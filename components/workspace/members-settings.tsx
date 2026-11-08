@@ -406,7 +406,7 @@ export function MembersSettings({
             )}
             {/* Fixed columns: the email cell truncates so role and actions always stay on screen. A phone has no email
                 column: the email goes under the name, so role and the menu fit (UI audit gap-06). */}
-            <Table className="table-fixed md:min-w-xl">
+            <Table className="md:min-w-xl md:table-fixed">
               <TableHeader>
                 <TableRow className="border-0 hover:bg-transparent">
                   <TableHead className="md:w-[38%]">
@@ -455,7 +455,8 @@ export function MembersSettings({
                         </TableRow>
                         {group.members.map((member) => (
                           <TableRow key={member.userId} className="border-0">
-                            <TableCell className="py-4">
+                            {/* On a phone the table lays out by content; this cell takes what is left and truncates. */}
+                            <TableCell className="py-4 max-md:w-full max-md:max-w-0">
                               <div className="flex items-center gap-3">
                                 <UserAvatar user={member} size="md" />
                                 <div className="flex min-w-0 flex-col">
@@ -575,7 +576,7 @@ export function MembersSettings({
                     </TableRow>
                     {visibleInvitations.map((invite) => (
                       <TableRow key={invite.id} className="border-0">
-                        <TableCell className="py-4">
+                        <TableCell className="py-4 max-md:w-full max-md:max-w-0">
                           <div className="flex items-center gap-3">
                             <UserAvatar user={invite} size="md" />
                             <div className="flex min-w-0 flex-col gap-0.5">
