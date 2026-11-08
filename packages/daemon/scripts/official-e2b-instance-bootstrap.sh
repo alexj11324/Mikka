@@ -79,7 +79,7 @@ ln -s node-v24.19.0-linux-x64 /opt/mikka/runtime/node
 export PATH=/opt/mikka/runtime/node/bin:$PATH
 mkdir -p /opt/mikka/runtime/bootstrap-home /opt/mikka/runtime/harness-bin
 mikka_phase_done node
-curl -fsSL --retry 3 --connect-timeout 20 --max-time 120 https://github.com/cli/cli/releases/download/v2.83.2/gh_2.83.2_linux_amd64.tar.gz -o /opt/mikka/archives/gh_2.83.2_linux_amd64.tar.gz
+curl -fsSL --retry 3 --connect-timeout 20 --max-time 120 --header 'Accept: application/octet-stream' https://api.github.com/repos/cli/cli/releases/assets/326964816 -o /opt/mikka/archives/gh_2.83.2_linux_amd64.tar.gz
 echo 'ca6e7641214fbd0e21429cec4b64a7ba626fd946d8f9d6d191467545b092015e  /opt/mikka/archives/gh_2.83.2_linux_amd64.tar.gz' | sha256sum --check --strict
 tar -xzf /opt/mikka/archives/gh_2.83.2_linux_amd64.tar.gz -C /opt/mikka/runtime
 ln -s /opt/mikka/runtime/gh_2.83.2_linux_amd64/bin/gh /opt/mikka/runtime/harness-bin/gh
@@ -168,7 +168,7 @@ if [[ "$mikka_kind" = desktop ]]; then
   cp scripts/e2b/start-desktop.sh scripts/e2b/viewer-gateway.py scripts/e2b/lease-driver.py /opt/mikka/computer/
   cp /home/user/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-desktop.xml /opt/mikka/computer/desktop-config/xfce4/xfconf/xfce-perchannel-xml/
   cp /home/user/.config/autostart/screensaver.desktop /opt/mikka/computer/desktop-config/autostart/
-  curl -fsSL --retry 3 --connect-timeout 20 --max-time 120 https://github.com/trycua/cua/releases/download/cua-driver-rs-v0.38.0/cua-driver-rs-0.38.0-linux-x86_64-binary.tar.gz -o /opt/mikka/archives/cua-driver.tar.gz
+  curl -fsSL --retry 3 --connect-timeout 20 --max-time 120 --header 'Accept: application/octet-stream' https://api.github.com/repos/trycua/cua/releases/assets/661455608 -o /opt/mikka/archives/cua-driver.tar.gz
   echo '31ab9709dd91ce73677e49b9f3e75c6f0d3e4d9625c286c9e58262bfbea698dd  /opt/mikka/archives/cua-driver.tar.gz' | sha256sum --check --strict
   tar -xzf /opt/mikka/archives/cua-driver.tar.gz -C /opt/mikka/computer
   chmod 0755 /opt/mikka/computer/start-desktop.sh /opt/mikka/computer/lease-driver.py
