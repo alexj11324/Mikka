@@ -1,0 +1,97 @@
+name: Self-hosted real cloud binding closeout
+on:
+  push:
+    branches: [ops/self-hosted-closeout-20261108]
+permissions:
+  contents: read
+concurrency:
+  group: production-smoke-owner-acceptance
+  cancel-in-progress: false
+  queue: max
+jobs:
+  binding:
+    if: github.repository == 'alexj11324/Mikka' && github.actor == 'alexj11324' && github.ref == 'refs/heads/ops/self-hosted-closeout-20261108'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/pnpm-install
+      - name: Verify source guards before all production credentials
+        run: |
+          node --test scripts/ops/self-hosted-closeout.test.mjs
+          node scripts/ops/self-hosted-closeout.mjs --check
+      - name: Prepare exact published image and disposable browser infrastructure
+        run: |
+          docker pull ghcr.io/alexj11324/mikka:3c32675c99d32f9c84a9b5e4bc48e59231baa4d8
+          docker pull postgres:17-alpine
+          docker pull axllent/mailpit:v1.27.4
+          pnpm exec playwright install --with-deps chromium
+          curl --fail --silent --show-error --location --max-time 60 https://github.com/cloudflare/cloudflared/releases/download/2026.10.7/cloudflared-linux-amd64 --output "$RUNNER_TEMP/cloudflared"
+          node --input-type=module <<'JS'
+          import { readFileSync, chmodSync } from 'node:fs'
+          import { createHash } from 'node:crypto'
+          import assert from 'node:assert/strict'
+          const path = process.env.RUNNER_TEMP + '/cloudflared'
+          assert.equal(createHash('sha256').update(readFileSync(path)).digest('hex'), '1f99fb518b83dec2ba8d870a7cc991d82a77e6196295a3d2754ba17ab9f91872')
+          chmodSync(path, 0o700)
+          JS
+      - name: Read existing deployment metadata credential only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: VERCEL_TEAM_TOKEN
+          recursive: false
+          include-imports: false
+      - name: Verify exact private deployment before shared-account credentials
+        run: node scripts/ops/self-hosted-closeout.mjs --private-check
+      - name: Read normal shared-account email
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_EMAIL
+          recursive: false
+          include-imports: false
+      - name: Read normal shared-account password
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_PASSWORD
+          recursive: false
+          include-imports: false
+      - name: Exercise real email login, consent, binding, management and revocation
+        timeout-minutes: 15
+        run: node --import tsx scripts/ops/self-hosted-closeout.mjs
+      - name: Upload only closed receipt and masked actual screenshots
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: self-hosted-cloud-binding-${{ github.run_id }}
+          path: |
+            .artifacts/self-hosted-closeout/report.json
+            .artifacts/self-hosted-closeout/*.png
+          if-no-files-found: warn
+          retention-days: 14

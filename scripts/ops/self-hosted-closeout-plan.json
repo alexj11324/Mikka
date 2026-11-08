@@ -1,0 +1,12 @@
+{
+  "repository": "alexj11324/Mikka",
+  "branch": "ops/self-hosted-closeout-20261108",
+  "source": "3c32675c99d32f9c84a9b5e4bc48e59231baa4d8",
+  "ciRun": 42439132838,
+  "imageRun": 42439132757,
+  "publicOrigin": "https://app.aspectlylabs.com",
+  "cloudDeployment": "dpl_92sdpZWCdDp6rkYNjZyNXkDgeLp5",
+  "cloudSource": "d6f0ece2237904e7b5f23cf92a9d6492e123e6c2",
+  "cloudProject": "prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc",
+  "vercelTeam": "team_C7lwxVVvnUicFli6112mvxpv"
+}
