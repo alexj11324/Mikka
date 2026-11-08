@@ -71,8 +71,7 @@ export function AuditLogSettings({ workspaceId }: { workspaceId: string }) {
         <ToggleGroupItem value="security">{t('filters.security')}</ToggleGroupItem>
       </ToggleGroup>
       {/* Nothing to export while the log is empty. */}
-      {empty ? <Button variant="secondary" size="sm" disabled><Download data-icon="inline-start" />{t('exportCsv')}</Button>
-        : <Button variant="secondary" size="sm" nativeButton={false} role="link" render={<a href={exportHref} download />}><Download data-icon="inline-start" />{t('exportCsv')}</Button>}
+      {!empty && <Button variant="secondary" size="sm" nativeButton={false} role="link" render={<a href={exportHref} download />}><Download data-icon="inline-start" />{t('exportCsv')}</Button>}
     </div>
     {pages.isLoading && <SettingsLoading label={t('loading')} rows={3} />}
     {(pages.error || failure) && <FieldError className="px-1">{actionError(failure?.error)}</FieldError>}
