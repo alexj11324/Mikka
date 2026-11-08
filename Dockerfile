@@ -20,11 +20,13 @@ RUN pnpm generate:agent-ui && pnpm build:app
 
 FROM node:24-bookworm-slim AS runtime
 ARG MIKKA_BUILD_REVISION
+ARG MIKKA_BUILD_WORKER_SHA
 LABEL org.opencontainers.image.source="https://github.com/alexj11324/Mikka" \
       org.opencontainers.image.licenses="AGPL-3.0-only" \
       org.opencontainers.image.revision="${MIKKA_BUILD_REVISION}"
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000 MIKKA_DATA_DIR=/data \
     WORKFLOW_TARGET_WORLD=local WORKFLOW_LOCAL_DATA_DIR=/data/workflow \
+    MIKKA_CLOUD_WORKER_SOURCE_COMMIT=${MIKKA_BUILD_REVISION} MIKKA_CLOUD_WORKER_SHA=${MIKKA_BUILD_WORKER_SHA} \
     MIKKA_BYOS_WORKER_BINARY=/app/packages/subscription-worker/bin/mikka-subscription-worker \
     MIKKA_BYOS_ENROLLMENT_BINARY=/app/packages/subscription-worker/bin/mikka-subscription-enrollment
 WORKDIR /app

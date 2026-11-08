@@ -375,3 +375,31 @@ full Factory completion is unproven. Codex GPT-6 Luna fails before the native
 question with lifecycle_pre_question_marker_missing. Both owned VMs were
 confirmed missing and sessions/workspace restored. The overall run remains
 failed and #1593 remains incomplete.
+
+## Standalone runtime follow-up
+
+Real vault run42451795617 and the structurally observed run42452282465 use
+the f132 image above. Normal verified email, local-KMS envelope storage,
+password-free listings and plaintext-free logs pass. Automatic fill times out;
+the second run proves four pre-target runtime failures, no credential access
+event and zero visits to the owned login site. Both runs confirm their own
+E2B VM missing and all nine cleanup dimensions pass. They do not prove autofill.
+
+The original desktop fallback calls bootstrapOfficialInstance, which requires
+an exact public source commit and worker digest. The standalone image omitted
+both values. The image build now derives the digest with the existing worker
+hash implementation and embeds both public pins for its exact revision. The
+offline actual-image check refuses a missing/mismatched source pin or missing
+digest. No provider key or identity is embedded, and the additive installer's
+source/digest validation remains unchanged. Real continuation is in progress
+with explicitly configured pins, separately labeled from an out-of-box image
+pass. Final image CI and the resulting runtime remain verification gates.
+
+After main9e's migration20261108120000 merged first, source CI correctly
+refused this PR's older pending migration number. A read-only production
+journal query confirms neither the old nor new enabled-model migration was
+applied. The same SQL is renamed to20261108120001 under the repository's
+merge-order rule; all open PR migration names were checked for collision.
+The complete source lint,55 migration regressions and the renamed actual-PG17
+enabled-model suite pass. Historical migration SQL and applied receipts are
+unchanged.
