@@ -744,3 +744,21 @@ self-hosted-image CI job 中，服务验收后、安装源码依赖前清理中�
 本方正常合入该完整提交；除这项 workflow 和本条证据文档外，相对 e7c 的所有 Git
 blob 完全一致，worker 指纹保持 5343beb。既有本地验证仍绑定原源，不追认为新
 head CI；新远端精确 CI 和真实生产门槛继续分别等待实际结果。
+
+## 2026-11-08：完整上游合流与 Git 分段收据（生产待验）
+
+本轮继续保留完整上游历史：#1688 的 `ec332cb34678e6638931e9b4ad1e9f893b3b303c` 已包含 #1705 的 `cf456f02c643d4e6074ccd7db2f7cee5b32e4f4c`、两处协调器修正和凭据清单分页修正；随后正常合入实际 main `263e7ea37013bd22aa197799a26f1d2e0d1abbf1`。本地产品源 `8870fbf4f97b415386a1b150f2df934f04f269e5` 与合入 main 后的 `ec1dc7dd9cf061f6a90fea372a32641b2db9a93b` 均为 tree `9b6fbdc4238cfc79ea492deda048d04b9c147211`，后一步没有改变任何文件。AGENTS.md 和 CONTRIBUTING.md 未改。本节及配套 [完整源码与 Git 计时证据](../research/2026-11-08-e2b-complete-source-and-git-timing.json) 是发布前验证记录，不能代替新远端候选的 CI 或生产成绩。
+
+证据分别绑定实际执行源：旧远端 `06307cb8` 的 13 个工作流全部成功，50 项检查为 39 成功、11 条件跳过；实际 checkout 为 `c51b48c5`，不把后来同树的合成 ref 冒记为已执行。中间 `aac23ec2` 通过 115 项及三组类型检查，worker 为 `d0f47bcc`。Git 收据后继 `41219130` 实际构建 worker `915cd92e81e56388d8bb2ff19abc919b85ae80e7`，两入口、9 个资源、16 个夹具、12 项语法和 daemon 类型检查通过。最终产品合流 `8870fbf4` 实际通过启动/Web **116/116** 及 app/API 类型检查；其 canonical WORKER_PATHS 与 RECIPE_PATHS 共 **470 个 mode/type/blob/path 对象**逐字等于 `41219130`，官方 fingerprint 命令也实算为同一 `915cd92e…`。构建证明通过明确的输入守恒继承，没有虚报在新 head 重跑构建。开发 Node 24.22.1 与官方模板 Node 24.19.0 的差异仍由发布门槛覆盖。
+
+Git 明细的原缺口已具体定位：`aac23` 的五类 Git 操作仅发 OTel span，正式 raw 没有收据。新增 `RepositoryGitTiming v1` 只在既有诊断 opt-in 中创建，沿原 `data-run-stage(repository)` **同一条事件**返回，不增加事件、SQL、行、HTTP 调用或定时轮询。普通关闭状态连新字段也不出现；原成功/失败事件和 `reportAfter` 授权屏障保持。observer 或计时记录失败不覆盖原 Git 结果或原错误。
+
+收据只包含 run hash、harness、闭式来源/时钟、数值区间、outcome 与截断标记，标签固定为 clone、fetch、remote_head、remote_refs、local；不采集命令、路径、URL、环境或凭据。最多 32 条、收据值最多 8192 B；包含字段封装后，诊断开启时 stage 的 JSON 最多增加 **8212 B**。一个固定示例由 74 B 增为 423 B。这是非零的 UTF-8 JSON 载荷增量，不是完整 HTTP/TLS wire 测量；普通 Task 的默认载荷保持原状。
+
+偏移只使用该次 `prepareRunRepository` 的独立单调时钟原点。覆盖范围是 `RepositoryCache.update` 的已有 Git wrapper；seed、push、baseRef 等其它动作没有被补成已测 Git 子阶段。总时长可能包含凭据或锁等待；区间重叠按区间并集描述，不与 repository 父阶段相加，不拿服务器 `storedAt` 推算 daemon 起点。driver 严格校验闭式键、标签、身份、数值和上限。重复有效收据继续保留第一份，状态取实际保留数据的截断标记，invalid 保持黏性；原 `8df3` 中重复状态不一致的发现和真实 RED 已保留，由 `412191` 修复。
+
+这次只增加可选诊断。原 dispatch 到 ACK 公式、39 阶段、版本 pin、真实 native/tool/post-tool 证明与清理门槛保持。reader 内联在原 driver，未增加 import。正式 workflow 仍 checkout 完整的准确来源；四项核心 source inventory 不是可脱离仓库运行的四文件包。七项 producer provenance 中只有预期的 driver 变化，canonical report producers 和原验收器不变。
+
+上游预算也明确区分：有效订阅省掉无关 hosted-policy SELECT 是上游修正，Promise 只在单次 resolver 中复用；有效显式 API key 原本已在该读取前返回，不重复记减读。Coordinator 无名或歧义仓库发现仍可每次读取使用标记，完整授权列表也可能大于旧 50 条；不能假定模型绝不额外发现仓库。凭据清单分页会增加该列表操作的行和字节，带 cursor 的空页可能再读一次；它没有被这九文件 delta 接入 dispatch/ensure/claim 路径。本方完整正常 Task 的数据库预算以相同完整上游源和实际调用路径比较，不借这些条件性节省或未来任务抵扣。
+
+官方模板仍只增不删，Mikka 文件仍在 /opt/mikka；CLI 文件校验和守恒、真实订阅采用、fresh claim/revoke/最终 fence 均保持发布门槛。原六例正式批次仍为 FAIL，原始报告、13/14 pins 及第 4 例执行/工具后证明缺口不改写。新的远端精确 CI、实际模板与双订阅 bootstrap adoption、配套 READY 部署和同一实际元组六次 ≤5 秒结果尚待取得。达到完整生产验收后才关闭 #1505。

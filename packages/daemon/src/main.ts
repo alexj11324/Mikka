@@ -555,8 +555,8 @@ export class Daemon {
           }
         : undefined,
       repository: assignment => this.repository(assignment),
-      prepareRepository: (assignment, signal, githubEnvironment, policyReady) => prepareRunRepository(this.repositories,
-        runPaths(this.paths.adapterState, assignment.runId).privateDir, assignment, signal, githubEnvironment, policyReady, this.options.collectCliTiming),
+      prepareRepository: (assignment, signal, githubEnvironment, policyReady, onRepositoryTiming) => prepareRunRepository(this.repositories,
+        runPaths(this.paths.adapterState, assignment.runId).privateDir, assignment, signal, githubEnvironment, policyReady, this.options.collectCliTiming, onRepositoryTiming),
       baseRef: assignment => assignment.remoteUrl
         ? this.repositories.baseRef(assignment.remoteUrl, assignment.baseBranch)
         : Promise.resolve(assignment.baseBranch ?? 'HEAD'),

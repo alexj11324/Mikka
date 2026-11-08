@@ -376,6 +376,18 @@ function readStartupTiming(value, record, names = STARTUP_PHASES) {
     ms: value.ms, outcome: value.outcome, phases, truncated: value.truncated }
 }
 
+
+const REPOSITORY_GIT_PHASES = new Set(['clone', 'fetch', 'remote_head', 'remote_refs', 'local'].map(name => `daemon.repository.git.${name}`))
+function readRepositoryTiming(value, record) {
+  if (value?.source !== 'prepare_run_repository' || value.clock !== 'repository_prepare_monotonic'
+    || Object.keys(value).sort().join(',') !== 'clock,endedAt,harness,ms,outcome,phases,runIdHash,source,startedAt,truncated,version'
+    || !Array.isArray(value.phases) || value.phases.length > 32
+    || value.phases.some(phase => !phase || Object.keys(phase).sort().join(',') !== 'endMs,ms,name,outcome,startMs')) return null
+  const timing = readStartupTiming(value, record, REPOSITORY_GIT_PHASES)
+  if (!timing || Buffer.byteLength(JSON.stringify(value)) > 8192) return null
+  return { ...timing, source: value.source, clock: value.clock }
+}
+
 function readPreparationTiming(value, record, stage) {
   if (!['prepared_agent_start', 'bootstrap_claude_start', 'bootstrap_codex_initialize'].includes(value?.source) ||
     value.harness !== (value.source === 'bootstrap_codex_initialize' ? 'codex' : 'claude_code') || !stage) return null
@@ -456,6 +468,11 @@ export function observeChunks(record, detail, observedAt) {
       if (['repository', 'worktree', 'agent_start'].includes(data?.stage) && Number.isFinite(data.ms) && typeof data.ok === 'boolean') {
         if (!stages.some(stage => stage.stage === data.stage)) stages.push({ stage: data.stage, ms: data.ms, ok: data.ok,
           ...(Number.isFinite(at) ? { storedAt: iso(at) } : {}) })
+        if (data.stage === 'repository' && data.repositoryTiming !== undefined) {
+          const timing = readRepositoryTiming(data.repositoryTiming, record)
+          if (timing) record.daemonRepositoryTiming ??= timing
+          record.repositoryTimingStatus = record.repositoryTimingStatus === 'invalid' || !timing ? 'invalid' : record.daemonRepositoryTiming.truncated ? 'truncated' : 'complete'
+        }
         if (data.stage === 'agent_start') {
           const timing = readStartupTiming(data.startupTiming, record)
           if (timing) record.daemonStartupTiming ??= timing

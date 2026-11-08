@@ -78,7 +78,7 @@ before(async () => {
 beforeEach(() => {
   configured = true; refreshFails = false; refreshUnconfirmed = false; events.length = 0
   changeFails = null; rereadFails = false; savedAutoRouting = true; changes.length = 0; liveKeys.length = 0
-  data = { location: 'cloud', customized: true, autoModelRouting: true, preferredHarness: 'claude_code', credentials: 1, entries: [], candidates: [], devices: 0, cloudReady: true, cloudModels: {}, places: { cloud: 'ready', devices: [] }, first: { kind: 'cloud' }, readyDeviceIds: [], deviceModels: {} }
+  data = { location: 'cloud', customized: true, autoModelRouting: true, preferredHarness: 'claude_code', credentials: 1, entries: [], candidates: [], devices: 0, cloudReady: true, cloudModels: {}, places: { cloud: 'ready', devices: [] }, first: { kind: 'cloud' }, readyDeviceIds: [] }
   container = browser.document.createElement('div') as unknown as HTMLDivElement
   document.body.append(container)
   root = createRoot(container)

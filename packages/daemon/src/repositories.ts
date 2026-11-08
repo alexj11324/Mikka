@@ -7,10 +7,11 @@ import lockfile from 'proper-lockfile'
 import { daemonTestMode, normalizeRepository } from '@mikka/protocol/repository'
 import type { Harness } from '@mikka/protocol'
 import { daemonTracer } from './tracing'
+import type { RepositoryGitTimer } from './repository-git-timing'
 import { assertBranchName } from './agents/publish'
 import { FETCH_GIT, FETCH_TIMEOUT_MS, isInside, withRepoConfig } from './worktrees'
 
-type RepositoryDiagnostics = { runIdHash: string; harness: Harness }
+type RepositoryDiagnostics = { runIdHash: string; harness: Harness; timer?: RepositoryGitTimer }
 
 /** git's empty tree: an initial commit with no files. */
 const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
@@ -62,8 +63,9 @@ export class RepositoryCache {
       const phase = args[0] === 'clone' ? 'clone' : args[0] === 'fetch' ? 'fetch'
         : args[0] === 'remote' && args[1] === 'set-head' ? 'remote_head'
         : args[0] === 'ls-remote' ? 'remote_refs' : 'local'
-      return daemonTracer.span(`daemon.repository.git.${phase}`,
+      const traced = () => daemonTracer.span(`daemon.repository.git.${phase}`,
         { 'mikka.run.id_hash': diagnostics.runIdHash, 'mikka.harness': diagnostics.harness }, execute)
+      return diagnostics.timer ? diagnostics.timer.measure(phase, traced) : traced()
     }
     let cloned = false
     if (!existsSync(path)) {

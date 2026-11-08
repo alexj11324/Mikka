@@ -1,3 +1,4 @@
+import type { RepositoryGitTiming, RepositoryTimingObserver } from '../repository-git-timing'
 import { captureRunFailure, failureFrom, type RunFailure } from "@mikka/protocol/run-failure"
 import { DAEMON_VERSION } from "../paths"
 import { runCriterion, reviewVerdict } from "@mikka/protocol/run"
@@ -147,7 +148,7 @@ export interface SupervisorDeps {
   repository: (assignment: RunAssignment) => DeviceRepo
   /** A fresh hosted claim may overlap remote reads with policyReady. Any
    * empty-repository creation/push must await that same authorization. */
-  prepareRepository: (assignment: RunAssignment, signal: AbortSignal, githubEnvironment?: Record<string, string>, policyReady?: Promise<unknown>) => Promise<void>
+  prepareRepository: (assignment: RunAssignment, signal: AbortSignal, githubEnvironment?: Record<string, string>, policyReady?: Promise<unknown>, onRepositoryTiming?: RepositoryTimingObserver) => Promise<void>
   baseRef: (assignment: RunAssignment) => Promise<string>
   log: Logger
   /** Uploads what the run's agent queued with `submit_capture` (`captures.ts`). */
@@ -1084,28 +1085,32 @@ export class RunSupervisor {
    * shows which stage it reached. The stage's own result or error passes
    * through unchanged.
    */
-  private async stage<T>(runId: string, stage: RunStage, work: () => Promise<T>, reportAfter?: Promise<unknown>, prepared?: PreparedAgentStart): Promise<T> {
+  private async stage<T>(runId: string, stage: RunStage, work: (onRepositoryTiming?: RepositoryTimingObserver) => Promise<T>, reportAfter?: Promise<unknown>, prepared?: PreparedAgentStart): Promise<T> {
     const started = performance.now()
     const attributes = { "mikka.run.id_hash": runIdHash(runId), "mikka.harness": this.deps.journal.get(runId)?.assignment.harness }
     let startupTiming: DaemonStartupTiming | undefined
+    let repositoryTiming: RepositoryGitTiming | undefined
+    const onRepositoryTiming: RepositoryTimingObserver | undefined = stage === 'repository' && this.active.get(runId)?.runtimeTiming
+      ? timing => { if (timing.runIdHash === attributes['mikka.run.id_hash'] && timing.harness === attributes['mikka.harness']) repositoryTiming = timing }
+      : undefined
     const preparationTiming = () => {
       const timing = this.active.get(runId)?.runtimeTiming && prepared?.preparationTiming
       return timing?.runIdHash === attributes['mikka.run.id_hash'] && timing.harness === attributes['mikka.harness'] ? timing : undefined
     }
     try {
-      const value = await daemonTracer.span(stage === "agent_start" ? "daemon.adapter.start" : `daemon.run.${stage}`, attributes, () => work(),
+      const value = await daemonTracer.span(stage === "agent_start" ? "daemon.adapter.start" : `daemon.run.${stage}`, attributes, () => work(onRepositoryTiming),
         this.active.get(runId)?.runtimeTiming ? { onStartupTiming: timing => { startupTiming = timing } } : undefined)
       const elapsed = performance.now() - started
       // Repository reads can finish before policy. Preserve their actual
       // duration, but produce no speculative stage/user message before it.
       if (reportAfter) await reportAfter
       if (stage === "agent_start") this.active.get(runId)?.runtimeTiming?.executing()
-      this.emit(runId, runStageChunk(stage, elapsed, true, startupTiming, preparationTiming()))
+      this.emit(runId, runStageChunk(stage, elapsed, true, startupTiming, preparationTiming(), repositoryTiming))
       return value
     } catch (error) {
       const elapsed = performance.now() - started
       if (reportAfter) await reportAfter
-      this.emit(runId, runStageChunk(stage, elapsed, false, startupTiming, preparationTiming()))
+      this.emit(runId, runStageChunk(stage, elapsed, false, startupTiming, preparationTiming(), repositoryTiming))
       throw error
     }
   }
@@ -1475,7 +1480,7 @@ export class RunSupervisor {
       const entryReady = new Promise<void>((resolve, reject) => { allowEffects = resolve; refuseEffects = reject })
       const authorized = Promise.all([policyReady, entryReady])
       void authorized.catch(() => undefined)
-      const done = this.stage(runId, 'repository', () => this.deps.prepareRepository(assignment, preparationSignal, undefined, authorized), authorized)
+      const done = this.stage(runId, 'repository', observer => this.deps.prepareRepository(assignment, preparationSignal, undefined, authorized, observer), authorized)
       run.repositoryPreparing = { abort: readAbort, done, allowEffects, refuseEffects }
       // Preserve the original rejection for the join without an unhandled
       // rejection while the independent policy transport is still pending.
@@ -1623,7 +1628,7 @@ export class RunSupervisor {
       if (!this.stopping) this.finish(runId, run.forcedStop ?? 'cancelled')
       return
     }
-    await (run.repositoryPreparing?.done ?? this.stage(runId, "repository", () => this.deps.prepareRepository(assignment, preparationSignal, run.github?.env)))
+    await (run.repositoryPreparing?.done ?? this.stage(runId, "repository", observer => this.deps.prepareRepository(assignment, preparationSignal, run.github?.env, undefined, observer)))
     if (this.stopping || run.cancelRequested) {
       if (!this.stopping) this.finish(runId, run.forcedStop ?? "cancelled")
       return

@@ -1434,3 +1434,56 @@ test('candidate bootstrap refuses provenance failure and retains normal cleanup 
   assert.ok(io.samples[0].cancelled && io.samples[0].deleted)
   assert.doesNotMatch(JSON.stringify(failed), /PRIVATE_BOOTSTRAP_SECRET/)
 })
+
+test('repository Git receipt stays independent and closed', () => {
+  const record = { runIdHash: 'a'.repeat(16), harness: 'claude_code' }
+  const receipt = { version: 1, source: 'prepare_run_repository', clock: 'repository_prepare_monotonic',
+    runIdHash: record.runIdHash, harness: record.harness, startedAt: epoch, endedAt: epoch + 50,
+    ms: 50, outcome: 'ok', truncated: false,
+    phases: [{ name: 'daemon.repository.git.clone', startMs: 2, endMs: 42, ms: 40, outcome: 'ok' }] }
+  const item = stage('repository', 100)
+  item.chunk.data.repositoryTiming = receipt
+  observeChunks(record, { chunks: [item] }, epoch + 100)
+  assert.deepEqual(record.daemonRepositoryTiming, receipt)
+  assert.equal(record.repositoryTimingStatus, 'complete')
+  assert.equal(record.agentStart, undefined)
+  // First valid receipt wins; duplicate status must describe that same object.
+  for (const [firstTruncated, secondTruncated] of [[true, false], [false, true], [true, true], [false, false]]) {
+    const next = { runIdHash: record.runIdHash, harness: record.harness }
+    const first = { ...receipt, truncated: firstTruncated }
+    const second = { ...receipt, truncated: secondTruncated }
+    const event = timing => ({ ...item, chunk: { type: 'data-run-stage', data: { ...item.chunk.data, repositoryTiming: timing } } })
+    observeChunks(next, { chunks: [event(first)] }, epoch + 100)
+    observeChunks(next, { chunks: [event(second)] }, epoch + 101)
+    assert.deepEqual(next.daemonRepositoryTiming, first)
+    assert.equal(next.repositoryTimingStatus, firstTruncated ? 'truncated' : 'complete')
+  }
+  const afterInvalid = { runIdHash: record.runIdHash, harness: record.harness }
+  const invalidEvent = { ...item, chunk: { type: 'data-run-stage', data: { ...item.chunk.data,
+    repositoryTiming: { ...receipt, runIdHash: 'b'.repeat(16) } } } }
+  observeChunks(afterInvalid, { chunks: [invalidEvent] }, epoch + 100)
+  observeChunks(afterInvalid, { chunks: [item] }, epoch + 101)
+  assert.deepEqual(afterInvalid.daemonRepositoryTiming, receipt)
+  assert.equal(afterInvalid.repositoryTimingStatus, 'invalid')
+
+  for (const mutate of [
+    value => { value.runIdHash = 'b'.repeat(16) },
+    value => { value.harness = 'codex' },
+    value => { value.phases[0].name = 'PRIVATE_COMMAND' },
+    value => { value.phases[0].endMs = 51 },
+    value => { value.phases[0].startMs = -1 },
+    value => { value.phases[0].ms = NaN },
+    value => { value.phases = Array(33).fill(value.phases[0]) },
+    value => { value.secret = 'PRIVATE_TOKEN' },
+  ]) {
+    const bad = structuredClone(receipt); mutate(bad)
+    const next = { runIdHash: record.runIdHash, harness: record.harness }
+    observeChunks(next, { chunks: [{ ...item, chunk: { type: 'data-run-stage', data: { ...item.chunk.data, repositoryTiming: bad } } }] }, epoch + 100)
+    assert.equal(next.repositoryTimingStatus, 'invalid')
+    assert.equal(next.daemonRepositoryTiming, undefined)
+  }
+  const ordinary = { runIdHash: record.runIdHash, harness: record.harness }
+  observeChunks(ordinary, { chunks: [stage('repository', 100)] }, epoch + 100)
+  assert.equal(Object.hasOwn(ordinary, 'daemonRepositoryTiming'), false)
+  assert.equal(Object.hasOwn(ordinary, 'repositoryTimingStatus'), false)
+})

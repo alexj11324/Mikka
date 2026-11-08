@@ -175,20 +175,25 @@ export function codexProviderFailure(error: unknown): ProviderFailure | undefine
   }
   const category = categories[info.category]
   const unspecified = ["unknown", "other", "rpc_refused"].includes(info.category)
-  if (!category && !unspecified) return undefined
+  const modelRefusal = info.category === "badRequest"
+  if (!category && !unspecified && !modelRefusal) return undefined
   const httpError = ["httpConnectionFailed", "responseStreamConnectionFailed", "responseStreamDisconnected", "responseTooManyFailedAttempts"].includes(info.category)
-  const diagnostic = (httpError || unspecified) && typeof value.message === "string" ? value.message : ""
+  const diagnostic = (httpError || unspecified || modelRefusal) && typeof value.message === "string" ? value.message : ""
   const bodyStart = diagnostic.indexOf("{")
   const bodyEnd = diagnostic.lastIndexOf("}")
   const prefixStatus = /^(?:stream disconnected before completion:\s*)?(?:unexpected status|HTTP status|API Error:)\s*([1-5]\d{2})\b/i.exec(diagnostic)?.[1]
   // Some official versions retain only this native API status prefix in the
   // terminal error. No arbitrary model/tool HTTP text is searched.
-  if (unspecified && !prefixStatus) return classifyProviderFailure(error)
-  return classifyProviderFailure({
+  if ((unspecified || modelRefusal) && !prefixStatus) {
+    const failure = classifyProviderFailure(error)
+    return modelRefusal && failure?.kind !== "model" ? undefined : failure
+  }
+  const failure = classifyProviderFailure({
     status: info.httpStatus ?? (prefixStatus ? Number(prefixStatus) : undefined),
     code: category,
     ...(bodyStart >= 0 && bodyEnd >= bodyStart ? { responseBody: diagnostic.slice(bodyStart, bodyEnd + 1) } : {}),
   })
+  return modelRefusal && failure?.kind !== "model" ? undefined : failure
 }
 
 /** Turn errors are a trusted CLI boundary; arbitrary messages elsewhere are not. */
