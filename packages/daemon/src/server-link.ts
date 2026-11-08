@@ -104,7 +104,7 @@ export interface ServerLink {
   /** Ids of queued runs pinned to this device. */
   pendingRuns(deviceId: string): Promise<string[]>
   /** Fails with `RunNotPinnedHereError` for runs pinned elsewhere. */
-  claimRun(deviceId: string, runId: string, signal?: AbortSignal): Promise<RunAssignment>
+  claimRun(deviceId: string, runId: string, signal?: AbortSignal, options?: { initialRepository: true }): Promise<RunAssignment>
   localComputerAuthority?(deviceId: string, runId: string): Promise<NonNullable<RunAssignment['localComputer']>>
   /** Receipted resumes require a current online source/access/lease fence. */
   validateSkillReceipt?(runId:string,receiptId:string):Promise<SkillReceiptRevalidation>
