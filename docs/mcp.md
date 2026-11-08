@@ -5,7 +5,10 @@ Agents such as Claude Code and Codex can drive Mikka through its MCP server at
 
 How to connect and the tool list for users are in the public docs:
 [aspectlylabs.com/mikka/docs/mcp](https://aspectlylabs.com/mikka/docs/mcp)
-(`mikka-web/content/docs/mcp.mdx`). This page covers the implementation.
+(maintained in the separate `mikka-web` repository). This page covers the
+implementation. The deployed API is served by the
+[Hono/Nitro runtime](operations/web-runtime.md), which reuses the handlers
+under `app/`.
 
 ## Tools
 
@@ -34,7 +37,7 @@ plugin, configured in `lib/auth.ts`, tables in `drizzle/0009_oauth_provider.sql`
   protected resource metadata (`/mikka/.well-known/oauth-protected-resource`).
 - The authorization server metadata is at
   `/mikka/.well-known/oauth-authorization-server`; the root paths RFC 8414 and
-  RFC 9728 expect redirect there (`next.config.mjs`).
+  RFC 9728 expect redirect there (`apps/api/runtime/http-policy.mjs`).
 - Clients register themselves (dynamic client registration) and use PKCE.
 - Sign-in goes through `/sign-in`, which sends the person back to the
   authorize request (`oauthResumePath` in `lib/auth-return.ts`), then the
@@ -70,11 +73,14 @@ run and its issue, and the author shown is the agent's name.
 
 - Limits: title 200 characters, Markdown 1 MB, HTML 2 MB (`lib/artifacts/limits.ts`).
   HTML must be one file: scripts and styles inline, images as `data:` URLs.
-- Files go to Cloudflare R2 (bucket `mikka-artifacts`, keys
+- Files use the configured S3-compatible bucket, including Cloudflare R2
+  (default R2 bucket `mikka-artifacts`, keys
   `<userId>/<artifactId>/v<n>-<sha>.<ext>`); versions and share tokens live in
-  Neon (`artifacts`, `artifact_versions`, `artifact_shares`). Without R2 keys
-  (`R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`), development
-  and previews keep the file in the row; production refuses.
+  PostgreSQL (`artifacts`, `artifact_versions`, `artifact_shares`).
+  `lib/artifacts/storage.ts` prefers a configured S3-compatible bucket, then
+  R2. Without a bucket, community deployments and non-production cloud
+  environments keep the file in the row. Cloud Vercel production refuses.
+  See [self-hosted storage configuration](self-hosting-byok.md#文件与-s3-兼容存储).
 - Markdown is rendered in the app with react-markdown (raw HTML stays text).
   HTML is served from `/api/artifacts/<id>/versions/<n>/frame` under a CSP
   `sandbox allow-scripts allow-popups` with `connect-src 'none'`, and shown in
@@ -103,15 +109,18 @@ issue and its Bot, and only the run's owner reads it (R-62).
   key. A bucket lifecycle rule for that prefix is needed to expire staging
   objects recreated with a still-valid signed URL. Share links live in
   `run_capture_shares` (hashed `mkc_…` tokens, revocable, as
-  artifact shares). Without R2 keys the file stays in the row (previews,
-  tests; uploads there are capped at 4 MB); production refuses.
+  artifact shares). The shared S3/R2 configuration also serves captures.
+  Without a bucket, community deployments and non-production cloud
+  environments keep the file in the row, with uploads capped at 4 MB. Cloud
+  Vercel production refuses.
 - Reads: `GET /api/runs/:runId/evidence` lists a run's captures and the
   documents it handed over; `GET /api/captures/:id` serves one (byte ranges
   for video); `GET /api/captures/shared/:token` serves a shared one. Media is
   served with `nosniff` and a `sandbox` CSP.
 
-Two ways in, both through the daemon, since a run's agent has no server
-credential (cloud threads also have no network):
+Two capture paths use the daemon or the run-bound computer service. Native
+Claude Code/Codex and GitHub requests use the machine's ordinary network and
+selected credentials, as [orchestration](design/orchestration.md) defines.
 
 | Where the thread runs | Tools | Path |
 | --- | --- | --- |
