@@ -20,6 +20,7 @@ jobs:
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       CLOSEOUT_PROTOCOL_PROBE: '1'
+      CLOSEOUT_MODELS: '1'
       GITHUB_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262

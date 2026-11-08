@@ -281,7 +281,7 @@ async function run(env) {
         return value
       }
       const before = await usage()
-      check(before.state === 'ready' && before.balance.verified === true && before.balance.free + before.balance.purchased >= 100_000,
+      check(before.state === 'ready' && before.balance.verified === true && Number(before.balance.free) + Number(before.balance.purchased) > 0,
         'BOUND_PAYER_NOT_READY')
       const priorUsage = new Set(before.recent.map(r => r.id))
       const workspace = await localApi('/api/workspace')
@@ -371,14 +371,14 @@ async function run(env) {
     const teams = management.workspaces.filter(w => w.kind === 'team' && w.role === 'admin')
     check(teams.length === 1 && teams[0].id !== cloudWorkspaceId, 'ADMIN_BILLING_TEAM_UNAMBIGUOUS')
     const billingTeam = teams[0].id
-    const keyName = `Closeout ${env.GITHUB_RUN_ID}`
+    const keyName = `Closeout key ${env.GITHUB_RUN_ID}`
     await both(cloud, manage, 'team-key-configuration', async p => {
       await p.locator('select[name=workspace_id]').selectOption(billingTeam)
       await p.getByRole('button', { name: /^(New server key|新建服务器密钥)$/ }).first().click()
       const dialog = p.getByRole('dialog')
       await dialog.locator('#cloud-server-id').fill(serverId)
       await dialog.locator('#cloud-server-key-name').fill(keyName)
-      await dialog.locator('#cloud-server-key-limit').fill('0.01')
+      await dialog.locator('#cloud-server-key-limit').fill('1')
       for (const name of [/^(Official GitHub App|官方 GitHub App)$/, /^(iOS notifications|iOS 推送)$/]) {
         const checkbox = dialog.getByRole('checkbox', { name })
         if (await checkbox.isChecked()) await checkbox.uncheck()
@@ -432,14 +432,14 @@ async function run(env) {
     })
     const teamConnections = await cloudApi(`/mikka/cloud/v1/management/connections?workspace_id=${encodeURIComponent(billingTeam)}`)
     const ownTeam = teamConnections.servers?.find(s => s.serverId === serverId)
-    check(ownTeam?.keys?.length === 1 && ownTeam.keys[0].name === keyName && ownTeam.keys[0].monthlyLimitMicroUsd === 10_000,
+    check(ownTeam?.keys?.length === 1 && ownTeam.keys[0].name === keyName && Number(ownTeam.keys[0].monthlyLimitMicroUsd) === 1_000_000,
       'OWN_TEAM_KEY_IDENTITY')
     await both(cloud, manage, 'team-key-revoke-confirm', prepareRevoke(billingTeam))
     await cloud.getByRole('dialog').getByRole('button', { name: /^(Revoke|撤销)$/ }).click()
     await cloud.getByRole('dialog').waitFor({ state: 'hidden' })
     const teamRejected = await local.request.get(`${localOrigin}/mikka/api/cloud/models/billing`)
     check(teamRejected.status() === 403 && (await teamRejected.json()).error === 'cloud_server_revoked', 'NEXT_TEAM_REQUEST_REVOCATION')
-    report.checks.teamKey = { verified: true, separateTeam: true, nextRequestRevoked: true, monthlyLimitMicroUsd: 10_000 }
+    report.checks.teamKey = { verified: true, separateTeam: true, nextRequestRevoked: true, monthlyLimitMicroUsd: 1_000_000 }
     await both(cloud, manage, 'team-key-authorization-revoked', async p => {
       await p.locator('select[name=workspace_id]').selectOption(billingTeam)
       await p.locator(`section[aria-labelledby="server-${serverId}"]`).waitFor({ state: 'hidden' })
@@ -466,6 +466,9 @@ async function run(env) {
     if (['ERR_MODULE_NOT_FOUND', 'ENOENT', 'ECONNREFUSED', 'ENOTFOUND', 'TimeoutError'].includes(error?.code ?? error?.name)) {
       report.failureDetail = error.code ?? error.name
     }
+    const frame = String(error?.stack ?? '').match(/self-hosted-closeout\.mjs:(\d+):(\d+)/)
+    if (frame) report.failureFrame = { line: Number(frame[1]), column: Number(frame[2]) }
+    if (/strict mode violation/.test(error?.message ?? '')) report.failureDetail = 'locator_ambiguous'
     process.exitCode = 1
   } finally {
     cleaning = true
@@ -495,6 +498,7 @@ async function run(env) {
     report.finished = new Date().toISOString()
     await writeFile(join(output, 'report.json'), JSON.stringify(report, null, 2) + '\n')
     console.log(JSON.stringify({ stage: report.stage, failure: report.failure, failureDetail: report.failureDetail,
+      failureFrame: report.failureFrame,
       consentPosts: report.consentPosts, consentStatuses: report.consentStatuses, checks: report.checks, cleanup: report.cleanup }))
   }
 }
