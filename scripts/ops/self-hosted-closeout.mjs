@@ -306,7 +306,7 @@ async function run(env) {
   } catch (error) {
     // No raw provider, browser, Docker or HTTP response can enter a public log.
     report.failure = /^[A-Z0-9_]+$/.test(error?.message ?? '') ? error.message : 'CLOSEOUT_FAILED'
-    if (error?.code === 'team_workspace_failed') {
+    if (error?.name === 'TeamWorkspaceError') {
       const { publicTeamWorkspaceFailure } = await import('../acceptance/team-workspace.mjs')
       report.failure = 'TEAM_WORKSPACE_FAILED'; report.failureDetail = publicTeamWorkspaceFailure(error).detail
     }
