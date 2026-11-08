@@ -1,15 +1,18 @@
 # Mikka mobile
 
-The iOS app (Expo SDK 58, Expo Router). Spec: `docs/design/mobile.md`.
-The design authority is the current main implementation and accepted decisions
-in `docs/design/README.md`. Figma page `268:4750` is archived (#1296);
+Use this guide to develop and release the iOS app (Expo SDK 58, Expo Router).
+See the [mobile specification](../../docs/design/mobile.md) and
+[design authority](../../docs/design/README.md) for product requirements.
+Figma page `268:4750` is archived (#1296);
 `358:9186` is a reference to verify, not an accepted redesign spec.
 
 The screens read the selected server's `app/api/mobile/*` routes (mobile.md,
 "Engineering"). The sign-in screen selects Mikka Cloud or a self-hosted server
 at runtime. `EXPO_PUBLIC_API_URL` changes the initial server for a preview build,
-including its base path (e.g. `http://127.0.0.1:3000/mikka`); official iOS builds
+including its base path, for example `http://127.0.0.1:3000/mikka`. Official iOS builds
 start on Mikka Cloud. Branches have no Vercel Preview.
+
+Run these commands in a cloud Linux checkout.
 
 ```sh
 pnpm install                       # from the repository root
@@ -24,16 +27,21 @@ Vercel Sandbox is a fallback only when Docker is unavailable. Stop the sandbox
 after the work. Expo web checks do not verify UIKit navigation, haptics,
 VoiceOver, Dynamic Type or native Reduce Motion on an iPhone.
 
-Layout:
+The source is organized by routes and features.
 
-- `app/`: routes. `(tabs)/chats` is the opening chat list, with `threads`
-  and `search` beside it. Bot and group chats and `thread/[id]` are pushed
-  pages; the drawer opens `suggestions`, `tasks`, `plugins` and `settings/`,
-  which is a modal stack.
-- `components/`: the drawer, chat pieces (bubbles, mention chips, proactive
-  and thread cards, swipe-for-times), the composer, settings rows, icons.
+- `app/` holds routes. `(tabs)/_layout.tsx` defines **Bot · 任务 · 建议 · 设置**
+  and a search tab. `(tabs)/(chats)/index.tsx` opens the Bot list. Chats,
+  `task/[id]/` and task conversations push over the tabs. Threads open from
+  their task. The legacy `thread/[id]` route remains for links without a task.
+- `features/` holds screens, components, and models for chat, home, tasks,
+  accounts, search, and other features.
+- `components/` holds shared controls, chat pieces, settings rows, and icons.
 - `lib/`: the auth client, `api()` and `useApi()`, response types, push
   registration, theme colours.
+
+For iOS UI changes, load the vendored SwiftUI and Expo skills specified in the
+[skill registry](../../.claude/skills/README.md#which-skill-to-use).
+See [native component ownership](DESIGN.md) for implementation details.
 
 ## Servers and accounts
 
@@ -71,14 +79,22 @@ preview; it does not establish iOS SecureStore or native multi-account acceptanc
 Registering a phone for pushes needs the EAS project id, committed in
 `app.json` (`extra.eas.projectId`); `EAS_PROJECT_ID` overrides it for a fork's
 own EAS project (`app.config.ts`). Without it the app runs but cannot
-register, and Settings shows 「推送无法送达」. The server sends through
-Expo's push service (`lib/mobile-push.ts`, optional `EXPO_ACCESS_TOKEN`).
+register, and Settings shows 「推送无法送达」. Server-side event selection lives
+in `lib/mobile-push.ts`. `lib/mobile-push-delivery.ts` sends Cloud edition
+notifications directly to Expo, using `EXPO_ACCESS_TOKEN` when configured.
+Self-hosted servers use their connected Mikka Cloud push service and selected
+content mode. Reminder mode sends generic text and account/chat routing fields.
+A disconnected or unselected push service sends no request. The delivery module
+persists encrypted receipt tickets and checks delivery through the receipt
+Workflow and existing recovery sweep.
 
 The app asks iOS for permission after the Coordinator's first message of its
 own, or when the person turns a push on in 通知; never at launch. A tapped
-push opens what it is about (`lib/push-route.ts`): a proposal's card
-(`pendingActionId`), a finished thread (`runId`), or the chat it came from
-(`botId`).
+push follows `lib/push-route.ts`. A proposal opens its chat card
+(`pendingActionId`). A task notification opens its task (`issueId`), with
+`runId` selecting the attempt in the task's conversation. A payload with only
+`runId` opens the legacy thread route. Other payloads open the originating chat
+(`botId`). Reminder mode retains the chat destination.
 
 New payloads include `data.serverUrl` (canonical origin plus base path) and
 `data.userId`. Foreground banners and push taps must match both fields to the
@@ -106,10 +122,16 @@ release results. Record each result against its own source commit.
 
 `.github/workflows/mobile-update.yml` publishes iOS JavaScript updates:
 main goes to the `production` channel, a pull request to branch `pr-<n>`.
-Check that the publish step actually ran: without `EXPO_TOKEN`, this workflow
-reports a notice and exits successfully without an update.
-The cold-start gate checks for an update before entering the app (with its
-offline/time limits); a background download offers 「重启以更新」 in the drawer.
+Check that the publish step actually ran. The PR preview step reports a notice
+and succeeds without an update when its repository `EXPO_TOKEN` is absent.
+Production publication depends on the preceding Infisical credential delivery
+and a non-empty token.
+The cold-start gate checks for an update before entering the app within its
+offline/time limits. A background download offers **重启以更新** on the Bot
+home screen. Production credential delivery uses the existing Infisical OIDC
+identity. The workflow can bundle the private mobile UI layer when its checkout
+credential is available, so record that layer's revision along with the app
+revision. See [mobile UI slots](../../docs/ui-overlay.md).
 
 ### Native iOS build and TestFlight submission
 
@@ -126,10 +148,12 @@ with `--freeze-credentials`, the production update channel, store distribution
 and the remotely incremented iOS build number. Missing signing credentials
 fail the build instead of being created in this workflow.
 
-After `eas build --wait --json`, the workflow verifies an iOS build is
-`FINISHED` and its `gitCommitHash` equals the workflow's `GITHUB_SHA`.
-It submits that returned build id with `eas submit --id`, never whichever
-build happens to be latest. Main push runs submit automatically; a manual
+After `eas build --wait --json`, `scripts/release/mobile-native.mjs` verifies
+the build's status and exact source commit. A manual run can instead supply
+`existing_build_id` and its 40-character `expected_commit` on main to submit
+that completed build. The driver checks CI for both the workflow revision and
+the binary's source revision. It submits the verified build ID with
+`eas submit --id`. Main push runs submit automatically. A manual
 run can set `submit: false` to build without submitting. The non-secret
 `mobile-native-<sha>` artifact records the build and source metadata.
 

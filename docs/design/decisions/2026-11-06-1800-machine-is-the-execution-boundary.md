@@ -21,8 +21,8 @@ per-call timing evidence before removing that proxy path.
 
 **Scope correction (2026-11-08):** The quoted instruction is retained as
 historical context; it does not authorize disclosing every user/workspace/
-repository Secret to a task Agent. The updated [credential-exposure boundary]
-(2026-11-08-0240-credential-exposure-boundary.md) distinguishes selected
+repository Secret to a task Agent. The updated
+[credential-exposure boundary](2026-11-08-0240-credential-exposure-boundary.md) distinguishes selected
 native CLI/GitHub credentials from other third-party Secrets. No repeated
 per-model/per-tool Mikka control-plane checks are reinstated.
 
@@ -209,3 +209,102 @@ acceptance daemon without a bootstrap sidecar and therefore validates the
 original FD3 route. Its success does not validate anonymous adoption. The
 subsequent real production dispatches must exercise and report the actual
 new source; no native-source value or performance saving is inferred.
+
+## Bootstrap-time anonymous Codex initialization
+
+A fresh, never-assigned Codex TaskVM may send only `initialize` and
+`initialized` after accepting the same strict bootstrap. It does not log in,
+start a thread, or send task input before the normal fresh assignment and
+final checkout are available. This is restricted to the verified 0.166.0
+protocol. Other native versions, custom environments, existing HOME settings
+or credentials, project `.codex`/`.agents` layers, and unverified worktree
+metadata use the original path after the speculative process has closed and
+drained.
+The existing model, account, approval, ledger and resume checks remain in
+their original order; an actual login or authority failure is never retried
+as a different session.
+
+The process starts only from an absent user Skills directory. Codex itself
+installs embedded system Skills under `CODEX_HOME/skills/.system` during
+initialization. The candidate snapshots only this bounded, owned, non-linked
+directory and requires its contents to remain unchanged before adoption.
+Added user Skills or changed configuration are not ignored. The native
+process retains the ordinary HOME. When the checkout is beneath HOME, only
+the exact canonical `HOME/.codex` already checked by the dedicated user
+configuration guard is excluded from project-layer traversal. `HOME/.agents`,
+all other ancestor configuration, the actual parking directory and symlinks
+still require the original cold path. A normal Git worktree is eligible only
+when its bounded, owned, no-follow `.git`, `gitdir` backlink and `commondir`
+files agree with the primary clone already proven by the supervisor. The
+primary checkout and its ancestor configuration are checked too: the native
+loader can obtain project hooks there. Changed metadata, a foreign common
+directory or worktree-specific configuration drains the spare before the
+original cold path. The final thread receives its actual
+repository cwd, original dynamic mailbox tools and the complete Mikka MCP
+configuration. MCP secrets stay in an owned, immutable 0600 context file
+outside native thread configuration; the original stdio implementation reads
+it through a bounded no-follow entry, including legitimate MCP restarts.
+The file is removed when the owned process group is drained. Leader exit
+also stops that group immediately, including descendants holding inherited
+pipes; completion still waits for the real child `close` event.
+
+For opted-in diagnostics, `preparationTiming.source =
+bootstrap_codex_initialize` records the actual earlier initialization clock
+and transfers the existing local collector once to the matching run.
+Authentication is still measured on the later ordinary login path; this
+source does not claim an early OAuth login. Missing, malformed, mismatched or
+truncated preparation evidence still fails the strict initialization reader.
+No receipt is added to ordinary diagnostic-disabled runs.
+
+Only a successfully adopted process exposes this preparation receipt. A
+discarded or failed speculative attempt is closed and drained before the
+ordinary cold path; its early initialization is available only in the
+existing bootstrap OTel spans when those spans are sampled and exported.
+The formal stage does not include that discarded attempt, assign it zero
+time, or claim full coverage or a performance saving. The accepted bootstrap
+trace context and its run reference can correlate the owned attempt with
+`daemon.adapter.cli_init.prewarm` and `daemon.adapter.cli_init`; a missing
+span remains unavailable. The complete dispatch-to-ACK measurement still
+includes any real resource contention caused by that attempt.
+
+Local controls with fixed official 0.166.0 bytes cover anonymous
+initialization, final-cwd `config/read` on a real `WorktreeManager` worktree,
+and a real project-configuration counterexample that drains and returns to
+cold startup. These controls send
+no account, thread or turn requests. Offline protocol processes cover login
+refusal, the original call order, MCP handoff and cancellation. They do not
+prove live subscription adoption, provider HTTP absence, or a five-second
+dispatch result; those remain real execution and measurement requirements.
+
+## Credential preparation transport in the subsequent candidate
+
+The candidate assembled on merged `0479675e188efeac341b207d8616c4d7b9d4ee23`
+also batches the five existing credential-preparation DML statements into
+one PostgreSQL simple-query message when its encoded request fits a
+conservative bound below the original bound-query protocol. It still does
+five writes in their original order. Larger or more expensive literal
+encodings use the unchanged five bound requests; this is an optimization
+limit, not a new input restriction.
+
+The caller retains the existing transaction, locks, fresh rebind, rollback
+and commit-before-bootstrap boundary. Each statement retains its READ
+COMMITTED snapshot; a real two-connection barrier proves the revocation
+statement sees a token committed while the prior update was waiting.
+The last INSERT returns the actual `clock_timestamp()` only after that
+insertion. A single message shares `statement_timestamp()`; the current
+DML, defaults and audited tracked migration triggers use transaction
+`now()` and final `clock_timestamp()`, not that message timestamp.
+
+The measured ordinary preparation segment sends 228 fewer PostgreSQL
+protocol bytes and transfers 322 fewer bytes in total. It does not remove
+SQL work or include TCP/TLS/startup costs. Early failures may pre-send later
+statement text, but no later DML run after the first error and the original
+outer transaction rolls back. The bounded extra-text ledger is retained.
+
+The [candidate evidence index](../research/2026-11-07-codex-initialize-five-write-candidate.json)
+pins the inherited Codex and database proofs separately from the new
+composition checks. These are local results, not live subscription
+adoption or a new five-second production result. Neither this transport
+change nor the account-free Codex process authorizes execution or changes
+the normal HOME/worktree. No saving is booked against the separate
+ready-pool design, whose complete database budget is still unproven.

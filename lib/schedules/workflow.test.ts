@@ -65,6 +65,7 @@ test('scheduled SDK turn uses the existing runtime with host-only scope and read
  assert.deepEqual(toolCall.args[2],{scheduledRead:{botId:COORDINATOR_BOT,occurrence:scheduledRead}})
  assert.deepEqual((toolCall.args[3] as {readToolIds:string[]}).readToolIds,['get_issue'])
  assert.equal((toolCall.args[3] as {readOnly:boolean}).readOnly,true)
+ assert.equal((toolCall.args[3] as {lazyGitHubContext:boolean}).lazyGitHubContext,false)
  assert.equal(calls.find(c=>c.name==='hosted')?.args[0] && (calls.find(c=>c.name==='hosted')!.args[0] as {model:string}).model,'existing-configured-model')
  assert.deepEqual(calls.find(c=>c.name==='complete')?.args,['owner',COORDINATOR_BOT,scheduledRead,result.text,'existing-workflow:0'])
  const hosted=calls.find(c=>c.name==='hosted')!.args[2] as {writable:unknown;preventClose:boolean}
@@ -80,6 +81,7 @@ test('scheduled native relay preserves actual native identity alongside the occu
  native=true;await coordinatorTurn('owner',COORDINATOR_BOT)
  assert.equal(calls.some(c=>c.name==='hosted'),false)
  const scoped=calls.filter(c=>c.name==='tools').at(-1)!
+ assert.equal((scoped.args[3] as {lazyGitHubContext?:boolean}).lazyGitHubContext,undefined)
  assert.deepEqual(scoped.args[2],{holder:'holder',turnId:'turn',callId:'call',scheduledRead:{botId:COORDINATOR_BOT,occurrence:scheduledRead}})
  assert.equal((scoped.args[3] as {readOnly:boolean}).readOnly,true)
  assert.equal(calls.filter(c=>c.name==='complete').length,1)

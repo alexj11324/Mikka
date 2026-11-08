@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { chatProjectionHash } from './chat-projection-version'
 import { captureRunFailure, readRunFailure, type RunFailure } from '@mikka/protocol/run-failure'
 import { APP_BUILD } from '@/lib/app-build'
 import { sourcedEventMessage } from './message-safety'
@@ -22,6 +22,7 @@ import { agentRuns, coordinatorEvents, coordinatorMessages, coordinatorSessions,
 import { markTelegramPending, pendingTelegramTargets, type PendingTelegramTarget } from './telegram-pending'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { eventsForInbox, isolateTaskRequest } from '@/lib/coordinator/triage'
+import { attentionQuestionsFromEvents, type AttentionQuestion } from './question-attention'
 import { citedIds, namedCitations, type CitationName, type CitationSource } from '@/lib/coordinator/citations'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
@@ -113,6 +114,8 @@ export interface InboxTake {
   pushHidesText: boolean
   taskEventId?: string
   sourceEventId?: string
+  /** Durable human handoffs already chosen by this inbox's Decision receipts. */
+  attentionQuestions?: AttentionQuestion[]
   scheduledRead?: ScheduledRead
 }
 
@@ -197,16 +200,18 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
       .where(and(eventsOf(userId, botId), isNotNull(coordinatorEvents.deliveredAt), sql`${coordinatorEvents.payload}->'mikkaTelegramReply'->>'state' = 'pending'`))
       .orderBy(asc(coordinatorEvents.createdAt), asc(coordinatorEvents.id)).limit(100)
     const handoffs = events.filter(event => isHandoff(event.kind))
+    const attentionQuestions = scheduledRead ? [] : attentionQuestionsFromEvents(events)
     return {
       held: true, added: events.length,
       ...(taskEventId ? { taskEventId } : {}),
       ...(sourceEventId ? { sourceEventId } : {}),
       ...(scheduledRead ? { scheduledRead } : {}),
+      ...(attentionQuestions.length ? { attentionQuestions } : {}),
       // A verification code is told in the app chat only, never on Telegram.
       telegramTargets: handoffs.some(carriesCode) ? [] : pendingTelegramTargets(pendingReplies),
       handoffMatterIds: handoffs.flatMap(event => typeof event.payload.matterId === 'string' ? [event.payload.matterId] : []),
       handoffOnly: handoffs.length === events.length,
-      pushEvents: events.map(event => ({ kind: event.kind, tier: event.tier })),
+      pushEvents: events.map(event => ({ kind: event.kind, tier: event.tier, runId: event.runId, issueId: event.issueId })),
       pushHidesText: handoffs.some(carriesCode),
     }
   })
@@ -651,7 +656,7 @@ async function chatPrefix(userId: string, botId: string, through: number) {
   const rows = db.select({ id: coordinatorMessages.id, position: coordinatorMessages.position, message: coordinatorMessages.message }).from(coordinatorMessages)
     .where(and(messagesOf(userId, botId), sql`${coordinatorMessages.position} <= ${through}`)).orderBy(desc(coordinatorMessages.position)).limit(200).as('chat_prefix')
   const [result] = await db.select({ hash: sql<string>`md5(coalesce(string_agg(${rows.id}::text || ':' || md5(${rows.message}::text), ',' order by ${rows.position}), ''))` }).from(rows)
-  return result.hash
+  return chatProjectionHash(result.hash)
 }
 
 /** Hash and metadata share one statement snapshot, so a concurrent prefix edit
@@ -664,7 +669,7 @@ async function chatPrefixMetadata(userId: string, botId: string, through: number
     hash: sql<string>`md5(coalesce(string_agg(${rows.id}::text || ':' || md5(${rows.message}::text), ',' order by ${rows.position}), ''))`,
     rows: sql<ChatToolMetadataRow[]>`coalesce(jsonb_agg(jsonb_build_object('position', ${rows.position}, 'parts', ${rows.parts}) order by ${rows.position}) filter (where ${rows.position} >= ${Math.max(0, cursor - 199)} and jsonb_array_length(${rows.parts}) > 0), '[]'::jsonb)`,
   }).from(rows)
-  return result
+  return { ...result, hash: chatProjectionHash(result.hash) }
 }
 
 /** The web chat's first screen: the latest messages, older ones a page at a time
@@ -741,7 +746,7 @@ export async function chatVersionState(userId: string, limit = 200, botId: strin
   const lastMessage = stored.role ? { role: stored.role, ...(stored.streamId ? { streamId: stored.streamId } : {}), ...(stored.createdAt ? { createdAt: new Date(stored.createdAt) } : {}) } : undefined
   const now = new Date()
   return {
-    version: createHash('sha256').update(`${limit}|${stored.hash}|${snapshot.failureVersion ?? ''}|${waiting.map(event => `${event.id}:${event.payloadVersion}`).join(',')}`).digest('hex').slice(0, 32),
+    version: chatProjectionHash(`${limit}|${stored.hash}|${snapshot.failureVersion ?? ''}|${waiting.map(event => `${event.id}:${event.payloadVersion}`).join(',')}`),
     cursor: stored.last,
     ...(coordinatorLeaseActive(session) && session?.leaseHolder?.startsWith('wrun_') ? { streamRunId: session.leaseHolder } : {}),
     ...coordinatorChatState(session, waiting, now, lastMessage),

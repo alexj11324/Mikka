@@ -16,6 +16,8 @@ import { ThreadStatusIcon } from '@/components/workspace/thread-status-icon'
 import { THREAD_CARD, THREAD_CARD_BUTTON } from '@/components/coordinator/thread-card'
 import { PullRequestsBadge } from '@/components/workspace/pull-requests-badge'
 import { useViewState } from '@/lib/hooks/view-state'
+import { ReviewSummaryLine } from '@ui-slot/review-summary'
+import { openReview } from '@/hooks/code-review/use-review-page'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 
@@ -89,6 +91,8 @@ function ThreadRow({ thread, group, issues, all, now, onOpenThread }: { thread: 
           {all && <span data-slot="thread-agent" className="flex shrink-0 items-center opacity-80 [&_svg]:size-3">{thread.harness ? <HarnessMark harness={thread.harness} /> : <ThreadMark size="row" />}</span>}
           <span className="min-w-0 flex-1 truncate">{[all ? <span key="bot" data-slot="thread-bot" className="text-foreground/80">{t('dispatchedBy', { bot: thread.agentName })}</span> : null, thread.attempts > 1 ? t('attempt', { count: thread.attempts }) : null, thread.lastReply].filter(Boolean).flatMap((part, index) => index ? [' · ', part] : [part])}</span>
         </span>}
+      {/* In 等待你, a coding task's summary line and 审阅 (R0); the default slot draws nothing. */}
+      {group === 'waiting' && thread.issueId && <ReviewSummaryLine taskId={thread.issueId} placement="waiting" onOpenReview={openReview} />}
     </span>
     {pullRequests && <PullRequestsBadge pullRequests={pullRequests} />}
     <ChevronRight aria-hidden="true" className="pointer-events-none relative size-4 shrink-0 text-muted-foreground" />

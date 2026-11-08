@@ -498,8 +498,10 @@ export function chatItems(rows: readonly (StoredMessage & { createdAt: Date; pen
       // The stream that first showed this reply: its first text, tool or thinking.
       const stream = (message as { mikkaStreamId?: unknown }).mikkaStreamId
       const streamId = typeof stream === 'string' ? stream : undefined
-      const shows = Boolean(cited.text || steps.length || thought)
+      const shows = Boolean(cited.text || steps.length || thought || stopped)
+      // A stopped-only round must keep its own identity and position, even after an older reply.
       const merges = last?.from === 'coordinator' && !waiting.ids.length && !briefingBoundary
+        && !(stopped && streamId && last.streamId !== streamId)
       // A step's tools run after its words: they sit after the reply's text so far, this step's included.
       const at = (merges ? [last.text, cited.text].filter(Boolean).join('\n\n') : cited.text).length
       for (const step of steps) step.at = at

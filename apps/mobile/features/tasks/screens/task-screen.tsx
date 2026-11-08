@@ -15,14 +15,13 @@ import { tasksLive } from '@/lib/live-keys'
 import type { TaskActivity, TaskDetail } from '@/lib/types'
 import { useLiveApi } from '@/lib/useApi'
 import { openOnWeb } from '@/lib/web'
-import { colors, LIST_INSET } from '@/lib/theme'
+import { shortWhen } from '@/lib/clock'
+import { colors, LIST_INSET, SPACE } from '@/lib/theme'
 import { AttemptIcon, BOARD_LABEL, PriorityIcon, priorityLabel, STATE_LABEL, TaskStateIcon } from '../components/task-icons'
 import { ATTEMPT_WORD, attemptState, rowState } from '../model/task-groups'
+import { ReviewSummaryRow } from '@/features/review/components/review-summary-row'
+import { reviewHref } from '@/features/review/model/routes'
 
-const day = (iso: string) => {
-  const d = new Date(iso)
-  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`
-}
 
 /** Where an attempt opens: the task's one conversation, scrolled to that attempt (2026-11-07). */
 export const conversationHref = (taskId: string, attempt?: string): Href => ({ pathname: '/task/[id]/conversation', params: attempt ? { id: taskId, attempt } : { id: taskId } })
@@ -64,18 +63,20 @@ export function TaskScreen() {
           <>
             {task.identifier ? <Text style={styles.key} selectable>{task.identifier}</Text> : null}
             <Text accessibilityRole="header" style={styles.title} selectable>{task.title}</Text>
+            {/* A code task's first row is its review summary; one tap opens the review (R2a, decisions/2026-11-08-1230). */}
+            {task.review ? <View style={styles.review}><ReviewSummaryRow short summary={task.review} onPress={() => router.push(reviewHref(task.id))} /></View> : null}
             <View style={styles.properties}>
               <Chip icon={<TaskStateIcon state={shown?.state ?? null} status={task.status} size={15} />}
                 label={shown?.reason ?? (shown?.state === 'waiting' ? '等待你' : shown?.state ? STATE_LABEL[shown.state] : BOARD_LABEL[task.status] ?? task.status)} />
               <Chip icon={<PriorityIcon priority={task.priority} size={15} />} label={`${priorityLabel(task.priority)}优先级`} />
-              {task.bot ? <Chip icon={<BotAvatar color={task.bot.color} shape={task.bot.shape} size={16} />} label={task.bot.name} /> : null}
+              {task.bot ? <Chip icon={<BotAvatar id={task.bot.id} color={task.bot.color} shape={task.bot.shape} size={16} />} label={task.bot.name} /> : null}
               {task.agent ? <Chip icon={<Sparkles size={14} color={colors.secondary} strokeWidth={2} />} label={[HARNESS[task.agent.harness] ?? task.agent.harness, task.agent.model].filter(Boolean).join(' · ')} /> : null}
               {task.place ? <Chip icon={<MachineIcon machine={task.place.kind} size={15} />} label={task.place.name} /> : null}
               {task.schedule ? <Chip icon={<CalendarClock size={14} color={colors.secondary} strokeWidth={2} />} label={task.schedule.label} /> : null}
             </View>
             {task.description ? <View style={styles.description}><Markdown text={task.description} /></View> : null}
             {activity.length ? <Text accessibilityRole="header" style={styles.section}>活动</Text> : null}
-            {activity.map((item, index) => <ActivityRow key={`${item.kind}:${index}`} item={item} last={index === activity.length - 1}
+            {activity.map((item, index) => <ActivityRow key={`${item.kind}:${index}`} item={item} first={index === 0} last={index === activity.length - 1}
 
               onOpen={item.kind === 'attempt' ? () => router.push(conversationHref(task.id, item.runId)) : undefined} />)}
           </>
@@ -104,23 +105,25 @@ function Chip({ icon, label }: { icon: ReactNode; label: string }) {
  * One entry of 活动 on the timeline: an attempt carries its own result's icon and word (2026-11-07-2230) and opens
  * its thread; a replaced thread and the creation are lines.
  */
-function ActivityRow({ item, last, onOpen }: { item: TaskActivity; last: boolean; onOpen?: () => void }) {
+function ActivityRow({ item, first, last, onOpen }: { item: TaskActivity; first: boolean; last: boolean; onOpen?: () => void }) {
   // Its own run's result, never the task's reason: an attempt that finished and opened a PR is 完成; only the task waits.
   const result = item.kind === 'attempt' ? attemptState(item) : null
   const body = (
     <>
+      {/* The timeline: each item draws the line through its own height (none above the first, none below the last), so
+          it runs on unbroken whatever the items' heights. An attempt's node is its own result's icon (never the
+          task's hand); the creation and a replaced thread are a small grey dot. The node's page fill hides the line. */}
       <View style={styles.rail}>
-        <View style={styles.node} />
-        {last ? null : <View style={styles.line} />}
+        {first ? null : <View style={[styles.line, styles.lineAbove]} />}
+        {last ? null : <View style={[styles.line, styles.lineBelow]} />}
+        {result ? <View style={styles.node}><AttemptIcon result={result} size={20} /></View> : <View style={styles.dot} />}
       </View>
-      {/* An attempt shows its own result, never the task's hand; a replaced thread and the creation have no icon. */}
-      {result ? <AttemptIcon result={result} size={20} /> : <View style={styles.noBot} />}
       <View style={styles.activityText}>
         <Text style={styles.activityTitle} numberOfLines={1}>
           {item.kind === 'attempt' ? `第 ${item.n} 次尝试` : item.kind === 'replaced' ? '换了新线程' : item.by ? `${item.by} 创建了任务` : '创建了任务'}
         </Text>
-        <Text style={styles.activityMeta} numberOfLines={1}>
-          {result && item.kind === 'attempt' ? [ATTEMPT_WORD[result], result === 'done' && item.pullRequest ? `开了 PR #${item.pullRequest.number}` : null, HARNESS[item.harness] ?? item.harness, day(item.createdAt)].filter(Boolean).join(' · ') : day(item.createdAt)}
+        <Text style={styles.activityMeta} numberOfLines={2}>
+          {result && item.kind === 'attempt' ? [ATTEMPT_WORD[result], result === 'done' && item.pullRequest ? `开了 PR #${item.pullRequest.number}` : null, HARNESS[item.harness] ?? item.harness, shortWhen(item.createdAt)].filter(Boolean).join(' · ') : shortWhen(item.createdAt)}
         </Text>
       </View>
       {onOpen ? <ChevronRight size={18} color={colors.tertiary} strokeWidth={2} /> : null}
@@ -136,17 +139,22 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: LIST_INSET, paddingTop: 8, gap: 0 },
   center: { paddingTop: 40, alignItems: 'center' },
   key: { fontSize: 15, color: colors.secondary, fontVariant: ['tabular-nums'] },
-  title: { fontSize: 26, lineHeight: 32, fontWeight: '700', color: colors.text, marginTop: 4, marginBottom: 14 },
-  properties: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, padding: 10, borderRadius: 14, borderCurve: 'continuous', backgroundColor: colors.bubble },
+  title: { fontSize: 26, lineHeight: 32, fontWeight: '700', color: colors.text, marginTop: 4, marginBottom: SPACE.block },
+  /** The chips sit on the page, wrapping; no box around them (Alex 2026-11-08: no grey slabs). */
+  properties: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 6, maxWidth: '100%', minHeight: 30, paddingHorizontal: 10, borderRadius: 8, borderCurve: 'continuous', backgroundColor: colors.chip },
   chipText: { flexShrink: 1, fontSize: 14, color: colors.text },
-  description: { marginTop: 16 },
-  section: { marginTop: 28, marginBottom: 6, fontSize: 14, fontWeight: '600', color: colors.secondary },
-  activity: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 58, marginHorizontal: -8, paddingHorizontal: 8, borderRadius: 10, borderCurve: 'continuous' },
-  rail: { width: 10, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
-  node: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.tertiary },
-  line: { position: 'absolute', top: '50%', bottom: -29, width: 1.5, backgroundColor: colors.separator },
-  noBot: { width: 20 },
+  description: { marginTop: SPACE.block },
+  review: { marginTop: -SPACE.block / 2, marginBottom: SPACE.block / 2 },
+  section: { marginTop: SPACE.block + 8, marginBottom: 4, fontSize: 14, fontWeight: '600', color: colors.secondary },
+  activity: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 58, marginHorizontal: -8, paddingHorizontal: 8, paddingVertical: SPACE.item / 2, borderRadius: 10, borderCurve: 'continuous' },
+  /** Spans the item's full height, its padding included, so the line meets the next item's. */
+  rail: { width: 24, alignSelf: 'stretch', marginVertical: -SPACE.item / 2, alignItems: 'center', justifyContent: 'center' },
+  node: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.page },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.tertiary },
+  line: { position: 'absolute', width: 1.5, backgroundColor: colors.separator },
+  lineAbove: { top: 0, bottom: '50%' },
+  lineBelow: { top: '50%', bottom: 0 },
   activityText: { flex: 1, minWidth: 0, gap: 2 },
   activityTitle: { fontSize: 16, fontWeight: '500', color: colors.text },
   activityMeta: { fontSize: 13, color: colors.secondary },

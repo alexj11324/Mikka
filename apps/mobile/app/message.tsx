@@ -12,9 +12,9 @@ import { heldMessage, REACTIONS } from '@/lib/message-actions'
 import { colors } from '@/lib/theme'
 
 /**
- * What a long press on a message offers, as a system sheet (Messages, Slack,
- * Claude): a row of reactions on a stored message, then 回复 quotes it in the composer, 复制 copies its words, 选择文本
- * opens them to select a part.
+ * What ⋯ under a message offers on the web build, as a sheet (iOS draws the system menu, MessageMenu.ios.tsx): a row
+ * of reactions on a stored message, then 回复 quotes it in the composer, 复制 copies its words, 选择文本 opens them to
+ * select a part.
  */
 export default function MessageActions() {
   const router = useRouter()

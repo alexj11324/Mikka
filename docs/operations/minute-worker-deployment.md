@@ -59,9 +59,9 @@ job without retrying the write. The logged receipt contains only source/build
 SHAs, deployment/version IDs and configuration checks.
 
 Use the main-only workflow dispatch for an intentional release of the current
-main. A documentation-only main commit that Web deploy skipped will not satisfy
-the matching-application gate; wait for a normal application deployment rather
-than authorizing an older build. After an uncertain write, inspect the active
+main. Every normal main push now builds Web, including documentation changes.
+An ordinary manual Web dispatch can still skip a documentation-only change.
+A skipped build cannot satisfy the matching-application gate. After an uncertain write, inspect the active
 version read-only before deciding whether another release is needed.
 
 ## Runtime observation

@@ -30,6 +30,11 @@ const DOCS_ONLY = [
   // Package and app READMEs. Nothing imports them; the daemon build copies its
   // README into the package as text.
   /^(?:packages|apps)\/[^/]+\/README\.md$/,
+  // Maintained guides and attribution copied as text, with no runtime prompt input.
+  /^agents\/README\.md$/,
+  /^apps\/mobile\/DESIGN\.md$/,
+  /^packages\/daemon\/THIRD_PARTY_NOTICES\.md$/,
+  /^scripts\/acceptance\/run-observability\.md$/,
   // Vendored agent skills: instructions and their metadata only (the skills
   // README forbids scripts there, so any other extension still runs CI).
   /^\.claude\/skills\/.+\.(?:md|yaml)$/,

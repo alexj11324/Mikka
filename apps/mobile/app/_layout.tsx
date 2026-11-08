@@ -19,6 +19,7 @@ import { apiCache } from '@/lib/api-cache'
 import { HomeProvider } from '@/lib/home'
 import { openPush } from '@/lib/navigate'
 import { colors, screenOptions } from '@/lib/theme'
+import { newSheetOptions, reviewSheetOptions } from '@/lib/sheet-options'
 import { currentAccount, servers } from '@/lib/config'
 import { serverCopy as copy } from '@/lib/server-copy'
 
@@ -75,8 +76,11 @@ function SessionGate() {
         <Stack.Screen name="message" options={{ presentation: 'formSheet', sheetAllowedDetents: [0.42], sheetGrabberVisible: true, headerShown: false, contentStyle: { backgroundColor: colors.grouped } }} />
         <Stack.Screen name="attach" options={{ presentation: 'formSheet', sheetAllowedDetents: [0.22], sheetGrabberVisible: true, headerShown: false, contentStyle: { backgroundColor: colors.grouped } }} />
         {/* 新建 Bot and 新建群聊: full-height form sheets with the grabber (docs/design/mobile-comma, 06–07). */}
-        <Stack.Screen name="new-bot" options={{ presentation: 'formSheet', sheetAllowedDetents: [1], sheetGrabberVisible: true, contentStyle: { backgroundColor: colors.page } }} />
-        <Stack.Screen name="new-group" options={{ presentation: 'formSheet', sheetAllowedDetents: [1], sheetGrabberVisible: true, contentStyle: { backgroundColor: colors.page } }} />
+        <Stack.Screen name="new-bot" options={newSheetOptions(colors.page)} />
+        <Stack.Screen name="new-group" options={newSheetOptions(colors.page)} />
+        <Stack.Screen name="task/[id]/comment" options={reviewSheetOptions(colors.page)} />
+        <Stack.Screen name="task/[id]/batch" options={reviewSheetOptions(colors.page)} />
+        <Stack.Screen name="task/[id]/note" options={reviewSheetOptions(colors.page)} />
         <Stack.Screen name="message-text" options={{ presentation: 'modal' }} />
       </Stack>
     </HomeProvider>

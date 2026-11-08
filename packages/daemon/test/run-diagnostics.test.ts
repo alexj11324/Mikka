@@ -8,12 +8,13 @@ import type { OutboxItem } from '../src/outbox'
 import { RunJournal } from '../src/runs/journal'
 import { RunSupervisor, type SupervisorDeps } from '../src/runs/supervisor'
 import { daemonTracer, runIdHash } from '../src/tracing'
+import { createRepositoryGitTimer } from '../src/repository-git-timing'
 import { WorktreeManager } from '../src/worktrees'
 import { cleanupTempDirs, makeRepo, tempDir } from './helpers'
 
 afterEach(cleanupTempDirs)
 
-async function fixture(collectCliTiming?: boolean) {
+async function fixture(collectCliTiming?: boolean, repositoryFailed = false) {
   const root = tempDir(), repo = await makeRepo(), chunks = new Map<string, RunChunk[]>()
   const adapter: AgentAdapter = { harness: 'mock', capabilities: { supportsInterject: false, supportsResume: false }, envAllow: [],
     async start(options) {
@@ -32,7 +33,13 @@ async function fixture(collectCliTiming?: boolean) {
       if (item.kind === 'chunk') { const values = chunks.get(runId) ?? []; values.push(item.chunk); chunks.set(runId, values) }
     }, async compact() {}, lastChunkSeq() { return 0 } } as unknown as SupervisorDeps['outbox'],
     adapters: new Map([['mock', adapter]]), repository: () => ({ repoId: 'repo', name: 'fixture', path: repo }),
-    baseRef: async () => 'main', prepareRepository: async () => {},
+    baseRef: async () => 'main', prepareRepository: async (assignment, _signal, _env, _policy, observer) => {
+      if (!observer) return
+      const timer = createRepositoryGitTimer(runIdHash(assignment.runId), assignment.harness)
+      let outcome: 'ok' | 'error' = 'error'
+      try { await timer.measure('local', async () => { if (repositoryFailed) throw Error('Synthetic repository failure') }); outcome = 'ok' }
+      finally { observer(timer.finish(outcome)) }
+    },
   })
   const run = async (runId: string, taskEnv?: RunAssignment['taskEnv'], failed = false) => {
     supervisor.start({ runId, deviceId: 'device', issueId: 'issue', repoId: 'repo', harness: 'mock', kind: 'plan',
@@ -61,6 +68,8 @@ for (const failed of [false, true]) {
         for (const chunk of stages) expect(Object.keys(chunk.data).sort()).toEqual(['ms', 'ok', 'stage'])
         expect(finish).toEqual({ type: 'finish' })
       } else {
+        expect(stages[0].data.repositoryTiming).toMatchObject({ runIdHash: runIdHash(runId), clock: 'repository_prepare_monotonic',
+          phases: [{ name: 'daemon.repository.git.local', outcome: 'ok' }] })
         expect(stages[2].data.startupTiming).toMatchObject({ runIdHash: runIdHash(runId), outcome: failed ? 'error' : 'ok',
           phases: [{ name: 'daemon.adapter.cli_init', outcome: failed ? 'error' : 'ok' }] })
         expect(finish?.type === 'finish' && finish.messageMetadata).toMatchObject({ mikkaRuntimeTiming: {
@@ -78,5 +87,16 @@ it('does not carry a task diagnostic opt-in into the next ordinary run on the sa
     const ordinary = await f.run('ordinary-next', { CLOUD_STARTUP_TIMING: '0' })
     expect(ordinary.findLast(chunk => chunk.type === 'finish')).toEqual({ type: 'finish' })
     expect(ordinary.filter(chunk => chunk.type === 'data-run-stage').every(chunk => chunk.data.startupTiming === undefined)).toBe(true)
+  } finally { await f.supervisor.stop() }
+})
+
+it('attaches an errored repository receipt to the same single failed stage', async () => {
+  const f = await fixture(true, true)
+  try {
+    const chunks = await f.run('failed-repository', undefined, true)
+    const stages = chunks.filter(chunk => chunk.type === 'data-run-stage')
+    expect(stages).toHaveLength(1)
+    expect(stages[0].data).toMatchObject({ stage: 'repository', ok: false, repositoryTiming: { outcome: 'error',
+      phases: [{ name: 'daemon.repository.git.local', outcome: 'error' }] } })
   } finally { await f.supervisor.stop() }
 })
