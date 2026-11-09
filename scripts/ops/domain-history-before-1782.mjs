@@ -375,10 +375,20 @@ export const SQL = Object.freeze({
     count(*) FILTER (WHERE evidence='workspace_null')::int AS "workspaceNull",
     count(*) FILTER (WHERE evidence='workspace_different')::int AS "workspaceDifferent",
     count(*) FILTER (WHERE evidence='verified')::int AS verified FROM receipts`,
-  select: `${AUTHORIZED} SELECT i.id FROM tasks i WHERE ${PUBLISHED} AND ${ENDED}
-    ORDER BY EXISTS (SELECT 1 FROM agent_runs r WHERE r."issueId"=i.id AND r."workspaceId"=i."workspaceId"
-      AND r.status IN ('succeeded','stopped','failed','cancelled') AND r."agentDefinition"->'projectExecution' IS NOT NULL) DESC,
-      i.id LIMIT 10`,
+  // §3.2 requires coverage by the collection, not both kinds on each Task.
+  // Reserve each coverage anchor before the cap, including an existing Project
+  // snapshot when present. A bare OR + LIMIT could discard a required category.
+  select: `${AUTHORIZED}, coverage AS (
+    SELECT i.id, ${PUBLISHED} AS published, ${ENDED} AS ended,
+      EXISTS (SELECT 1 FROM agent_runs r WHERE r."issueId"=i.id AND r."workspaceId"=i."workspaceId"
+        AND r.status IN ('succeeded','stopped','failed','cancelled') AND r."agentDefinition"->'projectExecution' IS NOT NULL) AS project_snapshot
+    FROM tasks i
+  ), anchors AS (
+    (SELECT id FROM coverage WHERE published ORDER BY id LIMIT 1)
+    UNION (SELECT id FROM coverage WHERE ended ORDER BY project_snapshot DESC, published, id LIMIT 1)
+    UNION (SELECT id FROM coverage WHERE project_snapshot ORDER BY id LIMIT 1)
+  ) SELECT i.id FROM coverage i WHERE i.published OR i.ended
+    ORDER BY EXISTS (SELECT 1 FROM anchors a WHERE a.id=i.id) DESC, i.project_snapshot DESC, i.id LIMIT 10`,
   task: `${AUTHORIZED} SELECT id, "userId" AS owner, scope, "ownershipState" AS state,
     "workspaceId" AS workspace,
     identifier
@@ -416,7 +426,7 @@ export function projectRows(scope, rows) {
       && new Set(rows[kind].map(row => row.id)).size === rows[kind].length, 'sample_invalid')
   }
   check(rows.run.every(row => typeof row.hasProjectSnapshot === 'boolean' && /^[a-f0-9]{32}$/.test(row.frozenDigest)), 'sample_invalid')
-  check(scope.taskIds.every(id => rows.publication.some(row => row.issueId === id) && rows.run.some(row => row.issueId === id)), 'history_missing')
+  check(scope.taskIds.every(id => rows.publication.some(row => row.issueId === id) || rows.run.some(row => row.issueId === id)), 'history_missing')
   if (scope.taskAccess) accessPairs(scope, scope.taskIds)
   const field = value => { check(value === null || typeof value === 'string' && value.length <= 8192, 'sample_invalid'); return hash(JSON.stringify(value)) }
   const result = {
@@ -480,7 +490,13 @@ export async function snapshot(db, scope, observe = () => {}) {
     const selectedPairs = [taskIds, pairedCreators(scope, taskIds), scope.workspaceId]
     const rows = {}
     for (const kind of ['task', 'publication', 'run']) rows[kind] = (await db.query(SQL[kind], selectedPairs)).rows
-    return { taskIds, candidateCount: scope.candidateTaskIds.length, rows: projectRows({ ...scope, taskIds }, rows), ledgerDigest: ledger.digest,
+    const projected = projectRows({ ...scope, taskIds }, rows)
+    observe({ historySelectionPolicy: 'collection_published_and_ended_with_coverage_anchors', selectedCoverage: {
+      tasks: taskIds.length, publishedTasks: new Set(projected.publication.map(row => row.issueId)).size,
+      endedTasks: new Set(projected.run.map(row => row.issueId)).size,
+      projectSnapshotRuns: projected.run.filter(row => row.hasProjectSnapshot).length,
+    } })
+    return { taskIds, candidateCount: scope.candidateTaskIds.length, rows: projected, ledgerDigest: ledger.digest,
       readOnly: true, isolation: 'repeatable read', statementTimeoutMs: 20000, lockTimeoutMs: 2000 }
   } finally {
     if (begun) { await db.query('ROLLBACK'); observe({ transactionRolledBack: true }) }

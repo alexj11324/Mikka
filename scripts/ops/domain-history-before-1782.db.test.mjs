@@ -113,15 +113,21 @@ test('real PG17 validates paired creators, verified publication, tenant-safe his
       await seed(); await db.query(mutation, args)
       const scope = scopeFor(), binding = (await db.query(SQL.binding, pairsFor(scope))).rows[0]
       assert.equal(binding.published, 1); assert.equal(binding.historical, 1)
-      assert.deepEqual((await db.query(SQL.select, pairsFor(scope))).rows.map(row => row.id), [id(2)])
+      // A bad publication never supplies published evidence. Its authorized
+      // Task can still contribute an independent valid ended Run to a group.
+      const selectedIds = ['executorMismatch', 'issueMismatch'].includes(bucket) ? [id(1), id(2)] : [id(2)]
+      assert.deepEqual((await db.query(SQL.select, pairsFor(scope))).rows.map(row => row.id).sort(), selectedIds)
       assert.deepEqual((await db.query(SQL.publication, pairsFor(scope))).rows.map(row => row.id), [id(102)])
       const evidence = (await db.query(SQL.publicationEvidence, pairsFor(scope))).rows[0]
       assert.deepEqual(evidence, { receipts: 2, published: 2, runMissing: 0, issueMismatch: 0, executorMismatch: 0,
         workspaceNull: 0, workspaceDifferent: 0, verified: 1, [bucket]: 1 })
       const result = await snapshot(db, scope)
-      assert.deepEqual(result.taskIds, [id(2)])
+      assert.deepEqual(result.taskIds, selectedIds)
+      assert.deepEqual(result.rows.publication.map(row => row.id), [id(102)])
+      const onlyInvalidPublication = scopeFor(1)
+      await assert.rejects(snapshot(db, onlyInvalidPublication), error => error.code === 'history_missing')
     })
-    await t.test('a valid publication plus only foreign ended Run still cannot qualify as historical', async () => {
+    await t.test('a foreign ended Run never enters a collection even when a separate valid publication qualifies its Task', async () => {
       await seed()
       await db.query('UPDATE agent_runs SET "workspaceId"=$1 WHERE id=$2', [foreignWorkspace, id(101)])
       await db.query(`INSERT INTO agent_runs VALUES ($1,$2,'synthetic-active-executor',$3,'running','{}','main')`, [id(201), id(1), workspaceId])
@@ -129,7 +135,11 @@ test('real PG17 validates paired creators, verified publication, tenant-safe his
       const scope = scopeFor(), binding = (await db.query(SQL.binding, pairsFor(scope))).rows[0]
       assert.equal(binding.published, 2); assert.equal(binding.ended, 1); assert.equal(binding.historical, 1)
       assert.deepEqual((await db.query(SQL.run, pairsFor(scope))).rows.map(row => row.id), [id(102)])
-      assert.deepEqual((await snapshot(db, scope)).taskIds, [id(2)])
+      const result = await snapshot(db, scope)
+      assert.deepEqual(result.taskIds, [id(1), id(2)])
+      assert.deepEqual(result.rows.run.map(row => row.id), [id(102)])
+      assert.deepEqual(result.rows.publication.map(row => row.id), [id(102), id(201)])
+      await assert.rejects(snapshot(db, scopeFor(1)), error => error.code === 'history_missing')
     })
     for (const [name, mutation, value] of [
       ['changed creator', 'UPDATE issues SET "userId"=$1 WHERE id=$2', 'changed-creator'],
@@ -162,6 +172,40 @@ test('real PG17 validates paired creators, verified publication, tenant-safe his
         assert.equal(result.rows[kind].length, 10)
         assert.ok(result.rows[kind].every(row => result.taskIds.includes(row.issueId)))
       }
+    })
+    await t.test('published and ended evidence on separate Tasks passes even when the per-Task intersection is zero', async () => {
+      await seed(); await db.query('DELETE FROM run_publications WHERE "issueId"=$1', [id(2)])
+      await db.query("UPDATE agent_runs SET status='running' WHERE id=$1", [id(101)])
+      const observed = [], result = await snapshot(db, scopeFor(), value => observed.push(value))
+      assert.deepEqual(result.taskIds, [id(1), id(2)])
+      assert.deepEqual(result.rows.publication.map(row => row.issueId), [id(1)])
+      assert.deepEqual(result.rows.run.map(row => row.issueId), [id(2)])
+      assert.equal(observed.find(row => row.candidateCounts)?.candidateCounts.historical, 0)
+      assert.deepEqual(observed.find(row => row.selectedCoverage), {
+        historySelectionPolicy: 'collection_published_and_ended_with_coverage_anchors',
+        selectedCoverage: { tasks: 2, publishedTasks: 1, endedTasks: 1, projectSnapshotRuns: 0 },
+      })
+      assert.equal(observed.at(-1).transactionRolledBack, true)
+    })
+    await t.test('published, ended-only and Project snapshot coverage anchors survive the ten-Task cap', async () => {
+      await seed(12)
+      await db.query('DELETE FROM run_publications WHERE "issueId"<>$1', [id(12)])
+      await db.query('UPDATE agent_runs SET "agentDefinition"=\'{}\'::jsonb')
+      await db.query('UPDATE agent_runs SET "agentDefinition"=$1::jsonb WHERE "issueId"=$2', [JSON.stringify({ projectExecution: { version: 1 } }), id(11)])
+      const result = await snapshot(db, scopeFor(12))
+      assert.equal(result.taskIds.length, 10)
+      assert.ok(result.taskIds.includes(id(12))); assert.ok(result.taskIds.includes(id(11)))
+      assert.deepEqual(result.rows.publication.map(row => row.issueId), [id(12)])
+      assert.equal(result.rows.run.filter(row => row.hasProjectSnapshot).length, 1)
+      assert.ok(result.rows.run.every(row => result.taskIds.includes(row.issueId)))
+    })
+    await t.test('the collection cannot pass without an actual same-Workspace ended Run', async () => {
+      await seed(); await db.query("UPDATE agent_runs SET status='running'")
+      const observed = []
+      await assert.rejects(snapshot(db, scopeFor(), value => observed.push(value)), error => error.code === 'history_missing')
+      assert.equal(observed.find(row => row.candidateCounts)?.candidateCounts.published, 2)
+      assert.equal(observed.find(row => row.candidateCounts)?.candidateCounts.ended, 0)
+      assert.equal(observed.at(-1).transactionRolledBack, true)
     })
     const deletedAt = '2026-11-01T12:00:00.000Z'
     const deletedScope = () => ({ ...scopeFor(), ownerId: owner(1),

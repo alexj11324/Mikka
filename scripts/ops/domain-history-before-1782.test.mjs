@@ -480,11 +480,23 @@ test('a separately authorized creator is accepted only under its frozen per-Task
   assert.throws(() => projectRows({ ...scope, taskOwners }, rows), error => error.code === 'database_binding')
 })
 
-test('each frozen Task must retain both published and ended history, not merely another Task in the batch', () => {
+test('the fixed Task collection may carry published and ended history on different authorized Tasks', () => {
+  const rows = fixture()
+  rows.publication = rows.publication.slice(0, 1)
+  rows.run = rows.run.slice(1)
+  const result = projectRows(scope, rows)
+  assert.deepEqual(result.task.map(row => row.id), scope.taskIds)
+  assert.deepEqual(result.publication.map(row => row.issueId), [id(1)])
+  assert.deepEqual(result.run.map(row => row.issueId), [id(2)])
+})
+
+test('collection coverage still rejects zero publication, zero ended Run and padding Tasks with neither', () => {
   for (const kind of ['publication', 'run']) {
-    const rows = fixture(); rows[kind].pop()
+    const rows = fixture(); rows[kind] = []
     assert.throws(() => projectRows(scope, rows), error => error.code === 'history_missing')
   }
+  const rows = fixture(); rows.publication.pop(); rows.run.pop()
+  assert.throws(() => projectRows(scope, rows), error => error.code === 'history_missing')
 })
 
 test('a missing creator mapping fails before opening APP rather than substituting the reader', async () => {

@@ -1,0 +1,88 @@
+name: Issue 1782 isolated history PG17 proof
+on:
+  push:
+    branches: [ops/1782-history-pg17-20261109]
+permissions:
+  contents: read
+jobs:
+  history_pg17:
+    name: Preserve complete before and after history on real PG17
+    if: github.repository == 'alexj11324/Mikka' && github.actor == 'alexj11324' && github.ref == 'refs/heads/ops/1782-history-pg17-20261109' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e-local-only
+          POSTGRES_DB: mikka_domain_history_1782_fixture
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e -d mikka_domain_history_1782_fixture"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Run all before and after offline regression cases
+        timeout-minutes: 2
+        run: |
+          mkdir -p "$RUNNER_TEMP/history-pg17-1782"
+          node --test --test-reporter=tap scripts/ops/domain-history-before-1782.test.mjs scripts/ops/domain-history-after-1782.test.mjs > "$RUNNER_TEMP/history-pg17-1782/unit.tap"
+      - name: Install only the bounded disposable PostgreSQL driver
+        timeout-minutes: 2
+        env:
+          DOMAIN_HISTORY_DEPENDENCIES: ${{ runner.temp }}/domain-history-dependencies
+        run: npm install --prefix "$DOMAIN_HISTORY_DEPENDENCIES" --ignore-scripts --no-audit --no-fund pg@8.16.3
+      - name: Run every before SQL case on the isolated PG17 service
+        timeout-minutes: 1
+        env:
+          DOMAIN_HISTORY_DEPENDENCIES: ${{ runner.temp }}/domain-history-dependencies
+          DOMAIN_HISTORY_TEST_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_domain_history_1782_fixture
+        run: node --test --test-reporter=tap scripts/ops/domain-history-before-1782.db.test.mjs > "$RUNNER_TEMP/history-pg17-1782/before-pg17.tap"
+      - name: Run every after SQL case on the isolated PG17 service
+        timeout-minutes: 1
+        env:
+          DOMAIN_HISTORY_DEPENDENCIES: ${{ runner.temp }}/domain-history-dependencies
+          DOMAIN_HISTORY_TEST_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_domain_history_1782_fixture
+        run: node --test --test-reporter=tap scripts/ops/domain-history-after-1782.db.test.mjs > "$RUNNER_TEMP/history-pg17-1782/after-pg17.tap"
+      - name: Bind actual source and complete test counts
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, re, subprocess
+          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'history-pg17-1782'
+          summaries = {}
+          for name, expected in [('unit', 159), ('before-pg17', 30), ('after-pg17', 31)]:
+              content = (root / (name + '.tap')).read_text()
+              counts = {}
+              for field in ['tests', 'pass', 'fail', 'cancelled', 'skipped', 'todo']:
+                  values = re.findall(r'^# ' + field + r' (\d+)$', content, re.M)
+                  assert len(values) == 1, (name, field)
+                  counts[field] = int(values[0])
+              assert counts == dict(tests=expected, **{'pass': expected}, fail=0, cancelled=0, skipped=0, todo=0), name
+              summaries[name] = {**counts, 'sha256': hashlib.sha256(content.encode()).hexdigest()}
+          paths = ['scripts/ops/domain-history-' + phase + '-1782' + suffix for phase in ['before', 'after'] for suffix in ['.mjs', '.test.mjs', '.db.test.mjs']]
+          paths += ['.github/workflows/issue1782-domain-history-after.yml', '.github/workflows/issue1782-history-pg17.yml']
+          sha = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          assert sha == os.environ['GITHUB_SHA']
+          receipt = {'version': 1, 'status': 'isolated_pg17_passed', 'source': sha,
+              'tree': subprocess.check_output(['git', 'rev-parse', 'HEAD^{tree}'], text=True).strip(),
+              'runId': int(os.environ['GITHUB_RUN_ID']), 'runAttempt': int(os.environ['GITHUB_RUN_ATTEMPT']),
+              'tests': summaries, 'files': {path: hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest() for path in paths},
+              'productionCredentialsRead': False, 'productionDatabaseAccessed': False}
+          (root / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          PY
+      - name: Retain synthetic test logs and exact source receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: history-pg17-1782-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/history-pg17-1782/
+          retention-days: 14
+          if-no-files-found: error
