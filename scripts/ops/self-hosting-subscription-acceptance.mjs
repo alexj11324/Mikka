@@ -113,6 +113,18 @@ export function communityDaemonHelper(raw, origin) {
   return prefix + "  const link = new HttpServerLink(`${origin}/mikka`, fetch, DAEMON_VERSION)\n  const heartbeatProof: unknown[] = []\n  const originalHeartbeat = link.heartbeat.bind(link)\n  link.heartbeat = async (...args) => {\n    const result = await originalHeartbeat(...args)\n    heartbeatProof.push({ reported: args[1].runs.length, renewed: Object.keys(result.leases).length,\n      revoked: result.revoked?.length ?? 0, reportedRevoked: args[1].runs.filter(run => result.revoked?.includes(run.runId)).length })\n    await writeFile(dataDir + '/heartbeat-proof.json', JSON.stringify(heartbeatProof.slice(-12)), { mode: 0o600 })\n    return result\n  }\n  const register = link.registerDevice.bind(link)\n  let announced = false\n  link.registerDevice = async (...args) => {\n    const registered = await register(...args)\n    if (!announced) {\n      announced = true\n      const proof = { deviceId: registered.deviceId, harness, binary, binarySha256, version }\n      await writeFile(`${dataDir}/device-proof.json`, `${JSON.stringify(proof)}\\n`, { mode: 0o600, flag: 'wx' })\n      process.stdout.write(`mikka-template-device ${JSON.stringify(proof)}\\n`)\n    }\n    return registered\n  }\n  const daemon = await startDaemon({ dataDir, flavor: 'prod', link, credential, hostedSubscriptions: true,\n    // A personal candidate does not receive cloud-only repository task secrets.\n    // Opt in locally; enrollment, claim authority and the assignment stay normal.\n    collectCliTiming: true, harnesses: probe.reports, preloadedModels: probe, modelProbe: true })\n  const stop = () => { void daemon.stop().then(() => process.exit(0)) }\n  process.once('SIGTERM', stop)\n  process.once('SIGINT', stop)\n}\n\nvoid main().catch(error => {\n  const code = /^candidate_[a-z0-9_]+$/.test(error?.message ?? '') ? error.message : 'candidate_daemon_failed'\n  process.stderr.write(`${code}\\n`)\n  process.exitCode = 1\n})\n"
 }
 
+// MCP arguments follow the actual server catalogue. Legacy strict schemas
+// reject workspaceId; their normal OAuth principal supplies the workspace.
+export function nativeMcpParameters(params, workspaceId, tools) {
+  check(UUID.test(workspaceId) && Array.isArray(tools) && tools.length <= 200
+    && ['create_issue','dispatch_run'].includes(params?.name), 'MCP_CATALOGUE')
+  const tool = tools.filter(row => row?.name === params.name)
+  check(tool.length === 1 && tool[0].inputSchema?.properties && params.arguments
+    && !Object.hasOwn(params.arguments,'workspaceId'), 'MCP_TOOL_SCHEMA')
+  const scoped = Object.hasOwn(tool[0].inputSchema.properties,'workspaceId')
+  return { ...params, arguments: { ...params.arguments, ...(scoped ? { workspaceId } : {}) } }
+}
+
 export function assertCommunityAdmission(env, now = Date.now()) {
   if (env.MIKKA_COMMUNITY_MODE !== 'native-delivery') return
   const value = env.MIKKA_COMMUNITY_ADMISSION_DEADLINE
@@ -1043,20 +1055,30 @@ export async function runCommunity(env = process.env) {
     const returned = new URL(agreed.url); check(returned.origin === origin && returned.searchParams.get('state') === state && returned.searchParams.has('code'), 'MCP_CONSENT')
     const exchanged = await community.json('/api/auth/oauth2/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ grant_type: 'authorization_code', client_id: client.client_id, code: returned.searchParams.get('code'), redirect_uri: redirect, code_verifier: verifier, resource: origin + '/mikka/api/mcp' }) })
     check(exchanged.access_token?.startsWith('mka_'), 'MCP_TOKEN')
-    let sequence = 0
+    let sequence = 0, mcpTools
     const mcp = async (method, params) => {
       const scopedParams = method === 'tools/call'
-        ? { ...params, arguments: { ...params.arguments, workspaceId: workspace.id } }
-        : params
+        ? nativeMcpParameters(params, workspace.id, mcpTools) : params
       const response = await fetch(origin + '/mikka/api/mcp', { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(45000), headers: {
         authorization: 'Bearer ' + exchanged.access_token, 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'mcp-protocol-version': '2025-03-26' }, body: JSON.stringify({ jsonrpc: '2.0', id: ++sequence, method, params: scopedParams }) })
       check(response.ok, 'MCP_HTTP_' + response.status)
       const eventStream = response.headers.get('content-type')?.includes('text/event-stream')
       const text = await response.text(), answer = eventStream ? JSON.parse(text.split('\n').filter(l => l.startsWith('data:')).at(-1).slice(5)) : JSON.parse(text)
-      check(!answer.error && !answer.result?.isError, 'MCP_RESULT')
+      if (answer.error || answer.result?.isError) {
+        (report.mcpRefusals ??= []).push({ method: method === 'tools/call' ? 'tools/call' : 'other',
+          tool: ['create_issue','dispatch_run'].includes(params?.name) ? params.name : null,
+          code: Number.isSafeInteger(answer.error?.code) ? answer.error.code : null, toolError: answer.result?.isError === true })
+        check(false,'MCP_RESULT')
+      }
       return answer.result?.structuredContent ?? (answer.result?.content?.[0]?.text ? JSON.parse(answer.result.content[0].text) : answer.result)
     }
     await mcp('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'mikka-community-release', version: '1.0.0' } })
+    mcpTools = (await mcp('tools/list', {})).tools
+    // Validate the two required catalogue entries before any VM allocation.
+    report.mcpCatalogue = Object.fromEntries(['create_issue','dispatch_run'].map(name => {
+      const value = nativeMcpParameters({name,arguments:{}},workspace.id,mcpTools)
+      return [name,{workspaceArgumentDeclared:Object.hasOwn(value.arguments,'workspaceId')}]
+    }))
     for (const s of sources.filter(source => source.ready)) {
       const row = s.receipt
       let sandbox, deviceId, runId, issueId, executionRecord, task

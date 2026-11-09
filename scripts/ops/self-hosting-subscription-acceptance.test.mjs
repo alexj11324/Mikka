@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { accessFixture, cleanupScope, ownedComputerVMs, ownedNativeVMs, independentProviders, readProductionAccessLocation, readAuthorizedProjection, configureBoundSubscription, readCheckedSourceMetadata, safeThreadFailure, safeRepositoryFailure, safeSourceFailures, deliveryTask, deliveryReceipt, cleanupDelivery, cloudChatResult, cloudModelBillingReceipt, vaultLogsContainPlaintext, inspectCommunityMonitoring, selectSharedTeam, idleRequestKind, idleRuntimeReceipt, communityReleaseCompatibility, mailpitNotifications, selectOfficialInstallation, assertCommunityAdmission, communityDaemonHelper } from './self-hosting-subscription-acceptance.mjs'
+import { accessFixture, cleanupScope, ownedComputerVMs, ownedNativeVMs, independentProviders, readProductionAccessLocation, readAuthorizedProjection, configureBoundSubscription, readCheckedSourceMetadata, safeThreadFailure, safeRepositoryFailure, safeSourceFailures, deliveryTask, deliveryReceipt, cleanupDelivery, cloudChatResult, cloudModelBillingReceipt, vaultLogsContainPlaintext, inspectCommunityMonitoring, selectSharedTeam, idleRequestKind, idleRuntimeReceipt, communityReleaseCompatibility, mailpitNotifications, selectOfficialInstallation, assertCommunityAdmission, communityDaemonHelper, nativeMcpParameters } from './self-hosting-subscription-acceptance.mjs'
 
 test('Mailpit v1.27.4 coalesced notification frame preserves the matching new mail after an update', () => {
   const update = { Type: 'update', Data: { Total: 1 } }
@@ -540,4 +540,19 @@ test('real released 9bc helper uses normal personal enrollment before VM allocat
   assert.ok(!value.includes('waitForCandidateStart') && !value.includes('MIKKA_ACCEPTANCE_WORKSPACE_ID'))
   assert.throws(()=>communityDaemonHelper(released9bcDaemonHelper+'\n','https://owned.trycloudflare.com'),/HELPER_SOURCE/)
   assert.throws(()=>communityDaemonHelper(released9bcDaemonHelper,'https://foreign.example.invalid'),/HELPER_ORIGIN/)
+})
+
+
+test('legacy strict MCP create schema receives no invented workspace parameter, while declared scope is preserved', () => {
+  const workspaceId='11111111-1111-4111-8111-111111111111'
+  const params={name:'create_issue',arguments:{title:'Real delivery',body:'Task',priority:'low'}}
+  const legacy=[{name:'create_issue',inputSchema:{type:'object',properties:{title:{},body:{},priority:{}},additionalProperties:false}}]
+  const accepts=value=>Object.keys(value).every(key=>Object.hasOwn(legacy[0].inputSchema.properties,key))
+  assert.equal(accepts({...params.arguments,workspaceId}),false)
+  const actual=nativeMcpParameters(params,workspaceId,legacy)
+  assert.equal(accepts(actual.arguments),true);assert.deepEqual(actual.arguments,params.arguments)
+  const modern=[{name:'create_issue',inputSchema:{properties:{...legacy[0].inputSchema.properties,workspaceId:{type:'string'}}}}]
+  assert.equal(nativeMcpParameters(params,workspaceId,modern).arguments.workspaceId,workspaceId)
+  assert.throws(()=>nativeMcpParameters({...params,arguments:{...params.arguments,workspaceId:'foreign'}},workspaceId,modern),/MCP_TOOL_SCHEMA/)
+  assert.throws(()=>nativeMcpParameters(params,workspaceId,[]),/MCP_TOOL_SCHEMA/)
 })
