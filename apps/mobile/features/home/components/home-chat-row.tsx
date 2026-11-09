@@ -1,3 +1,4 @@
+import { mobileMessages } from '@/lib/messages'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 import { EyeOff, Pin, PinOff } from 'lucide-react-native'
@@ -84,7 +85,7 @@ export function HomeChatRow({ chat, actions, openKey, onOpen }: { chat: HomeChat
             </ChatLink>
           </View>
           {/* An open row: a tap on it closes it rather than opening the chat. */}
-          {open ? <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel="收起" onPress={close} /> : null}
+          {open ? <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel={mobileMessages.MobileCore.collapseRow} onPress={close} /> : null}
         </Reanimated.View>
       </GestureDetector>
     </View>
@@ -94,13 +95,13 @@ export function HomeChatRow({ chat, actions, openKey, onOpen }: { chat: HomeChat
 /** The capsules under a swiped row: 置顶 or 取消置顶 (orange; grey when the pins are full) and 隐藏 (grey). */
 function SwipeActions({ chat, offset, blocked, onPin, onHide }: { chat: HomeChat; offset: SharedValue<number>; blocked: boolean; onPin: () => void; onHide: () => void }) {
   const shown = useAnimatedStyle(() => ({ width: Math.max(SWIPE_REVEAL, -offset.get()), opacity: Math.min(1, -offset.get() / (SWIPE_REVEAL / 2)) }))
-  const pinLabel = chat.pinned ? '取消置顶' : '置顶'
+  const pinLabel = chat.pinned ? mobileMessages.MobileCore.unpin : mobileMessages.MobileCore.pin
   return (
     <Reanimated.View style={[styles.actions, shown]}>
       <Capsule label={pinLabel} color={blocked ? colors.tertiary : colors.orange} onPress={onPin}
         icon={<Symbol name={chat.pinned ? 'pin.slash.fill' : 'pin.fill'} size={19} color={colors.onAccent}
           web={chat.pinned ? <PinOff size={19} color={colors.onAccent} strokeWidth={2} /> : <Pin size={19} color={colors.onAccent} strokeWidth={2} />} />} />
-      <Capsule label="隐藏" color={colors.tertiary} onPress={onHide}
+      <Capsule label={mobileMessages.MobileCore.hide} color={colors.tertiary} onPress={onHide}
         icon={<Symbol name="eye.slash.fill" size={19} color={colors.onAccent} web={<EyeOff size={19} color={colors.onAccent} strokeWidth={2} />} />} />
     </Reanimated.View>
   )
