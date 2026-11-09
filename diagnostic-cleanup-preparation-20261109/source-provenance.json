@@ -1,0 +1,44 @@
+{
+  "helper": {
+    "commit": "5958dea38437de20512bbbdf60b940ccc83f00ff",
+    "path": "scripts/ops/issue1505-diagnostic-window.mjs",
+    "newPath": "scripts/ops/issue1505-diagnostic-cleanup-r7.mjs",
+    "bytes": 27063,
+    "sha256": "46d8b905518cf480fecdf0a3bce1a3863f4e79c92609b1cd3ec9d4231820898c",
+    "blob": "e9f07af8ec87eb83b3eb46c046731390ba97c1d9",
+    "preservedBytes": true
+  },
+  "pureCall": {
+    "commit": "29218a0ff3f8dd458963eed3956666572b564309",
+    "path": "evidence/1505-startup-timing-20261108/formal-renderer/workflow.template.yml.in",
+    "sourceLines": "807-821",
+    "extractedBodySha256": "f1c0707a42571ef730523e62153f6de6231910ea18067c79cbe3860a05c98535",
+    "adaptations": [
+      "import path changed to the exact helper copy",
+      "fetchImpl injected solely for main/time verification immediately before DELETE and bounded HTTPS fetch; deletion/value checks unchanged",
+      "no formal report update or sample generation"
+    ]
+  },
+  "prospectiveOperator": {
+    "parent": null,
+    "tree": null,
+    "branch": "ops/1505-diagnostic-cleanup-r7-20261109",
+    "go": "root-reviewed-1505-diagnostic-cleanup-r7-20261109-v1",
+    "exactAddedPaths": [
+      ".github/workflows/issue1505-diagnostic-cleanup-r7.yml",
+      "scripts/ops/issue1505-diagnostic-cleanup-r7.mjs"
+    ],
+    "commitCreated": false,
+    "refCreated": false,
+    "activated": false
+  },
+  "oldSchemaConstants": {
+    "SOURCE": "e33e3a91d4011efbe768b11b428a5d152ede744a",
+    "TREE": "b2e36d3351654fceec59fe138a55de31cb155df9",
+    "meaning": "removeOwnedWindow input-schema binding only, not a fresh scope creation receipt"
+  },
+  "reviewedLocalRoot": {
+    "commit": "4c2efa6e9c57af88168c2d57039982ae29a9b54e",
+    "tree": "00ce4e05bb696a492183f361e4ada67eb9627e30"
+  }
+}

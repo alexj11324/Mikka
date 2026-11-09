@@ -1,0 +1,54 @@
+{
+  "checkedAt": "2026-11-09T15:52:21.386078+00:00",
+  "scope": "syntax and static structure only; no workflow, helper function, network request or test executed",
+  "nodeSyntax": [
+    {
+      "command": [
+        "node",
+        "--check",
+        "syntax/preflight.mjs"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "node",
+        "--check",
+        "syntax/cleanup.mjs"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "node",
+        "--check",
+        "syntax/retain-report.mjs"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "node",
+        "--check",
+        "scripts/ops/issue1505-diagnostic-cleanup-r7.mjs"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "pythonAst": "passed",
+  "yamlParse": "passed",
+  "disabled": true,
+  "allFreshBindingsNull": true,
+  "activeYamlFiles": 0,
+  "exactHelperBytes": true,
+  "singlePlatformSecret": true,
+  "originalCheckoutStatus": ""
+}

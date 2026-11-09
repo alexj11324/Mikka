@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "status": "offline_disabled_unfilled",
+  "createdAt": "2026-11-09T15:54:19.347707+00:00",
+  "directory": "/workspace/scratch/263e36984c81/diagnostic-cleanup-preparation-1505",
+  "memberCount": 12,
+  "memberBytes": 94645,
+  "helperOriginalSha256": "46d8b905518cf480fecdf0a3bce1a3863f4e79c92609b1cd3ec9d4231820898c",
+  "checkoutAfter": {
+    "head": "4c2efa6e9c57af88168c2d57039982ae29a9b54e",
+    "tree": "00ce4e05bb696a492183f361e4ada67eb9627e30",
+    "status": ""
+  },
+  "activity": {
+    "syntaxOnly": true,
+    "testsRun": 0,
+    "helperCalls": 0,
+    "productionCalls": 0,
+    "newVMs": 0,
+    "refsCreated": 0,
+    "commitsCreated": 0,
+    "activeWorkflowFiles": 0,
+    "newFormalSamples": 0
+  },
+  "files": [
+    {
+      "path": ".github/workflows/issue1505-diagnostic-cleanup-r7.yml.in",
+      "bytes": 20447,
+      "mode": "0o644",
+      "sha256": "5a7dd07d34b69fe8f8615a3ef65791bb4221532fe69c05e73a3bcfe194891e19",
+      "gitBlobSha1": "78949bbf55da6094dbe77cb86f8db1fc79cd9a1c"
+    },
+    {
+      "path": "README.md",
+      "bytes": 8119,
+      "mode": "0o644",
+      "sha256": "fb389d1d6a99a89089393db8bcefbf833638ec5e27eedfc68801c0f0ee60ed34",
+      "gitBlobSha1": "5a06e0f69e990fafceb4d256c42001b519f7cd37"
+    },
+    {
+      "path": "binding-table.md",
+      "bytes": 1763,
+      "mode": "0o644",
+      "sha256": "edfa0383c0368f08173a4a6bed3ad2cd57dea36ccc765f55d7b4b8a550ad71c7",
+      "gitBlobSha1": "1d484b733bc4d53473a23ea2baf45a44309a8878"
+    },
+    {
+      "path": "bindings.unfilled.json",
+      "bytes": 332,
+      "mode": "0o644",
+      "sha256": "901b5e690cd70f4115022206d80f43f738b258f6f6f15568632deceaec99e05d",
+      "gitBlobSha1": "f1304b86b4c9525e9ca59725d9ccc98a03d0b3d4"
+    },
+    {
+      "path": "prepare-package.py",
+      "bytes": 17128,
+      "mode": "0o644",
+      "sha256": "87b1ae0ad65c109e1d100d922bdae8d5950d9f0a86f29e79518543b3acb44ec1",
+      "gitBlobSha1": "5d4010399696cc822418f24ee592b2052ca54575"
+    },
+    {
+      "path": "provenance/original-pure-call.txt",
+      "bytes": 1128,
+      "mode": "0o644",
+      "sha256": "f1c0707a42571ef730523e62153f6de6231910ea18067c79cbe3860a05c98535",
+      "gitBlobSha1": "9277130d9544df88072d655e1c58eb7110b3cdcf"
+    },
+    {
+      "path": "scripts/ops/issue1505-diagnostic-cleanup-r7.mjs",
+      "bytes": 27063,
+      "mode": "0o644",
+      "sha256": "46d8b905518cf480fecdf0a3bce1a3863f4e79c92609b1cd3ec9d4231820898c",
+      "gitBlobSha1": "e9f07af8ec87eb83b3eb46c046731390ba97c1d9"
+    },
+    {
+      "path": "source-provenance.json",
+      "bytes": 1772,
+      "mode": "0o644",
+      "sha256": "d562935472fe919d4400c18071c61d1025673f5d5abdd750f30abf3e97d46065",
+      "gitBlobSha1": "d50d321326963a19a34f1a3ffaaa3cd0d4abc214"
+    },
+    {
+      "path": "static-checks.json",
+      "bytes": 1102,
+      "mode": "0o644",
+      "sha256": "245d2a64a798b81fe7fb8005afefdd3c5f7aa0e2ea95620ed61e54027c655209",
+      "gitBlobSha1": "a8e2b793ad59d6ac46a5cf624cbf60a50088db46"
+    },
+    {
+      "path": "syntax/cleanup.mjs",
+      "bytes": 9060,
+      "mode": "0o644",
+      "sha256": "c42b17e11396730b337b6d2b3d22735d669835846953e0bdf27c7ad6837a15d0",
+      "gitBlobSha1": "43d49d3eac09e0979c3e7d20612a4f56ed74b36f"
+    },
+    {
+      "path": "syntax/preflight.mjs",
+      "bytes": 6304,
+      "mode": "0o644",
+      "sha256": "7f92623f2b34c158a6d7ab23276e76c628696052b874e50c51b6bd1f4084d1ff",
+      "gitBlobSha1": "a73c7a5073510dc3e62ee3aec6ddc9311b9e1e8b"
+    },
+    {
+      "path": "syntax/retain-report.mjs",
+      "bytes": 427,
+      "mode": "0o644",
+      "sha256": "30d8be198422a7b5542a0e40dd61aa9f50d0c669b2416a9fac6867b85579bf10",
+      "gitBlobSha1": "d4b721b26a03fa1399e34b7c0717fe5419529716"
+    }
+  ]
+}

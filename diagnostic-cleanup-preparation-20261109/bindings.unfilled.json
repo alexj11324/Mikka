@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "baseCommit": null,
+  "baseTree": null,
+  "currentMainCommit": null,
+  "currentMainTree": null,
+  "freshScopeReceiptSha256": null,
+  "diagnosticEnvId": null,
+  "diagnosticValueSha256": null,
+  "diagnosticExpiresAt": null,
+  "startAt": null,
+  "latestEntryAt": null,
+  "hardEndAt": null,
+  "rootReviewGo": null
+}

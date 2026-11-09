@@ -1,0 +1,12 @@
+const env=process.env;
+// These are reviewed target pins from the prepare receipt, not a newly fabricated creation receipt.
+const expected={version:1,issue:1505,sourceCommit:SOURCE,sourceTree:TREE,projectId:PROJECT,teamId:TEAM,
+  window:{key:KEY,id:env.EXPECTED_DIAGNOSTIC_ENV_ID,valueSha256:env.EXPECTED_DIAGNOSTIC_VALUE_SHA256,expiresAt:env.EXPECTED_DIAGNOSTIC_EXPIRES_AT}};
+const codes=new Set(['cleanup_record_invalid','cleanup_window_changed','cleanup_absence_unconfirmed','platform_token_missing',
+  'platform_transport_failed','platform_request_refused','platform_response_invalid']);
+let cleanup;
+try{cleanup={status:'passed',...await removeOwnedWindow(expected,{token:env.VERCEL_TEAM_TOKEN})};}
+catch(error){cleanup={status:'failed',code:codes.has(error?.windowCode)?error.windowCode:'diagnostic_window_cleanup_failed',
+  key:KEY,id:expected.window.id,activeDeploymentRevoked:false,originalExpiresAt:expected.window.expiresAt};process.exitCode=1;}
+await mkdir('acceptance-results',{recursive:true});
+await writeFile('acceptance-results/diagnostic-window-cleanup.json',JSON.stringify(cleanup,null,2)+'\n',{mode:0o600});
