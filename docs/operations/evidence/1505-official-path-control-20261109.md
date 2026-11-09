@@ -65,3 +65,18 @@ Artifact `13697989038` 的 ZIP 为3353B，SHA256 `2aa02beb720a3e3922bafa5ba81344
 Codex 模板 `dfkgci7cyrpu3lxurfja` 和 Desktop 模板 `itr4vtex1pbr2lh6a10v` 均已按 exact ID 确认 absent。实例 `idhdaiwdpb5mu9rga5nx3`、`i60s51yizx5bykzpp83df` 均有 exact-ID absenceConfirmedById；两个分项及汇总的 cleanup 均 complete、errors=[]。入口正常 FF 关闭至 `376298951e4eee5970e2f0d00e21acb3ffba4e18`，关闭 run `42670790551` SKIPPED，canonical ref 已核对。
 
 首轮 `42668993157/A1` 因离线测试预期缺少 repository guard 而失败，35/36测试通过；SDK、OIDC、观察和清理步骤全部SKIP，没有实际云资源。修正断言后，第二版相同36个离线测试通过，再进入上述真实对照。两次结果均保留，不用后来的成功覆盖首轮失败。
+
+## 相关候选 CI 的平台失败
+
+候选 `240836cdf60998e1ef548c899c6a6c0423906a90` 的 E2B PR run
+[42672787329](https://github.com/alexj11324/Mikka/actions/runs/42672787329)
+在创建任何 job 之前失败。GitHub 公开 Summary 的 Annotations 明确报告
+`Internal server error. Correlation ID: 834e857a-e424-4756-9e23-829b662632f5`。
+该失败运行的正常重试接口返回403，信息为 `This workflow run cannot be retried`。
+同期 Browser、Cloud、Unattended 三条运行同样没有创建 job；主 CI 仅运行了
+最终 strict 汇总，因前置任务未创建而失败。这些结果不是代码测试通过或失败。
+
+实际 synthetic `f1d9dd83e82577b897f3b423341db5a24fb2b178` 的父为
+`ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d` 与上述候选；其完整 `.github`
+和 `scripts/ci` 树与前次成功的8197及当前ba1逐字一致。保留这次平台失败，
+后续正常提交仍须重新取得自己的完整CI结果，不能沿用父提交的绿色状态。
