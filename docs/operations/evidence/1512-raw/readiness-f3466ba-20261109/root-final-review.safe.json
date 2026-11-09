@@ -1,0 +1,463 @@
+{
+  "schemaVersion": 1,
+  "checkpoint": 31,
+  "source": {
+    "head": "f3466ba479ef51918790f521a288feaef5160e44",
+    "tree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+    "actualCheckout": "855245dba9accc3212dab9fd28af398af1a7e65a",
+    "baseAtMerge": "e78fccffd9dd878edd490b113ea80efcff1525e7",
+    "diffPathsFromBase": 479,
+    "p0OriginalOwnerMergePending": true
+  },
+  "ci": {
+    "runId": 42610943512,
+    "conclusion": "success",
+    "updatedAt": "2026-11-09T12:08:30Z",
+    "jobs": 22,
+    "successJobs": 21,
+    "originalOidcSkip": 1,
+    "headChecks": 51,
+    "successChecks": 40,
+    "originalConditionalSkips": 11,
+    "workflows": 14,
+    "allWorkflowSuccess": true
+  },
+  "sourcePg2": {
+    "schemaVersion": 1,
+    "runId": 42610943512,
+    "actualCheckout": "855245dba9accc3212dab9fd28af398af1a7e65a",
+    "tree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+    "receiptBlob": "43b2da8c8fdac35892a526f1f2e2be4618f672c7",
+    "rootHashVerified": true,
+    "sourceSummaryGroups": 7,
+    "sourceCounts": {
+      "tests": 361,
+      "pass": 361,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "pgSuiteRows": [
+      {
+        "suite": "test:execution-settings-db",
+        "range": [
+          1271,
+          1292
+        ],
+        "summaryCount": 1,
+        "counts": {
+          "tests": 5,
+          "pass": 5,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:test-accounts-db",
+        "range": [
+          1338,
+          1365
+        ],
+        "summaryCount": 1,
+        "counts": {
+          "tests": 17,
+          "pass": 17,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:account-db",
+        "range": [
+          1430,
+          1491
+        ],
+        "summaryCount": 1,
+        "counts": {
+          "tests": 43,
+          "pass": 43,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:worker-authorization-db",
+        "range": [
+          1904,
+          2046
+        ],
+        "summaryCount": 1,
+        "counts": {
+          "tests": 76,
+          "pass": 76,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:cloud-backend-db",
+        "range": [
+          3539,
+          5029
+        ],
+        "summaryCount": 1,
+        "counts": {
+          "tests": 215,
+          "pass": 215,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:secrets-db",
+        "range": [
+          5147,
+          5255
+        ],
+        "summaryCount": 1,
+        "counts": {
+          "tests": 93,
+          "pass": 93,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:pat-api-db",
+        "range": [
+          5431,
+          5603
+        ],
+        "summaryCount": 1,
+        "counts": {
+          "tests": 39,
+          "pass": 39,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:groups",
+        "range": [
+          5617,
+          5755
+        ],
+        "summaryCount": 2,
+        "counts": {
+          "tests": 94,
+          "pass": 94,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:bot-chats-db",
+        "range": [
+          5876,
+          6126
+        ],
+        "summaryCount": 1,
+        "counts": {
+          "tests": 144,
+          "pass": 144,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:run-publication-db",
+        "range": [
+          6182,
+          6262
+        ],
+        "summaryCount": 2,
+        "counts": {
+          "tests": 25,
+          "pass": 25,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:coordinator-issue-create-db",
+        "range": [
+          6286,
+          6306
+        ],
+        "summaryCount": 1,
+        "counts": {
+          "tests": 10,
+          "pass": 10,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:credentials-db",
+        "range": [
+          6322,
+          6334
+        ],
+        "summaryCount": 1,
+        "counts": {
+          "tests": 3,
+          "pass": 3,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:migration-steps-db",
+        "range": [
+          6359,
+          6372
+        ],
+        "summaryCount": 1,
+        "counts": {
+          "tests": 1,
+          "pass": 1,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:preview-driver",
+        "range": [
+          6395,
+          6405
+        ],
+        "summaryCount": 1,
+        "counts": {
+          "tests": 1,
+          "pass": 1,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:factory-all-dispatch-db",
+        "range": [
+          6463,
+          6517
+        ],
+        "summaryCount": 1,
+        "counts": {
+          "tests": 2,
+          "pass": 2,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:settings-activity-db",
+        "range": [
+          6540,
+          6560
+        ],
+        "summaryCount": 1,
+        "counts": {
+          "tests": 6,
+          "pass": 6,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:agent-tool-approval-db",
+        "range": [
+          6573,
+          6628
+        ],
+        "summaryCount": 2,
+        "counts": {
+          "tests": 20,
+          "pass": 20,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:factory-monitor-db",
+        "range": [
+          6654,
+          6700
+        ],
+        "summaryCount": 2,
+        "counts": {
+          "tests": 12,
+          "pass": 12,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      }
+    ],
+    "pgCounts": {
+      "tests": 806,
+      "pass": 806,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "errors": [],
+    "changedUi": {
+      "suite": "test:groups",
+      "tests": 94,
+      "blocks": [
+        12,
+        82
+      ],
+      "allPass": true,
+      "changedFile": {
+        "path": "scripts/issue-thread-acceptance.test.tsx",
+        "blob": "03657c4aec2ff53fd524459c6589c6b5fd071b17",
+        "names": [
+          {
+            "name": "a committed acceptance resolves the current producer row while its stored run outcome stays needs_input",
+            "matches": [
+              "✔ a committed acceptance resolves the current producer row while its stored run outcome stays needs_input (63.57718ms)"
+            ]
+          },
+          {
+            "name": "runs by one Agent are one 活动 row in the latest run's state; run data is unchanged (2026-11-09-0045)",
+            "matches": [
+              "✔ runs by one Agent are one 活动 row in the latest run's state; run data is unchanged (2026-11-09-0045) (1.025584ms)"
+            ]
+          },
+          {
+            "name": "an Agent change starts a new row labelled with the new Agent's own name, no switch verb",
+            "matches": [
+              "✔ an Agent change starts a new row labelled with the new Agent's own name, no switch verb (1.546179ms)"
+            ]
+          }
+        ],
+        "staticNames": 3,
+        "allExactlyOncePassed": true
+      }
+    },
+    "cleanup": {
+      "container": {
+        "createdId": "329083151bd326e5ecada8d8b5ae5471128ccd033f048e88b256eb384772955b",
+        "removedId": "329083151bd326e5ecada8d8b5ae5471128ccd033f048e88b256eb384772955b",
+        "commandAndReturnedIdMatch": true
+      },
+      "network": {
+        "created": "github_network_b17db863e9de4a24890af9bdd4d33bd1",
+        "removed": "github_network_b17db863e9de4a24890af9bdd4d33bd1",
+        "commandAndReturnedNameMatch": true
+      },
+      "originalRetainedSyntheticSchemas": "Some tests explicitly retain synthetic schemas until the disposable service is removed; this is not proof of per-schema DROP.",
+      "resourcesCreatedByReviewer": 0
+    },
+    "limits": {
+      "rootReDownloadedJobLogs": false,
+      "rawOtherThreePgRead": false,
+      "source63IsMigration": true,
+      "previousDriverEvidenceNotRelabelledAsNewSource": true,
+      "production": false
+    }
+  },
+  "native": {
+    "originalHashMatches": [
+      "lifecycle",
+      "smoke",
+      "parity",
+      "crypto",
+      "package"
+    ],
+    "arithmetic": {
+      "records": 24,
+      "checkpoints": 12,
+      "segments": 8,
+      "bucketCells": 2280,
+      "ordinalRows": 1252,
+      "errors": []
+    },
+    "full": {
+      "native": 426,
+      "web": 435
+    },
+    "first": {
+      "pair": 1,
+      "native": 158,
+      "hosted": 233
+    },
+    "firstRpcCrossEnd": {
+      "physical": 2,
+      "logical": 1
+    },
+    "rootParityPixelsViewed": false,
+    "cleanupBlob": "8bf93571e41e1acc7159e30f053856d87a07047d",
+    "ownedVmActive": 0
+  },
+  "correction": {
+    "priorCheckpoint": 29,
+    "priorReadmeAndDerivedSourceAttributionIncorrect": true,
+    "source63WasMigrations": true,
+    "driver63WasAe10Core": true,
+    "all63MatchedToOriginalPassNames": true,
+    "blob": "67736f41d1ca932ffb96efe275a7db6a334e903f"
+  },
+  "posthog": {
+    "fourMetadataCallsOnly": true,
+    "scoutsEnabled": true,
+    "scoutRunCompletionIndependent": false,
+    "project": {
+      "aiEvents": 857,
+      "combinedLogAndTraceMB": 373,
+      "apmMB": 324,
+      "logsMB": 47,
+      "replayRecordings": 16
+    },
+    "unknownComponentDifferenceMB": 2,
+    "dollarAmount": null,
+    "actualProductionAcceptedCases": 0
+  },
+  "sourceOnlyFactoryAcceptReview": true,
+  "limitations": {
+    "unreadCurrentLeafCountsNotClaimed": true,
+    "oldAe10EvidenceNotRelabelled": true,
+    "productionAcceptanceComplete": false,
+    "issueClosed": false,
+    "prMerged": false,
+    "currentActiveProductionWindowNotClaimed": true
+  },
+  "reviewRecordedAtUTC": "2026-11-09T12:16:41Z"
+}

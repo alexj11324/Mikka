@@ -1,0 +1,805 @@
+{
+  "schemaVersion": 1,
+  "head": "f3466ba479ef51918790f521a288feaef5160e44",
+  "actualCheckout": "855245dba9accc3212dab9fd28af398af1a7e65a",
+  "tree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+  "run": {
+    "id": 42610943512,
+    "attempt": 1,
+    "event": "pull_request",
+    "status": "completed",
+    "conclusion": "success",
+    "createdAt": "2026-11-09T11:40:49Z",
+    "updatedAt": "2026-11-09T12:08:30Z"
+  },
+  "jobCounts": {
+    "success": 21,
+    "skipped": 1
+  },
+  "jobs": [
+    {
+      "id": 129138895818,
+      "name": "changes / Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T11:40:52Z",
+      "completedAt": "2026-11-09T11:41:50Z"
+    },
+    {
+      "id": 129139328220,
+      "name": "Daemon checks",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T11:41:52Z",
+      "completedAt": "2026-11-09T11:45:37Z"
+    },
+    {
+      "id": 129139328386,
+      "name": "Source checks",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T11:41:52Z",
+      "completedAt": "2026-11-09T11:44:21Z"
+    },
+    {
+      "id": 129139328389,
+      "name": "Integration unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T11:41:52Z",
+      "completedAt": "2026-11-09T11:46:38Z"
+    },
+    {
+      "id": 129139328409,
+      "name": "Database checks (4/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T11:41:52Z",
+      "completedAt": "2026-11-09T11:46:11Z"
+    },
+    {
+      "id": 129139328450,
+      "name": "Core unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T11:41:52Z",
+      "completedAt": "2026-11-09T11:47:47Z"
+    },
+    {
+      "id": 129139328461,
+      "name": "Database checks (1/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T11:41:52Z",
+      "completedAt": "2026-11-09T11:45:01Z"
+    },
+    {
+      "id": 129139328469,
+      "name": "Database checks (3/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T11:41:52Z",
+      "completedAt": "2026-11-09T11:47:54Z"
+    },
+    {
+      "id": 129139328508,
+      "name": "Database checks (2/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T11:41:52Z",
+      "completedAt": "2026-11-09T11:44:40Z"
+    },
+    {
+      "id": 129139329117,
+      "name": "analytics-checks / changes / Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T11:41:52Z",
+      "completedAt": "2026-11-09T11:42:44Z"
+    },
+    {
+      "id": 129139329163,
+      "name": "image-checks / changes / Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T11:41:52Z",
+      "completedAt": "2026-11-09T11:42:37Z"
+    },
+    {
+      "id": 129139329168,
+      "name": "desktop-checks / changes / Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T11:41:52Z",
+      "completedAt": "2026-11-09T11:42:38Z"
+    },
+    {
+      "id": 129139331012,
+      "name": "Cloud credential access (OIDC)",
+      "status": "completed",
+      "conclusion": "skipped",
+      "startedAt": "2026-11-09T11:41:50Z",
+      "completedAt": "2026-11-09T11:41:50Z"
+    },
+    {
+      "id": 129139671421,
+      "name": "image-checks / image",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T11:42:40Z",
+      "completedAt": "2026-11-09T12:00:10Z"
+    },
+    {
+      "id": 129139677592,
+      "name": "desktop-checks / smoke",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T11:42:40Z",
+      "completedAt": "2026-11-09T11:47:48Z"
+    },
+    {
+      "id": 129139677619,
+      "name": "desktop-checks / checks",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T11:42:40Z",
+      "completedAt": "2026-11-09T11:45:17Z"
+    },
+    {
+      "id": 129139678341,
+      "name": "desktop-checks / icon",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T11:42:41Z",
+      "completedAt": "2026-11-09T11:43:07Z"
+    },
+    {
+      "id": 129139722427,
+      "name": "analytics-checks / Analytics SSR (full)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T11:42:46Z",
+      "completedAt": "2026-11-09T11:46:28Z"
+    },
+    {
+      "id": 129141355600,
+      "name": "analytics-checks / analytics-ssr",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T11:46:30Z",
+      "completedAt": "2026-11-09T11:46:33Z"
+    },
+    {
+      "id": 129141935329,
+      "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T11:47:51Z",
+      "completedAt": "2026-11-09T12:08:15Z"
+    },
+    {
+      "id": 129141980153,
+      "name": "Production build and browser interactions",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T11:47:56Z",
+      "completedAt": "2026-11-09T11:48:06Z"
+    },
+    {
+      "id": 129150846645,
+      "name": "UI policy (strict)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T12:08:17Z",
+      "completedAt": "2026-11-09T12:08:29Z"
+    }
+  ],
+  "headChecks": {
+    "total": 51,
+    "counts": {
+      "success": 40,
+      "skipped": 11
+    },
+    "checks": [
+      {
+        "id": 129150846645,
+        "name": "UI policy (strict)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T12:08:17Z",
+        "completedAt": "2026-11-09T12:08:29Z"
+      },
+      {
+        "id": 129141980153,
+        "name": "Production build and browser interactions",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:47:56Z",
+        "completedAt": "2026-11-09T11:48:06Z"
+      },
+      {
+        "id": 129141935329,
+        "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:47:51Z",
+        "completedAt": "2026-11-09T12:08:15Z"
+      },
+      {
+        "id": 129141355600,
+        "name": "analytics-checks / analytics-ssr",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:46:30Z",
+        "completedAt": "2026-11-09T11:46:33Z"
+      },
+      {
+        "id": 129139966508,
+        "name": "deploy",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T11:43:19Z",
+        "completedAt": "2026-11-09T11:43:18Z"
+      },
+      {
+        "id": 129139722427,
+        "name": "analytics-checks / Analytics SSR (full)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:42:46Z",
+        "completedAt": "2026-11-09T11:46:28Z"
+      },
+      {
+        "id": 129139678341,
+        "name": "desktop-checks / icon",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:42:41Z",
+        "completedAt": "2026-11-09T11:43:07Z"
+      },
+      {
+        "id": 129139677619,
+        "name": "desktop-checks / checks",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:42:40Z",
+        "completedAt": "2026-11-09T11:45:17Z"
+      },
+      {
+        "id": 129139677592,
+        "name": "desktop-checks / smoke",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:42:40Z",
+        "completedAt": "2026-11-09T11:47:48Z"
+      },
+      {
+        "id": 129139671421,
+        "name": "image-checks / image",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:42:40Z",
+        "completedAt": "2026-11-09T12:00:10Z"
+      },
+      {
+        "id": 129139341548,
+        "name": "macos-arm (18.20.8)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:41:55Z",
+        "completedAt": "2026-11-09T11:45:03Z"
+      },
+      {
+        "id": 129139341532,
+        "name": "macos-arm (22.22.1)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:41:54Z",
+        "completedAt": "2026-11-09T11:45:39Z"
+      },
+      {
+        "id": 129139332190,
+        "name": "Issue 1415 production reads and managed reminder",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T11:41:51Z",
+        "completedAt": "2026-11-09T11:41:50Z"
+      },
+      {
+        "id": 129139331012,
+        "name": "Cloud credential access (OIDC)",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T11:41:50Z",
+        "completedAt": "2026-11-09T11:41:50Z"
+      },
+      {
+        "id": 129139330825,
+        "name": "Read cache production reads",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T11:41:50Z",
+        "completedAt": "2026-11-09T11:41:50Z"
+      },
+      {
+        "id": 129139329168,
+        "name": "desktop-checks / changes / Changed files",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:41:52Z",
+        "completedAt": "2026-11-09T11:42:38Z"
+      },
+      {
+        "id": 129139329163,
+        "name": "image-checks / changes / Changed files",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:41:52Z",
+        "completedAt": "2026-11-09T11:42:37Z"
+      },
+      {
+        "id": 129139329117,
+        "name": "analytics-checks / changes / Changed files",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:41:52Z",
+        "completedAt": "2026-11-09T11:42:44Z"
+      },
+      {
+        "id": 129139328508,
+        "name": "Database checks (2/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:41:52Z",
+        "completedAt": "2026-11-09T11:44:40Z"
+      },
+      {
+        "id": 129139328469,
+        "name": "Database checks (3/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:41:52Z",
+        "completedAt": "2026-11-09T11:47:54Z"
+      },
+      {
+        "id": 129139328461,
+        "name": "Database checks (1/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:41:52Z",
+        "completedAt": "2026-11-09T11:45:01Z"
+      },
+      {
+        "id": 129139328450,
+        "name": "Core unit checks",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:41:52Z",
+        "completedAt": "2026-11-09T11:47:47Z"
+      },
+      {
+        "id": 129139328409,
+        "name": "Database checks (4/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:41:52Z",
+        "completedAt": "2026-11-09T11:46:11Z"
+      },
+      {
+        "id": 129139328389,
+        "name": "Integration unit checks",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:41:52Z",
+        "completedAt": "2026-11-09T11:46:38Z"
+      },
+      {
+        "id": 129139328386,
+        "name": "Source checks",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:41:52Z",
+        "completedAt": "2026-11-09T11:44:21Z"
+      },
+      {
+        "id": 129139328220,
+        "name": "Daemon checks",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:41:52Z",
+        "completedAt": "2026-11-09T11:45:37Z"
+      },
+      {
+        "id": 129139277778,
+        "name": "Core production API and gateway acceptance",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T11:41:43Z",
+        "completedAt": "2026-11-09T11:41:43Z"
+      },
+      {
+        "id": 129139017478,
+        "name": "publish",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T11:41:07Z",
+        "completedAt": "2026-11-09T11:41:07Z"
+      },
+      {
+        "id": 129139017117,
+        "name": "cleanup",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T11:41:07Z",
+        "completedAt": "2026-11-09T11:41:07Z"
+      },
+      {
+        "id": 129139016690,
+        "name": "subscriptions",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T11:41:07Z",
+        "completedAt": "2026-11-09T11:41:07Z"
+      },
+      {
+        "id": 129139016179,
+        "name": "validate",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T11:41:07Z",
+        "completedAt": "2026-11-09T11:41:07Z"
+      },
+      {
+        "id": 129139015525,
+        "name": "await-web",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T11:41:07Z",
+        "completedAt": "2026-11-09T11:41:07Z"
+      },
+      {
+        "id": 129139015117,
+        "name": "check",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T11:41:07Z",
+        "completedAt": "2026-11-09T11:41:06Z"
+      },
+      {
+        "id": 129138896242,
+        "name": "site-search",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:40:52Z",
+        "completedAt": "2026-11-09T11:47:36Z"
+      },
+      {
+        "id": 129138895818,
+        "name": "changes / Changed files",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:40:52Z",
+        "completedAt": "2026-11-09T11:41:50Z"
+      },
+      {
+        "id": 129138895164,
+        "name": "runtime",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:40:52Z",
+        "completedAt": "2026-11-09T11:43:00Z"
+      },
+      {
+        "id": 129138895146,
+        "name": "Workspace governance HTTP (Item 11)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:40:52Z",
+        "completedAt": "2026-11-09T11:42:23Z"
+      },
+      {
+        "id": 129138895123,
+        "name": "test",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:40:52Z",
+        "completedAt": "2026-11-09T11:41:06Z"
+      },
+      {
+        "id": 129138895004,
+        "name": "package",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:40:53Z",
+        "completedAt": "2026-11-09T11:41:52Z"
+      },
+      {
+        "id": 129138894930,
+        "name": "test",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:40:52Z",
+        "completedAt": "2026-11-09T11:43:18Z"
+      },
+      {
+        "id": 129138894903,
+        "name": "custody",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:40:52Z",
+        "completedAt": "2026-11-09T11:44:26Z"
+      },
+      {
+        "id": 129138894740,
+        "name": "ssh",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:40:52Z",
+        "completedAt": "2026-11-09T11:46:42Z"
+      },
+      {
+        "id": 129138894701,
+        "name": "Read cache production guards",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:40:52Z",
+        "completedAt": "2026-11-09T11:41:50Z"
+      },
+      {
+        "id": 129138894674,
+        "name": "Read cache API and CLI",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:40:52Z",
+        "completedAt": "2026-11-09T11:44:49Z"
+      },
+      {
+        "id": 129138894597,
+        "name": "node22-unit",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:40:52Z",
+        "completedAt": "2026-11-09T11:44:27Z"
+      },
+      {
+        "id": 129138894596,
+        "name": "Core production offline guards",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:40:52Z",
+        "completedAt": "2026-11-09T11:41:43Z"
+      },
+      {
+        "id": 129138894507,
+        "name": "Local driver (macOS permissions, nonblocking)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:40:53Z",
+        "completedAt": "2026-11-09T11:41:31Z"
+      },
+      {
+        "id": 129138894481,
+        "name": "backend",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:40:52Z",
+        "completedAt": "2026-11-09T11:43:52Z"
+      },
+      {
+        "id": 129138894310,
+        "name": "Browser tests (before merge)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:40:52Z",
+        "completedAt": "2026-11-09T11:40:56Z"
+      },
+      {
+        "id": 129138894033,
+        "name": "Local driver (Linux Xvfb)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:40:52Z",
+        "completedAt": "2026-11-09T11:41:15Z"
+      },
+      {
+        "id": 129138867278,
+        "name": "GitGuardian Security Checks",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T11:40:46Z",
+        "completedAt": "2026-11-09T11:41:17Z"
+      }
+    ]
+  },
+  "workflows": {
+    "total": 14,
+    "counts": {
+      "success": 14
+    },
+    "runs": [
+      {
+        "id": 42610943507,
+        "name": "Mikka cloud core compatibility",
+        "path": ".github/workflows/self-hosted-production.yml",
+        "event": "pull_request",
+        "attempt": 1,
+        "head": "f3466ba479ef51918790f521a288feaef5160e44",
+        "status": "completed",
+        "conclusion": "success",
+        "createdAt": "2026-11-09T11:40:49Z",
+        "updatedAt": "2026-11-09T11:41:43Z"
+      },
+      {
+        "id": 42610943434,
+        "name": "Read cache production acceptance",
+        "path": ".github/workflows/read-cache-production.yml",
+        "event": "pull_request",
+        "attempt": 1,
+        "head": "f3466ba479ef51918790f521a288feaef5160e44",
+        "status": "completed",
+        "conclusion": "success",
+        "createdAt": "2026-11-09T11:40:49Z",
+        "updatedAt": "2026-11-09T11:41:51Z"
+      },
+      {
+        "id": 42610943414,
+        "name": "Workspace governance acceptance",
+        "path": ".github/workflows/workspace-governance-acceptance.yml",
+        "event": "pull_request",
+        "attempt": 1,
+        "head": "f3466ba479ef51918790f521a288feaef5160e44",
+        "status": "completed",
+        "conclusion": "success",
+        "createdAt": "2026-11-09T11:40:49Z",
+        "updatedAt": "2026-11-09T11:42:24Z"
+      },
+      {
+        "id": 42610943439,
+        "name": "Unattended sandbox acceptance",
+        "path": ".github/workflows/unattended-sandbox.yml",
+        "event": "pull_request",
+        "attempt": 1,
+        "head": "f3466ba479ef51918790f521a288feaef5160e44",
+        "status": "completed",
+        "conclusion": "success",
+        "createdAt": "2026-11-09T11:40:49Z",
+        "updatedAt": "2026-11-09T11:43:00Z"
+      },
+      {
+        "id": 42610943418,
+        "name": "Device gateway",
+        "path": ".github/workflows/device-gateway.yml",
+        "event": "pull_request",
+        "attempt": 1,
+        "head": "f3466ba479ef51918790f521a288feaef5160e44",
+        "status": "completed",
+        "conclusion": "success",
+        "createdAt": "2026-11-09T11:40:49Z",
+        "updatedAt": "2026-11-09T11:43:19Z"
+      },
+      {
+        "id": 42610943422,
+        "name": "Cloud computer backend",
+        "path": ".github/workflows/cloud-computer.yml",
+        "event": "pull_request",
+        "attempt": 1,
+        "head": "f3466ba479ef51918790f521a288feaef5160e44",
+        "status": "completed",
+        "conclusion": "success",
+        "createdAt": "2026-11-09T11:40:49Z",
+        "updatedAt": "2026-11-09T11:43:53Z"
+      },
+      {
+        "id": 42610943440,
+        "name": "Browser gate",
+        "path": ".github/workflows/browser-gate.yml",
+        "event": "pull_request",
+        "attempt": 1,
+        "head": "f3466ba479ef51918790f521a288feaef5160e44",
+        "status": "completed",
+        "conclusion": "success",
+        "createdAt": "2026-11-09T11:40:49Z",
+        "updatedAt": "2026-11-09T11:40:56Z"
+      },
+      {
+        "id": 42610943452,
+        "name": "E2B additive runtime release",
+        "path": ".github/workflows/e2b-official-runtime.yml",
+        "event": "pull_request",
+        "attempt": 1,
+        "head": "f3466ba479ef51918790f521a288feaef5160e44",
+        "status": "completed",
+        "conclusion": "success",
+        "createdAt": "2026-11-09T11:40:49Z",
+        "updatedAt": "2026-11-09T11:41:07Z"
+      },
+      {
+        "id": 42610943718,
+        "name": "E2B subscription custody",
+        "path": ".github/workflows/e2b-byos.yml",
+        "event": "pull_request",
+        "attempt": 1,
+        "head": "f3466ba479ef51918790f521a288feaef5160e44",
+        "status": "completed",
+        "conclusion": "success",
+        "createdAt": "2026-11-09T11:40:49Z",
+        "updatedAt": "2026-11-09T11:44:27Z"
+      },
+      {
+        "id": 42610943421,
+        "name": "Local device Node 22",
+        "path": ".github/workflows/local-device-node22.yml",
+        "event": "pull_request",
+        "attempt": 1,
+        "head": "f3466ba479ef51918790f521a288feaef5160e44",
+        "status": "completed",
+        "conclusion": "success",
+        "createdAt": "2026-11-09T11:40:49Z",
+        "updatedAt": "2026-11-09T11:45:40Z"
+      },
+      {
+        "id": 42610943475,
+        "name": "Read cache API acceptance",
+        "path": ".github/workflows/read-cache.yml",
+        "event": "pull_request",
+        "attempt": 1,
+        "head": "f3466ba479ef51918790f521a288feaef5160e44",
+        "status": "completed",
+        "conclusion": "success",
+        "createdAt": "2026-11-09T11:40:49Z",
+        "updatedAt": "2026-11-09T11:44:50Z"
+      },
+      {
+        "id": 42610943420,
+        "name": "SSH device backend",
+        "path": ".github/workflows/ssh-device-backend.yml",
+        "event": "pull_request",
+        "attempt": 1,
+        "head": "f3466ba479ef51918790f521a288feaef5160e44",
+        "status": "completed",
+        "conclusion": "success",
+        "createdAt": "2026-11-09T11:40:49Z",
+        "updatedAt": "2026-11-09T11:46:43Z"
+      },
+      {
+        "id": 42610943708,
+        "name": "Site search read contract",
+        "path": ".github/workflows/site-search.yml",
+        "event": "pull_request",
+        "attempt": 1,
+        "head": "f3466ba479ef51918790f521a288feaef5160e44",
+        "status": "completed",
+        "conclusion": "success",
+        "createdAt": "2026-11-09T11:40:49Z",
+        "updatedAt": "2026-11-09T11:47:36Z"
+      },
+      {
+        "id": 42610943512,
+        "name": "CI",
+        "path": ".github/workflows/ui-policy.yml",
+        "event": "pull_request",
+        "attempt": 1,
+        "head": "f3466ba479ef51918790f521a288feaef5160e44",
+        "status": "completed",
+        "conclusion": "success",
+        "createdAt": "2026-11-09T11:40:49Z",
+        "updatedAt": "2026-11-09T12:08:30Z"
+      }
+    ]
+  },
+  "evidenceScope": {
+    "sourceAndPg2OriginalsArchived": true,
+    "nativeJobSuccessSeen": true,
+    "nativeBudgetReadbackPending": true,
+    "otherCurrentLeafCountsNotClaimed": true,
+    "previousAe10EvidenceBoundToItsOriginalTree": true,
+    "syntheticPostHogQueriesNewThisPhase": 0,
+    "productionAcceptedCases": 0
+  },
+  "errors": [],
+  "recordedAtUTC": "2026-11-09T12:16:41Z",
+  "metadataObservedBetweenUTC": [
+    "2026-11-09T12:07:07Z",
+    "2026-11-09T12:10:30Z"
+  ]
+}

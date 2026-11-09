@@ -1,0 +1,423 @@
+{
+  "schemaVersion": 1,
+  "issue": 1512,
+  "kind": "evidence-attribution-correction",
+  "affectedCheckpoint": {
+    "name": "CP29",
+    "commit": "df0d632f4108f2f81a9a8db0e0e64ed099d25f99",
+    "affectedDerivedBlob": "52057ad63bccd8c3b580c3610c4cb5011128aded",
+    "incorrectField": "source.driverComplete63Passed",
+    "incorrectClaim": "Source checks' 63-test Node summary belongs to run-observability driver"
+  },
+  "actualSourceSummary": {
+    "job": 129114784935,
+    "blob": "38bf977089b0ca71c735d992d5d849f4195adcbb",
+    "commandLine": 801,
+    "summaryLine": 870,
+    "script": "test:migrations",
+    "tests": 63,
+    "pass": 63,
+    "fail": 0,
+    "skip": 0
+  },
+  "driverActualCoverage": {
+    "job": 129114784847,
+    "blob": "e1921c9d3b784498cb31f1b94320ba881d734144",
+    "nxTarget": "ci-tasks:core-53",
+    "script": "test:dev-local",
+    "commandLine": 6500,
+    "file": "scripts/acceptance/run-observability.test.mjs",
+    "full63CaseNamesFromImmutableGreen": "2065169fef0a875735476ca126371351a2512dde",
+    "sourceBlob": "aab0a21c4c8fadb9df81ff87ada4fa23198fa575",
+    "matchedUniqueCaseCount": 63,
+    "cases": [
+      {
+        "name": "preflight reads both exact subscription paths without creating profiles, changing settings or submitting tasks",
+        "lines": [
+          6583
+        ]
+      },
+      {
+        "name": "preflight excludes only a version-bound Factory task proven to belong to another workspace",
+        "lines": [
+          6584
+        ]
+      },
+      {
+        "name": "preflight keeps same-workspace, missing and mismatched Factory scope proofs blocked",
+        "lines": [
+          6585
+        ]
+      },
+      {
+        "name": "preflight does not convert current-workspace failed or blocked Factory tasks into terminal tasks",
+        "lines": [
+          6586
+        ]
+      },
+      {
+        "name": "preflight does not request scope details for already settled Factory tasks",
+        "lines": [
+          6587
+        ]
+      },
+      {
+        "name": "foreign historical Factory tasks remain untouched while failed owned acceptance still cancels its task",
+        "lines": [
+          6588
+        ]
+      },
+      {
+        "name": "a default team switches only this login session to its verified personal workspace before reading Coordinator",
+        "lines": [
+          6589
+        ]
+      },
+      {
+        "name": "workspace selection rejects ambiguous choices, teams and another account personal membership before switching",
+        "lines": [
+          6590
+        ]
+      },
+      {
+        "name": "workspace switch acknowledgement and cookie readback failures stop before Coordinator and close the session",
+        "lines": [
+          6591
+        ]
+      },
+      {
+        "name": "unsafe configuration blocks before any model call and reports only closed failure codes",
+        "lines": [
+          6592
+        ]
+      },
+      {
+        "name": "two executed cases retain exact native receipts, restore model/profile state and never fabricate replay evidence",
+        "lines": [
+          6593
+        ]
+      },
+      {
+        "name": "successful terminal runs close only their own machines and retain task evidence",
+        "lines": [
+          6594
+        ]
+      },
+      {
+        "name": "a missing machine requires a fresh owned run and an explicit null machine read",
+        "lines": [
+          6595
+        ]
+      },
+      {
+        "name": "machine failures never turn a completed task green and do not prevent closing another owned machine",
+        "lines": [
+          6596
+        ]
+      },
+      {
+        "name": "legacy Factory tasks still require review and verify before the normal deliverable acceptance",
+        "lines": [
+          6597
+        ]
+      },
+      {
+        "name": "missing, failed or stale Factory checks never reach approval, including legacy verify",
+        "lines": [
+          6598
+        ]
+      },
+      {
+        "name": "deliverable approval requires its receipt, never accepts a repository and never retries a lost response",
+        "lines": [
+          6599
+        ]
+      },
+      {
+        "name": "uncertain mutation responses never resubmit and still reconcile own temporary settings",
+        "lines": [
+          6600
+        ]
+      },
+      {
+        "name": "wrong provider/model and an extra native attempt stop the case without retrying",
+        "lines": [
+          6601
+        ]
+      },
+      {
+        "name": "pure source and budget guards reject shared credentials, inherited model choices and retries",
+        "lines": [
+          6602
+        ]
+      },
+      {
+        "name": "cleanup preserves a concurrent model edit and reports incomplete restoration",
+        "lines": [
+          6603
+        ]
+      },
+      {
+        "name": "prepare is explicit, requires execution and restores only its acknowledged settings",
+        "lines": [
+          6604
+        ]
+      },
+      {
+        "name": "prepare refuses visible activity in authorized workspaces and inherited model choices without changing settings",
+        "lines": [
+          6605
+        ]
+      },
+      {
+        "name": "a blocked case does not prevent preparation and execution of another available model",
+        "lines": [
+          6606
+        ]
+      },
+      {
+        "name": "preparation failures restore acknowledged writes but never guess after a lost response",
+        "lines": [
+          6607
+        ]
+      },
+      {
+        "name": "restoration failures and concurrent edits remain visible without overwriting them",
+        "lines": [
+          6608
+        ]
+      },
+      {
+        "name": "issue inventory follows real opaque cursors beyond 100 rows and rejects a moving scan",
+        "lines": [
+          6609
+        ]
+      },
+      {
+        "name": "browser submission requires one executed case and does not authenticate on invalid options",
+        "lines": [
+          6610
+        ]
+      },
+      {
+        "name": "browser mode publishes readiness then observes the real-shaped UI click through push without an API submission",
+        "lines": [
+          6611
+        ]
+      },
+      {
+        "name": "browser waiting times out or blocks changed UI text without sending or repeating a task",
+        "lines": [
+          6612
+        ]
+      },
+      {
+        "name": "live transport waits for actual invalidations, rejects disconnects and keeps capabilities out of reports",
+        "lines": [
+          6613
+        ]
+      },
+      {
+        "name": "implicit default preflight requires server absence evidence and never writes a preference",
+        "lines": [
+          6614
+        ]
+      },
+      {
+        "name": "implicit default restores absence with the stored binding and revision, not the catalogue option",
+        "lines": [
+          6615
+        ]
+      },
+      {
+        "name": "implicit default never overwrites a preference created after preflight",
+        "lines": [
+          6616
+        ]
+      },
+      {
+        "name": "implicit default stops after a lost or incomplete first selection receipt without guessing ownership",
+        "lines": [
+          6617
+        ]
+      },
+      {
+        "name": "implicit default preserves a same-value concurrent rewrite when the revision no longer matches",
+        "lines": [
+          6618
+        ]
+      },
+      {
+        "name": "implicit default checks absence once after a lost restoration response and does not repeat deletion",
+        "lines": [
+          6619
+        ]
+      },
+      {
+        "name": "all Factory reads, writes, approval and cleanup pin the authorized personal workspace even when a team is listed first",
+        "lines": [
+          6620
+        ]
+      },
+      {
+        "name": "Factory authority refusals remain failures without retrying an implicit workspace",
+        "lines": [
+          6621
+        ]
+      },
+      {
+        "name": "Factory cleanup keeps its explicit workspace and exposes revoked authority or mismatch instead of retrying elsewhere",
+        "lines": [
+          6622
+        ]
+      },
+      {
+        "name": "malformed or foreign personal workspace selection stops before any Factory call",
+        "lines": [
+          6623
+        ]
+      },
+      {
+        "name": "workspace A idle cannot hide workspace B activity in either scoped reader",
+        "lines": [
+          6624
+        ]
+      },
+      {
+        "name": "idle proof covers every authorized workspace but reports only the existing 30-day visible window and is not atomic",
+        "lines": [
+          6625
+        ]
+      },
+      {
+        "name": "workspace inventory errors, missing pages, unknown memberships and the workspace cap fail before changing settings",
+        "lines": [
+          6626
+        ]
+      },
+      {
+        "name": "a changed workspace inventory cannot turn an incomplete scan into an idle proof",
+        "lines": [
+          6627
+        ]
+      },
+      {
+        "name": "scoped run reads reject saturation, delta or missing rows, malformed data and a foreign scope",
+        "lines": [
+          6628
+        ]
+      },
+      {
+        "name": "fresh authorization failures in another workspace and during restoration remain visible",
+        "lines": [
+          6629
+        ]
+      },
+      {
+        "name": "the scan rejects a 30-day row expiry at or during the scan and never filters it away",
+        "lines": [
+          6630
+        ]
+      },
+      {
+        "name": "one overall scan deadline and backwards time fail closed without extending the scan per workspace",
+        "lines": [
+          6631
+        ]
+      },
+      {
+        "name": "a real request AbortSignal expires within the remaining scan deadline and closes the login session",
+        "lines": [
+          6632
+        ]
+      },
+      {
+        "name": "the finite workspace cap and 199-row boundary can succeed without paging or widening the 30-day read",
+        "lines": [
+          6633
+        ]
+      },
+      {
+        "name": "profile preflight refuses workspace admission denied instead of treating any 404 as absence",
+        "lines": [
+          6634
+        ]
+      },
+      {
+        "name": "profile cleanup refuses workspace admission denied without falsely marking an existing profile archived",
+        "lines": [
+          6635
+        ]
+      },
+      {
+        "name": "profile preflight refuses profile scope denied instead of treating any 404 as absence",
+        "lines": [
+          6636
+        ]
+      },
+      {
+        "name": "profile cleanup refuses profile scope denied without falsely marking an existing profile archived",
+        "lines": [
+          6637
+        ]
+      },
+      {
+        "name": "profile preflight refuses unknown error instead of treating any 404 as absence",
+        "lines": [
+          6638
+        ]
+      },
+      {
+        "name": "profile cleanup refuses unknown error without falsely marking an existing profile archived",
+        "lines": [
+          6639
+        ]
+      },
+      {
+        "name": "profile preflight refuses nested not-found code instead of treating any 404 as absence",
+        "lines": [
+          6640
+        ]
+      },
+      {
+        "name": "profile cleanup refuses nested not-found code without falsely marking an existing profile archived",
+        "lines": [
+          6641
+        ]
+      },
+      {
+        "name": "profile preflight refuses malformed JSON instead of treating any 404 as absence",
+        "lines": [
+          6642
+        ]
+      },
+      {
+        "name": "profile cleanup refuses malformed JSON without falsely marking an existing profile archived",
+        "lines": [
+          6643
+        ]
+      },
+      {
+        "name": "profile absence preflight accepts only the normal authorized missing-profile response",
+        "lines": [
+          6644
+        ]
+      },
+      {
+        "name": "profile absence cleanup accepts an authorized exact missing-profile code without a DELETE retry",
+        "lines": [
+          6645
+        ]
+      }
+    ],
+    "isolatedFileSummaryReportedInCore": false,
+    "allCasesActuallyPassInCombinedCoreCommand": true
+  },
+  "scope": {
+    "existingRawBytesUnchanged": true,
+    "overallCiNativePassUnaffected": true,
+    "noTestRerun": true,
+    "noProductionClaim": true,
+    "correctedInterpretation": "Source has 63 migration tests. The driver has 63 independent cases from exact CP27; all63 names are individually present as passing cases in actual ae10 Core test:dev-local. Core does not print a separate 63-driver file summary."
+  }
+}

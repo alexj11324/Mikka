@@ -1,0 +1,8 @@
+{
+  "exitCode": 0,
+  "stdout": "{\"verified\": true, \"totals\": {\"webLogin\": 435, \"nativeLogin\": 426, \"startup-bundled\": 158, \"startup-hosted\": 233}, \"records\": 24, \"checkpoints\": 12, \"buckets\": [17, 78], \"diagnosticsStatus\": \"incomplete\", \"projectedQueries\": 1252, \"overflow\": false, \"unknowns\": {\"nativeLogin\": {\"context\": 91, \"statement\": 129}, \"webLogin\": {\"context\": 87, \"statement\": 132}, \"startup-bundled\": {\"context\": 53, \"statement\": 53}, \"startup-hosted\": {\"context\": 53, \"statement\": 77}}, \"cleanupAfter\": {\"lifecycle\": {\"owner\": true, \"peer\": true}, \"smoke\": {\"owner\": true, \"peer\": true}}, \"nativeFiles\": 308}\n",
+  "stderr": "",
+  "invocation": "python3 verify-native-originals.py",
+  "sourceRevision": "855245dba9accc3212dab9fd28af398af1a7e65a",
+  "sourceTree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2"
+}

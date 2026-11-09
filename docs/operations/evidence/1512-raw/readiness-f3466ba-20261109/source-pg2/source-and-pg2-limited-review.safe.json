@@ -1,0 +1,1772 @@
+{
+  "schemaVersion": 1,
+  "name": "source-and-pg2-limited-review.safe.json",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequest": 1799,
+  "runId": 42610943512,
+  "scope": {
+    "jobIds": [
+      129139328386,
+      129139328508
+    ],
+    "workflowJobLogAcquisitions": [
+      {
+        "jobId": 129139328386,
+        "count": 1,
+        "afterTerminal": true
+      },
+      {
+        "jobId": 129139328508,
+        "count": 1,
+        "afterTerminal": true
+      }
+    ],
+    "otherJobsRead": [],
+    "oldJobLogsDownloaded": 0,
+    "testsRunByReviewer": 0,
+    "computeCreated": 0,
+    "refWrites": 0,
+    "workflowActions": 0
+  },
+  "sourceBinding": {
+    "head": "f3466ba479ef51918790f521a288feaef5160e44",
+    "actualCheckout": "855245dba9accc3212dab9fd28af398af1a7e65a",
+    "tree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+    "actualCheckoutEvidence": "git log -1 --format=%H in each assigned original log",
+    "treeEvidence": "Root independently read Git commit API: parents [e78fccffd9dd878edd490b113ea80efcff1525e7, f3466ba479ef51918790f521a288feaef5160e44], tree102bc. This reviewer independently prepared and reconstructed that exact tree; remote whole-tree equality was confirmed by Root.",
+    "preparationReceipt": "1e21ba2a1e247d61d8ad03f9a3a5b1e721748de8",
+    "workflow": {
+      "path": ".github/workflows/ui-policy.yml",
+      "gitBlob": "e3938ad5c343fb14d60709e014cb3d9a3189b104"
+    }
+  },
+  "selection": {
+    "newChangesLog": {
+      "gitBlob": "d381ccc263060f0cc701b9ffd1cd98a094745644",
+      "bytes": 970097,
+      "sha256": "0e2e3998f97339cbbd5bf0492a465c92d7cea94936d09e66136bbd628ec14f46",
+      "owner": "Root; not downloaded again here"
+    },
+    "unchangedExactSelection": {
+      "gitBlob": "f9a8897406fe2e318823ceed90a2810744a0b1d5",
+      "bytes": 389272,
+      "sha256": "e1305a79e9240dc4e1c1dca2b997fbea4bf31ef8d520d676c837e7167baed178",
+      "full": true,
+      "unitTasks": 86,
+      "dbSuites": 72
+    },
+    "jobSelection": {
+      "shard": "2/4",
+      "total": 72,
+      "scripts": [
+        "test:account-db",
+        "test:agent-tool-approval-db",
+        "test:bot-chats-db",
+        "test:cloud-backend-db",
+        "test:coordinator-issue-create-db",
+        "test:credentials-db",
+        "test:execution-settings-db",
+        "test:factory-all-dispatch-db",
+        "test:factory-monitor-db",
+        "test:groups",
+        "test:migration-steps-db",
+        "test:pat-api-db",
+        "test:preview-driver",
+        "test:run-publication-db",
+        "test:secrets-db",
+        "test:settings-activity-db",
+        "test:test-accounts-db",
+        "test:worker-authorization-db"
+      ]
+    },
+    "allJobEnvSelectionSnapshots": [
+      {
+        "line": 169,
+        "count": 72,
+        "exact": true
+      },
+      {
+        "line": 268,
+        "count": 72,
+        "exact": true
+      },
+      {
+        "line": 298,
+        "count": 72,
+        "exact": true
+      },
+      {
+        "line": 340,
+        "count": 72,
+        "exact": true
+      },
+      {
+        "line": 374,
+        "count": 72,
+        "exact": true
+      },
+      {
+        "line": 406,
+        "count": 72,
+        "exact": true
+      },
+      {
+        "line": 446,
+        "count": 72,
+        "exact": true
+      },
+      {
+        "line": 663,
+        "count": 72,
+        "exact": true
+      },
+      {
+        "line": 691,
+        "count": 72,
+        "exact": true
+      },
+      {
+        "line": 736,
+        "count": 72,
+        "exact": true
+      },
+      {
+        "line": 781,
+        "count": 72,
+        "exact": true
+      },
+      {
+        "line": 805,
+        "count": 72,
+        "exact": true
+      },
+      {
+        "line": 850,
+        "count": 72,
+        "exact": true
+      },
+      {
+        "line": 1143,
+        "count": 72,
+        "exact": true
+      },
+      {
+        "line": 1169,
+        "count": 72,
+        "exact": true
+      },
+      {
+        "line": 6724,
+        "count": 72,
+        "exact": true
+      }
+    ],
+    "selectedAndExecutedShardSetsExact": true
+  },
+  "originals": [
+    {
+      "name": "source-job-129139328386.original.log",
+      "jobId": 129139328386,
+      "bytes": 136596,
+      "sha256": "ef507db80b2f84eb5839a088e9d51b31de13bc98bf980a36435c59b27ea2f798",
+      "gitBlob": "bbb13eb0f9bba661c31250ac978ca2ab41d6cd35",
+      "acquisitionCount": 1,
+      "source": "Unmodified decoded original log from GitHub; UTF-8 byte/hash accounting retains BOM/ANSI as returned.",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42610943512/job/129139328386",
+      "remoteHashVerified": true
+    },
+    {
+      "name": "postgres-2of4-job-129139328508.original.log",
+      "jobId": 129139328508,
+      "bytes": 1181925,
+      "sha256": "c1c6e76e7c9bb9a90824fdb542d52f7af28ad81a07f6336f518cfc12b9f53578",
+      "gitBlob": "1413bdf4bd42d20dc882bf3268d722527a2091e5",
+      "acquisitionCount": 1,
+      "source": "Unmodified decoded original log from GitHub; UTF-8 byte/hash accounting retains BOM/ANSI as returned.",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42610943512/job/129139328508",
+      "remoteHashVerified": true
+    }
+  ],
+  "jobs": [
+    {
+      "id": 129139328386,
+      "name": "Source checks",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Shadow selection against full baseline scenarios",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Run pnpm check:cloud-boundary",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Verify all production release credentials use existing Infisical OIDC",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Verify production auth and lease acceptance drivers without credentials",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Run pnpm lint:code",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Run node apps/api/scripts/generate-routes.mjs --check",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        },
+        {
+          "name": "Run pnpm lint:runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Run pnpm test:api",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        },
+        {
+          "name": "Run pnpm --filter @mikka/frontend test",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "Run pnpm typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        },
+        {
+          "name": "Run pnpm --filter @mikka/protocol typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14
+        },
+        {
+          "name": "Run pnpm --filter @mikka/mobile typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        },
+        {
+          "name": "Audit business UI composition",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16
+        },
+        {
+          "name": "Show audit summary",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17
+        },
+        {
+          "name": "Upload detailed audit",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18
+        },
+        {
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 35
+        },
+        {
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 36
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 37
+        }
+      ]
+    },
+    {
+      "id": 129139328508,
+      "name": "Database checks (2/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Name the native dependency package cache",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Restore native dependency packages",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Install native dependencies for the CLI approval database roundtrip",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Save native dependency packages (main only)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 8
+        },
+        {
+          "name": "Generate ephemeral test-only auth secret",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        },
+        {
+          "name": "Bootstrap empty database using tracked migrations only",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Run pnpm test:e2e:setup",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        },
+        {
+          "name": "Bind the disposable test environment to the exact checkout",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "Verify local execution identities and repository records (isolated Postgres)",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 13
+        },
+        {
+          "name": "Verify thread sharing, membership and privacy against isolated database",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 14
+        },
+        {
+          "name": "Required DB suites (temporary Postgres 17, no skips)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        },
+        {
+          "name": "Preserve synthetic CLI approval database evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16
+        },
+        {
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 30
+        },
+        {
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 31
+        },
+        {
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 32
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 33
+        }
+      ]
+    }
+  ],
+  "execution": [
+    {
+      "job": 129139328386,
+      "checkout": "855245dba9accc3212dab9fd28af398af1a7e65a",
+      "checkoutLine": 133,
+      "firstLogAt": "2026-11-09T11:41:53.4400816Z",
+      "lastLogAt": "2026-11-09T11:44:19.4409992Z",
+      "testOrRunnerFailureMarkers": [],
+      "versionLines": [
+        {
+          "line": 215,
+          "text": "node: v24.22.2"
+        },
+        {
+          "line": 216,
+          "text": "npm: 11.19.1"
+        },
+        {
+          "line": 485,
+          "text": "Done in 15s using pnpm v10.34.3"
+        }
+      ]
+    },
+    {
+      "job": 129139328508,
+      "checkout": "855245dba9accc3212dab9fd28af398af1a7e65a",
+      "checkoutLine": 250,
+      "firstLogAt": "2026-11-09T11:41:52.7673911Z",
+      "lastLogAt": "2026-11-09T11:44:38.0449632Z",
+      "testOrRunnerFailureMarkers": [],
+      "versionLines": [
+        {
+          "line": 355,
+          "text": "node: v24.22.2"
+        },
+        {
+          "line": 356,
+          "text": "npm: 11.19.1"
+        },
+        {
+          "line": 646,
+          "text": "Done in 12.4s using pnpm v10.34.3"
+        },
+        {
+          "line": 6795,
+          "text": " waiting for server to start....2026-11-09 11:42:00.268 UTC [48] LOG:  starting PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit"
+        },
+        {
+          "line": 6819,
+          "text": " 2026-11-09 11:42:00.523 UTC [1] LOG:  starting PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit"
+        }
+      ]
+    }
+  ],
+  "sourceChecks": {
+    "totals": {
+      "tests": 361,
+      "pass": 361,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "summaryBlocks": [
+      {
+        "name": "cloud-boundary",
+        "startLine": 656,
+        "tests": 46,
+        "suites": 0,
+        "pass": 46,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 3083.640792
+      },
+      {
+        "name": "release credential unit guards",
+        "startLine": 687,
+        "tests": 7,
+        "suites": 0,
+        "pass": 7,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 48.5319
+      },
+      {
+        "name": "production auth/lease/queue/smoke offline guards",
+        "startLine": 740,
+        "tests": 29,
+        "suites": 0,
+        "pass": 29,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 322.867996
+      },
+      {
+        "name": "migration tests",
+        "startLine": 846,
+        "tests": 63,
+        "suites": 0,
+        "pass": 63,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 335.923627
+      },
+      {
+        "name": "API TypeScript tests",
+        "startLine": 1022,
+        "tests": 102,
+        "suites": 0,
+        "pass": 102,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 4177.989949
+      },
+      {
+        "name": "API/build-contract TAP tests",
+        "startLine": 1496,
+        "tests": 69,
+        "suites": 0,
+        "pass": 69,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 9953.420518
+      },
+      {
+        "name": "frontend tests",
+        "startLine": 1583,
+        "tests": 45,
+        "suites": 0,
+        "pass": 45,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 23190.409406
+      }
+    ],
+    "actualCommands": [
+      {
+        "line": 278,
+        "text": "##[group]Run pnpm install --frozen-lockfile"
+      },
+      {
+        "line": 489,
+        "text": "##[group]Run node scripts/ci/shadow.mjs"
+      },
+      {
+        "line": 589,
+        "text": "##[group]Run pnpm check:cloud-boundary"
+      },
+      {
+        "line": 606,
+        "text": "> next-app@0.0.1 check:cloud-boundary /home/runner/work/Mikka/Mikka"
+      },
+      {
+        "line": 607,
+        "text": "> node scripts/cloud-boundary-policy.mjs && node --test scripts/cloud-boundary-policy.test.mjs"
+      },
+      {
+        "line": 664,
+        "text": "##[group]Run node --test scripts/mobile-ota-credentials.test.mjs scripts/release/apple-credentials.test.mjs"
+      },
+      {
+        "line": 695,
+        "text": "##[group]Run node --test scripts/acceptance/auth-audit-production.test.mjs scripts/acceptance/cloud-lease-audit.test.mjs scripts/acceptance/cloud-lease-recovery.test.mjs scripts/acceptance/shared-account-queue.test.mjs scripts/ops/production-smoke.test.mjs"
+      },
+      {
+        "line": 748,
+        "text": "##[group]Run pnpm lint:code"
+      },
+      {
+        "line": 765,
+        "text": "> next-app@0.0.1 lint:code /home/runner/work/Mikka/Mikka"
+      },
+      {
+        "line": 766,
+        "text": "> oxlint --deny-warnings && pnpm check:migrations && pnpm test:migrations && pnpm check:factory"
+      },
+      {
+        "line": 771,
+        "text": "> next-app@0.0.1 check:migrations /home/runner/work/Mikka/Mikka"
+      },
+      {
+        "line": 772,
+        "text": "> node scripts/check-migrations.mjs"
+      },
+      {
+        "line": 776,
+        "text": "> next-app@0.0.1 test:migrations /home/runner/work/Mikka/Mikka"
+      },
+      {
+        "line": 777,
+        "text": "> node --test scripts/activity-actor-validation.test.mjs scripts/check-migrations.test.mjs scripts/migration-order.test.mjs scripts/migrate-mode.test.mjs scripts/migration-guard.test.mjs scripts/migration-steps.test.mjs scripts/migration-targets.test.mjs scripts/scope-migration-history.test.mjs scripts/integration-migration-history.test.mjs scripts/task-workspace-evidence.test.mjs"
+      },
+      {
+        "line": 855,
+        "text": "> next-app@0.0.1 check:factory /home/runner/work/Mikka/Mikka"
+      },
+      {
+        "line": 856,
+        "text": "> node scripts/check-factory.mjs"
+      },
+      {
+        "line": 859,
+        "text": "##[group]Run node apps/api/scripts/generate-routes.mjs --check"
+      },
+      {
+        "line": 876,
+        "text": "##[group]Run pnpm lint:runtime"
+      },
+      {
+        "line": 893,
+        "text": "> next-app@0.0.1 lint:runtime /home/runner/work/Mikka/Mikka"
+      },
+      {
+        "line": 894,
+        "text": "> oxlint --no-ignore --deny-warnings apps/api/compat apps/api/plugins apps/api/routes apps/api/runtime apps/api/scripts apps/api/src apps/api/*.mjs apps/api/nitro.config.ts apps/frontend/scripts apps/frontend/src apps/frontend/vite.config.mjs"
+      },
+      {
+        "line": 898,
+        "text": "##[group]Run pnpm test:api"
+      },
+      {
+        "line": 915,
+        "text": "> next-app@0.0.1 test:api /home/runner/work/Mikka/Mikka"
+      },
+      {
+        "line": 916,
+        "text": "> node --import ./tests/support/server-only.mjs --import tsx --test apps/api/src/*.test.ts apps/api/runtime/*.test.ts lib/browser-rpc/*.test.ts lib/agent-image-cache.test.ts lib/web-connection/*.test.ts && node --test --test-reporter=tap apps/api/build-contract.test.mjs apps/api/runtime/*.test.mjs apps/api/scripts/*.test.mjs scripts/start-app.test.mjs scripts/test-subscription-enrollment-app.test.mjs scripts/release/build-vercel.test.mjs apps/api/cloud-service-rewrite.test.mjs"
+      },
+      {
+        "line": 1504,
+        "text": "##[group]Run pnpm --filter @mikka/frontend test"
+      },
+      {
+        "line": 1521,
+        "text": "> @mikka/frontend@0.0.1 test /home/runner/work/Mikka/Mikka/apps/frontend"
+      },
+      {
+        "line": 1522,
+        "text": "> node --test scripts/*.test.mjs"
+      },
+      {
+        "line": 1591,
+        "text": "##[group]Run pnpm typecheck"
+      },
+      {
+        "line": 1609,
+        "text": "> next-app@0.0.1 typecheck /home/runner/work/Mikka/Mikka"
+      },
+      {
+        "line": 1610,
+        "text": "> tsrs --noEmit && tsrs --noEmit -p apps/api/tsconfig.json && pnpm --filter @mikka/frontend typecheck"
+      },
+      {
+        "line": 1613,
+        "text": "> @mikka/frontend@0.0.1 typecheck /home/runner/work/Mikka/Mikka/apps/frontend"
+      },
+      {
+        "line": 1614,
+        "text": "> tsc --noEmit -p tsconfig.json"
+      },
+      {
+        "line": 1616,
+        "text": "##[group]Run pnpm --filter @mikka/protocol typecheck"
+      },
+      {
+        "line": 1633,
+        "text": "> @mikka/protocol@0.0.1 typecheck /home/runner/work/Mikka/Mikka/packages/protocol"
+      },
+      {
+        "line": 1634,
+        "text": "> tsgo --noEmit -p tsconfig.json"
+      },
+      {
+        "line": 1636,
+        "text": "##[group]Run pnpm --filter @mikka/mobile typecheck"
+      },
+      {
+        "line": 1653,
+        "text": "> @mikka/mobile@0.0.1 typecheck /home/runner/work/Mikka/Mikka/apps/mobile"
+      },
+      {
+        "line": 1654,
+        "text": "> tsc --noEmit -p tsconfig.json"
+      },
+      {
+        "line": 1656,
+        "text": "##[group]Run pnpm --silent lint:ui --json > ui-audit.json"
+      }
+    ],
+    "sourceChecksCompleted": [
+      "frozen pnpm install",
+      "CI shadow selection scenarios",
+      "cloud-boundary checks",
+      "release credential guards",
+      "production auth/lease/queue/smoke offline unit guards",
+      "oxlint --deny-warnings plus migration and Factory checks",
+      "canonical route generator --check",
+      "runtime oxlint --no-ignore --deny-warnings",
+      "API tests",
+      "frontend tests",
+      "root/API/frontend typechecks",
+      "protocol typecheck",
+      "mobile typecheck",
+      "business UI static audit"
+    ],
+    "uiAudit": {
+      "businessFilesStyleScanned": 3224,
+      "interactionFilesScanned": 532,
+      "errors": 0,
+      "componentLibraryFilesExcludedFromStyleOnly": 287,
+      "upstreamSourceVerification": false,
+      "browserExecution": false
+    },
+    "migration63IsNotDriver63": true,
+    "observabilityDriver63ObservedInThisSourceLog": false,
+    "driverBoundary": "The 63-test summary in Source is test:migrations. No run-observability/test:observability driver invocation appears in this log. Root separately identified the historical ae10 driver under Core job129114784847, ci-tasks:core-53/test:dev-local; that original-source evidence is not relabelled as execution in this Source job or this new run."
+  },
+  "postgresShard": {
+    "shard": "2/4",
+    "suiteCount": 18,
+    "totals": {
+      "tests": 806,
+      "pass": 806,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "summaryAccounting": "Only completed ##[group]pnpm suite outputs are counted. Live [db-runner ...] streamed duplicates are excluded. Multiple Node summary blocks inside a single suite are added.",
+    "groups": [
+      {
+        "suite": "test:execution-settings-db",
+        "label": "template database, 9.7s",
+        "startLine": 1271,
+        "endLine": 1292,
+        "summaries": [
+          {
+            "startLine": 13,
+            "tests": 5,
+            "suites": 0,
+            "pass": 5,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 8821.999253
+          }
+        ],
+        "totals": {
+          "tests": 5,
+          "pass": 5,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:test-accounts-db",
+        "label": "template database, 9.2s",
+        "startLine": 1338,
+        "endLine": 1365,
+        "summaries": [
+          {
+            "startLine": 19,
+            "tests": 17,
+            "suites": 0,
+            "pass": 17,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 7922.405038
+          }
+        ],
+        "totals": {
+          "tests": 17,
+          "pass": 17,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:account-db",
+        "label": "mikka_s01_account_e2e, 26.3s",
+        "startLine": 1430,
+        "endLine": 1491,
+        "summaries": [
+          {
+            "startLine": 53,
+            "tests": 43,
+            "suites": 0,
+            "pass": 43,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 26021.061461
+          }
+        ],
+        "totals": {
+          "tests": 43,
+          "pass": 43,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:worker-authorization-db",
+        "label": "mikka_s69_worker_authorization_e2e, 27.7s",
+        "startLine": 1904,
+        "endLine": 2046,
+        "summaries": [
+          {
+            "startLine": 134,
+            "tests": 76,
+            "suites": 0,
+            "pass": 76,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 26228.413691
+          }
+        ],
+        "totals": {
+          "tests": 76,
+          "pass": 76,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:cloud-backend-db",
+        "label": "mikka_s13_cloud_backend_e2e, 22.7s",
+        "startLine": 3539,
+        "endLine": 5029,
+        "summaries": [
+          {
+            "startLine": 1482,
+            "tests": 215,
+            "suites": 0,
+            "pass": 215,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 22392.371043
+          }
+        ],
+        "totals": {
+          "tests": 215,
+          "pass": 215,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:secrets-db",
+        "label": "mikka_s57_secrets_e2e, 7.1s",
+        "startLine": 5147,
+        "endLine": 5255,
+        "summaries": [
+          {
+            "startLine": 100,
+            "tests": 93,
+            "suites": 0,
+            "pass": 93,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 6886.407175
+          }
+        ],
+        "totals": {
+          "tests": 93,
+          "pass": 93,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:pat-api-db",
+        "label": "mikka_s45_pat_api_e2e, 5.2s",
+        "startLine": 5431,
+        "endLine": 5603,
+        "summaries": [
+          {
+            "startLine": 164,
+            "tests": 39,
+            "suites": 0,
+            "pass": 39,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 4978.128726
+          }
+        ],
+        "totals": {
+          "tests": 39,
+          "pass": 39,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:groups",
+        "label": "mikka_s37_groups_e2e, 65.1s",
+        "startLine": 5617,
+        "endLine": 5755,
+        "summaries": [
+          {
+            "startLine": 15,
+            "tests": 12,
+            "suites": 0,
+            "pass": 12,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 2395.058709
+          },
+          {
+            "startLine": 130,
+            "tests": 82,
+            "suites": 0,
+            "pass": 82,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 62356.10869
+          }
+        ],
+        "totals": {
+          "tests": 94,
+          "pass": 94,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:bot-chats-db",
+        "label": "mikka_s09_bot_chats_e2e, 68.2s",
+        "startLine": 5876,
+        "endLine": 6126,
+        "summaries": [
+          {
+            "startLine": 242,
+            "tests": 144,
+            "suites": 0,
+            "pass": 144,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 67640.438024
+          }
+        ],
+        "totals": {
+          "tests": 144,
+          "pass": 144,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:run-publication-db",
+        "label": "mikka_s53_run_publication_e2e, 10s",
+        "startLine": 6182,
+        "endLine": 6262,
+        "summaries": [
+          {
+            "startLine": 35,
+            "tests": 24,
+            "suites": 0,
+            "pass": 24,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 6503.602964
+          },
+          {
+            "startLine": 72,
+            "tests": 1,
+            "suites": 0,
+            "pass": 1,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 3209.503575
+          }
+        ],
+        "totals": {
+          "tests": 25,
+          "pass": 25,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:coordinator-issue-create-db",
+        "label": "mikka_s17_coordinator_issue_create_e2e, 2.5s",
+        "startLine": 6286,
+        "endLine": 6306,
+        "summaries": [
+          {
+            "startLine": 12,
+            "tests": 10,
+            "suites": 0,
+            "pass": 10,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 2159.62945
+          }
+        ],
+        "totals": {
+          "tests": 10,
+          "pass": 10,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:credentials-db",
+        "label": "mikka_s21_credentials_e2e, 1.1s",
+        "startLine": 6322,
+        "endLine": 6334,
+        "summaries": [
+          {
+            "startLine": 4,
+            "tests": 3,
+            "suites": 0,
+            "pass": 3,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 850.425472
+          }
+        ],
+        "totals": {
+          "tests": 3,
+          "pass": 3,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:migration-steps-db",
+        "label": "mikka_s41_migration_steps_e2e, 1s",
+        "startLine": 6359,
+        "endLine": 6372,
+        "summaries": [
+          {
+            "startLine": 5,
+            "tests": 1,
+            "suites": 0,
+            "pass": 1,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 686.565163
+          }
+        ],
+        "totals": {
+          "tests": 1,
+          "pass": 1,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:preview-driver",
+        "label": "mikka_s49_preview_driver_e2e, 0.7s",
+        "startLine": 6395,
+        "endLine": 6405,
+        "summaries": [
+          {
+            "startLine": 2,
+            "tests": 1,
+            "suites": 0,
+            "pass": 1,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 261.216793
+          }
+        ],
+        "totals": {
+          "tests": 1,
+          "pass": 1,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:factory-all-dispatch-db",
+        "label": "mikka_s29_factory_all_dispatch_e2e, 6s",
+        "startLine": 6463,
+        "endLine": 6517,
+        "summaries": [
+          {
+            "startLine": 46,
+            "tests": 2,
+            "suites": 0,
+            "pass": 2,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 5730.522664
+          }
+        ],
+        "totals": {
+          "tests": 2,
+          "pass": 2,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:settings-activity-db",
+        "label": "mikka_s61_settings_activity_e2e, 3.9s",
+        "startLine": 6540,
+        "endLine": 6560,
+        "summaries": [
+          {
+            "startLine": 12,
+            "tests": 6,
+            "suites": 0,
+            "pass": 6,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 3520.327354
+          }
+        ],
+        "totals": {
+          "tests": 6,
+          "pass": 6,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:agent-tool-approval-db",
+        "label": "mikka_s05_agent_tool_approval_e2e, 25.6s",
+        "startLine": 6573,
+        "endLine": 6628,
+        "summaries": [
+          {
+            "startLine": 20,
+            "tests": 17,
+            "suites": 0,
+            "pass": 17,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 1247.80719
+          },
+          {
+            "startLine": 46,
+            "tests": 3,
+            "suites": 0,
+            "pass": 3,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 23986.842826
+          }
+        ],
+        "totals": {
+          "tests": 20,
+          "pass": 20,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "suite": "test:factory-monitor-db",
+        "label": "mikka_s33_factory_monitor_e2e, 44.3s",
+        "startLine": 6654,
+        "endLine": 6700,
+        "summaries": [
+          {
+            "startLine": 7,
+            "tests": 2,
+            "suites": 0,
+            "pass": 2,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 22529.154011
+          },
+          {
+            "startLine": 38,
+            "tests": 10,
+            "suites": 0,
+            "pass": 10,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 21351.724027
+          }
+        ],
+        "totals": {
+          "tests": 12,
+          "pass": 12,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      }
+    ],
+    "changedUiTestSuite": {
+      "suite": "test:groups",
+      "tests": 94,
+      "blocks": [
+        12,
+        82
+      ],
+      "allPass": true,
+      "changedFile": {
+        "path": "scripts/issue-thread-acceptance.test.tsx",
+        "blob": "03657c4aec2ff53fd524459c6589c6b5fd071b17",
+        "names": [
+          {
+            "name": "a committed acceptance resolves the current producer row while its stored run outcome stays needs_input",
+            "matches": [
+              "✔ a committed acceptance resolves the current producer row while its stored run outcome stays needs_input (63.57718ms)"
+            ]
+          },
+          {
+            "name": "runs by one Agent are one 活动 row in the latest run's state; run data is unchanged (2026-11-09-0045)",
+            "matches": [
+              "✔ runs by one Agent are one 活动 row in the latest run's state; run data is unchanged (2026-11-09-0045) (1.025584ms)"
+            ]
+          },
+          {
+            "name": "an Agent change starts a new row labelled with the new Agent's own name, no switch verb",
+            "matches": [
+              "✔ an Agent change starts a new row labelled with the new Agent's own name, no switch verb (1.546179ms)"
+            ]
+          }
+        ],
+        "staticNames": 3,
+        "allExactlyOncePassed": true
+      }
+    },
+    "bootstrapTestsOutsideRequiredSuiteTotal": {
+      "tests": 2,
+      "pass": 2,
+      "fail": 0,
+      "skipped": 0,
+      "names": [
+        "pnpm migrate bootstraps empty shared target and safely reruns",
+        "pnpm migrate bootstraps empty separate targets and safely reruns"
+      ]
+    },
+    "conditionalStepSkips": [
+      {
+        "number": 8,
+        "name": "Save native dependency packages (main only)"
+      },
+      {
+        "number": 13,
+        "name": "Verify local execution identities and repository records (isolated Postgres)"
+      },
+      {
+        "number": 14,
+        "name": "Verify thread sharing, membership and privacy against isolated database"
+      }
+    ],
+    "requiredTestSkips": 0,
+    "otherShardsNotReviewedHere": true
+  },
+  "cleanup": {
+    "postgres": {
+      "container": {
+        "createdId": "329083151bd326e5ecada8d8b5ae5471128ccd033f048e88b256eb384772955b",
+        "removedId": "329083151bd326e5ecada8d8b5ae5471128ccd033f048e88b256eb384772955b",
+        "commandAndReturnedIdMatch": true
+      },
+      "network": {
+        "created": "github_network_b17db863e9de4a24890af9bdd4d33bd1",
+        "removed": "github_network_b17db863e9de4a24890af9bdd4d33bd1",
+        "commandAndReturnedNameMatch": true
+      },
+      "originalRetainedSyntheticSchemas": "Some tests explicitly retain synthetic schemas until the disposable service is removed; this is not proof of per-schema DROP.",
+      "resourcesCreatedByReviewer": 0
+    },
+    "sourcePostJobCommands": [
+      {
+        "line": 1737,
+        "text": "Post job cleanup."
+      },
+      {
+        "line": 1739,
+        "text": "Post job cleanup."
+      },
+      {
+        "line": 1744,
+        "text": "Post job cleanup."
+      },
+      {
+        "line": 1747,
+        "text": "Post job cleanup."
+      },
+      {
+        "line": 1748,
+        "text": "[command]/usr/bin/git version"
+      },
+      {
+        "line": 1752,
+        "text": "[command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka"
+      },
+      {
+        "line": 1753,
+        "text": "[command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand"
+      },
+      {
+        "line": 1754,
+        "text": "[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+      },
+      {
+        "line": 1755,
+        "text": "[command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader"
+      },
+      {
+        "line": 1757,
+        "text": "[command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader"
+      },
+      {
+        "line": 1758,
+        "text": "[command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+      },
+      {
+        "line": 1759,
+        "text": "[command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:"
+      },
+      {
+        "line": 1760,
+        "text": "[command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url"
+      },
+      {
+        "line": 1761,
+        "text": "Cleaning up orphan processes"
+      }
+    ],
+    "boundary": "GitHub job completion and logged cleanup commands are preserved. This reviewer did not create or separately inspect runner infrastructure."
+  },
+  "privacy": {
+    "scope": "Two final decoded GitHub public workflow job logs only; original strings retained unchanged.",
+    "workflowBlob": "e3938ad5c343fb14d60709e014cb3d9a3189b104",
+    "reviewedSource": "855245dba9accc3212dab9fd28af398af1a7e65a",
+    "patterns": [
+      "GitHub tokens",
+      "provider-token shapes",
+      "JWT shapes",
+      "private-key headers",
+      "email addresses",
+      "bearer-looking strings",
+      "credential assignments",
+      "URL userinfo passwords",
+      "Authorization Basic/Bearer values"
+    ],
+    "candidateCount": 40,
+    "classificationCounts": {
+      "exact tracked localhost build-only fixture value": 22,
+      "GitHub-masked credential value": 7,
+      "ordinary test assertion wording, not a token": 7,
+      "exact tracked disposable PostgreSQL service fixture credential": 1,
+      "tracked shell expression; generated runtime value is masked elsewhere": 1,
+      "GitHub-masked checkout authentication header": 2
+    },
+    "candidates": [
+      {
+        "jobId": 129139328386,
+        "line": 57,
+        "category": "credential_assignment",
+        "disposition": "exact tracked localhost build-only fixture value"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 149,
+        "category": "credential_assignment",
+        "disposition": "exact tracked localhost build-only fixture value"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 171,
+        "category": "credential_assignment",
+        "disposition": "exact tracked localhost build-only fixture value"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 205,
+        "category": "credential_assignment",
+        "disposition": "exact tracked localhost build-only fixture value"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 231,
+        "category": "credential_assignment",
+        "disposition": "exact tracked localhost build-only fixture value"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 255,
+        "category": "credential_assignment",
+        "disposition": "exact tracked localhost build-only fixture value"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 288,
+        "category": "credential_assignment",
+        "disposition": "exact tracked localhost build-only fixture value"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 293,
+        "category": "credential_assignment",
+        "disposition": "GitHub-masked credential value"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 499,
+        "category": "credential_assignment",
+        "disposition": "exact tracked localhost build-only fixture value"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 599,
+        "category": "credential_assignment",
+        "disposition": "exact tracked localhost build-only fixture value"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 674,
+        "category": "credential_assignment",
+        "disposition": "exact tracked localhost build-only fixture value"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 705,
+        "category": "credential_assignment",
+        "disposition": "exact tracked localhost build-only fixture value"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 758,
+        "category": "credential_assignment",
+        "disposition": "exact tracked localhost build-only fixture value"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 869,
+        "category": "credential_assignment",
+        "disposition": "exact tracked localhost build-only fixture value"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 886,
+        "category": "credential_assignment",
+        "disposition": "exact tracked localhost build-only fixture value"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 908,
+        "category": "credential_assignment",
+        "disposition": "exact tracked localhost build-only fixture value"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 948,
+        "category": "bearer_candidate",
+        "disposition": "ordinary test assertion wording, not a token"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 990,
+        "category": "bearer_candidate",
+        "disposition": "ordinary test assertion wording, not a token"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 1019,
+        "category": "bearer_candidate",
+        "disposition": "ordinary test assertion wording, not a token"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 1514,
+        "category": "credential_assignment",
+        "disposition": "exact tracked localhost build-only fixture value"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 1601,
+        "category": "credential_assignment",
+        "disposition": "exact tracked localhost build-only fixture value"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 1626,
+        "category": "credential_assignment",
+        "disposition": "exact tracked localhost build-only fixture value"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 1646,
+        "category": "credential_assignment",
+        "disposition": "exact tracked localhost build-only fixture value"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 1666,
+        "category": "credential_assignment",
+        "disposition": "exact tracked localhost build-only fixture value"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 1690,
+        "category": "credential_assignment",
+        "disposition": "exact tracked localhost build-only fixture value"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 1717,
+        "category": "credential_assignment",
+        "disposition": "exact tracked localhost build-only fixture value"
+      },
+      {
+        "jobId": 129139328508,
+        "line": 122,
+        "category": "credential_assignment",
+        "disposition": "exact tracked disposable PostgreSQL service fixture credential"
+      },
+      {
+        "jobId": 129139328508,
+        "line": 456,
+        "category": "credential_assignment",
+        "disposition": "GitHub-masked credential value"
+      },
+      {
+        "jobId": 129139328508,
+        "line": 768,
+        "category": "credential_assignment",
+        "disposition": "tracked shell expression; generated runtime value is masked elsewhere"
+      },
+      {
+        "jobId": 129139328508,
+        "line": 815,
+        "category": "credential_assignment",
+        "disposition": "GitHub-masked credential value"
+      },
+      {
+        "jobId": 129139328508,
+        "line": 860,
+        "category": "credential_assignment",
+        "disposition": "GitHub-masked credential value"
+      },
+      {
+        "jobId": 129139328508,
+        "line": 1153,
+        "category": "credential_assignment",
+        "disposition": "GitHub-masked credential value"
+      },
+      {
+        "jobId": 129139328508,
+        "line": 1179,
+        "category": "credential_assignment",
+        "disposition": "GitHub-masked credential value"
+      },
+      {
+        "jobId": 129139328508,
+        "line": 5286,
+        "category": "bearer_candidate",
+        "disposition": "ordinary test assertion wording, not a token"
+      },
+      {
+        "jobId": 129139328508,
+        "line": 5346,
+        "category": "bearer_candidate",
+        "disposition": "ordinary test assertion wording, not a token"
+      },
+      {
+        "jobId": 129139328508,
+        "line": 5460,
+        "category": "bearer_candidate",
+        "disposition": "ordinary test assertion wording, not a token"
+      },
+      {
+        "jobId": 129139328508,
+        "line": 5520,
+        "category": "bearer_candidate",
+        "disposition": "ordinary test assertion wording, not a token"
+      },
+      {
+        "jobId": 129139328508,
+        "line": 6734,
+        "category": "credential_assignment",
+        "disposition": "GitHub-masked credential value"
+      },
+      {
+        "jobId": 129139328386,
+        "line": 100,
+        "category": "authorization_header",
+        "disposition": "GitHub-masked checkout authentication header"
+      },
+      {
+        "jobId": 129139328508,
+        "line": 217,
+        "category": "authorization_header",
+        "disposition": "GitHub-masked checkout authentication header"
+      }
+    ],
+    "unresolved": [],
+    "publicEligible": true,
+    "boundary": "No unresolved real-secret or personal-data candidates identified. This is a bounded pattern and source-context review, not a claim that heuristics prove universal absence; GitHub masking remains part of the source boundary. No API envelopes or download URLs are included."
+  },
+  "warningOccurrences": [
+    {
+      "job": 129139328386,
+      "counts": {
+        "warning": 9,
+        "DeprecationWarning": 7,
+        "WARN": 2,
+        "Warning": 1
+      },
+      "note": "Counts are literal log occurrences and can include command text or streamed/replayed output; not unique incidents."
+    },
+    {
+      "job": 129139328508,
+      "counts": {
+        "warning": 56,
+        "DeprecationWarning": 60,
+        "WARN": 2,
+        "Warning": 1,
+        "ExperimentalWarning": 44
+      },
+      "note": "Counts are literal log occurrences and can include command text or streamed/replayed output; not unique incidents."
+    }
+  ],
+  "evidenceReuseBoundary": "Unmodified backend, tracing, workflow and package source retain their original ae10 receipt bindings; globally shared messages and all transitive inputs are not declared unchanged. This new Source job and PG2 include the e78 UI/locale/test combination at actual855/tree102bc. Neither receipt asserts a new complete four-shard run, Core/Integration run, Native pass or production acceptance.",
+  "acquisitionNotes": [
+    "Two preliminary generic GET calls to /actions/jobs/{id} were rejected by the connector URL allowlist before any log access; the supported run-jobs tool supplied terminal metadata. The only actual workflow log downloads are the two one-time calls listed above.",
+    "One local V8 analysis expression had a syntax typo before execution and was corrected; it did not execute tests, change source, acquire logs again or alter the originals."
+  ],
+  "result": {
+    "source": "success",
+    "pg2": "success",
+    "failure": 0,
+    "unexpectedSkip": 0,
+    "productionAcceptance": false
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "issue": 1512,
+  "repository": "alexj11324/Mikka",
+  "projectId": 670821,
+  "subject": "scout-metadata",
+  "observedAtUTC": "2026-11-09T11:49:09.482Z",
+  "originalRequest": {
+    "command": "call --json scout-metadata-get {}",
+    "context": "Read project 670821 scout enrollment and enforced dispatch limits once. This is metadata only, not a scan/run trigger.",
+    "llm_model": "gpt-6-astra",
+    "conversation_id": "01a1bffc-8ada-7a55-8d2e-09190763024a"
+  },
+  "originalRequestFingerprint": {
+    "bytes": 279,
+    "sha256": "88989020a7a0e1308e980b9b6816b3dff36bfed6f945675a4790987a23a31963"
+  },
+  "responseStatus": {
+    "isError": false
+  },
+  "originalPrivateResponseFingerprint": {
+    "bytes": 429,
+    "sha256": "ee6f37502568730161b65ec14aad54d6311e0aa7f2c9cd6906ded948f4bbdf11",
+    "serialization": "JSON.stringify(decoded MCP response, null, 2) + newline; not raw HTTP wire bytes",
+    "retainedAtStoreKey": "posthogFreshBillingScouts20261109:scout-metadata:private",
+    "published": false
+  },
+  "safeResponse": {
+    "observedAtUTC": "2026-11-09T11:49:09.482Z",
+    "projectId": 670821,
+    "enrolled": true,
+    "limits": {
+      "max_runs_per_tick": 3,
+      "max_runs_per_day": 100,
+      "runs_today": 2,
+      "runs_remaining_today": 98,
+      "max_enabled_scouts": 250
+    },
+    "bannerPresent": true,
+    "bannerTextOmitted": true
+  },
+  "privacy": {
+    "strategy": "explicit field allowlist",
+    "accountCustomerMemberOwnerIdentifiersOmitted": true,
+    "credentialValuesOmitted": true,
+    "freeTextInstructionsAndUserContentOmitted": true,
+    "unrelatedEntitiesOmitted": true
+  },
+  "boundaries": [
+    "limits 来自官方 metadata 接口，表示 coordinator 在 dispatch 时采用的实时项目限额。",
+    "runs_today/remaining 是项目整体值，不是本 issue case 的消耗或两个 scout 的完成结果。",
+    "未公开 banner 的自由文本。"
+  ],
+  "readsForThisMetadataItem": 1,
+  "writesOrRunsTriggered": 0
+}

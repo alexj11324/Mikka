@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "name": "source-and-pg2-review-index.safe.json",
+  "prefix": "ci-f346-source-pg2-20261109",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "runId": 42610943512,
+  "head": "f3466ba479ef51918790f521a288feaef5160e44",
+  "actualCheckout": "855245dba9accc3212dab9fd28af398af1a7e65a",
+  "tree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+  "payloadFiles": 3,
+  "payloadBytes": 1369748,
+  "artifacts": [
+    {
+      "path": "source-job-129139328386.original.log",
+      "jobId": 129139328386,
+      "bytes": 136596,
+      "sha256": "ef507db80b2f84eb5839a088e9d51b31de13bc98bf980a36435c59b27ea2f798",
+      "gitBlob": "bbb13eb0f9bba661c31250ac978ca2ab41d6cd35",
+      "acquisitionCount": 1
+    },
+    {
+      "path": "postgres-2of4-job-129139328508.original.log",
+      "jobId": 129139328508,
+      "bytes": 1181925,
+      "sha256": "c1c6e76e7c9bb9a90824fdb542d52f7af28ad81a07f6336f518cfc12b9f53578",
+      "gitBlob": "1413bdf4bd42d20dc882bf3268d722527a2091e5",
+      "acquisitionCount": 1
+    },
+    {
+      "path": "source-and-pg2-limited-review.safe.json",
+      "name": "source-and-pg2-limited-review.safe.json",
+      "bytes": 51227,
+      "sha256": "1e40e156f204c5121e6c8b3c561c69279673a4f4c0c9c0d7d4354e54e6d57a56",
+      "gitBlob": "43b2da8c8fdac35892a526f1f2e2be4618f672c7"
+    }
+  ],
+  "terminalSummary": {
+    "source": {
+      "job": 129139328386,
+      "success": true,
+      "assertions": 361,
+      "fail": 0,
+      "skipped": 0,
+      "migrationTests": 63,
+      "observabilityDriver63NotExecutedInThisJob": true
+    },
+    "postgres2": {
+      "job": 129139328508,
+      "success": true,
+      "suites": 18,
+      "tests": 806,
+      "pass": 806,
+      "fail": 0,
+      "skipped": 0,
+      "testGroups": 94,
+      "changedAcceptanceFileAssertionsPassedExactlyOnce": 3,
+      "bootstrapTestsSeparately": 2,
+      "containerAndNetworkRemovalVerified": true
+    }
+  },
+  "scope": [
+    "Only Source and PG2 original workflow logs read, each exactly once after terminal.",
+    "Four-shard selection is 72, but this package only establishes execution of the 18 selected PG2 suites.",
+    "Neither full-run success nor new Native/production acceptance is asserted.",
+    "Earlier ae10 receipts stay bound to their own source; the old Source driver63 misattribution is explicitly corrected to migration63."
+  ],
+  "privacy": "Original public GitHub decoded logs preserved; masking boundary and all 40 pattern candidates resolved in the review receipt. No API envelopes or temporary download URLs included.",
+  "remoteCreateBlobHashesVerified": true,
+  "refWrites": 0,
+  "newTests": 0,
+  "newResources": 0
+}

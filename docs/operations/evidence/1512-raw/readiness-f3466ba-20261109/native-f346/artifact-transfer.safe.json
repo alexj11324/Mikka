@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "runId": 42610943512,
+  "jobId": 129141935329,
+  "artifacts": [
+    {
+      "kind": "NATIVE",
+      "artifactId": 13672166131,
+      "filename": "native-f346-original.zip",
+      "bytes": 14610338,
+      "sha256": "c352bdb02cb2305c80c202c82acdf1b83dbbf6b21e1bee888990067ea4bc833e",
+      "name": "desktop-native-evidence-855245dba9accc3212dab9fd28af398af1a7e65a",
+      "createdAt": "2026-11-09T12:08:08Z",
+      "updatedAt": "2026-11-09T12:08:08Z"
+    },
+    {
+      "kind": "PACKAGE",
+      "artifactId": 13672430500,
+      "filename": "package-f346-original.zip",
+      "bytes": 1597,
+      "sha256": "e22f30fa198424078a8deed1379c731eb0e5131ef2160b55ca42cacc7eaf1a4a",
+      "name": "desktop-package-evidence-855245dba9accc3212dab9fd28af398af1a7e65a",
+      "createdAt": "2026-11-09T12:08:03Z",
+      "updatedAt": "2026-11-09T12:08:03Z"
+    }
+  ],
+  "originalMemberInventory": {
+    "path": "original-files-manifest.safe.json",
+    "bytes": 84763,
+    "sha256": "6a7d9b7d4e42797db7f3d143cc648c953a1a50fb5bb61e6d7bd81e5e06f8cfc8",
+    "gitBlobSha1": "767fc73a6b67ea97f2da92ad18e4f548aa41e37e",
+    "nativeFiles": 308,
+    "packageFiles": 2,
+    "totalFiles": 310
+  },
+  "zippedBytesVerifiedAgainstApi": true,
+  "testzipPassed": true,
+  "noUnsafePathOrSymlink": true,
+  "criticalOriginalsPreservedVerbatim": true,
+  "transfer": {
+    "compressedBytes": 168940,
+    "compressedSha256": "c91ff0a26de812cec03ea448b3874cf88b34a26810d9ecb033636e67407ff94e",
+    "uncompressedBytes": 1340306,
+    "uncompressedSha256": "2a2f2ddd6acfcf6d67aacb46b062a442778134cc628efcea3ef93ac1ff4c1c0f",
+    "chunkSize": 1455,
+    "chunks": 117,
+    "fileCount": 13,
+    "missingOriginals": [],
+    "crcAndIsize": "verified by V8 gunzip",
+    "allBytesSha256GitBlobMatch": true,
+    "parts": 117,
+    "partBytes": 1455
+  },
+  "signedReferencesStoredInPublicPayload": false,
+  "fullOriginalZipsInPublicPayload": false,
+  "originalArchiveAvailability": "Original GitHub Actions artifacts; transient extraction VM was stopped and deleted after full critical byte recovery",
+  "recoveryBoundary": "VM only copied and verified this run's existing CI artifact bytes; it did not execute Native, browser, models, or production acceptance"
+}

@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "issue": 1512,
+  "sourceHead": "f3466ba479ef51918790f521a288feaef5160e44",
+  "sourceTree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+  "why": "Another owner's actual request_changes run failed factoryHumanRequired. Determine whether its confirmed predicate is on this existing acceptance path before adding a dependency or spending on model cases.",
+  "relatedOwnerReceipt": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6739263341",
+  "sources": [
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "blob": "002b8501cd4f4df023148515add7c55e2863dbd3",
+      "bytes": 64090,
+      "sha256": "7fa1c032cb0d9b7c5a88c6262b559368445866691796b001648a95efea856950"
+    },
+    {
+      "path": "app/api/factory/tasks/[taskId]/approval/route.ts",
+      "blob": "d3b583a364b8ac587485fab4d38189fbcc28f6a5",
+      "bytes": 2321,
+      "sha256": "f009352cede7ffe2b6923332e2287db16f8d4bbf597134a23c61a2b7a3ba6b92"
+    },
+    {
+      "path": "lib/factory/approval-http.ts",
+      "blob": "28a49b43b624c3e376f6e73c249cd1a75346d930",
+      "bytes": 4127,
+      "sha256": "ee2edbff121e0d973b0b0f5262992ad6c566c77e31f81428086bee1539b4251c"
+    },
+    {
+      "path": "lib/factory/merge.ts",
+      "blob": "2668c61a5f3727deba620e77f184fd6826bd77ba",
+      "bytes": 25059,
+      "sha256": "2c56ae59a015a7a8f661a94bf87709c47a0c7a1f24eeabea6ef81beed7db109e"
+    },
+    {
+      "path": "lib/factory/approval.ts",
+      "blob": "e78ad9e26f1f6e37dca2f10ccc5eaede77b52932",
+      "bytes": 43767,
+      "sha256": "159b125232642f1b973e3b7d5361c5f38494f53446eb67b2f8d9cc52358b6d27"
+    }
+  ],
+  "findings": {
+    "driverOperation": "accept",
+    "driverCandidateKind": "no-repository deliverable",
+    "driverLineRange": [
+      829,
+      849
+    ],
+    "httpDispatch": "handleFactoryApproval -> merges.accept for operation accept; service.reject is a separate operation",
+    "acceptRequiresLiveOwnedSession": true,
+    "acceptAlsoChecksTaskOwnerWorkspaceFreshBindingEvidence": true,
+    "acceptSessionSql": "SELECT id FROM \"session\" WHERE id=$1 AND \"userId\"=$2 AND \"expiresAt\">clock_timestamp() FOR SHARE",
+    "acceptProviderAccountPredicatePresent": false,
+    "deliverableBranchBeforeGitHubTokenFetch": true,
+    "approvalHumanPredicateForRejectAndApprove": "EXISTS account providerId IN ('github','google')",
+    "rejectUsesThatPredicate": true,
+    "affectedOtherOwnerOperation": "request_changes / reject",
+    "oursConfirmedToHitReportedOAuthPredicate": false,
+    "acmeAccountStateRead": false,
+    "productionExecutePerformed": false,
+    "conclusion": "No current source evidence that the reported reject-path provider restriction blocks this acceptance's accept/no-repository-deliverable path. Retain ordinary preflight, live session, task/workspace/evidence and cleanup guards; do not add an unproven future merge dependency."
+  },
+  "limits": [
+    "Source path analysis only; no assertion about actual ACME account, session, runtime result or production pass.",
+    "No approval guard was changed or bypassed.",
+    "The other owner’s failure remains a real distinct issue; its fix and resource cleanup stay under that owner.",
+    "If the eventual actual source changes these files, re-evaluate the precise delta before execution."
+  ]
+}

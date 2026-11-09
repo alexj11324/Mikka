@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 1,
+  "rootReadback": {
+    "scoutConfig": {
+      "blob": "9b6090d23c6b3b14c1069f120f61d882110f93fc",
+      "bytes": 4842,
+      "sha256": "6b61a1228f58d1a350ce7089d43800b2ee0a89f600bf3fc1cb991bce17409bd6"
+    },
+    "scoutLimits": {
+      "blob": "02c0607320d75dffbd6dcf27ba422efd8689d728",
+      "bytes": 1992,
+      "sha256": "d4c1e073b635ecf69eb83e9635af8df742e47dbf8d450f4c313c7385fef1a2da"
+    },
+    "billingOverview": {
+      "blob": "3bb103ca21d8ed7ad62cfe1eddf1f7126fc7fef3",
+      "bytes": 4785,
+      "sha256": "ea2f299fe55819700ec78faabd725f2027cc364b352d7cfc4694a2f35583e4a6"
+    },
+    "billingProjectUsage": {
+      "blob": "6ee4d295f37facb09f3c5a1f5e91b8be5530400a",
+      "bytes": 8961,
+      "sha256": "21a1f75971b1039a01a4502600d53d4e5bf8e28893362614d7adbac627e89ca3"
+    }
+  },
+  "scouts": {
+    "ids": [
+      "01a1b247-09d7-7388-be42-a8d96310c44b",
+      "01a1b247-0a2c-7611-9061-0f7e791cfd2e"
+    ],
+    "enabledBoth": true,
+    "allInboxOnly": true,
+    "runIntervals": [
+      1440,
+      1440
+    ],
+    "lastRunMetadata": [
+      {
+        "id": "01a1b247-09d7-7388-be42-a8d96310c44b",
+        "lastRun": "2026-11-09T07:30:00Z",
+        "lastPrecheck": "2026-11-09T07:57:34.360958Z"
+      },
+      {
+        "id": "01a1b247-0a2c-7611-9061-0f7e791cfd2e",
+        "lastRun": "2026-11-09T06:30:00Z",
+        "lastPrecheck": "2026-11-09T07:01:50.937249Z"
+      }
+    ],
+    "runCompletionIndependentlyVerified": false,
+    "limits": {
+      "observedAtUTC": "2026-11-09T11:49:09.482Z",
+      "projectId": 670821,
+      "enrolled": true,
+      "limits": {
+        "max_runs_per_tick": 3,
+        "max_runs_per_day": 100,
+        "runs_today": 2,
+        "runs_remaining_today": 98,
+        "max_enabled_scouts": 250
+      },
+      "bannerPresent": true,
+      "bannerTextOmitted": true
+    }
+  },
+  "billing": {
+    "organization": {
+      "observedAtUTC": "2026-11-09T11:47:43.655Z",
+      "scope": "organization billing overview; scoped project usage is read separately",
+      "billing_provider": "posthog",
+      "has_active_subscription": false,
+      "subscription_level": "free",
+      "billing_plan": "free",
+      "is_annual_plan_customer": false,
+      "billing_period": {
+        "current_period_start": "2026-10-17T17:45:01.620Z",
+        "current_period_end": "2026-11-16T17:45:01.620Z",
+        "interval": "month"
+      },
+      "current_total_amount_usd": null,
+      "current_total_amount_usd_after_discount": null,
+      "products": [
+        {
+          "name": "Session replay",
+          "description": "Session replay helps you diagnose issues and understand user behavior in your product or website.",
+          "price_description": null,
+          "usage_key": "recordings",
+          "type": "session_replay",
+          "subscribed": false,
+          "free_allocation": 5000,
+          "current_amount_usd": null,
+          "current_usage": 18,
+          "usage_limit": 5000,
+          "no_billing_limit": false,
+          "has_exceeded_limit": false,
+          "unit": "recording",
+          "display_unit": null,
+          "display_decimals": null,
+          "display_divisor": null,
+          "docs_url": "https://posthog.com/docs/session-replay"
+        },
+        {
+          "name": "AI Observability",
+          "description": "Gather data for your AI products' usage and performance.",
+          "price_description": null,
+          "usage_key": "llm_events",
+          "type": "llm_analytics",
+          "subscribed": false,
+          "free_allocation": 100000,
+          "current_amount_usd": null,
+          "current_usage": 1117,
+          "usage_limit": 100000,
+          "no_billing_limit": false,
+          "has_exceeded_limit": false,
+          "unit": "event",
+          "display_unit": null,
+          "display_decimals": null,
+          "display_divisor": null,
+          "docs_url": "https://posthog.com/docs/ai-observability"
+        },
+        {
+          "name": "Logs",
+          "description": "Ingest, search, and analyze logs from your applications with full PostHog context.",
+          "price_description": null,
+          "usage_key": "logs_mb_ingested",
+          "type": "logs",
+          "subscribed": false,
+          "free_allocation": 10000,
+          "current_amount_usd": null,
+          "current_usage": 447,
+          "usage_limit": 10000,
+          "no_billing_limit": false,
+          "has_exceeded_limit": false,
+          "unit": "ingested MB",
+          "display_unit": "GB",
+          "display_decimals": 2,
+          "display_divisor": 1000,
+          "docs_url": "https://posthog.com/docs/logs"
+        }
+      ],
+      "custom_limits_usd": {},
+      "next_period_custom_limits_usd": {},
+      "free_trial_until": null
+    },
+    "projectTotals": [
+      {
+        "key": "ai_event_count_in_period",
+        "total": 857,
+        "unit": "events"
+      },
+      {
+        "key": "logs_and_traces_mb_in_period",
+        "total": 373,
+        "unit": "MB"
+      },
+      {
+        "key": "apm_tracing_mb_in_period",
+        "total": 324,
+        "unit": "MB"
+      },
+      {
+        "key": "logs_mb_in_period",
+        "total": 47,
+        "unit": "MB"
+      },
+      {
+        "key": "recording_count_in_period",
+        "total": 16,
+        "unit": "recordings"
+      }
+    ],
+    "allFive24DayBucketSumsVerified": true,
+    "paginationNext": null,
+    "unexplainedComponentDifferenceMB": 2,
+    "orgProjectDifferenceUnexplained": true,
+    "dayZeroIsNotZeroUse": true,
+    "dollarAmount": null,
+    "noActualZeroDollarClaim": true,
+    "noAttributionToIssue1512Cases": true
+  },
+  "operations": {
+    "rootMetadataNetworkReread": false,
+    "rootReadsImmutableSafeBlobsOnly": true,
+    "sql": 0,
+    "projectGet": 0,
+    "writes": 0,
+    "modelCases": 0
+  }
+}

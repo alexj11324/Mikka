@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "issue": 1512,
+  "repository": "alexj11324/Mikka",
+  "projectId": 670821,
+  "subject": "scout-config",
+  "observedAtUTC": "2026-11-09T11:49:15.112Z",
+  "originalRequest": {
+    "command": "call --json scout-config-list {}",
+    "context": "Read existing project 670821 scout configuration once; the official list endpoint has no ID selector. Locally select only the two already known APM/AI scout IDs 01a1b247-0a2c-7611-9061-0f7e791cfd2e and 01a1b247-09d7-7388-be42-a8d96310c44b. Preserve only enabled/status/schedule and safe delivery metadata, not free-text instructions. Do not run or alter any scout.",
+    "llm_model": "gpt-6-astra",
+    "conversation_id": "01a1bffc-8ada-7a55-8d2e-09190763024a"
+  },
+  "originalRequestFingerprint": {
+    "bytes": 524,
+    "sha256": "08b50f66ee40609395e60a1fff473ddc187a8d17c82ba92269888fe68ffcaa89"
+  },
+  "responseStatus": {
+    "isError": false
+  },
+  "originalPrivateResponseFingerprint": {
+    "bytes": 51895,
+    "sha256": "964a0b83608ec3ea14b4002fa14b2a0e5f41ad5df80828fca730dc557da3029d",
+    "serialization": "JSON.stringify(decoded MCP response, null, 2) + newline; not raw HTTP wire bytes",
+    "retainedAtStoreKey": "posthogFreshBillingScouts20261109:scout-config:private",
+    "published": false
+  },
+  "safeResponse": {
+    "observedAtUTC": "2026-11-09T11:49:15.112Z",
+    "projectId": 670821,
+    "requestedIds": [
+      "01a1b247-0a2c-7611-9061-0f7e791cfd2e",
+      "01a1b247-09d7-7388-be42-a8d96310c44b"
+    ],
+    "returnedTargetCount": 2,
+    "targets": [
+      {
+        "id": "01a1b247-09d7-7388-be42-a8d96310c44b",
+        "skill_name": "signals-scout-ai-observability",
+        "scout_origin": "canonical",
+        "scout_role": "specialist",
+        "enabled": true,
+        "status": "active",
+        "emit": true,
+        "run_interval_minutes": 1440,
+        "run_cron_schedule": null,
+        "precheck_disabled": false,
+        "precheck_query_source": "skill_default",
+        "last_precheck_at": "2026-11-09T07:57:34.360958Z",
+        "last_precheck_outcome": "run",
+        "last_precheck_row_count": 1,
+        "last_run_at": "2026-11-09T07:30:00Z",
+        "consecutive_failure_count": 0,
+        "status_changed_at": "2026-11-06T19:13:00.852024Z",
+        "auto_pause_exempt": false,
+        "source_product": null,
+        "created_at": "2026-11-06T19:12:42.459900Z",
+        "updated_at": "2026-11-06T19:13:00.857420Z",
+        "pauseReasonPresent": false,
+        "configuredPrecheckPresent": false,
+        "effectivePrecheckPresent": true,
+        "nextRunAtFieldReturned": false,
+        "outputDestinations": {
+          "inbox": true,
+          "slackConfigured": false,
+          "webhookConfigured": false
+        }
+      },
+      {
+        "id": "01a1b247-0a2c-7611-9061-0f7e791cfd2e",
+        "skill_name": "signals-scout-apm",
+        "scout_origin": "canonical",
+        "scout_role": "specialist",
+        "enabled": true,
+        "status": "active",
+        "emit": true,
+        "run_interval_minutes": 1440,
+        "run_cron_schedule": null,
+        "precheck_disabled": false,
+        "precheck_query_source": "skill_default",
+        "last_precheck_at": "2026-11-09T07:01:50.937249Z",
+        "last_precheck_outcome": "run",
+        "last_precheck_row_count": 1,
+        "last_run_at": "2026-11-09T06:30:00Z",
+        "consecutive_failure_count": 0,
+        "status_changed_at": "2026-11-06T19:12:52.937681Z",
+        "auto_pause_exempt": false,
+        "source_product": null,
+        "created_at": "2026-11-06T19:12:42.544411Z",
+        "updated_at": "2026-11-06T19:12:52.943039Z",
+        "pauseReasonPresent": false,
+        "configuredPrecheckPresent": false,
+        "effectivePrecheckPresent": true,
+        "nextRunAtFieldReturned": false,
+        "outputDestinations": {
+          "inbox": true,
+          "slackConfigured": false,
+          "webhookConfigured": false
+        }
+      }
+    ],
+    "unrelatedConfigsOmitted": 27,
+    "credentialOrOwnerMetadataOmitted": true,
+    "querySqlAndFreeTextDescriptionsOmitted": true
+  },
+  "privacy": {
+    "strategy": "explicit field allowlist",
+    "accountCustomerMemberOwnerIdentifiersOmitted": true,
+    "credentialValuesOmitted": true,
+    "freeTextInstructionsAndUserContentOmitted": true,
+    "unrelatedEntitiesOmitted": true
+  },
+  "boundaries": [
+    "官方 list 接口没有按 config ID 读取的参数；本次仅调用一次 canonical scout-config-list，公开投影仅包含两个预先指定 ID。",
+    "仅配置/历史时间元数据；last_run_at 不等于本次已验证 run 完成或报告发出。",
+    "接口未返回 next_run_at；没有估造下一次精确执行时间。",
+    "未调用 run-now、precheck-test、reports、emissions 或任何模型/扫描入口。"
+  ],
+  "readsForThisMetadataItem": 1,
+  "writesOrRunsTriggered": 0
+}

@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "repository": "alexj11324/Mikka",
+  "runId": 42610943512,
+  "jobId": 129141935329,
+  "runAttempt": 1,
+  "candidate": {
+    "commit": "f3466ba479ef51918790f521a288feaef5160e44",
+    "tree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+    "basis": "fixed published candidate supplied by root"
+  },
+  "actual": {
+    "commit": "855245dba9accc3212dab9fd28af398af1a7e65a",
+    "tree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+    "parents": [
+      "e78fccffd9dd878edd490b113ea80efcff1525e7",
+      "f3466ba479ef51918790f521a288feaef5160e44"
+    ],
+    "basis": [
+      "own Native job checkout output",
+      "own build ready revision output",
+      "same exact commit read-only Git API",
+      "original lifecycle and smoke revision; parity app/harness revision; crypto revision"
+    ],
+    "sameTreeAsCandidate": true
+  },
+  "originalJobLog": {
+    "bytes": 256117,
+    "sha256": "53ec57deaac5d3e7351fbe0c63a0156b8dc023c118644829d9f46c8339f56142",
+    "gitBlobSha1": "3123e1ee968825f33d20c1d5ecb1497e5808a0d0"
+  },
+  "sourceLines": [
+    "2026-11-09T11:48:01.9574150Z HEAD is now at 855245d Merge f3466ba479ef51918790f521a288feaef5160e44 into e78fccffd9dd878edd490b113ea80efcff1525e7",
+    "2026-11-09T11:48:01.9953210Z 855245dba9accc3212dab9fd28af398af1a7e65a",
+    "2026-11-09T11:56:22.4416940Z {\"status\":\"built\",\"revision\":\"855245dba9accc3212dab9fd28af398af1a7e65a\",\"preset\":\"node-server\",\"functions\":0,\"resources\":51}",
+    "2026-11-09T11:58:08.7408750Z {\"status\":\"ready\",\"revision\":\"855245dba9accc3212dab9fd28af398af1a7e65a\",\"origin\":\"http://localhost:3000\",\"gateway\":\"http://127.0.0.1:49241\"}"
+  ],
+  "measurementBinding": {
+    "basis": "current original artifact contracts and checkpoint/segment data, verified by unchanged verifier assertions",
+    "originalContracts": {
+      "scope": "all actual pg.Client.query calls and PostgreSQL protocol bytes in the primary API process; no sampling",
+      "exclusions": [
+        "test-account lease/session tracking and fixture SQL in the separate harness process",
+        "PostgreSQL connection handshake and TCP/TLS overhead"
+      ],
+      "background": "all concurrent primary API background traffic is included; no guessed subtraction or per-request attribution",
+      "boundary": "query calls started and protocol bytes transferred by each checkpoint; in-flight response bytes can cross a checkpoint",
+      "login": {
+        "authentication": "normal email sign-in and get-session through the original leased-account helper; freshly saved private storageState",
+        "native": "the same email authentication, then real PKCE with the authenticated browser session and initial renderer/workspace selection",
+        "web": "the same email authentication, then a new actual Chromium context and the same workspace selection",
+        "externalOAuthChallenge": false,
+        "sessionCache": "normal signed-cookie cache, no manual flush; cache hits are not measured",
+        "comparable": true,
+        "comparisonBasis": "common ordinary authentication and same usable workspace; native includes its additional PKCE transport",
+        "order": "short Web context closes first; native and hosted retain the final ordinary login through the unchanged lifecycle checks",
+        "protocolPhases": "native handoff overlaps automatic renderer navigation; these concurrent queries are not falsely separated",
+        "accountAndWorkspace": "same leased owner and existing seeded fixture",
+        "locale": "zh-CN"
+      },
+      "startup": {
+        "samples": "first pair only from the unchanged five-pair lifecycle sequence",
+        "clients": "bundled Electron and the preserved hosted Web renderer in the same compiled Electron shell",
+        "sessionCache": "same retained authenticated app profile/workspace; normal profile and OS caches, no purge",
+        "backend": "same primary API and fixed source; server is already warm",
+        "performanceThreshold": "none"
+      }
+    },
+    "firstPair": 1,
+    "fullBackgroundIncluded": true,
+    "noPreviousRunNumericalInputs": true
+  },
+  "rootReportedSourceChangeScope": {
+    "description": "ordinary merge of e78/#1816, eight UI wording/icon/assertion/document paths; no backend, DB, trace or Native measurement harness changes",
+    "scope": "root's source review report; this reader did not re-fetch that changes job"
+  },
+  "nativeWorker": {
+    "runnerLabels": [
+      "macos-26"
+    ],
+    "runnerGroup": "GitHub Actions",
+    "platform": "darwin",
+    "architecture": "arm64",
+    "independentWorkerSourceHash": "not present in this Native original job log; not inferred from installed daemon"
+  },
+  "installedDaemon": [
+    {
+      "mode": "bundled",
+      "version": "0.0.551",
+      "protocolVersion": 3,
+      "installedRevision": "facb389f6cc06c453e9135bb60ada1b0f302e0d9",
+      "installedVersion": "0.0.551"
+    },
+    {
+      "mode": "hosted",
+      "version": "0.0.551",
+      "protocolVersion": 3,
+      "installedRevision": "facb389f6cc06c453e9135bb60ada1b0f302e0d9",
+      "installedVersion": "0.0.551"
+    }
+  ],
+  "limits": {
+    "productionAcceptance": false,
+    "oldNativeArtifactRead": false,
+    "productTestsRunByReader": false
+  }
+}

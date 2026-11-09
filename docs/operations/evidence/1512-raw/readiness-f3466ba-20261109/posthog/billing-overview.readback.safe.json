@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "issue": 1512,
+  "repository": "alexj11324/Mikka",
+  "projectId": 670821,
+  "subject": "billing-overview",
+  "observedAtUTC": "2026-11-09T11:47:43.655Z",
+  "originalRequest": {
+    "command": "call --json billing-overview-get {}",
+    "context": "Issue 1512 bounded read-only preparation in existing project 670821. Read only existing APM/AI signal scout configuration or current billing metadata. Do not execute scouts, query user events/recordings, access project tokens, or change settings/plans/caps.",
+    "llm_model": "gpt-6-astra",
+    "conversation_id": "01a1bffc-8ada-7a55-8d2e-09190763024a"
+  },
+  "originalRequestFingerprint": {
+    "bytes": 420,
+    "sha256": "5f9ac4ae75bfcc2e99f820e3bb354710c319e9fbe681ef34d8c4e7a2f01dffba"
+  },
+  "responseStatus": {
+    "isError": false
+  },
+  "originalPrivateResponseFingerprint": {
+    "bytes": 56153,
+    "sha256": "e8762b46c88706c2755871569ffd7f654a314a2f17b999ff16bb11cf196e3db7",
+    "serialization": "JSON.stringify(decoded MCP response, null, 2) + newline; not raw HTTP wire bytes",
+    "retainedAtStoreKey": "posthogFreshBillingScouts20261109:billing-overview:private",
+    "published": false
+  },
+  "safeResponse": {
+    "observedAtUTC": "2026-11-09T11:47:43.655Z",
+    "scope": "organization billing overview; scoped project usage is read separately",
+    "billing_provider": "posthog",
+    "has_active_subscription": false,
+    "subscription_level": "free",
+    "billing_plan": "free",
+    "is_annual_plan_customer": false,
+    "billing_period": {
+      "current_period_start": "2026-10-17T17:45:01.620Z",
+      "current_period_end": "2026-11-16T17:45:01.620Z",
+      "interval": "month"
+    },
+    "current_total_amount_usd": null,
+    "current_total_amount_usd_after_discount": null,
+    "products": [
+      {
+        "name": "Session replay",
+        "description": "Session replay helps you diagnose issues and understand user behavior in your product or website.",
+        "price_description": null,
+        "usage_key": "recordings",
+        "type": "session_replay",
+        "subscribed": false,
+        "free_allocation": 5000,
+        "current_amount_usd": null,
+        "current_usage": 18,
+        "usage_limit": 5000,
+        "no_billing_limit": false,
+        "has_exceeded_limit": false,
+        "unit": "recording",
+        "display_unit": null,
+        "display_decimals": null,
+        "display_divisor": null,
+        "docs_url": "https://posthog.com/docs/session-replay"
+      },
+      {
+        "name": "AI Observability",
+        "description": "Gather data for your AI products' usage and performance.",
+        "price_description": null,
+        "usage_key": "llm_events",
+        "type": "llm_analytics",
+        "subscribed": false,
+        "free_allocation": 100000,
+        "current_amount_usd": null,
+        "current_usage": 1117,
+        "usage_limit": 100000,
+        "no_billing_limit": false,
+        "has_exceeded_limit": false,
+        "unit": "event",
+        "display_unit": null,
+        "display_decimals": null,
+        "display_divisor": null,
+        "docs_url": "https://posthog.com/docs/ai-observability"
+      },
+      {
+        "name": "Logs",
+        "description": "Ingest, search, and analyze logs from your applications with full PostHog context.",
+        "price_description": null,
+        "usage_key": "logs_mb_ingested",
+        "type": "logs",
+        "subscribed": false,
+        "free_allocation": 10000,
+        "current_amount_usd": null,
+        "current_usage": 447,
+        "usage_limit": 10000,
+        "no_billing_limit": false,
+        "has_exceeded_limit": false,
+        "unit": "ingested MB",
+        "display_unit": "GB",
+        "display_decimals": 2,
+        "display_divisor": 1000,
+        "docs_url": "https://posthog.com/docs/logs"
+      }
+    ],
+    "custom_limits_usd": {},
+    "next_period_custom_limits_usd": {},
+    "free_trial_until": null
+  },
+  "privacy": {
+    "strategy": "explicit field allowlist",
+    "accountCustomerMemberOwnerIdentifiersOmitted": true,
+    "credentialValuesOmitted": true,
+    "freeTextInstructionsAndUserContentOmitted": true,
+    "unrelatedEntitiesOmitted": true
+  },
+  "boundaries": [
+    "这是组织级账务概览；project 670821 的限定日序列在独立回执中。",
+    "free/usage_limit/free_allocation 是实际返回值；current_amount_usd 与 current_total_amount_usd 返回 null，实际美元费用保持 unknown，不填写 $0。",
+    "usage_limit 是各产品返回的用量上限，不转换成自设美元 cap。",
+    "未读取或发布 customer_id、付款/账户标识、整份 available_product_features 或无关产品。",
+    "不使用 projected_* 字段预测未来需求或费用。"
+  ],
+  "readsForThisMetadataItem": 1,
+  "writesOrRunsTriggered": 0
+}

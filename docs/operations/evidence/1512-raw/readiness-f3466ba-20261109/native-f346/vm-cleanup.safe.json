@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "purpose": "this run's existing artifact byte recovery only",
+  "sessionId": "sbx_Kd7mxF5KayM7Ifw0TnYm9D3c6A0P",
+  "name": "issue1512-native-f346-42610943512",
+  "createdAt": "2026-11-09T12:09:36.381Z",
+  "startedAt": "2026-11-09T12:09:36.405Z",
+  "stoppedAt": "2026-11-09T12:12:11.950Z",
+  "status": "stopped",
+  "resources": {
+    "vcpus": 1,
+    "memoryMiB": 2048,
+    "region": "iad1",
+    "architecture": "amd64",
+    "image": "vercel/sandbox/universal@sha256:bbec19cffb43ad724eee446d3bd4476e2993849dc0ff0c9f33356f8365d72219",
+    "persistent": false,
+    "ports": [],
+    "timeoutMs": 900000,
+    "extensions": 0,
+    "networkPolicy": {
+      "mode": "custom",
+      "allowedDomains": [
+        "*.blob.core.windows.net",
+        "*.amazonaws.com",
+        "*.oaiusercontent.com",
+        "chatgpt.com"
+      ]
+    }
+  },
+  "consumption": {
+    "durationMs": 155545,
+    "activeCpuDurationMs": 6808,
+    "ingressBytes": 14932318,
+    "egressBytes": 397039,
+    "cost": "not measured; no zero-cost claim"
+  },
+  "deletion": {
+    "requestedWithConfirm": true,
+    "returnedStoppedSandbox": true,
+    "exactNamedRead": {
+      "resume": false,
+      "httpStatus": 404,
+      "code": "not_found",
+      "sameProjectAndTeam": true
+    },
+    "verifiedAbsent": true
+  },
+  "currentOwnedActiveResources": 0,
+  "criticalFilesRecoveredBeforeStop": 13,
+  "criticalOriginalBlobsConfirmedBeforeStop": 5,
+  "commandCorrections": []
+}

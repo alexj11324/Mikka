@@ -1,0 +1,317 @@
+{
+  "schemaVersion": 1,
+  "issue": 1512,
+  "repository": "alexj11324/Mikka",
+  "projectId": 670821,
+  "generatedAtUTC": "2026-11-09T11:53:58.177Z",
+  "purpose": "正式 ACME case 前的一次 fresh scout 调度与当前账务元数据核验",
+  "status": "read_only_metadata_completed",
+  "productionAcceptance": false,
+  "originalRequestsAndAllowlistedResponses": true,
+  "observations": {
+    "scoutConfigsObservedAtUTC": "2026-11-09T11:49:15.112Z",
+    "scoutMetadataObservedAtUTC": "2026-11-09T11:49:09.482Z",
+    "billingOverviewObservedAtUTC": "2026-11-09T11:47:43.655Z",
+    "projectUsageObservedAtUTC": "2026-11-09T11:49:21.037Z"
+  },
+  "projectBinding": {
+    "requestedProjectId": 670821,
+    "existingAuthorizedContext": true,
+    "freshProjectGetCalls": 0,
+    "projectSwitches": 0,
+    "priorTokenFreeIdentityProofIndexBlob": "7f58245bf3c8c6f66ce7f135a19fc3a155b05f51",
+    "priorObservedAtUTC": "2026-11-09T11:14:28.936Z",
+    "billingUsageExplicitTeamFilter": [
+      670821
+    ]
+  },
+  "scouts": {
+    "targets": [
+      {
+        "id": "01a1b247-09d7-7388-be42-a8d96310c44b",
+        "skill_name": "signals-scout-ai-observability",
+        "enabled": true,
+        "status": "active",
+        "emit": true,
+        "run_interval_minutes": 1440,
+        "run_cron_schedule": null,
+        "precheck_disabled": false,
+        "precheck_query_source": "skill_default",
+        "last_precheck_at": "2026-11-09T07:57:34.360958Z",
+        "last_precheck_outcome": "run",
+        "last_precheck_row_count": 1,
+        "last_run_at": "2026-11-09T07:30:00Z",
+        "consecutive_failure_count": 0,
+        "pauseReasonPresent": false,
+        "outputDestinations": {
+          "inbox": true,
+          "slackConfigured": false,
+          "webhookConfigured": false
+        },
+        "next_run_at": "not returned"
+      },
+      {
+        "id": "01a1b247-0a2c-7611-9061-0f7e791cfd2e",
+        "skill_name": "signals-scout-apm",
+        "enabled": true,
+        "status": "active",
+        "emit": true,
+        "run_interval_minutes": 1440,
+        "run_cron_schedule": null,
+        "precheck_disabled": false,
+        "precheck_query_source": "skill_default",
+        "last_precheck_at": "2026-11-09T07:01:50.937249Z",
+        "last_precheck_outcome": "run",
+        "last_precheck_row_count": 1,
+        "last_run_at": "2026-11-09T06:30:00Z",
+        "consecutive_failure_count": 0,
+        "pauseReasonPresent": false,
+        "outputDestinations": {
+          "inbox": true,
+          "slackConfigured": false,
+          "webhookConfigured": false
+        },
+        "next_run_at": "not returned"
+      }
+    ],
+    "projectEnrolled": true,
+    "actualDispatchLimits": {
+      "max_runs_per_tick": 3,
+      "max_runs_per_day": 100,
+      "runs_today": 2,
+      "runs_remaining_today": 98,
+      "max_enabled_scouts": 250
+    },
+    "completedRunOrReportContentsRead": false,
+    "scopeLimit": "已确认 enabled/active、interval 配置、enrollment 与官方 dispatch 限额，以及返回的历史 last_run_at；没有读取 run 完成报告或推定未来执行保证。",
+    "endpointBoundary": "当前 signals-scout-config-list 已声明 deprecated alias；实际调用 canonical scout-config-list 一次。公开只投影两个预先固定 ID，其他 27 配置及所有自由文本/owner 字段省略。"
+  },
+  "billing": {
+    "scope": "overview 为组织级；usage 为显式 project 670821 的 UTC 日序列。",
+    "plan": {
+      "billing_provider": "posthog",
+      "billing_plan": "free",
+      "subscription_level": "free",
+      "has_active_subscription": false,
+      "is_annual_plan_customer": false
+    },
+    "exactBillingPeriod": {
+      "current_period_start": "2026-10-17T17:45:01.620Z",
+      "current_period_end": "2026-11-16T17:45:01.620Z",
+      "interval": "month"
+    },
+    "currentOrganizationProductUsageAndCaps": [
+      {
+        "name": "Session replay",
+        "type": "session_replay",
+        "usage_key": "recordings",
+        "unit": "recording",
+        "current_usage": 18,
+        "subscribed": false,
+        "free_allocation": 5000,
+        "usage_limit": 5000,
+        "no_billing_limit": false,
+        "has_exceeded_limit": false,
+        "current_amount_usd": null,
+        "display_unit": null,
+        "display_divisor": null
+      },
+      {
+        "name": "AI Observability",
+        "type": "llm_analytics",
+        "usage_key": "llm_events",
+        "unit": "event",
+        "current_usage": 1117,
+        "subscribed": false,
+        "free_allocation": 100000,
+        "usage_limit": 100000,
+        "no_billing_limit": false,
+        "has_exceeded_limit": false,
+        "current_amount_usd": null,
+        "display_unit": null,
+        "display_divisor": null
+      },
+      {
+        "name": "Logs",
+        "type": "logs",
+        "usage_key": "logs_mb_ingested",
+        "unit": "ingested MB",
+        "current_usage": 447,
+        "subscribed": false,
+        "free_allocation": 10000,
+        "usage_limit": 10000,
+        "no_billing_limit": false,
+        "has_exceeded_limit": false,
+        "current_amount_usd": null,
+        "display_unit": "GB",
+        "display_divisor": 1000
+      }
+    ],
+    "organizationCurrentTotalAmountUsd": null,
+    "organizationCurrentTotalAmountUsdAfterDiscount": null,
+    "actualUsdChargeKnown": false,
+    "costBoundary": "free plan 是实际返回值；美元费用字段均为 null，不能写成实际账单 $0，也未使用 projected_* 预测。",
+    "customLimitsUsd": {},
+    "nextPeriodCustomLimitsUsd": {},
+    "scopedDailyUsage": {
+      "projectId": 670821,
+      "startDateUTC": "2026-10-17",
+      "endDateUTCInclusive": "2026-11-09",
+      "interval": "day",
+      "seriesCount": 5,
+      "next": null,
+      "paginationComplete": true,
+      "logsAndTracesMB": 373,
+      "apmMB": 324,
+      "logsMB": 47,
+      "aiObservabilityEvents": 857,
+      "sessionReplayRecordings": 16,
+      "bucketCountPerSeries": 24
+    },
+    "preservedUnreconciledDifferences": {
+      "combinedLogsAndTracesMB": 373,
+      "sumComponentMB": 371,
+      "combinedMinusComponentsMB": 2,
+      "cause": "unknown; API did not supply reconciliation/rounding details",
+      "overviewVersusProjectDaily": "两接口的组织/项目范围与聚合窗口不同，值亦不一致。未再取数，未以延迟、其他项目或取整猜测填平差额。",
+      "todayZeros": "日序列 2026-11-09 返回 0；不证明今天没有使用或采集。"
+    },
+    "measurementLimits": [
+      "AI Observability 的 event 数不等于独立上游模型调用数。",
+      "Replay 用量不是本 issue 的 session ID、遮罩或真实播放证明。",
+      "计量没有按本 issue case/source 归因，不能把增长记为本轮实际验收消耗。",
+      "日窗口从 10-17 00:00 UTC 开始，组织账期从当日 17:45:01.620 UTC 开始；不可不加说明混用。",
+      "组合 Logs+Tracing 不与 Logs/APM 分项重复相加；产品额度按响应原单位保留。",
+      "此 fresh 元数据不能替代最终模型后用量与精确服务 source 的证据。"
+    ],
+    "documentationUrls": [
+      "https://posthog.com/docs/session-replay",
+      "https://posthog.com/docs/ai-observability",
+      "https://posthog.com/docs/logs"
+    ]
+  },
+  "metadataCallCounts": {
+    "scout-config-list": 1,
+    "scout-metadata-get": 1,
+    "billing-overview-get": 1,
+    "billing-usage-get": 1
+  },
+  "officialContractFingerprints": [
+    {
+      "key": "billing-overview-info",
+      "command": "info billing-overview-get",
+      "observedAtUTC": "2026-11-09T11:46:59.364Z",
+      "decodedResponseBytes": 1013,
+      "decodedResponseSha256": "bcbd3d5a9495ffa76739a218640d68df0281f2651a1d3d251ee67ede79138abc",
+      "responsePublished": false
+    },
+    {
+      "key": "billing-usage-info",
+      "command": "info billing-usage-get",
+      "observedAtUTC": "2026-11-09T11:47:03.309Z",
+      "decodedResponseBytes": 5264,
+      "decodedResponseSha256": "550ca8b2090d7daa92a3c41e34df62195db867ebc5de967b3b90aa9e68691288",
+      "responsePublished": false
+    },
+    {
+      "key": "scout-tool-search",
+      "command": "search scout",
+      "observedAtUTC": "2026-11-09T11:46:53.870Z",
+      "decodedResponseBytes": 3311,
+      "decodedResponseSha256": "f73085f2809cdafb7c7b645ee5e01f594c48568469e8221d1a4033265ab46556",
+      "responsePublished": false
+    },
+    {
+      "key": "signals-scout-config-info",
+      "command": "info signals-scout-config-list",
+      "observedAtUTC": "2026-11-09T11:47:35.864Z",
+      "decodedResponseBytes": 1231,
+      "decodedResponseSha256": "d9eb82d858b5cfeb62821fa173391b2e767c274118ab9b67635c2e0a9e5868da",
+      "responsePublished": false
+    },
+    {
+      "key": "scout-metadata-info",
+      "command": "info scout-metadata-get",
+      "observedAtUTC": "2026-11-09T11:47:31.354Z",
+      "decodedResponseBytes": 989,
+      "decodedResponseSha256": "1000aa556a1c3c3e5454344f7c10712390fcd6a91795829331d89e17b57aebda",
+      "responsePublished": false
+    }
+  ],
+  "files": [
+    {
+      "path": "posthog-scouts-billing-fresh-20261109/public/scout-configuration.readback.safe.json",
+      "bytes": 4842,
+      "sha256": "6b61a1228f58d1a350ce7089d43800b2ee0a89f600bf3fc1cb991bce17409bd6",
+      "blob": "9b6090d23c6b3b14c1069f120f61d882110f93fc",
+      "privacyPatternFindings": 0
+    },
+    {
+      "path": "posthog-scouts-billing-fresh-20261109/public/scout-dispatch-limits.readback.safe.json",
+      "bytes": 1992,
+      "sha256": "d4c1e073b635ecf69eb83e9635af8df742e47dbf8d450f4c313c7385fef1a2da",
+      "blob": "02c0607320d75dffbd6dcf27ba422efd8689d728",
+      "privacyPatternFindings": 0
+    },
+    {
+      "path": "posthog-scouts-billing-fresh-20261109/public/billing-overview.readback.safe.json",
+      "bytes": 4785,
+      "sha256": "ea2f299fe55819700ec78faabd725f2027cc364b352d7cfc4694a2f35583e4a6",
+      "blob": "3bb103ca21d8ed7ad62cfe1eddf1f7126fc7fef3",
+      "privacyPatternFindings": 0
+    },
+    {
+      "path": "posthog-scouts-billing-fresh-20261109/public/billing-project-usage.readback.safe.json",
+      "bytes": 8961,
+      "sha256": "21a1f75971b1039a01a4502600d53d4e5bf8e28893362614d7adbac627e89ca3",
+      "blob": "6ee4d295f37facb09f3c5a1f5e91b8be5530400a",
+      "privacyPatternFindings": 0
+    }
+  ],
+  "manifest": {
+    "payloadFiles": 4,
+    "payloadBytes": 20580,
+    "indexIsSeparate": true,
+    "totalFilesIncludingIndex": 5
+  },
+  "privacy": {
+    "originalRequestsPreserved": true,
+    "rawAccountResponsesRetainedPrivatelyWithSha256": true,
+    "publicResponsesExplicitAllowlist": true,
+    "excluded": [
+      "customer/account/owner/member identifiers",
+      "project display names",
+      "API tokens or credentials",
+      "free-text scout instructions and descriptions",
+      "precheck SQL",
+      "recording/user/model content",
+      "signed URLs",
+      "unrelated product/config details"
+    ],
+    "payloadPatternScanFindings": 0,
+    "scanLimits": "Explicit field selection is primary; pattern scan is an additional check, not a universal sensitive-data detector."
+  },
+  "actions": {
+    "sqlQueries": 0,
+    "modelCalls": 0,
+    "scoutExecutions": 0,
+    "actualAcmeCases": 0,
+    "recordingEnumeration": 0,
+    "browserAuthAttempts": 0,
+    "projectGetCalls": 0,
+    "settingsChanges": 0,
+    "planChanges": 0,
+    "capChanges": 0,
+    "retentionChanges": 0,
+    "resourcesStarted": 0,
+    "gitRefChanges": 0,
+    "readRetries": 0,
+    "allExternalReadsComplete": true
+  },
+  "retainedStores": {
+    "prefix": "posthogFreshBillingScouts20261109:",
+    "index": "posthogFreshBillingScouts20261109:index:safeJSON",
+    "privateSuffix": ":private",
+    "publicPayloadPrefix": "posthogFreshBillingScouts20261109:artifact:"
+  }
+}

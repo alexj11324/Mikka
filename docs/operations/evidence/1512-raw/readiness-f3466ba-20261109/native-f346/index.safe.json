@@ -1,0 +1,261 @@
+{
+  "version": 1,
+  "purpose": "Immutable source-bound Native artifact evidence; no Git ref update",
+  "repository": "alexj11324/Mikka",
+  "runId": 42610943512,
+  "jobId": 129141935329,
+  "head": "f3466ba479ef51918790f521a288feaef5160e44",
+  "actualRevision": "855245dba9accc3212dab9fd28af398af1a7e65a",
+  "actualTree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+  "nativeJobConclusion": "success",
+  "budget": {
+    "fullLogin": {
+      "native": 426,
+      "web": 435,
+      "passed": true
+    },
+    "originalFirstPair": {
+      "pair": 1,
+      "native": 158,
+      "hosted": 233,
+      "passed": true
+    }
+  },
+  "projectedOrdinals": 1252,
+  "diagnosticsStatus": "incomplete",
+  "firstNativePairRpc": {
+    "physical": 5,
+    "physicalCompletedInWindow": 3,
+    "physicalCrossesStart": 0,
+    "physicalCrossesEnd": 2,
+    "physicalCompletionNotObserved": 0,
+    "logical": 14,
+    "logicalCompletedInWindow": 13,
+    "logicalCrossesStart": 0,
+    "logicalCrossesEnd": 1,
+    "logicalCompletionNotObserved": 0
+  },
+  "lifecycleWorkspaceNameRestored": false,
+  "smokeAndLifecycleBaselinesSeparated": true,
+  "productionAcceptance": false,
+  "payloadFiles": 22,
+  "payloadBytes": 1302669,
+  "indexExcludedFromPayloadCount": true,
+  "files": [
+    {
+      "path": "native-f346/arithmetic.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 23630,
+      "sha256": "50f03137eb031249c85956fc3fe351ae1d06a791534163a2c12afc1a9c6ed75c",
+      "gitBlob": "bcf9d6ca6d30e6e6de0c1321a8b8735294be01b6",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-f346/artifact-transfer.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 2231,
+      "sha256": "fe21774b8dd1754409dfe6f04f3aca2bea88263cbe8eeab386b5325031f6316b",
+      "gitBlob": "a1aaf3bb104ef86ad1dcefc8ff3e71c7e1f52f4e",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-f346/cleanup-package.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 11408,
+      "sha256": "421d9c0c33fd3838ad695f5364549c7e0552150a674ef33c53f8e9d7eda513b8",
+      "gitBlob": "8dbda3380fc2691a3a18118dc4981a329335b426",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-f346/first-read.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 1588,
+      "sha256": "b47ce89b57d50c0a4ecb0508a8ba7d498e2950f741fd0cfab9b6aefd77a38fd2",
+      "gitBlob": "64c46ac17a424d9c0e1631b53f572b0c7fdb8a4b",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-f346/job-129141935329.original.log",
+      "kind": "original-job-log",
+      "mode": "100644",
+      "bytes": 256117,
+      "sha256": "53ec57deaac5d3e7351fbe0c63a0156b8dc023c118644829d9f46c8339f56142",
+      "gitBlob": "3123e1ee968825f33d20c1d5ecb1497e5808a0d0",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-f346/job.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 7071,
+      "sha256": "55df06e110b5f8dc7a5339b87c83d60b415aadf5c5db512d17898ff8ddf2196e",
+      "gitBlob": "b15b87c52085919eed82376f30e5f5150fb62da9",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-f346/original-files-manifest.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 84763,
+      "sha256": "6a7d9b7d4e42797db7f3d143cc648c953a1a50fb5bb61e6d7bd81e5e06f8cfc8",
+      "gitBlob": "767fc73a6b67ea97f2da92ad18e4f548aa41e37e",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-f346/original/lifecycle.json",
+      "kind": "exact-original-JSON",
+      "mode": "100644",
+      "bytes": 697493,
+      "sha256": "0f8d13932b0ee96f84d20391b4f9d36f1e17f186ad0d6631a6e1da515e1d2706",
+      "gitBlob": "3b8932ee8f13a5a259857fdd08a5732ef3f93751",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-f346/original/mac-acceptance-package.json",
+      "kind": "exact-original-JSON",
+      "mode": "100644",
+      "bytes": 957,
+      "sha256": "862d66035ee99aded7c71bad40f7527b04c65a41da3dfcfea8f0de0a9b1544a2",
+      "gitBlob": "2bec7393fc3801ce2631da0f9ecdcf9d3039d261",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-f346/original/native-crypto.json",
+      "kind": "exact-original-JSON",
+      "mode": "100644",
+      "bytes": 2868,
+      "sha256": "36b3cb14f57a08281952fb7c2e52dece3b6c609ea253cc0b2bef89ae991b2398",
+      "gitBlob": "2d5618a19f5b489c0d75b5b8af763ceede76b7fa",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-f346/original/parity.json",
+      "kind": "exact-original-JSON",
+      "mode": "100644",
+      "bytes": 117021,
+      "sha256": "64951e2f54e2b6c6102e6c858faad7feb9aed2b420302274008209a67541c857",
+      "gitBlob": "4da402b8fb4cad3ab1cae0e75457bf6a6df609eb",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-f346/original/smoke.json",
+      "kind": "exact-original-JSON",
+      "mode": "100644",
+      "bytes": 3144,
+      "sha256": "5d5bad2ebb1e70d59bb46dcace776edab0ec1d592b9451d6c4e24f31663dc49d",
+      "gitBlob": "85b671f71cc275cbe805d5dad932b4048de17d4b",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-f346/privacy-scan.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 4656,
+      "sha256": "fd43ccef38c304d410cba9241f7e8c2e415e28db7a0060472ba3f9963d13deda",
+      "gitBlob": "c852df7434e4727940b623e3de610a5d95ee4033",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-f346/read-ledger.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 1235,
+      "sha256": "ad4bc50741eb2592db4252b63725596d06ae2b180b26c11eae18996b4c50d617",
+      "gitBlob": "e30d44cb1e6267f028b8b1c069a37cf9a45e216a",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-f346/README.md",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 4468,
+      "sha256": "7b5ea4d5bb16f3799537428bef6fa05efb320344e3bbd130381d15e90dbf377f",
+      "gitBlob": "71b9c4de5f68c777e96901723ed2a201fbe01f70",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-f346/rpc-diagnostics.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 40734,
+      "sha256": "c91bb31c92e00114b1dd58cf58ec6e455d3884fe5e4ba97f298a3215582d41c8",
+      "gitBlob": "54f17196aacb9b0056de169fba161ef11e23412d",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-f346/source-binding.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 5234,
+      "sha256": "023a96d6b819cee0153ef580c7c043b6980bf20ff8ca598488c83c8616377021",
+      "gitBlob": "efd08fb912f99b911def658051058d3a4bf96c07",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-f346/terminal-review.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 16930,
+      "sha256": "e5bf85600d26d40ed649125fb79ccbdaa764c5e81eb4a28e68b84b2683edd821",
+      "gitBlob": "6a60fdb8195ac109b9312a2f3b0816132a71a338",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-f346/verification-run.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 887,
+      "sha256": "952a460b7d87288a5d2ad0e7b2b7fc29ac46e0c170bae3a394ed8bd9e00d8c4b",
+      "gitBlob": "6ca5c271041bc10f98304e7458b88e168c26d393",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-f346/verify-artifact-download.py",
+      "kind": "exact-verification-script",
+      "mode": "100644",
+      "bytes": 2781,
+      "sha256": "d459a1a68d4a87043cf0dcc9712c4d696acd9cb4bd119ade72b45063f4a600f4",
+      "gitBlob": "b9147c9f81184f9003ba3af087041caaa00f81c7",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-f346/verify-native-originals.py",
+      "kind": "exact-verification-script",
+      "mode": "100644",
+      "bytes": 16005,
+      "sha256": "81fca15ac8197ade4e630778dd8e001a690e6d9fb399a9c6452dd56bc40b90a3",
+      "gitBlob": "6bf5eedc9c71008ec015e95ff56dc29f14eeb469",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-f346/vm-cleanup.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 1448,
+      "sha256": "28bcad7a1c554a62ff50ba4dcb19a675da0bfef3005385798c99ee95a5851989",
+      "gitBlob": "8bf93571e41e1acc7159e30f053856d87a07047d",
+      "remoteConfirmed": true
+    }
+  ],
+  "readLedger": {
+    "originalJobLog": 1,
+    "artifactDownloads": 2,
+    "artifactRefreshes": 0,
+    "ciReruns": 0,
+    "oldArtifactReads": 0
+  },
+  "resources": {
+    "created": 1,
+    "stopped": 1,
+    "deleted": 1,
+    "exact404Verified": true,
+    "currentOwnedActive": 0
+  },
+  "noRefWrites": true,
+  "originalBytesPreserved": true,
+  "frozenAt": "2026-11-09T12:14:55.008Z"
+}
