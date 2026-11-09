@@ -65,6 +65,31 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
     assert.equal(mask(`key ${E2B_KEY}`), 'key [secret:E2B_API_KEY]')
   })
 
+  await t.test('mobile steps read masked tool output and source timing through a retried event batch', async () => {
+    const events = await import('../app/v1/runs/[runId]/events/route')
+    const { threadItems } = await import('../lib/issue-run-conversation')
+    const runId = await newRun()
+    const chunks = [
+      { type: 'tool-input-available', toolCallId: 'command', toolName: 'bash', input: { command: 'print result' } },
+      { type: 'tool-output-available', toolCallId: 'command', toolDurationMs: 1250,
+        output: { stdout: `${SECRET} ${Buffer.from(SECRET).toString('base64')} ${E2B_KEY}` } },
+    ]
+    for (let retry = 0; retry < 2; retry++) {
+      const response = await events.POST(call('POST', `/v1/runs/${runId}/events`, { fromSeq: 1, chunks }), { params: Promise.resolve({ runId }) })
+      assert.equal(response.status, 200)
+    }
+    const { rows } = await pool.query('select chunk, "createdAt" as at from run_chunks where "runId"=$1 order by seq', [runId])
+    assert.equal(rows.length, 2)
+    const [item] = threadItems(rows, [])
+    assert.ok(item.kind === 'steps')
+    assert.equal(item.steps[0].ms, 1250)
+    assert.equal(item.steps[0].failed, false)
+    const output = item.steps[0].output!
+    noPlain('mobile tool output', output)
+    assert.ok(!output.includes(Buffer.from(SECRET).toString('base64')))
+    assert.equal(output, '{\n  "stdout": "[secret:API_TOKEN] [secret:API_TOKEN] [secret:E2B_API_KEY]"\n}')
+  })
+
   await t.test('A: a secret (and its base64) split over deltas of one batch never reaches run_chunks or lastReply', async () => {
     const events = await import('../app/v1/runs/[runId]/events/route')
     for (const split of ['two', 'chars'] as const) {
