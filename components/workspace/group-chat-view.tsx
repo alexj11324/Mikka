@@ -7,11 +7,12 @@ import { useTranslations } from 'next-intl'
 import { listAgents } from '@/app/actions/agents'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
+import { CHAT_SURFACE, ChatMessage } from '@ui-slot/chat-message'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Spinner } from '@/components/ui/spinner'
 import { ConversationPill } from '@/components/nav/conversation-pill'
-import { GroupAvatar, groupMembersKey, useGroupMembers } from '@/components/nav/group-avatar'
+import { GroupAvatar, groupMembersKey, memberAvatar, useGroupMembers } from '@/components/nav/group-avatar'
 import { useLiveKey } from '@/hooks/use-live-key'
 import { LetterAvatar } from '@/components/nav/letter-avatar'
 import { BotAvatar } from '@/components/nav/bot-avatar'
@@ -149,10 +150,13 @@ export function GroupChatView({ group, userId, people }: {
     ? id === userId ? t('you') : member(type, id)?.name || people.get(id) || t('member')
     : member(type, id)?.name ?? (type === 'agent' ? agents.find(agent => agent.id === id)?.name : undefined) ?? t('bot')
 
-  return <section aria-label={group.title || t('untitled')} data-testid="group-chat" className="relative flex min-h-0 w-full flex-1 flex-col">
+  // Whom the person's messages go to, for the chat-message slot: the group.
+  const speaker = { id: group.id, name: group.title || t('untitled') }
+
+  return <section aria-label={group.title || t('untitled')} data-testid="group-chat" className={cn('relative flex min-h-0 w-full flex-1 flex-col', CHAT_SURFACE)}>
     <ConversationPill name={group.title || t('untitled')} avatar={<GroupAvatar title={group.title || t('untitled')} members={members} />} />
     <div aria-hidden="true" className="hidden h-14 shrink-0 md:block" />
-    <div ref={scroller} onScroll={event => { const node = event.currentTarget; const next = node.scrollHeight - node.scrollTop - node.clientHeight < 56; if (next !== following) setFollowing(next) }} className="min-h-0 flex-1 overflow-y-auto">
+    <div ref={scroller} onScroll={event => { const node = event.currentTarget; const next = node.scrollHeight - node.scrollTop - node.clientHeight < 56; if (next !== following) setFollowing(next) }} className="min-h-0 flex-1 overflow-y-auto scroll-fade-y">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 pb-6">
         {blockingCode === 'not_found' ? <p role="alert" className="py-6 text-sm">{t('notFound')}</p>
           : blockingCode ? <div role="alert" className="flex items-center gap-3 py-6 text-sm"><span>{blockingCode === 'unauthorized' ? t('authRequired') : t('loadError')}</span>{blockingCode !== 'unauthorized' && <Button variant="outline" size="sm" onClick={() => { void mutate() }}>{t('retry')}</Button>}</div>
@@ -166,22 +170,23 @@ export function GroupChatView({ group, userId, people }: {
                       const name = authorName(run.authorType, run.authorId)
                       const bot = run.authorType === 'bot' ? member('bot', run.authorId) : undefined
                       return <li key={run.key} className={cn('flex', mine ? 'flex-col items-end gap-1' : 'items-end gap-2')}>
-                        {!mine && (bot ? <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size="message" still /> : <LetterAvatar name={name} size="message" />)}
+                        {!mine && (bot ? <BotAvatar {...memberAvatar(bot)} size="message" still /> : <LetterAvatar name={name} size="message" />)}
                         <div className={cn('flex min-w-0 flex-col gap-1', mine ? 'max-w-[min(26rem,80%)] items-end' : 'max-w-[min(35rem,85%)]')}>
                           {mine ? <span className="sr-only">{name}</span> : <span className="text-xs font-medium text-muted-foreground">{name}</span>}
-                          {run.messages.map(message => <Fragment key={message.id}>
-                            <Bubble variant={mine ? 'secondary' : 'muted'} align={mine ? 'end' : 'start'} className={cn('max-w-full', mine && '*:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground')}>
-                              <BubbleContent className="rounded-2xl px-4 py-3 whitespace-pre-wrap">{run.authorType === 'user' ? <CollapsibleMessage><UserMessageText text={message.body} /></CollapsibleMessage> : <AgentMarkdown text={message.body} />}</BubbleContent>
-                            </Bubble>
-                            <MessageReactions reactions={reactions[message.id]} align={mine ? 'end' : 'start'} />
-                          </Fragment>)}
+                          {/* The person's own words are drawn by the chat-message slot, as in a 1:1 chat. */}
+                          {run.messages.map(message => mine
+                            ? <ChatMessage key={message.id} from="person" speaker={speaker} body={<CollapsibleMessage><UserMessageText text={message.body} /></CollapsibleMessage>} after={<MessageReactions reactions={reactions[message.id]} align="end" />} />
+                            : <Fragment key={message.id}>
+                              <Bubble variant="muted" align="start" className="max-w-full">
+                                <BubbleContent className="rounded-2xl px-4 py-3 whitespace-pre-wrap">{run.authorType === 'user' ? <CollapsibleMessage><UserMessageText text={message.body} /></CollapsibleMessage> : <AgentMarkdown text={message.body} />}</BubbleContent>
+                              </Bubble>
+                              <MessageReactions reactions={reactions[message.id]} align="start" />
+                            </Fragment>)}
                         </div>
                       </li>
                     })}
-                    {unsent.map(item => <li key={item.key} data-pending={item.failed ? 'failed' : 'sending'} className="flex flex-col items-end gap-1">
-                      <Bubble variant="secondary" align="end" className={cn('max-w-[min(26rem,80%)] *:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground', !item.failed && 'opacity-60')}>
-                        <BubbleContent className="rounded-2xl px-4 py-3 whitespace-pre-wrap"><CollapsibleMessage><UserMessageText text={item.body} /></CollapsibleMessage></BubbleContent>
-                      </Bubble>
+                    {unsent.map(item => <li key={item.key} data-pending={item.failed ? 'failed' : 'sending'} className={cn('flex flex-col items-end gap-1', !item.failed && 'opacity-60')}>
+                      <ChatMessage from="person" speaker={speaker} body={<CollapsibleMessage><UserMessageText text={item.body} /></CollapsibleMessage>} />
                       {item.failed && <span role="alert" className="flex items-center gap-2 text-xs text-destructive-foreground">{t('notSent')}<Button variant="ghost" size="xs" onClick={() => { void deliver(item) }}>{t('retry')}</Button></span>}
                     </li>)}
                     {first?.agentStatus && <li aria-label={t('answering')} className="flex"><span className="rounded-2xl bg-muted px-4 py-3"><Spinner aria-hidden="true" /></span></li>}

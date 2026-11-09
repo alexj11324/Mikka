@@ -388,8 +388,9 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   Sources are [navigation](decisions/2026-11-01-1320-navigation-model.md),
   [task lists](decisions/2026-11-07-2045-tasks-only-threads-inside.md) and
   [one conversation](decisions/2026-11-07-2300-one-conversation-per-task.md).
-  Public default slots can retain older thread presentation; implementation
-  coverage depends on the selected [UI layer](../ui-overlay.md).
+  The UI is the official build ([one UI](decisions/2026-11-08-2133-one-ui.md));
+  default slots in this repository can retain older thread presentation
+  ([UI slots](../ui-overlay.md)).
 - **R-83** A reply's tool calls say what they did, not that a tool was used
   ([decision](decisions/2026-11-04-2221-chat-tool-groups-and-citations.md),
   spec `chat-tool-calls.md`). Two or more calls with nothing said between them

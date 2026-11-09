@@ -146,7 +146,7 @@ export function fetchScopedGroups(ownerId: string, workspaceId: string, fetcher:
 }
 
 /** A group's members as GET /api/conversations/{id}/members returns them; bots carry their colour and shape. */
-export type GroupMember = { id: string; name: string; memberType: 'user' | 'agent' | 'bot'; color?: string | null; shape?: string | null }
+export type GroupMember = { id: string; name: string; memberType: 'user' | 'agent' | 'bot'; color?: string | null; shape?: string | null; coordinator?: boolean }
 
 export function fetchGroupMembers(id: string, fetcher: typeof fetch = fetch): Promise<GroupMember[]> {
   return readGroupApi(`/api/conversations/${encodeURIComponent(id)}/members`, listIn<GroupMember>('members'), fetcher)

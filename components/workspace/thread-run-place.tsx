@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { HarnessMark, harnessName } from '@/components/labels/entity-labels'
-import { cloudShortId, machineDot, systemLabel, type ThreadMachine, type ThreadMachineKind } from '@/lib/thread-machine'
+import { cloudShortId, machineDot, machineStateWord, systemLabel, type ThreadMachine, type ThreadMachineKind } from '@/lib/thread-machine'
 import { cn } from '@/lib/utils'
 
 const KIND_ICONS: Record<ThreadMachineKind, typeof Cloud> = { cloud: Cloud, laptop: Laptop, server: Server }
@@ -62,7 +62,7 @@ export function MachineDetails({ machine }: { machine: ThreadMachine }) {
       <KindIcon aria-hidden="true" className="size-4 shrink-0" />
       <span className="min-w-0 flex-1 truncate text-sm font-semibold">{name}</span>
       <span className={cn('flex shrink-0 items-center gap-1.5 text-xs font-medium', dot === 'running' ? 'text-success-foreground' : dot === 'failed' ? 'text-destructive-foreground' : 'text-muted-foreground')}>
-        <Dot dot={dot} />{t(`states.${machine.state}`)}
+        <Dot dot={dot} />{t(`states.${machineStateWord(machine)}`)}
       </span>
     </div>
     <dl className="flex flex-col gap-1.5">
@@ -99,7 +99,7 @@ export function ThreadRunPlace({ issueId, runId, status, harness, botName }: { i
   return <span className="flex shrink-0 items-center gap-0.5" data-slot="thread-run-place">
     {machine && <HoverCard>
       <HoverCardTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0 text-muted-foreground pointer-coarse:size-11"
-        aria-label={t('label', { name: name(machine), state: t(`states.${machine.state}`) })} />}>
+        aria-label={t('label', { name: name(machine), state: t(`states.${machineStateWord(machine)}`) })} />}>
         <MachineIcon machine={machine} />
       </HoverCardTrigger>
       <HoverCardContent align="start" className="w-72 p-3"><MachineDetails machine={machine} /></HoverCardContent>

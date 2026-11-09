@@ -1,5 +1,9 @@
 # Community settings visual evidence
 
+Retired from CI on 2026-11-08: there is one UI and no separate open-source look
+to screenshot ([decision](../../docs/design/decisions/2026-11-08-2133-one-ui.md)).
+The `community-settings-ui.yml` workflow was removed; these scripts are kept.
+
 This is a production-component screenshot entry, not a product route or a
 browser functional test. It uses the existing production Vite configuration,
 fonts and tokens to render `SettingsView` inside `AppFrame` with its settings

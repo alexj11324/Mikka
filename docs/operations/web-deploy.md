@@ -170,7 +170,7 @@ as a recovery step.
 
 ## Official private UI overlay
 
-Open-source builds, including every public/fork PR check, leave
+Builds without `mikka-hosted-ui`, including every public/fork PR check, leave
 `MIKKA_UI_OVERLAY_DIR` unset and use the public slot implementations. Only the
 trusted `main` official release jobs check out `alexj11324/mikka-hosted-ui`.
 They read `HOSTED_UI_READ_KEY` from Infisical `prod:/platform` with the existing
