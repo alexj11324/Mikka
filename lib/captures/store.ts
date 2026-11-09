@@ -13,6 +13,7 @@ import { artifactStorage, deleteArtifactObject, getArtifactObjectBytes, presignA
 import { runArtifactSubmissions } from '@/lib/artifacts/run-submissions'
 import { executionIdentitySchema } from '@/lib/execution-identity'
 import { modelRoutingEvidenceSchema } from '@/lib/thread-execution-identity-view'
+import { taskActivityChanged } from '@/lib/factory/activity-live'
 
 // Screenshots and screen recordings in Neon (whose, which run, share links)
 // with their files in the artifacts bucket. Every read is scoped to the run's
@@ -66,6 +67,7 @@ async function writableSaveCapture(owner: CaptureOwner, input: { bytes: Uint8Arr
     id, userId: owner.userId, runId: owner.runId, issueId: owner.issueId, botId: owner.botId,
     kind: captureKind(contentType), contentType, source: input.source, status: 'ready', title, durationMs: input.durationMs ?? null, ...file,
   }).returning()
+  taskActivityChanged(db, owner.runId)
   return captureView(row)
 }
 
@@ -207,7 +209,7 @@ async function writableCompleteUpload(owner: CaptureOwner, captureId: string): P
     // Its eventual cleanup requires an object-storage lifecycle rule.
     await deleteArtifactObject(ready ? row.storageKey : verifiedKey).catch(() => undefined)
   }
-  if (ready) return captureView(ready)
+  if (ready) { taskActivityChanged(db, owner.runId); return captureView(ready) }
   const winner = await readyUpload()
   return winner ? captureView(winner) : { error: 'conflict', message: 'The upload already ended.' }
 }
@@ -273,6 +275,7 @@ async function writableFinishRecording(row: Row, input: { bytes: Uint8Array; dur
   const file = await place(row, row.id, input.bytes, 'video/mp4')
   const [ready] = await db.update(runCaptures).set({ status: 'ready', ...file, durationMs: input.durationMs, expiresAt: null, updatedAt: new Date() })
     .where(and(eq(runCaptures.id, row.id), eq(runCaptures.status, 'recording'))).returning()
+  if (ready) taskActivityChanged(db, row.runId)
   return ready ? captureView(ready) : { error: 'conflict', message: 'The recording already ended.' }
 }
 
