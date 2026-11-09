@@ -53,7 +53,8 @@ Decision: [2026-11-01-2310](decisions/2026-11-01-2310-personal-and-team-workspac
 - Choosing another bot on the left changes the center chat and the right
   column's dispatched tasks and computer together.
 - A task (issue, `MIK-xx`) is one conversation: its runs read oldest first,
-  with a divider only where the Agent changes. The composer addresses the
+  and where the Agent changes, a label with the next Agent's mark and name,
+  never a 「换」 verb (as Warp labels runs). The composer addresses the
   newest run ([decision](decisions/2026-11-09-0045-no-attempt-word.md)).
 - **Attempt** is an internal data term only (`factory_attempts`, a run chain's
   runs). User-facing copy never says 「尝试」 or "attempt".
@@ -78,7 +79,8 @@ the task's status: task status, Factory stage, run result and the derived
 | idle | 暂不处理 | On hold | The run decided there is nothing to do now. |
 | ended | 已结束 | Ended | An earlier run left waiting while the conversation went on. |
 
-_Avoid_: 已解决 for a run (a thread group word, R-52), 已替换, 进行中 for a run
+_Avoid_: 「换 Codex」 or 「换 Codex 继续」 (a row or a change of Agent is labelled by the
+Agent's own mark and name), 已解决 for a run (a thread group word, R-52), 已替换, 进行中 for a run
 (进行中 is the board column), 尝试.
 
 ## Other words

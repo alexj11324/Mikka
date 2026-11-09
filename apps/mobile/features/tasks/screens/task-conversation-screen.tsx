@@ -41,8 +41,8 @@ async function readConversation(id: string): Promise<Conversation> {
 }
 
 /**
- * A task's one conversation (Alex 2026-11-07, 2026-11-08): every run's messages in order, oldest at the top. A line
- * only where the task switched Agent (「换 Codex 继续」, 「Claude Code 没跑通 · 换 Codex 继续」); a small marker
+ * A task's one conversation (Alex 2026-11-07, 2026-11-08): every run's messages in order, oldest at the top. A label
+ * only where the Agent changed, the next Agent's name (「Codex」, no 「换」 verb, as Warp labels runs); a small marker
  * where a factory stage started (「独立审查」); same-Agent runs otherwise read as one. The bar is ← and the task's title over the current
  * Agent; the composer, 停止 and a quota pause act on the newest attempt. It updates on the task's and the newest
  * attempt's live keys.
@@ -192,15 +192,15 @@ function ReviewCard({ flow, running, children }: { flow: TaskFlow | null | undef
 }
 
 /**
- * Between two runs of the task's one conversation: a centred line where the task switched Agent (「换 Claude Code 继续」),
- * a small marker where a factory stage started (「独立审查」), nothing otherwise.
+ * Between two runs of the task's one conversation: a centred label with the next Agent's name where the Agent
+ * changed (「Claude Code」), a small marker where a factory stage started (「独立审查」), nothing otherwise.
  */
 function Boundary({ at }: { at: ReturnType<typeof boundary> }) {
   if (!at) return null
-  return at.kind === 'switch' ? <Divider text={at.text} /> : <Text style={styles.stage}>{at.text}</Text>
+  return at.kind === 'agent' ? <Divider text={at.text} /> : <Text style={styles.stage}>{at.text}</Text>
 }
 
-/** The line where the Agent changed, as the chat's event lines are drawn: centred grey words between hairlines. */
+/** Where the Agent changed: the next Agent's name, as the chat's event lines are drawn, centred between hairlines. */
 function Divider({ text }: { text: string }) {
   return (
     <View style={styles.divider} accessibilityRole="header">
