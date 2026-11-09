@@ -1,0 +1,1 @@
+{"candidateAccepted": true, "cleanup": "both archived receipts exact and complete", "originalRejected": ["/etc/ssl/certs/1560546e.0", "/etc/ssl/certs/e2b-ca.pem"], "paths": 3, "receipt": "/workspace/scratch/263e36984c81/claude-ca-control-replay-1505/receipt.json", "result": "original_rejects_candidate_accepts"}

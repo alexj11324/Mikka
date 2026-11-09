@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+    "-B",
+    "replay.py"
+  ],
+  "cwd": "/workspace/scratch/263e36984c81/claude-ca-control-replay-1505",
+  "startedAt": "2026-11-09T17:30:32.387087+00:00",
+  "completedAt": "2026-11-09T17:30:32.451160+00:00",
+  "exitCode": 0,
+  "stdout": {
+    "bytes": 313,
+    "sha256": "7b92fe2136367883d7d0f6bf55153e458fa8174aaf1f6d72cafe84f3f352154e"
+  },
+  "stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

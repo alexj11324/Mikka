@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "archiveDate": "2026-11-09",
+  "prefix": "claude-ca-control-replay-20261109",
+  "parentCommit": "800eff40eeead9c78fb83cd2260adc0cf40fbd4f",
+  "baseTree": "f3aeb1dd5cc1f77044fd67583d8a3c450594a6aa",
+  "sourceDirectory": "/workspace/scratch/263e36984c81/claude-ca-control-replay-1505",
+  "originalFileCount": 6,
+  "originalTotalBytes": 32156,
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 3114,
+      "mode": "100644",
+      "sha256": "16347e0ad61760801ed62b3690ff6b45b57c73653e4fe6de65ecd75c8f12099b",
+      "gitBlob": "2987b537ea998c8d9fc000d3a1af5a630ac8b701"
+    },
+    {
+      "path": "execution-result.json",
+      "bytes": 555,
+      "mode": "100644",
+      "sha256": "75af133c5598ddc8843d55e5735767710fb490cc233c48f6d1dfdba6e467f58f",
+      "gitBlob": "acdc2cdb035a254213dd3398c54d96788ff3ce52"
+    },
+    {
+      "path": "receipt.json",
+      "bytes": 13771,
+      "mode": "100644",
+      "sha256": "aba59b7ce4af9095694bd6069cee0dc036f2003addf83080e42b930723008155",
+      "gitBlob": "7cc399b84f26aa16592a6315be58418591348769"
+    },
+    {
+      "path": "replay.py",
+      "bytes": 14403,
+      "mode": "100644",
+      "sha256": "d73fe12b23577df243fe326560cb1f5831e51076dc373cc745fff759917fe765",
+      "gitBlob": "4c70c302d66d31b51819565ba583c3e31a9adc53"
+    },
+    {
+      "path": "stderr.txt",
+      "bytes": 0,
+      "mode": "100644",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "stdout.txt",
+      "bytes": 313,
+      "mode": "100644",
+      "sha256": "7b92fe2136367883d7d0f6bf55153e458fa8174aaf1f6d72cafe84f3f352154e",
+      "gitBlob": "d11ccd8caf4855df2b0059c576e1ec2213aa0266"
+    }
+  ],
+  "scope": "Byte-preserving archive of an already-completed local replay against archived Claude control values. No replay rerun, no new control, no CI or production operation. Does not prove the new Codex certificate-mode or Desktop apt-backup paths pass.",
+  "sourceFilesUnmodified": true,
+  "originalRootEntries": 83,
+  "manifestSelfHashExcluded": true,
+  "activation": {
+    "commitUnreferenced": true,
+    "refUpdated": false
+  }
+}
