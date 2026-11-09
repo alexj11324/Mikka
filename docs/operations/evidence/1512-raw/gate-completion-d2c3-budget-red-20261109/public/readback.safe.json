@@ -1,0 +1,34 @@
+{
+  "schema": "mikka.issue1512.cp50.public-status-readback.v1",
+  "observedAtUtc": "2026-11-09T22:50:36.323Z",
+  "pullRequest": {
+    "number": 1799,
+    "url": "https://github.com/alexj11324/Mikka/pull/1799",
+    "head": "d2c3f63448130443e3e10bb5304417162f585776",
+    "base": "1c7698655405b289d7fdbd814713d15e542cc2bb",
+    "state": "open",
+    "merged": false,
+    "updatedAt": "2026-11-09T22:44:22Z",
+    "bodyPath": "public/pr1799-body-20261109T224422Z.md",
+    "bodyBytes": 20211,
+    "bodySha256": "58f23089192ec5b5c98b4c4fb4670f7138ee39a6496eecebd4a8ffc385ecce51",
+    "bodyGitBlob": "377701edb8a9a9eb1b9df3070aad414d5ffb812a"
+  },
+  "comment": {
+    "id": 6753484456,
+    "url": "https://github.com/alexj11324/Mikka/issues/1512#issuecomment-6753484456",
+    "issue": 1512,
+    "createdAt": "2026-11-09T22:44:51Z",
+    "updatedAt": "2026-11-09T22:44:51Z",
+    "bodyPath": "public/issue1512-comment-6753484456.md",
+    "bodyBytes": 1892,
+    "bodySha256": "9ab83f0c033ef082d76c01b1110bb19e4167f6952e69e157f03ec7c9ce388908",
+    "bodyGitBlob": "978ac6b6fd7e9f303f1e62e1c8324ef152e0a86d"
+  },
+  "scope": {
+    "readOnly": true,
+    "newComments": 0,
+    "bodyUpdates": 0
+  },
+  "status": "Readback preserves current RED budget and production 0/2; historical sections remain historical."
+}

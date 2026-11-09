@@ -1,0 +1,177 @@
+{
+  "schema": "issue1512.d2c3.offline-and-db-summary.v1",
+  "head": "d2c3f63448130443e3e10bb5304417162f585776",
+  "actualCheckout": "3bc095c100537563296186fc3d4cc4d60b59b698",
+  "tree": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+  "e2bOffline": {
+    "runId": 42707256401,
+    "jobId": 129467199825,
+    "originalLog": {
+      "sha": "21c36e18474a6080eeb9f94b4ec894e238c49ad5",
+      "bytes": 53953,
+      "sha256": "7cee4a2c39d3181767706fcad20ede645d0c9eb7542ac73f3b9f26204dde7908"
+    },
+    "wrapper": {
+      "sha": "6bd1debfac7c00f4ce8fc3393ce6081086c63cc9",
+      "bytes": 55488,
+      "sha256": "4ea629ad3a27e810d89dccaa6c525257fc9fb34043f3e067a3a4bd8e3f08a642"
+    },
+    "originalReads": 1,
+    "node": {
+      "tests": 215,
+      "suites": 0,
+      "pass": 215,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "python": [
+      {
+        "tests": 32,
+        "seconds": 0.705,
+        "result": "OK"
+      },
+      {
+        "tests": 5,
+        "seconds": 0.01,
+        "result": "OK"
+      },
+      {
+        "tests": 38,
+        "seconds": 0.484,
+        "result": "OK"
+      },
+      {
+        "tests": 16,
+        "seconds": 0.009,
+        "result": "OK"
+      }
+    ],
+    "jobStatuses": [
+      {
+        "id": 129467199825,
+        "name": "test",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T21:57:25Z",
+        "completedAt": "2026-11-09T21:57:41Z"
+      },
+      {
+        "id": 129467701954,
+        "name": "validate",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T21:57:42Z",
+        "completedAt": "2026-11-09T21:57:41Z"
+      },
+      {
+        "id": 129467702244,
+        "name": "check",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T21:57:42Z",
+        "completedAt": "2026-11-09T21:57:41Z"
+      },
+      {
+        "id": 129467703344,
+        "name": "subscriptions",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T21:57:42Z",
+        "completedAt": "2026-11-09T21:57:41Z"
+      },
+      {
+        "id": 129467703375,
+        "name": "await-web",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T21:57:42Z",
+        "completedAt": "2026-11-09T21:57:41Z"
+      },
+      {
+        "id": 129467703830,
+        "name": "cleanup",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T21:57:42Z",
+        "completedAt": "2026-11-09T21:57:41Z"
+      },
+      {
+        "id": 129467704011,
+        "name": "publish",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T21:57:42Z",
+        "completedAt": "2026-11-09T21:57:41Z"
+      }
+    ],
+    "rawSkipTimestampOrdering": "Some skipped job API timestamps have completedAt before startedAt by one second; raw values preserved, no duration inferred.",
+    "meaning": "Only offline gate tests executed. Real build/subscriptions/publish/cleanup jobs were skipped on this PR."
+  },
+  "databaseSummary": {
+    "runId": 42707256422,
+    "jobId": 129474183623,
+    "displayName": "Production build and browser interactions",
+    "actualRole": "Require selected database matrix result, then record job timings. This job does not run a production build or browser acceptance.",
+    "originalLog": {
+      "sha": "351bd5f77fe6f692dd29fc6fe4041f4f78ce0ad1",
+      "bytes": 13304,
+      "sha256": "8efff0360afc0bf33d5589cb96ace5a196526d4704047d790acfc2d4ea897eeb"
+    },
+    "wrapper": {
+      "sha": "bef5baab125b5ee68b0fdc591ad211277cd1f059",
+      "bytes": 13782,
+      "sha256": "8546c73f920f491d30ecc712ae2eecfda6d6d517e4172bace810eccd5dadfe3a"
+    },
+    "originalReads": 1,
+    "observedEnvironment": {
+      "CHANGES_RESULT": "success",
+      "EXPECT_DB": "true",
+      "DB_RESULT": "success"
+    },
+    "matrixMetadata": [
+      {
+        "id": 129470272321,
+        "name": "Database checks (3/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T22:02:32Z",
+        "completedAt": "2026-11-09T22:09:07Z"
+      },
+      {
+        "id": 129470272430,
+        "name": "Database checks (4/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T22:04:12Z",
+        "completedAt": "2026-11-09T22:08:48Z"
+      },
+      {
+        "id": 129470272504,
+        "name": "Database checks (2/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T22:04:35Z",
+        "completedAt": "2026-11-09T22:08:14Z"
+      },
+      {
+        "id": 129470272516,
+        "name": "Database checks (1/4)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T22:05:02Z",
+        "completedAt": "2026-11-09T22:09:32Z"
+      }
+    ],
+    "fullOriginalReaderScope": "PG3/PG4 original logs independently preserved; PG1/PG2 statuses read, no invented assertion totals."
+  },
+  "sourceCorePGIndex": "385bb9ccdc0b1e57d6d4b02474d4ad2af17475da",
+  "sourceCorePGProof": "009923cd0e84158a9b9b93980b7310843c621218",
+  "productionCases": 0,
+  "limitations": [
+    "Offline E2B success is not a runtime publication.",
+    "The DB summary label does not add browser coverage.",
+    "No production/hosted DOM/Replay/PNG result is asserted by this proof."
+  ]
+}

@@ -1,0 +1,5434 @@
+{
+  "schema": "mikka.issue1512.d2c3.source-core-pg3-pg4.evidence.v1",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequest": 1799,
+  "identity": {
+    "head": "d2c3f63448130443e3e10bb5304417162f585776",
+    "tree": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+    "runId": 42707256422,
+    "attempt": 1,
+    "actualCheckout": "3bc095c100537563296186fc3d4cc4d60b59b698",
+    "actualCheckoutTree": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+    "actualCheckoutProofSource": {
+      "gitBlob": "4f369b8ac0e58294392047e459aa4016b02e75ec",
+      "bytes": 147588,
+      "sha256": "f945b9506fb81d01ed1a1037b1ec5cf2963a72ba98059ebe6e64e963f62ef36a"
+    },
+    "publicationAndLeafProof": {
+      "gitBlob": "9b40a2a34dbde83d82cb6b34f767e1967bb4806f",
+      "bytes": 41412,
+      "sha256": "be5d2cf2f0d6d8fa5538c405bdec9a299e3014e7ace10d6877c152c76f35ce71"
+    },
+    "uiInputProof": {
+      "gitBlob": "1c8e549227692f78bb49d4d4cbed68dbc186a4dd",
+      "bytes": 70907,
+      "sha256": "db01e80e70aa7584eebdbdce811332a1658421f7688c54fdaff73eb22970d27a"
+    },
+    "treeApiReadRepeatedByThisReader": false,
+    "sourceBindings": [
+      {
+        "kind": "source",
+        "checkout": "3bc095c100537563296186fc3d4cc4d60b59b698",
+        "gitLogCommandLine": 132,
+        "gitLogShaLine": 133,
+        "fetchAndCheckout": [
+          {
+            "line": 103,
+            "text": "[command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +3bc095c100537563296186fc3d4cc4d60b59b698:refs/remotes/pull/1799/merge"
+          },
+          {
+            "line": 112,
+            "text": "[command]/usr/bin/git checkout --progress --force refs/remotes/pull/1799/merge"
+          },
+          {
+            "line": 113,
+            "text": "Note: switching to 'refs/remotes/pull/1799/merge'."
+          },
+          {
+            "line": 130,
+            "text": "HEAD is now at 3bc095c Merge d2c3f63448130443e3e10bb5304417162f585776 into 1c7698655405b289d7fdbd814713d15e542cc2bb"
+          }
+        ],
+        "node": "node: v24.22.2",
+        "install": [
+          "Lockfile is up to date, resolution step is skipped",
+          "Done in 14.4s using pnpm v10.34.3"
+        ]
+      },
+      {
+        "kind": "core",
+        "checkout": "3bc095c100537563296186fc3d4cc4d60b59b698",
+        "gitLogCommandLine": 131,
+        "gitLogShaLine": 132,
+        "fetchAndCheckout": [
+          {
+            "line": 102,
+            "text": "[command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +3bc095c100537563296186fc3d4cc4d60b59b698:refs/remotes/pull/1799/merge"
+          },
+          {
+            "line": 111,
+            "text": "[command]/usr/bin/git checkout --progress --force refs/remotes/pull/1799/merge"
+          },
+          {
+            "line": 112,
+            "text": "Note: switching to 'refs/remotes/pull/1799/merge'."
+          },
+          {
+            "line": 129,
+            "text": "HEAD is now at 3bc095c Merge d2c3f63448130443e3e10bb5304417162f585776 into 1c7698655405b289d7fdbd814713d15e542cc2bb"
+          }
+        ],
+        "node": "node: v24.22.2",
+        "install": [
+          "Lockfile is up to date, resolution step is skipped",
+          "Done in 30.4s using pnpm v10.34.3"
+        ]
+      },
+      {
+        "kind": "pg3",
+        "checkout": "3bc095c100537563296186fc3d4cc4d60b59b698",
+        "gitLogCommandLine": 249,
+        "gitLogShaLine": 250,
+        "fetchAndCheckout": [
+          {
+            "line": 220,
+            "text": "[command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +3bc095c100537563296186fc3d4cc4d60b59b698:refs/remotes/pull/1799/merge"
+          },
+          {
+            "line": 229,
+            "text": "[command]/usr/bin/git checkout --progress --force refs/remotes/pull/1799/merge"
+          },
+          {
+            "line": 230,
+            "text": "Note: switching to 'refs/remotes/pull/1799/merge'."
+          },
+          {
+            "line": 247,
+            "text": "HEAD is now at 3bc095c Merge d2c3f63448130443e3e10bb5304417162f585776 into 1c7698655405b289d7fdbd814713d15e542cc2bb"
+          }
+        ],
+        "node": "node: v24.22.2",
+        "install": [
+          "Lockfile is up to date, resolution step is skipped",
+          "Done in 15.1s using pnpm v10.34.3"
+        ]
+      },
+      {
+        "kind": "pg4",
+        "checkout": "3bc095c100537563296186fc3d4cc4d60b59b698",
+        "gitLogCommandLine": 249,
+        "gitLogShaLine": 250,
+        "fetchAndCheckout": [
+          {
+            "line": 220,
+            "text": "[command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +3bc095c100537563296186fc3d4cc4d60b59b698:refs/remotes/pull/1799/merge"
+          },
+          {
+            "line": 229,
+            "text": "[command]/usr/bin/git checkout --progress --force refs/remotes/pull/1799/merge"
+          },
+          {
+            "line": 230,
+            "text": "Note: switching to 'refs/remotes/pull/1799/merge'."
+          },
+          {
+            "line": 247,
+            "text": "HEAD is now at 3bc095c Merge d2c3f63448130443e3e10bb5304417162f585776 into 1c7698655405b289d7fdbd814713d15e542cc2bb"
+          }
+        ],
+        "node": "node: v24.22.2",
+        "install": [
+          "Lockfile is up to date, resolution step is skipped",
+          "Done in 30.6s using pnpm v10.34.3"
+        ]
+      }
+    ]
+  },
+  "acquisition": {
+    "owner": "current_source_review",
+    "assignedKinds": [
+      "source",
+      "core",
+      "pg3",
+      "pg4"
+    ],
+    "eachOriginalReadExactlyOnce": true,
+    "originalJobReads": 4,
+    "plainFrozenBeforeAnalysis": true,
+    "wrapperFormat": "A controlled metadata envelope plus unchanged decoded original text; not the tool's entire response envelope.",
+    "githubDecodedStringBoundary": "BOM, ANSI escape sequences and timestamps are retained in plain and wrapper. Hashes cover the UTF-8 encoding of the tool's decoded log string, not a ZIP or pre-decoding byte stream.",
+    "metadataOwnReadsBeforeTerminal": 2,
+    "terminalMetadataSource": "Root's fresh jobs observation at 2026-11-09T22:10:57Z; no periodic polling after ownership handoff.",
+    "otherOriginalJobReads": 0,
+    "oldOriginalJobReads": 0,
+    "resourcesCreated": 0,
+    "testsStarted": 0,
+    "workflowActions": 0,
+    "refChanges": 0
+  },
+  "originals": [
+    {
+      "kind": "source",
+      "jobId": 129470272292,
+      "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42707256422/job/129470272292",
+      "plain": {
+        "path": "ci-d2c3/source.original.log",
+        "gitBlob": "2a5320ae6256af70c734a271a0f46a830480f4dd",
+        "bytes": 137952,
+        "sha256": "37681e538f8e245d08845c344663ddfde94d1902d6fb8a47962a1316cb3f37aa"
+      },
+      "wrapper": {
+        "path": "ci-d2c3/source.decoded-log-wrapper.safe.json",
+        "gitBlob": "acb223eb945d57e638684bb780ffa929a26298e4",
+        "bytes": 141014,
+        "sha256": "92ac7449d116f2956dfbdbab0218df9b589d09bbc1702d7f02fb617abd1d205c",
+        "plain": "2a5320ae6256af70c734a271a0f46a830480f4dd"
+      },
+      "originalReadCount": 1,
+      "plainRoundtrip": {
+        "gitBlob": "2a5320ae6256af70c734a271a0f46a830480f4dd",
+        "bytes": 137952,
+        "sha256": "37681e538f8e245d08845c344663ddfde94d1902d6fb8a47962a1316cb3f37aa",
+        "equalOriginal": true
+      },
+      "wrapperRoundtrip": {
+        "gitBlob": "acb223eb945d57e638684bb780ffa929a26298e4",
+        "bytes": 141014,
+        "sha256": "92ac7449d116f2956dfbdbab0218df9b589d09bbc1702d7f02fb617abd1d205c",
+        "contentEqualsPlainOriginal": true
+      }
+    },
+    {
+      "kind": "core",
+      "jobId": 129470272193,
+      "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42707256422/job/129470272193",
+      "plain": {
+        "path": "ci-d2c3/core.original.log",
+        "gitBlob": "40522933306173d4096dec7ba108c9b162003c86",
+        "bytes": 1026287,
+        "sha256": "9ef1e08346a617f225ef15b52c89dfb85e41caaebb5c80f844f72b2f41ca2fe1"
+      },
+      "wrapper": {
+        "path": "ci-d2c3/core.decoded-log-wrapper.safe.json",
+        "gitBlob": "bd6e835fd4d4248b3fd461b5c8419b7209d40514",
+        "bytes": 1048072,
+        "sha256": "4ee49f2f1d1ab19f4f6726146b36f774e0df362cdd01f92433e29f7d2cf58946",
+        "plain": "40522933306173d4096dec7ba108c9b162003c86"
+      },
+      "originalReadCount": 1,
+      "plainRoundtrip": {
+        "gitBlob": "40522933306173d4096dec7ba108c9b162003c86",
+        "bytes": 1026287,
+        "sha256": "9ef1e08346a617f225ef15b52c89dfb85e41caaebb5c80f844f72b2f41ca2fe1",
+        "equalOriginal": true
+      },
+      "wrapperRoundtrip": {
+        "gitBlob": "bd6e835fd4d4248b3fd461b5c8419b7209d40514",
+        "bytes": 1048072,
+        "sha256": "4ee49f2f1d1ab19f4f6726146b36f774e0df362cdd01f92433e29f7d2cf58946",
+        "contentEqualsPlainOriginal": true
+      }
+    },
+    {
+      "kind": "pg3",
+      "jobId": 129470272321,
+      "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42707256422/job/129470272321",
+      "plain": {
+        "path": "ci-d2c3/pg3.original.log",
+        "gitBlob": "60fbbd71d43ec19813657277da59eb165f7c7b0c",
+        "bytes": 2768419,
+        "sha256": "cfdece99daa7f380325e74d16e1a50a4bad5a68e624ea6b3fd4114dcf98a6153"
+      },
+      "wrapper": {
+        "path": "ci-d2c3/pg3.decoded-log-wrapper.safe.json",
+        "gitBlob": "729feefc8588a4c6367f3919603ec8d0873f0514",
+        "bytes": 2937222,
+        "sha256": "8a37115af88fb2b19a7e71802aed73eeb812b3b5f0432d74bfdc0a054c41fc84",
+        "plain": "60fbbd71d43ec19813657277da59eb165f7c7b0c"
+      },
+      "originalReadCount": 1,
+      "plainRoundtrip": {
+        "gitBlob": "60fbbd71d43ec19813657277da59eb165f7c7b0c",
+        "bytes": 2768419,
+        "sha256": "cfdece99daa7f380325e74d16e1a50a4bad5a68e624ea6b3fd4114dcf98a6153",
+        "equalOriginal": true
+      },
+      "wrapperRoundtrip": {
+        "gitBlob": "729feefc8588a4c6367f3919603ec8d0873f0514",
+        "bytes": 2937222,
+        "sha256": "8a37115af88fb2b19a7e71802aed73eeb812b3b5f0432d74bfdc0a054c41fc84",
+        "contentEqualsPlainOriginal": true
+      }
+    },
+    {
+      "kind": "pg4",
+      "jobId": 129470272430,
+      "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42707256422/job/129470272430",
+      "plain": {
+        "path": "ci-d2c3/pg4.original.log",
+        "gitBlob": "fdbe819ddc7fe386ecdcab43f9aa435ca983b032",
+        "bytes": 687428,
+        "sha256": "197317e9360f9c5a795797b1a07a3f92697ed215496b589249612f1b63b7dea9"
+      },
+      "wrapper": {
+        "path": "ci-d2c3/pg4.decoded-log-wrapper.safe.json",
+        "gitBlob": "72076e945674cbd6a3f2668d5ae1978da97ac0c7",
+        "bytes": 714508,
+        "sha256": "a291160493c803335c8e6f41555d3d11035a173fb2f244c485f8077a7b49c406",
+        "plain": "fdbe819ddc7fe386ecdcab43f9aa435ca983b032"
+      },
+      "originalReadCount": 1,
+      "plainRoundtrip": {
+        "gitBlob": "fdbe819ddc7fe386ecdcab43f9aa435ca983b032",
+        "bytes": 687428,
+        "sha256": "197317e9360f9c5a795797b1a07a3f92697ed215496b589249612f1b63b7dea9",
+        "equalOriginal": true
+      },
+      "wrapperRoundtrip": {
+        "gitBlob": "72076e945674cbd6a3f2668d5ae1978da97ac0c7",
+        "bytes": 714508,
+        "sha256": "a291160493c803335c8e6f41555d3d11035a173fb2f244c485f8077a7b49c406",
+        "contentEqualsPlainOriginal": true
+      }
+    }
+  ],
+  "selection": {
+    "source": {
+      "gitBlob": "4f369b8ac0e58294392047e459aa4016b02e75ec",
+      "bytes": 147588,
+      "sha256": "f945b9506fb81d01ed1a1037b1ec5cf2963a72ba98059ebe6e64e963f62ef36a"
+    },
+    "authority": "Exact new Changes stdout parsed by root; this reader retrieved immutable Git proof only, never re-read Changes log.",
+    "full": true,
+    "docsOnly": false,
+    "unitTaskCount": 86,
+    "databaseSuiteCount": 72,
+    "databaseMatrix": {
+      "shard": [
+        "1/4",
+        "2/4",
+        "3/4",
+        "4/4"
+      ]
+    },
+    "sourceEnabled": true,
+    "coreExpectedCount": 57,
+    "plannedDoesNotMeanExecuted": true
+  },
+  "source": {
+    "reporterSummaries": [
+      {
+        "startLine": 658,
+        "tests": 46,
+        "endLine": 665,
+        "suites": 0,
+        "pass": 46,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 5646.726377,
+        "command": "pnpm check:cloud-boundary"
+      },
+      {
+        "startLine": 689,
+        "tests": 7,
+        "endLine": 696,
+        "suites": 0,
+        "pass": 7,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 82.969907,
+        "command": "node --test scripts/mobile-ota-credentials.test.mjs scripts/release/apple-credentials.test.mjs"
+      },
+      {
+        "startLine": 742,
+        "tests": 29,
+        "endLine": 749,
+        "suites": 0,
+        "pass": 29,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 567.795644,
+        "command": "node --test scripts/acceptance/auth-audit-production.test.mjs scripts/acceptance/cloud-lease-audit.test.mjs scripts/acceptance/cloud-lease-recovery.test.mjs scripts/acceptance/shared-account-queue.test.mjs scripts/ops/production-smoke.test.mjs"
+      },
+      {
+        "startLine": 848,
+        "tests": 63,
+        "endLine": 855,
+        "suites": 0,
+        "pass": 63,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 585.314072,
+        "command": "pnpm lint:code",
+        "nestedCommand": "pnpm test:migrations"
+      },
+      {
+        "startLine": 1024,
+        "tests": 102,
+        "endLine": 1031,
+        "suites": 0,
+        "pass": 102,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 6786.693551,
+        "command": "pnpm test:api"
+      },
+      {
+        "startLine": 1498,
+        "tests": 69,
+        "endLine": 1505,
+        "suites": 0,
+        "pass": 69,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 16320.380336,
+        "command": "pnpm test:api"
+      },
+      {
+        "startLine": 1596,
+        "tests": 45,
+        "endLine": 1603,
+        "suites": 0,
+        "pass": 45,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 35225.539748,
+        "command": "pnpm --filter @mikka/frontend test"
+      }
+    ],
+    "totals": {
+      "tests": 361,
+      "suites": 0,
+      "pass": 361,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "executedCommands": [
+      {
+        "line": 34,
+        "text": "##[group]Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262"
+      },
+      {
+        "line": 139,
+        "text": "##[group]Run ./.github/actions/pnpm-install"
+      },
+      {
+        "line": 155,
+        "text": "##[group]Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1"
+      },
+      {
+        "line": 192,
+        "text": "##[group]Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020"
+      },
+      {
+        "line": 221,
+        "text": "##[group]Run echo \"path=$(pnpm store path --silent)\" >> \"$GITHUB_OUTPUT\""
+      },
+      {
+        "line": 239,
+        "text": "##[group]Run actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830"
+      },
+      {
+        "line": 283,
+        "text": "##[group]Run pnpm install --frozen-lockfile"
+      },
+      {
+        "line": 491,
+        "text": "##[group]Run node scripts/ci/shadow.mjs"
+      },
+      {
+        "line": 591,
+        "text": "##[group]Run pnpm check:cloud-boundary"
+      },
+      {
+        "line": 666,
+        "text": "##[group]Run node --test scripts/mobile-ota-credentials.test.mjs scripts/release/apple-credentials.test.mjs"
+      },
+      {
+        "line": 697,
+        "text": "##[group]Run node --test scripts/acceptance/auth-audit-production.test.mjs scripts/acceptance/cloud-lease-audit.test.mjs scripts/acceptance/cloud-lease-recovery.test.mjs scripts/acceptance/shared-account-queue.test.mjs scripts/ops/production-smoke.test.mjs"
+      },
+      {
+        "line": 750,
+        "text": "##[group]Run pnpm lint:code"
+      },
+      {
+        "line": 861,
+        "text": "##[group]Run node apps/api/scripts/generate-routes.mjs --check"
+      },
+      {
+        "line": 878,
+        "text": "##[group]Run pnpm lint:runtime"
+      },
+      {
+        "line": 900,
+        "text": "##[group]Run pnpm test:api"
+      },
+      {
+        "line": 1506,
+        "text": "##[group]Run pnpm --filter @mikka/frontend test"
+      },
+      {
+        "line": 1604,
+        "text": "##[group]Run pnpm typecheck"
+      },
+      {
+        "line": 1629,
+        "text": "##[group]Run pnpm --filter @mikka/protocol typecheck"
+      },
+      {
+        "line": 1649,
+        "text": "##[group]Run pnpm --filter @mikka/mobile typecheck"
+      },
+      {
+        "line": 1669,
+        "text": "##[group]Run pnpm --silent lint:ui --json > ui-audit.json"
+      },
+      {
+        "line": 1685,
+        "text": "##[group]Run node --input-type=module -e '"
+      },
+      {
+        "line": 1715,
+        "text": "##[group]Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02"
+      }
+    ],
+    "lint": [
+      {
+        "line": 301,
+        "text": "Lockfile is up to date, resolution step is skipped"
+      },
+      {
+        "line": 768,
+        "text": "> oxlint --deny-warnings && pnpm check:migrations && pnpm test:migrations && pnpm check:factory"
+      },
+      {
+        "line": 770,
+        "text": "Found 0 warnings and 0 errors."
+      },
+      {
+        "line": 771,
+        "text": "Finished in 507ms on 4040 files with 97 rules using 4 threads."
+      },
+      {
+        "line": 773,
+        "text": "> next-app@0.0.1 check:migrations /home/runner/work/Mikka/Mikka"
+      },
+      {
+        "line": 774,
+        "text": "> node scripts/check-migrations.mjs"
+      },
+      {
+        "line": 776,
+        "text": "migrations: 261 个迁移文件检查通过"
+      },
+      {
+        "line": 778,
+        "text": "> next-app@0.0.1 test:migrations /home/runner/work/Mikka/Mikka"
+      },
+      {
+        "line": 779,
+        "text": "> node --test scripts/activity-actor-validation.test.mjs scripts/check-migrations.test.mjs scripts/migration-order.test.mjs scripts/migrate-mode.test.mjs scripts/migration-guard.test.mjs scripts/migration-steps.test.mjs scripts/migration-targets.test.mjs scripts/scope-migration-history.test.mjs scripts/integration-migration-history.test.mjs scripts/task-workspace-evidence.test.mjs"
+      },
+      {
+        "line": 798,
+        "text": "✔ the build runs migrations only after compilation and type checking succeed (17.586333ms)"
+      },
+      {
+        "line": 805,
+        "text": "✔ only the explicit baseline precedes legacy migrations, without changing their IDs (3.545179ms)"
+      },
+      {
+        "line": 861,
+        "text": "##[group]Run node apps/api/scripts/generate-routes.mjs --check"
+      },
+      {
+        "line": 862,
+        "text": "node apps/api/scripts/generate-routes.mjs --check"
+      },
+      {
+        "line": 898,
+        "text": "Found 0 warnings and 0 errors."
+      },
+      {
+        "line": 899,
+        "text": "Finished in 14ms on 89 files with 97 rules using 4 threads."
+      },
+      {
+        "line": 1063,
+        "text": "# [success] [nitro] Generated public ../../../../../tmp/mikka-public-assets-V7Vc4z/.output/public"
+      },
+      {
+        "line": 1323,
+        "text": "# [info] Generated ../mikka-local-world-build-xig7ET/output/nitro.json"
+      },
+      {
+        "line": 1352,
+        "text": "# [info] Generated ../../../../../tmp/mikka-workflow-routing-0cnhXS/output/nitro.json"
+      },
+      {
+        "line": 1604,
+        "text": "##[group]Run pnpm typecheck"
+      },
+      {
+        "line": 1605,
+        "text": "pnpm typecheck"
+      },
+      {
+        "line": 1622,
+        "text": "> next-app@0.0.1 typecheck /home/runner/work/Mikka/Mikka"
+      },
+      {
+        "line": 1623,
+        "text": "> tsrs --noEmit && tsrs --noEmit -p apps/api/tsconfig.json && pnpm --filter @mikka/frontend typecheck"
+      },
+      {
+        "line": 1626,
+        "text": "> @mikka/frontend@0.0.1 typecheck /home/runner/work/Mikka/Mikka/apps/frontend"
+      },
+      {
+        "line": 1629,
+        "text": "##[group]Run pnpm --filter @mikka/protocol typecheck"
+      },
+      {
+        "line": 1630,
+        "text": "pnpm --filter @mikka/protocol typecheck"
+      },
+      {
+        "line": 1646,
+        "text": "> @mikka/protocol@0.0.1 typecheck /home/runner/work/Mikka/Mikka/packages/protocol"
+      },
+      {
+        "line": 1649,
+        "text": "##[group]Run pnpm --filter @mikka/mobile typecheck"
+      },
+      {
+        "line": 1650,
+        "text": "pnpm --filter @mikka/mobile typecheck"
+      },
+      {
+        "line": 1666,
+        "text": "> @mikka/mobile@0.0.1 typecheck /home/runner/work/Mikka/Mikka/apps/mobile"
+      }
+    ],
+    "sourceBoundSummaryNote": "63 belongs to the migration test command, not to the acceptance driver; driver74 is matched independently in Core.",
+    "terminalMetadata": {
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T22:03:03Z",
+      "completedAt": "2026-11-09T22:06:33Z",
+      "provenance": "root fresh run/jobs metadata at 2026-11-09T22:10:57Z; original checkout and executed commands independently read here"
+    },
+    "generateCheckEvidence": [
+      {
+        "line": 861,
+        "text": "##[group]Run node apps/api/scripts/generate-routes.mjs --check"
+      },
+      {
+        "line": 862,
+        "text": "node apps/api/scripts/generate-routes.mjs --check"
+      },
+      {
+        "line": 878,
+        "text": "next step: pnpm lint:runtime"
+      }
+    ],
+    "warningBoundary": {
+      "oxlintSourceAndRuntimeZeroWarnings": true,
+      "githubNode20ActionsDeprecationWarningPresent": true,
+      "notBlanketWarningFree": true
+    }
+  },
+  "core": {
+    "expectedTargets": [
+      "ci-tasks:core-10",
+      "ci-tasks:core-11",
+      "ci-tasks:core-12",
+      "ci-tasks:core-13",
+      "ci-tasks:core-14",
+      "ci-tasks:core-15",
+      "ci-tasks:core-16",
+      "ci-tasks:core-17",
+      "ci-tasks:core-18",
+      "ci-tasks:core-19",
+      "ci-tasks:core-2",
+      "ci-tasks:core-20",
+      "ci-tasks:core-21",
+      "ci-tasks:core-22",
+      "ci-tasks:core-23",
+      "ci-tasks:core-24",
+      "ci-tasks:core-25",
+      "ci-tasks:core-26",
+      "ci-tasks:core-27",
+      "ci-tasks:core-28",
+      "ci-tasks:core-29",
+      "ci-tasks:core-3",
+      "ci-tasks:core-30",
+      "ci-tasks:core-31",
+      "ci-tasks:core-32",
+      "ci-tasks:core-33",
+      "ci-tasks:core-34",
+      "ci-tasks:core-35",
+      "ci-tasks:core-36",
+      "ci-tasks:core-37",
+      "ci-tasks:core-38",
+      "ci-tasks:core-39",
+      "ci-tasks:core-4",
+      "ci-tasks:core-40",
+      "ci-tasks:core-41",
+      "ci-tasks:core-42",
+      "ci-tasks:core-43",
+      "ci-tasks:core-44",
+      "ci-tasks:core-45",
+      "ci-tasks:core-46",
+      "ci-tasks:core-47",
+      "ci-tasks:core-48",
+      "ci-tasks:core-49",
+      "ci-tasks:core-5",
+      "ci-tasks:core-50",
+      "ci-tasks:core-51",
+      "ci-tasks:core-52",
+      "ci-tasks:core-53",
+      "ci-tasks:core-54",
+      "ci-tasks:core-55",
+      "ci-tasks:core-56",
+      "ci-tasks:core-57",
+      "ci-tasks:core-6",
+      "ci-tasks:core-7",
+      "ci-tasks:core-8",
+      "ci-tasks:core-9",
+      "ci-tasks:core-triage"
+    ],
+    "actualTargets": [
+      "ci-tasks:core-10",
+      "ci-tasks:core-11",
+      "ci-tasks:core-12",
+      "ci-tasks:core-13",
+      "ci-tasks:core-14",
+      "ci-tasks:core-15",
+      "ci-tasks:core-16",
+      "ci-tasks:core-17",
+      "ci-tasks:core-18",
+      "ci-tasks:core-19",
+      "ci-tasks:core-2",
+      "ci-tasks:core-20",
+      "ci-tasks:core-21",
+      "ci-tasks:core-22",
+      "ci-tasks:core-23",
+      "ci-tasks:core-24",
+      "ci-tasks:core-25",
+      "ci-tasks:core-26",
+      "ci-tasks:core-27",
+      "ci-tasks:core-28",
+      "ci-tasks:core-29",
+      "ci-tasks:core-3",
+      "ci-tasks:core-30",
+      "ci-tasks:core-31",
+      "ci-tasks:core-32",
+      "ci-tasks:core-33",
+      "ci-tasks:core-34",
+      "ci-tasks:core-35",
+      "ci-tasks:core-36",
+      "ci-tasks:core-37",
+      "ci-tasks:core-38",
+      "ci-tasks:core-39",
+      "ci-tasks:core-4",
+      "ci-tasks:core-40",
+      "ci-tasks:core-41",
+      "ci-tasks:core-42",
+      "ci-tasks:core-43",
+      "ci-tasks:core-44",
+      "ci-tasks:core-45",
+      "ci-tasks:core-46",
+      "ci-tasks:core-47",
+      "ci-tasks:core-48",
+      "ci-tasks:core-49",
+      "ci-tasks:core-5",
+      "ci-tasks:core-50",
+      "ci-tasks:core-51",
+      "ci-tasks:core-52",
+      "ci-tasks:core-53",
+      "ci-tasks:core-54",
+      "ci-tasks:core-55",
+      "ci-tasks:core-56",
+      "ci-tasks:core-57",
+      "ci-tasks:core-6",
+      "ci-tasks:core-7",
+      "ci-tasks:core-8",
+      "ci-tasks:core-9",
+      "ci-tasks:core-triage"
+    ],
+    "setsExactlyEqual": true,
+    "expectedTargetCommands": [
+      {
+        "project": "ci-core-2",
+        "target": "ci-tasks:core-2",
+        "command": "pnpm test:factory-check-independence",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-3",
+        "target": "ci-tasks:core-3",
+        "command": "pnpm test:factory-check-recovery",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-4",
+        "target": "ci-tasks:core-4",
+        "command": "pnpm test:factory-routing",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-5",
+        "target": "ci-tasks:core-5",
+        "command": "pnpm test:self-improvement-semantic-source",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-6",
+        "target": "ci-tasks:core-6",
+        "command": "node --test scripts/ci-docs-only.test.mjs",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-7",
+        "target": "ci-tasks:core-7",
+        "command": "pnpm test:ui-policy",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-8",
+        "target": "ci-tasks:core-8",
+        "command": "pnpm test:idle-budget",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-9",
+        "target": "ci-tasks:core-9",
+        "command": "pnpm test:motion",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-10",
+        "target": "ci-tasks:core-10",
+        "command": "pnpm test:i18n",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-11",
+        "target": "ci-tasks:core-11",
+        "command": "pnpm i18n:check",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-12",
+        "target": "ci-tasks:core-12",
+        "command": "pnpm test:ssh-target",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-13",
+        "target": "ci-tasks:core-13",
+        "command": "pnpm test:linear-sync",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-14",
+        "target": "ci-tasks:core-14",
+        "command": "pnpm check:agent-definitions",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-15",
+        "target": "ci-tasks:core-15",
+        "command": "pnpm test:release-security",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-16",
+        "target": "ci-tasks:core-16",
+        "command": "pnpm test:mailbox-verification",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-17",
+        "target": "ci-tasks:core-17",
+        "command": "pnpm test:factory-approval",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-18",
+        "target": "ci-tasks:core-18",
+        "command": "pnpm test:personal-mailbox-core",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-19",
+        "target": "ci-tasks:core-19",
+        "command": "pnpm test:factory-monitor",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-20",
+        "target": "ci-tasks:core-20",
+        "command": "pnpm test:execution-rules",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-21",
+        "target": "ci-tasks:core-21",
+        "command": "pnpm test:abuse",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-22",
+        "target": "ci-tasks:core-22",
+        "command": "pnpm test:self-hosting",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-23",
+        "target": "ci-tasks:core-23",
+        "command": "pnpm test:self-hosted-byok",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-24",
+        "target": "ci-tasks:core-24",
+        "command": "pnpm test:cloud-services",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-25",
+        "target": "ci-tasks:core-25",
+        "command": "pnpm test:hosted-usage",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-26",
+        "target": "ci-tasks:core-26",
+        "command": "pnpm test:model-admission",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-27",
+        "target": "ci-tasks:core-27",
+        "command": "pnpm test:audit",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-28",
+        "target": "ci-tasks:core-28",
+        "command": "pnpm test:agent-kit",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-29",
+        "target": "ci-tasks:core-29",
+        "command": "pnpm test:agent-kit-compat",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-30",
+        "target": "ci-tasks:core-30",
+        "command": "pnpm test:approved-writes",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-31",
+        "target": "ci-tasks:core-31",
+        "command": "pnpm test:coordinator-events",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-32",
+        "target": "ci-tasks:core-32",
+        "command": "pnpm test:schedules",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-33",
+        "target": "ci-tasks:core-33",
+        "command": "pnpm test:run-recovery",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-34",
+        "target": "ci-tasks:core-34",
+        "command": "pnpm test:mvp-fixtures",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-35",
+        "target": "ci-tasks:core-35",
+        "command": "pnpm test:credentials",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-36",
+        "target": "ci-tasks:core-36",
+        "command": "pnpm test:run-publication",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-37",
+        "target": "ci-tasks:core-37",
+        "command": "pnpm test:workflow-wakes",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-38",
+        "target": "ci-tasks:core-38",
+        "command": "pnpm --filter @mikka/protocol exec vitest run src/run.test.ts\npnpm --filter @mikka/daemon exec vitest run test/factory-check.test.ts test/runs.test.ts test/hardening.test.ts src/permissions.test.ts",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-39",
+        "target": "ci-tasks:core-39",
+        "command": "pnpm test:mobile-push",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-40",
+        "target": "ci-tasks:core-40",
+        "command": "pnpm test:mobile",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-41",
+        "target": "ci-tasks:core-41",
+        "command": "pnpm test:coordinator-native-relay",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-42",
+        "target": "ci-tasks:core-42",
+        "command": "pnpm test:coordinator-native-scope",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-43",
+        "target": "ci-tasks:core-43",
+        "command": "pnpm test:coordinator-issue-tools",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-44",
+        "target": "ci-tasks:core-44",
+        "command": "pnpm test:signup-turnstile",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-45",
+        "target": "ci-tasks:core-45",
+        "command": "pnpm test:cloud-limits",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-46",
+        "target": "ci-tasks:core-46",
+        "command": "pnpm test:analytics",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-47",
+        "target": "ci-tasks:core-47",
+        "command": "pnpm test:artifacts",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-48",
+        "target": "ci-tasks:core-48",
+        "command": "pnpm test:factory-config",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-49",
+        "target": "ci-tasks:core-49",
+        "command": "pnpm test:user-message-text",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-50",
+        "target": "ci-tasks:core-50",
+        "command": "pnpm test:run-info",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-51",
+        "target": "ci-tasks:core-51",
+        "command": "pnpm test:thread-changes",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-52",
+        "target": "ci-tasks:core-52",
+        "command": "pnpm check:agent-ui",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-53",
+        "target": "ci-tasks:core-53",
+        "command": "pnpm test:dev-local",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-54",
+        "target": "ci-tasks:core-54",
+        "command": "pnpm test:lib-units",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-55",
+        "target": "ci-tasks:core-55",
+        "command": "pnpm test:project-decisions",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-56",
+        "target": "ci-tasks:core-56",
+        "command": "pnpm test:unread",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-57",
+        "target": "ci-tasks:core-57",
+        "command": "pnpm test:issue-readonly-dom",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-core-triage",
+        "target": "ci-tasks:core-triage",
+        "command": "node --test scripts/ci/*.test.mjs",
+        "reason": "full validation"
+      }
+    ],
+    "reporterCount": 92,
+    "nonzeroTerminalFields": [],
+    "cacheEvidence": [
+      {
+        "line": 7885,
+        "text": " NX   Successfully ran targets core-2, core-3, core-4, core-5, core-6, core-7, core-8, core-9, core-10, core-11, core-12, core-13, core-14, core-15, core-16, core-17, core-18, core-19, core-20, core-21, core-22, core-23, core-24, core-25, core-26, core-27, core-28, core-29, core-30, core-31, core-32, core-33, core-34, core-35, core-36, core-37, core-38, core-39, core-40, core-41, core-42, core-43, core-44, core-45, core-46, core-47, core-48, core-49, core-50, core-51, core-52, core-53, core-54, core-55, core-56, core-57, core-triage for project ci-tasks"
+      },
+      {
+        "line": 7889,
+        "text": "  Cache:             Skipped (--skip-nx-cache)"
+      },
+      {
+        "line": 7895,
+        "text": "    - Cache: drop --skip-nx-cache to restore unchanged tasks instantly."
+      }
+    ],
+    "actualNodeVersion": "node: v24.22.2",
+    "terminalMetadata": {
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T22:02:32Z",
+      "completedAt": "2026-11-09T22:09:16Z",
+      "provenance": "root fresh run/jobs metadata at 2026-11-09T22:10:57Z; original checkout and executed commands independently read here"
+    }
+  },
+  "postgres": {
+    "shard3": {
+      "kind": "pg3",
+      "index": 3,
+      "expectedSuites": [
+        "test:active-agents",
+        "test:approved-writes-db",
+        "test:bot-threads-db",
+        "test:cloud-services-db",
+        "test:coordinator-issue-tools-db",
+        "test:desktop-auth",
+        "test:factory",
+        "test:factory-approval-db",
+        "test:factory-routing-db",
+        "test:issue-search-db",
+        "test:model-admission-db",
+        "test:pat-db",
+        "test:project-decisions-db",
+        "test:run-recovery-db",
+        "test:self-improvement-db",
+        "test:settings-prefs-db",
+        "test:user-facts-db",
+        "test:workspace-admin-db"
+      ],
+      "actualSuites": [
+        "test:active-agents",
+        "test:approved-writes-db",
+        "test:bot-threads-db",
+        "test:cloud-services-db",
+        "test:coordinator-issue-tools-db",
+        "test:desktop-auth",
+        "test:factory",
+        "test:factory-approval-db",
+        "test:factory-routing-db",
+        "test:issue-search-db",
+        "test:model-admission-db",
+        "test:pat-db",
+        "test:project-decisions-db",
+        "test:run-recovery-db",
+        "test:self-improvement-db",
+        "test:settings-prefs-db",
+        "test:user-facts-db",
+        "test:workspace-admin-db"
+      ],
+      "setsExactlyEqual": true,
+      "groups": [
+        {
+          "suite": "test:desktop-auth",
+          "databaseLabel": "mikka_s22_desktop_auth_e2e",
+          "wallSeconds": 59.6,
+          "startLine": 2734,
+          "endLine": 3008,
+          "reporters": [
+            {
+              "startLine": 2813,
+              "tests": 78,
+              "endLine": 2820,
+              "suites": 0,
+              "pass": 78,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 8568.963526
+            },
+            {
+              "startLine": 2824,
+              "tests": 3,
+              "endLine": 2831,
+              "suites": 0,
+              "pass": 3,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 2397.353988
+            },
+            {
+              "startLine": 2904,
+              "tests": 11,
+              "endLine": 2911,
+              "suites": 0,
+              "pass": 11,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 10000.7893
+            },
+            {
+              "startLine": 3000,
+              "tests": 44,
+              "endLine": 3007,
+              "suites": 0,
+              "pass": 44,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 36494.894629
+            }
+          ],
+          "totals": {
+            "tests": 136,
+            "suites": 0,
+            "pass": 136,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:workspace-admin-db",
+          "databaseLabel": "mikka_s70_workspace_admin_e2e",
+          "wallSeconds": 102.6,
+          "startLine": 5310,
+          "endLine": 5685,
+          "reporters": [
+            {
+              "startLine": 5677,
+              "tests": 116,
+              "endLine": 5684,
+              "suites": 0,
+              "pass": 116,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 101002.608524
+            }
+          ],
+          "totals": {
+            "tests": 116,
+            "suites": 0,
+            "pass": 116,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:self-improvement-db",
+          "databaseLabel": "mikka_s58_self_improvement_e2e",
+          "wallSeconds": 45,
+          "startLine": 6844,
+          "endLine": 6889,
+          "reporters": [
+            {
+              "startLine": 6881,
+              "tests": 28,
+              "endLine": 6888,
+              "suites": 0,
+              "pass": 28,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 43457.174083
+            }
+          ],
+          "totals": {
+            "tests": 28,
+            "suites": 0,
+            "pass": 28,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:factory",
+          "databaseLabel": "mikka_s26_factory_e2e",
+          "wallSeconds": 226.3,
+          "startLine": 7271,
+          "endLine": 7832,
+          "reporters": [
+            {
+              "startLine": 7824,
+              "tests": 513,
+              "endLine": 7831,
+              "suites": 1,
+              "pass": 513,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 225320.394616
+            }
+          ],
+          "totals": {
+            "tests": 513,
+            "suites": 1,
+            "pass": 513,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:factory-approval-db",
+          "databaseLabel": "mikka_s30_factory_approval_e2e",
+          "wallSeconds": 32,
+          "startLine": 8902,
+          "endLine": 9020,
+          "reporters": [
+            {
+              "startLine": 9012,
+              "tests": 52,
+              "endLine": 9019,
+              "suites": 0,
+              "pass": 52,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 30726.043774
+            }
+          ],
+          "totals": {
+            "tests": 52,
+            "suites": 0,
+            "pass": 52,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:project-decisions-db",
+          "databaseLabel": "mikka_s50_project_decisions_e2e",
+          "wallSeconds": 35.9,
+          "startLine": 9855,
+          "endLine": 10337,
+          "reporters": [
+            {
+              "startLine": 10329,
+              "tests": 39,
+              "endLine": 10336,
+              "suites": 0,
+              "pass": 39,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 34987.034544
+            }
+          ],
+          "totals": {
+            "tests": 39,
+            "suites": 0,
+            "pass": 39,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:approved-writes-db",
+          "databaseLabel": "template database",
+          "wallSeconds": 9.6,
+          "startLine": 10571,
+          "endLine": 10598,
+          "reporters": [
+            {
+              "startLine": 10590,
+              "tests": 10,
+              "endLine": 10597,
+              "suites": 0,
+              "pass": 10,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 8906.990502
+            }
+          ],
+          "totals": {
+            "tests": 10,
+            "suites": 0,
+            "pass": 10,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:bot-threads-db",
+          "databaseLabel": "mikka_s10_bot_threads_e2e",
+          "wallSeconds": 277.9,
+          "startLine": 10890,
+          "endLine": 15720,
+          "reporters": [
+            {
+              "startLine": 15712,
+              "tests": 375,
+              "endLine": 15719,
+              "suites": 0,
+              "pass": 375,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 277254.292159
+            }
+          ],
+          "totals": {
+            "tests": 375,
+            "suites": 0,
+            "pass": 375,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:cloud-services-db",
+          "databaseLabel": "mikka_s14_cloud_services_e2e",
+          "wallSeconds": 1.8,
+          "startLine": 15757,
+          "endLine": 15782,
+          "reporters": [
+            {
+              "startLine": 15774,
+              "tests": 10,
+              "endLine": 15781,
+              "suites": 0,
+              "pass": 10,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 1000.851484
+            }
+          ],
+          "totals": {
+            "tests": 10,
+            "suites": 0,
+            "pass": 10,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:model-admission-db",
+          "databaseLabel": "mikka_s42_model_admission_e2e",
+          "wallSeconds": 8,
+          "startLine": 15796,
+          "endLine": 15858,
+          "reporters": [
+            {
+              "startLine": 15838,
+              "tests": 13,
+              "endLine": 15845,
+              "suites": 0,
+              "pass": 13,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 3878.630475
+            },
+            {
+              "startLine": 15850,
+              "tests": 1,
+              "endLine": 15857,
+              "suites": 0,
+              "pass": 1,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 3548.267484
+            }
+          ],
+          "totals": {
+            "tests": 14,
+            "suites": 0,
+            "pass": 14,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:run-recovery-db",
+          "databaseLabel": "mikka_s54_run_recovery_e2e",
+          "wallSeconds": 41,
+          "startLine": 15881,
+          "endLine": 16314,
+          "reporters": [
+            {
+              "startLine": 15905,
+              "tests": 21,
+              "endLine": 15912,
+              "suites": 0,
+              "pass": 21,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 9102.996324
+            },
+            {
+              "startLine": 16064,
+              "tests": 9,
+              "endLine": 16071,
+              "suites": 0,
+              "pass": 9,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 7742.418724
+            },
+            {
+              "startLine": 16267,
+              "tests": 11,
+              "endLine": 16274,
+              "suites": 0,
+              "pass": 11,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 17612.775323
+            },
+            {
+              "startLine": 16288,
+              "tests": 12,
+              "endLine": 16295,
+              "suites": 0,
+              "pass": 12,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 2297.390813
+            },
+            {
+              "startLine": 16306,
+              "tests": 9,
+              "endLine": 16313,
+              "suites": 0,
+              "pass": 9,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 2511.550818
+            }
+          ],
+          "totals": {
+            "tests": 62,
+            "suites": 0,
+            "pass": 62,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:factory-routing-db",
+          "databaseLabel": "mikka_s34_factory_routing_e2e",
+          "wallSeconds": 281.5,
+          "startLine": 16327,
+          "endLine": 16948,
+          "reporters": [
+            {
+              "startLine": 16919,
+              "tests": 286,
+              "endLine": 16926,
+              "suites": 0,
+              "pass": 286,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 252550.190594
+            },
+            {
+              "startLine": 16940,
+              "tests": 5,
+              "endLine": 16947,
+              "suites": 0,
+              "pass": 5,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 26796.58832
+            }
+          ],
+          "totals": {
+            "tests": 291,
+            "suites": 0,
+            "pass": 291,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:coordinator-issue-tools-db",
+          "databaseLabel": "mikka_s18_coordinator_issue_tools_e2e",
+          "wallSeconds": 11.4,
+          "startLine": 16985,
+          "endLine": 16998,
+          "reporters": [
+            {
+              "startLine": 16990,
+              "tests": 2,
+              "endLine": 16997,
+              "suites": 0,
+              "pass": 2,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 10731.109294
+            }
+          ],
+          "totals": {
+            "tests": 2,
+            "suites": 0,
+            "pass": 2,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:pat-db",
+          "databaseLabel": "mikka_s46_pat_e2e",
+          "wallSeconds": 9.5,
+          "startLine": 17019,
+          "endLine": 17041,
+          "reporters": [
+            {
+              "startLine": 17033,
+              "tests": 12,
+              "endLine": 17040,
+              "suites": 0,
+              "pass": 12,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 8165.780194
+            }
+          ],
+          "totals": {
+            "tests": 12,
+            "suites": 0,
+            "pass": 12,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:user-facts-db",
+          "databaseLabel": "mikka_s66_user_facts_e2e",
+          "wallSeconds": 3,
+          "startLine": 17061,
+          "endLine": 17071,
+          "reporters": [
+            {
+              "startLine": 17063,
+              "tests": 1,
+              "endLine": 17070,
+              "suites": 0,
+              "pass": 1,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 2452.905019
+            }
+          ],
+          "totals": {
+            "tests": 1,
+            "suites": 0,
+            "pass": 1,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:issue-search-db",
+          "databaseLabel": "mikka_s38_issue_search_e2e",
+          "wallSeconds": 14.9,
+          "startLine": 17103,
+          "endLine": 17131,
+          "reporters": [
+            {
+              "startLine": 17123,
+              "tests": 8,
+              "endLine": 17130,
+              "suites": 0,
+              "pass": 8,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 14145.204396
+            }
+          ],
+          "totals": {
+            "tests": 8,
+            "suites": 0,
+            "pass": 8,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:active-agents",
+          "databaseLabel": "mikka_s02_active_agents_e2e",
+          "wallSeconds": 31.5,
+          "startLine": 17151,
+          "endLine": 17175,
+          "reporters": [
+            {
+              "startLine": 17167,
+              "tests": 14,
+              "endLine": 17174,
+              "suites": 0,
+              "pass": 14,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 30754.888741
+            }
+          ],
+          "totals": {
+            "tests": 14,
+            "suites": 0,
+            "pass": 14,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:settings-prefs-db",
+          "databaseLabel": "mikka_s62_settings_prefs_e2e",
+          "wallSeconds": 26.4,
+          "startLine": 17187,
+          "endLine": 17211,
+          "reporters": [
+            {
+              "startLine": 17203,
+              "tests": 11,
+              "endLine": 17210,
+              "suites": 0,
+              "pass": 11,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 25778.036706
+            }
+          ],
+          "totals": {
+            "tests": 11,
+            "suites": 0,
+            "pass": 11,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        }
+      ],
+      "totals": {
+        "tests": 1694,
+        "suites": 1,
+        "pass": 1694,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "cleanup": {
+        "containerId": "ce21992e43189d4c5558bb29dc76dec353fa44acdcdab1831dabf17fa4f48698",
+        "containerRemovalLine": 17901,
+        "containerRemovalEchoMatches": true,
+        "network": "github_network_284d45de7f504ee1b3df3a5ea2806a37",
+        "networkRemovalLine": 17904,
+        "networkRemovalEchoMatches": true,
+        "orphanCleanupReported": true,
+        "scope": "only this GHA PostgreSQL service container and network, not provider or production resources"
+      },
+      "actualNodeVersion": "node: v24.22.2",
+      "postgresImageEvidence": [
+        {
+          "line": 52,
+          "text": "##[command]/usr/bin/docker pull postgres:17"
+        },
+        {
+          "line": 120,
+          "text": "Status: Downloaded newer image for postgres:17"
+        },
+        {
+          "line": 121,
+          "text": "docker.io/library/postgres:17"
+        },
+        {
+          "line": 122,
+          "text": "##[command]/usr/bin/docker create --name 9dc568afaccf4824aa6941d2cbd41d5f_postgres17_1a7e03 --label b83165 --network github_network_284d45de7f504ee1b3df3a5ea2806a37 --network-alias postgres -p 5432:5432 --health-cmd \"pg_isready -U e2e -d mikka_e2e\" --health-interval 5s --health-timeout 5s --health-retries 10 -e \"POSTGRES_USER=e2e\" -e \"POSTGRES_PASSWORD=e2e-local-only\" -e \"POSTGRES_DB=mikka_e2e\" -e GITHUB_ACTIONS=true -e CI=true postgres:17"
+        },
+        {
+          "line": 5284,
+          "text": "[db-runner test:factory stdout] ℹ {\"environment\":\"isolated local Docker postgres:17\",\"schema\":\"monitor_195_4ca239fab5e442b393bb26a7d2220cd5\",\"agentId\":\"516f75ca-ef6e-4112-af1e-53bd97ed0c19\",\"originalIssueId\":\"80b2582e-f99f-47e1-b071-7a6c18364fc6\",\"taskId\":\"c3be1eb3-b902-49ab-b0eb-3ab9e83f3cfb\",\"runId\":\"76452493-9594-4fd0-a790-17847e2d17af\",\"sourceEventId\":\"8df1ebc7-91b3-4cf3-bf40-2eca263e4bf7\",\"candidateId\":\"475ed9d7-b746-4001-b683-ce9e0fb85e85\",\"actualValidators\":[193,194,195],\"fixtureIdentitie [truncated]"
+        },
+        {
+          "line": 7671,
+          "text": "ℹ {\"environment\":\"isolated local Docker postgres:17\",\"schema\":\"monitor_195_4ca239fab5e442b393bb26a7d2220cd5\",\"agentId\":\"516f75ca-ef6e-4112-af1e-53bd97ed0c19\",\"originalIssueId\":\"80b2582e-f99f-47e1-b071-7a6c18364fc6\",\"taskId\":\"c3be1eb3-b902-49ab-b0eb-3ab9e83f3cfb\",\"runId\":\"76452493-9594-4fd0-a790-17847e2d17af\",\"sourceEventId\":\"8df1ebc7-91b3-4cf3-bf40-2eca263e4bf7\",\"candidateId\":\"475ed9d7-b746-4001-b683-ce9e0fb85e85\",\"actualValidators\":[193,194,195],\"fixtureIdentities\":[\"OAuth identity\",\"Harness/review conclusions\"],\"realHarnessAcceptance\":false}"
+        }
+      ],
+      "terminalMetadata": {
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T22:02:32Z",
+        "completedAt": "2026-11-09T22:09:07Z",
+        "provenance": "root fresh run/jobs metadata at 2026-11-09T22:10:57Z; original checkout and executed commands independently read here"
+      }
+    },
+    "shard4": {
+      "kind": "pg4",
+      "index": 4,
+      "expectedSuites": [
+        "test:activity-actor-db",
+        "test:artifact-migration-db",
+        "test:captures-db",
+        "test:computer-db",
+        "test:coordinator-native",
+        "test:device-enrollment-db",
+        "test:factory-activity-db",
+        "test:factory-check-independence-db",
+        "test:github-connections-db",
+        "test:live-db",
+        "test:onboarding-db",
+        "test:personal-mailbox-default-off-db",
+        "test:relation-cycle",
+        "test:schedules-db",
+        "test:self-improvement-unit",
+        "test:skill-semantic-db",
+        "test:visibility-db",
+        "test:workspace-migration-db"
+      ],
+      "actualSuites": [
+        "test:activity-actor-db",
+        "test:artifact-migration-db",
+        "test:captures-db",
+        "test:computer-db",
+        "test:coordinator-native",
+        "test:device-enrollment-db",
+        "test:factory-activity-db",
+        "test:factory-check-independence-db",
+        "test:github-connections-db",
+        "test:live-db",
+        "test:onboarding-db",
+        "test:personal-mailbox-default-off-db",
+        "test:relation-cycle",
+        "test:schedules-db",
+        "test:self-improvement-unit",
+        "test:skill-semantic-db",
+        "test:visibility-db",
+        "test:workspace-migration-db"
+      ],
+      "setsExactlyEqual": true,
+      "groups": [
+        {
+          "suite": "test:self-improvement-unit",
+          "databaseLabel": "mikka_s59_self_improvement_unit_e2e",
+          "wallSeconds": 17.6,
+          "startLine": 1433,
+          "endLine": 1572,
+          "reporters": [
+            {
+              "startLine": 1564,
+              "tests": 100,
+              "endLine": 1571,
+              "suites": 0,
+              "pass": 100,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 17023.475
+            }
+          ],
+          "totals": {
+            "tests": 100,
+            "suites": 0,
+            "pass": 100,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:computer-db",
+          "databaseLabel": "mikka_s15_computer_e2e",
+          "wallSeconds": 36.5,
+          "startLine": 1714,
+          "endLine": 1739,
+          "reporters": [
+            {
+              "startLine": 1731,
+              "tests": 8,
+              "endLine": 1738,
+              "suites": 0,
+              "pass": 8,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 35204.161345
+            }
+          ],
+          "totals": {
+            "tests": 8,
+            "suites": 0,
+            "pass": 8,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:visibility-db",
+          "databaseLabel": "mikka_s67_visibility_e2e",
+          "wallSeconds": 24,
+          "startLine": 1783,
+          "endLine": 1908,
+          "reporters": [
+            {
+              "startLine": 1900,
+              "tests": 57,
+              "endLine": 1907,
+              "suites": 0,
+              "pass": 57,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 23379.409658
+            }
+          ],
+          "totals": {
+            "tests": 57,
+            "suites": 0,
+            "pass": 57,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:coordinator-native",
+          "databaseLabel": "mikka_s19_coordinator_native_e2e",
+          "wallSeconds": 8.7,
+          "startLine": 1977,
+          "endLine": 2028,
+          "reporters": [
+            {
+              "startLine": 2020,
+              "tests": 36,
+              "endLine": 2027,
+              "suites": 0,
+              "pass": 36,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 8079.170893
+            }
+          ],
+          "totals": {
+            "tests": 36,
+            "suites": 0,
+            "pass": 36,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:github-connections-db",
+          "databaseLabel": "mikka_s35_github_connections_e2e",
+          "wallSeconds": 7.1,
+          "startLine": 2169,
+          "endLine": 2259,
+          "reporters": [
+            {
+              "startLine": 2251,
+              "tests": 24,
+              "endLine": 2258,
+              "suites": 0,
+              "pass": 24,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 6253.730295
+            }
+          ],
+          "totals": {
+            "tests": 24,
+            "suites": 0,
+            "pass": 24,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:factory-activity-db",
+          "databaseLabel": "mikka_s27_factory_activity_e2e",
+          "wallSeconds": 32.4,
+          "startLine": 2371,
+          "endLine": 2434,
+          "reporters": [
+            {
+              "startLine": 2426,
+              "tests": 49,
+              "endLine": 2433,
+              "suites": 0,
+              "pass": 49,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 31746.652767
+            }
+          ],
+          "totals": {
+            "tests": 49,
+            "suites": 0,
+            "pass": 49,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:personal-mailbox-default-off-db",
+          "databaseLabel": "template database",
+          "wallSeconds": 26.6,
+          "startLine": 2530,
+          "endLine": 2589,
+          "reporters": [
+            {
+              "startLine": 2581,
+              "tests": 42,
+              "endLine": 2588,
+              "suites": 0,
+              "pass": 42,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 25932.772795
+            }
+          ],
+          "totals": {
+            "tests": 42,
+            "suites": 0,
+            "pass": 42,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:schedules-db",
+          "databaseLabel": "mikka_s55_schedules_e2e",
+          "wallSeconds": 12.6,
+          "startLine": 2725,
+          "endLine": 2752,
+          "reporters": [
+            {
+              "startLine": 2744,
+              "tests": 16,
+              "endLine": 2751,
+              "suites": 0,
+              "pass": 16,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 11846.25796
+            }
+          ],
+          "totals": {
+            "tests": 16,
+            "suites": 0,
+            "pass": 16,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:skill-semantic-db",
+          "databaseLabel": "mikka_s63_skill_semantic_e2e",
+          "wallSeconds": 2.5,
+          "startLine": 2770,
+          "endLine": 2784,
+          "reporters": [
+            {
+              "startLine": 2776,
+              "tests": 2,
+              "endLine": 2783,
+              "suites": 0,
+              "pass": 2,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 2202.895638
+            }
+          ],
+          "totals": {
+            "tests": 2,
+            "suites": 0,
+            "pass": 2,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:artifact-migration-db",
+          "databaseLabel": "mikka_s07_artifact_migration_e2e",
+          "wallSeconds": 0.4,
+          "startLine": 2798,
+          "endLine": 2808,
+          "reporters": [
+            {
+              "startLine": 2800,
+              "tests": 1,
+              "endLine": 2807,
+              "suites": 0,
+              "pass": 1,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 116.618061
+            }
+          ],
+          "totals": {
+            "tests": 1,
+            "suites": 0,
+            "pass": 1,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:captures-db",
+          "databaseLabel": "mikka_s11_captures_e2e",
+          "wallSeconds": 30.9,
+          "startLine": 2851,
+          "endLine": 2905,
+          "reporters": [
+            {
+              "startLine": 2897,
+              "tests": 29,
+              "endLine": 2904,
+              "suites": 0,
+              "pass": 29,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 30482.833828
+            }
+          ],
+          "totals": {
+            "tests": 29,
+            "suites": 0,
+            "pass": 29,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:factory-check-independence-db",
+          "databaseLabel": "mikka_s31_factory_check_independence_e2e",
+          "wallSeconds": 3.2,
+          "startLine": 3001,
+          "endLine": 3067,
+          "reporters": [
+            {
+              "startLine": 3059,
+              "tests": 55,
+              "endLine": 3066,
+              "suites": 0,
+              "pass": 55,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 2841.001929
+            }
+          ],
+          "totals": {
+            "tests": 55,
+            "suites": 0,
+            "pass": 55,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:onboarding-db",
+          "databaseLabel": "mikka_s43_onboarding_e2e",
+          "wallSeconds": 1.6,
+          "startLine": 3126,
+          "endLine": 3145,
+          "reporters": [
+            {
+              "startLine": 3137,
+              "tests": 5,
+              "endLine": 3144,
+              "suites": 0,
+              "pass": 5,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 1191.29813
+            }
+          ],
+          "totals": {
+            "tests": 5,
+            "suites": 0,
+            "pass": 5,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:device-enrollment-db",
+          "databaseLabel": "mikka_s23_device_enrollment_e2e",
+          "wallSeconds": 34.5,
+          "startLine": 3220,
+          "endLine": 3250,
+          "reporters": [
+            {
+              "startLine": 3242,
+              "tests": 13,
+              "endLine": 3249,
+              "suites": 0,
+              "pass": 13,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 34194.632672
+            }
+          ],
+          "totals": {
+            "tests": 13,
+            "suites": 0,
+            "pass": 13,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:workspace-migration-db",
+          "databaseLabel": "mikka_s71_workspace_migration_e2e",
+          "wallSeconds": 0.4,
+          "startLine": 3264,
+          "endLine": 3274,
+          "reporters": [
+            {
+              "startLine": 3266,
+              "tests": 1,
+              "endLine": 3273,
+              "suites": 0,
+              "pass": 1,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 107.500527
+            }
+          ],
+          "totals": {
+            "tests": 1,
+            "suites": 0,
+            "pass": 1,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:activity-actor-db",
+          "databaseLabel": "mikka_s03_activity_actor_e2e",
+          "wallSeconds": 130.1,
+          "startLine": 3295,
+          "endLine": 3490,
+          "reporters": [
+            {
+              "startLine": 3482,
+              "tests": 66,
+              "endLine": 3489,
+              "suites": 0,
+              "pass": 66,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 129015.237879
+            }
+          ],
+          "totals": {
+            "tests": 66,
+            "suites": 0,
+            "pass": 66,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:relation-cycle",
+          "databaseLabel": "mikka_s51_relation_cycle_e2e",
+          "wallSeconds": 23.2,
+          "startLine": 3502,
+          "endLine": 3526,
+          "reporters": [
+            {
+              "startLine": 3518,
+              "tests": 6,
+              "endLine": 3525,
+              "suites": 0,
+              "pass": 6,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 22781.27644
+            }
+          ],
+          "totals": {
+            "tests": 6,
+            "suites": 0,
+            "pass": 6,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        },
+        {
+          "suite": "test:live-db",
+          "databaseLabel": "mikka_s39_live_e2e",
+          "wallSeconds": 152.9,
+          "startLine": 3585,
+          "endLine": 3881,
+          "reporters": [
+            {
+              "startLine": 3603,
+              "tests": 10,
+              "endLine": 3610,
+              "suites": 0,
+              "pass": 10,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 7396.389855
+            },
+            {
+              "startLine": 3873,
+              "tests": 165,
+              "endLine": 3880,
+              "suites": 0,
+              "pass": 165,
+              "fail": 0,
+              "cancelled": 0,
+              "skipped": 0,
+              "todo": 0,
+              "duration_ms": 144928.810508
+            }
+          ],
+          "totals": {
+            "tests": 175,
+            "suites": 0,
+            "pass": 175,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "terminalGroupComplete": true
+        }
+      ],
+      "totals": {
+        "tests": 685,
+        "suites": 0,
+        "pass": 685,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "cleanup": {
+        "containerId": "569167fd59273708945f862ec3683d855f395dd1b77fb376ca48069c608bca52",
+        "containerRemovalLine": 4334,
+        "containerRemovalEchoMatches": true,
+        "network": "github_network_967ff93597fe4a31bbae69a4a1a79d3b",
+        "networkRemovalLine": 4337,
+        "networkRemovalEchoMatches": true,
+        "orphanCleanupReported": true,
+        "scope": "only this GHA PostgreSQL service container and network, not provider or production resources"
+      },
+      "actualNodeVersion": "node: v24.22.2",
+      "postgresImageEvidence": [
+        {
+          "line": 52,
+          "text": "##[command]/usr/bin/docker pull postgres:17"
+        },
+        {
+          "line": 120,
+          "text": "Status: Downloaded newer image for postgres:17"
+        },
+        {
+          "line": 121,
+          "text": "docker.io/library/postgres:17"
+        },
+        {
+          "line": 122,
+          "text": "##[command]/usr/bin/docker create --name 2832783081ad4efe85b86cc63a373636_postgres17_feb5ef --label 3dbde4 --network github_network_967ff93597fe4a31bbae69a4a1a79d3b --network-alias postgres -p 5432:5432 --health-cmd \"pg_isready -U e2e -d mikka_e2e\" --health-interval 5s --health-timeout 5s --health-retries 10 -e \"POSTGRES_USER=e2e\" -e \"POSTGRES_PASSWORD=e2e-local-only\" -e \"POSTGRES_DB=mikka_e2e\" -e GITHUB_ACTIONS=true -e CI=true postgres:17"
+        }
+      ],
+      "terminalMetadata": {
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T22:04:12Z",
+        "completedAt": "2026-11-09T22:08:48Z",
+        "provenance": "root fresh run/jobs metadata at 2026-11-09T22:10:57Z; original checkout and executed commands independently read here"
+      }
+    },
+    "onlyOwnedShardTotal": {
+      "suites": 36,
+      "tests": 2379,
+      "pass": 2379,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "notFourShardTotal": true,
+    "groupCounting": "Only terminal ##[group]pnpm test:<name> groups are counted; earlier db-runner streaming repetitions are excluded. Multiple reporter summaries within a suite are summed."
+  },
+  "namedTestCoverage": [
+    {
+      "name": "policyA",
+      "path": "lib/personal-policy.test.ts",
+      "job": "core",
+      "expectedCount": 22,
+      "names": [
+        "a shared credential check returns its current authorization in one read",
+        "a missing share does not issue an additional read or write",
+        "a refused share does not issue an additional read or write",
+        "repeated permission checks observe revoke and restore without reusing an earlier grant",
+        "a failed authorization read propagates its original cause without another query",
+        "a Native read batch shares its workspace policy across the real key and subscription readers",
+        "a refused batch policy still permits own keys and skips every shared credential read",
+        "concurrent batches never share a policy observation, while sibling reads join only their batch",
+        "a batch policy belongs to its actual request database executor and exact workspace",
+        "a failed batch policy preserves its original rejection and cannot poison the next request",
+        "bound after-work reads fresh after both fulfilled and rejected batch lifetimes",
+        "only the policy is shared: credential shares and own-key reads remain fresh in the batch",
+        "ordinary policy readers observe changes on every call without touching batch metadata",
+        "afterJob cannot reuse a foreground policy while its parent read batch is still active",
+        "cron and workflow jobs cannot inherit an active foreground policy observation",
+        "standalone read-only policy consumers share one observation and keep every credential read",
+        "standalone policy refusal and absence are observed again by the next read",
+        "standalone observations isolate parallel reads, exact workspaces and actual executors",
+        "standalone policy failures retain their original cause and do not poison the next read",
+        "standalone observation closes on fulfillment and rejection before bound after-work runs",
+        "standalone foreground observation never supplies policy to after, cron or workflow work",
+        "standalone read-only observation preserves the surrounding Native batch policy"
+      ],
+      "results": [
+        {
+          "name": "a shared credential check returns its current authorization in one read",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2366,
+              "durationMs": 2.336306
+            }
+          ]
+        },
+        {
+          "name": "a missing share does not issue an additional read or write",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2367,
+              "durationMs": 0.270325
+            }
+          ]
+        },
+        {
+          "name": "a refused share does not issue an additional read or write",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2368,
+              "durationMs": 0.14654
+            }
+          ]
+        },
+        {
+          "name": "repeated permission checks observe revoke and restore without reusing an earlier grant",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2369,
+              "durationMs": 0.380741
+            }
+          ]
+        },
+        {
+          "name": "a failed authorization read propagates its original cause without another query",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2370,
+              "durationMs": 0.583626
+            }
+          ]
+        },
+        {
+          "name": "a Native read batch shares its workspace policy across the real key and subscription readers",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2371,
+              "durationMs": 6.309608
+            }
+          ]
+        },
+        {
+          "name": "a refused batch policy still permits own keys and skips every shared credential read",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2372,
+              "durationMs": 3.662856
+            }
+          ]
+        },
+        {
+          "name": "concurrent batches never share a policy observation, while sibling reads join only their batch",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2373,
+              "durationMs": 2.595094
+            }
+          ]
+        },
+        {
+          "name": "a batch policy belongs to its actual request database executor and exact workspace",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2374,
+              "durationMs": 648.976914
+            }
+          ]
+        },
+        {
+          "name": "a failed batch policy preserves its original rejection and cannot poison the next request",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2375,
+              "durationMs": 1.004006
+            }
+          ]
+        },
+        {
+          "name": "bound after-work reads fresh after both fulfilled and rejected batch lifetimes",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2376,
+              "durationMs": 0.549034
+            }
+          ]
+        },
+        {
+          "name": "only the policy is shared: credential shares and own-key reads remain fresh in the batch",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2377,
+              "durationMs": 0.515093
+            }
+          ]
+        },
+        {
+          "name": "ordinary policy readers observe changes on every call without touching batch metadata",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2378,
+              "durationMs": 0.194812
+            }
+          ]
+        },
+        {
+          "name": "afterJob cannot reuse a foreground policy while its parent read batch is still active",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2379,
+              "durationMs": 63.3329
+            }
+          ]
+        },
+        {
+          "name": "cron and workflow jobs cannot inherit an active foreground policy observation",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2380,
+              "durationMs": 0.937597
+            }
+          ]
+        },
+        {
+          "name": "standalone read-only policy consumers share one observation and keep every credential read",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2381,
+              "durationMs": 0.631017
+            }
+          ]
+        },
+        {
+          "name": "standalone policy refusal and absence are observed again by the next read",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2382,
+              "durationMs": 0.391258
+            }
+          ]
+        },
+        {
+          "name": "standalone observations isolate parallel reads, exact workspaces and actual executors",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2383,
+              "durationMs": 0.356435
+            }
+          ]
+        },
+        {
+          "name": "standalone policy failures retain their original cause and do not poison the next read",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2384,
+              "durationMs": 0.290826
+            }
+          ]
+        },
+        {
+          "name": "standalone observation closes on fulfillment and rejection before bound after-work runs",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2385,
+              "durationMs": 0.389525
+            }
+          ]
+        },
+        {
+          "name": "standalone foreground observation never supplies policy to after, cron or workflow work",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2386,
+              "durationMs": 0.360801
+            }
+          ]
+        },
+        {
+          "name": "standalone read-only observation preserves the surrounding Native batch policy",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2387,
+              "durationMs": 0.233641
+            }
+          ]
+        }
+      ],
+      "target": "ci-tasks:core-20",
+      "command": "pnpm test:execution-rules",
+      "source": {
+        "path": "lib/personal-policy.test.ts",
+        "mode": "100644",
+        "gitBlob": "0338aed556fe721ba49c2fa7fa066fdd9d63ff96",
+        "bytes": 19713,
+        "sha256": "f0b2950fbb7bc87ef207f0c8357b394c51d21d36c734e469b82165a69c19c12f"
+      },
+      "allUniquePass": true,
+      "countMatchesExpected": true
+    },
+    {
+      "name": "revisionB",
+      "path": "lib/desktop-rpc/read-batch-context.test.ts",
+      "job": "pg3",
+      "expectedCount": 23,
+      "names": [
+        "concurrent owner-wide readers reuse their actual personal home only within the batch",
+        "different Live kinds share one revision query before either consumer reads its data",
+        "owner observations are separate for parallel batches, owners and database authorities",
+        "later reads in one batch keep the earlier revision, while the next batch reads the new revision",
+        "a missing or failed revision never becomes fabricated proof and does not poison the next request",
+        "ordinary revision readers and different database scopes remain independent",
+        "bound after-work cannot reuse an already completed batch authority observation",
+        "notification target resolution never inherits an earlier list-read home, even inside the batch",
+        "planned owner readers share one earlier observation without exposing each other's keys",
+        "an undeclared batch keeps ordinary per-reader observations",
+        "a selected team key stays late and total requested and returned keys stay unchanged",
+        "owner homes and database authorities do not borrow another planned observation",
+        "absent homes and invalid or nonrevision refs never trigger an owner prefetch",
+        "an entity or another owner key does not start the resolved home's list prefetch",
+        "missing and failed prefetched revisions remain unknown until another request reads",
+        "throw and cancellation release the plan as well as its earlier observations",
+        "authorized workspace readers share their earlier Team revisions despite different readiness",
+        "authorized Team plans do not resolve a Personal home or borrow a different workspace",
+        "entities, unresolved scopes and mismatched workspace refs never start a Team plan",
+        "workspace revision observations use the actual executor behind one request proxy",
+        "workspace plans never supply foreground revisions to after, cron or workflow reads",
+        "workspace plan failure and completed lifetimes never fabricate or retain revision proof",
+        "authorized Team list prefetch reduces three separately ready fixed-revision reads to one SQL"
+      ],
+      "results": [
+        {
+          "name": "concurrent owner-wide readers reuse their actual personal home only within the batch",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2766,
+              "durationMs": 7.740834
+            }
+          ]
+        },
+        {
+          "name": "different Live kinds share one revision query before either consumer reads its data",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2767,
+              "durationMs": 45.330276
+            }
+          ]
+        },
+        {
+          "name": "owner observations are separate for parallel batches, owners and database authorities",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2768,
+              "durationMs": 7.912815
+            }
+          ]
+        },
+        {
+          "name": "later reads in one batch keep the earlier revision, while the next batch reads the new revision",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2769,
+              "durationMs": 5.076613
+            }
+          ]
+        },
+        {
+          "name": "a missing or failed revision never becomes fabricated proof and does not poison the next request",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2770,
+              "durationMs": 10.961484
+            }
+          ]
+        },
+        {
+          "name": "ordinary revision readers and different database scopes remain independent",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2771,
+              "durationMs": 0.761722
+            }
+          ]
+        },
+        {
+          "name": "bound after-work cannot reuse an already completed batch authority observation",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2772,
+              "durationMs": 0.58399
+            }
+          ]
+        },
+        {
+          "name": "notification target resolution never inherits an earlier list-read home, even inside the batch",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2773,
+              "durationMs": 0.38073
+            }
+          ]
+        },
+        {
+          "name": "planned owner readers share one earlier observation without exposing each other's keys",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2774,
+              "durationMs": 4.482253
+            }
+          ]
+        },
+        {
+          "name": "an undeclared batch keeps ordinary per-reader observations",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2775,
+              "durationMs": 50.245418
+            }
+          ]
+        },
+        {
+          "name": "a selected team key stays late and total requested and returned keys stay unchanged",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2776,
+              "durationMs": 17.114165
+            }
+          ]
+        },
+        {
+          "name": "owner homes and database authorities do not borrow another planned observation",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2777,
+              "durationMs": 3.590029
+            }
+          ]
+        },
+        {
+          "name": "absent homes and invalid or nonrevision refs never trigger an owner prefetch",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2778,
+              "durationMs": 2.03101
+            }
+          ]
+        },
+        {
+          "name": "an entity or another owner key does not start the resolved home's list prefetch",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2779,
+              "durationMs": 4.797281
+            }
+          ]
+        },
+        {
+          "name": "missing and failed prefetched revisions remain unknown until another request reads",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2780,
+              "durationMs": 1.47407
+            }
+          ]
+        },
+        {
+          "name": "throw and cancellation release the plan as well as its earlier observations",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2781,
+              "durationMs": 1.647224
+            }
+          ]
+        },
+        {
+          "name": "authorized workspace readers share their earlier Team revisions despite different readiness",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2782,
+              "durationMs": 1.269459
+            }
+          ]
+        },
+        {
+          "name": "authorized Team plans do not resolve a Personal home or borrow a different workspace",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2783,
+              "durationMs": 0.734141
+            }
+          ]
+        },
+        {
+          "name": "entities, unresolved scopes and mismatched workspace refs never start a Team plan",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2784,
+              "durationMs": 0.770838
+            }
+          ]
+        },
+        {
+          "name": "workspace revision observations use the actual executor behind one request proxy",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2785,
+              "durationMs": 0.71284
+            }
+          ]
+        },
+        {
+          "name": "workspace plans never supply foreground revisions to after, cron or workflow reads",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2786,
+              "durationMs": 0.538064
+            }
+          ]
+        },
+        {
+          "name": "workspace plan failure and completed lifetimes never fabricate or retain revision proof",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2787,
+              "durationMs": 0.773102
+            }
+          ]
+        },
+        {
+          "name": "authorized Team list prefetch reduces three separately ready fixed-revision reads to one SQL",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 2788,
+              "durationMs": 0.709013
+            }
+          ]
+        }
+      ],
+      "suite": "test:desktop-auth",
+      "source": {
+        "path": "lib/desktop-rpc/read-batch-context.test.ts",
+        "mode": "100644",
+        "gitBlob": "47ef8ffe0e8b6ac1e7604e96362ba66ed4f015d5",
+        "bytes": 26773,
+        "sha256": "ea4cd0de715f0089aa08a6f7fe8555d7b0f245b397d0896c5254814d62fac670"
+      },
+      "allUniquePass": true,
+      "countMatchesExpected": true
+    },
+    {
+      "name": "driver",
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "job": "core",
+      "expectedCount": 74,
+      "names": [
+        "preflight reads both exact subscription paths without creating profiles, changing settings or submitting tasks",
+        "preflight excludes only a version-bound Factory task proven to belong to another workspace",
+        "preflight keeps same-workspace, missing and mismatched Factory scope proofs blocked",
+        "preflight does not convert current-workspace failed or blocked Factory tasks into terminal tasks",
+        "preflight does not request scope details for already settled Factory tasks",
+        "foreign historical Factory tasks remain untouched while failed owned acceptance still cancels its task",
+        "a default team switches only this login session to its verified personal workspace before reading Coordinator",
+        "workspace selection rejects ambiguous choices, teams and another account personal membership before switching",
+        "workspace switch acknowledgement and cookie readback failures stop before Coordinator and close the session",
+        "unsafe configuration blocks before any model call and reports only closed failure codes",
+        "two executed cases retain exact native receipts, restore model/profile state and never fabricate replay evidence",
+        "successful terminal runs close only their own machines and retain task evidence",
+        "a missing machine requires a fresh owned run and an explicit null machine read",
+        "machine failures never turn a completed task green and do not prevent closing another owned machine",
+        "legacy Factory tasks still require review and verify before the normal deliverable acceptance",
+        "missing, failed or stale Factory checks never reach approval, including legacy verify",
+        "deliverable approval requires its receipt, never accepts a repository and never retries a lost response",
+        "uncertain mutation responses never resubmit and still reconcile own temporary settings",
+        "wrong provider/model and an extra native attempt stop the case without retrying",
+        "pure source and budget guards reject shared credentials, inherited model choices and retries",
+        "cleanup preserves a concurrent model edit and reports incomplete restoration",
+        "prepare is explicit, requires execution and restores only its acknowledged settings",
+        "prepare refuses visible activity in authorized workspaces and inherited model choices without changing settings",
+        "a blocked case does not prevent preparation and execution of another available model",
+        "preparation failures restore acknowledged writes but never guess after a lost response",
+        "restoration failures and concurrent edits remain visible without overwriting them",
+        "issue inventory follows real opaque cursors beyond 100 rows and rejects a moving scan",
+        "browser submission requires one executed case and does not authenticate on invalid options",
+        "browser mode publishes readiness then observes the real-shaped UI click through push without an API submission",
+        "browser waiting times out or blocks changed UI text without sending or repeating a task",
+        "live transport waits for actual invalidations, rejects disconnects and keeps capabilities out of reports",
+        "implicit default preflight requires server absence evidence and never writes a preference",
+        "implicit default restores absence with the stored binding and revision, not the catalogue option",
+        "implicit default never overwrites a preference created after preflight",
+        "implicit default stops after a lost or incomplete first selection receipt without guessing ownership",
+        "implicit default preserves a same-value concurrent rewrite when the revision no longer matches",
+        "implicit default checks absence once after a lost restoration response and does not repeat deletion",
+        "all Factory reads, writes, approval and cleanup pin the authorized personal workspace even when a team is listed first",
+        "Factory authority refusals remain failures without retrying an implicit workspace",
+        "Factory cleanup keeps its explicit workspace and exposes revoked authority or mismatch instead of retrying elsewhere",
+        "malformed or foreign personal workspace selection stops before any Factory call",
+        "workspace A idle cannot hide workspace B activity in either scoped reader",
+        "idle proof covers every authorized workspace but reports only the existing 30-day visible window and is not atomic",
+        "workspace inventory errors, missing pages, unknown memberships and the workspace cap fail before changing settings",
+        "a changed workspace inventory cannot turn an incomplete scan into an idle proof",
+        "scoped run reads reject saturation, delta or missing rows, malformed data and a foreign scope",
+        "fresh authorization failures in another workspace and during restoration remain visible",
+        "the scan rejects a 30-day row expiry at or during the scan and never filters it away",
+        "one overall scan deadline and backwards time fail closed without extending the scan per workspace",
+        "a real request AbortSignal expires within the remaining scan deadline and closes the login session",
+        "the finite workspace cap and 199-row boundary can succeed without paging or widening the 30-day read",
+        "profile absence preflight accepts only the normal authorized missing-profile response",
+        "profile absence cleanup accepts an authorized exact missing-profile code without a DELETE retry",
+        "recovery journal refuses each new setting write when its preceding checkpoint fails",
+        "recovery journal failure after a model acknowledgement still restores explicit and implicit selections",
+        "recovery journal failure after each preparation acknowledgement does not prevent restoration",
+        "persistent checkpoint failures cannot interrupt any already-required cleanup or permit another case",
+        "recovery journal retains only validated recovery metadata and isolates callback mutation",
+        "failed cleanup reports retain the original explicit model and acknowledged implicit binding without guessing",
+        "a lost temporary selection response records intent without inventing a binding receipt",
+        "an unresolved profile restore retains only the exact acknowledged version and digest",
+        "actual CLI writes the fixed atomic 0600 recovery file and blocks before HTTP when persistence fails",
+        "the existing safe artifact includes only the fixed recovery filename alongside the reports",
+        "recovery metadata preserves the actual shared API-key menu shape and restores its explicit choice",
+        "profile preflight refuses workspace admission denied instead of treating any 404 as absence",
+        "profile cleanup refuses workspace admission denied without falsely marking an existing profile archived",
+        "profile preflight refuses profile scope denied instead of treating any 404 as absence",
+        "profile cleanup refuses profile scope denied without falsely marking an existing profile archived",
+        "profile preflight refuses unknown error instead of treating any 404 as absence",
+        "profile cleanup refuses unknown error without falsely marking an existing profile archived",
+        "profile preflight refuses nested not-found code instead of treating any 404 as absence",
+        "profile cleanup refuses nested not-found code without falsely marking an existing profile archived",
+        "profile preflight refuses malformed JSON instead of treating any 404 as absence",
+        "profile cleanup refuses malformed JSON without falsely marking an existing profile archived"
+      ],
+      "results": [
+        {
+          "name": "preflight reads both exact subscription paths without creating profiles, changing settings or submitting tasks",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6648,
+              "durationMs": 45.524192
+            }
+          ]
+        },
+        {
+          "name": "preflight excludes only a version-bound Factory task proven to belong to another workspace",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6649,
+              "durationMs": 7.688221
+            }
+          ]
+        },
+        {
+          "name": "preflight keeps same-workspace, missing and mismatched Factory scope proofs blocked",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6650,
+              "durationMs": 52.676899
+            }
+          ]
+        },
+        {
+          "name": "preflight does not convert current-workspace failed or blocked Factory tasks into terminal tasks",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6651,
+              "durationMs": 8.218221
+            }
+          ]
+        },
+        {
+          "name": "preflight does not request scope details for already settled Factory tasks",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6652,
+              "durationMs": 20.396193
+            }
+          ]
+        },
+        {
+          "name": "foreign historical Factory tasks remain untouched while failed owned acceptance still cancels its task",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6653,
+              "durationMs": 22.414732
+            }
+          ]
+        },
+        {
+          "name": "a default team switches only this login session to its verified personal workspace before reading Coordinator",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6654,
+              "durationMs": 3.454974
+            }
+          ]
+        },
+        {
+          "name": "workspace selection rejects ambiguous choices, teams and another account personal membership before switching",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6655,
+              "durationMs": 25.475625
+            }
+          ]
+        },
+        {
+          "name": "workspace switch acknowledgement and cookie readback failures stop before Coordinator and close the session",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6656,
+              "durationMs": 4.033332
+            }
+          ]
+        },
+        {
+          "name": "unsafe configuration blocks before any model call and reports only closed failure codes",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6657,
+              "durationMs": 14.486747
+            }
+          ]
+        },
+        {
+          "name": "two executed cases retain exact native receipts, restore model/profile state and never fabricate replay evidence",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6658,
+              "durationMs": 25.889145
+            }
+          ]
+        },
+        {
+          "name": "successful terminal runs close only their own machines and retain task evidence",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6659,
+              "durationMs": 12.42957
+            }
+          ]
+        },
+        {
+          "name": "a missing machine requires a fresh owned run and an explicit null machine read",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6660,
+              "durationMs": 15.212995
+            }
+          ]
+        },
+        {
+          "name": "machine failures never turn a completed task green and do not prevent closing another owned machine",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6661,
+              "durationMs": 114.394503
+            }
+          ]
+        },
+        {
+          "name": "legacy Factory tasks still require review and verify before the normal deliverable acceptance",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6662,
+              "durationMs": 10.761097
+            }
+          ]
+        },
+        {
+          "name": "missing, failed or stale Factory checks never reach approval, including legacy verify",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6663,
+              "durationMs": 46.78608
+            }
+          ]
+        },
+        {
+          "name": "deliverable approval requires its receipt, never accepts a repository and never retries a lost response",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6664,
+              "durationMs": 29.406614
+            }
+          ]
+        },
+        {
+          "name": "uncertain mutation responses never resubmit and still reconcile own temporary settings",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6665,
+              "durationMs": 12.891032
+            }
+          ]
+        },
+        {
+          "name": "wrong provider/model and an extra native attempt stop the case without retrying",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6666,
+              "durationMs": 13.913096
+            }
+          ]
+        },
+        {
+          "name": "pure source and budget guards reject shared credentials, inherited model choices and retries",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6667,
+              "durationMs": 0.322404
+            }
+          ]
+        },
+        {
+          "name": "cleanup preserves a concurrent model edit and reports incomplete restoration",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6668,
+              "durationMs": 4.861034
+            }
+          ]
+        },
+        {
+          "name": "prepare is explicit, requires execution and restores only its acknowledged settings",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6669,
+              "durationMs": 23.575964
+            }
+          ]
+        },
+        {
+          "name": "prepare refuses visible activity in authorized workspaces and inherited model choices without changing settings",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6670,
+              "durationMs": 2.339921
+            }
+          ]
+        },
+        {
+          "name": "a blocked case does not prevent preparation and execution of another available model",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6671,
+              "durationMs": 11.527186
+            }
+          ]
+        },
+        {
+          "name": "preparation failures restore acknowledged writes but never guess after a lost response",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6672,
+              "durationMs": 9.681547
+            }
+          ]
+        },
+        {
+          "name": "restoration failures and concurrent edits remain visible without overwriting them",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6673,
+              "durationMs": 36.252464
+            }
+          ]
+        },
+        {
+          "name": "issue inventory follows real opaque cursors beyond 100 rows and rejects a moving scan",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6674,
+              "durationMs": 0.87976
+            }
+          ]
+        },
+        {
+          "name": "browser submission requires one executed case and does not authenticate on invalid options",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6675,
+              "durationMs": 0.181112
+            }
+          ]
+        },
+        {
+          "name": "browser mode publishes readiness then observes the real-shaped UI click through push without an API submission",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6676,
+              "durationMs": 20.314511
+            }
+          ]
+        },
+        {
+          "name": "browser waiting times out or blocks changed UI text without sending or repeating a task",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6677,
+              "durationMs": 5.471841
+            }
+          ]
+        },
+        {
+          "name": "live transport waits for actual invalidations, rejects disconnects and keeps capabilities out of reports",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6678,
+              "durationMs": 1.443717
+            }
+          ]
+        },
+        {
+          "name": "implicit default preflight requires server absence evidence and never writes a preference",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6679,
+              "durationMs": 1.291228
+            }
+          ]
+        },
+        {
+          "name": "implicit default restores absence with the stored binding and revision, not the catalogue option",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6680,
+              "durationMs": 4.343197
+            }
+          ]
+        },
+        {
+          "name": "implicit default never overwrites a preference created after preflight",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6681,
+              "durationMs": 2.067011
+            }
+          ]
+        },
+        {
+          "name": "implicit default stops after a lost or incomplete first selection receipt without guessing ownership",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6682,
+              "durationMs": 2.851508
+            }
+          ]
+        },
+        {
+          "name": "implicit default preserves a same-value concurrent rewrite when the revision no longer matches",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6683,
+              "durationMs": 4.417778
+            }
+          ]
+        },
+        {
+          "name": "implicit default checks absence once after a lost restoration response and does not repeat deletion",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6684,
+              "durationMs": 5.5047
+            }
+          ]
+        },
+        {
+          "name": "all Factory reads, writes, approval and cleanup pin the authorized personal workspace even when a team is listed first",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6685,
+              "durationMs": 33.320346
+            }
+          ]
+        },
+        {
+          "name": "Factory authority refusals remain failures without retrying an implicit workspace",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6686,
+              "durationMs": 3.073291
+            }
+          ]
+        },
+        {
+          "name": "Factory cleanup keeps its explicit workspace and exposes revoked authority or mismatch instead of retrying elsewhere",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6687,
+              "durationMs": 14.197212
+            }
+          ]
+        },
+        {
+          "name": "malformed or foreign personal workspace selection stops before any Factory call",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6688,
+              "durationMs": 1.357957
+            }
+          ]
+        },
+        {
+          "name": "workspace A idle cannot hide workspace B activity in either scoped reader",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6689,
+              "durationMs": 6.448105
+            }
+          ]
+        },
+        {
+          "name": "idle proof covers every authorized workspace but reports only the existing 30-day visible window and is not atomic",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6690,
+              "durationMs": 7.746743
+            }
+          ]
+        },
+        {
+          "name": "workspace inventory errors, missing pages, unknown memberships and the workspace cap fail before changing settings",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6691,
+              "durationMs": 11.538763
+            }
+          ]
+        },
+        {
+          "name": "a changed workspace inventory cannot turn an incomplete scan into an idle proof",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6692,
+              "durationMs": 0.954933
+            }
+          ]
+        },
+        {
+          "name": "scoped run reads reject saturation, delta or missing rows, malformed data and a foreign scope",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6693,
+              "durationMs": 29.687995
+            }
+          ]
+        },
+        {
+          "name": "fresh authorization failures in another workspace and during restoration remain visible",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6694,
+              "durationMs": 12.877202
+            }
+          ]
+        },
+        {
+          "name": "the scan rejects a 30-day row expiry at or during the scan and never filters it away",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6695,
+              "durationMs": 5.146552
+            }
+          ]
+        },
+        {
+          "name": "one overall scan deadline and backwards time fail closed without extending the scan per workspace",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6696,
+              "durationMs": 6.709187
+            }
+          ]
+        },
+        {
+          "name": "a real request AbortSignal expires within the remaining scan deadline and closes the login session",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6697,
+              "durationMs": 19.034916
+            }
+          ]
+        },
+        {
+          "name": "the finite workspace cap and 199-row boundary can succeed without paging or widening the 30-day read",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6698,
+              "durationMs": 69.839806
+            }
+          ]
+        },
+        {
+          "name": "profile absence preflight accepts only the normal authorized missing-profile response",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6709,
+              "durationMs": 2.631198
+            }
+          ]
+        },
+        {
+          "name": "profile absence cleanup accepts an authorized exact missing-profile code without a DELETE retry",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6710,
+              "durationMs": 7.647284
+            }
+          ]
+        },
+        {
+          "name": "recovery journal refuses each new setting write when its preceding checkpoint fails",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6711,
+              "durationMs": 4.703297
+            }
+          ]
+        },
+        {
+          "name": "recovery journal failure after a model acknowledgement still restores explicit and implicit selections",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6712,
+              "durationMs": 3.297088
+            }
+          ]
+        },
+        {
+          "name": "recovery journal failure after each preparation acknowledgement does not prevent restoration",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6713,
+              "durationMs": 11.542809
+            }
+          ]
+        },
+        {
+          "name": "persistent checkpoint failures cannot interrupt any already-required cleanup or permit another case",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6714,
+              "durationMs": 6.615747
+            }
+          ]
+        },
+        {
+          "name": "recovery journal retains only validated recovery metadata and isolates callback mutation",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6715,
+              "durationMs": 9.945502
+            }
+          ]
+        },
+        {
+          "name": "failed cleanup reports retain the original explicit model and acknowledged implicit binding without guessing",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6716,
+              "durationMs": 7.981666
+            }
+          ]
+        },
+        {
+          "name": "a lost temporary selection response records intent without inventing a binding receipt",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6717,
+              "durationMs": 1.543155
+            }
+          ]
+        },
+        {
+          "name": "an unresolved profile restore retains only the exact acknowledged version and digest",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6718,
+              "durationMs": 8.004731
+            }
+          ]
+        },
+        {
+          "name": "actual CLI writes the fixed atomic 0600 recovery file and blocks before HTTP when persistence fails",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6719,
+              "durationMs": 272.818069
+            }
+          ]
+        },
+        {
+          "name": "the existing safe artifact includes only the fixed recovery filename alongside the reports",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6720,
+              "durationMs": 0.865609
+            }
+          ]
+        },
+        {
+          "name": "recovery metadata preserves the actual shared API-key menu shape and restores its explicit choice",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6721,
+              "durationMs": 8.040164
+            }
+          ]
+        },
+        {
+          "name": "profile preflight refuses workspace admission denied instead of treating any 404 as absence",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6699,
+              "durationMs": 1.787992
+            }
+          ]
+        },
+        {
+          "name": "profile cleanup refuses workspace admission denied without falsely marking an existing profile archived",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6700,
+              "durationMs": 12.276941
+            }
+          ]
+        },
+        {
+          "name": "profile preflight refuses profile scope denied instead of treating any 404 as absence",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6701,
+              "durationMs": 1.24631
+            }
+          ]
+        },
+        {
+          "name": "profile cleanup refuses profile scope denied without falsely marking an existing profile archived",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6702,
+              "durationMs": 5.367504
+            }
+          ]
+        },
+        {
+          "name": "profile preflight refuses unknown error instead of treating any 404 as absence",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6703,
+              "durationMs": 1.047352
+            }
+          ]
+        },
+        {
+          "name": "profile cleanup refuses unknown error without falsely marking an existing profile archived",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6704,
+              "durationMs": 3.853803
+            }
+          ]
+        },
+        {
+          "name": "profile preflight refuses nested not-found code instead of treating any 404 as absence",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6705,
+              "durationMs": 0.991288
+            }
+          ]
+        },
+        {
+          "name": "profile cleanup refuses nested not-found code without falsely marking an existing profile archived",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6706,
+              "durationMs": 4.394724
+            }
+          ]
+        },
+        {
+          "name": "profile preflight refuses malformed JSON instead of treating any 404 as absence",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6707,
+              "durationMs": 1.05923
+            }
+          ]
+        },
+        {
+          "name": "profile cleanup refuses malformed JSON without falsely marking an existing profile archived",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 6708,
+              "durationMs": 3.887693
+            }
+          ]
+        }
+      ],
+      "target": "ci-tasks:core-53",
+      "command": "pnpm test:dev-local",
+      "source": {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "mode": "100644",
+        "gitBlob": "2e3c8c7aad0594df165caf8f798c72034b3d484f",
+        "bytes": 94496,
+        "sha256": "12da2b118255f1ea05399d915bd80dd87737e2f42b0a1ab6b7c19bf0d8bff775"
+      },
+      "allUniquePass": true,
+      "countMatchesExpected": true
+    },
+    {
+      "name": "lib/bot-model-selection.test.ts",
+      "path": "lib/bot-model-selection.test.ts",
+      "job": "core",
+      "names": [
+        "A bot saved on an API key model freezes that key and resolves through it; an unusable key falls back",
+        "Coordinator without a subscription freezes and resolves the configured hosted default",
+        "a saved choice whose account is gone, with no subscription bound, replies on Mikka 默认",
+        "Mikka 默认 picked in the composer stays hosted while a subscription is bound",
+        "Bot without a subscription replies on the same hosted default as the Coordinator, in its own workspace",
+        "a saved choice whose account is gone switches to a bound subscription, Claude first, not Mikka 默认",
+        "Coordinator still freezes an available or selected subscription with ownership validation",
+        "settings errors propagate instead of selecting the hosted fallback",
+        "an explicit shared subscription freezes its exact saved model before own or pooled defaults",
+        "shared subscription menu exposes both providers without private account or quota details",
+        "an archived bot (its owner left the team) is refused before any model is chosen",
+        "Mikka 默认 with no points here runs on the next allowed model and says so; with none, it stays and is refused",
+        "a disabled hosted source never starts a new hosted turn",
+        "an unavailable saved model follows the preferred source and preserves its old frozen turn",
+        "a saved subscription freezes its exact model without unrelated catalogue work and still checks current authority",
+        "an unavailable saved subscription still reads the fallback catalogue and propagates its failure",
+        "a saved exhausted subscription retains its same-model quota fallback without reading the catalogue"
+      ],
+      "results": [
+        {
+          "name": "A bot saved on an API key model freezes that key and resolves through it; an unusable key falls back",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3322,
+              "durationMs": 146.639265
+            }
+          ]
+        },
+        {
+          "name": "Coordinator without a subscription freezes and resolves the configured hosted default",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3323,
+              "durationMs": 1.33289
+            }
+          ]
+        },
+        {
+          "name": "a saved choice whose account is gone, with no subscription bound, replies on Mikka 默认",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3324,
+              "durationMs": 4.103448
+            }
+          ]
+        },
+        {
+          "name": "Mikka 默认 picked in the composer stays hosted while a subscription is bound",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3325,
+              "durationMs": 2.397088
+            }
+          ]
+        },
+        {
+          "name": "Bot without a subscription replies on the same hosted default as the Coordinator, in its own workspace",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3326,
+              "durationMs": 1.197687
+            }
+          ]
+        },
+        {
+          "name": "a saved choice whose account is gone switches to a bound subscription, Claude first, not Mikka 默认",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3327,
+              "durationMs": 3.61183
+            }
+          ]
+        },
+        {
+          "name": "Coordinator still freezes an available or selected subscription with ownership validation",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3328,
+              "durationMs": 1.108454
+            }
+          ]
+        },
+        {
+          "name": "settings errors propagate instead of selecting the hosted fallback",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3329,
+              "durationMs": 0.305038
+            }
+          ]
+        },
+        {
+          "name": "an explicit shared subscription freezes its exact saved model before own or pooled defaults",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3330,
+              "durationMs": 0.586851
+            }
+          ]
+        },
+        {
+          "name": "shared subscription menu exposes both providers without private account or quota details",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3331,
+              "durationMs": 729.932999
+            }
+          ]
+        },
+        {
+          "name": "an archived bot (its owner left the team) is refused before any model is chosen",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3332,
+              "durationMs": 0.368693
+            }
+          ]
+        },
+        {
+          "name": "Mikka 默认 with no points here runs on the next allowed model and says so; with none, it stays and is refused",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3333,
+              "durationMs": 62.93957
+            }
+          ]
+        },
+        {
+          "name": "a disabled hosted source never starts a new hosted turn",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3334,
+              "durationMs": 4.140565
+            }
+          ]
+        },
+        {
+          "name": "an unavailable saved model follows the preferred source and preserves its old frozen turn",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3335,
+              "durationMs": 3.380483
+            }
+          ]
+        },
+        {
+          "name": "a saved subscription freezes its exact model without unrelated catalogue work and still checks current authority",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3336,
+              "durationMs": 1.439811
+            }
+          ]
+        },
+        {
+          "name": "an unavailable saved subscription still reads the fallback catalogue and propagates its failure",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3337,
+              "durationMs": 3.818345
+            }
+          ]
+        },
+        {
+          "name": "a saved exhausted subscription retains its same-model quota fallback without reading the catalogue",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3338,
+              "durationMs": 14.710909
+            }
+          ]
+        }
+      ],
+      "target": "ci-tasks:core-29",
+      "command": "pnpm test:agent-kit-compat -> pnpm test:agent-kit-model",
+      "countScope": "top-level named tests; nested dynamic children separately checked where declared",
+      "source": {
+        "path": "lib/bot-model-selection.test.ts",
+        "mode": "100644",
+        "gitBlob": "6453ff0fae3dd8549c7f6ecb68b315d65a59f633",
+        "bytes": 22916,
+        "sha256": "37085ffbae8568a06933f11e31e89034eec34ae7fd42c7c73920bfd3b3a43884"
+      },
+      "allUniquePass": true,
+      "countMatchesExpected": true
+    },
+    {
+      "name": "lib/model-call-timing.test.ts",
+      "path": "lib/model-call-timing.test.ts",
+      "job": "core",
+      "names": [
+        "a model call logs when its first token, first text and end came, its token counts and tool count, never its content",
+        "a call with no text and a failing stream still logs once, marked interrupted, and the error reaches the caller",
+        "each tool call is timed by name, failures included, and its result is unchanged",
+        "provider error parts mark timing interrupted and malformed counts or finish text are not logged",
+        "the cacheable prefix is logged as short hashes of the tools and each system message, never their text",
+        "the actual compatible SDK timing distinguishes missing, null, zero and positive raw cache counts",
+        "raw cache diagnostics reject malformed counts and read only own whitelisted fields",
+        "real worker terminal diagnostics arrive before the compatible SDK flush logs one unchanged model result",
+        "missing or malformed optional worker timing cannot change a result or refusal and never bypasses the original frame guards",
+        "cancel during identity preparation logs missing Go immediately and never starts an execution child after late resolution",
+        "a same-call warm projection produces one real worker row plus separate private-free pre-read timing",
+        "real worker HTTP timing uses a separate bounded log without enlarging the original model receipt",
+        "the complete HTTP log is below one KiB and neither log sink can change the stream"
+      ],
+      "results": [
+        {
+          "name": "a model call logs when its first token, first text and end came, its token counts and tool count, never its content",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3396,
+              "durationMs": 3.65085
+            }
+          ]
+        },
+        {
+          "name": "a call with no text and a failing stream still logs once, marked interrupted, and the error reaches the caller",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3397,
+              "durationMs": 1.2328
+            }
+          ]
+        },
+        {
+          "name": "each tool call is timed by name, failures included, and its result is unchanged",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3398,
+              "durationMs": 0.591468
+            }
+          ]
+        },
+        {
+          "name": "provider error parts mark timing interrupted and malformed counts or finish text are not logged",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3399,
+              "durationMs": 0.590487
+            }
+          ]
+        },
+        {
+          "name": "the cacheable prefix is logged as short hashes of the tools and each system message, never their text",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3400,
+              "durationMs": 3.275566
+            }
+          ]
+        },
+        {
+          "name": "the actual compatible SDK timing distinguishes missing, null, zero and positive raw cache counts",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3406,
+              "durationMs": 36.469858
+            }
+          ]
+        },
+        {
+          "name": "raw cache diagnostics reject malformed counts and read only own whitelisted fields",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3407,
+              "durationMs": 1.24558
+            }
+          ]
+        },
+        {
+          "name": "real worker terminal diagnostics arrive before the compatible SDK flush logs one unchanged model result",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3409,
+              "durationMs": 102.398527
+            }
+          ]
+        },
+        {
+          "name": "missing or malformed optional worker timing cannot change a result or refusal and never bypasses the original frame guards",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3417,
+              "durationMs": 229.127311
+            }
+          ]
+        },
+        {
+          "name": "cancel during identity preparation logs missing Go immediately and never starts an execution child after late resolution",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3418,
+              "durationMs": 7.220617
+            }
+          ]
+        },
+        {
+          "name": "a same-call warm projection produces one real worker row plus separate private-free pre-read timing",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3420,
+              "durationMs": 43.065295
+            }
+          ]
+        },
+        {
+          "name": "real worker HTTP timing uses a separate bounded log without enlarging the original model receipt",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3427,
+              "durationMs": 421.481652
+            }
+          ]
+        },
+        {
+          "name": "the complete HTTP log is below one KiB and neither log sink can change the stream",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3428,
+              "durationMs": 3.310659
+            }
+          ]
+        }
+      ],
+      "target": "ci-tasks:core-29",
+      "command": "pnpm test:agent-kit-compat -> pnpm test:agent-kit-model",
+      "countScope": "top-level named tests; nested dynamic children separately checked where declared",
+      "source": {
+        "path": "lib/model-call-timing.test.ts",
+        "mode": "100644",
+        "gitBlob": "9b98a617cb833fed907a4947dc63a0097d8b554c",
+        "bytes": 25687,
+        "sha256": "7ae9c63c59bc58b582df83eb3f86c27936031aa986bfe4aefa91bfc7033b8a51"
+      },
+      "allUniquePass": true,
+      "countMatchesExpected": true
+    },
+    {
+      "name": "lib/subscription-workflow-model.test.ts",
+      "path": "lib/subscription-workflow-model.test.ts",
+      "job": "core",
+      "names": [
+        "Workflow serde carries only the fixed non-secret binding descriptor",
+        "unsupported non-streaming invocation refuses rather than calling a default provider",
+        "the Node model method resolves the fixed descriptor and forwards cancellation into the existing stream call",
+        "the same model marks Claude cache breakpoints and leaves a Codex request as it is",
+        "the Codex subscription SDK request keeps the dynamic system tail after history without cache fields",
+        "only the supported Codex CPA route moves the prepared tail; Claude, API-key and native paths keep their contracts",
+        "timing reports whether the actual Codex layout was applied without changing other routes or unknown shapes",
+        "setup quota workers are observed before the provider request without logging their inputs"
+      ],
+      "results": [
+        {
+          "name": "Workflow serde carries only the fixed non-secret binding descriptor",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3480,
+              "durationMs": 5.922158
+            }
+          ]
+        },
+        {
+          "name": "unsupported non-streaming invocation refuses rather than calling a default provider",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3481,
+              "durationMs": 0.556435
+            }
+          ]
+        },
+        {
+          "name": "the Node model method resolves the fixed descriptor and forwards cancellation into the existing stream call",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3482,
+              "durationMs": 1044.243808
+            }
+          ]
+        },
+        {
+          "name": "the same model marks Claude cache breakpoints and leaves a Codex request as it is",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3483,
+              "durationMs": 7.401071
+            }
+          ]
+        },
+        {
+          "name": "the Codex subscription SDK request keeps the dynamic system tail after history without cache fields",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3484,
+              "durationMs": 44.94526
+            }
+          ]
+        },
+        {
+          "name": "only the supported Codex CPA route moves the prepared tail; Claude, API-key and native paths keep their contracts",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3485,
+              "durationMs": 20.347642
+            }
+          ]
+        },
+        {
+          "name": "timing reports whether the actual Codex layout was applied without changing other routes or unknown shapes",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3486,
+              "durationMs": 15.051342
+            }
+          ]
+        },
+        {
+          "name": "setup quota workers are observed before the provider request without logging their inputs",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3487,
+              "durationMs": 3.151296
+            }
+          ]
+        }
+      ],
+      "target": "ci-tasks:core-29",
+      "command": "pnpm test:agent-kit-compat -> pnpm test:agent-kit-model",
+      "countScope": "top-level named tests; nested dynamic children separately checked where declared",
+      "source": {
+        "path": "lib/subscription-workflow-model.test.ts",
+        "mode": "100644",
+        "gitBlob": "c30d59512477d11703c23212a6a3f638fcc08765",
+        "bytes": 13045,
+        "sha256": "268e7e836061e1832a46ff24731611daea3d208c10ee4d620dc4e64c32247c24"
+      },
+      "allUniquePass": true,
+      "countMatchesExpected": true
+    },
+    {
+      "name": "realPostgresRevision",
+      "path": "tests/live-revision-reads.db.test.ts",
+      "job": "pg4",
+      "names": [
+        "one write seen by 3 tabs and 2 devices: the echo and a duplicate push read nothing again",
+        "a revision rises once per publish across its fan-out and a reader sees the latest",
+        "prepared owner-list revisions share one PostgreSQL read without duplicate team refs or rows",
+        "authorized selected-workspace revision plan co-reads exactly the requested Team keys"
+      ],
+      "results": [
+        {
+          "name": "one write seen by 3 tabs and 2 devices: the echo and a duplicate push read nothing again",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3355,
+              "durationMs": 2077.536751
+            }
+          ]
+        },
+        {
+          "name": "a revision rises once per publish across its fan-out and a reader sees the latest",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3361,
+              "durationMs": 23.90861
+            }
+          ]
+        },
+        {
+          "name": "prepared owner-list revisions share one PostgreSQL read without duplicate team refs or rows",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3362,
+              "durationMs": 27.258197
+            }
+          ]
+        },
+        {
+          "name": "authorized selected-workspace revision plan co-reads exactly the requested Team keys",
+          "uniquePass": true,
+          "matches": [
+            {
+              "line": 3365,
+              "durationMs": 7.83893
+            }
+          ]
+        }
+      ],
+      "suite": "test:activity-actor-db",
+      "source": {
+        "path": "tests/live-revision-reads.db.test.ts",
+        "mode": "100644",
+        "gitBlob": "1cd2dd85dda5e9edd76379d41bd86c3b7f6cc351",
+        "bytes": 18747,
+        "sha256": "db04b75ea5d222f34ed61c67680f4850b5486ea0df8edd5a97008dcf0d85247e"
+      },
+      "allUniquePass": true,
+      "countMatchesExpected": true
+    }
+  ],
+  "coordinator": {
+    "source": {
+      "path": "tests/coordinator-bot.db.test.ts",
+      "mode": "100644",
+      "gitBlob": "c6c92ea2741174b5baadbd1535fc8b0c62b8275e",
+      "bytes": 86798,
+      "sha256": "80e713858cc61e23094cff2c16281b643e06796b5ed0cf8a382922dcddfb4bcd"
+    },
+    "group": "test:bot-threads-db",
+    "names": [
+      "a retained copied agent head still permits the empty Personal read",
+      "only a boolean false Personal observation can skip the migration",
+      "a failed Personal observation is retried on the next read",
+      "an inactive Personal member cannot certify an empty backfill",
+      "busy chat locks retain the full migration and the next-read retry",
+      "legacy rows committed after an empty read wait for the original next pass",
+      "stale attention reads only settlement fields and preserves the decision input and owner log",
+      "existing Coordinator chat, runs and settings move to its bot row once; a second pass changes nothing",
+      "personal backfill preserves shared and unresolved task events, runs, Factory sources and schedules",
+      "one shared-tenant task retains its complete null-Bot source family, including a Personal sibling",
+      "a new Coordinator message and a run use the real bot id, stored where they enter",
+      "a legacy run with no bot finishes for an owner with no workspace; its event is kept, and moved once the Coordinator resolves",
+      "real null-Bot admission retains frozen identity, Factory family and repository authority after backfill",
+      "a publication holding its issue cannot deadlock with the backfill run lock",
+      "migration first holds the issue through its run update; real publication continues after commit",
+      "a run committed after issue locking retains its family until the next pass",
+      "a revoked shared-workspace member run keeps its tenant without blocking unrelated Personal history",
+      "an in-flight null-Bot route defers migration; its unfrozen history moves after commit",
+      "migration first fences a stale source validation before it can create a null-Bot task",
+      "a task committed between migration lock statements keeps its source until the next pass",
+      "a completion committed after the event lock keeps its legacy run until both can move",
+      "a chat writer holding its session cannot deadlock against the migration chat lock",
+      "model choice goes through the ordinary bot path",
+      "the Coordinator stays outside workspace app policy; an ordinary bot does not",
+      "the bot list (left column and mobile home) has that workspace's own Coordinator once, as the Coordinator",
+      "one Coordinator per workspace; work with no workspace goes to the personal one, never the oldest",
+      "a leaving member's Coordinator is paused with their bots and never transferred",
+      "an empty explicit Personal Coordinator uses one Personal read",
+      "an empty explicit Team Coordinator uses one Personal read",
+      "an explicit Team read retains the real migration for legacy coordinator_messages",
+      "an explicit Team read retains the real migration for legacy coordinator_sessions",
+      "an explicit Team read retains the real migration for legacy coordinator_events",
+      "an explicit Team read retains the real migration for legacy agent_runs",
+      "an explicit Team read retains the real migration for legacy factory_tasks",
+      "an explicit Team read retains the real migration for legacy bot_model_choices",
+      "an explicit Team read retains the real migration for legacy chat_preferences",
+      "an explicit Team read retains the real migration for legacy user_schedules",
+      "an explicit Team read retains the real migration for legacy suggestions",
+      "an explicit Team read retains the real migration for legacy pending_actions",
+      "an explicit Team read retains the real migration for legacy agent_kit_heads",
+      "a missing Personal Coordinator still follows the original creation path",
+      "a missing Personal workspace reuses the unsuccessful lookup",
+      "a captured legacy event still runs the execution migration",
+      "an empty execution family skips its recursive update after every NOWAIT read",
+      "an unfrozen computer run retains its Factory family and ordinary retry",
+      "an unfrozen group run retains its Factory family and ordinary retry"
+    ],
+    "results": [
+      {
+        "name": "a retained copied agent head still permits the empty Personal read",
+        "matches": [
+          {
+            "line": 12529
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "only a boolean false Personal observation can skip the migration",
+        "matches": [
+          {
+            "line": 12613
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "a failed Personal observation is retried on the next read",
+        "matches": [
+          {
+            "line": 12620
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "an inactive Personal member cannot certify an empty backfill",
+        "matches": [
+          {
+            "line": 12627
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "busy chat locks retain the full migration and the next-read retry",
+        "matches": [
+          {
+            "line": 12634
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "legacy rows committed after an empty read wait for the original next pass",
+        "matches": [
+          {
+            "line": 12640
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "stale attention reads only settlement fields and preserves the decision input and owner log",
+        "matches": [
+          {
+            "line": 12658
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "existing Coordinator chat, runs and settings move to its bot row once; a second pass changes nothing",
+        "matches": [
+          {
+            "line": 12664
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "personal backfill preserves shared and unresolved task events, runs, Factory sources and schedules",
+        "matches": [
+          {
+            "line": 12670
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "one shared-tenant task retains its complete null-Bot source family, including a Personal sibling",
+        "matches": [
+          {
+            "line": 12676
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "a new Coordinator message and a run use the real bot id, stored where they enter",
+        "matches": [
+          {
+            "line": 12682
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "a legacy run with no bot finishes for an owner with no workspace; its event is kept, and moved once the Coordinator resolves",
+        "matches": [
+          {
+            "line": 12688
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "real null-Bot admission retains frozen identity, Factory family and repository authority after backfill",
+        "matches": [
+          {
+            "line": 12694
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "a publication holding its issue cannot deadlock with the backfill run lock",
+        "matches": [
+          {
+            "line": 12712
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "migration first holds the issue through its run update; real publication continues after commit",
+        "matches": [
+          {
+            "line": 12718
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "a run committed after issue locking retains its family until the next pass",
+        "matches": [
+          {
+            "line": 12724
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "a revoked shared-workspace member run keeps its tenant without blocking unrelated Personal history",
+        "matches": [
+          {
+            "line": 12730
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "an in-flight null-Bot route defers migration; its unfrozen history moves after commit",
+        "matches": [
+          {
+            "line": 12736
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "migration first fences a stale source validation before it can create a null-Bot task",
+        "matches": [
+          {
+            "line": 12742
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "a task committed between migration lock statements keeps its source until the next pass",
+        "matches": [
+          {
+            "line": 12748
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "a completion committed after the event lock keeps its legacy run until both can move",
+        "matches": [
+          {
+            "line": 12754
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "a chat writer holding its session cannot deadlock against the migration chat lock",
+        "matches": [
+          {
+            "line": 12760
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "model choice goes through the ordinary bot path",
+        "matches": [
+          {
+            "line": 12766
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "the Coordinator stays outside workspace app policy; an ordinary bot does not",
+        "matches": [
+          {
+            "line": 12772
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "the bot list (left column and mobile home) has that workspace's own Coordinator once, as the Coordinator",
+        "matches": [
+          {
+            "line": 12778
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "one Coordinator per workspace; work with no workspace goes to the personal one, never the oldest",
+        "matches": [
+          {
+            "line": 12784
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "a leaving member's Coordinator is paused with their bots and never transferred",
+        "matches": [
+          {
+            "line": 12790
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "an empty explicit Personal Coordinator uses one Personal read",
+        "matches": [
+          {
+            "line": 12517
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "an empty explicit Team Coordinator uses one Personal read",
+        "matches": [
+          {
+            "line": 12523
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "an explicit Team read retains the real migration for legacy coordinator_messages",
+        "matches": [
+          {
+            "line": 12535
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "an explicit Team read retains the real migration for legacy coordinator_sessions",
+        "matches": [
+          {
+            "line": 12541
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "an explicit Team read retains the real migration for legacy coordinator_events",
+        "matches": [
+          {
+            "line": 12547
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "an explicit Team read retains the real migration for legacy agent_runs",
+        "matches": [
+          {
+            "line": 12553
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "an explicit Team read retains the real migration for legacy factory_tasks",
+        "matches": [
+          {
+            "line": 12559
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "an explicit Team read retains the real migration for legacy bot_model_choices",
+        "matches": [
+          {
+            "line": 12565
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "an explicit Team read retains the real migration for legacy chat_preferences",
+        "matches": [
+          {
+            "line": 12571
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "an explicit Team read retains the real migration for legacy user_schedules",
+        "matches": [
+          {
+            "line": 12577
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "an explicit Team read retains the real migration for legacy suggestions",
+        "matches": [
+          {
+            "line": 12583
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "an explicit Team read retains the real migration for legacy pending_actions",
+        "matches": [
+          {
+            "line": 12589
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "an explicit Team read retains the real migration for legacy agent_kit_heads",
+        "matches": [
+          {
+            "line": 12595
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "a missing Personal Coordinator still follows the original creation path",
+        "matches": [
+          {
+            "line": 12607
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "a missing Personal workspace reuses the unsuccessful lookup",
+        "matches": [
+          {
+            "line": 12601
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "a captured legacy event still runs the execution migration",
+        "matches": [
+          {
+            "line": 12652
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "an empty execution family skips its recursive update after every NOWAIT read",
+        "matches": [
+          {
+            "line": 12646
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "an unfrozen computer run retains its Factory family and ordinary retry",
+        "matches": [
+          {
+            "line": 12700
+          }
+        ],
+        "uniquePass": true
+      },
+      {
+        "name": "an unfrozen group run retains its Factory family and ordinary retry",
+        "matches": [
+          {
+            "line": 12706
+          }
+        ],
+        "uniquePass": true
+      }
+    ],
+    "childCount": 46,
+    "allUniquePass": true,
+    "parentPass": [
+      {
+        "line": 12796,
+        "text": "ok 6 - the Coordinator is an ordinary bot row"
+      }
+    ],
+    "familyTotals": {
+      "tests": 375,
+      "suites": 0,
+      "pass": 375,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "familyReporters": [
+      {
+        "startLine": 15712,
+        "tests": 375,
+        "endLine": 15719,
+        "suites": 0,
+        "pass": 375,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 277254.292159
+      }
+    ],
+    "baseNameComparison": {
+      "baseSource": {
+        "gitBlob": "32a8321c981dd6a534f8859fa35f281e874466e6",
+        "bytes": 65832,
+        "sha256": "d9b998eb6babcaa96ad493d3335a333d0f041cc1c7350d295e5a9fb92fb228b8"
+      },
+      "baseChildCount": 25,
+      "currentChildCount": 46,
+      "retainedNames": [
+        "stale attention reads only settlement fields and preserves the decision input and owner log",
+        "existing Coordinator chat, runs and settings move to its bot row once; a second pass changes nothing",
+        "personal backfill preserves shared and unresolved task events, runs, Factory sources and schedules",
+        "one shared-tenant task retains its complete null-Bot source family, including a Personal sibling",
+        "a new Coordinator message and a run use the real bot id, stored where they enter",
+        "a legacy run with no bot finishes for an owner with no workspace; its event is kept, and moved once the Coordinator resolves",
+        "real null-Bot admission retains frozen identity, Factory family and repository authority after backfill",
+        "a publication holding its issue cannot deadlock with the backfill run lock",
+        "migration first holds the issue through its run update; real publication continues after commit",
+        "a run committed after issue locking retains its family until the next pass",
+        "a revoked shared-workspace member run keeps its tenant without blocking unrelated Personal history",
+        "an in-flight null-Bot route defers migration; its unfrozen history moves after commit",
+        "migration first fences a stale source validation before it can create a null-Bot task",
+        "a task committed between migration lock statements keeps its source until the next pass",
+        "a completion committed after the event lock keeps its legacy run until both can move",
+        "a chat writer holding its session cannot deadlock against the migration chat lock",
+        "model choice goes through the ordinary bot path",
+        "the Coordinator stays outside workspace app policy; an ordinary bot does not",
+        "the bot list (left column and mobile home) has that workspace's own Coordinator once, as the Coordinator",
+        "one Coordinator per workspace; work with no workspace goes to the personal one, never the oldest",
+        "a leaving member's Coordinator is paused with their bots and never transferred",
+        "a captured legacy event still runs the execution migration",
+        "an empty execution family skips its recursive update after every NOWAIT read",
+        "an unfrozen computer run retains its Factory family and ordinary retry",
+        "an unfrozen group run retains its Factory family and ordinary retry"
+      ],
+      "missingBaseNames": [],
+      "newNames": [
+        "a retained copied agent head still permits the empty Personal read",
+        "only a boolean false Personal observation can skip the migration",
+        "a failed Personal observation is retried on the next read",
+        "an inactive Personal member cannot certify an empty backfill",
+        "busy chat locks retain the full migration and the next-read retry",
+        "legacy rows committed after an empty read wait for the original next pass",
+        "an empty explicit Personal Coordinator uses one Personal read",
+        "an empty explicit Team Coordinator uses one Personal read",
+        "an explicit Team read retains the real migration for legacy coordinator_messages",
+        "an explicit Team read retains the real migration for legacy coordinator_sessions",
+        "an explicit Team read retains the real migration for legacy coordinator_events",
+        "an explicit Team read retains the real migration for legacy agent_runs",
+        "an explicit Team read retains the real migration for legacy factory_tasks",
+        "an explicit Team read retains the real migration for legacy bot_model_choices",
+        "an explicit Team read retains the real migration for legacy chat_preferences",
+        "an explicit Team read retains the real migration for legacy user_schedules",
+        "an explicit Team read retains the real migration for legacy suggestions",
+        "an explicit Team read retains the real migration for legacy pending_actions",
+        "an explicit Team read retains the real migration for legacy agent_kit_heads",
+        "a missing Personal Coordinator still follows the original creation path",
+        "a missing Personal workspace reuses the unsuccessful lookup"
+      ],
+      "oldExecutionNotReused": true
+    }
+  },
+  "modelTimingNested": [
+    {
+      "name": "the actual compatible SDK timing distinguishes missing, null, zero and positive raw cache counts",
+      "children": [
+        "missing",
+        "null",
+        "zero",
+        "positive"
+      ],
+      "startLine": 3401,
+      "endLine": 3406,
+      "results": [
+        {
+          "name": "missing",
+          "matches": [
+            {
+              "line": 3402,
+              "durationMs": 26.522678
+            }
+          ],
+          "uniquePass": true
+        },
+        {
+          "name": "null",
+          "matches": [
+            {
+              "line": 3403,
+              "durationMs": 3.541065
+            }
+          ],
+          "uniquePass": true
+        },
+        {
+          "name": "zero",
+          "matches": [
+            {
+              "line": 3404,
+              "durationMs": 3.044159
+            }
+          ],
+          "uniquePass": true
+        },
+        {
+          "name": "positive",
+          "matches": [
+            {
+              "line": 3405,
+              "durationMs": 2.277348
+            }
+          ],
+          "uniquePass": true
+        }
+      ],
+      "allUniquePass": true
+    },
+    {
+      "name": "missing or malformed optional worker timing cannot change a result or refusal and never bypasses the original frame guards",
+      "children": [
+        "missing",
+        "invalid",
+        "refused",
+        "wrong_id",
+        "oversize"
+      ],
+      "startLine": 3410,
+      "endLine": 3417,
+      "results": [
+        {
+          "name": "missing",
+          "matches": [
+            {
+              "line": 3411,
+              "durationMs": 48.205049
+            }
+          ],
+          "uniquePass": true
+        },
+        {
+          "name": "invalid",
+          "matches": [
+            {
+              "line": 3412,
+              "durationMs": 46.816737
+            }
+          ],
+          "uniquePass": true
+        },
+        {
+          "name": "refused",
+          "matches": [
+            {
+              "line": 3413,
+              "durationMs": 47.410137
+            }
+          ],
+          "uniquePass": true
+        },
+        {
+          "name": "wrong_id",
+          "matches": [
+            {
+              "line": 3414,
+              "durationMs": 45.279268
+            }
+          ],
+          "uniquePass": true
+        },
+        {
+          "name": "oversize",
+          "matches": [
+            {
+              "line": 3416,
+              "durationMs": 40.183812
+            }
+          ],
+          "uniquePass": true
+        }
+      ],
+      "allUniquePass": true
+    },
+    {
+      "name": "real worker HTTP timing uses a separate bounded log without enlarging the original model receipt",
+      "children": [
+        "valid",
+        "legacy",
+        "invalid",
+        "null"
+      ],
+      "startLine": 3422,
+      "endLine": 3427,
+      "results": [
+        {
+          "name": "valid",
+          "matches": [
+            {
+              "line": 3423,
+              "durationMs": 108.687918
+            }
+          ],
+          "uniquePass": true
+        },
+        {
+          "name": "legacy",
+          "matches": [
+            {
+              "line": 3424,
+              "durationMs": 108.661977
+            }
+          ],
+          "uniquePass": true
+        },
+        {
+          "name": "invalid",
+          "matches": [
+            {
+              "line": 3425,
+              "durationMs": 101.256609
+            }
+          ],
+          "uniquePass": true
+        },
+        {
+          "name": "null",
+          "matches": [
+            {
+              "line": 3426,
+              "durationMs": 101.593244
+            }
+          ],
+          "uniquePass": true
+        }
+      ],
+      "allUniquePass": true
+    }
+  ],
+  "exactSourceAssertions": {
+    "revisionPlan": {
+      "source": {
+        "path": "tests/live-revision-reads.db.test.ts",
+        "mode": "100644",
+        "gitBlob": "1cd2dd85dda5e9edd76379d41bd86c3b7f6cc351",
+        "bytes": 18747,
+        "sha256": "db04b75ea5d222f34ed61c67680f4850b5486ea0df8edd5a97008dcf0d85247e"
+      },
+      "test": "authorized selected-workspace revision plan co-reads exactly the requested Team keys",
+      "sourceLines": {
+        "valuesEqual": 263,
+        "beforeStatementsThree": 264,
+        "afterStatementsOne": 265,
+        "requestedRefsThree": 267,
+        "returnedRowsThree": 268,
+        "bytesNotIncreased": 270
+      },
+      "meaning": "Actual passing real-PG test establishes these fixture assertions. It does not predict Native whole-window savings."
+    },
+    "emptyCoordinator": {
+      "source": {
+        "path": "tests/coordinator-bot.db.test.ts",
+        "mode": "100644",
+        "gitBlob": "c6c92ea2741174b5baadbd1535fc8b0c62b8275e",
+        "bytes": 86798,
+        "sha256": "80e713858cc61e23094cff2c16281b643e06796b5ed0cf8a382922dcddfb4bcd"
+      },
+      "sourceLines": {
+        "singlePersonalSelect": 155,
+        "noMigrationTransaction": 156,
+        "freshBackfillCacheRetained": 160,
+        "legacyFamilies": 179
+      },
+      "meaning": "Both Personal and Team empty cases, retained legacy migrations and authority/race cases matched actual child passes."
+    }
+  },
+  "relatedCoverageBoundaries": {
+    "packageSource": {
+      "gitBlob": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d",
+      "bytes": 80877,
+      "sha256": "ed9893d62d9d90299de21eb0325e73ab3c97202dec5eafe3d9983c04b64a6add"
+    },
+    "modelTests": {
+      "target": "ci-tasks:core-29",
+      "selectedCommand": "pnpm test:agent-kit-compat",
+      "nestedCommand": "pnpm test:agent-kit-model",
+      "actualCommandLine": 3117,
+      "topLevelPassedByFile": {
+        "lib/bot-model-selection.test.ts": 17,
+        "lib/model-call-timing.test.ts": 13,
+        "lib/subscription-workflow-model.test.ts": 8
+      },
+      "modelTimingNestedPassed": 13,
+      "notProductionModelCalls": true
+    },
+    "go": {
+      "selectedInThese86Units": false,
+      "actualPackageTarget": "test:byos-worker",
+      "command": "node scripts/test-subscription-worker.mjs",
+      "separateWorkflowOriginalOwner": "root",
+      "reportedWorkflowRunId": 42707256524,
+      "reportedJobId": 129467203882,
+      "executionConclusionFromThisPackage": null,
+      "noE2BNodePythonSubstitution": true
+    },
+    "daemon": {
+      "originalOwner": "root",
+      "jobId": 129470272323,
+      "mailboxCommand": "node --import tsx --test --test-timeout=60000 test/run-mailbox.node-test.ts test/codex-mailbox-resume.node-test.ts",
+      "executionConclusionFromThisPackage": null
+    },
+    "ui": {
+      "source": {
+        "gitBlob": "1c8e549227692f78bb49d4d4cbed68dbc186a4dd",
+        "bytes": 70907,
+        "sha256": "db01e80e70aa7584eebdbdce811332a1658421f7688c54fdaff73eb22970d27a"
+      },
+      "mappedToRootIntegration": [
+        {
+          "path": "tests/agent-ui-report.test.tsx",
+          "blob": "a256bc547d61260a53f84bb654d231927d3b59a2",
+          "target": "ci-tasks:integration-15",
+          "script": "test:agent"
+        },
+        {
+          "path": "tests/settings-sections.test.mjs",
+          "blob": "719478baef0dbf2d8efd014a49ba0784b6f4103f",
+          "target": "ci-tasks:integration-21",
+          "script": "test:settings"
+        },
+        {
+          "path": "components/coordinator/retry-reply-button.test.tsx",
+          "blob": "589f2db2a01c715bfab07bdc02c155da70db134c",
+          "target": "ci-tasks:integration-21",
+          "script": "test:settings -> test:subscription-usability"
+        }
+      ],
+      "notConfirmedInTheseSelectedTargets": [
+        {
+          "path": "components/workspace/board-view-state.test.tsx",
+          "blob": "10d2934ea643e922024c72b6801fbdf638f02e06",
+          "registeredScript": "test:view-state"
+        },
+        {
+          "path": "components/workspace/issue-workspace-settings.test.tsx",
+          "blob": "4581baa184e667961f3de31cb5b78718829c5690",
+          "registeredScript": "test:view-state"
+        }
+      ],
+      "reason": "No test:view-state target occurs in the 86-item selector; package registers these two files only under that script. No current execution is asserted here, and no new test/gate was created.",
+      "earlierBroadMappingCorrected": true
+    }
+  },
+  "parsing": {
+    "plainUnmodified": true,
+    "parsingCopyRemoves": "Leading BOM, SGR ANSI color and leading GitHub UTC timestamp only.",
+    "coreTargetEquality": "Sorted exact > nx run target list vs formal Core selector; Nx terminal success and Cache: Skipped (--skip-nx-cache).",
+    "specNames": "Exact source-derived registered names matched once to terminal checkmark duration lines; dynamic source name sets expanded from fixed arrays.",
+    "coordinatorNames": "Exact source-derived children, including dynamic workspace/family cases, matched once within terminal bot-threads TAP group; parent counted separately and already included in family375.",
+    "coreReporterCaveat": "Core output interleaves independent targets. No per-file global reporter total was inferred from adjacency; named cases and selected target completion are used."
+  },
+  "privacy": {
+    "scanPatternDefinitions": {
+      "privateKey": {
+        "source": "-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----",
+        "flags": "g"
+      },
+      "githubToken": {
+        "source": "\\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\\b",
+        "flags": "g"
+      },
+      "posthogToken": {
+        "source": "\\b(?:phc|phx|phv)_[A-Za-z0-9]{20,}\\b",
+        "flags": "g"
+      },
+      "awsAccessKey": {
+        "source": "\\b(?:AKIA|ASIA)[A-Z0-9]{16}\\b",
+        "flags": "g"
+      },
+      "bearerOrBasic": {
+        "source": "\\b(?:Bearer|Basic)\\s+[A-Za-z0-9+/_=-]{16,}",
+        "flags": "gi"
+      },
+      "signedUrl": {
+        "source": "(?:X-Amz-Signature|X-Goog-Signature|[?&]sig)=[A-Za-z0-9%+/_=-]{12,}",
+        "flags": "gi"
+      },
+      "email": {
+        "source": "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b",
+        "flags": "g"
+      },
+      "credentialUrl": {
+        "source": "https?://[^\\s/:@]+:[^\\s/@]{3,}@",
+        "flags": "gi"
+      }
+    },
+    "perOriginal": [
+      {
+        "kind": "source",
+        "hits": []
+      },
+      {
+        "kind": "core",
+        "hits": []
+      },
+      {
+        "kind": "pg3",
+        "hits": []
+      },
+      {
+        "kind": "pg4",
+        "hits": []
+      }
+    ],
+    "unresolvedFindings": 0,
+    "scope": "Bounded pattern scan, not exhaustive content audit; GitHub masking remains an upstream boundary.",
+    "toolEnvelopesOrSignedUrlsArchived": false
+  },
+  "limitations": [
+    "Only these four new-job originals are independently read here; PG1/PG2, Integration, Changes, Daemon, custody, E2B and Native originals are owned elsewhere.",
+    "Selection72 and full=true are inventory, not a claim that this package proves all72 suites.",
+    "No Native budget, production deployment, model execution, Replay capture or PostHog ingestion pass is established here.",
+    "Historical failures, timeouts and the previous manual full-Live UNKNOWN remain unchanged; only this source's actual executions are asserted.",
+    "Source's migration63 is not acceptance driver63/74; current driver74 is independently matched in Core.",
+    "No tests, workflow actions, VM or DB resources were started by this reader."
+  ],
+  "status": "assigned_four_jobs_completed_success_with_exact_inventory_and_named_case_evidence"
+}

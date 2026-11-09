@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "head": "d2c3f63448130443e3e10bb5304417162f585776",
+  "runId": 42707256422,
+  "attempt": 1,
+  "originalReads": {
+    "nativeJobLog": 1,
+    "otherJobLogs": 0,
+    "artifactDownloadApiCalls": 2,
+    "artifactReferenceByteReads": 2,
+    "artifactRefreshOrRedownloads": 0
+  },
+  "compute": {
+    "vmsCreated": 1,
+    "vmExtensions": 0,
+    "businessRuns": 0,
+    "modelCalls": 0,
+    "nativeReruns": 0,
+    "testReruns": 0,
+    "sourceEdits": 0,
+    "refMutations": 0,
+    "localExecRetries": 0
+  },
+  "vmCleanupBlob": "0169eafc410e36a3745ea463542e2974286c7eba",
+  "ledger": [
+    {
+      "kind": "resume_for_terminal_originals",
+      "priorOriginalLogReads": 0,
+      "priorArtifactDownloads": 0,
+      "priorResources": 0,
+      "metadataInterruptedBeforeAnyOriginalRead": true
+    },
+    {
+      "kind": "native_original_job_log",
+      "jobId": 129474527225,
+      "count": 1,
+      "bytes": 251498,
+      "sha256": "b660da245481f431435975bfb6f489697585d98f81907634ecbf603b3220e8e1",
+      "gitBlob": "5e08171245005885e33bc702ba33a2d9c27845e2",
+      "published": true
+    },
+    {
+      "kind": "artifact_metadata",
+      "selectedIds": [
+        13716212399,
+        13714749727
+      ],
+      "downloadApiCalls": 0
+    },
+    {
+      "kind": "artifact_download_api",
+      "artifactId": 13716212399,
+      "count": 1,
+      "fileReferenceReturned": true,
+      "urlPublished": false
+    },
+    {
+      "kind": "artifact_download_api",
+      "artifactId": 13714749727,
+      "count": 1,
+      "fileReferenceReturned": true,
+      "urlPublished": false
+    }
+  ],
+  "interruptionBoundary": "Metadata-only waiting was externally interrupted before any original read or VM. Root later supplied terminal metadata and reawakened this same unique reader. Immutable helper restored; no old or new original was reread.",
+  "finalMetadataBoundary": "Root owns final whole-head workflow/job/check metadata and strict original. This reader did not repeat those original reads.",
+  "rootTerminalObservation": {
+    "provider": "root fresh GitHub jobs GET",
+    "observedAt": "2026-11-09T22:29:41Z",
+    "runId": 42707256422,
+    "attempt": 1,
+    "nativeJobId": 129474527225,
+    "status": "completed",
+    "conclusion": "success",
+    "completedAt": "2026-11-09T22:28:28Z",
+    "strictJobId": 129484343677,
+    "strictConclusion": "success",
+    "strictCompletedAt": "2026-11-09T22:28:42Z"
+  }
+}

@@ -1,0 +1,1081 @@
+{
+  "schema": "issue1512.d2c.integration.ui1818-execution-review.v1",
+  "reviewedAtUtc": "2026-11-09 22:20:54 UTC",
+  "status": "three_fixed_ui_test_files_executed_two_not_executed_by_this_job",
+  "scope": "Read-only attribution of the five specified PR1818 test files to Root's immutable Integration log. This is neither a whole-CI audit nor a hosted production DOM result.",
+  "run": {
+    "runId": 42707256422,
+    "attempt": 1,
+    "jobId": 129470272431,
+    "jobName": "Integration",
+    "jobConclusion": "success",
+    "completedAt": "2026-11-09T22:07:47Z",
+    "jobMetadataAttribution": "Provided by Root, the original log's unique Actions reader. No new Actions/job-log endpoint called.",
+    "featureHead": "d2c3f63448130443e3e10bb5304417162f585776",
+    "actualCheckout": "3bc095c100537563296186fc3d4cc4d60b59b698",
+    "actualTree": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+    "actualParents": [
+      "1c7698655405b289d7fdbd814713d15e542cc2bb",
+      "d2c3f63448130443e3e10bb5304417162f585776"
+    ],
+    "checkoutProof": {
+      "immutableLogLines": [
+        102,
+        104,
+        132
+      ],
+      "commitApiRead": true,
+      "fullTreeRead": true,
+      "treeTruncated": false,
+      "allFiveFixedBlobsMatchActualTree": true
+    }
+  },
+  "immutableInputs": {
+    "plainLog": {
+      "blob": "9c75ce621550af79a87a291377e85a344126c10c",
+      "bytes": 682113,
+      "sha256": "d4fe0af7db03f9bf25aa795b884d9151a676e1f53887ca51ffc0a89291f18c39",
+      "gitShaAndBytesIndependentlyMatched": true
+    },
+    "originalToolWrapper": {
+      "blob": "ac3b336f022eb8754169f80b905af9711eea96db",
+      "bytes": 705493,
+      "sha256": "87c21ab221eba97d24a1f5779826934f35d5bb31432a498e1db827263fa3e692",
+      "gitShaIndependentlyMatched": true,
+      "structuredContentExactlyEqualsPlainLog": true
+    },
+    "package": {
+      "blob": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d",
+      "scripts": {
+        "test:agent": "node --import tsx --test scripts/demo-data/chats.test.mts scripts/demo-data/thread-issues.test.mjs scripts/demo-data/sets.test.mjs tests/agent-ui.test.mjs tests/legacy-chat-retirement.test.mjs tests/legacy-chat-content.test.tsx tests/bot-web-tools.test.mjs lib/agent-ui-source.test.ts lib/search/search.test.ts lib/search/firecrawl.test.ts lib/agent-rounds.test.ts && node --import ./tests/support/server-only.mjs --import tsx --test tests/agent-ui-report.test.tsx components/agents/file-diff.test.ts tests/object-chip-open.test.tsx tests/close-on-escape.test.ts",
+        "test:settings": "node --experimental-strip-types --test tests/settings-sections.test.mjs tests/settings-navigation.test.mjs tests/settings-sidebar-search.test.mjs tests/team-identifier.test.mjs && node --import tsx --test lib/settings/activity-cursor.test.ts lib/audit/events.test.ts lib/workspace-admin/bot-threads.test.ts lib/tokens/format.test.ts && node --import ./tests/support/server-only.mjs --import tsx --test lib/workspace-admin/settings-action.test.ts lib/secrets/secrets.test.ts lib/secrets/permissions.test.ts lib/secrets/e2b.test.ts lib/secrets/mask.test.ts lib/secrets/stream-mask.test.ts lib/secrets/checkpoint.test.ts lib/secrets/e2b-runtime.test.ts lib/secrets/delivery.test.ts lib/secrets/egress-capability.test.ts lib/secrets/egress-http.test.ts lib/secrets/egress-route.test.ts lib/secrets/task-access.test.ts lib/secrets/delivery-http.test.ts && pnpm test:subscription-usability",
+        "test:subscription-usability": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test components/coordinator/bot-model-picker.test.tsx components/coordinator/task-profile-picker.test.tsx components/coordinator/task-profile-submit.test.tsx components/coordinator/retry-reply-button.test.tsx components/coordinator/subscription-recovery.test.tsx components/workspace/thread-quota.test.tsx components/settings/model-order-settings.test.tsx components/settings/subscription-settings.test.tsx components/settings/payment-privacy-read-states.test.tsx lib/cloud-dispatch-failure.test.ts lib/new-task-placement.test.ts lib/run-credential-source.test.ts lib/subscription-quota.test.ts components/plugins/plugins-view.test.tsx components/plugins/mcp-connections.test.tsx components/plugins/github-settings.test.tsx",
+        "test:view-state": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/hooks/view-state.test.tsx components/nav/thread-view-state.test.tsx components/workspace/issue-workspace-settings.test.tsx components/workspace/board-view-state.test.tsx hooks/use-resizable-width.test.tsx"
+      }
+    }
+  },
+  "formalExecution": {
+    "targetHeaders": [
+      {
+        "line": 2486,
+        "text": "2026-11-09T22:05:30.0185598Z > nx run ci-tasks:integration-15"
+      },
+      {
+        "line": 3302,
+        "text": "2026-11-09T22:06:11.9390064Z > nx run ci-tasks:integration-21"
+      }
+    ],
+    "commandEvidence": [
+      {
+        "line": 2488,
+        "text": "2026-11-09T22:05:30.3916929Z > next-app@0.0.1 test:agent /home/runner/work/Mikka/Mikka"
+      },
+      {
+        "line": 2489,
+        "text": "2026-11-09T22:05:30.3920620Z > node --import tsx --test scripts/demo-data/chats.test.mts scripts/demo-data/thread-issues.test.mjs scripts/demo-data/sets.test.mjs tests/agent-ui.test.mjs tests/legacy-chat-retirement.test.mjs tests/legacy-chat-content.test.tsx tests/bot-web-tools.test.mjs lib/agent-ui-source.test.ts lib/search/search.test.ts lib/search/firecrawl.test.ts lib/agent-rounds.test.ts && node --import ./tests/support/server-only.mjs --import tsx --test tests/agent-ui-report.test.tsx components/agents/file-diff.test.ts tests/object-chip-open.test.tsx tests/close-on-escape.test.ts"
+      },
+      {
+        "line": 3304,
+        "text": "2026-11-09T22:06:12.3093702Z > next-app@0.0.1 test:settings /home/runner/work/Mikka/Mikka"
+      },
+      {
+        "line": 3305,
+        "text": "2026-11-09T22:06:12.3102774Z > node --experimental-strip-types --test tests/settings-sections.test.mjs tests/settings-navigation.test.mjs tests/settings-sidebar-search.test.mjs tests/team-identifier.test.mjs && node --import tsx --test lib/settings/activity-cursor.test.ts lib/audit/events.test.ts lib/workspace-admin/bot-threads.test.ts lib/tokens/format.test.ts && node --import ./tests/support/server-only.mjs --import tsx --test lib/workspace-admin/settings-action.test.ts lib/secrets/secrets.test.ts lib/secrets/permissions.test.ts lib/secrets/e2b.test.ts lib/secrets/mask.test.ts lib/secrets/stream-mask.test.ts lib/secrets/checkpoint.test.ts lib/secrets/e2b-runtime.test.ts lib/secrets/delivery.test.ts lib/secrets/egress-capability.test.ts lib/secrets/egress-http.test.ts lib/secrets/egress-route.test.ts lib/secrets/task-access.test.ts lib/secrets/delivery-http.test.ts && pnpm test:subscription-usability"
+      },
+      {
+        "line": 3519,
+        "text": "2026-11-09T22:06:22.1570518Z > next-app@0.0.1 test:subscription-usability /home/runner/work/Mikka/Mikka"
+      },
+      {
+        "line": 3520,
+        "text": "2026-11-09T22:06:22.1574841Z > node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test components/coordinator/bot-model-picker.test.tsx components/coordinator/task-profile-picker.test.tsx components/coordinator/task-profile-submit.test.tsx components/coordinator/retry-reply-button.test.tsx components/coordinator/subscription-recovery.test.tsx components/workspace/thread-quota.test.tsx components/settings/model-order-settings.test.tsx components/settings/subscription-settings.test.tsx components/settings/payment-privacy-read-states.test.tsx lib/cloud-dispatch-failure.test.ts lib/new-task-placement.test.ts lib/run-credential-source.test.ts lib/subscription-quota.test.ts components/plugins/plugins-view.test.tsx components/plugins/mcp-connections.test.tsx components/plugins/github-settings.test.tsx"
+      }
+    ],
+    "nxCompletion": [
+      {
+        "line": 502,
+        "text": "2026-11-09T22:03:27.3522527Z  NX   Running targets integration-2, integration-3, integration-4, integration-5, integration-6, integration-7, integration-8, integration-9, integration-10, integration-11, integration-12, integration-13, integration-14, integration-15, integration-16, integration-17, integration-18, integration-19, integration-20, integration-21, integration-22, integration-23, integration-24, integration-25, integration-26, integration-27, integration-28, integration-29, integration-factory-activity for project ci-tasks:"
+      },
+      {
+        "line": 5005,
+        "text": "2026-11-09T22:07:45.2982464Z  NX   Successfully ran targets integration-2, integration-3, integration-4, integration-5, integration-6, integration-7, integration-8, integration-9, integration-10, integration-11, integration-12, integration-13, integration-14, integration-15, integration-16, integration-17, integration-18, integration-19, integration-20, integration-21, integration-22, integration-23, integration-24, integration-25, integration-26, integration-27, integration-28, integration-29, integration-factory-activity for project ci-tasks"
+      }
+    ],
+    "relation": "integration-15 invokes test:agent, whose second Node command names agent-ui-report. integration-21 invokes test:settings; its first Node command names settings-sections, and its final chained command invokes test:subscription-usability naming retry-reply-button.",
+    "missingTarget": {
+      "commandNameMentions": 0,
+      "boardFilenameMentions": 0,
+      "workspaceFilenameMentions": 0,
+      "status": "not-executed-by-this-log",
+      "basis": "No direct command target/file name and no exact source test-result title appears in the complete immutable log."
+    },
+    "selected86Scope": "Root/Source reader reports the 86 selected tests do not contain test:view-state. Independently, the exact package registers these two files under test:view-state and the complete Integration log contains neither that command, those filenames, nor any corresponding fixed-source result title."
+  },
+  "countingMethod": {
+    "titleSource": "Read exact test source literals; expand only explicit fixed arrays for live/valid/reason/code/owner/workspace variants. No source was imported or executed.",
+    "resultSource": "Match complete Node spec-reporter result lines to exact expanded source titles inside the formal target command ranges.",
+    "terminalStatusRequired": "Each counted title has exactly one PASS record and no skip suffix.",
+    "avoidDoubleCounting": "Do not count TAP descriptions, Nx summaries, internal assertion/sample loops, or the same result again as a script/target pass.",
+    "durations": "Node-reported per-test durations and log emission timestamps are retained separately; timestamp batches are not individual test start/end times.",
+    "mappedUniquePasses": 58,
+    "mappedExecutedFiles": 3,
+    "filesNotExecutedByThisLog": 2,
+    "thisIsNotTotalIntegrationTestCount": true
+  },
+  "files": [
+    {
+      "path": "components/coordinator/retry-reply-button.test.tsx",
+      "blob": "589f2db2a01c715bfab07bdc02c155da70db134c",
+      "bytes": 30539,
+      "sha256": "d87517df31e49ffb54a93df9fa7bc44e6e0a99dd4e9082b351dccb2300701656",
+      "sourceTreeBinding": {
+        "key": "retry",
+        "path": "components/coordinator/retry-reply-button.test.tsx",
+        "expectedBlob": "589f2db2a01c715bfab07bdc02c155da70db134c",
+        "actualTreeBlob": "589f2db2a01c715bfab07bdc02c155da70db134c",
+        "mode": "100644",
+        "matches": true
+      },
+      "nxTarget": "integration-21",
+      "registeredScripts": [
+        "test:settings",
+        "test:subscription-usability"
+      ],
+      "status": "executed_unique_titles_all_passed",
+      "sourceExpandedCaseCount": 34,
+      "uniquePassedResultCount": 34,
+      "duplicatedTitles": [],
+      "failureResultCount": 0,
+      "skippedResultCount": 0,
+      "evidence": [
+        {
+          "title": "a current API balance refusal opens the same Bot model picker without retrying",
+          "sourceLine": 124,
+          "results": [
+            {
+              "logLine": 3549,
+              "emittedAt": "2026-11-09T22:06:27.0661434Z",
+              "status": "passed",
+              "reportedDurationMs": 3718.020656
+            }
+          ]
+        },
+        {
+          "title": "a historical API balance refusal opens the same Bot model picker without retrying",
+          "sourceLine": 124,
+          "results": [
+            {
+              "logLine": 3550,
+              "emittedAt": "2026-11-09T22:06:27.1086127Z",
+              "status": "passed",
+              "reportedDurationMs": 36.006483
+            }
+          ]
+        },
+        {
+          "title": "a current cloud quota refusal offers cloud billing without resending",
+          "sourceLine": 142,
+          "results": [
+            {
+              "logLine": 3551,
+              "emittedAt": "2026-11-09T22:06:27.1440018Z",
+              "status": "passed",
+              "reportedDurationMs": 39.801078
+            }
+          ]
+        },
+        {
+          "title": "a historical cloud quota refusal offers cloud billing without resending",
+          "sourceLine": 142,
+          "results": [
+            {
+              "logLine": 3552,
+              "emittedAt": "2026-11-09T22:06:27.1780988Z",
+              "status": "passed",
+              "reportedDurationMs": 33.734045
+            }
+          ]
+        },
+        {
+          "title": "a generic current reply failure retains its explicit retry action",
+          "sourceLine": 161,
+          "results": [
+            {
+              "logLine": 3553,
+              "emittedAt": "2026-11-09T22:06:27.2041441Z",
+              "status": "passed",
+              "reportedDurationMs": 39.226429
+            }
+          ]
+        },
+        {
+          "title": "background chat catch-up preserves the reading position and an in-progress draft",
+          "sourceLine": 174,
+          "results": [
+            {
+              "logLine": 3554,
+              "emittedAt": "2026-11-09T22:06:27.2305130Z",
+              "status": "passed",
+              "reportedDurationMs": 38.572797
+            }
+          ]
+        },
+        {
+          "title": "an accepted send in this composer scrolls once; unrelated reads do not scroll again",
+          "sourceLine": 193,
+          "results": [
+            {
+              "logLine": 3555,
+              "emittedAt": "2026-11-09T22:06:27.2618152Z",
+              "status": "passed",
+              "reportedDurationMs": 25.838525
+            }
+          ]
+        },
+        {
+          "title": "existing window drafts migrate once and survive a chat remount in the scoped store",
+          "sourceLine": 203,
+          "results": [
+            {
+              "logLine": 3556,
+              "emittedAt": "2026-11-09T22:06:27.2983468Z",
+              "status": "passed",
+              "reportedDurationMs": 34.873576
+            }
+          ]
+        },
+        {
+          "title": "retrying a historical failure keeps the original bubble when stale",
+          "sourceLine": 220,
+          "results": [
+            {
+              "logLine": 3557,
+              "emittedAt": "2026-11-09T22:06:27.3139072Z",
+              "status": "passed",
+              "reportedDurationMs": 15.431127
+            }
+          ]
+        },
+        {
+          "title": "retrying a historical failure keeps retryOf in the submission",
+          "sourceLine": 220,
+          "results": [
+            {
+              "logLine": 3558,
+              "emittedAt": "2026-11-09T22:06:27.3309096Z",
+              "status": "passed",
+              "reportedDurationMs": 20.470063
+            }
+          ]
+        },
+        {
+          "title": "parallel sends during a pending version probe are serialized (current)",
+          "sourceLine": 238,
+          "results": [
+            {
+              "logLine": 3559,
+              "emittedAt": "2026-11-09T22:06:27.3533098Z",
+              "status": "passed",
+              "reportedDurationMs": 26.254052
+            }
+          ]
+        },
+        {
+          "title": "parallel sends during a pending version probe are serialized (stale)",
+          "sourceLine": 238,
+          "results": [
+            {
+              "logLine": 3560,
+              "emittedAt": "2026-11-09T22:06:27.3913100Z",
+              "status": "passed",
+              "reportedDurationMs": 35.966208
+            }
+          ]
+        },
+        {
+          "title": "a stale send leaves the composer draft, attached text and browser notes intact",
+          "sourceLine": 261,
+          "results": [
+            {
+              "logLine": 3561,
+              "emittedAt": "2026-11-09T22:06:27.4002373Z",
+              "status": "passed",
+              "reportedDurationMs": 9.542671
+            }
+          ]
+        },
+        {
+          "title": "a stale send does not clear an artifact quote",
+          "sourceLine": 274,
+          "results": [
+            {
+              "logLine": 3562,
+              "emittedAt": "2026-11-09T22:06:27.4052328Z",
+              "status": "passed",
+              "reportedDurationMs": 8.308302
+            }
+          ]
+        },
+        {
+          "title": "required refresh raised before VersionGuard mounts still shows a prompt without document reload",
+          "sourceLine": 286,
+          "results": [
+            {
+              "logLine": 3563,
+              "emittedAt": "2026-11-09T22:06:27.4068589Z",
+              "status": "passed",
+              "reportedDurationMs": 3.803415
+            }
+          ]
+        },
+        {
+          "title": "switching only the Bot search parameter checks the page version and requires a refresh",
+          "sourceLine": 292,
+          "results": [
+            {
+              "logLine": 3564,
+              "emittedAt": "2026-11-09T22:06:27.4095026Z",
+              "status": "passed",
+              "reportedDurationMs": 2.632194
+            }
+          ]
+        },
+        {
+          "title": "a stale page does not retry the old action or claim it queued a reply",
+          "sourceLine": 303,
+          "results": [
+            {
+              "logLine": 3565,
+              "emittedAt": "2026-11-09T22:06:27.4120177Z",
+              "status": "passed",
+              "reportedDurationMs": 2.334897
+            }
+          ]
+        },
+        {
+          "title": "a returned action error is visible and does not claim the reply was queued",
+          "sourceLine": 314,
+          "results": [
+            {
+              "logLine": 3566,
+              "emittedAt": "2026-11-09T22:06:27.4144726Z",
+              "status": "passed",
+              "reportedDurationMs": 2.732692
+            }
+          ]
+        },
+        {
+          "title": "queued:false reports working instead of silent success",
+          "sourceLine": 320,
+          "results": [
+            {
+              "logLine": 3567,
+              "emittedAt": "2026-11-09T22:06:27.4170240Z",
+              "status": "passed",
+              "reportedDurationMs": 2.537607
+            }
+          ]
+        },
+        {
+          "title": "queued:false reports nothingToRetry instead of silent success",
+          "sourceLine": 320,
+          "results": [
+            {
+              "logLine": 3568,
+              "emittedAt": "2026-11-09T22:06:27.4198135Z",
+              "status": "passed",
+              "reportedDurationMs": 2.553226
+            }
+          ]
+        },
+        {
+          "title": "queued:false reports unavailable instead of silent success",
+          "sourceLine": 320,
+          "results": [
+            {
+              "logLine": 3569,
+              "emittedAt": "2026-11-09T22:06:27.4223986Z",
+              "status": "passed",
+              "reportedDurationMs": 2.676747
+            }
+          ]
+        },
+        {
+          "title": "a transport rejection reports an unconfirmed retry without exposing its message",
+          "sourceLine": 326,
+          "results": [
+            {
+              "logLine": 3570,
+              "emittedAt": "2026-11-09T22:06:27.4249720Z",
+              "status": "passed",
+              "reportedDurationMs": 2.285065
+            }
+          ]
+        },
+        {
+          "title": "a confirmed enqueue survives a refresh error and cannot be submitted twice while pending",
+          "sourceLine": 332,
+          "results": [
+            {
+              "logLine": 3571,
+              "emittedAt": "2026-11-09T22:06:27.4350721Z",
+              "status": "passed",
+              "reportedDurationMs": 2.839041
+            }
+          ]
+        },
+        {
+          "title": "words quoted from a reply wait above the draft, head the sent message as quote lines and then leave",
+          "sourceLine": 342,
+          "results": [
+            {
+              "logLine": 3572,
+              "emittedAt": "2026-11-09T22:06:27.4505071Z",
+              "status": "passed",
+              "reportedDurationMs": 15.281289
+            }
+          ]
+        },
+        {
+          "title": "a removed quote is not sent",
+          "sourceLine": 352,
+          "results": [
+            {
+              "logLine": 3573,
+              "emittedAt": "2026-11-09T22:06:27.4759915Z",
+              "status": "passed",
+              "reportedDurationMs": 20.718618
+            }
+          ]
+        },
+        {
+          "title": "a sent message that quotes a reply shows the quote above its words, and every message has 复制",
+          "sourceLine": 363,
+          "results": [
+            {
+              "logLine": 3574,
+              "emittedAt": "2026-11-09T22:06:27.4797747Z",
+              "status": "passed",
+              "reportedDurationMs": 14.258372
+            }
+          ]
+        },
+        {
+          "title": "an idle page detects the new build on its minute probe and keeps the draft mounted",
+          "sourceLine": 376,
+          "results": [
+            {
+              "logLine": 3575,
+              "emittedAt": "2026-11-09T22:06:27.4865910Z",
+              "status": "passed",
+              "reportedDurationMs": 3.526276
+            }
+          ]
+        },
+        {
+          "title": "a failed welcome shows on the Bot's side in the chat, not only above the composer",
+          "sourceLine": 400,
+          "results": [
+            {
+              "logLine": 3576,
+              "emittedAt": "2026-11-09T22:06:27.4913044Z",
+              "status": "passed",
+              "reportedDurationMs": 6.140928
+            }
+          ]
+        },
+        {
+          "title": "the refused welcome is not retried when the model already reads runnable on open",
+          "sourceLine": 407,
+          "results": [
+            {
+              "logLine": 3577,
+              "emittedAt": "2026-11-09T22:06:27.4987447Z",
+              "status": "passed",
+              "reportedDurationMs": 6.868419
+            }
+          ]
+        },
+        {
+          "title": "the refused welcome runs again exactly once when its model turns runnable while the chat is open",
+          "sourceLine": 414,
+          "results": [
+            {
+              "logLine": 3578,
+              "emittedAt": "2026-11-09T22:06:27.5098443Z",
+              "status": "passed",
+              "reportedDurationMs": 9.631838
+            }
+          ]
+        },
+        {
+          "title": "a passing usage limit (usage_in_progress) is never retried on its own",
+          "sourceLine": 424,
+          "results": [
+            {
+              "logLine": 3579,
+              "emittedAt": "2026-11-09T22:06:27.5164502Z",
+              "status": "passed",
+              "reportedDurationMs": 6.764213
+            }
+          ]
+        },
+        {
+          "title": "a passing usage limit (usage_concurrency_limit) is never retried on its own",
+          "sourceLine": 424,
+          "results": [
+            {
+              "logLine": 3580,
+              "emittedAt": "2026-11-09T22:06:27.5257235Z",
+              "status": "passed",
+              "reportedDurationMs": 8.300467
+            }
+          ]
+        },
+        {
+          "title": "a passing usage limit (usage_cost_unavailable) is never retried on its own",
+          "sourceLine": 424,
+          "results": [
+            {
+              "logLine": 3581,
+              "emittedAt": "2026-11-09T22:06:27.5323666Z",
+              "status": "passed",
+              "reportedDurationMs": 9.02335
+            }
+          ]
+        },
+        {
+          "title": "a hidden tab never retries the welcome",
+          "sourceLine": 432,
+          "results": [
+            {
+              "logLine": 3582,
+              "emittedAt": "2026-11-09T22:06:27.5363978Z",
+              "status": "passed",
+              "reportedDurationMs": 6.517252
+            }
+          ]
+        }
+      ],
+      "absenceMeaning": null
+    },
+    {
+      "path": "components/workspace/board-view-state.test.tsx",
+      "blob": "10d2934ea643e922024c72b6801fbdf638f02e06",
+      "bytes": 9228,
+      "sha256": "a553ff59ee1f23e1fa8c0254c29363845b3de42c3d3b260c4029e78f732be9c5",
+      "sourceTreeBinding": {
+        "key": "board",
+        "path": "components/workspace/board-view-state.test.tsx",
+        "expectedBlob": "10d2934ea643e922024c72b6801fbdf638f02e06",
+        "actualTreeBlob": "10d2934ea643e922024c72b6801fbdf638f02e06",
+        "mode": "100644",
+        "matches": true
+      },
+      "nxTarget": null,
+      "registeredScripts": [
+        "test:view-state"
+      ],
+      "status": "not-executed-by-this-log",
+      "sourceExpandedCaseCount": 4,
+      "uniquePassedResultCount": 0,
+      "duplicatedTitles": [],
+      "failureResultCount": 0,
+      "skippedResultCount": null,
+      "evidence": [
+        {
+          "title": "board filters stay inside their workspace while the original view remains recoverable",
+          "sourceLine": 75,
+          "results": []
+        },
+        {
+          "title": "board filters stay inside their account while the original view remains recoverable",
+          "sourceLine": 75,
+          "results": []
+        },
+        {
+          "title": "legacy unscoped filter names are discarded while durable view and display preferences remain",
+          "sourceLine": 95,
+          "results": []
+        },
+        {
+          "title": "changing browser display preferences never writes scoped filter names back into the shared preference key",
+          "sourceLine": 108,
+          "results": []
+        }
+      ],
+      "absenceMeaning": "Not selected/executed by this job log; not a skipped test result, not a failed test result, and not a pass."
+    },
+    {
+      "path": "components/workspace/issue-workspace-settings.test.tsx",
+      "blob": "4581baa184e667961f3de31cb5b78718829c5690",
+      "bytes": 25654,
+      "sha256": "f9f8b4cf4676071c23e57c035e94027f04fec641abe8ddb2c6871b22b8cd3ece",
+      "sourceTreeBinding": {
+        "key": "workspace",
+        "path": "components/workspace/issue-workspace-settings.test.tsx",
+        "expectedBlob": "4581baa184e667961f3de31cb5b78718829c5690",
+        "actualTreeBlob": "4581baa184e667961f3de31cb5b78718829c5690",
+        "mode": "100644",
+        "matches": true
+      },
+      "nxTarget": null,
+      "registeredScripts": [
+        "test:view-state"
+      ],
+      "status": "not-executed-by-this-log",
+      "sourceExpandedCaseCount": 10,
+      "uniquePassedResultCount": 0,
+      "duplicatedTitles": [],
+      "failureResultCount": 0,
+      "skippedResultCount": null,
+      "evidence": [
+        {
+          "title": "a cold Settings chunk keeps the same frame, bar and rail; returning keeps pending browser notes and draft",
+          "sourceLine": 168,
+          "results": []
+        },
+        {
+          "title": "legacy Settings also loads inside the frame and keeps it when returning to chat",
+          "sourceLine": 212,
+          "results": []
+        },
+        {
+          "title": "hosted Settings preserves pending browser notes and the computer registry across its distinct frame",
+          "sourceLine": 228,
+          "results": []
+        },
+        {
+          "title": "hosted Settings providers still retire state when the owner or workspace changes",
+          "sourceLine": 261,
+          "results": []
+        },
+        {
+          "title": "routed Settings keyboard search follows the top bar and leaves other workspace shortcuts inactive",
+          "sourceLine": 285,
+          "results": []
+        },
+        {
+          "title": "legacy Settings keyboard search follows the top bar and leaves other workspace shortcuts inactive",
+          "sourceLine": 285,
+          "results": []
+        },
+        {
+          "title": "Settings search and repeated Back/Forward restore the addressed bot when the router renders after popstate",
+          "sourceLine": 319,
+          "results": []
+        },
+        {
+          "title": "Settings search and repeated Back/Forward restore the addressed bot when the router renders before popstate",
+          "sourceLine": 319,
+          "results": []
+        },
+        {
+          "title": "the existing authenticated scope boundary still discards annotations across owners and workspaces",
+          "sourceLine": 362,
+          "results": []
+        },
+        {
+          "title": "a standalone Settings shell still provides its frame and route-specific members content",
+          "sourceLine": 377,
+          "results": []
+        }
+      ],
+      "absenceMeaning": "Not selected/executed by this job log; not a skipped test result, not a failed test result, and not a pass."
+    },
+    {
+      "path": "tests/agent-ui-report.test.tsx",
+      "blob": "a256bc547d61260a53f84bb654d231927d3b59a2",
+      "bytes": 20594,
+      "sha256": "7ec752c91e28fa576d9aa4d7f238e44880e7590900e3bb518677e4c83fcdbff5",
+      "sourceTreeBinding": {
+        "key": "agent",
+        "path": "tests/agent-ui-report.test.tsx",
+        "expectedBlob": "a256bc547d61260a53f84bb654d231927d3b59a2",
+        "actualTreeBlob": "a256bc547d61260a53f84bb654d231927d3b59a2",
+        "mode": "100644",
+        "matches": true
+      },
+      "nxTarget": "integration-15",
+      "registeredScripts": [
+        "test:agent"
+      ],
+      "status": "executed_unique_titles_all_passed",
+      "sourceExpandedCaseCount": 14,
+      "uniquePassedResultCount": 14,
+      "duplicatedTitles": [],
+      "failureResultCount": 0,
+      "skippedResultCount": 0,
+      "evidence": [
+        {
+          "title": "streaming Markdown is visible while incomplete OpenUI prefixes stay buffered",
+          "sourceLine": 40,
+          "results": [
+            {
+              "logLine": 2667,
+              "emittedAt": "2026-11-09T22:05:49.3038541Z",
+              "status": "passed",
+              "reportedDurationMs": 44.570911
+            }
+          ]
+        },
+        {
+          "title": "Report components parse, are detected as OpenUI and render through the real renderer",
+          "sourceLine": 47,
+          "results": [
+            {
+              "logLine": 2668,
+              "emittedAt": "2026-11-09T22:05:49.3049012Z",
+              "status": "passed",
+              "reportedDurationMs": 339.476798
+            }
+          ]
+        },
+        {
+          "title": "a saved reply's file diff shows ✓; only a streaming one spins",
+          "sourceLine": 77,
+          "results": [
+            {
+              "logLine": 2669,
+              "emittedAt": "2026-11-09T22:05:49.3050669Z",
+              "status": "passed",
+              "reportedDurationMs": 13.21925
+            }
+          ]
+        },
+        {
+          "title": "Report components reject invalid props",
+          "sourceLine": 89,
+          "results": [
+            {
+              "logLine": 2670,
+              "emittedAt": "2026-11-09T22:05:49.3055243Z",
+              "status": "passed",
+              "reportedDurationMs": 12.466081
+            }
+          ]
+        },
+        {
+          "title": "BeQuestions accepts beUI Select, Switch, slider and date range inputs on the existing submit path",
+          "sourceLine": 123,
+          "results": [
+            {
+              "logLine": 2671,
+              "emittedAt": "2026-11-09T22:05:49.3059380Z",
+              "status": "passed",
+              "reportedDurationMs": 17.040239
+            }
+          ]
+        },
+        {
+          "title": "a repository card: candidates answer with owner/repo, githubInstall opens the GitHub App page in a new tab",
+          "sourceLine": 138,
+          "results": [
+            {
+              "logLine": 2672,
+              "emittedAt": "2026-11-09T22:05:49.3062009Z",
+              "status": "passed",
+              "reportedDurationMs": 19.562497
+            }
+          ]
+        },
+        {
+          "title": "beUI date range text follows the locale",
+          "sourceLine": 151,
+          "results": [
+            {
+              "logLine": 2673,
+              "emittedAt": "2026-11-09T22:05:49.3063951Z",
+              "status": "passed",
+              "reportedDurationMs": 20.572366
+            }
+          ]
+        },
+        {
+          "title": "OpenUI Tag, Steps and an EditableTable in a Form render for the Coordinator",
+          "sourceLine": 159,
+          "results": [
+            {
+              "logLine": 2674,
+              "emittedAt": "2026-11-09T22:05:49.3065820Z",
+              "status": "passed",
+              "reportedDurationMs": 43.603672
+            }
+          ]
+        },
+        {
+          "title": "In a chat, BeCitations leaves its links to the reply's one sources toggle",
+          "sourceLine": 183,
+          "results": [
+            {
+              "logLine": 2675,
+              "emittedAt": "2026-11-09T22:05:49.3068123Z",
+              "status": "passed",
+              "reportedDurationMs": 12.961287
+            }
+          ]
+        },
+        {
+          "title": "A task or run chip is boxed with no underline and only its title; a source chip keeps its unboxed underline (R-15)",
+          "sourceLine": 190,
+          "results": [
+            {
+              "logLine": 2676,
+              "emittedAt": "2026-11-09T22:05:49.3070465Z",
+              "status": "passed",
+              "reportedDurationMs": 21.952719
+            }
+          ]
+        },
+        {
+          "title": "Text inside an OpenUI card is part of the card, not a chat bubble",
+          "sourceLine": 229,
+          "results": [
+            {
+              "logLine": 2677,
+              "emittedAt": "2026-11-09T22:05:49.3073156Z",
+              "status": "passed",
+              "reportedDurationMs": 7.789102
+            }
+          ]
+        },
+        {
+          "title": "An OpenUI button or form submit continues the chat with its label and the edited rows",
+          "sourceLine": 237,
+          "results": [
+            {
+              "logLine": 2678,
+              "emittedAt": "2026-11-09T22:05:49.3075243Z",
+              "status": "passed",
+              "reportedDurationMs": 0.308087
+            }
+          ]
+        },
+        {
+          "title": "Saved replies with retired component names still parse and render as their replacements",
+          "sourceLine": 246,
+          "results": [
+            {
+              "logLine": 2679,
+              "emittedAt": "2026-11-09T22:05:49.3076778Z",
+              "status": "passed",
+              "reportedDurationMs": 108.77392
+            }
+          ]
+        },
+        {
+          "title": "a new bot's welcome card renders, empty entries included",
+          "sourceLine": 266,
+          "results": [
+            {
+              "logLine": 2680,
+              "emittedAt": "2026-11-09T22:05:49.3079043Z",
+              "status": "passed",
+              "reportedDurationMs": 31.619723
+            }
+          ]
+        }
+      ],
+      "absenceMeaning": null
+    },
+    {
+      "path": "tests/settings-sections.test.mjs",
+      "blob": "719478baef0dbf2d8efd014a49ba0784b6f4103f",
+      "bytes": 5266,
+      "sha256": "10fbfc956ebf82284bd3cc5da3628d9975ecc5a5c7698205e4c8c25aec4dc19a",
+      "sourceTreeBinding": {
+        "key": "settings",
+        "path": "tests/settings-sections.test.mjs",
+        "expectedBlob": "719478baef0dbf2d8efd014a49ba0784b6f4103f",
+        "actualTreeBlob": "719478baef0dbf2d8efd014a49ba0784b6f4103f",
+        "mode": "100644",
+        "matches": true
+      },
+      "nxTarget": "integration-21",
+      "registeredScripts": [
+        "test:settings"
+      ],
+      "status": "executed_unique_titles_all_passed",
+      "sourceExpandedCaseCount": 10,
+      "uniquePassedResultCount": 10,
+      "duplicatedTitles": [],
+      "failureResultCount": 0,
+      "skippedResultCount": 0,
+      "evidence": [
+        {
+          "title": "every v4 nav item has exactly one section, in Figma order (Bot 权限 after 连接, 2026-11-09)",
+          "sourceLine": 5,
+          "results": [
+            {
+              "logLine": 3321,
+              "emittedAt": "2026-11-09T22:06:12.5382471Z",
+              "status": "passed",
+              "reportedDurationMs": 2.7371
+            }
+          ]
+        },
+        {
+          "title": "old links keep landing on the page that now holds their content",
+          "sourceLine": 10,
+          "results": [
+            {
+              "logLine": 3322,
+              "emittedAt": "2026-11-09T22:06:12.5384003Z",
+              "status": "passed",
+              "reportedDurationMs": 0.330678
+            }
+          ]
+        },
+        {
+          "title": "routed pages win over the query, and unknown input falls back to preferences",
+          "sourceLine": 17,
+          "results": [
+            {
+              "logLine": 3323,
+              "emittedAt": "2026-11-09T22:06:12.5385530Z",
+              "status": "passed",
+              "reportedDurationMs": 0.364863
+            }
+          ]
+        },
+        {
+          "title": "hrefs keep the workspace and use the routed paths for members and teams",
+          "sourceLine": 25,
+          "results": [
+            {
+              "logLine": 3324,
+              "emittedAt": "2026-11-09T22:06:12.5394414Z",
+              "status": "passed",
+              "reportedDurationMs": 0.401511
+            }
+          ]
+        },
+        {
+          "title": "members do not see admin-only sections; admins see every built one",
+          "sourceLine": 33,
+          "results": [
+            {
+              "logLine": 3325,
+              "emittedAt": "2026-11-09T22:06:12.5395842Z",
+              "status": "passed",
+              "reportedDurationMs": 0.53515
+            }
+          ]
+        },
+        {
+          "title": "cloud server settings require the explicit server administrator capability",
+          "sourceLine": 43,
+          "results": [
+            {
+              "logLine": 3326,
+              "emittedAt": "2026-11-09T22:06:12.5397699Z",
+              "status": "passed",
+              "reportedDurationMs": 0.445784
+            }
+          ]
+        },
+        {
+          "title": "sections without a page body are hidden until their UI lands, and their links open preferences",
+          "sourceLine": 52,
+          "results": [
+            {
+              "logLine": 3327,
+              "emittedAt": "2026-11-09T22:06:12.5399765Z",
+              "status": "passed",
+              "reportedDurationMs": 0.539559
+            }
+          ]
+        },
+        {
+          "title": "sidebar names follow Figma 设置 v4 in the English search titles",
+          "sourceLine": 61,
+          "results": [
+            {
+              "logLine": 3328,
+              "emittedAt": "2026-11-09T22:06:12.5401644Z",
+              "status": "passed",
+              "reportedDurationMs": 0.269424
+            }
+          ]
+        },
+        {
+          "title": "a current id wins over a legacy alias with the same name",
+          "sourceLine": 66,
+          "results": [
+            {
+              "logLine": 3329,
+              "emittedAt": "2026-11-09T22:06:12.5403259Z",
+              "status": "passed",
+              "reportedDurationMs": 2.408294
+            }
+          ]
+        },
+        {
+          "title": "a personal workspace has every setting of the workspace itself; only what is between people is a team's",
+          "sourceLine": 71,
+          "results": [
+            {
+              "logLine": 3330,
+              "emittedAt": "2026-11-09T22:06:12.5405263Z",
+              "status": "passed",
+              "reportedDurationMs": 0.843708
+            }
+          ]
+        }
+      ],
+      "absenceMeaning": null
+    }
+  ],
+  "coverageBoundaries": [
+    {
+      "path": "tests/agent-ui-report.test.tsx",
+      "covered": "14 exact source case titles passed. Source uses React renderToStaticMarkup and the repository AgentGenerativeUI/parser paths.",
+      "notClaimed": "No browser navigation, private hosted overlay, real account/model call, or end-to-end production Coordinator dispatch is established."
+    },
+    {
+      "path": "tests/settings-sections.test.mjs",
+      "covered": "10 exact routing/section/visibility case titles passed, including the updated Bot-permissions placement.",
+      "notClaimed": "No actual settings save, private UI visual/DOM contract, or Native interaction is established."
+    },
+    {
+      "path": "components/coordinator/retry-reply-button.test.tsx",
+      "covered": "34 expanded exact titles passed; fixed source uses happy-dom plus explicit action/SWR/stream/composer and UI mocks to exercise reply/retry/version/draft behavior.",
+      "notClaimed": "This does not prove the real hosted ThreadScreen, real workflow/network transport, or production model behavior."
+    },
+    {
+      "path": "components/workspace/board-view-state.test.tsx",
+      "covered": "Source blob is present in actual tree; its 4 expanded titles are absent from this log.",
+      "notClaimed": "No execution/pass/skip is inferred from overall job success or other suites."
+    },
+    {
+      "path": "components/workspace/issue-workspace-settings.test.tsx",
+      "covered": "Source blob is present in actual tree; its 10 expanded titles are absent from this log.",
+      "notClaimed": "No owner/workspace/settings-frame regression execution is inferred here. Separate Native settings/parity observations, if later obtained, are different evidence and do not mean this unit file ran."
+    }
+  ],
+  "conclusions": {
+    "sourceChangesLinkedToObservedExecution": true,
+    "allFiveFilesExecuted": false,
+    "publicDefaultTestsEqualHostedProductionDOM": false,
+    "nativeAcceptanceEvaluated": false,
+    "productionAcceptanceEvaluated": false,
+    "additionalTestOrSourceGateIntroduced": false,
+    "nextAction": "Preserve this exact per-file scope in the evidence index. Any later Native or hosted-production result is recorded separately by its assigned reader."
+  },
+  "privacy": {
+    "outputProjection": "Only fixed source test titles, repository commands/paths, source IDs, timestamps, durations and closed execution statuses are copied; no other raw log/environment/account content is included.",
+    "originalLogReprinted": false
+  },
+  "actions": {
+    "originalActionsJobLogToolCalls": 0,
+    "artifactOrZIPDownloads": 0,
+    "newTestsRun": 0,
+    "sourceImportsExecuted": 0,
+    "resourcesCreated": 0,
+    "sourceFilesOrRefsChanged": 0,
+    "reusedGitPlainLogReads": 2,
+    "reusedGitWrapperReads": 2,
+    "readRetryExplanation": "The first Git reads completed but prior in-memory hash helpers were unavailable; no fetched raw content was output. Hash helpers were restored in memory, followed by a preserved Git read whose bytes and hashes match Root's immutable originals.",
+    "onlyNewObject": "unreferenced safe JSON proof"
+  }
+}

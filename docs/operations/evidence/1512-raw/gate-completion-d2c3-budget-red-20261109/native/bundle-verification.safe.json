@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "gzip": {
+    "bytes": 134763,
+    "sha256": "34015eae001c58f08bad3cd2cab75e19b48c969312b9d36336630b010caec7e3"
+  },
+  "json": {
+    "bytes": 1166558,
+    "sha256": "fdf982fd4967163b07a2a23e8bdb4fa6b60fca9dc0974a30e2cfdeaf8d715eba"
+  },
+  "gzipCrcAndSizeValidated": true,
+  "independentPythonHashMatch": true,
+  "chunks": 93,
+  "selectedOriginals": [
+    {
+      "name": "mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "1299e7149c4a1536296bba96874180e072daafbab850adf643f4b6279547a116",
+      "gitBlob": "6df7cf4a7be0c9b7e2bf412c1a87956ee6dd04ac",
+      "findings": []
+    },
+    {
+      "name": "native-crypto.json",
+      "bytes": 2868,
+      "sha256": "30b69e8508c88d0ddd92bd35b1f58b286ba4988ec2893fb005f2f81787e1affd",
+      "gitBlob": "079127056496f7beee460c395c237dd9fcfa4b98",
+      "findings": []
+    },
+    {
+      "name": "lifecycle.json",
+      "bytes": 687054,
+      "sha256": "4a3b01ccf9d3e03175dd666683afa2f45027bfbb3be5c3cc76969cbd083c37a5",
+      "gitBlob": "d3e17ccdb25193b6da4a6c645c06bc7d140e96d2",
+      "findings": []
+    },
+    {
+      "name": "parity.json",
+      "bytes": 117759,
+      "sha256": "7d5de8ecfd9815af4df76498c7c3ed5194b89a45abb77eabb54ea8fcfb32e73a",
+      "gitBlob": "3ac40c8932217529e6d1f800a199e20178f5ee41",
+      "findings": []
+    },
+    {
+      "name": "smoke.json",
+      "bytes": 3144,
+      "sha256": "f62793bc6703b9fa144b400d39b9069991bbd6055bc73edc5ae8b69c696af0c6",
+      "gitBlob": "f1be543b69ba04fd39f15c8151f68d788b3f081a",
+      "findings": []
+    }
+  ],
+  "manifestEntries": 316
+}

@@ -1,0 +1,5203 @@
+{
+  "schema": "mikka.issue1512.d2c-daemon-custody.archived-log-independent-review.v1",
+  "observedAtUtc": "2026-11-09 22:23:16 UTC",
+  "status": "ACTUAL_EXECUTION_VERIFIED; DECLARED_SKIPS_RETAINED; SYNTHETIC_SCOPE_AND_CONTAINER_CLEANUP_LIMITS_EXPLICIT",
+  "scope": {
+    "repository": "alexj11324/Mikka",
+    "head": "d2c3f63448130443e3e10bb5304417162f585776",
+    "actualCheckout": "3bc095c100537563296186fc3d4cc4d60b59b698",
+    "actualTree": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+    "reviewedJobsOnly": [
+      "Daemon",
+      "E2B subscription custody"
+    ],
+    "sourceCorePgIntegrationE2bOtherJobsNotReviewed": true
+  },
+  "jobMetadataProvidedByArchivingRoot": {
+    "daemon": {
+      "run": 42707256422,
+      "attempt": 1,
+      "job": 129470272323,
+      "conclusion": "SUCCESS",
+      "completedAt": "2026-11-09T22:05:21Z"
+    },
+    "custody": {
+      "run": 42707256524,
+      "attempt": 1,
+      "job": 129467203882,
+      "conclusion": "SUCCESS",
+      "completedAt": "2026-11-09T22:05:31Z"
+    },
+    "note": "These job IDs/conclusions/completion times are root-supplied archive provenance. This reviewer did not call original joblog or metadata/ZIP endpoints; actual test execution and checkout below were independently parsed from the immutable archived full logs."
+  },
+  "originals": {
+    "daemon": {
+      "plain": {
+        "bytes": 117822,
+        "sha256": "3d660cdc975b318dc45f5577c241db5e70d03b8e28726d8373088bbe8780e21c",
+        "gitBlob": "56cdd63bc2d47cfd4f6131e336e469f430f70087",
+        "wrapperContentExactlyEqualsPlain": true
+      },
+      "wrapper": {
+        "key": "ciD2:daemon:wrapper",
+        "bytes": 133001,
+        "sha256": "233afc77b8ed6c226ebc4241fff159e734e3a1d43b5ea3fe65c3bab3391f8fcd",
+        "gitBlob": "e4c176185e7f7e0b7d27027ac06fdc945c86c2f8"
+      },
+      "lines": 1200
+    },
+    "custody": {
+      "plain": {
+        "bytes": 220895,
+        "sha256": "ffe8fe910b24ab7b476c0a90b09d57d36e4556cf310b915dfee673aa70323381",
+        "gitBlob": "37da3c400b9c9a00d607a4e1e203a30fb539684d",
+        "wrapperContentExactlyEqualsPlain": true
+      },
+      "wrapper": {
+        "key": "ciD2:custody:wrapper",
+        "bytes": 231461,
+        "sha256": "9bb8dd6f2e1e4d2de3fe8d6fc83c42672534b477c0bffb40f22afe25e9cfba67",
+        "gitBlob": "26b903623095722cd7657574be155889851624ba"
+      },
+      "lines": 1880
+    },
+    "verification": "Each raw UTF8 byte count,SHA256 and canonical Git blob SHA1 matches the supplied original. Each archived tool wrapper has isError:false and structuredContent.content exactly equals the entire corresponding plain log."
+  },
+  "checkout": {
+    "immutableCommit": {
+      "sha": "3bc095c100537563296186fc3d4cc4d60b59b698",
+      "tree": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+      "parents": [
+        "1c7698655405b289d7fdbd814713d15e542cc2bb",
+        "d2c3f63448130443e3e10bb5304417162f585776"
+      ]
+    },
+    "daemonLines": [
+      {
+        "line": 103,
+        "timestamp": "2026-11-09T22:02:33.5614116Z",
+        "text": "[command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +3bc095c100537563296186fc3d4cc4d60b59b698:refs/remotes/pull/1799/merge"
+      },
+      {
+        "line": 105,
+        "timestamp": "2026-11-09T22:02:36.3300512Z",
+        "text": " * [new ref]         3bc095c100537563296186fc3d4cc4d60b59b698 -> pull/1799/merge"
+      },
+      {
+        "line": 130,
+        "timestamp": "2026-11-09T22:02:36.7418455Z",
+        "text": "HEAD is now at 3bc095c Merge d2c3f63448130443e3e10bb5304417162f585776 into 1c7698655405b289d7fdbd814713d15e542cc2bb"
+      },
+      {
+        "line": 133,
+        "timestamp": "2026-11-09T22:02:36.7567415Z",
+        "text": "3bc095c100537563296186fc3d4cc4d60b59b698"
+      }
+    ],
+    "custodyLines": [
+      {
+        "line": 95,
+        "timestamp": "2026-11-09T22:01:48.0608645Z",
+        "text": "[command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +3bc095c100537563296186fc3d4cc4d60b59b698:refs/remotes/pull/1799/merge"
+      },
+      {
+        "line": 97,
+        "timestamp": "2026-11-09T22:01:51.4000471Z",
+        "text": " * [new ref]         3bc095c100537563296186fc3d4cc4d60b59b698 -> pull/1799/merge"
+      },
+      {
+        "line": 122,
+        "timestamp": "2026-11-09T22:01:51.9326073Z",
+        "text": "HEAD is now at 3bc095c Merge d2c3f63448130443e3e10bb5304417162f585776 into 1c7698655405b289d7fdbd814713d15e542cc2bb"
+      },
+      {
+        "line": 125,
+        "timestamp": "2026-11-09T22:01:51.9433750Z",
+        "text": "3bc095c100537563296186fc3d4cc4d60b59b698"
+      }
+    ],
+    "treeExactlyEqualsReviewedD2": true
+  },
+  "sourceIdentities": [
+    {
+      "key": "ciD2:byosScript",
+      "bytes": 5275,
+      "sha256": "1d14be1da02ae48b29196c8603f02dd92acf86cc3e3a7e58f8926a8655abb25f",
+      "gitBlob": "fdd715b33deb5b6944011845092c019a9686c823"
+    },
+    {
+      "key": "ciD2:adaptersTest",
+      "bytes": 24586,
+      "sha256": "c6af14fb0117a6b9aba7d9b89be45ea3e5e37ef18fcfcb643c072f7e6143dd9e",
+      "gitBlob": "c594202c9db5a0fa8a1c19fb731125d309abc61d"
+    },
+    {
+      "key": "ciD2:daemonPackage",
+      "bytes": 2857,
+      "sha256": "11d2828499ff46ddf10ae2eb6653b400ae3863c012b1c979c66a53560120ec30",
+      "gitBlob": "a91bbe26794e858d2e66a7eca0b6839b12d6a6f1"
+    },
+    {
+      "key": "ciD2:anonymousHosted",
+      "bytes": 13662,
+      "sha256": "b007e5d3369cdd41ff9fb7083498a522bc2398d15d6aa7055873df08aec3545e",
+      "gitBlob": "8ffd1fa642e7e3b22463c4127471f02a4e7eb6fd"
+    },
+    {
+      "key": "ciD2:anonymousSpare",
+      "bytes": 15067,
+      "sha256": "4ff047f7ddfbca99d6ac0b4b5b4524e5b90df7b041e81855242d5cd7acaaed06",
+      "gitBlob": "2e3d76a20c67848fb68cfeca8712754f5fc35ca6"
+    },
+    {
+      "key": "ciD2:codexMailboxTest",
+      "bytes": 15881,
+      "sha256": "f11548e6de43a94469f9a1d0095303a4e6db882ab9fb4a8816d579e4e53047c1",
+      "gitBlob": "14a9ca5d87eccbb5b6402ee4c8618e5654e5b54f"
+    },
+    {
+      "key": "ciD2:realAgentsTest",
+      "bytes": 12154,
+      "sha256": "f55883b29c4c357b717a4f578f859eb00b5a6c13db871f5e935cbd64ee83679f",
+      "gitBlob": "6153fb4ead3ffc55d8c31451d27608da05300f1f"
+    },
+    {
+      "key": "ciD2:custody:workflow",
+      "bytes": 1660,
+      "sha256": "d837c7bcad12763ba903a04e05fecbe0f4dbbd8a8b10f13149a3c4a770ecc6d5",
+      "gitBlob": "333e0674355baa72ce7bd00e7e57964fff8c7d6a"
+    },
+    {
+      "key": "ciD2:selectionProof",
+      "bytes": 147588,
+      "sha256": "f945b9506fb81d01ed1a1037b1ec5cf2963a72ba98059ebe6e64e963f62ef36a",
+      "gitBlob": "4f369b8ac0e58294392047e459aa4016b02e75ec"
+    },
+    {
+      "key": "ciD2:daemon:wrapper",
+      "bytes": 133001,
+      "sha256": "233afc77b8ed6c226ebc4241fff159e734e3a1d43b5ea3fe65c3bab3391f8fcd",
+      "gitBlob": "e4c176185e7f7e0b7d27027ac06fdc945c86c2f8"
+    },
+    {
+      "key": "ciD2:custody:wrapper",
+      "bytes": 231461,
+      "sha256": "9bb8dd6f2e1e4d2de3fe8d6fc83c42672534b477c0bffb40f22afe25e9cfba67",
+      "gitBlob": "26b903623095722cd7657574be155889851624ba"
+    }
+  ],
+  "daemon": {
+    "fullVitestCommand": {
+      "line": 487,
+      "timestamp": "2026-11-09T22:03:21.2149176Z",
+      "text": "##[group]Run pnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=github-actions --reporter=json --outputFile.json=\"$RUNNER_TEMP/pr13-daemon-unit-results.json\""
+    },
+    "counts": {
+      "vitest": {
+        "filesPassed": 140,
+        "filesSkipped": 1,
+        "totalFiles": 141,
+        "testsPassed": 1591,
+        "testsSkipped": 2,
+        "totalTests": 1593,
+        "fileRows": 141,
+        "recomputedTests": 1593,
+        "recomputedSkipped": 2
+      },
+      "nodeSummaries": [
+        {
+          "line": 950,
+          "timestamp": "2026-11-09T22:05:01.4449197Z",
+          "tests": 62,
+          "counts": {
+            "suites": 0,
+            "pass": 62,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 2595.249035
+          }
+        },
+        {
+          "line": 984,
+          "timestamp": "2026-11-09T22:05:01.7620410Z",
+          "tests": 4,
+          "counts": {
+            "suites": 0,
+            "pass": 4,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 76.072943
+          }
+        },
+        {
+          "line": 1003,
+          "timestamp": "2026-11-09T22:05:02.0477570Z",
+          "tests": 7,
+          "counts": {
+            "suites": 0,
+            "pass": 7,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 61.304553
+          }
+        },
+        {
+          "line": 1019,
+          "timestamp": "2026-11-09T22:05:02.3595238Z",
+          "tests": 4,
+          "counts": {
+            "suites": 0,
+            "pass": 4,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 68.198422
+          }
+        },
+        {
+          "line": 1056,
+          "timestamp": "2026-11-09T22:05:04.5206595Z",
+          "tests": 5,
+          "counts": {
+            "suites": 0,
+            "pass": 5,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 1920.856759
+          }
+        },
+        {
+          "line": 1166,
+          "timestamp": "2026-11-09T22:05:19.4974149Z",
+          "tests": 1,
+          "counts": {
+            "suites": 0,
+            "pass": 1,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 10887.876912
+          }
+        }
+      ],
+      "nodeStages": [
+        {
+          "name": "mailbox-cli",
+          "line": 950,
+          "timestamp": "2026-11-09T22:05:01.4449197Z",
+          "tests": 62,
+          "counts": {
+            "suites": 0,
+            "pass": 62,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 2595.249035
+          }
+        },
+        {
+          "name": "repository-identity",
+          "line": 984,
+          "timestamp": "2026-11-09T22:05:01.7620410Z",
+          "tests": 4,
+          "counts": {
+            "suites": 0,
+            "pass": 4,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 76.072943
+          }
+        },
+        {
+          "name": "github-credentials",
+          "line": 1003,
+          "timestamp": "2026-11-09T22:05:02.0477570Z",
+          "tests": 7,
+          "counts": {
+            "suites": 0,
+            "pass": 7,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 61.304553
+          }
+        },
+        {
+          "name": "trusted-endpoint",
+          "line": 1019,
+          "timestamp": "2026-11-09T22:05:02.3595238Z",
+          "tests": 4,
+          "counts": {
+            "suites": 0,
+            "pass": 4,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 68.198422
+          }
+        },
+        {
+          "name": "local-computer node tests",
+          "line": 1056,
+          "timestamp": "2026-11-09T22:05:04.5206595Z",
+          "tests": 5,
+          "counts": {
+            "suites": 0,
+            "pass": 5,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 1920.856759
+          }
+        },
+        {
+          "name": "package installation",
+          "line": 1166,
+          "timestamp": "2026-11-09T22:05:19.4974149Z",
+          "tests": 1,
+          "counts": {
+            "suites": 0,
+            "pass": 1,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 10887.876912
+          }
+        }
+      ],
+      "mailbox": {
+        "reportedPass": 62,
+        "codexResumeNodes": 40,
+        "codexTopLevel": 10,
+        "codexSubtests": 30,
+        "generalNodes": 22,
+        "allDisplayedPass": true
+      }
+    },
+    "all141FileReceipts": [
+      {
+        "line": 506,
+        "timestamp": "2026-11-09T22:03:23.0440431Z",
+        "text": " ✓ test/server-link-http.test.ts (40 tests) 106ms",
+        "status": "✓",
+        "file": "test/server-link-http.test.ts",
+        "tests": 40,
+        "skipped": 0
+      },
+      {
+        "line": 507,
+        "timestamp": "2026-11-09T22:03:23.6283173Z",
+        "text": " ✓ test/commands-polling.test.ts (36 tests) 54ms",
+        "status": "✓",
+        "file": "test/commands-polling.test.ts",
+        "tests": 36,
+        "skipped": 0
+      },
+      {
+        "line": 512,
+        "timestamp": "2026-11-09T22:03:26.5801320Z",
+        "text": " ✓ test/agents.test.ts (46 tests) 4295ms",
+        "status": "✓",
+        "file": "test/agents.test.ts",
+        "tests": 46,
+        "skipped": 0
+      },
+      {
+        "line": 513,
+        "timestamp": "2026-11-09T22:03:27.2666686Z",
+        "text": " ✓ src/tracing.test.ts (18 tests) 284ms",
+        "status": "✓",
+        "file": "src/tracing.test.ts",
+        "tests": 18,
+        "skipped": 0
+      },
+      {
+        "line": 536,
+        "timestamp": "2026-11-09T22:03:29.7205393Z",
+        "text": " ✓ test/anonymous-claude-spare.test.ts (22 tests) 1896ms",
+        "status": "✓",
+        "file": "test/anonymous-claude-spare.test.ts",
+        "tests": 22,
+        "skipped": 0
+      },
+      {
+        "line": 537,
+        "timestamp": "2026-11-09T22:03:31.7285896Z",
+        "text": " ✓ test/subscription-question-resume.test.ts (46 tests) 7537ms",
+        "status": "✓",
+        "file": "test/subscription-question-resume.test.ts",
+        "tests": 46,
+        "skipped": 0
+      },
+      {
+        "line": 541,
+        "timestamp": "2026-11-09T22:03:33.5896680Z",
+        "text": " ✓ test/subscription-worker-client.test.ts (23 tests) 1674ms",
+        "status": "✓",
+        "file": "test/subscription-worker-client.test.ts",
+        "tests": 23,
+        "skipped": 0
+      },
+      {
+        "line": 547,
+        "timestamp": "2026-11-09T22:03:37.2398377Z",
+        "text": " ✓ test/subscription-hosted-runner.test.ts (45 tests) 3125ms",
+        "status": "✓",
+        "file": "test/subscription-hosted-runner.test.ts",
+        "tests": 45,
+        "skipped": 0
+      },
+      {
+        "line": 548,
+        "timestamp": "2026-11-09T22:03:38.8754694Z",
+        "text": " ✓ test/mcp-http-observation.test.ts (18 tests) 1272ms",
+        "status": "✓",
+        "file": "test/mcp-http-observation.test.ts",
+        "tests": 18,
+        "skipped": 0
+      },
+      {
+        "line": 549,
+        "timestamp": "2026-11-09T22:03:42.3952395Z",
+        "text": " ✓ test/repositories.test.ts (18 tests) 3047ms",
+        "status": "✓",
+        "file": "test/repositories.test.ts",
+        "tests": 18,
+        "skipped": 0
+      },
+      {
+        "line": 556,
+        "timestamp": "2026-11-09T22:03:42.6584743Z",
+        "text": " ✓ src/quota/quota.test.ts (22 tests) 38ms",
+        "status": "✓",
+        "file": "src/quota/quota.test.ts",
+        "tests": 22,
+        "skipped": 0
+      },
+      {
+        "line": 557,
+        "timestamp": "2026-11-09T22:03:45.4926794Z",
+        "text": " ✓ test/runs.test.ts (56 tests) 22538ms",
+        "status": "✓",
+        "file": "test/runs.test.ts",
+        "tests": 56,
+        "skipped": 0
+      },
+      {
+        "line": 587,
+        "timestamp": "2026-11-09T22:03:46.0821430Z",
+        "text": " ✓ test/initial-run-hint.test.ts (27 tests) 2862ms",
+        "status": "✓",
+        "file": "test/initial-run-hint.test.ts",
+        "tests": 27,
+        "skipped": 0
+      },
+      {
+        "line": 590,
+        "timestamp": "2026-11-09T22:03:46.7774005Z",
+        "text": " ✓ test/device-gateway-reliability.test.ts (19 tests) 76ms",
+        "status": "✓",
+        "file": "test/device-gateway-reliability.test.ts",
+        "tests": 19,
+        "skipped": 0
+      },
+      {
+        "line": 591,
+        "timestamp": "2026-11-09T22:03:47.1557409Z",
+        "text": " ✓ src/codex-generation-telemetry.test.ts (13 tests) 165ms",
+        "status": "✓",
+        "file": "src/codex-generation-telemetry.test.ts",
+        "tests": 13,
+        "skipped": 0
+      },
+      {
+        "line": 592,
+        "timestamp": "2026-11-09T22:03:47.5509869Z",
+        "text": " ✓ src/task-secret-bridge.test.ts (25 tests) 194ms",
+        "status": "✓",
+        "file": "src/task-secret-bridge.test.ts",
+        "tests": 25,
+        "skipped": 0
+      },
+      {
+        "line": 593,
+        "timestamp": "2026-11-09T22:03:47.8820107Z",
+        "text": " ✓ test/github-runtime.test.ts (9 tests) 1891ms",
+        "status": "✓",
+        "file": "test/github-runtime.test.ts",
+        "tests": 9,
+        "skipped": 0
+      },
+      {
+        "line": 596,
+        "timestamp": "2026-11-09T22:03:48.6530934Z",
+        "text": " ✓ test/adapters.test.ts (39 tests | 2 skipped) 18418ms",
+        "status": "✓",
+        "file": "test/adapters.test.ts",
+        "tests": 39,
+        "skipped": 2
+      },
+      {
+        "line": 640,
+        "timestamp": "2026-11-09T22:03:48.7906014Z",
+        "text": " ✓ test/mikka-mcp-backend.test.ts (17 tests) 530ms",
+        "status": "✓",
+        "file": "test/mikka-mcp-backend.test.ts",
+        "tests": 17,
+        "skipped": 0
+      },
+      {
+        "line": 641,
+        "timestamp": "2026-11-09T22:03:49.4263868Z",
+        "text": " ✓ test/auto-update.test.ts (26 tests) 37ms",
+        "status": "✓",
+        "file": "test/auto-update.test.ts",
+        "tests": 26,
+        "skipped": 0
+      },
+      {
+        "line": 642,
+        "timestamp": "2026-11-09T22:03:49.4529704Z",
+        "text": " ✓ test/skill-mounts.test.ts (21 tests) 1422ms",
+        "status": "✓",
+        "file": "test/skill-mounts.test.ts",
+        "tests": 21,
+        "skipped": 0
+      },
+      {
+        "line": 643,
+        "timestamp": "2026-11-09T22:03:50.5005171Z",
+        "text": " ✓ test/anonymous-codex-spare.test.ts (22 tests) 596ms",
+        "status": "✓",
+        "file": "test/anonymous-codex-spare.test.ts",
+        "tests": 22,
+        "skipped": 0
+      },
+      {
+        "line": 644,
+        "timestamp": "2026-11-09T22:03:50.5445877Z",
+        "text": " ✓ test/captures.test.ts (14 tests) 490ms",
+        "status": "✓",
+        "file": "test/captures.test.ts",
+        "tests": 14,
+        "skipped": 0
+      },
+      {
+        "line": 645,
+        "timestamp": "2026-11-09T22:03:52.0261070Z",
+        "text": " ✓ test/policy-repository.test.ts (14 tests) 1096ms",
+        "status": "✓",
+        "file": "test/policy-repository.test.ts",
+        "tests": 14,
+        "skipped": 0
+      },
+      {
+        "line": 646,
+        "timestamp": "2026-11-09T22:03:52.0594649Z",
+        "text": " ✓ test/codex-subscription.test.ts (28 tests) 1189ms",
+        "status": "✓",
+        "file": "test/codex-subscription.test.ts",
+        "tests": 28,
+        "skipped": 0
+      },
+      {
+        "line": 647,
+        "timestamp": "2026-11-09T22:03:52.8336967Z",
+        "text": " ✓ test/cloud-model-preload.test.ts (8 tests) 303ms",
+        "status": "✓",
+        "file": "test/cloud-model-preload.test.ts",
+        "tests": 8,
+        "skipped": 0
+      },
+      {
+        "line": 648,
+        "timestamp": "2026-11-09T22:03:54.1921619Z",
+        "text": " ✓ test/local-github.test.ts (10 tests) 1017ms",
+        "status": "✓",
+        "file": "test/local-github.test.ts",
+        "tests": 10,
+        "skipped": 0
+      },
+      {
+        "line": 650,
+        "timestamp": "2026-11-09T22:03:56.1861813Z",
+        "text": " ✓ test/hardening.test.ts (13 tests) 1500ms",
+        "status": "✓",
+        "file": "test/hardening.test.ts",
+        "tests": 13,
+        "skipped": 0
+      },
+      {
+        "line": 661,
+        "timestamp": "2026-11-09T22:03:57.2817326Z",
+        "text": " ✓ test/provider-failure-runs.test.ts (19 tests) 4745ms",
+        "status": "✓",
+        "file": "test/provider-failure-runs.test.ts",
+        "tests": 19,
+        "skipped": 0
+      },
+      {
+        "line": 668,
+        "timestamp": "2026-11-09T22:03:57.7461297Z",
+        "text": " ✓ test/prewarm-preparation.test.ts (11 tests) 1131ms",
+        "status": "✓",
+        "file": "test/prewarm-preparation.test.ts",
+        "tests": 11,
+        "skipped": 0
+      },
+      {
+        "line": 669,
+        "timestamp": "2026-11-09T22:03:58.6367654Z",
+        "text": " ✓ test/anonymous-codex-hosted.test.ts (10 tests) 876ms",
+        "status": "✓",
+        "file": "test/anonymous-codex-hosted.test.ts",
+        "tests": 10,
+        "skipped": 0
+      },
+      {
+        "line": 670,
+        "timestamp": "2026-11-09T22:03:59.1189499Z",
+        "text": " ✓ test/mailbox-preparation.test.ts (12 tests) 978ms",
+        "status": "✓",
+        "file": "test/mailbox-preparation.test.ts",
+        "tests": 12,
+        "skipped": 0
+      },
+      {
+        "line": 671,
+        "timestamp": "2026-11-09T22:03:59.8910078Z",
+        "text": " ✓ test/task-secret-child.test.ts (2 tests) 409ms",
+        "status": "✓",
+        "file": "test/task-secret-child.test.ts",
+        "tests": 2,
+        "skipped": 0
+      },
+      {
+        "line": 672,
+        "timestamp": "2026-11-09T22:04:00.7373122Z",
+        "text": " ✓ test/git-prepared-token.test.ts (7 tests) 1847ms",
+        "status": "✓",
+        "file": "test/git-prepared-token.test.ts",
+        "tests": 7,
+        "skipped": 0
+      },
+      {
+        "line": 676,
+        "timestamp": "2026-11-09T22:04:01.8075543Z",
+        "text": " ✓ test/model-probe.test.ts (12 tests) 1464ms",
+        "status": "✓",
+        "file": "test/model-probe.test.ts",
+        "tests": 12,
+        "skipped": 0
+      },
+      {
+        "line": 682,
+        "timestamp": "2026-11-09T22:04:02.2383936Z",
+        "text": " ↓ test/real-agents.test.ts (0 test)",
+        "status": "↓",
+        "file": "test/real-agents.test.ts",
+        "tests": 0,
+        "skipped": 0
+      },
+      {
+        "line": 683,
+        "timestamp": "2026-11-09T22:04:02.6621198Z",
+        "text": " ✓ test/subscription-preflight.test.ts (12 tests) 1501ms",
+        "status": "✓",
+        "file": "test/subscription-preflight.test.ts",
+        "tests": 12,
+        "skipped": 0
+      },
+      {
+        "line": 686,
+        "timestamp": "2026-11-09T22:04:02.7075138Z",
+        "text": " ✓ src/permissions.test.ts (23 tests) 10ms",
+        "status": "✓",
+        "file": "src/permissions.test.ts",
+        "tests": 23,
+        "skipped": 0
+      },
+      {
+        "line": 689,
+        "timestamp": "2026-11-09T22:04:03.0169629Z",
+        "text": " ✓ src/run-runtime-timing.test.ts (8 tests) 30ms",
+        "status": "✓",
+        "file": "src/run-runtime-timing.test.ts",
+        "tests": 8,
+        "skipped": 0
+      },
+      {
+        "line": 704,
+        "timestamp": "2026-11-09T22:04:03.3853106Z",
+        "text": " ✓ test/claude-prewarm.test.ts (16 tests) 452ms",
+        "status": "✓",
+        "file": "test/claude-prewarm.test.ts",
+        "tests": 16,
+        "skipped": 0
+      },
+      {
+        "line": 705,
+        "timestamp": "2026-11-09T22:04:04.0355748Z",
+        "text": " ✓ test/policy-distribution.test.ts (9 tests) 185ms",
+        "status": "✓",
+        "file": "test/policy-distribution.test.ts",
+        "tests": 9,
+        "skipped": 0
+      },
+      {
+        "line": 706,
+        "timestamp": "2026-11-09T22:04:04.3478212Z",
+        "text": " ✓ test/hosted-cli-prefetch.test.ts (13 tests) 140ms",
+        "status": "✓",
+        "file": "test/hosted-cli-prefetch.test.ts",
+        "tests": 13,
+        "skipped": 0
+      },
+      {
+        "line": 707,
+        "timestamp": "2026-11-09T22:04:06.5765524Z",
+        "text": " ✓ test/terminal-checkpoint.test.ts (16 tests) 1911ms",
+        "status": "✓",
+        "file": "test/terminal-checkpoint.test.ts",
+        "tests": 16,
+        "skipped": 0
+      },
+      {
+        "line": 708,
+        "timestamp": "2026-11-09T22:04:07.3425980Z",
+        "text": " ✓ test/mikka-mcp-bridge.test.ts (13 tests) 3926ms",
+        "status": "✓",
+        "file": "test/mikka-mcp-bridge.test.ts",
+        "tests": 13,
+        "skipped": 0
+      },
+      {
+        "line": 710,
+        "timestamp": "2026-11-09T22:04:07.6203654Z",
+        "text": " ✓ test/project-decisions.test.ts (13 tests) 787ms",
+        "status": "✓",
+        "file": "test/project-decisions.test.ts",
+        "tests": 13,
+        "skipped": 0
+      },
+      {
+        "line": 711,
+        "timestamp": "2026-11-09T22:04:07.7388707Z",
+        "text": " ✓ test/run-control-monitor.test.ts (15 tests) 18ms",
+        "status": "✓",
+        "file": "test/run-control-monitor.test.ts",
+        "tests": 15,
+        "skipped": 0
+      },
+      {
+        "line": 712,
+        "timestamp": "2026-11-09T22:04:08.9954938Z",
+        "text": " ✓ test/publication-cancel.test.ts (10 tests) 1242ms",
+        "status": "✓",
+        "file": "test/publication-cancel.test.ts",
+        "tests": 10,
+        "skipped": 0
+      },
+      {
+        "line": 713,
+        "timestamp": "2026-11-09T22:04:09.1473365Z",
+        "text": " ✓ src/secret-mask.test.ts (14 tests) 47ms",
+        "status": "✓",
+        "file": "src/secret-mask.test.ts",
+        "tests": 14,
+        "skipped": 0
+      },
+      {
+        "line": 714,
+        "timestamp": "2026-11-09T22:04:10.5356161Z",
+        "text": " ✓ test/commands.test.ts (8 tests) 2344ms",
+        "status": "✓",
+        "file": "test/commands.test.ts",
+        "tests": 8,
+        "skipped": 0
+      },
+      {
+        "line": 721,
+        "timestamp": "2026-11-09T22:04:10.7883631Z",
+        "text": " ✓ test/provider-failure-adapters.test.ts (25 tests) 1246ms",
+        "status": "✓",
+        "file": "test/provider-failure-adapters.test.ts",
+        "tests": 25,
+        "skipped": 0
+      },
+      {
+        "line": 722,
+        "timestamp": "2026-11-09T22:04:10.8165458Z",
+        "text": " ✓ src/official-cli-timing.test.ts (8 tests) 54ms",
+        "status": "✓",
+        "file": "src/official-cli-timing.test.ts",
+        "tests": 8,
+        "skipped": 0
+      },
+      {
+        "line": 723,
+        "timestamp": "2026-11-09T22:04:11.1018205Z",
+        "text": " ✓ src/harness-install.test.ts (7 tests) 171ms",
+        "status": "✓",
+        "file": "src/harness-install.test.ts",
+        "tests": 7,
+        "skipped": 0
+      },
+      {
+        "line": 724,
+        "timestamp": "2026-11-09T22:04:11.3357149Z",
+        "text": " ✓ src/mcp-http-timing.test.ts (21 tests) 19ms",
+        "status": "✓",
+        "file": "src/mcp-http-timing.test.ts",
+        "tests": 21,
+        "skipped": 0
+      },
+      {
+        "line": 725,
+        "timestamp": "2026-11-09T22:04:11.4388726Z",
+        "text": " ✓ src/subscription-worker-timing.test.ts (8 tests) 10ms",
+        "status": "✓",
+        "file": "src/subscription-worker-timing.test.ts",
+        "tests": 8,
+        "skipped": 0
+      },
+      {
+        "line": 726,
+        "timestamp": "2026-11-09T22:04:11.4713905Z",
+        "text": " ✓ test/local-git-origin.test.ts (4 tests) 303ms",
+        "status": "✓",
+        "file": "test/local-git-origin.test.ts",
+        "tests": 4,
+        "skipped": 0
+      },
+      {
+        "line": 727,
+        "timestamp": "2026-11-09T22:04:11.6530772Z",
+        "text": " ✓ test/subscription-native-broker.test.ts (8 tests) 46ms",
+        "status": "✓",
+        "file": "test/subscription-native-broker.test.ts",
+        "tests": 8,
+        "skipped": 0
+      },
+      {
+        "line": 728,
+        "timestamp": "2026-11-09T22:04:11.9669225Z",
+        "text": " ✓ test/candidate-bootstrap.test.ts (7 tests) 35ms",
+        "status": "✓",
+        "file": "test/candidate-bootstrap.test.ts",
+        "tests": 7,
+        "skipped": 0
+      },
+      {
+        "line": 739,
+        "timestamp": "2026-11-09T22:04:12.3293565Z",
+        "text": " ✓ test/claude-prewarm-adapter.test.ts (9 tests) 425ms",
+        "status": "✓",
+        "file": "test/claude-prewarm-adapter.test.ts",
+        "tests": 9,
+        "skipped": 0
+      },
+      {
+        "line": 740,
+        "timestamp": "2026-11-09T22:04:12.7400008Z",
+        "text": " ✓ src/subscription-local-runner.test.ts (7 tests) 301ms",
+        "status": "✓",
+        "file": "src/subscription-local-runner.test.ts",
+        "tests": 7,
+        "skipped": 0
+      },
+      {
+        "line": 741,
+        "timestamp": "2026-11-09T22:04:12.7989132Z",
+        "text": " ✓ test/codex-startup-config.test.ts (28 tests) 321ms",
+        "status": "✓",
+        "file": "test/codex-startup-config.test.ts",
+        "tests": 28,
+        "skipped": 0
+      },
+      {
+        "line": 744,
+        "timestamp": "2026-11-09T22:04:14.0688407Z",
+        "text": " ✓ test/worktrees.test.ts (12 tests) 1132ms",
+        "status": "✓",
+        "file": "test/worktrees.test.ts",
+        "tests": 12,
+        "skipped": 0
+      },
+      {
+        "line": 745,
+        "timestamp": "2026-11-09T22:04:14.5432169Z",
+        "text": " ✓ test/tool-approval-liveness.test.ts (10 tests) 1306ms",
+        "status": "✓",
+        "file": "test/tool-approval-liveness.test.ts",
+        "tests": 10,
+        "skipped": 0
+      },
+      {
+        "line": 747,
+        "timestamp": "2026-11-09T22:04:14.9203772Z",
+        "text": " ✓ src/tracing-sampling.test.ts (13 tests) 60ms",
+        "status": "✓",
+        "file": "src/tracing-sampling.test.ts",
+        "tests": 13,
+        "skipped": 0
+      },
+      {
+        "line": 748,
+        "timestamp": "2026-11-09T22:04:15.1197781Z",
+        "text": " ✓ test/github-receipt-concurrency.test.ts (14 tests) 25ms",
+        "status": "✓",
+        "file": "test/github-receipt-concurrency.test.ts",
+        "tests": 14,
+        "skipped": 0
+      },
+      {
+        "line": 749,
+        "timestamp": "2026-11-09T22:04:15.3224954Z",
+        "text": " ✓ test/cloud-model-probe-bundle.test.ts (5 tests) 1172ms",
+        "status": "✓",
+        "file": "test/cloud-model-probe-bundle.test.ts",
+        "tests": 5,
+        "skipped": 0
+      },
+      {
+        "line": 751,
+        "timestamp": "2026-11-09T22:04:15.8666603Z",
+        "text": " ✓ src/run-isolation.test.ts (5 tests) 118ms",
+        "status": "✓",
+        "file": "src/run-isolation.test.ts",
+        "tests": 5,
+        "skipped": 0
+      },
+      {
+        "line": 752,
+        "timestamp": "2026-11-09T22:04:16.2807309Z",
+        "text": " ✓ src/runs/supervisor.test.ts (8 tests) 754ms",
+        "status": "✓",
+        "file": "src/runs/supervisor.test.ts",
+        "tests": 8,
+        "skipped": 0
+      },
+      {
+        "line": 753,
+        "timestamp": "2026-11-09T22:04:16.6345455Z",
+        "text": " ✓ test/run-model-credential.test.ts (4 tests) 327ms",
+        "status": "✓",
+        "file": "test/run-model-credential.test.ts",
+        "tests": 4,
+        "skipped": 0
+      },
+      {
+        "line": 754,
+        "timestamp": "2026-11-09T22:04:17.0873024Z",
+        "text": " ✓ test/provider-failure.test.ts (52 tests) 8ms",
+        "status": "✓",
+        "file": "test/provider-failure.test.ts",
+        "tests": 52,
+        "skipped": 0
+      },
+      {
+        "line": 755,
+        "timestamp": "2026-11-09T22:04:17.5804274Z",
+        "text": " ✓ test/tool-approval-codex.test.ts (18 tests) 939ms",
+        "status": "✓",
+        "file": "test/tool-approval-codex.test.ts",
+        "tests": 18,
+        "skipped": 0
+      },
+      {
+        "line": 756,
+        "timestamp": "2026-11-09T22:04:19.1056183Z",
+        "text": " ✓ test/fs-polling.test.ts (10 tests) 1529ms",
+        "status": "✓",
+        "file": "test/fs-polling.test.ts",
+        "tests": 10,
+        "skipped": 0
+      },
+      {
+        "line": 758,
+        "timestamp": "2026-11-09T22:04:19.2142131Z",
+        "text": " ✓ src/adapters/generation-metrics.test.ts (6 tests) 6ms",
+        "status": "✓",
+        "file": "src/adapters/generation-metrics.test.ts",
+        "tests": 6,
+        "skipped": 0
+      },
+      {
+        "line": 759,
+        "timestamp": "2026-11-09T22:04:19.6727237Z",
+        "text": " ✓ test/cloud-bootstrap.test.ts (6 tests) 42ms",
+        "status": "✓",
+        "file": "test/cloud-bootstrap.test.ts",
+        "tests": 6,
+        "skipped": 0
+      },
+      {
+        "line": 760,
+        "timestamp": "2026-11-09T22:04:19.8611591Z",
+        "text": " ✓ test/prewarm-timing.test.ts (5 tests) 12ms",
+        "status": "✓",
+        "file": "test/prewarm-timing.test.ts",
+        "tests": 5,
+        "skipped": 0
+      },
+      {
+        "line": 761,
+        "timestamp": "2026-11-09T22:04:20.3712397Z",
+        "text": " ✓ src/coordinator/codex.test.ts (11 tests) 191ms",
+        "status": "✓",
+        "file": "src/coordinator/codex.test.ts",
+        "tests": 11,
+        "skipped": 0
+      },
+      {
+        "line": 762,
+        "timestamp": "2026-11-09T22:04:20.8227851Z",
+        "text": " ✓ test/hosted-cli-prefetch-lifecycle.test.ts (4 tests) 30ms",
+        "status": "✓",
+        "file": "test/hosted-cli-prefetch-lifecycle.test.ts",
+        "tests": 4,
+        "skipped": 0
+      },
+      {
+        "line": 763,
+        "timestamp": "2026-11-09T22:04:21.1661332Z",
+        "text": " ✓ src/outbox.test.ts (6 tests) 80ms",
+        "status": "✓",
+        "file": "src/outbox.test.ts",
+        "tests": 6,
+        "skipped": 0
+      },
+      {
+        "line": 764,
+        "timestamp": "2026-11-09T22:04:21.7158515Z",
+        "text": " ✓ test/subscription.test.ts (14 tests) 172ms",
+        "status": "✓",
+        "file": "test/subscription.test.ts",
+        "tests": 14,
+        "skipped": 0
+      },
+      {
+        "line": 765,
+        "timestamp": "2026-11-09T22:04:21.8614824Z",
+        "text": " ✓ src/hosted-binaries.test.ts (8 tests) 13ms",
+        "status": "✓",
+        "file": "src/hosted-binaries.test.ts",
+        "tests": 8,
+        "skipped": 0
+      },
+      {
+        "line": 766,
+        "timestamp": "2026-11-09T22:04:22.1170593Z",
+        "text": " ✓ test/mailbox-catalogue.test.ts (11 tests) 42ms",
+        "status": "✓",
+        "file": "test/mailbox-catalogue.test.ts",
+        "tests": 11,
+        "skipped": 0
+      },
+      {
+        "line": 767,
+        "timestamp": "2026-11-09T22:04:22.9266906Z",
+        "text": " ✓ test/run-diagnostics.test.ts (8 tests) 516ms",
+        "status": "✓",
+        "file": "test/run-diagnostics.test.ts",
+        "tests": 8,
+        "skipped": 0
+      },
+      {
+        "line": 768,
+        "timestamp": "2026-11-09T22:04:24.1046111Z",
+        "text": " ✓ test/factory-check.test.ts (1 test) 762ms",
+        "status": "✓",
+        "file": "test/factory-check.test.ts",
+        "tests": 1,
+        "skipped": 0
+      },
+      {
+        "line": 770,
+        "timestamp": "2026-11-09T22:04:24.1585583Z",
+        "text": " ✓ test/cli-startup-login.test.ts (7 tests) 6142ms",
+        "status": "✓",
+        "file": "test/cli-startup-login.test.ts",
+        "tests": 7,
+        "skipped": 0
+      },
+      {
+        "line": 772,
+        "timestamp": "2026-11-09T22:04:24.2709810Z",
+        "text": " ✓ src/computer/credential-executor.test.ts (6 tests) 9ms",
+        "status": "✓",
+        "file": "src/computer/credential-executor.test.ts",
+        "tests": 6,
+        "skipped": 0
+      },
+      {
+        "line": 773,
+        "timestamp": "2026-11-09T22:04:24.2894303Z",
+        "text": " ✓ test/service.test.ts (11 tests) 11ms",
+        "status": "✓",
+        "file": "test/service.test.ts",
+        "tests": 11,
+        "skipped": 0
+      },
+      {
+        "line": 774,
+        "timestamp": "2026-11-09T22:04:24.3725912Z",
+        "text": " ✓ test/subscription-access-ready.test.ts (10 tests) 6ms",
+        "status": "✓",
+        "file": "test/subscription-access-ready.test.ts",
+        "tests": 10,
+        "skipped": 0
+      },
+      {
+        "line": 775,
+        "timestamp": "2026-11-09T22:04:24.6170793Z",
+        "text": " ✓ test/subscription-credentials.test.ts (8 tests) 11ms",
+        "status": "✓",
+        "file": "test/subscription-credentials.test.ts",
+        "tests": 8,
+        "skipped": 0
+      },
+      {
+        "line": 776,
+        "timestamp": "2026-11-09T22:04:25.2902555Z",
+        "text": " ✓ src/computer/web-review-push.test.ts (5 tests) 941ms",
+        "status": "✓",
+        "file": "src/computer/web-review-push.test.ts",
+        "tests": 5,
+        "skipped": 0
+      },
+      {
+        "line": 780,
+        "timestamp": "2026-11-09T22:04:25.4595680Z",
+        "text": " ✓ test/codex-mcp-context.test.ts (6 tests) 627ms",
+        "status": "✓",
+        "file": "test/codex-mcp-context.test.ts",
+        "tests": 6,
+        "skipped": 0
+      },
+      {
+        "line": 782,
+        "timestamp": "2026-11-09T22:04:25.5724288Z",
+        "text": " ✓ src/runs/quota-exhausted.test.ts (12 tests) 7ms",
+        "status": "✓",
+        "file": "src/runs/quota-exhausted.test.ts",
+        "tests": 12,
+        "skipped": 0
+      },
+      {
+        "line": 783,
+        "timestamp": "2026-11-09T22:04:25.8896917Z",
+        "text": " ✓ src/coordinator/runner.test.ts (6 tests) 134ms",
+        "status": "✓",
+        "file": "src/coordinator/runner.test.ts",
+        "tests": 6,
+        "skipped": 0
+      },
+      {
+        "line": 784,
+        "timestamp": "2026-11-09T22:04:26.1706434Z",
+        "text": " ✓ test/verify.test.ts (5 tests) 43ms",
+        "status": "✓",
+        "file": "test/verify.test.ts",
+        "tests": 5,
+        "skipped": 0
+      },
+      {
+        "line": 785,
+        "timestamp": "2026-11-09T22:04:26.3074005Z",
+        "text": " ✓ src/coordinator/claude.test.ts (9 tests) 346ms",
+        "status": "✓",
+        "file": "src/coordinator/claude.test.ts",
+        "tests": 9,
+        "skipped": 0
+      },
+      {
+        "line": 786,
+        "timestamp": "2026-11-09T22:04:26.5818114Z",
+        "text": " ✓ test/credential-journal.test.ts (2 tests) 64ms",
+        "status": "✓",
+        "file": "test/credential-journal.test.ts",
+        "tests": 2,
+        "skipped": 0
+      },
+      {
+        "line": 787,
+        "timestamp": "2026-11-09T22:04:26.6986200Z",
+        "text": " ✓ src/coordinator/contract.test.ts (17 tests) 10ms",
+        "status": "✓",
+        "file": "src/coordinator/contract.test.ts",
+        "tests": 17,
+        "skipped": 0
+      },
+      {
+        "line": 788,
+        "timestamp": "2026-11-09T22:04:27.2141379Z",
+        "text": " ✓ test/rpc.test.ts (6 tests) 114ms",
+        "status": "✓",
+        "file": "test/rpc.test.ts",
+        "tests": 6,
+        "skipped": 0
+      },
+      {
+        "line": 796,
+        "timestamp": "2026-11-09T22:04:28.3508704Z",
+        "text": " ✓ test/checkpoint-recovery.test.ts (4 tests) 928ms",
+        "status": "✓",
+        "file": "test/checkpoint-recovery.test.ts",
+        "tests": 4,
+        "skipped": 0
+      },
+      {
+        "line": 798,
+        "timestamp": "2026-11-09T22:04:28.6778297Z",
+        "text": " ✓ test/repository-git-timing.test.ts (3 tests) 102ms",
+        "status": "✓",
+        "file": "test/repository-git-timing.test.ts",
+        "tests": 3,
+        "skipped": 0
+      },
+      {
+        "line": 799,
+        "timestamp": "2026-11-09T22:04:29.3199278Z",
+        "text": " ✓ test/hosted-command.test.ts (5 tests) 2614ms",
+        "status": "✓",
+        "file": "test/hosted-command.test.ts",
+        "tests": 5,
+        "skipped": 0
+      },
+      {
+        "line": 802,
+        "timestamp": "2026-11-09T22:04:29.4409704Z",
+        "text": " ✓ test/claude-generation-abort.test.ts (4 tests) 401ms",
+        "status": "✓",
+        "file": "test/claude-generation-abort.test.ts",
+        "tests": 4,
+        "skipped": 0
+      },
+      {
+        "line": 803,
+        "timestamp": "2026-11-09T22:04:29.9532987Z",
+        "text": " ✓ test/codex-generation-completion.test.ts (3 tests) 287ms",
+        "status": "✓",
+        "file": "test/codex-generation-completion.test.ts",
+        "tests": 3,
+        "skipped": 0
+      },
+      {
+        "line": 804,
+        "timestamp": "2026-11-09T22:04:30.1724235Z",
+        "text": " ✓ test/adapter-runtime-model.test.ts (4 tests) 273ms",
+        "status": "✓",
+        "file": "test/adapter-runtime-model.test.ts",
+        "tests": 4,
+        "skipped": 0
+      },
+      {
+        "line": 805,
+        "timestamp": "2026-11-09T22:04:30.3123702Z",
+        "text": " ✓ test/machine-github.test.ts (4 tests) 10ms",
+        "status": "✓",
+        "file": "test/machine-github.test.ts",
+        "tests": 4,
+        "skipped": 0
+      },
+      {
+        "line": 806,
+        "timestamp": "2026-11-09T22:04:30.3924721Z",
+        "text": " ✓ test/codex-generation-wiring.test.ts (3 tests) 77ms",
+        "status": "✓",
+        "file": "test/codex-generation-wiring.test.ts",
+        "tests": 3,
+        "skipped": 0
+      },
+      {
+        "line": 807,
+        "timestamp": "2026-11-09T22:04:30.5832921Z",
+        "text": " ✓ src/env.test.ts (5 tests) 65ms",
+        "status": "✓",
+        "file": "src/env.test.ts",
+        "tests": 5,
+        "skipped": 0
+      },
+      {
+        "line": 808,
+        "timestamp": "2026-11-09T22:04:30.9578933Z",
+        "text": " ✓ test/computer-review-lifecycle.test.ts (3 tests) 169ms",
+        "status": "✓",
+        "file": "test/computer-review-lifecycle.test.ts",
+        "tests": 3,
+        "skipped": 0
+      },
+      {
+        "line": 809,
+        "timestamp": "2026-11-09T22:04:31.0551363Z",
+        "text": " ✓ test/cloud-registration.test.ts (4 tests) 10ms",
+        "status": "✓",
+        "file": "test/cloud-registration.test.ts",
+        "tests": 4,
+        "skipped": 0
+      },
+      {
+        "line": 810,
+        "timestamp": "2026-11-09T22:04:31.2071520Z",
+        "text": " ✓ test/cloud-anonymous-hint.test.ts (22 tests) 29ms",
+        "status": "✓",
+        "file": "test/cloud-anonymous-hint.test.ts",
+        "tests": 22,
+        "skipped": 0
+      },
+      {
+        "line": 811,
+        "timestamp": "2026-11-09T22:04:31.5645067Z",
+        "text": " ✓ src/coordinator/tool-result-wait.test.ts (4 tests) 8ms",
+        "status": "✓",
+        "file": "src/coordinator/tool-result-wait.test.ts",
+        "tests": 4,
+        "skipped": 0
+      },
+      {
+        "line": 812,
+        "timestamp": "2026-11-09T22:04:31.8685815Z",
+        "text": " ✓ test/skills.test.ts (4 tests) 59ms",
+        "status": "✓",
+        "file": "test/skills.test.ts",
+        "tests": 4,
+        "skipped": 0
+      },
+      {
+        "line": 813,
+        "timestamp": "2026-11-09T22:04:31.8843279Z",
+        "text": " ✓ test/subscription-launcher.test.ts (2 tests) 183ms",
+        "status": "✓",
+        "file": "test/subscription-launcher.test.ts",
+        "tests": 2,
+        "skipped": 0
+      },
+      {
+        "line": 814,
+        "timestamp": "2026-11-09T22:04:32.0916011Z",
+        "text": " ✓ src/agents/run-credential.test.ts (6 tests) 5ms",
+        "status": "✓",
+        "file": "src/agents/run-credential.test.ts",
+        "tests": 6,
+        "skipped": 0
+      },
+      {
+        "line": 815,
+        "timestamp": "2026-11-09T22:04:35.9044726Z",
+        "text": " ✓ test/chat-files.test.ts (1 test) 3328ms",
+        "status": "✓",
+        "file": "test/chat-files.test.ts",
+        "tests": 1,
+        "skipped": 0
+      },
+      {
+        "line": 817,
+        "timestamp": "2026-11-09T22:04:37.2729344Z",
+        "text": " ✓ test/quota-exhausted-runs.test.ts (3 tests) 924ms",
+        "status": "✓",
+        "file": "test/quota-exhausted-runs.test.ts",
+        "tests": 3,
+        "skipped": 0
+      },
+      {
+        "line": 819,
+        "timestamp": "2026-11-09T22:04:37.6017336Z",
+        "text": " ✓ test/codex-item-chunks.test.ts (6 tests) 3ms",
+        "status": "✓",
+        "file": "test/codex-item-chunks.test.ts",
+        "tests": 6,
+        "skipped": 0
+      },
+      {
+        "line": 820,
+        "timestamp": "2026-11-09T22:04:37.8240863Z",
+        "text": " ✓ test/fs-browse.test.ts (5 tests) 52ms",
+        "status": "✓",
+        "file": "test/fs-browse.test.ts",
+        "tests": 5,
+        "skipped": 0
+      },
+      {
+        "line": 821,
+        "timestamp": "2026-11-09T22:04:38.1619568Z",
+        "text": " ✓ test/mailbox-notices.test.ts (8 tests) 7ms",
+        "status": "✓",
+        "file": "test/mailbox-notices.test.ts",
+        "tests": 8,
+        "skipped": 0
+      },
+      {
+        "line": 822,
+        "timestamp": "2026-11-09T22:04:40.6222493Z",
+        "text": " ✓ test/chat-files-http.test.ts (2 tests) 8465ms",
+        "status": "✓",
+        "file": "test/chat-files-http.test.ts",
+        "tests": 2,
+        "skipped": 0
+      },
+      {
+        "line": 824,
+        "timestamp": "2026-11-09T22:04:41.1456745Z",
+        "text": " ✓ test/claude-resume.test.ts (2 tests) 140ms",
+        "status": "✓",
+        "file": "test/claude-resume.test.ts",
+        "tests": 2,
+        "skipped": 0
+      },
+      {
+        "line": 825,
+        "timestamp": "2026-11-09T22:04:41.5840263Z",
+        "text": " ✓ test/quota.test.ts (1 test) 24ms",
+        "status": "✓",
+        "file": "test/quota.test.ts",
+        "tests": 1,
+        "skipped": 0
+      },
+      {
+        "line": 826,
+        "timestamp": "2026-11-09T22:04:41.6949040Z",
+        "text": " ✓ src/agents/chat-files.test.ts (2 tests) 8ms",
+        "status": "✓",
+        "file": "src/agents/chat-files.test.ts",
+        "tests": 2,
+        "skipped": 0
+      },
+      {
+        "line": 827,
+        "timestamp": "2026-11-09T22:04:41.8100713Z",
+        "text": " ✓ src/harnesses.test.ts (4 tests) 4ms",
+        "status": "✓",
+        "file": "src/harnesses.test.ts",
+        "tests": 4,
+        "skipped": 0
+      },
+      {
+        "line": 828,
+        "timestamp": "2026-11-09T22:04:42.0379631Z",
+        "text": " ✓ test/kill.test.ts (1 test) 3645ms",
+        "status": "✓",
+        "file": "test/kill.test.ts",
+        "tests": 1,
+        "skipped": 0
+      },
+      {
+        "line": 831,
+        "timestamp": "2026-11-09T22:04:42.2339721Z",
+        "text": " ✓ src/agents/run-apps.test.ts (4 tests) 5ms",
+        "status": "✓",
+        "file": "src/agents/run-apps.test.ts",
+        "tests": 4,
+        "skipped": 0
+      },
+      {
+        "line": 832,
+        "timestamp": "2026-11-09T22:04:42.3431131Z",
+        "text": " ✓ test/dispatch-link.test.ts (4 tests) 21ms",
+        "status": "✓",
+        "file": "test/dispatch-link.test.ts",
+        "tests": 4,
+        "skipped": 0
+      },
+      {
+        "line": 833,
+        "timestamp": "2026-11-09T22:04:42.4351412Z",
+        "text": " ✓ src/task-env.test.ts (5 tests) 4ms",
+        "status": "✓",
+        "file": "src/task-env.test.ts",
+        "tests": 5,
+        "skipped": 0
+      },
+      {
+        "line": 834,
+        "timestamp": "2026-11-09T22:04:42.5254705Z",
+        "text": " ✓ test/repository-cancel.test.ts (1 test) 36ms",
+        "status": "✓",
+        "file": "test/repository-cancel.test.ts",
+        "tests": 1,
+        "skipped": 0
+      },
+      {
+        "line": 835,
+        "timestamp": "2026-11-09T22:04:42.7488190Z",
+        "text": " ✓ test/verify-artifacts.test.ts (1 test) 97ms",
+        "status": "✓",
+        "file": "test/verify-artifacts.test.ts",
+        "tests": 1,
+        "skipped": 0
+      },
+      {
+        "line": 836,
+        "timestamp": "2026-11-09T22:04:42.8372923Z",
+        "text": " ✓ src/tool-duration.test.ts (2 tests) 2ms",
+        "status": "✓",
+        "file": "src/tool-duration.test.ts",
+        "tests": 2,
+        "skipped": 0
+      },
+      {
+        "line": 837,
+        "timestamp": "2026-11-09T22:04:42.9499518Z",
+        "text": " ✓ test/tool-approval-claude.test.ts (2 tests) 87ms",
+        "status": "✓",
+        "file": "test/tool-approval-claude.test.ts",
+        "tests": 2,
+        "skipped": 0
+      },
+      {
+        "line": 838,
+        "timestamp": "2026-11-09T22:04:43.0379481Z",
+        "text": " ✓ test/native-companion.test.ts (1 test) 80ms",
+        "status": "✓",
+        "file": "test/native-companion.test.ts",
+        "tests": 1,
+        "skipped": 0
+      },
+      {
+        "line": 839,
+        "timestamp": "2026-11-09T22:04:43.1339257Z",
+        "text": " ✓ test/subscription-quota.test.ts (6 tests) 5ms",
+        "status": "✓",
+        "file": "test/subscription-quota.test.ts",
+        "tests": 6,
+        "skipped": 0
+      },
+      {
+        "line": 840,
+        "timestamp": "2026-11-09T22:04:43.2207969Z",
+        "text": " ✓ src/agents/tool-approval.test.ts (3 tests) 4ms",
+        "status": "✓",
+        "file": "src/agents/tool-approval.test.ts",
+        "tests": 3,
+        "skipped": 0
+      },
+      {
+        "line": 844,
+        "timestamp": "2026-11-09T22:04:43.3534791Z",
+        "text": " ✓ test/retain-resources.test.ts (1 test) 4ms",
+        "status": "✓",
+        "file": "test/retain-resources.test.ts",
+        "tests": 1,
+        "skipped": 0
+      },
+      {
+        "line": 845,
+        "timestamp": "2026-11-09T22:04:43.4310991Z",
+        "text": " ✓ test/tool-approval-admission.test.ts (2 tests) 38ms",
+        "status": "✓",
+        "file": "test/tool-approval-admission.test.ts",
+        "tests": 2,
+        "skipped": 0
+      },
+      {
+        "line": 846,
+        "timestamp": "2026-11-09T22:04:43.5350012Z",
+        "text": " ✓ src/log.test.ts (1 test) 12ms",
+        "status": "✓",
+        "file": "src/log.test.ts",
+        "tests": 1,
+        "skipped": 0
+      },
+      {
+        "line": 847,
+        "timestamp": "2026-11-09T22:04:43.6648351Z",
+        "text": " ✓ test/registration-login.test.ts (2 tests) 16ms",
+        "status": "✓",
+        "file": "test/registration-login.test.ts",
+        "tests": 2,
+        "skipped": 0
+      },
+      {
+        "line": 848,
+        "timestamp": "2026-11-09T22:04:43.9481247Z",
+        "text": " ✓ test/claude-chunks.test.ts (1 test) 3ms",
+        "status": "✓",
+        "file": "test/claude-chunks.test.ts",
+        "tests": 1,
+        "skipped": 0
+      },
+      {
+        "line": 849,
+        "timestamp": "2026-11-09T22:04:44.0493820Z",
+        "text": " ✓ src/computer/transport.test.ts (2 tests) 2ms",
+        "status": "✓",
+        "file": "src/computer/transport.test.ts",
+        "tests": 2,
+        "skipped": 0
+      },
+      {
+        "line": 850,
+        "timestamp": "2026-11-09T22:04:44.1429307Z",
+        "text": " ✓ test/device-file.test.ts (3 tests) 2ms",
+        "status": "✓",
+        "file": "test/device-file.test.ts",
+        "tests": 3,
+        "skipped": 0
+      },
+      {
+        "line": 851,
+        "timestamp": "2026-11-09T22:04:58.5549733Z",
+        "text": " ✓ test/claude-subscription.test.ts (26 tests) 69363ms",
+        "status": "✓",
+        "file": "test/claude-subscription.test.ts",
+        "tests": 26,
+        "skipped": 0
+      }
+    ],
+    "countConservation": "141 printed file rows =140 passed+1 skipped; sum per-file tests1593 and explicit per-file skipped2 equals summary1591 passed+2 skipped.",
+    "focusFileReceipts": [
+      {
+        "line": 548,
+        "timestamp": "2026-11-09T22:03:38.8754694Z",
+        "text": " ✓ test/mcp-http-observation.test.ts (18 tests) 1272ms",
+        "status": "✓",
+        "file": "test/mcp-http-observation.test.ts",
+        "tests": 18,
+        "skipped": 0
+      },
+      {
+        "line": 640,
+        "timestamp": "2026-11-09T22:03:48.7906014Z",
+        "text": " ✓ test/mikka-mcp-backend.test.ts (17 tests) 530ms",
+        "status": "✓",
+        "file": "test/mikka-mcp-backend.test.ts",
+        "tests": 17,
+        "skipped": 0
+      },
+      {
+        "line": 643,
+        "timestamp": "2026-11-09T22:03:50.5005171Z",
+        "text": " ✓ test/anonymous-codex-spare.test.ts (22 tests) 596ms",
+        "status": "✓",
+        "file": "test/anonymous-codex-spare.test.ts",
+        "tests": 22,
+        "skipped": 0
+      },
+      {
+        "line": 669,
+        "timestamp": "2026-11-09T22:03:58.6367654Z",
+        "text": " ✓ test/anonymous-codex-hosted.test.ts (10 tests) 876ms",
+        "status": "✓",
+        "file": "test/anonymous-codex-hosted.test.ts",
+        "tests": 10,
+        "skipped": 0
+      },
+      {
+        "line": 708,
+        "timestamp": "2026-11-09T22:04:07.3425980Z",
+        "text": " ✓ test/mikka-mcp-bridge.test.ts (13 tests) 3926ms",
+        "status": "✓",
+        "file": "test/mikka-mcp-bridge.test.ts",
+        "tests": 13,
+        "skipped": 0
+      },
+      {
+        "line": 725,
+        "timestamp": "2026-11-09T22:04:11.4388726Z",
+        "text": " ✓ src/subscription-worker-timing.test.ts (8 tests) 10ms",
+        "status": "✓",
+        "file": "src/subscription-worker-timing.test.ts",
+        "tests": 8,
+        "skipped": 0
+      },
+      {
+        "line": 741,
+        "timestamp": "2026-11-09T22:04:12.7989132Z",
+        "text": " ✓ test/codex-startup-config.test.ts (28 tests) 321ms",
+        "status": "✓",
+        "file": "test/codex-startup-config.test.ts",
+        "tests": 28,
+        "skipped": 0
+      },
+      {
+        "line": 780,
+        "timestamp": "2026-11-09T22:04:25.4595680Z",
+        "text": " ✓ test/codex-mcp-context.test.ts (6 tests) 627ms",
+        "status": "✓",
+        "file": "test/codex-mcp-context.test.ts",
+        "tests": 6,
+        "skipped": 0
+      }
+    ],
+    "anonymousAndRequired": {
+      "focusedSuiteTotal": 60,
+      "anonymousSpare22Passed": true,
+      "anonymousHosted10Passed": true,
+      "startupConfig28Passed": true,
+      "allThreeFilesNoReportedSkips": true,
+      "sourceBinding": {
+        "spare": {
+          "key": "ciD2:anonymousSpare",
+          "bytes": 15067,
+          "sha256": "4ff047f7ddfbca99d6ac0b4b5b4524e5b90df7b041e81855242d5cd7acaaed06",
+          "gitBlob": "2e3d76a20c67848fb68cfeca8712754f5fc35ca6"
+        },
+        "hosted": {
+          "key": "ciD2:anonymousHosted",
+          "bytes": 13662,
+          "sha256": "b007e5d3369cdd41ff9fb7083498a522bc2398d15d6aa7055873df08aec3545e",
+          "gitBlob": "8ffd1fa642e7e3b22463c4127471f02a4e7eb6fd"
+        }
+      },
+      "sourceEvidence": {
+        "hostedSyntheticUserAgent": {
+          "line": 36,
+          "text": "    FAKE_CODEX_USER_AGENT: `mikka/${version} (offline fixture)`, FIXTURE_WIRE: trace }).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))"
+        },
+        "warmRequiredAssertion": {
+          "line": 84,
+          "text": "    expect(mcp.required).toBe(true)"
+        },
+        "coldRequiredAssertion": {
+          "line": 143,
+          "text": "  expect(login.argv).toContain('mcp_servers.mikka.required=true')"
+        },
+        "hostedVersionMatrix": {
+          "line": 95,
+          "text": "it.each(['0.166.0', '0.167.0'])('records the adopted %s child\\'s asynchronous login in the late startup scope without repeating initialize', async version => {"
+        },
+        "spareInitializeMatrix": {
+          "line": 63,
+          "text": "it.each(['0.166.0', '0.167.0'])('sends only initialize before a repository exists, then adopts that exact %s process once', async version => {"
+        },
+        "spareTimingMatrix": {
+          "line": 102,
+          "text": "it.each(['0.166.0', '0.167.0'])('retains the true earlier timing origin only for successful %s adoption', async version => {"
+        },
+        "spareUnverifiedVersions": {
+          "line": 94,
+          "text": "it.each(['0.163.0', '0.166.1', '0.168.0', '0.167.0-alpha.1'])('does not adopt unverified native protocol version %s', async version => {"
+        }
+      },
+      "interpretation": "The named full suites executed with no skips; fixed-source matrices contain both0.166.0 and0.167.0 and the warm/cold required assertions. This binds coverage by fixed-source suite execution; default Vitest output does not print every fast assertion individually. The fixture CLI/IPC is synthetic, not an officialCLI production run."
+    },
+    "declaredSkips": {
+      "realAgentFile": {
+        "receipt": {
+          "line": 682,
+          "timestamp": "2026-11-09T22:04:02.2383936Z",
+          "text": " ↓ test/real-agents.test.ts (0 test)",
+          "status": "↓",
+          "file": "test/real-agents.test.ts",
+          "tests": 0,
+          "skipped": 0
+        },
+        "source": {
+          "key": "ciD2:realAgentsTest",
+          "bytes": 12154,
+          "sha256": "f55883b29c4c357b717a4f578f859eb00b5a6c13db871f5e935cbd64ee83679f",
+          "gitBlob": "6153fb4ead3ffc55d8c31451d27608da05300f1f"
+        },
+        "sourceGate": "HARNESSES is derived from MIKKA_REAL_AGENTS; describe.skipIf(HARNESSES.length===0). Actual file receipt is skipped with0 registered tests.",
+        "officialCliExecutionProved": false
+      },
+      "cursorCases": {
+        "receipt": {
+          "line": 596,
+          "timestamp": "2026-11-09T22:03:48.6530934Z",
+          "text": " ✓ test/adapters.test.ts (39 tests | 2 skipped) 18418ms",
+          "status": "✓",
+          "file": "test/adapters.test.ts",
+          "tests": 39,
+          "skipped": 2
+        },
+        "source": {
+          "key": "ciD2:adaptersTest",
+          "bytes": 24586,
+          "sha256": "c6af14fb0117a6b9aba7d9b89be45ea3e5e37ef18fcfcb643c072f7e6143dd9e",
+          "gitBlob": "c594202c9db5a0fa8a1c19fb731125d309abc61d"
+        },
+        "guards": [
+          {
+            "line": 501,
+            "text": "    it.skipIf(harness === \"cursor\")("
+          },
+          {
+            "line": 515,
+            "text": "    it.skipIf(harness === \"cursor\")("
+          }
+        ],
+        "caseTitles": [
+          "question continuation refuses a missing original session without a fresh prompt",
+          "question continuation resumes the exact original session"
+        ],
+        "interpretation": "Exactly the two Cursor branches are guarded by it.skipIf(harness===cursor); these are the2 skipped tests in the1593 total. They are distinct from the skipped0-test real-agent file."
+      }
+    },
+    "mailbox": {
+      "command": {
+        "line": 883,
+        "timestamp": "2026-11-09T22:04:58.8261829Z",
+        "text": "> node --import tsx --test --test-timeout=60000 test/run-mailbox.node-test.ts test/codex-mailbox-resume.node-test.ts"
+      },
+      "counts": {
+        "reportedPass": 62,
+        "codexResumeNodes": 40,
+        "codexTopLevel": 10,
+        "codexSubtests": 30,
+        "generalNodes": 22,
+        "allDisplayedPass": true
+      },
+      "allPrintedReceipts": [
+        {
+          "line": 885,
+          "timestamp": "2026-11-09T22:04:59.6594921Z",
+          "text": "✔ Codex mailbox continues the original history in a new run and restarts with only the current transport (196.34077ms)"
+        },
+        {
+          "line": 886,
+          "timestamp": "2026-11-09T22:04:59.7799720Z",
+          "text": "✔ Codex 0.166.0 records its actual version and resumes the same mailbox thread with the current transport (128.940124ms)"
+        },
+        {
+          "line": 887,
+          "timestamp": "2026-11-09T22:04:59.8793520Z",
+          "text": "✔ Codex 0.167.0 records its actual version and resumes the same mailbox thread with the current transport (99.066725ms)"
+        },
+        {
+          "line": 888,
+          "timestamp": "2026-11-09T22:04:59.9414338Z",
+          "text": "▶ Codex mailbox resume rejects unverified cross-version history before thread/resume or a native turn"
+        },
+        {
+          "line": 889,
+          "timestamp": "2026-11-09T22:04:59.9415259Z",
+          "text": "  ✔ 0.163.0 to 0.166.0 (61.405948ms)"
+        },
+        {
+          "line": 890,
+          "timestamp": "2026-11-09T22:05:00.0038021Z",
+          "text": "  ✔ 0.166.0 to 0.163.0 (61.878195ms)"
+        },
+        {
+          "line": 891,
+          "timestamp": "2026-11-09T22:05:00.0747523Z",
+          "text": "  ✔ 0.163.0 to 0.167.0 (66.031497ms)"
+        },
+        {
+          "line": 892,
+          "timestamp": "2026-11-09T22:05:00.1407972Z",
+          "text": "  ✔ 0.167.0 to 0.163.0 (71.506023ms)"
+        },
+        {
+          "line": 893,
+          "timestamp": "2026-11-09T22:05:00.2291828Z",
+          "text": "  ✔ 0.166.0 to 0.167.0 (87.684614ms)"
+        },
+        {
+          "line": 894,
+          "timestamp": "2026-11-09T22:05:00.2889143Z",
+          "text": "  ✔ 0.167.0 to 0.166.0 (60.19054ms)"
+        },
+        {
+          "line": 895,
+          "timestamp": "2026-11-09T22:05:00.2900619Z",
+          "text": "✔ Codex mailbox resume rejects unverified cross-version history before thread/resume or a native turn (410.104505ms)"
+        },
+        {
+          "line": 896,
+          "timestamp": "2026-11-09T22:05:00.3216184Z",
+          "text": "▶ Codex mailbox resume rejects missing or changed capability evidence before any native turn"
+        },
+        {
+          "line": 897,
+          "timestamp": "2026-11-09T22:05:00.3217010Z",
+          "text": "  ✔ 0.163.0 missing-receipt (32.985735ms)"
+        },
+        {
+          "line": 898,
+          "timestamp": "2026-11-09T22:05:00.3539321Z",
+          "text": "  ✔ 0.163.0 catalogue (31.259745ms)"
+        },
+        {
+          "line": 899,
+          "timestamp": "2026-11-09T22:05:00.3867129Z",
+          "text": "  ✔ 0.163.0 header-catalogue (32.237774ms)"
+        },
+        {
+          "line": 900,
+          "timestamp": "2026-11-09T22:05:00.4159366Z",
+          "text": "  ✔ 0.163.0 header-schema (30.33639ms)"
+        },
+        {
+          "line": 901,
+          "timestamp": "2026-11-09T22:05:00.4504250Z",
+          "text": "  ✔ 0.163.0 header-session (34.194566ms)"
+        },
+        {
+          "line": 902,
+          "timestamp": "2026-11-09T22:05:00.4830246Z",
+          "text": "  ✔ 0.163.0 missing-history (32.829709ms)"
+        },
+        {
+          "line": 903,
+          "timestamp": "2026-11-09T22:05:00.5149604Z",
+          "text": "  ✔ 0.163.0 receipt-path (31.440749ms)"
+        },
+        {
+          "line": 904,
+          "timestamp": "2026-11-09T22:05:00.5488863Z",
+          "text": "  ✔ 0.163.0 receipt-run (33.42508ms)"
+        },
+        {
+          "line": 905,
+          "timestamp": "2026-11-09T22:05:00.5845866Z",
+          "text": "  ✔ 0.163.0 receipt-session (32.939074ms)"
+        },
+        {
+          "line": 906,
+          "timestamp": "2026-11-09T22:05:00.6173449Z",
+          "text": "  ✔ 0.163.0 receipt-version (33.795874ms)"
+        },
+        {
+          "line": 907,
+          "timestamp": "2026-11-09T22:05:00.6503779Z",
+          "text": "  ✔ 0.163.0 history-link (34.471997ms)"
+        },
+        {
+          "line": 908,
+          "timestamp": "2026-11-09T22:05:00.6834251Z",
+          "text": "  ✔ 0.167.0 missing-receipt (33.292179ms)"
+        },
+        {
+          "line": 909,
+          "timestamp": "2026-11-09T22:05:00.7163180Z",
+          "text": "  ✔ 0.167.0 catalogue (32.696312ms)"
+        },
+        {
+          "line": 910,
+          "timestamp": "2026-11-09T22:05:00.7488225Z",
+          "text": "  ✔ 0.167.0 header-catalogue (31.780407ms)"
+        },
+        {
+          "line": 911,
+          "timestamp": "2026-11-09T22:05:00.7853835Z",
+          "text": "  ✔ 0.167.0 header-schema (36.733291ms)"
+        },
+        {
+          "line": 912,
+          "timestamp": "2026-11-09T22:05:00.8167447Z",
+          "text": "  ✔ 0.167.0 header-session (31.563554ms)"
+        },
+        {
+          "line": 913,
+          "timestamp": "2026-11-09T22:05:00.8484386Z",
+          "text": "  ✔ 0.167.0 missing-history (31.316511ms)"
+        },
+        {
+          "line": 914,
+          "timestamp": "2026-11-09T22:05:00.8791994Z",
+          "text": "  ✔ 0.167.0 receipt-path (30.687701ms)"
+        },
+        {
+          "line": 915,
+          "timestamp": "2026-11-09T22:05:00.9086878Z",
+          "text": "  ✔ 0.167.0 receipt-run (29.516129ms)"
+        },
+        {
+          "line": 916,
+          "timestamp": "2026-11-09T22:05:00.9389712Z",
+          "text": "  ✔ 0.167.0 receipt-session (30.004406ms)"
+        },
+        {
+          "line": 917,
+          "timestamp": "2026-11-09T22:05:00.9703752Z",
+          "text": "  ✔ 0.167.0 receipt-version (30.996622ms)"
+        },
+        {
+          "line": 918,
+          "timestamp": "2026-11-09T22:05:01.0053925Z",
+          "text": "  ✔ 0.167.0 history-link (33.122982ms)"
+        },
+        {
+          "line": 919,
+          "timestamp": "2026-11-09T22:05:01.0075883Z",
+          "text": "✔ Codex mailbox resume rejects missing or changed capability evidence before any native turn (715.240603ms)"
+        },
+        {
+          "line": 920,
+          "timestamp": "2026-11-09T22:05:01.0649847Z",
+          "text": "▶ Codex mailbox resume never substitutes a new thread after native refusal or a changed SID"
+        },
+        {
+          "line": 921,
+          "timestamp": "2026-11-09T22:05:01.0650202Z",
+          "text": "  ✔ refuseResume (61.056428ms)"
+        },
+        {
+          "line": 922,
+          "timestamp": "2026-11-09T22:05:01.1448155Z",
+          "text": "  ✔ differentThread (78.416237ms)"
+        },
+        {
+          "line": 923,
+          "timestamp": "2026-11-09T22:05:01.1448648Z",
+          "text": "✔ Codex mailbox resume never substitutes a new thread after native refusal or a changed SID (140.008745ms)"
+        },
+        {
+          "line": 924,
+          "timestamp": "2026-11-09T22:05:01.2125983Z",
+          "text": "✔ a previous-turn callback during native resume cannot use the current run mailbox (68.609975ms)"
+        },
+        {
+          "line": 925,
+          "timestamp": "2026-11-09T22:05:01.2487269Z",
+          "text": "✔ missing native resume evidence does not prevent an otherwise supported fresh mailbox thread (35.516486ms)"
+        },
+        {
+          "line": 926,
+          "timestamp": "2026-11-09T22:05:01.3450519Z",
+          "text": "✔ unverified Codex 0.164.0 keeps fresh-thread behavior but cannot resume a mailbox thread (96.35105ms)"
+        },
+        {
+          "line": 927,
+          "timestamp": "2026-11-09T22:05:01.4289213Z",
+          "text": "✔ unverified Codex 0.168.0 keeps fresh-thread behavior but cannot resume a mailbox thread (89.269476ms)"
+        },
+        {
+          "line": 928,
+          "timestamp": "2026-11-09T22:05:01.4433689Z",
+          "text": "✔ claim parser preserves only an explicit transport capability and uses the configured MCP endpoint (28.826316ms)"
+        },
+        {
+          "line": 929,
+          "timestamp": "2026-11-09T22:05:01.4434185Z",
+          "text": "✔ actual Supervisor wires the callback and clears custody after stop (36.563905ms)"
+        },
+        {
+          "line": 930,
+          "timestamp": "2026-11-09T22:05:01.4434583Z",
+          "text": "✔ actual Supervisor wires the callback and clears custody after lease-expiry (9.950787ms)"
+        },
+        {
+          "line": 931,
+          "timestamp": "2026-11-09T22:05:01.4434979Z",
+          "text": "✔ actual Supervisor wires the callback and clears custody after default-off (7.727414ms)"
+        },
+        {
+          "line": 932,
+          "timestamp": "2026-11-09T22:05:01.4435540Z",
+          "text": "✔ actual Supervisor wires the callback and clears custody after close-failure (12.950771ms)"
+        },
+        {
+          "line": 933,
+          "timestamp": "2026-11-09T22:05:01.4436139Z",
+          "text": "✔ Supervisor handshake handoff stop closes once without starting a CLI (3.193969ms)"
+        },
+        {
+          "line": 934,
+          "timestamp": "2026-11-09T22:05:01.4436756Z",
+          "text": "✔ Supervisor handshake handoff lease-expiry closes once without starting a CLI (1.796356ms)"
+        },
+        {
+          "line": 935,
+          "timestamp": "2026-11-09T22:05:01.4437823Z",
+          "text": "✔ Supervisor handshake handoff shutdown closes once without starting a CLI (1.625548ms)"
+        },
+        {
+          "line": 936,
+          "timestamp": "2026-11-09T22:05:01.4438479Z",
+          "text": "✔ explicit mailbox close removes its run abort listener without retaining authority (0.937798ms)"
+        },
+        {
+          "line": 937,
+          "timestamp": "2026-11-09T22:05:01.4439201Z",
+          "text": "✔ capability defaults off and arbitrary host/path/credentials never receive a request (1.035556ms)"
+        },
+        {
+          "line": 938,
+          "timestamp": "2026-11-09T22:05:01.4440078Z",
+          "text": "✔ Supervisor admission requires held nonterminal run and a present fresh lease, including the terminal-before-close window (0.446476ms)"
+        },
+        {
+          "line": 939,
+          "timestamp": "2026-11-09T22:05:01.4440884Z",
+          "text": "✔ actual configured HTTP link pins the optional host adapter to its own Mikka endpoint (0.882675ms)"
+        },
+        {
+          "line": 940,
+          "timestamp": "2026-11-09T22:05:01.4441651Z",
+          "text": "✔ claude_code actual fake CLI consumes the run-bound MCP config, strict schemas and shared peer transport (180.390333ms)"
+        },
+        {
+          "line": 941,
+          "timestamp": "2026-11-09T22:05:01.4442617Z",
+          "text": "✔ codex actual fake CLI consumes the run-bound MCP config, strict schemas and shared peer transport (123.775334ms)"
+        },
+        {
+          "line": 942,
+          "timestamp": "2026-11-09T22:05:01.4443511Z",
+          "text": "✔ cancel, revoked bearer and malformed/oversized responses fail closed; uncertain send uses original key without auto-replay (3.612152ms)"
+        },
+        {
+          "line": 943,
+          "timestamp": "2026-11-09T22:05:01.4444324Z",
+          "text": "✔ claude_code actual fake CLI and host catalogue preserve a frozen one-tool subset (148.701614ms)"
+        },
+        {
+          "line": 944,
+          "timestamp": "2026-11-09T22:05:01.4444988Z",
+          "text": "✔ codex actual fake CLI and host catalogue preserve a frozen one-tool subset (161.618513ms)"
+        },
+        {
+          "line": 945,
+          "timestamp": "2026-11-09T22:05:01.4445650Z",
+          "text": "✔ claude_code fake CLI has no mailbox configuration or advertised tools by default (159.161931ms)"
+        },
+        {
+          "line": 946,
+          "timestamp": "2026-11-09T22:05:01.4446306Z",
+          "text": "✔ codex fake CLI has no mailbox configuration or advertised tools by default (152.794011ms)"
+        },
+        {
+          "line": 947,
+          "timestamp": "2026-11-09T22:05:01.4447144Z",
+          "text": "✔ hosted source preserves original socket mounts/network isolation and passes host callbacks only through existing adapters (0.477913ms)"
+        },
+        {
+          "line": 948,
+          "timestamp": "2026-11-09T22:05:01.4447981Z",
+          "text": "✔ stop aborts a genuinely pending host request and prevents another request during CLI grace (1.300877ms)"
+        },
+        {
+          "line": 949,
+          "timestamp": "2026-11-09T22:05:01.4448733Z",
+          "text": "✔ Codex mailbox history without a host receipt fails closed regardless of the reported version (2.492418ms)"
+        }
+      ],
+      "codexSource": {
+        "key": "ciD2:codexMailboxTest",
+        "bytes": 15881,
+        "sha256": "f11548e6de43a94469f9a1d0095303a4e6db882ab9fb4a8816d579e4e53047c1",
+        "gitBlob": "14a9ca5d87eccbb5b6402ee4c8618e5654e5b54f"
+      },
+      "codexMatrix": "40 reported passing test nodes =10 top-level +30 subtests, including same-version0.163/0.166/0.167 positives,6 cross-version negatives,22 capability/history mutations,2 refusal/changedSID subtests,old-turn callback/fresh-thread/unverified-version cases. The parent group result nodes are included in40; do not call all40 independent leaf scenarios.",
+      "genericMailboxNodes": 22,
+      "syntheticBoundary": "Fixed test source uses test/fakes/fake-codex.mjs and labels the adapter real but CLI synthetic. General mailbox tests also report fakeCLI cases. The62-node command is not officialCLI or production mailbox verification."
+    },
+    "typecheckBuildPackage": {
+      "commandReceipts": [
+        {
+          "line": 1099,
+          "timestamp": "2026-11-09T22:05:05.5373588Z",
+          "text": "##[group]Run pnpm --filter @mikka/daemon typecheck"
+        },
+        {
+          "line": 1117,
+          "timestamp": "2026-11-09T22:05:05.7348157Z",
+          "text": "> tsgo --noEmit -p tsconfig.json"
+        },
+        {
+          "line": 1119,
+          "timestamp": "2026-11-09T22:05:08.0544197Z",
+          "text": "##[group]Run pnpm --filter @mikka/daemon build"
+        },
+        {
+          "line": 1137,
+          "timestamp": "2026-11-09T22:05:08.2623669Z",
+          "text": "> node scripts/build.mjs"
+        },
+        {
+          "line": 1141,
+          "timestamp": "2026-11-09T22:05:08.3890580Z",
+          "text": "##[group]Run pnpm --filter @mikka/daemon test:package"
+        },
+        {
+          "line": 1160,
+          "timestamp": "2026-11-09T22:05:08.5887240Z",
+          "text": "> node --test test/package.test.mjs"
+        }
+      ],
+      "packagePass": {
+        "line": 1165,
+        "timestamp": "2026-11-09T22:05:19.4912034Z",
+        "text": "✔ registry-installed tarball runs its CLI and a real mock-daemon git task without workspace dependencies (10851.248101ms)"
+      },
+      "note": "Typecheck/build commands are logged and execution proceeds to the passing package test and root-reported SUCCESS job. The package test is an installed MikkaCLI plus mock-daemon git task, not official agentCLI production coverage."
+    },
+    "diagnosticsUploadObserved": [
+      {
+        "line": 1096,
+        "timestamp": "2026-11-09T22:05:05.5278558Z",
+        "text": "Artifact pr13-cli-diagnostics-3bc095c100537563296186fc3d4cc4d60b59b698.zip successfully finalized. Artifact ID 13714841487"
+      },
+      {
+        "line": 1097,
+        "timestamp": "2026-11-09T22:05:05.5279290Z",
+        "text": "Artifact pr13-cli-diagnostics-3bc095c100537563296186fc3d4cc4d60b59b698 has been successfully uploaded! Final size is 71371 bytes. Artifact ID is 13714841487"
+      }
+    ],
+    "cleanupReceipts": [
+      {
+        "line": 1174,
+        "timestamp": "2026-11-09T22:05:19.5138909Z",
+        "text": "Post job cleanup."
+      },
+      {
+        "line": 1176,
+        "timestamp": "2026-11-09T22:05:19.5165256Z",
+        "text": "Post job cleanup."
+      },
+      {
+        "line": 1179,
+        "timestamp": "2026-11-09T22:05:19.5980735Z",
+        "text": "##[end-action id=__3c44f3c6-c259-4a43-a302-dae05e0a34ca.__actions_setup-node;outcome=success;conclusion=success;duration_ms=83]"
+      },
+      {
+        "line": 1181,
+        "timestamp": "2026-11-09T22:05:19.6006813Z",
+        "text": "Post job cleanup."
+      },
+      {
+        "line": 1183,
+        "timestamp": "2026-11-09T22:05:19.6887779Z",
+        "text": "##[end-action id=__3c44f3c6-c259-4a43-a302-dae05e0a34ca.__pnpm_action-setup;outcome=success;conclusion=success;duration_ms=90]"
+      },
+      {
+        "line": 1184,
+        "timestamp": "2026-11-09T22:05:19.6938876Z",
+        "text": "Post job cleanup."
+      },
+      {
+        "line": 1198,
+        "timestamp": "2026-11-09T22:05:19.8194177Z",
+        "text": "Cleaning up orphan processes"
+      }
+    ]
+  },
+  "custody": {
+    "workflow": {
+      "source": {
+        "key": "ciD2:custody:workflow",
+        "bytes": 1660,
+        "sha256": "d837c7bcad12763ba903a04e05fecbe0f4dbbd8a8b10f13149a3c4a770ecc6d5",
+        "gitBlob": "333e0674355baa72ce7bd00e7e57964fff8c7d6a"
+      },
+      "equalsActualCheckoutWorkflow": true,
+      "byosWorkerLine": {
+        "line": 42,
+        "text": "      - run: pnpm test:byos-worker"
+      },
+      "backendOnlyEnvLine": {
+        "line": 44,
+        "text": "          MIKKA_BYOS_BACKEND_ONLY: '1'"
+      }
+    },
+    "counts": {
+      "nodeSummaries": [
+        {
+          "line": 585,
+          "timestamp": "2026-11-09T22:02:37.2343025Z",
+          "tests": 139,
+          "counts": {
+            "suites": 0,
+            "pass": 139,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 4743.704834
+          }
+        },
+        {
+          "line": 1846,
+          "timestamp": "2026-11-09T22:05:28.0813805Z",
+          "tests": 4,
+          "counts": {
+            "suites": 0,
+            "pass": 4,
+            "fail": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0,
+            "duration_ms": 7945.985678
+          }
+        }
+      ],
+      "protocol": {
+        "files": 1,
+        "testsPassed": 42
+      },
+      "hostedRunner": {
+        "files": 1,
+        "testsPassed": 45
+      },
+      "go": {
+        "runCount": 308,
+        "pass": 308,
+        "fail": 0,
+        "skip": 0,
+        "topLevel": 124,
+        "subtests": 184,
+        "uniqueRuns": 308,
+        "uniqueResults": 308,
+        "missingResult": [],
+        "missingRun": [],
+        "dataRaceWarningLines": [],
+        "noTestPackages": [
+          {
+            "line": 1747,
+            "timestamp": "2026-11-09T22:04:59.9822126Z",
+            "text": "?   \tgithub.com/alexj11324/Mikka/subscription-worker/cmd/mikka-subscription-enrollment\t[no test files]"
+          },
+          {
+            "line": 1748,
+            "timestamp": "2026-11-09T22:04:59.9822580Z",
+            "text": "?   \tgithub.com/alexj11324/Mikka/subscription-worker/cmd/mikka-subscription-worker\t[no test files]"
+          }
+        ],
+        "packageSummary": {
+          "line": 1746,
+          "timestamp": "2026-11-09T22:04:59.9821672Z",
+          "text": "ok  \tgithub.com/alexj11324/Mikka/subscription-worker\t13.945s"
+        }
+      }
+    },
+    "invocationReceipts": [
+      {
+        "line": 381,
+        "timestamp": "2026-11-09T22:02:32.2277243Z",
+        "text": "##[group]Run pnpm test:byos"
+      },
+      {
+        "line": 593,
+        "timestamp": "2026-11-09T22:02:37.2637320Z",
+        "text": "##[group]Run pnpm --filter @mikka/protocol exec vitest run src/subscription.test.ts"
+      },
+      {
+        "line": 610,
+        "timestamp": "2026-11-09T22:02:37.9517233Z",
+        "text": "##[group]Run pnpm --filter @mikka/daemon exec vitest run test/subscription-hosted-runner.test.ts"
+      },
+      {
+        "line": 631,
+        "timestamp": "2026-11-09T22:02:42.4405830Z",
+        "text": "##[group]Run pnpm test:byos-worker"
+      },
+      {
+        "line": 641,
+        "timestamp": "2026-11-09T22:02:42.6523030Z",
+        "text": "> node scripts/test-subscription-worker.mjs"
+      }
+    ],
+    "goExecution": {
+      "all308PairedTestNodes": [
+        {
+          "name": "TestAccessSnapshotIsReadOnlyAndBoundToOneSecret",
+          "topLevel": true,
+          "runLine": 1026,
+          "resultLine": 1027,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestStartupAllowanceKeepsQuotaWithoutSettingsProfileHTTP",
+          "topLevel": true,
+          "runLine": 1028,
+          "resultLine": 1033,
+          "status": "PASS",
+          "duration": "0.13s"
+        },
+        {
+          "name": "TestStartupAllowanceKeepsQuotaWithoutSettingsProfileHTTP/claude",
+          "topLevel": false,
+          "runLine": 1029,
+          "resultLine": 1034,
+          "status": "PASS",
+          "duration": "0.07s"
+        },
+        {
+          "name": "TestStartupAllowanceKeepsQuotaWithoutSettingsProfileHTTP/codex",
+          "topLevel": false,
+          "runLine": 1031,
+          "resultLine": 1035,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestStartupAllowanceKeepsOwnerAndEpochFences",
+          "topLevel": true,
+          "runLine": 1036,
+          "resultLine": 1039,
+          "status": "PASS",
+          "duration": "0.11s"
+        },
+        {
+          "name": "TestStartupAllowanceKeepsOwnerAndEpochFences/claude",
+          "topLevel": false,
+          "runLine": 1037,
+          "resultLine": 1040,
+          "status": "PASS",
+          "duration": "0.05s"
+        },
+        {
+          "name": "TestStartupAllowanceKeepsOwnerAndEpochFences/codex",
+          "topLevel": false,
+          "runLine": 1038,
+          "resultLine": 1041,
+          "status": "PASS",
+          "duration": "0.05s"
+        },
+        {
+          "name": "TestStartupAllowanceDiscardsProviderAnswerAfterConnectionChanges",
+          "topLevel": true,
+          "runLine": 1042,
+          "resultLine": 1045,
+          "status": "PASS",
+          "duration": "0.13s"
+        },
+        {
+          "name": "TestStartupAllowanceDiscardsProviderAnswerAfterConnectionChanges/epoch",
+          "topLevel": false,
+          "runLine": 1043,
+          "resultLine": 1046,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestStartupAllowanceDiscardsProviderAnswerAfterConnectionChanges/disconnect",
+          "topLevel": false,
+          "runLine": 1044,
+          "resultLine": 1047,
+          "status": "PASS",
+          "duration": "0.07s"
+        },
+        {
+          "name": "TestStartupAllowanceRPCRemainsOwnerOnlyAndDoesNotRefreshOnProviderRefusal",
+          "topLevel": true,
+          "runLine": 1048,
+          "resultLine": 1051,
+          "status": "PASS",
+          "duration": "0.12s"
+        },
+        {
+          "name": "TestStartupAllowanceRPCRemainsOwnerOnlyAndDoesNotRefreshOnProviderRefusal/401",
+          "topLevel": false,
+          "runLine": 1049,
+          "resultLine": 1052,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestStartupAllowanceRPCRemainsOwnerOnlyAndDoesNotRefreshOnProviderRefusal/403",
+          "topLevel": false,
+          "runLine": 1050,
+          "resultLine": 1053,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestInitialActualCPAStorageCanonicalization",
+          "topLevel": true,
+          "runLine": 1054,
+          "resultLine": 1057,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestInitialActualCPAStorageCanonicalization/codex",
+          "topLevel": false,
+          "runLine": 1055,
+          "resultLine": 1058,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestInitialActualCPAStorageCanonicalization/claude",
+          "topLevel": false,
+          "runLine": 1056,
+          "resultLine": 1059,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestActualCodexRefreshPatchMergesPartitions",
+          "topLevel": true,
+          "runLine": 1060,
+          "resultLine": 1061,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestUnknownStorageAndCredentialConfigurationNeverExecute",
+          "topLevel": true,
+          "runLine": 1062,
+          "resultLine": 1063,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestClaudePlainOAuthAndRefreshExcludeNativeIdentityAndFingerprintPaths",
+          "topLevel": true,
+          "runLine": 1064,
+          "resultLine": 1065,
+          "status": "PASS",
+          "duration": "0.08s"
+        },
+        {
+          "name": "TestCodexSubscriptionLegacyMarkersAreNotSent",
+          "topLevel": true,
+          "runLine": 1066,
+          "resultLine": 1067,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionImplicitStablePrefix",
+          "topLevel": true,
+          "runLine": 1068,
+          "resultLine": 1069,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionTailFollowsAllHistoryAndToolOutputs",
+          "topLevel": true,
+          "runLine": 1070,
+          "resultLine": 1076,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionTailFollowsAllHistoryAndToolOutputs/first_user",
+          "topLevel": false,
+          "runLine": 1071,
+          "resultLine": 1077,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionTailFollowsAllHistoryAndToolOutputs/multiple_turns",
+          "topLevel": false,
+          "runLine": 1072,
+          "resultLine": 1078,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionTailFollowsAllHistoryAndToolOutputs/assistant_last",
+          "topLevel": false,
+          "runLine": 1073,
+          "resultLine": 1079,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionTailFollowsAllHistoryAndToolOutputs/parallel_tool_outputs_last",
+          "topLevel": false,
+          "runLine": 1074,
+          "resultLine": 1080,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionTailFollowsAllHistoryAndToolOutputs/assistant_after_tools",
+          "topLevel": false,
+          "runLine": 1075,
+          "resultLine": 1081,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointCompatibility",
+          "topLevel": true,
+          "runLine": 1082,
+          "resultLine": 1101,
+          "status": "PASS",
+          "duration": "0.03s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointCompatibility/gpt-5.6",
+          "topLevel": false,
+          "runLine": 1083,
+          "resultLine": 1102,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointCompatibility/gpt-5.6-luna",
+          "topLevel": false,
+          "runLine": 1084,
+          "resultLine": 1103,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointCompatibility/gpt-5.6-sol",
+          "topLevel": false,
+          "runLine": 1085,
+          "resultLine": 1104,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointCompatibility/gpt-5.6-terra",
+          "topLevel": false,
+          "runLine": 1086,
+          "resultLine": 1105,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointCompatibility/gpt-6-luna",
+          "topLevel": false,
+          "runLine": 1087,
+          "resultLine": 1106,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointCompatibility/gpt-6-sol",
+          "topLevel": false,
+          "runLine": 1088,
+          "resultLine": 1107,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointCompatibility/gpt-6-astra",
+          "topLevel": false,
+          "runLine": 1089,
+          "resultLine": 1108,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointCompatibility/gpt-6.1-sol",
+          "topLevel": false,
+          "runLine": 1090,
+          "resultLine": 1109,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointCompatibility/gpt-6.1-terra",
+          "topLevel": false,
+          "runLine": 1091,
+          "resultLine": 1110,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointCompatibility/gpt-5.5",
+          "topLevel": false,
+          "runLine": 1092,
+          "resultLine": 1111,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointCompatibility/gpt-5.4",
+          "topLevel": false,
+          "runLine": 1093,
+          "resultLine": 1112,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointCompatibility/gpt-5.6-unknown",
+          "topLevel": false,
+          "runLine": 1094,
+          "resultLine": 1113,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointCompatibility/gpt-6",
+          "topLevel": false,
+          "runLine": 1095,
+          "resultLine": 1114,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointCompatibility/gpt-6-unknown",
+          "topLevel": false,
+          "runLine": 1096,
+          "resultLine": 1115,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointCompatibility/gpt-6.2-sol",
+          "topLevel": false,
+          "runLine": 1097,
+          "resultLine": 1116,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointCompatibility/gpt-7-luna",
+          "topLevel": false,
+          "runLine": 1098,
+          "resultLine": 1117,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointCompatibility/openai/gpt-6-luna",
+          "topLevel": false,
+          "runLine": 1099,
+          "resultLine": 1118,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointCompatibility/fixture-model",
+          "topLevel": false,
+          "runLine": 1100,
+          "resultLine": 1119,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointAlignment",
+          "topLevel": true,
+          "runLine": 1120,
+          "resultLine": 1129,
+          "status": "PASS",
+          "duration": "0.01s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointAlignment/unhinted_legacy",
+          "topLevel": false,
+          "runLine": 1121,
+          "resultLine": 1130,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointAlignment/coincident_boundaries",
+          "topLevel": false,
+          "runLine": 1122,
+          "resultLine": 1131,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointAlignment/absent_live_tail",
+          "topLevel": false,
+          "runLine": 1123,
+          "resultLine": 1132,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointAlignment/three_private_markers",
+          "topLevel": false,
+          "runLine": 1124,
+          "resultLine": 1133,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointAlignment/non-string_later_system",
+          "topLevel": false,
+          "runLine": 1125,
+          "resultLine": 1134,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointAlignment/empty_later_system",
+          "topLevel": false,
+          "runLine": 1126,
+          "resultLine": 1135,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointAlignment/history_first",
+          "topLevel": false,
+          "runLine": 1127,
+          "resultLine": 1136,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionCacheBreakpointAlignment/public_part_marker",
+          "topLevel": false,
+          "runLine": 1128,
+          "resultLine": 1137,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionGrowingHistoryEligiblePrefixes",
+          "topLevel": true,
+          "runLine": 1138,
+          "resultLine": 1203,
+          "status": "PASS",
+          "duration": "0.01s"
+        },
+        {
+          "name": "TestCodexSessionAffinityUsesAuthorizedConversationScope",
+          "topLevel": true,
+          "runLine": 1204,
+          "resultLine": 1214,
+          "status": "PASS",
+          "duration": "0.01s"
+        },
+        {
+          "name": "TestCodexSessionAffinityUsesAuthorizedConversationScope/base",
+          "topLevel": false,
+          "runLine": 1205,
+          "resultLine": 1215,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSessionAffinityUsesAuthorizedConversationScope/another_workflow",
+          "topLevel": false,
+          "runLine": 1206,
+          "resultLine": 1216,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSessionAffinityUsesAuthorizedConversationScope/token_rotation",
+          "topLevel": false,
+          "runLine": 1207,
+          "resultLine": 1217,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSessionAffinityUsesAuthorizedConversationScope/owner",
+          "topLevel": false,
+          "runLine": 1208,
+          "resultLine": 1218,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSessionAffinityUsesAuthorizedConversationScope/custody_workspace",
+          "topLevel": false,
+          "runLine": 1209,
+          "resultLine": 1219,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSessionAffinityUsesAuthorizedConversationScope/connection",
+          "topLevel": false,
+          "runLine": 1210,
+          "resultLine": 1220,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSessionAffinityUsesAuthorizedConversationScope/binding",
+          "topLevel": false,
+          "runLine": 1211,
+          "resultLine": 1221,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSessionAffinityUsesAuthorizedConversationScope/consumer",
+          "topLevel": false,
+          "runLine": 1212,
+          "resultLine": 1222,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSessionAffinityUsesAuthorizedConversationScope/epoch",
+          "topLevel": false,
+          "runLine": 1213,
+          "resultLine": 1223,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSessionAffinityCannotBypassAuthorizationReadinessOrCancellation",
+          "topLevel": true,
+          "runLine": 1224,
+          "resultLine": 1231,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSessionAffinityCannotBypassAuthorizationReadinessOrCancellation/authorization",
+          "topLevel": false,
+          "runLine": 1225,
+          "resultLine": 1232,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSessionAffinityCannotBypassAuthorizationReadinessOrCancellation/first_lookup",
+          "topLevel": false,
+          "runLine": 1226,
+          "resultLine": 1233,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSessionAffinityCannotBypassAuthorizationReadinessOrCancellation/store_lookup",
+          "topLevel": false,
+          "runLine": 1227,
+          "resultLine": 1234,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSessionAffinityCannotBypassAuthorizationReadinessOrCancellation/connected_lookup",
+          "topLevel": false,
+          "runLine": 1228,
+          "resultLine": 1235,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSessionAffinityCannotBypassAuthorizationReadinessOrCancellation/cancelled",
+          "topLevel": false,
+          "runLine": 1229,
+          "resultLine": 1236,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSessionAffinityCannotBypassAuthorizationReadinessOrCancellation/missing_use",
+          "topLevel": false,
+          "runLine": 1230,
+          "resultLine": 1237,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPlainModelCannotTakeSessionAffinityFromUntrustedInputs",
+          "topLevel": true,
+          "runLine": 1238,
+          "resultLine": 1243,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPlainModelCannotTakeSessionAffinityFromUntrustedInputs/codex",
+          "topLevel": false,
+          "runLine": 1239,
+          "resultLine": 1244,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPlainModelCannotTakeSessionAffinityFromUntrustedInputs/claude",
+          "topLevel": false,
+          "runLine": 1241,
+          "resultLine": 1245,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestEnrollmentBindingPublishesOneOwnedConnectionAndReusesRefresh",
+          "topLevel": true,
+          "runLine": 1246,
+          "resultLine": 1247,
+          "status": "PASS",
+          "duration": "0.11s"
+        },
+        {
+          "name": "TestEnrollmentBindingLatePublicationCannotUndoDisconnect",
+          "topLevel": true,
+          "runLine": 1248,
+          "resultLine": 1249,
+          "status": "PASS",
+          "duration": "0.04s"
+        },
+        {
+          "name": "TestEnrollmentBindingResumesExpiredOriginalReservationWithoutNewEpoch",
+          "topLevel": true,
+          "runLine": 1250,
+          "resultLine": 1251,
+          "status": "PASS",
+          "duration": "0.08s"
+        },
+        {
+          "name": "TestEnrollmentBindingRecoversExactStagedGrantAndProjection",
+          "topLevel": true,
+          "runLine": 1252,
+          "resultLine": 1255,
+          "status": "PASS",
+          "duration": "0.11s"
+        },
+        {
+          "name": "TestEnrollmentBindingRecoversExactStagedGrantAndProjection/grant",
+          "topLevel": false,
+          "runLine": 1253,
+          "resultLine": 1256,
+          "status": "PASS",
+          "duration": "0.05s"
+        },
+        {
+          "name": "TestEnrollmentBindingRecoversExactStagedGrantAndProjection/access",
+          "topLevel": false,
+          "runLine": 1254,
+          "resultLine": 1257,
+          "status": "PASS",
+          "duration": "0.05s"
+        },
+        {
+          "name": "TestEnrollmentBindingRefusesReconnectAndIndependentTargetDatabase",
+          "topLevel": true,
+          "runLine": 1258,
+          "resultLine": 1259,
+          "status": "PASS",
+          "duration": "0.05s"
+        },
+        {
+          "name": "TestEnrollmentBindingGlobalClaimSurvivesMetadataLoss",
+          "topLevel": true,
+          "runLine": 1260,
+          "resultLine": 1261,
+          "status": "PASS",
+          "duration": "0.04s"
+        },
+        {
+          "name": "TestEnrollmentBindingConcurrentRequestsNeverCreateTwoConnections",
+          "topLevel": true,
+          "runLine": 1262,
+          "resultLine": 1263,
+          "status": "PASS",
+          "duration": "0.11s"
+        },
+        {
+          "name": "TestEnrollmentCleanupPreservesOnlyRecoveryCopyUntilPublicationOrExplicitDisconnect",
+          "topLevel": true,
+          "runLine": 1264,
+          "resultLine": 1265,
+          "status": "PASS",
+          "duration": "0.04s"
+        },
+        {
+          "name": "TestEnrollmentCleanupFailureRetriesAllCopiesAfterImmediateDisconnectFence",
+          "topLevel": true,
+          "runLine": 1266,
+          "resultLine": 1267,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestEnrollmentCleanupRequiresGlobalClaimAndConfiguredDatabaseIdentity",
+          "topLevel": true,
+          "runLine": 1268,
+          "resultLine": 1269,
+          "status": "PASS",
+          "duration": "0.04s"
+        },
+        {
+          "name": "TestEnrollmentCleanupPublicationProofSurvivesDisconnectBeforeBoundMarker",
+          "topLevel": true,
+          "runLine": 1270,
+          "resultLine": 1271,
+          "status": "PASS",
+          "duration": "0.05s"
+        },
+        {
+          "name": "TestEnrollmentCleanupUnknownAndLateCreatesNeverReportFullyDeleted",
+          "topLevel": true,
+          "runLine": 1272,
+          "resultLine": 1275,
+          "status": "PASS",
+          "duration": "0.12s"
+        },
+        {
+          "name": "TestEnrollmentCleanupUnknownAndLateCreatesNeverReportFullyDeleted/uncertain_late_commit",
+          "topLevel": false,
+          "runLine": 1273,
+          "resultLine": 1276,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestEnrollmentCleanupUnknownAndLateCreatesNeverReportFullyDeleted/legacy_missing_receipt",
+          "topLevel": false,
+          "runLine": 1274,
+          "resultLine": 1277,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestEnrollmentRetentionBlocksImplicitBindingAndCleanupDeletion",
+          "topLevel": true,
+          "runLine": 1278,
+          "resultLine": 1279,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestEnrollmentHandoffBindsFullCeremonyAndRetainsGlobalCredentials",
+          "topLevel": true,
+          "runLine": 1280,
+          "resultLine": 1281,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestEnrollmentHandoffAndLegacyCompletionShareOneUseLatch",
+          "topLevel": true,
+          "runLine": 1282,
+          "resultLine": 1283,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestEnrollmentHandoffRefusesLegacyAttemptsWithoutWeakeningLegacyOperator",
+          "topLevel": true,
+          "runLine": 1284,
+          "resultLine": 1285,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestEnrollmentHandoffUncertainClaimNeverRetriesProvider",
+          "topLevel": true,
+          "runLine": 1286,
+          "resultLine": 1287,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestEnrollmentActualPlainClaudeAdapterWithoutSQL",
+          "topLevel": true,
+          "runLine": 1288,
+          "resultLine": 1289,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestEnrollmentPersistsStateAndFullCPAStorageWithoutDatabaseOrExecution",
+          "topLevel": true,
+          "runLine": 1290,
+          "resultLine": 1291,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestEnrollmentRefusesMalformedForeignExpiredAndConcurrentCallbacks",
+          "topLevel": true,
+          "runLine": 1292,
+          "resultLine": 1293,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestEnrollmentPersistenceFailuresNeverRepeatConsumedCode",
+          "topLevel": true,
+          "runLine": 1294,
+          "resultLine": 1297,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestEnrollmentPersistenceFailuresNeverRepeatConsumedCode/failed",
+          "topLevel": false,
+          "runLine": 1295,
+          "resultLine": 1298,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestEnrollmentPersistenceFailuresNeverRepeatConsumedCode/uncertain_committed",
+          "topLevel": false,
+          "runLine": 1296,
+          "resultLine": 1299,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestEnrollmentRetriesOnlyCapturedUncertainWriteAndFencesUncertainClaim",
+          "topLevel": true,
+          "runLine": 1300,
+          "resultLine": 1301,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestExecutorErrorsExportOnlyKnownRefusals",
+          "topLevel": true,
+          "runLine": 1302,
+          "resultLine": 1303,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestStreamPreservesSafeExecutorRefusalsAtStartAndDuringStream",
+          "topLevel": true,
+          "runLine": 1304,
+          "resultLine": 1305,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestProviderDiagnosticKeepsRecoveryAndRedactsBeforeIPC",
+          "topLevel": true,
+          "runLine": 1306,
+          "resultLine": 1307,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestProviderDiagnosticNeverExportsBodiesOrPartialRequestEchoes",
+          "topLevel": true,
+          "runLine": 1308,
+          "resultLine": 1309,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestRPCPreservesSafeDiagnosticsAtBothStreamFailureBoundaries",
+          "topLevel": true,
+          "runLine": 1310,
+          "resultLine": 1311,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestProviderDiagnosticRedactionNeverRewritesItsMarkers",
+          "topLevel": true,
+          "runLine": 1312,
+          "resultLine": 1313,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestProviderDiagnosticRedactionMergesKnownInputMatches",
+          "topLevel": true,
+          "runLine": 1314,
+          "resultLine": 1315,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestProviderDiagnosticRedactionFailsClosedAtInputAndOutputBounds",
+          "topLevel": true,
+          "runLine": 1316,
+          "resultLine": 1317,
+          "status": "PASS",
+          "duration": "0.03s"
+        },
+        {
+          "name": "TestProviderDiagnosticKeepsSpecificCodeWhenPrivateMessageIsDropped",
+          "topLevel": true,
+          "runLine": 1318,
+          "resultLine": 1325,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestProviderDiagnosticKeepsSpecificCodeWhenPrivateMessageIsDropped/context_length_exceeded/nested=false",
+          "topLevel": false,
+          "runLine": 1319,
+          "resultLine": 1326,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestProviderDiagnosticKeepsSpecificCodeWhenPrivateMessageIsDropped/context_length_exceeded/nested=true",
+          "topLevel": false,
+          "runLine": 1320,
+          "resultLine": 1327,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestProviderDiagnosticKeepsSpecificCodeWhenPrivateMessageIsDropped/insufficient_quota/nested=false",
+          "topLevel": false,
+          "runLine": 1321,
+          "resultLine": 1328,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestProviderDiagnosticKeepsSpecificCodeWhenPrivateMessageIsDropped/insufficient_quota/nested=true",
+          "topLevel": false,
+          "runLine": 1322,
+          "resultLine": 1329,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestProviderDiagnosticKeepsSpecificCodeWhenPrivateMessageIsDropped/model_not_found/nested=false",
+          "topLevel": false,
+          "runLine": 1323,
+          "resultLine": 1330,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestProviderDiagnosticKeepsSpecificCodeWhenPrivateMessageIsDropped/model_not_found/nested=true",
+          "topLevel": false,
+          "runLine": 1324,
+          "resultLine": 1331,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestHTTPTransportConcurrentHooksAreFirstOffsetsNotSummedDurations",
+          "topLevel": true,
+          "runLine": 1332,
+          "resultLine": 1333,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestHTTPTransportOptionalBudgetNeverDisplacesLegacyTiming",
+          "topLevel": true,
+          "runLine": 1334,
+          "resultLine": 1335,
+          "status": "PASS",
+          "duration": "0.02s"
+        },
+        {
+          "name": "TestHTTPTransportPreservesRefusedRedirectAndParentDeadline",
+          "topLevel": true,
+          "runLine": 1336,
+          "resultLine": 1338,
+          "status": "PASS",
+          "duration": "0.01s"
+        },
+        {
+          "name": "TestCPAInitialSaveRestartRefreshAndRepeatedUse",
+          "topLevel": true,
+          "runLine": 1339,
+          "resultLine": 1342,
+          "status": "PASS",
+          "duration": "0.16s"
+        },
+        {
+          "name": "TestCPAInitialSaveRestartRefreshAndRepeatedUse/codex",
+          "topLevel": false,
+          "runLine": 1340,
+          "resultLine": 1343,
+          "status": "PASS",
+          "duration": "0.08s"
+        },
+        {
+          "name": "TestCPAInitialSaveRestartRefreshAndRepeatedUse/claude",
+          "topLevel": false,
+          "runLine": 1341,
+          "resultLine": 1344,
+          "status": "PASS",
+          "duration": "0.08s"
+        },
+        {
+          "name": "TestSingleRefreshAuthorityAndReconnectRejectsLateResult",
+          "topLevel": true,
+          "runLine": 1345,
+          "resultLine": 1347,
+          "status": "PASS",
+          "duration": "0.07s"
+        },
+        {
+          "name": "TestAcceptedSecretLostResponseRecoversAfterRestartWithoutLogin",
+          "topLevel": true,
+          "runLine": 1348,
+          "resultLine": 1353,
+          "status": "PASS",
+          "duration": "0.08s"
+        },
+        {
+          "name": "TestRejectedStoreAndRawProviderErrorsFailClosed",
+          "topLevel": true,
+          "runLine": 1354,
+          "resultLine": 1357,
+          "status": "PASS",
+          "duration": "0.07s"
+        },
+        {
+          "name": "TestPostgresPublishFailureRecoversStoredBundle",
+          "topLevel": true,
+          "runLine": 1358,
+          "resultLine": 1359,
+          "status": "PASS",
+          "duration": "0.05s"
+        },
+        {
+          "name": "TestPrivateIPCDoesNotExposeCredentialsOrAcceptTenantOverrides",
+          "topLevel": true,
+          "runLine": 1360,
+          "resultLine": 1361,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestExpiredAccessRefreshesOnceAndTasksReuseConnection",
+          "topLevel": true,
+          "runLine": 1362,
+          "resultLine": 1365,
+          "status": "PASS",
+          "duration": "0.14s"
+        },
+        {
+          "name": "TestExpiredAccessRefreshesOnceAndTasksReuseConnection/codex",
+          "topLevel": false,
+          "runLine": 1363,
+          "resultLine": 1366,
+          "status": "PASS",
+          "duration": "0.07s"
+        },
+        {
+          "name": "TestExpiredAccessRefreshesOnceAndTasksReuseConnection/claude",
+          "topLevel": false,
+          "runLine": 1364,
+          "resultLine": 1367,
+          "status": "PASS",
+          "duration": "0.07s"
+        },
+        {
+          "name": "TestClaudeNativeAccessLeaseReusesCPARotationAuthority",
+          "topLevel": true,
+          "runLine": 1368,
+          "resultLine": 1369,
+          "status": "PASS",
+          "duration": "0.08s"
+        },
+        {
+          "name": "TestDisconnectDuringRefreshRejectsItsLatePublication",
+          "topLevel": true,
+          "runLine": 1370,
+          "resultLine": 1372,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestExpiredLeaseCannotReplayRotatingGrant",
+          "topLevel": true,
+          "runLine": 1373,
+          "resultLine": 1374,
+          "status": "PASS",
+          "duration": "0.05s"
+        },
+        {
+          "name": "TestInfisicalRedirectAndIntegrityFailuresDoNotPublish",
+          "topLevel": true,
+          "runLine": 1375,
+          "resultLine": 1377,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestStoreCannotChangeConnectionScopeOrRunImportedHelpers",
+          "topLevel": true,
+          "runLine": 1378,
+          "resultLine": 1379,
+          "status": "PASS",
+          "duration": "0.02s"
+        },
+        {
+          "name": "TestWorkerExecutableHasPrivateScopeAndNoLiveRegistry",
+          "topLevel": true,
+          "runLine": 1380,
+          "resultLine": 1381,
+          "status": "PASS",
+          "duration": "0.08s"
+        },
+        {
+          "name": "TestPrivateFramingRejectsTrailingObjectsAndOversizedFrames",
+          "topLevel": true,
+          "runLine": 1382,
+          "resultLine": 1383,
+          "status": "PASS",
+          "duration": "0.03s"
+        },
+        {
+          "name": "TestModelsReadsOnlyBoundOwnerCatalogue",
+          "topLevel": true,
+          "runLine": 1384,
+          "resultLine": 1387,
+          "status": "PASS",
+          "duration": "0.12s"
+        },
+        {
+          "name": "TestModelsReadsOnlyBoundOwnerCatalogue/codex",
+          "topLevel": false,
+          "runLine": 1385,
+          "resultLine": 1388,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestModelsReadsOnlyBoundOwnerCatalogue/claude",
+          "topLevel": false,
+          "runLine": 1386,
+          "resultLine": 1389,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestModelsRefusesProviderErrorsAndPaginates",
+          "topLevel": true,
+          "runLine": 1390,
+          "resultLine": 1391,
+          "status": "PASS",
+          "duration": "0.14s"
+        },
+        {
+          "name": "TestModelsDisconnectWinsProviderRead",
+          "topLevel": true,
+          "runLine": 1392,
+          "resultLine": 1393,
+          "status": "PASS",
+          "duration": "0.05s"
+        },
+        {
+          "name": "TestNativeBrokerUsesAccessOnlyCredentialsWithoutExportOrEndpointSelection",
+          "topLevel": true,
+          "runLine": 1394,
+          "resultLine": 1397,
+          "status": "PASS",
+          "duration": "0.18s"
+        },
+        {
+          "name": "TestNativeBrokerUsesAccessOnlyCredentialsWithoutExportOrEndpointSelection/codex",
+          "topLevel": false,
+          "runLine": 1395,
+          "resultLine": 1398,
+          "status": "PASS",
+          "duration": "0.09s"
+        },
+        {
+          "name": "TestNativeBrokerUsesAccessOnlyCredentialsWithoutExportOrEndpointSelection/claude",
+          "topLevel": false,
+          "runLine": 1396,
+          "resultLine": 1399,
+          "status": "PASS",
+          "duration": "0.09s"
+        },
+        {
+          "name": "TestNativeBrokerMissingMIMEIsOnlyForCodexStreaming",
+          "topLevel": true,
+          "runLine": 1400,
+          "resultLine": 1404,
+          "status": "PASS",
+          "duration": "0.26s"
+        },
+        {
+          "name": "TestNativeBrokerMissingMIMEIsOnlyForCodexStreaming/codex/stream=true",
+          "topLevel": false,
+          "runLine": 1401,
+          "resultLine": 1405,
+          "status": "PASS",
+          "duration": "0.09s"
+        },
+        {
+          "name": "TestNativeBrokerMissingMIMEIsOnlyForCodexStreaming/codex/stream=false",
+          "topLevel": false,
+          "runLine": 1402,
+          "resultLine": 1406,
+          "status": "PASS",
+          "duration": "0.08s"
+        },
+        {
+          "name": "TestNativeBrokerMissingMIMEIsOnlyForCodexStreaming/claude/stream=true",
+          "topLevel": false,
+          "runLine": 1403,
+          "resultLine": 1407,
+          "status": "PASS",
+          "duration": "0.08s"
+        },
+        {
+          "name": "TestNativeBrokerRefusalsPreserveCauseWithoutEmittingProviderBody",
+          "topLevel": true,
+          "runLine": 1408,
+          "resultLine": 1413,
+          "status": "PASS",
+          "duration": "0.09s"
+        },
+        {
+          "name": "TestNativeBrokerRefusalsPreserveCauseWithoutEmittingProviderBody/401",
+          "topLevel": false,
+          "runLine": 1409,
+          "resultLine": 1414,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestNativeBrokerRefusalsPreserveCauseWithoutEmittingProviderBody/403",
+          "topLevel": false,
+          "runLine": 1410,
+          "resultLine": 1415,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestNativeBrokerRefusalsPreserveCauseWithoutEmittingProviderBody/429",
+          "topLevel": false,
+          "runLine": 1411,
+          "resultLine": 1416,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestNativeBrokerRefusalsPreserveCauseWithoutEmittingProviderBody/503",
+          "topLevel": false,
+          "runLine": 1412,
+          "resultLine": 1417,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestNativeBrokerFencesSilentRequestsOnDisconnectAndRefusesEchoedBearer",
+          "topLevel": true,
+          "runLine": 1418,
+          "resultLine": 1419,
+          "status": "PASS",
+          "duration": "1.17s"
+        },
+        {
+          "name": "TestNativeRunLedgerAndLeaseRefuseUseBeforeVaultReads",
+          "topLevel": true,
+          "runLine": 1420,
+          "resultLine": 1421,
+          "status": "PASS",
+          "duration": "0.12s"
+        },
+        {
+          "name": "TestNativeRunModelChoiceUsesFrozenServerSnapshot",
+          "topLevel": true,
+          "runLine": 1422,
+          "resultLine": 1423,
+          "status": "PASS",
+          "duration": "0.21s"
+        },
+        {
+          "name": "TestOAuthResumePreservesAttemptWithoutProviderRestartAndRejectsOtherScopes",
+          "topLevel": true,
+          "runLine": 1424,
+          "resultLine": 1427,
+          "status": "PASS",
+          "duration": "0.12s"
+        },
+        {
+          "name": "TestOAuthResumePreservesAttemptWithoutProviderRestartAndRejectsOtherScopes/codex",
+          "topLevel": false,
+          "runLine": 1425,
+          "resultLine": 1428,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestOAuthResumePreservesAttemptWithoutProviderRestartAndRejectsOtherScopes/claude",
+          "topLevel": false,
+          "runLine": 1426,
+          "resultLine": 1429,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestConcurrentOAuthStartReturnsBusyUntilSingleProviderStartCanBeResumed",
+          "topLevel": true,
+          "runLine": 1430,
+          "resultLine": 1431,
+          "status": "PASS",
+          "duration": "0.04s"
+        },
+        {
+          "name": "TestCodexDeviceCPAProtocolOwnerSessionIntervalPKCEOneUseAndExpiry",
+          "topLevel": true,
+          "runLine": 1432,
+          "resultLine": 1433,
+          "status": "PASS",
+          "duration": "0.14s"
+        },
+        {
+          "name": "TestPlainModelUpstreamRefusalIsLoggedByStatusAndTypeOnly",
+          "topLevel": true,
+          "runLine": 1434,
+          "resultLine": 1435,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPlainModelProviderStatusKeepsOnlyActionableRefusal",
+          "topLevel": true,
+          "runLine": 1436,
+          "resultLine": 1449,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPlainModelProviderStatusKeepsOnlyActionableRefusal/401",
+          "topLevel": false,
+          "runLine": 1437,
+          "resultLine": 1450,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPlainModelProviderStatusKeepsOnlyActionableRefusal/403",
+          "topLevel": false,
+          "runLine": 1439,
+          "resultLine": 1451,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPlainModelProviderStatusKeepsOnlyActionableRefusal/429",
+          "topLevel": false,
+          "runLine": 1441,
+          "resultLine": 1452,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPlainModelProviderStatusKeepsOnlyActionableRefusal/400",
+          "topLevel": false,
+          "runLine": 1443,
+          "resultLine": 1453,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPlainModelProviderStatusKeepsOnlyActionableRefusal/404",
+          "topLevel": false,
+          "runLine": 1445,
+          "resultLine": 1454,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPlainModelProviderStatusKeepsOnlyActionableRefusal/503",
+          "topLevel": false,
+          "runLine": 1447,
+          "resultLine": 1455,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPlainModelProviderStreamErrorKeepsOnlyKnownTypes",
+          "topLevel": true,
+          "runLine": 1456,
+          "resultLine": 1467,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPlainModelProviderStreamErrorKeepsOnlyKnownTypes/authentication_error",
+          "topLevel": false,
+          "runLine": 1457,
+          "resultLine": 1468,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPlainModelProviderStreamErrorKeepsOnlyKnownTypes/permission_error",
+          "topLevel": false,
+          "runLine": 1459,
+          "resultLine": 1469,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPlainModelProviderStreamErrorKeepsOnlyKnownTypes/rate_limit_error",
+          "topLevel": false,
+          "runLine": 1461,
+          "resultLine": 1470,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPlainModelProviderStreamErrorKeepsOnlyKnownTypes/overloaded_error",
+          "topLevel": false,
+          "runLine": 1463,
+          "resultLine": 1471,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPlainModelProviderStreamErrorKeepsOnlyKnownTypes/fixture_private_token",
+          "topLevel": false,
+          "runLine": 1465,
+          "resultLine": 1472,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestUpstreamErrorTypeKeepsOnlyTheEnum",
+          "topLevel": true,
+          "runLine": 1473,
+          "resultLine": 1474,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestRequestDiagnosticsAcceptOnlyLocalEnumsAndByteCounts",
+          "topLevel": true,
+          "runLine": 1475,
+          "resultLine": 1476,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPlainModelRequestBoundariesDoNotReachProviderOrExposeInput",
+          "topLevel": true,
+          "runLine": 1477,
+          "resultLine": 1480,
+          "status": "PASS",
+          "duration": "0.65s"
+        },
+        {
+          "name": "TestPlainModelRequestBoundariesDoNotReachProviderOrExposeInput/claude",
+          "topLevel": false,
+          "runLine": 1478,
+          "resultLine": 1481,
+          "status": "PASS",
+          "duration": "0.42s"
+        },
+        {
+          "name": "TestPlainModelRequestBoundariesDoNotReachProviderOrExposeInput/codex",
+          "topLevel": false,
+          "runLine": 1479,
+          "resultLine": 1482,
+          "status": "PASS",
+          "duration": "0.23s"
+        },
+        {
+          "name": "TestClaudeSubscriptionSystemPreservesHostBlocks",
+          "topLevel": true,
+          "runLine": 1483,
+          "resultLine": 1488,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestClaudeSubscriptionSystemPreservesHostBlocks/absent",
+          "topLevel": false,
+          "runLine": 1484,
+          "resultLine": 1489,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestClaudeSubscriptionSystemPreservesHostBlocks/string",
+          "topLevel": false,
+          "runLine": 1485,
+          "resultLine": 1490,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestClaudeSubscriptionSystemPreservesHostBlocks/blocks",
+          "topLevel": false,
+          "runLine": 1486,
+          "resultLine": 1491,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestClaudeSubscriptionSystemPreservesHostBlocks/already_prefixed",
+          "topLevel": false,
+          "runLine": 1487,
+          "resultLine": 1492,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestClaudeSubscriptionRequestPreservesInstructionsAndToolHistory",
+          "topLevel": true,
+          "runLine": 1493,
+          "resultLine": 1494,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestClaudeSubscriptionLayeredCacheBreakpoints",
+          "topLevel": true,
+          "runLine": 1495,
+          "resultLine": 1499,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestClaudeSubscriptionLayeredCacheBreakpoints/user_text",
+          "topLevel": false,
+          "runLine": 1496,
+          "resultLine": 1500,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestClaudeSubscriptionLayeredCacheBreakpoints/assistant_tool_call_with_duplicated_SDK_metadata",
+          "topLevel": false,
+          "runLine": 1497,
+          "resultLine": 1501,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestClaudeSubscriptionLayeredCacheBreakpoints/tool_result",
+          "topLevel": false,
+          "runLine": 1498,
+          "resultLine": 1502,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionStreamWithoutContentType",
+          "topLevel": true,
+          "runLine": 1503,
+          "resultLine": 1511,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionStreamWithoutContentType/valid_SSE_without_MIME",
+          "topLevel": false,
+          "runLine": 1504,
+          "resultLine": 1512,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionStreamWithoutContentType/HTML",
+          "topLevel": false,
+          "runLine": 1505,
+          "resultLine": 1513,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionStreamWithoutContentType/JSON_without_MIME",
+          "topLevel": false,
+          "runLine": 1507,
+          "resultLine": 1514,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSubscriptionStreamWithoutContentType/truncated_SSE",
+          "topLevel": false,
+          "runLine": 1509,
+          "resultLine": 1515,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPrepareStreamKeepsReadinessAndAvoidsUnusedMaintenanceQueries",
+          "topLevel": true,
+          "runLine": 1516,
+          "resultLine": 1519,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPrepareStreamKeepsReadinessAndAvoidsUnusedMaintenanceQueries/prepare",
+          "topLevel": false,
+          "runLine": 1517,
+          "resultLine": 1520,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPrepareStreamKeepsReadinessAndAvoidsUnusedMaintenanceQueries/prepareStream",
+          "topLevel": false,
+          "runLine": 1518,
+          "resultLine": 1521,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPrepareStreamCannotBypassAuthorityReadinessOrExecutionIsolation",
+          "topLevel": true,
+          "runLine": 1522,
+          "resultLine": 1529,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPrepareStreamCannotBypassAuthorityReadinessOrExecutionIsolation/authority",
+          "topLevel": false,
+          "runLine": 1523,
+          "resultLine": 1530,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPrepareStreamCannotBypassAuthorityReadinessOrExecutionIsolation/record",
+          "topLevel": false,
+          "runLine": 1524,
+          "resultLine": 1531,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPrepareStreamCannotBypassAuthorityReadinessOrExecutionIsolation/ready_record",
+          "topLevel": false,
+          "runLine": 1525,
+          "resultLine": 1532,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPrepareStreamCannotBypassAuthorityReadinessOrExecutionIsolation/digest",
+          "topLevel": false,
+          "runLine": 1526,
+          "resultLine": 1533,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPrepareStreamCannotBypassAuthorityReadinessOrExecutionIsolation/execution_only",
+          "topLevel": false,
+          "runLine": 1527,
+          "resultLine": 1534,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPrepareStreamCannotBypassAuthorityReadinessOrExecutionIsolation/run_scope",
+          "topLevel": false,
+          "runLine": 1528,
+          "resultLine": 1535,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestHostedModelRPCFrameBudgetIsInclusiveWithOrWithoutNewline",
+          "topLevel": true,
+          "runLine": 1536,
+          "resultLine": 1541,
+          "status": "PASS",
+          "duration": "0.29s"
+        },
+        {
+          "name": "TestHostedModelRPCFrameBudgetIsInclusiveWithOrWithoutNewline/bytes=2097152/newline=true",
+          "topLevel": false,
+          "runLine": 1537,
+          "resultLine": 1542,
+          "status": "PASS",
+          "duration": "0.13s"
+        },
+        {
+          "name": "TestHostedModelRPCFrameBudgetIsInclusiveWithOrWithoutNewline/bytes=2097153/newline=true",
+          "topLevel": false,
+          "runLine": 1538,
+          "resultLine": 1543,
+          "status": "PASS",
+          "duration": "0.02s"
+        },
+        {
+          "name": "TestHostedModelRPCFrameBudgetIsInclusiveWithOrWithoutNewline/bytes=2097152/newline=false",
+          "topLevel": false,
+          "runLine": 1539,
+          "resultLine": 1544,
+          "status": "PASS",
+          "duration": "0.11s"
+        },
+        {
+          "name": "TestHostedModelRPCFrameBudgetIsInclusiveWithOrWithoutNewline/bytes=2097153/newline=false",
+          "topLevel": false,
+          "runLine": 1540,
+          "resultLine": 1545,
+          "status": "PASS",
+          "duration": "0.02s"
+        },
+        {
+          "name": "TestHostedModelRPCEnforcesBudgetWhenFinalReadAlsoReturnsEOF",
+          "topLevel": true,
+          "runLine": 1546,
+          "resultLine": 1547,
+          "status": "PASS",
+          "duration": "0.14s"
+        },
+        {
+          "name": "TestRPCFrameBudgetsCountCRBeforeLF",
+          "topLevel": true,
+          "runLine": 1548,
+          "resultLine": 1549,
+          "status": "PASS",
+          "duration": "0.20s"
+        },
+        {
+          "name": "TestHostedModelBudgetDoesNotExpandAnyOtherRPCMethod",
+          "topLevel": true,
+          "runLine": 1550,
+          "resultLine": 1573,
+          "status": "PASS",
+          "duration": "1.25s"
+        },
+        {
+          "name": "TestHostedModelBudgetDoesNotExpandAnyOtherRPCMethod/execute",
+          "topLevel": false,
+          "runLine": 1551,
+          "resultLine": 1574,
+          "status": "PASS",
+          "duration": "0.05s"
+        },
+        {
+          "name": "TestHostedModelBudgetDoesNotExpandAnyOtherRPCMethod/nativeStream",
+          "topLevel": false,
+          "runLine": 1552,
+          "resultLine": 1575,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestHostedModelBudgetDoesNotExpandAnyOtherRPCMethod/nativeContext",
+          "topLevel": false,
+          "runLine": 1553,
+          "resultLine": 1576,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestHostedModelBudgetDoesNotExpandAnyOtherRPCMethod/prepare",
+          "topLevel": false,
+          "runLine": 1554,
+          "resultLine": 1577,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestHostedModelBudgetDoesNotExpandAnyOtherRPCMethod/prepareStream",
+          "topLevel": false,
+          "runLine": 1555,
+          "resultLine": 1578,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestHostedModelBudgetDoesNotExpandAnyOtherRPCMethod/quota",
+          "topLevel": false,
+          "runLine": 1556,
+          "resultLine": 1579,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestHostedModelBudgetDoesNotExpandAnyOtherRPCMethod/models",
+          "topLevel": false,
+          "runLine": 1557,
+          "resultLine": 1580,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestHostedModelBudgetDoesNotExpandAnyOtherRPCMethod/usage",
+          "topLevel": false,
+          "runLine": 1558,
+          "resultLine": 1581,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestHostedModelBudgetDoesNotExpandAnyOtherRPCMethod/allowance",
+          "topLevel": false,
+          "runLine": 1559,
+          "resultLine": 1582,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestHostedModelBudgetDoesNotExpandAnyOtherRPCMethod/cleanup",
+          "topLevel": false,
+          "runLine": 1560,
+          "resultLine": 1583,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestHostedModelBudgetDoesNotExpandAnyOtherRPCMethod/oauthStart",
+          "topLevel": false,
+          "runLine": 1561,
+          "resultLine": 1584,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestHostedModelBudgetDoesNotExpandAnyOtherRPCMethod/oauthResume",
+          "topLevel": false,
+          "runLine": 1562,
+          "resultLine": 1585,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestHostedModelBudgetDoesNotExpandAnyOtherRPCMethod/oauthPoll",
+          "topLevel": false,
+          "runLine": 1563,
+          "resultLine": 1586,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestHostedModelBudgetDoesNotExpandAnyOtherRPCMethod/oauthHandoff",
+          "topLevel": false,
+          "runLine": 1564,
+          "resultLine": 1587,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestHostedModelBudgetDoesNotExpandAnyOtherRPCMethod/oauthComplete",
+          "topLevel": false,
+          "runLine": 1565,
+          "resultLine": 1588,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestHostedModelBudgetDoesNotExpandAnyOtherRPCMethod/nativeAuth",
+          "topLevel": false,
+          "runLine": 1566,
+          "resultLine": 1589,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestHostedModelBudgetDoesNotExpandAnyOtherRPCMethod/status",
+          "topLevel": false,
+          "runLine": 1567,
+          "resultLine": 1590,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestHostedModelBudgetDoesNotExpandAnyOtherRPCMethod/acquire",
+          "topLevel": false,
+          "runLine": 1568,
+          "resultLine": 1591,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestHostedModelBudgetDoesNotExpandAnyOtherRPCMethod/refresh",
+          "topLevel": false,
+          "runLine": 1569,
+          "resultLine": 1592,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestHostedModelBudgetDoesNotExpandAnyOtherRPCMethod/recover",
+          "topLevel": false,
+          "runLine": 1570,
+          "resultLine": 1593,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestHostedModelBudgetDoesNotExpandAnyOtherRPCMethod/disconnect",
+          "topLevel": false,
+          "runLine": 1571,
+          "resultLine": 1594,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestHostedModelBudgetDoesNotExpandAnyOtherRPCMethod/unknown",
+          "topLevel": false,
+          "runLine": 1572,
+          "resultLine": 1595,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestHostedModelRPCPreservesUTF8PayloadAndCredentialFence",
+          "topLevel": true,
+          "runLine": 1596,
+          "resultLine": 1605,
+          "status": "PASS",
+          "duration": "0.74s"
+        },
+        {
+          "name": "TestHostedModelRPCPreservesUTF8PayloadAndCredentialFence/claude",
+          "topLevel": false,
+          "runLine": 1597,
+          "resultLine": 1606,
+          "status": "PASS",
+          "duration": "0.40s"
+        },
+        {
+          "name": "TestHostedModelRPCPreservesUTF8PayloadAndCredentialFence/claude/payload=266742",
+          "topLevel": false,
+          "runLine": 1598,
+          "resultLine": 1607,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestHostedModelRPCPreservesUTF8PayloadAndCredentialFence/claude/payload=1048576",
+          "topLevel": false,
+          "runLine": 1599,
+          "resultLine": 1608,
+          "status": "PASS",
+          "duration": "0.13s"
+        },
+        {
+          "name": "TestHostedModelRPCPreservesUTF8PayloadAndCredentialFence/claude/payload=1048577",
+          "topLevel": false,
+          "runLine": 1600,
+          "resultLine": 1609,
+          "status": "PASS",
+          "duration": "0.13s"
+        },
+        {
+          "name": "TestHostedModelRPCPreservesUTF8PayloadAndCredentialFence/codex",
+          "topLevel": false,
+          "runLine": 1601,
+          "resultLine": 1610,
+          "status": "PASS",
+          "duration": "0.34s"
+        },
+        {
+          "name": "TestHostedModelRPCPreservesUTF8PayloadAndCredentialFence/codex/payload=266742",
+          "topLevel": false,
+          "runLine": 1602,
+          "resultLine": 1611,
+          "status": "PASS",
+          "duration": "0.03s"
+        },
+        {
+          "name": "TestHostedModelRPCPreservesUTF8PayloadAndCredentialFence/codex/payload=1048576",
+          "topLevel": false,
+          "runLine": 1603,
+          "resultLine": 1612,
+          "status": "PASS",
+          "duration": "0.13s"
+        },
+        {
+          "name": "TestHostedModelRPCPreservesUTF8PayloadAndCredentialFence/codex/payload=1048577",
+          "topLevel": false,
+          "runLine": 1604,
+          "resultLine": 1613,
+          "status": "PASS",
+          "duration": "0.13s"
+        },
+        {
+          "name": "TestActiveChecksOmitUnusedQuotaButAdmissionStillEnforcesIt",
+          "topLevel": true,
+          "runLine": 1614,
+          "resultLine": 1619,
+          "status": "PASS",
+          "duration": "0.20s"
+        },
+        {
+          "name": "TestActiveChecksOmitUnusedQuotaButAdmissionStillEnforcesIt/active",
+          "topLevel": false,
+          "runLine": 1615,
+          "resultLine": 1620,
+          "status": "PASS",
+          "duration": "0.10s"
+        },
+        {
+          "name": "TestActiveChecksOmitUnusedQuotaButAdmissionStillEnforcesIt/native_active",
+          "topLevel": false,
+          "runLine": 1617,
+          "resultLine": 1621,
+          "status": "PASS",
+          "duration": "0.10s"
+        },
+        {
+          "name": "TestRuntimeQuotaAvailabilityUsesTheActualModel",
+          "topLevel": true,
+          "runLine": 1622,
+          "resultLine": 1630,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestRuntimeQuotaAvailabilityUsesTheActualModel/haiku_with_opus_exhausted",
+          "topLevel": false,
+          "runLine": 1623,
+          "resultLine": 1631,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestRuntimeQuotaAvailabilityUsesTheActualModel/sonnet_with_opus_exhausted",
+          "topLevel": false,
+          "runLine": 1624,
+          "resultLine": 1632,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestRuntimeQuotaAvailabilityUsesTheActualModel/opus_exhausted",
+          "topLevel": false,
+          "runLine": 1625,
+          "resultLine": 1633,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestRuntimeQuotaAvailabilityUsesTheActualModel/account_exhausted",
+          "topLevel": false,
+          "runLine": 1626,
+          "resultLine": 1634,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestRuntimeQuotaAvailabilityUsesTheActualModel/unknown_exhausted_scope",
+          "topLevel": false,
+          "runLine": 1627,
+          "resultLine": 1635,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestRuntimeQuotaAvailabilityUsesTheActualModel/unknown_native_model",
+          "topLevel": false,
+          "runLine": 1628,
+          "resultLine": 1636,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestRuntimeQuotaAvailabilityUsesTheActualModel/stale_quota",
+          "topLevel": false,
+          "runLine": 1629,
+          "resultLine": 1637,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestRuntimeAuthorizationKeepsOtherModelQuotaIndependent",
+          "topLevel": true,
+          "runLine": 1638,
+          "resultLine": 1639,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestQuotaProjectionPreservesRecognizedModelScope",
+          "topLevel": true,
+          "runLine": 1640,
+          "resultLine": 1643,
+          "status": "PASS",
+          "duration": "0.11s"
+        },
+        {
+          "name": "TestQuotaProjectionPreservesRecognizedModelScope/claude",
+          "topLevel": false,
+          "runLine": 1641,
+          "resultLine": 1644,
+          "status": "PASS",
+          "duration": "0.05s"
+        },
+        {
+          "name": "TestQuotaProjectionPreservesRecognizedModelScope/codex",
+          "topLevel": false,
+          "runLine": 1642,
+          "resultLine": 1645,
+          "status": "PASS",
+          "duration": "0.05s"
+        },
+        {
+          "name": "TestProductionWorkerRefusesNativeExportWithoutAConfigurableBypass",
+          "topLevel": true,
+          "runLine": 1646,
+          "resultLine": 1647,
+          "status": "PASS",
+          "duration": "0.09s"
+        },
+        {
+          "name": "TestStreamRequestByteBoundaryPrecedesCredentialReadAndInference",
+          "topLevel": true,
+          "runLine": 1648,
+          "resultLine": 1653,
+          "status": "PASS",
+          "duration": "0.16s"
+        },
+        {
+          "name": "TestStreamRequestByteBoundaryPrecedesCredentialReadAndInference/ASCII_boundary",
+          "topLevel": false,
+          "runLine": 1649,
+          "resultLine": 1654,
+          "status": "PASS",
+          "duration": "0.02s"
+        },
+        {
+          "name": "TestStreamRequestByteBoundaryPrecedesCredentialReadAndInference/UTF8_boundary",
+          "topLevel": false,
+          "runLine": 1650,
+          "resultLine": 1655,
+          "status": "PASS",
+          "duration": "0.02s"
+        },
+        {
+          "name": "TestStreamRequestByteBoundaryPrecedesCredentialReadAndInference/ASCII_overflow",
+          "topLevel": false,
+          "runLine": 1651,
+          "resultLine": 1656,
+          "status": "PASS",
+          "duration": "0.02s"
+        },
+        {
+          "name": "TestStreamRequestByteBoundaryPrecedesCredentialReadAndInference/UTF8_overflow",
+          "topLevel": false,
+          "runLine": 1652,
+          "resultLine": 1657,
+          "status": "PASS",
+          "duration": "0.02s"
+        },
+        {
+          "name": "TestProductionExecutionWorkerAcceptsOnlyItsAccessSnapshot",
+          "topLevel": true,
+          "runLine": 1658,
+          "resultLine": 1659,
+          "status": "PASS",
+          "duration": "0.11s"
+        },
+        {
+          "name": "TestExecutionReadsOnlyAccessProjectionAndEnforcesEveryBinding",
+          "topLevel": true,
+          "runLine": 1660,
+          "resultLine": 1663,
+          "status": "PASS",
+          "duration": "0.11s"
+        },
+        {
+          "name": "TestExecutionReadsOnlyAccessProjectionAndEnforcesEveryBinding/codex",
+          "topLevel": false,
+          "runLine": 1661,
+          "resultLine": 1664,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestExecutionReadsOnlyAccessProjectionAndEnforcesEveryBinding/claude",
+          "topLevel": false,
+          "runLine": 1662,
+          "resultLine": 1665,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestQuotaProjectionDropsEchoedSecretsWithoutDroppingExhaustedWindows",
+          "topLevel": true,
+          "runLine": 1666,
+          "resultLine": 1669,
+          "status": "PASS",
+          "duration": "0.70s"
+        },
+        {
+          "name": "TestQuotaProjectionDropsEchoedSecretsWithoutDroppingExhaustedWindows/codex",
+          "topLevel": false,
+          "runLine": 1667,
+          "resultLine": 1670,
+          "status": "PASS",
+          "duration": "0.05s"
+        },
+        {
+          "name": "TestQuotaProjectionDropsEchoedSecretsWithoutDroppingExhaustedWindows/claude",
+          "topLevel": false,
+          "runLine": 1668,
+          "resultLine": 1671,
+          "status": "PASS",
+          "duration": "0.65s"
+        },
+        {
+          "name": "TestTrustedLegacyProjectionMigrationDoesNotLoginOrRefresh",
+          "topLevel": true,
+          "runLine": 1672,
+          "resultLine": 1673,
+          "status": "PASS",
+          "duration": "0.63s"
+        },
+        {
+          "name": "TestAccessPublicationFailureRecoversWithoutAnotherProviderRefresh",
+          "topLevel": true,
+          "runLine": 1674,
+          "resultLine": 1676,
+          "status": "PASS",
+          "duration": "0.08s"
+        },
+        {
+          "name": "TestDisconnectFencesBeforeDeletionAndRetriesWithoutClaimingProviderRevocation",
+          "topLevel": true,
+          "runLine": 1677,
+          "resultLine": 1678,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestDisconnectTracksLateCreateAndNeverResurrectsDeletedArtifacts",
+          "topLevel": true,
+          "runLine": 1679,
+          "resultLine": 1680,
+          "status": "PASS",
+          "duration": "0.09s"
+        },
+        {
+          "name": "TestConcurrentRotationPreservesStreamButDisconnectStopsIt",
+          "topLevel": true,
+          "runLine": 1681,
+          "resultLine": 1684,
+          "status": "PASS",
+          "duration": "0.13s"
+        },
+        {
+          "name": "TestConcurrentRotationPreservesStreamButDisconnectStopsIt/refresh",
+          "topLevel": false,
+          "runLine": 1682,
+          "resultLine": 1685,
+          "status": "PASS",
+          "duration": "0.07s"
+        },
+        {
+          "name": "TestConcurrentRotationPreservesStreamButDisconnectStopsIt/disconnect",
+          "topLevel": false,
+          "runLine": 1683,
+          "resultLine": 1686,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestAccessProjectionRejectsFullAndNestedRefreshCopies",
+          "topLevel": true,
+          "runLine": 1687,
+          "resultLine": 1688,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestUnknownRemoteCreateRemainsQueuedAfter404AndLateCommit",
+          "topLevel": true,
+          "runLine": 1689,
+          "resultLine": 1690,
+          "status": "PASS",
+          "duration": "0.09s"
+        },
+        {
+          "name": "TestCleanupFailuresCannotStarveLaterArtifacts",
+          "topLevel": true,
+          "runLine": 1691,
+          "resultLine": 1692,
+          "status": "PASS",
+          "duration": "0.08s"
+        },
+        {
+          "name": "TestUsageReadsOwnConnectionWithoutBindingOrToken",
+          "topLevel": true,
+          "runLine": 1693,
+          "resultLine": 1696,
+          "status": "PASS",
+          "duration": "0.11s"
+        },
+        {
+          "name": "TestUsageReadsOwnConnectionWithoutBindingOrToken/codex",
+          "topLevel": false,
+          "runLine": 1694,
+          "resultLine": 1697,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestUsageReadsOwnConnectionWithoutBindingOrToken/claude",
+          "topLevel": false,
+          "runLine": 1695,
+          "resultLine": 1698,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestPersistentUsage401NeverRefreshesOrStopsTheConnection",
+          "topLevel": true,
+          "runLine": 1699,
+          "resultLine": 1702,
+          "status": "PASS",
+          "duration": "0.13s"
+        },
+        {
+          "name": "TestPersistentUsage401NeverRefreshesOrStopsTheConnection/401",
+          "topLevel": false,
+          "runLine": 1700,
+          "resultLine": 1703,
+          "status": "PASS",
+          "duration": "0.07s"
+        },
+        {
+          "name": "TestPersistentUsage401NeverRefreshesOrStopsTheConnection/403",
+          "topLevel": false,
+          "runLine": 1701,
+          "resultLine": 1704,
+          "status": "PASS",
+          "duration": "0.07s"
+        },
+        {
+          "name": "TestProductionWorkerExportsOnlyARunAccessLease",
+          "topLevel": true,
+          "runLine": 1705,
+          "resultLine": 1708,
+          "status": "PASS",
+          "duration": "0.34s"
+        },
+        {
+          "name": "TestProductionWorkerExportsOnlyARunAccessLease/codex",
+          "topLevel": false,
+          "runLine": 1706,
+          "resultLine": 1709,
+          "status": "PASS",
+          "duration": "0.17s"
+        },
+        {
+          "name": "TestProductionWorkerExportsOnlyARunAccessLease/claude",
+          "topLevel": false,
+          "runLine": 1707,
+          "resultLine": 1710,
+          "status": "PASS",
+          "duration": "0.17s"
+        },
+        {
+          "name": "TestUsageNamesClaudePlanOnlyFromKnownProfileLabels",
+          "topLevel": true,
+          "runLine": 1711,
+          "resultLine": 1716,
+          "status": "PASS",
+          "duration": "0.65s"
+        },
+        {
+          "name": "TestUsageNamesClaudePlanOnlyFromKnownProfileLabels/type_claude_max",
+          "topLevel": false,
+          "runLine": 1712,
+          "resultLine": 1717,
+          "status": "PASS",
+          "duration": "0.15s"
+        },
+        {
+          "name": "TestUsageNamesClaudePlanOnlyFromKnownProfileLabels/type_claude_pro",
+          "topLevel": false,
+          "runLine": 1713,
+          "resultLine": 1718,
+          "status": "PASS",
+          "duration": "0.14s"
+        },
+        {
+          "name": "TestUsageNamesClaudePlanOnlyFromKnownProfileLabels/type_unexpected<b>",
+          "topLevel": false,
+          "runLine": 1714,
+          "resultLine": 1719,
+          "status": "PASS",
+          "duration": "0.22s"
+        },
+        {
+          "name": "TestUsageNamesClaudePlanOnlyFromKnownProfileLabels/type_",
+          "topLevel": false,
+          "runLine": 1715,
+          "resultLine": 1720,
+          "status": "PASS",
+          "duration": "0.14s"
+        },
+        {
+          "name": "TestStreamChecksAuthorizeEveryChunkWithoutFetchingUnusedCredentialRecord",
+          "topLevel": true,
+          "runLine": 1721,
+          "resultLine": 1723,
+          "status": "PASS",
+          "duration": "0.17s"
+        },
+        {
+          "name": "TestWorkerTimingSnapshotIsPerRequestAndSurvivesCancellation",
+          "topLevel": true,
+          "runLine": 1724,
+          "resultLine": 1725,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestWorkerTimingTerminalKeepsOneOriginalFrameAndBudget",
+          "topLevel": true,
+          "runLine": 1726,
+          "resultLine": 1727,
+          "status": "PASS",
+          "duration": "0.03s"
+        },
+        {
+          "name": "TestWorkerTimingServePreservesUnsupportedAndInvalidRequests",
+          "topLevel": true,
+          "runLine": 1728,
+          "resultLine": 1729,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestWorkerTimingProviderTextUsesOnlyKnownNonemptyTextEvents",
+          "topLevel": true,
+          "runLine": 1730,
+          "resultLine": 1731,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPlainModelTimingUsesExistingTransportAndKeepsRequestAndRefusal",
+          "topLevel": true,
+          "runLine": 1732,
+          "resultLine": 1737,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPlainModelTransportTimingKeepsRealTLSReuseAndOriginalTerminal",
+          "topLevel": true,
+          "runLine": 1738,
+          "resultLine": 1741,
+          "status": "PASS",
+          "duration": "0.01s"
+        },
+        {
+          "name": "TestPlainModelTransportTimingCancellationDoesNotWaitForNewEvidence",
+          "topLevel": true,
+          "runLine": 1742,
+          "resultLine": 1744,
+          "status": "PASS",
+          "duration": "0.01s"
+        }
+      ],
+      "topLevelCount": 124,
+      "subtestCount": 184,
+      "fail": 0,
+      "skip": 0,
+      "unpairedRunOrResult": 0,
+      "uniqueRunAndResultNames": 308,
+      "packagePass": {
+        "line": 1746,
+        "timestamp": "2026-11-09T22:04:59.9821672Z",
+        "text": "ok  \tgithub.com/alexj11324/Mikka/subscription-worker\t13.945s"
+      },
+      "noTestPackages": [
+        {
+          "line": 1747,
+          "timestamp": "2026-11-09T22:04:59.9822126Z",
+          "text": "?   \tgithub.com/alexj11324/Mikka/subscription-worker/cmd/mikka-subscription-enrollment\t[no test files]"
+        },
+        {
+          "line": 1748,
+          "timestamp": "2026-11-09T22:04:59.9822580Z",
+          "text": "?   \tgithub.com/alexj11324/Mikka/subscription-worker/cmd/mikka-subscription-worker\t[no test files]"
+        }
+      ],
+      "focusedPassingNodes": [
+        {
+          "name": "TestCodexSessionAffinityCannotBypassAuthorizationReadinessOrCancellation",
+          "topLevel": true,
+          "runLine": 1224,
+          "resultLine": 1231,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSessionAffinityCannotBypassAuthorizationReadinessOrCancellation/authorization",
+          "topLevel": false,
+          "runLine": 1225,
+          "resultLine": 1232,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSessionAffinityCannotBypassAuthorizationReadinessOrCancellation/first_lookup",
+          "topLevel": false,
+          "runLine": 1226,
+          "resultLine": 1233,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSessionAffinityCannotBypassAuthorizationReadinessOrCancellation/store_lookup",
+          "topLevel": false,
+          "runLine": 1227,
+          "resultLine": 1234,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSessionAffinityCannotBypassAuthorizationReadinessOrCancellation/connected_lookup",
+          "topLevel": false,
+          "runLine": 1228,
+          "resultLine": 1235,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSessionAffinityCannotBypassAuthorizationReadinessOrCancellation/cancelled",
+          "topLevel": false,
+          "runLine": 1229,
+          "resultLine": 1236,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestCodexSessionAffinityCannotBypassAuthorizationReadinessOrCancellation/missing_use",
+          "topLevel": false,
+          "runLine": 1230,
+          "resultLine": 1237,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestProviderDiagnosticKeepsRecoveryAndRedactsBeforeIPC",
+          "topLevel": true,
+          "runLine": 1306,
+          "resultLine": 1307,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestHTTPTransportConcurrentHooksAreFirstOffsetsNotSummedDurations",
+          "topLevel": true,
+          "runLine": 1332,
+          "resultLine": 1333,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestHTTPTransportOptionalBudgetNeverDisplacesLegacyTiming",
+          "topLevel": true,
+          "runLine": 1334,
+          "resultLine": 1335,
+          "status": "PASS",
+          "duration": "0.02s"
+        },
+        {
+          "name": "TestHTTPTransportPreservesRefusedRedirectAndParentDeadline",
+          "topLevel": true,
+          "runLine": 1336,
+          "resultLine": 1338,
+          "status": "PASS",
+          "duration": "0.01s"
+        },
+        {
+          "name": "TestPrivateIPCDoesNotExposeCredentialsOrAcceptTenantOverrides",
+          "topLevel": true,
+          "runLine": 1360,
+          "resultLine": 1361,
+          "status": "PASS",
+          "duration": "0.06s"
+        },
+        {
+          "name": "TestWorkerTimingSnapshotIsPerRequestAndSurvivesCancellation",
+          "topLevel": true,
+          "runLine": 1724,
+          "resultLine": 1725,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestWorkerTimingTerminalKeepsOneOriginalFrameAndBudget",
+          "topLevel": true,
+          "runLine": 1726,
+          "resultLine": 1727,
+          "status": "PASS",
+          "duration": "0.03s"
+        },
+        {
+          "name": "TestWorkerTimingServePreservesUnsupportedAndInvalidRequests",
+          "topLevel": true,
+          "runLine": 1728,
+          "resultLine": 1729,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestWorkerTimingProviderTextUsesOnlyKnownNonemptyTextEvents",
+          "topLevel": true,
+          "runLine": 1730,
+          "resultLine": 1731,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPlainModelTimingUsesExistingTransportAndKeepsRequestAndRefusal",
+          "topLevel": true,
+          "runLine": 1732,
+          "resultLine": 1737,
+          "status": "PASS",
+          "duration": "0.00s"
+        },
+        {
+          "name": "TestPlainModelTransportTimingKeepsRealTLSReuseAndOriginalTerminal",
+          "topLevel": true,
+          "runLine": 1738,
+          "resultLine": 1741,
+          "status": "PASS",
+          "duration": "0.01s"
+        },
+        {
+          "name": "TestPlainModelTransportTimingCancellationDoesNotWaitForNewEvidence",
+          "topLevel": true,
+          "runLine": 1742,
+          "resultLine": 1744,
+          "status": "PASS",
+          "duration": "0.01s"
+        }
+      ],
+      "raceEvidence": {
+        "executedScript": {
+          "key": "ciD2:byosScript",
+          "bytes": 5275,
+          "sha256": "1d14be1da02ae48b29196c8603f02dd92acf86cc3e3a7e58f8926a8655abb25f",
+          "gitBlob": "fdd715b33deb5b6944011845092c019a9686c823"
+        },
+        "scriptLine134": {
+          "line": 134,
+          "text": "    \"CGO_ENABLED=0 go build -mod=readonly -trimpath -o bin/mikka-subscription-worker ./cmd/mikka-subscription-worker && CGO_ENABLED=0 go build -mod=readonly -trimpath -o bin/mikka-subscription-enrollment ./cmd/mikka-subscription-enrollment && CGO_ENABLED=0 go build -mod=readonly -tags mikka_byos_fixture -o bin/mikka-subscription-fixture ./testfixture && go test -mod=readonly -race -timeout 90s -count=1 -v ./... && go vet -mod=readonly ./... && ./bin/mikka-subscription-worker --version\""
+        },
+        "command": "go test -mod=readonly -race -timeout 90s -count=1 -v ./...",
+        "dataRaceWarnings": [],
+        "workerVersionReceipt": {
+          "line": 1749,
+          "timestamp": "2026-11-09T22:05:19.2441090Z",
+          "text": "mikka-subscription-worker CPA 8289ec4c71ad914d0612c2776352b76ba3d355a6"
+        },
+        "interpretation": "The archived invocation runs the fixed script, whose unconditional Docker command uses&& between builds,go test -race,go vet and worker--version. The308 paired PASS records plus the later version line and following application test block show the chain completed. The-race argv is source-bound rather than echoed as a standalone rawlog command. go vet completion is inferred from reaching the subsequent&&version command."
+      }
+    },
+    "backendAcceptance": {
+      "nodeSummary": {
+        "line": 1846,
+        "timestamp": "2026-11-09T22:05:28.0813805Z",
+        "tests": 4,
+        "counts": {
+          "suites": 0,
+          "pass": 4,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0,
+          "duration_ms": 7945.985678
+        }
+      },
+      "caseReceipts": [
+        {
+          "line": 1842,
+          "timestamp": "2026-11-09T22:05:28.0234466Z",
+          "text": "✔ new OAuth consent, owner-bound streaming/tool use and native launches reuse one durable connection (6459.817998ms)"
+        },
+        {
+          "line": 1843,
+          "timestamp": "2026-11-09T22:05:28.0811453Z",
+          "text": "✔ authenticated binding migrates one escrow through actual canonical publication and recovers projection failure (1097.055021ms)"
+        },
+        {
+          "line": 1844,
+          "timestamp": "2026-11-09T22:05:28.0812319Z",
+          "text": "✔ source cleanup migration backfills legacy published transfers and replays without erasing history (41.017261ms)"
+        },
+        {
+          "line": 1845,
+          "timestamp": "2026-11-09T22:05:28.0813398Z",
+          "text": "✔ production receiver persists PKCE before returning a link with no SQL or inference configuration (319.915827ms)"
+        }
+      ],
+      "migrationsReceipt": {
+        "line": 1856,
+        "timestamp": "2026-11-09T22:05:28.1930159Z",
+        "text": "BYOS acceptance passed: 261 migrations; repeat migration passed; disposable Postgres + TLS fakes only"
+      },
+      "migrations": 261,
+      "repeatMigrationLogged": true,
+      "browserBoundary": {
+        "line": 1840,
+        "timestamp": "2026-11-09T22:05:28.0132027Z",
+        "text": "Backend-only acceptance complete; browser acceptance intentionally not run"
+      },
+      "scope": "The fixed Linux harness uses disposable Postgres and TLS fakes, as the terminal receipt states. Local TLS reuse/cancellation/IPC tests executed; this does not establish real subscriptions,officialCLI,TaskVM/E2B runtime or production readiness."
+    },
+    "cleanup": {
+      "scriptFinally": [
+        {
+          "line": 149,
+          "text": "} finally {"
+        },
+        {
+          "line": 150,
+          "text": "  await pool.end()"
+        },
+        {
+          "line": 151,
+          "text": "  // Preserve the Postgres and build containers, including after a failed test."
+        },
+        {
+          "line": 152,
+          "text": "  console.error(`Retained BYOS Postgres container if created: ${name}`)"
+        }
+      ],
+      "retainedContainerReceipt": {
+        "line": 1857,
+        "timestamp": "2026-11-09T22:05:28.1931135Z",
+        "text": "Retained BYOS Postgres container if created: mikka-cpa-test-ac5b52e9-04ae-4f8c-b78f-1463e347dbd3"
+      },
+      "postJobReceipts": [
+        {
+          "line": 1858,
+          "timestamp": "2026-11-09T22:05:28.2193259Z",
+          "text": "Post job cleanup."
+        },
+        {
+          "line": 1862,
+          "timestamp": "2026-11-09T22:05:28.3142462Z",
+          "text": "Post job cleanup."
+        },
+        {
+          "line": 1864,
+          "timestamp": "2026-11-09T22:05:28.4277221Z",
+          "text": "Post job cleanup."
+        },
+        {
+          "line": 1878,
+          "timestamp": "2026-11-09T22:05:28.6228080Z",
+          "text": "Cleaning up orphan processes"
+        }
+      ],
+      "poolEndCompletion": "Inferred from reaching the retained-container log immediately after awaited pool.end in the fixed finally block.",
+      "containerDeletionObserved": false,
+      "runnerDestructionObserved": false,
+      "limitation": "The harness explicitly preserves Postgres and build containers. Neither this archive nor generic post-job/orphan-process cleanup proves docker stop/rm or later hosted-runner destruction. No external resource cleanup action was attempted by this read-only reviewer."
+    }
+  },
+  "ciSelectionBoundary": {
+    "proof": {
+      "key": "ciD2:selectionProof",
+      "bytes": 147588,
+      "sha256": "f945b9506fb81d01ed1a1037b1ec5cf2963a72ba98059ebe6e64e963f62ef36a",
+      "gitBlob": "4f369b8ac0e58294392047e459aa4016b02e75ec"
+    },
+    "coreUnitTargets": 86,
+    "byosWorkerCommandsInCoreSelection": [],
+    "daemonSelected": true,
+    "conclusion": "Go byos-worker actual execution belongs to the independent custody workflow line42 and its archived command/results. Do not attribute it to Core86-target selection."
+  },
+  "validationBounds": {
+    "noAggregateUniqueTestTotalClaimed": true,
+    "nestedNodeAndGoParentCountsIdentified": true,
+    "duplicateSuitesAcrossJobsNotDeduplicatedIntoAUniqueTotal": true,
+    "rawFixturesErrorsNotMisclassifiedAsTestFailures": true,
+    "cacheAndDependencyResolutionSkipsNotCountedAsTestSkips": true,
+    "realAgentSuiteNotRun": true,
+    "productionValidation": false,
+    "browserAcceptanceNotRun": true
+  },
+  "reviewerActions": {
+    "originalJobLogReads": 0,
+    "originalWorkflowZipReads": 0,
+    "artifactZipDownloads": 0,
+    "newTestsRun": 0,
+    "resourcesStarted": 0,
+    "reviewerResourcesRemaining": 0,
+    "refsUpdated": 0,
+    "ciTriggered": 0,
+    "sourceChanged": false,
+    "evidenceBlobOnly": true
+  }
+}

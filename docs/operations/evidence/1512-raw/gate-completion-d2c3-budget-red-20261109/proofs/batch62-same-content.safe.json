@@ -1,0 +1,677 @@
+{
+  "schema": "issue1512.batch62-content-compatibility.v1",
+  "observedAtUtc": "2026-11-09 22:27:05 UTC",
+  "own": {
+    "head": "d2c3f63448130443e3e10bb5304417162f585776",
+    "tree": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+    "leaves": 6840,
+    "ciRun": 42707256422,
+    "actualCheckout": "3bc095c100537563296186fc3d4cc4d60b59b698"
+  },
+  "upstream": {
+    "head": "62b5783a61a199f886a2d71d2914f85b3bf6cfc7",
+    "tree": "6475c62014da3bb709bfcd0c96ef9303150ae165",
+    "parents": [
+      "9f1429343d5fafff2cdf9a473ebec43f07e61721",
+      "7d5185fb0cd5801a57cb77e58263a7a8ef8cd80f",
+      "1c7698655405b289d7fdbd814713d15e542cc2bb"
+    ],
+    "leaves": 6840,
+    "published": true
+  },
+  "completeRemoteTrees": {
+    "truncated": [
+      false,
+      false
+    ],
+    "fullUnionPathsCompared": 6840,
+    "exactDifferenceCount": 48,
+    "unexplainedDifferences": [],
+    "allOther6792LeavesEqual": true
+  },
+  "originalOwn48Proof": "a8085dc283bcb7d6eee2164cacce0e0f6a52caa3",
+  "delta": [
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b248a4d97240ba895c3c165b2d7d5c4a763ffe23"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4"
+      }
+    },
+    {
+      "path": "app/actions/coordinator.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bd24ef4c103b670d92d381d396d5c3e1b6aba083"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c1af7261fed4907c265041a549441b92f3ba6ab7"
+      }
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/repos/route.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9fe33b05a9570ab59e4bb041f9a1344c44ab31ad"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b"
+      }
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/runs/route.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3bbb71a8a7d249eb517d75a95986cf75d1994168"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5a4c4f8486239161b325b9774b3086afe666dfa9"
+      }
+    },
+    {
+      "path": "apps/api/generated/routes.json",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "016af99a766db7d863704225d451d9eb3a950bbb"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6fbced33e672f3fa0d5e35bed40b63fa103809d5"
+      }
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f218fd0698bfae6296be7a06c732c26cac412eb7"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a0cc13783eb567c256c34e08eaf3f6e9aca157e2"
+      }
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "b72659facb8a5a710fb0c0121e2543add0ad8f33"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e7f6972a23519ae45e059038cd0c404789d44a98"
+      }
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c69dcfe5f459de0e603651fd510f06cf8d32e75b"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "dae8798653457afad334c2d909b10b63e9b3956f"
+      }
+    },
+    {
+      "path": "components/swr-defaults.tsx",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f6be8710182ad68ce0a87f6cac910184bf1d52f3"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9b7a4385896b9aacc69ea898be23636b5a8c62fb"
+      }
+    },
+    {
+      "path": "components/workspace/issue-workspace.tsx",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6f031756fc13de69dc87fc011bb3696b5a15aa52"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "064b7cb66429d3219622637eaa4228596f98d54b"
+      }
+    },
+    {
+      "path": "docs/operations/tracing.md",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e75e8377fbcb6f92d3446f5325d6d55cc4b294af"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7ec15f7515853877c5940b9e08106df50b0d5c55"
+      }
+    },
+    {
+      "path": "hooks/use-live-lists.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ac60a59be511ec45cc372b8c91c0535861a30931"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "afd0cae59d1b871cbc5175a6de8f2b44f2d036ca"
+      }
+    },
+    {
+      "path": "instrumentation-client.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "649ac94ae8f45203782a2a99aad0cc3e4c42f27a"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9109982d1c3245179b85a42d6969003aec2f5047"
+      }
+    },
+    {
+      "path": "lib/analytics-policy.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9529e8f563ef43d3e7c1eedd992165626eb86085"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "152b941ff7b05004a7c57a909f776c6268ede106"
+      }
+    },
+    {
+      "path": "lib/coordinator/coordinator-bot.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a2a6bf1fd1307babd350c9a168b003e38fa4b3cc"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d73e30c36212029a8951a25a692c4e04a2a5b86d"
+      }
+    },
+    {
+      "path": "lib/coordinator/repository-resolution.test.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1d76b2da5d6b70fce05221cb10f8a7a35a72ae1c"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a5157f09e8022bf9077053686d36aa02760a4e94"
+      }
+    },
+    {
+      "path": "lib/coordinator/repository-resolution.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "faa8276d73120a257034b2a31d4c89d24856b46c"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6826efdd6895fa3f584e35ff2f1edb527cd080fa"
+      }
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.test.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "076d59eea10b000cd08df46754d32454609ecdc6"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "47ef8ffe0e8b6ac1e7604e96362ba66ed4f015d5"
+      }
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9ddddf4230c9f63ca9fb5f966de87116449844fe"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ec8497366c9c46cdac494814bd832beb1828c880"
+      }
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-contract.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "45f73181cffbda3a48b61b90e9dc20e3a88cb18b"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a40f946620ec874320586cb12ddb90c4b2fc438d"
+      }
+    },
+    {
+      "path": "lib/device-enrollment.db.test.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "431897540dc97e29fbc514ecb1ccd1dbf5d0c9ed"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "071b2243d35cd6fdd97b7be0f17f21728578c537"
+      }
+    },
+    {
+      "path": "lib/device-enrollment.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f9490f18359d2d3a9b61b068bfb14ef4b965144d"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8fe53cb39985150e5fc05daa6370121cb5426d53"
+      }
+    },
+    {
+      "path": "lib/device-heartbeat.db.test.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "46c43f5c8bd9d33818f67d1e899f924ac9d267ae"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e8f4f35748707364e77c53fa594c166bafc3dae8"
+      }
+    },
+    {
+      "path": "lib/device-management.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c2e44913f843391095232bdda81d774a58ff9d24"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c2243c5732d67b3ff5444196ce3b45e9aca67805"
+      }
+    },
+    {
+      "path": "lib/device-unit-fence.db.test.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a5237da052e304897cd48afdebc42ee6f7571d96"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bc65b3faf494d2fd7c797b68f34d04227df38b7a"
+      }
+    },
+    {
+      "path": "lib/dispatch-timing.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7f5ca1b72b28823f00936a820edac001766f5e71"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f82563e766f5c0477479b2d487e0f92e60a08b75"
+      }
+    },
+    {
+      "path": "lib/live/revision-read.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "445ea81dccbed5f4b6ad16816757df0154a74b76"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "266aa82ba4a683e88d207bc197fd97cee1f2b1ae"
+      }
+    },
+    {
+      "path": "lib/personal-policy.test.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bb2de016988758cbf34c00a8284a084c19b9e809"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0338aed556fe721ba49c2fa7fa066fdd9d63ff96"
+      }
+    },
+    {
+      "path": "lib/personal-policy.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bbb9684619cbfa8faca236a78e6f8f61148d9a94"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "dc710f0a16a5e28e5a34d5112a86fab349a2639a"
+      }
+    },
+    {
+      "path": "lib/replay-readiness.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "899a9dcf33af282913c3e25c99b0826566b2c56b"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d60598b09201228e23c5ac7a9df00938192f0e67"
+      }
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2dc3ab5a9934fed5146189fd236b450f0d223920"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "69a827369bd71838ba8ac9ffbee928ca70219e76"
+      }
+    },
+    {
+      "path": "lib/tracing/logs.test.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8e6dc9b951d1126376ab29d4d0a80f276391a58a"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "737fa373e4a8333a4a703bf6133f9a533d585460"
+      }
+    },
+    {
+      "path": "lib/tracing/node.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3037a3b0cc2538451917cdd8e454a376553fc47c"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "00775a5928228262a66b12b845ee0dc18f6c6047"
+      }
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0ed07cf1751a0fc2885109201caf89cda71f704b"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2f6cb3ab32695c64fa67191653c0add6e8720b39"
+      }
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.test.mjs",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "58170f27b9586752ca966e377c9255ac6e6174a9"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "56412efdfe5bc638496b89de56281360b4cbe9b5"
+      }
+    },
+    {
+      "path": "scripts/acceptance/run-observability.md",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "176e3aead0068d801f829dcadaafcd02a61e67a3"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4ca2cf35c1f499b338469556836ae0505649e82a"
+      }
+    },
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "104075571c73b97a985458f206dba310e4894490"
+      }
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e73f32f4b93a1bffc70d9d9ba96f581e47746a9d"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2e3c8c7aad0594df165caf8f798c72034b3d484f"
+      }
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7ee7564fe213ce3fba762fee8685eb9a4bb31329"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f36ecf2d08f1bc2754b21be0d47d149871bb67c5"
+      }
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a70f45e7395309a1cf93ae295e880e06ad521ef2"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "628395f91d97a64655afb80117788d70207200c0"
+      }
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f981a61d72fb9c0e153e490f89d7328fb014558e"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "30ef728a5a2d465d389916a63d40a816d13b1d4c"
+      }
+    },
+    {
+      "path": "tests/analytics-policy.test.mjs",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9fc0602f814f3d8e25ba5668f0f174a26f14718b"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f162a894cbada7fada30c63a3a49f4b665574f0f"
+      }
+    },
+    {
+      "path": "tests/cloud-dispatch-startup.test.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c006685c7862c1fd41197f3a786ecb399076aa8b"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "609029dde521868c00ab7eb687394ad5cacd6183"
+      }
+    },
+    {
+      "path": "tests/coordinator-bot.db.test.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "32a8321c981dd6a534f8859fa35f281e874466e6"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c6c92ea2741174b5baadbd1535fc8b0c62b8275e"
+      }
+    },
+    {
+      "path": "tests/live-revision-reads.db.test.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "960eb24ff24aba996a681bc47468290cf6200398"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "1cd2dd85dda5e9edd76379d41bd86c3b7f6cc351"
+      }
+    },
+    {
+      "path": "tests/replay-readiness.test.mjs",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2c67bead9d3d211e58dd6a7a684d60139d7df16c"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "58e4706039dafe6901082676f37a3c92da613d43"
+      }
+    },
+    {
+      "path": "workflows/coordinator/factory-steps.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "665573940610341eea039de5fb2c02406c6ef3b7"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0e2ecce921c4b56795ad1096f2b1eae987299e95"
+      }
+    },
+    {
+      "path": "workflows/coordinator/steps.ts",
+      "batch": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5002aebd9ed3df6047ccb3f7a083401c3cad34c3"
+      },
+      "own": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d500795e9a62631b6c7619c4ffd1df67f137ee54"
+      }
+    }
+  ],
+  "uiComposition": {
+    "path": "components/workspace/issue-workspace.tsx",
+    "upstream": "6f031756fc13de69dc87fc011bb3696b5a15aa52",
+    "own": "064b7cb66429d3219622637eaa4228596f98d54b",
+    "priorIndependentCompositionProof": "d7a637a24b3f1b46f2802555a590a27cf83da971",
+    "meaning": "complete owner UI source plus exactly three pre-existing own snapshotReadFetcher edits"
+  },
+  "conclusion": "The newly published runtime/UI/mailbox batch has exactly the content already included in own d2c, except the original 48 own changes. No new own source commit or repeat CI is justified by this wrapper commit alone.",
+  "limitations": [
+    "Actual main is still separately checked before merge; later source additions require their own net-diff review.",
+    "This is source compatibility, not upstream CI success, R7 publication, window release or production acceptance.",
+    "Native current-head budget and all production evidence remain separate requirements."
+  ],
+  "actions": {
+    "sourceRefChanges": 0,
+    "CIReRuns": 0,
+    "resources": 0
+  }
+}

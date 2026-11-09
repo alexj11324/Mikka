@@ -1,0 +1,473 @@
+{
+  "schema": "issue1512.d2c3.integration-execution.v1",
+  "runId": 42707256422,
+  "attempt": 1,
+  "jobId": 129470272431,
+  "head": "d2c3f63448130443e3e10bb5304417162f585776",
+  "actualCheckout": "3bc095c100537563296186fc3d4cc4d60b59b698",
+  "tree": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+  "originalLog": {
+    "sha": "9c75ce621550af79a87a291377e85a344126c10c",
+    "bytes": 682113,
+    "sha256": "d4fe0af7db03f9bf25aa795b884d9151a676e1f53887ca51ffc0a89291f18c39"
+  },
+  "wrapper": {
+    "sha": "ac3b336f022eb8754169f80b905af9711eea96db",
+    "bytes": 705493,
+    "sha256": "87c21ab221eba97d24a1f5779826934f35d5bb31432a498e1db827263fa3e692"
+  },
+  "originalReads": 1,
+  "selectionProof": "4f369b8ac0e58294392047e459aa4016b02e75ec",
+  "targetClosure": {
+    "expected": [
+      {
+        "project": "ci-integration-2",
+        "target": "ci-tasks:integration-2",
+        "command": "pnpm test:active-agents",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-3",
+        "target": "ci-tasks:integration-3",
+        "command": "pnpm test:auth-composio",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-4",
+        "target": "ci-tasks:integration-4",
+        "command": "pnpm test:test-accounts",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-5",
+        "target": "ci-tasks:integration-5",
+        "command": "node scripts/test-auth-email.mjs",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-6",
+        "target": "ci-tasks:integration-6",
+        "command": "pnpm test:groups",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-7",
+        "target": "ci-tasks:integration-7",
+        "command": "pnpm test:live-lists",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-8",
+        "target": "ci-tasks:integration-8",
+        "command": "pnpm test:group-turns",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-9",
+        "target": "ci-tasks:integration-9",
+        "command": "pnpm test:integrations",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-10",
+        "target": "ci-tasks:integration-10",
+        "command": "pnpm test:github",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-11",
+        "target": "ci-tasks:integration-11",
+        "command": "pnpm test:request-log",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-12",
+        "target": "ci-tasks:integration-12",
+        "command": "pnpm test:legacy-reads",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-13",
+        "target": "ci-tasks:integration-13",
+        "command": "pnpm test:slack",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-14",
+        "target": "ci-tasks:integration-14",
+        "command": "pnpm test:telegram",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-15",
+        "target": "ci-tasks:integration-15",
+        "command": "pnpm test:agent",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-16",
+        "target": "ci-tasks:integration-16",
+        "command": "pnpm test:acceptance",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-17",
+        "target": "ci-tasks:integration-17",
+        "command": "pnpm test:suggestions",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-18",
+        "target": "ci-tasks:integration-18",
+        "command": "pnpm test:captures",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-19",
+        "target": "ci-tasks:integration-19",
+        "command": "pnpm test:db-runner",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-20",
+        "target": "ci-tasks:integration-20",
+        "command": "pnpm test:csv",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-21",
+        "target": "ci-tasks:integration-21",
+        "command": "pnpm test:settings",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-22",
+        "target": "ci-tasks:integration-22",
+        "command": "pnpm test:settings-backend",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-23",
+        "target": "ci-tasks:integration-23",
+        "command": "pnpm test:workspace-settings",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-24",
+        "target": "ci-tasks:integration-24",
+        "command": "pnpm test:settings-prefs",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-25",
+        "target": "ci-tasks:integration-25",
+        "command": "pnpm test:account",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-26",
+        "target": "ci-tasks:integration-26",
+        "command": "pnpm test:issues",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-27",
+        "target": "ci-tasks:integration-27",
+        "command": "pnpm test:issue-search",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-28",
+        "target": "ci-tasks:integration-28",
+        "command": "pnpm --filter @mikka/protocol test",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-29",
+        "target": "ci-tasks:integration-29",
+        "command": "node --test scripts/e2b/local-api-relay.test.mjs",
+        "reason": "full validation"
+      },
+      {
+        "project": "ci-integration-factory-activity",
+        "target": "ci-tasks:integration-factory-activity",
+        "command": "pnpm test:factory-activity",
+        "reason": "full validation"
+      }
+    ],
+    "actual": [
+      "ci-tasks:integration-2",
+      "ci-tasks:integration-3",
+      "ci-tasks:integration-4",
+      "ci-tasks:integration-5",
+      "ci-tasks:integration-6",
+      "ci-tasks:integration-7",
+      "ci-tasks:integration-8",
+      "ci-tasks:integration-9",
+      "ci-tasks:integration-10",
+      "ci-tasks:integration-11",
+      "ci-tasks:integration-12",
+      "ci-tasks:integration-13",
+      "ci-tasks:integration-14",
+      "ci-tasks:integration-15",
+      "ci-tasks:integration-16",
+      "ci-tasks:integration-17",
+      "ci-tasks:integration-18",
+      "ci-tasks:integration-19",
+      "ci-tasks:integration-20",
+      "ci-tasks:integration-21",
+      "ci-tasks:integration-22",
+      "ci-tasks:integration-23",
+      "ci-tasks:integration-24",
+      "ci-tasks:integration-25",
+      "ci-tasks:integration-26",
+      "ci-tasks:integration-27",
+      "ci-tasks:integration-28",
+      "ci-tasks:integration-29",
+      "ci-tasks:integration-factory-activity"
+    ],
+    "misses": [],
+    "extra": []
+  },
+  "nxSuccess": " NX   Successfully ran targets integration-2, integration-3, integration-4, integration-5, integration-6, integration-7, integration-8, integration-9, integration-10, integration-11, integration-12, integration-13, integration-14, integration-15, integration-16, integration-17, integration-18, integration-19, integration-20, integration-21, integration-22, integration-23, integration-24, integration-25, integration-26, integration-27, integration-28, integration-29, integration-factory-activity for project ci-tasks",
+  "live": {
+    "target": "ci-tasks:integration-7",
+    "command": "ci-tasks: > node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test scripts/use-live-lists.live.test.tsx scripts/desktop-notification-lifetime.live.test.tsx tests/desktop-notifications.test.ts",
+    "reported": {
+      "tests": 104,
+      "suites": 0,
+      "pass": 104,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 129820.801892
+    },
+    "precedingFinalCase": [
+      "ci-tasks: (node:3696) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.",
+      "ci-tasks: ▶ desktop decisions read completion preferences only for a currently owned completion",
+      "ci-tasks:   ✔ unauthenticated, empty, malformed, foreign and stale-state candidates never read preferences or ask the model (6.259674ms)",
+      "ci-tasks:   ✔ awaiting and failed decisions keep their existing path without reading completion settings (3.884113ms)",
+      "ci-tasks:   ✔ a finished event with either switch off is rejected before a model decision (0.612545ms)",
+      "ci-tasks:   ✔ one current preference read covers all owned completions and filters only finished candidates (5.864984ms)",
+      "ci-tasks:   ✔ a failed preference read cannot produce a completion notification (0.907156ms)",
+      "ci-tasks: ✔ desktop decisions read completion preferences only for a currently owned completion (327.798122ms)"
+    ],
+    "reportSelection": "Unique explicit 104-tests summary follows the final desktop-decisions file. Nx target stdout interleaves; the first following summary after the earlier command (119/110/9) belongs to another process and is not assigned to Live.",
+    "snapshotReceiptCount": 7,
+    "snapshotReceipts": [
+      {
+        "kind": "native_workspace_snapshot_dispatch",
+        "scenario": "committed-after-ready",
+        "physicalCalls": 1,
+        "counts": {
+          "teams.listTeams": 1,
+          "team-relations.listProjectTeams": 1
+        },
+        "phases": [
+          "fetcher:teams.listTeams",
+          "enqueue:teams.listTeams",
+          "fetcher:team-relations.listProjectTeams",
+          "enqueue:team-relations.listProjectTeams",
+          "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001",
+          "dispatch:1",
+          "response:1"
+        ],
+        "rejected": []
+      },
+      {
+        "kind": "native_workspace_snapshot_dispatch",
+        "scenario": "pending-after-ready",
+        "physicalCalls": 1,
+        "counts": {
+          "teams.listTeams": 1,
+          "team-relations.listProjectTeams": 1
+        },
+        "phases": [
+          "fetcher:teams.listTeams",
+          "enqueue:teams.listTeams",
+          "fetcher:team-relations.listProjectTeams",
+          "enqueue:team-relations.listProjectTeams",
+          "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001",
+          "dispatch:1",
+          "response:1"
+        ],
+        "rejected": []
+      },
+      {
+        "kind": "native_workspace_snapshot_dispatch",
+        "scenario": "late-subscription",
+        "physicalCalls": 1,
+        "counts": {
+          "teams.listTeams": 1,
+          "team-relations.listProjectTeams": 1
+        },
+        "phases": [
+          "fetcher:teams.listTeams",
+          "enqueue:teams.listTeams",
+          "fetcher:team-relations.listProjectTeams",
+          "enqueue:team-relations.listProjectTeams",
+          "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001",
+          "dispatch:1",
+          "response:1"
+        ],
+        "rejected": []
+      },
+      {
+        "kind": "native_workspace_snapshot_dispatch",
+        "scenario": "dispatch-before-ready",
+        "physicalCalls": 2,
+        "counts": {
+          "teams.listTeams": 2,
+          "team-relations.listProjectTeams": 2
+        },
+        "phases": [
+          "fetcher:teams.listTeams",
+          "enqueue:teams.listTeams",
+          "fetcher:team-relations.listProjectTeams",
+          "enqueue:team-relations.listProjectTeams",
+          "dispatch:1",
+          "response:1",
+          "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001",
+          "fetcher:teams.listTeams",
+          "enqueue:teams.listTeams",
+          "fetcher:team-relations.listProjectTeams",
+          "enqueue:team-relations.listProjectTeams",
+          "dispatch:2",
+          "response:2"
+        ],
+        "rejected": []
+      },
+      {
+        "kind": "native_workspace_snapshot_dispatch",
+        "scenario": "newer-push",
+        "physicalCalls": 2,
+        "counts": {
+          "teams.listTeams": 2,
+          "team-relations.listProjectTeams": 2
+        },
+        "phases": [
+          "fetcher:teams.listTeams",
+          "enqueue:teams.listTeams",
+          "fetcher:team-relations.listProjectTeams",
+          "enqueue:team-relations.listProjectTeams",
+          "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001",
+          "dispatch:1",
+          "fetcher:teams.listTeams",
+          "enqueue:teams.listTeams",
+          "fetcher:team-relations.listProjectTeams",
+          "enqueue:team-relations.listProjectTeams",
+          "dispatch:2",
+          "response:2",
+          "response:1"
+        ],
+        "rejected": []
+      },
+      {
+        "kind": "native_workspace_snapshot_dispatch",
+        "scenario": "workspace-change",
+        "physicalCalls": 2,
+        "counts": {
+          "teams.listTeams": 2,
+          "team-relations.listProjectTeams": 2
+        },
+        "phases": [
+          "fetcher:teams.listTeams",
+          "enqueue:teams.listTeams",
+          "fetcher:team-relations.listProjectTeams",
+          "enqueue:team-relations.listProjectTeams",
+          "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001",
+          "dispatch:1",
+          "fetcher:teams.listTeams",
+          "enqueue:teams.listTeams",
+          "fetcher:team-relations.listProjectTeams",
+          "enqueue:team-relations.listProjectTeams",
+          "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000002",
+          "dispatch:2",
+          "response:2",
+          "response:1"
+        ],
+        "rejected": [
+          {
+            "action": "teams.listTeams",
+            "code": "desktop_session_changed",
+            "status": 409
+          },
+          {
+            "action": "team-relations.listProjectTeams",
+            "code": "desktop_session_changed",
+            "status": 409
+          }
+        ]
+      },
+      {
+        "kind": "native_workspace_snapshot_dispatch",
+        "scenario": "identity-change",
+        "physicalCalls": 2,
+        "counts": {
+          "teams.listTeams": 2,
+          "team-relations.listProjectTeams": 2
+        },
+        "phases": [
+          "fetcher:teams.listTeams",
+          "enqueue:teams.listTeams",
+          "fetcher:team-relations.listProjectTeams",
+          "enqueue:team-relations.listProjectTeams",
+          "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001",
+          "dispatch:1",
+          "fetcher:teams.listTeams",
+          "enqueue:teams.listTeams",
+          "fetcher:team-relations.listProjectTeams",
+          "enqueue:team-relations.listProjectTeams",
+          "ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001",
+          "dispatch:2",
+          "response:2",
+          "response:1"
+        ],
+        "rejected": [
+          {
+            "action": "teams.listTeams",
+            "code": "desktop_session_changed",
+            "status": 409
+          },
+          {
+            "action": "team-relations.listProjectTeams",
+            "code": "desktop_session_changed",
+            "status": 409
+          }
+        ]
+      }
+    ]
+  },
+  "teamImport": {
+    "observedResult": "ci-tasks: ✔ all real team dependencies and auth export/session metadata load before the denied native SQL boundary (13710.660197ms)",
+    "observedDurationMs": 13710.660197,
+    "receipt": {
+      "teamImportContract": true,
+      "dynamicImportOccurrences": 26,
+      "uniqueModules": 24,
+      "scenarios": 22,
+      "realAuthExports": [
+        "MOBILE_APP_ORIGIN",
+        "auth",
+        "authBaseURL",
+        "githubEnabled",
+        "githubSignInEnabled",
+        "googleEnabled",
+        "oauthCallbackBaseURL"
+      ],
+      "deniedConnections": 1,
+      "nativeTransportAttempts": 0,
+      "nativeSqlSubmissions": 0
+    },
+    "interpretation": "one source-bound CI dependency import test, not product first-token latency or observability network overhead"
+  },
+  "uiExecutionProof": "38f1b25125f26e2695fca014de4b70151e7099c1",
+  "boundaries": [
+    "Nx target success is not a statement that every possible UI unit target was selected.",
+    "board-view-state and issue-workspace-settings are registered in test:view-state, absent from this selector; not counted as executed or skipped here.",
+    "Existing fixture error lines and local missing-database diagnostics remain in the original log; they are not removed or rewritten as successes.",
+    "No all-Integration assertion total is fabricated from interleaved nested reporters.",
+    "This evidence does not substitute for current Native real budgets or hosted production UI/Replay."
+  ]
+}

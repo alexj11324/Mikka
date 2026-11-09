@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "runId": 42707256422,
+  "attempt": 1,
+  "head": "d2c3f63448130443e3e10bb5304417162f585776",
+  "actualCheckout": "3bc095c100537563296186fc3d4cc4d60b59b698",
+  "selectedArtifacts": [
+    {
+      "id": 13716212399,
+      "name": "desktop-package-evidence-3bc095c100537563296186fc3d4cc4d60b59b698",
+      "sizeInBytes": 1596,
+      "digest": "sha256:972889ccf4d19cdd662a453d847af614426df3501eca473c91e0fc438d6ee28e",
+      "expired": false,
+      "createdAt": "2026-11-09T22:28:16Z",
+      "updatedAt": "2026-11-09T22:28:16Z",
+      "expiresAt": "2026-11-16T22:28:15Z",
+      "workflowRun": {
+        "id": 42707256422,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "fix/1512-daemon-fixture-executable-20261109",
+        "head_sha": "d2c3f63448130443e3e10bb5304417162f585776"
+      }
+    },
+    {
+      "id": 13714749727,
+      "name": "desktop-native-evidence-3bc095c100537563296186fc3d4cc4d60b59b698",
+      "sizeInBytes": 15153427,
+      "digest": "sha256:3fbc2d4165cb8b1c90042f091466d77860ac8f1473f82c462f2a14afa1e78ce7",
+      "expired": false,
+      "createdAt": "2026-11-09T22:28:19Z",
+      "updatedAt": "2026-11-09T22:28:19Z",
+      "expiresAt": "2026-11-16T22:28:17Z",
+      "workflowRun": {
+        "id": 42707256422,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "fix/1512-daemon-fixture-executable-20261109",
+        "head_sha": "d2c3f63448130443e3e10bb5304417162f585776"
+      }
+    }
+  ],
+  "restoredZipBytes": [
+    {
+      "id": 13716212399,
+      "bytes": 1596,
+      "sha256": "972889ccf4d19cdd662a453d847af614426df3501eca473c91e0fc438d6ee28e",
+      "fileCount": 2
+    },
+    {
+      "id": 13714749727,
+      "bytes": 15153427,
+      "sha256": "3fbc2d4165cb8b1c90042f091466d77860ac8f1473f82c462f2a14afa1e78ce7",
+      "fileCount": 314
+    }
+  ],
+  "actualFileCount": 316,
+  "downloadApiCalls": 2,
+  "refreshes": 0,
+  "missingSelectedOriginals": [],
+  "temporaryDownloadUrlsPublished": false
+}

@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "repository": "alexj11324/Mikka",
+  "head": "d2c3f63448130443e3e10bb5304417162f585776",
+  "tree": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+  "actualCheckout": "3bc095c100537563296186fc3d4cc4d60b59b698",
+  "orderedCheckoutParents": [
+    "1c7698655405b289d7fdbd814713d15e542cc2bb",
+    "d2c3f63448130443e3e10bb5304417162f585776"
+  ],
+  "ownNativeJobLog": {
+    "path": "native-d2c3f6/job-129474527225.original.log",
+    "kind": "exact_decoded_native_job_log",
+    "mode": "100644",
+    "bytes": 251498,
+    "sha256": "b660da245481f431435975bfb6f489697585d98f81907634ecbf603b3220e8e1",
+    "gitBlob": "5e08171245005885e33bc702ba33a2d9c27845e2",
+    "remoteConfirmed": true,
+    "scanFindings": []
+  },
+  "checkoutOccurrences": [
+    {
+      "line": 178,
+      "sha": "3bc095c100537563296186fc3d4cc4d60b59b698"
+    }
+  ],
+  "originalRevisionFields": {
+    "lifecycle": "3bc095c100537563296186fc3d4cc4d60b59b698",
+    "smoke": "3bc095c100537563296186fc3d4cc4d60b59b698",
+    "crypto": "3bc095c100537563296186fc3d4cc4d60b59b698",
+    "parityApp": "3bc095c100537563296186fc3d4cc4d60b59b698",
+    "parityHarness": "3bc095c100537563296186fc3d4cc4d60b59b698"
+  },
+  "parityHarnessSha256": "3cf8818efdc55a782e839eba45ed9ce252888771758136e51cff108c40b23554",
+  "actualCommitApi": {
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/3bc095c100537563296186fc3d4cc4d60b59b698",
+    "readOnce": true,
+    "sha": "3bc095c100537563296186fc3d4cc4d60b59b698",
+    "tree": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+    "parents": [
+      "1c7698655405b289d7fdbd814713d15e542cc2bb",
+      "d2c3f63448130443e3e10bb5304417162f585776"
+    ]
+  },
+  "nativeLogNodeVersions": [
+    "v24.22.2"
+  ],
+  "platform": "darwin",
+  "architecture": "arm64",
+  "packageBinding": "Standalone package has no revision field; its full object matches the crypto report, which verifies three independent processes share the immutable package.",
+  "nativeTerminalMetadata": {
+    "provider": "root fresh GitHub jobs GET",
+    "observedAt": "2026-11-09T22:29:41Z",
+    "runId": 42707256422,
+    "attempt": 1,
+    "nativeJobId": 129474527225,
+    "status": "completed",
+    "conclusion": "success",
+    "completedAt": "2026-11-09T22:28:28Z",
+    "strictJobId": 129484343677,
+    "strictConclusion": "success",
+    "strictCompletedAt": "2026-11-09T22:28:42Z"
+  },
+  "installedDaemon": [
+    {
+      "mode": "bundled",
+      "daemon": {
+        "source": "local_daemon_hello",
+        "status": "connected",
+        "daemonVersion": "0.0.564",
+        "protocolVersion": 3
+      },
+      "service": {
+        "platform": "darwin",
+        "definition": "file",
+        "profile": "matches",
+        "dev": true,
+        "installedVersion": "0.0.564",
+        "installedRevision": "8db16095f46be955df22f42914e0f89b6e5f3d11"
+      }
+    },
+    {
+      "mode": "hosted",
+      "daemon": {
+        "source": "local_daemon_hello",
+        "status": "connected",
+        "daemonVersion": "0.0.564",
+        "protocolVersion": 3
+      },
+      "service": {
+        "platform": "darwin",
+        "definition": "file",
+        "profile": "matches",
+        "dev": true,
+        "installedVersion": "0.0.564",
+        "installedRevision": "8db16095f46be955df22f42914e0f89b6e5f3d11"
+      }
+    }
+  ],
+  "limits": {
+    "eventHeadNotSubstitutedForActualCheckout": true,
+    "installedDaemonSourceSeparateFromAppSource": true,
+    "workerHashNotReportedByTheseOriginals": true,
+    "wholeCiFinalMetadataOwnedByRoot": true,
+    "productionAcceptance": false
+  }
+}

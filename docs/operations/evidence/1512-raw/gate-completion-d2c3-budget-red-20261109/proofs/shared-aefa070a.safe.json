@@ -1,0 +1,328 @@
+{
+  "schema": "mikka-1512-shared-release-readonly-observation-v1",
+  "repository": "alexj11324/Mikka",
+  "priorProof": "e474fd95c5e1b23996474ecca35249244ba4f133",
+  "observationStart": "2026-11-09 22:23:53 UTC",
+  "workflowAndCommentSnapshotEnd": "2026-11-09 22:23:54 UTC",
+  "fixedCommitReadEnd": "2026-11-09 22:24:25 UTC",
+  "scope": "One bounded fresh checkpoint. Read only shared refs, comments, workflow/job/step metadata and newly published immutable batch commit. No own d2c CI polling, peer original logs or ZIPs, account/resource/ref/rerun action, or background monitoring.",
+  "actualMain": {
+    "ref": "refs/heads/main",
+    "node_id": "REF_kwDOVRYxA69yZWZzL2hlYWRzL21haW4",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/refs/heads/main",
+    "object": {
+      "sha": "1c7698655405b289d7fdbd814713d15e542cc2bb",
+      "type": "commit",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/1c7698655405b289d7fdbd814713d15e542cc2bb"
+    }
+  },
+  "actualBatchRef": {
+    "ref": "refs/heads/batch/issue1506-http-events-codex-20261109t2139",
+    "node_id": "REF_kwDOVRYxA9oAOnJlZnMvaGVhZHMvYmF0Y2gvaXNzdWUxNTA2LWh0dHAtZXZlbnRzLWNvZGV4LTIwMjYxMTA5dDIxMzk",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/refs/heads/batch/issue1506-http-events-codex-20261109t2139",
+    "object": {
+      "sha": "62b5783a61a199f886a2d71d2914f85b3bf6cfc7",
+      "type": "commit",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/62b5783a61a199f886a2d71d2914f85b3bf6cfc7"
+    }
+  },
+  "newBatchCommit": {
+    "sha": "62b5783a61a199f886a2d71d2914f85b3bf6cfc7",
+    "tree": "6475c62014da3bb709bfcd0c96ef9303150ae165",
+    "orderedParents": [
+      "9f1429343d5fafff2cdf9a473ebec43f07e61721",
+      "7d5185fb0cd5801a57cb77e58263a7a8ef8cd80f",
+      "1c7698655405b289d7fdbd814713d15e542cc2bb"
+    ],
+    "committedAt": "2026-11-09T22:18:20Z",
+    "message": "fix(coordinator): complete Codex 0.167 resume support in latency batch\n\nOrdinarily merge the original #1846 commit and current main into the\n#1836/#1839/#1842 batch, preserving all source commits and authors.\n\nValidated tree: 6475c62014da3bb709bfcd0c96ef9303150ae165\nFull pnpm check: exit 0; startup/prewarm 60/60; mailbox resume 40/40.\nProduction latency and Stop acceptance remain pending. Refs #1506."
+  },
+  "commentsSince": "2026-11-09T22:11:48Z",
+  "coordination1752": [
+    {
+      "id": 6753045637,
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6753045637",
+      "created_at": "2026-11-09T22:22:21Z",
+      "updated_at": "2026-11-09T22:22:21Z",
+      "body": "### #1844 最终21路径 head 已发布，生产窗口仍未开始\n\n已按普通 merge 保留原提交，将 #1846 与当前 main1c 合入批次，正常 CAS `9f142934… → 62b5783a61a199f886a2d71d2914f85b3bf6cfc7`。最终 tree `6475c62014da3bb709bfcd0c96ef9303150ae165`；直接父序为9f / 7d5185 / 1c769。原19个修复路径与继承UI50个路径的 blob 均不变。\n\n新树完整原 `pnpm check` 已根验真：22:03:07–22:14:51 UTC，exit0，85段命令，51项原条件SKIP，idle-budget10/10无SKIP；启动/预热60/60与mailbox恢复40/40均无SKIP。完整日志1,150,837B，SHA256 `da5903070e6b01d9dcff7ab17a6e88c9b1bc1ae56f9a5bf5ae2594e58eeb98e9`。实际源码、index tree和最终HEAD已核对一致。\n\n新head自身9条CI已触发：[主CI42710712714](https://github.com/alexj11324/Mikka/actions/runs/42710712714)，目前未终态。synthetic `ec908bc419ead3e8a281fec7d91ffcc0e76f2199` 已独立读回为父 `[1c769…,62b578…]`、同tree。旧9f绿色不转移。\n\nPR正文和 #1506 进度已更新，延迟仍以 warm 1/4 的失败基线为准。当前main1c的UI发布仍在实际R7订阅准备阶段；本方处于新head CI阶段，不登记未来占位。待相关发布和owner实际释放，再准备本方fresh readonly child，准备入口关闭后才普通合main，继续原六轮和两条普通Stop。OPS `5d08fe6f…` 仍是关闭态。"
+    },
+    {
+      "id": 6753064179,
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6753064179",
+      "created_at": "2026-11-09T22:23:16Z",
+      "updated_at": "2026-11-09T22:23:16Z",
+      "body": "#1826 安全修复就绪（当前不占位）：#1841 exact head `91472edf593840e97f4cfb18f5bf6edce30f677a` / tree2154f40b，最新7条workflows全SUCCESS，主CI42705962996及28个适用check均已通过；完整回执见 [#1826/6752921568](https://github.com/alexj11324/Mikka/issues/1826#issuecomment-6752921568)。\n\n22:23 fresh已核当前UI Web42705513711 SUCCESS，生产完整build=1c769865、overlay=b92b0e1；其自动R7 42705513501正在subscriptions，尚未终态。本方继续保持main和SMOKE不动，等待现行owner实际收口释放；随后才登记有界安全段，正常owner精确处理历史临时凭据/设备并完成Core复验。没有借旧R7失败断言当前轮结果，也没有预占后继。#1608原owner继续唯一维护1831，安全实际闭合后再交接。"
+    }
+  ],
+  "batch1844": [
+    {
+      "id": 6752879783,
+      "url": "https://github.com/alexj11324/Mikka/pull/1844#issuecomment-6752879783",
+      "created_at": "2026-11-09T22:14:01Z",
+      "updated_at": "2026-11-09T22:14:01Z",
+      "body": "#1503 Root｜#1846 的单项门禁现已全部闭合。Root 刚独立 GET 精确 `7d5185fb…` 的 9 条关联 workflows，全部 SUCCESS；主 CI42704906487/A1于22:09:47 UTC成功，Apple129464822973与最终policy129474218974均通过，主CI13success/3既有skip。完整回执与9条run链接在 [#1846/6752875738](https://github.com/alexj11324/Mikka/pull/1846#issuecomment-6752875738)。这只证明1846原精确head，不替代你正在做的tree6475最终组合门禁。独立source-proof和五维medium/no-blocking审阅已转存，我方所有VM均stopped，继续保持无生产占位。"
+    }
+  ],
+  "r7": {
+    "run": {
+      "id": 42705513501,
+      "name": "E2B additive runtime release",
+      "head_sha": "1c7698655405b289d7fdbd814713d15e542cc2bb",
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "failure",
+      "created_at": "2026-11-09T21:45:31Z",
+      "updated_at": "2026-11-09T22:23:44Z"
+    },
+    "jobs": [
+      {
+        "id": 129461136468,
+        "name": "test",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-09T21:47:45Z",
+        "completed_at": "2026-11-09T21:47:58Z",
+        "steps": []
+      },
+      {
+        "id": 129462479255,
+        "name": "check",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-09T21:48:42Z",
+        "completed_at": "2026-11-09T21:49:00Z",
+        "steps": []
+      },
+      {
+        "id": 129463034131,
+        "name": "validate / build",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-09T21:51:23Z",
+        "completed_at": "2026-11-09T21:57:54Z",
+        "steps": []
+      },
+      {
+        "id": 129467811293,
+        "name": "await-web",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-09T22:02:02Z",
+        "completed_at": "2026-11-09T22:17:46Z",
+        "steps": [
+          {
+            "number": 4,
+            "name": "Await this source's actual Web build and public version",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T22:02:11Z",
+            "completed_at": "2026-11-09T22:17:44Z"
+          }
+        ]
+      },
+      {
+        "id": 129478701081,
+        "name": "subscriptions",
+        "status": "completed",
+        "conclusion": "failure",
+        "started_at": "2026-11-09T22:21:30Z",
+        "completed_at": "2026-11-09T22:23:18Z",
+        "steps": [
+          {
+            "number": 4,
+            "name": "Refuse an obsolete source before real subscription work",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T22:21:36Z",
+            "completed_at": "2026-11-09T22:21:36Z"
+          },
+          {
+            "number": 7,
+            "name": "Bind the candidate bytes to this source, worker and run attempt",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T22:21:37Z",
+            "completed_at": "2026-11-09T22:21:37Z"
+          },
+          {
+            "number": 9,
+            "name": "Read the existing candidate E2B key",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T22:21:47Z",
+            "completed_at": "2026-11-09T22:21:47Z"
+          },
+          {
+            "number": 10,
+            "name": "Read the authorized acceptance account email",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T22:21:47Z",
+            "completed_at": "2026-11-09T22:21:48Z"
+          },
+          {
+            "number": 11,
+            "name": "Read the authorized acceptance account password",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T22:21:48Z",
+            "completed_at": "2026-11-09T22:21:48Z"
+          },
+          {
+            "number": 12,
+            "name": "Require real Claude Code and Codex subscriptions on the private candidates",
+            "status": "completed",
+            "conclusion": "failure",
+            "started_at": "2026-11-09T22:21:48Z",
+            "completed_at": "2026-11-09T22:23:16Z"
+          },
+          {
+            "number": 13,
+            "name": "Preserve closed diagnostics and any accepted subscription proof",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T22:23:16Z",
+            "completed_at": "2026-11-09T22:23:17Z"
+          },
+          {
+            "number": 14,
+            "name": "Make only fully accepted candidates public",
+            "status": "completed",
+            "conclusion": "skipped",
+            "started_at": "2026-11-09T22:23:17Z",
+            "completed_at": "2026-11-09T22:23:17Z"
+          },
+          {
+            "number": 15,
+            "name": "Preserve the complete public release report",
+            "status": "completed",
+            "conclusion": "skipped",
+            "started_at": "2026-11-09T22:23:17Z",
+            "completed_at": "2026-11-09T22:23:17Z"
+          }
+        ]
+      },
+      {
+        "id": 129481636859,
+        "name": "cleanup",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-09T22:23:22Z",
+        "completed_at": "2026-11-09T22:23:43Z",
+        "steps": [
+          {
+            "number": 5,
+            "name": "Close this attempt's instances and remove only its private candidates",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T22:23:37Z",
+            "completed_at": "2026-11-09T22:23:40Z"
+          },
+          {
+            "number": 6,
+            "name": "Preserve release cleanup receipt",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T22:23:40Z",
+            "completed_at": "2026-11-09T22:23:41Z"
+          }
+        ]
+      },
+      {
+        "id": 129481638633,
+        "name": "publish",
+        "status": "completed",
+        "conclusion": "skipped",
+        "started_at": "2026-11-09T22:23:19Z",
+        "completed_at": "2026-11-09T22:23:19Z",
+        "steps": []
+      }
+    ]
+  },
+  "web": {
+    "run": {
+      "id": 42705513711,
+      "name": "Web deploy",
+      "head_sha": "1c7698655405b289d7fdbd814713d15e542cc2bb",
+      "run_attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-09T21:45:31Z",
+      "updated_at": "2026-11-09T22:17:35Z"
+    },
+    "jobs": [
+      {
+        "id": 129461137105,
+        "name": "deploy",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-09T21:54:25Z",
+        "completed_at": "2026-11-09T22:17:35Z",
+        "steps": [
+          {
+            "number": 15,
+            "name": "Publish the verified additive runtime pair inside the deployment queue",
+            "status": "completed",
+            "conclusion": "skipped",
+            "started_at": "2026-11-09T21:54:41Z",
+            "completed_at": "2026-11-09T21:54:41Z"
+          },
+          {
+            "number": 24,
+            "name": "Build (runs migrations last, as the Vercel build did)",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T21:56:33Z",
+            "completed_at": "2026-11-09T22:01:12Z"
+          },
+          {
+            "number": 25,
+            "name": "Record official build capacity without private diagnostics",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T22:01:12Z",
+            "completed_at": "2026-11-09T22:01:14Z"
+          },
+          {
+            "number": 26,
+            "name": "Audit the public output for source and source maps",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T22:01:14Z",
+            "completed_at": "2026-11-09T22:01:14Z"
+          },
+          {
+            "number": 27,
+            "name": "Upload the prebuilt output to production",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T22:01:14Z",
+            "completed_at": "2026-11-09T22:17:26Z"
+          },
+          {
+            "number": 28,
+            "name": "Verify the public production version before releasing the deployment queue",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T22:17:26Z",
+            "completed_at": "2026-11-09T22:17:32Z"
+          }
+        ]
+      }
+    ]
+  },
+  "findings": {
+    "source": "Actual main remains 1c7698655405b289d7fdbd814713d15e542cc2bb; batch ref is now 62b5783a61a199f886a2d71d2914f85b3bf6cfc7.",
+    "union": "The published commit independently binds tree6475c62014da3bb709bfcd0c96ef9303150ae165 and ordered parents [9f1429343d5fafff2cdf9a473ebec43f07e61721,7d5185fb0cd5801a57cb77e58263a7a8ef8cd80f,1c7698655405b289d7fdbd814713d15e542cc2bb]. This is the same tree the owner previously reported locally; the actual parent order differs from the earlier suggested order.",
+    "sourceValidationBoundary": "Owner reports complete original pnpm check exit0 and 60/60 startup plus 40/40 mailbox tests. These are the owner's preserved reports; this watcher did not read original logs or wait for the new 62b CI. No additional source change is claimed by the owner, but this checkpoint is not a new independent full-leaf comparison against the own d2c union.",
+    "web": "Current main Web completed SUCCESS at 22:17:35; public version verification step28 SUCCESS at 22:17:32.",
+    "publicTuple": "Comment6753064179 reports production build prefix1c769865 and overlay prefixb92b0e1. Known full source commits are main1c7698655405b289d7fdbd814713d15e542cc2bb and hostedb92b0e1d48f75c92d059ee071162b72455e6af90, but this watcher did not independently retrieve the public JSON or a new DPL. Do not expand this into a complete successful runtime tuple.",
+    "r7": "R7 completed FAILURE at 22:23:44. subscriptions step12 failed at 22:23:16, publish skipped, cleanup job129481636859 completed SUCCESS at 22:23:43.",
+    "r7FailureCause": "No direct current-round diagnostic cause was published in the retrieved comments. Do not infer this is adoption guard failure, missing child, or any prior round's cause merely from step12 FAILURE.",
+    "cleanupBoundary": "The cleanup job's exact candidate close step5 and receipt preservation step6 succeeded. This metadata is not an independent original receipt/provider deletion verification and does not itself constitute explicit owner source/account release.",
+    "window": "The original UI window ended at 22:22 on paper, but no explicit owner release appears in this snapshot. Deadline expiry is not treated as proof of actual cleanup/release.",
+    "freshChild": "Batch owner comment6753045637 states production window has not started, OPS5d08 remains closed, and fresh readonly child preparation is future work after actual release. No new active child/source window is established.",
+    "futureCoordination": "Security owner readiness and future batch preparation do not reserve a new current window.",
+    "resources": "Watcher resources remain zero; checkpoint ended after proof creation/readback."
+  }
+}

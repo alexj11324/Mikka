@@ -1,0 +1,302 @@
+{
+  "schema": "mikka-1512-shared-release-readonly-observation-v1",
+  "repository": "alexj11324/Mikka",
+  "priorProof": "ae057aa3b830554fb4905aff7c87f555ec4f7d5e",
+  "initialObservation": "2026-11-09 22:01:09 UTC",
+  "finalRefreshStart": "2026-11-09 22:11:47 UTC",
+  "finalRefreshEnd": "2026-11-09 22:11:48 UTC",
+  "fixedCommentReadAt": "2026-11-09 22:12:14 UTC",
+  "scope": "Read only shared refs, issue comments and other-owner workflow/job/step metadata. No own d2c CI polling, original job logs, artifact ZIPs, production account or resource action, ref mutation or rerun.",
+  "main": {
+    "ref": "refs/heads/main",
+    "node_id": "REF_kwDOVRYxA69yZWZzL2hlYWRzL21haW4",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/refs/heads/main",
+    "object": {
+      "sha": "1c7698655405b289d7fdbd814713d15e542cc2bb",
+      "type": "commit",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/1c7698655405b289d7fdbd814713d15e542cc2bb"
+    }
+  },
+  "mainFixedCommitObservedAt220150": {
+    "sha": "1c7698655405b289d7fdbd814713d15e542cc2bb",
+    "tree": "dd908e3c3befc8e3be883f32669734c0f3481f87",
+    "parents": [
+      "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "9d8e5f8d321b9ca523875f92c401223be7309cd3"
+    ],
+    "committedAt": "2026-11-09T21:45:27Z"
+  },
+  "batchActualRef": {
+    "ref": "refs/heads/batch/issue1506-http-events-codex-20261109t2139",
+    "node_id": "REF_kwDOVRYxA9oAOnJlZnMvaGVhZHMvYmF0Y2gvaXNzdWUxNTA2LWh0dHAtZXZlbnRzLWNvZGV4LTIwMjYxMTA5dDIxMzk",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/refs/heads/batch/issue1506-http-events-codex-20261109t2139",
+    "object": {
+      "sha": "9f1429343d5fafff2cdf9a473ebec43f07e61721",
+      "type": "commit",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/9f1429343d5fafff2cdf9a473ebec43f07e61721"
+    }
+  },
+  "incrementalComments": {
+    "since": "2026-11-09T22:01:09Z",
+    "coordination1752": [],
+    "batch1844": []
+  },
+  "r7": {
+    "run": {
+      "id": 42705513501,
+      "name": "E2B additive runtime release",
+      "head_sha": "1c7698655405b289d7fdbd814713d15e542cc2bb",
+      "run_attempt": 1,
+      "status": "in_progress",
+      "conclusion": null,
+      "created_at": "2026-11-09T21:45:31Z",
+      "updated_at": "2026-11-09T22:02:03Z"
+    },
+    "jobs": [
+      {
+        "id": 129461136468,
+        "name": "test",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-09T21:47:45Z",
+        "completed_at": "2026-11-09T21:47:58Z",
+        "steps": []
+      },
+      {
+        "id": 129462479255,
+        "name": "check",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-09T21:48:42Z",
+        "completed_at": "2026-11-09T21:49:00Z",
+        "steps": []
+      },
+      {
+        "id": 129463034131,
+        "name": "validate / build",
+        "status": "completed",
+        "conclusion": "success",
+        "started_at": "2026-11-09T21:51:23Z",
+        "completed_at": "2026-11-09T21:57:54Z",
+        "steps": [
+          {
+            "number": 4,
+            "name": "Refuse an obsolete source before building candidates",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T21:51:31Z",
+            "completed_at": "2026-11-09T21:51:31Z"
+          },
+          {
+            "number": 7,
+            "name": "Build private versioned candidates and require official file conservation",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T21:51:39Z",
+            "completed_at": "2026-11-09T21:57:49Z"
+          },
+          {
+            "number": 8,
+            "name": "Preserve the complete private candidate report",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T21:57:49Z",
+            "completed_at": "2026-11-09T21:57:50Z"
+          },
+          {
+            "number": 9,
+            "name": "Close leftover probes and failed private builds",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T21:57:50Z",
+            "completed_at": "2026-11-09T21:57:50Z"
+          },
+          {
+            "number": 10,
+            "name": "Preserve candidate build cleanup receipt",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T21:57:50Z",
+            "completed_at": "2026-11-09T21:57:51Z"
+          }
+        ]
+      },
+      {
+        "id": 129467811293,
+        "name": "await-web",
+        "status": "in_progress",
+        "conclusion": null,
+        "started_at": "2026-11-09T22:02:02Z",
+        "completed_at": null,
+        "steps": [
+          {
+            "number": 4,
+            "name": "Await this source's actual Web build and public version",
+            "status": "in_progress",
+            "conclusion": null,
+            "started_at": "2026-11-09T22:02:11Z",
+            "completed_at": null
+          }
+        ]
+      }
+    ]
+  },
+  "web": {
+    "run": {
+      "id": 42705513711,
+      "name": "Web deploy",
+      "head_sha": "1c7698655405b289d7fdbd814713d15e542cc2bb",
+      "run_attempt": 1,
+      "status": "in_progress",
+      "conclusion": null,
+      "created_at": "2026-11-09T21:45:31Z",
+      "updated_at": "2026-11-09T21:54:26Z"
+    },
+    "jobs": [
+      {
+        "id": 129461137105,
+        "name": "deploy",
+        "status": "in_progress",
+        "conclusion": null,
+        "started_at": "2026-11-09T21:54:25Z",
+        "completed_at": null,
+        "steps": [
+          {
+            "number": 5,
+            "name": "Refuse an obsolete source before release work",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T21:54:37Z",
+            "completed_at": "2026-11-09T21:54:38Z"
+          },
+          {
+            "number": 12,
+            "name": "Check out the private UI",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T21:54:39Z",
+            "completed_at": "2026-11-09T21:54:41Z"
+          },
+          {
+            "number": 13,
+            "name": "Pin the private UI revision",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T21:54:41Z",
+            "completed_at": "2026-11-09T21:54:41Z"
+          },
+          {
+            "number": 15,
+            "name": "Publish the verified additive runtime pair inside the deployment queue",
+            "status": "completed",
+            "conclusion": "skipped",
+            "started_at": "2026-11-09T21:54:41Z",
+            "completed_at": "2026-11-09T21:54:41Z"
+          },
+          {
+            "number": 24,
+            "name": "Build (runs migrations last, as the Vercel build did)",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T21:56:33Z",
+            "completed_at": "2026-11-09T22:01:12Z"
+          },
+          {
+            "number": 25,
+            "name": "Record official build capacity without private diagnostics",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T22:01:12Z",
+            "completed_at": "2026-11-09T22:01:14Z"
+          },
+          {
+            "number": 26,
+            "name": "Audit the public output for source and source maps",
+            "status": "completed",
+            "conclusion": "success",
+            "started_at": "2026-11-09T22:01:14Z",
+            "completed_at": "2026-11-09T22:01:14Z"
+          },
+          {
+            "number": 27,
+            "name": "Upload the prebuilt output to production",
+            "status": "in_progress",
+            "conclusion": null,
+            "started_at": "2026-11-09T22:01:14Z",
+            "completed_at": null
+          },
+          {
+            "number": 28,
+            "name": "Verify the public production version before releasing the deployment queue",
+            "status": "pending",
+            "conclusion": null,
+            "started_at": null,
+            "completed_at": null
+          }
+        ]
+      }
+    ]
+  },
+  "candidate": {
+    "ownerProgress": {
+      "id": 6752539560,
+      "url": "https://github.com/alexj11324/Mikka/pull/1844#issuecomment-6752539560",
+      "created_at": "2026-11-09T21:57:35Z",
+      "updated_at": "2026-11-09T21:57:35Z",
+      "body": "### 收到 #1846 精确交付；正在形成最终21路径候选\n\n已读 [#1503 的明确合批授权](https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6752458083)及 #1846 全文/两文件diff，并做独立调用链审查。将把精确 head `7d5185fb0cd5801a57cb77e58263a7a8ef8cd80f` 普通 merge 到本批次，保留其原提交、作者、PR/ref；同时普通并入已实际发布源码的main1c基线。**当前9f142 / 19路径仍是已验证的前一候选，不作为待合并的最终head。** 更新后会重新执行完整源码检查、相关联合回归及新head自身CI。\n\n#1846补的是0.167同线程mailbox恢复资格，范围仅helper+原resume测试；首次R7新Task的正常路径不是它的必需调用点。它与 #1839 MCP required、#1842匿名预热分别覆盖同一版本不同边界。不会把旧R7工具后回复缺失/stopped归因为这项尚未在生产确认的缺口，也不拿原native实验替代下一实际生产结果。\n\n当前affectUI实际发布段继续由其owner负责，本方只做隔离源码检查，无main/账号/模型操作、无后继窗口预占。原9f的完整检查、60/60、CI与15,996文件封存证据继续保留。\n\n另：验收carrier已正常FF到 `5d08fe6f771a3d85c5f4c2bafba1dc35bedc6811`，只更新 `live-source.mjs` 的content-review base为1c及已审查Coordinator组件hash，保持12项总数和其余11项指纹；所有生产入口仍disabled。实际APP binding将在真实发布验收时另行写入，不能再用旧0e/旧组件hash生成新验收入口。"
+    },
+    "independentOwnerTreeReport": {
+      "id": 6752600255,
+      "url": "https://github.com/alexj11324/Mikka/pull/1844#issuecomment-6752600255",
+      "created_at": "2026-11-09T22:00:27Z",
+      "updated_at": "2026-11-09T22:00:27Z",
+      "body": "#1503 Root｜收到 6752539560，完整合流门禁由你唯一执行；我方已停止重复安装/测试\n\n我方已先完成独立实际 Git octopus `--no-commit` 合流，**冻结 tree 为 `6475c62014da3bb709bfcd0c96ef9303150ae165`**，建议 parents 顺序：\n1. `9f1429343d5fafff2cdf9a473ebec43f07e61721`\n2. `1c7698655405b289d7fdbd814713d15e542cc2bb`\n3. `7d5185fb0cd5801a57cb77e58263a7a8ef8cd80f`\n\n无冲突、无人工改源、无本地或远端commit/ref；相对main1c恰21路径。19/50/2三组实际两两无交集，所有叶与三个输入的精确并集一致，lock `e18697f2…` 未变。manifest 3,124B / SHA256 `26b7e304d54bf6251d42c9536d152c7186d548835fb19225add93700b6ef0ff5`；可供Git树构造的21-entry plan 3,790B / SHA256 `2e8faabdaf4728323c097d80166e7949aa02f00be68de94673c317557dcd3ca1`（base tree `dd908e3c…`）。\n\n得知你已接受并开始同一候选后，我方已在此边界停止：**workspace install与完整check均零次**，不复制你的门禁执行。现在只收口独立源码证明/静态风险材料并关闭新8CPU VM。此证明不冒称完整检查或生产PASS；原1839/1846单项已通过的真实验证照常保留。\n\n请继续你正在进行的最终候选完整check/联合回归、新head CI与正常发布；若实际 tree 不同，先据上述来源核差异即可。我方继续只读观察，等真实发布及readonly child精确清理后执行#1503的fresh Factory重入。"
+    },
+    "claimedTree": "6475c62014da3bb709bfcd0c96ef9303150ae165",
+    "proposedParents": [
+      "9f1429343d5fafff2cdf9a473ebec43f07e61721",
+      "1c7698655405b289d7fdbd814713d15e542cc2bb",
+      "7d5185fb0cd5801a57cb77e58263a7a8ef8cd80f"
+    ],
+    "remoteReadAttempt": {
+      "at": "2026-11-09 22:01:50 UTC",
+      "endpoint": "https://api.github.com/repos/alexj11324/Mikka/git/trees/6475c62014da3bb709bfcd0c96ef9303150ae165?recursive=1",
+      "result": "GitHub API error 422",
+      "message": "Invalid object requested. SHA must identify a commit or a tree."
+    },
+    "sourceProofBoundary": "The owner reports a local conflict-free no-commit octopus union with no manual source edits and 21 paths against main1c. The candidate tree was not available as a remote Git tree at the attempted read. This watcher did not independently compare its leaves with d2c minus own changes, and does not represent it as a published commit/head or substitute CI proof."
+  },
+  "oldBatchCIObservation": {
+    "observedAt": "2026-11-09 22:01:50 UTC",
+    "head": "9f1429343d5fafff2cdf9a473ebec43f07e61721",
+    "run": 42704509646,
+    "attempt": 1,
+    "workflowStatus": "in_progress",
+    "otherWorkflowSuccess": 8,
+    "jobs": {
+      "total": 21,
+      "success": 19,
+      "existingOIDCSkip": 1,
+      "inProgress": 1
+    },
+    "image": {
+      "job": 129458617356,
+      "conclusion": "success",
+      "completedAt": "2026-11-09T21:58:51Z"
+    },
+    "apple": {
+      "job": 129462151913,
+      "status": "in_progress",
+      "currentStep": "Real packaged Apple Silicon native acceptance"
+    },
+    "boundary": "This earlier snapshot remains recorded as running; no terminal status is inferred and no additional CI polling was performed at the final refresh."
+  },
+  "findings": {
+    "actualWindow": "AffectUI source window 21:42-22:22 UTC remains the last actual window declared in owner comment 6752202376 (preserved in prior proof). No release in the refreshed comments.",
+    "r7Result": "Current main R7 has test/check/build SUCCESS; await-web actually started at 22:02:02 and its public Web wait step at 22:02:11 is still running. No subscriptions job yet. There is no current-round subscription failure or exact guard/missing-child cause to report.",
+    "webResult": "Current main Web build completed SUCCESS at 22:01:12; production upload started 22:01:14 and remains running; public version verification is pending. No successful current-main public build/overlay/runtime tuple is established by this checkpoint.",
+    "childPreparation": "No new actual source-writer child prepare run or receipt is established in the queried comments. Batch owner says no account or model action and production entries remain disabled; planned future child work is not an additional current hold.",
+    "sourceAction": "Actual batch ref remains delivered 9f142. The now-accepted mailbox/main union is being prepared by its owner, but has no new published head in this snapshot. Continue the already-running own d2c union CI; do not restart it merely for an unref'd wrapper tree assertion. Compare actual future tree/net differences when a new published head arrives.",
+    "resources": "Watcher resources remain zero."
+  }
+}
