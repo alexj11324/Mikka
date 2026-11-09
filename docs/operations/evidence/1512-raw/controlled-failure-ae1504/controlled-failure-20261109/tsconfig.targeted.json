@@ -1,0 +1,12 @@
+{
+  "extends": "/workspace/scratch/812e3b7d6d45/issue1512-failure-probe-copy/tsconfig.json",
+  "compilerOptions": {
+    "incremental": false,
+    "plugins": []
+  },
+  "include": [
+    "/workspace/scratch/812e3b7d6d45/issue1512-failure-probe-copy/scripts/ops/run-trace-benchmark.ts",
+    "/workspace/scratch/812e3b7d6d45/issue1512-failure-probe-copy/scripts/ops/run-trace-benchmark.test.ts"
+  ],
+  "exclude": []
+}

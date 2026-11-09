@@ -1,0 +1,16 @@
+{
+  "head": "ae1504f1bb266ae3f7b6612898f134dd979f5fdd",
+  "tree": "8c5c12ea993533403d13e21dc75647bb28022767",
+  "parent": "3ffa641c6eaade5d968475795d7221c99ed393a6",
+  "previousPublicHead": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+  "branch": "test/1512-native-query-sources-78-20261107",
+  "ciRun": 42541312185,
+  "sourcePublished": true,
+  "productionCases": 0,
+  "latestCompletedLogin": {
+    "native": 504,
+    "web": 480,
+    "passed": false
+  },
+  "issueComment": 6729494742
+}

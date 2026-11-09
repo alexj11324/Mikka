@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "sourceManifest": {
+    "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/controlled-failure-20261109/final-manifest.safe.json",
+    "sha256": "6fb350b3562637c0ffead33a190dcd6dd9d07767eb48e86c614dd12478a74467"
+  },
+  "implementation": {
+    "changedFiles": 3,
+    "defaultBenchmark": "No flag uses existing local memory exporters and existing 100 warm-up pairs plus configured 600 measured condition count, then 20 local failures; no external exporter constructed. Historical receipts retain their original source binding.",
+    "optIn": "--export-controlled-failures: exact workflow_dispatch repository/main/SHA and existing project token checks before exporter or PG construction; fixed official US OTLP traces/logs, dev + exact SHA, owned loopback *_e2e, exactly 20 existing GET /failure requests; no successful warmup/benchmark/model path.",
+    "productPath": "Actual beginRequestTrace, pg instrumentation, RunSampler(0.1), RetainingSpanProcessor, SafeExporter/SafeLogExporter and safe error-cause projection are reused unchanged.",
+    "deliveryBoundary": "Raw OTLP callback counts are observed inside Safe wrappers, after sanitization. Separate failure/throw/pending counters; forceFlush or wrapper SUCCESS is not delivery/ingestion proof. backendObserved=false remains mandatory.",
+    "report": "Only source/env/timestamps, closed checks/counters, actual generated trace/span IDs, cleanup and incomplete/exported-awaiting-backend status; no SQL/text/parameters/credentials/raw exceptions.",
+    "cleanup": "Listener/connections, owned pg pool, instrumentation, providers and global OTel registrations are closed in finally; failed local checks, raw transport counters or cleanup cause exit 1.",
+    "workflow": "Existing preflight/execute/export unchanged except explicit acceptance mode allowlist; new isolated closed job tests first, loads only NEXT_PUBLIC_POSTHOG_KEY from existing prod:/vercel identity, no account/model inputs accepted."
+  },
+  "verification": {
+    "regressionRed": {
+      "log": "offline-workflow-red.log",
+      "exitCode": 1,
+      "tests": 2,
+      "failed": 2,
+      "reason": "Existing workflow had neither closed mode nor dedicated isolated job."
+    },
+    "offlineFinal": {
+      "log": "offline-final.log",
+      "exitCode": 0,
+      "passed": 7,
+      "scope": "Mode/source guards and real CLI safe rejection; exporter callback/failure/pending/flush/shutdown accounting; actual product unsampled ordinary failure retention + safe error/log projection with fake failed exporter, no external IO."
+    },
+    "existingGuards": {
+      "log": "existing-acceptance-guards.log",
+      "exitCode": 0,
+      "passed": 91,
+      "scope": "Existing run-observability, workflow bridge and browser fixture guards; not an actual browser/model execution."
+    },
+    "targetedTypes": {
+      "log": "targeted-types-final.log",
+      "exitCode": 0,
+      "command": "node node_modules/@typescript/native-preview/bin/tsgo --project <evidence>/tsconfig.targeted.json --pretty false",
+      "scope": "Two changed TypeScript files plus transitive imports; not full repository typecheck."
+    },
+    "lint": {
+      "log": "targeted-lint-final.log",
+      "exitCode": 0,
+      "command": "node node_modules/oxlint/bin/oxlint --no-ignore --deny-warnings scripts/ops/run-trace-benchmark.ts scripts/ops/run-trace-benchmark.test.ts",
+      "version": "1.89.0",
+      "stdout": "empty"
+    },
+    "retainedSetupFailures": [
+      {
+        "log": "targeted-types.log",
+        "exitCode": 1,
+        "reason": "Initial command used missing bin/tsgo.js instead of actual bin/tsgo; corrected command subsequently exited 0."
+      },
+      {
+        "exitCode": 1,
+        "reason": "pnpm exec attempted an implicit install and refused the external shared node_modules symlink (ERR_PNPM_UNSAFE_MODULES_DIR); no deletion was authorized, no install retried; installed CLI used directly."
+      }
+    ]
+  },
+  "notEstablished": [
+    "No PG server was started or real PostgreSQL query run by this new candidate in this subtask. Existing real PG benchmark is historical and source-bound.",
+    "No GitHub dispatch, Infisical token read, external OTLP POST, paid model, Native workflow, deployment or PostHog ingestion verification was performed.",
+    "Offline retention test uses actual product processor but a fake failing exporter and is not production/backend proof.",
+    "Root must integrate/review, run required current CI, merge exact reviewed source, synchronize existing closed ops transport mode enum, and dispatch authorized job; then independently read actual receipt IDs from PostHog."
+  ],
+  "resources": {
+    "activeOwnedProcesses": 0,
+    "remoteResourcesStarted": 0,
+    "temporaryCliFixtureRemoved": true
+  },
+  "logs": [
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/controlled-failure-20261109/offline-workflow-red.log",
+      "sha256": "0d3646c4ad29981d1ae13572f509b7c62ac276e4a5f3ff5f17f81e7dbf869435"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/controlled-failure-20261109/offline-candidate-1.log",
+      "sha256": "bc72640c280f4643889fbf79062a1aa6bb0cdee660733c274232c2a83e64341c"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/controlled-failure-20261109/offline-final.log",
+      "sha256": "f62eda4ff8c6377414c905ddeda9c871c657f04dbc5ab900a7d66866737fee96"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/controlled-failure-20261109/existing-acceptance-guards.log",
+      "sha256": "8b3f2820eec855587ad994ed8e91f91ebe36b8e1c7ad5a5def9c6c1daf0a9b9e"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/controlled-failure-20261109/targeted-types.log",
+      "sha256": "8e71e85e972787b8c0624080faac6efa29d78aef81675bdf5e16d63d4cdd4f21"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/controlled-failure-20261109/targeted-types-retry.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/controlled-failure-20261109/targeted-types-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/controlled-failure-20261109/targeted-lint.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/controlled-failure-20261109/targeted-lint-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

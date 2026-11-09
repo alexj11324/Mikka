@@ -1,0 +1,34 @@
+{
+  "manifest": {
+    "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/controlled-failure-20261109/final-manifest.safe.json",
+    "sha256": "6fb350b3562637c0ffead33a190dcd6dd9d07767eb48e86c614dd12478a74467"
+  },
+  "implementation": {
+    "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/controlled-failure-20261109/implementation.safe.json",
+    "sha256": "8c7b8d4d3c7c325a0e7cbf07c218af83fb33cd3feece1ca0dec17a00865d104e"
+  },
+  "patch": {
+    "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/controlled-failure-20261109/controlled-failure.patch",
+    "sha256": "ce6dbaa6bf1a817202f815345397c874e1c24205a781dc72043cdea7d5f542c1"
+  },
+  "files": [
+    {
+      "path": "scripts/ops/run-trace-benchmark.ts",
+      "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-failure-probe-copy/scripts/ops/run-trace-benchmark.ts",
+      "beforeSha256": "14b5322edcb3c3660d4a7f15eac0052d65ed690e554bd1ff17e724ce2d22dc2a",
+      "afterSha256": "0962440794712e7f42a919d755cba69c7e2fcc15f1fad02de29ba9d2b31f9de4"
+    },
+    {
+      "path": "scripts/ops/run-trace-benchmark.test.ts",
+      "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-failure-probe-copy/scripts/ops/run-trace-benchmark.test.ts",
+      "beforeSha256": null,
+      "afterSha256": "26e18c89b2c214a7e9f8a3f0e893bce96a964b2bc9f28d549c67f18cece5317c"
+    },
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-failure-probe-copy/.github/workflows/run-trace-acceptance.yml",
+      "beforeSha256": "651759b28ff4275074ebc4a68a5fd3fbb043bc51608aa491f7ebb211c1cf6fa4",
+      "afterSha256": "4af09162b668cf5eefc5a052a653bdbcdc7dc79e5986ac6c0ed660f4557707c7"
+    }
+  ]
+}

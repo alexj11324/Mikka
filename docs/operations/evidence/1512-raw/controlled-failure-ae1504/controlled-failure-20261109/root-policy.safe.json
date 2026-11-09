@@ -1,0 +1,15 @@
+{
+  "sourceTree": "60c133f423833ce20490c8ff78428614181344fe",
+  "checks": [
+    {
+      "name": "error-cause-policy",
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "polling-policy",
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

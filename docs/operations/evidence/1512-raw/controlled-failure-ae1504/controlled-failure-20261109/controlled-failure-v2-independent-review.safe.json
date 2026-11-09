@@ -1,0 +1,301 @@
+{
+  "schema": "mikka.issue1512.independent-source-review.v1",
+  "createdAt": "2026-11-09T00:37:55.238459+00:00",
+  "reviewer": "/root/native_6180_review",
+  "scope": "Read-only independent review of controlled-failure runner/workflow/tests through v2. Later v3 token-before memory-overhead workflow/test addition requires a separate additive review; this receipt stays frozen.",
+  "decision": {
+    "blockingFindings": [],
+    "status": "approved_for_candidate_integration_and_CI",
+    "productionAcceptance": false,
+    "backendObserved": false
+  },
+  "source": {
+    "parentCommit": "3ffa641c6eaade5d968475795d7221c99ed393a6",
+    "baseTree": "766c063fcac276ea55251d76e43b2e616244b62b",
+    "v1Tree": "71f6c8b26f7763c714c159f977fc33d64508e31a",
+    "reviewedV2Tree": "60c133f423833ce20490c8ff78428614181344fe",
+    "workingCopyHeadWarning": "baseline-source reports checkout HEAD 6180 while identifying its input as the then-current candidate working tree; review binds actual bytes to baseTree instead of treating HEAD as the source.",
+    "files": [
+      {
+        "path": "scripts/ops/run-trace-benchmark.ts",
+        "bytes": 19846,
+        "sha256": "0962440794712e7f42a919d755cba69c7e2fcc15f1fad02de29ba9d2b31f9de4",
+        "gitBlobSha": "09280f0dfb945157aa8c692699fecbc2989f15dc",
+        "baselineSha256": "14b5322edcb3c3660d4a7f15eac0052d65ed690e554bd1ff17e724ce2d22dc2a",
+        "v1Sha256": "0962440794712e7f42a919d755cba69c7e2fcc15f1fad02de29ba9d2b31f9de4"
+      },
+      {
+        "path": "scripts/ops/run-trace-benchmark.test.ts",
+        "bytes": 13479,
+        "sha256": "29a8264bc2a02f241042510883d15cac25cc199819452f884a6cf15b422e362d",
+        "gitBlobSha": "d008c99c6a67e7c638cc9fe501bafc0ba72a7844",
+        "baselineSha256": null,
+        "v1Sha256": "26e18c89b2c214a7e9f8a3f0e893bce96a964b2bc9f28d549c67f18cece5317c"
+      },
+      {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "bytes": 13594,
+        "sha256": "4af09162b668cf5eefc5a052a653bdbcdc7dc79e5986ac6c0ed660f4557707c7",
+        "gitBlobSha": "491e70772d8d0e1b3ccc54c1b9ea770b4aa91cd7",
+        "baselineSha256": "651759b28ff4275074ebc4a68a5fd3fbb043bc51608aa491f7ebb211c1cf6fa4",
+        "v1Sha256": "4af09162b668cf5eefc5a052a653bdbcdc7dc79e5986ac6c0ed660f4557707c7"
+      }
+    ],
+    "unchangedProductFiles": [
+      {
+        "path": "lib/tracing/node.ts",
+        "sha256": "adefe4b0af2c59021f37ae77262da07cc11c2369941b7482553f4299739de670",
+        "unchangedBetweenTrees": true
+      },
+      {
+        "path": "lib/tracing/logs.ts",
+        "sha256": "08286b12ffb5db4010d5dbcc887726840792a79417bafa7d2ae26e72910a2e3d",
+        "unchangedBetweenTrees": true
+      },
+      {
+        "path": "lib/tracing/sampling.ts",
+        "sha256": "e33b7a9856e7641652a8d52eed4aba4621e6587434e3eb7d1582a13ebbde4e03",
+        "unchangedBetweenTrees": true
+      },
+      {
+        "path": "lib/tracing/sanitize.ts",
+        "sha256": "39093ea5a24982773e7292f2d75fbc1dc3411787f37cf4a4957088e4285bef03",
+        "unchangedBetweenTrees": true
+      },
+      {
+        "path": "lib/tracing/spans.ts",
+        "sha256": "7e11a7c2ce659d4722206e89d5339ed2588e35ccebb15b68ce0e2870ea2bd04e",
+        "unchangedBetweenTrees": true
+      },
+      {
+        "path": "apps/api/runtime/request-trace.ts",
+        "sha256": "a7c9c6bcb0b5e68dfebb96d7841171f4dc07c09061d0889404482d2594124ca9",
+        "unchangedBetweenTrees": true
+      }
+    ],
+    "diffTreeOnlyThreeExpectedFiles": true,
+    "v1PatchReplayedInMemoryByteExact": true,
+    "v2TwoLineOverlayReplayedInMemoryByteExact": true,
+    "rootIndexOrProductSourceModifiedByReviewer": false
+  },
+  "findings": [
+    {
+      "topic": "Explicit export scope and source",
+      "result": "Exactly one --export-controlled-failures argument enables external exporters. Runtime requires workflow_dispatch on alexj11324/Mikka refs/heads/main and matching full lowercase 40-character GITHUB_SHA/expected SHA, public phc project token, and owned loopback *_e2e database. Workflow independently checks git HEAD equals GITHUB_SHA and rejects unrelated flags before OIDC. Fixed official US traces/logs URLs; dev + exact SHA resources; count fixed at 20. No model or account task execution."
+    },
+    {
+      "topic": "Actual sampler, failure and PG path",
+      "result": "Existing RunSampler(0.1), RetainingSpanProcessor, beginRequestTrace, pg instrumentation and Safe exporters remain unchanged. Explicit mode executes exactly 20 existing ordinary GET /failure requests with two real SELECT ready queries then real SELECT 1/0; no success benchmark or warmup runs in that mode. Root finish uses 500/ERROR, safe CodedError + PostgreSQL cause. Local witness requires exactly 20 distinct roots, actual per-root critical=false, effective sample rate 1, retention error_or_slow, three SELECT spans and one PG error, matching native root ERROR log, and an initially unsampled root. This is a synthetic dev probe, not a production coding run."
+    },
+    {
+      "topic": "Raw delivery accounting inside safe wrappers",
+      "result": "SafeExporter/SafeLogExporter sanitize first, then observer tees sanitized data to memory and raw OTLP. Raw exporter callback success/failure/throw/pending and flush/shutdown failures are counted independently of Safe wrapper SUCCESS. First callback only is authoritative. No raw transport exception is retained or written. Counts describe exporter invocation batches and records, not HTTP wire attempts or stored backend rows. Receipt success requires all attempted batches/records successful with no failed/pending/flush/shutdown outcomes."
+    },
+    {
+      "topic": "Backend verification remains separate",
+      "result": "Receipt always has backendObserved=false and actual generated trace/span IDs. Exported-awaiting-backend-verification means local structure and raw callback checks passed; root must subsequently look up those IDs in PostHog. No actual local PG or OTLP send was performed during this review or the author offline tests."
+    },
+    {
+      "topic": "Privacy and closed failure reporting",
+      "result": "Actual product sanitizer and safeErrorAttributes/causeFields exclude raw error messages, bodies and SQL. SQLSTATE 22012 can survive only in bounded safe cause metadata; private division-by-zero error text must not. Receipt contains source/environment, timings, counts, closed checks/status and actual generated native IDs only. Bad source/configuration goes through closed CLI failure receipt without raw stack/token/DB URL."
+    },
+    {
+      "topic": "Cleanup and nonfatal exporters",
+      "result": "Finally closes HTTP connections/listener, ends only owned pool, unregisters pg instrumentation, shuts down both providers, disables global OTel registrations. Provider trace flush precedes log flush. Observer inner shutdown/flush failures remain explicit even where product Safe wrappers suppress exceptions; local checks, incomplete callbacks or cleanup produce exit 1. Bounded PG/client/exporter/workflow timeouts retained. No retry loop added."
+    },
+    {
+      "topic": "Default benchmark preservation",
+      "result": "Without explicit flag, external OTLP exporters are not constructed. Existing memory-only 100 warm-up pairs, configured default 600 measured pairs, same SQL/retention checks and 20 local failures remain. New control flow isolates export path. Historical overhead remains bound to historical source until the current exact-source default benchmark actually runs."
+    },
+    {
+      "topic": "Workflow and credential scope",
+      "result": "Old preflight/execute select only acceptance; export selects only existing export; controlled-failure selects isolated new PG17 job. New job has contents:read/id-token:write, no issue-write. Pinned checkout uses exact SHA with credentials disabled. Frozen-lock dependency install and offline guards precede existing OIDC, which selects only prod:/vercel NEXT_PUBLIC_POSTHOG_KEY with imports disabled. Always artifact upload includes only safe receipt. Parent independently checked official pinned Infisical action.yaml secret-name support and default nonrecursive behavior; reviewer did not independently access credentials or the external action source."
+    }
+  ],
+  "verification": {
+    "reviewerExecution": "No test, PG, OTLP, browser, Native, model, deployment, workflow, credential, or PostHog query executed by reviewer. Read source and existing raw logs; independently computed hashes/git blobs, compared tree scope, replayed patches in memory and validated receipts against log hashes.",
+    "negativeControl": {
+      "artifact": "offline-workflow-red.log",
+      "reportedExitCode": 1,
+      "failed": 2,
+      "scope": "Old workflow lacks dedicated controlled mode/job; original failure retained."
+    },
+    "authorOfflineV1": {
+      "artifact": "offline-final.log",
+      "reportedExitCode": 0,
+      "passed": 7,
+      "scope": "Actual product sampler/Safe components with fake transport plus real CLI early rejection; no real PG/external IO."
+    },
+    "existingGuards": {
+      "artifact": "existing-acceptance-guards.log",
+      "reportedExitCode": 0,
+      "passed": 91,
+      "reusedWithoutRerun": true,
+      "scope": "Previously run existing acceptance/browser-driver guards; not an actual browser/model execution."
+    },
+    "canonicalV1Failure": {
+      "artifact": "root-canonical-type.log",
+      "sourceTree": "71f6c8b26f7763c714c159f977fc33d64508e31a",
+      "exitCode": 2,
+      "reason": "Next global ProcessEnv requires NODE_ENV; prior targeted tsgo lacked that global and was not canonical proof. Original failure and targeted results preserved."
+    },
+    "v2FixtureFix": {
+      "artifact": "v2-test-environment.patch",
+      "scope": "Only two lines: NODE_ENV test literal in fixture and empty default-mode env case; no runtime/workflow changes."
+    },
+    "rootCanonicalV2": {
+      "receipt": "root-validation-v2.safe.json",
+      "sourceTree": "60c133f423833ce20490c8ff78428614181344fe",
+      "canonicalTsrsExitCode": 0,
+      "offlineExitCode": 0,
+      "offlinePassed": 7,
+      "rawLogReadAndHashMatched": true
+    },
+    "lint": {
+      "artifact": "targeted-lint-final.log",
+      "reportedExitCode": 0,
+      "scope": "Explicit --no-ignore two changed TS files on v1. v2 only type-correct test environment literals; no claim of a v2 lint rerun."
+    }
+  },
+  "risk": {
+    "alignment": "Closes the explicitly identified controlled-failure retention/export evidence gap; does not claim to finish broader issue acceptance.",
+    "impact": "Medium: authorized explicit workflow can ingest a bounded dev synthetic probe with existing public project token; product tracing code unchanged, all external work opt-in and source bound.",
+    "verification": "Offline guards/actual processor tests and canonical integrated typecheck support integration. Real PG, callbacks and backend lookup remain future gates.",
+    "rollback": "Revert this three-file patch; no schema/data migration or product library change.",
+    "errorDetection": "Closed local witness, raw transport counters, cleanup fields and nonzero exit preserve failure; backendObserved never auto-promoted."
+  },
+  "boundaries": {
+    "reviewerExternalExecutions": 0,
+    "ownedActiveResources": 0,
+    "productionAcceptedCases": 0,
+    "priorNativeLogin": {
+      "native": 504,
+      "web": 480,
+      "status": "RED",
+      "unaffectedByThisReview": true
+    },
+    "notEstablished": [
+      "actual 20-request PG/OTLP execution",
+      "PostHog backend rows or UI views",
+      "current-source HTTP overhead",
+      "Native SQL budget success",
+      "production model/run acceptance"
+    ]
+  },
+  "evidence": [
+    {
+      "path": "baseline-source.safe.json",
+      "bytes": 975,
+      "sha256": "031854cd702b3036d77420ce4d7578abba0f198f254022677d15adae387737db",
+      "gitBlobSha": "f8be6675dd0753a7f846d947a8ca31091fb35c1e"
+    },
+    {
+      "path": "controlled-failure.patch",
+      "bytes": 46966,
+      "sha256": "ce6dbaa6bf1a817202f815345397c874e1c24205a781dc72043cdea7d5f542c1",
+      "gitBlobSha": "38a14759b851b19b0bff09115924f4a8b288b2b2"
+    },
+    {
+      "path": "final-manifest.safe.json",
+      "bytes": 1746,
+      "sha256": "6fb350b3562637c0ffead33a190dcd6dd9d07767eb48e86c614dd12478a74467",
+      "gitBlobSha": "879540aa226c12188e4d075a66c5ac118385fd69"
+    },
+    {
+      "path": "implementation.safe.json",
+      "bytes": 6776,
+      "sha256": "8c7b8d4d3c7c325a0e7cbf07c218af83fb33cd3feece1ca0dec17a00865d104e",
+      "gitBlobSha": "527deed58ce575dddb34484779d193add9117580"
+    },
+    {
+      "path": "review-index.safe.json",
+      "bytes": 1757,
+      "sha256": "ebb90e7b7d5ac7b4ed34391fdfd3757bf76a8cecc65cf7532c393409a4ec2237",
+      "gitBlobSha": "cdc0aab1b98b24341573298c20cfe369c36c9bc2"
+    },
+    {
+      "path": "offline-workflow-red.log",
+      "bytes": 2216,
+      "sha256": "0d3646c4ad29981d1ae13572f509b7c62ac276e4a5f3ff5f17f81e7dbf869435",
+      "gitBlobSha": "8069f2f87f29cb54435dff6727d8a525645ebe41"
+    },
+    {
+      "path": "offline-final.log",
+      "bytes": 880,
+      "sha256": "f62eda4ff8c6377414c905ddeda9c871c657f04dbc5ab900a7d66866737fee96",
+      "gitBlobSha": "aa23e8a3d2ae104e7fd76d9914b212affc71cb92"
+    },
+    {
+      "path": "existing-acceptance-guards.log",
+      "bytes": 9327,
+      "sha256": "8b3f2820eec855587ad994ed8e91f91ebe36b8e1c7ad5a5def9c6c1daf0a9b9e",
+      "gitBlobSha": "138858ca6463a3ff85b15460a663c337aabcc714"
+    },
+    {
+      "path": "targeted-types-final.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "targeted-lint-final.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "v2-test-environment.patch",
+      "bytes": 1301,
+      "sha256": "5a235c9ef3e2afe7c52b9204b8bb4ddb24f92ce05e5b001bf1fb82ab63cc6660",
+      "gitBlobSha": "f197588d08a0fd290defee2b93207f1d8caedae8"
+    },
+    {
+      "path": "v2-test-environment.safe.json",
+      "bytes": 1807,
+      "sha256": "9ff2c2f6d956d78d484ee4eb52c24fe5e0f5315437790a8e6f37fa442d6e8f35",
+      "gitBlobSha": "4cef3f1043842d2a22a83d165b2a95bcbcebb480"
+    },
+    {
+      "path": "root-integration.safe.json",
+      "bytes": 1038,
+      "sha256": "40c8dbc23f5ca24f30dee1564d61c3e29b215fde6ca2e31ad5c5fd401533df66",
+      "gitBlobSha": "1b902097e1c873f812ba9d04f6c9560395fcc20f"
+    },
+    {
+      "path": "root-final-manifest.safe.json",
+      "bytes": 1052,
+      "sha256": "864ff53f88ea50a8fadb50e963a82d4c4a5d17ce35e2031d44b296e31238f00e",
+      "gitBlobSha": "11182f555a8e4601a2e37139006375f298f78571"
+    },
+    {
+      "path": "root-validation.safe.json",
+      "bytes": 694,
+      "sha256": "2796add4b88bda7c140caf2bc4fe8ffb8fd833b687b7ff8fee9ef5f39433f81f",
+      "gitBlobSha": "2496b6b209bc37ae764158383bea87f6d193db46"
+    },
+    {
+      "path": "root-canonical-type.log",
+      "bytes": 3615,
+      "sha256": "2c5889d95d9e125bbf11d8482d7e609fb8cbda882fe06d289aa4bebbb4edf144",
+      "gitBlobSha": "59c45c7d714af424685da22d7de3cacf534fa671"
+    },
+    {
+      "path": "root-validation-v2.safe.json",
+      "bytes": 1233,
+      "sha256": "f98493393bae9ffd448906e143b8a0b4a9d050442883982311e4cc8f828849bb",
+      "gitBlobSha": "c7985c2d95ebcc8808d7acdbf8407654463c48d3"
+    },
+    {
+      "path": "root-canonical-type-v2.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "root-combined-offline-v2.log",
+      "bytes": 879,
+      "sha256": "0cd64aa86b260f701aa1b38a98a5a70db5a3ed849092fd64b90f0a7f1f0b9300",
+      "gitBlobSha": "4ca20068731feb483af8f39f934617f8a2364e0d"
+    }
+  ]
+}

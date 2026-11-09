@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "createdAt": "2026-11-09T00:32:08.817809+00:00",
+  "parentCommit": "3ffa641c6eaade5d968475795d7221c99ed393a6",
+  "beforeTree": "766c063fcac276ea55251d76e43b2e616244b62b",
+  "afterTree": "71f6c8b26f7763c714c159f977fc33d64508e31a",
+  "files": [
+    {
+      "path": "scripts/ops/run-trace-benchmark.ts",
+      "bytes": 19846,
+      "sha256": "0962440794712e7f42a919d755cba69c7e2fcc15f1fad02de29ba9d2b31f9de4",
+      "gitBlobSha": "09280f0dfb945157aa8c692699fecbc2989f15dc"
+    },
+    {
+      "path": "scripts/ops/run-trace-benchmark.test.ts",
+      "bytes": 13434,
+      "sha256": "26e18c89b2c214a7e9f8a3f0e893bce96a964b2bc9f28d549c67f18cece5317c",
+      "gitBlobSha": "e77b76cced71064273bf79bfc35561fbfcf6ab3e"
+    },
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "bytes": 13594,
+      "sha256": "4af09162b668cf5eefc5a052a653bdbcdc7dc79e5986ac6c0ed660f4557707c7",
+      "gitBlobSha": "491e70772d8d0e1b3ccc54c1b9ea770b4aa91cd7"
+    }
+  ],
+  "rootWorktreeChanges": "",
+  "branchUpdated": false
+}

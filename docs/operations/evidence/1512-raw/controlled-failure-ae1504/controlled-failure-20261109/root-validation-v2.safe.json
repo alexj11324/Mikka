@@ -1,0 +1,35 @@
+{
+  "sourceTree": "60c133f423833ce20490c8ff78428614181344fe",
+  "results": [
+    {
+      "name": "root-canonical-type-v2",
+      "command": [
+        "node_modules/.bin/tsrs",
+        "--noEmit"
+      ],
+      "sourceTree": "60c133f423833ce20490c8ff78428614181344fe",
+      "startedAt": "2026-11-09T00:33:21.986354+00:00",
+      "endedAt": "2026-11-09T00:33:23.024460+00:00",
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "root-combined-offline-v2",
+      "command": [
+        "node",
+        "--import",
+        "./scripts/server-test.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "scripts/ops/run-trace-benchmark.test.ts"
+      ],
+      "sourceTree": "60c133f423833ce20490c8ff78428614181344fe",
+      "startedAt": "2026-11-09T00:33:23.024882+00:00",
+      "endedAt": "2026-11-09T00:33:24.553898+00:00",
+      "exitCode": 0,
+      "logSha256": "0cd64aa86b260f701aa1b38a98a5a70db5a3ed849092fd64b90f0a7f1f0b9300"
+    }
+  ],
+  "scope": "Canonical root typecheck and actual offline tests on integrated v2 source. Prior v1 canonical failure preserved; only test fixture NODE_ENV changed. No PG/export/Native/model execution."
+}

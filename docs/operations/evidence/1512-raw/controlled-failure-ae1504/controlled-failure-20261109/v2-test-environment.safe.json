@@ -1,0 +1,30 @@
+{
+  "version": 2,
+  "createdAt": "2026-11-09T00:32:58.321929+00:00",
+  "change": "Only two test fixture lines: explicit NODE_ENV test literal required by Next global ProcessEnv during canonical root tsrs. No runner or workflow changes.",
+  "file": {
+    "path": "scripts/ops/run-trace-benchmark.test.ts",
+    "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-failure-probe-copy/scripts/ops/run-trace-benchmark.test.ts",
+    "v1Backup": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/controlled-failure-20261109/v1/run-trace-benchmark.test.ts",
+    "beforeSha256": "26e18c89b2c214a7e9f8a3f0e893bce96a964b2bc9f28d549c67f18cece5317c",
+    "afterSha256": "29a8264bc2a02f241042510883d15cac25cc199819452f884a6cf15b422e362d"
+  },
+  "patch": {
+    "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/controlled-failure-20261109/v2-test-environment.patch",
+    "sha256": "5a235c9ef3e2afe7c52b9204b8bb4ddb24f92ce05e5b001bf1fb82ab63cc6660"
+  },
+  "unchangedFiles": {
+    "scripts/ops/run-trace-benchmark.ts": "0962440794712e7f42a919d755cba69c7e2fcc15f1fad02de29ba9d2b31f9de4",
+    ".github/workflows/run-trace-acceptance.yml": "4af09162b668cf5eefc5a052a653bdbcdc7dc79e5986ac6c0ed660f4557707c7"
+  },
+  "priorEvidencePreserved": [
+    "final-manifest.safe.json",
+    "controlled-failure.patch",
+    "implementation.safe.json",
+    "review-index.safe.json",
+    "offline-workflow-red.log",
+    "offline-final.log"
+  ],
+  "canonicalFailure": "Reported by root in root-canonical-type.log/root-validation.safe.json; prior targeted types omitted Next global ProcessEnv declaration and are not canonical typecheck proof.",
+  "validationOwner": "Root will run canonical typecheck and seven offline tests once after applying this fixture-only patch; no duplicate test execution by this agent."
+}

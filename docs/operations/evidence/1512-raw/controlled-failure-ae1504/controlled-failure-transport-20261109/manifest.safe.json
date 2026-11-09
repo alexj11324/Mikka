@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "baseCommit": "959e5be01c4927bec64f820b6efbd8d2b241eb6e",
+  "status": "prepared_not_published",
+  "boundary": "Only adds controlled-failure to closed modes after the reviewed main workflow supports it; repository/main/served version/input guards and permissions unchanged. Not dispatched.",
+  "files": [
+    {
+      "path": "candidate.yml",
+      "bytes": 7630,
+      "sha256": "610dc8cc67aff5e6cb7cd7c778be9fc4cf8d2ab4b69b4ed170ccc79853ad7b8a",
+      "gitBlobSha": "7429381cee94f6188303ac997cb4e0c89906672a"
+    },
+    {
+      "path": "mode-only.patch",
+      "bytes": 867,
+      "sha256": "71f05fe1a15f6145a231b3a2279b62f468903b17538900a18034c28ba4fc83b1",
+      "gitBlobSha": "bcfedbec56fa22d8942bca8ff2300fc4e84a0d10"
+    },
+    {
+      "path": "original.yml",
+      "bytes": 7609,
+      "sha256": "dbbaf39bcffc3d279c8017d2a846c1406a31ce68fc3ce83b013cf19986a6cc2f",
+      "gitBlobSha": "d07d4d44382266b9061c3f2236f79b9e4b23ebe9"
+    }
+  ]
+}

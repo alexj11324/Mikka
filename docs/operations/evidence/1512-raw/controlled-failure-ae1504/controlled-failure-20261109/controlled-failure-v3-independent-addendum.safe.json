@@ -1,0 +1,153 @@
+{
+  "schema": "mikka.issue1512.independent-source-review-addendum.v1",
+  "createdAt": "2026-11-09T00:39:00.616500+00:00",
+  "reviewer": "/root/native_6180_review",
+  "baseReview": {
+    "path": "controlled-failure-v2-independent-review.safe.json",
+    "bytes": 15942,
+    "sha256": "932dbde6a93d1593cdd09a84444340195ec0c5bc302149e293cbfa90106a5cdf",
+    "gitBlobSha": "51bae592f16d3061e0cda07759d458c523473f5b"
+  },
+  "decision": {
+    "status": "approved_for_candidate_integration_and_CI",
+    "blockingFindings": [],
+    "productionAcceptance": false,
+    "backendObserved": false
+  },
+  "scope": "Only v2-to-v3 workflow/test addition runs the already reviewed default memory benchmark before credentials and retains its raw stdout. Runtime/product code unchanged. v2 review remains frozen.",
+  "source": {
+    "beforeTree": "60c133f423833ce20490c8ff78428614181344fe",
+    "afterTree": "8c5c12ea993533403d13e21dc75647bb28022767",
+    "parentCommit": "3ffa641c6eaade5d968475795d7221c99ed393a6",
+    "baseTree": "766c063fcac276ea55251d76e43b2e616244b62b",
+    "files": [
+      {
+        "path": "scripts/ops/run-trace-benchmark.ts",
+        "bytes": 19846,
+        "sha256": "0962440794712e7f42a919d755cba69c7e2fcc15f1fad02de29ba9d2b31f9de4",
+        "gitBlobSha": "09280f0dfb945157aa8c692699fecbc2989f15dc"
+      },
+      {
+        "path": "scripts/ops/run-trace-benchmark.test.ts",
+        "bytes": 14157,
+        "sha256": "cde0e822f16784d5fa24dbe940ec9308394e640c4a275a8d8dddc066833cf478",
+        "gitBlobSha": "aecb57c52b21e99ffb6fdbeb8df287e542a14440"
+      },
+      {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "bytes": 13984,
+        "sha256": "474e7d33bcc1a521ae61ab30040f1715c376b2d8b160b5db89aacf2785aea8c4",
+        "gitBlobSha": "b248a4d97240ba895c3c165b2d7d5c4a763ffe23"
+      }
+    ],
+    "changedPaths": [
+      ".github/workflows/run-trace-acceptance.yml",
+      "scripts/ops/run-trace-benchmark.test.ts"
+    ],
+    "twoFilePatchReplayedInMemoryByteExact": true,
+    "onlyExpectedTreePathsChanged": true,
+    "isolatedCopyEqualsRootFinalTree": true,
+    "runnerUnchanged": true
+  },
+  "findings": [
+    {
+      "topic": "Exact local-only command",
+      "result": "New step calls the existing runner without arguments; controlledFailureSettings returns undefined, so no external exporters are created. Default existing 100 warm-up pairs, 600 measured requests per condition, same SQL and 20 local failure checks are unchanged. It reuses the same job-owned PG17 loopback database; no new service, CI job, model or account resource is added."
+    },
+    {
+      "topic": "Credential and execution ordering",
+      "result": "Actual workflow places default benchmark after exact-main/source/flag and seven offline guards and before the only Infisical project-token step. A nonzero benchmark exit fails the step and prevents later token/export steps under normal GitHub success conditions. Controlled external mode remains the separate later explicit 20-request command."
+    },
+    {
+      "topic": "Raw evidence preservation",
+      "result": "Only stdout redirection is added: original benchmark JSON goes unchanged to overhead.receipt.json. Always upload includes exact controlled-failure and overhead receipt paths. An empty/missing report or failed step remains failure/unknown; artifact presence is not acceptance. Raw overhead has no own SHA field, so source binding comes from immutable checkout, workflow run and retained Git tree/source manifest."
+    },
+    {
+      "topic": "Measurement limits",
+      "result": "Existing report measures real HTTP/pg driver with asynchronous batched memory collectors and excludes collector network, model and provisioning latency. This v3 source review has not run the benchmark and establishes no measured overhead value or threshold pass. The actual current-source report remains a required later gate."
+    },
+    {
+      "topic": "Scope preservation",
+      "result": "v3 does not alter runtime counters, Safe exporters, source/token guards, default loop counts, external count, model/Native procedures, budgets, retry logic, or original evidence. Test adds only four lines asserting exact no-flag command ordering and exact two artifact paths."
+    }
+  ],
+  "validation": {
+    "authorOffline": {
+      "artifact": "offline-v3.log",
+      "exitCode": 0,
+      "passed": 7,
+      "failed": 0,
+      "rawLogReadAndHashMatched": true,
+      "scope": "Same seven offline cases; first case additionally checks no-flag benchmark ordering/artifact list. Not actual PG or OTLP."
+    },
+    "authorLint": {
+      "artifact": "targeted-lint-v3.log",
+      "exitCode": 0,
+      "scope": "Explicit no-ignore two TS files; empty log hash verified against author receipt."
+    },
+    "rootCanonical": {
+      "artifact": "root-validation-v3.safe.json",
+      "sourceTree": "8c5c12ea993533403d13e21dc75647bb28022767",
+      "exitCode": 0,
+      "rawLogHashMatched": true,
+      "scope": "Canonical root tsrs --noEmit, exact final integrated tree. Earlier canonical v1 missing-NODE_ENV failure preserved."
+    },
+    "reviewer": "Read-only source, original logs, SHA/blob checks and in-memory patch replay only. No duplicate test or external run."
+  },
+  "boundaries": {
+    "actualPGOrOTLPRunsByReviewer": 0,
+    "newResourcesByReviewer": 0,
+    "productionAcceptedCases": 0,
+    "priorNativeLogin": {
+      "native": 504,
+      "web": 480,
+      "status": "RED"
+    },
+    "actualCurrentSourceOverhead": "not yet observed",
+    "PostHogBackendLookup": "not yet observed"
+  },
+  "evidence": [
+    {
+      "path": "v3-overhead-step.patch",
+      "bytes": 2825,
+      "sha256": "82e1eeb9e2b68fa28ad40b6c7547e14657b0d413140fc327637b92a35000f28a",
+      "gitBlobSha": "6a2b9f295e5cc2c7a47a2a58d2651b384cbb750e"
+    },
+    {
+      "path": "v3-overhead-step.safe.json",
+      "bytes": 3135,
+      "sha256": "df58ac8df2dbf284af762b7d71456fa9c100f1dbfb15ba7a302be42e4fbcabfb",
+      "gitBlobSha": "3c12426e43624159271aa8aae0e81199a9a70649"
+    },
+    {
+      "path": "offline-v3.log",
+      "bytes": 879,
+      "sha256": "6d7820a00258e29cb1658e66ebfa9338228a5b63b3a4332d545edb3859751e93",
+      "gitBlobSha": "59ea528942bf4b8a0fbc976c75250158981202fc"
+    },
+    {
+      "path": "targeted-lint-v3.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "root-final-manifest-v3.safe.json",
+      "bytes": 1001,
+      "sha256": "19f079811b850f948559763dee0c7edea9d092adc7999a3002d5ee6733bc026c",
+      "gitBlobSha": "faae00848b5fae7e893964103014a4e53ca0b5f6"
+    },
+    {
+      "path": "root-validation-v3.safe.json",
+      "bytes": 487,
+      "sha256": "61d17ffc17703119884ef1bbcd1e193e4d5e8550328812c628309189bcb243ea",
+      "gitBlobSha": "1b18cb0e7cae5614b34055fca814e8f80c06b92b"
+    },
+    {
+      "path": "root-canonical-type-v3.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    }
+  ]
+}

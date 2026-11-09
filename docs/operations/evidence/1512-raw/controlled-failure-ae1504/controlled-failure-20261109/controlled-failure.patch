@@ -1,0 +1,721 @@
+--- a/scripts/ops/run-trace-benchmark.ts
++++ b/scripts/ops/run-trace-benchmark.ts
+@@ -2,14 +2,20 @@
+  * Isolated HTTP + PostgreSQL overhead/retention check for #1512.
+  * Run with E2E_DATABASE_URL pointing at an owned loopback *_e2e database:
+  * node --import ./scripts/server-test.mjs --import tsx scripts/ops/run-trace-benchmark.ts
+- * No schema writes, external telemetry, model calls, secrets or raw SQL errors in output.
++ * Default mode is entirely local. --export-controlled-failures sends only 20
++ * existing test failures to PostHog, from the exact-main opt-in workflow.
++ * No schema writes, model calls, secrets or raw SQL errors in output.
+  */
+ import assert from 'node:assert/strict'
+ import { randomUUID } from 'node:crypto'
+ import { createServer } from 'node:http'
+ import { createRequire } from 'node:module'
++import { mkdir, writeFile } from 'node:fs/promises'
++import { pathToFileURL } from 'node:url'
+ import { context, propagation, ROOT_CONTEXT, trace } from '@opentelemetry/api'
+-import { CompositePropagator, W3CTraceContextPropagator } from '@opentelemetry/core'
++import { CompositePropagator, ExportResultCode, W3CTraceContextPropagator, type ExportResult } from '@opentelemetry/core'
++import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto'
++import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-proto'
+ import { registerInstrumentations } from '@opentelemetry/instrumentation'
+ import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base'
+ import { InMemoryLogRecordExporter } from '@opentelemetry/sdk-logs'
+@@ -20,118 +26,266 @@
+ import { createLogProvider } from '../../lib/tracing/logs'
+ import { localDatabaseTarget } from '../test-accounts/database-target.mjs'
+ 
+-const connectionString = process.env.E2E_DATABASE_URL
+-localDatabaseTarget(connectionString)
+-const spans = new InMemorySpanExporter()
+-const logs = new InMemoryLogRecordExporter()
+-const logProvider = createLogProvider({ endpoint: 'http://127.0.0.1/i/v1/traces', token: 'isolated-no-export', environment: 'dev', exporter: logs })
+-const provider = createTracerProvider({ exporter: new SafeExporter(spans), sampleRate: 0.1, environment: 'dev', logger: logProvider.getLogger('benchmark'), serverless: false })
+-provider.register({ propagator: new CompositePropagator({ propagators: [new W3CTraceContextPropagator(), new RunContextPropagator()] }) })
+-const unregister = registerInstrumentations({ tracerProvider: provider, instrumentations: [createPgInstrumentation()] })
+-const { Pool } = createRequire(import.meta.url)('pg') as typeof import('pg')
+-const database = new Pool({ connectionString, max: 1, statement_timeout: 5_000, connectionTimeoutMillis: 5_000 })
+-const count = Math.min(5_000, Math.max(200, Number(process.env.TRACE_BENCHMARK_REQUESTS) || 600))
+-const failureIds = new Set<string>()
+-const durations = { off: [] as number[], on: [] as number[] }
+-const roundTrips = { off: [] as number[], on: [] as number[] }
+-const flush = async () => { await provider.forceFlush(); await logProvider.forceFlush() }
+-const server = createServer((incoming, response) => {
+-  void context.with(ROOT_CONTEXT, async () => {
+-    const mode = incoming.url === '/off' ? 'off' : 'on'
+-    const failure = incoming.url === '/failure'
+-    const request = new Request('http://127.0.0.1/api/trace-benchmark', { method: failure ? 'GET' : 'POST' })
+-    const started = performance.now()
+-    const requestTrace = mode === 'on' ? beginRequestTrace(request, '/api/trace-benchmark') : undefined
+-    let status = 200
+-    let cause: unknown
+-    const stage = <T>(name: string, work: () => Promise<T>) => mode === 'on' && !failure ? withRunSpan(name, {}, work) : work()
+-    const run = async () => {
+-      if (failure) failureIds.add(trace.getActiveSpan()!.spanContext().traceId)
+-      await stage('dispatch.prepare', () => database.query('SELECT 1 AS ready'))
+-      await stage('dispatch.claim', () => database.query('SELECT 1 AS ready'))
+-      if (failure) {
+-        try { await database.query('SELECT 1 / 0') }
+-        catch (error) { throw new CodedError('trace_acceptance_failed', { detail: 'controlled_database_failure', cause: error }) }
+-      }
+-      await stage('completion.persist', () => database.query('SELECT 1 AS ready'))
+-    }
+-    try {
+-      if (requestTrace) await requestTrace.run(() => withTraceMetadata({ runId: randomUUID(), threadId: randomUUID() }, run))
+-      else await run()
+-    } catch (error) { status = 500; cause = error }
+-    requestTrace?.finish(status, cause)
+-    const elapsed = performance.now() - started
+-    response.writeHead(status, { 'content-type': 'application/json', 'server-timing': `handler;dur=${elapsed}` })
+-    response.end(JSON.stringify({ ok: status === 200 }))
+-  }).catch(() => { response.writeHead(500); response.end('{"ok":false}') })
+-})
+-
+-function distribution(values: number[]) {
+-  const sorted = values.toSorted((a, b) => a - b)
+-  return { n: values.length, mean_ms: values.reduce((sum, value) => sum + value, 0) / values.length,
+-    p50_ms: sorted[Math.floor(sorted.length * 0.5)], p95_ms: sorted[Math.floor(sorted.length * 0.95)], p99_ms: sorted[Math.floor(sorted.length * 0.99)] }
+-}
+-
+-try {
+-  await database.query('SELECT 1')
+-  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+-  const address = server.address()
+-  assert.ok(address && typeof address === 'object')
+-  const origin = `http://127.0.0.1:${address.port}`
+-  const request = async (mode: 'off' | 'on', collect: boolean) => {
+-    const started = performance.now()
+-    const response = await fetch(`${origin}/${mode}`)
+-    await response.arrayBuffer()
+-    assert.equal(response.status, 200)
+-    if (collect) {
+-      durations[mode].push(Number(response.headers.get('server-timing')!.split('dur=')[1]))
+-      roundTrips[mode].push(performance.now() - started)
+-    }
+-  }
+-  for (let i = 0; i < 100; i++) { await request('off', false); await request('on', false) }
+-  await flush()
+-  spans.reset(); logs.reset()
+-  // Alternate blocks and order, so neither condition gets all of the warm CPU/connection benefit.
+-  const block = 20
+-  for (let batch = 0; batch < Math.ceil(count / block); batch++) {
+-    for (const mode of batch % 2 ? ['on', 'off'] as const : ['off', 'on'] as const) {
+-      for (let i = 0; i < Math.min(block, count - batch * block); i++) await request(mode, true)
++// These are test-environment failures, never production coding runs. There is
++// no endpoint, request-count or token-kind override on the export path.
++export function controlledFailureSettings(args: string[], env: NodeJS.ProcessEnv) {
++  if (!args.length) return undefined
++  if (args.length !== 1 || args[0] !== '--export-controlled-failures') throw new Error('invalid_trace_benchmark_mode')
++  if (env.GITHUB_ACTIONS !== 'true' || env.GITHUB_EVENT_NAME !== 'workflow_dispatch'
++    || env.GITHUB_REPOSITORY !== 'alexj11324/Mikka' || env.GITHUB_REF !== 'refs/heads/main'
++    || !/^[a-f0-9]{40}$/.test(env.GITHUB_SHA ?? '') || env.GITHUB_SHA !== env.MIKKA_EXPECTED_DEPLOYMENT_SHA) {
++    throw new Error('controlled_failure_source_binding_required')
++  }
++  const token = env.NEXT_PUBLIC_POSTHOG_KEY
++  if (!token || !/^phc_[a-zA-Z0-9_-]{1,256}$/.test(token)) throw new Error('controlled_failure_project_token_required')
++  localDatabaseTarget(env.E2E_DATABASE_URL)
++  return { endpoint: 'https://us.i.posthog.com/i/v1/traces', token, version: env.GITHUB_SHA, environment: 'dev', requests: 20 } as const
++}
++
++type ExportSink<T> = { export(items: T[], done: (result: ExportResult) => void): void; shutdown(): Promise<void>; forceFlush?(): Promise<void> }
++
++/** Observe only sanitized batches, inside the product Safe exporters. Their
++ * deliberate SUCCESS-on-failure behavior must not become delivery evidence. */
++export function observedExporter<T>(local: ExportSink<T>, remote?: ExportSink<T>) {
++  const counts = { enabled: Boolean(remote), batchesAttempted: 0, recordsAttempted: 0, batchesSucceeded: 0, recordsSucceeded: 0,
++    batchesFailed: 0, recordsFailed: 0, exportThrows: 0, flushFailures: 0, shutdownFailures: 0 }
++  return {
++    receipt: () => ({ ...counts, batchesPending: counts.batchesAttempted - counts.batchesSucceeded - counts.batchesFailed,
++      recordsPending: counts.recordsAttempted - counts.recordsSucceeded - counts.recordsFailed }),
++    exporter: {
++      export(items: T[], done: (result: ExportResult) => void) {
++        local.export(items, result => {
++          if (!remote || result.code !== ExportResultCode.SUCCESS) return done(result)
++          counts.batchesAttempted++; counts.recordsAttempted += items.length
++          let completed = false
++          const finish = (outcome: ExportResult) => {
++            if (completed) return
++            completed = true
++            if (outcome.code === ExportResultCode.SUCCESS) { counts.batchesSucceeded++; counts.recordsSucceeded += items.length }
++            else { counts.batchesFailed++; counts.recordsFailed += items.length }
++            // Error text stays inside the product wrapper, never in the receipt.
++            done({ code: outcome.code })
++          }
++          try { remote.export(items, finish) } catch { counts.exportThrows++; finish({ code: ExportResultCode.FAILED }) }
++        })
++      },
++      async forceFlush() {
++        await local.forceFlush?.()
++        try { await remote?.forceFlush?.() } catch { counts.flushFailures++; throw new Error('controlled_failure_export_flush_failed') }
++      },
++      async shutdown() {
++        await local.shutdown()
++        try { await remote?.shutdown() } catch { counts.shutdownFailures++; throw new Error('controlled_failure_export_shutdown_failed') }
++      },
++    },
++  }
++}
++
++export async function runTraceBenchmark(args = process.argv.slice(2), env: NodeJS.ProcessEnv = process.env) {
++  const settings = controlledFailureSettings(args, env)
++  const connectionString = env.E2E_DATABASE_URL
++  localDatabaseTarget(connectionString)
++  const spans = new InMemorySpanExporter()
++  const logs = new InMemoryLogRecordExporter()
++  const spanExport = observedExporter(spans, settings ? new OTLPTraceExporter({ url: settings.endpoint,
++    headers: { Authorization: `Bearer ${settings.token}` }, timeoutMillis: 5_000 }) : undefined)
++  const logExport = observedExporter(logs, settings ? new OTLPLogExporter({ url: settings.endpoint.replace(/\/traces$/, '/logs'),
++    headers: { Authorization: `Bearer ${settings.token}` }, timeoutMillis: 5_000 }) : undefined)
++  const logProvider = createLogProvider({ endpoint: 'http://127.0.0.1/i/v1/traces', token: 'isolated-no-export', environment: 'dev', version: settings?.version, exporter: settings ? logExport.exporter : logs })
++  const provider = createTracerProvider({ exporter: new SafeExporter(settings ? spanExport.exporter : spans), sampleRate: 0.1, environment: 'dev', version: settings?.version, logger: logProvider.getLogger('benchmark'), serverless: false })
++  provider.register({ propagator: new CompositePropagator({ propagators: [new W3CTraceContextPropagator(), new RunContextPropagator()] }) })
++  const unregister = registerInstrumentations({ tracerProvider: provider, instrumentations: [createPgInstrumentation()] })
++  const { Pool } = createRequire(import.meta.url)('pg') as typeof import('pg')
++  const database = new Pool({ connectionString, max: 1, statement_timeout: 5_000, connectionTimeoutMillis: 5_000 })
++  const count = Math.min(5_000, Math.max(200, Number(env.TRACE_BENCHMARK_REQUESTS) || 600))
++  const failureIds = new Set<string>()
++  let initialUnsampled = 0, attempted = 0, failedResponses = 0, executionComplete = false
++  let report: Record<string, unknown> | undefined
++  let localChecksPassed = false
++  let cleanupComplete = false
++  const startedAt = new Date().toISOString()
++  const durations = { off: [] as number[], on: [] as number[] }
++  const roundTrips = { off: [] as number[], on: [] as number[] }
++  const flush = async () => { await provider.forceFlush(); await logProvider.forceFlush() }
++  const server = createServer((incoming, response) => {
++    void context.with(ROOT_CONTEXT, async () => {
++      const mode = incoming.url === '/off' ? 'off' : 'on'
++      const failure = incoming.url === '/failure'
++      const request = new Request('http://127.0.0.1/api/trace-benchmark', { method: failure ? 'GET' : 'POST' })
++      const started = performance.now()
++      const requestTrace = mode === 'on' ? beginRequestTrace(request, '/api/trace-benchmark') : undefined
++      let status = 200
++      let cause: unknown
++      const stage = <T>(name: string, work: () => Promise<T>) => mode === 'on' && !failure ? withRunSpan(name, {}, work) : work()
++      const run = async () => {
++        if (failure) {
++          const info = trace.getActiveSpan()!.spanContext()
++          failureIds.add(info.traceId)
++          if (!(info.traceFlags & 1)) initialUnsampled++
++        }
++        await stage('dispatch.prepare', () => database.query('SELECT 1 AS ready'))
++        await stage('dispatch.claim', () => database.query('SELECT 1 AS ready'))
++        if (failure) {
++          try { await database.query('SELECT 1 / 0') }
++          catch (error) { throw new CodedError('trace_acceptance_failed', { detail: 'controlled_database_failure', cause: error }) }
++        }
++        await stage('completion.persist', () => database.query('SELECT 1 AS ready'))
++      }
++      try {
++        if (requestTrace) await requestTrace.run(() => withTraceMetadata({ runId: randomUUID(), threadId: randomUUID() }, run))
++        else await run()
++      } catch (error) { status = 500; cause = error }
++      requestTrace?.finish(status, cause)
++      const elapsed = performance.now() - started
++      response.writeHead(status, { 'content-type': 'application/json', 'server-timing': `handler;dur=${elapsed}` })
++      response.end(JSON.stringify({ ok: status === 200 }))
++    }).catch(() => { response.writeHead(500); response.end('{"ok":false}') })
++  })
++
++  function distribution(values: number[]) {
++    const sorted = values.toSorted((a, b) => a - b)
++    return { n: values.length, mean_ms: values.reduce((sum, value) => sum + value, 0) / values.length,
++      p50_ms: sorted[Math.floor(sorted.length * 0.5)], p95_ms: sorted[Math.floor(sorted.length * 0.95)], p99_ms: sorted[Math.floor(sorted.length * 0.99)] }
++  }
++
++  try {
++    await database.query('SELECT 1')
++    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
++    const address = server.address()
++    assert.ok(address && typeof address === 'object')
++    const origin = `http://127.0.0.1:${address.port}`
++    const request = async (mode: 'off' | 'on', collect: boolean) => {
++      const started = performance.now()
++      const response = await fetch(`${origin}/${mode}`)
++      await response.arrayBuffer()
++      assert.equal(response.status, 200)
++      if (collect) {
++        durations[mode].push(Number(response.headers.get('server-timing')!.split('dur=')[1]))
++        roundTrips[mode].push(performance.now() - started)
++      }
++    }
++    let successfulRoots: ReturnType<InMemorySpanExporter['getFinishedSpans']> = []
++    if (!settings) {
++      for (let i = 0; i < 100; i++) { await request('off', false); await request('on', false) }
+       await flush()
+-    }
+-  }
+-  const successfulRoots = spans.getFinishedSpans().filter(span => span.name === 'POST /api/trace-benchmark')
+-  assert.equal(successfulRoots.length, count, 'Every critical request must be retained')
+-  assert.ok(spans.getFinishedSpans().some(span => span.attributes['db.system.name'] === 'postgresql' || span.attributes['db.system'] === 'postgresql'), 'Real PostgreSQL driver spans required')
+-  await flush()
+-  spans.reset(); logs.reset()
+-  for (let i = 0; i < 20; i++) {
+-    const response = await fetch(`${origin}/failure`)
+-    await response.arrayBuffer()
+-    assert.equal(response.status, 500)
+-  }
+-  await flush()
+-  const exported = spans.getFinishedSpans()
+-  const failedRoots = exported.filter(span => span.name === 'GET /api/trace-benchmark')
+-  const linked = logs.getFinishedLogRecords()
+-  assert.equal(failedRoots.length, 20, 'Every ordinary failed request must be retained')
+-  for (const id of failureIds) {
+-    assert.ok(exported.some(span => span.spanContext().traceId === id && span.attributes['db.operation'] === 'SELECT'))
+-    assert.ok(linked.some(record => record.spanContext?.traceId === id && record.severityText === 'ERROR'))
+-  }
+-  assert.ok(failedRoots.every(span => span.attributes['mikka.error.detail'] === 'controlled_database_failure'))
+-  const safe = JSON.stringify({ spans: exported.map(span => ({ name: span.name, attributes: span.attributes, status: span.status, events: span.events })), logs: linked.map(record => ({ body: record.body, attributes: record.attributes })) })
+-  assert.equal(safe.includes('division by zero'), false, 'SQL error messages must not leave the process')
+-  const off = distribution(durations.off), on = distribution(durations.on)
+-  console.log(JSON.stringify({ environment: { node: process.version, platform: process.platform, postgres: 'real loopback', requests_per_condition: count, queries_per_request: 3 },
+-    boundary: 'Real HTTP and pg driver; async batched in-memory collectors. Excludes external collector network, model and cloud provisioning latency.',
+-    handler: { off, on, delta_mean_ms: on.mean_ms - off.mean_ms, delta_p95_ms: on.p95_ms - off.p95_ms },
+-    round_trip: { off: distribution(roundTrips.off), on: distribution(roundTrips.on) },
+-    retention: { critical: `${successfulRoots.length}/${count}`, controlled_failures: `${failedRoots.length}/20`, linked_error_logs: failureIds.size, safe_cause_chain: true, raw_sql_error_exported: false } }, null, 2))
+-} finally {
+-  server.closeAllConnections()
+-  await new Promise<void>(resolve => server.close(() => resolve()))
+-  await database.end()
+-  unregister()
+-  await Promise.allSettled([provider.shutdown(), logProvider.shutdown()])
+-  trace.disable(); context.disable(); propagation.disable()
+-}
++      spans.reset(); logs.reset()
++      // Alternate blocks and order, so neither condition gets all of the warm CPU/connection benefit.
++      const block = 20
++      for (let batch = 0; batch < Math.ceil(count / block); batch++) {
++        for (const mode of batch % 2 ? ['on', 'off'] as const : ['off', 'on'] as const) {
++          for (let i = 0; i < Math.min(block, count - batch * block); i++) await request(mode, true)
++          await flush()
++        }
++      }
++      successfulRoots = spans.getFinishedSpans().filter(span => span.name === 'POST /api/trace-benchmark')
++      assert.equal(successfulRoots.length, count, 'Every critical request must be retained')
++      assert.ok(spans.getFinishedSpans().some(span => span.attributes['db.system.name'] === 'postgresql' || span.attributes['db.system'] === 'postgresql'), 'Real PostgreSQL driver spans required')
++      await flush()
++      spans.reset(); logs.reset()
++    }
++    for (let i = 0; i < 20; i++) {
++      attempted++
++      const response = await fetch(`${origin}/failure`, settings ? { signal: AbortSignal.timeout(10_000) } : undefined)
++      await response.arrayBuffer()
++      if (response.status === 500) failedResponses++
++      assert.equal(response.status, 500)
++    }
++    await flush()
++    const exported = spans.getFinishedSpans()
++    const failedRoots = exported.filter(span => span.name === 'GET /api/trace-benchmark')
++    const linked = logs.getFinishedLogRecords()
++    assert.equal(failedRoots.length, 20, 'Every ordinary failed request must be retained')
++    for (const id of failureIds) {
++      assert.ok(exported.some(span => span.spanContext().traceId === id && span.attributes['db.operation'] === 'SELECT'))
++      assert.ok(linked.some(record => record.spanContext?.traceId === id && record.severityText === 'ERROR'))
++    }
++    assert.ok(failedRoots.every(span => span.attributes['mikka.error.detail'] === 'controlled_database_failure'))
++    const safe = JSON.stringify({ spans: exported.map(span => ({ name: span.name, attributes: span.attributes, status: span.status, events: span.events })), logs: linked.map(record => ({ body: record.body, attributes: record.attributes })) })
++    assert.equal(safe.includes('division by zero'), false, 'SQL error messages must not leave the process')
++    executionComplete = true
++    if (!settings) {
++      const off = distribution(durations.off), on = distribution(durations.on)
++      report = { environment: { node: process.version, platform: process.platform, postgres: 'real loopback', requests_per_condition: count, queries_per_request: 3 },
++        boundary: 'Real HTTP and pg driver; async batched in-memory collectors. Excludes external collector network, model and cloud provisioning latency.',
++        handler: { off, on, delta_mean_ms: on.mean_ms - off.mean_ms, delta_p95_ms: on.p95_ms - off.p95_ms },
++        round_trip: { off: distribution(roundTrips.off), on: distribution(roundTrips.on) },
++        retention: { critical: `${successfulRoots.length}/${count}`, controlled_failures: `${failedRoots.length}/20`, linked_error_logs: failureIds.size, safe_cause_chain: true, raw_sql_error_exported: false } }
++    }
++  } catch (error) {
++    if (!settings) throw error
++  } finally {
++    if (settings) {
++      const exported = spans.getFinishedSpans(), linked = logs.getFinishedLogRecords()
++      const roots = exported.filter(span => span.name === 'GET /api/trace-benchmark')
++      const checks = {
++        allAttemptsCompleted: executionComplete && attempted === 20 && failedResponses === 20 && failureIds.size === 20,
++        rootsRetained: roots.length === 20 && new Set(roots.map(span => span.spanContext().traceId)).size === 20
++          && roots.every(span => failureIds.has(span.spanContext().traceId)),
++        ordinaryFailures: roots.length === 20 && roots.every(span => span.status.code === 2 && span.attributes['http.response.status_code'] === 500
++          && span.attributes['mikka.trace.critical'] === false && span.attributes['mikka.trace.sample_rate'] === 1 && span.attributes['mikka.trace.retention'] === 'error_or_slow'),
++        realPgErrorPerTrace: failureIds.size === 20 && [...failureIds].every(id => {
++          const pg = exported.filter(span => span.spanContext().traceId === id && span.attributes['db.operation'] === 'SELECT'
++            && (span.attributes['db.system.name'] === 'postgresql' || span.attributes['db.system'] === 'postgresql'))
++          return pg.length === 3 && pg.filter(span => span.status.code === 2).length === 1
++        }),
++        safeCausePerTrace: roots.length === 20 && roots.every(span => span.attributes['mikka.error.code'] === 'trace_acceptance_failed'
++          && span.attributes['mikka.error.detail'] === 'controlled_database_failure' && String(span.attributes['mikka.error.causes']).includes('22012')),
++        linkedErrorLogPerTrace: roots.length === 20 && roots.every(root => linked.some(record => record.spanContext?.traceId === root.spanContext().traceId
++          && record.spanContext?.spanId === root.spanContext().spanId && record.severityText === 'ERROR'
++          && record.attributes['mikka.error.code'] === 'trace_acceptance_failed' && record.attributes['mikka.error.detail'] === 'controlled_database_failure')),
++        unsampledFailuresPromoted: initialUnsampled > 0,
++        rawSqlErrorAbsent: !JSON.stringify({ spans: exported.map(span => ({ name: span.name, attributes: span.attributes, status: span.status, events: span.events })),
++          logs: linked.map(record => ({ body: record.body, attributes: record.attributes })) }).includes('division by zero'),
++      }
++      localChecksPassed = Object.values(checks).every(Boolean)
++      report = { version: 1, kind: 'controlled_failure_otlp_probe', sourceRevision: settings.version, environment: 'dev', startedAt, endedAt: new Date().toISOString(),
++        boundary: '20 synthetic test-environment HTTP/real PostgreSQL failures through the product sampler, retention and safe exporters. No production coding run or model. Raw OTLP callback success is not backend ingestion evidence.',
++        configuredSampleRate: 0.1, attempted, failedResponses, initialUnsampled, localRetainedRoots: roots.length, localExportedSpans: exported.length, localExportedLogs: linked.length,
++        traceIds: [...failureIds].sort(), perTrace: roots.map(root => ({ traceId: root.spanContext().traceId, rootSpanId: root.spanContext().spanId,
++          pgSpanIds: exported.filter(span => span.spanContext().traceId === root.spanContext().traceId && span.attributes['db.operation'] === 'SELECT').map(span => span.spanContext().spanId),
++          errorSpanIds: exported.filter(span => span.spanContext().traceId === root.spanContext().traceId && span.status.code === 2).map(span => span.spanContext().spanId) })),
++        checks, backendObserved: false }
++    }
++    server.closeAllConnections()
++    await new Promise<void>(resolve => server.close(() => resolve()))
++    const databaseClosed = await Promise.allSettled([database.end()])
++    unregister()
++    const providersClosed = await Promise.allSettled([provider.shutdown(), logProvider.shutdown()])
++    cleanupComplete = [...databaseClosed, ...providersClosed].every(value => value.status === 'fulfilled')
++    trace.disable(); context.disable(); propagation.disable()
++  }
++  assert.ok(report)
++  if (settings) {
++    const transport = { spans: spanExport.receipt(), logs: logExport.receipt() }
++    const callbacksComplete = Object.values(transport).every(value => value.batchesAttempted > 0 && value.batchesSucceeded === value.batchesAttempted
++      && value.recordsSucceeded === value.recordsAttempted && value.batchesFailed === 0 && value.batchesPending === 0 && value.flushFailures === 0 && value.shutdownFailures === 0)
++    const exitCode = localChecksPassed && callbacksComplete && cleanupComplete ? 0 : 1
++    return { exitCode, report: { ...report, cleanupComplete,
++      transportBoundary: 'Raw OTLP exporter callback batches/items; not HTTP wire attempts or stored PostHog rows.',
++      transport, result: exitCode ? 'incomplete' : 'exported_awaiting_backend_verification' } }
++  }
++  assert.ok(cleanupComplete, 'Local benchmark cleanup required')
++  return { exitCode: 0, report }
++}
++
++if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
++  try {
++    const result = await runTraceBenchmark()
++    if (process.argv.includes('--export-controlled-failures')) {
++      await mkdir('production-run-observability-report', { recursive: true })
++      await writeFile('production-run-observability-report/controlled-failure.receipt.json', JSON.stringify(result.report, null, 2) + '\n')
++    }
++    console.log(JSON.stringify(result.report, null, 2))
++    process.exitCode = result.exitCode
++  } catch {
++    // Database, token, OTLP and assertion error objects are never log payloads.
++    const failure = { version: 1, kind: 'trace_benchmark_failure', result: 'incomplete', backendObserved: false,
++      failureCode: 'configuration_or_execution_failed' }
++    if (process.argv.includes('--export-controlled-failures')) {
++      await mkdir('production-run-observability-report', { recursive: true }).catch(() => {})
++      await writeFile('production-run-observability-report/controlled-failure.receipt.json', JSON.stringify(failure, null, 2) + '\n').catch(() => {})
++    }
++    console.error(JSON.stringify(failure))
++    process.exitCode = 1
++  }
++}
+--- /dev/null
++++ b/scripts/ops/run-trace-benchmark.test.ts
+@@ -0,0 +1,192 @@
++import assert from 'node:assert/strict'
++import { readFileSync, mkdtempSync, rmSync } from 'node:fs'
++import { tmpdir } from 'node:os'
++import { join } from 'node:path'
++import { createRequire } from 'node:module'
++import { spawnSync } from 'node:child_process'
++import { test } from 'node:test'
++import { runInNewContext } from 'node:vm'
++import { context, propagation, trace } from '@opentelemetry/api'
++import { CompositePropagator, ExportResultCode, W3CTraceContextPropagator, type ExportResult } from '@opentelemetry/core'
++import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base'
++import { InMemoryLogRecordExporter } from '@opentelemetry/sdk-logs'
++import { CodedError } from '@mikka/protocol/coded-error'
++import { beginRequestTrace } from '../../apps/api/runtime/request-trace'
++import { createTracerProvider, SafeExporter } from '../../lib/tracing/node'
++import { createLogProvider } from '../../lib/tracing/logs'
++
++const subject = () => import('./run-trace-benchmark')
++const revision = 'a'.repeat(40)
++const env = { GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REPOSITORY: 'alexj11324/Mikka',
++  GITHUB_REF: 'refs/heads/main', GITHUB_SHA: revision, MIKKA_EXPECTED_DEPLOYMENT_SHA: revision,
++  NEXT_PUBLIC_POSTHOG_KEY: 'phc_UNIT_PRIVATE_CANARY', E2E_DATABASE_URL: 'postgresql://e2e:local-only@127.0.0.1:5432/mikka_e2e' }
++const flag = ['--export-controlled-failures']
++const require = createRequire(import.meta.url)
++const workflow = require('js-yaml').load(readFileSync(new URL('../../.github/workflows/run-trace-acceptance.yml', import.meta.url), 'utf8'))
++
++test('controlled-failure workflow mode has one isolated job and preserves every old mode', () => {
++  assert.deepEqual(workflow.on.workflow_dispatch.inputs.mode.options, ['preflight', 'execute', 'export', 'controlled-failure'])
++  for (const [mode, expected] of [['preflight', 'acceptance'], ['execute', 'acceptance'], ['export', 'export'], ['controlled-failure', 'controlled-failure'], ['unknown', undefined]]) {
++    const active = Object.entries(workflow.jobs).filter(([, value]) => runInNewContext((value as { if: string }).if, {
++      github: { repository: 'alexj11324/Mikka', ref: 'refs/heads/main' }, inputs: { mode },
++    })).map(([name]) => name)
++    assert.deepEqual(active, expected ? [expected] : [])
++  }
++  const job = workflow.jobs['controlled-failure']
++  for (const github of [{ repository: 'foreign/repo', ref: 'refs/heads/main' }, { repository: 'alexj11324/Mikka', ref: 'refs/heads/unreviewed' }]) {
++    assert.equal(runInNewContext(job.if, { github, inputs: { mode: 'controlled-failure' } }), false)
++  }
++  assert.equal(job.services.postgres.image, 'postgres:17')
++  assert.equal(job.services.postgres.env.POSTGRES_DB, 'mikka_e2e')
++  assert.deepEqual(job.services.postgres.ports, ['127.0.0.1:5432:5432'])
++  assert.equal(job.permissions['id-token'], 'write')
++  assert.equal(job.permissions.issues, undefined)
++  const secretSteps = job.steps.filter((step: { uses?: string }) => step.uses?.startsWith('Infisical/'))
++  assert.equal(secretSteps.length, 1)
++  assert.equal(secretSteps[0].with['secret-name'], 'NEXT_PUBLIC_POSTHOG_KEY')
++  assert.equal(secretSteps[0].with['secret-path'], '/vercel')
++  assert.equal(secretSteps[0].with['identity-id'], '2cf9fa19-b9db-4c08-8ca0-b31859f2cbac')
++  const testStep = job.steps.findIndex((step: { run?: string }) => step.run?.includes('--test scripts/ops/run-trace-benchmark.test.ts'))
++  assert.ok(testStep >= 0 && testStep < job.steps.indexOf(secretSteps[0]))
++  assert.doesNotMatch(JSON.stringify(job), /ACME_DEMO_|SMOKE_OWNER_|run-observability-workflow\.mjs|browser-submit --runner|POSTHOG_PERSONAL_API_KEY/)
++  assert.ok(job.steps.some((step: { run?: string }) => step.run === 'node --import ./scripts/server-test.mjs --import tsx scripts/ops/run-trace-benchmark.ts --export-controlled-failures'))
++})
++
++test('workflow source and unrelated-input guards execute before credentials', () => {
++  const job = workflow.jobs['controlled-failure']
++  assert.ok(job, 'A dedicated controlled-failure job is required')
++  const step = job.steps.find((item: { name: string }) => item.name === 'Bind the isolated probe to this exact main revision')
++  const script = step.run.match(/<<'JS'\n([\s\S]*?)\nJS\s*$/)?.[1]
++  assert.ok(script)
++  const clean = { ...env, ACCEPTANCE_MODE: 'controlled-failure', ACCEPTANCE_PREPARE: 'false', ACCEPTANCE_BROWSER_SUBMIT: 'false',
++    ACCEPTANCE_MODEL_CASE: 'all', EXPORT_TARGET: 'dashboard', EXPORT_ID: '', REPLAY_SESSION_ID: '', REPLAY_TRACE_ID: '' }
++  for (const patch of [{}, { MIKKA_EXPECTED_DEPLOYMENT_SHA: 'b'.repeat(40) }, { ACCEPTANCE_MODE: 'execute' },
++    { ACCEPTANCE_PREPARE: 'true' }, { ACCEPTANCE_BROWSER_SUBMIT: 'true' }, { ACCEPTANCE_MODEL_CASE: 'claude' },
++    { EXPORT_TARGET: 'insight' }, { EXPORT_ID: '123' }, { REPLAY_SESSION_ID: 'private-input' }, { REPLAY_TRACE_ID: 'private-input' }]) {
++    const child = spawnSync(process.execPath, ['--input-type=module', '-'], { input: script, env: { ...clean, ...patch }, encoding: 'utf8' })
++    assert.equal(child.status === 0, Object.keys(patch).length === 0)
++  }
++})
++
++test('actual CLI rejects the source before connections and writes only a closed failure receipt', () => {
++  const cwd = mkdtempSync(join(tmpdir(), 'mikka-controlled-failure-'))
++  try {
++    const child = spawnSync(process.execPath, ['--import', new URL('../server-test.mjs', import.meta.url).pathname,
++      '--import', require.resolve('tsx'), new URL('./run-trace-benchmark.ts', import.meta.url).pathname, ...flag], {
++      cwd, encoding: 'utf8', env: { ...env, GITHUB_REF: 'refs/heads/unreviewed',
++        TSX_TSCONFIG_PATH: new URL('../../tsconfig.json', import.meta.url).pathname }, timeout: 10_000,
++    })
++    assert.equal(child.status, 1)
++    const receipt = JSON.parse(readFileSync(join(cwd, 'production-run-observability-report/controlled-failure.receipt.json'), 'utf8'))
++    assert.equal(receipt.backendObserved, false)
++    assert.equal(receipt.result, 'incomplete')
++    assert.equal(receipt.failureCode, 'configuration_or_execution_failed')
++    assert.doesNotMatch(JSON.stringify(receipt) + child.stdout + child.stderr, /PRIVATE_|phc_|phx_|Error:|stack|postgresql:/)
++  } finally { rmSync(cwd, { recursive: true, force: true }) }
++})
++
++test('export opt-in is finite, source bound and uses only the official project-token endpoints', async () => {
++  const { controlledFailureSettings } = await subject()
++  assert.equal(controlledFailureSettings([], env), undefined)
++  assert.equal(controlledFailureSettings([], {}), undefined)
++  const settings = controlledFailureSettings(flag, env)!
++  assert.equal(settings.requests, 20)
++  assert.equal(settings.endpoint, 'https://us.i.posthog.com/i/v1/traces')
++  assert.equal(settings.environment, 'dev')
++  assert.equal(settings.version, revision)
++  assert.equal(settings.token, env.NEXT_PUBLIC_POSTHOG_KEY)
++  assert.equal(controlledFailureSettings(flag, { ...env, TRACE_BENCHMARK_REQUESTS: '5000', OTEL_EXPORTER_OTLP_ENDPOINT: 'https://foreign.test' })!.endpoint, settings.endpoint)
++  for (const args of [['--export-controlled-failures', '--export-controlled-failures'], ['--endpoint=https://foreign.test'], ['--export-controlled-failures=1']]) {
++    assert.throws(() => controlledFailureSettings(args, env), /invalid_trace_benchmark_mode/)
++  }
++  for (const patch of [{ NEXT_PUBLIC_POSTHOG_KEY: '' }, { NEXT_PUBLIC_POSTHOG_KEY: 'phx_PRIVATE_CANARY' },
++    { NEXT_PUBLIC_POSTHOG_KEY: 'phc_PRIVATE\nCANARY' }, { GITHUB_SHA: 'moving-branch' },
++    { MIKKA_EXPECTED_DEPLOYMENT_SHA: 'b'.repeat(40) }, { GITHUB_REF: 'refs/heads/unreviewed' },
++    { GITHUB_REPOSITORY: 'foreign/repo' }, { GITHUB_ACTIONS: 'false' }, { GITHUB_EVENT_NAME: 'push' },
++    { E2E_DATABASE_URL: 'postgresql://e2e:PRIVATE_CANARY@foreign.test/production' }]) {
++    assert.throws(() => controlledFailureSettings(flag, { ...env, ...patch }), error => {
++      assert.doesNotMatch(String(error), /PRIVATE|phc_|phx_|foreign\.test/)
++      return true
++    })
++  }
++})
++
++test('raw exporter callbacks distinguish failure and pending even when product wrappers report success', async () => {
++  const { observedExporter } = await subject()
++  const local = { export: (_items: number[], done: (result: ExportResult) => void) => done({ code: ExportResultCode.SUCCESS }),
++    shutdown: async () => {}, forceFlush: async () => {} }
++  let callback: ((result: ExportResult) => void) | undefined
++  const observed = observedExporter(local, { ...local, export: (_items, done) => { callback = done } })
++  let completed = 0
++  observed.exporter.export([1, 2, 3], () => { completed++ })
++  assert.deepEqual(observed.receipt(), { enabled: true, batchesAttempted: 1, recordsAttempted: 3, batchesSucceeded: 0, recordsSucceeded: 0,
++    batchesFailed: 0, recordsFailed: 0, batchesPending: 1, recordsPending: 3, exportThrows: 0, flushFailures: 0, shutdownFailures: 0 })
++  callback!({ code: ExportResultCode.FAILED, error: new Error('PRIVATE_REMOTE_ERROR') })
++  callback!({ code: ExportResultCode.SUCCESS })
++  assert.equal(completed, 1)
++  assert.equal(observed.receipt().batchesFailed, 1)
++  assert.equal(observed.receipt().batchesSucceeded, 0)
++  assert.equal(observed.receipt().batchesPending, 0)
++  assert.doesNotMatch(JSON.stringify(observed.receipt()), /PRIVATE_REMOTE_ERROR|stack/)
++})
++
++test('synchronous transport errors and flush failures remain closed counters; local-only export stays local', async () => {
++  const { observedExporter } = await subject()
++  const local = { export: (_items: number[], done: (result: ExportResult) => void) => done({ code: ExportResultCode.SUCCESS }),
++    shutdown: async () => {}, forceFlush: async () => {} }
++  const observed = observedExporter(local, { ...local,
++    export: () => { throw new Error('PRIVATE_TRANSPORT_CANARY') },
++    forceFlush: async () => { throw new Error('PRIVATE_FLUSH_CANARY') },
++    shutdown: async () => { throw new Error('PRIVATE_SHUTDOWN_CANARY') },
++  })
++  let result
++  observed.exporter.export([1], value => { result = value.code })
++  assert.equal(result, ExportResultCode.FAILED)
++  await assert.rejects(observed.exporter.forceFlush())
++  await assert.rejects(observed.exporter.shutdown())
++  assert.equal(observed.receipt().recordsFailed, 1)
++  assert.equal(observed.receipt().exportThrows, 1)
++  assert.equal(observed.receipt().flushFailures, 1)
++  assert.equal(observed.receipt().shutdownFailures, 1)
++  assert.doesNotMatch(JSON.stringify(observed.receipt()), /PRIVATE_|stack/)
++  const isolated = observedExporter(local)
++  isolated.exporter.export([1], value => assert.equal(value.code, ExportResultCode.SUCCESS))
++  await isolated.exporter.forceFlush(); await isolated.exporter.shutdown()
++  assert.equal(isolated.receipt().enabled, false)
++  assert.equal(isolated.receipt().batchesAttempted, 0)
++})
++
++test('actual sampler and safe exporters retain an unsampled ordinary failure and do not hide raw delivery failures', async () => {
++  const { observedExporter } = await subject()
++  const memorySpans = new InMemorySpanExporter(), memoryLogs = new InMemoryLogRecordExporter()
++  const failed = { export: (_items: unknown[], done: (result: ExportResult) => void) => done({ code: ExportResultCode.FAILED, error: new Error('PRIVATE_REMOTE_ERROR') }),
++    shutdown: async () => {}, forceFlush: async () => {} }
++  const spans = observedExporter(memorySpans, failed), logs = observedExporter(memoryLogs, failed)
++  const logger = createLogProvider({ endpoint: 'http://127.0.0.1/i/v1/traces', token: 'unit-no-export', environment: 'dev', version: revision, exporter: logs.exporter })
++  const provider = createTracerProvider({ exporter: new SafeExporter(spans.exporter), logger: logger.getLogger('unit'), sampleRate: 0.1,
++    environment: 'dev', version: revision, serverless: false })
++  provider.register({ propagator: new CompositePropagator({ propagators: [new W3CTraceContextPropagator()] }) })
++  try {
++    const request = beginRequestTrace(new Request('http://127.0.0.1/api/trace-benchmark', { headers: {
++      traceparent: '00-ffffffff000000000000000000000000-aaaaaaaaaaaaaaaa-00',
++    } }), '/api/trace-benchmark')
++    await request.run(async () => { assert.equal(trace.getActiveSpan()!.spanContext().traceFlags, 0) })
++    request.finish(500, new CodedError('trace_acceptance_failed', { detail: 'controlled_database_failure', cause: new Error('PRIVATE_SQL_ERROR') }))
++    await provider.forceFlush(); await logger.forceFlush()
++    assert.equal(memorySpans.getFinishedSpans().length, 1)
++    assert.equal(memoryLogs.getFinishedLogRecords().length, 1)
++    const span = memorySpans.getFinishedSpans()[0]
++    assert.equal(span.attributes['mikka.trace.sample_rate'], 1)
++    assert.equal(span.attributes['mikka.error.code'], 'trace_acceptance_failed')
++    assert.equal(span.attributes['mikka.error.detail'], 'controlled_database_failure')
++    assert.equal(span.resource.attributes['service.version'], revision)
++    assert.equal(span.resource.attributes['deployment.environment.name'], 'dev')
++    assert.equal(spans.receipt().batchesFailed, 1)
++    assert.equal(logs.receipt().batchesFailed, 1)
++    assert.equal(spans.receipt().batchesSucceeded, 0)
++    assert.doesNotMatch(JSON.stringify({ attributes: span.attributes, status: span.status, logs: memoryLogs.getFinishedLogRecords().map(item => ({ body: item.body, attributes: item.attributes })) }), /PRIVATE_|division by zero/)
++  } finally {
++    await Promise.allSettled([provider.shutdown(), logger.shutdown()])
++    trace.disable(); context.disable(); propagation.disable()
++  }
++})
+--- a/.github/workflows/run-trace-acceptance.yml
++++ b/.github/workflows/run-trace-acceptance.yml
+@@ -1,16 +1,17 @@
+ name: Run trace production acceptance
+ # Explicit operator runs only. Preflight reads configuration; execute uses the
+ # existing tagged account and fixed small subscription models for issue #1512.
++# controlled-failure uses only an owned loopback database and 20 test failures.
+ on:
+   workflow_dispatch:
+     inputs:
+       mode:
+-        description: Read-only preflight, bounded real tasks, or native PostHog PNG export
++        description: Preflight, bounded real tasks, native PNG export, or 20 isolated failures
+         type: choice
+-        options: [preflight, execute, export]
++        options: [preflight, execute, export, controlled-failure]
+         default: preflight
+       expected-deployment-sha:
+-        description: Exact main commit already served by the production domain
++        description: Exact main commit; already served for production acceptance and export
+         type: string
+         required: true
+       model-case:
+@@ -51,7 +52,7 @@
+   queue: max
+ jobs:
+   acceptance:
+-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && inputs.mode != 'export'
++    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && (inputs.mode == 'preflight' || inputs.mode == 'execute')
+     runs-on: ubuntu-latest
+     timeout-minutes: 25
+     permissions:
+@@ -145,6 +146,87 @@
+           path: |
+             production-run-observability-report/report.json
+             production-run-observability-report/browser-actor.receipt.json
++          retention-days: 7
++          if-no-files-found: warn
++  controlled-failure:
++    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && inputs.mode == 'controlled-failure'
++    runs-on: ubuntu-latest
++    timeout-minutes: 10
++    permissions:
++      contents: read
++      id-token: write
++    env:
++      MIKKA_EXPECTED_DEPLOYMENT_SHA: ${{ inputs.expected-deployment-sha }}
++      ACCEPTANCE_MODE: ${{ inputs.mode }}
++      ACCEPTANCE_PREPARE: ${{ inputs.prepare }}
++      ACCEPTANCE_BROWSER_SUBMIT: ${{ inputs.browser-submit }}
++      ACCEPTANCE_MODEL_CASE: ${{ inputs.model-case }}
++      EXPORT_TARGET: ${{ inputs.export-target }}
++      EXPORT_ID: ${{ inputs.export-id }}
++      REPLAY_SESSION_ID: ${{ inputs.session-id }}
++      REPLAY_TRACE_ID: ${{ inputs.trace-id }}
++      E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
++      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
++    services:
++      postgres:
++        image: postgres:17
++        env:
++          POSTGRES_USER: e2e
++          POSTGRES_PASSWORD: e2e-local-only
++          POSTGRES_DB: mikka_e2e
++        ports:
++          - 127.0.0.1:5432:5432
++        options: >-
++          --health-cmd "pg_isready -U e2e -d mikka_e2e"
++          --health-interval 5s --health-timeout 5s --health-retries 10
++    steps:
++      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
++        with:
++          ref: ${{ github.sha }}
++          persist-credentials: false
++      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
++        with:
++          node-version: 24
++      - name: Bind the isolated probe to this exact main revision
++        run: |
++          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
++          node --input-type=module - <<'JS'
++          import assert from 'node:assert/strict'
++          assert.match(process.env.MIKKA_EXPECTED_DEPLOYMENT_SHA ?? '', /^[a-f0-9]{40}$/)
++          assert.equal(process.env.MIKKA_EXPECTED_DEPLOYMENT_SHA, process.env.GITHUB_SHA)
++          assert.equal(process.env.ACCEPTANCE_MODE, 'controlled-failure')
++          assert.notEqual(process.env.ACCEPTANCE_PREPARE, 'true')
++          assert.notEqual(process.env.ACCEPTANCE_BROWSER_SUBMIT, 'true')
++          assert.equal(process.env.ACCEPTANCE_MODEL_CASE, 'all')
++          assert.equal(process.env.EXPORT_TARGET, 'dashboard')
++          assert.ok(!process.env.EXPORT_ID && !process.env.REPLAY_SESSION_ID && !process.env.REPLAY_TRACE_ID)
++          JS
++      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
++        with:
++          version: 10.34.3
++      - name: Install locked dependencies before loading the project token
++        run: pnpm install --frozen-lockfile --ignore-scripts
++      - name: Verify the isolated export and workflow guards before credentials
++        run: node --import ./scripts/server-test.mjs --import tsx --test scripts/ops/run-trace-benchmark.test.ts
++      - name: Read only the existing PostHog project ingestion token
++        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
++        with:
++          method: oidc
++          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
++          oidc-audience: mikka-infisical
++          project-id: 89850d6a-f020-4936-863e-df77380dfe40
++          env-slug: prod
++          secret-path: /vercel
++          secret-name: NEXT_PUBLIC_POSTHOG_KEY
++          include-imports: false
++      - name: Export exactly 20 ordinary controlled failures from the isolated database
++        run: node --import ./scripts/server-test.mjs --import tsx scripts/ops/run-trace-benchmark.ts --export-controlled-failures
++      - name: Preserve the safe callback receipt for separate backend verification
++        if: always()
++        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
++        with:
++          name: run-trace-controlled-failure-${{ github.run_id }}
++          path: production-run-observability-report/controlled-failure.receipt.json
+           retention-days: 7
+           if-no-files-found: warn
+   export:

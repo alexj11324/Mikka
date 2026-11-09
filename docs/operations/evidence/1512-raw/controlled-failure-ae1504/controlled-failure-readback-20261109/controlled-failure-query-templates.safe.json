@@ -1,0 +1,130 @@
+{
+  "schemaVersion": 1,
+  "status": "prepared_not_executed",
+  "projectId": 670821,
+  "logicalCluster": "Logs",
+  "scope": "20 actual controlled dev failures only; not production coding-run evidence",
+  "actualReceipt": null,
+  "queriesExecuted": 0,
+  "acceptedTraceIds": [],
+  "parameters": {
+    "trace_id_b64_sql_list": "Exactly 20 distinct nonzero lowercase 32-hex IDs from actual receipt.traceIds; each rendered only as base64Encode(unhex('validated-id')). No example/fake IDs, placeholders, existing unrelated IDs or discovery query.",
+    "source_revision": "Actual receipt.sourceRevision: exact 40-lowercase-hex main SHA; verify against the workflow run source.",
+    "window_start_utc": "UTC YYYY-MM-DD HH:mm:ss: floor actual receipt.startedAt to a whole second.",
+    "window_end_utc": "UTC YYYY-MM-DD HH:mm:ss: floor actual receipt.endedAt then add one second; exclusive. Keep fixed for every page and repeat.",
+    "row_offset": "0, 500, 1000, ... only if the previous full page has 500 rows; preserve every raw page until a page has fewer than 500 rows."
+  },
+  "columnTypes": {
+    "trace": "32 lowercase nonzero hex",
+    "span": "16 lowercase nonzero hex",
+    "parent_span": "16 lowercase hex or empty exactly as returned for a native root; do not fabricate a zero parent",
+    "uuid": "Storage UUID as returned",
+    "sha": "exact input sourceRevision",
+    "service": "mikka-web",
+    "environment": "dev",
+    "int": "finite nonnegative safe integer",
+    "number": "finite number; no default for null",
+    "time": "UTC ISO timestamp with six fractional digits",
+    "bool": "Accept the observed true/false or 1/0 encoding; retain raw spelling alongside typed value",
+    "flag": "Only true/false/1/0; null stays unknown",
+    "label": "bounded closed metadata, no arbitrary body; reject controls or delimiter injection",
+    "stage": "bounded sanitized span/stage name, including spaces",
+    "statement": "12 lowercase hex; no SQL text",
+    "causes": "At most 256 characters of safeErrorAttributes name/code/detail chain; retain only its safe metadata, never message/stack",
+    "body": "completed | failed | unexpected_body_redacted",
+    "nullable": "A ? suffix permits null; missing column is not null"
+  },
+  "queries": {
+    "span_counts": {
+      "sql": "SELECT lower(hex(base64Decode(trace_id))) AS trace_id_hex,\n  count() AS span_rows, uniqExact(uuid) AS span_row_uuids, uniqExact(span_id) AS span_ids,\n  countIf(is_root_span) AS root_rows, countIf(status_code = 2) AS error_span_rows\nFROM posthog.trace_spans\nWHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n  AND timestamp < toDateTime('{{window_end_utc}}', 'UTC')\n  AND service_name = 'mikka-web'\n  AND coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) = 'dev'\n  AND resource_attributes['service.version'] = '{{source_revision}}'\n  AND trace_id IN ({{trace_id_b64_sql_list}})\nGROUP BY trace_id_hex\nORDER BY trace_id_hex",
+      "sha256": "9fc41d5dce657bd065df37000da35c515f00847a435930f37fa5430cacc49019",
+      "columns": [
+        "trace_id_hex:trace",
+        "span_rows:int",
+        "span_row_uuids:int",
+        "span_ids:int",
+        "root_rows:int",
+        "error_span_rows:int"
+      ],
+      "paginated": false
+    },
+    "span_rows": {
+      "sql": "SELECT formatDateTime(timestamp, '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS started_utc,\n  formatDateTime(end_time, '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS ended_utc,\n  toString(uuid) AS span_row_uuid, lower(hex(base64Decode(trace_id))) AS trace_id_hex,\n  lower(hex(base64Decode(span_id))) AS span_id_hex, lower(hex(base64Decode(parent_span_id))) AS parent_span_id_hex,\n  is_root_span, service_name AS service,\n  coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) AS environment,\n  nullIf(resource_attributes['service.version'], '') AS service_version,\n  name AS stage, status_code, duration_nano / 1000000 AS duration_ms,\n  nullIf(attributes['mikka.route'], '') AS route,\n  coalesce(nullIf(attributes['http.request.method'], ''), nullIf(attributes['http.method'], '')) AS method,\n  coalesce(toFloatOrNull(attributes['http.response.status_code']), toFloatOrNull(attributes['http.status_code'])) AS http_status,\n  coalesce(nullIf(attributes['db.system.name'], ''), nullIf(attributes['db.system'], '')) AS db_system,\n  coalesce(nullIf(attributes['db.operation'], ''), nullIf(attributes['db.operation.name'], '')) AS db_operation,\n  nullIf(attributes['mikka.db.statement_id'], '') AS statement_id,\n  toFloatOrNull(attributes['mikka.trace.sample_rate']) AS sample_rate,\n  nullIf(attributes['mikka.trace.retention'], '') AS retention,\n  nullIf(attributes['mikka.trace.critical'], '') AS critical_raw,\n  nullIf(attributes['error.type'], '') AS error_type,\n  nullIf(attributes['mikka.error.code'], '') AS error_code,\n  nullIf(attributes['mikka.error.detail'], '') AS error_detail,\n  nullIf(attributes['mikka.error.causes'], '') AS error_causes\nFROM posthog.trace_spans\nWHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n  AND timestamp < toDateTime('{{window_end_utc}}', 'UTC')\n  AND service_name = 'mikka-web'\n  AND coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) = 'dev'\n  AND resource_attributes['service.version'] = '{{source_revision}}'\n  AND trace_id IN ({{trace_id_b64_sql_list}})\nORDER BY timestamp, trace_id, span_id, uuid\nLIMIT 500 OFFSET {{row_offset}}",
+      "sha256": "0b4de6ac9015af0d79fc22464ddb3b511f92986cfc8389ed553a600e72e18985",
+      "columns": [
+        "started_utc:time",
+        "ended_utc:time",
+        "span_row_uuid:uuid",
+        "trace_id_hex:trace",
+        "span_id_hex:span",
+        "parent_span_id_hex:parent_span",
+        "is_root_span:bool",
+        "service:service",
+        "environment:environment",
+        "service_version:sha",
+        "stage:stage",
+        "status_code:int",
+        "duration_ms:number",
+        "route:label?",
+        "method:label?",
+        "http_status:number?",
+        "db_system:label?",
+        "db_operation:label?",
+        "statement_id:statement?",
+        "sample_rate:number?",
+        "retention:label?",
+        "critical_raw:flag?",
+        "error_type:label?",
+        "error_code:label?",
+        "error_detail:label?",
+        "error_causes:causes?"
+      ],
+      "paginated": true
+    },
+    "log_counts": {
+      "sql": "SELECT lower(hex(base64Decode(trace_id))) AS trace_id_hex,\n  count() AS log_rows, uniqExact(uuid) AS log_uuids, uniqExact(span_id) AS log_span_ids,\n  countIf(severity_text = 'ERROR') AS error_log_rows,\n  countIf(body NOT IN ('mikka.stage.completed', 'mikka.stage.failed')) AS unexpected_body_rows\nFROM logs\nWHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n  AND timestamp < toDateTime('{{window_end_utc}}', 'UTC')\n  AND service_name = 'mikka-web'\n  AND coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) = 'dev'\n  AND resource_attributes['service.version'] = '{{source_revision}}'\n  AND trace_id IN ({{trace_id_b64_sql_list}})\nGROUP BY trace_id_hex\nORDER BY trace_id_hex",
+      "sha256": "f8ba6e3c9eb6fb7f7da84ffbdd6f378d1c7591fe3ed266bf88163865faf0c6ad",
+      "columns": [
+        "trace_id_hex:trace",
+        "log_rows:int",
+        "log_uuids:int",
+        "log_span_ids:int",
+        "error_log_rows:int",
+        "unexpected_body_rows:int"
+      ],
+      "paginated": false
+    },
+    "log_rows": {
+      "sql": "SELECT formatDateTime(timestamp, '%Y-%m-%dT%H:%i:%S.%fZ', 'UTC') AS emitted_utc,\n  toString(uuid) AS log_uuid, lower(hex(base64Decode(trace_id))) AS trace_id_hex,\n  lower(hex(base64Decode(span_id))) AS span_id_hex, service_name AS service,\n  coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) AS environment,\n  nullIf(resource_attributes['service.version'], '') AS service_version, severity_text,\n  multiIf(body = 'mikka.stage.completed', 'completed', body = 'mikka.stage.failed', 'failed', 'unexpected_body_redacted') AS body_code,\n  body IN ('mikka.stage.completed', 'mikka.stage.failed') AS safe_body_shape,\n  nullIf(attributes['mikka.stage'], '') AS stage,\n  toFloatOrNull(attributes['mikka.trace.sample_rate']) AS sample_rate,\n  nullIf(attributes['mikka.trace.retention'], '') AS retention,\n  nullIf(attributes['mikka.trace.critical'], '') AS critical_raw,\n  nullIf(attributes['error.type'], '') AS error_type,\n  nullIf(attributes['mikka.error.code'], '') AS error_code,\n  nullIf(attributes['mikka.error.detail'], '') AS error_detail,\n  nullIf(attributes['mikka.error.causes'], '') AS error_causes\nFROM logs\nWHERE timestamp >= toDateTime('{{window_start_utc}}', 'UTC')\n  AND timestamp < toDateTime('{{window_end_utc}}', 'UTC')\n  AND service_name = 'mikka-web'\n  AND coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) = 'dev'\n  AND resource_attributes['service.version'] = '{{source_revision}}'\n  AND trace_id IN ({{trace_id_b64_sql_list}})\nORDER BY timestamp, trace_id, span_id, uuid\nLIMIT 500 OFFSET {{row_offset}}",
+      "sha256": "4bc82bd081932115b63975b13dfc780d3e9ff9f2a16771d5811600e6dfcc0d86",
+      "columns": [
+        "emitted_utc:time",
+        "log_uuid:uuid",
+        "trace_id_hex:trace",
+        "span_id_hex:span",
+        "service:service",
+        "environment:environment",
+        "service_version:sha",
+        "severity_text:label",
+        "body_code:body",
+        "safe_body_shape:bool",
+        "stage:stage?",
+        "sample_rate:number?",
+        "retention:label?",
+        "critical_raw:flag?",
+        "error_type:label?",
+        "error_code:label?",
+        "error_detail:label?",
+        "error_causes:causes?"
+      ],
+      "paginated": true
+    }
+  },
+  "limits": [
+    "Source/schema review only. These four dev-scoped SQL texts have not been compiled or executed against PostHog.",
+    "The pinned 14 production queries and their hash-bound normalizer/reconciler remain unchanged; the old normalizer will reject these new SQL names/texts.",
+    "Raw OTLP callback SUCCESS, SDK forceFlush success, HTTP 200 or MCP isError:false alone do not establish stored rows.",
+    "Do not query events/AI content, full attributes maps, SQL text, original error messages, prompts, output, tools, tokens or URLs.",
+    "A missing/error/truncated/unparseable response is not an empty complete table; null/missing rates remain unknown."
+  ]
+}

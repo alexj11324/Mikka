@@ -1,0 +1,50 @@
+{
+  "version": 3,
+  "createdAt": "2026-11-09T00:37:29.981066+00:00",
+  "scope": "Only existing workflow and one existing test case changed; runner unchanged.",
+  "files": [
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-failure-probe-copy/.github/workflows/run-trace-acceptance.yml",
+      "beforeSha256": "4af09162b668cf5eefc5a052a653bdbcdc7dc79e5986ac6c0ed660f4557707c7",
+      "afterSha256": "474e7d33bcc1a521ae61ab30040f1715c376b2d8b160b5db89aacf2785aea8c4"
+    },
+    {
+      "path": "scripts/ops/run-trace-benchmark.test.ts",
+      "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-failure-probe-copy/scripts/ops/run-trace-benchmark.test.ts",
+      "beforeSha256": "29a8264bc2a02f241042510883d15cac25cc199819452f884a6cf15b422e362d",
+      "afterSha256": "cde0e822f16784d5fa24dbe940ec9308394e640c4a275a8d8dddc066833cf478"
+    }
+  ],
+  "unchangedRunner": {
+    "path": "scripts/ops/run-trace-benchmark.ts",
+    "sha256": "0962440794712e7f42a919d755cba69c7e2fcc15f1fad02de29ba9d2b31f9de4"
+  },
+  "patch": {
+    "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/controlled-failure-20261109/v3-overhead-step.patch",
+    "sha256": "82e1eeb9e2b68fa28ad40b6c7547e14657b0d413140fc327637b92a35000f28a"
+  },
+  "change": "Run existing default memory benchmark after offline guards and before the only project-token read, using the same job-owned PG17 loopback database. Capture stdout unchanged to production-run-observability-report/overhead.receipt.json and preserve in the same always-upload artifact.",
+  "measurementBoundary": "Default 100 warm-up pairs, 600 requests per condition, and 20 local failures; no external exporter. Existing raw report format retained, source bound by immutable workflow checkout and GitHub run. Controlled external mode remains fixed at 20 separate failure requests. No benchmark has been executed by this v3 subtask.",
+  "validation": {
+    "offline": {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/controlled-failure-20261109/offline-v3.log",
+      "sha256": "6d7820a00258e29cb1658e66ebfa9338228a5b63b3a4332d545edb3859751e93",
+      "exitCode": 0,
+      "passed": 7,
+      "failed": 0,
+      "scope": "Existing seven offline cases; first case additionally proves exact no-flag benchmark command and ordering before token load, plus both receipt artifact paths."
+    },
+    "lint": {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/controlled-failure-20261109/targeted-lint-v3.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0,
+      "command": "node node_modules/oxlint/bin/oxlint --no-ignore --deny-warnings scripts/ops/run-trace-benchmark.ts scripts/ops/run-trace-benchmark.test.ts"
+    },
+    "canonicalTypes": "Owned by root; not repeated by this subtask."
+  },
+  "preservation": "All v1/v2 original manifests, patches and logs retained; v2 changed-file byte backups in v2/.",
+  "externalExecution": false,
+  "rootCheckoutOrIndexModifiedByThisAgent": false,
+  "activeResources": 0
+}

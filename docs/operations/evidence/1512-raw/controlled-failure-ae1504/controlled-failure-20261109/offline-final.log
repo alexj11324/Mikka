@@ -1,0 +1,15 @@
+✔ controlled-failure workflow mode has one isolated job and preserves every old mode (8.531936ms)
+✔ workflow source and unrelated-input guards execute before credentials (295.058922ms)
+✔ actual CLI rejects the source before connections and writes only a closed failure receipt (349.416731ms)
+✔ export opt-in is finite, source bound and uses only the official project-token endpoints (5.913818ms)
+✔ raw exporter callbacks distinguish failure and pending even when product wrappers report success (0.640897ms)
+✔ synchronous transport errors and flush failures remain closed counters; local-only export stays local (1.495115ms)
+✔ actual sampler and safe exporters retain an unsampled ordinary failure and do not hide raw delivery failures (13.192483ms)
+ℹ tests 7
+ℹ suites 0
+ℹ pass 7
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1134.331376

@@ -1,0 +1,14 @@
+{
+  "version": 3,
+  "sourceTree": "8c5c12ea993533403d13e21dc75647bb28022767",
+  "startedAt": "2026-11-09T00:38:17.510151+00:00",
+  "endedAt": "2026-11-09T00:38:19.160434+00:00",
+  "command": [
+    "node_modules/.bin/tsrs",
+    "--noEmit"
+  ],
+  "exitCode": 0,
+  "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "offlineProof": "offline-v3.log, exact final test/workflow and unchanged runtime; 7/7 from isolated copy",
+  "priorFailuresPreserved": true
+}

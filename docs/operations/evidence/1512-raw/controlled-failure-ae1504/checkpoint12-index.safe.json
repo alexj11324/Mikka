@@ -1,0 +1,361 @@
+{
+  "schemaVersion": 1,
+  "checkpoint": 12,
+  "createdAt": "2026-11-09T00:41:04.075048+00:00",
+  "parentEvidenceCommit": "f0b7bbd6fe45255373463cf211a562439f378828",
+  "prefix": "docs/operations/evidence/1512-raw/controlled-failure-ae1504",
+  "sourceCommit": "ae1504f1bb266ae3f7b6612898f134dd979f5fdd",
+  "sourceTree": "8c5c12ea993533403d13e21dc75647bb28022767",
+  "status": "source_and_offline_proof_only_new_CI_pending",
+  "currentAcceptance": {
+    "latestCompletedNativeLogin": 504,
+    "matchedWebLogin": 480,
+    "loginPassed": false,
+    "firstStartupNative": 156,
+    "firstStartupWeb": 195,
+    "productionModelCases": 0,
+    "newControlledFailureBackendObserved": false,
+    "newCurrentSourceHttpBenchmarkExecuted": false
+  },
+  "scope": [
+    "Three-file controlled-failure probe plus v2 NODE_ENV and v3 precredential memory-overhead step; original RED and all source-bound local validations preserved.",
+    "Independent v2 review and v3 addendum; raw prior known-fixture PostHog zero-row result with missing command-envelope boundary.",
+    "Four bounded future readback query templates; no actual IDs or queries executed.",
+    "Only prepared ops transport mode enum extension; neither published nor dispatched.",
+    "Final candidate is already published, CI42541312185 pending; this archive does not establish Native, model, PostHog, PNG, Replay or production acceptance."
+  ],
+  "files": [
+    {
+      "path": "controlled-failure-20261109/baseline/.github/workflows/run-trace-acceptance.yml",
+      "bytes": 9483,
+      "sha256": "651759b28ff4275074ebc4a68a5fd3fbb043bc51608aa491f7ebb211c1cf6fa4",
+      "gitBlobSha": "f83fe9042319ae5d3db6fc98a584fa46e51c83c5"
+    },
+    {
+      "path": "controlled-failure-20261109/baseline/scripts/ops/run-trace-benchmark.ts",
+      "bytes": 8658,
+      "sha256": "14b5322edcb3c3660d4a7f15eac0052d65ed690e554bd1ff17e724ce2d22dc2a",
+      "gitBlobSha": "2f804eed816519115c4defcd92e07e0b84088c9c"
+    },
+    {
+      "path": "controlled-failure-20261109/baseline-source.safe.json",
+      "bytes": 975,
+      "sha256": "031854cd702b3036d77420ce4d7578abba0f198f254022677d15adae387737db",
+      "gitBlobSha": "f8be6675dd0753a7f846d947a8ca31091fb35c1e"
+    },
+    {
+      "path": "controlled-failure-20261109/controlled-failure-v2-independent-review.safe.json",
+      "bytes": 15942,
+      "sha256": "932dbde6a93d1593cdd09a84444340195ec0c5bc302149e293cbfa90106a5cdf",
+      "gitBlobSha": "51bae592f16d3061e0cda07759d458c523473f5b"
+    },
+    {
+      "path": "controlled-failure-20261109/controlled-failure-v3-independent-addendum.safe.json",
+      "bytes": 7130,
+      "sha256": "31b00980b1bd8d355f93fbd1dd9eb4c8c4f0e975f5892f72450db3767e671884",
+      "gitBlobSha": "8e14e0abbc8fd72107dbbbe467dadccee1bf66a6"
+    },
+    {
+      "path": "controlled-failure-20261109/controlled-failure.patch",
+      "bytes": 46966,
+      "sha256": "ce6dbaa6bf1a817202f815345397c874e1c24205a781dc72043cdea7d5f542c1",
+      "gitBlobSha": "38a14759b851b19b0bff09115924f4a8b288b2b2"
+    },
+    {
+      "path": "controlled-failure-20261109/error-cause-policy.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "controlled-failure-20261109/existing-acceptance-guards.log",
+      "bytes": 9327,
+      "sha256": "8b3f2820eec855587ad994ed8e91f91ebe36b8e1c7ad5a5def9c6c1daf0a9b9e",
+      "gitBlobSha": "138858ca6463a3ff85b15460a663c337aabcc714"
+    },
+    {
+      "path": "controlled-failure-20261109/final-manifest.safe.json",
+      "bytes": 1746,
+      "sha256": "6fb350b3562637c0ffead33a190dcd6dd9d07767eb48e86c614dd12478a74467",
+      "gitBlobSha": "879540aa226c12188e4d075a66c5ac118385fd69"
+    },
+    {
+      "path": "controlled-failure-20261109/implementation.safe.json",
+      "bytes": 6776,
+      "sha256": "8c7b8d4d3c7c325a0e7cbf07c218af83fb33cd3feece1ca0dec17a00865d104e",
+      "gitBlobSha": "527deed58ce575dddb34484779d193add9117580"
+    },
+    {
+      "path": "controlled-failure-20261109/offline-candidate-1.log",
+      "bytes": 772,
+      "sha256": "bc72640c280f4643889fbf79062a1aa6bb0cdee660733c274232c2a83e64341c",
+      "gitBlobSha": "9d0a86ff74fd2c37c2629cf86498faa4c31819be"
+    },
+    {
+      "path": "controlled-failure-20261109/offline-final.log",
+      "bytes": 880,
+      "sha256": "f62eda4ff8c6377414c905ddeda9c871c657f04dbc5ab900a7d66866737fee96",
+      "gitBlobSha": "aa23e8a3d2ae104e7fd76d9914b212affc71cb92"
+    },
+    {
+      "path": "controlled-failure-20261109/offline-v3.log",
+      "bytes": 879,
+      "sha256": "6d7820a00258e29cb1658e66ebfa9338228a5b63b3a4332d545edb3859751e93",
+      "gitBlobSha": "59ea528942bf4b8a0fbc976c75250158981202fc"
+    },
+    {
+      "path": "controlled-failure-20261109/offline-workflow-red.log",
+      "bytes": 2216,
+      "sha256": "0d3646c4ad29981d1ae13572f509b7c62ac276e4a5f3ff5f17f81e7dbf869435",
+      "gitBlobSha": "8069f2f87f29cb54435dff6727d8a525645ebe41"
+    },
+    {
+      "path": "controlled-failure-20261109/pinned-infisical-action.safe.json",
+      "bytes": 3034,
+      "sha256": "a5633023299d2efd5cc78cd74b756d16de0425030fa2988cf4af98385e7425f7",
+      "gitBlobSha": "8970f5c534d2c7993732d34e460864dc4346ad80"
+    },
+    {
+      "path": "controlled-failure-20261109/polling-policy.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "controlled-failure-20261109/prior-controlled-failure-posthog-read.safe.json",
+      "bytes": 5593,
+      "sha256": "1415f42e15ee1327e7ec69d57ee810bfc32f20470bf10459635cc7c9832c8380",
+      "gitBlobSha": "7a4b05864491dbbf088d200f398755021f23d0e7"
+    },
+    {
+      "path": "controlled-failure-20261109/published-candidate.safe.json",
+      "bytes": 486,
+      "sha256": "06dd12e4259d6bd409145ec2febf4af45072c7ff2d0d612052c065dfdaa7b641",
+      "gitBlobSha": "58712b6d63a62480a0b22ac38b31d08daebc497e"
+    },
+    {
+      "path": "controlled-failure-20261109/review-index.safe.json",
+      "bytes": 1757,
+      "sha256": "ebb90e7b7d5ac7b4ed34391fdfd3757bf76a8cecc65cf7532c393409a4ec2237",
+      "gitBlobSha": "cdc0aab1b98b24341573298c20cfe369c36c9bc2"
+    },
+    {
+      "path": "controlled-failure-20261109/root-canonical-type-v2.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "controlled-failure-20261109/root-canonical-type-v3.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "controlled-failure-20261109/root-canonical-type.log",
+      "bytes": 3615,
+      "sha256": "2c5889d95d9e125bbf11d8482d7e609fb8cbda882fe06d289aa4bebbb4edf144",
+      "gitBlobSha": "59c45c7d714af424685da22d7de3cacf534fa671"
+    },
+    {
+      "path": "controlled-failure-20261109/root-combined-offline-v2.log",
+      "bytes": 879,
+      "sha256": "0cd64aa86b260f701aa1b38a98a5a70db5a3ed849092fd64b90f0a7f1f0b9300",
+      "gitBlobSha": "4ca20068731feb483af8f39f934617f8a2364e0d"
+    },
+    {
+      "path": "controlled-failure-20261109/root-final-manifest-v3.safe.json",
+      "bytes": 1001,
+      "sha256": "19f079811b850f948559763dee0c7edea9d092adc7999a3002d5ee6733bc026c",
+      "gitBlobSha": "faae00848b5fae7e893964103014a4e53ca0b5f6"
+    },
+    {
+      "path": "controlled-failure-20261109/root-final-manifest.safe.json",
+      "bytes": 1052,
+      "sha256": "864ff53f88ea50a8fadb50e963a82d4c4a5d17ce35e2031d44b296e31238f00e",
+      "gitBlobSha": "11182f555a8e4601a2e37139006375f298f78571"
+    },
+    {
+      "path": "controlled-failure-20261109/root-integration.safe.json",
+      "bytes": 1038,
+      "sha256": "40c8dbc23f5ca24f30dee1564d61c3e29b215fde6ca2e31ad5c5fd401533df66",
+      "gitBlobSha": "1b902097e1c873f812ba9d04f6c9560395fcc20f"
+    },
+    {
+      "path": "controlled-failure-20261109/root-policy.safe.json",
+      "bytes": 389,
+      "sha256": "08f18b189262b157319dc995be2a37f660517339b516734a0cf78801d18e72e4",
+      "gitBlobSha": "db209370417e899720d2940628293ea903611015"
+    },
+    {
+      "path": "controlled-failure-20261109/root-validation-v2.safe.json",
+      "bytes": 1233,
+      "sha256": "f98493393bae9ffd448906e143b8a0b4a9d050442883982311e4cc8f828849bb",
+      "gitBlobSha": "c7985c2d95ebcc8808d7acdbf8407654463c48d3"
+    },
+    {
+      "path": "controlled-failure-20261109/root-validation-v3.safe.json",
+      "bytes": 487,
+      "sha256": "61d17ffc17703119884ef1bbcd1e193e4d5e8550328812c628309189bcb243ea",
+      "gitBlobSha": "1b18cb0e7cae5614b34055fca814e8f80c06b92b"
+    },
+    {
+      "path": "controlled-failure-20261109/root-validation.safe.json",
+      "bytes": 694,
+      "sha256": "2796add4b88bda7c140caf2bc4fe8ffb8fd833b687b7ff8fee9ef5f39433f81f",
+      "gitBlobSha": "2496b6b209bc37ae764158383bea87f6d193db46"
+    },
+    {
+      "path": "controlled-failure-20261109/targeted-lint-final.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "controlled-failure-20261109/targeted-lint-v3.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "controlled-failure-20261109/targeted-lint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "controlled-failure-20261109/targeted-types-final.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "controlled-failure-20261109/targeted-types-retry.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "controlled-failure-20261109/targeted-types.log",
+      "bytes": 827,
+      "sha256": "8e71e85e972787b8c0624080faac6efa29d78aef81675bdf5e16d63d4cdd4f21",
+      "gitBlobSha": "4b2524f2c227212c8fbfb2847c471ce061613db4"
+    },
+    {
+      "path": "controlled-failure-20261109/tsconfig.targeted.json",
+      "bytes": 413,
+      "sha256": "bf706fa18e7f6c0fa924e3ae3056f3c5156729cadfdcf6fa338357f43f3eb6ed",
+      "gitBlobSha": "6bee1c84c728805e9448e8c1b618141f122f5b80"
+    },
+    {
+      "path": "controlled-failure-20261109/v1/run-trace-benchmark.test.ts",
+      "bytes": 13434,
+      "sha256": "26e18c89b2c214a7e9f8a3f0e893bce96a964b2bc9f28d549c67f18cece5317c",
+      "gitBlobSha": "e77b76cced71064273bf79bfc35561fbfcf6ab3e"
+    },
+    {
+      "path": "controlled-failure-20261109/v2/.github/workflows/run-trace-acceptance.yml",
+      "bytes": 13594,
+      "sha256": "4af09162b668cf5eefc5a052a653bdbcdc7dc79e5986ac6c0ed660f4557707c7",
+      "gitBlobSha": "491e70772d8d0e1b3ccc54c1b9ea770b4aa91cd7"
+    },
+    {
+      "path": "controlled-failure-20261109/v2/scripts/ops/run-trace-benchmark.test.ts",
+      "bytes": 13479,
+      "sha256": "29a8264bc2a02f241042510883d15cac25cc199819452f884a6cf15b422e362d",
+      "gitBlobSha": "d008c99c6a67e7c638cc9fe501bafc0ba72a7844"
+    },
+    {
+      "path": "controlled-failure-20261109/v2-test-environment.patch",
+      "bytes": 1301,
+      "sha256": "5a235c9ef3e2afe7c52b9204b8bb4ddb24f92ce05e5b001bf1fb82ab63cc6660",
+      "gitBlobSha": "f197588d08a0fd290defee2b93207f1d8caedae8"
+    },
+    {
+      "path": "controlled-failure-20261109/v2-test-environment.safe.json",
+      "bytes": 1807,
+      "sha256": "9ff2c2f6d956d78d484ee4eb52c24fe5e0f5315437790a8e6f37fa442d6e8f35",
+      "gitBlobSha": "4cef3f1043842d2a22a83d165b2a95bcbcebb480"
+    },
+    {
+      "path": "controlled-failure-20261109/v3-overhead-step.patch",
+      "bytes": 2825,
+      "sha256": "82e1eeb9e2b68fa28ad40b6c7547e14657b0d413140fc327637b92a35000f28a",
+      "gitBlobSha": "6a2b9f295e5cc2c7a47a2a58d2651b384cbb750e"
+    },
+    {
+      "path": "controlled-failure-20261109/v3-overhead-step.safe.json",
+      "bytes": 3135,
+      "sha256": "df58ac8df2dbf284af762b7d71456fa9c100f1dbfb15ba7a302be42e4fbcabfb",
+      "gitBlobSha": "3c12426e43624159271aa8aae0e81199a9a70649"
+    },
+    {
+      "path": "controlled-failure-readback-20261109/controlled-failure-query-templates.safe.json",
+      "bytes": 10661,
+      "sha256": "9dc2522e30104bf082610a2cf0df8ae9164bbf1b839e00b09ade8c5a76579855",
+      "gitBlobSha": "455d102b33397b67f5a9c4ea8b70c84a0705ec3a"
+    },
+    {
+      "path": "controlled-failure-readback-20261109/controlled-failure-readback-plan.safe.md",
+      "bytes": 9294,
+      "sha256": "5cd7c9105f81b877bc4c35e1eea8fe264b978c647baf9cda89213cfea85539be",
+      "gitBlobSha": "ef8aac70bb830de2e6efaf0f4fd7cd3ba71fd104"
+    },
+    {
+      "path": "controlled-failure-readback-20261109/controlled-failure-readback-source-index.safe.json",
+      "bytes": 8136,
+      "sha256": "071a1df6be0e86932741760de3177a1e5024b4430332ad79c5a0d860bec7ad15",
+      "gitBlobSha": "3e77de8f4b5cf75bbd3058637ad4d07adecf9acb"
+    },
+    {
+      "path": "controlled-failure-readback-20261109/controlled-failure-reconciliation.template.safe.json",
+      "bytes": 2458,
+      "sha256": "2ea10ea2b9fc9d109de78b253c5c8c0c88806adbd79e891f78b9f819c26c0a98",
+      "gitBlobSha": "f7eef1945fa4bb7195d1b44fd3fbe13f1907fac2"
+    },
+    {
+      "path": "controlled-failure-transport-20261109/candidate.yml",
+      "bytes": 7630,
+      "sha256": "610dc8cc67aff5e6cb7cd7c778be9fc4cf8d2ab4b69b4ed170ccc79853ad7b8a",
+      "gitBlobSha": "7429381cee94f6188303ac997cb4e0c89906672a"
+    },
+    {
+      "path": "controlled-failure-transport-20261109/manifest.safe.json",
+      "bytes": 965,
+      "sha256": "e7e7b1d33ca6162b8b19d85bdadc30e507f5bbc241dde0c79bcee6327569ef1e",
+      "gitBlobSha": "5eaafbba7f42a6768ce6a669cc3d7f0733bd351c"
+    },
+    {
+      "path": "controlled-failure-transport-20261109/mode-only.patch",
+      "bytes": 867,
+      "sha256": "71f05fe1a15f6145a231b3a2279b62f468903b17538900a18034c28ba4fc83b1",
+      "gitBlobSha": "bcfedbec56fa22d8942bca8ff2300fc4e84a0d10"
+    },
+    {
+      "path": "controlled-failure-transport-20261109/original.yml",
+      "bytes": 7609,
+      "sha256": "dbbaf39bcffc3d279c8017d2a846c1406a31ce68fc3ce83b013cf19986a6cc2f",
+      "gitBlobSha": "d07d4d44382266b9061c3f2236f79b9e4b23ebe9"
+    },
+    {
+      "path": "final-source/.github/workflows/run-trace-acceptance.yml",
+      "bytes": 13984,
+      "sha256": "474e7d33bcc1a521ae61ab30040f1715c376b2d8b160b5db89aacf2785aea8c4",
+      "gitBlobSha": "b248a4d97240ba895c3c165b2d7d5c4a763ffe23"
+    },
+    {
+      "path": "final-source/scripts/ops/run-trace-benchmark.test.ts",
+      "bytes": 14157,
+      "sha256": "cde0e822f16784d5fa24dbe940ec9308394e640c4a275a8d8dddc066833cf478",
+      "gitBlobSha": "aecb57c52b21e99ffb6fdbeb8df287e542a14440"
+    },
+    {
+      "path": "final-source/scripts/ops/run-trace-benchmark.ts",
+      "bytes": 19846,
+      "sha256": "0962440794712e7f42a919d755cba69c7e2fcc15f1fad02de29ba9d2b31f9de4",
+      "gitBlobSha": "09280f0dfb945157aa8c692699fecbc2989f15dc"
+    }
+  ],
+  "payloadFiles": 55,
+  "payloadBytes": 279430
+}

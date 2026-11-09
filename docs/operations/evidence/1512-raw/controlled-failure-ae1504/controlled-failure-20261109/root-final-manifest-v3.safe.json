@@ -1,0 +1,28 @@
+{
+  "version": 3,
+  "parentCommit": "3ffa641c6eaade5d968475795d7221c99ed393a6",
+  "baseTree": "766c063fcac276ea55251d76e43b2e616244b62b",
+  "tree": "8c5c12ea993533403d13e21dc75647bb28022767",
+  "files": [
+    {
+      "path": "scripts/ops/run-trace-benchmark.ts",
+      "bytes": 19846,
+      "sha256": "0962440794712e7f42a919d755cba69c7e2fcc15f1fad02de29ba9d2b31f9de4",
+      "gitBlobSha": "09280f0dfb945157aa8c692699fecbc2989f15dc"
+    },
+    {
+      "path": "scripts/ops/run-trace-benchmark.test.ts",
+      "bytes": 14157,
+      "sha256": "cde0e822f16784d5fa24dbe940ec9308394e640c4a275a8d8dddc066833cf478",
+      "gitBlobSha": "aecb57c52b21e99ffb6fdbeb8df287e542a14440"
+    },
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "bytes": 13984,
+      "sha256": "474e7d33bcc1a521ae61ab30040f1715c376b2d8b160b5db89aacf2785aea8c4",
+      "gitBlobSha": "b248a4d97240ba895c3c165b2d7d5c4a763ffe23"
+    }
+  ],
+  "branchPublished": false,
+  "validation": "root-validation-v3.safe.json"
+}

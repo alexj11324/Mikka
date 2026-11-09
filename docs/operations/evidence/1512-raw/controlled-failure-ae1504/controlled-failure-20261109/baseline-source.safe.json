@@ -1,0 +1,14 @@
+{
+  "checkoutHead": "6180cd8889006f4e1618c2549b1aa12d13506ee8",
+  "source": "current candidate working tree, not a committed revision",
+  "files": {
+    "scripts/ops/run-trace-benchmark.ts": "14b5322edcb3c3660d4a7f15eac0052d65ed690e554bd1ff17e724ce2d22dc2a",
+    ".github/workflows/run-trace-acceptance.yml": "651759b28ff4275074ebc4a68a5fd3fbb043bc51608aa491f7ebb211c1cf6fa4",
+    "lib/tracing/node.ts": "adefe4b0af2c59021f37ae77262da07cc11c2369941b7482553f4299739de670",
+    "lib/tracing/logs.ts": "08286b12ffb5db4010d5dbcc887726840792a79417bafa7d2ae26e72910a2e3d",
+    "lib/tracing/sampling.ts": "e33b7a9856e7641652a8d52eed4aba4621e6587434e3eb7d1582a13ebbde4e03",
+    "lib/tracing/sanitize.ts": "39093ea5a24982773e7292f2d75fbc1dc3411787f37cf4a4957088e4285bef03",
+    "lib/tracing/spans.ts": "7e11a7c2ce659d4722206e89d5339ed2588e35ccebb15b68ce0e2870ea2bd04e",
+    "apps/api/runtime/request-trace.ts": "a7c9c6bcb0b5e68dfebb96d7841171f4dc07c09061d0889404482d2594124ca9"
+  }
+}

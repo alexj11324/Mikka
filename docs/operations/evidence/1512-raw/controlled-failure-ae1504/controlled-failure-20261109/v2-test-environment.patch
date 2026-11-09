@@ -1,0 +1,20 @@
+--- a/scripts/ops/run-trace-benchmark.test.ts
++++ b/scripts/ops/run-trace-benchmark.test.ts
+@@ -17,7 +17,7 @@
+ 
+ const subject = () => import('./run-trace-benchmark')
+ const revision = 'a'.repeat(40)
+-const env = { GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REPOSITORY: 'alexj11324/Mikka',
++const env = { NODE_ENV: 'test' as const, GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REPOSITORY: 'alexj11324/Mikka',
+   GITHUB_REF: 'refs/heads/main', GITHUB_SHA: revision, MIKKA_EXPECTED_DEPLOYMENT_SHA: revision,
+   NEXT_PUBLIC_POSTHOG_KEY: 'phc_UNIT_PRIVATE_CANARY', E2E_DATABASE_URL: 'postgresql://e2e:local-only@127.0.0.1:5432/mikka_e2e' }
+ const flag = ['--export-controlled-failures']
+@@ -88,7 +88,7 @@
+ test('export opt-in is finite, source bound and uses only the official project-token endpoints', async () => {
+   const { controlledFailureSettings } = await subject()
+   assert.equal(controlledFailureSettings([], env), undefined)
+-  assert.equal(controlledFailureSettings([], {}), undefined)
++  assert.equal(controlledFailureSettings([], { NODE_ENV: 'test' }), undefined)
+   const settings = controlledFailureSettings(flag, env)!
+   assert.equal(settings.requests, 20)
+   assert.equal(settings.endpoint, 'https://us.i.posthog.com/i/v1/traces')

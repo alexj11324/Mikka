@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512-controlled-failure-readback-preparation",
+  "preparedAtUTC": "2026-11-09T00:32:02.950196+00:00",
+  "status": "prepared_not_executed",
+  "backendObserved": false,
+  "actualTraceIds": [],
+  "projectId": 670821,
+  "scope": {
+    "environment": "dev",
+    "service": "mikka-web",
+    "sourceRevision": null,
+    "fixedActualFailures": 20
+  },
+  "basis": {
+    "schema": "Reuse observed APM/Logs columns, Base64 IDs and UTC handling from frozen 14-template schema preflight. New four-query combinations are not live compiled.",
+    "pagination": "Reuse 500-row UUID-ordered pages, independent counts, raw response retention and stable scope. Do not rerun prior zero-row OFFSET probes.",
+    "normalization": "Provide exact columns/types for this fixed case; do not mutate or bypass the existing production normalizer SQL-hash contract.",
+    "sourceReceipt": "Frozen isolated one-shot runner candidate SHA-256 0962440794712e7f42a919d755cba69c7e2fcc15f1fad02de29ba9d2b31f9de4 emits exact main sourceRevision, 20 actual IDs, perTrace root/PG/error IDs, UTC bounds and raw OTLP callback counters. This records reviewed candidate bytes, not final main authority; rebind to actual workflow source and receipt when executed.",
+    "expectedShape": "Current runner executes three PG SELECT spans and one root per trace; two ERROR logs per trace. 80/40 remain expectations until actual local/backend counters exist.",
+    "rootRoute": "beginRequestTrace(request, /api/trace-benchmark) stamps http.route and mikka.route directly, with the request method. The query reads mikka.route and http.request.method.",
+    "retainedErrorLogs": "createTracerProvider places StageLogProcessor after RetainingSpanProcessor; retained ReadableSpan views carry effective sample_rate=1 and error_or_slow. StageLogProcessor copies sanitized span attributes into each ERROR record before SafeLogExporter."
+  },
+  "localReview": {
+    "jsonParsed": true,
+    "fourQueriesScoped": true,
+    "paginationEndsWithUuid": true,
+    "columnNamesUnique": true,
+    "inlineOfflineBinderSyntaxParsed": true,
+    "rootRouteSourceMapped": true,
+    "retainedErrorLogSourceMapped": true,
+    "binderExecuted": false,
+    "backendSqlCompiled": false,
+    "backendSqlExecuted": false,
+    "note": "An initial local substring check mistakenly matched the permitted mikka.db.statement_id. The corrected static check targets exact db.statement/db.query.text attributes; no template change or backend execution was involved."
+  },
+  "resources": {
+    "posthogQueries": 0,
+    "posthogObjectsCreated": 0,
+    "browserSessions": 0,
+    "modelCalls": 0,
+    "productionBusinessCalls": 0,
+    "newCompute": 0,
+    "newDatabases": 0,
+    "processesRemaining": 0,
+    "productSourceEdits": 0,
+    "frozenProductionTemplateEdits": 0
+  },
+  "sources": [
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/Mikka-1512-resume/docs/operations/tracing.md",
+      "bytes": 63844,
+      "sha256": "963dd1f41e3f94c31983529db2807a54af77fab11afe41980986154aee9ad75e",
+      "gitBlob": "e75e8377fbcb6f92d3446f5325d6d55cc4b294af"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/Mikka-1512-resume/scripts/ops/run-trace-benchmark.ts",
+      "bytes": 8658,
+      "sha256": "14b5322edcb3c3660d4a7f15eac0052d65ed690e554bd1ff17e724ce2d22dc2a",
+      "gitBlob": "2f804eed816519115c4defcd92e07e0b84088c9c"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/Mikka-1512-resume/apps/api/runtime/request-trace.ts",
+      "bytes": 2883,
+      "sha256": "a7c9c6bcb0b5e68dfebb96d7841171f4dc07c09061d0889404482d2594124ca9",
+      "gitBlob": "d875b1cbcb97eaecccb80a190ebd0778aee9bc3b"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/Mikka-1512-resume/lib/tracing/sampling.ts",
+      "bytes": 4983,
+      "sha256": "e33b7a9856e7641652a8d52eed4aba4621e6587434e3eb7d1582a13ebbde4e03",
+      "gitBlob": "62ffc81009b4b317b2242f42b56f072b594a44d0"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/Mikka-1512-resume/lib/tracing/node.ts",
+      "bytes": 7106,
+      "sha256": "adefe4b0af2c59021f37ae77262da07cc11c2369941b7482553f4299739de670",
+      "gitBlob": "3037a3b0cc2538451917cdd8e454a376553fc47c"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/Mikka-1512-resume/lib/tracing/logs.ts",
+      "bytes": 4312,
+      "sha256": "08286b12ffb5db4010d5dbcc887726840792a79417bafa7d2ae26e72910a2e3d",
+      "gitBlob": "ac6a917887a94a6a673410753d4645e2dba25d21"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/Mikka-1512-resume/lib/tracing/sanitize.ts",
+      "bytes": 6160,
+      "sha256": "39093ea5a24982773e7292f2d75fbc1dc3411787f37cf4a4957088e4285bef03",
+      "gitBlob": "2389f07e8b9f6ec9ff84496f9b7a6f8ea060ffc5"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/Mikka-1512-resume/lib/tracing/spans.ts",
+      "bytes": 9992,
+      "sha256": "7e11a7c2ce659d4722206e89d5339ed2588e35ccebb15b68ce0e2870ea2bd04e",
+      "gitBlob": "9822a772a135fa77f4f4bb604cf40b17f7635a96"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/Mikka-1512-resume/packages/protocol/src/tracing.ts",
+      "bytes": 2589,
+      "sha256": "cef008055b6401d04ba96ba593312592caa4080c1afd911d1a69d8e3aeddcf27",
+      "gitBlob": "0bb62e9bb2eac7c17ae076cb55f9da05b571c502"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/Mikka-1512-resume/packages/protocol/src/coded-error.ts",
+      "bytes": 4495,
+      "sha256": "01978a3515ee14cf9a75010ad0fbf953287c51f3987ee44427d159228361aca5",
+      "gitBlob": "53c619750e667cba008192495928112da5de16f1"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ops1512/production-evidence-query-templates.json",
+      "bytes": 58165,
+      "sha256": "a52df37feff2ef4c304d4bc47960657dc5c5badbde0fba4416f0e9bf4fea4c68",
+      "gitBlob": "07f2013526784be3bff29fd23073f5320a980cf3"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ops1512/normalize-posthog-metadata.mjs",
+      "bytes": 19913,
+      "sha256": "56ce0805aa5e75fece1efcd06ab9c0652ab90037c7e453e7e4fe6b7748b36ae5",
+      "gitBlob": "8bd8d631b24cb134e1581e48eca86e8f16d3f557"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ops1512/reconcile-production-evidence.mjs",
+      "bytes": 28367,
+      "sha256": "52884757d76555bd8478ec7e3154a0b58746a6c9bbe56e7c15083494526626d2",
+      "gitBlob": "521ef985cd815b19b5220025adbd053879ccb41e"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/posthog-recovery-20261108/posthog-offset-capability-probes-20261108.safe.json",
+      "bytes": 8121,
+      "sha256": "d70bf98f70d3c081e1d943ab81f0273a4a2e500a1c23f6e230e5f4c7b0d812fa",
+      "gitBlob": "ae2a62cb59cbf3896a3c38aeae12cc1875e92549"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-failure-probe-copy/scripts/ops/run-trace-benchmark.ts",
+      "bytes": 19846,
+      "sha256": "0962440794712e7f42a919d755cba69c7e2fcc15f1fad02de29ba9d2b31f9de4",
+      "gitBlob": "09280f0dfb945157aa8c692699fecbc2989f15dc"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/controlled-failure-readback-20261109/controlled-failure-query-templates.safe.json",
+      "bytes": 10661,
+      "sha256": "9dc2522e30104bf082610a2cf0df8ae9164bbf1b839e00b09ade8c5a76579855",
+      "gitBlob": "455d102b33397b67f5a9c4ea8b70c84a0705ec3a"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/controlled-failure-readback-20261109/controlled-failure-reconciliation.template.safe.json",
+      "bytes": 2458,
+      "sha256": "2ea10ea2b9fc9d109de78b253c5c8c0c88806adbd79e891f78b9f819c26c0a98",
+      "gitBlob": "f7eef1945fa4bb7195d1b44fd3fbe13f1907fac2"
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/controlled-failure-readback-20261109/controlled-failure-readback-plan.safe.md",
+      "bytes": 9294,
+      "sha256": "5cd7c9105f81b877bc4c35e1eea8fe264b978c647baf9cda89213cfea85539be",
+      "gitBlob": "ef8aac70bb830de2e6efaf0f4fd7cd3ba71fd104"
+    }
+  ],
+  "runnerCandidateFrozen": true
+}

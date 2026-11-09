@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "provenance": {
+    "source": "Recovered unchanged from persisted functions tool state in /root/current_source_review; no new query executed",
+    "tool": "mcp__codex_apps__posthog_exec",
+    "operation": "execute-sql",
+    "originalExecEnvelopePreserved": false,
+    "limitation": "The saved state includes the exact submitted SQL and complete tool response, but not the original exec command/context envelope. Missing envelope fields are not reconstructed."
+  },
+  "request": {
+    "query": "SELECT 'spans' AS signal, count() AS matching_rows, count(DISTINCT trace_id) AS traces, countIf(status_code = 2) AS errors, countIf(toFloatOrNull(attributes['mikka.trace.sample_rate']) = 1) AS rate_one\nFROM posthog.trace_spans\nWHERE timestamp >= toDateTime('2026-11-06 00:00:00', 'UTC') AND timestamp < toDateTime('2026-11-09 00:11:11', 'UTC')\n  AND service_name IN ('mikka-web', 'mikka-daemon')\n  AND (attributes['mikka.error.code'] = 'trace_acceptance_failed' OR attributes['mikka.error.detail'] = 'controlled_database_failure' OR trace_id = base64Encode(unhex('a13813aa2ce5396caf26d911d8952e95')))\nUNION ALL\nSELECT 'logs' AS signal, count() AS matching_rows, count(DISTINCT trace_id) AS traces, countIf(severity_text = 'ERROR') AS errors, countIf(toFloatOrNull(attributes['mikka.trace.sample_rate']) = 1) AS rate_one\nFROM logs\nWHERE timestamp >= toDateTime('2026-11-06 00:00:00', 'UTC') AND timestamp < toDateTime('2026-11-09 00:11:11', 'UTC')\n  AND service_name IN ('mikka-web', 'mikka-daemon')\n  AND (attributes['mikka.error.code'] = 'trace_acceptance_failed' OR attributes['mikka.error.detail'] = 'controlled_database_failure' OR trace_id = base64Encode(unhex('a13813aa2ce5396caf26d911d8952e95')))",
+    "utcWindow": {
+      "startInclusive": "2026-11-06T00:00:00Z",
+      "endExclusive": "2026-11-09T00:11:11Z"
+    },
+    "services": [
+      "mikka-web",
+      "mikka-daemon"
+    ],
+    "predicate": "Known prior acceptance trace OR controlled error code OR controlled detail; fixed UTC window"
+  },
+  "observedClock": {
+    "current_time": "2026-11-09 00:11:11 UTC"
+  },
+  "rawToolResponse": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"query\":{\"kind\":\"HogQLQuery\",\"query\":\"SELECT 'spans' AS signal, count() AS matching_rows, count(DISTINCT trace_id) AS traces, countIf(status_code = 2) AS errors, countIf(toFloatOrNull(attributes['mikka.trace.sample_rate']) = 1) AS rate_one\\nFROM posthog.trace_spans\\nWHERE timestamp >= toDateTime('2026-11-06 00:00:00', 'UTC') AND timestamp < toDateTime('2026-11-09 00:11:11', 'UTC')\\n  AND service_name IN ('mikka-web', 'mikka-daemon')\\n  AND (attributes['mikka.error.code'] = 'trace_acceptance_failed' OR attributes['mikka.error.detail'] = 'controlled_database_failure' OR trace_id = base64Encode(unhex('a13813aa2ce5396caf26d911d8952e95')))\\nUNION ALL\\nSELECT 'logs' AS signal, count() AS matching_rows, count(DISTINCT trace_id) AS traces, countIf(severity_text = 'ERROR') AS errors, countIf(toFloatOrNull(attributes['mikka.trace.sample_rate']) = 1) AS rate_one\\nFROM logs\\nWHERE timestamp >= toDateTime('2026-11-06 00:00:00', 'UTC') AND timestamp < toDateTime('2026-11-09 00:11:11', 'UTC')\\n  AND service_name IN ('mikka-web', 'mikka-daemon')\\n  AND (attributes['mikka.error.code'] = 'trace_acceptance_failed' OR attributes['mikka.error.detail'] = 'controlled_database_failure' OR trace_id = base64Encode(unhex('a13813aa2ce5396caf26d911d8952e95')))\"},\"results\":\"signal|matching_rows|traces|errors|rate_one\\nspans|0|0|0|0\\nlogs|0|0|0|0\",\"__formatted_results_override\":\"signal|matching_rows|traces|errors|rate_one\\nspans|0|0|0|0\\nlogs|0|0|0|0\"}"
+      }
+    ],
+    "structuredContent": null,
+    "isError": false
+  },
+  "parsedEcho": {
+    "query": {
+      "kind": "HogQLQuery",
+      "query": "SELECT 'spans' AS signal, count() AS matching_rows, count(DISTINCT trace_id) AS traces, countIf(status_code = 2) AS errors, countIf(toFloatOrNull(attributes['mikka.trace.sample_rate']) = 1) AS rate_one\nFROM posthog.trace_spans\nWHERE timestamp >= toDateTime('2026-11-06 00:00:00', 'UTC') AND timestamp < toDateTime('2026-11-09 00:11:11', 'UTC')\n  AND service_name IN ('mikka-web', 'mikka-daemon')\n  AND (attributes['mikka.error.code'] = 'trace_acceptance_failed' OR attributes['mikka.error.detail'] = 'controlled_database_failure' OR trace_id = base64Encode(unhex('a13813aa2ce5396caf26d911d8952e95')))\nUNION ALL\nSELECT 'logs' AS signal, count() AS matching_rows, count(DISTINCT trace_id) AS traces, countIf(severity_text = 'ERROR') AS errors, countIf(toFloatOrNull(attributes['mikka.trace.sample_rate']) = 1) AS rate_one\nFROM logs\nWHERE timestamp >= toDateTime('2026-11-06 00:00:00', 'UTC') AND timestamp < toDateTime('2026-11-09 00:11:11', 'UTC')\n  AND service_name IN ('mikka-web', 'mikka-daemon')\n  AND (attributes['mikka.error.code'] = 'trace_acceptance_failed' OR attributes['mikka.error.detail'] = 'controlled_database_failure' OR trace_id = base64Encode(unhex('a13813aa2ce5396caf26d911d8952e95')))"
+    },
+    "results": "signal|matching_rows|traces|errors|rate_one\nspans|0|0|0|0\nlogs|0|0|0|0",
+    "__formatted_results_override": "signal|matching_rows|traces|errors|rate_one\nspans|0|0|0|0\nlogs|0|0|0|0"
+  },
+  "interpretation": {
+    "matchingSpans": 0,
+    "matchingLogs": 0,
+    "backendFailureAcceptanceEstablished": false,
+    "boundary": "Zero matching acceptance trace/markers within this fixed window only; does not assert that all project errors or traces are absent. Earlier in-memory fixture retention is not PostHog ingestion proof."
+  }
+}

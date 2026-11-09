@@ -1,0 +1,18 @@
+{
+  "sourceTree": "71f6c8b26f7763c714c159f977fc33d64508e31a",
+  "results": [
+    {
+      "name": "root-canonical-type",
+      "command": [
+        "node_modules/.bin/tsrs",
+        "--noEmit"
+      ],
+      "sourceTree": "71f6c8b26f7763c714c159f977fc33d64508e31a",
+      "startedAt": "2026-11-09T00:32:16.171417+00:00",
+      "endedAt": "2026-11-09T00:32:17.081506+00:00",
+      "exitCode": 2,
+      "logSha256": "2c5889d95d9e125bbf11d8482d7e609fb8cbda882fe06d289aa4bebbb4edf144"
+    }
+  ],
+  "scope": "Canonical root typecheck and 7 actual offline tests on integrated source. Prior API/frontend/renderer/product-source checks remain individually bound; no PG/export/Native/model execution."
+}

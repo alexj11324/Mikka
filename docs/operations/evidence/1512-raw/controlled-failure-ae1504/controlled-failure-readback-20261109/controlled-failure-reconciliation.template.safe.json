@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "kind": "controlled_failure_posthog_readback",
+  "status": "not_run",
+  "backendObserved": false,
+  "overallIssue1512Acceptance": null,
+  "scope": {
+    "projectId": 670821,
+    "environment": "dev",
+    "service": "mikka-web",
+    "sourceRevision": null,
+    "windowUTC": null,
+    "traceIds": []
+  },
+  "runnerReceipt": {
+    "path": null,
+    "sha256": null,
+    "backendObserved": false,
+    "localRetainedRoots": null,
+    "localExportedSpans": null,
+    "localExportedLogs": null,
+    "initialUnsampled": null,
+    "transport": null
+  },
+  "captures": [],
+  "backend": {
+    "observedTraceIds": [],
+    "completeFailureTraceIds": [],
+    "missingTraceIds": [],
+    "spanPhysicalRows": null,
+    "spanRowUuids": null,
+    "logicalSpanIds": null,
+    "logPhysicalRows": null,
+    "logUuids": null,
+    "errorLogSpanIds": null
+  },
+  "perTrace": [],
+  "perTraceFields": {
+    "traceId": "Actual receipt trace ID",
+    "root": "Actual root span ID, is_root_span, name, HTTP 500, ERROR=2, safe code/detail/causes, sample rate and retention; compare receipt.perTrace.rootSpanId",
+    "pg": "Actual SELECT/PostgreSQL span IDs and parents, one ERROR PG span; compare both directions with receipt.perTrace.pgSpanIds/errorSpanIds",
+    "logs": "Actual UUIDs/span IDs; root ERROR log with same trace/rootSpanId and code/detail, failed body code, sample rate 1 and error_or_slow; also preserve PG error log",
+    "checks": "Named true/false/null findings. Null means unavailable or not evaluated, never zero/pass"
+  },
+  "checks": {
+    "exact20InputIds": null,
+    "sourceAndDevScopeMatched": null,
+    "completePageEnumeration": null,
+    "summaryAndRowsAgree": null,
+    "runnerAndBackendSpanSetsAgree": null,
+    "allRootsErrorAndSafeCause": null,
+    "allSpanEffectiveRatesAndRetention": null,
+    "allPgChildrenPresent": null,
+    "allRootErrorLogsLinked": null,
+    "observedLogCountMatchesLocalReceipt": null
+  },
+  "mismatches": [],
+  "limitations": [],
+  "notes": [
+    "Populate only after actual PostHog reads. Keep the runner original backendObserved=false unchanged; this is a separate downstream receipt.",
+    "Report physical duplicates and logical IDs separately. A count discrepancy must be explained rather than hidden by deduplication.",
+    "This scoped readback covers the existing controlled-failure acceptance item, not a production model case, full issue closure, or an abstract no-packet-loss guarantee."
+  ]
+}
