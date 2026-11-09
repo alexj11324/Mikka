@@ -527,7 +527,7 @@ jobs:
 
   cleanup-root-delivery-receipts:
     if: >-
-      github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
+      false && github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
       github.repository_owner_id == '183887963' && github.actor == 'alexj11324' &&
       github.event_name == 'push' && github.ref == 'refs/heads/ops/infisical-cloud-capabilities' &&
       github.run_attempt == 1 &&
