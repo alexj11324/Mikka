@@ -87,7 +87,8 @@ item from that viewer's pending tab; it never changes the task or hides work
 from teammates. Snoozed suggestions are also hidden from the legacy suggestion
 list and briefing highlights. Rejected suggestions stay dismissed, retain their
 external-source deduplication key, and are excluded from Coordinator attention
-handoff. Undo restores visibility under the source's existing seven-day window.
+handoff. Rejection also settles its current attention matter and consumes an
+undelivered handoff; undo makes that rejected matter eligible again. Undo restores visibility under the source's existing seven-day window.
 
 ## Write commands
 

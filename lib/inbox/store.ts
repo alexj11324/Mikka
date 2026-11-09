@@ -98,6 +98,7 @@ export class InboxStore {
         await tx.query('BEGIN')
         // All commands for the same inbox item serialize, including no-op replays.
         await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify([workspaceId, userId, type, id])])
+        if (action === 'reject' || action === 'undo_reject') await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`attention:${userId}`])
         if (type === 'suggestion') await tx.query('SELECT id FROM suggestions WHERE id=$1 AND "userId"=$2 FOR UPDATE', [id, userId])
         const [item] = await this.sources(tx, userId, workspaceId, scope, type, id)
         if (!item) throw new InboxError('inboxNotFound', 404)
@@ -112,6 +113,16 @@ export class InboxStore {
           } else {
             const undone = await tx.query(`UPDATE suggestions SET "rejectedAt"=NULL,"rejectedBy"=NULL,"dismissedAt"=NULL WHERE id=$1 AND "userId"=$2 AND "rejectedAt" IS NOT NULL RETURNING id`, [id, userId])
             changed = Boolean(undone.rowCount)
+          }
+          if (changed && action === 'reject') {
+            // A handoff already queued before rejection must not announce the
+            // rejected item on the Coordinator's next turn. Share its writer lock.
+            const matters = await tx.query<{ id: string }>(`UPDATE attention_matters SET state='quiet',reason='person_rejected_suggestion',"runAt"=NULL,recheck=false,"updatedAt"=now()
+              WHERE "userId"=$1 AND "suggestionId"=$2 RETURNING id`, [userId, id])
+            if (matters.rowCount) await tx.query(`UPDATE coordinator_events SET "deliveredAt"=now(),tier='background'
+              WHERE "userId"=$1 AND kind='matter_handoff' AND "deliveredAt" IS NULL AND payload->>'matterId'=ANY($2::text[])`, [userId, matters.rows.map(m => m.id)])
+          } else if (changed && action === 'undo_reject') {
+            await tx.query(`UPDATE attention_matters SET state='waiting',reason=NULL,"updatedAt"=now() WHERE "userId"=$1 AND "suggestionId"=$2 AND state='quiet' AND reason='person_rejected_suggestion'`, [userId, id])
           }
           if (action === 'reject') await tx.query('DELETE FROM inbox_snoozes WHERE "workspaceId"=$1 AND "userId"=$2 AND "itemType"=$3 AND "itemId"=$4', [workspaceId, userId, type, id])
         } else if (action === 'snooze') {

@@ -21,7 +21,7 @@ test('inbox PostgreSQL: workspace authority, receipts, undo and durable deadline
   t.after(async () => { await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end() })
   // Actual migrated source columns, defaults and constraints. LIKE deliberately
   // omits foreign keys to public so every fixture stays in our private schema.
-  for (const table of ['"user"', 'issues', 'agent_runs', 'bots', 'suggestions', 'run_messages', 'factory_tasks', 'factory_attempts', 'factory_questions', 'factory_approvals', 'factory_merges', 'mikka_workspaces', 'mikka_workspace_members', 'mikka_teams', 'mikka_team_issues']) {
+  for (const table of ['"user"', 'issues', 'agent_runs', 'bots', 'suggestions', 'run_messages', 'factory_tasks', 'factory_attempts', 'factory_questions', 'factory_approvals', 'factory_merges', 'attention_matters', 'coordinator_events', 'mikka_workspaces', 'mikka_workspace_members', 'mikka_teams', 'mikka_team_issues']) {
     await pool.query(`CREATE TABLE ${table} (LIKE public.${table} INCLUDING DEFAULTS INCLUDING CONSTRAINTS INCLUDING INDEXES)`)
   }
   await pool.query('ALTER TABLE suggestions DROP COLUMN "rejectedAt", DROP COLUMN "rejectedBy"')
@@ -58,7 +58,14 @@ test('inbox PostgreSQL: workspace authority, receipts, undo and durable deadline
     await assert.rejects(reject(teamSuggestion, workspace, peer), { code: 'inboxNotFound' })
   })
   await t.test('concurrent rejection is idempotent, attributed and undoable', async () => {
+    const matter = randomUUID(), event = randomUUID()
+    await pool.query(`INSERT INTO attention_matters(id,"userId","matterKey",source,"suggestionId",title,level,assessment,evidence,state)
+      VALUES($1,$2,'inbox-test','gmail',$3,'fixture','ask','{}','{}','handed')`, [matter, owner, teamSuggestion])
+    await pool.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload,tier)
+      VALUES($1::uuid,$2,'matter_handoff',$1::text,jsonb_build_object('matterId',$3::text),'attention')`, [event, owner, matter])
     const results = await Promise.all([reject(), reject()])
+    assert.equal((await pool.query('SELECT state FROM attention_matters WHERE id=$1', [matter])).rows[0].state, 'quiet')
+    assert.ok((await pool.query('SELECT "deliveredAt" FROM coordinator_events WHERE id=$1', [event])).rows[0].deliveredAt, 'a queued handoff cannot reannounce the rejected suggestion')
     assert.equal(results.filter(r => r.changed).length, 1)
     assert.ok(!(await list()).items.some(i => i.id === teamSuggestion))
     const history = await list(owner, workspace, 'done')
@@ -72,6 +79,7 @@ test('inbox PostgreSQL: workspace authority, receipts, undo and durable deadline
     assert.equal((await store.command(owner, undo)).changed, false)
     assert.ok((await list()).items.some(i => i.id === teamSuggestion))
     assert.equal((await list(owner, workspace, 'done')).items.length, 1, 'undo retains the audit receipt')
+    assert.equal((await pool.query('SELECT state FROM attention_matters WHERE id=$1', [matter])).rows[0].state, 'waiting')
   })
   await t.test('task and suggestion snooze wake exactly at the persisted due time, with live invalidation and no polling', async () => {
     const due = new Date(now.getTime() + 60_123)
