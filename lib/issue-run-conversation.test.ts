@@ -127,3 +127,12 @@ test('a thread that ran again reads as one conversation: each run keeps its own 
     ['agent:First.', 'steps:Edit', 'person', 'agent:Second.', 'steps:Bash!'])
   assert.deepEqual(chainChunks(rows.slice(0, 2)).map(row => row.chunk.id ?? row.chunk.toolCallId), ['t1', 'a'], 'one run keeps its ids')
 })
+
+test('a folded steps row counts commands and tools the way iOS does (#1770)', async () => {
+  const { isCommandStep, threadStepCounts } = await import('./issue-run-conversation')
+  for (const name of ['Bash', 'bash', 'shell', 'execute']) assert.equal(isCommandStep({ name }), true)
+  for (const name of ['Read', 'apply_patch', 'mcp__mikka__record_decision', 'tool']) assert.equal(isCommandStep({ name }), false)
+  assert.deepEqual(threadStepCounts([{ name: 'Bash' }, { name: 'bash' }, { name: 'Edit' }]), { commands: 2, tools: 1 })
+  assert.deepEqual(threadStepCounts([{ name: 'Read' }]), { commands: 0, tools: 1 })
+  assert.deepEqual(threadStepCounts([]), { commands: 0, tools: 0 })
+})
