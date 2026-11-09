@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import yaml from 'js-yaml'
 import { encode, decode } from '../../lib/desktop-rpc/wire.ts'
+import { clampSubject } from '../../lib/profile/facts.ts'
 import { runMemoryProduction, readMemoryTurn } from './memory-production.mjs'
 import { MEMORY_BRANCH, MemorySelectionError } from './memory-production-target.mjs'
 import { CORE_ISSUES, CORE_MODE, CORE_WORKFLOW, attestCoreProduction } from './self-hosted-production-target.mjs'
@@ -99,7 +100,7 @@ function fixture(options = {}) {
       const value = args[0]
       if (requestId) { assert.equal(value.requestId, requestId); return reply(FACT) }
       requestId = value.requestId
-      facts.set(FACT, { ...ownRow(FACT, value.subject), scope: value.scope })
+      facts.set(FACT, { ...ownRow(FACT, clampSubject(value.subject)), scope: value.scope })
       if (options.missingManualSource) facts.get(FACT).source.id = null
       if (options.lostCreate) throw new Error(PASSWORD + COOKIE)
       return reply(options.wrongFactId ? EXISTING : FACT)
@@ -189,6 +190,9 @@ test('owner memory CRUD, scopes, short undo and two real-stream usage contracts 
   assert.equal(report.coverage.crossWorkspace, 'hidden_and_mutations_refused_for_own_fixture')
   assert.equal(report.coverage.projectScope, 'existing_authorized_project_scope')
   assert.equal(report.coverage.realUse, 'both_fixed_subscription_bot_replies_and_usage_observed')
+  const added = f.calls.find(row => row.action === 'memory.addFact').args[0]
+  assert.equal(added.subject.length, 78)
+  assert.equal(clampSubject(added.subject), added.subject, 'the actual store must preserve the full nonce and challenge')
   assert.deepEqual(report.models.map(row => [row.harness, row.model, row.status, row.reply, row.usage, row.botStopped]), [
     ['claude_code', 'claude-haiku-5-5', 'passed', true, true, true], ['codex', 'gpt-6-luna', 'passed', true, true, true],
   ])
@@ -367,5 +371,6 @@ test('the normal main/Web guard includes the memory issue without a dispatch or 
   assert.equal(workflow.concurrency.queue, 'max'); assert.equal(workflow.concurrency['cancel-in-progress'], false)
   assert.ok(workflow.jobs.guards.steps.some(step => step.run?.includes('memory-production.test.mjs')))
   assert.ok(workflow.jobs.acceptance.steps.some(step => step.run === 'node --import tsx scripts/acceptance/memory-production.mjs'))
-  assert.deepEqual(Object.keys(workflow.jobs.acceptance.permissions).sort(), ['actions', 'contents', 'id-token', 'issues'])
+  assert.deepEqual(Object.keys(workflow.jobs.acceptance.permissions).sort(), ['actions', 'contents', 'id-token', 'issues', 'pull-requests'])
+  assert.equal(workflow.jobs.acceptance.permissions['pull-requests'], 'read')
 })

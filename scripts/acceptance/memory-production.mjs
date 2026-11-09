@@ -244,7 +244,10 @@ export async function runMemoryProduction({ env = process.env, event, attestatio
     marker = nonce(); requestId = nonce(); const challengeNonce = nonce()
     check([marker, requestId, challengeNonce].every(value => UUID.test(value)), 'fixture_binding_failed')
     challenge = 'MEMORY1821_' + digest(challengeNonce).slice(0, 24)
-    subject = `Memory verification 1821 ${marker}: the verification value is ${challenge}.`
+    // The real fact store normalizes subjects to at most 80 characters. Keep
+    // both the full nonce and hidden challenge intact for readback and cleanup.
+    subject = `M1821 ${marker} ${challenge}`
+    check([...subject].length <= 80, 'fixture_binding_failed')
     client = createSessionClient(CORE_ORIGIN, async (input, init = {}) => {
       const url = new URL(input), headers = new Headers(init.headers), path = url.pathname.slice('/mikka'.length)
       check(url.origin === CORE_ORIGIN && url.pathname.startsWith('/mikka/api/') && !headers.has('authorization'), 'target_refused')
@@ -373,7 +376,7 @@ export async function runMemoryProduction({ env = process.env, event, attestatio
             && (current.available === true || current.availability === 'checking') && !current.quota?.fallback
           check(exactModel(chosen.current), 'model_unavailable')
           const beforeUse = ownedFact(await readMemory()).usedCount
-          const prompt = `这是只读记忆验收。请从已提供的个人事实中找到 Memory verification 1821 ${marker} 的 verification value，只回复该值。不要调用工具，不要创建任务、派发工作、访问外部服务或修改任何数据。找不到就回复 MISSING。`
+          const prompt = `这是只读记忆验收。请从已提供的个人事实中找到 M1821 ${marker} 后面的值，只回复该值。不要调用工具，不要创建任务、派发工作、访问外部服务或修改任何数据。找不到就回复 MISSING。`
           check((await rpc('coordinator.sendCoordinatorMessage', [prompt, null, botId, nonce(), undefined, null, [], undefined, undefined, selectedWorkspaceId]))?.queued === true)
           promptSent = true
           phase = 'model_stream'

@@ -50,6 +50,7 @@ jobs:
       contents: read
       actions: read
       issues: read
+      pull-requests: read
       id-token: write
     env:
       MIKKA_ACCEPTANCE_TARGET_MODE: self-hosted-core
