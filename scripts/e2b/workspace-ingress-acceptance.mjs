@@ -29,6 +29,46 @@ const error = (code, cause) => Object.assign(new Error(`workspace_acceptance_${c
 const check = (ok, code) => { if (!ok) throw error(code) }
 const safeFailure = cause => CODES.has(cause?.receiptCode) ? cause.receiptCode : 'internal'
 const delay = milliseconds => new Promise(accept => setTimeout(accept, milliseconds))
+const IDENTITY_OPERATIONS = new Set(['get_info', 'source_command', 'source_compare'])
+const IDENTITY_ERROR_TYPES = new Set(['Error', 'TypeError', 'SyntaxError', 'CommandExitError', 'ConnectError',
+  'SandboxError', 'SandboxNotFoundError', 'SandboxNotRunningError', 'SandboxUnreachableError', 'FileNotFoundError',
+  'NotFoundError', 'ServiceBusyError', 'RateLimitError', 'AuthenticationError', 'InvalidArgumentError',
+  'NotEnoughSpaceError', 'TimeoutError', 'AbortError'])
+const diagnosticInteger = (value, minimum, maximum) => Number.isSafeInteger(value)
+  && value >= minimum && value <= maximum ? value : null
+
+// SDK messages, command output, request URLs and headers must never enter a
+// receipt. Inspect only bounded command stderr for these fixed classifications.
+export function identityDiagnostic(cause, operation) {
+  if (!IDENTITY_OPERATIONS.has(operation)) return null
+  const result = { operation, exceptionChain: [], truncated: false,
+    stderr: { gitDubiousOwnership: false, gitNotRepository: false, oversized: false } }
+  const seen = new Set()
+  try {
+    let current = cause
+    for (let depth = 0; current != null && depth < 4; depth++) {
+      if (seen.has(current)) { result.truncated = true; break }
+      seen.add(current)
+      const type = IDENTITY_ERROR_TYPES.has(current?.name) ? current.name : 'other'
+      result.exceptionChain.push({ type,
+        reason: type === 'Error' && current.message === 'Expected start event' ? 'process_start_event_missing'
+          : type === 'SandboxError' && current.message === 'Process exited without a result' ? 'process_result_missing' : null,
+        exitCode: type === 'CommandExitError' ? diagnosticInteger(current.exitCode, -255, 255) : null,
+        httpStatus: diagnosticInteger(current?.statusCode, 100, 599),
+        connectCode: type === 'ConnectError' ? diagnosticInteger(current.code, 1, 16) : null })
+      if (type === 'CommandExitError' && typeof current.stderr === 'string') {
+        if (Buffer.byteLength(current.stderr) > 16_384) result.stderr.oversized = true
+        else {
+          result.stderr.gitDubiousOwnership ||= current.stderr.includes('fatal: detected dubious ownership in repository at ')
+          result.stderr.gitNotRepository ||= current.stderr.includes('fatal: not a git repository (or any of the parent directories): .git')
+        }
+      }
+      current = current?.cause
+      if (depth === 3 && current != null) result.truncated = true
+    }
+  } catch { result.truncated = true }
+  return result
+}
 
 async function bounded(promise, milliseconds, code) {
   let timer
@@ -355,6 +395,7 @@ export async function probeWorkspaceIngress(initialSandbox, identity, {
   terminalProbe = async (...args) => (await import('./workspace-terminal-acceptance.mjs')).probeWorkspaceTerminal(...args),
 } = {}) {
   let sandbox = initialSandbox
+  let identityOperation = 'get_info'
   check(SHA.test(identity.sourceCommit) && SHA.test(identity.workerSha) && UUID.test(identity.fixtureId), 'configuration')
   const source = await readFile(new URL('../../packages/daemon/scripts/workspace-ingress.py', import.meta.url))
   const expectedDigest = hash(source)
@@ -367,7 +408,10 @@ export async function probeWorkspaceIngress(initialSandbox, identity, {
     const info = await sandbox.getInfo()
     check(info.templateId === identity.templateId && info.metadata?.sourceCommit === identity.sourceCommit
       && info.metadata?.fixtureId === identity.fixtureId && info.metadata?.application === PURPOSE, 'scope')
-    const actualSource = (await sandbox.commands.run("git -C /opt/mikka/worker rev-parse HEAD && cat /opt/mikka/worker-source-sha", { user: 'root', timeoutMs: 5000 })).stdout.trim().split('\n')
+    identityOperation = 'source_command'
+    const sourceResult = await sandbox.commands.run("git -C /opt/mikka/worker rev-parse HEAD && cat /opt/mikka/worker-source-sha", { user: 'root', timeoutMs: 5000 })
+    identityOperation = 'source_compare'
+    const actualSource = sourceResult.stdout.trim().split('\n')
     check(actualSource.length === 2 && actualSource[0] === identity.sourceCommit && actualSource[1] === identity.workerSha, 'source')
     report.stage = 'prelistener_guard'
     report.guard = await readGuard(sandbox, expectedDigest)
@@ -425,6 +469,7 @@ export async function probeWorkspaceIngress(initialSandbox, identity, {
     report.stage = 'completed'; report.passed = true
   } catch (cause) {
     report.failure = safeFailure(cause)
+    if (report.stage === 'identity') report.identityDiagnostic = identityDiagnostic(cause, identityOperation)
   } finally { report.finishedAt = new Date().toISOString() }
   return report
 }
