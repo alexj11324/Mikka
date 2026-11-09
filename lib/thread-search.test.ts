@@ -25,3 +25,13 @@ test('an empty query lists no threads, and a broad one is capped', () => {
   assert.equal(hits.length, THREAD_SEARCH_LIMIT)
   assert.equal(hits[0].thread.id, '0', 'keeps the shell’s newest-first order')
 })
+
+test('a task\'s attempts show as one thread, and none when the task is already listed', () => {
+  const attempts = [
+    { id: 'new', prompt: 'Order lookup times out', lastReply: null, issueId: 'task-3' },
+    { id: 'old', prompt: 'Order lookup times out', lastReply: 'Added the index', issueId: 'task-3' },
+    { id: 'chat', prompt: 'Order history export', lastReply: null, issueId: null },
+  ]
+  assert.deepEqual(threadSearchHits(attempts, 'order', item => item.prompt).map(hit => hit.thread.id), ['new', 'chat'])
+  assert.deepEqual(threadSearchHits(attempts, 'order', item => item.prompt, new Set(['task-3'])).map(hit => hit.thread.id), ['chat'])
+})
