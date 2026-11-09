@@ -72,7 +72,7 @@ export async function readMemoryView(userId: string, workspaceId: string, choice
       select "factId", "targetKind", "targetId", "targetUrl", "usedAt",
         count(*) over (partition by "factId")::integer as "usedCount",
         row_number() over (partition by "factId" order by "usedAt" desc, "eventId" desc) as rn
-      from user_fact_uses where "userId" = ${userId} and "factId" = any(${ids}::uuid[])
+      from user_fact_uses where "userId" = ${userId} and ${inArray(userFactUses.factId, ids)}
     )
     select "factId", "targetKind", "targetId", "targetUrl", "usedAt", "usedCount"
     from ranked where rn <= 5
@@ -301,8 +301,10 @@ export async function purgeExpiredMemoryUndo() {
  * A project-only fact never leaks into an unbound chat. A fixed lease holder
  * yields the same idempotency id even if a workflow step retries.
  */
-export async function memoryForBotPrompt(userId: string, botId: string): Promise<string> {
-  if (!await memoryEnabled(userId)) return ''
+export async function memoryForBotPrompt(userId: string, botId: string, enabled?: boolean): Promise<string> {
+  // Hosted preparation already read this owner's switch with the conversation.
+  // Reuse that snapshot rather than issuing a second preference query in a turn.
+  if (!(enabled ?? await memoryEnabled(userId))) return ''
   const [bot] = await db.select({ workspaceId: bots.workspaceId }).from(bots)
     .where(and(eq(bots.id, botId), eq(bots.ownerId, userId))).limit(1)
   if (!bot) return ''

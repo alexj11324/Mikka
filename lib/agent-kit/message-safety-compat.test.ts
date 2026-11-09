@@ -18,7 +18,8 @@ const stub = (path: string, namedExports: Record<string, unknown>) => mock.modul
 const conversation: { summary: string | null; memory: string; messages: StoredMessage[] } = { summary: null, memory: '', messages: [] }
 const saved: unknown[][] = [], enqueued: unknown[][] = [], forwarded: unknown[][] = []
 let modelCalls = 0
-stub('../coordinator/store.ts', { loadConversation: async () => conversation, loadConversationForPrompt: async () => ({ ...conversation, personalInstructions: '' }), saveSummary: async (...args: unknown[]) => { saved.push(args) } })
+stub('../coordinator/store.ts', { loadConversation: async () => conversation, loadConversationForPrompt: async () => ({ ...conversation, personalInstructions: '', memoryEnabled: true }), saveSummary: async (...args: unknown[]) => { saved.push(args) } })
+stub('../profile/memory.ts', { memoryForBotPrompt: async () => '' })
 stub('../coordinator/native.ts', { nativeCoordinatorEnabled: () => true, nativeCoordinatorStore: { enqueue: async (...args: unknown[]) => { enqueued.push(args); return 'pure-turn' } } })
 stub('../coordinator/bot-instructions.ts', { botInstructions: async (_owner: string, _bot: string | null, base: string) => base })
 stub('../coordinator/personal-instructions.ts', { withPersonalInstructions: async (_owner: string, base: string) => base, withPersonalInstructionText: async (_owner: string, base: string) => base })

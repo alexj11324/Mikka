@@ -353,7 +353,7 @@ async function preparePromptDetails(userId: string, botId: string, snapshot?: De
     timed('execution', () => executionContextParts(userId, botId)),
     timed('personal', () => withPersonalInstructionText(userId, instructions, conversation.personalInstructions, snapshot ? snapshot.personalPlugins ?? { servers: [], skills: [] } : undefined)),
     timed('github', () => githubPromptContext(userId, githubScope, undefined, undefined, botId)),
-    memoryForBotPrompt(userId, botId),
+    conversation.memoryEnabled ? memoryForBotPrompt(userId, botId, conversation.memoryEnabled) : Promise.resolve(''),
   ])
   // Rules keep an earlier cache breakpoint. This context contains current model facts and either lazy GitHub discovery
   // guidance or the complete legacy/fallback repository context; it can change between turns (lib/prompt-cache.ts).

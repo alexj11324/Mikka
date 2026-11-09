@@ -23,7 +23,7 @@ stub('../abuse/resolve.ts',{resolveDefaultHostedModel:async(_scope:unknown,model
 stub('../auth.ts',{auth:{api:{getSession:async()=>userId?{user:{id:userId},session:{id:'planner-fixture-session'}}:null}}})
 stub('../db/index.ts',{pool:null,withDatabaseClient:unavailable,db:{insert:()=>({values:(event:Event)=>({onConflictDoNothing:()=>({returning:async()=>{events.push(structuredClone(event));return [{id:event.id}]}})})})}})
 stub('../request-log.ts',{noteLogRpcAction:()=>{},noteLogUser:()=>undefined,withRequestLog:(_path:string,handler:unknown)=>handler})
-stub('../coordinator/store.ts',{loadConversationForPrompt:async()=>({...conversation,personalInstructions:''}),saveSummary:async()=>undefined,chatView:async()=>({})})
+stub('../coordinator/store.ts',{loadConversationForPrompt:async()=>({...conversation,personalInstructions:'',memoryEnabled:false}),saveSummary:async()=>undefined,chatView:async()=>({})})
 stub('../agent-kit/service.ts',{agentScope:async(ownerId:string,botId:string|null)=>({ownerId,botId,workspaceId:null})})
 stub('../subscription-runtime.ts',{subscriptionRuntime:unavailable,authorizeSubscriptionWorkspace:unavailable})
 stub('../coordinator/wake.ts',{coordinatorEnabled:()=>true,wakeCoordinator:unavailable})

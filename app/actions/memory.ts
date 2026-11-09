@@ -11,7 +11,8 @@ import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { USER_FACT_KINDS } from '@/lib/profile/kinds'
 
 // 记忆 (R-73): the signed-in person's own facts only; nothing here takes
-// another person or a workspace. The switch is user_preferences."memoryEnabled",
+// another person. Scope uses the authenticated workspace selection and checks
+// current membership. The switch is user_preferences."memoryEnabled",
 // the same one mobile Settings writes (app/api/mobile/preferences).
 
 /** The switch, the facts shown (at most 500) and how many active facts there are in all. */
