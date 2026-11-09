@@ -9,9 +9,9 @@ import { pathToFileURL } from 'node:url'
 import { assertOpsContext } from './self-hosted-ingress-probe.mjs'
 
 export const P0 = Object.freeze({
-  source: 'eb387d91cee9845e00026cc1f83387e42caf7993',
-  tree: '52ffc56e7dbcf94362519101a8410aee3893bfe8',
-  workerSha: '300c7be89fb2bbb701e29d4c74ec7962694613e1',
+  source: '9dddd26d40ba22723ba154476c036662c1277762',
+  tree: '821ae5344adeabad5326331e58bab7d1920ff352',
+  workerSha: 'c8764e6ad1b8ee9f5fe44d9213e07980c28132d0',
   sdks: { nodeMajor: '24', pnpm: '10.34.3', javascriptE2b: '2.61.0', pythonE2b: '2.62.0', next: '16.4.1' },
   files: {
     'package.json': '42e0321a095d434bb22437cfd2a3685cbbfb0d0d66576e334aeab2d05e50eb47',
