@@ -1,3 +1,4 @@
+import { mobileMessages } from '../lib/messages.ts'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { groupTag, groupTitle, HOSTED_CHOICE, modelDisplayName, modelMenuLabel, modelSourceLabel, modelStatusLine, type ModelMenu } from '../lib/model-menu-view.ts'
@@ -44,9 +45,9 @@ test('a used-up subscription without a fallback never claims it switched to a pa
 
 test('cloud hosted choices identify Mikka Cloud credits while self-hosted and older servers retain their own billing labels', () => {
   const hosted: ModelMenu['current'] = { id: HOSTED_CHOICE, modelId: '', provider: 'mikka', kind: 'hosted', available: true, chosen: true, hostedSource: 'cloud' }
-  assert.equal(groupTag({ kind: 'hosted', hostedSource: 'cloud', options: [hosted] }), 'Mikka Cloud 额度')
-  assert.equal(groupTag({ kind: 'hosted', hostedSource: 'self-hosted', options: [] }), '自带服务商')
+  assert.equal(groupTag({ kind: 'hosted', hostedSource: 'cloud', options: [hosted] }), mobileMessages.Coordinator.modelPicker.cloudCredits)
+  assert.equal(groupTag({ kind: 'hosted', hostedSource: 'self-hosted', options: [] }), mobileMessages.Coordinator.modelPicker.ownProvider)
   assert.equal(groupTag({ kind: 'hosted', options: [] }), '点数')
-  assert.equal(modelMenuLabel(hosted), 'Mikka 默认', 'the composer chip stays compact')
-  assert.equal(modelSourceLabel(hosted), 'Mikka 默认 · Mikka Cloud 额度')
+  assert.equal(modelMenuLabel(hosted), mobileMessages.Coordinator.modelPicker.hosted, 'the composer chip stays compact')
+  assert.equal(modelSourceLabel(hosted), `${mobileMessages.Coordinator.modelPicker.hosted} · ${mobileMessages.Coordinator.modelPicker.cloudCredits}`)
 })
