@@ -20,7 +20,7 @@ import type { LegacyChatRequest } from './legacy-chat-archive'
 import { TeamHome } from '@/components/teams/team-home'
 import { ArtifactsPage } from '@ui-slot/artifacts'
 import { MemoryPage } from '@ui-slot/memory'
-import { InboxPage } from '@ui-slot/inbox'
+import { INBOX_TITLE, InboxPage } from '@ui-slot/inbox'
 import { AppFrame, AppShellContent, FRAME_LISTS_CHATS, SignOutBoundary, WindowBar } from '@/components/app-shell'
 import * as settingsFrameSlot from '@ui-slot/settings-frame'
 import * as reviewSummarySlot from '@ui-slot/review-summary'
@@ -161,7 +161,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     'team-projects': i18nText('Overview.sections.teamProjects'),
     'all-issues': i18nText('Overview.sections.allIssues'),
     plugins: tPlugins('title'),
-    suggestions: i18nText('Nav.suggestions'),
+    suggestions: i18nText(INBOX_TITLE as never),
     artifacts: i18nText('Nav.artifacts'),
     memory: i18nText('HostedSettings.memory.title'),
   }

@@ -7,6 +7,9 @@ import type { Thread } from '@/app/actions/task-runs'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 
+/** `INBOX_TITLE`, a message key the slot exports: the page's title, e.g. in the phone header. */
+export type InboxTitle = string
+
 export type InboxPageProps = {
   threads: Thread[]
   issues: Issue[]

@@ -7,6 +7,9 @@
 import { SuggestionFeed } from '@/components/suggestions/suggestion-feed'
 import type { InboxPageProps } from './inbox-contract'
 
+/** The page's title, e.g. in the phone header (inbox-contract.ts): the open-source page is 建议. */
+export const INBOX_TITLE = 'Nav.suggestions'
+
 export function InboxPage({ onOpenIssue, onConnect, onSent }: InboxPageProps) {
   return <SuggestionFeed onOpenIssue={onOpenIssue} onConnect={onConnect} onSent={onSent} />
 }
