@@ -5,6 +5,13 @@ items (#1820). Routes below are relative to the application's `/mikka` base path
 Authentication uses the existing session or workspace-scoped personal access token.
 The requested workspace must have an active membership; a workspace token cannot
 select a different workspace.
+Task visibility uses the task's canonical `workspaceId` with
+`ownershipState=bound`. Team links and legacy `scope` do not grant access.
+Personal workspaces remain visible only to their owner, even if an invalid
+membership row exists.
+Reads and commands preserve the original authenticated reader through
+`withTaskWorkspace`; workspace admission and Enterprise session/token policy
+remain at that shared boundary.
 
 ## Read items
 
@@ -82,6 +89,46 @@ Render only actions present in `actions`:
 Review/approval execution keeps the existing detail-page authorization and
 candidate/revision checks. `open` does not grant approval authority.
 
+## Read a Factory approval summary
+
+Use the existing human-session `GET /api/factory/tasks/:taskId/flow` route and
+read `review.summary`. The route keeps its canonical task, Bot, owner and
+selected-workspace authorization. The summary contains:
+
+```json
+{
+  "branch": "mikka/mik-42",
+  "additions": 28,
+  "deletions": 4,
+  "changedFiles": 3,
+  "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "checks": { "passed": 12, "failed": 1, "pending": 2, "skipped": 1 },
+  "checksUpdatedAt": "2026-11-09T14:00:00.000Z"
+}
+```
+
+There is no summary for a task without a delivered PR: `review` is null when
+there is also no review, or `review.summary` is null when a review exists.
+Each missing historical field is null. `checks` is null until a complete
+snapshot for that PR head has been synchronized. An observed complete empty
+snapshot has zero in each count. `skipped` includes GitHub's neutral and skipped
+conclusions; neither is reported as a pass. Cancelled and timed-out checks count
+as failed. This snapshot describes observed checks, not branch-protection
+requirements or permission to merge.
+
+The route reads the current candidate's persisted `run_publications` record;
+it never requests GitHub. Publication ingestion resolves the PR details and
+reads checks and commit statuses, with existing repository credentials and
+permissions. A checks refusal leaves `checks` null without failing publication.
+The existing signature-verified webhook updates PR metadata and, when delivered
+by the configured App, `check_run` and `status` events. Same-named jobs in
+different check suites are counted independently; a rerun replaces only the
+earlier result in its own suite. Duplicate and older events do not restore an earlier pass. A new PR
+head clears the prior head's counts and checks. No App permission or subscription
+is changed by this feature. `checksUpdatedAt` identifies the cached observation;
+without check/status subscriptions it remains the publication snapshot until a
+later ingestion. Factory live invalidations refresh an open approval view.
+
 Snooze is personal to the viewer, within the selected workspace. It hides the
 item from that viewer's pending tab; it never changes the task or hides work
 from teammates. Snoozed suggestions are also hidden from the legacy suggestion
@@ -152,3 +199,8 @@ times and live invalidation callbacks, transactional source receipts, pagination
 at equal microsecond timestamps, and HTTP validation. CI enrolls it as a
 mandatory database suite. These local checks do not establish production
 acceptance; deployment and shared-account evidence belong on #1820.
+
+`pnpm test:run-publication` verifies metadata ingestion, pagination, check-state
+classification and unknown results. With the same isolated database URLs,
+`REQUIRE_DB=1 pnpm test:run-publication-db` verifies concurrent webhook updates,
+idempotence, repository/head binding, newer reruns and empty Factory summaries.

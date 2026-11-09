@@ -127,6 +127,21 @@ test('pull-request actions that change nothing stored stop before any background
   assert.equal(refresh.mock.callCount(), 0)
 })
 
+test('verified repository-bound check and status events use publication ingestion without notification work', async () => {
+  const repository = { full_name: 'o/r' }, sha = 'a'.repeat(40), at = '2026-11-09T14:00:00Z'
+  for (const [event, payload] of [
+    ['check_run', { action: 'completed', repository, check_run: { id: 1, name: 'CI', head_sha: sha, app: { id: 1 }, check_suite: { id: 100 }, status: 'completed', conclusion: 'success', started_at: at, completed_at: at } }],
+    ['status', { repository, id: 2, context: 'deploy', state: 'pending', sha, updated_at: at }],
+  ] as const) {
+    assert.equal((await POST(request(event, payload, 'sha256=invalid'))).status, 401)
+    assert.equal((await POST(request(event, payload))).status, 202)
+    await callbacks.shift()!()
+    assert.deepEqual(refresh.mock.calls.at(-1)!.arguments, [event, payload])
+  }
+  assert.equal(readNotifications.mock.callCount(), 0)
+  assert.equal(ingest.mock.callCount(), 0)
+})
+
 test('created comments retain notification ingestion and do not refresh publications', async () => {
   const payload = { action: 'created', issue: { user: { id: 42 } } }
   assert.equal((await POST(request('issue_comment', payload))).status, 202)

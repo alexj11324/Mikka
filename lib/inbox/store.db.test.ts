@@ -8,6 +8,7 @@ import { InboxStore } from './store'
 import { createInboxGuard } from './workspace'
 import { handleInbox } from './http'
 import { tokenWorkspace } from '../tokens/principal'
+import { ActionFailureError } from '../action-error'
 
 const target = process.env.E2E_DATABASE_URL
 const valid = isE2eTarget(target) && target === process.env.MIKKA_DATABASE_URL && target === process.env.DATABASE_URL
@@ -34,17 +35,51 @@ test('inbox PostgreSQL: workspace authority, receipts, undo and durable deadline
   for (const [id, ws] of [[team, workspace], [otherTeam, other]]) await pool.query('INSERT INTO mikka_teams(id,"workspaceId","userId",name,identifier) VALUES($1::uuid,$2,$3,$1::text,\'INBOX\')', [id, ws, owner])
   for (const [id, ws] of [[bot, personal], [teamBot, workspace]]) await pool.query('INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1::uuid,$2,$3,$1::text)', [id, ws, owner])
   const issue = randomUUID(), privateIssue = randomUUID(), foreignIssue = randomUUID(), run = randomUUID()
-  for (const [id, scope] of [[issue, 'workspace'], [foreignIssue, 'workspace'], [privateIssue, 'personal']]) await pool.query('INSERT INTO issues(id,"userId",title,content,status,priority,scope,number) VALUES($1::uuid,$2,$1::text,\'{"attrs":{"mikka":{}}}\',\'todo\',\'normal\',$3,$4)', [id, owner, scope, ([issue, foreignIssue, privateIssue] as string[]).indexOf(id) + 1])
+  for (const [id, ws] of [[issue, workspace], [foreignIssue, other], [privateIssue, personal]]) await pool.query('INSERT INTO issues(id,"userId",title,content,status,priority,scope,number,"workspaceId","ownershipState") VALUES($1::uuid,$2,$1::text,\'{"attrs":{"mikka":{}}}\',\'todo\',\'normal\',\'personal\',$3,$4,\'bound\')', [id, owner, ([issue, foreignIssue, privateIssue] as string[]).indexOf(id) + 1, ws])
   for (const [id, ws, tm] of [[issue, workspace, team], [foreignIssue, other, otherTeam]]) await pool.query('INSERT INTO mikka_team_issues("issueId","workspaceId","teamId",number,"userId") VALUES($1,$2,$3,1,$4)', [id, ws, tm, owner])
   for (const [id, task] of [[run, issue], [randomUUID(), privateIssue], [randomUUID(), foreignIssue]]) await pool.query('INSERT INTO agent_runs(id,"userId","issueId","agentId",status,outcome) VALUES($1,$2,$3,$4,\'waiting_input\',\'needs_input\')', [id, owner, task, randomUUID()])
   const suggestion = randomUUID(), teamSuggestion = randomUUID()
   for (const [id, botId] of [[suggestion, bot], [teamSuggestion, teamBot]]) await pool.query('INSERT INTO suggestions(id,"userId","botId",source,"externalId",action,title,shown,"decidedBy","occurredAt") VALUES($1::uuid,$2,$3,\'gmail\',$1::text,\'reply\',$1::text,true,\'rule\',now())', [id, owner, botId])
   let now = new Date()
   const pushes: [string, string][] = [], arms: number[] = []
-  const store = new InboxStore(pool, createInboxGuard(pool, pool), async (user, ws) => { pushes.push([user, ws]) }, async () => { arms.push(1) }, () => now)
+  // The source/store suite keeps every fixture in its private schema. Exercise
+  // the admission adapter with the same locked membership facts; the canonical
+  // task-workspace DB suites own its session/Enterprise policy implementation.
+  const admit: Parameters<typeof createInboxGuard>[0] = async (reader, workspaceId, work) => {
+    const userId = typeof reader === 'string' ? reader : reader.id, tx = await pool.connect()
+    try {
+      await tx.query('BEGIN')
+      const { rows: [selected] } = await tx.query<{ kind: 'personal' | 'team'; userId: string }>('SELECT kind,"userId" FROM mikka_workspaces WHERE id=$1 FOR SHARE', [workspaceId])
+      if (!selected || (selected.kind === 'personal' && selected.userId !== userId)) throw new ActionFailureError('workspaceAccessDenied')
+      const member = await tx.query('SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status=\'active\' FOR SHARE', [workspaceId, userId])
+      if (!member.rowCount) throw new ActionFailureError('workspaceAccessDenied')
+      const result = await work({ id: workspaceId, kind: selected.kind }, undefined as never)
+      await tx.query('COMMIT')
+      return result
+    } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
+  }
+  const store = new InboxStore(pool, createInboxGuard(admit), async (user, ws) => { pushes.push([user, ws]) }, async () => { arms.push(1) }, () => now)
   const list = (user = owner, ws = workspace, tab: 'pending' | 'done' | 'snoozed' = 'pending', limit = 50, cursor?: string) => store.list(user, ws, tab, limit, cursor)
   const reject = (id = teamSuggestion, ws = workspace, user = owner) => store.command(user, { workspaceId: ws, type: 'suggestion', id, action: 'reject' })
 
+  await t.test('production admission uses canonical locked membership and rejects a removed or foreign personal member', async () => {
+    const canonicalOwner = `inbox-canonical-${randomUUID()}`, canonicalPeer = `inbox-peer-${randomUUID()}`, id = randomUUID()
+    const guard = createInboxGuard()
+    try {
+      for (const user of [canonicalOwner, canonicalPeer]) await admin.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())', [user, `${user}@example.invalid`])
+      await admin.query('INSERT INTO mikka_workspaces(id,"userId",name,kind) VALUES($1,$2,\'fixture\',\'personal\')', [id, canonicalOwner])
+      for (const user of [canonicalOwner, canonicalPeer]) await admin.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role) VALUES($1,$2,$2,$2,\'member\')', [id, user])
+      assert.equal(await guard({ id: canonicalOwner }, id, async scope => scope.personal), true)
+      await assert.rejects(guard({ id: canonicalPeer }, id, async () => assert.fail('foreign personal admission')), { code: 'workspaceAccessDenied' })
+      await admin.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [id, canonicalOwner])
+      await assert.rejects(guard({ id: canonicalOwner }, id, async () => assert.fail('removed member admission')), { code: 'workspaceAccessDenied' })
+    } finally {
+      await admin.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1', [id])
+      await admin.query('DELETE FROM mikka_workspaces WHERE id=$1', [id])
+      await admin.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [[canonicalOwner, canonicalPeer]])
+      await (await import('../workspace-db')).workspacePool.end()
+    }
+  })
   await t.test('active workspace isolation and task-specific reply authority', async () => {
     assert.deepEqual(new Set((await list(owner, personal)).items.map(i => i.id)), new Set([privateIssue, suggestion]))
     const mine = await list()
@@ -57,6 +92,18 @@ test('inbox PostgreSQL: workspace authority, receipts, undo and durable deadline
     await assert.rejects(reject(suggestion), { code: 'inboxNotFound' })
     await assert.rejects(reject(teamSuggestion, other), { code: 'inboxNotFound' })
     await assert.rejects(reject(teamSuggestion, workspace, peer), { code: 'inboxNotFound' })
+  })
+  await t.test('canonical ownership ignores missing and stale team links and denies unresolved tasks and corrupt personal members', async () => {
+    await pool.query('DELETE FROM mikka_team_issues WHERE "issueId"=$1', [issue])
+    assert.ok((await list(peer)).items.some(i => i.id === issue), 'team-less canonical tasks remain visible')
+    await pool.query('UPDATE mikka_team_issues SET "workspaceId"=$2,"teamId"=$3 WHERE "issueId"=$1', [foreignIssue, workspace, team])
+    assert.ok(!(await list()).items.some(i => i.id === foreignIssue), 'a stale link cannot cross tenants')
+    await pool.query('UPDATE issues SET "workspaceId"=NULL,"ownershipState"=\'pending\' WHERE id=$1', [issue])
+    assert.ok(!(await list()).items.some(i => i.id === issue))
+    await assert.rejects(store.command(owner, { workspaceId: workspace, type: 'task', id: issue, action: 'reopen' }), { code: 'inboxNotFound' })
+    await pool.query('UPDATE issues SET "workspaceId"=$2,"ownershipState"=\'bound\' WHERE id=$1', [issue, workspace])
+    await pool.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role) VALUES($1,$2,$2,$2,\'member\')', [personal, peer])
+    await assert.rejects(list(peer, personal), { code: 'workspaceAccessDenied' })
   })
   await t.test('concurrent rejection is idempotent, attributed and undoable', async () => {
     const matter = randomUUID(), event = randomUUID()

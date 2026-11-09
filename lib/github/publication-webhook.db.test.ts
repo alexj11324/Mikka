@@ -7,6 +7,8 @@ import { Pool } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { refreshPublishedPullRequest } from './publication-webhook'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { readFactoryFlow } from '../factory/public-flow'
+import type { FactoryTask } from '../factory/store'
 
 const base = process.env.E2E_DATABASE_URL
 const required = process.env.REQUIRE_DB === '1' || (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true')
@@ -76,6 +78,114 @@ test('a PR webhook records its line counts on the delivery and on the tasks it b
     await refreshPublishedPullRequest('pull_request', event({ additions: 25, deletions: 6 }), pool)
     assert.deepEqual((await task(delivered)).content.attrs.mikka.pullRequests[1], { url, state: 'open', title: 'Fix the login page', additions: 25, deletions: 6 })
     assert.deepEqual((await versions(delivered)).map(row => row.revision), [2, 3])
+
+    const taskId = randomUUID(), attemptId = randomUUID(), candidateId = randomUUID(), headSha = 'a'.repeat(40), newHead = 'b'.repeat(40)
+    const fixture = await pool.connect()
+    try {
+      await fixture.query('BEGIN')
+      await fixture.query(`INSERT INTO factory_tasks(id,"userId","workspaceId","issueId","sourceEventId",route,stage,status,"attemptId",reason)
+        VALUES($1,'owner',$2,$3,$4,'{}','approval','pending',$5,'fixture')`, [taskId, workspaceId, delivered, randomUUID(), attemptId])
+      await fixture.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,"runId",reason)
+        VALUES($1,$2,'approval',1,1,'pending',$3,'fixture')`, [attemptId, taskId, runId])
+      await fixture.query(`INSERT INTO factory_candidates(id,"taskId",sha,repository,environment,scope,"runId")
+        VALUES($1,$2,$3,'o/r','fixture','fixture',$4)`, [candidateId, taskId, headSha, runId])
+      await fixture.query('UPDATE factory_tasks SET "candidateId"=$2 WHERE id=$1', [taskId, candidateId])
+      await fixture.query('COMMIT')
+    } catch (error) { await fixture.query('ROLLBACK'); throw error } finally { fixture.release() }
+    const flowTask = { id: taskId, userId: 'owner', issueId: delivered, botId: null, revision: 1, stage: 'approval', status: 'pending', candidateId, attemptId } as FactoryTask
+    const flow = () => readFactoryFlow(pool, flowTask)
+    const at = '2026-11-09T14:00:00.000Z'
+    await pool.query(`UPDATE run_publications SET branch='mikka/mik-1',"pullRequest"="pullRequest"||$2::jsonb WHERE "runId"=$1`, [runId, JSON.stringify({ headSha, changedFiles: 2,
+      reviewChecks: { headSha, complete: true, updatedAt: at, entries: {} } })])
+    const snapshot = () => pool.query('SELECT "pullRequest","updatedAt" FROM run_publications WHERE "runId"=$1', [runId]).then(r => r.rows[0])
+    const check = (id: number, name: string, status = 'completed', conclusion: string | null = 'success', sha = headSha) => ({ action: status === 'completed' ? 'completed' : 'created',
+      repository: { full_name: 'o/r' }, check_run: { id, name, head_sha: sha, app: { id: 1 }, check_suite: { id: 100 }, status, conclusion, started_at: at, completed_at: status === 'completed' ? '2026-11-09T14:01:00.000Z' : null } })
+    await Promise.all([
+      refreshPublishedPullRequest('check_run', check(1, 'build'), pool),
+      refreshPublishedPullRequest('check_run', check(2, 'tests', 'queued', null), pool),
+      refreshPublishedPullRequest('status', { repository: { full_name: 'o/r' }, id: 3, context: 'deploy', sha: headSha, state: 'failure', updated_at: at }, pool),
+    ])
+    assert.deepEqual((await flow()).review?.summary, { branch: 'mikka/mik-1', additions: 25, deletions: 6, changedFiles: 2, headSha,
+      checks: { passed: 1, failed: 1, pending: 1, skipped: 0 }, checksUpdatedAt: '2026-11-09T14:01:00.000Z' })
+    const beforeReplay = await snapshot()
+    await refreshPublishedPullRequest('check_run', check(1, 'build'), pool)
+    await refreshPublishedPullRequest('check_run', check(1, 'build', 'queued', null), pool)
+    await refreshPublishedPullRequest('check_run', { ...check(4, 'other'), repository: { full_name: 'foreign/r' } }, pool)
+    await refreshPublishedPullRequest('check_run', check(5, 'old-head', 'completed', 'success', newHead), pool)
+    assert.deepEqual(await snapshot(), beforeReplay, 'duplicates, stale states, other repositories and heads write nothing')
+    await refreshPublishedPullRequest('check_run', check(10, 'build', 'queued', null), pool)
+    assert.deepEqual((await flow()).review?.summary?.checks, { passed: 0, failed: 1, pending: 2, skipped: 0 }, 'a newer rerun replaces the prior green check')
+    await refreshPublishedPullRequest('check_run', check(1, 'build'), pool)
+    assert.deepEqual((await flow()).review?.summary?.checks, { passed: 0, failed: 1, pending: 2, skipped: 0 })
+
+    const update = { ...event({}), action: 'synchronize', before: headSha, after: newHead,
+      pull_request: { ...event({}).pull_request, head: { sha: newHead, ref: 'mikka/mik-2' }, updated_at: '2026-11-09T15:00:00Z' } }
+    await refreshPublishedPullRequest('pull_request', update, pool)
+    assert.deepEqual((await flow()).review?.summary, { branch: 'mikka/mik-2', headSha: newHead, additions: null, deletions: null, changedFiles: null, checks: null, checksUpdatedAt: null })
+    const beforeOldEvent = (await task(delivered)).revision
+    await refreshPublishedPullRequest('pull_request', { ...update, action: 'edited', pull_request: { ...update.pull_request, additions: 999, deletions: 999,
+      head: { sha: headSha, ref: 'mikka/old' }, updated_at: '2026-11-09T14:00:00Z' } }, pool)
+    assert.equal((await flow()).review?.summary?.headSha, newHead, 'an older PR event cannot restore the old head')
+    assert.equal((await task(delivered)).revision, beforeOldEvent, 'an older event cannot rewrite the task line counts either')
+    for (const action of ['edited', 'synchronize']) await refreshPublishedPullRequest('pull_request', { ...update, action, before: 'c'.repeat(40), after: headSha,
+      pull_request: { ...update.pull_request, head: { sha: headSha, ref: 'mikka/older' } } }, pool)
+    assert.equal((await flow()).review?.summary?.headSha, newHead, 'same-second delayed deliveries cannot reverse an observed head transition')
+    await refreshPublishedPullRequest('check_run', check(20, 'only-one-observed', 'completed', 'success', newHead), pool)
+    assert.equal((await flow()).review?.summary?.checks, null, 'a partial webhook cache never claims a complete checks total')
+
+    const change = (before: string, after: string, updated_at: string, additions: number) => ({ ...event({ additions, deletions: 8 }),
+      action: 'synchronize', before, after, pull_request: { ...event({ additions, deletions: 8 }).pull_request,
+        head: { sha: after, ref: 'mikka/mik-2' }, changed_files: 3, updated_at } })
+    // Fix the interleaving with a real row lock: the old event's initial
+    // snapshot qualifies, then it waits while the lock owner commits a newer
+    // head and task counts. Admission must be re-evaluated after that wait.
+    const beforeRace = await task(delivered), lock = await pool.connect(), waiting = await pool.connect()
+    let oldEvent: Promise<void> | undefined
+    try {
+      const pid = (await waiting.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0].pid
+      await lock.query('BEGIN')
+      await lock.query('SELECT "runId" FROM run_publications WHERE "runId"=$1 FOR UPDATE', [runId])
+      oldEvent = refreshPublishedPullRequest('pull_request', change(newHead, 'c'.repeat(40), '2026-11-09T16:00:00Z', 50), waiting)
+      let blocked = false
+      for (let attempt = 0; attempt < 100; attempt++) {
+        blocked = Boolean((await adminPool.query(`SELECT 1 FROM pg_stat_activity WHERE pid=$1 AND wait_event_type='Lock'`, [pid])).rowCount)
+        if (blocked) break
+        await new Promise(resolve => setTimeout(resolve, 10))
+      }
+      assert.equal(blocked, true, 'the stale webhook must actually be waiting for the publication row')
+      await refreshPublishedPullRequest('pull_request', change(newHead, 'd'.repeat(40), '2026-11-09T17:00:00Z', 80), lock)
+      await lock.query('COMMIT')
+      await oldEvent
+    } finally {
+      await lock.query('ROLLBACK')
+      await oldEvent?.catch(() => {})
+      waiting.release(); lock.release()
+    }
+    assert.equal((await snapshot()).pullRequest.headSha, 'd'.repeat(40))
+    assert.equal((await snapshot()).pullRequest.additions, 80)
+    assert.equal((await task(delivered)).content.attrs.mikka.pullRequests[1].additions, 80)
+    assert.equal((await task(delivered)).revision, beforeRace.revision + 1, 'a rejected stale event cannot write a task version')
+
+    // A second race exists between the metadata UPDATE and the separate task
+    // version statement. Let the newer delivery finish in that exact gap.
+    let reached!: () => void, resume!: () => void
+    const reachedCounts = new Promise<void>(resolve => { reached = resolve })
+    const resumeCounts = new Promise<void>(resolve => { resume = resolve })
+    const pausedDatabase = { query: async (...args: unknown[]) => {
+      if (String(args[0]).includes('WITH delivered AS')) { reached(); await resumeCounts }
+      return Reflect.apply(pool.query, pool, args)
+    } } as Pick<Pool, 'query'>
+    const delayed = refreshPublishedPullRequest('pull_request', change('d'.repeat(40), 'e'.repeat(40), '2026-11-09T18:00:00Z', 85), pausedDatabase)
+    try {
+      await Promise.race([reachedCounts, delayed.then(() => { assert.fail('the old event must pause before task counts') })])
+      await refreshPublishedPullRequest('pull_request', change('e'.repeat(40), 'f'.repeat(40), '2026-11-09T19:00:00Z', 90), pool)
+      const currentPublication = await snapshot(), currentTask = await task(delivered)
+      resume(); await delayed
+      assert.deepEqual(await snapshot(), currentPublication)
+      assert.deepEqual(await task(delivered), currentTask, 'the old second statement cannot overwrite the newer task counts or revision')
+    } finally { resume(); await delayed.catch(() => {}) }
+    await pool.query('UPDATE run_publications SET "pullRequest"=NULL WHERE "runId"=$1', [runId])
+    assert.equal((await flow()).review, null, 'a task without a PR returns empty review metadata')
   } finally {
     // Only after every client of this test's own database has closed (#913).
     await dropTestDatabase(adminPool, name, pool)

@@ -2,8 +2,9 @@ import type { Pool, PoolClient } from 'pg'
 import { randomUUID } from 'node:crypto'
 import { InboxError, isInboxId, type InboxCommand, type InboxSource, type InboxPage, type InboxEntry } from './contract'
 
-export type Scope = { personal: boolean; issueIds: string[]; otherIssueIds: string[] }
-export type Guard = <T>(userId: string, workspaceId: string, work: (scope: Scope) => Promise<T>) => Promise<T>
+export type Scope = { personal: boolean }
+export type InboxReader = Parameters<typeof import('../task-workspace').withTaskWorkspace>[0]
+export type Guard = <T>(reader: InboxReader, workspaceId: string, work: (scope: Scope) => Promise<T>) => Promise<T>
 export type Changed = (userId: string, workspaceId: string) => Promise<void>
 type SourceRow = InboxSource & { snoozedUntil: Date | null }
 const key = (type: string, id: string) => `${type}:${id}`
@@ -36,23 +37,24 @@ export class InboxStore {
             ELSE 'confirm' END AS reason
         FROM issues i LEFT JOIN LATERAL (SELECT id,"userId",status,outcome FROM agent_runs WHERE "issueId"=i.id ORDER BY "createdAt" DESC,id DESC LIMIT 1) r ON true
         WHERE coalesce(i.content->'attrs'->'mikka',i.content->'attrs'->'orvilo')->>'deletedAt' IS NULL
-          AND ((i.scope='workspace' AND i.id=ANY($3::uuid[])) OR ($4 AND i."userId"=$1 AND NOT (i.scope='workspace' AND i.id=ANY($5::uuid[]))))
+          AND i."workspaceId"=$2 AND i."ownershipState"='bound'
         UNION ALL
         SELECT s.id,'suggestion',s.source,coalesce(s."actionTitle",s.title),NULL::uuid,s."userId",false,
           (s."dismissedAt" IS NULL AND s."createdAt">now()-interval '7 days'),s."rejectedAt",s."rejectedBy",NULL::uuid,NULL::text FROM suggestions s
         LEFT JOIN bots b ON b.id=s."botId" AND b."ownerId"=s."userId"
-        WHERE s."userId"=$1 AND s.shown AND (b."workspaceId"=$2 OR (s."botId" IS NULL AND $4))
+        WHERE s."userId"=$1 AND s.shown AND (b."workspaceId"=$2 OR (s."botId" IS NULL AND $3))
       ) SELECT s.*,z."snoozedUntil" FROM sources s LEFT JOIN inbox_snoozes z
         ON z."workspaceId"=$2 AND z."userId"=$1 AND z."itemType"=s.type AND z."itemId"=s.id
-      WHERE ($6::text IS NULL OR s.type=$6) AND ($7::uuid IS NULL OR s.id=$7)
-      `, values: [userId, workspaceId, scope.issueIds, scope.personal, scope.otherIssueIds, type ?? null, id ?? null] }
+      WHERE ($4::text IS NULL OR s.type=$4) AND ($5::uuid IS NULL OR s.id=$5)
+      `, values: [userId, workspaceId, scope.personal, type ?? null, id ?? null] }
   }
   private async sources(tx: Pick<PoolClient, 'query'>, userId: string, workspaceId: string, scope: Scope, type?: string, id?: string) {
     return (await tx.query<SourceRow>(this.sourceQuery(userId, workspaceId, scope, type, id))).rows
   }
 
-  async list(userId: string, workspaceId: string, tab: 'pending' | 'done' | 'snoozed', limit: number, cursor?: string): Promise<InboxPage> {
-    return this.guard(userId, workspaceId, async scope => {
+  async list(reader: InboxReader, workspaceId: string, tab: 'pending' | 'done' | 'snoozed', limit: number, cursor?: string): Promise<InboxPage> {
+    const userId = typeof reader === 'string' ? reader : reader.id
+    return this.guard(reader, workspaceId, async scope => {
       const source = this.sourceQuery(userId, workspaceId, scope)
       const since = (await this.pool.query<{ historySince: Date }>('SELECT "historySince" FROM inbox_metadata')).rows[0].historySince.toISOString()
       const project = (s: SourceRow, done = false): InboxEntry => {
@@ -67,8 +69,8 @@ export class InboxStore {
         if (cursor && (!/^(task|suggestion):/.test(cursor) || !isInboxId(cursor.split(':')[1]))) throw new InboxError('inboxInvalid', 422)
         const { rows: items } = await this.pool.query<SourceRow>(`
           SELECT * FROM (${source.text}) eligible WHERE pending AND
-            CASE WHEN $8::text='snoozed' THEN "snoozedUntil" IS NOT NULL ELSE "snoozedUntil" IS NULL END
-            AND ($9::text IS NULL OR (type||':'||id)>$9) ORDER BY type,id LIMIT $10`, [...source.values, tab, cursor ?? null, limit + 1])
+            CASE WHEN $6::text='snoozed' THEN "snoozedUntil" IS NOT NULL ELSE "snoozedUntil" IS NULL END
+            AND ($7::text IS NULL OR (type||':'||id)>$7) ORDER BY type,id LIMIT $8`, [...source.values, tab, cursor ?? null, limit + 1])
         return { items: items.slice(0, limit).map(s => project(s)), nextCursor: items.length > limit ? key(items[limit - 1].type, items[limit - 1].id) : null, historySince: since }
       }
       let after: { at: string; id: string } | null = null
@@ -83,18 +85,19 @@ export class InboxStore {
         SELECT s.*,h.id AS "historyId",h.action,h."actorId",h."createdAt",h."runId" AS "completionRunId",
           to_char(h."createdAt" AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "cursorAt"
         FROM inbox_history h JOIN eligible s ON s.type=h."itemType" AND s.id=h."itemId"
-        WHERE ($8::timestamptz IS NULL OR (h."createdAt",h.id)<($8::timestamptz,$9::uuid))
-        ORDER BY h."createdAt" DESC,h.id DESC LIMIT $10`, [...source.values, after?.at ?? null, after?.id ?? null, limit + 1])
+        WHERE ($6::timestamptz IS NULL OR (h."createdAt",h.id)<($6::timestamptz,$7::uuid))
+        ORDER BY h."createdAt" DESC,h.id DESC LIMIT $8`, [...source.values, after?.at ?? null, after?.id ?? null, limit + 1])
       const page = rows.slice(0, limit)
       return { items: page.map(row => ({ ...project(row, true), completion: { id: row.historyId, action: row.action, actorId: row.actorId, at: row.createdAt.toISOString(), runId: row.completionRunId } })),
         nextCursor: rows.length > limit ? Buffer.from(JSON.stringify({ at: page.at(-1)!.cursorAt, id: page.at(-1)!.historyId })).toString('base64url') : null, historySince: since }
     })
   }
 
-  async command(userId: string, command: InboxCommand) {
+  async command(reader: InboxReader, command: InboxCommand) {
+    const userId = typeof reader === 'string' ? reader : reader.id
     const { workspaceId, type, id, action } = command
     if (action === 'snooze' && new Date(command.until).getTime() <= this.now().getTime()) throw new InboxError('inboxInvalid', 422)
-    const result = await this.guard(userId, workspaceId, async scope => {
+    const result = await this.guard(reader, workspaceId, async scope => {
       const tx = await this.pool.connect()
       try {
         await tx.query('BEGIN')
