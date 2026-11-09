@@ -1,0 +1,124 @@
+name: Issue 1782 own GitHub write child
+on:
+  push:
+    branches: [ops/self-hosted-vault-closeout-20261108]
+    paths:
+      - .github/workflows/issue1782-github-write.yml
+      - scripts/ops/issue1782/github-write-*
+permissions: {}
+jobs:
+  github_child:
+    if: ${{ false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    concurrency:
+      group: production-smoke-owner-acceptance
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      contents: read
+      actions: read
+      issues: read
+      id-token: write
+    env:
+      MIKKA_GITHUB_REPAIR_GO: UNBOUND
+      MIKKA_EDITION: cloud
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          path: ops
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: UNBOUND
+          path: application
+          fetch-depth: 1
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Run every provider, store and source-bound guard regression without credentials
+        run: node --test ops/scripts/ops/issue1782/github-write.test.mjs ops/scripts/ops/issue1782/github-write-guard.test.mjs
+      - name: Install the exact current application's normal dependencies before credentials
+        working-directory: application
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+          FFMPEG_GITHUB_TOKEN: ${{ github.token }}
+        run: corepack enable && corepack prepare pnpm@10.34.3 --activate && pnpm install --frozen-lockfile
+      - name: Verify exact source, current main, public version, latest window and idle runtime before Infisical
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node ops/scripts/ops/issue1782/github-write-guard.mjs --prepare
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /neon
+          secret-name: DATABASE_URL
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: MIKKA_DATABASE_URL
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: BETTER_AUTH_SECRET
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: GITHUB_CLIENT_ID
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: GITHUB_CLIENT_SECRET
+          recursive: false
+          include-imports: false
+      - name: Revalidate and prepare only this batch's independently minted single-repository child
+        working-directory: application
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          NODE_ENV: production
+          VERCEL_ENV: production
+          BETTER_AUTH_URL: https://app.aspectlylabs.com
+          NEXT_PUBLIC_APP_URL: https://app.aspectlylabs.com
+        run: node --import ./tests/support/server-only.mjs --import tsx ../ops/scripts/ops/issue1782/github-write-runner.mjs --prepare
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1782-github-write-prepare-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/issue1782-github-write-report/receipt.json
+          if-no-files-found: error
+          retention-days: 7
