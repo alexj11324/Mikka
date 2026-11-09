@@ -235,8 +235,8 @@ export async function setMemoryFactScope(userId: string, workspaceId: string, id
   const scope = await validatedScope(userId, input)
   const [owned] = await db.select().from(userFacts).where(and(eq(userFacts.id, id), eq(userFacts.userId, userId))).limit(1)
   if (!owned || owned.state !== 'active') return false
-  if (owned.scopeKind === scope.kind && JSON.stringify([...owned.scopeIds].sort()) === JSON.stringify(scope.ids)) return true
   if (!await accessibleFact(userId, workspaceId, id)) return false
+  if (owned.scopeKind === scope.kind && JSON.stringify([...owned.scopeIds].sort()) === JSON.stringify(scope.ids)) return true
   await db.update(userFacts).set({ scopeKind: scope.kind, scopeIds: scope.ids, updatedAt: new Date() })
     .where(and(eq(userFacts.id, id), eq(userFacts.userId, userId), eq(userFacts.state, 'active')))
   return true
