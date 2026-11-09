@@ -41,13 +41,17 @@ export class ClaudeGenerationMetrics {
         return
       }
       const body = record(message.message)
+      const aborted = message.aborted === true
       // Full messages are a fallback for producers without streaming. Block-level
-      // assistant frames have stop_reason=null and non-final usage; never count them.
-      if (!identifier(body.id) || (body.stop_reason == null && !message.error) || this.completed.has(body.id)) return
+      // frames have no stop_reason; the SDK's explicit aborted frame is terminal.
+      if (!identifier(body.id) || (body.stop_reason == null && !message.error && !aborted) || this.completed.has(body.id)) return
       const existing = this.active.get(channel)
-      const generation = existing?.id === body.id ? existing : { id: body.id, model: modelLabel(body.model), startedAt: this.now() }
+      const generation: ClaudeGeneration = existing?.id === body.id ? existing : { id: body.id, model: modelLabel(body.model), startedAt: this.now() }
       this.usage(generation, body.usage)
-      this.finish(channel, generation, Boolean(message.error))
+      // An interrupted assistant still carries message_start's output placeholder,
+      // not final response usage. Preserve unknown output instead of reporting it.
+      if (aborted) generation.output = undefined
+      this.finish(channel, generation, Boolean(message.error) || aborted)
     } catch { /* A CLI telemetry frame cannot interrupt the session. */ }
   }
 

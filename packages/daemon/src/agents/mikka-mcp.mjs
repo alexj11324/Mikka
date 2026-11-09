@@ -30,6 +30,7 @@ const backend = createMikkaMcpBackend({
   artifactRoot: value('--factory-artifacts'), repositoryRoot: value('--repository-selection'),
   decisionUrl: process.env.MIKKA_DECISION_MCP_URL, decisionToken: process.env.MIKKA_DECISION_MCP_TOKEN,
   decisionCatalogue: process.env.MIKKA_DECISION_MCP_CATALOGUE,
+  decisionTraceparent: process.env.MIKKA_DECISION_MCP_TRACEPARENT,
   observationUrl: process.env.MIKKA_MCP_HTTP_OBSERVATION_URL, env: process.env,
 })
 const send = response => { if (response) process.stdout.write(JSON.stringify(response) + '\n') }

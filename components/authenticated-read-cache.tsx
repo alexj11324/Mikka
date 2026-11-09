@@ -25,7 +25,7 @@ export function AuthenticatedReadCache({ ownerId, workspace, build = APP_BUILD, 
 
 function ReadCacheBoundary({ scope, unauthorized, initialReads, children }: { scope: ReadCacheScope | null; unauthorized: boolean; initialReads?: readonly InitialRead[]; children: ReactNode }) {
   const router = useRouter()
-  const [state, setState] = useState<{ cache: Cache; generation: number }>(() => {
+  const [state, setState] = useState<{ cache: Cache; generation: number; retired?: boolean }>(() => {
     const cache: Cache = scope ? new PersistentReadCache(scope) : new Map()
     // SWR fallback is not necessarily stored in the provider. Put authorized
     // server reads there before the asynchronous disk snapshot can arrive.
@@ -38,15 +38,22 @@ function ReadCacheBoundary({ scope, unauthorized, initialReads, children }: { sc
   const config = useMemo(() => ({ provider: () => state.cache }), [state.cache])
   useEffect(() => { if (unauthorized) void clearPersistentReadCaches() }, [unauthorized])
   useEffect(() => {
-    if (!(state.cache instanceof PersistentReadCache)) return
-    return state.cache.connect(() => {
+    if (state.retired || !(state.cache instanceof PersistentReadCache)) return
+    return state.cache.connect(documentNavigation => {
+      if (documentNavigation) {
+        // Clear the old view without mounting another reader before assign().
+        // The next Document creates its ordinary fresh authorized boundary.
+        setState(current => ({ ...current, retired: true }))
+        return
+      }
       // Retire the whole provider, including in-flight requests and component
       // refs. Remounted children use an empty in-memory cache until the server
       // confirms the new account/workspace. An old fetch cannot refill it.
       setState(current => ({ cache: new Map(), generation: current.generation + 1 }))
       router.refresh()
     })
-  }, [state.cache, router])
+  }, [state.cache, state.retired, router])
+  if (state.retired) return null
   return <SWRConfig key={state.generation} value={config}><HydrateReadCache />{children}</SWRConfig>
 }
 

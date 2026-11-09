@@ -1,9 +1,10 @@
+import { captureReadDispatch } from '@/lib/swr/read-observer'
 import { withBasePath } from '@/lib/base-path'
 import { decode, encodeArgs, DESKTOP_RPC_VERSION } from '@/lib/desktop-rpc/wire'
 import { isBatchReadAction } from '@/lib/desktop-rpc/read-batch-contract'
 import { localeOf, type Locale } from './location'
 import { setTransportState } from './transport-state'
-import { DesktopTransportError, enqueueRead } from './read-batch'
+import { DesktopTransportError, enqueueRead, isSnapshotReadAction } from './read-batch'
 
 export { DesktopTransportError, resetReadBatchScope } from './read-batch'
 
@@ -28,6 +29,9 @@ export async function callRemoteAction<T = unknown>(action: string, args: unknow
   const encoded = await encodeArgs(args)
   assertCurrent()
   let response: Response
+  // Only this snapshot read (or its batch envelope) supplies a dispatch proof.
+  // Other list actions may merge cached data or issue additional reads.
+  const prove = transport.endpoint === '/api/desktop/rpc' && (isSnapshotReadAction(action) || action === 'desktop.readBatch') ? captureReadDispatch() : undefined
   try {
     response = await fetch(withBasePath(transport.endpoint), {
       method: 'POST',
@@ -60,5 +64,6 @@ export async function callRemoteAction<T = unknown>(action: string, args: unknow
   if (!value.ok) throw new DesktopTransportError(value.error?.code ?? 'desktop_rpc_response_invalid', { status: response.status })
   if (!response.ok) throw new DesktopTransportError('desktop_rpc_request_rejected', { status: response.status })
   setTransportState('ready')
-  return decode(value.result) as T
+  const result = decode(value.result) as T
+  return prove ? prove(result) : result
 }
