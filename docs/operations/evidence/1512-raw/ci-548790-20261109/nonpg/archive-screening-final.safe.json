@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "preparedAtUTC": "2026-11-09T03:49:23.880643+00:00",
+  "scope": "Fourteen once-downloaded non-PG/non-Native terminal decoded job logs. Signature screening, original bytes unchanged.",
+  "files": 14,
+  "counts": {
+    "private_key": 0,
+    "github_token": 0,
+    "posthog_token": 0,
+    "aws_access_key": 0,
+    "jwt": 0,
+    "bearer_material": 9,
+    "email": 0,
+    "signed_url_material": 0,
+    "slack_token": 0
+  },
+  "findings": [
+    {
+      "path": "128963364148.original.log",
+      "line": 2138,
+      "category": "bearer_material",
+      "matches": 1,
+      "classification": "test-title prose, not a token value"
+    },
+    {
+      "path": "128963364213.original.log",
+      "line": 925,
+      "category": "bearer_material",
+      "matches": 1,
+      "classification": "test-title prose, not a token value"
+    },
+    {
+      "path": "128963364213.original.log",
+      "line": 966,
+      "category": "bearer_material",
+      "matches": 1,
+      "classification": "test-title prose, not a token value"
+    },
+    {
+      "path": "128963364213.original.log",
+      "line": 990,
+      "category": "bearer_material",
+      "matches": 1,
+      "classification": "test-title prose, not a token value"
+    },
+    {
+      "path": "128963583411.original.log",
+      "line": 2859,
+      "category": "bearer_material",
+      "matches": 1,
+      "classification": "test-title prose, not a token value"
+    },
+    {
+      "path": "128963583411.original.log",
+      "line": 2893,
+      "category": "bearer_material",
+      "matches": 1,
+      "classification": "test-title prose, not a token value"
+    },
+    {
+      "path": "128963583411.original.log",
+      "line": 3063,
+      "category": "bearer_material",
+      "matches": 1,
+      "classification": "test-title prose, not a token value"
+    },
+    {
+      "path": "128963583411.original.log",
+      "line": 3064,
+      "category": "bearer_material",
+      "matches": 1,
+      "classification": "test-title prose, not a token value"
+    },
+    {
+      "path": "128963583411.original.log",
+      "line": 3073,
+      "category": "bearer_material",
+      "matches": 1,
+      "classification": "test-title prose, not a token value"
+    }
+  ],
+  "unresolved": 0,
+  "valuesDisclosed": false,
+  "privacyBoundary": "API/platform raw envelopes remain private. This index contains only file names, line numbers, categories and classification."
+}

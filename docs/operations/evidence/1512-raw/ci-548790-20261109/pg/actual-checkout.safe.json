@@ -1,0 +1,14 @@
+{
+  "schema": "issue1512.ci-548790.actual-checkout.v1",
+  "sourceUrl": "https://api.github.com/repos/alexj11324/Mikka/git/commits/90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+  "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+  "tree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+  "parents": [
+    "0e4118020311ae8f9083d0d21cfb990be0282f25",
+    "548790b4676d5e43556bf62cf452c3c5aee68073"
+  ],
+  "eventHead": "548790b4676d5e43556bf62cf452c3c5aee68073",
+  "eventHeadTree": "933f76fbff37682f2f9cfaf64e672d229531f5ff",
+  "sameTreeAsReportedHead": false,
+  "boundary": "Exact Git commit API projection. Full source equivalence is by tree; each job must still show this checkout in its own final log."
+}

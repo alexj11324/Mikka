@@ -1,0 +1,35 @@
+{
+  "noMatchedValuesPrinted": true,
+  "files": [
+    {
+      "path": "native-548790-original/lifecycle.json",
+      "matches": [],
+      "unresolved": 0
+    },
+    {
+      "path": "native-548790-original/smoke.json",
+      "matches": [],
+      "unresolved": 0
+    },
+    {
+      "path": "native-548790-original/parity/parity.json",
+      "matches": [],
+      "unresolved": 0
+    },
+    {
+      "path": "package-548790-original/native-crypto.json",
+      "matches": [],
+      "unresolved": 0
+    },
+    {
+      "path": "package-548790-original/mac-acceptance-package.json",
+      "matches": [],
+      "unresolved": 0
+    },
+    {
+      "path": "private/job-128965799828.original.log",
+      "matches": [],
+      "unresolved": 0
+    }
+  ]
+}

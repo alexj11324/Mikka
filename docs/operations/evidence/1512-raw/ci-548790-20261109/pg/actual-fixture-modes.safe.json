@@ -1,0 +1,124 @@
+{
+  "schema": "issue1512.ci-548790.actual-fixture-modes.v1",
+  "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+  "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+  "source": "Five exact Git tree API responses; each non-truncated child is followed from the actual checkout tree.",
+  "chain": [
+    {
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/trees/56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "tree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "component": "packages",
+      "child": "1797fc5aa3eb462e14e5552972739e88c62c76f4",
+      "mode": "040000",
+      "type": "tree"
+    },
+    {
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/trees/1797fc5aa3eb462e14e5552972739e88c62c76f4",
+      "tree": "1797fc5aa3eb462e14e5552972739e88c62c76f4",
+      "component": "daemon",
+      "child": "497f81a2cd20875c847be0816ef67897056e50e4",
+      "mode": "040000",
+      "type": "tree"
+    },
+    {
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/trees/497f81a2cd20875c847be0816ef67897056e50e4",
+      "tree": "497f81a2cd20875c847be0816ef67897056e50e4",
+      "component": "test",
+      "child": "4f0bb6fdf176c751fe5d8e781720bb64151919a8",
+      "mode": "040000",
+      "type": "tree"
+    },
+    {
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/trees/4f0bb6fdf176c751fe5d8e781720bb64151919a8",
+      "tree": "4f0bb6fdf176c751fe5d8e781720bb64151919a8",
+      "component": "fakes",
+      "child": "fed76966734f5953de365783a3fb25f69c8384a5",
+      "mode": "040000",
+      "type": "tree"
+    },
+    {
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/trees/fed76966734f5953de365783a3fb25f69c8384a5",
+      "tree": "fed76966734f5953de365783a3fb25f69c8384a5",
+      "component": null,
+      "entries": [
+        {
+          "path": "fake-claude-generation-abort.mjs",
+          "mode": "100755",
+          "type": "blob",
+          "sha": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+          "size": 3767,
+          "url": "https://api.github.com/repos/alexj11324/Mikka/git/blobs/09e0751562d1164cb3c0ba67fe7e4bc971dc3116"
+        },
+        {
+          "path": "fake-codex-generation-completion.mjs",
+          "mode": "100755",
+          "type": "blob",
+          "sha": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+          "size": 4466,
+          "url": "https://api.github.com/repos/alexj11324/Mikka/git/blobs/2b4fd7946c39a83eac97def4bab1cf0839802a3b"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "actualMode": "100755",
+      "actualBlob": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+      "actualBytes": 3767,
+      "frozenMode": "100755",
+      "frozenBlob": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+      "frozenBytes": 3767,
+      "exactMatch": true
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+      "actualMode": "100755",
+      "actualBlob": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+      "actualBytes": 4466,
+      "frozenMode": "100755",
+      "frozenBlob": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+      "frozenBytes": 4466,
+      "exactMatch": true
+    }
+  ],
+  "inputs": [
+    {
+      "path": "actual-mode-trees/56e5616bc48d43654c867cb13ea9c6c4ba393d07.original.json",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/trees/56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "bytes": 12803,
+      "sha256": "1b398045501dcc5f1f1cab4505fd90f25ec048c9e440f208f96acb0b987d7594",
+      "gitBlob": "1d53a5248abd5526953d6de0a7efedee29756fee"
+    },
+    {
+      "path": "actual-mode-trees/1797fc5aa3eb462e14e5552972739e88c62c76f4.original.json",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/trees/1797fc5aa3eb462e14e5552972739e88c62c76f4",
+      "bytes": 1005,
+      "sha256": "d0114bfde94f6c848b7c029af9a0442cc006e58ee6b88d887c7cdd04a29dec2a",
+      "gitBlob": "5656888863c23dda426b3399aa18f7c49f5b373e"
+    },
+    {
+      "path": "actual-mode-trees/497f81a2cd20875c847be0816ef67897056e50e4.original.json",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/trees/497f81a2cd20875c847be0816ef67897056e50e4",
+      "bytes": 2500,
+      "sha256": "c4086adf1c17406dfa2d0da98fcce7dd73411f536faf547e82872f6bef653f62",
+      "gitBlob": "fbc06a914c6060b9c161f2f7378564a4aca97db4"
+    },
+    {
+      "path": "actual-mode-trees/4f0bb6fdf176c751fe5d8e781720bb64151919a8.original.json",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/trees/4f0bb6fdf176c751fe5d8e781720bb64151919a8",
+      "bytes": 28122,
+      "sha256": "35f2f14ed68697d1b4306643399bc9c3266a2d855ef8fea827660ff093586225",
+      "gitBlob": "a02b845173e0aa39b1b5fdbe593bbb4a3e42d12f"
+    },
+    {
+      "path": "actual-mode-trees/fed76966734f5953de365783a3fb25f69c8384a5.original.json",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/trees/fed76966734f5953de365783a3fb25f69c8384a5",
+      "bytes": 2964,
+      "sha256": "f0a6d11335d0738f7645e98c63bd5dcae9278b4a936211b58c0d992f6ea2d240",
+      "gitBlob": "3aad0affef9916bbffdebdcb5b4ac301b9617833"
+    }
+  ],
+  "resolvesPriorUnknown": "The two null SHA entries in commit diff API are independently resolved here; prior owned-source-merge-review.safe.json is preserved. Both actual mode100755 and original blobs are now observed.",
+  "boundary": "This is source mode/blob evidence, not a daemon release, worker identity equivalence, or seal execution. No new jobs/tests were run."
+}

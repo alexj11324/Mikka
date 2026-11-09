@@ -1,0 +1,309 @@
+{
+  "schema": 1,
+  "kind": "root-independent-native-budget-and-conservation",
+  "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+  "sourceFileBytes": 695452,
+  "sourceFileSha256": "e0185c5197dfb3460a98d1ac7df72ee855745aa76dd38b48bb1e975652c94f6b",
+  "records": [
+    {
+      "window": "webLogin",
+      "kind": "checkpoint",
+      "ordinal": 0,
+      "queryCalls": 26559,
+      "operationSum": 26559,
+      "nestedUnattributedSourceSum": 8149
+    },
+    {
+      "window": "webLogin",
+      "kind": "checkpoint",
+      "ordinal": 1,
+      "queryCalls": 26578,
+      "operationSum": 26578,
+      "nestedUnattributedSourceSum": 8149
+    },
+    {
+      "window": "webLogin",
+      "kind": "checkpoint",
+      "ordinal": 2,
+      "queryCalls": 26578,
+      "operationSum": 26578,
+      "nestedUnattributedSourceSum": 8149
+    },
+    {
+      "window": "webLogin",
+      "kind": "checkpoint",
+      "ordinal": 3,
+      "queryCalls": 26971,
+      "operationSum": 26971,
+      "nestedUnattributedSourceSum": 8241
+    },
+    {
+      "window": "webLogin",
+      "kind": "segment",
+      "ordinal": 0,
+      "queryCalls": 19,
+      "operationSum": 19,
+      "nestedUnattributedSourceSum": 0
+    },
+    {
+      "window": "webLogin",
+      "kind": "segment",
+      "ordinal": 1,
+      "queryCalls": 0,
+      "operationSum": 0,
+      "nestedUnattributedSourceSum": 0
+    },
+    {
+      "window": "webLogin",
+      "kind": "segment",
+      "ordinal": 2,
+      "queryCalls": 393,
+      "operationSum": 393,
+      "nestedUnattributedSourceSum": 92
+    },
+    {
+      "window": "webLogin",
+      "kind": "total",
+      "ordinal": 0,
+      "queryCalls": 412,
+      "operationSum": 412,
+      "nestedUnattributedSourceSum": 92
+    },
+    {
+      "window": "nativeLogin",
+      "kind": "checkpoint",
+      "ordinal": 0,
+      "queryCalls": 26971,
+      "operationSum": 26971,
+      "nestedUnattributedSourceSum": 8241
+    },
+    {
+      "window": "nativeLogin",
+      "kind": "checkpoint",
+      "ordinal": 1,
+      "queryCalls": 26990,
+      "operationSum": 26990,
+      "nestedUnattributedSourceSum": 8241
+    },
+    {
+      "window": "nativeLogin",
+      "kind": "checkpoint",
+      "ordinal": 2,
+      "queryCalls": 27005,
+      "operationSum": 27005,
+      "nestedUnattributedSourceSum": 8241
+    },
+    {
+      "window": "nativeLogin",
+      "kind": "checkpoint",
+      "ordinal": 3,
+      "queryCalls": 27368,
+      "operationSum": 27368,
+      "nestedUnattributedSourceSum": 8335
+    },
+    {
+      "window": "nativeLogin",
+      "kind": "segment",
+      "ordinal": 0,
+      "queryCalls": 19,
+      "operationSum": 19,
+      "nestedUnattributedSourceSum": 0
+    },
+    {
+      "window": "nativeLogin",
+      "kind": "segment",
+      "ordinal": 1,
+      "queryCalls": 15,
+      "operationSum": 15,
+      "nestedUnattributedSourceSum": 0
+    },
+    {
+      "window": "nativeLogin",
+      "kind": "segment",
+      "ordinal": 2,
+      "queryCalls": 363,
+      "operationSum": 363,
+      "nestedUnattributedSourceSum": 94
+    },
+    {
+      "window": "nativeLogin",
+      "kind": "total",
+      "ordinal": 0,
+      "queryCalls": 397,
+      "operationSum": 397,
+      "nestedUnattributedSourceSum": 94
+    },
+    {
+      "window": "startup-bundled",
+      "kind": "checkpoint",
+      "ordinal": 0,
+      "queryCalls": 27945,
+      "operationSum": 27945,
+      "nestedUnattributedSourceSum": 8597
+    },
+    {
+      "window": "startup-bundled",
+      "kind": "checkpoint",
+      "ordinal": 1,
+      "queryCalls": 28115,
+      "operationSum": 28115,
+      "nestedUnattributedSourceSum": 8638
+    },
+    {
+      "window": "startup-bundled",
+      "kind": "segment",
+      "ordinal": 0,
+      "queryCalls": 170,
+      "operationSum": 170,
+      "nestedUnattributedSourceSum": 41
+    },
+    {
+      "window": "startup-bundled",
+      "kind": "total",
+      "ordinal": 0,
+      "queryCalls": 170,
+      "operationSum": 170,
+      "nestedUnattributedSourceSum": 41
+    },
+    {
+      "window": "startup-hosted",
+      "kind": "checkpoint",
+      "ordinal": 0,
+      "queryCalls": 28120,
+      "operationSum": 28120,
+      "nestedUnattributedSourceSum": 8643
+    },
+    {
+      "window": "startup-hosted",
+      "kind": "checkpoint",
+      "ordinal": 1,
+      "queryCalls": 28324,
+      "operationSum": 28324,
+      "nestedUnattributedSourceSum": 8699
+    },
+    {
+      "window": "startup-hosted",
+      "kind": "segment",
+      "ordinal": 0,
+      "queryCalls": 204,
+      "operationSum": 204,
+      "nestedUnattributedSourceSum": 56
+    },
+    {
+      "window": "startup-hosted",
+      "kind": "total",
+      "ordinal": 0,
+      "queryCalls": 204,
+      "operationSum": 204,
+      "nestedUnattributedSourceSum": 56
+    }
+  ],
+  "all24BucketSumsEqual": true,
+  "unknownReadingsAllZero": true,
+  "unknownReadingMeaning": "Measurement snapshots only. Diagnostic unknown context/shape is separate and is not zeroed.",
+  "windows": {
+    "webLogin": {
+      "start": "2026-11-09T03:58:17.854Z",
+      "end": "2026-11-09T03:58:21.387Z",
+      "total": 412,
+      "segments": [
+        19,
+        0,
+        393
+      ],
+      "checkpointDelta": 412
+    },
+    "nativeLogin": {
+      "start": "2026-11-09T03:58:22.824Z",
+      "end": "2026-11-09T03:58:30.893Z",
+      "total": 397,
+      "segments": [
+        19,
+        15,
+        363
+      ],
+      "checkpointDelta": 397
+    },
+    "startup-bundled": {
+      "start": "2026-11-09T03:58:46.607Z",
+      "end": "2026-11-09T03:58:49.171Z",
+      "total": 170,
+      "segments": [
+        170
+      ],
+      "checkpointDelta": 170
+    },
+    "startup-hosted": {
+      "start": "2026-11-09T03:58:49.650Z",
+      "end": "2026-11-09T03:58:51.624Z",
+      "total": 204,
+      "segments": [
+        204
+      ],
+      "checkpointDelta": 204
+    }
+  },
+  "firstOriginalWindowsUsed": true,
+  "sourcePath": "native-548790-original/lifecycle.json",
+  "noTestRerun": true,
+  "cleanupStages": [
+    {
+      "stage": "browser-close",
+      "result": "passed"
+    },
+    {
+      "stage": "daemon-drain",
+      "result": "passed"
+    },
+    {
+      "stage": "native-resources",
+      "result": "passed"
+    },
+    {
+      "stage": "fixtures",
+      "result": "passed"
+    },
+    {
+      "stage": "workspace-generated-name",
+      "result": "passed"
+    },
+    {
+      "stage": "lease-release",
+      "result": "passed"
+    }
+  ],
+  "nativeCleanup": {
+    "cleaned": true,
+    "counts": {
+      "desktop_auth_requests": 2,
+      "device_token_devices": 1,
+      "device_management_commands": 0,
+      "device_repos": 0,
+      "agents": 2,
+      "device_tokens": 1,
+      "device_enrollments": 0,
+      "devices": 1
+    }
+  },
+  "workspaceNameCleanup": {
+    "captured": true,
+    "phase": "unchanged",
+    "restored": false,
+    "initialName": {
+      "en": false,
+      "zhCN": true
+    },
+    "initialOwnerMatchesSealedBaseline": false,
+    "beforeName": {
+      "en": false,
+      "zhCN": true
+    },
+    "peerMatchesSealedBaseline": true,
+    "afterName": {
+      "en": false,
+      "zhCN": true
+    },
+    "ownerMatchesSealedBaseline": true
+  },
+  "verificationMethod": "17 operation buckets sum to queryCalls; 78 source buckets sum to the nested unattributed operation, not added again. Four checkpoint differences equal original segment sums and totals."
+}

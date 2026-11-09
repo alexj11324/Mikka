@@ -1,0 +1,553 @@
+{
+  "schema": "issue1512.ci548790.cp18.publication.v1",
+  "preparedAtUTC": "2026-11-09T03:56:18.885803+00:00",
+  "repository": "alexj11324/Mikka",
+  "ciRunId": 42556448828,
+  "ciRunURL": "https://github.com/alexj11324/Mikka/actions/runs/42556448828",
+  "eventHead": "548790b4676d5e43556bf62cf452c3c5aee68073",
+  "eventHeadTree": "933f76fbff37682f2f9cfaf64e672d229531f5ff",
+  "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+  "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+  "actualSourceBinding": "13 of 14 terminal decoded logs contain an explicit git log -1 full SHA; the analytics-only aggregate has no checkout and remains null. The exact commit-to-tree API is referenced by the unchanged main index.",
+  "status": "all_owned_non_pg_non_native_leaves_passed",
+  "files": [
+    {
+      "publicationPath": "main-leaves-final.safe.json",
+      "kind": "safe-json-projection",
+      "originalPath": "issue1512-evidence-work/ci-548790/nonpg/main-leaves-final.safe.json",
+      "original": {
+        "bytes": 59054,
+        "sha256": "7d4a9d2037f751ec05c15910a3bff0cbd5ad32008379297377e540e1121c19ce",
+        "gitBlobSHA1": "0012a2be7795e8087487ba705d92ebba3f6dec4f"
+      },
+      "publishedCopy": {
+        "bytes": 59054,
+        "sha256": "7d4a9d2037f751ec05c15910a3bff0cbd5ad32008379297377e540e1121c19ce",
+        "gitBlobSHA1": "0012a2be7795e8087487ba705d92ebba3f6dec4f"
+      },
+      "byteIdenticalToFrozenSource": true
+    },
+    {
+      "publicationPath": "archive-manifest.safe.json",
+      "kind": "safe-json-projection",
+      "originalPath": "issue1512-evidence-work/ci-548790/nonpg/archive-manifest.safe.json",
+      "original": {
+        "bytes": 5416,
+        "sha256": "a0ecaa17e15b4cd98c4f3a41608720549d508d294f7a117101c79910ca87c878",
+        "gitBlobSHA1": "fabfdeda6f765c2ff60ab503b71dac5f0984eb86"
+      },
+      "publishedCopy": {
+        "bytes": 5416,
+        "sha256": "a0ecaa17e15b4cd98c4f3a41608720549d508d294f7a117101c79910ca87c878",
+        "gitBlobSHA1": "fabfdeda6f765c2ff60ab503b71dac5f0984eb86"
+      },
+      "byteIdenticalToFrozenSource": true
+    },
+    {
+      "publicationPath": "unit-reconciliation.safe.json",
+      "kind": "safe-json-projection",
+      "originalPath": "issue1512-evidence-work/ci-548790/nonpg/unit-reconciliation.safe.json",
+      "original": {
+        "bytes": 11332,
+        "sha256": "3a6ca503f89b8b0c5e9ffb59c105bcc212b896f05d4bb65252b12747296ec1ef",
+        "gitBlobSHA1": "988e58aa4606b9d0b29f16d6d05e91484230c303"
+      },
+      "publishedCopy": {
+        "bytes": 11332,
+        "sha256": "3a6ca503f89b8b0c5e9ffb59c105bcc212b896f05d4bb65252b12747296ec1ef",
+        "gitBlobSHA1": "988e58aa4606b9d0b29f16d6d05e91484230c303"
+      },
+      "byteIdenticalToFrozenSource": true
+    },
+    {
+      "publicationPath": "companion-workflows-final.safe.json",
+      "kind": "safe-json-projection",
+      "originalPath": "issue1512-evidence-work/ci-548790/nonpg/companion-workflows-final.safe.json",
+      "original": {
+        "bytes": 53551,
+        "sha256": "e80ad81e0efd087b36f0e0dcd8cdc96a939186d31f10f381587cb8ffed119993",
+        "gitBlobSHA1": "b8233f3a53aa24e6ac8718079e0f23ceffc13253"
+      },
+      "publishedCopy": {
+        "bytes": 53551,
+        "sha256": "e80ad81e0efd087b36f0e0dcd8cdc96a939186d31f10f381587cb8ffed119993",
+        "gitBlobSHA1": "b8233f3a53aa24e6ac8718079e0f23ceffc13253"
+      },
+      "byteIdenticalToFrozenSource": true
+    },
+    {
+      "publicationPath": "archive-screening-final.safe.json",
+      "kind": "safe-json-projection",
+      "originalPath": "issue1512-evidence-work/ci-548790/nonpg/archive-screening-final.safe.json",
+      "original": {
+        "bytes": 2414,
+        "sha256": "de965e235e9381a8fe02ac6a053a57aeb1076a89a7d9bdb7c72bcac9f07866bb",
+        "gitBlobSHA1": "80306ab9bbb7e69510a2f419d4cacb268354a1c5"
+      },
+      "publishedCopy": {
+        "bytes": 2414,
+        "sha256": "de965e235e9381a8fe02ac6a053a57aeb1076a89a7d9bdb7c72bcac9f07866bb",
+        "gitBlobSHA1": "80306ab9bbb7e69510a2f419d4cacb268354a1c5"
+      },
+      "byteIdenticalToFrozenSource": true
+    },
+    {
+      "publicationPath": "archive-logs/128963152085.original.log.gz",
+      "kind": "deterministic-gzip-of-once-downloaded-decoded-log",
+      "jobId": 128963152085,
+      "jobName": "changes / Changed files",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "originalPath": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963152085.original.log.gz",
+      "originalGzip": {
+        "bytes": 88736,
+        "sha256": "5080c8c7967fedcf50f529690a8e7ce69852ceeeab9430936b7de4dc14919463",
+        "gitBlobSHA1": "bd65ae23b967d864c9c1eea871994577e7b212ff"
+      },
+      "originalDecodedLog": {
+        "bytes": 558209,
+        "sha256": "81f95712566c8ba22bcc9094dd9670157e2eb4b016549a9b6a32e0824dfea3f4",
+        "gitBlobSHA1": "9ecc4727e91c94dfe7a87273ecc5ae68d9ec7eeb",
+        "source": "issue1512-evidence-work/ci-548790/nonpg/private/128963152085.original.log"
+      },
+      "publishedCopy": {
+        "bytes": 88736,
+        "sha256": "5080c8c7967fedcf50f529690a8e7ce69852ceeeab9430936b7de4dc14919463",
+        "gitBlobSHA1": "bd65ae23b967d864c9c1eea871994577e7b212ff"
+      },
+      "gzipMtime": 0,
+      "decodedBytesMatchFrozenOriginal": true,
+      "byteIdenticalToFrozenSource": true
+    },
+    {
+      "publicationPath": "archive-logs/128963364068.original.log.gz",
+      "kind": "deterministic-gzip-of-once-downloaded-decoded-log",
+      "jobId": 128963364068,
+      "jobName": "Daemon checks",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "originalPath": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963364068.original.log.gz",
+      "originalGzip": {
+        "bytes": 24602,
+        "sha256": "3a0876682f4106e436c67a0e8da7b6683f4a4834b554a3edf3467141a44820dc",
+        "gitBlobSHA1": "c3f5005609e2fb0e643225c9967f420c9b76199e"
+      },
+      "originalDecodedLog": {
+        "bytes": 114805,
+        "sha256": "d29677bbf5cd00dfa35557518162e308f9b5e44b49b34a744c369425955870c9",
+        "gitBlobSHA1": "678259d4f0f74c26b28cb6fd8c597d628a9cbe79",
+        "source": "issue1512-evidence-work/ci-548790/nonpg/private/128963364068.original.log"
+      },
+      "publishedCopy": {
+        "bytes": 24602,
+        "sha256": "3a0876682f4106e436c67a0e8da7b6683f4a4834b554a3edf3467141a44820dc",
+        "gitBlobSHA1": "c3f5005609e2fb0e643225c9967f420c9b76199e"
+      },
+      "gzipMtime": 0,
+      "decodedBytesMatchFrozenOriginal": true,
+      "byteIdenticalToFrozenSource": true
+    },
+    {
+      "publicationPath": "archive-logs/128963364148.original.log.gz",
+      "kind": "deterministic-gzip-of-once-downloaded-decoded-log",
+      "jobId": 128963364148,
+      "jobName": "Integration unit checks",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "originalPath": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963364148.original.log.gz",
+      "originalGzip": {
+        "bytes": 143045,
+        "sha256": "1a38bac5b3cbab338feb2c8dd8b9f14c371fad3d602a11c471eebd941f921583",
+        "gitBlobSHA1": "80089846aa031f30b3939c3e33c0efcca3b25312"
+      },
+      "originalDecodedLog": {
+        "bytes": 644722,
+        "sha256": "4505a8ff46cdc4dbc0abe7985a966ac4fb04240114919f01681614387c7e23f8",
+        "gitBlobSHA1": "797bc87600769ea4503a74cacc435d1d9b6cfdca",
+        "source": "issue1512-evidence-work/ci-548790/nonpg/private/128963364148.original.log"
+      },
+      "publishedCopy": {
+        "bytes": 143045,
+        "sha256": "1a38bac5b3cbab338feb2c8dd8b9f14c371fad3d602a11c471eebd941f921583",
+        "gitBlobSHA1": "80089846aa031f30b3939c3e33c0efcca3b25312"
+      },
+      "gzipMtime": 0,
+      "decodedBytesMatchFrozenOriginal": true,
+      "byteIdenticalToFrozenSource": true
+    },
+    {
+      "publicationPath": "archive-logs/128963364213.original.log.gz",
+      "kind": "deterministic-gzip-of-once-downloaded-decoded-log",
+      "jobId": 128963364213,
+      "jobName": "Source checks",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "originalPath": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963364213.original.log.gz",
+      "originalGzip": {
+        "bytes": 33432,
+        "sha256": "6d85f66b51365b64df713a3f26e71b5a1ce948e34be8df37bfb4fc99bab072cc",
+        "gitBlobSHA1": "7877dc421ed113cbfb1c73b8261bdce1d6b66473"
+      },
+      "originalDecodedLog": {
+        "bytes": 131986,
+        "sha256": "9071e5a30ce5ca7e7ac543ee048fcc3fbdb5f99fd27111aec7d0a67101ee9f3d",
+        "gitBlobSHA1": "510a31d6a025176e8d7bc717c0bf02d3accba4d0",
+        "source": "issue1512-evidence-work/ci-548790/nonpg/private/128963364213.original.log"
+      },
+      "publishedCopy": {
+        "bytes": 33432,
+        "sha256": "6d85f66b51365b64df713a3f26e71b5a1ce948e34be8df37bfb4fc99bab072cc",
+        "gitBlobSHA1": "7877dc421ed113cbfb1c73b8261bdce1d6b66473"
+      },
+      "gzipMtime": 0,
+      "decodedBytesMatchFrozenOriginal": true,
+      "byteIdenticalToFrozenSource": true
+    },
+    {
+      "publicationPath": "archive-logs/128963364224.original.log.gz",
+      "kind": "deterministic-gzip-of-once-downloaded-decoded-log",
+      "jobId": 128963364224,
+      "jobName": "Core unit checks",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "originalPath": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963364224.original.log.gz",
+      "originalGzip": {
+        "bytes": 244883,
+        "sha256": "28dbcf9eb474d4114b4aea1efe19588c709db4bb9c471e30a8effa7657a6b246",
+        "gitBlobSHA1": "b71ea8a783cc9ab163674d2dc692b616571b6801"
+      },
+      "originalDecodedLog": {
+        "bytes": 998766,
+        "sha256": "2cf70769333518be8d02ab369b3cc23de1bdea239d4499ca4628234e6dc351aa",
+        "gitBlobSHA1": "f3fcea00d722a4c84d1a13d683361e21925ea313",
+        "source": "issue1512-evidence-work/ci-548790/nonpg/private/128963364224.original.log"
+      },
+      "publishedCopy": {
+        "bytes": 244883,
+        "sha256": "28dbcf9eb474d4114b4aea1efe19588c709db4bb9c471e30a8effa7657a6b246",
+        "gitBlobSHA1": "b71ea8a783cc9ab163674d2dc692b616571b6801"
+      },
+      "gzipMtime": 0,
+      "decodedBytesMatchFrozenOriginal": true,
+      "byteIdenticalToFrozenSource": true
+    },
+    {
+      "publicationPath": "archive-logs/128963364555.original.log.gz",
+      "kind": "deterministic-gzip-of-once-downloaded-decoded-log",
+      "jobId": 128963364555,
+      "jobName": "analytics-checks / changes / Changed files",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "originalPath": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963364555.original.log.gz",
+      "originalGzip": {
+        "bytes": 90202,
+        "sha256": "ab8ec5fc6ec1d8db29c2f32f29a47bcfd90a6d4b259e492f0a4d8bf834e8ded5",
+        "gitBlobSHA1": "b8a515a5c179711f1473432e5837715025c31a33"
+      },
+      "originalDecodedLog": {
+        "bytes": 558312,
+        "sha256": "8dd14737b6e109fb2ded99f86844f8341eac1d95ce9310694a0fc20d6efbf569",
+        "gitBlobSHA1": "3a54ca0b9af57ef3b82d7427f34338e2a758b042",
+        "source": "issue1512-evidence-work/ci-548790/nonpg/private/128963364555.original.log"
+      },
+      "publishedCopy": {
+        "bytes": 90202,
+        "sha256": "ab8ec5fc6ec1d8db29c2f32f29a47bcfd90a6d4b259e492f0a4d8bf834e8ded5",
+        "gitBlobSHA1": "b8a515a5c179711f1473432e5837715025c31a33"
+      },
+      "gzipMtime": 0,
+      "decodedBytesMatchFrozenOriginal": true,
+      "byteIdenticalToFrozenSource": true
+    },
+    {
+      "publicationPath": "archive-logs/128963364654.original.log.gz",
+      "kind": "deterministic-gzip-of-once-downloaded-decoded-log",
+      "jobId": 128963364654,
+      "jobName": "desktop-checks / changes / Changed files",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "originalPath": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963364654.original.log.gz",
+      "originalGzip": {
+        "bytes": 88806,
+        "sha256": "3d4b862a47a2f393a5d466cc4ecdca1c09324f263ceb00013179f326d8169375",
+        "gitBlobSHA1": "143878067b3d91e04ad06ae5ff4c6e331f9a63fa"
+      },
+      "originalDecodedLog": {
+        "bytes": 558131,
+        "sha256": "cbe45b386f5b9348692980a8ea8aedf954f88b9daac8e48289dfa9bddaa06eaf",
+        "gitBlobSHA1": "ef70da64da6f4e67bcf230daa7a938f53b8da544",
+        "source": "issue1512-evidence-work/ci-548790/nonpg/private/128963364654.original.log"
+      },
+      "publishedCopy": {
+        "bytes": 88806,
+        "sha256": "3d4b862a47a2f393a5d466cc4ecdca1c09324f263ceb00013179f326d8169375",
+        "gitBlobSHA1": "143878067b3d91e04ad06ae5ff4c6e331f9a63fa"
+      },
+      "gzipMtime": 0,
+      "decodedBytesMatchFrozenOriginal": true,
+      "byteIdenticalToFrozenSource": true
+    },
+    {
+      "publicationPath": "archive-logs/128963364690.original.log.gz",
+      "kind": "deterministic-gzip-of-once-downloaded-decoded-log",
+      "jobId": 128963364690,
+      "jobName": "image-checks / changes / Changed files",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "originalPath": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963364690.original.log.gz",
+      "originalGzip": {
+        "bytes": 89890,
+        "sha256": "577d42c300b49d7219613a81f0672119e2e1806cbbd65363dcd5a26ed90496c3",
+        "gitBlobSHA1": "57435367cf3758f4ae85efcd5e06f8fb9866eb80"
+      },
+      "originalDecodedLog": {
+        "bytes": 558672,
+        "sha256": "f96202a571fdf161c7007aa501dce600bdf55097ddd35e81a99e121fbe7456fe",
+        "gitBlobSHA1": "c9cfacbd663e47ee42cfb988fc5ac2a1c924d4bf",
+        "source": "issue1512-evidence-work/ci-548790/nonpg/private/128963364690.original.log"
+      },
+      "publishedCopy": {
+        "bytes": 89890,
+        "sha256": "577d42c300b49d7219613a81f0672119e2e1806cbbd65363dcd5a26ed90496c3",
+        "gitBlobSHA1": "57435367cf3758f4ae85efcd5e06f8fb9866eb80"
+      },
+      "gzipMtime": 0,
+      "decodedBytesMatchFrozenOriginal": true,
+      "byteIdenticalToFrozenSource": true
+    },
+    {
+      "publicationPath": "archive-logs/128963583362.original.log.gz",
+      "kind": "deterministic-gzip-of-once-downloaded-decoded-log",
+      "jobId": 128963583362,
+      "jobName": "desktop-checks / icon",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "originalPath": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963583362.original.log.gz",
+      "originalGzip": {
+        "bytes": 5561,
+        "sha256": "4a9e4a44a1bc7a10b0dd92eba2b494f9ea8f5038004644b1bcb7bea40a19a989",
+        "gitBlobSHA1": "a94a6dbabe2b35f6dcde7255761c9094c485af68"
+      },
+      "originalDecodedLog": {
+        "bytes": 20512,
+        "sha256": "d794d5a530cc6487ea23c6d33e066820c54cdcd3c4f44b0ad736142fa685b2b4",
+        "gitBlobSHA1": "51fc0c94164aaee7d5f2e112f1bf71d0c7739a91",
+        "source": "issue1512-evidence-work/ci-548790/nonpg/private/128963583362.original.log"
+      },
+      "publishedCopy": {
+        "bytes": 5561,
+        "sha256": "4a9e4a44a1bc7a10b0dd92eba2b494f9ea8f5038004644b1bcb7bea40a19a989",
+        "gitBlobSHA1": "a94a6dbabe2b35f6dcde7255761c9094c485af68"
+      },
+      "gzipMtime": 0,
+      "decodedBytesMatchFrozenOriginal": true,
+      "byteIdenticalToFrozenSource": true
+    },
+    {
+      "publicationPath": "archive-logs/128963583372.original.log.gz",
+      "kind": "deterministic-gzip-of-once-downloaded-decoded-log",
+      "jobId": 128963583372,
+      "jobName": "desktop-checks / checks",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "originalPath": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963583372.original.log.gz",
+      "originalGzip": {
+        "bytes": 31516,
+        "sha256": "a11f584b31133522d2ef3e1e0ed137b50bd74fd6c127c5778a6181914d35798c",
+        "gitBlobSHA1": "9fe5814596be24a020b9e58983f1646bef165fcf"
+      },
+      "originalDecodedLog": {
+        "bytes": 102583,
+        "sha256": "5709c726e55f6dc5973515c31e50c7df08a396850bbeddc53bce80beff807f17",
+        "gitBlobSHA1": "3ae1aa97b735aa21f370a4a6567dbac7d7ee38d4",
+        "source": "issue1512-evidence-work/ci-548790/nonpg/private/128963583372.original.log"
+      },
+      "publishedCopy": {
+        "bytes": 31516,
+        "sha256": "a11f584b31133522d2ef3e1e0ed137b50bd74fd6c127c5778a6181914d35798c",
+        "gitBlobSHA1": "9fe5814596be24a020b9e58983f1646bef165fcf"
+      },
+      "gzipMtime": 0,
+      "decodedBytesMatchFrozenOriginal": true,
+      "byteIdenticalToFrozenSource": true
+    },
+    {
+      "publicationPath": "archive-logs/128963583411.original.log.gz",
+      "kind": "deterministic-gzip-of-once-downloaded-decoded-log",
+      "jobId": 128963583411,
+      "jobName": "desktop-checks / smoke",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "originalPath": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963583411.original.log.gz",
+      "originalGzip": {
+        "bytes": 59138,
+        "sha256": "4ef8b9343e91133b9ff5d64f3cbe333c576595b33a48f13dcb95f3deacac9ef4",
+        "gitBlobSHA1": "b2ddab3dbfe9e9cfa4c1d6eb2f4679944c0000b1"
+      },
+      "originalDecodedLog": {
+        "bytes": 308380,
+        "sha256": "8ecf793da59faeb1027a5fee4127d17d4ea7bdd6b13525b8e2f528977fdecfac",
+        "gitBlobSHA1": "572c428ae66b4fdbc77f8561b3c1b19d101edf8d",
+        "source": "issue1512-evidence-work/ci-548790/nonpg/private/128963583411.original.log"
+      },
+      "publishedCopy": {
+        "bytes": 59138,
+        "sha256": "4ef8b9343e91133b9ff5d64f3cbe333c576595b33a48f13dcb95f3deacac9ef4",
+        "gitBlobSHA1": "b2ddab3dbfe9e9cfa4c1d6eb2f4679944c0000b1"
+      },
+      "gzipMtime": 0,
+      "decodedBytesMatchFrozenOriginal": true,
+      "byteIdenticalToFrozenSource": true
+    },
+    {
+      "publicationPath": "archive-logs/128963608463.original.log.gz",
+      "kind": "deterministic-gzip-of-once-downloaded-decoded-log",
+      "jobId": 128963608463,
+      "jobName": "analytics-checks / Analytics SSR (full)",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "originalPath": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963608463.original.log.gz",
+      "originalGzip": {
+        "bytes": 40579,
+        "sha256": "5963a252381759454b658feb4344e84e2093687ca968e682c9c6e23bcd51f53f",
+        "gitBlobSHA1": "765ba360be52608775367355f1dde972e9e3eb2b"
+      },
+      "originalDecodedLog": {
+        "bytes": 225212,
+        "sha256": "917a483f394be3476e25eaa436b55e30c6f9181533a6390150002eab54706119",
+        "gitBlobSHA1": "19223ec4f5113f27c9008ba8e0b18b76f9a394e4",
+        "source": "issue1512-evidence-work/ci-548790/nonpg/private/128963608463.original.log"
+      },
+      "publishedCopy": {
+        "bytes": 40579,
+        "sha256": "5963a252381759454b658feb4344e84e2093687ca968e682c9c6e23bcd51f53f",
+        "gitBlobSHA1": "765ba360be52608775367355f1dde972e9e3eb2b"
+      },
+      "gzipMtime": 0,
+      "decodedBytesMatchFrozenOriginal": true,
+      "byteIdenticalToFrozenSource": true
+    },
+    {
+      "publicationPath": "archive-logs/128963633310.original.log.gz",
+      "kind": "deterministic-gzip-of-once-downloaded-decoded-log",
+      "jobId": 128963633310,
+      "jobName": "image-checks / image",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "originalPath": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963633310.original.log.gz",
+      "originalGzip": {
+        "bytes": 69561,
+        "sha256": "1874e29896093828e8f727c0845c26f4a88c428f377c6667b1d34d0b4d60ab64",
+        "gitBlobSHA1": "d62a475f0a1d5e862e64e7a7f303808c44cd13a1"
+      },
+      "originalDecodedLog": {
+        "bytes": 354882,
+        "sha256": "b4976fe052e87ade041cce4a2f2ca3ace57339abd79975f1e1125a29de69a30b",
+        "gitBlobSHA1": "ab29114ba10a2ad55a4bfbb8ad8b0bea8b68722a",
+        "source": "issue1512-evidence-work/ci-548790/nonpg/private/128963633310.original.log"
+      },
+      "publishedCopy": {
+        "bytes": 69561,
+        "sha256": "1874e29896093828e8f727c0845c26f4a88c428f377c6667b1d34d0b4d60ab64",
+        "gitBlobSHA1": "d62a475f0a1d5e862e64e7a7f303808c44cd13a1"
+      },
+      "gzipMtime": 0,
+      "decodedBytesMatchFrozenOriginal": true,
+      "byteIdenticalToFrozenSource": true
+    },
+    {
+      "publicationPath": "archive-logs/128964722908.original.log.gz",
+      "kind": "deterministic-gzip-of-once-downloaded-decoded-log",
+      "jobId": 128964722908,
+      "jobName": "analytics-checks / analytics-ssr",
+      "actualCheckout": null,
+      "actualTree": null,
+      "originalPath": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128964722908.original.log.gz",
+      "originalGzip": {
+        "bytes": 1114,
+        "sha256": "efcd6ae8849320f217c1efeab8bcfdefc19195e15f6832d8d43fa135252d228e",
+        "gitBlobSHA1": "ccb8ce27b4a1eeb943d28ff9c49a04bcc08aac0e"
+      },
+      "originalDecodedLog": {
+        "bytes": 2939,
+        "sha256": "f6711059c7bd98356e603267c1c18b7b259a59f35582599a7e94a66276940277",
+        "gitBlobSHA1": "b59070231876f1ce7d547a7d75c15c42fd1cadf0",
+        "source": "issue1512-evidence-work/ci-548790/nonpg/private/128964722908.original.log"
+      },
+      "publishedCopy": {
+        "bytes": 1114,
+        "sha256": "efcd6ae8849320f217c1efeab8bcfdefc19195e15f6832d8d43fa135252d228e",
+        "gitBlobSHA1": "ccb8ce27b4a1eeb943d28ff9c49a04bcc08aac0e"
+      },
+      "gzipMtime": 0,
+      "decodedBytesMatchFrozenOriginal": true,
+      "byteIdenticalToFrozenSource": true
+    }
+  ],
+  "totals": {
+    "safeJsonFiles": 5,
+    "logGzipFiles": 14,
+    "filesListed": 19,
+    "decodedOriginalLogBytes": 5138111,
+    "logGzipBytes": 1011065,
+    "payloadBytesExcludingThisManifest": 1142832
+  },
+  "publicationBoundary": {
+    "privatePlatformEnvelopeContentIncluded": false,
+    "privateDirectoriesCopied": false,
+    "temporaryOrCredentialURLsIncluded": false,
+    "urlScan": {
+      "scope": "All 14 decompressed terminal log texts and all 5 selected safe JSON files; URLs checked for userinfo and listed signed/auth query keys.",
+      "logUrlOccurrencesChecked": 482,
+      "candidateCount": 0,
+      "candidateValuesDisclosed": false,
+      "checkedQueryKeyNames": [
+        "access_token",
+        "auth",
+        "authorization",
+        "credential",
+        "se",
+        "sig",
+        "signature",
+        "ske",
+        "skoid",
+        "sks",
+        "skt",
+        "sktid",
+        "skv",
+        "sp",
+        "token",
+        "x-amz-credential",
+        "x-amz-security-token",
+        "x-amz-signature",
+        "x-goog-signature"
+      ],
+      "userinfoChecked": true
+    },
+    "platformAccountMetadataExcluded": true,
+    "rawEvidenceFingerprintsMayBeReferenced": true,
+    "originalFilesModified": false,
+    "productOrWorkflowFilesModified": false,
+    "externalCallsMadeForThisPublicationTask": 0,
+    "githubDownloadsOrPollsMadeForThisPublicationTask": 0
+  },
+  "preservedBoundaries": [
+    "Nine companion workflows are terminal success. The E2B additive PR test does not publish or exercise its subscription release gate.",
+    "BrowserGate is an echo-only protected-name job. The old Production build and browser interactions job is the PG aggregate, owned by a different reader.",
+    "Linux desktop smoke and isolated community-image checks are distinct from Apple Silicon Native acceptance and production ACME model cases.",
+    "UI policy strict aggregate was not created in this snapshot and still depends on Native; no overall-main-CI pass is claimed.",
+    "Daemon Vitest: 1,569 passed / 2 skipped; 138 files passed / 1 skipped. No all-tests-zero-skip claim.",
+    "The Cloud credential access (OIDC) PR job and self-hosted-image production publish step are skipped.",
+    "Self-hosted-image service report is synthetic=true, productionAcceptance=false; 31/31 synthetic replies do not substitute for ACME official-subscription production cases.",
+    "Image cleanup succeeded with 6 containers, 3 volumes and 1 network removed.",
+    "This package excludes PG and Apple Silicon raw evidence. UI policy strict final aggregate is not included and will be handled only after its own terminal ID is assigned."
+  ],
+  "mainCIOverallConclusion": null,
+  "productionAcceptance": false,
+  "ownResourcesAtCompletion": {
+    "processes": 0,
+    "sessions": 0,
+    "paidResourcesCreated": 0,
+    "modelsTriggered": 0
+  }
+}

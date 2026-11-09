@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "scope": "Public-safe projections and exact original terminal logs compressed after bounded signature screening. Raw platform envelopes stay private.",
+  "mainIndex": {
+    "path": "issue1512-evidence-work/ci-548790/nonpg/main-leaves-final.safe.json",
+    "bytes": 59054,
+    "sha256": "7d4a9d2037f751ec05c15910a3bff0cbd5ad32008379297377e540e1121c19ce",
+    "gitBlobSHA1": "0012a2be7795e8087487ba705d92ebba3f6dec4f"
+  },
+  "unitReconciliation": {
+    "path": "issue1512-evidence-work/ci-548790/nonpg/unit-reconciliation.safe.json",
+    "bytes": 11332,
+    "sha256": "3a6ca503f89b8b0c5e9ffb59c105bcc212b896f05d4bb65252b12747296ec1ef",
+    "gitBlobSHA1": "988e58aa4606b9d0b29f16d6d05e91484230c303"
+  },
+  "companionWorkflows": {
+    "path": "issue1512-evidence-work/ci-548790/nonpg/companion-workflows-final.safe.json",
+    "bytes": 53551,
+    "sha256": "e80ad81e0efd087b36f0e0dcd8cdc96a939186d31f10f381587cb8ffed119993",
+    "gitBlobSHA1": "b8233f3a53aa24e6ac8718079e0f23ceffc13253"
+  },
+  "screening": {
+    "path": "issue1512-evidence-work/ci-548790/nonpg/archive-screening-final.safe.json",
+    "bytes": 2414,
+    "sha256": "de965e235e9381a8fe02ac6a053a57aeb1076a89a7d9bdb7c72bcac9f07866bb",
+    "gitBlobSHA1": "80306ab9bbb7e69510a2f419d4cacb268354a1c5"
+  },
+  "archives": [
+    {
+      "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963152085.original.log.gz",
+      "bytes": 88736,
+      "sha256": "5080c8c7967fedcf50f529690a8e7ce69852ceeeab9430936b7de4dc14919463",
+      "gitBlobSHA1": "bd65ae23b967d864c9c1eea871994577e7b212ff"
+    },
+    {
+      "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963364068.original.log.gz",
+      "bytes": 24602,
+      "sha256": "3a0876682f4106e436c67a0e8da7b6683f4a4834b554a3edf3467141a44820dc",
+      "gitBlobSHA1": "c3f5005609e2fb0e643225c9967f420c9b76199e"
+    },
+    {
+      "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963364148.original.log.gz",
+      "bytes": 143045,
+      "sha256": "1a38bac5b3cbab338feb2c8dd8b9f14c371fad3d602a11c471eebd941f921583",
+      "gitBlobSHA1": "80089846aa031f30b3939c3e33c0efcca3b25312"
+    },
+    {
+      "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963364213.original.log.gz",
+      "bytes": 33432,
+      "sha256": "6d85f66b51365b64df713a3f26e71b5a1ce948e34be8df37bfb4fc99bab072cc",
+      "gitBlobSHA1": "7877dc421ed113cbfb1c73b8261bdce1d6b66473"
+    },
+    {
+      "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963364224.original.log.gz",
+      "bytes": 244883,
+      "sha256": "28dbcf9eb474d4114b4aea1efe19588c709db4bb9c471e30a8effa7657a6b246",
+      "gitBlobSHA1": "b71ea8a783cc9ab163674d2dc692b616571b6801"
+    },
+    {
+      "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963364555.original.log.gz",
+      "bytes": 90202,
+      "sha256": "ab8ec5fc6ec1d8db29c2f32f29a47bcfd90a6d4b259e492f0a4d8bf834e8ded5",
+      "gitBlobSHA1": "b8a515a5c179711f1473432e5837715025c31a33"
+    },
+    {
+      "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963364654.original.log.gz",
+      "bytes": 88806,
+      "sha256": "3d4b862a47a2f393a5d466cc4ecdca1c09324f263ceb00013179f326d8169375",
+      "gitBlobSHA1": "143878067b3d91e04ad06ae5ff4c6e331f9a63fa"
+    },
+    {
+      "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963364690.original.log.gz",
+      "bytes": 89890,
+      "sha256": "577d42c300b49d7219613a81f0672119e2e1806cbbd65363dcd5a26ed90496c3",
+      "gitBlobSHA1": "57435367cf3758f4ae85efcd5e06f8fb9866eb80"
+    },
+    {
+      "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963583362.original.log.gz",
+      "bytes": 5561,
+      "sha256": "4a9e4a44a1bc7a10b0dd92eba2b494f9ea8f5038004644b1bcb7bea40a19a989",
+      "gitBlobSHA1": "a94a6dbabe2b35f6dcde7255761c9094c485af68"
+    },
+    {
+      "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963583372.original.log.gz",
+      "bytes": 31516,
+      "sha256": "a11f584b31133522d2ef3e1e0ed137b50bd74fd6c127c5778a6181914d35798c",
+      "gitBlobSHA1": "9fe5814596be24a020b9e58983f1646bef165fcf"
+    },
+    {
+      "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963583411.original.log.gz",
+      "bytes": 59138,
+      "sha256": "4ef8b9343e91133b9ff5d64f3cbe333c576595b33a48f13dcb95f3deacac9ef4",
+      "gitBlobSHA1": "b2ddab3dbfe9e9cfa4c1d6eb2f4679944c0000b1"
+    },
+    {
+      "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963608463.original.log.gz",
+      "bytes": 40579,
+      "sha256": "5963a252381759454b658feb4344e84e2093687ca968e682c9c6e23bcd51f53f",
+      "gitBlobSHA1": "765ba360be52608775367355f1dde972e9e3eb2b"
+    },
+    {
+      "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963633310.original.log.gz",
+      "bytes": 69561,
+      "sha256": "1874e29896093828e8f727c0845c26f4a88c428f377c6667b1d34d0b4d60ab64",
+      "gitBlobSHA1": "d62a475f0a1d5e862e64e7a7f303808c44cd13a1"
+    },
+    {
+      "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128964722908.original.log.gz",
+      "bytes": 1114,
+      "sha256": "efcd6ae8849320f217c1efeab8bcfdefc19195e15f6832d8d43fa135252d228e",
+      "gitBlobSHA1": "ccb8ce27b4a1eeb943d28ff9c49a04bcc08aac0e"
+    }
+  ],
+  "totals": {
+    "logs": 14,
+    "decodedBytes": 5138111,
+    "gzipBytes": 1011065
+  },
+  "allGzipRoundtripsVerified": true,
+  "originalFilesModified": false
+}

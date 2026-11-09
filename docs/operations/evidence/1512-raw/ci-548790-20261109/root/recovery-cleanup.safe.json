@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "kind": "evidence-only-temporary-compute-cleanup",
+  "reason": "Original local execution environment became unavailable after CI terminal; read existing GitHub artifact references and compute evidence only.",
+  "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+  "sessionId": "sbx_LejfQAU2XenS2DfLpGKGkNat1bae",
+  "sandboxName": "issue1512-evidence-recovery-20261109-0406",
+  "region": "iad1",
+  "vcpus": 1,
+  "memoryMb": 2048,
+  "persistent": false,
+  "startedAtUTC": "2026-11-09T04:05:14.562Z",
+  "stoppedAtUTC": "2026-11-09T04:19:50.558Z",
+  "status": "stopped",
+  "durationMs": 875996,
+  "activeCpuDurationMs": 11649,
+  "networkTransfer": {
+    "ingress": 15426748,
+    "egress": 1166652
+  },
+  "originalTimeoutMs": 900000,
+  "oneExtensionMs": 600000,
+  "totalSessionTimeoutMs": 1500000,
+  "providerSandboxConfiguredTimeoutMs": 900000,
+  "ports": [],
+  "modelCalls": 0,
+  "ciReruns": 0,
+  "productionMutations": 0,
+  "rawUrlsAndCredentialsIncluded": false,
+  "namedSandboxDeletion": "tool_success",
+  "billUsd": null
+}

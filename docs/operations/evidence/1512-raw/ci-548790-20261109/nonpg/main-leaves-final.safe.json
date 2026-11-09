@@ -1,0 +1,1722 @@
+{
+  "schemaVersion": 1,
+  "repository": "alexj11324/Mikka",
+  "runId": 42556448828,
+  "runURL": "https://github.com/alexj11324/Mikka/actions/runs/42556448828",
+  "eventHead": "548790b4676d5e43556bf62cf452c3c5aee68073",
+  "eventHeadTree": "933f76fbff37682f2f9cfaf64e672d229531f5ff",
+  "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+  "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+  "bindingSource": {
+    "path": "issue1512-evidence-work/ci-548790/pg/actual-checkout.safe.json",
+    "bytes": 711,
+    "sha256": "3b304e1ae7ccf2ee61db31bcc9f230a7837a76000e9c47e0e2d88a7525282a41",
+    "gitBlobSHA1": "fd830ce51496862fddf15aea50fb9ebd05ac4746"
+  },
+  "observedAtUTC": "2026-11-09T03:48:22.155Z",
+  "frozenAtUTC": "2026-11-09T03:50:35.469454+00:00",
+  "scope": "Non-PG/non-Apple-Silicon terminal CI leaf jobs and selected small aggregators. Four PG shards+DB aggregate and Native job/artifacts belong to separate readers.",
+  "status": "own_leaf_scope_passed",
+  "originalLogDownloadCount": 14,
+  "actualCheckoutBoundCount": 13,
+  "originalLogDownloadPolicy": "Exactly one official decoded-log request per recorded terminal job; originals are the UTF-8 encoding of the returned decoded text, not HTTP wire bytes.",
+  "terminalLogRecords": [
+    {
+      "jobId": 128963152085,
+      "name": "changes / Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T03:26:53Z",
+      "completedAt": "2026-11-09T03:27:37Z",
+      "onceOnlyLogRequestAtUTC": "2026-11-09T03:32:24.238Z",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "sourceEvidence": [
+        {
+          "sha": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+          "line": 2516
+        }
+      ],
+      "checkoutBoundary": "explicit git log -1 output",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run git fetch origin main --no-tags",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ],
+      "privateRawTool": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963152085.tool.original.json",
+        "bytes": 573830,
+        "sha256": "95f5f395440b058d50359f5ab948422d3f3dc28196d60f45f2e2205e0e9cb4d3",
+        "gitBlobSHA1": "af91cc3cfd9470d0151836c1322a764b6fb20bb6"
+      },
+      "decodedOriginalLog": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963152085.original.log",
+        "bytes": 558209,
+        "sha256": "81f95712566c8ba22bcc9094dd9670157e2eb4b016549a9b6a32e0824dfea3f4",
+        "gitBlobSHA1": "9ecc4727e91c94dfe7a87273ecc5ae68d9ec7eeb"
+      },
+      "gzip": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963152085.original.log.gz",
+        "bytes": 88736,
+        "sha256": "5080c8c7967fedcf50f529690a8e7ce69852ceeeab9430936b7de4dc14919463",
+        "gitBlobSHA1": "bd65ae23b967d864c9c1eea871994577e7b212ff"
+      },
+      "gzipRoundtripEqualsOriginal": true
+    },
+    {
+      "jobId": 128963364068,
+      "name": "Daemon checks",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T03:27:39Z",
+      "completedAt": "2026-11-09T03:30:27Z",
+      "onceOnlyLogRequestAtUTC": "2026-11-09T03:32:24.238Z",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "sourceEvidence": [
+        {
+          "sha": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+          "line": 133
+        }
+      ],
+      "checkoutBoundary": "explicit git log -1 output",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run ./.github/actions/pnpm-install",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Daemon unit and transport regression tests",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Existing mailbox CLI integration tests",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Daemon repository identity, GitHub credential and trusted endpoint tests",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Local computer authority through actual daemon and adapter protocol",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Preserve daemon unit evidence",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Run pnpm --filter @mikka/daemon typecheck",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Run pnpm --filter @mikka/daemon build",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm --filter @mikka/daemon test:package",
+          "conclusion": "success"
+        },
+        {
+          "number": 21,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "conclusion": "success"
+        },
+        {
+          "number": 22,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 23,
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ],
+      "privateRawTool": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963364068.tool.original.json",
+        "bytes": 134324,
+        "sha256": "4bb22a52514c7d944bbcbdfdbb99683c2f6f976926d5be82270160dc3e73d656",
+        "gitBlobSHA1": "9d2bfc4a8cbc4bd93e9a70ea22f969cc24be167b"
+      },
+      "decodedOriginalLog": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963364068.original.log",
+        "bytes": 114805,
+        "sha256": "d29677bbf5cd00dfa35557518162e308f9b5e44b49b34a744c369425955870c9",
+        "gitBlobSHA1": "678259d4f0f74c26b28cb6fd8c597d628a9cbe79"
+      },
+      "gzip": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963364068.original.log.gz",
+        "bytes": 24602,
+        "sha256": "3a0876682f4106e436c67a0e8da7b6683f4a4834b554a3edf3467141a44820dc",
+        "gitBlobSHA1": "c3f5005609e2fb0e643225c9967f420c9b76199e"
+      },
+      "gzipRoundtripEqualsOriginal": true
+    },
+    {
+      "jobId": 128963364148,
+      "name": "Integration unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T03:27:39Z",
+      "completedAt": "2026-11-09T03:31:37Z",
+      "onceOnlyLogRequestAtUTC": "2026-11-09T03:32:24.238Z",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "sourceEvidence": [
+        {
+          "sha": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+          "line": 132
+        }
+      ],
+      "checkoutBoundary": "explicit git log -1 output",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run ./.github/actions/pnpm-install",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run selected integration tasks through Nx Core",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ],
+      "privateRawTool": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963364148.tool.original.json",
+        "bytes": 668664,
+        "sha256": "452997fd0e7bd03b25c49181d6af7a6fc0041feba4b1110ea9645c26f925a087",
+        "gitBlobSHA1": "9acae41899338cb1d0514a383c6763be078fbfad"
+      },
+      "decodedOriginalLog": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963364148.original.log",
+        "bytes": 644722,
+        "sha256": "4505a8ff46cdc4dbc0abe7985a966ac4fb04240114919f01681614387c7e23f8",
+        "gitBlobSHA1": "797bc87600769ea4503a74cacc435d1d9b6cfdca"
+      },
+      "gzip": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963364148.original.log.gz",
+        "bytes": 143045,
+        "sha256": "1a38bac5b3cbab338feb2c8dd8b9f14c371fad3d602a11c471eebd941f921583",
+        "gitBlobSHA1": "80089846aa031f30b3939c3e33c0efcca3b25312"
+      },
+      "gzipRoundtripEqualsOriginal": true
+    },
+    {
+      "jobId": 128963364213,
+      "name": "Source checks",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T03:27:39Z",
+      "completedAt": "2026-11-09T03:30:24Z",
+      "onceOnlyLogRequestAtUTC": "2026-11-09T03:32:24.238Z",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "sourceEvidence": [
+        {
+          "sha": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+          "line": 133
+        }
+      ],
+      "checkoutBoundary": "explicit git log -1 output",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run ./.github/actions/pnpm-install",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Shadow selection against full baseline scenarios",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run pnpm check:cloud-boundary",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Verify all production release credentials use existing Infisical OIDC",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Verify production auth and lease acceptance drivers without credentials",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Run pnpm lint:code",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Run node apps/api/scripts/generate-routes.mjs --check",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Run pnpm lint:runtime",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm test:api",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Run pnpm --filter @mikka/frontend test",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "Run pnpm typecheck",
+          "conclusion": "success"
+        },
+        {
+          "number": 14,
+          "name": "Run pnpm --filter @mikka/protocol typecheck",
+          "conclusion": "success"
+        },
+        {
+          "number": 15,
+          "name": "Run pnpm --filter @mikka/mobile typecheck",
+          "conclusion": "success"
+        },
+        {
+          "number": 16,
+          "name": "Audit business UI composition",
+          "conclusion": "success"
+        },
+        {
+          "number": 17,
+          "name": "Show audit summary",
+          "conclusion": "success"
+        },
+        {
+          "number": 18,
+          "name": "Upload detailed audit",
+          "conclusion": "success"
+        },
+        {
+          "number": 35,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "conclusion": "success"
+        },
+        {
+          "number": 36,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 37,
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ],
+      "privateRawTool": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963364213.tool.original.json",
+        "bytes": 140919,
+        "sha256": "09b3b0b50a42d38521e44310ea660ff8c88fa5a42b442a3e344738afbb594cbf",
+        "gitBlobSHA1": "21e07788736e290dd0984b1dbbb75d122a2f64ef"
+      },
+      "decodedOriginalLog": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963364213.original.log",
+        "bytes": 131986,
+        "sha256": "9071e5a30ce5ca7e7ac543ee048fcc3fbdb5f99fd27111aec7d0a67101ee9f3d",
+        "gitBlobSHA1": "510a31d6a025176e8d7bc717c0bf02d3accba4d0"
+      },
+      "gzip": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963364213.original.log.gz",
+        "bytes": 33432,
+        "sha256": "6d85f66b51365b64df713a3f26e71b5a1ce948e34be8df37bfb4fc99bab072cc",
+        "gitBlobSHA1": "7877dc421ed113cbfb1c73b8261bdce1d6b66473"
+      },
+      "gzipRoundtripEqualsOriginal": true
+    },
+    {
+      "jobId": 128963364224,
+      "name": "Core unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T03:27:40Z",
+      "completedAt": "2026-11-09T03:34:47Z",
+      "onceOnlyLogRequestAtUTC": "2026-11-09T03:36:08.384Z",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "sourceEvidence": [
+        {
+          "sha": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+          "line": 132
+        }
+      ],
+      "checkoutBoundary": "explicit git log -1 output",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run ./.github/actions/pnpm-install",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run selected core tasks through Nx Core",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ],
+      "privateRawTool": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963364224.tool.original.json",
+        "bytes": 1021997,
+        "sha256": "d712abcb5c56ac036f09bbd9c758dceec9382ec7d0634dca502780e2b353a25c",
+        "gitBlobSHA1": "4865d6823586285a4b96bcf280ee2edda899f874"
+      },
+      "decodedOriginalLog": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963364224.original.log",
+        "bytes": 998766,
+        "sha256": "2cf70769333518be8d02ab369b3cc23de1bdea239d4499ca4628234e6dc351aa",
+        "gitBlobSHA1": "f3fcea00d722a4c84d1a13d683361e21925ea313"
+      },
+      "gzip": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963364224.original.log.gz",
+        "bytes": 244883,
+        "sha256": "28dbcf9eb474d4114b4aea1efe19588c709db4bb9c471e30a8effa7657a6b246",
+        "gitBlobSHA1": "b71ea8a783cc9ab163674d2dc692b616571b6801"
+      },
+      "gzipRoundtripEqualsOriginal": true
+    },
+    {
+      "jobId": 128963364555,
+      "name": "analytics-checks / changes / Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T03:27:39Z",
+      "completedAt": "2026-11-09T03:28:30Z",
+      "onceOnlyLogRequestAtUTC": "2026-11-09T03:32:24.238Z",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "sourceEvidence": [
+        {
+          "sha": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+          "line": 2516
+        }
+      ],
+      "checkoutBoundary": "explicit git log -1 output",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run git fetch origin main --no-tags",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ],
+      "privateRawTool": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963364555.tool.original.json",
+        "bytes": 573953,
+        "sha256": "e56a9ede4fb423b3366c4a307ff187dcfffeeddf08a251e230f50aed4f7240d1",
+        "gitBlobSHA1": "55e23404a55ab7f406f9140d6efb71c66c8c3e4b"
+      },
+      "decodedOriginalLog": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963364555.original.log",
+        "bytes": 558312,
+        "sha256": "8dd14737b6e109fb2ded99f86844f8341eac1d95ce9310694a0fc20d6efbf569",
+        "gitBlobSHA1": "3a54ca0b9af57ef3b82d7427f34338e2a758b042"
+      },
+      "gzip": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963364555.original.log.gz",
+        "bytes": 90202,
+        "sha256": "ab8ec5fc6ec1d8db29c2f32f29a47bcfd90a6d4b259e492f0a4d8bf834e8ded5",
+        "gitBlobSHA1": "b8a515a5c179711f1473432e5837715025c31a33"
+      },
+      "gzipRoundtripEqualsOriginal": true
+    },
+    {
+      "jobId": 128963364654,
+      "name": "desktop-checks / changes / Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T03:27:39Z",
+      "completedAt": "2026-11-09T03:28:24Z",
+      "onceOnlyLogRequestAtUTC": "2026-11-09T03:32:24.238Z",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "sourceEvidence": [
+        {
+          "sha": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+          "line": 2516
+        }
+      ],
+      "checkoutBoundary": "explicit git log -1 output",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run git fetch origin main --no-tags",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ],
+      "privateRawTool": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963364654.tool.original.json",
+        "bytes": 573768,
+        "sha256": "212611146acf32f1c036719f8fdde553a1bbbb9d768423972d7fad8e91fd8135",
+        "gitBlobSHA1": "93a22633b9532ce9713c7bae2ab00c425f49b549"
+      },
+      "decodedOriginalLog": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963364654.original.log",
+        "bytes": 558131,
+        "sha256": "cbe45b386f5b9348692980a8ea8aedf954f88b9daac8e48289dfa9bddaa06eaf",
+        "gitBlobSHA1": "ef70da64da6f4e67bcf230daa7a938f53b8da544"
+      },
+      "gzip": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963364654.original.log.gz",
+        "bytes": 88806,
+        "sha256": "3d4b862a47a2f393a5d466cc4ecdca1c09324f263ceb00013179f326d8169375",
+        "gitBlobSHA1": "143878067b3d91e04ad06ae5ff4c6e331f9a63fa"
+      },
+      "gzipRoundtripEqualsOriginal": true
+    },
+    {
+      "jobId": 128963364690,
+      "name": "image-checks / changes / Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T03:27:39Z",
+      "completedAt": "2026-11-09T03:28:35Z",
+      "onceOnlyLogRequestAtUTC": "2026-11-09T03:32:24.238Z",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "sourceEvidence": [
+        {
+          "sha": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+          "line": 2516
+        }
+      ],
+      "checkoutBoundary": "explicit git log -1 output",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run git fetch origin main --no-tags",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ],
+      "privateRawTool": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963364690.tool.original.json",
+        "bytes": 574313,
+        "sha256": "05e2a00c8618d0fb1a9afc06d4d07f4b3a6fe0177b2a14df91cb4e5e7a30c9f3",
+        "gitBlobSHA1": "f36c3ccb5394091b21ed66e23a6007cb71bdd770"
+      },
+      "decodedOriginalLog": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963364690.original.log",
+        "bytes": 558672,
+        "sha256": "f96202a571fdf161c7007aa501dce600bdf55097ddd35e81a99e121fbe7456fe",
+        "gitBlobSHA1": "c9cfacbd663e47ee42cfb988fc5ac2a1c924d4bf"
+      },
+      "gzip": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963364690.original.log.gz",
+        "bytes": 89890,
+        "sha256": "577d42c300b49d7219613a81f0672119e2e1806cbbd65363dcd5a26ed90496c3",
+        "gitBlobSHA1": "57435367cf3758f4ae85efcd5e06f8fb9866eb80"
+      },
+      "gzipRoundtripEqualsOriginal": true
+    },
+    {
+      "jobId": 128963583362,
+      "name": "desktop-checks / icon",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T03:35:37Z",
+      "completedAt": "2026-11-09T03:36:13Z",
+      "onceOnlyLogRequestAtUTC": "2026-11-09T03:38:03.199Z",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "sourceEvidence": [
+        {
+          "sha": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+          "line": 173
+        }
+      ],
+      "checkoutBoundary": "explicit git log -1 output",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Select Xcode 26 for actool",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Compile build/icon.icon as electron-builder does",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ],
+      "privateRawTool": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963583362.tool.original.json",
+        "bytes": 24261,
+        "sha256": "90125eee0d39b72125c45ef563141bbbbd9f7d7fc30e8c22f362547caa33e9ad",
+        "gitBlobSHA1": "e03c5e64dd36ab68b3dd46b20896abfb13e886ee"
+      },
+      "decodedOriginalLog": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963583362.original.log",
+        "bytes": 20512,
+        "sha256": "d794d5a530cc6487ea23c6d33e066820c54cdcd3c4f44b0ad736142fa685b2b4",
+        "gitBlobSHA1": "51fc0c94164aaee7d5f2e112f1bf71d0c7739a91"
+      },
+      "gzip": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963583362.original.log.gz",
+        "bytes": 5561,
+        "sha256": "4a9e4a44a1bc7a10b0dd92eba2b494f9ea8f5038004644b1bcb7bea40a19a989",
+        "gitBlobSHA1": "a94a6dbabe2b35f6dcde7255761c9094c485af68"
+      },
+      "gzipRoundtripEqualsOriginal": true
+    },
+    {
+      "jobId": 128963583372,
+      "name": "desktop-checks / checks",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T03:28:26Z",
+      "completedAt": "2026-11-09T03:30:49Z",
+      "onceOnlyLogRequestAtUTC": "2026-11-09T03:32:24.238Z",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "sourceEvidence": [
+        {
+          "sha": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+          "line": 127
+        }
+      ],
+      "checkoutBoundary": "explicit git log -1 output",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Install dependencies without the Electron runtime",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm --filter @mikka/desktop typecheck",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Run pnpm --filter @mikka/desktop lint",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Run pnpm --filter @mikka/desktop test",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Run pnpm --filter @mikka/desktop build",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Run pnpm --filter @mikka/protocol typecheck",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm test:platform",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Run pnpm test:idle-budget",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "Run pnpm lint:ui",
+          "conclusion": "success"
+        },
+        {
+          "number": 24,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "conclusion": "success"
+        },
+        {
+          "number": 25,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "conclusion": "success"
+        },
+        {
+          "number": 26,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 27,
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ],
+      "privateRawTool": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963583372.tool.original.json",
+        "bytes": 109866,
+        "sha256": "31cd18ef6bd2701e1c1851a2ef06c496e6d23c60a747f1a27e8b4a3184382bb4",
+        "gitBlobSHA1": "cdbea578db572ce6bdc54c24e62070ce2689c2c1"
+      },
+      "decodedOriginalLog": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963583372.original.log",
+        "bytes": 102583,
+        "sha256": "5709c726e55f6dc5973515c31e50c7df08a396850bbeddc53bce80beff807f17",
+        "gitBlobSHA1": "3ae1aa97b735aa21f370a4a6567dbac7d7ee38d4"
+      },
+      "gzip": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963583372.original.log.gz",
+        "bytes": 31516,
+        "sha256": "a11f584b31133522d2ef3e1e0ed137b50bd74fd6c127c5778a6181914d35798c",
+        "gitBlobSHA1": "9fe5814596be24a020b9e58983f1646bef165fcf"
+      },
+      "gzipRoundtripEqualsOriginal": true
+    },
+    {
+      "jobId": 128963583411,
+      "name": "desktop-checks / smoke",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T03:28:26Z",
+      "completedAt": "2026-11-09T03:33:04Z",
+      "onceOnlyLogRequestAtUTC": "2026-11-09T03:34:18.146Z",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "sourceEvidence": [
+        {
+          "sha": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+          "line": 246
+        }
+      ],
+      "checkoutBoundary": "explicit git log -1 output",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm install --frozen-lockfile",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Install Chromium system dependencies",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Run sudo apt-get install -y xvfb dbus-x11 gnome-keyring libsecret-1-0",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Install the pinned Electron runtime and its Linux sandbox helper",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Generate ephemeral test-only auth secret",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Apply tracked migrations to the disposable database",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Prepare the isolated E2E schema",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "Build the production web backend",
+          "conclusion": "success"
+        },
+        {
+          "number": 14,
+          "name": "Archive the compiled Linux backend",
+          "conclusion": "success"
+        },
+        {
+          "number": 15,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "conclusion": "success"
+        },
+        {
+          "number": 16,
+          "name": "Build the dev Electron shell",
+          "conclusion": "success"
+        },
+        {
+          "number": 17,
+          "name": "Isolated Electron authentication and runtime acceptance",
+          "conclusion": "success"
+        },
+        {
+          "number": 18,
+          "name": "Audit runtime evidence before upload",
+          "conclusion": "success"
+        },
+        {
+          "number": 19,
+          "name": "Keep audited Electron evidence",
+          "conclusion": "success"
+        },
+        {
+          "number": 35,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "conclusion": "success"
+        },
+        {
+          "number": 36,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "conclusion": "success"
+        },
+        {
+          "number": 37,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 38,
+          "name": "Stop containers",
+          "conclusion": "success"
+        },
+        {
+          "number": 39,
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ],
+      "privateRawTool": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963583411.tool.original.json",
+        "bytes": 333662,
+        "sha256": "feed2e6951abbfaf108d336a1f3ea994fee01c184ca91192b494edf0fb35ef1e",
+        "gitBlobSHA1": "1dc07d64a1d0a47a74723158b3e6211e9730137f"
+      },
+      "decodedOriginalLog": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963583411.original.log",
+        "bytes": 308380,
+        "sha256": "8ecf793da59faeb1027a5fee4127d17d4ea7bdd6b13525b8e2f528977fdecfac",
+        "gitBlobSHA1": "572c428ae66b4fdbc77f8561b3c1b19d101edf8d"
+      },
+      "gzip": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963583411.original.log.gz",
+        "bytes": 59138,
+        "sha256": "4ef8b9343e91133b9ff5d64f3cbe333c576595b33a48f13dcb95f3deacac9ef4",
+        "gitBlobSHA1": "b2ddab3dbfe9e9cfa4c1d6eb2f4679944c0000b1"
+      },
+      "gzipRoundtripEqualsOriginal": true
+    },
+    {
+      "jobId": 128963608463,
+      "name": "analytics-checks / Analytics SSR (full)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T03:28:32Z",
+      "completedAt": "2026-11-09T03:32:25Z",
+      "onceOnlyLogRequestAtUTC": "2026-11-09T03:34:18.146Z",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "sourceEvidence": [
+        {
+          "sha": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+          "line": 240
+        }
+      ],
+      "checkoutBoundary": "explicit git log -1 output",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm install --frozen-lockfile",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Apply tracked SQL only to the disposable CI database",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Run pnpm build",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Verify compiled runtime resources and browser analytics assets",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Install the pinned browser into this job's temporary directory",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Permit the installed Chromium sandbox in this disposable runner",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Render real compiled HTTP pages with browser analytics enabled",
+          "conclusion": "success"
+        },
+        {
+          "number": 21,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "conclusion": "success"
+        },
+        {
+          "number": 22,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "conclusion": "success"
+        },
+        {
+          "number": 23,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 24,
+          "name": "Stop containers",
+          "conclusion": "success"
+        },
+        {
+          "number": 25,
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ],
+      "privateRawTool": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963608463.tool.original.json",
+        "bytes": 245709,
+        "sha256": "abfcb8a55496dae97216455164767997611ded8dd9db61e54bee98e2bc2be2e4",
+        "gitBlobSHA1": "2604de565663ddebfad3f9186a7b2a494e651cca"
+      },
+      "decodedOriginalLog": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963608463.original.log",
+        "bytes": 225212,
+        "sha256": "917a483f394be3476e25eaa436b55e30c6f9181533a6390150002eab54706119",
+        "gitBlobSHA1": "19223ec4f5113f27c9008ba8e0b18b76f9a394e4"
+      },
+      "gzip": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963608463.original.log.gz",
+        "bytes": 40579,
+        "sha256": "5963a252381759454b658feb4344e84e2093687ca968e682c9c6e23bcd51f53f",
+        "gitBlobSHA1": "765ba360be52608775367355f1dde972e9e3eb2b"
+      },
+      "gzipRoundtripEqualsOriginal": true
+    },
+    {
+      "jobId": 128963633310,
+      "name": "image-checks / image",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T03:28:37Z",
+      "completedAt": "2026-11-09T03:47:00Z",
+      "onceOnlyLogRequestAtUTC": "2026-11-09T03:48:22.158Z",
+      "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+      "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+      "sourceEvidence": [
+        {
+          "sha": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+          "line": 128
+        }
+      ],
+      "checkoutBoundary": "explicit git log -1 output",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Verify disposable acceptance target guards and model fixture",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Build the public standalone application",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Verify packaged subscription binaries without network or credentials",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Start with an empty database and no Mikka credentials",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Build the pinned upstream MinIO fixture",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Apply migrations and wait for health",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Verify runtime edition, sign-in document, API and compiled assets",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Exercise Mailpit, MinIO, two app replicas and 31 synthetic model replies",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Reclaim intermediate build cache before installing source dependencies",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "Install the same-revision source daemon dependencies",
+          "conclusion": "success"
+        },
+        {
+          "number": 14,
+          "name": "Exercise the real daemon against the registered community user",
+          "conclusion": "success"
+        },
+        {
+          "number": 15,
+          "name": "Install the native desktop runtime dependencies",
+          "conclusion": "success"
+        },
+        {
+          "number": 16,
+          "name": "Build one packaged acceptance desktop with an independent default server",
+          "conclusion": "success"
+        },
+        {
+          "number": 17,
+          "name": "Verify packaged desktop email login, chat and built-in live against the actual image",
+          "conclusion": "success"
+        },
+        {
+          "number": 18,
+          "name": "Remove private desktop fixture material",
+          "conclusion": "success"
+        },
+        {
+          "number": 19,
+          "name": "Remove private daemon fixture material",
+          "conclusion": "success"
+        },
+        {
+          "number": 20,
+          "name": "Retain secret-free application acceptance evidence",
+          "conclusion": "success"
+        },
+        {
+          "number": 21,
+          "name": "Upload isolated acceptance receipt",
+          "conclusion": "success"
+        },
+        {
+          "number": 22,
+          "name": "Verify the same persistent installation restarts",
+          "conclusion": "success"
+        },
+        {
+          "number": 23,
+          "name": "Verify the older built-in UI remains opt-in with the same data",
+          "conclusion": "success"
+        },
+        {
+          "number": 24,
+          "name": "Publish the tested revision",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 25,
+          "name": "Retain startup diagnostics on failure",
+          "conclusion": "skipped"
+        },
+        {
+          "number": 26,
+          "name": "Stop disposable services",
+          "conclusion": "success"
+        },
+        {
+          "number": 50,
+          "name": "Post Install the same-revision source daemon dependencies",
+          "conclusion": "success"
+        },
+        {
+          "number": 51,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "conclusion": "success"
+        },
+        {
+          "number": 52,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "conclusion": "success"
+        },
+        {
+          "number": 53,
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ],
+      "privateRawTool": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963633310.tool.original.json",
+        "bytes": 369983,
+        "sha256": "579cf9684ed8d608ffa0d4d56b955c4f566fb37c6f32ae78e4b4c83189cacc13",
+        "gitBlobSHA1": "ce820b395eaf512d1868019feeb45f834a8acaf5"
+      },
+      "decodedOriginalLog": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128963633310.original.log",
+        "bytes": 354882,
+        "sha256": "b4976fe052e87ade041cce4a2f2ca3ace57339abd79975f1e1125a29de69a30b",
+        "gitBlobSHA1": "ab29114ba10a2ad55a4bfbb8ad8b0bea8b68722a"
+      },
+      "gzip": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128963633310.original.log.gz",
+        "bytes": 69561,
+        "sha256": "1874e29896093828e8f727c0845c26f4a88c428f377c6667b1d34d0b4d60ab64",
+        "gitBlobSHA1": "d62a475f0a1d5e862e64e7a7f303808c44cd13a1"
+      },
+      "gzipRoundtripEqualsOriginal": true
+    },
+    {
+      "jobId": 128964722908,
+      "name": "analytics-checks / analytics-ssr",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T03:32:27Z",
+      "completedAt": "2026-11-09T03:32:31Z",
+      "onceOnlyLogRequestAtUTC": "2026-11-09T03:34:18.146Z",
+      "actualCheckout": null,
+      "actualTree": null,
+      "sourceEvidence": [],
+      "checkoutBoundary": "No checkout in this aggregate log; no actual source tree asserted for this job.",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Require classification and full regression unless docs-only",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Complete job",
+          "conclusion": "success"
+        }
+      ],
+      "privateRawTool": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128964722908.tool.original.json",
+        "bytes": 5244,
+        "sha256": "06625f7a48ac8aaac7db9b12e4fc463940e8c400def8c7eac3c40338f972f1ea",
+        "gitBlobSHA1": "b7da68aa7074fb8255a65edcd77eaa0bd861bf81"
+      },
+      "decodedOriginalLog": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/private/128964722908.original.log",
+        "bytes": 2939,
+        "sha256": "f6711059c7bd98356e603267c1c18b7b259a59f35582599a7e94a66276940277",
+        "gitBlobSHA1": "b59070231876f1ce7d547a7d75c15c42fd1cadf0"
+      },
+      "gzip": {
+        "path": "issue1512-evidence-work/ci-548790/nonpg/archive-logs/128964722908.original.log.gz",
+        "bytes": 1114,
+        "sha256": "efcd6ae8849320f217c1efeab8bcfdefc19195e15f6832d8d43fa135252d228e",
+        "gitBlobSHA1": "ccb8ce27b4a1eeb943d28ff9c49a04bcc08aac0e"
+      },
+      "gzipRoundtripEqualsOriginal": true
+    }
+  ],
+  "pendingOwnLeafScope": [],
+  "skippedOwnLeafScope": [
+    {
+      "id": 128963365314,
+      "name": "Cloud credential access (OIDC)",
+      "conclusion": "skipped"
+    }
+  ],
+  "sourceMetadata": {
+    "path": "issue1512-evidence-work/ci-548790/nonpg/private/leaf-terminal-ci-jobs.original.json",
+    "bytes": 163847,
+    "sha256": "54f525ea094bb70707e469605c08984205d4c162c69c6372e55ec5e12542a5e4",
+    "gitBlobSHA1": "599775e355452cdf318e28946719fdb63471d0ba"
+  },
+  "unitReconciliation": {
+    "path": "issue1512-evidence-work/ci-548790/nonpg/unit-reconciliation.safe.json",
+    "bytes": 11332,
+    "sha256": "3a6ca503f89b8b0c5e9ffb59c105bcc212b896f05d4bb65252b12747296ec1ef",
+    "gitBlobSHA1": "988e58aa4606b9d0b29f16d6d05e91484230c303"
+  },
+  "companionWorkflows": {
+    "path": "issue1512-evidence-work/ci-548790/nonpg/companion-workflows-final.safe.json",
+    "bytes": 53551,
+    "sha256": "e80ad81e0efd087b36f0e0dcd8cdc96a939186d31f10f381587cb8ffed119993",
+    "gitBlobSHA1": "b8233f3a53aa24e6ac8718079e0f23ceffc13253"
+  },
+  "credentialPatternScreening": {
+    "path": "issue1512-evidence-work/ci-548790/nonpg/archive-screening-final.safe.json",
+    "bytes": 2414,
+    "sha256": "de965e235e9381a8fe02ac6a053a57aeb1076a89a7d9bdb7c72bcac9f07866bb",
+    "gitBlobSHA1": "80306ab9bbb7e69510a2f419d4cacb268354a1c5"
+  },
+  "regressionExecutionEvidence": [
+    {
+      "jobId": 128963364224,
+      "test": "a Native read batch shares its workspace policy across the real key and subscription readers",
+      "logEvidence": [
+        {
+          "line": 2330,
+          "text": "2026-11-09T03:29:39.7260580Z ci-tasks: ✔ a Native read batch shares its workspace policy across the real key and subscription readers (5.603501ms)"
+        }
+      ]
+    },
+    {
+      "jobId": 128963364224,
+      "test": "afterJob cannot reuse a foreground policy while its parent read batch is still active",
+      "logEvidence": [
+        {
+          "line": 2338,
+          "text": "2026-11-09T03:29:39.7330951Z ci-tasks: ✔ afterJob cannot reuse a foreground policy while its parent read batch is still active (59.253738ms)"
+        }
+      ]
+    },
+    {
+      "jobId": 128963364224,
+      "test": "HTTP completes while waitUntil retains an earlier in-flight Workflow trace export",
+      "logEvidence": [
+        {
+          "line": 6956,
+          "text": "2026-11-09T03:32:52.5998005Z ci-tasks: ✔ HTTP completes while waitUntil retains an earlier in-flight Workflow trace export (201.399079ms)"
+        }
+      ]
+    },
+    {
+      "jobId": 128963364148,
+      "test": "closed repository refusals keep their exact result and mark phase plus dispatch beneath an OK Workflow step",
+      "logEvidence": [
+        {
+          "line": 2187,
+          "text": "2026-11-09T03:30:03.1404716Z ci-tasks: ✔ closed repository refusals keep their exact result and mark phase plus dispatch beneath an OK Workflow step (89.853754ms)"
+        }
+      ]
+    },
+    {
+      "jobId": 128963364068,
+      "test": "test/codex-generation-completion.test.ts (3 tests)",
+      "logEvidence": [
+        {
+          "line": 789,
+          "text": "2026-11-09T03:29:33.9180153Z  ✓ test/codex-generation-completion.test.ts (3 tests) 229ms"
+        }
+      ]
+    },
+    {
+      "jobId": 128963364068,
+      "test": "test/claude-generation-abort.test.ts (4 tests)",
+      "logEvidence": [
+        {
+          "line": 790,
+          "text": "2026-11-09T03:29:33.9708703Z  ✓ test/claude-generation-abort.test.ts (4 tests) 430ms"
+        }
+      ]
+    }
+  ],
+  "daemonVitestSummary": {
+    "filesPassed": 138,
+    "filesSkipped": 1,
+    "testsPassed": 1569,
+    "testsSkipped": 2,
+    "reportedSkippedFiles": [
+      "test/real-agents.test.ts (0 test)"
+    ],
+    "reportedSkippedTestsFile": "test/adapters.test.ts",
+    "boundary": "No all-tests-zero-skip claim; mailbox/authority/type/package steps have separate successful outcomes."
+  },
+  "selfHostedImage": {
+    "jobId": 128963633310,
+    "safeOriginalReportLines": [
+      {
+        "line": 2686,
+        "value": {
+          "kind": "isolated-self-hosted-services",
+          "revision": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+          "origin": "http://localhost:3000",
+          "provider": "synthetic-openai-compatible",
+          "synthetic": true,
+          "productionAcceptance": false,
+          "checks": {
+            "mailpit": {
+              "verificationReceived": true,
+              "passwordResetReceived": true,
+              "configuredSender": true,
+              "verifiedSignIn": true
+            },
+            "officialWeb": {
+              "transport": "actual-http",
+              "protocol": "v1",
+              "discovery": true,
+              "corsPreflight": true,
+              "bearerOnly": true,
+              "explicitSameOriginReturn": true,
+              "independentSession": true,
+              "fragmentCodeOnly": true,
+              "replayRejected": true,
+              "sessionRpc": true,
+              "maliciousOriginRejected": true,
+              "visualAcceptance": false,
+              "workspaceRead": true,
+              "attachmentUploadAndDownload": true,
+              "messageSubmitted": true,
+              "messageReplyRead": true,
+              "replyProvider": "synthetic-openai-compatible",
+              "revokeImmediate": true,
+              "sourceCookieSurvives": true,
+              "bearerBoundLive": true,
+              "liveClosedOnRevoke": true
+            },
+            "live": {
+              "applications": 2,
+              "sharedPostgres": true,
+              "cloudflare": false,
+              "businessMutationReceivedAcrossReplicas": true
+            },
+            "minio": {
+              "applicationUpload": true,
+              "privateObject": true,
+              "presignedDownload": true,
+              "bytesVerified": true
+            },
+            "chat": {
+              "messages": 31,
+              "replies": 31,
+              "provider": "synthetic-openai-compatible",
+              "synthetic": true,
+              "hostedUsageRows": 0,
+              "subscriptionAcceptance": false
+            }
+          },
+          "status": "passed",
+          "stage": "complete",
+          "chatProgress": {
+            "confirmedReplies": 31
+          }
+        }
+      }
+    ],
+    "cleanupEvidence": [
+      {
+        "line": 3822,
+        "text": "2026-11-09T03:46:36.4920049Z  Container mikka-selfhost-ci-app-replica-1  Removed"
+      },
+      {
+        "line": 3826,
+        "text": "2026-11-09T03:46:55.4162785Z  Container mikka-selfhost-ci-app-1  Removed"
+      },
+      {
+        "line": 3837,
+        "text": "2026-11-09T03:46:55.5446934Z  Container mikka-selfhost-ci-model-1  Removed"
+      },
+      {
+        "line": 3838,
+        "text": "2026-11-09T03:46:55.5480212Z  Container mikka-selfhost-ci-postgres-1  Removed"
+      },
+      {
+        "line": 3839,
+        "text": "2026-11-09T03:46:55.5543845Z  Container mikka-selfhost-ci-minio-1  Removed"
+      },
+      {
+        "line": 3842,
+        "text": "2026-11-09T03:46:55.8050973Z  Container mikka-selfhost-ci-mailpit-1  Removed"
+      },
+      {
+        "line": 3847,
+        "text": "2026-11-09T03:46:55.8695212Z  Network mikka-selfhost-ci_default  Removed"
+      },
+      {
+        "line": 3848,
+        "text": "2026-11-09T03:46:56.4112789Z  Volume mikka-selfhost-ci_postgres-data  Removed"
+      },
+      {
+        "line": 3849,
+        "text": "2026-11-09T03:46:56.4126260Z  Volume mikka-selfhost-ci_replica-data  Removed"
+      },
+      {
+        "line": 3850,
+        "text": "2026-11-09T03:46:57.0087155Z  Volume mikka-selfhost-ci_app-data  Removed"
+      }
+    ],
+    "productionPublish": "skipped for PR"
+  },
+  "privacy": "Platform request/response envelopes remain private. Compressed copies contain exact decoded logs and were signature screened; only test-title prose matched Bearer candidates. This is bounded screening, not an assertion about all possible private-data patterns.",
+  "productionAcceptance": false,
+  "mainCIOverallConclusion": null,
+  "boundaries": [
+    "Nine companion workflows are terminal success. The E2B additive PR test does not publish or exercise its subscription release gate.",
+    "BrowserGate is an echo-only protected-name job. The old Production build and browser interactions job is the PG aggregate, owned by a different reader.",
+    "Linux desktop smoke and isolated community-image checks are distinct from Apple Silicon Native acceptance and production ACME model cases.",
+    "UI policy strict aggregate was not created in this snapshot and still depends on Native; no overall-main-CI pass is claimed."
+  ],
+  "ownResources": {
+    "processes": 0,
+    "sessions": 0,
+    "paidResourcesCreated": 0,
+    "modelsTriggered": 0
+  },
+  "mutations": {
+    "reruns": 0,
+    "cancellations": 0,
+    "branchOrSourceChanges": 0,
+    "configurationChanges": 0
+  }
+}

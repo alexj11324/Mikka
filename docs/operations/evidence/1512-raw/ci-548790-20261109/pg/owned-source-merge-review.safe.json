@@ -1,0 +1,187 @@
+{
+  "schema": "issue1512.ci-548790.owned-source-merge-review.v1",
+  "head": "548790b4676d5e43556bf62cf452c3c5aee68073",
+  "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+  "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+  "lateMain": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+  "ownedPaths": 25,
+  "actualMergeFirstParentChangedPaths": 25,
+  "pathSetIdentical": true,
+  "comparisons": [
+    {
+      "path": "app/v1/devices/[deviceId]/repos/route.ts",
+      "frozenHeadBlob": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b",
+      "actualMergeBlob": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b",
+      "status": "identical"
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/runs/route.ts",
+      "frozenHeadBlob": "5a4c4f8486239161b325b9774b3086afe666dfa9",
+      "actualMergeBlob": "5a4c4f8486239161b325b9774b3086afe666dfa9",
+      "status": "identical"
+    },
+    {
+      "path": "apps/api/generated/routes.json",
+      "frozenHeadBlob": "17c08e555f327646bfa01df49ab6406053dfe538",
+      "actualMergeBlob": "17c08e555f327646bfa01df49ab6406053dfe538",
+      "status": "identical"
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "frozenHeadBlob": "08aaff7b3c936a3a0ede346ab51a15ebf2fd785d",
+      "actualMergeBlob": "08aaff7b3c936a3a0ede346ab51a15ebf2fd785d",
+      "status": "identical"
+    },
+    {
+      "path": "docs/operations/tracing.md",
+      "frozenHeadBlob": "35694355877eea55393ba9299f7796c2c171ccb7",
+      "actualMergeBlob": "35694355877eea55393ba9299f7796c2c171ccb7",
+      "status": "identical"
+    },
+    {
+      "path": "lib/coordinator/repository-resolution.test.ts",
+      "frozenHeadBlob": "a5157f09e8022bf9077053686d36aa02760a4e94",
+      "actualMergeBlob": "a5157f09e8022bf9077053686d36aa02760a4e94",
+      "status": "identical"
+    },
+    {
+      "path": "lib/coordinator/repository-resolution.ts",
+      "frozenHeadBlob": "6826efdd6895fa3f584e35ff2f1edb527cd080fa",
+      "actualMergeBlob": "6826efdd6895fa3f584e35ff2f1edb527cd080fa",
+      "status": "identical"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "frozenHeadBlob": "e32da5e4d7294af3363eb2de4623a52aeb7e4f47",
+      "actualMergeBlob": "e32da5e4d7294af3363eb2de4623a52aeb7e4f47",
+      "status": "identical"
+    },
+    {
+      "path": "lib/device-enrollment.db.test.ts",
+      "frozenHeadBlob": "071b2243d35cd6fdd97b7be0f17f21728578c537",
+      "actualMergeBlob": "071b2243d35cd6fdd97b7be0f17f21728578c537",
+      "status": "identical"
+    },
+    {
+      "path": "lib/device-enrollment.ts",
+      "frozenHeadBlob": "8fe53cb39985150e5fc05daa6370121cb5426d53",
+      "actualMergeBlob": "8fe53cb39985150e5fc05daa6370121cb5426d53",
+      "status": "identical"
+    },
+    {
+      "path": "lib/device-heartbeat.db.test.ts",
+      "frozenHeadBlob": "27bbb720ac8f5bd3716787db62eb11833e9f3530",
+      "actualMergeBlob": "27bbb720ac8f5bd3716787db62eb11833e9f3530",
+      "status": "identical"
+    },
+    {
+      "path": "lib/device-management.ts",
+      "frozenHeadBlob": "c2243c5732d67b3ff5444196ce3b45e9aca67805",
+      "actualMergeBlob": "c2243c5732d67b3ff5444196ce3b45e9aca67805",
+      "status": "identical"
+    },
+    {
+      "path": "lib/device-unit-fence.db.test.ts",
+      "frozenHeadBlob": "bc65b3faf494d2fd7c797b68f34d04227df38b7a",
+      "actualMergeBlob": "bc65b3faf494d2fd7c797b68f34d04227df38b7a",
+      "status": "identical"
+    },
+    {
+      "path": "lib/dispatch-timing.ts",
+      "frozenHeadBlob": "f82563e766f5c0477479b2d487e0f92e60a08b75",
+      "actualMergeBlob": "f82563e766f5c0477479b2d487e0f92e60a08b75",
+      "status": "identical"
+    },
+    {
+      "path": "lib/personal-policy.test.ts",
+      "frozenHeadBlob": "fef80337b9b5244d2e8565236c6dd96f7d329acd",
+      "actualMergeBlob": "fef80337b9b5244d2e8565236c6dd96f7d329acd",
+      "status": "identical"
+    },
+    {
+      "path": "lib/personal-policy.ts",
+      "frozenHeadBlob": "dc710f0a16a5e28e5a34d5112a86fab349a2639a",
+      "actualMergeBlob": "dc710f0a16a5e28e5a34d5112a86fab349a2639a",
+      "status": "identical"
+    },
+    {
+      "path": "lib/tracing/logs.test.ts",
+      "frozenHeadBlob": "737fa373e4a8333a4a703bf6133f9a533d585460",
+      "actualMergeBlob": "737fa373e4a8333a4a703bf6133f9a533d585460",
+      "status": "identical"
+    },
+    {
+      "path": "lib/tracing/node.ts",
+      "frozenHeadBlob": "00775a5928228262a66b12b845ee0dc18f6c6047",
+      "actualMergeBlob": "00775a5928228262a66b12b845ee0dc18f6c6047",
+      "status": "identical"
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "frozenHeadBlob": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+      "actualMergeBlob": null,
+      "status": "api_blob_unavailable_mode_only"
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+      "frozenHeadBlob": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+      "actualMergeBlob": null,
+      "status": "api_blob_unavailable_mode_only"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "frozenHeadBlob": "f36ecf2d08f1bc2754b21be0d47d149871bb67c5",
+      "actualMergeBlob": "f36ecf2d08f1bc2754b21be0d47d149871bb67c5",
+      "status": "identical"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "frozenHeadBlob": "628395f91d97a64655afb80117788d70207200c0",
+      "actualMergeBlob": "628395f91d97a64655afb80117788d70207200c0",
+      "status": "identical"
+    },
+    {
+      "path": "tests/cloud-dispatch-startup.test.ts",
+      "frozenHeadBlob": "609029dde521868c00ab7eb687394ad5cacd6183",
+      "actualMergeBlob": "609029dde521868c00ab7eb687394ad5cacd6183",
+      "status": "identical"
+    },
+    {
+      "path": "workflows/coordinator/factory-steps.ts",
+      "frozenHeadBlob": "0e2ecce921c4b56795ad1096f2b1eae987299e95",
+      "actualMergeBlob": "0e2ecce921c4b56795ad1096f2b1eae987299e95",
+      "status": "identical"
+    },
+    {
+      "path": "workflows/coordinator/steps.ts",
+      "frozenHeadBlob": "3f480288b10905be0877ad3d192d6483d1c7d096",
+      "actualMergeBlob": "8b7a5b06f3d1a9c0ebae03a434095a33fa552894",
+      "status": "changed_by_late_main"
+    }
+  ],
+  "changedOverlap": {
+    "path": "workflows/coordinator/steps.ts",
+    "headBlob": "3f480288b10905be0877ad3d192d6483d1c7d096",
+    "headSha256": "dff7bb2a993b9510cc70ecde1c5b2bc03e6a8fb5ffa1c68919ce49e19d1a57ad",
+    "actualBlob": "8b7a5b06f3d1a9c0ebae03a434095a33fa552894",
+    "actualSha256": "3cecb55acb3f721a65a73649975c18f1f121e4536bdb10c17baba5d62184ba4a",
+    "lateMainPatchHunks": 5,
+    "eachOldContextUnique": [
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    "applyingExactLateMainHunksToFrozenHeadEqualsActual": true,
+    "changes": [
+      "Personal instruction import and consumer now use conversation projection text.",
+      "Adds hostedStartupSettings for existing pure ai_sdk selection.",
+      "Extends optional timing origin/startup fields.",
+      "Uses loadConversationForPrompt and its personalInstructions."
+    ],
+    "ownReturnedRefusalEditsPreserved": "All actual-vs-head bytes are accounted for exactly by the five late-main hunks; no extra merge edit is present.",
+    "reviewLimit": "Focused merge-integrity review, not an independent approval of all #1791 behavior or a new performance measurement."
+  },
+  "blobApiLimits": "Two mode-only fixture entries expose null blob SHA in commit diff API; this report does not invent their actual tree mode/blob. All 23 text entries are checked: 22 frozen blobs identical and one steps.ts exact replay above."
+}

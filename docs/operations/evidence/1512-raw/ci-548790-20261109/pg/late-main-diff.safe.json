@@ -1,0 +1,254 @@
+{
+  "schema": "issue1512.ci-548790.late-main-diff.v1",
+  "sourceUrl": "https://api.github.com/repos/alexj11324/Mikka/commits/0e4118020311ae8f9083d0d21cfb990be0282f25",
+  "sha": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+  "parents": [
+    "0a355918330f6dac04d2b0ee4716cd056c263162",
+    "dfed4658ae974ae3703c4b07f9997f06d0aa1431"
+  ],
+  "authoredAt": "2026-11-09T03:26:38Z",
+  "committedAt": "2026-11-09T03:26:38Z",
+  "title": "perf(coordinator): checkpoint bounded startup preparation (#1791)",
+  "stats": {
+    "total": 2517,
+    "additions": 2455,
+    "deletions": 62
+  },
+  "changedPaths": [
+    {
+      "path": "apps/desktop/test/native-device-ready.mjs",
+      "status": "modified",
+      "blob": "aeacdb31da2c30da3e9afe5dbe7849af91da9a57",
+      "additions": 13,
+      "deletions": 2,
+      "changes": 15
+    },
+    {
+      "path": "apps/desktop/test/native-device-ready.test.mjs",
+      "status": "modified",
+      "blob": "9ed7176172b9f9301b25d625611bdf7839447411",
+      "additions": 95,
+      "deletions": 0,
+      "changes": 95
+    },
+    {
+      "path": "components/workspace/issue-workspace-settings.test.tsx",
+      "status": "modified",
+      "blob": "33876bcc1333f227e3e4c3891cd25dae4d816cc0",
+      "additions": 2,
+      "deletions": 0,
+      "changes": 2
+    },
+    {
+      "path": "drizzle/20261108233500_coordinator_startup_receipts.sql",
+      "status": "added",
+      "blob": "9e1cfb7cb9d3b96d57071e9217a29954f296a5e0",
+      "additions": 13,
+      "deletions": 0,
+      "changes": 13
+    },
+    {
+      "path": "lib/agent-kit/core-entry.test.ts",
+      "status": "modified",
+      "blob": "b48c852cac4c0e3ac7f02fee99fcca412847d55a",
+      "additions": 221,
+      "deletions": 2,
+      "changes": 223
+    },
+    {
+      "path": "lib/agent-kit/message-safety-compat.test.ts",
+      "status": "modified",
+      "blob": "2c2c8625c4d5d8436b837e8dc370bbdd359aae4d",
+      "additions": 2,
+      "deletions": 2,
+      "changes": 4
+    },
+    {
+      "path": "lib/coordinator/chat-projection-version.test.ts",
+      "status": "modified",
+      "blob": "9cccb67bd87fdb4800549e5b3a20392a2f0559e0",
+      "additions": 1,
+      "deletions": 1,
+      "changes": 2
+    },
+    {
+      "path": "lib/coordinator/message-safety-consumers.test.ts",
+      "status": "modified",
+      "blob": "ce6cdacaf1836f91ba19c602e3e0c1c8b9c57456",
+      "additions": 2,
+      "deletions": 2,
+      "changes": 4
+    },
+    {
+      "path": "lib/coordinator/personal-instructions.ts",
+      "status": "modified",
+      "blob": "03baa4911d341a0a4e1558d8d32f3c71435258fb",
+      "additions": 6,
+      "deletions": 1,
+      "changes": 7
+    },
+    {
+      "path": "lib/coordinator/prompt-context-concurrency.test.ts",
+      "status": "modified",
+      "blob": "32a56938b057f16f1421dc84cb93e465df0e5a26",
+      "additions": 4,
+      "deletions": 4,
+      "changes": 8
+    },
+    {
+      "path": "lib/coordinator/prompt-preferences.test.ts",
+      "status": "added",
+      "blob": "2dedc1e04f36b42a3096a084ebe08f6d388815a2",
+      "additions": 233,
+      "deletions": 0,
+      "changes": 233
+    },
+    {
+      "path": "lib/coordinator/startup-receipt.db.test.ts",
+      "status": "added",
+      "blob": "510f476f683398cc200c745a885ba8c806d5218b",
+      "additions": 1084,
+      "deletions": 0,
+      "changes": 1084
+    },
+    {
+      "path": "lib/coordinator/startup-receipt.test.ts",
+      "status": "added",
+      "blob": "7a5fb8f8a59ffb4f1cf3c532d7cc93cbedbd0e88",
+      "additions": 228,
+      "deletions": 0,
+      "changes": 228
+    },
+    {
+      "path": "lib/coordinator/startup-receipt.ts",
+      "status": "added",
+      "blob": "440030ca5b1398e1578ed49ed02c349066c72a52",
+      "additions": 131,
+      "deletions": 0,
+      "changes": 131
+    },
+    {
+      "path": "lib/coordinator/store.ts",
+      "status": "modified",
+      "blob": "0198839eeb0ebb522b22a790f08c65b35550584c",
+      "additions": 179,
+      "deletions": 20,
+      "changes": 199
+    },
+    {
+      "path": "lib/coordinator/summary-model-consumer.test.ts",
+      "status": "modified",
+      "blob": "5456709d430481cf8cfa20fa355c79b44341ed6f",
+      "additions": 2,
+      "deletions": 2,
+      "changes": 4
+    },
+    {
+      "path": "lib/coordinator/user-images-entry.test.ts",
+      "status": "modified",
+      "blob": "5befa7574dbdadf018b3f45559e683e170020c25",
+      "additions": 2,
+      "deletions": 2,
+      "changes": 4
+    },
+    {
+      "path": "lib/coordinator/wake-deadline.test.ts",
+      "status": "modified",
+      "blob": "d76ee4cdb0406827f24e7b645f79723071bf119e",
+      "additions": 1,
+      "deletions": 1,
+      "changes": 2
+    },
+    {
+      "path": "lib/coordinator/wake.ts",
+      "status": "modified",
+      "blob": "7c7f86098b104c57f434d08fdd384ce748db7fc9",
+      "additions": 1,
+      "deletions": 1,
+      "changes": 2
+    },
+    {
+      "path": "lib/db/schema.ts",
+      "status": "modified",
+      "blob": "b4fa3dfffa0ae5f622d6e61d24c3437afe7215a3",
+      "additions": 17,
+      "deletions": 1,
+      "changes": 18
+    },
+    {
+      "path": "lib/operations/write-planning-ingress.test.ts",
+      "status": "modified",
+      "blob": "527b281dbb995401db75a75dac4d0853881dc137",
+      "additions": 2,
+      "deletions": 2,
+      "changes": 4
+    },
+    {
+      "path": "lib/preferences.ts",
+      "status": "modified",
+      "blob": "0d650ef042f11a2f9515def6aeed4037704867e9",
+      "additions": 15,
+      "deletions": 1,
+      "changes": 16
+    },
+    {
+      "path": "lib/swr/cache-policy.test.ts",
+      "status": "modified",
+      "blob": "5e7a1ca8261647e6c12c779d4a2529e900df4327",
+      "additions": 81,
+      "deletions": 0,
+      "changes": 81
+    },
+    {
+      "path": "lib/swr/cache-policy.ts",
+      "status": "modified",
+      "blob": "977431cfdeb11adbe2863794ca7bde010c7842ad",
+      "additions": 7,
+      "deletions": 2,
+      "changes": 9
+    },
+    {
+      "path": "package.json",
+      "status": "modified",
+      "blob": "bf33dc9f177f4635f9cb55b8e9eddc894b2aa43c",
+      "additions": 2,
+      "deletions": 2,
+      "changes": 4
+    },
+    {
+      "path": "workflows/coordinator/startup-preparation.ts",
+      "status": "added",
+      "blob": "26a05803fbf92c28f1833c5e8375a374f4f67cb4",
+      "additions": 39,
+      "deletions": 0,
+      "changes": 39
+    },
+    {
+      "path": "workflows/coordinator/steps.ts",
+      "status": "modified",
+      "blob": "4437f048cda5c22142d407e46417abb8f15e80e6",
+      "additions": 15,
+      "deletions": 4,
+      "changes": 19
+    },
+    {
+      "path": "workflows/coordinator/workflow.ts",
+      "status": "modified",
+      "blob": "cf1205e23d288ab8311f56b8452b958f2bedbc4d",
+      "additions": 57,
+      "deletions": 10,
+      "changes": 67
+    }
+  ],
+  "filesReturned": 28,
+  "ownedManifest": {
+    "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/integrated-source-validation-20261109/final-source-binding.safe.json",
+    "sha256": "3efc6e7b501d8d915678c5090e29f3f1d7133483e08a73e5a907f6163f3d8740",
+    "count": 25
+  },
+  "ownedIntersection": [
+    "workflows/coordinator/steps.ts"
+  ],
+  "apiChangedPathsCompleteByStats": true,
+  "boundary": "Main first-parent commit diff only. No direct overlap with owned files does not imply whole-tree equivalence or performance equivalence. Actual CI source is 90e698/tree56e5616."
+}

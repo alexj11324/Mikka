@@ -1,0 +1,233 @@
+{
+  "schema": "issue1512.ci548790.ui-strict-aggregate.v1",
+  "repository": "alexj11324/Mikka",
+  "runId": 42556448828,
+  "jobId": 128972030721,
+  "jobName": "UI policy (strict)",
+  "jobURL": "https://github.com/alexj11324/Mikka/actions/runs/42556448828/job/128972030721",
+  "readAtUTC": "2026-11-09T04:01:47.883Z",
+  "downloadCount": 1,
+  "terminalState": {
+    "status": "completed",
+    "conclusion": "success",
+    "source": "Official terminal jobs summary observed and supplied by parent and Native owner; this agent fetched only the final log."
+  },
+  "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+  "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+  "checkoutEvidence": [
+    {
+      "line": 164,
+      "sha": "90e6988338d56a5f03b09f7e956adbf7ff4daf20"
+    }
+  ],
+  "treeEvidence": {
+    "source": "Existing PG owner exact Git commit API, not queried again",
+    "safeReceipt": "ci-548790/pg/actual-checkout.safe.json",
+    "sha256": "3b304e1ae7ccf2ee61db31bcc9f230a7837a76000e9c47e0e2d88a7525282a41"
+  },
+  "eventHead": "548790b4676d5e43556bf62cf452c3c5aee68073",
+  "eventHeadTree": "933f76fbff37682f2f9cfaf64e672d229531f5ff",
+  "changesResult": "success",
+  "needs": [
+    {
+      "name": "CORE",
+      "expectedSelected": true,
+      "actualConclusion": "success"
+    },
+    {
+      "name": "INTEGRATION",
+      "expectedSelected": true,
+      "actualConclusion": "success"
+    },
+    {
+      "name": "SOURCE",
+      "expectedSelected": true,
+      "actualConclusion": "success"
+    },
+    {
+      "name": "DAEMON",
+      "expectedSelected": true,
+      "actualConclusion": "success"
+    },
+    {
+      "name": "IMAGE",
+      "expectedSelected": true,
+      "actualConclusion": "success"
+    },
+    {
+      "name": "DESKTOP",
+      "expectedSelected": true,
+      "actualConclusion": "success"
+    },
+    {
+      "name": "ANALYTICS",
+      "expectedSelected": true,
+      "actualConclusion": "success"
+    }
+  ],
+  "needsEvidence": [
+    {
+      "line": 53,
+      "key": "CHANGES_RESULT",
+      "value": "success"
+    },
+    {
+      "line": 54,
+      "key": "EXPECT_CORE",
+      "value": "true"
+    },
+    {
+      "line": 55,
+      "key": "EXPECT_INTEGRATION",
+      "value": "true"
+    },
+    {
+      "line": 56,
+      "key": "EXPECT_SOURCE",
+      "value": "true"
+    },
+    {
+      "line": 57,
+      "key": "EXPECT_DAEMON",
+      "value": "true"
+    },
+    {
+      "line": 58,
+      "key": "EXPECT_IMAGE",
+      "value": "true"
+    },
+    {
+      "line": 59,
+      "key": "EXPECT_DESKTOP",
+      "value": "true"
+    },
+    {
+      "line": 60,
+      "key": "EXPECT_ANALYTICS",
+      "value": "true"
+    },
+    {
+      "line": 61,
+      "key": "IMAGE",
+      "value": "success"
+    },
+    {
+      "line": 62,
+      "key": "DESKTOP",
+      "value": "success"
+    },
+    {
+      "line": 63,
+      "key": "ANALYTICS",
+      "value": "success"
+    },
+    {
+      "line": 64,
+      "key": "CORE",
+      "value": "success"
+    },
+    {
+      "line": 65,
+      "key": "INTEGRATION",
+      "value": "success"
+    },
+    {
+      "line": 66,
+      "key": "SOURCE",
+      "value": "success"
+    },
+    {
+      "line": 67,
+      "key": "DAEMON",
+      "value": "success"
+    }
+  ],
+  "githubErrorMarkers": 0,
+  "originalDecodedLog": {
+    "characters": 14085,
+    "bytes": 14087,
+    "sha256": "973176462c436c5ea8d91a1fec5db571ebe4c81c085d7dfa4d08dba129ab748a",
+    "gitBlobSHA1": "0138bb99fa3906b27477482e260c4cbb161bebd7"
+  },
+  "originalRawCaptureFingerprint": {
+    "bytes": 15121,
+    "sha256": "e6967c9b175d5a656aa57a3b02c0f3f480c6c578331c2dea4309e40147294a29",
+    "gitBlobSHA1": "9a17b62020aff0fe013cbe79d3083bc8fa1c965d"
+  },
+  "publicGzip": {
+    "path": "archive-logs/128972030721.original.log.gz",
+    "bytes": 3942,
+    "sha256": "79957f20789391ec2cdda6184e179abba76c2a83a9f67ff4e37fe1e24f68f6e1",
+    "gitBlobSHA1": "7eceeb26131a3ff1c631e486adeb6250d92175a9",
+    "mtime": 0,
+    "encoding": "gzip, Python gzip.compress with mtime=0",
+    "validation": "hashlib agrees with prior V8 SHA-256/Git SHA-1; gzip.decompress equals original and repeated deterministic gzip bytes equal"
+  },
+  "safety": {
+    "rawPlatformEnvelopeContentIncluded": false,
+    "signatureCounts": {
+      "private_key": 0,
+      "github_token": 0,
+      "posthog_token": 0,
+      "aws_access_key": 0,
+      "jwt": 0,
+      "bearer_material": 0,
+      "email": 0,
+      "signed_url_material": 0
+    },
+    "signatureCandidateValuesDisclosed": false,
+    "urlScan": {
+      "urlOccurrences": 10,
+      "sensitiveQueryKeyNames": [
+        "access_token",
+        "auth",
+        "authorization",
+        "credential",
+        "se",
+        "sig",
+        "signature",
+        "ske",
+        "skoid",
+        "sks",
+        "skt",
+        "sktid",
+        "skv",
+        "sp",
+        "token",
+        "x-amz-credential",
+        "x-amz-security-token",
+        "x-amz-signature",
+        "x-goog-signature"
+      ],
+      "candidateCount": 0,
+      "userinfoChecked": true
+    }
+  },
+  "boundary": [
+    "The aggregate verifies selected needs and runs timing summary; its success does not replace Native budget analysis, the separate PG proof, or production acceptance.",
+    "Existing E2B PR release skips, BrowserGate echo-only placeholder, PG aggregate old label, synthetic image replies and daemon skips remain as recorded in the unchanged 14-leaf publication package.",
+    "No 14-leaf or nine-companion log was redownloaded, and no old public file was modified."
+  ],
+  "productionAcceptance": false,
+  "persistence": {
+    "filesystemAvailable": true,
+    "filesystemWritten": true,
+    "restoredFrom": "The once-downloaded functions-store response, without a GitHub reread",
+    "relativeRoot": "ui-aggregate",
+    "privateRawCaptureKept": true,
+    "remotePublicationByThisAgent": "blob upload follows; no evidence ref mutation"
+  },
+  "ownResources": {
+    "processes": 0,
+    "sessions": 0,
+    "models": 0,
+    "paidResourcesCreated": 0
+  },
+  "validationEnvironment": {
+    "kind": "Parent-owned temporary evidence-only Vercel sandbox",
+    "pythonHashlibVerified": true,
+    "networkUsedByPython": false,
+    "productTestsRun": false,
+    "newSandboxCreatedByThisAgent": false
+  }
+}

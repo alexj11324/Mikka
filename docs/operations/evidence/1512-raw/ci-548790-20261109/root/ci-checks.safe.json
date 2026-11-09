@@ -1,0 +1,322 @@
+{
+  "schema": 1,
+  "repository": "alexj11324/Mikka",
+  "pr": 1799,
+  "head": "548790b4676d5e43556bf62cf452c3c5aee68073",
+  "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+  "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+  "checkCount": 43,
+  "checks": [
+    {
+      "id": 128972030721,
+      "name": "UI policy (strict)",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128965799828,
+      "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128964857582,
+      "name": "Production build and browser interactions",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128964722908,
+      "name": "analytics-checks / analytics-ssr",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963633310,
+      "name": "image-checks / image",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963608463,
+      "name": "analytics-checks / Analytics SSR (full)",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963583411,
+      "name": "desktop-checks / smoke",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963583372,
+      "name": "desktop-checks / checks",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963583362,
+      "name": "desktop-checks / icon",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963457301,
+      "name": "macos-arm (22.22.1)",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963457283,
+      "name": "macos-arm (18.20.8)",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963365314,
+      "name": "Cloud credential access (OIDC)",
+      "status": "completed",
+      "conclusion": "skipped",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963364690,
+      "name": "image-checks / changes / Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963364654,
+      "name": "desktop-checks / changes / Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963364555,
+      "name": "analytics-checks / changes / Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963364224,
+      "name": "Core unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963364213,
+      "name": "Source checks",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963364207,
+      "name": "Database checks (3/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963364183,
+      "name": "Database checks (4/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963364182,
+      "name": "Database checks (2/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963364163,
+      "name": "Database checks (1/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963364148,
+      "name": "Integration unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963364068,
+      "name": "Daemon checks",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963253921,
+      "name": "await-web",
+      "status": "completed",
+      "conclusion": "skipped",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963253665,
+      "name": "cleanup",
+      "status": "completed",
+      "conclusion": "skipped",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963253627,
+      "name": "subscriptions",
+      "status": "completed",
+      "conclusion": "skipped",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963253374,
+      "name": "validate",
+      "status": "completed",
+      "conclusion": "skipped",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963253367,
+      "name": "publish",
+      "status": "completed",
+      "conclusion": "skipped",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963253202,
+      "name": "check",
+      "status": "completed",
+      "conclusion": "skipped",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963152359,
+      "name": "backend",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963152276,
+      "name": "runtime",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963152085,
+      "name": "changes / Changed files",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963151995,
+      "name": "site-search",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963151904,
+      "name": "Read cache API and CLI",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963151875,
+      "name": "package",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963151736,
+      "name": "node22-unit",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963151589,
+      "name": "custody",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963151559,
+      "name": "test",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963151515,
+      "name": "Local driver (macOS permissions, nonblocking)",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963151471,
+      "name": "ssh",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963151366,
+      "name": "Browser tests (before merge)",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963151341,
+      "name": "Local driver (Linux Xvfb)",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    },
+    {
+      "id": 128963147752,
+      "name": "GitGuardian Security Checks",
+      "status": "completed",
+      "conclusion": "success",
+      "head": "548790b4676d5e43556bf62cf452c3c5aee68073"
+    }
+  ],
+  "conclusions": {
+    "success": 36,
+    "skipped": 7
+  },
+  "nativeSqlBudgetReview": "pending actual artifact parse; successful CI job alone does not establish issue budget",
+  "productionAccepted": false,
+  "observationUtcBounds": [
+    "2026-11-09T04:01:31Z",
+    "2026-11-09T04:03:15Z"
+  ]
+}

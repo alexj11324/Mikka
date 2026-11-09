@@ -1,0 +1,32 @@
+{
+  "exactWorkerOrInstalledRevisionFields": [
+    {
+      "path": "native-548790-original/lifecycle.json",
+      "field": "$.nativeSetup[0].environment.service.installedRevision",
+      "value": "facb389f6cc06c453e9135bb60ada1b0f302e0d9",
+      "valueRetained": true
+    },
+    {
+      "path": "native-548790-original/lifecycle.json",
+      "field": "$.nativeSetup[1].environment.service.installedRevision",
+      "value": "facb389f6cc06c453e9135bb60ada1b0f302e0d9",
+      "valueRetained": true
+    },
+    {
+      "path": "native-548790-original/parity/parity.json",
+      "field": "$.nativeDeviceChecks[0].environment.service.installedRevision",
+      "value": "facb389f6cc06c453e9135bb60ada1b0f302e0d9",
+      "valueRetained": true
+    },
+    {
+      "path": "native-548790-original/parity/parity.json",
+      "field": "$.nativeDeviceChecks[1].environment.service.installedRevision",
+      "value": "facb389f6cc06c453e9135bb60ada1b0f302e0d9",
+      "valueRetained": true
+    }
+  ],
+  "daemonHelloVersion": "0.0.551",
+  "protocolVersion": 3,
+  "workerHashNotInFiveKeyJson": false,
+  "limitation": "Do not infer worker source solely from daemon version. Native own checkout and all receipt revision fields are separately verified."
+}

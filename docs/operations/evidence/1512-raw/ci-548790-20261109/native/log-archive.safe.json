@@ -1,0 +1,19 @@
+{
+  "raw": {
+    "bytes": 247700,
+    "sha256": "3fb65d0eb8cab66b0a8764b8bf6a2be9eebf581917f0978085b55eb50f10de76",
+    "gitBlobSha1": "b08341c817bf8617cb0774496a06ca9019320f9e"
+  },
+  "gzip": {
+    "path": "job-128965799828.original.log.gz",
+    "bytes": 43608,
+    "sha256": "8b66d6235159b3342bf63d481a8bd439a06839cd3dda241928d0bead6822b5f9",
+    "gitBlobSha1": "ee76b90138ad313979739ad789b7fb32118fede5"
+  },
+  "gzipSettings": {
+    "level": 9,
+    "mtime": 0,
+    "filename": ""
+  },
+  "roundtripBytesAndSha": "passed"
+}

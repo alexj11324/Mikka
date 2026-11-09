@@ -1,0 +1,61 @@
+{
+  "schema": "issue1512.ci548790.ui-aggregate-publication.v1",
+  "preparedAtUTC": "2026-11-09T04:07:29.065292+00:00",
+  "intendedEvidenceDirectory": "ci-548790/ui-aggregate/public",
+  "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+  "actualTree": "56e5616bc48d43654c867cb13ea9c6c4ba393d07",
+  "runId": 42556448828,
+  "jobId": 128972030721,
+  "files": [
+    {
+      "path": "ui-strict-aggregate.safe.json",
+      "bytes": 6204,
+      "sha256": "6ce625b61b4db5a04a2cc273121b8209efe64bbbd3251448017c4a2983cc9433",
+      "gitBlobSHA1": "c72f3e922d97c1ff85dfd10492e1a157f755fe9e",
+      "encoding": "utf-8"
+    },
+    {
+      "path": "archive-logs/128972030721.original.log.gz",
+      "bytes": 3942,
+      "sha256": "79957f20789391ec2cdda6184e179abba76c2a83a9f67ff4e37fe1e24f68f6e1",
+      "gitBlobSHA1": "7eceeb26131a3ff1c631e486adeb6250d92175a9",
+      "mtime": 0,
+      "encoding": "gzip"
+    }
+  ],
+  "originalDecodedLog": {
+    "bytes": 14087,
+    "sha256": "973176462c436c5ea8d91a1fec5db571ebe4c81c085d7dfa4d08dba129ab748a",
+    "gitBlobSHA1": "0138bb99fa3906b27477482e260c4cbb161bebd7"
+  },
+  "privateOriginalRawCaptureFingerprint": {
+    "bytes": 15121,
+    "sha256": "e6967c9b175d5a656aa57a3b02c0f3f480c6c578331c2dea4309e40147294a29",
+    "gitBlobSHA1": "9a17b62020aff0fe013cbe79d3083bc8fa1c965d"
+  },
+  "previousPublication": {
+    "path": "ci-548790/nonpg/public/publication-manifest.safe.json",
+    "sha256": "39e81da56a0587858156f8beaa5d33e6bdafc0a4c8f5ddc968ae17cc293b2b6d",
+    "mutatedByThisTask": false
+  },
+  "privatePlatformEnvelopeContentIncluded": false,
+  "temporaryURLsIncluded": false,
+  "externalLogDownloads": 1,
+  "additionalWorkflowPolls": 0,
+  "filesystemRestoration": "Parent-owned evidence-only sandbox; original scratch unavailable",
+  "checks": [
+    "Python hashlib agrees with V8 original-log SHA-256 and Git blob SHA-1",
+    "Public gzip decompresses to exact original bytes",
+    "Repeated mtime=0 gzip yields identical bytes",
+    "Seven expected-selected needs are success and CHANGES_RESULT is success",
+    "Actual checkout is 90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+    "No credential-pattern or signed/auth URL candidate"
+  ],
+  "boundaries": [
+    "The aggregate verifies selected needs and runs timing summary; its success does not replace Native budget analysis, the separate PG proof, or production acceptance.",
+    "Existing E2B PR release skips, BrowserGate echo-only placeholder, PG aggregate old label, synthetic image replies and daemon skips remain as recorded in the unchanged 14-leaf publication package.",
+    "No 14-leaf or nine-companion log was redownloaded, and no old public file was modified."
+  ],
+  "productionAcceptance": false,
+  "evidenceRefMutatedByThisAgent": false
+}

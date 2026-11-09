@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "actualCheckout": "90e6988338d56a5f03b09f7e956adbf7ff4daf20",
+  "credentialPatternFindings": 0,
+  "rawLogsUnmodified": true,
+  "syntheticNormalizedEmail": {
+    "count": 1,
+    "sha256": "fdb0d7655db963926cc4efe3326475516ec97dcbd6959766918e03ff45edb225",
+    "source": "lib/abuse/store.db.test.ts uses test.abuse+one@gmail.com; existing signup normalization removes dots and +tag. Same synthetic normalized value previously classified in checkpoint16."
+  },
+  "privateApiAndSignedDownloadUrlsExcluded": true,
+  "zipDownloads": 0,
+  "newExternalReads": 0
+}
