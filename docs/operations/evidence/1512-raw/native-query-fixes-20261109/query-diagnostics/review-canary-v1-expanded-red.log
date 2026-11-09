@@ -1,0 +1,146 @@
+✖ diagnostic safety: context identifiers accept primitive strings and read fields once (3.394352ms)
+✖ diagnostic safety: structure identifiers cannot preserve objects through implicit coercion (2.178081ms)
+✖ diagnostic safety: receipt timestamps accept primitive strings only (0.667656ms)
+✖ diagnostic safety: Proxy query configs are rejected before any descriptor or value trap runs (0.33195ms)
+✖ diagnostic safety: statement prefixes cannot admit opaque SET payloads or a second statement (0.324639ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 0
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 101.149846
+
+✖ failing tests:
+
+test at apps/desktop/test/db-query-diagnostics.test.mjs:77:1
+✖ diagnostic safety: context identifiers accept primitive strings and read fields once (3.394352ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   value: {
+  +     httpInvocationId: {
+  +       privateCanary: 'PRIVATE_BOXED_ID',
+  +       toString: [Function: toString]
+  +     },
+  +     invocationId: {
+  +       privateCanary: 'PRIVATE_BOXED_ID',
+  +       toString: [Function: toString]
+  +     },
+  +     method: 'GET',
+  +     route: '/api/devices/enrollment',
+  +     rpcAction: null,
+  +     status: 'known'
+  +   }
+  -   reason: 'context_invalid'
+    }
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/issue1512-diagnostics-copy/apps/desktop/test/db-query-diagnostics.test.mjs:80:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [Object],
+    expected: [Object],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at apps/desktop/test/db-query-diagnostics.test.mjs:92:1
+✖ diagnostic safety: structure identifiers cannot preserve objects through implicit coercion (2.178081ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'incomplete'
+  - 'unavailable'
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/issue1512-diagnostics-copy/apps/desktop/test/db-query-diagnostics.test.mjs:97:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'incomplete',
+    expected: 'unavailable',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at apps/desktop/test/db-query-diagnostics.test.mjs:101:1
+✖ diagnostic safety: receipt timestamps accept primitive strings only (0.667656ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 'complete'
+  - 'incomplete'
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/issue1512-diagnostics-copy/apps/desktop/test/db-query-diagnostics.test.mjs:104:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'complete',
+    expected: 'incomplete',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at apps/desktop/test/db-query-diagnostics.test.mjs:107:1
+✖ diagnostic safety: Proxy query configs are rejected before any descriptor or value trap runs (0.33195ms)
+  AssertionError [ERR_ASSERTION]: the diagnostic must not trigger traps before the original driver sees the config
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/issue1512-diagnostics-copy/apps/desktop/test/db-query-diagnostics.test.mjs:115:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at apps/desktop/test/db-query-diagnostics.test.mjs:120:1
+✖ diagnostic safety: statement prefixes cannot admit opaque SET payloads or a second statement (0.324639ms)
+  AssertionError [ERR_ASSERTION]: SET
+  + actual - expected
+  
+  + {
+  +   command: 'SET',
+  +   normalizedStructureId: 'b3e1f6d6bf65',
+  +   parameterCount: 0,
+  +   status: 'known'
+  + }
+  - undefined
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/issue1512-diagnostics-copy/apps/desktop/test/db-query-diagnostics.test.mjs:125:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: { status: 'known', normalizedStructureId: 'b3e1f6d6bf65', command: 'SET', parameterCount: 0 },
+    expected: undefined,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

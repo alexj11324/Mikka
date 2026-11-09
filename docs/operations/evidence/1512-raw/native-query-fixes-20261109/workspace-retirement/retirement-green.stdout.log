@@ -1,0 +1,13 @@
+(node:12) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:12) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ a document workspace departure retires readers instead of reading again before navigation (57.499956ms)
+ℹ {"initialReads":1,"readsBeforeAssign":1,"refreshesBeforeAssign":0,"departedEnabled":false,"departedEntries":0,"oldDocumentText":""}
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3749.63397

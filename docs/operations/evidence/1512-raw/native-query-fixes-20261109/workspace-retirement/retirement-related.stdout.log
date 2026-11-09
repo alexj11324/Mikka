@@ -1,0 +1,43 @@
+(node:12) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:12) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ disk namespaces distinguish owner, viewed workspace, build and authorized role (17.278143ms)
+✔ installed UI may supply its build identity while retaining server workspace authority (30.252054ms)
+✔ fresh server seed and an optimistic write both win over a late disk hydration (1.554976ms)
+✔ deleting a key while disk opens prevents its resurrection (0.270348ms)
+✔ revocation during hydration retires the cache and clears after queued disk work (0.958225ms)
+✔ an old tab retiring its namespace does not erase the newly activated account (0.31159ms)
+✔ unavailable storage still releases authorized network reads (0.273522ms)
+✔ task not found removes its detail and activity history, including a delayed disk restore (0.460455ms)
+✔ global clear waits for a provider that unregisters synchronously on invalidation (0.865666ms)
+✔ unmounted providers retire before late activation, while a StrictMode reconnect stays enabled (0.313804ms)
+✔ real SWR waits for disk and accepts exactly one fresh first response (11.282995ms)
+✔ real SWR in StrictMode waits for disk and accepts exactly one fresh first response (5.258591ms)
+✔ real SWR starts a cold read after an empty or failed disk hydrate (5.54987ms)
+✔ a cold paginated settings read resumes after hydration with its real aggregate key (3.124221ms)
+✔ the authenticated boundary seeds real SWR before an inner fallback can be replaced by disk (5.01281ms)
+✔ hydration respects a read explicitly disabled on mount (16.637946ms)
+(node:12) TimeoutNaNWarning: NaN is not a number.
+Timeout duration was set to 1.
+✔ real SWR keeps a connected key fresh for five minutes, then validates in the background and catches a disconnect (75.052383ms)
+✔ a server-denied workspace clears durable data without hydrating or refreshing in a loop (2.746653ms)
+✔ a document workspace departure retires readers instead of reading again before navigation (6.368755ms)
+ℹ {"initialReads":1,"readsBeforeAssign":1,"refreshesBeforeAssign":0,"departedEnabled":false,"departedEntries":0,"oldDocumentText":""}
+✔ document retirement disables and clears synchronously but still waits for pending disk erasure (7.989534ms)
+✔ document departure still broadcasts clear while remote and denied scopes keep ordinary remounts (8.201679ms)
+ℹ {"mode":"document","reads":1,"refreshes":0,"cacheEnabled":false,"cacheEntries":0}
+ℹ {"mode":"remote","reads":2,"refreshes":1,"cacheEnabled":false,"cacheEntries":0}
+ℹ {"mode":"denied","reads":2,"refreshes":1,"cacheEnabled":false,"cacheEntries":0}
+(node:13) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:13) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ successful logout waits for persistent data to be erased before navigation can proceed (26.744181ms)
+✔ failed logout does not claim that the still-authenticated session was cleared (0.325962ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 23
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4180.987245

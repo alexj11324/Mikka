@@ -1,0 +1,15 @@
+{
+  "createdAt": "2026-11-09T00:06:22.255711+00:00",
+  "beforeTree": "bf605ac53e7cefec179eafe6338b34c2af3ed845",
+  "afterTree": "c0fc19c32787d3f86a37ef2836b37440d20d300a",
+  "paths": [
+    "lib/request-log.ts",
+    "apps/desktop/test/db-metrics.cjs",
+    "apps/desktop/test/db-metrics.test.mjs",
+    "apps/desktop/test/lifecycle-query-counts.mjs",
+    "apps/desktop/test/db-query-diagnostics.cjs",
+    "apps/desktop/test/db-query-diagnostics.test.mjs"
+  ],
+  "independentReviewSha256": "41c5d67f494b246bdd390ceb0b5359e46b3a7cdfdc3a1433cd0c85473cfddee3",
+  "sourceManifestSha256": "63797e4b42d125878517893a25587c3b12c42243088d54c9253ddbcf668dcb50"
+}

@@ -1,0 +1,7 @@
+{
+  "command": "node_modules/.bin/oxlint --no-ignore lib/request-log.ts apps/desktop/test/db-metrics.cjs apps/desktop/test/db-metrics.test.mjs apps/desktop/test/lifecycle-query-counts.mjs apps/desktop/test/db-query-diagnostics.cjs apps/desktop/test/db-query-diagnostics.test.mjs",
+  "version": "1.89.0",
+  "exitCode": 0,
+  "output": "",
+  "note": "The first invocation without --no-ignore inherited root ignorePatterns for apps/desktop; it is preserved but does not establish harness lint coverage. This invocation explicitly includes all six files."
+}

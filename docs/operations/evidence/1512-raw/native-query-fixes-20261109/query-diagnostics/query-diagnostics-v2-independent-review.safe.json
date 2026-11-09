@@ -1,0 +1,345 @@
+{
+  "version": 1,
+  "task": "issue-1512-query-diagnostics-independent-review",
+  "reviewer": "/root/native_6180_review",
+  "createdAt": "2026-11-09T00:05:52.811486+00:00",
+  "verdict": "No remaining blockers in the frozen six-file v2 patch for integration into the owner candidate. This is not approval of a merge or a claim of compiled Native, SQL-budget or production acceptance.",
+  "source": {
+    "base": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+    "baseTree": "7a2e1b485920ae36e0b311519b50ab1ed30dfe69",
+    "isolatedCopy": "/workspace/scratch/812e3b7d6d45/issue1512-diagnostics-copy",
+    "manifest": {
+      "path": "frozen-source-manifest-v2.safe.json",
+      "bytes": 2599,
+      "sha256": "63797e4b42d125878517893a25587c3b12c42243088d54c9253ddbcf668dcb50"
+    },
+    "patch": {
+      "path": "query-diagnostics-v2.patch",
+      "bytes": 56524,
+      "sha256": "8cfecb43ecbf45d0641c58be24dda5175db891ca5cb0d46a98a34700bee81fb0"
+    },
+    "v1ToV2": {
+      "path": "query-diagnostics-v1-to-v2.patch",
+      "bytes": 12123,
+      "sha256": "3c1166dde2fb16bcc0b7050f0c79c2d05578b15b94ea7da743e0b11cbb5b192f"
+    },
+    "files": [
+      {
+        "path": "lib/request-log.ts",
+        "baselineSha256": "d0a529fd0696397afc89e36c5b07015c33785367e14ce6c9fbf07891d747d054",
+        "candidateSha256": "2884101d84e815ece44d1f3758885cc1c2145932cbe1001dfe17273684c8949a",
+        "candidateBytes": 10743,
+        "candidateGitBlobSha1": "3c4b95e5cf716717b1e8d64208013783e8e93862",
+        "independentlyVerified": true,
+        "changedSinceV1": false
+      },
+      {
+        "path": "apps/desktop/test/db-metrics.cjs",
+        "baselineSha256": "475df35d2998e1eab7f9dd186261c2ef00d50b2a31a5ec4feb65a786217d5396",
+        "candidateSha256": "814aa821cdc111c25f4632df5c2fa6abcbe2fa725f23a2ce4a397493f2a5e491",
+        "candidateBytes": 8890,
+        "candidateGitBlobSha1": "b36f8db3a1d34233a697a676ab9bb86aadd9cfa3",
+        "independentlyVerified": true,
+        "changedSinceV1": false
+      },
+      {
+        "path": "apps/desktop/test/db-metrics.test.mjs",
+        "baselineSha256": "0062b88ce2823f8ce4e5a64c0927faed7d4ead8dcdbed31920eee92b76efb8d4",
+        "candidateSha256": "2a6e5d42c063c771d770c2e92b804bb88573e3043c2a410a1b9d3374ff1fa346",
+        "candidateBytes": 38470,
+        "candidateGitBlobSha1": "902f0d99874738550e3545cfab0d75c1ad827c9f",
+        "independentlyVerified": true,
+        "changedSinceV1": false
+      },
+      {
+        "path": "apps/desktop/test/lifecycle-query-counts.mjs",
+        "baselineSha256": "855dac3438434cf643a222a8297bcf09caff2c283064768b50082ae04edc226e",
+        "candidateSha256": "564706188c1b96bc9d9ebadb01bab5be4bc03cd0920131ecda0185b6e07fda7f",
+        "candidateBytes": 23696,
+        "candidateGitBlobSha1": "39e1facecdf28a661511f72e14580fdb4b1ae967",
+        "independentlyVerified": true,
+        "changedSinceV1": false
+      },
+      {
+        "path": "apps/desktop/test/db-query-diagnostics.cjs",
+        "baselineSha256": null,
+        "candidateSha256": "763d180bfc0d0a62e67a99624a4815eeca953bbcb7290193a5515bb67e24ccad",
+        "candidateBytes": 18406,
+        "candidateGitBlobSha1": "93fc0510b98e9a3812e6b4452a929ac5900fe458",
+        "independentlyVerified": true,
+        "changedSinceV1": true
+      },
+      {
+        "path": "apps/desktop/test/db-query-diagnostics.test.mjs",
+        "baselineSha256": null,
+        "candidateSha256": "236633af2b451f23f26b4dec32f2778881dbe31ebbb3c1e00e0431661b898c23",
+        "candidateBytes": 26054,
+        "candidateGitBlobSha1": "671bc3cb87e263ffb4cae20da0c408aa91519431",
+        "independentlyVerified": true,
+        "changedSinceV1": true
+      }
+    ],
+    "independentPatchReplay": {
+      "method": "Applied every unified-diff hunk in memory to git show of the exact base; compared all six reconstructed files byte for byte with frozen candidate. No checkout/index writes.",
+      "passed": true,
+      "fileCount": 6
+    }
+  },
+  "v1Preserved": {
+    "manifest": {
+      "path": "frozen-source-manifest.safe.json",
+      "bytes": 2183,
+      "sha256": "6c5e44177025206ecc0dd3772290566eadceacefa3211b77a40d9c39e2a1917d"
+    },
+    "patch": {
+      "path": "query-diagnostics.patch",
+      "bytes": 52711,
+      "sha256": "28255779fc5ebaa63c814a27e94a4445a929a33458a32a405f5cc3971a260b7c"
+    },
+    "warning": "V1 was not approved; its type-coercion, Proxy and SQL-syntax findings are resolved only by v2."
+  },
+  "reviewedInvariants": [
+    {
+      "name": "Private ALS across module copies",
+      "finding": "Each request-log module registers a getter for its own private ALS in a shared Set; reads require exactly one active valid context. Missing, invalid, ambiguous and oversized registries produce explicit unknown attribution. No global current-request pointer replaces ALS."
+    },
+    {
+      "name": "Queued and reused pool clients",
+      "finding": "The product already binds pool.connect callbacks through AsyncLocalStorage.bind in manageDatabasePool. No additional pool wrapper was added. The actual product module plus real pg.Pool(max:1) test queues three requests behind one controlled in-memory Client, releases it from another request and verifies logical/physical contexts plus reuse and multiple module copies."
+    },
+    {
+      "name": "Internal identities and closed labels",
+      "finding": "The getter uses the server-generated metadata.requestId and the logical randomUUID stored at the existing timing point. It never reads external requestId, userIdHash, headers, cookies, SQL parameters or request arguments. Projection validates primitive UUID strings and closed route/method/action sets; a captured null action remains null."
+    },
+    {
+      "name": "Original query behavior and counters",
+      "finding": "Recording occurs immediately after the original queryCalls and 17-operation/78-source increments in the existing Client.query wrapper. The original this, arguments, return value and thrown error still pass through originalQuery.apply(this,args); the existing driver/OTel load interposition is unchanged. Known scope/context/structure are independent dimensions; failure in one does not erase another."
+    },
+    {
+      "name": "SQL shape privacy",
+      "finding": "No raw SQL or values are retained. Any quote, comment, dollarquote, backslash, unusual identifier or unsupported syntax becomes unknown. Numeric literals normalize before SHA256/12. V2 rejects Proxy configs without traps, opaque commands and internal semicolons; only SELECT/WITH/INSERT/UPDATE/DELETE plus exact BEGIN/COMMIT/ROLLBACK are admitted. normalizedStructureId is deliberately distinct from production raw-text statementId."
+    },
+    {
+      "name": "Ordinal conservation and overflow",
+      "finding": "Every retained row carries the original cumulative query ordinal. Rows remain strictly consecutive from capture start; dropped rows and context/shape dictionary caps are explicit. Capture validates retained+dropped equals end-start and recomputes the original operation/source deltas. Unknown structure/context and overflow never become zero cost."
+    },
+    {
+      "name": "Measurement boundaries",
+      "finding": "The four original windows and twelve checkpoint call sites are unchanged. SQL belongs to (before.queryCalls, after.queryCalls], including inherited/background work after HTTP completion. Request timestamps do not choose SQL membership. Added queryDiagnostics is separate from original metric unknownReadings and RPC aggregates."
+    },
+    {
+      "name": "Single final export",
+      "finding": "The normal metrics response and 8192-byte limit are unchanged. At the existing post-measurement/cleanup rpcActions call, one bounded /diagnostics GET freezes the collector before the existing single log read. The added request has a five-second timeout, two-MiB bound and no retry, flush wait or added metric snapshot."
+    },
+    {
+      "name": "Receipts and causality limits",
+      "finding": "Only selected internal HTTP identities and their logical batch siblings enter the closed projection. Start/completion, method, route, action, parent relation and batch item counts expose conflicts/unpaired evidence. ALS origin and equal structure fingerprints do not establish equal parameters, causation or redundant work."
+    }
+  ],
+  "resolvedFindings": [
+    {
+      "id": "primitive-fields",
+      "occurrenceEstimate1to10": 1,
+      "impactEstimate1to10": 6,
+      "privacyExceptionApplies": true,
+      "v1Evidence": "A UUID-shaped object with a privateCanary property passed RegExp coercion and was retained; normalizedStructureId had the same issue. Array timestamps also passed implicit coercion. The reviewer reproduced these without I/O.",
+      "v2Resolution": "Read validated fields once and require primitive strings for UUIDs, structure IDs and timestamps. Five-case negative control includes independent coverage of these three fields."
+    },
+    {
+      "id": "proxy-config",
+      "occurrenceEstimate1to10": 1,
+      "impactEstimate1to10": 5,
+      "v1Evidence": "Object.getOwnPropertyDescriptor invoked a query-config Proxy trap once before the original driver, permitting diagnostic side effects.",
+      "v2Resolution": "node:util types.isProxy returns statement_proxy before any descriptor/value trap. Known request context remains present."
+    },
+    {
+      "id": "opaque-or-multiple-statements",
+      "occurrenceEstimate1to10": 2,
+      "impactEstimate1to10": 6,
+      "privacyExceptionApplies": true,
+      "v1Evidence": "SET/SAVEPOINT payloads and SELECT 1; SET ... were incorrectly treated as known structures.",
+      "v2Resolution": "Narrowed command set, exact transaction commands, at most one terminal semicolon and no internal semicolon; unsupported syntax stays unknown without retained SQL."
+    }
+  ],
+  "validation": [
+    {
+      "path": "harness-regression-v2-green.log",
+      "bytes": 4077,
+      "sha256": "2febd396f0425b551b2c88e536e9f25cac4ec8c52fbb38ddf161777020d7ea32",
+      "observedCounts": {
+        "tests": 35,
+        "pass": 35,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "reviewerReadOriginalOutput": true,
+      "executionOwner": "current_source_review",
+      "reviewerReran": false
+    },
+    {
+      "path": "review-canary-v1-expanded-red.log",
+      "bytes": 6099,
+      "sha256": "18349caa12713860e515394b4f0560350c8d0d1627b00e24c3fd0678ed5a5cf9",
+      "observedCounts": {
+        "tests": 5,
+        "pass": 0,
+        "fail": 5,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "reviewerReadOriginalOutput": true,
+      "executionOwner": "current_source_review",
+      "reviewerReran": false
+    },
+    {
+      "path": "product-regression-green.log",
+      "bytes": 1459,
+      "sha256": "34fb28c0f7095f139cadc3b0c58a30b462af1140414d57c03f6f78d0995f4247",
+      "observedCounts": {
+        "tests": 15,
+        "pass": 15,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "reviewerReadOriginalOutput": true,
+      "executionOwner": "current_source_review",
+      "reviewerReran": false
+    },
+    {
+      "path": "harness-regression-green.log",
+      "bytes": 3556,
+      "sha256": "8d6c41e4305ba1234d8c0f39f94af596cef129813474597b66902268af4929f1",
+      "observedCounts": {
+        "tests": 30,
+        "pass": 30,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "reviewerReadOriginalOutput": true,
+      "executionOwner": "current_source_review",
+      "reviewerReran": false
+    },
+    {
+      "path": "getter-negative-control.log",
+      "bytes": 2338,
+      "sha256": "306bb9f7f5aebc3c3690478578bf26e041052bb92a78e9427fd459110fcdc573",
+      "observedCounts": {
+        "tests": 1,
+        "pass": 0,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "reviewerReadOriginalOutput": true,
+      "executionOwner": "current_source_review",
+      "reviewerReran": false
+    },
+    {
+      "path": "preload-endpoint-red.log",
+      "bytes": 10903,
+      "sha256": "79ab1611275e2b05cf67e7b10327e6bcf92916bed0992b19aa79861df7079def",
+      "observedCounts": {
+        "tests": 3,
+        "pass": 0,
+        "fail": 3,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "reviewerReadOriginalOutput": true,
+      "executionOwner": "current_source_review",
+      "reviewerReran": false
+    }
+  ],
+  "independentSafetyVerification": {
+    "command": [
+      "node",
+      "--test",
+      "--test-name-pattern",
+      "^diagnostic safety:",
+      "apps/desktop/test/db-query-diagnostics.test.mjs"
+    ],
+    "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-diagnostics-copy",
+    "exitCode": 0,
+    "tests": 5,
+    "pass": 5,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "durationMsFromToolOutput": 124.701077,
+    "sourceBoundToV2Manifest": true,
+    "runByReviewer": true,
+    "scope": "Five pure in-process canaries only; no database, Native, external provider or cloud resource."
+  },
+  "lint": {
+    "existingReceipt": {
+      "path": "targeted-lint-no-ignore.safe.json",
+      "bytes": 553,
+      "sha256": "9349b90c1f5607df1735a4a6364d0e8f36ac230fe5c2491201290a0d00fa2f4f"
+    },
+    "explicitNoIgnore": true,
+    "receiptResult": "exit 0, oxlint 1.89.0",
+    "v2Execution": "Implementer reports rerunning the same six-file command on v2; requested source binding in its v2 implementation receipt. The identical empty-output receipt alone does not identify a revision. Reviewer did not rerun lint."
+  },
+  "mergeRisk": {
+    "scope": "The six-file diagnostic patch, not the whole issue or the combined PR.",
+    "level": "medium",
+    "alignment": {
+      "verdict": "good",
+      "reason": "Addresses missing request-level attribution for the preserved Native SQL regression without changing budget or window semantics."
+    },
+    "impact": {
+      "verdict": "medium",
+      "reason": "One shared request-log product module adds metadata-only readers; all collection/export work remains in the gated isolated harness. Sensitive-field boundaries received direct mitigation."
+    },
+    "verification": {
+      "verdict": "decent",
+      "reason": "Exact source and patch replay, real-module/pool fixtures, five-case RED-to-GREEN and independent five-case GREEN are verified. The combined candidate typecheck, compiled Native, profiling/SQL budget and production are not established by these tests."
+    },
+    "rollbackCost": {
+      "verdict": "low",
+      "reason": "Additive reversible source changes; no migrations or external data writes."
+    },
+    "errorDetection": {
+      "verdict": "good",
+      "reason": "Unknown, incomplete, unavailable, unmatched receipts and overflow stay explicit, with bounded failed export and no fabricated zero."
+    }
+  },
+  "acceptanceBoundary": {
+    "preservedNativeHead": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+    "preservedActualCheckout": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+    "nativeLoginQueries": 504,
+    "webLoginQueries": 480,
+    "loginBudgetResult": "RED",
+    "firstStartupNativeQueries": 156,
+    "firstStartupWebQueries": 195,
+    "compiledNativeRunsByThisReview": 0,
+    "databaseRunsByThisReview": 0,
+    "cloudResourcesCreated": 0,
+    "productionAcceptedCases": 0,
+    "remainingOwnerGate": "Integrate exact v2 bytes, run combined candidate checks and real Native acceptance, recompute all original SQL windows and cleanup, then continue the issue production criteria. No current acceptance claim follows from a local fixture GREEN."
+  },
+  "reviewerMutationBoundary": {
+    "productSourceEdited": false,
+    "gitIndexEdited": false,
+    "githubRefsOrCommentsWritten": false,
+    "largeSuitesRerun": false,
+    "newArtifacts": "This independent review receipt only."
+  },
+  "checklistsRead": [
+    "AGENTS.md",
+    "CONTRIBUTING.md",
+    ".claude/skills/merge-risk/SKILL.md",
+    ".claude/skills/systematic-debugging/SKILL.md",
+    ".claude/skills/verification-before-completion/SKILL.md"
+  ]
+}

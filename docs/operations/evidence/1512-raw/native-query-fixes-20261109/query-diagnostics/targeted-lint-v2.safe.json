@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "command": "node_modules/.bin/oxlint --no-ignore lib/request-log.ts apps/desktop/test/db-metrics.cjs apps/desktop/test/db-metrics.test.mjs apps/desktop/test/lifecycle-query-counts.mjs apps/desktop/test/db-query-diagnostics.cjs apps/desktop/test/db-query-diagnostics.test.mjs",
+  "oxlintVersion": "1.89.0",
+  "exitCode": 0,
+  "output": "",
+  "toolChunk": "874e39",
+  "manifest": "frozen-source-manifest-v2.safe.json",
+  "manifestSha256": "63797e4b42d125878517893a25587c3b12c42243088d54c9253ddbcf668dcb50",
+  "note": "This is the actual post-v2 lint invocation. No source file changed between that invocation and the v2 manifest; all six files were explicitly included with --no-ignore."
+}

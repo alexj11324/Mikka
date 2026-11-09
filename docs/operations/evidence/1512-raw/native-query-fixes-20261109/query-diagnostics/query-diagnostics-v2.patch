@@ -1,0 +1,795 @@
+--- a/lib/request-log.ts
++++ b/lib/request-log.ts
+@@ -10,8 +10,19 @@
+ 
+ export type RequestLogOutcome = 'empty' | 'work' | 'ignored'
+ type RequestMetadata = { requestId: string; userIdHash?: string; rpcAction?: string }
+-type Store = { userId?: string; outcome?: RequestLogOutcome; metadata: RequestMetadata; sink?: LogSink; route?: string; method?: string; rpcItemCount?: number }
++type Store = { userId?: string; outcome?: RequestLogOutcome; metadata: RequestMetadata; sink?: LogSink; route?: string; method?: string; rpcItemCount?: number; invocationId?: string }
+ const requestScope = new AsyncLocalStorage<Store>()
++// Metadata-only readers for in-process diagnostics. Each module copy keeps its
++// own ALS reader: replacing one would silently attribute another copy's work.
++// Nothing calls these in production; no query, event or I/O is added here.
++const diagnosticKey = Symbol.for('mikka.requestDiagnosticReaders')
++const diagnosticGlobals = globalThis as Record<symbol, unknown>
++const diagnosticReaders = diagnosticGlobals[diagnosticKey] ??= new Set<() => unknown>()
++if (diagnosticReaders instanceof Set) diagnosticReaders.add(() => {
++  const store = requestScope.getStore()
++  return store ? { httpInvocationId: store.metadata.requestId, invocationId: store.invocationId ?? store.metadata.requestId,
++    route: store.route, method: store.method, rpcAction: store.metadata.rpcAction ?? null } : undefined
++})
+ const requestClientChannel = channel('mikka.request.client')
+ const requestErrorChannel = channel('mikka.request.error')
+ const requestMetadataChannel = channel('mikka.request.metadata')
+@@ -112,6 +123,7 @@
+   parent.rpcItemCount = (parent.rpcItemCount ?? 0) + 1
+   const store: Store = { ...parent, outcome: undefined, metadata: { ...parent.metadata, rpcAction: action } }
+   const invocationId = randomUUID(), started = performance.now()
++  store.invocationId = invocationId
+   const span = trace.getTracer('mikka.rpc').startSpan('rpc.action', { attributes: { 'mikka.rpc.action': action } })
+   const write = (completed?: number, error?: unknown) => {
+     const level = completed === undefined ? 'info' : levelFor(completed)
+--- a/apps/desktop/test/db-metrics.cjs
++++ b/apps/desktop/test/db-metrics.cjs
+@@ -9,6 +9,7 @@
+ const knownOperations = new Set(operations)
+ const unattributedSourceKeys = require('./db-query-unattributed-sources.cjs')
+ const knownUnattributedSources = new Set(unattributedSourceKeys.filter(key => key !== 'otherScoped' && key !== 'noScope'))
++const { createQueryDiagnostics } = require('./db-query-diagnostics.cjs')
+ 
+ const socketPath = process.env.MIKKA_DESKTOP_METRICS_SOCKET
+ const target = new URL(process.env.E2E_DATABASE_URL ?? 'invalid:')
+@@ -57,6 +58,7 @@
+   const streams = new Map()
+   const clients = new WeakSet()
+   let instrumentedClients = 0
++  const diagnostics = createQueryDiagnostics({ globals: globalThis })
+   const read = (stream, key) => {
+     const value = stream[key]
+     if (!Number.isSafeInteger(value) || value < 0) { unknownReadings++; return 0 }
+@@ -83,6 +85,7 @@
+         const source = operation == null ? 'noScope' : knownUnattributedSources.has(operation) ? operation : 'otherScoped'
+         unattributedSources[source]++
+       }
++      diagnostics.record(queries, args[0], operation)
+       return originalQuery.apply(this, args)
+     }
+     const originalConnect = Client.prototype.connect
+@@ -150,10 +153,16 @@
+         entry.received = read(stream, 'bytesRead'); entry.sent = read(stream, 'bytesWritten')
+       }
+       startedAt = Date.now()
++      diagnostics.reset()
++    } else if (request.url === '/diagnostics' && request.method === 'GET') {
++      response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
++      response.end(JSON.stringify(diagnostics.finish({ pid: process.pid, runtime, startedAt }, queries)))
++      return
+     } else if (request.url !== '/metrics' || request.method !== 'GET') {
+       response.writeHead(404).end(); return
+     }
+     response.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store' })
++    diagnostics.checkpoint(queries)
+     response.end(JSON.stringify(snapshot()))
+   })
+   server.on('error', () => { throw new Error('DESKTOP_METRICS_CONTROL_UNAVAILABLE') })
+--- a/apps/desktop/test/db-metrics.test.mjs
++++ b/apps/desktop/test/db-metrics.test.mjs
+@@ -10,6 +10,7 @@
+ import { createLifecycleQueryCounter, projectQuerySnapshot, queryCountDelta } from './lifecycle-query-counts.mjs'
+ import queryOperations from './db-query-operations.cjs'
+ import unattributedSourceKeys from './db-query-unattributed-sources.cjs'
++import './db-query-diagnostics.test.mjs'
+ 
+ const require = createRequire(import.meta.url)
+ const run = promisify(execFile)
+@@ -157,6 +158,25 @@
+   assert.equal(Object.values(refined.queryOperations).reduce((total, count) => total + count, 0), refined.queryCalls)
+   assert.equal(JSON.stringify(refined).includes('PRIVATE_'), false)
+   assert.ok(Buffer.byteLength(JSON.stringify(refined)) <= 8192, 'the unchanged metric response bound includes the closed refinement')
++  let diagnostics
++  handler({ method: 'GET', url: '/diagnostics' }, {
++    writeHead(status) { assert.equal(status, 200, 'the isolated counter must export bounded query diagnostics after measurement'); return this },
++    end(body) { diagnostics = JSON.parse(body) },
++  })
++  assert.equal(diagnostics.version, 1)
++  assert.equal(diagnostics.queries.length, refined.queryCalls)
++  assert.equal(diagnostics.endQueryCalls, refined.queryCalls)
++  assert.equal(JSON.stringify(diagnostics).includes('PRIVATE_'), false)
++  const { scopeKeys } = Module.createRequire(metricsPath)('./db-query-diagnostics.cjs')
++  const diagnosticOperations = Object.fromEntries(Object.keys(refined.queryOperations).map(key => [key, 0]))
++  const diagnosticSources = Object.fromEntries(sourceKeys.map(key => [key, 0]))
++  for (const row of diagnostics.queries) {
++    const scope = scopeKeys[row[3]], bucket = Object.hasOwn(diagnosticOperations, scope) ? scope : 'unattributed'
++    diagnosticOperations[bucket]++
++    if (bucket === 'unattributed') diagnosticSources[scope]++
++  }
++  assert.deepEqual(diagnosticOperations, refined.queryOperations, 'every original operation count retains its query ordinal')
++  assert.deepEqual(diagnosticSources, refined.unattributedSources, 'reserved names keep the original source bucket semantics')
+   const outsider = new other.Client()
+   outsider._queryable = false
+   await new Promise(resolve => outsider.query('SELECT 1', () => resolve()))
+--- a/apps/desktop/test/lifecycle-query-counts.mjs
++++ b/apps/desktop/test/lifecycle-query-counts.mjs
+@@ -6,6 +6,7 @@
+ import { dirname, resolve } from 'node:path'
+ import queryOperations from './db-query-operations.cjs'
+ import unattributedSourceKeys from './db-query-unattributed-sources.cjs'
++import queryDiagnostics from './db-query-diagnostics.cjs'
+ 
+ const fields = ['pid', 'startedAt', 'endedAt', 'instrumentedClients', 'queryCalls',
+   'pgProtocolReceiveBytes', 'pgProtocolSendBytes', 'activeConnections', 'closedConnections', 'unknownReadings']
+@@ -229,10 +230,14 @@
+ 
+ // One read after the existing samples and cleanup. Never upload the mixed
+ // stdout file, wait for a flush or query an API to obtain these diagnostics.
+-async function readRpcActions({ revision, runtimePath, backend }, windows) {
++async function readRpcActions({ revision, runtimePath, backend, diagnostics }, windows) {
++  let logText = ''
++  const annotate = result => diagnostics === undefined ? result : { ...result,
++    queryDiagnostics: diagnostics === null ? { version: 1, status: 'unavailable', reasons: ['diagnostic_read_failed'] }
++      : queryDiagnostics.projectQueryDiagnostics(diagnostics, windows, backend, logText) }
+   const ownerPid = /^\/tmp\/mikka-bundled-([0-9]+)\.sock$/.exec(backend.socket)?.[1]
+   const expected = resolve(dirname(runtimePath), 'bundled-' + revision.slice(0, 12) + '-' + ownerPid + '.log')
+-  if (!ownerPid || backend.log !== expected) return unavailableRpcActions('log_binding_mismatch')
++  if (!ownerPid || backend.log !== expected) return annotate(unavailableRpcActions('log_binding_mismatch'))
+   let file, result
+   try {
+     file = await open(expected, constants.O_RDONLY | constants.O_NOFOLLOW)
+@@ -244,14 +249,34 @@
+       const read = await file.read(bytes, 0, bytes.length, 0)
+       if (read.bytesRead !== info.size) result = unavailableRpcActions('log_read_incomplete')
+       else if (bytes.length && bytes.at(-1) !== 10) result = unavailableRpcActions('log_partial_line')
+-      else result = projectRpcActions(bytes.toString('utf8'), windows)
++      else { logText = bytes.toString('utf8'); result = projectRpcActions(logText, windows) }
+     }
+   } catch (error) {
+     result = unavailableRpcActions(error.code === 'ENOENT' ? 'log_missing' : 'log_read_failed')
+   } finally {
+     try { await file?.close() } catch { result = unavailableRpcActions('log_close_failed') }
+   }
+-  return result
++  return annotate(result)
++}
++
++// One bounded export after the original samples and cleanup, alongside the
++// existing log projection. Normal /metrics snapshots retain their old fields.
++function readQueryDiagnostics(backend, httpRequest) {
++  return new Promise((resolve, reject) => {
++    const failed = () => reject(new Error('LIFECYCLE_QUERY_DIAGNOSTICS_UNAVAILABLE'))
++    const req = httpRequest({ socketPath: backend.socket, path: '/diagnostics', method: 'GET', signal: AbortSignal.timeout(5000) }, response => {
++      if (response.statusCode !== 200) { response.resume(); failed(); return }
++      const chunks = []; let bytes = 0
++      response.on('data', chunk => {
++        bytes += chunk.length
++        if (bytes > queryDiagnostics.LIMITS.bytes) req.destroy(new Error('LIFECYCLE_QUERY_DIAGNOSTICS_SIZE'))
++        else chunks.push(chunk)
++      })
++      response.once('error', failed); response.once('aborted', failed)
++      response.once('end', () => { try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8'))) } catch { failed() } })
++    })
++    req.once('error', failed); req.end()
++  })
+ }
+ 
+ export function projectQuerySnapshot(value, expected) {
+@@ -345,7 +370,13 @@
+   return {
+     source: { revision, platform: process.platform, arch: process.arch, runtime: backend.runtime, pid: backend.pid,
+       process: 'primary API shared by lifecycle bundled, hosted and Chromium' },
+-    rpcActions: windows => readRpcActions({ revision, runtimePath, backend }, windows),
++    rpcActions: async windows => {
++      // Historical aggregate-only fixtures have no ordinal boundaries. They
++      // cannot acquire or retrospectively claim the new query-level evidence.
++      const measured = Object.values(windows).some(window => Array.isArray(window?.checkpoints))
++      const diagnostics = measured ? await readQueryDiagnostics(backend, httpRequest).catch(() => null) : undefined
++      return readRpcActions({ revision, runtimePath, backend, diagnostics }, windows)
++    },
+     snapshot: () => new Promise((resolve, reject) => {
+       const failed = error => reject(new Error('LIFECYCLE_QUERY_COUNTER_READ_FAILED', { cause: error }))
+       const req = httpRequest({ socketPath: backend.socket, path: '/metrics', method: 'GET', signal: AbortSignal.timeout(5000) }, response => {
+--- /dev/null
++++ b/apps/desktop/test/db-query-diagnostics.cjs
+@@ -0,0 +1,254 @@
++// Isolated harness only. Never retain SQL text, parameters or request content.
++const { createHash } = require('node:crypto')
++const { types } = require('node:util')
++const operations = require('./db-query-operations.cjs')
++const sources = require('./db-query-unattributed-sources.cjs')
++const scopeKeys = Object.freeze([...new Set([...operations, ...sources])])
++const scopedNames = new Set(scopeKeys.filter(value => !['unattributed', 'otherScoped', 'noScope'].includes(value)))
++const routes = new Set(scopeKeys.filter(value => value.startsWith('/api/') || value.startsWith('/v1/')))
++const methods = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'])
++const actions = new Set(['desktop.session', 'desktop.bootstrap', 'desktop.readBatch', 'workspace.switchWorkspace',
++  'execution-settings.getBotModelMenu', 'preferences.getPreferences', 'agents.listDevices',
++  'bots.pollBots', 'issues.syncIssueList', 'projects.listProjects', 'teams.listTeams', 'team-relations.listProjectTeams',
++  'task-runs.pollTaskRuns', 'task-runs.syncThreadList', 'coordinator.pollBotChatSummaries', 'coordinator.syncCoordinatorChat'])
++const commands = new Set(['SELECT', 'WITH', 'INSERT', 'UPDATE', 'DELETE', 'BEGIN', 'COMMIT', 'ROLLBACK'])
++const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
++const LIMITS = Object.freeze({ queries: 8192, contexts: 2048, statements: 512, sqlChars: 32768, bytes: 2 * 1024 * 1024 })
++const diagnosticReasons = new Set(['registry_unavailable', 'registry_invalid', 'context_ambiguous', 'context_invalid',
++  'context_read_failed', 'context_missing', 'context_limit', 'statement_limit', 'statement_missing', 'statement_size',
++  'statement_syntax', 'statement_proxy', 'statement_read_failed', 'diagnostic_failed'])
++const unknown = () => ({ status: 'unknown' })
++const integer = value => Number.isSafeInteger(value) && value >= 0
++
++function projectContext(value) {
++  if (!value) return null
++  const { httpInvocationId, invocationId, route, method, rpcAction } = value
++  if (typeof httpInvocationId !== 'string' || typeof invocationId !== 'string' || !UUID.test(httpInvocationId) || !UUID.test(invocationId)
++    || !routes.has(route) || !methods.has(method) || (rpcAction !== null && !actions.has(rpcAction))
++    || (invocationId !== httpInvocationId && rpcAction === null)) return null
++  return { status: 'known', httpInvocationId, invocationId, route, method, rpcAction }
++}
++
++function readContext(globals = globalThis) {
++  const readers = globals[Symbol.for('mikka.requestDiagnosticReaders')]
++  if (!(readers instanceof Set) || readers.size < 1 || readers.size > 16) return { reason: 'registry_unavailable' }
++  let found
++  try {
++    for (const reader of readers) {
++      if (typeof reader !== 'function') return { reason: 'registry_invalid' }
++      const value = reader()
++      if (value === undefined) continue
++      if (found) return { reason: 'context_ambiguous' }
++      found = projectContext(value)
++      if (!found) return { reason: 'context_invalid' }
++    }
++  } catch { return { reason: 'context_read_failed' } }
++  return found ? { value: found } : { reason: 'context_missing' }
++}
++
++// SHA256/12 is the existing statementId format, but its input here is a
++// literal-free structure. It is NOT the production raw-text statement ID.
++// This deliberately supports only a small common SQL subset, not a parser.
++function statementStructure(first) {
++  if (types.isProxy(first)) return { reason: 'statement_proxy' }
++  let text
++  try { text = typeof first === 'string' ? first : first && Object.getOwnPropertyDescriptor(first, 'text')?.value }
++  catch { return { reason: 'statement_read_failed' } }
++  if (typeof text !== 'string') return { reason: 'statement_missing' }
++  if (!text.length || text.length > LIMITS.sqlChars) return { reason: 'statement_size' }
++  if (/'|--|\/\*|\*\/|\\|\$(?:[A-Za-z_]\w*)?\$|[^\x20-\x7e\r\n\t]/.test(text)) return { reason: 'statement_syntax' }
++  // Reject unusual quoted identifiers rather than interpreting escapes or
++  // treating a literal inside an identifier as safe SQL text.
++  let invalid = false
++  const normalized = text.replace(/"(?:[^"]|"")*"/g, token => {
++    if (!/^"[A-Za-z_][A-Za-z_0-9]*"$/.test(token)) invalid = true
++    return token
++  })
++  if (invalid || (normalized.match(/"/g)?.length ?? 0) % 2) return { reason: 'statement_syntax' }
++  if (/(?:^|[^\w$])(?:0[xob][0-9a-f_]+|\d[\d_]*_\d)/i.test(normalized)) return { reason: 'statement_syntax' }
++  const canonical = normalized.replace(/(?<![$\w"])-?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?\b/g, '?').replace(/\s+/g, ' ').trim().replace(/;$/, '').trim()
++  const command = /^[A-Za-z]+/.exec(canonical)?.[0].toUpperCase()
++  if (!commands.has(command) || canonical.includes(';') || /\$(?![1-9][0-9]*\b)/.test(canonical)
++    || (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(command) && canonical.toUpperCase() !== command)) return { reason: 'statement_syntax' }
++  const parameters = [...canonical.matchAll(/\$([1-9][0-9]*)\b/g)].map(match => Number(match[1]))
++  if (parameters.some(value => value > 65535)) return { reason: 'statement_syntax' }
++  return { value: { status: 'known', normalizedStructureId: createHash('sha256').update(canonical).digest('hex').slice(0, 12),
++    command, parameterCount: new Set(parameters).size } }
++}
++
++function createQueryDiagnostics({ globals = globalThis, limits = LIMITS } = {}) {
++  let active = false, finished = false, startQueryCalls = null, endQueryCalls = null, droppedQueries = 0
++  let contexts = [unknown()], statements = [unknown()], queries = [], reasons = {}
++  let contextIds = new Map(), statementIds = new Map()
++  const reason = key => { reasons[key] = (reasons[key] ?? 0) + 1 }
++  const intern = (table, ids, value, maximum, overflow) => {
++    const key = JSON.stringify(value)
++    if (ids.has(key)) return ids.get(key)
++    if (table.length >= maximum) { reason(overflow); return 0 }
++    const id = table.length; table.push(value); ids.set(key, id); return id
++  }
++  return {
++    checkpoint(sequence) { if (!active && !finished) { active = true; startQueryCalls = endQueryCalls = sequence } },
++    reset() {
++      active = finished = false; startQueryCalls = endQueryCalls = null; droppedQueries = 0
++      contexts = [unknown()]; statements = [unknown()]; queries = []; reasons = {}; contextIds = new Map(); statementIds = new Map()
++    },
++    record(sequence, first, operation) {
++      if (!active) return
++      endQueryCalls = sequence
++      if (queries.length >= limits.queries) { droppedQueries++; return }
++      let contextId = 0, statementId = 0
++      const scope = scopeKeys.indexOf(operation == null ? 'noScope' : scopedNames.has(operation) ? operation : 'otherScoped')
++      try {
++        const context = readContext(globals)
++        if (context.value) contextId = intern(contexts, contextIds, context.value, limits.contexts, 'context_limit')
++        else reason(context.reason)
++      } catch { reason('context_read_failed') }
++      try {
++        const statement = statementStructure(first)
++        if (statement.value) statementId = intern(statements, statementIds, statement.value, limits.statements, 'statement_limit')
++        else reason(statement.reason)
++      } catch { reason('diagnostic_failed') }
++      queries.push([sequence, contextId, statementId, scope])
++    },
++    finish(identity, sequence) {
++      if (!finished) { active = false; finished = true; if (startQueryCalls !== null) endQueryCalls = sequence }
++      return { version: 1, ...identity, startQueryCalls, endQueryCalls, droppedQueries,
++        overflow: droppedQueries > 0 || Boolean(reasons.context_limit || reasons.statement_limit),
++        reasons: { ...reasons }, contexts, statements, queries }
++    },
++  }
++}
++
++const unavailable = reason => ({ version: 1, status: 'unavailable', reasons: [reason] })
++const phases = {
++  nativeLogin: ['before', 'common-email-authentication', 'native-pkce-and-automatic-renderer-to-public-session', 'workspace-selection-to-usable'],
++  webLogin: ['before', 'common-email-authentication', 'web-navigation-to-dom-content-loaded', 'workspace-selection-to-usable'],
++  'startup-bundled': ['before', 'launch-to-usable'], 'startup-hosted': ['before', 'launch-to-usable'],
++}
++
++// Read the already-existing completion log once. Only identities referenced by
++// captured queries and their batch siblings are selected; no mixed log escapes.
++function invocationReceipts(text, contexts) {
++  const parents = new Set(contexts.filter(value => value.status === 'known').map(value => value.httpInvocationId))
++  const entries = new Map(), reasons = new Set()
++  for (const line of text.split('\n')) {
++    let value
++    try { value = JSON.parse(line) } catch { continue }
++    const logical = ['rpc_action_started', 'rpc_action'].includes(value?.msg)
++    if (!logical && !['api_request_started', 'api_request'].includes(value?.msg)) continue
++    if (!parents.has(logical ? value.httpInvocationId : value.invocationId)) continue
++    const complete = ['api_request', 'rpc_action'].includes(value.msg)
++    const context = projectContext({ ...value, httpInvocationId: logical ? value.httpInvocationId : value.invocationId,
++      rpcAction: value.rpcAction ?? null })
++    const timestamp = value.timestamp
++    if (!context || typeof timestamp !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(timestamp)
++      || !Number.isFinite(Date.parse(timestamp)) || (complete && (!Number.isInteger(value.status) || value.status < 100 || value.status > 599))) {
++      reasons.add('receipt_invalid'); continue
++    }
++    if (!entries.has(value.invocationId) && entries.size >= LIMITS.contexts * 2) { reasons.add('receipt_limit'); continue }
++    const entry = entries.get(value.invocationId) ?? { ...context }
++    if (entry.httpInvocationId !== context.httpInvocationId || entry.route !== context.route || entry.method !== context.method
++      || (logical && entry.rpcAction !== context.rpcAction)) entry.conflict = true
++    const field = complete ? 'completedAt' : 'startedAt'
++    const itemCount = integer(value.rpcItemCount) && value.rpcItemCount <= 16 ? value.rpcItemCount : undefined
++    if (entry[field] && (entry[field] !== timestamp || (complete && (entry.httpStatus !== value.status
++      || entry.rpcAction !== context.rpcAction || entry.rpcItemCount !== itemCount)))) entry.conflict = true
++    entry[field] = timestamp
++    if (complete) {
++      entry.httpStatus = value.status; entry.rpcAction = context.rpcAction
++      if (itemCount !== undefined) entry.rpcItemCount = itemCount
++    }
++    entries.set(value.invocationId, entry)
++  }
++  for (const value of entries.values()) {
++    if (value.conflict || (value.startedAt && value.completedAt && value.startedAt > value.completedAt)) reasons.add('receipt_conflict')
++    if (!value.startedAt || !value.completedAt) reasons.add('receipt_unpaired')
++    if (value.invocationId !== value.httpInvocationId) {
++      const parent = entries.get(value.httpInvocationId)
++      if (!parent || parent.route !== value.route || parent.method !== value.method
++        || parent.rpcAction !== 'desktop.readBatch' || !parent.startedAt || !parent.completedAt
++        || value.startedAt < parent.startedAt || value.completedAt > parent.completedAt) reasons.add('receipt_parent_mismatch')
++    } else if (value.rpcAction === 'desktop.readBatch') {
++      if (value.rpcItemCount !== [...entries.values()].filter(child => child.invocationId !== child.httpInvocationId && child.httpInvocationId === value.invocationId).length) reasons.add('receipt_batch_count')
++    }
++  }
++  let unmatchedQueryContexts = 0
++  for (const value of contexts.filter(value => value.status === 'known')) {
++    const entry = entries.get(value.invocationId)
++    if (!entry || entry.httpInvocationId !== value.httpInvocationId || entry.route !== value.route || entry.method !== value.method
++      || (value.rpcAction !== null && value.rpcAction !== entry.rpcAction)) {
++      unmatchedQueryContexts++; reasons.add('query_receipt_mismatch')
++    }
++  }
++  return { status: reasons.size ? 'incomplete' : 'complete', reasons: [...reasons], unmatchedQueryContexts,
++    unpairedInvocations: [...entries.values()].filter(value => !value.startedAt || !value.completedAt).length,
++    conflictingInvocations: [...entries.values()].filter(value => value.conflict).length, invocations: [...entries.values()] }
++}
++
++function projectQueryDiagnostics(raw, windows, expected, log = '') {
++  if (!raw || raw.version !== 1 || raw.pid !== expected.pid || raw.runtime !== expected.runtime || !integer(raw.startedAt)
++    || !integer(raw.startQueryCalls) || !integer(raw.endQueryCalls) || raw.endQueryCalls < raw.startQueryCalls
++    || !integer(raw.droppedQueries) || !Array.isArray(raw.queries) || raw.queries.length > LIMITS.queries
++    || raw.queries.length + raw.droppedQueries !== raw.endQueryCalls - raw.startQueryCalls
++    || !Array.isArray(raw.contexts) || raw.contexts.length < 1 || raw.contexts.length > LIMITS.contexts
++    || !Array.isArray(raw.statements) || raw.statements.length < 1 || raw.statements.length > LIMITS.statements
++    || !raw.reasons || typeof raw.reasons !== 'object' || Array.isArray(raw.reasons)
++    || Object.entries(raw.reasons).some(([key, value]) => !diagnosticReasons.has(key) || !integer(value))
++    || typeof raw.overflow !== 'boolean' || raw.overflow !== (raw.droppedQueries > 0 || Boolean(raw.reasons.context_limit || raw.reasons.statement_limit))) return unavailable('diagnostic_payload_invalid')
++  const contexts = raw.contexts.map((value, index) => index === 0 && value?.status === 'unknown' ? unknown()
++    : value?.status === 'known' ? projectContext(value) : null)
++  const statements = raw.statements.map((value, index) => {
++    if (index === 0 && value?.status === 'unknown') return unknown()
++    const { status, normalizedStructureId, command, parameterCount } = value ?? {}
++    return status === 'known' && typeof normalizedStructureId === 'string' && /^[a-f0-9]{12}$/.test(normalizedStructureId) && commands.has(command)
++      && integer(parameterCount) && parameterCount <= 65535
++      ? { status: 'known', normalizedStructureId, command, parameterCount } : null
++  })
++  if (contexts.includes(null) || statements.includes(null) || raw.queries.some((row, index) => !Array.isArray(row) || row.length !== 4
++    || !row.every(integer) || row[0] !== raw.startQueryCalls + index + 1 || row[1] >= contexts.length || row[2] >= statements.length
++    || row[3] >= scopeKeys.length || scopeKeys[row[3]] === 'unattributed')) return unavailable('diagnostic_payload_invalid')
++  const selected = [], measured = {}
++  for (const [name, names] of Object.entries(phases)) {
++    const window = windows[name], points = window?.checkpoints
++    if (window?.status !== 'complete' || !Array.isArray(points) || points.length !== names.length || points.some((point, index) =>
++      point.phase !== names[index] || point.snapshot?.pid !== raw.pid || point.snapshot?.runtime !== raw.runtime
++      || point.snapshot?.startedAt !== raw.startedAt || !integer(point.snapshot?.queryCalls)
++      || (index && point.snapshot.queryCalls < points[index - 1].snapshot.queryCalls))) {
++      measured[name] = { status: 'unavailable', reasons: ['query_checkpoints_invalid'] }; continue
++    }
++    const from = points[0].snapshot.queryCalls, to = points.at(-1).snapshot.queryCalls
++    const rows = raw.queries.filter(row => row[0] > from && row[0] <= to)
++    const unknownContextQueries = rows.filter(row => !row[1]).length, unknownStatementQueries = rows.filter(row => !row[2]).length
++    const uncapturedQueries = to - from - rows.length
++    const reasons = []
++    if (from < raw.startQueryCalls || to > raw.endQueryCalls || uncapturedQueries) reasons.push('query_capture_incomplete')
++    if (unknownContextQueries) reasons.push('query_context_unknown')
++    if (unknownStatementQueries) reasons.push('statement_structure_unknown')
++    const counts = Object.fromEntries(operations.map(key => [key, 0])), sourceCounts = Object.fromEntries(sources.map(key => [key, 0]))
++    for (const row of rows) {
++      const scope = scopeKeys[row[3]], operation = operations.includes(scope) ? scope : 'unattributed'
++      counts[operation]++
++      if (operation === 'unattributed') sourceCounts[scope]++
++    }
++    if (!uncapturedQueries && points[0].snapshot.queryOperations && points.at(-1).snapshot.queryOperations
++      && operations.some(key => counts[key] !== points.at(-1).snapshot.queryOperations[key] - points[0].snapshot.queryOperations[key])) reasons.push('operation_counter_mismatch')
++    if (!uncapturedQueries && points[0].snapshot.unattributedSources && points.at(-1).snapshot.unattributedSources
++      && sources.some(key => sourceCounts[key] !== points.at(-1).snapshot.unattributedSources[key] - points[0].snapshot.unattributedSources[key])) reasons.push('source_counter_mismatch')
++    selected.push(...rows)
++    measured[name] = { status: reasons.length ? 'incomplete' : 'complete', reasons, fromQueryCalls: from, toQueryCalls: to,
++      expectedQueries: to - from, capturedQueries: rows.length, uncapturedQueries, unknownContextQueries, unknownStatementQueries,
++      segments: points.slice(1).map((point, index) => ({ phase: point.phase, fromQueryCalls: points[index].snapshot.queryCalls, toQueryCalls: point.snapshot.queryCalls })),
++      queries: rows.map(row => [...row]) }
++  }
++  const used = new Set(selected.map(row => row[1]).filter(Boolean))
++  const receipts = invocationReceipts(log, contexts.filter((_, index) => used.has(index)))
++  return { version: 1, status: !raw.overflow && Object.values(measured).every(value => value.status === 'complete') && receipts.status === 'complete' ? 'complete' : 'incomplete',
++    source: { pid: raw.pid, runtime: raw.runtime, startedAt: raw.startedAt },
++    boundary: 'SQL calls belong to (before.queryCalls, after.queryCalls]; completion times never choose a SQL window. IDs show ALS origin, including inherited background work; a captured null action is never backfilled. Structure equality proves neither equal parameters nor redundant work.',
++    columns: ['queryCalls', 'context', 'statement', 'scope'], scopeKeys, contexts, statements,
++    capture: { fromQueryCalls: raw.startQueryCalls, toQueryCalls: raw.endQueryCalls, droppedQueries: raw.droppedQueries,
++      overflow: raw.droppedQueries > 0 || Boolean(raw.overflow), reasons: { ...raw.reasons } }, receipts, windows: measured }
++}
++
++module.exports = { LIMITS, scopeKeys, readContext, statementStructure, createQueryDiagnostics, projectQueryDiagnostics }
+--- /dev/null
++++ b/apps/desktop/test/db-query-diagnostics.test.mjs
+@@ -0,0 +1,346 @@
++import assert from 'node:assert/strict'
++import { AsyncLocalStorage } from 'node:async_hooks'
++import { createHash } from 'node:crypto'
++import { execFile } from 'node:child_process'
++import { EventEmitter } from 'node:events'
++import { createRequire } from 'node:module'
++import { mkdtemp, rm, writeFile } from 'node:fs/promises'
++import { tmpdir } from 'node:os'
++import { join } from 'node:path'
++import { fileURLToPath } from 'node:url'
++import { promisify } from 'node:util'
++import test from 'node:test'
++import diagnostic from './db-query-diagnostics.cjs'
++import { createLifecycleQueryCounter, queryCountDelta } from './lifecycle-query-counts.mjs'
++import operations from './db-query-operations.cjs'
++import sources from './db-query-unattributed-sources.cjs'
++
++const { LIMITS, createQueryDiagnostics, projectQueryDiagnostics, statementStructure, readContext } = diagnostic
++const key = Symbol.for('mikka.requestDiagnosticReaders')
++const id = n => '00000000-0000-4000-8000-' + String(n).padStart(12, '0')
++const metadata = (n = 1, extra = {}) => ({ httpInvocationId: id(n), invocationId: id(n), route: '/api/devices/enrollment', method: 'GET', rpcAction: null, ...extra })
++const identity = { pid: 77, runtime: 'nitro', startedAt: 1000 }
++const fixture = (limits = LIMITS) => {
++  const scope = new AsyncLocalStorage()
++  const collector = createQueryDiagnostics({ globals: { [key]: new Set([() => scope.getStore()]) }, limits })
++  return { scope, collector, record: (n, sql = 'SELECT id FROM session WHERE token=$1', context = metadata(), operation = '/api/devices/enrollment') =>
++    scope.run(context, () => collector.record(n, sql, operation)) }
++}
++const window = (from, to) => ({ status: 'complete', checkpoints: [
++  { phase: 'before', snapshot: { ...identity, queryCalls: from } },
++  { phase: 'launch-to-usable', snapshot: { ...identity, queryCalls: to } },
++] })
++const event = (n, complete, extra = {}) => ({ msg: complete ? 'api_request' : 'api_request_started', invocationId: id(n),
++  timestamp: `2026-11-09T00:00:0${complete ? 9 : 0}.000Z`, route: '/api/devices/enrollment', method: 'GET',
++  ...(complete ? { status: 200 } : {}), ...extra })
++const lines = events => events.map(value => JSON.stringify(value)).join('\n') + '\n'
++
++test('SQL structures hash only a bounded parameterized subset and never read parameter/config getters', () => {
++  const sql = 'SELECT "id" FROM "session" WHERE "token"=$1 AND "ownerId"=$2'
++  const shape = statementStructure({ text: sql, values: ['PRIVATE_TOKEN', 'PRIVATE_OWNER'] }).value
++  assert.equal(shape.normalizedStructureId, createHash('sha256').update(sql).digest('hex').slice(0, 12))
++  assert.equal(shape.parameterCount, 2)
++  for (const sql of ["SELECT 'PRIVATE_LITERAL'", "SELECT E'PRIVATE_LITERAL'", 'SELECT $$PRIVATE_LITERAL$$',
++    'SELECT $tag$PRIVATE_LITERAL$tag$', 'SELECT 1 -- PRIVATE_COMMENT', 'SELECT /*PRIVATE_COMMENT*/ 1',
++    'SELECT "PRIVATE\\IDENTIFIER"', 'SELECT "unterminated', "SELECT 'unterminated", 'SELECT 0x1234', 'SELECT 1_000',
++    'SELECT $65536', 'SELECT '.repeat(LIMITS.sqlChars), 'SELECT \u0000']) {
++    const value = statementStructure(sql)
++    assert.ok(value.reason, sql.slice(0, 24)); assert.equal(value.value, undefined)
++    assert.equal(JSON.stringify(value).includes('PRIVATE_'), false)
++  }
++  for (const [a, b] of [['SELECT 12345', 'SELECT 98765'], ['SELECT .12345', 'SELECT .98765'], ['SELECT -1.5e+3', 'SELECT 19.5e-2']]) {
++    assert.equal(statementStructure(a).value.normalizedStructureId, statementStructure(b).value.normalizedStructureId)
++  }
++  let read = false
++  assert.equal(statementStructure({ get text() { read = true; throw Error('PRIVATE_GETTER') } }).reason, 'statement_missing')
++  assert.equal(read, false)
++  const throwing = new Proxy({}, { getOwnPropertyDescriptor() { throw Error('PRIVATE_DESCRIPTOR') } })
++  const f = fixture(); f.collector.checkpoint(0); f.record(1, throwing)
++  const raw = f.collector.finish(identity, 1)
++  assert.ok(raw.queries[0][1] > 0, 'a failed statement descriptor cannot erase the independently known request')
++  assert.equal(raw.queries[0][2], 0); assert.equal(raw.reasons.statement_proxy, 1)
++})
++
++test('request diagnostics reject foreign registries, concurrent module scopes and arbitrary metadata', () => {
++  for (const [registry, reason] of [[undefined, 'registry_unavailable'], [{}, 'registry_unavailable'],
++    [new Set([() => undefined]), 'context_missing'], [new Set([() => metadata(), () => metadata(2)]), 'context_ambiguous'],
++    [new Set([() => { throw Error('PRIVATE_ERROR') }]), 'context_read_failed'],
++    [new Set([() => metadata(1, { route: '/api/PRIVATE_ROUTE' })]), 'context_invalid'],
++    [new Set([() => metadata(1, { rpcAction: 'private.action' })]), 'context_invalid'],
++    [new Set([() => metadata(1, { method: 'PRIVATE_METHOD' })]), 'context_invalid'],
++    [new Set(Array.from({ length: 17 }, () => () => undefined)), 'registry_unavailable']]) {
++    assert.deepEqual(readContext({ [key]: registry }), { reason })
++  }
++  assert.equal(readContext({ [key]: new Set([() => undefined, () => metadata()]) }).value.invocationId, id(1))
++})
++
++test('diagnostic safety: context identifiers accept primitive strings and read fields once', () => {
++  const boxed = { toString: () => id(1), privateCanary: 'PRIVATE_BOXED_ID' }
++  const bad = readContext({ [key]: new Set([() => metadata(1, { httpInvocationId: boxed, invocationId: boxed })]) })
++  assert.deepEqual(bad, { reason: 'context_invalid' })
++  let httpReads = 0, logicalReads = 0
++  const changing = { ...metadata(),
++    get httpInvocationId() { return ++httpReads === 1 ? id(1) : boxed },
++    get invocationId() { return ++logicalReads === 1 ? id(1) : boxed },
++  }
++  const safe = readContext({ [key]: new Set([() => changing]) })
++  assert.equal(safe.value.httpInvocationId, id(1)); assert.equal(safe.value.invocationId, id(1))
++  assert.equal(httpReads, 1); assert.equal(logicalReads, 1)
++  assert.equal(JSON.stringify([bad, safe]).includes('PRIVATE_'), false)
++})
++
++test('diagnostic safety: structure identifiers cannot preserve objects through implicit coercion', () => {
++  const f = fixture(); f.collector.checkpoint(0); f.record(1)
++  const raw = f.collector.finish(identity, 1)
++  raw.statements[1].normalizedStructureId = { toString: () => 'a'.repeat(12), privateCanary: 'PRIVATE_BOXED_SHAPE' }
++  const report = projectQueryDiagnostics(raw, { 'startup-bundled': window(0, 1) }, identity)
++  assert.equal(report.status, 'unavailable')
++  assert.equal(JSON.stringify(report).includes('PRIVATE_'), false)
++})
++
++test('diagnostic safety: receipt timestamps accept primitive strings only', () => {
++  const strings = [event(1, false), event(1, true)].map(value => ({ ...value, timestamp: ['2026-11-09T00:00:01.000Z'] }))
++  const rawAgain = fixture(); rawAgain.collector.checkpoint(0); rawAgain.record(1)
++  assert.equal(projectQueryDiagnostics(rawAgain.collector.finish(identity, 1), { 'startup-bundled': window(0, 1) }, identity, lines(strings)).receipts.status, 'incomplete')
++})
++
++test('diagnostic safety: Proxy query configs are rejected before any descriptor or value trap runs', () => {
++  let traps = 0
++  const config = new Proxy({ text: 'SELECT id FROM session WHERE token=$1' }, {
++    getOwnPropertyDescriptor(target, property) { traps++; return Object.getOwnPropertyDescriptor(target, property) },
++    get(target, property) { traps++; return target[property] },
++  })
++  const f = fixture(); f.collector.checkpoint(0); f.record(1, config)
++  const raw = f.collector.finish(identity, 1)
++  assert.equal(traps, 0, 'the diagnostic must not trigger traps before the original driver sees the config')
++  assert.ok(raw.queries[0][1] > 0); assert.equal(raw.queries[0][2], 0)
++  assert.equal(raw.reasons.statement_proxy, 1)
++})
++
++test('diagnostic safety: statement prefixes cannot admit opaque SET payloads or a second statement', () => {
++  for (const sql of ['SET application_name = PRIVATE_SETTING', 'SHOW PRIVATE_SETTING', 'SAVEPOINT PRIVATE_NAME',
++    'RELEASE PRIVATE_NAME', 'BEGIN PRIVATE_PAYLOAD', 'COMMIT PRIVATE_PAYLOAD', 'ROLLBACK TO PRIVATE_NAME',
++    'SELECT 1; SET application_name=PRIVATE_SETTING', 'BEGIN; SET application_name=PRIVATE_SETTING', 'SELECT 1;;']) {
++    const shape = statementStructure(sql)
++    assert.equal(shape.value, undefined, sql.split(' ')[0]); assert.equal(shape.reason, 'statement_syntax')
++    assert.equal(JSON.stringify(shape).includes('PRIVATE_'), false)
++  }
++  for (const sql of ['BEGIN', 'COMMIT;', 'ROLLBACK ;', 'SELECT id FROM session WHERE token=$1;']) assert.ok(statementStructure(sql).value)
++})
++
++test('query capture starts at the existing checkpoint, freezes once and reset creates a new diagnostic history', () => {
++  const f = fixture()
++  f.record(100); f.collector.checkpoint(100); f.record(101); f.collector.checkpoint(101); f.record(102)
++  const first = f.collector.finish(identity, 102)
++  assert.equal(first.startQueryCalls, 100); assert.deepEqual(first.queries.map(row => row[0]), [101, 102])
++  f.record(103); f.collector.checkpoint(103)
++  assert.deepEqual(f.collector.finish(identity, 103), first)
++  f.collector.reset(); f.collector.checkpoint(0); f.record(1)
++  assert.equal(f.collector.finish({ ...identity, startedAt: 2000 }, 1).startQueryCalls, 0)
++})
++
++test('ordinal windows retain carried requests, unknown shapes and all overflow as nonzero unknown costs', () => {
++  const f = fixture({ ...LIMITS, queries: 3, contexts: 2, statements: 2 })
++  f.collector.checkpoint(100)
++  f.record(101)
++  f.record(102, "SELECT 'PRIVATE_LITERAL'", metadata(2))
++  f.record(103, 'SELECT other FROM session', metadata())
++  f.record(104)
++  const raw = f.collector.finish(identity, 104)
++  assert.equal(raw.queries.length + raw.droppedQueries, 4)
++  assert.equal(raw.overflow, true)
++  const report = projectQueryDiagnostics(raw, { 'startup-bundled': window(100, 104) }, identity, lines([event(1, false), event(1, true)]))
++  const measured = report.windows['startup-bundled']
++  assert.equal(measured.expectedQueries, 4); assert.equal(measured.capturedQueries, 3); assert.equal(measured.uncapturedQueries, 1)
++  assert.equal(measured.unknownContextQueries, 1); assert.equal(measured.unknownStatementQueries, 2)
++  assert.equal(measured.status, 'incomplete'); assert.equal(report.capture.overflow, true)
++  assert.equal(JSON.stringify(report).includes('PRIVATE_'), false)
++  const middle = projectQueryDiagnostics(raw, { 'startup-bundled': window(101, 103) }, identity, lines([event(1, false), event(1, true)]))
++  assert.deepEqual(middle.windows['startup-bundled'].queries.map(row => row[0]), [102, 103])
++})
++
++test('query receipts retain exact HTTP method and batch siblings, ignore external IDs and detect mismatches', () => {
++  const f = fixture(); f.collector.checkpoint(10)
++  f.record(11, 'SELECT 1', metadata(1, { route: '/api/desktop/rpc', method: 'POST' }))
++  f.record(12, 'SELECT 1', metadata(1, { invocationId: id(2), route: '/api/desktop/rpc', method: 'POST', rpcAction: 'task-runs.pollTaskRuns' }))
++  const raw = f.collector.finish(identity, 12)
++  const parent = complete => event(1, complete, { route: '/api/desktop/rpc', method: 'POST', requestId: 'PRIVATE_EXTERNAL_ID', userIdHash: 'PRIVATE_USER',
++    ...(complete ? { rpcAction: 'desktop.readBatch', rpcItemCount: 2 } : {}) })
++  const child = (n, complete) => event(n, complete, { msg: complete ? 'rpc_action' : 'rpc_action_started',
++    httpInvocationId: id(1), route: '/api/desktop/rpc', method: 'POST', rpcAction: n === 2 ? 'task-runs.pollTaskRuns' : 'issues.syncIssueList' })
++  const events = [parent(false), parent(true), child(2, false), child(2, true), child(3, false), child(3, true)]
++  const report = projectQueryDiagnostics(raw, { 'startup-bundled': window(10, 12) }, identity, lines(events.toReversed()))
++  assert.equal(report.receipts.status, 'complete')
++  assert.equal(report.receipts.invocations.length, 3, 'the zero-SQL sibling still proves the actual batch action set')
++  assert.ok(report.receipts.invocations.every(value => value.method === 'POST'))
++  assert.equal(report.contexts[raw.queries[0][1]].rpcAction, null, 'pre-auth physical SQL is never assigned to a later logical child')
++  assert.equal(JSON.stringify(report).includes('PRIVATE_'), false)
++  for (const changed of [events.slice(1), [...events, child(2, true), { ...child(2, true), status: 500 }],
++    [...events, { ...parent(true), rpcAction: 'desktop.bootstrap' }],
++    events.map(value => value.invocationId === id(2) ? { ...value, method: 'GET' } : value)]) {
++    assert.equal(projectQueryDiagnostics(raw, { 'startup-bundled': window(10, 12) }, identity, lines(changed)).receipts.status, 'incomplete')
++  }
++  assert.equal(projectQueryDiagnostics(raw, { 'startup-bundled': window(10, 12) }, identity, lines(events.slice(1))).receipts.unpairedInvocations, 1)
++})
++
++test('malformed diagnostic payloads, reset identities and absent checkpoints are never manufactured zeroes', () => {
++  const f = fixture(); f.collector.checkpoint(10); f.record(11)
++  const raw = f.collector.finish(identity, 11)
++  for (const value of [{ ...raw, pid: 99 }, { ...raw, queries: [] }, { ...raw, queries: [[12, 1, 1, 1]] },
++    { ...raw, queries: [[11, 99, 1, 1]] }, { ...raw, contexts: [{ status: 'unknown' }, { ...metadata(), route: 'PRIVATE_ROUTE' }] },
++    { ...raw, reasons: { PRIVATE_REASON: 1 } }, { ...raw, overflow: 'PRIVATE_OVERFLOW' }, { ...raw, overflow: true }]) {
++    const result = projectQueryDiagnostics(value, { 'startup-bundled': window(10, 11) }, identity)
++    assert.equal(result.status, 'unavailable'); assert.equal(JSON.stringify(result).includes('PRIVATE_'), false)
++  }
++  const reset = window(10, 11); reset.checkpoints[1].snapshot.startedAt++
++  const report = projectQueryDiagnostics(raw, { 'startup-bundled': reset }, identity)
++  assert.equal(report.windows['startup-bundled'].status, 'unavailable')
++  assert.equal(report.windows['startup-hosted'].status, 'unavailable')
++})
++
++test('maximum query/context/structure cardinality stays under the final export bound', () => {
++  const f = fixture(); f.collector.checkpoint(0)
++  for (let n = 1; n <= LIMITS.queries; n++) f.record(n, `SELECT "column${n % (LIMITS.statements - 1)}" FROM session WHERE id=$1`, metadata(n % (LIMITS.contexts - 1) + 1))
++  const raw = f.collector.finish(identity, LIMITS.queries)
++  assert.equal(raw.overflow, false)
++  assert.ok(Buffer.byteLength(JSON.stringify(raw)) <= LIMITS.bytes)
++  assert.equal(raw.queries.length, LIMITS.queries)
++})
++
++test('the final projection reads one bounded export after all twelve unchanged snapshots and preserves the original windows', async t => {
++  const directory = await mkdtemp(join(tmpdir(), 'mikka-query-export-'))
++  t.after(() => rm(directory, { recursive: true, force: true }))
++  const revision = 'a'.repeat(40), origin = 'http://localhost:3000', runtimePath = join(directory, 'processes.json')
++  const log = join(directory, `bundled-${revision.slice(0, 12)}-44.log`)
++  const backend = { ...identity, port: 3000, socket: '/tmp/mikka-bundled-44.sock', log }
++  await writeFile(runtimePath, JSON.stringify({ revision, origin, bundled: backend }), { mode: 0o600 })
++  // These requests finish outside the counter time ranges. SQL still belongs
++  // to its original ordinal window, including inherited background work.
++  await writeFile(log, lines([1, 2, 3, 4].flatMap(n => [event(n, false), event(n, true)])), { mode: 0o600 })
++  const f = fixture(), paths = [], windows = {}; let sequence = 0, mode = 'normal'
++  const dependencies = { httpRequest(options, callback) {
++    paths.push(options.path)
++    assert.equal(options.socketPath, backend.socket); assert.equal(options.method, 'GET')
++    const request = new EventEmitter()
++    request.destroy = error => request.emit('error', error)
++    request.end = () => queueMicrotask(() => {
++      const response = Object.assign(new EventEmitter(), { statusCode: mode === 'http-error' ? 500 : 200, resume() {} })
++      let body
++      if (options.path === '/metrics') {
++        f.collector.checkpoint(sequence)
++        body = JSON.stringify({ version: 1, ...identity, measurement: 'all_pg_client_calls_and_connection_protocol_bytes',
++          endedAt: 1000 + paths.length, instrumentedClients: 1, queryCalls: sequence,
++          pgProtocolReceiveBytes: 0, pgProtocolSendBytes: 0, activeConnections: 1, closedConnections: 0, unknownReadings: 0,
++          queryOperations: Object.fromEntries(operations.map(key => [key, key === 'unattributed' ? sequence : 0])),
++          unattributedSources: Object.fromEntries(sources.map(key => [key, key === '/api/devices/enrollment' ? sequence : 0])) })
++      } else {
++        assert.equal(options.path, '/diagnostics'); assert.equal(paths.filter(path => path === '/metrics').length, 12)
++        body = mode === 'oversize' ? 'x'.repeat(LIMITS.bytes + 1) : mode === 'invalid' ? '{PRIVATE_INVALID'
++          : JSON.stringify(f.collector.finish(identity, sequence))
++      }
++      callback(response); response.emit('data', Buffer.from(body)); response.emit('end')
++    })
++    return request
++  } }
++  const counter = await createLifecycleQueryCounter({ revision, origin, runtimePath }, dependencies)
++  const names = {
++    nativeLogin: ['before', 'common-email-authentication', 'native-pkce-and-automatic-renderer-to-public-session', 'workspace-selection-to-usable'],
++    webLogin: ['before', 'common-email-authentication', 'web-navigation-to-dom-content-loaded', 'workspace-selection-to-usable'],
++    'startup-bundled': ['before', 'launch-to-usable'], 'startup-hosted': ['before', 'launch-to-usable'],
++  }
++  let invocation = 0
++  for (const [name, phases] of Object.entries(names)) {
++    invocation++
++    const checkpoints = []
++    for (const [index, phase] of phases.entries()) {
++      if (index) f.record(++sequence, 'SELECT id FROM session WHERE token=$1', metadata(invocation))
++      checkpoints.push({ phase, snapshot: await counter.snapshot() })
++    }
++    windows[name] = { status: 'complete', checkpoints,
++      total: queryCountDelta(checkpoints[0].snapshot, checkpoints.at(-1).snapshot),
++      segments: checkpoints.slice(1).map((point, index) => ({ phase: point.phase, ...queryCountDelta(checkpoints[index].snapshot, point.snapshot) })) }
++  }
++  const unchanged = structuredClone(windows)
++  const result = await counter.rpcActions(windows)
++  assert.deepEqual(paths, [...Array(12).fill('/metrics'), '/diagnostics'])
++  assert.deepEqual(windows, unchanged)
++  assert.equal(result.queryDiagnostics.status, 'complete')
++  assert.equal(result.queryDiagnostics.receipts.invocations.length, 4)
++  assert.equal(result.queryDiagnostics.windows.nativeLogin.expectedQueries, 3)
++  assert.equal(Object.values(result.queryDiagnostics.windows).reduce((sum, value) => sum + value.capturedQueries, 0), sequence)
++  // The original RPC result is identical when using its historical aggregate
++  // boundaries. That legacy projection must not acquire new query evidence.
++  const historical = Object.fromEntries(Object.entries(windows).map(([name, { checkpoints: _points, ...value }]) => [name, value]))
++  const { queryDiagnostics: _diagnostics, ...original } = result
++  assert.deepEqual(await counter.rpcActions(historical), original)
++  assert.equal(paths.length, 13)
++  for (mode of ['oversize', 'invalid', 'http-error']) {
++    const failed = await counter.rpcActions(windows)
++    assert.deepEqual(failed.queryDiagnostics, { version: 1, status: 'unavailable', reasons: ['diagnostic_read_failed'] })
++    assert.equal(JSON.stringify(failed).includes('PRIVATE_'), false)
++  }
++  assert.equal(paths.filter(path => path === '/metrics').length, 12, 'export failures never add a counter snapshot or retry')
++})
++
++test('actual request ALS and manageDatabasePool bind concurrent and reused queued clients without a global current request', async t => {
++  const temporary = await mkdtemp(join(tmpdir(), 'mikka-query-context-'))
++  t.after(() => rm(temporary, { recursive: true, force: true }))
++  const script = join(temporary, 'probe.mjs')
++  const root = fileURLToPath(new URL('../../../', import.meta.url))
++  const require = createRequire(new URL('../../../package.json', import.meta.url))
++  await writeFile(script, `
++    import assert from 'node:assert/strict'; import {EventEmitter} from 'node:events'; import {AsyncLocalStorage} from 'node:async_hooks';
++    import {createRequire} from 'node:module'; import {pathToFileURL} from 'node:url'; import {join} from 'node:path';
++    const root=process.argv[2], require=createRequire(join(root,'package.json'));
++    const diagnostic=require(join(root,'apps/desktop/test/db-query-diagnostics.cjs'));
++    const log=await import(pathToFileURL(join(root,'lib/request-log.ts')).href);
++    const {manageDatabasePool}=await import(pathToFileURL(join(root,'lib/db/pool-lifecycle.ts')).href);
++    const {statementId}=await import(pathToFileURL(join(root,'lib/tracing/sanitize.ts')).href);
++    assert.equal(diagnostic.statementStructure('SELECT id FROM session WHERE token=$1').value.normalizedStructureId,statementId('SELECT id FROM session WHERE token=$1'));
++    assert.ok(globalThis[Symbol.for('mikka.requestDiagnosticReaders')] instanceof Set,'actual request-log must register its own safe ALS getter');
++    const {Pool}=require('pg'); let clients=0,sequence=0; const observed=[]; const logs=[];
++    const collector=diagnostic.createQueryDiagnostics(); collector.checkpoint(0);
++    const route=globalThis[Symbol.for('mikka.requestRoute')];
++    class Client extends EventEmitter {
++      _queryable=true; _ending=false;
++      constructor(){super();clients++} connect(callback){queueMicrotask(callback)} end(callback){callback?.();this.emit('end')}
++      query(text,values,callback){const cb=typeof values==='function'?values:callback; observed.push(diagnostic.readContext());
++        collector.record(++sequence,text,route.getStore()); queueMicrotask(()=>cb(null,{rows:[]}));}
++    }
++    const pool=manageDatabasePool(new Pool({max:1,idleTimeoutMillis:0,Client})); const held=await pool.connect();
++    const sink=line=>logs.push(JSON.parse(line));
++    const native=log.withRequestLog('/api/desktop/rpc',async()=>{
++      log.noteLogRpcAction('desktop.readBatch');
++      await Promise.all(['task-runs.pollTaskRuns','issues.syncIssueList'].map(action=>log.withRpcActionLog(action,async()=>{
++        await Promise.resolve(); await pool.query('SELECT id FROM session WHERE token=$1',['PRIVATE_PARAMETER']);
++      }))); return new Response(null);
++    },sink)(new Request('http://localhost/mikka/api/desktop/rpc',{method:'POST',headers:{'x-vercel-id':'PRIVATE_EXTERNAL_ID',cookie:'PRIVATE_COOKIE'}}));
++    const enrollment=log.withRequestLog('/api/devices/enrollment',async()=>{await Promise.resolve();await pool.query('SELECT id FROM session WHERE token=$1',['PRIVATE_PARAMETER']);return new Response(null)},sink)(new Request('http://localhost/mikka/api/devices/enrollment'));
++    await Promise.resolve(); await Promise.resolve();
++    assert.equal(pool.waitingCount,3,'all three actual Pool.query callbacks must wait for the same held client');
++    await log.withRequestLog('/api/workspace',async()=>{held.release();return new Response(null)},sink)(new Request('http://localhost/mikka/api/workspace'));
++    await Promise.all([native,enrollment]);
++    assert.deepEqual(observed.map(value=>value.value?.rpcAction),['task-runs.pollTaskRuns','issues.syncIssueList',null]);
++    assert.deepEqual(observed.map(value=>value.value?.method),['POST','POST','GET']);
++    const parent=observed[0].value.httpInvocationId; assert.equal(observed[1].value.httpInvocationId,parent);
++    assert.notEqual(observed[0].value.invocationId,observed[1].value.invocationId);
++    await log.withRequestLog('/api/devices/enrollment',async()=>{await pool.query('SELECT 1');return new Response(null)},sink)(new Request('http://localhost/mikka/api/devices/enrollment',{method:'POST'}));
++    assert.equal(clients,1); assert.equal(observed.at(-1).value.method,'POST'); assert.notEqual(observed.at(-1).value.httpInvocationId,parent);
++    let deferred; await log.withRequestLog('/api/workspace',async()=>{deferred=AsyncLocalStorage.bind(()=>diagnostic.readContext());return new Response(null)},sink)(new Request('http://localhost/mikka/api/workspace'));
++    assert.equal(diagnostic.readContext().reason,'context_missing'); assert.equal(deferred().value.route,'/api/workspace');
++    const second=await import(pathToFileURL(join(root,'lib/request-log.ts')).href+'?diagnostic-second-copy');
++    assert.equal(globalThis[Symbol.for('mikka.requestDiagnosticReaders')].size,2);
++    await log.withRequestLog('/api/workspace',()=>second.withRequestLog('/api/workspace',async()=>{assert.equal(diagnostic.readContext().reason,'context_ambiguous');return new Response(null)},sink)(new Request('http://localhost/mikka/api/workspace')),sink)(new Request('http://localhost/mikka/api/workspace'));
++    await second.withRequestLog('/api/workspace',async()=>{assert.equal(diagnostic.readContext().value.route,'/api/workspace');return new Response(null)},sink)(new Request('http://localhost/mikka/api/workspace'));
++    const raw=collector.finish({pid:77,runtime:'nitro',startedAt:1000},sequence);
++    const window={status:'complete',checkpoints:[{phase:'before',snapshot:{pid:77,runtime:'nitro',startedAt:1000,queryCalls:0}},{phase:'launch-to-usable',snapshot:{pid:77,runtime:'nitro',startedAt:1000,queryCalls:sequence}}]};
++    const report=diagnostic.projectQueryDiagnostics(raw,{'startup-bundled':window},{pid:77,runtime:'nitro'},logs.map(value=>JSON.stringify(value)).join('\\n'));
++    assert.equal(report.receipts.status,'complete'); assert.equal(report.windows['startup-bundled'].status,'complete');
++    assert.equal(JSON.stringify(raw).includes('PRIVATE_'),false); assert.equal(JSON.stringify(report).includes('PRIVATE_'),false);
++    await pool.end(); console.log(JSON.stringify({queries:sequence,clients,queued:3,moduleCopies:2,receiptStatus:report.receipts.status}));
++  `)
++  const { stdout } = await promisify(execFile)(process.execPath, ['--import', require.resolve('tsx'), script, root], {
++    cwd: root, env: { PATH: process.env.PATH }, timeout: 20_000, maxBuffer: 32_768,
++  })
++  assert.deepEqual(JSON.parse(stdout), { queries: 4, clients: 1, queued: 3, moduleCopies: 2, receiptStatus: 'complete' })
++})

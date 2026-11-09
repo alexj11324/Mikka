@@ -1,0 +1,32 @@
+(node:12) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:12) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✖ a document workspace departure retires readers instead of reading again before navigation (81.978856ms)
+ℹ {"initialReads":1,"readsBeforeAssign":2,"refreshesBeforeAssign":1,"departedEnabled":false,"departedEntries":0,"oldDocumentText":"read 2"}
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3881.977455
+
+✖ failing tests:
+
+test at lib/swr/persistent-cache.test.tsx:1:18635
+✖ a document workspace departure retires readers instead of reading again before navigation (81.978856ms)
+  AssertionError [ERR_ASSERTION]: the departing Document must not remount a fresh reader before its full navigation
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/workspace-retirement-20261109/checkout/lib/swr/persistent-cache.test.tsx:377:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

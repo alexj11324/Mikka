@@ -1,0 +1,84 @@
+{
+  "sourceCheckoutHead": "6180cd8889006f4e1618c2549b1aa12d13506ee8",
+  "copy": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/revision-prefetch-triage-20261108/checkout",
+  "copiedWorkingTreeFiles": [
+    {
+      "path": "app/actions/coordinator.ts",
+      "sha256": "b70ceec98efa1edfc1074598b2a6cf12b58d4f2539bb351854a562fa43f9d451"
+    },
+    {
+      "path": "app/actions/issues.ts",
+      "sha256": "610a5e47fb5115723e44c229fdb4f5b49135bed51b5dc8fb11032a924ebbf399"
+    },
+    {
+      "path": "app/actions/task-runs.ts",
+      "sha256": "4f29acbe6899a1432d4f216cb1f08aeba8672897319106b98848fbfda45767f8"
+    },
+    {
+      "path": "lib/action-error.ts",
+      "sha256": "b703bdecc6b1a98254d5caa6133d12f3379e4426d0f49ea17c03474e49c2c606"
+    },
+    {
+      "path": "lib/cache-read-action.ts",
+      "sha256": "b83baef9cecdabcb535d10a50c2e65da477434a3f9245e3fd9d1db9a84ce3f29"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.test.ts",
+      "sha256": "c6eb4a456b99d693476dedbb7645fc21ad33999e3f99bac4fed3cb9aba4d437e"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "sha256": "4673311b318c705301b14129ce38af905481064c02da19dcc6b2394ce6b94108"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-contract.ts",
+      "sha256": "2a9b5cf31b9cf0936f457336517ec481b7a358496c63a00da2c719eab4467f0d"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch.test.ts",
+      "sha256": "67a6601893454e80880513b5b44a230cc2a379940320a542dbfc43aa40265399"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch.ts",
+      "sha256": "3d99daae29daec0ca3ee25065c7a69c0d089f769c151e1509cb7d7721ed65045"
+    },
+    {
+      "path": "lib/list-poll.ts",
+      "sha256": "e676c7e623bcf5f99489027c73e2f741f71a263d8f54a81a3d6d7a7f14f930ab"
+    },
+    {
+      "path": "lib/live/events.ts",
+      "sha256": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5"
+    },
+    {
+      "path": "lib/live/list-read-server.ts",
+      "sha256": "b6fa906a7eee521f91160f39d77098b33c640c0ec8ee15fc86a3df7e4518aff7"
+    },
+    {
+      "path": "lib/live/owner-scope.ts",
+      "sha256": "d803e41828b7bb49ef89e6571efe43f8080249e121cb4852f7e869d0a2382673"
+    },
+    {
+      "path": "lib/live/revision-read.ts",
+      "sha256": "eddf21c6fe1d381d154ddf257c28ae9923daaeff3ebc1d2b63c621add914af46"
+    },
+    {
+      "path": "lib/live/revisions.ts",
+      "sha256": "bd2b351ade97a5b0f3f12f43d606ce9f9d8eca9b90de33400be94203d9d76328"
+    },
+    {
+      "path": "lib/workspace-access.ts",
+      "sha256": "db5f3de381689ec358c5862c6f3d0b06823d40ade368791e85006005ea8545cd"
+    },
+    {
+      "path": "lib/workspace-error.ts",
+      "sha256": "6a6c60acde3a8b6526c8ca4f87f25413f3f9aff1e867d488921779d4d99c610e"
+    },
+    {
+      "path": "tests/live-revision-reads.db.test.ts",
+      "sha256": "46bf3b9ac0dc3eeca749da3e0e24dbf6e9b491c73b962c62102a349f686bd6b5"
+    }
+  ],
+  "dependencyReuse": "/workspace/scratch/af05d9e4f31e/Mikka-observability-1512/node_modules",
+  "sourceCheckoutMutations": 0
+}

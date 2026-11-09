@@ -1,0 +1,9 @@
+{
+  "schema": "issue1512.remote-candidate.v1",
+  "commit": "3ffa641c6eaade5d968475795d7221c99ed393a6",
+  "tree": "766c063fcac276ea55251d76e43b2e616244b62b",
+  "parent": "9794bc23fa2fe6eb71dbefe62fe0bcdfa0a7d183",
+  "remoteBlobsVerified": 21,
+  "branchUpdated": false,
+  "reason": "Controlled failure actual PostHog export preparation remains to be added before one CI run"
+}

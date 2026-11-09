@@ -1,0 +1,51 @@
+{
+  "kind": "bounded-safe-revision-metadata-byte-accounting",
+  "scope": "The reproduced late issue reader denial after another declared owner-list reader started. Original and candidate each execute one revision SELECT in this denial case; candidate includes one additional issue_list home key.",
+  "additionalStatementInReproducedDeniedCase": 0,
+  "additionalSafeKey": "issue_list at the already resolved authenticated owner home",
+  "upstreamPgParameterText": {
+    "kindArrayAdditionalElementBytes": 13,
+    "uuidArrayAdditionalElementBytes": 39,
+    "totalAdditionalValueBytes": 52,
+    "method": "Previously measured with installed pg 8.23.1 prepareValue; one comma plus quoted issue_list (10 bytes), one comma plus quoted UUID (36 bytes). Two existing parameter containers and SQL text are unchanged."
+  },
+  "possibleReturnedRow": {
+    "kindUtf8Bytes": 10,
+    "uuidTextBytes": 36,
+    "signedBigintTextBytesAtMost": 20,
+    "dataRowFramingBytes": 19,
+    "framingFormula": "1 message code + 4 length + 2 field count + 3 * 4 field lengths",
+    "pgDataRowBytesAtMost": 85,
+    "examplePositiveRevision7DataRowBytes": 66,
+    "rowAbsentIfCounterDoesNotExist": true
+  },
+  "projection": "The extra key is not included in the successful sibling reader response. A denied issue reader keeps its original failure result.",
+  "closedPlanBound": {
+    "kindsAtMost": 4,
+    "oneOriginalRequestedHomeKindRequiredToStartPrefetch": true,
+    "unusedOtherKindsAtMost": 3,
+    "claim": "The one-extra-issue-key bound is specific to this reproduced late-issue case. Other partial failures can leave up to three safe planned keys unused."
+  },
+  "limitations": [
+    "These are PG parameter value and DataRow frame bytes, not a bound on TLS/TCP framing, complete transport egress, CPU or total bytes of arbitrary failures.",
+    "A revision SELECT failure can leave more readers without best-effort revision metadata in this request; it never fabricates proof and the next request reads fresh.",
+    "The real PG regression is authored in the existing mandatory suite but was not executed locally."
+  ],
+  "primarySourceReceipts": [
+    {
+      "path": "/workspace/scratch/af05d9e4f31e/Mikka-observability-1512/node_modules/.pnpm/pg@8.23.1/node_modules/pg/lib/utils.js",
+      "sha256": "0348fa1818f4490823187cafc3d31738de7fe3bd30dd0cd12711c272367b2d80",
+      "relevance": "prepareValue serializes the actual text array parameters"
+    },
+    {
+      "path": "/workspace/scratch/af05d9e4f31e/Mikka-observability-1512/node_modules/.pnpm/pg-protocol@1.16.1/node_modules/pg-protocol/dist/parser.js",
+      "sha256": "6f841aabda7240df44e1b08bbe8e202502ead969576c1ecc17311af48f57f2ef",
+      "relevance": "pinned pg-protocol parser header constants and parseDataRowMessage field count/length layout"
+    },
+    {
+      "path": "checkout/lib/db/schema.ts",
+      "sha256": "8b9d4fc48436efa65052f29b993501440862018d37c00b342af02688ccc28305",
+      "relevance": "live_revisions revision bigint, UUID id and fixed query kind predicate"
+    }
+  ]
+}

@@ -1,0 +1,244 @@
+diff --git a/lib/swr/persistent-cache.ts b/lib/swr/persistent-cache.ts
+--- a/lib/swr/persistent-cache.ts
++++ b/lib/swr/persistent-cache.ts
+@@ -39,7 +39,7 @@
+   private freshData = new Set<string>()
+   private startupReads = new Map<string | RevalidateHydratedRead, Set<RevalidateHydratedRead>>()
+   private pending: Promise<unknown> = Promise.resolve()
+-  private invalidated?: () => void
++  private invalidated?: (documentNavigation: boolean) => void
+   private channel?: BroadcastChannel
+ 
+   constructor(scope: ReadCacheScope | null, private storage: ReadStorage = new IndexedReadStorage()) {
+@@ -144,7 +144,7 @@
+     } finally { this.hydrationComplete = true; this.finishHydration() }
+   }
+ 
+-  connect(onInvalidated: () => void) {
++  connect(onInvalidated: (documentNavigation: boolean) => void) {
+     this.invalidated = onInvalidated
+     activeCaches.add(this)
+     if (typeof BroadcastChannel !== 'undefined' && this.namespace) {
+@@ -171,7 +171,7 @@
+     }
+   }
+ 
+-  invalidate(broadcast = true) {
++  invalidate(broadcast = true, documentNavigation = false) {
+     if (!this.enabled) return
+     this.enabled = false
+     super.clear()
+@@ -181,7 +181,7 @@
+     // Retiring an old tab must not clear a newly activated account's namespace.
+     void this.enqueue(() => this.storage.clear(this.namespace ?? undefined)).catch(() => undefined)
+     if (broadcast) this.channel?.postMessage({ type: 'clear', scope: this.namespace })
+-    this.invalidated?.()
++    this.invalidated?.(documentNavigation)
+   }
+ 
+   async flushed() { await this.pending }
+@@ -199,11 +199,13 @@
+ 
+ /** Successful logout, account deletion and workspace/account switches share
+  * this path. No token, account content or credential is broadcast. */
+-export async function clearPersistentReadCaches() {
++export async function clearPersistentReadCaches(options: { documentNavigation?: boolean } = {}) {
+   // Invalidating calls React subscribers, which may unregister or create a
+   // provider. Work on one snapshot so none of its pending writes escape the wait.
+   const caches = [...activeCaches]
+-  for (const cache of caches) cache.invalidate(false)
++  // A confirmed full-page switch needs no fresh reader in the departing
++  // Document. Other tabs still receive the ordinary clear/revalidate signal.
++  for (const cache of caches) cache.invalidate(false, options.documentNavigation === true)
+   if (typeof BroadcastChannel !== 'undefined') {
+     const channel = new BroadcastChannel('mikka-read-cache')
+     channel.postMessage({ type: 'clear' }); channel.close()
+diff --git a/components/authenticated-read-cache.tsx b/components/authenticated-read-cache.tsx
+--- a/components/authenticated-read-cache.tsx
++++ b/components/authenticated-read-cache.tsx
+@@ -25,7 +25,7 @@
+ 
+ function ReadCacheBoundary({ scope, unauthorized, initialReads, children }: { scope: ReadCacheScope | null; unauthorized: boolean; initialReads?: readonly InitialRead[]; children: ReactNode }) {
+   const router = useRouter()
+-  const [state, setState] = useState<{ cache: Cache; generation: number }>(() => {
++  const [state, setState] = useState<{ cache: Cache; generation: number; retired?: boolean }>(() => {
+     const cache: Cache = scope ? new PersistentReadCache(scope) : new Map()
+     // SWR fallback is not necessarily stored in the provider. Put authorized
+     // server reads there before the asynchronous disk snapshot can arrive.
+@@ -38,15 +38,22 @@
+   const config = useMemo(() => ({ provider: () => state.cache }), [state.cache])
+   useEffect(() => { if (unauthorized) void clearPersistentReadCaches() }, [unauthorized])
+   useEffect(() => {
+-    if (!(state.cache instanceof PersistentReadCache)) return
+-    return state.cache.connect(() => {
++    if (state.retired || !(state.cache instanceof PersistentReadCache)) return
++    return state.cache.connect(documentNavigation => {
++      if (documentNavigation) {
++        // Clear the old view without mounting another reader before assign().
++        // The next Document creates its ordinary fresh authorized boundary.
++        setState(current => ({ ...current, retired: true }))
++        return
++      }
+       // Retire the whole provider, including in-flight requests and component
+       // refs. Remounted children use an empty in-memory cache until the server
+       // confirms the new account/workspace. An old fetch cannot refill it.
+       setState(current => ({ cache: new Map(), generation: current.generation + 1 }))
+       router.refresh()
+     })
+-  }, [state.cache, router])
++  }, [state.cache, state.retired, router])
++  if (state.retired) return null
+   return <SWRConfig key={state.generation} value={config}><HydrateReadCache />{children}</SWRConfig>
+ }
+ 
+diff --git a/hooks/use-workspace-switcher.ts b/hooks/use-workspace-switcher.ts
+--- a/hooks/use-workspace-switcher.ts
++++ b/hooks/use-workspace-switcher.ts
+@@ -68,7 +68,7 @@
+       try {
+         const result = await switchWorkspace({ accountId, workspaceId })
+         if (!result.ok) { toast.error(result.error); return }
+-        await clearPersistentReadCaches()
++        await clearPersistentReadCaches({ documentNavigation: true })
+         window.location.assign(withBasePath(getPathname({ locale, href: '/' })))
+       } catch { toast.error(i18nText("FeatureCopy.c_b8e346ef")) }
+       finally { setPending(false) }
+diff --git a/lib/swr/persistent-cache.test.tsx b/lib/swr/persistent-cache.test.tsx
+--- a/lib/swr/persistent-cache.test.tsx
++++ b/lib/swr/persistent-cache.test.tsx
+@@ -356,3 +356,135 @@
+     else Reflect.deleteProperty(globalThis, 'indexedDB')
+   }
+ })
++
++test('a document workspace departure retires readers instead of reading again before navigation', async t => {
++  let reads = 0, departed: PersistentReadCache | undefined, latest: PersistentReadCache | undefined
++  function Read() {
++    const { cache } = swr.useSWRConfig()
++    if (cache instanceof PersistentReadCache) { departed ??= cache; latest = cache }
++    const { data } = swr.default('preferences', async () => { reads++; return { theme: `read ${reads}` } })
++    return <output>{data?.theme ?? 'loading'}</output>
++  }
++  const container = browser.document.createElement('div') as unknown as HTMLDivElement
++  let root = createRoot(container)
++  const beforeRefresh = refreshes
++  const content = () => <swr.SWRConfig value={swrDefaults}><AuthenticatedReadCache ownerId={scope.userId} workspace={{ workspaceId: scope.workspaceId, role: 'admin' }}><Read /></AuthenticatedReadCache></swr.SWRConfig>
++  try {
++    await act(async () => root.render(content()))
++    assert.equal(reads, 1)
++    assert.equal(container.textContent, 'read 1')
++    await act(async () => { await clearPersistentReadCaches({ documentNavigation: true }) })
++    t.diagnostic(JSON.stringify({ initialReads: 1, readsBeforeAssign: reads, refreshesBeforeAssign: refreshes - beforeRefresh,
++      departedEnabled: departed?.isEnabled, departedEntries: departed?.size, oldDocumentText: container.textContent }))
++    assert.equal(reads, 1, 'the departing Document must not remount a fresh reader before its full navigation')
++    assert.equal(refreshes, beforeRefresh)
++    assert.equal(departed?.isEnabled, false)
++    assert.equal(departed?.size, 0)
++    assert.equal(container.textContent, '')
++    await act(async () => { await clearPersistentReadCaches(); root.render(content()) })
++    assert.equal(reads, 1, 'a later ordinary clear or parent render cannot revive the retired boundary')
++    assert.equal(container.textContent, '')
++    await act(async () => root.unmount())
++    root = createRoot(container)
++    await act(async () => root.render(content()))
++    assert.equal(reads, 2, 'a fresh document boundary performs its ordinary first read')
++    assert.equal(container.textContent, 'read 2')
++    assert.notEqual(latest, departed)
++    assert.equal(latest?.isEnabled, true)
++  } finally { await act(async () => root.unmount()); await departed?.flushed(); await latest?.flushed() }
++})
++
++test('document retirement disables and clears synchronously but still waits for pending disk erasure', async () => {
++  const { IndexedReadStorage } = await import('./indexed-db')
++  const entered = deferred<void>(), erase = deferred<void>()
++  const cleared: (string | undefined)[] = []
++  const clear = mock.method(IndexedReadStorage.prototype, 'clear', async (namespace?: string) => {
++    cleared.push(namespace); entered.resolve(); await erase.promise
++  })
++  let cache: PersistentReadCache | undefined, reads = 0, finished = false
++  let clearing: Promise<void> | undefined
++  function Read() {
++    const value = swr.useSWRConfig().cache
++    if (value instanceof PersistentReadCache) cache = value
++    const { data } = swr.default('preferences', async () => { reads++; return { theme: 'authorized view' } })
++    return <output>{data?.theme ?? 'loading'}</output>
++  }
++  const container = browser.document.createElement('div') as unknown as HTMLDivElement, root = createRoot(container)
++  try {
++    await act(async () => root.render(<swr.SWRConfig value={swrDefaults}><AuthenticatedReadCache ownerId={scope.userId} workspace={{ workspaceId: scope.workspaceId, role: 'admin' }}><Read /></AuthenticatedReadCache></swr.SWRConfig>))
++    assert.equal(reads, 1)
++    await act(async () => {
++      clearing = clearPersistentReadCaches({ documentNavigation: true }).then(() => { finished = true })
++      assert.equal(cache?.isEnabled, false)
++      assert.equal(cache?.size, 0)
++      cache?.set('preferences', { _k: 'preferences', data: { theme: 'late response' } })
++      assert.equal(cache?.size, 0)
++      await entered.promise
++    })
++    assert.equal(finished, false, 'the caller cannot assign before the captured old provider finishes erasure')
++    assert.equal(container.textContent, '')
++    assert.equal(reads, 1)
++    assert.ok(cleared.includes(readCacheNamespace(scope)))
++    await act(async () => { erase.resolve(); await clearing })
++    assert.equal(finished, true)
++  } finally { erase.resolve(); await clearing; await act(async () => root.unmount()); await cache?.flushed(); clear.mock.restore() }
++})
++
++test('document departure still broadcasts clear while remote and denied scopes keep ordinary remounts', async t => {
++  const original = Object.getOwnPropertyDescriptor(globalThis, 'BroadcastChannel')
++  const messages: unknown[] = []
++  const channels: Channel[] = []
++  class Channel {
++    onmessage: ((event: MessageEvent) => void) | null = null
++    closed = false
++    constructor(readonly name: string) { channels.push(this) }
++    postMessage(value: unknown) { messages.push(value) }
++    close() { this.closed = true }
++  }
++  Object.defineProperty(globalThis, 'BroadcastChannel', { configurable: true, value: Channel })
++  try {
++    for (const mode of ['document', 'ordinary', 'remote', 'denied'] as const) {
++      let reads = 0, cache: PersistentReadCache | undefined
++      function Read() {
++        const current = swr.useSWRConfig().cache
++        if (current instanceof PersistentReadCache) cache = current
++        const { data } = swr.default('preferences', async () => { reads++; return { theme: `read ${reads}` } })
++        return <output>{data?.theme ?? 'loading'}</output>
++      }
++      const container = browser.document.createElement('div') as unknown as HTMLDivElement, root = createRoot(container)
++      const beforeRefresh = refreshes, firstMessage = messages.length
++      try {
++        await act(async () => root.render(<swr.SWRConfig value={swrDefaults}><AuthenticatedReadCache ownerId={scope.userId} workspace={{ workspaceId: scope.workspaceId, role: 'admin' }}><Read /></AuthenticatedReadCache></swr.SWRConfig>))
++        assert.equal(reads, 1)
++        const receiver = channels.find(channel => !channel.closed && channel.onmessage)
++        assert.ok(receiver)
++        await act(async () => {
++          if (mode === 'document') await clearPersistentReadCaches({ documentNavigation: true })
++          else if (mode === 'ordinary') await clearPersistentReadCaches()
++          else if (mode === 'remote') receiver.onmessage!({ data: { type: 'clear' } } as MessageEvent)
++          else cache!.set('preferences', { _k: 'preferences', error: { status: 403 } })
++        })
++        assert.equal(cache?.isEnabled, false)
++        assert.equal(cache?.size, 0)
++        assert.equal(reads, mode === 'document' ? 1 : 2)
++        assert.equal(refreshes - beforeRefresh, mode === 'document' ? 0 : 1)
++        if (mode === 'document') {
++          assert.ok(messages.slice(firstMessage).some(message => JSON.stringify(message) === '{"type":"clear"}'))
++          await act(async () => {
++            // Even a callback already queued before close cannot reopen this boundary.
++            receiver.onmessage!({ data: { type: 'clear' } } as MessageEvent)
++            receiver.onmessage!({ data: { type: 'scope', scope: 'another-document' } } as MessageEvent)
++          })
++          assert.equal(reads, 1)
++          assert.equal(refreshes, beforeRefresh)
++          assert.equal(container.textContent, '')
++        }
++        assert.ok(messages.every(message => !JSON.stringify(message).includes('documentNavigation')), 'local retirement does not propagate to another document')
++        t.diagnostic(JSON.stringify({ mode, reads, refreshes: refreshes - beforeRefresh, cacheEnabled: cache?.isEnabled, cacheEntries: cache?.size }))
++      } finally { await act(async () => root.unmount()); await cache?.flushed() }
++    }
++  } finally {
++    if (original) Object.defineProperty(globalThis, 'BroadcastChannel', original)
++    else Reflect.deleteProperty(globalThis, 'BroadcastChannel')
++  }
++})

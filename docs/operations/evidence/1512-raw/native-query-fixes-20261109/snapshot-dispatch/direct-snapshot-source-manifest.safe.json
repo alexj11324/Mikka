@@ -1,0 +1,30 @@
+{
+  "schema": "issue1512.frozen-integration.v1",
+  "createdAt": "2026-11-08T23:55:14.228014+00:00",
+  "baseTree": "fd1aadd36228359a6ac75f6ed690f8c40877fc07",
+  "rootTreeAfterThisIntegration": "0f4f21122111c18085e2c6cca6b0bacb7f7b106e",
+  "independentReviewSha256": "d33b1eb37afd68b4daa69f5b4abe054f9e0cc1ea1802feac0a1a800307b8d292",
+  "files": [
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "bytes": 4265,
+      "sha256": "7cadecd350fd73031473a4131edf769c552822a9faf6d26b345e6417dae671c0",
+      "gitBlob": "a9ffaee70d53e2c9c0471b61abbddf80cc244fbe",
+      "beforeSha256": "603268415400b8c11bd3b6cd70e0064f4064139f7ec57e6548c96d8f489d3448"
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "bytes": 5988,
+      "sha256": "040d039af2d8abb6aeb9eb4a4d66d357526d8afa6c0afed0e5bbaf80ba7a87c1",
+      "gitBlob": "b72659facb8a5a710fb0c0121e2543add0ad8f33",
+      "beforeSha256": "057dd6f7ee07639c3e8bd44f139021b4e1796c991596016aaf43c3dbd75ae72c"
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "bytes": 58655,
+      "sha256": "da2c31a515397745e02d3118981751aedc319ac3ea53f01dc22d340c6ed75512",
+      "gitBlob": "f981a61d72fb9c0e153e490f89d7328fb014558e",
+      "beforeSha256": "78a9ac67440cf9eff68cf73bcb62500b1e96382b70a46c2d15c28918dd4d9d5e"
+    }
+  ]
+}

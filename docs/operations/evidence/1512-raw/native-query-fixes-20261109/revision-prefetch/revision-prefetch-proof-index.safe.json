@@ -1,0 +1,382 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512-revision-prefetch-independent-review-proof-index",
+  "frozenAtUTC": "2026-11-08T23:55:19.186849+00:00",
+  "status": "local_candidate_verified_pg_and_actual_native_frequency_pending",
+  "sourceCheckoutHead": "6180cd8889006f4e1618c2549b1aa12d13506ee8",
+  "isolatedCheckout": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/revision-prefetch-triage-20261108/checkout",
+  "sourceAndTests": {
+    "files": [
+      {
+        "path": "lib/desktop-rpc/read-batch-contract.ts",
+        "beforeSha256": "2a9b5cf31b9cf0936f457336517ec481b7a358496c63a00da2c719eab4467f0d",
+        "sha256": "cdd915dacd21d2e9555896daeaa5e5c1f5b23a193cb48e0b959507e96e990000",
+        "added": 14,
+        "removed": 0
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-context.ts",
+        "beforeSha256": "4673311b318c705301b14129ce38af905481064c02da19dcc6b2394ce6b94108",
+        "sha256": "5a4a3ec8120558c25c5c9b4db117df1acc3f4f8dfe3f5c66146c6a30d60da00f",
+        "added": 20,
+        "removed": 2
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch.ts",
+        "beforeSha256": "3d99daae29daec0ca3ee25065c7a69c0d089f769c151e1509cb7d7721ed65045",
+        "sha256": "8aadc849e1de11727a67f03c0d0d07d656136e455f4ef7bf32281f6b10194fdb",
+        "added": 1,
+        "removed": 1
+      },
+      {
+        "path": "lib/live/revision-read.ts",
+        "beforeSha256": "eddf21c6fe1d381d154ddf257c28ae9923daaeff3ebc1d2b63c621add914af46",
+        "sha256": "91b23b11e829e217de8c07942a8cc6f2e59c83e1f2828c566354e0348a8219e2",
+        "added": 4,
+        "removed": 4
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-context.test.ts",
+        "beforeSha256": "c6eb4a456b99d693476dedbb7645fc21ad33999e3f99bac4fed3cb9aba4d437e",
+        "sha256": "a548b3d73268bd35f81ce8648b673c66b5931c37ed405ed100479c34c10d5353",
+        "added": 155,
+        "removed": 1
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch.test.ts",
+        "beforeSha256": "67a6601893454e80880513b5b44a230cc2a379940320a542dbfc43aa40265399",
+        "sha256": "68ccad0a96c16a39bb30df26bf3fdb593a59827857df9dbda3b715809948961b",
+        "added": 31,
+        "removed": 0
+      },
+      {
+        "path": "tests/live-revision-reads.db.test.ts",
+        "beforeSha256": "46bf3b9ac0dc3eeca749da3e0e24dbf6e9b491c73b962c62102a349f686bd6b5",
+        "sha256": "49c00de7613ef0f88a78906456d94f90b2438646ead72acdf1afda0a0bd07c3f",
+        "added": 55,
+        "removed": 0
+      }
+    ],
+    "mainSourceHashesUnchanged": true,
+    "onlyIsolatedCopyChanged": true,
+    "newResources": 0,
+    "realModelCalls": 0,
+    "productionQueries": 0
+  },
+  "originalQueueMemoBody": {
+    "unchanged": true,
+    "sha256": "d9dc303a56e1285dc2b5e93aaab746100fa8ac89d10f96d2e7b4a63021dea187"
+  },
+  "change": "After createReadBatch validates every prepared item, declare only the four existing owner-list kinds. A reader that resolves its actual home and requests one declared home key can read the closed same-home set through the existing queue. Project only the original reader refs; late entity and selected-team keys remain on their original authorized path.",
+  "runs": [
+    {
+      "name": "actual_source_red",
+      "command": "node --import ./tests/support/server-only.mjs --import tsx ../actual-module-red-green.mjs",
+      "cwd": "checkout",
+      "exitCode": 1,
+      "chunkId": "184836",
+      "log": "actual-module-red.stdout.log",
+      "reason": "2 !== 1 assertion after both original results were produced; no missing import/setup failure",
+      "revisionStatements": 2
+    },
+    {
+      "name": "actual_source_green",
+      "command": "node --import ./tests/support/server-only.mjs --import tsx ../actual-module-red-green.mjs",
+      "cwd": "checkout",
+      "exitCode": 0,
+      "chunkId": "74bc5b",
+      "log": "actual-module-green.stdout.log",
+      "revisionStatements": 1,
+      "businessAndLiveResultsEqualToRed": true
+    },
+    {
+      "name": "actual_module_regression",
+      "command": "node --import ./tests/support/server-only.mjs --import tsx --test lib/desktop-rpc/read-batch-context.test.ts lib/desktop-rpc/read-batch.test.ts",
+      "cwd": "checkout",
+      "exitCode": 0,
+      "execChunkId": "f259b5",
+      "completionChunkId": "2e9beb",
+      "log": "actual-module-regression.stdout.log",
+      "tests": 23,
+      "passed": 23,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "name": "four_actual_reader_source_copy",
+      "command": "node --test --test-reporter=tap probe.test.mjs baseline/lib/desktop-rpc/read-batch-context.test.mjs prototype/lib/desktop-rpc/read-batch-context.test.mjs",
+      "cwd": ".",
+      "exitCode": 0,
+      "chunkId": "e21a1b",
+      "log": "final-source-copy.stdout.log",
+      "tests": 26,
+      "passed": 26,
+      "failed": 0,
+      "skipped": 0,
+      "boundaries": "17 original function declarations copied byte-for-byte; final four metadata source files synchronized from actual checkout; SQL/auth/data dependencies are fixtures, not real PG/SDK authentication."
+    },
+    {
+      "name": "root_typescript",
+      "command": "node_modules/.bin/tsrs --noEmit",
+      "cwd": "checkout",
+      "exitCode": 0,
+      "execChunkId": "f9b402",
+      "completionChunkId": "610ef3",
+      "log": "actual-typecheck.stdout.log",
+      "notClaimed": "Not the entire pnpm typecheck or full check pipeline."
+    },
+    {
+      "name": "existing_pg_suite_unavailable",
+      "command": "node --import ./tests/support/server-only.mjs --import tsx --test tests/live-revision-reads.db.test.ts",
+      "cwd": "checkout",
+      "exitCode": 0,
+      "chunkId": "72ae71",
+      "log": "actual-pg-suite-unavailable.stdout.log",
+      "tests": 3,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 3,
+      "reason": "No authorized exclusive loopback *_e2e PostgreSQL in this environment. Original disposableDatabase/REQUIRE_DB gate retained.",
+      "ciEntry": "existing pnpm test:activity-actor-db"
+    }
+  ],
+  "benefit": {
+    "reproducedPersonalHomeBatch": {
+      "baselineRevisionQueries": 2,
+      "candidateRevisionQueries": 1,
+      "ownerScopeQueriesEach": 1,
+      "allFourReaderResultsEqualWithoutConcurrentWrite": true,
+      "bothImmediateAndControlledWorkspaceCompletion": true
+    },
+    "selectedTeam": {
+      "baselineQueries": {
+        "statements": 2,
+        "refs": 5,
+        "returnedRows": 5,
+        "rowJsonBytes": 414
+      },
+      "prototypeQueries": {
+        "statements": 2,
+        "refs": 5,
+        "returnedRows": 5,
+        "rowJsonBytes": 414
+      }
+    },
+    "eligibleBatchSavings": 1,
+    "actualNativeEligibleBatchCount": "unknown_old_lifecycle_has_no_batch_item_mapping",
+    "native24SqlDeltaResolved": false
+  },
+  "conservativeRace": {
+    "name": "concurrent_write",
+    "baselineIssueRevision": 12,
+    "prototypeIssueRevision": 7,
+    "unseenPushAcknowledged": false,
+    "nextBatchIssueRevision": 12,
+    "businessItemsAndVersionEqual": true
+  },
+  "lateDenial": {
+    "sourceCase": {
+      "name": "late_reader_denied",
+      "queriesEach": 1,
+      "outputEqual": true,
+      "limitation": "Closed prepared plan includes one issue_list key whose later reader fails authorization; no extra statement or response key, but one extra safe metadata key is requested."
+    },
+    "byteBoundary": "late-denial-byte-boundary.safe.json"
+  },
+  "revisionFailure": {
+    "name": "revision_failure",
+    "baselineQueries": 2,
+    "prototypeQueries": 1,
+    "businessItemsAndVersionEqual": true,
+    "fabricatedRevision": false,
+    "nextRequestRecovers": true,
+    "limitation": "Prefetched issue key shares the failed early query instead of making the late baseline query; it lacks revision proof until a later read."
+  },
+  "environment": {
+    "tool": "functions.exec -> tools.exec_command",
+    "sandboxPermissions": "default, no escalation",
+    "externalRunner": false,
+    "dependencies": "existing local pnpm links; no package installation",
+    "initialTypecheckFailure": "actual-typecheck.initial-dependency-gap.stdout.log; missing per-package links in isolated archive, fixed only by reusing six existing authorized local links before fresh successful typecheck"
+  },
+  "activity": {
+    "rootSourceEdits": 0,
+    "rootIndexEdits": 0,
+    "refsChanged": 0,
+    "productionQueries": 0,
+    "realModelCalls": 0,
+    "newCloudResources": 0,
+    "newDatabaseResources": 0,
+    "fullNativeRuns": 0
+  },
+  "artifacts": [
+    {
+      "path": "actual-source-and-tests.patch",
+      "bytes": 23732,
+      "sha256": "1f747a3ab2754be32f63084f5e8613b6561e7de227ecd21fb06d61c01a3fe91d",
+      "gitBlobSha1": "e2a9b1b024357978539fb1029ccfb8bb1bee0288"
+    },
+    {
+      "path": "actual-source-manifest.safe.json",
+      "bytes": 2103,
+      "sha256": "fc9c107753ca7dc31fdedbccbfeddfb2cdfcd5995f344393fe13a8d547be5fb4",
+      "gitBlobSha1": "c5f559e22beb809ad4a3a16af3367c2c96cf3961"
+    },
+    {
+      "path": "actual-copy-origin.safe.json",
+      "bytes": 3015,
+      "sha256": "2bbf4d1c835bc516a989da5b7c3f402397de85ad9234c3b352977f27caad3be1",
+      "gitBlobSha1": "44a0147500b2ffdc9d6ff253a8052b436901bc44"
+    },
+    {
+      "path": "actual-dependency-links.safe.json",
+      "bytes": 1025,
+      "sha256": "ebda69e3f85a504f88a2c7f107611ceb9380963b20d00dfe1d29d5e79e6fac3d",
+      "gitBlobSha1": "eade12348756e2dcb131ee44c9e669a114a18f7a"
+    },
+    {
+      "path": "actual-module-red-green.mjs",
+      "bytes": 2785,
+      "sha256": "382d39c7e0e27e863da1050e0c72a714bdb7527e25ec2dce85f808e3f5ee706f",
+      "gitBlobSha1": "0106badafe21d6a16660a6cde2c99df51de3293d"
+    },
+    {
+      "path": "actual-module-boundary.mjs",
+      "bytes": 795,
+      "sha256": "e3af80a13174973193668927d53fc6a2535b1cdd0ffd0ac4b5bce1708b5bb969",
+      "gitBlobSha1": "3ae56caad921a8f3fbabe65fbce0436bb6d02f32"
+    },
+    {
+      "path": "actual-module-red.stdout.log",
+      "bytes": 1430,
+      "sha256": "fc51575677d7266c7ca2f7615b1c6f388989aab0b1650c8d0fd0eda1fb3862b0",
+      "gitBlobSha1": "a3157ff46528d12fada294d56f28422f62def3c5"
+    },
+    {
+      "path": "actual-module-green.stdout.log",
+      "bytes": 909,
+      "sha256": "968a041a8fe5817a56468b669d1b9935118b626da1ddfc12c30308a929bc08a5",
+      "gitBlobSha1": "ab54b457ff329e42c82063a82bf41d3187b59add"
+    },
+    {
+      "path": "actual-module-regression.stdout.log",
+      "bytes": 2468,
+      "sha256": "89e9c5b0c905adeba0d6d0e6c979d5ed7881c0832d4db95306d081ab5027f10f",
+      "gitBlobSha1": "b1f9c77b4295e53556cfd1a0f4cff9af76789984"
+    },
+    {
+      "path": "final-source-copy.stdout.log",
+      "bytes": 16115,
+      "sha256": "aebd0cb01a05a6d268d8f40913fe05a619122c4e88f5d8581d127573b09547ee",
+      "gitBlobSha1": "f3df919249fa257f41cfc52a85c585fe7d6e8575"
+    },
+    {
+      "path": "actual-typecheck.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "actual-typecheck.initial-dependency-gap.stdout.log",
+      "bytes": 2752,
+      "sha256": "b51ec4d6303fcbca2cc82f2f95dba9c1c1e45a61be0b0b32f9ff7a2dc9bdefa7",
+      "gitBlobSha1": "a15766737366315cf5cc8b61e5fc0963ef9d110b"
+    },
+    {
+      "path": "actual-pg-suite-unavailable.stdout.log",
+      "bytes": 449,
+      "sha256": "130c5eb764488793dd48e043498a0f24ae955701c3a79db1a4caa3cc7a3f3545",
+      "gitBlobSha1": "1fbbcc9d02ce42417e5f90dbb0d9037c4f69322f"
+    },
+    {
+      "path": "late-denial-byte-boundary.safe.json",
+      "bytes": 3035,
+      "sha256": "622d5bd2ff130fe48a983198c08f91dea11973088bdf084eb20cfc629a73a10d",
+      "gitBlobSha1": "da79ada0a67edf560d04ae24d7c2a566959f4129"
+    },
+    {
+      "path": "measurements.safe.json",
+      "bytes": 15869,
+      "sha256": "dfdd43db7f0e137bb4a3eb4863c60a72483f2d07eb9a141d9cb42bb3916a563c",
+      "gitBlobSha1": "94e175ca230a4518811ac52a84cfaf31b530bca8"
+    },
+    {
+      "path": "source-copy-manifest.safe.json",
+      "bytes": 7279,
+      "sha256": "e0ca5d898bf75c10ce59ac70a1c10b6d8be7b5562b3aaa195bd6f3f2a40d6416",
+      "gitBlobSha1": "f1c933dfd493c82c79f51ad04c4a7696cd4fe506"
+    },
+    {
+      "path": "final-copy-probe-source.safe.json",
+      "bytes": 1368,
+      "sha256": "b849a5055b35a9ea6a6c85ef6ac6e0f54f79be35b178e13120c93ee4cdb055b2",
+      "gitBlobSha1": "a545902ba6ad5d16f8d7d30fe7b6aa9f0d846d71"
+    },
+    {
+      "path": "probe.test.mjs",
+      "bytes": 12004,
+      "sha256": "4b3885a82cae7b94a3ce1c159db4e5eaa426a0c1652b76a5b4aaffaacaf68495",
+      "gitBlobSha1": "94f04ff83a601c1dcd85faaa1395e5c1b30656d2"
+    },
+    {
+      "path": "fixture-template.mjs",
+      "bytes": 7717,
+      "sha256": "fb451a7f14456c863bb0d37dfa96ff922d5e49d75b40b56e74146c45fede1ad5",
+      "gitBlobSha1": "68526af17f090747e24e7383e6bc8fbc84413751"
+    },
+    {
+      "path": "prepare-probe.mjs",
+      "bytes": 11016,
+      "sha256": "7dd7586e04a936a51931015917675ad95e7c41094265beeeb150e00106c64e3c",
+      "gitBlobSha1": "96762043e2d4d079df18c21fce34cb636788dd31"
+    },
+    {
+      "path": "sync-final-probe.mjs",
+      "bytes": 2710,
+      "sha256": "05ffa79b588f54f6397b73718c030c7400b0fd25f284766f7cd8a4baacb79a2e",
+      "gitBlobSha1": "b513678f1681c2c7ec26ee452decac8f15740fbe"
+    },
+    {
+      "path": "checkout/lib/desktop-rpc/read-batch-contract.ts",
+      "bytes": 1637,
+      "sha256": "cdd915dacd21d2e9555896daeaa5e5c1f5b23a193cb48e0b959507e96e990000",
+      "gitBlobSha1": "45f73181cffbda3a48b61b90e9dc20e3a88cb18b"
+    },
+    {
+      "path": "checkout/lib/desktop-rpc/read-batch-context.ts",
+      "bytes": 5039,
+      "sha256": "5a4a3ec8120558c25c5c9b4db117df1acc3f4f8dfe3f5c66146c6a30d60da00f",
+      "gitBlobSha1": "9ddddf4230c9f63ca9fb5f966de87116449844fe"
+    },
+    {
+      "path": "checkout/lib/desktop-rpc/read-batch.ts",
+      "bytes": 3099,
+      "sha256": "8aadc849e1de11727a67f03c0d0d07d656136e455f4ef7bf32281f6b10194fdb",
+      "gitBlobSha1": "528365a2f6735a12fa514f6088bf81446c813ec7"
+    },
+    {
+      "path": "checkout/lib/live/revision-read.ts",
+      "bytes": 1772,
+      "sha256": "91b23b11e829e217de8c07942a8cc6f2e59c83e1f2828c566354e0348a8219e2",
+      "gitBlobSha1": "b9779343c98166c8a04292532204b2c92f8c4891"
+    },
+    {
+      "path": "checkout/lib/desktop-rpc/read-batch-context.test.ts",
+      "bytes": 18417,
+      "sha256": "a548b3d73268bd35f81ce8648b673c66b5931c37ed405ed100479c34c10d5353",
+      "gitBlobSha1": "076d59eea10b000cd08df46754d32454609ecdc6"
+    },
+    {
+      "path": "checkout/lib/desktop-rpc/read-batch.test.ts",
+      "bytes": 11706,
+      "sha256": "68ccad0a96c16a39bb30df26bf3fdb593a59827857df9dbda3b715809948961b",
+      "gitBlobSha1": "6d896c2763a2ededca04d37d89b8e2d4fc293dd0"
+    },
+    {
+      "path": "checkout/tests/live-revision-reads.db.test.ts",
+      "bytes": 16071,
+      "sha256": "49c00de7613ef0f88a78906456d94f90b2438646ead72acdf1afda0a0bd07c3f",
+      "gitBlobSha1": "960eb24ff24aba996a681bc47468290cf6200398"
+    }
+  ]
+}

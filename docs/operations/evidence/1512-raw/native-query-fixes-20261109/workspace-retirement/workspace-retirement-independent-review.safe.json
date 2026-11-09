@@ -1,0 +1,303 @@
+{
+  "version": 1,
+  "kind": "issue1512-workspace-document-retirement-independent-review",
+  "reviewer": "/root/native_6180_review",
+  "createdAt": "2026-11-09T00:19:37.728881+00:00",
+  "verdict": "No remaining blockers in the frozen four-file candidate for integration and combined validation. Exact packaged Native, SQL-budget and production acceptance remain unproven by this review.",
+  "source": {
+    "baselineTargetFilesTree": "c0fc19c32787d3f86a37ef2836b37440d20d300a",
+    "copy": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/workspace-retirement-20261109/checkout",
+    "files": [
+      {
+        "path": "lib/swr/persistent-cache.ts",
+        "baselineSha256": "b7750de029f5462bee61efba2642ccfa894e08a981a75c97f5852e715b5f9b1f",
+        "baselineGitBlob": "df7d4d1b5f2c744061236c54d766f68aa2137830",
+        "sha256": "d1e1793960a0401fc2e8cb3a9b29e2a894828096e444fc086a6d1ebe5d34df1a",
+        "gitBlob": "6776b93c8d98738a3e7c84a383da435af64baa95",
+        "bytes": 10956,
+        "added": 8,
+        "removed": 6
+      },
+      {
+        "path": "components/authenticated-read-cache.tsx",
+        "baselineSha256": "186b86f223636a4391cc54a0e76a25280e527a50cd4cbedde55ee8685798ae41",
+        "baselineGitBlob": "e76bfbd5c5897696bf6301431c4f1fee7ab4407a",
+        "sha256": "90dc00b1dfd6ad21a5ffee1774db8b4a5225b8457390fcb73bb74dbcf7ff009c",
+        "gitBlob": "54b50bb03a114cdb99dd02d2909553e29b3002fc",
+        "bytes": 4539,
+        "added": 11,
+        "removed": 4
+      },
+      {
+        "path": "hooks/use-workspace-switcher.ts",
+        "baselineSha256": "67e18fbbbeb9e0686ce512815df7faf79d075765bf02c74f0ade970cdb930ef8",
+        "baselineGitBlob": "299e9805be3764a90b71e78f79549e6b17a32b70",
+        "sha256": "088f1ed918e101f3cbefbde5329146f04512aef01f90087c820a481782e518e2",
+        "gitBlob": "63550f8517171bafa565327bfb4a72b84d242f7f",
+        "bytes": 4636,
+        "added": 1,
+        "removed": 1
+      },
+      {
+        "path": "lib/swr/persistent-cache.test.tsx",
+        "baselineSha256": "7788c9c8569ea670770027941e31de2eba60ce80c718228c3ac610e4ed0f8015",
+        "baselineGitBlob": "4918061ebe77b2974dd70119f4e3c3a1954b58b3",
+        "sha256": "d57c1fdf88356395dc67d5f1d81891541bb9ea7800bab8d24cdd26583fbdca30",
+        "gitBlob": "99a37c3f55ab05b6b3e986cc5c1eedd0b68d1460",
+        "bytes": 28784,
+        "added": 132,
+        "removed": 0
+      }
+    ],
+    "manifest": {
+      "path": "workspace-retirement-files.safe.json",
+      "bytes": 4196,
+      "sha256": "d23fc4e23afaf52f0d505993eb6cb4f619f0e3029d538079d2a6406b2bcb56d9",
+      "gitBlob": "0c0bf3a18ab04aaafad6ca97550e0de1012faf4e"
+    },
+    "proofIndex": {
+      "path": "workspace-retirement-proof-index.safe.json",
+      "bytes": 18746,
+      "sha256": "92a09bbecb7063a82dcb671cb25f79843ef9bb05433889bc9cac01d864e3d750",
+      "gitBlob": "75e607f41c94ae76e06f5a0943d964bae5d5f892"
+    },
+    "fullPatch": {
+      "path": "workspace-retirement.patch",
+      "bytes": 13627,
+      "sha256": "0cbc562b5dd1ea66eb845328974a3346bdea8fb69d94e0adda44172d10f073de",
+      "gitBlob": "4a19d35536a0968285fb07bf21b7786e1a7c7622"
+    },
+    "finalTestDelta": {
+      "path": "workspace-retirement-ordinary-test.patch",
+      "bytes": 957,
+      "sha256": "62781aa2756162b11c5f34223b5a22e116ef8446daf4f0c72ef8da5f8665c01a",
+      "gitBlob": "5588de14b4f653acb0a5d9fc214524d50313d6bb"
+    },
+    "independentChecks": {
+      "allFourBaselineAndCandidateBytesShaAndGitBlobsVerified": true,
+      "baselineFilesMatchExactRootStagedTree": true,
+      "fullPatchReplayedInMemoryOntoExactTreeFiles": true,
+      "finalTwoSiteTestDeltaReplayedAgainstPreservedPreOrdinarySnapshot": true,
+      "protectedFilesUnchanged": 10,
+      "rootCheckoutOrIndexWrittenByReviewer": false
+    }
+  },
+  "externalSourceBoundary": {
+    "receipt": {
+      "path": "github-1782-source-resolution.safe.json",
+      "bytes": 2900,
+      "sha256": "95f04c76c89ced6eab0d791fd041b705dbc1bdbaab3ef4f7f08ac5ea0872b561",
+      "gitBlob": "d860479e6d97bb58e3a57a0cd838a80fd0760285"
+    },
+    "unresolvedShortSha": "bd5ed45",
+    "observedGitHubResult": 422,
+    "externalCommitOrDiffReused": false,
+    "otherPr226TestClaimReused": false,
+    "explanation": "The inspected implementation is an independently reproduced local change. The unresolved short SHA establishes no full commit, parent, tree, source or acceptance."
+  },
+  "cause": {
+    "flow": "Successful workspace switch -> original cache invalidation -> ordinary listener creates a new Map/provider generation and calls router.refresh -> real SWR remounts and reads before full-document navigation.",
+    "observedOldState": {
+      "initialReads": 1,
+      "readsBeforeAssign": 2,
+      "refreshesBeforeAssign": 1,
+      "oldCacheEnabled": false,
+      "oldCacheEntries": 0,
+      "oldDocumentText": "read 2"
+    },
+    "riskTriage": {
+      "occurrenceEstimate1to10": 8,
+      "impactEstimate1to10": 3,
+      "reason": "Deterministic extra work in the exercised authenticated workspace-departure flow; directly reproduced with real React/SWR. No fixed number of real SQL calls is inferred."
+    }
+  },
+  "findings": [
+    {
+      "area": "Narrow activation",
+      "result": "Only useWorkspaceSwitcher opts into documentNavigation:true, after switchWorkspace returns ok and immediately before the existing awaited clear and location.assign. Existing same-workspace no-op, failed switch, logout, account deletion, connection reset and other callers retain their previous default paths."
+    },
+    {
+      "area": "Synchronous safety",
+      "result": "invalidate still sets enabled=false, clears the Map, releases hydration and schedules erasure before notifying React. Disabled set() rejects late writes. Existing staleOnFocus.isPaused, useLiveKey.current and prefetchScopedRead guards continue to reject new work for a disabled PersistentReadCache."
+    },
+    {
+      "area": "Old boundary retirement",
+      "result": "The navigation branch retains the old cache reference, marks the existing boundary retired, returns null and lets the connection effect clean up. It creates no fallback Map, increments no generation and issues no router.refresh. The same retired boundary remains retired after parent rerender, ordinary clear and callbacks already queued before disconnect."
+    },
+    {
+      "area": "Disk ordering",
+      "result": "The original activeCaches snapshot, per-cache pending queue waits and final IndexedReadStorage.clear remain. The controlled blocked-erasure fixture shows the caller stays pending while memory is already empty and late writes are rejected."
+    },
+    {
+      "area": "Ordinary and remote resets",
+      "result": "Default options use navigation=false. The normal listener still makes an empty memory provider, increments generation and refreshes. Remote BroadcastChannel messages call invalidate(false), retaining default navigation=false; permission-denied invalidation likewise remains ordinary. Final real React/SWR observations are reads2/refresh1 for all three paths."
+    },
+    {
+      "area": "Broadcast",
+      "result": "The existing global {type:clear} message is preserved. The local retirement boolean is never sent, so another document receives ordinary invalidation rather than a permanent retirement instruction."
+    },
+    {
+      "area": "New boundary initialization",
+      "result": "No document-global pause flag is introduced. A fresh mounted authorized boundary owns a distinct enabled cache and performs its ordinary first read. The test models this by unmounting/remounting a root; it does not execute a browser or Electron document reload."
+    },
+    {
+      "area": "Product composition",
+      "result": "Both Native Workspace and Web WorkspaceApp use this shared AuthenticatedReadCache boundary. Server authorization, namespace identity, backend reads, query counters, login/startup windows and checkpoint code are untouched by this patch."
+    }
+  ],
+  "validation": {
+    "reviewerRanRuntimeSuites": false,
+    "reviewerReadActualRedAndGreenOutput": true,
+    "initialRed": {
+      "path": "retirement-red.stdout.log",
+      "bytes": 1422,
+      "sha256": "2dcb6f0548c85adb0cd8e7f7cd5e1c9a60cbbf5157586575fef1573e3fbda9a0",
+      "gitBlob": "9a61efb293d9f49a7dc142d740094e2066f04c19",
+      "tests": 1,
+      "pass": 0,
+      "fail": 1,
+      "exitCodeFromExecutionReceipt": 1,
+      "stage": "Initial single-case addition before product fix; final expanded test retains the failing assertion."
+    },
+    "initialGreen": {
+      "path": "retirement-green.stdout.log",
+      "bytes": 643,
+      "sha256": "181c5ea99c488c61f50ad275ccbec1d9f144940191614f12523cd62c6129b009",
+      "gitBlob": "d70fda8618a16b69a311f974742791a4d0008b85",
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "exitCodeFromExecutionReceipt": 0
+    },
+    "finalRelated": {
+      "path": "retirement-related-final.stdout.log",
+      "bytes": 3513,
+      "sha256": "db811cc86a2e3852f332cdaf3cde329a3840aaee2b8392e0b5ead57aa6ff0619",
+      "gitBlob": "5694a9b34ddecb584351802175cc9dd6955f6966",
+      "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/swr/persistent-cache.test.tsx lib/swr/session-lifecycle.test.ts",
+      "exitCodeFromExecutionReceipt": 0,
+      "execChunk": "5d503f",
+      "counts": {
+        "tests": 23,
+        "pass": 23,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "observations": [
+        {
+          "initialReads": 1,
+          "readsBeforeAssign": 1,
+          "refreshesBeforeAssign": 0,
+          "departedEnabled": false,
+          "departedEntries": 0,
+          "oldDocumentText": ""
+        },
+        {
+          "mode": "document",
+          "reads": 1,
+          "refreshes": 0,
+          "cacheEnabled": false,
+          "cacheEntries": 0
+        },
+        {
+          "mode": "ordinary",
+          "reads": 2,
+          "refreshes": 1,
+          "cacheEnabled": false,
+          "cacheEntries": 0
+        },
+        {
+          "mode": "remote",
+          "reads": 2,
+          "refreshes": 1,
+          "cacheEnabled": false,
+          "cacheEntries": 0
+        },
+        {
+          "mode": "denied",
+          "reads": 2,
+          "refreshes": 1,
+          "cacheEnabled": false,
+          "cacheEntries": 0
+        }
+      ],
+      "testSha256": "d57c1fdf88356395dc67d5f1d81891541bb9ea7800bab8d24cdd26583fbdca30",
+      "runtimeSourceHashes": {
+        "lib/swr/persistent-cache.ts": "d1e1793960a0401fc2e8cb3a9b29e2a894828096e444fc086a6d1ebe5d34df1a",
+        "components/authenticated-read-cache.tsx": "90dc00b1dfd6ad21a5ffee1774db8b4a5225b8457390fcb73bb74dbcf7ff009c",
+        "hooks/use-workspace-switcher.ts": "088f1ed918e101f3cbefbde5329146f04512aef01f90087c820a481782e518e2"
+      }
+    },
+    "typeChecks": {
+      "localRootTsrs": {
+        "command": "node_modules/.bin/tsrs --noEmit",
+        "recordedExitCode": 0,
+        "boundary": "An extra isolated check completed before central validation instruction; not the complete pnpm check/typecheck pipeline."
+      },
+      "localFrontendTsc": {
+        "recordedExitCode": 130,
+        "result": "cancelled_on_root_instruction_not_pass"
+      },
+      "finalCombinedCandidate": "Owned by root; no success inferred here."
+    },
+    "retainedWarnings": "Existing experimental module-mock/deprecation and TimeoutNaN warnings remain in the original logs; no warning was stripped or interpreted as a failed test."
+  },
+  "fixtureBoundary": [
+    "Real React, react-dom, SWR, shared AuthenticatedReadCache, PersistentReadCache and staleOnFocus code run in happy-dom.",
+    "Navigation/build imports and storage/BroadcastChannel system boundaries are controlled by the existing fixture. The workspace hook opt-in location was reviewed in source; actual server switch and location.assign are not exercised by these component tests.",
+    "Fresh-root initialization demonstrates fresh boundary behavior, not a real new browser Document.",
+    "No compiled Native run, real SQL workload, model call, PostHog query/render or production acceptance was run by this review."
+  ],
+  "mergeRisk": {
+    "scope": "This four-file workspace-retirement change only.",
+    "level": "medium",
+    "alignment": {
+      "verdict": "good",
+      "reason": "Small product fix addresses the demonstrated extra read while preserving original measurement semantics."
+    },
+    "impact": {
+      "verdict": "medium",
+      "reason": "Touches a shared authenticated cache boundary and full-page switch path; memory revocation, disk erasure and other-document reset behavior are preserved and directly exercised."
+    },
+    "verification": {
+      "verdict": "decent",
+      "reason": "Exact source/patch verification and final 23/23 real React/SWR component/session regressions are verified; actual browser navigation, combined checks and current Native budget await owner validation."
+    },
+    "rollbackCost": {
+      "verdict": "low",
+      "reason": "Reversible source-only change with no migration or external data modification."
+    },
+    "errorDetection": {
+      "verdict": "decent",
+      "reason": "Regression asserts extra reads, refreshes, retired output, disk waiting and reset behavior. Current-source packaged Native evidence remains the runtime gate."
+    }
+  },
+  "acceptanceBoundary": {
+    "preservedNativeHead": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+    "preservedNativeLoginQueries": 504,
+    "preservedWebLoginQueries": 480,
+    "preservedNativeLoginBudget": "RED",
+    "productionAcceptedCases": 0,
+    "noClaimedSqlDeltaReduction": true,
+    "remaining": "Owner integrates the exact final test delta, validates the combined candidate, then obtains current-source Native originals and evaluates full windows/cleanup before production criteria."
+  },
+  "reviewerResources": {
+    "sourceEdits": 0,
+    "rootIndexEdits": 0,
+    "githubWrites": 0,
+    "runtimeTestsRerun": 0,
+    "databaseResources": 0,
+    "cloudResources": 0,
+    "backgroundProcessesStarted": 0,
+    "newArtifacts": "This review receipt only."
+  },
+  "checklistsApplied": [
+    "AGENTS.md",
+    "CONTRIBUTING.md",
+    "merge-risk",
+    "systematic-debugging",
+    "verification-before-completion"
+  ]
+}

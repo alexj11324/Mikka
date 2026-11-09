@@ -1,0 +1,20 @@
+{
+  "name": "batch-request-integration",
+  "command": [
+    "node",
+    "--experimental-test-module-mocks",
+    "--import",
+    "./scripts/server-test.mjs",
+    "--import",
+    "tsx",
+    "--test",
+    "lib/desktop-rpc/read-batch-context.test.ts",
+    "lib/desktop-rpc/read-batch.test.ts",
+    "lib/request-log.test.ts",
+    "lib/tracing/clients.test.ts"
+  ],
+  "startedAt": "2026-11-09T00:07:05.667870+00:00",
+  "endedAt": "2026-11-09T00:07:06.436692+00:00",
+  "exitCode": 0,
+  "tree": "c0fc19c32787d3f86a37ef2836b37440d20d300a"
+}

@@ -1,0 +1,183 @@
+TAP version 13
+# Subtest: concurrent owner-wide readers reuse their actual personal home only within the batch
+ok 1 - concurrent owner-wide readers reuse their actual personal home only within the batch
+  ---
+  duration_ms: 2.543454
+  type: 'test'
+  ...
+# Subtest: different Live kinds share one revision query before either consumer reads its data
+ok 2 - different Live kinds share one revision query before either consumer reads its data
+  ---
+  duration_ms: 10.282461
+  type: 'test'
+  ...
+# Subtest: owner observations are separate for parallel batches, owners and database authorities
+ok 3 - owner observations are separate for parallel batches, owners and database authorities
+  ---
+  duration_ms: 0.738393
+  type: 'test'
+  ...
+# Subtest: later reads in one batch keep the earlier revision, while the next batch reads the new revision
+ok 4 - later reads in one batch keep the earlier revision, while the next batch reads the new revision
+  ---
+  duration_ms: 0.641327
+  type: 'test'
+  ...
+# Subtest: a missing or failed revision never becomes fabricated proof and does not poison the next request
+ok 5 - a missing or failed revision never becomes fabricated proof and does not poison the next request
+  ---
+  duration_ms: 3.565825
+  type: 'test'
+  ...
+# Subtest: ordinary revision readers and different database scopes remain independent
+ok 6 - ordinary revision readers and different database scopes remain independent
+  ---
+  duration_ms: 0.743681
+  type: 'test'
+  ...
+# Subtest: bound after-work cannot reuse an already completed batch authority observation
+ok 7 - bound after-work cannot reuse an already completed batch authority observation
+  ---
+  duration_ms: 1.35375
+  type: 'test'
+  ...
+# Subtest: notification target resolution never inherits an earlier list-read home, even inside the batch
+ok 8 - notification target resolution never inherits an earlier list-read home, even inside the batch
+  ---
+  duration_ms: 0.366403
+  type: 'test'
+  ...
+# RECEIPT {"name":"personal_scope_staggered","baselineQueries":[{"kinds":["bot_chat_list","task_run_list","thread_list"],"ids":["bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"],"revision":7,"rowCount":3,"rowJsonBytes":251},{"kinds":["issue_list"],"ids":["bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"],"revision":7,"rowCount":1,"rowJsonBytes":82}],"prototypeQueries":[{"kinds":["bot_chat_list","issue_list","task_run_list","thread_list"],"ids":["bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"],"revision":7,"rowCount":4,"rowJsonBytes":332}],"ownerScopeQueriesEach":1,"outputEqual":true,"perReaderRefsUnchanged":true,"baselineEvents":[{"index":0,"event":"action_start","action":"task-runs.pollTaskRuns"},{"index":1,"event":"action_start","action":"task-runs.syncThreadList"},{"index":2,"event":"action_start","action":"coordinator.pollBotChatSummaries"},{"index":3,"event":"action_start","action":"issues.syncIssueList"},{"index":4,"event":"authenticate","action":"task-runs.pollTaskRuns"},{"index":5,"event":"authenticate","action":"task-runs.syncThreadList"},{"index":6,"event":"authenticate","action":"coordinator.pollBotChatSummaries"},{"index":7,"event":"authenticate","action":"issues.syncIssueList"},{"index":8,"event":"authenticate","action":"issues.syncIssueList"},{"index":9,"event":"owner_scope_query","action":"task-runs.pollTaskRuns","requestedOwner":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"},{"index":10,"event":"workspace_context_query_started","action":"issues.syncIssueList"},{"index":11,"event":"revision_query","action":"task-runs.pollTaskRuns","kinds":["bot_chat_list","task_run_list","thread_list"],"ids":["bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"],"revision":7},{"index":12,"event":"revision_observed","action":"task-runs.pollTaskRuns","kinds":["bot_chat_list","task_run_list","thread_list"],"ids":["bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"],"revision":7},{"index":13,"event":"business_summary_read","action":"coordinator.pollBotChatSummaries","revisionAtData":7},{"index":14,"event":"business_version_read","action":"task-runs.syncThreadList","revisionAtData":7},{"index":15,"event":"business_rows_read","action":"task-runs.pollTaskRuns","revisionAtData":7},{"index":16,"event":"action_end","action":"coordinator.pollBotChatSummaries"},{"index":17,"event":"business_rows_read","action":"task-runs.syncThreadList","revisionAtData":7},{"index":18,"event":"action_end","action":"task-runs.pollTaskRuns"},{"index":19,"event":"action_end","action":"task-runs.syncThreadList"},{"index":20,"event":"workspace_context_query_completed","action":"issues.syncIssueList"},{"index":21,"event":"share_checked","action":"issues.syncIssueList"},{"index":22,"event":"revision_query","action":"issues.syncIssueList","kinds":["issue_list"],"ids":["bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"],"revision":7},{"index":23,"event":"revision_observed","action":"issues.syncIssueList","kinds":["issue_list"],"ids":["bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"],"revision":7},{"index":24,"event":"business_version_read","action":"issues.syncIssueList","revisionAtData":7},{"index":25,"event":"business_version_read","action":"issues.syncIssueList","revisionAtData":7},{"index":26,"event":"business_rows_read","action":"issues.syncIssueList","revisionAtData":7},{"index":27,"event":"action_end","action":"issues.syncIssueList"}],"prototypeEvents":[{"index":0,"event":"action_start","action":"task-runs.pollTaskRuns"},{"index":1,"event":"action_start","action":"task-runs.syncThreadList"},{"index":2,"event":"action_start","action":"coordinator.pollBotChatSummaries"},{"index":3,"event":"action_start","action":"issues.syncIssueList"},{"index":4,"event":"authenticate","action":"task-runs.pollTaskRuns"},{"index":5,"event":"authenticate","action":"task-runs.syncThreadList"},{"index":6,"event":"authenticate","action":"coordinator.pollBotChatSummaries"},{"index":7,"event":"authenticate","action":"issues.syncIssueList"},{"index":8,"event":"authenticate","action":"issues.syncIssueList"},{"index":9,"event":"owner_scope_query","action":"task-runs.pollTaskRuns","requestedOwner":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"},{"index":10,"event":"workspace_context_query_started","action":"issues.syncIssueList"},{"index":11,"event":"revision_query","action":"task-runs.pollTaskRuns","kinds":["bot_chat_list","issue_list","task_run_list","thread_list"],"ids":["bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"],"revision":7},{"index":12,"event":"revision_observed","action":"task-runs.pollTaskRuns","kinds":["bot_chat_list","issue_list","task_run_list","thread_list"],"ids":["bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"],"revision":7},{"index":13,"event":"business_summary_read","action":"coordinator.pollBotChatSummaries","revisionAtData":7},{"index":14,"event":"business_version_read","action":"task-runs.syncThreadList","revisionAtData":7},{"index":15,"event":"business_rows_read","action":"task-runs.pollTaskRuns","revisionAtData":7},{"index":16,"event":"action_end","action":"coordinator.pollBotChatSummaries"},{"index":17,"event":"business_rows_read","action":"task-runs.syncThreadList","revisionAtData":7},{"index":18,"event":"action_end","action":"task-runs.pollTaskRuns"},{"index":19,"event":"action_end","action":"task-runs.syncThreadList"},{"index":20,"event":"workspace_context_query_completed","action":"issues.syncIssueList"},{"index":21,"event":"share_checked","action":"issues.syncIssueList"},{"index":22,"event":"business_version_read","action":"issues.syncIssueList","revisionAtData":7},{"index":23,"event":"business_version_read","action":"issues.syncIssueList","revisionAtData":7},{"index":24,"event":"business_rows_read","action":"issues.syncIssueList","revisionAtData":7},{"index":25,"event":"action_end","action":"issues.syncIssueList"}]}
+# RECEIPT {"name":"personal_scope_immediate","baselineQueries":[{"kinds":["bot_chat_list","task_run_list","thread_list"],"ids":["bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"],"revision":7,"rowCount":3,"rowJsonBytes":251},{"kinds":["issue_list"],"ids":["bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"],"revision":7,"rowCount":1,"rowJsonBytes":82}],"prototypeQueries":[{"kinds":["bot_chat_list","issue_list","task_run_list","thread_list"],"ids":["bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"],"revision":7,"rowCount":4,"rowJsonBytes":332}],"outputEqual":true}
+# RECEIPT {"name":"selected_team_no_saving","baselineQueries":[{"kinds":["bot_chat_list","task_run_list","thread_list"],"ids":["bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"],"revision":7,"rowCount":3,"rowJsonBytes":251},{"kinds":["issue_list","issue_list"],"ids":["bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","cccccccc-cccc-4ccc-8ccc-cccccccccccc"],"revision":7,"rowCount":2,"rowJsonBytes":163}],"prototypeQueries":[{"kinds":["bot_chat_list","issue_list","task_run_list","thread_list"],"ids":["bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"],"revision":7,"rowCount":4,"rowJsonBytes":332},{"kinds":["issue_list"],"ids":["cccccccc-cccc-4ccc-8ccc-cccccccccccc"],"revision":7,"rowCount":1,"rowJsonBytes":82}],"outputEqual":true}
+# RECEIPT {"name":"concurrent_write","baselineIssueRevision":12,"prototypeIssueRevision":7,"unseenPushAcknowledged":false,"nextBatchIssueRevision":12,"businessItemsAndVersionEqual":true}
+# RECEIPT {"name":"single_and_non_revision","rows":[{"name":"task-runs.pollTaskRuns","queriesEach":1,"outputEqual":true},{"name":"task-runs.syncThreadList","queriesEach":1,"outputEqual":true},{"name":"coordinator.pollBotChatSummaries","queriesEach":1,"outputEqual":true},{"name":"issues.syncIssueList","queriesEach":1,"outputEqual":true},{"name":"teams.listTeams","queriesEach":0,"outputEqual":true}]}
+# RECEIPT {"name":"revoked_authentication_fixture","ownerQueriesEach":0,"revisionQueriesEach":0,"authRequiredPreserved":true}
+# RECEIPT {"name":"missing_home","queriesEach":1,"onlyOriginalSelectedIssueKey":true,"outputEqual":true}
+# RECEIPT {"name":"late_reader_denied","queriesEach":1,"outputEqual":true,"limitation":"Closed prepared plan includes one issue_list key whose later reader fails authorization; no extra statement or response key, but one extra safe metadata key is requested."}
+# [live] revision read unavailable { name: 'Error', code: '08006' }
+# [live] revision read unavailable { name: 'Error', code: '08006' }
+# [live] revision read unavailable { name: 'Error', code: '08006' }
+# [live] revision read unavailable { name: 'Error', code: '08006' }
+# [live] revision read unavailable { name: 'Error', code: '08006' }
+# [live] revision read unavailable { name: 'Error', code: '08006' }
+# [live] revision read unavailable { name: 'Error', code: '08006' }
+# RECEIPT {"name":"revision_failure","baselineQueries":2,"prototypeQueries":1,"businessItemsAndVersionEqual":true,"fabricatedRevision":false,"nextRequestRecovers":true,"limitation":"Prefetched issue key shares the failed early query instead of making the late baseline query; it lacks revision proof until a later read."}
+# RECEIPT {"name":"parallel_owners","queriesPerBatch":1,"scopeIsolation":true,"revisionA":7,"revisionB":12}
+# Subtest: actual four action bodies: delayed authorized workspace context splits owner revisions 2 -> 1
+ok 9 - actual four action bodies: delayed authorized workspace context splits owner revisions 2 -> 1
+  ---
+  duration_ms: 27.351541
+  type: 'test'
+  ...
+# Subtest: ordinary immediate dependency completion is measured separately
+ok 10 - ordinary immediate dependency completion is measured separately
+  ---
+  duration_ms: 3.056858
+  type: 'test'
+  ...
+# Subtest: selected team id is read only after original workspace resolution; no claimed query saving
+ok 11 - selected team id is read only after original workspace resolution; no claimed query saving
+  ---
+  duration_ms: 3.734589
+  type: 'test'
+  ...
+# Subtest: a concurrent revision increase remains conservatively old, with identical business items/version
+ok 12 - a concurrent revision increase remains conservatively old, with identical business items/version
+  ---
+  duration_ms: 4.020651
+  type: 'test'
+  ...
+# Subtest: one-action and non-revision actions do not issue speculative revision SQL
+ok 13 - one-action and non-revision actions do not issue speculative revision SQL
+  ---
+  duration_ms: 3.776243
+  type: 'test'
+  ...
+# Subtest: failed authentication issues no owner or revision SQL
+ok 14 - failed authentication issues no owner or revision SQL
+  ---
+  duration_ms: 3.237841
+  type: 'test'
+  ...
+# Subtest: missing personal home does not invent a scope or prefetch keys
+ok 15 - missing personal home does not invent a scope or prefetch keys
+  ---
+  duration_ms: 2.014477
+  type: 'test'
+  ...
+# Subtest: reader access failure preserves items and does not add a SQL statement
+ok 16 - reader access failure preserves items and does not add a SQL statement
+  ---
+  duration_ms: 1.959935
+  type: 'test'
+  ...
+# Subtest: revision failure never fabricates proof; expanded failure affects best-effort metadata only
+ok 17 - revision failure never fabricates proof; expanded failure affects best-effort metadata only
+  ---
+  duration_ms: 4.243106
+  type: 'test'
+  ...
+# Subtest: parallel batches and different owners remain isolated
+ok 18 - parallel batches and different owners remain isolated
+  ---
+  duration_ms: 2.749234
+  type: 'test'
+  ...
+# Subtest: concurrent owner-wide readers reuse their actual personal home only within the batch
+ok 19 - concurrent owner-wide readers reuse their actual personal home only within the batch
+  ---
+  duration_ms: 2.019404
+  type: 'test'
+  ...
+# Subtest: different Live kinds share one revision query before either consumer reads its data
+ok 20 - different Live kinds share one revision query before either consumer reads its data
+  ---
+  duration_ms: 9.449044
+  type: 'test'
+  ...
+# Subtest: owner observations are separate for parallel batches, owners and database authorities
+ok 21 - owner observations are separate for parallel batches, owners and database authorities
+  ---
+  duration_ms: 0.771643
+  type: 'test'
+  ...
+# Subtest: later reads in one batch keep the earlier revision, while the next batch reads the new revision
+ok 22 - later reads in one batch keep the earlier revision, while the next batch reads the new revision
+  ---
+  duration_ms: 0.679254
+  type: 'test'
+  ...
+# Subtest: a missing or failed revision never becomes fabricated proof and does not poison the next request
+ok 23 - a missing or failed revision never becomes fabricated proof and does not poison the next request
+  ---
+  duration_ms: 0.931664
+  type: 'test'
+  ...
+# Subtest: ordinary revision readers and different database scopes remain independent
+ok 24 - ordinary revision readers and different database scopes remain independent
+  ---
+  duration_ms: 1.720393
+  type: 'test'
+  ...
+# Subtest: bound after-work cannot reuse an already completed batch authority observation
+ok 25 - bound after-work cannot reuse an already completed batch authority observation
+  ---
+  duration_ms: 0.339843
+  type: 'test'
+  ...
+# Subtest: notification target resolution never inherits an earlier list-read home, even inside the batch
+ok 26 - notification target resolution never inherits an earlier list-read home, even inside the batch
+  ---
+  duration_ms: 0.287824
+  type: 'test'
+  ...
+1..26
+# tests 26
+# suites 0
+# pass 26
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 197.228587

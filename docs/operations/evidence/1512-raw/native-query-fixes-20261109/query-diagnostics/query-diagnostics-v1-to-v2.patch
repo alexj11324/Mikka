@@ -1,0 +1,171 @@
+--- a/apps/desktop/test/db-query-diagnostics.cjs
++++ b/apps/desktop/test/db-query-diagnostics.cjs
+@@ -1,5 +1,6 @@
+ // Isolated harness only. Never retain SQL text, parameters or request content.
+ const { createHash } = require('node:crypto')
++const { types } = require('node:util')
+ const operations = require('./db-query-operations.cjs')
+ const sources = require('./db-query-unattributed-sources.cjs')
+ const scopeKeys = Object.freeze([...new Set([...operations, ...sources])])
+@@ -10,22 +11,22 @@
+   'execution-settings.getBotModelMenu', 'preferences.getPreferences', 'agents.listDevices',
+   'bots.pollBots', 'issues.syncIssueList', 'projects.listProjects', 'teams.listTeams', 'team-relations.listProjectTeams',
+   'task-runs.pollTaskRuns', 'task-runs.syncThreadList', 'coordinator.pollBotChatSummaries', 'coordinator.syncCoordinatorChat'])
+-const commands = new Set(['SELECT', 'WITH', 'INSERT', 'UPDATE', 'DELETE', 'BEGIN', 'COMMIT', 'ROLLBACK', 'SAVEPOINT', 'RELEASE', 'SET', 'SHOW'])
++const commands = new Set(['SELECT', 'WITH', 'INSERT', 'UPDATE', 'DELETE', 'BEGIN', 'COMMIT', 'ROLLBACK'])
+ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+ const LIMITS = Object.freeze({ queries: 8192, contexts: 2048, statements: 512, sqlChars: 32768, bytes: 2 * 1024 * 1024 })
+ const diagnosticReasons = new Set(['registry_unavailable', 'registry_invalid', 'context_ambiguous', 'context_invalid',
+   'context_read_failed', 'context_missing', 'context_limit', 'statement_limit', 'statement_missing', 'statement_size',
+-  'statement_syntax', 'statement_read_failed', 'diagnostic_failed'])
++  'statement_syntax', 'statement_proxy', 'statement_read_failed', 'diagnostic_failed'])
+ const unknown = () => ({ status: 'unknown' })
+ const integer = value => Number.isSafeInteger(value) && value >= 0
+ 
+ function projectContext(value) {
+-  if (!value || !UUID.test(value.httpInvocationId) || !UUID.test(value.invocationId)
+-    || !routes.has(value.route) || !methods.has(value.method)
+-    || (value.rpcAction !== null && !actions.has(value.rpcAction))
+-    || (value.invocationId !== value.httpInvocationId && value.rpcAction === null)) return null
+-  return { status: 'known', httpInvocationId: value.httpInvocationId, invocationId: value.invocationId,
+-    route: value.route, method: value.method, rpcAction: value.rpcAction }
++  if (!value) return null
++  const { httpInvocationId, invocationId, route, method, rpcAction } = value
++  if (typeof httpInvocationId !== 'string' || typeof invocationId !== 'string' || !UUID.test(httpInvocationId) || !UUID.test(invocationId)
++    || !routes.has(route) || !methods.has(method) || (rpcAction !== null && !actions.has(rpcAction))
++    || (invocationId !== httpInvocationId && rpcAction === null)) return null
++  return { status: 'known', httpInvocationId, invocationId, route, method, rpcAction }
+ }
+ 
+ function readContext(globals = globalThis) {
+@@ -49,6 +50,7 @@
+ // literal-free structure. It is NOT the production raw-text statement ID.
+ // This deliberately supports only a small common SQL subset, not a parser.
+ function statementStructure(first) {
++  if (types.isProxy(first)) return { reason: 'statement_proxy' }
+   let text
+   try { text = typeof first === 'string' ? first : first && Object.getOwnPropertyDescriptor(first, 'text')?.value }
+   catch { return { reason: 'statement_read_failed' } }
+@@ -64,9 +66,10 @@
+   })
+   if (invalid || (normalized.match(/"/g)?.length ?? 0) % 2) return { reason: 'statement_syntax' }
+   if (/(?:^|[^\w$])(?:0[xob][0-9a-f_]+|\d[\d_]*_\d)/i.test(normalized)) return { reason: 'statement_syntax' }
+-  const canonical = normalized.replace(/(?<![$\w"])-?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?\b/g, '?').replace(/\s+/g, ' ').trim()
++  const canonical = normalized.replace(/(?<![$\w"])-?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?\b/g, '?').replace(/\s+/g, ' ').trim().replace(/;$/, '').trim()
+   const command = /^[A-Za-z]+/.exec(canonical)?.[0].toUpperCase()
+-  if (!commands.has(command) || /\$(?![1-9][0-9]*\b)/.test(canonical)) return { reason: 'statement_syntax' }
++  if (!commands.has(command) || canonical.includes(';') || /\$(?![1-9][0-9]*\b)/.test(canonical)
++    || (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(command) && canonical.toUpperCase() !== command)) return { reason: 'statement_syntax' }
+   const parameters = [...canonical.matchAll(/\$([1-9][0-9]*)\b/g)].map(match => Number(match[1]))
+   if (parameters.some(value => value > 65535)) return { reason: 'statement_syntax' }
+   return { value: { status: 'known', normalizedStructureId: createHash('sha256').update(canonical).digest('hex').slice(0, 12),
+@@ -138,8 +141,9 @@
+     const complete = ['api_request', 'rpc_action'].includes(value.msg)
+     const context = projectContext({ ...value, httpInvocationId: logical ? value.httpInvocationId : value.invocationId,
+       rpcAction: value.rpcAction ?? null })
+-    if (!context || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value.timestamp)
+-      || !Number.isFinite(Date.parse(value.timestamp)) || (complete && (!Number.isInteger(value.status) || value.status < 100 || value.status > 599))) {
++    const timestamp = value.timestamp
++    if (!context || typeof timestamp !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(timestamp)
++      || !Number.isFinite(Date.parse(timestamp)) || (complete && (!Number.isInteger(value.status) || value.status < 100 || value.status > 599))) {
+       reasons.add('receipt_invalid'); continue
+     }
+     if (!entries.has(value.invocationId) && entries.size >= LIMITS.contexts * 2) { reasons.add('receipt_limit'); continue }
+@@ -148,9 +152,9 @@
+       || (logical && entry.rpcAction !== context.rpcAction)) entry.conflict = true
+     const field = complete ? 'completedAt' : 'startedAt'
+     const itemCount = integer(value.rpcItemCount) && value.rpcItemCount <= 16 ? value.rpcItemCount : undefined
+-    if (entry[field] && (entry[field] !== value.timestamp || (complete && (entry.httpStatus !== value.status
++    if (entry[field] && (entry[field] !== timestamp || (complete && (entry.httpStatus !== value.status
+       || entry.rpcAction !== context.rpcAction || entry.rpcItemCount !== itemCount)))) entry.conflict = true
+-    entry[field] = value.timestamp
++    entry[field] = timestamp
+     if (complete) {
+       entry.httpStatus = value.status; entry.rpcAction = context.rpcAction
+       if (itemCount !== undefined) entry.rpcItemCount = itemCount
+@@ -196,9 +200,10 @@
+     : value?.status === 'known' ? projectContext(value) : null)
+   const statements = raw.statements.map((value, index) => {
+     if (index === 0 && value?.status === 'unknown') return unknown()
+-    return value?.status === 'known' && /^[a-f0-9]{12}$/.test(value.normalizedStructureId) && commands.has(value.command)
+-      && integer(value.parameterCount) && value.parameterCount <= 65535
+-      ? { status: 'known', normalizedStructureId: value.normalizedStructureId, command: value.command, parameterCount: value.parameterCount } : null
++    const { status, normalizedStructureId, command, parameterCount } = value ?? {}
++    return status === 'known' && typeof normalizedStructureId === 'string' && /^[a-f0-9]{12}$/.test(normalizedStructureId) && commands.has(command)
++      && integer(parameterCount) && parameterCount <= 65535
++      ? { status: 'known', normalizedStructureId, command, parameterCount } : null
+   })
+   if (contexts.includes(null) || statements.includes(null) || raw.queries.some((row, index) => !Array.isArray(row) || row.length !== 4
+     || !row.every(integer) || row[0] !== raw.startQueryCalls + index + 1 || row[1] >= contexts.length || row[2] >= statements.length
+--- a/apps/desktop/test/db-query-diagnostics.test.mjs
++++ b/apps/desktop/test/db-query-diagnostics.test.mjs
+@@ -58,7 +58,7 @@
+   const f = fixture(); f.collector.checkpoint(0); f.record(1, throwing)
+   const raw = f.collector.finish(identity, 1)
+   assert.ok(raw.queries[0][1] > 0, 'a failed statement descriptor cannot erase the independently known request')
+-  assert.equal(raw.queries[0][2], 0); assert.equal(raw.reasons.statement_read_failed, 1)
++  assert.equal(raw.queries[0][2], 0); assert.equal(raw.reasons.statement_proxy, 1)
+ })
+ 
+ test('request diagnostics reject foreign registries, concurrent module scopes and arbitrary metadata', () => {
+@@ -72,6 +72,60 @@
+     assert.deepEqual(readContext({ [key]: registry }), { reason })
+   }
+   assert.equal(readContext({ [key]: new Set([() => undefined, () => metadata()]) }).value.invocationId, id(1))
++})
++
++test('diagnostic safety: context identifiers accept primitive strings and read fields once', () => {
++  const boxed = { toString: () => id(1), privateCanary: 'PRIVATE_BOXED_ID' }
++  const bad = readContext({ [key]: new Set([() => metadata(1, { httpInvocationId: boxed, invocationId: boxed })]) })
++  assert.deepEqual(bad, { reason: 'context_invalid' })
++  let httpReads = 0, logicalReads = 0
++  const changing = { ...metadata(),
++    get httpInvocationId() { return ++httpReads === 1 ? id(1) : boxed },
++    get invocationId() { return ++logicalReads === 1 ? id(1) : boxed },
++  }
++  const safe = readContext({ [key]: new Set([() => changing]) })
++  assert.equal(safe.value.httpInvocationId, id(1)); assert.equal(safe.value.invocationId, id(1))
++  assert.equal(httpReads, 1); assert.equal(logicalReads, 1)
++  assert.equal(JSON.stringify([bad, safe]).includes('PRIVATE_'), false)
++})
++
++test('diagnostic safety: structure identifiers cannot preserve objects through implicit coercion', () => {
++  const f = fixture(); f.collector.checkpoint(0); f.record(1)
++  const raw = f.collector.finish(identity, 1)
++  raw.statements[1].normalizedStructureId = { toString: () => 'a'.repeat(12), privateCanary: 'PRIVATE_BOXED_SHAPE' }
++  const report = projectQueryDiagnostics(raw, { 'startup-bundled': window(0, 1) }, identity)
++  assert.equal(report.status, 'unavailable')
++  assert.equal(JSON.stringify(report).includes('PRIVATE_'), false)
++})
++
++test('diagnostic safety: receipt timestamps accept primitive strings only', () => {
++  const strings = [event(1, false), event(1, true)].map(value => ({ ...value, timestamp: ['2026-11-09T00:00:01.000Z'] }))
++  const rawAgain = fixture(); rawAgain.collector.checkpoint(0); rawAgain.record(1)
++  assert.equal(projectQueryDiagnostics(rawAgain.collector.finish(identity, 1), { 'startup-bundled': window(0, 1) }, identity, lines(strings)).receipts.status, 'incomplete')
++})
++
++test('diagnostic safety: Proxy query configs are rejected before any descriptor or value trap runs', () => {
++  let traps = 0
++  const config = new Proxy({ text: 'SELECT id FROM session WHERE token=$1' }, {
++    getOwnPropertyDescriptor(target, property) { traps++; return Object.getOwnPropertyDescriptor(target, property) },
++    get(target, property) { traps++; return target[property] },
++  })
++  const f = fixture(); f.collector.checkpoint(0); f.record(1, config)
++  const raw = f.collector.finish(identity, 1)
++  assert.equal(traps, 0, 'the diagnostic must not trigger traps before the original driver sees the config')
++  assert.ok(raw.queries[0][1] > 0); assert.equal(raw.queries[0][2], 0)
++  assert.equal(raw.reasons.statement_proxy, 1)
++})
++
++test('diagnostic safety: statement prefixes cannot admit opaque SET payloads or a second statement', () => {
++  for (const sql of ['SET application_name = PRIVATE_SETTING', 'SHOW PRIVATE_SETTING', 'SAVEPOINT PRIVATE_NAME',
++    'RELEASE PRIVATE_NAME', 'BEGIN PRIVATE_PAYLOAD', 'COMMIT PRIVATE_PAYLOAD', 'ROLLBACK TO PRIVATE_NAME',
++    'SELECT 1; SET application_name=PRIVATE_SETTING', 'BEGIN; SET application_name=PRIVATE_SETTING', 'SELECT 1;;']) {
++    const shape = statementStructure(sql)
++    assert.equal(shape.value, undefined, sql.split(' ')[0]); assert.equal(shape.reason, 'statement_syntax')
++    assert.equal(JSON.stringify(shape).includes('PRIVATE_'), false)
++  }
++  for (const sql of ['BEGIN', 'COMMIT;', 'ROLLBACK ;', 'SELECT id FROM session WHERE token=$1;']) assert.ok(statementStructure(sql).value)
+ })
+ 
+ test('query capture starts at the existing checkpoint, freezes once and reset creates a new diagnostic history', () => {

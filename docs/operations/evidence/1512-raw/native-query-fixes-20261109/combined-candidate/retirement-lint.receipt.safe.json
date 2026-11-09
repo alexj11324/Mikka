@@ -1,0 +1,17 @@
+{
+  "name": "retirement-lint",
+  "command": [
+    "node",
+    "node_modules/oxlint/bin/oxlint",
+    "--deny-warnings",
+    "--no-ignore",
+    "lib/swr/persistent-cache.ts",
+    "components/authenticated-read-cache.tsx",
+    "hooks/use-workspace-switcher.ts",
+    "lib/swr/persistent-cache.test.tsx"
+  ],
+  "startedAt": "2026-11-09T00:18:18.734611+00:00",
+  "endedAt": "2026-11-09T00:18:18.885681+00:00",
+  "exitCode": 0,
+  "tree": "766c063fcac276ea55251d76e43b2e616244b62b"
+}

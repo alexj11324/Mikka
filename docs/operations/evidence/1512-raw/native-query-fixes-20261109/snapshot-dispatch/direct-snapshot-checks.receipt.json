@@ -1,0 +1,38 @@
+[
+  {
+    "command": [
+      "node",
+      "--test",
+      "apps/desktop/scripts/read-batch.test.mjs"
+    ],
+    "startedAt": "2026-11-08T23:46:52.321551+00:00",
+    "endedAt": "2026-11-08T23:46:53.322456+00:00",
+    "exitCode": 0
+  },
+  {
+    "command": [
+      "node",
+      "node_modules/oxlint/bin/oxlint",
+      "--deny-warnings",
+      "-c",
+      "apps/desktop/oxlint.json",
+      "apps/desktop/src/renderer/rpc.ts",
+      "apps/desktop/src/renderer/read-batch.ts"
+    ],
+    "startedAt": "2026-11-08T23:46:53.322548+00:00",
+    "endedAt": "2026-11-08T23:46:53.439858+00:00",
+    "exitCode": 0
+  },
+  {
+    "command": [
+      "node",
+      "node_modules/typescript/bin/tsc",
+      "--noEmit",
+      "-p",
+      "apps/desktop/tsconfig.renderer.json"
+    ],
+    "startedAt": "2026-11-08T23:46:53.439947+00:00",
+    "endedAt": "2026-11-08T23:47:51.132457+00:00",
+    "exitCode": -6
+  }
+]

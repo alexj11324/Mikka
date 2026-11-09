@@ -1,0 +1,105 @@
+(node:13) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:13) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ native dispatch proof: tasks single HTTP after readiness (597.535071ms)
+ℹ {"kind":"native_dispatch_order","action":"task-runs.pollTaskRuns","grouped":false,"beforeReady":false,"phases":["list_fetcher","native_enqueued","live_ready","fetch_dispatch"],"listCalls":1,"physicalCalls":1}
+✔ native dispatch proof: tasks single HTTP before readiness (328.151359ms)
+ℹ {"kind":"native_dispatch_order","action":"task-runs.pollTaskRuns","grouped":false,"beforeReady":true,"phases":["list_fetcher","native_enqueued","fetch_dispatch","live_ready","list_fetcher","native_enqueued","fetch_dispatch"],"listCalls":2,"physicalCalls":2}
+✔ native dispatch proof: tasks batch HTTP after readiness (328.413875ms)
+ℹ {"kind":"native_dispatch_order","action":"task-runs.pollTaskRuns","grouped":true,"beforeReady":false,"phases":["list_fetcher","native_enqueued","live_ready","fetch_dispatch"],"listCalls":1,"physicalCalls":1}
+✔ native dispatch proof: tasks batch HTTP before readiness (326.764294ms)
+ℹ {"kind":"native_dispatch_order","action":"task-runs.pollTaskRuns","grouped":true,"beforeReady":true,"phases":["list_fetcher","native_enqueued","fetch_dispatch","live_ready","list_fetcher","native_enqueued","fetch_dispatch"],"listCalls":2,"physicalCalls":2}
+✖ native dispatch proof: bots single HTTP after readiness (331.935928ms)
+ℹ {"kind":"native_dispatch_order","action":"coordinator.pollBotChatSummaries","grouped":false,"beforeReady":false,"phases":["list_fetcher","native_enqueued","live_ready","fetch_dispatch","list_fetcher","native_enqueued","fetch_dispatch"],"listCalls":2,"physicalCalls":2}
+✔ native dispatch proof: bots single HTTP before readiness (327.044995ms)
+ℹ {"kind":"native_dispatch_order","action":"coordinator.pollBotChatSummaries","grouped":false,"beforeReady":true,"phases":["list_fetcher","native_enqueued","fetch_dispatch","live_ready","list_fetcher","native_enqueued","fetch_dispatch"],"listCalls":2,"physicalCalls":2}
+✖ native dispatch proof: bots batch HTTP after readiness (325.52554ms)
+ℹ {"kind":"native_dispatch_order","action":"coordinator.pollBotChatSummaries","grouped":true,"beforeReady":false,"phases":["list_fetcher","native_enqueued","live_ready","fetch_dispatch","list_fetcher","native_enqueued","fetch_dispatch"],"listCalls":2,"physicalCalls":2}
+✔ native dispatch proof: bots batch HTTP before readiness (327.402023ms)
+ℹ {"kind":"native_dispatch_order","action":"coordinator.pollBotChatSummaries","grouped":true,"beforeReady":true,"phases":["list_fetcher","native_enqueued","fetch_dispatch","live_ready","list_fetcher","native_enqueued","fetch_dispatch"],"listCalls":2,"physicalCalls":2}
+✖ native dispatch proof: roster single HTTP after readiness (328.325646ms)
+ℹ {"kind":"native_dispatch_order","action":"bots.pollBots","grouped":false,"beforeReady":false,"phases":["list_fetcher","native_enqueued","live_ready","fetch_dispatch","list_fetcher","native_enqueued","fetch_dispatch"],"listCalls":2,"physicalCalls":2}
+✔ native dispatch proof: roster single HTTP before readiness (326.27154ms)
+ℹ {"kind":"native_dispatch_order","action":"bots.pollBots","grouped":false,"beforeReady":true,"phases":["list_fetcher","native_enqueued","fetch_dispatch","live_ready","list_fetcher","native_enqueued","fetch_dispatch"],"listCalls":2,"physicalCalls":2}
+✖ native dispatch proof: roster batch HTTP after readiness (326.243357ms)
+ℹ {"kind":"native_dispatch_order","action":"bots.pollBots","grouped":true,"beforeReady":false,"phases":["list_fetcher","native_enqueued","live_ready","fetch_dispatch","list_fetcher","native_enqueued","fetch_dispatch"],"listCalls":2,"physicalCalls":2}
+✔ native dispatch proof: roster batch HTTP before readiness (327.045911ms)
+ℹ {"kind":"native_dispatch_order","action":"bots.pollBots","grouped":true,"beforeReady":true,"phases":["list_fetcher","native_enqueued","fetch_dispatch","live_ready","list_fetcher","native_enqueued","fetch_dispatch"],"listCalls":2,"physicalCalls":2}
+ℹ tests 12
+ℹ suites 0
+ℹ pass 8
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 7672.546521
+
+✖ failing tests:
+
+test at scripts/use-live-lists.live.test.tsx:1:47276
+✖ native dispatch proof: bots single HTTP after readiness (331.935928ms)
+  AssertionError [ERR_ASSERTION]: only a read actually dispatched after coverage may satisfy the late subscription
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/snapshot-dispatch-20261108/checkout/scripts/use-live-lists.live.test.tsx:950:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/use-live-lists.live.test.tsx:1:47276
+✖ native dispatch proof: bots batch HTTP after readiness (325.52554ms)
+  AssertionError [ERR_ASSERTION]: only a read actually dispatched after coverage may satisfy the late subscription
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/snapshot-dispatch-20261108/checkout/scripts/use-live-lists.live.test.tsx:950:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/use-live-lists.live.test.tsx:1:47276
+✖ native dispatch proof: roster single HTTP after readiness (328.325646ms)
+  AssertionError [ERR_ASSERTION]: only a read actually dispatched after coverage may satisfy the late subscription
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/snapshot-dispatch-20261108/checkout/scripts/use-live-lists.live.test.tsx:950:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/use-live-lists.live.test.tsx:1:47276
+✖ native dispatch proof: roster batch HTTP after readiness (326.243357ms)
+  AssertionError [ERR_ASSERTION]: only a read actually dispatched after coverage may satisfy the late subscription
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/snapshot-dispatch-20261108/checkout/scripts/use-live-lists.live.test.tsx:950:14)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

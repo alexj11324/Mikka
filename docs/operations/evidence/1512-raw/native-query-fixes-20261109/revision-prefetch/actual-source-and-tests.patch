@@ -1,0 +1,387 @@
+--- a/lib/desktop-rpc/read-batch-contract.ts
++++ b/lib/desktop-rpc/read-batch-contract.ts
+@@ -20,5 +20,19 @@
+   return typeof action === 'string' && reads.has(action)
+ }
+ 
++/** Only these existing readers observe an owner-home revision. Entity and
++ * selected-team keys still wait for their original reader's authorization. */
++const ownerRevisionKinds = {
++  'issues.syncIssueList': 'issue_list',
++  'task-runs.pollTaskRuns': 'task_run_list',
++  'task-runs.syncThreadList': 'thread_list',
++  'coordinator.pollBotChatSummaries': 'bot_chat_list',
++} as const
++
++export function readBatchOwnerRevisionKinds(actions: readonly BatchReadAction[]) {
++  return [...new Set(actions.flatMap(action => Object.hasOwn(ownerRevisionKinds, action)
++    ? [ownerRevisionKinds[action as keyof typeof ownerRevisionKinds]] : []))]
++}
++
+ export type ReadBatchCall = { action: BatchReadAction; args: unknown[] }
+ export type ReadBatchItem = { ok: true; result: unknown } | { ok: false; status: number; error: { code: string } }
+--- a/lib/desktop-rpc/read-batch-context.ts
++++ b/lib/desktop-rpc/read-batch-context.ts
+@@ -2,6 +2,7 @@
+ import { isLiveRevisionKind, LIVE_ID } from '../live/events'
+ import type { LiveScope } from '../live/scope'
+ import { liveRevisionKey, readLiveRevisions, type LiveRef, type LiveRevisions } from '../live/revisions'
++import { readBatchOwnerRevisionKinds, type BatchReadAction } from './read-batch-contract'
+ 
+ type Database = Parameters<typeof readLiveRevisions>[0]
+ type RevisionRead = { ref: LiveRef; resolve: (revision: number | undefined) => void; reject: (error: unknown) => void }
+@@ -10,13 +11,14 @@
+   active: boolean
+   owners: Map<object, Map<string, Promise<LiveScope | null>>>
+   revisions: Map<Database, RevisionQueue>
++  ownerRevisionKinds: ReturnType<typeof readBatchOwnerRevisionKinds>
+ }
+ const batches = new AsyncLocalStorage<BatchContext>()
+ 
+ /** Installed only by the bounded read action. Detached after-work cannot keep
+  * using the batch's authority/revision observations once its items settle. */
+-export async function withReadBatchContext<T>(work: () => Promise<T>): Promise<T> {
+-  const scope: BatchContext = { active: true, owners: new Map(), revisions: new Map() }
++export async function withReadBatchContext<T>(work: () => Promise<T>, actions: readonly BatchReadAction[] = []): Promise<T> {
++  const scope: BatchContext = { active: true, owners: new Map(), revisions: new Map(), ownerRevisionKinds: readBatchOwnerRevisionKinds(actions) }
+   try { return await batches.run(scope, work) }
+   finally { scope.active = false; scope.owners.clear(); scope.revisions.clear() }
+ }
+@@ -29,6 +31,22 @@
+   let pending = owners.get(ownerId)
+   if (!pending) { pending = Promise.resolve().then(read); owners.set(ownerId, pending) }
+   return pending
++}
++
++/** A prepared batch already knows its owner-list kinds, but never their home.
++ * Once the original reader resolves that home, read those counters together.
++ * Later readers keep the conservative earlier values; only this reader's
++ * original refs leave the helper. Missing/failed counters remain no proof. */
++export async function readBatchOwnerRevisions(database: Database, refs: readonly LiveRef[], home?: LiveScope | null): Promise<LiveRevisions> {
++  const scope = batches.getStore()
++  if (!scope?.active || !home || !scope.ownerRevisionKinds.length) return readBatchRevisions(database, refs)
++  const requested = new Set(refs.filter(ref => isLiveRevisionKind(ref.kind) && LIVE_ID.test(ref.id))
++    .map(ref => liveRevisionKey(ref.kind, ref.id.toLowerCase())))
++  // An entity read or another home cannot start this owner's list prefetch.
++  if (!scope.ownerRevisionKinds.some(kind => requested.has(liveRevisionKey(kind, home.workspaceId.toLowerCase()))))
++    return readBatchRevisions(database, refs)
++  const values = await readBatchRevisions(database, [...refs, ...scope.ownerRevisionKinds.map(kind => ({ kind, id: home.workspaceId }))])
++  return Object.fromEntries(Object.entries(values).filter(([key]) => requested.has(key)))
+ }
+ 
+ /** Each caller still awaits the revision before its data. Keys arriving in the
+--- a/lib/desktop-rpc/read-batch.ts
++++ b/lib/desktop-rpc/read-batch.ts
+@@ -45,6 +45,6 @@
+       // batch-only memo are released, including when a reader rejects auth.
+       if (authFailure) throw authFailure
+       return items
+-    })
++    }, prepared.map(item => item.name))
+   }
+ }
+--- a/lib/live/revision-read.ts
++++ b/lib/live/revision-read.ts
+@@ -2,7 +2,7 @@
+ import type { LiveKind } from './events'
+ import type { LiveRef, LiveRevisions } from './revisions'
+ import type { LiveScope } from './scope'
+-import { readBatchRevisions } from '../desktop-rpc/read-batch-context'
++import { readBatchOwnerRevisions } from '../desktop-rpc/read-batch-context'
+ 
+ /** `scope` undefined: the home was not resolved here; ownerListRead reads it as before. */
+ export type BegunListRead = { scope?: LiveScope | null; revisions: LiveRevisions }
+@@ -11,10 +11,10 @@
+ 
+ /** Call before reading the data: the revisions it returns are then never newer than that data.
+  * Best effort: without a revision the next push simply reads. */
+-export async function readRevisions(refs: readonly LiveRef[]): Promise<LiveRevisions> {
++export async function readRevisions(refs: readonly LiveRef[], ownerScope?: LiveScope | null): Promise<LiveRevisions> {
+   try {
+     const { pool } = await import('../db/request-scope')
+-    return await readBatchRevisions(pool, refs)
++    return await readBatchOwnerRevisions(pool, refs, ownerScope)
+   } catch (error) { unavailable(error); return {} }
+ }
+ 
+@@ -25,5 +25,5 @@
+     const [{ workspacePool }, { ownerLiveReadScope }] = await Promise.all([import('../workspace-db'), import('./owner-scope')])
+     scope = await ownerLiveReadScope(workspacePool, ownerId)
+   } catch (error) { unavailable(error); return { revisions: await readRevisions(others) } }
+-  return { scope, revisions: await readRevisions([...scope ? kinds.map(kind => ({ kind, id: scope.workspaceId })) : [], ...others]) }
++  return { scope, revisions: await readRevisions([...scope ? kinds.map(kind => ({ kind, id: scope.workspaceId })) : [], ...others], scope) }
+ }
+--- a/lib/desktop-rpc/read-batch-context.test.ts
++++ b/lib/desktop-rpc/read-batch-context.test.ts
+@@ -2,7 +2,7 @@
+ import assert from 'node:assert/strict'
+ import { AsyncLocalStorage } from 'node:async_hooks'
+ import { ownerLiveReadScope, ownerLiveScope } from '../live/owner-scope'
+-import { readBatchRevisions, withReadBatchContext } from './read-batch-context'
++import { readBatchOwnerRevisions, readBatchRevisions, withReadBatchContext } from './read-batch-context'
+ 
+ const owner = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+ const workspace = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+@@ -140,3 +140,157 @@
+   })
+   assert.equal(queries, 2)
+ })
++
++test('planned owner readers share one earlier observation without exposing each other\'s keys', async () => {
++  let revision = 7
++  const calls: string[][][] = []
++  const database = { query: async (_sql: string, values: string[][]) => {
++    calls.push(values)
++    return { rows: values[0].map((kind, index) => ({ kind, id: values[1][index], revision: String(revision) })) }
++  } } as unknown as Parameters<typeof readBatchRevisions>[0]
++  const home = { ownerId: owner, workspaceId: workspace }, issueKey = `issue_list:${workspace}`
++  await withReadBatchContext(async () => {
++    assert.deepEqual(await readBatchOwnerRevisions(database, [{ kind: 'thread_list', id: workspace }], home), { [threadKey]: 7 })
++    revision = 12
++    assert.deepEqual(await readBatchOwnerRevisions(database, [{ kind: 'issue_list', id: workspace }], home), { [issueKey]: 7 })
++  }, ['task-runs.syncThreadList', 'issues.syncIssueList'])
++  assert.deepEqual(calls, [[['issue_list', 'thread_list'], [workspace, workspace]]])
++  assert.deepEqual(await withReadBatchContext(() => readBatchOwnerRevisions(database, [{ kind: 'issue_list', id: workspace }], home), ['issues.syncIssueList']), { [issueKey]: 12 })
++  assert.equal(calls.length, 2, 'another request observes the current revision')
++})
++
++test('an undeclared batch keeps ordinary per-reader observations', async () => {
++  let queries = 0, revision = 7
++  const database = { query: async (_sql: string, values: string[][]) => {
++    queries++; assert.equal(values[0].length, 1)
++    return { rows: [{ kind: values[0][0], id: values[1][0], revision: String(revision) }] }
++  } } as unknown as Parameters<typeof readBatchRevisions>[0]
++  const home = { ownerId: owner, workspaceId: workspace }
++  await withReadBatchContext(async () => {
++    assert.deepEqual(await readBatchOwnerRevisions(database, [{ kind: 'thread_list', id: workspace }], home), { [threadKey]: 7 })
++    revision = 12
++    assert.deepEqual(await readBatchOwnerRevisions(database, [{ kind: 'task_run_list', id: workspace }], home), { [taskKey]: 12 })
++  })
++  assert.equal(queries, 2)
++})
++
++test('a selected team key stays late and total requested and returned keys stay unchanged', async () => {
++  const team = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
++  const run = async (planned: boolean) => {
++    const calls: string[][][] = [], returned: number[] = []
++    const database = { query: async (_sql: string, values: string[][]) => {
++      calls.push(values); returned.push(values[0].length)
++      return { rows: values[0].map((kind, index) => ({ kind, id: values[1][index], revision: '7' })) }
++    } } as unknown as Parameters<typeof readBatchRevisions>[0]
++    const values = await withReadBatchContext(async () => {
++      const home = { ownerId: owner, workspaceId: workspace }
++      const thread = await readBatchOwnerRevisions(database, [{ kind: 'thread_list', id: workspace }], home)
++      const issues = await readBatchOwnerRevisions(database, [{ kind: 'issue_list', id: workspace }, { kind: 'issue_list', id: team }], home)
++      return { thread, issues }
++    }, planned ? ['task-runs.syncThreadList', 'issues.syncIssueList'] : [])
++    return { calls, returned, values }
++  }
++  const before = await run(false), after = await run(true)
++  assert.deepEqual(after.values, before.values)
++  assert.equal(before.calls.length, 2); assert.equal(after.calls.length, 2)
++  assert.equal(before.returned.reduce((a, b) => a + b), 3)
++  assert.equal(after.returned.reduce((a, b) => a + b), 3)
++  assert.deepEqual(after.calls, [[['issue_list', 'thread_list'], [workspace, workspace]], [['issue_list'], [team]]])
++})
++
++test('owner homes and database authorities do not borrow another planned observation', async () => {
++  const peer = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
++  const homes = { query: async (_sql: string, values: string[]) => ({ rows: [{ ownerId: values[0], workspaceId: values[0] === owner ? workspace : peer }] }) } as unknown as Parameters<typeof ownerLiveScope>[0]
++  const counts = [0, 0]
++  const database = (index: number) => ({ query: async (_sql: string, values: string[][]) => {
++    counts[index]++
++    return { rows: values[0].map((kind, i) => ({ kind, id: values[1][i], revision: String((index ? 20 : 0) + (values[1][i] === workspace ? 7 : 12)) })) }
++  } }) as unknown as Parameters<typeof readBatchRevisions>[0]
++  const first = database(0), second = database(1)
++  await withReadBatchContext(async () => {
++    const a = await ownerLiveReadScope(homes, owner), b = await ownerLiveReadScope(homes, peer)
++    assert.ok(a && b)
++    assert.deepEqual(await readBatchOwnerRevisions(first, [{ kind: 'thread_list', id: workspace }], a), { [threadKey]: 7 })
++    assert.deepEqual(await readBatchOwnerRevisions(first, [{ kind: 'thread_list', id: peer }], b), { [`thread_list:${peer}`]: 12 })
++    assert.deepEqual(await readBatchOwnerRevisions(second, [{ kind: 'thread_list', id: workspace }], a), { [threadKey]: 27 })
++  }, ['task-runs.syncThreadList', 'issues.syncIssueList'])
++  assert.deepEqual(counts, [2, 1])
++})
++
++test('absent homes and invalid or nonrevision refs never trigger an owner prefetch', async () => {
++  let queries = 0
++  const database = { query: async (_sql: string, values: string[][]) => {
++    queries++; assert.deepEqual(values[0], ['thread_list'])
++    return { rows: [{ kind: 'thread_list', id: workspace, revision: '7' }] }
++  } } as unknown as Parameters<typeof readBatchRevisions>[0]
++  await withReadBatchContext(async () => {
++    for (const refs of [[], [{ kind: 'device_list' as const, id: workspace }], [{ kind: 'thread_list' as const, id: 'invalid' }]])
++      assert.deepEqual(await readBatchOwnerRevisions(database, refs, { ownerId: owner, workspaceId: workspace }), {})
++    assert.equal(queries, 0)
++    assert.deepEqual(await readBatchOwnerRevisions(database, [{ kind: 'thread_list', id: workspace }], null), { [threadKey]: 7 })
++  }, ['task-runs.syncThreadList', 'issues.syncIssueList'])
++  assert.equal(queries, 1)
++})
++
++test('an entity or another owner key does not start the resolved home\'s list prefetch', async () => {
++  const peer = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
++  const calls: string[][][] = []
++  const database = { query: async (_sql: string, values: string[][]) => {
++    calls.push(values)
++    return { rows: values[0].map((kind, index) => ({ kind, id: values[1][index], revision: '7' })) }
++  } } as unknown as Parameters<typeof readBatchRevisions>[0]
++  await withReadBatchContext(async () => {
++    const home = { ownerId: owner, workspaceId: workspace }
++    assert.deepEqual(await readBatchOwnerRevisions(database, [{ kind: 'bot_chat', id: peer }], home), { [`bot_chat:${peer}`]: 7 })
++    assert.deepEqual(await readBatchOwnerRevisions(database, [{ kind: 'thread_list', id: peer }], home), { [`thread_list:${peer}`]: 7 })
++  }, ['task-runs.syncThreadList', 'issues.syncIssueList'])
++  assert.deepEqual(calls, [[['bot_chat'], [peer]], [['thread_list'], [peer]]])
++})
++
++test('missing and failed prefetched revisions remain unknown until another request reads', async () => {
++  const home = { ownerId: owner, workspaceId: workspace }, issueKey = `issue_list:${workspace}`
++  const failure = new Error('fixture revision unavailable')
++  let unavailable = false, queries = 0
++  const database = { query: async (_sql: string, values: string[][]) => {
++    queries++; if (unavailable) throw failure
++    return { rows: values[0].map((kind, index) => ({ kind, id: values[1][index], revision: kind === 'thread_list' ? '7' : 'invalid' })) }
++  } } as unknown as Parameters<typeof readBatchRevisions>[0]
++  const read = async () => {
++    assert.deepEqual(await readBatchOwnerRevisions(database, [{ kind: 'thread_list', id: workspace }], home), { [threadKey]: 7 })
++    assert.deepEqual(await readBatchOwnerRevisions(database, [{ kind: 'issue_list', id: workspace }], home), {})
++  }
++  const plan = ['task-runs.syncThreadList', 'issues.syncIssueList'] as const
++  await withReadBatchContext(read, plan)
++  assert.equal(queries, 1)
++  unavailable = true
++  await withReadBatchContext(async () => {
++    await assert.rejects(readBatchOwnerRevisions(database, [{ kind: 'thread_list', id: workspace }], home), error => error === failure)
++    await assert.rejects(readBatchOwnerRevisions(database, [{ kind: 'issue_list', id: workspace }], home), error => error === failure)
++  }, plan)
++  assert.equal(queries, 2, 'the failed prefetched key is not silently retried or fabricated')
++  unavailable = false
++  await withReadBatchContext(read, plan)
++  assert.equal(queries, 3)
++  assert.equal(Object.hasOwn(await readBatchOwnerRevisions(database, [{ kind: 'issue_list', id: workspace }], home), issueKey), false)
++})
++
++test('throw and cancellation release the plan as well as its earlier observations', async () => {
++  for (const failure of [new Error('fixture thrown'), new DOMException('fixture cancelled', 'AbortError')]) {
++    let revision = 7, after!: () => Promise<unknown>
++    const calls: string[][][] = []
++    const database = { query: async (_sql: string, values: string[][]) => {
++      calls.push(values)
++      return { rows: values[0].map((kind, index) => ({ kind, id: values[1][index], revision: String(revision) })) }
++    } } as unknown as Parameters<typeof readBatchRevisions>[0]
++    const home = { ownerId: owner, workspaceId: workspace }, refs = [{ kind: 'thread_list' as const, id: workspace }]
++    await assert.rejects(withReadBatchContext(async () => {
++      await readBatchOwnerRevisions(database, refs, home)
++      after = AsyncLocalStorage.bind(() => readBatchOwnerRevisions(database, refs, home))
++      throw failure
++    }, ['task-runs.syncThreadList', 'issues.syncIssueList']), error => error === failure)
++    revision = 12
++    assert.deepEqual(await after(), { [threadKey]: 12 })
++    assert.deepEqual(await after(), { [threadKey]: 12 })
++    assert.deepEqual(calls.map(values => values[0]), [['issue_list', 'thread_list'], ['thread_list'], ['thread_list']])
++  }
++})
+--- a/lib/desktop-rpc/read-batch.test.ts
++++ b/lib/desktop-rpc/read-batch.test.ts
+@@ -5,6 +5,7 @@
+ import { withRequestLog } from '../request-log'
+ import { createDesktopRpc, type DesktopActions } from './handler'
+ import { createReadBatch } from './read-batch'
++import { readBatchOwnerRevisions } from './read-batch-context'
+ import { READ_BATCH_ACTION, READ_BATCH_ACTIONS, type BatchReadAction, type ReadBatchCall } from './read-batch-contract'
+ import { desktopActionSchemas } from './schemas'
+ import { currentDesktopSession, withDesktopSession } from './session'
+@@ -163,3 +164,33 @@
+   ])
+   assert.equal(reads, 2, 'a later HTTP request cannot retain the prior membership observation')
+ })
++
++test('only the validated prepared owner readers contribute revision kinds across different readiness times', async () => {
++  let release!: () => void
++  const started = new Promise<void>(resolve => { release = resolve })
++  const queries: string[][][] = []
++  const database = { query: async (_sql: string, values: string[][]) => {
++    queries.push(values)
++    return { rows: values[0].map((kind, index) => ({ kind, id: values[1][index], revision: '7' })) }
++  } } as unknown as Parameters<typeof readBatchOwnerRevisions>[0]
++  const home = { ownerId: owner, workspaceId: owner }
++  const f = fixture({
++    'task-runs.pollTaskRuns': async () => {
++      const revisions = await readBatchOwnerRevisions(database, [{ kind: 'task_run_list', id: owner }], home)
++      release(); return { revisions }
++    },
++    'issues.syncIssueList': async () => {
++      await started
++      return { revisions: await readBatchOwnerRevisions(database, [{ kind: 'issue_list', id: owner }], home) }
++    },
++  })
++  const response = await f.handle(request([task, { action: 'issues.syncIssueList', args: [] },
++    { action: 'bots.pollBots', args: [] }, { action: 'coordinator.syncCoordinatorChat', args: [owner] }, teams]))
++  assert.equal(response.status, 200)
++  assert.deepEqual(queries, [[['issue_list', 'task_run_list'], [owner, owner]]], 'unrequested lists and bot entity keys are not guessed')
++  const items = decode((await response.json()).result) as { ok: true; result: { revisions: Record<string, number> } }[]
++  assert.deepEqual(items.slice(0, 2), [
++    { ok: true, result: { revisions: { [`task_run_list:${owner}`]: 7 } } },
++    { ok: true, result: { revisions: { [`issue_list:${owner}`]: 7 } } },
++  ])
++})
+--- a/tests/live-revision-reads.db.test.ts
++++ b/tests/live-revision-reads.db.test.ts
+@@ -179,3 +179,58 @@
+     if (previous.secret === undefined) delete process.env.DEVICE_GATEWAY_PUSH_SECRET; else process.env.DEVICE_GATEWAY_PUSH_SECRET = previous.secret
+   }
+ })
++
++test('prepared owner-list revisions share one PostgreSQL read without duplicate team refs or rows', { skip: !enabled }, async t => {
++  const { pool } = await import('../lib/db')
++  const { workspacePool } = await import('../lib/workspace-db')
++  const { ownerLiveReadScope } = await import('../lib/live/owner-scope')
++  const { readBatchOwnerRevisions, withReadBatchContext } = await import('../lib/desktop-rpc/read-batch-context')
++  const { bumpLiveRevisions } = await import('../lib/live/revisions')
++  const owner = `batch-revision-${randomUUID()}`, homeId = randomUUID(), teamId = randomUUID()
++  await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,false,now(),now())', [owner, `${owner}@example.invalid`])
++  await workspacePool.query(`insert into mikka_workspaces(id,"userId",name,kind) values($1,$2,'Personal','personal')`, [homeId, owner])
++  await workspacePool.query(`insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,$2,$3,'admin')`, [homeId, owner, `${owner}@example.invalid`])
++  await workspacePool.query(`insert into mikka_workspaces(id,"userId",name,kind) values($1,$2,'Shared','team')`, [teamId, owner])
++  await workspacePool.query(`insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,$2,$3,'admin')`, [teamId, owner, `${owner}@example.invalid`])
++  const kinds = ['task_run_list', 'thread_list', 'bot_chat_list'] as const
++  const plan = ['task-runs.pollTaskRuns', 'task-runs.syncThreadList', 'coordinator.pollBotChatSummaries', 'issues.syncIssueList'] as const
++  await bumpLiveRevisions(pool, [...kinds.map(kind => ({ kind, id: homeId })), { kind: 'issue_list', id: homeId }, { kind: 'issue_list', id: teamId }])
++  const measure = async (selected: string, planned: boolean) => {
++    const statements: { refs: number; rows: number; rowJsonBytes: number }[] = []
++    let homeQueries = 0
++    const homes = { query: async (sql: string, values: string[]) => {
++      homeQueries++; return workspacePool.query(sql, values)
++    } } as unknown as Parameters<typeof ownerLiveReadScope>[0]
++    const database = { query: async (sql: string, values: string[][]) => {
++      const result = await pool.query(sql, values)
++      statements.push({ refs: values[0].length, rows: result.rows.length, rowJsonBytes: Buffer.byteLength(JSON.stringify(result.rows)) })
++      return result
++    } } as unknown as Parameters<typeof readBatchOwnerRevisions>[0]
++    const read = async (kind: typeof kinds[number] | 'issue_list', selected?: string) => {
++      const home = await ownerLiveReadScope(homes, owner)
++      assert.ok(home)
++      return readBatchOwnerRevisions(database, [{ kind, id: homeId }, ...selected ? [{ kind: 'issue_list' as const, id: selected }] : []], home)
++    }
++    const values = await withReadBatchContext(async () => {
++      const early = await Promise.all(kinds.map(kind => read(kind)))
++      // Same legal readiness order as an issue reader's workspace resolution.
++      return [...early, await read('issue_list', selected)]
++    }, planned ? plan : [])
++    return { statements, values, homeQueries }
++  }
++  for (const selected of [homeId, teamId]) {
++    const before = await measure(selected, false), after = await measure(selected, true)
++    assert.deepEqual(after.values, before.values)
++    assert.equal(before.homeQueries, 1); assert.equal(after.homeQueries, 1)
++    assert.equal(before.statements.length, 2)
++    assert.equal(after.statements.length, selected === homeId ? 1 : 2)
++    const expected = selected === homeId ? 4 : 5
++    for (const sample of [before, after]) {
++      assert.equal(sample.statements.reduce((sum, row) => sum + row.refs, 0), expected)
++      assert.equal(sample.statements.reduce((sum, row) => sum + row.rows, 0), expected)
++    }
++    assert.ok(after.statements.reduce((sum, row) => sum + row.rowJsonBytes, 0) <= before.statements.reduce((sum, row) => sum + row.rowJsonBytes, 0))
++    t.diagnostic(JSON.stringify({ scope: selected === homeId ? 'personal' : 'team-key', before: before.statements, after: after.statements,
++      byteMeaning: 'UTF-8 JSON of actual pg result rows, not transport/TLS bytes' }))
++  }
++})

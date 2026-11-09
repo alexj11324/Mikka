@@ -1,0 +1,26 @@
+{
+  "command": [
+    "node",
+    "node_modules/oxlint/bin/oxlint",
+    "--deny-warnings",
+    "--no-ignore",
+    "apps/desktop/test/db-metrics.cjs",
+    "apps/desktop/test/db-metrics.test.mjs",
+    "apps/desktop/test/db-query-diagnostics.cjs",
+    "apps/desktop/test/db-query-diagnostics.test.mjs",
+    "apps/desktop/test/lifecycle-query-counts.mjs",
+    "lib/desktop-rpc/read-batch-context.test.ts",
+    "lib/desktop-rpc/read-batch-context.ts",
+    "lib/desktop-rpc/read-batch-contract.ts",
+    "lib/desktop-rpc/read-batch.test.ts",
+    "lib/desktop-rpc/read-batch.ts",
+    "lib/live/revision-read.ts",
+    "lib/request-log.ts",
+    "scripts/use-live-lists.live.test.tsx",
+    "tests/live-revision-reads.db.test.ts"
+  ],
+  "startedAt": "2026-11-09T00:07:25.085846+00:00",
+  "endedAt": "2026-11-09T00:07:25.206373+00:00",
+  "exitCode": 0,
+  "tree": "c0fc19c32787d3f86a37ef2836b37440d20d300a"
+}

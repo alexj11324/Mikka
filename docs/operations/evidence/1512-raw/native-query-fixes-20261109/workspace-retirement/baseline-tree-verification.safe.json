@@ -1,0 +1,23 @@
+{
+  "targetFilesTree": "c0fc19c32787d3f86a37ef2836b37440d20d300a",
+  "files": [
+    {
+      "path": "lib/swr/persistent-cache.ts",
+      "sha256": "b7750de029f5462bee61efba2642ccfa894e08a981a75c97f5852e715b5f9b1f"
+    },
+    {
+      "path": "components/authenticated-read-cache.tsx",
+      "sha256": "186b86f223636a4391cc54a0e76a25280e527a50cd4cbedde55ee8685798ae41"
+    },
+    {
+      "path": "hooks/use-workspace-switcher.ts",
+      "sha256": "67e18fbbbeb9e0686ce512815df7faf79d075765bf02c74f0ade970cdb930ef8"
+    },
+    {
+      "path": "lib/swr/persistent-cache.test.tsx",
+      "sha256": "7788c9c8569ea670770027941e31de2eba60ce80c718228c3ac610e4ed0f8015"
+    }
+  ],
+  "allFourMatchCopyOrigin": true,
+  "commitClaim": "No commit is inferred for this tree; HEAD6180 alone does not describe the entire overlaid copy."
+}

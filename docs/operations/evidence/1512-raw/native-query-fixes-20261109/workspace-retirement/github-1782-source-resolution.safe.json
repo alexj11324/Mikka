@@ -1,0 +1,22 @@
+{
+  "kind": "github-source-resolution",
+  "comment": {
+    "id": 6728716992,
+    "url": "https://github.com/alexj11324/Mikka/pull/1782#issuecomment-6728716992",
+    "created_at": "2026-11-08T23:32:56Z",
+    "updated_at": "2026-11-08T23:32:56Z",
+    "body": "### 下一候选的进度与仍保留的红项\n\n冻结 head 4ec74d5 仍未改变、未合并。其 GitHub required workflows 全绿，但 Native 原件是 498 SQL > Web 484，不能用 job 的绿色掩盖该验收红项。已通过真实 React/SWR fixture 复现工作区整页切换前旧 Document 被 remount 额外读取（1→2）；独立修复 bd5ed45 保留同步禁用/清空与跨 tab 广播，本页直接退休至新 Document，226/226 缓存回归、root/frontend typecheck、lint 通过。整合后必须由新精确候选的完整 Native 检查实测，未宣称总量已经改善。\n\nP0 最新私有诊断是 [42534528306](https://github.com/alexj11324/Mikka/actions/runs/42534528306)，产品 source 1f7c6bdd / tree 2c74ffbc / worker 68034219，Ops 43b4110d。实际 `build_claude→finalize` 在 **IPv4/provider_rule** 返回4，闭集诊断 unsupportedRevision=true、missingKernelModule=true；该规则包含 owner 和 multiport 匹配，目前尚未区分具体扩展。不是IPv6失败的证据。新最小诊断只补已知扩展名/有界revision，不改入口策略。该轮模板已 deleted→absent 两次确认，Codex/运行验收未开始；SHA256 `495d01a605f130997a0ce2605b9c702ec42bd046fcb533e25d0616129a7e35e1`。详情在 #1723/#1724。\n\n另已在 #1722 [6728526557](https://github.com/alexj11324/Mikka/issues/1722#issuecomment-6728526557) 对齐实际 Run 选择缺陷：P0 应与 D 一样排除 Factory review/verify/monitor 与 group_chat，不能把较新的 checker 当 coding sandbox。正在补同事务 queue→bind、真正新execute撤权、late-bind/concurrent grant 的真实PG回归源。#1695 的 stored tenant/锁序兼容也在隔离正常合流提交中，不改 #1636 由原负责人先合的队列。下一次公开候选会统一整合并执行必要完整门禁；这些本地提交和诊断运行均不构成生产PASS或main/账号hold。"
+  },
+  "commitLookup": {
+    "url": "https://api.github.com/repos/alexj11324/Mikka/commits/bd5ed45",
+    "isError": true,
+    "error": "GitHub API error 422: {\"message\":\"No commit found for SHA: bd5ed45\",\"documentation_url\":\"https://docs.github.com/rest/commits/commits#get-a-commit\",\"status\":\"422\"}",
+    "error_code": "INVALID_ARGUMENT",
+    "error_data": {
+      "message": "No commit found for SHA: bd5ed45",
+      "documentation_url": "https://docs.github.com/rest/commits/commits#get-a-commit",
+      "status": "422"
+    }
+  },
+  "interpretation": "The claimed local short commit is not resolvable from GitHub. No full SHA, parents, tree or diff was inferred. Subsequent analysis is independent current-source work."
+}

@@ -1,0 +1,19 @@
+{
+  "command": [
+    "node",
+    "--experimental-test-module-mocks",
+    "--import",
+    "./scripts/server-test.mjs",
+    "--import",
+    "tsx",
+    "--test",
+    "--test-name-pattern=^native dispatch proof:",
+    "scripts/use-live-lists.live.test.tsx"
+  ],
+  "startedAt": "2026-11-08T23:44:50.238019+00:00",
+  "endedAt": "2026-11-08T23:44:57.980068+00:00",
+  "exitCode": 1,
+  "sourceTree": "fd1aadd36228359a6ac75f6ed690f8c40877fc07",
+  "productPatched": false,
+  "realModelCalls": 0
+}

@@ -1,0 +1,285 @@
+{
+  "schemaVersion": 1,
+  "kind": "native_auth_pkce_enrollment_read_only_source_triage",
+  "observedAtUtc": "2026-11-08T23:26:57.511507+00:00",
+  "status": "no_proven_minimal_auth_or_enrollment_change_for_current_delta",
+  "sourceCheckoutHead": "6180cd8889006f4e1618c2549b1aa12d13506ee8",
+  "sourceAuthority": "Parent-specified current Mikka-1512-resume working tree; includes unpushed generation fixes. Auth source bytes are bound below.",
+  "runtimeArtifact": {
+    "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/native4a07/native-4a07-original/lifecycle.json",
+    "sha256": "5b2a401a348cb03965e8666b66acf0e253463dbd8af6555a8dc4558d58da376f",
+    "reportedRevision": "353f6606ead0b45e3ea0a6015c326f9825c7229b"
+  },
+  "observedCounts": {
+    "nativeLogin": {
+      "total": 504,
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19,
+          "durationMs": 162
+        },
+        {
+          "phase": "native-pkce-and-automatic-renderer-to-public-session",
+          "queryCalls": 13,
+          "durationMs": 1128
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 472,
+          "durationMs": 7648
+        }
+      ]
+    },
+    "webLogin": {
+      "total": 480,
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19,
+          "durationMs": 160
+        },
+        {
+          "phase": "web-navigation-to-dom-content-loaded",
+          "queryCalls": 0,
+          "durationMs": 341
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 461,
+          "durationMs": 2996
+        }
+      ]
+    }
+  },
+  "delta": 24,
+  "peerActionAttribution": "native-4a07-action-attribution.safe.json",
+  "sourceFiles": [
+    {
+      "path": "app/api/desktop/begin/route.ts",
+      "bytes": 1974,
+      "sha256": "c60a9bfef2b79d74a4bd1310f30510a89f6b4e73f152ddfbda0b4ad3899c35da"
+    },
+    {
+      "path": "app/api/desktop/return/route.ts",
+      "bytes": 3441,
+      "sha256": "0dc038c8958b0a797862999d4fd20ea4ad8c34280e0070c8e293f16b3cd701da"
+    },
+    {
+      "path": "app/api/desktop/exchange/route.ts",
+      "bytes": 3755,
+      "sha256": "1b3cb2abb5f15a3cda75e66eefcc0cc0fdbddc326cda96e4091f6a7a66be7f9c"
+    },
+    {
+      "path": "app/api/devices/enrollment/route.ts",
+      "bytes": 2145,
+      "sha256": "08c91a56354263fcce77afc73ec9b44b2889ea07f0ae56007e07879fa07d36a4"
+    },
+    {
+      "path": "lib/auth.ts",
+      "bytes": 9220,
+      "sha256": "d86af1c463c32f045f84e4f57b8ae94f3b61fd537f1f10e854e9ef80e7fd3f2a"
+    },
+    {
+      "path": "lib/fresh-session.ts",
+      "bytes": 2709,
+      "sha256": "1100600b5c2cd015e3e5de2302860ff15e3b3915d086bee7a77bf05f302e6750"
+    },
+    {
+      "path": "lib/device-enrollment.ts",
+      "bytes": 1338,
+      "sha256": "70a9b0a0c8c2d1b8c39098b19c52229188b8da98b75188aaff6e4e595584afae"
+    },
+    {
+      "path": "lib/desktop-rpc/authentication.ts",
+      "bytes": 2516,
+      "sha256": "206f09f84f14d2d09bbe734f3dc9072d5b99b80f1976ca12f73cfa22af72a92c"
+    },
+    {
+      "path": "lib/desktop-rpc/session.ts",
+      "bytes": 2969,
+      "sha256": "9a9083622b42034d00f5e425319561397ea28e3c8b2220f1a0ed93b43b969103"
+    },
+    {
+      "path": "lib/browser-rpc/session.ts",
+      "bytes": 4334,
+      "sha256": "b39281bb3c10643446d58caba8ccc962fa77b5ae34731ab5818a07e1c60cc142"
+    },
+    {
+      "path": "apps/desktop/src/main/bundled-auth.ts",
+      "bytes": 27113,
+      "sha256": "a23a2ebf683ea49b0f07380f204e3ef5692b9c973933f35f07d8041af30c7b18"
+    },
+    {
+      "path": "apps/desktop/src/main/local-setup.ts",
+      "bytes": 2843,
+      "sha256": "a368c563deb313ed556024fc152a3940ff68c58ac1b2f40feb8d29f767fc59a8"
+    },
+    {
+      "path": "apps/desktop/src/main/bridge.ts",
+      "bytes": 4822,
+      "sha256": "69b494ad37f9b810bff648d6f29e12653627ef76a6765b27dfea7fb542c2d06a"
+    },
+    {
+      "path": "apps/desktop/src/main/ssh-install.ts",
+      "bytes": 18756,
+      "sha256": "2180a5f03d0ddc692e206f126d07f14715d1b4e48025347d48a9d755c96222f5"
+    },
+    {
+      "path": "components/desktop/desktop-integration.tsx",
+      "bytes": 4428,
+      "sha256": "71447f74b45076755aefb322e721c3263c61cf8188d31b4c2159246645d76168"
+    }
+  ],
+  "pinnedSdkContracts": [
+    {
+      "packageVersion": "1.7.12",
+      "installedPath": "/workspace/scratch/af05d9e4f31e/Mikka-observability-1512/node_modules/.pnpm/better-auth@1.7.12_@opentelemetry+api@1.10.0_drizzle-orm@0.45.4_@opentelemetry+api@1.10_75ae3c5b12cbad1cc5bce1c7e1990785/node_modules/better-auth/dist/plugins/one-time-token/index.mjs",
+      "sha256": "f5705d5c5a99b633dad9f81dc34680ce6ed943a1f91bd3880bd839763e544aa1",
+      "peerVariantContentsEqual": true,
+      "relevantLineBoundaries": [
+        50,
+        87
+      ]
+    },
+    {
+      "packageVersion": "1.7.12",
+      "installedPath": "/workspace/scratch/af05d9e4f31e/Mikka-observability-1512/node_modules/.pnpm/better-auth@1.7.12_@opentelemetry+api@1.10.0_drizzle-orm@0.45.4_@opentelemetry+api@1.10_75ae3c5b12cbad1cc5bce1c7e1990785/node_modules/better-auth/dist/db/internal-adapter.mjs",
+      "sha256": "f9c5e9c8faa058a19ec73690b6faa5331e49ca8f9057cdb16307b064a017b1b6",
+      "peerVariantContentsEqual": true,
+      "relevantLineBoundaries": [
+        333,
+        370,
+        802,
+        872
+      ]
+    },
+    {
+      "packageVersion": "1.7.12",
+      "installedPath": "/workspace/scratch/af05d9e4f31e/Mikka-observability-1512/node_modules/.pnpm/@better-auth+core@1.7.12_@better-auth+utils@0.5.0_@better-fetch+fetch@1.3.2_@openteleme_6c46b22c587c05cb7ce847eaf1855072/node_modules/@better-auth/core/dist/db/adapter/factory.mjs",
+      "sha256": "68809ea9778a59590c91a2274d8029cdf359559e659b6dd1918cb6fdb2382323",
+      "peerVariantContentsEqual": true,
+      "relevantLineBoundaries": [
+        191,
+        200,
+        562,
+        598
+      ]
+    },
+    {
+      "packageVersion": "1.7.12",
+      "installedPath": "/workspace/scratch/af05d9e4f31e/Mikka-observability-1512/node_modules/.pnpm/@better-auth+kysely-adapter@1.7.12_@better-auth+core@1.7.12_@better-auth+utils@0.5.0_@b_bb68c7d3eb9d1f6254df5e8116861448/node_modules/@better-auth/kysely-adapter/dist/index.mjs",
+      "sha256": "b5f033d42be5c229089639a83a25d2bf42d26273a3181abba0f558205e797dfa",
+      "peerVariantContentsEqual": true,
+      "relevantLineBoundaries": [
+        503,
+        526
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "pkce-inherent-work",
+      "status": "source_explanation_matches_aggregate_not_per_statement_capture",
+      "observedExtraSql": 13,
+      "scope": "native-pkce-and-automatic-renderer-to-public-session",
+      "decomposition": {
+        "authRoute": 2,
+        "begin": 1,
+        "return": 2,
+        "exchange": 8
+      },
+      "begin": "One pending-request INSERT.",
+      "return": "Normal browser-session read plus official OTT generation and one-time binding; two writes account for observed2 when ordinary signed-cache reads hit.",
+      "exchange": "Current application already atomically consumes and clears pending request with one locked CTE. Official OTT consume code has a transaction with latest-row SELECT, consume/delete and duplicate invalidation; session/user fresh lookup follows. Source 1+5+2 is consistent with observed8, not an independently recorded SQL list.",
+      "decision": "Do not remove replay, expiry, revocation, principal or callback binding checks to reduce counts."
+    },
+    {
+      "id": "enrollment-nine",
+      "status": "aggregate_only_no_duplicate_request_proof",
+      "observedNativeSql": 9,
+      "observedWebSql": 0,
+      "route": "/api/devices/enrollment",
+      "methodsNotInReceipt": true,
+      "getOwner": "Explicit disableCookieCache=true; returns fresh owner without a devices query.",
+      "getFull": "Same fresh session plus one owner-scoped, active local devices SELECT.",
+      "post": "Same-origin check, fresh session plus one INSERT minting an expiring user-bound enrollment.",
+      "lifecycle": "localSetupController checks owner at each automatic/manual admission. SshInstaller.waitOnline then verifies current owner and actual device ownership again. This protects A-B-A, sign-out/revocation and foreign daemons.",
+      "notProven": "9 cannot identify exact GET-owner/GET-full/POST counts, retries or repeated mounts. Do not infer redundant calls from aggregate9.",
+      "decision": "No additional safe single-request redundant SQL found in these handlers. Do not remove the final fresh owner/device verification or cache it across requests."
+    },
+    {
+      "id": "official-auth-joins",
+      "status": "record_only_parent_deferred",
+      "changeCandidate": "lib/auth.ts advanced.database.joins=true",
+      "sourceBasis": "findSession requests join:user; default core factory strips it before adapter and executes fallback user lookup. Kysely supports the actual SQL left join.",
+      "semanticBoundary": "Would still read current DB on every fresh request; no TTL/principal reuse introduced.",
+      "remainingRisk": "Global authentication configuration also changes Web and other joined auth flows. Relative Native-Web savings are not established and must be measured on both paths.",
+      "parentDecision": "Do not expand current24-delta work into global auth config; retained as deferred candidate only.",
+      "estimatedOccurrence": 10,
+      "estimatedImpact": 2,
+      "scoreProduct": 20,
+      "scoreMeaning": "One redundant DB round trip on each default joined fresh read; does not establish need to include broad auth change in this issue."
+    }
+  ],
+  "existingTestEntrypoints": [
+    {
+      "path": "tests/desktop-auth-exchange.test.ts",
+      "scope": "Unit/stubbed: one application DB operation; wrong proof burns; SDK revocation failure and malformed origin preserved.",
+      "realSdk": false,
+      "realPg": false
+    },
+    {
+      "path": "tests/desktop-auth-handoff.db.test.ts",
+      "scope": "Real PostgreSQL pending-state/locking concurrency, burn/expiry/rebind/callback tests. Browser session and OTT stubbed.",
+      "realSdk": false,
+      "realPg": true
+    },
+    {
+      "path": "tests/desktop-rpc-auth.db.test.ts",
+      "scope": "Real Better Auth+PostgreSQL, actual bearer/PKCE OTT exchange, foreign-cookie rejection, tenant suspension, expiry/revocation.",
+      "realSdk": true,
+      "realPg": true
+    },
+    {
+      "path": "tests/desktop-session-cache.db.test.ts",
+      "scope": "Real SDK+PG statement/byte measurement for Web and Native, scoped fresh reads, cache/token binding and revocation.",
+      "realSdk": true,
+      "realPg": true
+    },
+    {
+      "path": "tests/session-cookie-cache.db.test.ts",
+      "scope": "Real SDK+PG; explicit default cached0 versus fresh session/user2 query baseline.",
+      "realSdk": true,
+      "realPg": true
+    },
+    {
+      "path": "lib/device-enrollment.db.test.ts",
+      "scope": "Real PG device owner, expired/single-use enrollment and revocation behavior; human auth is mocked. Owner-only business SQL0 vs full ownership1 is explicitly measured.",
+      "realSdk": false,
+      "realPg": true
+    },
+    {
+      "path": "apps/desktop/src/main/daemon-map.test.ts",
+      "scope": "Main A-B-A setup and workspace dedup, expected-owner verification, no second registration for repair.",
+      "realSdk": false,
+      "realPg": false
+    }
+  ],
+  "futureVerificationOnly": {
+    "command": "node --test-force-exit --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test tests/desktop-rpc-auth.db.test.ts tests/desktop-session-cache.db.test.ts tests/session-cookie-cache.db.test.ts",
+    "environment": "Only an already authorized isolated loopback *_e2e PostgreSQL with REQUIRE_DB=1 and existing normal env delivery. This command was not run in this task.",
+    "caution": "Existing DB tests instantiate their own Better Auth configs; changing lib/auth.ts alone would not exercise a joins candidate. If revisited, explicit paired off/on real SDK fixtures are needed, not weaker assertions. No global config change authorized in current triage."
+  },
+  "activity": {
+    "sourceEdits": 0,
+    "workflowEdits": 0,
+    "thresholdOrWindowEdits": 0,
+    "checkpointEdits": 0,
+    "refsChanged": 0,
+    "newTestsRun": 0,
+    "newDbQueries": 0,
+    "newModelCalls": 0,
+    "newCompute": 0
+  }
+}

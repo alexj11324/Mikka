@@ -1,0 +1,44 @@
+✔ SQL structures hash only a bounded parameterized subset and never read parameter/config getters (3.307912ms)
+✔ request diagnostics reject foreign registries, concurrent module scopes and arbitrary metadata (0.946786ms)
+✔ diagnostic safety: context identifiers accept primitive strings and read fields once (0.244909ms)
+✔ diagnostic safety: structure identifiers cannot preserve objects through implicit coercion (0.565732ms)
+✔ diagnostic safety: receipt timestamps accept primitive strings only (0.884342ms)
+✔ diagnostic safety: Proxy query configs are rejected before any descriptor or value trap runs (0.216466ms)
+✔ diagnostic safety: statement prefixes cannot admit opaque SET payloads or a second statement (0.551201ms)
+✔ query capture starts at the existing checkpoint, freezes once and reset creates a new diagnostic history (0.492782ms)
+✔ ordinal windows retain carried requests, unknown shapes and all overflow as nonzero unknown costs (0.73007ms)
+✔ query receipts retain exact HTTP method and batch siblings, ignore external IDs and detect mismatches (1.409233ms)
+✔ malformed diagnostic payloads, reset identities and absent checkpoints are never manufactured zeroes (0.313973ms)
+✔ maximum query/context/structure cardinality stays under the final export bound (79.322504ms)
+✔ the final projection reads one bounded export after all twelve unchanged snapshots and preserves the original windows (25.335701ms)
+✔ actual request ALS and manageDatabasePool bind concurrent and reused queued clients without a global current request (195.111102ms)
+✔ next cjs: bind the actual PG after tracing, with distinct copies and no double count (192.673402ms)
+✔ nitro cjs: bind the actual PG after tracing, with distinct copies and no double count (194.139685ms)
+✔ nitro esm: bind the actual PG after tracing, with distinct copies and no double count (234.023157ms)
+✔ Nitro cannot fall back to source PG when its traced dependency is absent or points outside the output (100.627647ms)
+✔ lifecycle query windows retain exact counter deltas and omit unrelated content (0.443127ms)
+✔ operation SQL counts partition the original full window without removing unknown or background work (0.243356ms)
+✔ operation SQL attribution refuses unknown labels, missing buckets, inconsistent totals and partial histories (0.467414ms)
+✔ unattributed source refinement conserves the original partition and full-window deltas (0.430057ms)
+✔ unattributed source refinement rejects incomplete evidence without upgrading legacy reports (1.247389ms)
+✔ unattributed source refinement fits the unchanged control-response limit at the largest safe count (0.402256ms)
+✔ the 78-source refinement rejects a historical 75-key partition without backfilling it (0.237398ms)
+✔ lifecycle query windows refuse a changed process, reset, missing driver and unknown readings (0.336497ms)
+✔ lifecycle reads only the attested primary metric socket, with bounded closed errors (0.838553ms)
+✔ RPC diagnostics count four windows by request start, deduplicate unordered receipts and discard private fields (5.415226ms)
+✔ RPC diagnostics retain unknown attribution and missing boundaries without double counting conflicting receipts (9.233838ms)
+✔ RPC diagnostic missing, partial and oversized logs remain unavailable rather than reporting zero calls (4.218283ms)
+✔ RPC diagnostics accept only the descriptor-bound primary log and complete measured windows (2.127805ms)
+✔ RPC phase attribution separates handoff from workspace reads and preserves a completed login when startup is unavailable (3.222954ms)
+✔ RPC phase attribution refuses private labels and non-partition boundaries without fabricating phases (3.562486ms)
+✔ RPC batch diagnostics separate physical requests from logical actions without losing phase boundaries (2.932948ms)
+✔ RPC batch diagnostics refuse missing, mismatched and out-of-parent action evidence (5.002905ms)
+ℹ tests 35
+ℹ suites 0
+ℹ pass 35
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1162.272245
+

@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "createdAt": "2026-11-08T23:54:13.084516+00:00",
+  "base": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+  "baseTree": "7a2e1b485920ae36e0b311519b50ab1ed30dfe69",
+  "isolatedCopy": "/workspace/scratch/812e3b7d6d45/issue1512-diagnostics-copy",
+  "originalCheckoutUntouched": true,
+  "files": [
+    {
+      "path": "lib/request-log.ts",
+      "baselineSha256": "d0a529fd0696397afc89e36c5b07015c33785367e14ce6c9fbf07891d747d054",
+      "candidateSha256": "2884101d84e815ece44d1f3758885cc1c2145932cbe1001dfe17273684c8949a",
+      "candidateBytes": 10743
+    },
+    {
+      "path": "apps/desktop/test/db-metrics.cjs",
+      "baselineSha256": "475df35d2998e1eab7f9dd186261c2ef00d50b2a31a5ec4feb65a786217d5396",
+      "candidateSha256": "814aa821cdc111c25f4632df5c2fa6abcbe2fa725f23a2ce4a397493f2a5e491",
+      "candidateBytes": 8890
+    },
+    {
+      "path": "apps/desktop/test/db-metrics.test.mjs",
+      "baselineSha256": "0062b88ce2823f8ce4e5a64c0927faed7d4ead8dcdbed31920eee92b76efb8d4",
+      "candidateSha256": "2a6e5d42c063c771d770c2e92b804bb88573e3043c2a410a1b9d3374ff1fa346",
+      "candidateBytes": 38470
+    },
+    {
+      "path": "apps/desktop/test/lifecycle-query-counts.mjs",
+      "baselineSha256": "855dac3438434cf643a222a8297bcf09caff2c283064768b50082ae04edc226e",
+      "candidateSha256": "564706188c1b96bc9d9ebadb01bab5be4bc03cd0920131ecda0185b6e07fda7f",
+      "candidateBytes": 23696
+    },
+    {
+      "path": "apps/desktop/test/db-query-diagnostics.cjs",
+      "baselineSha256": null,
+      "candidateSha256": "53eeebc04adb40f82c90fda9e56858eb5ce5d10e351a4ce3ee66fd864a5fdd18",
+      "candidateBytes": 18075
+    },
+    {
+      "path": "apps/desktop/test/db-query-diagnostics.test.mjs",
+      "baselineSha256": null,
+      "candidateSha256": "9b29bfd15b9d4bb12f0291d8bd68c236c94c1a66cd356fddda4225e49370cb27",
+      "candidateBytes": 22631
+    }
+  ],
+  "patchSha256": "28255779fc5ebaa63c814a27e94a4445a929a33458a32a405f5cc3971a260b7c",
+  "harnessCommand": [
+    "node",
+    "--test",
+    "apps/desktop/test/db-metrics.test.mjs"
+  ],
+  "harnessExitCode": 0,
+  "harnessLogSha256": "8d6c41e4305ba1234d8c0f39f94af596cef129813474597b66902268af4929f1"
+}

@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "reviewer": "/root/native_6180_review",
+  "createdAt": "2026-11-09T00:06:28.048182+00:00",
+  "additiveTo": {
+    "path": "query-diagnostics-v2-independent-review.safe.json",
+    "bytes": 16101,
+    "sha256": "41c5d67f494b246bdd390ceb0b5359e46b3a7cdfdc3a1433cd0c85473cfddee3"
+  },
+  "verdict": "No remaining blockers for exact-v2 integration; the frozen primary review is unchanged.",
+  "lintBinding": {
+    "path": "targeted-lint-v2.safe.json",
+    "bytes": 708,
+    "sha256": "eb233c93dd5796c91e9fedec68651f2e4c86d53c899fca6e9a6112da709f321e",
+    "reviewerRead": true,
+    "manifestHashMatches": true,
+    "recordedToolChunk": "874e39",
+    "exitCode": 0,
+    "sixFilesExplicitlyIncludedWithNoIgnore": true,
+    "reviewerReranLint": false
+  },
+  "implementationReceipt": {
+    "path": "query-diagnostics-implementation-v2.safe.json",
+    "bytes": 16764,
+    "sha256": "6ac377a159d59b3bcc109d8056c31a28dbb5db2a8765b8da701d69a29dc44525",
+    "reviewerRead": true
+  },
+  "clarifications": [
+    "The same product getter bytes bind the preserved 15/15 product regression; it was not rerun for v2.",
+    "Collection incurs bounded CPU and memory work inside the original windows. Only the final export is after the original measurements and cleanup; zero measurement overhead is not claimed.",
+    "Native login 504 versus Web 480 remains RED; this review ran no compiled Native, database or production acceptance."
+  ],
+  "sourceChangedSincePrimaryReview": false,
+  "extraRuntimeTests": 0
+}

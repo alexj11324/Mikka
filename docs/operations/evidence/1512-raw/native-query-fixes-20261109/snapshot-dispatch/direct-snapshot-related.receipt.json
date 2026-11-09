@@ -1,0 +1,19 @@
+{
+  "command": [
+    "node",
+    "--experimental-test-module-mocks",
+    "--import",
+    "./scripts/server-test.mjs",
+    "--import",
+    "tsx",
+    "--test",
+    "scripts/use-live-lists.live.test.tsx",
+    "scripts/desktop-notification-lifetime.live.test.tsx",
+    "tests/desktop-notifications.test.ts"
+  ],
+  "startedAt": "2026-11-08T23:46:07.498116+00:00",
+  "endedAt": "2026-11-08T23:48:03.850748+00:00",
+  "exitCode": 0,
+  "declaredScript": "test:live-lists",
+  "realModelCalls": 0
+}

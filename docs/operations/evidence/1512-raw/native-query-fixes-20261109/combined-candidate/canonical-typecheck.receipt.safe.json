@@ -1,0 +1,48 @@
+{
+  "scope": "root, API and frontend checks matching package typecheck commands; frontend Node heap explicitly 4GiB",
+  "sourceTree": "ab558518c15e0984a06cc7291a5ac52bf1ca7bfa",
+  "results": [
+    {
+      "name": "root-type",
+      "command": [
+        "node_modules/.bin/tsrs",
+        "--noEmit"
+      ],
+      "startedAt": "2026-11-09T00:13:42.553104+00:00",
+      "endedAt": "2026-11-09T00:13:46.622685+00:00",
+      "exitCode": 0,
+      "tree": "ab558518c15e0984a06cc7291a5ac52bf1ca7bfa"
+    },
+    {
+      "name": "api-type",
+      "command": [
+        "node_modules/.bin/tsrs",
+        "--noEmit",
+        "-p",
+        "apps/api/tsconfig.json"
+      ],
+      "startedAt": "2026-11-09T00:13:46.623183+00:00",
+      "endedAt": "2026-11-09T00:13:48.152861+00:00",
+      "exitCode": 0,
+      "tree": "ab558518c15e0984a06cc7291a5ac52bf1ca7bfa"
+    },
+    {
+      "name": "frontend-type",
+      "command": [
+        "node",
+        "--max-old-space-size=4096",
+        "node_modules/typescript/bin/tsc",
+        "--noEmit",
+        "-p",
+        "apps/frontend/tsconfig.json"
+      ],
+      "startedAt": "2026-11-09T00:13:48.153316+00:00",
+      "endedAt": "2026-11-09T00:14:27.283702+00:00",
+      "exitCode": 0,
+      "tree": "ab558518c15e0984a06cc7291a5ac52bf1ca7bfa"
+    }
+  ],
+  "completed": true,
+  "allPassed": true,
+  "treeStillMatches": true
+}

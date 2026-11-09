@@ -1,0 +1,28 @@
+{
+  "kind": "final-actual-source-in-controlled-reader-copy",
+  "files": [
+    {
+      "path": "lib/desktop-rpc/read-batch.ts",
+      "sha256": "8aadc849e1de11727a67f03c0d0d07d656136e455f4ef7bf32281f6b10194fdb",
+      "generatedJsSha256": "7437232f56f955dd70db79749a4b6fef2db4a0115673fdd1086a30fb27332a13"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "sha256": "5a4a3ec8120558c25c5c9b4db117df1acc3f4f8dfe3f5c66146c6a30d60da00f",
+      "generatedJsSha256": "3b59c2f4eabc9c4ba602c9f0d45b17b3f6936273f7585ec06eadb7137b8447fe"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-contract.ts",
+      "sha256": "cdd915dacd21d2e9555896daeaa5e5c1f5b23a193cb48e0b959507e96e990000",
+      "generatedJsSha256": "ac49046fce068bfac57f0220d177c4c204d15427850d78cd980379ad860829ba"
+    },
+    {
+      "path": "lib/live/revision-read.ts",
+      "sha256": "91b23b11e829e217de8c07942a8cc6f2e59c83e1f2828c566354e0348a8219e2",
+      "generatedJsSha256": "99e52f412a01c6e81fe0d591aef164794d3cb34a78910e6d86fcb7ec10c8d588"
+    }
+  ],
+  "originalReadBatchRevisionsFunctionUnchanged": true,
+  "originalReadBatchRevisionsFunctionSha256": "d9dc303a56e1285dc2b5e93aaab746100fa8ac89d10f96d2e7b4a63021dea187",
+  "scope": "Only the SQL/backend and nonmetadata dependencies are fixtures. All four final metadata modules are exact checkout source before TS erasure."
+}

@@ -1,0 +1,1658 @@
+{
+  "schemaVersion": 1,
+  "preparedAt": "2026-11-08T23:24:00.766025+00:00",
+  "status": "READ_ONLY_ATTRIBUTION_COMPLETE_BUDGET_REMAINS_RED",
+  "source": {
+    "publicHead": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+    "actualCheckout": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+    "tree": "7a2e1b485920ae36e0b311519b50ab1ed30dfe69",
+    "lifecyclePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/native4a07/native-4a07-original/lifecycle.json",
+    "lifecycleSha256": "5b2a401a348cb03965e8666b66acf0e253463dbd8af6555a8dc4558d58da376f"
+  },
+  "primary": {
+    "summary": {
+      "nativeLogin": {
+        "totalSql": 504,
+        "segments": [
+          {
+            "phase": "common-email-authentication",
+            "sql": 19,
+            "elapsedMs": 162
+          },
+          {
+            "phase": "native-pkce-and-automatic-renderer-to-public-session",
+            "sql": 13,
+            "elapsedMs": 1128
+          },
+          {
+            "phase": "workspace-selection-to-usable",
+            "sql": 472,
+            "elapsedMs": 7648
+          }
+        ]
+      },
+      "webLogin": {
+        "totalSql": 480,
+        "segments": [
+          {
+            "phase": "common-email-authentication",
+            "sql": 19,
+            "elapsedMs": 160
+          },
+          {
+            "phase": "web-navigation-to-dom-content-loaded",
+            "sql": 0,
+            "elapsedMs": 341
+          },
+          {
+            "phase": "workspace-selection-to-usable",
+            "sql": 461,
+            "elapsedMs": 2996
+          }
+        ]
+      }
+    },
+    "operationDiff": [
+      {
+        "name": "/actions/coordinator/chat",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/actions/coordinator/poll",
+        "native": 107,
+        "web": 90,
+        "delta": 17
+      },
+      {
+        "name": "/actions/coordinator/summaries",
+        "native": 15,
+        "web": 20,
+        "delta": -5
+      },
+      {
+        "name": "/actions/issues/poll",
+        "native": 35,
+        "web": 33,
+        "delta": 2
+      },
+      {
+        "name": "/actions/projects/list",
+        "native": 4,
+        "web": 6,
+        "delta": -2
+      },
+      {
+        "name": "/actions/task-runs/read",
+        "native": 15,
+        "web": 0,
+        "delta": 15
+      },
+      {
+        "name": "/actions/threads/poll",
+        "native": 16,
+        "web": 22,
+        "delta": -6
+      },
+      {
+        "name": "/api/auth/[...all]",
+        "native": 21,
+        "web": 24,
+        "delta": -3
+      },
+      {
+        "name": "/api/desktop/begin",
+        "native": 1,
+        "web": 0,
+        "delta": 1
+      },
+      {
+        "name": "/api/desktop/exchange",
+        "native": 8,
+        "web": 0,
+        "delta": 8
+      },
+      {
+        "name": "/api/desktop/return",
+        "native": 2,
+        "web": 0,
+        "delta": 2
+      },
+      {
+        "name": "/api/desktop/rpc",
+        "native": 113,
+        "web": 0,
+        "delta": 113
+      },
+      {
+        "name": "/api/live/ticket",
+        "native": 15,
+        "web": 15,
+        "delta": 0
+      },
+      {
+        "name": "/api/rpc",
+        "native": 0,
+        "web": 117,
+        "delta": -117
+      },
+      {
+        "name": "/api/workspace",
+        "native": 25,
+        "web": 25,
+        "delta": 0
+      },
+      {
+        "name": "/api/workspace/switcher",
+        "native": 10,
+        "web": 20,
+        "delta": -10
+      },
+      {
+        "name": "unattributed",
+        "native": 117,
+        "web": 108,
+        "delta": 9
+      }
+    ],
+    "unattributedSourceDiff": [
+      {
+        "name": "/api/agent/sessions",
+        "native": 6,
+        "web": 6,
+        "delta": 0
+      },
+      {
+        "name": "/api/approved-writes",
+        "native": 50,
+        "web": 50,
+        "delta": 0
+      },
+      {
+        "name": "/api/computer/events",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/api/conversations",
+        "native": 23,
+        "web": 23,
+        "delta": 0
+      },
+      {
+        "name": "/api/conversations/[id]/read",
+        "native": 22,
+        "web": 22,
+        "delta": 0
+      },
+      {
+        "name": "/api/coordinator/attention",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/api/coordinator/messages",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/api/coordinator/runtime",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/api/coordinator/stream",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/api/devices/enrollment",
+        "native": 9,
+        "web": 0,
+        "delta": 9
+      },
+      {
+        "name": "/api/frontend/oauth-consent",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/api/integrations/composio",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/api/mobile/reactions",
+        "native": 2,
+        "web": 2,
+        "delta": 0
+      },
+      {
+        "name": "/api/pending-actions",
+        "native": 5,
+        "web": 5,
+        "delta": 0
+      },
+      {
+        "name": "/api/settings/[read]",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/api/settings/model-order",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/api/settings/preferences",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/api/teams/[teamId]/members",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/api/teams/directory",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/pages/settings",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/pages/workspace",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/commands",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/commands/ack",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/computer",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/coordinator",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/fs/requests",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/fs/requests/[requestId]",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/gateway",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/github-token",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/heartbeat",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/repos",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/runs",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/runs/[runId]/attachments/[id]",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/runs/[runId]/claim",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/runs/[runId]/computer-authority",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/runs/[runId]/credentials/login",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/runs/[runId]/subscription",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/runs/[runId]/subscription-lease",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/enroll",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/register",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/runs/[runId]",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/runs/[runId]/captures",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/runs/[runId]/captures/[captureId]",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/runs/[runId]/captures/[captureId]/complete",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/runs/[runId]/checkpoint",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/runs/[runId]/complete",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/runs/[runId]/decision",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/runs/[runId]/events",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/runs/[runId]/policy-snapshot",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/runs/[runId]/screen",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/runs/[runId]/skill-receipt",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/runs/[runId]/tool-approval",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:agent-images.revalidate",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:auth-email",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:composio-triggers",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:composio-webhook",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:coordinator-wake",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:device-wake",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:due-timer",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:factory-dispatch-recovery",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:github-webhook",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:group-turn",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:issue-effects",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:linear-issue-sync",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:linear-sync-batch",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:linear-webhook",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:linear-webhook-suggestions",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:live-notify",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:record-time-zone",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:remember-locale",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:run-outcome-judge",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:short-title",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:stop-recordings",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:subagent-start",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:suggestions-bootstrap",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:workflow-wake",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "noScope",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "otherScoped",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      }
+    ],
+    "physicalActionDiff": [
+      {
+        "action": "bots.pollBots",
+        "native": 1,
+        "web": 5,
+        "delta": -4
+      },
+      {
+        "action": "coordinator.pollBotChatSummaries",
+        "native": 0,
+        "web": 4,
+        "delta": -4
+      },
+      {
+        "action": "coordinator.syncCoordinatorChat",
+        "native": 1,
+        "web": 4,
+        "delta": -3
+      },
+      {
+        "action": "desktop.bootstrap",
+        "native": 3,
+        "web": 3,
+        "delta": 0
+      },
+      {
+        "action": "desktop.readBatch",
+        "native": 10,
+        "web": 0,
+        "delta": 10
+      },
+      {
+        "action": "desktop.session",
+        "native": 1,
+        "web": 0,
+        "delta": 1
+      },
+      {
+        "action": "execution-settings.getBotModelMenu",
+        "native": 3,
+        "web": 3,
+        "delta": 0
+      },
+      {
+        "action": "issues.syncIssueList",
+        "native": 1,
+        "web": 4,
+        "delta": -3
+      },
+      {
+        "action": "projects.listProjects",
+        "native": 0,
+        "web": 3,
+        "delta": -3
+      },
+      {
+        "action": "task-runs.syncThreadList",
+        "native": 0,
+        "web": 4,
+        "delta": -4
+      },
+      {
+        "action": "team-relations.listProjectTeams",
+        "native": 0,
+        "web": 5,
+        "delta": -5
+      },
+      {
+        "action": "teams.listTeams",
+        "native": 0,
+        "web": 5,
+        "delta": -5
+      },
+      {
+        "action": "workspace.switchWorkspace",
+        "native": 1,
+        "web": 1,
+        "delta": 0
+      }
+    ],
+    "logicalActionDiff": [
+      {
+        "action": "bots.pollBots",
+        "native": 5,
+        "web": 5,
+        "delta": 0
+      },
+      {
+        "action": "coordinator.pollBotChatSummaries",
+        "native": 5,
+        "web": 4,
+        "delta": 1
+      },
+      {
+        "action": "coordinator.syncCoordinatorChat",
+        "native": 5,
+        "web": 4,
+        "delta": 1
+      },
+      {
+        "action": "desktop.bootstrap",
+        "native": 3,
+        "web": 3,
+        "delta": 0
+      },
+      {
+        "action": "desktop.session",
+        "native": 1,
+        "web": 0,
+        "delta": 1
+      },
+      {
+        "action": "execution-settings.getBotModelMenu",
+        "native": 3,
+        "web": 3,
+        "delta": 0
+      },
+      {
+        "action": "issues.syncIssueList",
+        "native": 5,
+        "web": 4,
+        "delta": 1
+      },
+      {
+        "action": "projects.listProjects",
+        "native": 3,
+        "web": 3,
+        "delta": 0
+      },
+      {
+        "action": "task-runs.pollTaskRuns",
+        "native": 5,
+        "web": 0,
+        "delta": 5
+      },
+      {
+        "action": "task-runs.syncThreadList",
+        "native": 5,
+        "web": 4,
+        "delta": 1
+      },
+      {
+        "action": "team-relations.listProjectTeams",
+        "native": 5,
+        "web": 5,
+        "delta": 0
+      },
+      {
+        "action": "teams.listTeams",
+        "native": 5,
+        "web": 5,
+        "delta": 0
+      },
+      {
+        "action": "workspace.switchWorkspace",
+        "native": 1,
+        "web": 1,
+        "delta": 0
+      }
+    ]
+  },
+  "independentReference": {
+    "publicHead": "4ec74d5caae87d20358409b41906091cca33b46f",
+    "actualCheckout": "c96149ef94c0a2ef0e92b7eef80a91eba17bda86",
+    "tree": "6ec1f97897c2db3300286977e041acb43b81a686",
+    "originalZip": "/workspace/scratch/af05d9e4f31e/triage-1512/batch1782-native.zip",
+    "zipSha256": "a4cde3c3c30b669cef64c42eabb5141475c3da187a106f7abf51e0d69bfbbc25",
+    "lifecycleSha256": "e5ea9673d606be31d9850ec4d7284a974435f3bbcdd666d829085a6544957f4f",
+    "summary": {
+      "nativeLogin": {
+        "totalSql": 498,
+        "segments": [
+          {
+            "phase": "common-email-authentication",
+            "sql": 20,
+            "elapsedMs": 142
+          },
+          {
+            "phase": "native-pkce-and-automatic-renderer-to-public-session",
+            "sql": 15,
+            "elapsedMs": 711
+          },
+          {
+            "phase": "workspace-selection-to-usable",
+            "sql": 463,
+            "elapsedMs": 4767
+          }
+        ]
+      },
+      "webLogin": {
+        "totalSql": 484,
+        "segments": [
+          {
+            "phase": "common-email-authentication",
+            "sql": 20,
+            "elapsedMs": 105
+          },
+          {
+            "phase": "web-navigation-to-dom-content-loaded",
+            "sql": 0,
+            "elapsedMs": 250
+          },
+          {
+            "phase": "workspace-selection-to-usable",
+            "sql": 464,
+            "elapsedMs": 2693
+          }
+        ]
+      }
+    },
+    "operationDiff": [
+      {
+        "name": "/actions/coordinator/chat",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/actions/coordinator/poll",
+        "native": 105,
+        "web": 114,
+        "delta": -9
+      },
+      {
+        "name": "/actions/coordinator/summaries",
+        "native": 15,
+        "web": 25,
+        "delta": -10
+      },
+      {
+        "name": "/actions/issues/poll",
+        "native": 35,
+        "web": 40,
+        "delta": -5
+      },
+      {
+        "name": "/actions/projects/list",
+        "native": 4,
+        "web": 6,
+        "delta": -2
+      },
+      {
+        "name": "/actions/task-runs/read",
+        "native": 15,
+        "web": 0,
+        "delta": 15
+      },
+      {
+        "name": "/actions/threads/poll",
+        "native": 16,
+        "web": 26,
+        "delta": -10
+      },
+      {
+        "name": "/api/auth/[...all]",
+        "native": 22,
+        "web": 26,
+        "delta": -4
+      },
+      {
+        "name": "/api/desktop/begin",
+        "native": 1,
+        "web": 0,
+        "delta": 1
+      },
+      {
+        "name": "/api/desktop/exchange",
+        "native": 8,
+        "web": 0,
+        "delta": 8
+      },
+      {
+        "name": "/api/desktop/return",
+        "native": 2,
+        "web": 0,
+        "delta": 2
+      },
+      {
+        "name": "/api/desktop/rpc",
+        "native": 113,
+        "web": 0,
+        "delta": 113
+      },
+      {
+        "name": "/api/live/ticket",
+        "native": 15,
+        "web": 15,
+        "delta": 0
+      },
+      {
+        "name": "/api/rpc",
+        "native": 0,
+        "web": 115,
+        "delta": -115
+      },
+      {
+        "name": "/api/workspace",
+        "native": 25,
+        "web": 25,
+        "delta": 0
+      },
+      {
+        "name": "/api/workspace/switcher",
+        "native": 10,
+        "web": 20,
+        "delta": -10
+      },
+      {
+        "name": "unattributed",
+        "native": 112,
+        "web": 72,
+        "delta": 40
+      }
+    ],
+    "unattributedSourceDiff": [
+      {
+        "name": "/api/agent/sessions",
+        "native": 6,
+        "web": 6,
+        "delta": 0
+      },
+      {
+        "name": "/api/approved-writes",
+        "native": 50,
+        "web": 20,
+        "delta": 30
+      },
+      {
+        "name": "/api/computer/events",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/api/conversations",
+        "native": 23,
+        "web": 23,
+        "delta": 0
+      },
+      {
+        "name": "/api/conversations/[id]/read",
+        "native": 17,
+        "web": 19,
+        "delta": -2
+      },
+      {
+        "name": "/api/coordinator/attention",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/api/coordinator/messages",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/api/coordinator/runtime",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/api/coordinator/stream",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/api/devices/enrollment",
+        "native": 9,
+        "web": 0,
+        "delta": 9
+      },
+      {
+        "name": "/api/frontend/oauth-consent",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/api/integrations/composio",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/api/mobile/reactions",
+        "native": 2,
+        "web": 2,
+        "delta": 0
+      },
+      {
+        "name": "/api/pending-actions",
+        "native": 5,
+        "web": 2,
+        "delta": 3
+      },
+      {
+        "name": "/api/settings/[read]",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/api/settings/model-order",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/api/settings/preferences",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/api/teams/[teamId]/members",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/api/teams/directory",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/pages/settings",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/pages/workspace",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/commands",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/commands/ack",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/computer",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/coordinator",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/fs/requests",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/fs/requests/[requestId]",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/gateway",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/github-token",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/heartbeat",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/repos",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/runs",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/runs/[runId]/attachments/[id]",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/runs/[runId]/claim",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/runs/[runId]/computer-authority",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/runs/[runId]/credentials/login",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/runs/[runId]/subscription",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/[deviceId]/runs/[runId]/subscription-lease",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/enroll",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/devices/register",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/runs/[runId]",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/runs/[runId]/captures",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/runs/[runId]/captures/[captureId]",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/runs/[runId]/captures/[captureId]/complete",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/runs/[runId]/checkpoint",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/runs/[runId]/complete",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/runs/[runId]/decision",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/runs/[runId]/events",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/runs/[runId]/policy-snapshot",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/runs/[runId]/screen",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/runs/[runId]/skill-receipt",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "/v1/runs/[runId]/tool-approval",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:agent-images.revalidate",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:auth-email",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:composio-triggers",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:composio-webhook",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:coordinator-wake",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:device-wake",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:due-timer",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:factory-dispatch-recovery",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:github-webhook",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:group-turn",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:issue-effects",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:linear-issue-sync",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:linear-sync-batch",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:linear-webhook",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:linear-webhook-suggestions",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:live-notify",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:record-time-zone",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:remember-locale",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:run-outcome-judge",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:short-title",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:stop-recordings",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:subagent-start",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:suggestions-bootstrap",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "after:workflow-wake",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "noScope",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      },
+      {
+        "name": "otherScoped",
+        "native": 0,
+        "web": 0,
+        "delta": 0
+      }
+    ],
+    "logicalActionDiff": [
+      {
+        "action": "None",
+        "native": 1,
+        "web": 0,
+        "delta": 1
+      },
+      {
+        "action": "bots.pollBots",
+        "native": 5,
+        "web": 5,
+        "delta": 0
+      },
+      {
+        "action": "coordinator.pollBotChatSummaries",
+        "native": 5,
+        "web": 5,
+        "delta": 0
+      },
+      {
+        "action": "coordinator.syncCoordinatorChat",
+        "native": 5,
+        "web": 5,
+        "delta": 0
+      },
+      {
+        "action": "desktop.bootstrap",
+        "native": 3,
+        "web": 3,
+        "delta": 0
+      },
+      {
+        "action": "desktop.session",
+        "native": 1,
+        "web": 0,
+        "delta": 1
+      },
+      {
+        "action": "execution-settings.getBotModelMenu",
+        "native": 3,
+        "web": 3,
+        "delta": 0
+      },
+      {
+        "action": "issues.syncIssueList",
+        "native": 5,
+        "web": 5,
+        "delta": 0
+      },
+      {
+        "action": "projects.listProjects",
+        "native": 3,
+        "web": 3,
+        "delta": 0
+      },
+      {
+        "action": "task-runs.pollTaskRuns",
+        "native": 5,
+        "web": 0,
+        "delta": 5
+      },
+      {
+        "action": "task-runs.syncThreadList",
+        "native": 5,
+        "web": 5,
+        "delta": 0
+      },
+      {
+        "action": "team-relations.listProjectTeams",
+        "native": 5,
+        "web": 5,
+        "delta": 0
+      },
+      {
+        "action": "teams.listTeams",
+        "native": 5,
+        "web": 5,
+        "delta": 0
+      },
+      {
+        "action": "workspace.switchWorkspace",
+        "native": 1,
+        "web": 1,
+        "delta": 0
+      }
+    ]
+  },
+  "reviewedSource": [
+    {
+      "path": "components/desktop/desktop-integration.tsx",
+      "gitBlob": "a755882162c52559579cbd96b26373f121d74761",
+      "sha256": "71447f74b45076755aefb322e721c3263c61cf8188d31b4c2159246645d76168",
+      "reviewedWorkingCopyMatchesExactHead": true
+    },
+    {
+      "path": "hooks/use-live-lists.ts",
+      "gitBlob": "ac60a59be511ec45cc372b8c91c0535861a30931",
+      "sha256": "c4c9ea9e785986831df600cfff09fccba1705e7a10e0a886d5d6af21d8463b1a",
+      "reviewedWorkingCopyMatchesExactHead": true
+    },
+    {
+      "path": "hooks/use-live-key.tsx",
+      "gitBlob": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f",
+      "sha256": "5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857",
+      "reviewedWorkingCopyMatchesExactHead": true
+    },
+    {
+      "path": "app/actions/task-runs.ts",
+      "gitBlob": "ae3974497f8c0573dd9c8d0ec5ba880f5a5c72ef",
+      "sha256": "4f29acbe6899a1432d4f216cb1f08aeba8672897319106b98848fbfda45767f8",
+      "reviewedWorkingCopyMatchesExactHead": true
+    },
+    {
+      "path": "app/actions/coordinator.ts",
+      "gitBlob": "3cde11bdaab0164d179d51f37efdf1d77ec7e938",
+      "sha256": "b70ceec98efa1edfc1074598b2a6cf12b58d4f2539bb351854a562fa43f9d451",
+      "reviewedWorkingCopyMatchesExactHead": true
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "gitBlob": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+      "sha256": "7d1d16e02ea9ca8256812312eafc96c0591cc1df1c6a463e0216e420d37b8ede",
+      "reviewedWorkingCopyMatchesExactHead": true
+    },
+    {
+      "path": "lib/live/list-read.ts",
+      "gitBlob": "0ddc43d2db3680343288bc524f8f2de4d8ed5969",
+      "sha256": "7dca0d60ae5aa2bc9f3ed5ca1a2ecc3aba08767df8af26a1d9f666bea7a94fb0",
+      "reviewedWorkingCopyMatchesExactHead": true
+    },
+    {
+      "path": "lib/live/revision-read.ts",
+      "gitBlob": "beb3193ba6e10a586e86e8e0988d799e00a482bd",
+      "sha256": "eddf21c6fe1d381d154ddf257c28ae9923daaeff3ebc1d2b63c621add914af46",
+      "reviewedWorkingCopyMatchesExactHead": true
+    },
+    {
+      "path": "lib/live/owner-scope.ts",
+      "gitBlob": "962829a3e69f508f93621e897209e408f6ad1d2a",
+      "sha256": "d803e41828b7bb49ef89e6571efe43f8080249e121cb4852f7e869d0a2382673",
+      "reviewedWorkingCopyMatchesExactHead": true
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "gitBlob": "48e1ec4556d16393c9b95e65e82c91fc3dd1e0f8",
+      "sha256": "4673311b318c705301b14129ce38af905481064c02da19dcc6b2394ce6b94108",
+      "reviewedWorkingCopyMatchesExactHead": true
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch.ts",
+      "gitBlob": "603982e23fafd342cc38177fa1ece09e2df26be6",
+      "sha256": "3d99daae29daec0ca3ee25065c7a69c0d089f769c151e1509cb7d7721ed65045",
+      "reviewedWorkingCopyMatchesExactHead": true
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "gitBlob": "e9e60ee1555658b49cc4336b426c07156e96bfbe",
+      "sha256": "057dd6f7ee07639c3e8bd44f139021b4e1796c991596016aaf43c3dbd75ae72c",
+      "reviewedWorkingCopyMatchesExactHead": true
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "gitBlob": "5856e85262e22354ffafb88d7cd60e4a94d1a29c",
+      "sha256": "603268415400b8c11bd3b6cd70e0064f4064139f7ec57e6548c96d8f489d3448",
+      "reviewedWorkingCopyMatchesExactHead": true
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "gitBlob": "2dc3ab5a9934fed5146189fd236b450f0d223920",
+      "sha256": "2c4f60539d1eb8d8e607490268fe065fa03b6f1b27e796fa23f5f35bd670499b",
+      "reviewedWorkingCopyMatchesExactHead": true
+    },
+    {
+      "path": "apps/desktop/src/renderer/app.tsx",
+      "gitBlob": "c780d381fce0daa9c1646d63c7c099d48d197223",
+      "sha256": "f1135aa822bc092b6f2c490e0f1b5fdbbafe93b990c484055a5939478a07603d",
+      "reviewedWorkingCopyMatchesExactHead": true
+    },
+    {
+      "path": "apps/desktop/src/renderer/bootstrap.ts",
+      "gitBlob": "bad05c7cadc6de8604d7ab89ffb1fc6246fe6ea5",
+      "sha256": "1aac5eb7968426e8ec6158f4c2d511b13993d392e4f204111e631ccc6d58a333",
+      "reviewedWorkingCopyMatchesExactHead": true
+    },
+    {
+      "path": "lib/coordinator/chat-read-client.ts",
+      "gitBlob": "c5588e067ff295cc81b5c3e35ea5307fbd94bf57",
+      "sha256": "428bd4e2529d89c0ba740efbb5e0121f1ae50d9efcedffecaca72dd0dbdd2dd4",
+      "reviewedWorkingCopyMatchesExactHead": true
+    }
+  ],
+  "findings": [
+    {
+      "id": "A1",
+      "confidence": "observed",
+      "finding": "504-480=24. Common authentication 19-19=0, native PKCE/automatic-renderer segment 13-0=13, workspace-to-usable 472-461=11. All concurrent primary API traffic is included. No subtraction proposed."
+    },
+    {
+      "id": "A2",
+      "confidence": "observed_and_source_explained",
+      "finding": "Native task-runs.pollTaskRuns logical 5 versus Web 0; /actions/task-runs/read bucket 15 versus 0. DesktopIntegration enables useLiveTaskRunList only on desktop for Dock badge and run-status notifications. This is required existing desktop functionality, not a proven redundant action; disabling it or adding Web reads is not proposed."
+    },
+    {
+      "id": "A3",
+      "confidence": "observed",
+      "finding": "The 78 unattributed-source buckets differ only at /api/devices/enrollment, Native 9 versus Web 0; all other source buckets are equal in this run. Enrollment auth/PKCE source diagnosis is owned by the separate posthog_recovery agent."
+    },
+    {
+      "id": "A4",
+      "confidence": "observed_not_semantic_duplicate_proof",
+      "finding": "Native has one extra logical call each to coordinator.pollBotChatSummaries, coordinator.syncCoordinatorChat, issues.syncIssueList, task-runs.syncThreadList. Native workspace segment is 7648ms versus Web 2996ms. Aggregate records do not carry per-call arguments, held revisions, document IDs or dispatch timestamps, so these extras cannot be proven redundant from this receipt."
+    },
+    {
+      "id": "A5",
+      "confidence": "source_explained_boundary",
+      "finding": "withReadBatchContext shares owner scope and revisions within one bounded read batch. SQL charged to the originating operation can serve multiple logical actions. Dividing 15 SQL by five task-run actions is an average only; deleting one logical action is not proved to save three SQL."
+    },
+    {
+      "id": "A6",
+      "confidence": "observed",
+      "finding": "Both sides have desktop.bootstrap 3, execution-settings.getBotModelMenu 3, projects.listProjects 3, bots.pollBots 5, teams.listTeams 5, team-relations.listProjectTeams 5, workspace.switchWorkspace 1. No Native-only duplication is demonstrated for these actions. Native physical21/logical51 versus Web physical41/logical41 reflects batching, not RPC retry evidence."
+    },
+    {
+      "id": "A7",
+      "confidence": "source_explained",
+      "finding": "The renderer read batch falls back to singles only after explicit 404 desktop_rpc_action_unknown. This run has all200 and complete pairing. LiveChannel catches up on open/reconnect and honors revisions and actual read dispatch proof; its necessity cannot be discarded using aggregate action counts."
+    },
+    {
+      "id": "A8",
+      "confidence": "cross_source_reference_only",
+      "finding": "Independent 4ec/c961 remains 498/484 RED and also has task-run5/0 and enrollment9/0, but the other four logical lists are5/5 there. Its approved-write, pending-action and coordinator counts differ materially. It is an independent pattern reference, not repeated measurement of the4a source or proof of a universal fourteen-SQL cause."
+    },
+    {
+      "id": "A9",
+      "confidence": "public_progress_observed",
+      "finding": "PR1782 last inspected owner progress comment6728438720 says diagnosing actual source, with no concrete same-cause fix published; cross-version registration6728562324 retains the RED and upcoming9794 boundary. No unreviewed fix is adopted."
+    }
+  ],
+  "limitations": [
+    "No workflow was dispatched, rerun or canceled. No model or paid compute was invoked. No source, measurement window or threshold was changed.",
+    "No credential values or raw user/model content were read. Only safe existing lifecycle artifacts and exact source were inspected.",
+    "Conservation, cleanup and package verification are owned by native_6180_review; this receipt does not replace its full-original verification.",
+    "Existing 4a and 4ec results do not validate the unpublished9794 or any eventual integrated candidate.",
+    "No semantically redundant RPC action is proven by these aggregate artifacts alone. Required desktop features and authorization checks must stay intact."
+  ]
+}

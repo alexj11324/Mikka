@@ -1,0 +1,19 @@
+--- a/lib/swr/persistent-cache.test.tsx
++++ b/lib/swr/persistent-cache.test.tsx
+@@ -443,7 +443,7 @@
+   }
+   Object.defineProperty(globalThis, 'BroadcastChannel', { configurable: true, value: Channel })
+   try {
+-    for (const mode of ['document', 'remote', 'denied'] as const) {
++    for (const mode of ['document', 'ordinary', 'remote', 'denied'] as const) {
+       let reads = 0, cache: PersistentReadCache | undefined
+       function Read() {
+         const current = swr.useSWRConfig().cache
+@@ -460,6 +460,7 @@
+         assert.ok(receiver)
+         await act(async () => {
+           if (mode === 'document') await clearPersistentReadCaches({ documentNavigation: true })
++          else if (mode === 'ordinary') await clearPersistentReadCaches()
+           else if (mode === 'remote') receiver.onmessage!({ data: { type: 'clear' } } as MessageEvent)
+           else cache!.set('preferences', { _k: 'preferences', error: { status: 403 } })
+         })

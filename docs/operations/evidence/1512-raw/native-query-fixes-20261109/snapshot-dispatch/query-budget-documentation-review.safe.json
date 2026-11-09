@@ -1,0 +1,26 @@
+{
+  "schema": "issue1512.docs-source-review.v1",
+  "path": "docs/operations/tracing.md",
+  "baseTree": "fd1aadd36228359a6ac75f6ed690f8c40877fc07",
+  "baselineSha256": "3c1bf09901f5ff267a0df1d927691516be50b2a868fe8faa1e2fa5c467a1c127",
+  "sha256": "963dd1f41e3f94c31983529db2807a54af77fab11afe41980986154aee9ad75e",
+  "gitBlob": "e75e8377fbcb6f92d3446f5325d6d55cc4b294af",
+  "bytes": 63844,
+  "checkedAt": "2026-11-09T00:01:01.786915+00:00",
+  "sourceBindings": [
+    "apps/desktop/src/renderer/rpc.ts",
+    "apps/desktop/src/renderer/read-batch.ts",
+    "hooks/use-live-lists.ts",
+    "lib/desktop-rpc/read-batch-context.ts",
+    "lib/live/revision-read.ts",
+    "apps/desktop/test/db-query-diagnostics.cjs",
+    "apps/desktop/test/lifecycle-query-counts.mjs",
+    "lib/request-log.ts"
+  ],
+  "independentReview": "current_source_review confirmed source consistency, with clarification now added that query metadata collection happens inside windows and only its export is after measurements",
+  "notClaimed": [
+    "actual Native SQL budget pass",
+    "real PG run",
+    "production acceptance"
+  ]
+}

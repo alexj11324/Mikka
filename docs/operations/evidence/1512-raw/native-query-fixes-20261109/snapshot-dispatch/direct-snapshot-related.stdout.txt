@@ -1,0 +1,117 @@
+(node:13) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:13) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ desktop startup and unchanged snapshots never read a notification preference they cannot use (137.89348ms)
+✔ a real completion asks the server to enforce current preferences before showing its decision (48.204435ms)
+✔ a decision that returns after the integration unmounts cannot raise an OS notification (198.591688ms)
+✔ a prior account decision cannot notify after the Vite account subtree is replaced (229.76304ms)
+✔ an ordinary list refresh does not discard a valid pending decision from the same session (196.900683ms)
+✔ changing from the desktop runtime invalidates an outstanding notification decision (197.873918ms)
+✔ a pending notification click cannot navigate after the integration unmounts (34.675447ms)
+✔ replacing the router discards the old pending click and keeps the current click handler (35.001462ms)
+✔ native setup does not read the device list when connecting (3.56955ms)
+✔ native setup does not read the device list when offline (3.185044ms)
+✔ native setup does not read the device list when unsigned (2.260677ms)
+✔ native setup does not read the device list when unregistered (2.953424ms)
+✔ native setup still reads ownership before retaining or replacing an online signed-in device (3.547322ms)
+✔ native setup does not start an ownership read after its account has unmounted (3.207288ms)
+✔ an old ownership response cannot install a device after the account changes (3.75187ms)
+✔ failed ownership verification never becomes an install decision (2.764127ms)
+(node:14) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:14) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ a committed SWR read after connection readiness covers the pending live flush (812.77771ms)
+✔ a late live subscription shares the committed read from its continuously ready connection (330.004698ms)
+✔ a new unversioned push while unsubscribed invalidates the committed read before a late subscription (328.300325ms)
+✔ a higher-revision push while unsubscribed invalidates the committed read before a late subscription (328.445797ms)
+✔ a late subscription cannot reuse a read from without the capability acknowledgement (325.333963ms)
+✔ a late subscription cannot reuse a read from before the capability acknowledgement (325.800109ms)
+(node:14) TimeoutNaNWarning: NaN is not a number.
+Timeout duration was set to 1.
+✔ a committed read from an earlier connection generation cannot cover a late subscription (327.327211ms)
+✔ a replaced committed cache object cannot satisfy the pending live flush (327.009536ms)
+✔ a newer failed SWR read cannot resurrect an earlier committed provenance (328.97851ms)
+✔ live catch-ups share an ordinary SWR read that starts after both scoped connections open (653.081942ms)
+✔ a SWR read that starts before the live connection opens cannot consume its catch-up (329.184956ms)
+✔ a new unversioned push during a shared SWR read still gets its trailing read (646.840334ms)
+✔ a higher-revision push during a shared SWR read still gets its trailing read (646.928808ms)
+✔ a later-started SWR read must still prove every required revision before covering a live push (488.579052ms)
+✔ a SWR response discarded by an optimistic mutation cannot consume the live catch-up (487.122963ms)
+✔ a custom comparator retaining an older cache value cannot certify an unversioned live catch-up (485.783422ms)
+✔ a shared read cannot replace the revision held when the live obligation began with a lower revision (487.810922ms)
+✔ a completed read cannot erase the higher revision still held by the active live subscription (646.79134ms)
+✔ an original onSuccess exception remains a SWR error without a shared-read retry (484.892327ms)
+✔ a discarded shared read cannot start another request after the page becomes hidden (808.907212ms)
+✔ a newer SWR read replaces a shared observation without applying or re-reading the discarded result (487.141251ms)
+✔ an old cache error cannot be attributed to a superseded read or consume the replacement revision requirement (647.820639ms)
+✔ a shared permission failure keeps SWR error handling and does not start another request (486.822365ms)
+✔ retiring the owner cache while a shared read is pending neither adopts it nor revalidates the departed scope (811.985548ms)
+✔ resolving the issue home different from the selected workspace preserves its live subscription (649.575847ms)
+✔ resolving the issue home equal to the selected workspace preserves its live subscription (646.718482ms)
+✔ an unresolved issue home retains disconnected fallback even when its selected workspace channel is healthy (327.949827ms)
+✔ real thread hooks require a current presence acknowledgement, update its proof and unregister on exit (499.366509ms)
+✔ an older server presence fallback flag remains uncovered on a healthy new live transport (328.091345ms)
+✔ three acknowledged presence tabs still share one authorized read for the same device-state push (2755.020612ms)
+✔ a restored issues snapshot sends its existing row proofs and removes rows absent from the authorized delta (326.126133ms)
+✔ a restored threads snapshot sends its existing row proofs and removes rows absent from the authorized delta (326.784426ms)
+✔ a restored list with partial proofs cannot receive unchanged while rows are missing (326.313456ms)
+✔ a restored list with missing proofs cannot receive unchanged while rows are missing (324.443067ms)
+✔ an explicit revoked access response hides a previously visible cached issue list (678.378297ms)
+✔ real list hooks update held revisions after an asynchronous read without losing scoped focus coverage (5051.651542ms)
+✔ real shared live hooks reject an older in-flight snapshot and still coalesce matching pushes (7596.959425ms)
+✔ healthy real list hooks stay quiet beyond the old sixty-second interval, and an owner-home event refreshes only its list (61942.020511ms)
+✔ a late tasks response after the cookie changes cannot populate the old owner's real SWR cache (331.894451ms)
+✔ a late bots response after the cookie changes cannot populate the old owner's real SWR cache (330.728019ms)
+✔ a late issue response cannot replace the selected workspace, and an unresolved read has no adopted SSR rows (810.220339ms)
+✔ a server-selected replacement workspace is refused under the former issue-list key (324.363976ms)
+✔ group list GET results are bound to both the authenticated owner and the requested workspace before caching (326.918745ms)
+✔ a delayed Bot roster cannot populate another owner's list key (334.096432ms)
+✔ a delayed Bot roster cannot populate another workspace's list key (330.31833ms)
+✔ leaving Settings catches up a roster event that arrived while its read was paused (2763.279104ms)
+✔ hidden list views retain a dirty event and catch up once when visible (3079.117131ms)
+✔ without an active owned home, the owner-wide list never guesses the Provider workspace (323.569095ms)
+✔ a server-derived chat lease expiry performs one read without recreating the transport (2278.459356ms)
+✔ a completed-list age boundary repaints once without a data read, and a hidden boundary catches up on visibility (1356.612448ms)
+✔ a bot-list push re-reads the bot list only, never a mounted whole Coordinator chat (2628.364334ms)
+✔ native dispatch proof: tasks single HTTP after readiness (338.464471ms)
+ℹ {"kind":"native_dispatch_order","action":"task-runs.pollTaskRuns","grouped":false,"beforeReady":false,"phases":["list_fetcher","native_enqueued","live_ready","fetch_dispatch"],"listCalls":1,"physicalCalls":1}
+✔ native dispatch proof: tasks single HTTP before readiness (325.943018ms)
+ℹ {"kind":"native_dispatch_order","action":"task-runs.pollTaskRuns","grouped":false,"beforeReady":true,"phases":["list_fetcher","native_enqueued","fetch_dispatch","live_ready","list_fetcher","native_enqueued","fetch_dispatch"],"listCalls":2,"physicalCalls":2}
+✔ native dispatch proof: tasks batch HTTP after readiness (328.723663ms)
+ℹ {"kind":"native_dispatch_order","action":"task-runs.pollTaskRuns","grouped":true,"beforeReady":false,"phases":["list_fetcher","native_enqueued","live_ready","fetch_dispatch"],"listCalls":1,"physicalCalls":1}
+✔ native dispatch proof: tasks batch HTTP before readiness (324.602856ms)
+ℹ {"kind":"native_dispatch_order","action":"task-runs.pollTaskRuns","grouped":true,"beforeReady":true,"phases":["list_fetcher","native_enqueued","fetch_dispatch","live_ready","list_fetcher","native_enqueued","fetch_dispatch"],"listCalls":2,"physicalCalls":2}
+✔ native dispatch proof: bots single HTTP after readiness (325.314615ms)
+ℹ {"kind":"native_dispatch_order","action":"coordinator.pollBotChatSummaries","grouped":false,"beforeReady":false,"phases":["list_fetcher","native_enqueued","live_ready","fetch_dispatch"],"listCalls":1,"physicalCalls":1}
+✔ native dispatch proof: bots single HTTP before readiness (327.394338ms)
+ℹ {"kind":"native_dispatch_order","action":"coordinator.pollBotChatSummaries","grouped":false,"beforeReady":true,"phases":["list_fetcher","native_enqueued","fetch_dispatch","live_ready","list_fetcher","native_enqueued","fetch_dispatch"],"listCalls":2,"physicalCalls":2}
+✔ native dispatch proof: bots batch HTTP after readiness (326.00352ms)
+ℹ {"kind":"native_dispatch_order","action":"coordinator.pollBotChatSummaries","grouped":true,"beforeReady":false,"phases":["list_fetcher","native_enqueued","live_ready","fetch_dispatch"],"listCalls":1,"physicalCalls":1}
+✔ native dispatch proof: bots batch HTTP before readiness (327.133195ms)
+ℹ {"kind":"native_dispatch_order","action":"coordinator.pollBotChatSummaries","grouped":true,"beforeReady":true,"phases":["list_fetcher","native_enqueued","fetch_dispatch","live_ready","list_fetcher","native_enqueued","fetch_dispatch"],"listCalls":2,"physicalCalls":2}
+✔ native dispatch proof: roster single HTTP after readiness (324.383397ms)
+ℹ {"kind":"native_dispatch_order","action":"bots.pollBots","grouped":false,"beforeReady":false,"phases":["list_fetcher","native_enqueued","live_ready","fetch_dispatch"],"listCalls":1,"physicalCalls":1}
+✔ native dispatch proof: roster single HTTP before readiness (327.708009ms)
+ℹ {"kind":"native_dispatch_order","action":"bots.pollBots","grouped":false,"beforeReady":true,"phases":["list_fetcher","native_enqueued","fetch_dispatch","live_ready","list_fetcher","native_enqueued","fetch_dispatch"],"listCalls":2,"physicalCalls":2}
+✔ native dispatch proof: roster batch HTTP after readiness (326.027855ms)
+ℹ {"kind":"native_dispatch_order","action":"bots.pollBots","grouped":true,"beforeReady":false,"phases":["list_fetcher","native_enqueued","live_ready","fetch_dispatch"],"listCalls":1,"physicalCalls":1}
+✔ native dispatch proof: roster batch HTTP before readiness (325.162867ms)
+ℹ {"kind":"native_dispatch_order","action":"bots.pollBots","grouped":true,"beforeReady":true,"phases":["list_fetcher","native_enqueued","fetch_dispatch","live_ready","list_fetcher","native_enqueued","fetch_dispatch"],"listCalls":2,"physicalCalls":2}
+(node:15) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+▶ desktop decisions read completion preferences only for a currently owned completion
+  ✔ unauthenticated, empty, malformed, foreign and stale-state candidates never read preferences or ask the model (4.938905ms)
+  ✔ awaiting and failed decisions keep their existing path without reading completion settings (35.018727ms)
+  ✔ a finished event with either switch off is rejected before a model decision (0.365151ms)
+  ✔ one current preference read covers all owned completions and filters only finished candidates (4.748837ms)
+  ✔ a failed preference read cannot produce a completion notification (0.638435ms)
+✔ desktop decisions read completion preferences only for a currently owned completion (217.641995ms)
+ℹ tests 85
+ℹ suites 0
+ℹ pass 85
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 116287.867252

@@ -1,0 +1,30 @@
+{
+  "links": [
+    {
+      "path": "apps/desktop/node_modules",
+      "target": "/workspace/scratch/af05d9e4f31e/Mikka-observability-1512/apps/desktop/node_modules"
+    },
+    {
+      "path": "apps/frontend/node_modules",
+      "target": "/workspace/scratch/af05d9e4f31e/Mikka-observability-1512/apps/frontend/node_modules"
+    },
+    {
+      "path": "apps/mobile/node_modules",
+      "target": "/workspace/scratch/af05d9e4f31e/Mikka-observability-1512/apps/mobile/node_modules"
+    },
+    {
+      "path": "packages/config/node_modules",
+      "target": "/workspace/scratch/af05d9e4f31e/Mikka-observability-1512/packages/config/node_modules"
+    },
+    {
+      "path": "packages/daemon/node_modules",
+      "target": "/workspace/scratch/af05d9e4f31e/Mikka-observability-1512/packages/daemon/node_modules"
+    },
+    {
+      "path": "packages/protocol/node_modules",
+      "target": "/workspace/scratch/af05d9e4f31e/Mikka-observability-1512/packages/protocol/node_modules"
+    }
+  ],
+  "installs": 0,
+  "externalRunners": 0
+}

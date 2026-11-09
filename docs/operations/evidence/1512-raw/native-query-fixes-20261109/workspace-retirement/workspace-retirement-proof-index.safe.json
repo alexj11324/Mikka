@@ -1,0 +1,415 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512-independent-workspace-document-retirement-proof",
+  "frozenAtUTC": "2026-11-09T00:17:41.804087+00:00",
+  "status": "isolated_candidate_verified_final_test_update_pending_root_integration_and_exact_native_acceptance",
+  "candidate": {
+    "kind": "independent-workspace-document-retirement-candidate",
+    "baselineTargetFilesTree": "c0fc19c32787d3f86a37ef2836b37440d20d300a",
+    "isolatedCheckout": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/workspace-retirement-20261109/checkout",
+    "files": [
+      {
+        "path": "lib/swr/persistent-cache.ts",
+        "baselineSha256": "b7750de029f5462bee61efba2642ccfa894e08a981a75c97f5852e715b5f9b1f",
+        "baselineGitBlob": "df7d4d1b5f2c744061236c54d766f68aa2137830",
+        "sha256": "d1e1793960a0401fc2e8cb3a9b29e2a894828096e444fc086a6d1ebe5d34df1a",
+        "gitBlob": "6776b93c8d98738a3e7c84a383da435af64baa95",
+        "bytes": 10956,
+        "added": 8,
+        "removed": 6
+      },
+      {
+        "path": "components/authenticated-read-cache.tsx",
+        "baselineSha256": "186b86f223636a4391cc54a0e76a25280e527a50cd4cbedde55ee8685798ae41",
+        "baselineGitBlob": "e76bfbd5c5897696bf6301431c4f1fee7ab4407a",
+        "sha256": "90dc00b1dfd6ad21a5ffee1774db8b4a5225b8457390fcb73bb74dbcf7ff009c",
+        "gitBlob": "54b50bb03a114cdb99dd02d2909553e29b3002fc",
+        "bytes": 4539,
+        "added": 11,
+        "removed": 4
+      },
+      {
+        "path": "hooks/use-workspace-switcher.ts",
+        "baselineSha256": "67e18fbbbeb9e0686ce512815df7faf79d075765bf02c74f0ade970cdb930ef8",
+        "baselineGitBlob": "299e9805be3764a90b71e78f79549e6b17a32b70",
+        "sha256": "088f1ed918e101f3cbefbde5329146f04512aef01f90087c820a481782e518e2",
+        "gitBlob": "63550f8517171bafa565327bfb4a72b84d242f7f",
+        "bytes": 4636,
+        "added": 1,
+        "removed": 1
+      },
+      {
+        "path": "lib/swr/persistent-cache.test.tsx",
+        "baselineSha256": "7788c9c8569ea670770027941e31de2eba60ce80c718228c3ac610e4ed0f8015",
+        "baselineGitBlob": "4918061ebe77b2974dd70119f4e3c3a1954b58b3",
+        "sha256": "d57c1fdf88356395dc67d5f1d81891541bb9ea7800bab8d24cdd26583fbdca30",
+        "gitBlob": "99a37c3f55ab05b6b3e986cc5c1eedd0b68d1460",
+        "bytes": 28784,
+        "added": 132,
+        "removed": 0
+      }
+    ],
+    "protectedFiles": [
+      {
+        "path": "apps/desktop/src/renderer/rpc.ts",
+        "sha256": "7cadecd350fd73031473a4131edf769c552822a9faf6d26b345e6417dae671c0",
+        "unchangedFromCopyOrigin": true
+      },
+      {
+        "path": "apps/desktop/src/renderer/read-batch.ts",
+        "sha256": "040d039af2d8abb6aeb9eb4a4d66d357526d8afa6c0afed0e5bbaf80ba7a87c1",
+        "unchangedFromCopyOrigin": true
+      },
+      {
+        "path": "scripts/use-live-lists.live.test.tsx",
+        "sha256": "da2c31a515397745e02d3118981751aedc319ac3ea53f01dc22d340c6ed75512",
+        "unchangedFromCopyOrigin": true
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-contract.ts",
+        "sha256": "cdd915dacd21d2e9555896daeaa5e5c1f5b23a193cb48e0b959507e96e990000",
+        "unchangedFromCopyOrigin": true
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-context.ts",
+        "sha256": "5a4a3ec8120558c25c5c9b4db117df1acc3f4f8dfe3f5c66146c6a30d60da00f",
+        "unchangedFromCopyOrigin": true
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch.ts",
+        "sha256": "8aadc849e1de11727a67f03c0d0d07d656136e455f4ef7bf32281f6b10194fdb",
+        "unchangedFromCopyOrigin": true
+      },
+      {
+        "path": "lib/live/revision-read.ts",
+        "sha256": "91b23b11e829e217de8c07942a8cc6f2e59c83e1f2828c566354e0348a8219e2",
+        "unchangedFromCopyOrigin": true
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-context.test.ts",
+        "sha256": "a548b3d73268bd35f81ce8648b673c66b5931c37ed405ed100479c34c10d5353",
+        "unchangedFromCopyOrigin": true
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch.test.ts",
+        "sha256": "68ccad0a96c16a39bb30df26bf3fdb593a59827857df9dbda3b715809948961b",
+        "unchangedFromCopyOrigin": true
+      },
+      {
+        "path": "tests/live-revision-reads.db.test.ts",
+        "sha256": "49c00de7613ef0f88a78906456d94f90b2438646ead72acdf1afda0a0bd07c3f",
+        "unchangedFromCopyOrigin": true
+      }
+    ],
+    "externalCommitSource": null,
+    "shortShaLookup": "GitHub bd5ed45 returned422; not used as source or evidence",
+    "sourceEditsInRoot": 0,
+    "indexEditsInRoot": 0,
+    "rootEditAttribution": "This child agent edited only its isolated copy; root separately integrated the previous four-file freeze."
+  },
+  "causalChain": [
+    "useWorkspaceSwitcher waits for successful switchWorkspace",
+    "old clearPersistentReadCaches invalidated the mounted PersistentReadCache",
+    "the ordinary invalidation listener created a fresh Map and incremented the provider generation",
+    "real React/SWR remounted and read again before location.assign",
+    "explicit documentNavigation now retires that boundary instead; only the exact successful full-page switch opts in"
+  ],
+  "contract": {
+    "retiredBoundary": "Renders null, disconnects old cache, never creates a readable fallback Map and never requests router.refresh.",
+    "ordinaryReset": "Existing default behavior still creates the fallback Map and refreshes. Remote BroadcastChannel messages still use invalidate(false) with default navigation=false.",
+    "synchronousSafety": "Original enabled=false, Map.clear, hydration release and future-write rejection remain before awaiting disk.",
+    "disk": "Original snapshot of active caches and all pending erase queues remain awaited.",
+    "broadcast": "Original global clear broadcast remains; local retirement flag is never sent.",
+    "newBoundary": "A fresh mounted authorized boundary retains its default first read; no document-global pause flag was added."
+  },
+  "runs": [
+    {
+      "name": "focused_red_old_source",
+      "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test --test-name-pattern='a document workspace departure' lib/swr/persistent-cache.test.tsx",
+      "exitCode": 1,
+      "execChunk": "2bb26b",
+      "completionChunk": "08bdb7",
+      "log": "retirement-red.stdout.log",
+      "tests": 1,
+      "passed": 0,
+      "failed": 1,
+      "initialReads": 1,
+      "readsBeforeAssign": 2,
+      "refreshesBeforeAssign": 1,
+      "disabled": true,
+      "cacheEntries": 0,
+      "oldDocumentText": "read 2",
+      "testStage": "Initial single-case addition to the existing test file; its failing assertion is retained in the final expanded regression."
+    },
+    {
+      "name": "focused_green_same_initial_case",
+      "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test --test-name-pattern='a document workspace departure' lib/swr/persistent-cache.test.tsx",
+      "exitCode": 0,
+      "execChunk": "d6387e",
+      "completionChunk": "dad48d",
+      "log": "retirement-green.stdout.log",
+      "tests": 1,
+      "passed": 1,
+      "failed": 0,
+      "initialReads": 1,
+      "readsBeforeAssign": 1,
+      "refreshesBeforeAssign": 0,
+      "disabled": true,
+      "cacheEntries": 0,
+      "oldDocumentText": ""
+    },
+    {
+      "name": "existing_related_cache_and_session_suites",
+      "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/swr/persistent-cache.test.tsx lib/swr/session-lifecycle.test.ts",
+      "exitCode": 0,
+      "execChunk": "369ae4",
+      "completionChunk": "65f569",
+      "log": "retirement-related.stdout.log",
+      "tests": 23,
+      "passed": 23,
+      "failed": 0,
+      "skipped": 0,
+      "coverage": [
+        "retirement before assign 1 read and 0 refresh",
+        "repeated ordinary reset and same-boundary rerender cannot revive readers",
+        "queued remote clear/scope callbacks cannot revive retired boundary",
+        "new root/boundary creates enabled cache and normal first read",
+        "synchronous disable and clear reject a late response write",
+        "disk erase blocks the caller until completion",
+        "global clear broadcast retained without navigation flag",
+        "remote clear and denied scope still remount and refresh",
+        "existing hydration, namespace, revocation, and logout behavior"
+      ],
+      "testSha256": "62feef235f6f6096d83bb9e13b647f3f29bea7eb81f39a228c8fa22168d5550c",
+      "testSnapshot": "retirement-pre-ordinary.test.tsx.snapshot",
+      "testStage": "Pre-ordinary-mode test file; preserved separately from the final repeat."
+    },
+    {
+      "name": "root_types_started_before_stop_instruction",
+      "command": "node_modules/.bin/tsrs --noEmit",
+      "exitCode": 0,
+      "execChunk": "b6d7c9",
+      "completionChunk": "1eaab1",
+      "log": "retirement-root-type.stdout.log",
+      "scope": "Extra local typecheck completed before root instructed that integrated types would run centrally; not the complete pnpm typecheck/check pipeline."
+    },
+    {
+      "name": "frontend_types_stopped_on_root_instruction",
+      "command": "node --max-old-space-size=4096 node_modules/typescript/bin/tsc --noEmit -p apps/frontend/tsconfig.json",
+      "exitCode": 130,
+      "execChunk": "28ecd7",
+      "completionChunk": "5d7411",
+      "log": "retirement-frontend-type.stdout.log",
+      "result": "cancelled_by_instruction_not_pass",
+      "reason": "Root requested no duplicate root/frontend runs and will validate after final integration."
+    },
+    {
+      "name": "final_existing_related_cache_and_session_suites",
+      "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/swr/persistent-cache.test.tsx lib/swr/session-lifecycle.test.ts",
+      "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/workspace-retirement-20261109/checkout",
+      "exitCode": 0,
+      "execChunk": "5d503f",
+      "log": "retirement-related-final.stdout.log",
+      "tests": 23,
+      "passed": 23,
+      "failed": 0,
+      "skipped": 0,
+      "testSha256": "d57c1fdf88356395dc67d5f1d81891541bb9ea7800bab8d24cdd26583fbdca30",
+      "sourceSha256": {
+        "lib/swr/persistent-cache.ts": "d1e1793960a0401fc2e8cb3a9b29e2a894828096e444fc086a6d1ebe5d34df1a",
+        "components/authenticated-read-cache.tsx": "90dc00b1dfd6ad21a5ffee1774db8b4a5225b8457390fcb73bb74dbcf7ff009c",
+        "hooks/use-workspace-switcher.ts": "088f1ed918e101f3cbefbde5329146f04512aef01f90087c820a481782e518e2"
+      },
+      "coverage": [
+        "retirement before assign 1 read and 0 refresh",
+        "repeated ordinary reset and same-boundary rerender cannot revive readers",
+        "queued remote clear/scope callbacks cannot revive retired boundary",
+        "new root/boundary creates enabled cache and normal first read",
+        "synchronous disable and clear reject a late response write",
+        "disk erase blocks the caller until completion",
+        "global clear broadcast retained without navigation flag",
+        "remote clear and denied scope still remount and refresh",
+        "existing hydration, namespace, revocation, and logout behavior",
+        "default clearPersistentReadCaches() on an active boundary still reads twice total and refreshes once"
+      ],
+      "diagnostics": [
+        {
+          "mode": "document",
+          "reads": 1,
+          "refreshes": 0
+        },
+        {
+          "mode": "ordinary",
+          "reads": 2,
+          "refreshes": 1
+        },
+        {
+          "mode": "remote",
+          "reads": 2,
+          "refreshes": 1
+        },
+        {
+          "mode": "denied",
+          "reads": 2,
+          "refreshes": 1
+        }
+      ],
+      "scope": "Same two existing related files repeated once after the reviewer-requested default-options branch; no additional suite or typecheck."
+    }
+  ],
+  "fixtureBoundary": [
+    "Real React, react-dom, SWR, AuthenticatedReadCache, PersistentReadCache and existing staleOnFocus middleware.",
+    "Happy-dom supplies the DOM. Existing navigation/build imports are mocked by the existing fixture. The test controls storage and BroadcastChannel at their system boundaries.",
+    "New-root initialization models the fresh boundary in a new Document; no actual browser reload, Electron navigation, Native lifecycle or production request was executed.",
+    "The old-source optional navigation argument was ignored at runtime, preserving the original clear path and producing the 2-versus-1 failure.",
+    "The full 226/226 claim in comment6728716992 is not reused. This task executed only the stated local checks."
+  ],
+  "limits": [
+    "No claimed reduction of the actual Native SQL delta. A new exact candidate Native run remains required.",
+    "Unresolved bd5ed45 has no verified full SHA, parents, tree or patch; this is an independent fix against the recorded target-file baseline.",
+    "Frontend types were cancelled, not green; final integrated validation belongs to root.",
+    "No lint, full read-cache package script, complete Native, model or PostgreSQL action was started."
+  ],
+  "resources": {
+    "tools": "functions.exec -> tools.exec_command using default permissions",
+    "externalRunner": false,
+    "newCloudResources": 0,
+    "newDatabaseResources": 0,
+    "realModelCalls": 0,
+    "productionQueries": 0,
+    "rootSourceEdits": 0,
+    "rootIndexEdits": 0,
+    "processesRemaining": 0,
+    "processCleanup": "All tests and root types exited. Frontend typecheck stopped with Ctrl-C and exit130."
+  },
+  "artifacts": [
+    {
+      "path": "github-1782-source-resolution.safe.json",
+      "bytes": 2900,
+      "sha256": "95f04c76c89ced6eab0d791fd041b705dbc1bdbaab3ef4f7f08ac5ea0872b561",
+      "gitBlob": "d860479e6d97bb58e3a57a0cd838a80fd0760285"
+    },
+    {
+      "path": "copy-origin.safe.json",
+      "bytes": 4687,
+      "sha256": "2adcead8ba45c144b4a93ece3907ac29847b6a9b923d60b4fba00aa1fd266bae",
+      "gitBlob": "1950525beb1172d61b52da5ec5dd506a7c12bb9b"
+    },
+    {
+      "path": "baseline-tree-verification.safe.json",
+      "bytes": 821,
+      "sha256": "3d16704bc0b92ccc34133e59b65ea3a7c9d089d377df7592b061bfaf994950be",
+      "gitBlob": "4379519208941c5b0b630e112eb4de4ef3ebd99b"
+    },
+    {
+      "path": "workspace-retirement-files.safe.json",
+      "bytes": 4196,
+      "sha256": "d23fc4e23afaf52f0d505993eb6cb4f619f0e3029d538079d2a6406b2bcb56d9",
+      "gitBlob": "0c0bf3a18ab04aaafad6ca97550e0de1012faf4e"
+    },
+    {
+      "path": "workspace-retirement.patch",
+      "bytes": 13627,
+      "sha256": "0cbc562b5dd1ea66eb845328974a3346bdea8fb69d94e0adda44172d10f073de",
+      "gitBlob": "4a19d35536a0968285fb07bf21b7786e1a7c7622"
+    },
+    {
+      "path": "retirement-red.stdout.log",
+      "bytes": 1422,
+      "sha256": "2dcb6f0548c85adb0cd8e7f7cd5e1c9a60cbbf5157586575fef1573e3fbda9a0",
+      "gitBlob": "9a61efb293d9f49a7dc142d740094e2066f04c19"
+    },
+    {
+      "path": "retirement-green.stdout.log",
+      "bytes": 643,
+      "sha256": "181c5ea99c488c61f50ad275ccbec1d9f144940191614f12523cd62c6129b009",
+      "gitBlob": "d70fda8618a16b69a311f974742791a4d0008b85"
+    },
+    {
+      "path": "retirement-related.stdout.log",
+      "bytes": 3427,
+      "sha256": "cb4b28a85791542997b3cfa560dac572ba3fee59c84c310fd35bdebb5b7829ce",
+      "gitBlob": "449f29e09963d34bc849d1f0d820e2ac4dc8caec"
+    },
+    {
+      "path": "retirement-root-type.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "retirement-frontend-type.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "checkout/lib/swr/persistent-cache.ts",
+      "bytes": 10956,
+      "sha256": "d1e1793960a0401fc2e8cb3a9b29e2a894828096e444fc086a6d1ebe5d34df1a",
+      "gitBlob": "6776b93c8d98738a3e7c84a383da435af64baa95"
+    },
+    {
+      "path": "checkout/components/authenticated-read-cache.tsx",
+      "bytes": 4539,
+      "sha256": "90dc00b1dfd6ad21a5ffee1774db8b4a5225b8457390fcb73bb74dbcf7ff009c",
+      "gitBlob": "54b50bb03a114cdb99dd02d2909553e29b3002fc"
+    },
+    {
+      "path": "checkout/hooks/use-workspace-switcher.ts",
+      "bytes": 4636,
+      "sha256": "088f1ed918e101f3cbefbde5329146f04512aef01f90087c820a481782e518e2",
+      "gitBlob": "63550f8517171bafa565327bfb4a72b84d242f7f"
+    },
+    {
+      "path": "checkout/lib/swr/persistent-cache.test.tsx",
+      "bytes": 28784,
+      "sha256": "d57c1fdf88356395dc67d5f1d81891541bb9ea7800bab8d24cdd26583fbdca30",
+      "gitBlob": "99a37c3f55ab05b6b3e986cc5c1eedd0b68d1460"
+    },
+    {
+      "path": "baseline/lib/swr/persistent-cache.ts",
+      "bytes": 10622,
+      "sha256": "b7750de029f5462bee61efba2642ccfa894e08a981a75c97f5852e715b5f9b1f",
+      "gitBlob": "df7d4d1b5f2c744061236c54d766f68aa2137830"
+    },
+    {
+      "path": "baseline/components/authenticated-read-cache.tsx",
+      "bytes": 4167,
+      "sha256": "186b86f223636a4391cc54a0e76a25280e527a50cd4cbedde55ee8685798ae41",
+      "gitBlob": "e76bfbd5c5897696bf6301431c4f1fee7ab4407a"
+    },
+    {
+      "path": "baseline/hooks/use-workspace-switcher.ts",
+      "bytes": 4608,
+      "sha256": "67e18fbbbeb9e0686ce512815df7faf79d075765bf02c74f0ade970cdb930ef8",
+      "gitBlob": "299e9805be3764a90b71e78f79549e6b17a32b70"
+    },
+    {
+      "path": "baseline/lib/swr/persistent-cache.test.tsx",
+      "bytes": 20870,
+      "sha256": "7788c9c8569ea670770027941e31de2eba60ce80c718228c3ac610e4ed0f8015",
+      "gitBlob": "4918061ebe77b2974dd70119f4e3c3a1954b58b3"
+    },
+    {
+      "path": "retirement-pre-ordinary.test.tsx.snapshot",
+      "bytes": 28698,
+      "sha256": "62feef235f6f6096d83bb9e13b647f3f29bea7eb81f39a228c8fa22168d5550c",
+      "gitBlob": "48ed2661b1ce4805f0d8bc2bd8e965a5ddc9ed61"
+    },
+    {
+      "path": "workspace-retirement-ordinary-test.patch",
+      "bytes": 957,
+      "sha256": "62781aa2756162b11c5f34223b5a22e116ef8446daf4f0c72ef8da5f8665c01a",
+      "gitBlob": "5588de14b4f653acb0a5d9fc214524d50313d6bb"
+    },
+    {
+      "path": "retirement-related-final.stdout.log",
+      "bytes": 3513,
+      "sha256": "db811cc86a2e3852f332cdaf3cde329a3840aaee2b8392e0b5ead57aa6ff0619",
+      "gitBlob": "5694a9b34ddecb584351802175cc9dd6955f6966"
+    }
+  ],
+  "runtimeFilesUnchangedAfterFirstFreeze": true,
+  "finalTestDelta": "Only add ordinary mode and await clearPersistentReadCaches() to the existing broadcast/reset regression; exact delta is workspace-retirement-ordinary-test.patch."
+}

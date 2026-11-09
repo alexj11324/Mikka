@@ -1,0 +1,15 @@
+{
+  "createdAt": "2026-11-08T23:56:10.806951+00:00",
+  "beforeTree": "0f4f21122111c18085e2c6cca6b0bacb7f7b106e",
+  "afterTree": "50fa229d4f161010faa3b8b62fb8d87823be4c5b",
+  "paths": [
+    "lib/desktop-rpc/read-batch-contract.ts",
+    "lib/desktop-rpc/read-batch-context.ts",
+    "lib/desktop-rpc/read-batch.ts",
+    "lib/live/revision-read.ts",
+    "lib/desktop-rpc/read-batch-context.test.ts",
+    "lib/desktop-rpc/read-batch.test.ts",
+    "tests/live-revision-reads.db.test.ts"
+  ],
+  "reviewSha256": "f8404ae330267a2cf206a14d43dca55c1e8067f58f1b3c01ca5bf5879982f677"
+}

@@ -1,0 +1,104 @@
+{
+  "kind": "independent-workspace-document-retirement-candidate",
+  "baselineTargetFilesTree": "c0fc19c32787d3f86a37ef2836b37440d20d300a",
+  "isolatedCheckout": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/workspace-retirement-20261109/checkout",
+  "files": [
+    {
+      "path": "lib/swr/persistent-cache.ts",
+      "baselineSha256": "b7750de029f5462bee61efba2642ccfa894e08a981a75c97f5852e715b5f9b1f",
+      "baselineGitBlob": "df7d4d1b5f2c744061236c54d766f68aa2137830",
+      "sha256": "d1e1793960a0401fc2e8cb3a9b29e2a894828096e444fc086a6d1ebe5d34df1a",
+      "gitBlob": "6776b93c8d98738a3e7c84a383da435af64baa95",
+      "bytes": 10956,
+      "added": 8,
+      "removed": 6
+    },
+    {
+      "path": "components/authenticated-read-cache.tsx",
+      "baselineSha256": "186b86f223636a4391cc54a0e76a25280e527a50cd4cbedde55ee8685798ae41",
+      "baselineGitBlob": "e76bfbd5c5897696bf6301431c4f1fee7ab4407a",
+      "sha256": "90dc00b1dfd6ad21a5ffee1774db8b4a5225b8457390fcb73bb74dbcf7ff009c",
+      "gitBlob": "54b50bb03a114cdb99dd02d2909553e29b3002fc",
+      "bytes": 4539,
+      "added": 11,
+      "removed": 4
+    },
+    {
+      "path": "hooks/use-workspace-switcher.ts",
+      "baselineSha256": "67e18fbbbeb9e0686ce512815df7faf79d075765bf02c74f0ade970cdb930ef8",
+      "baselineGitBlob": "299e9805be3764a90b71e78f79549e6b17a32b70",
+      "sha256": "088f1ed918e101f3cbefbde5329146f04512aef01f90087c820a481782e518e2",
+      "gitBlob": "63550f8517171bafa565327bfb4a72b84d242f7f",
+      "bytes": 4636,
+      "added": 1,
+      "removed": 1
+    },
+    {
+      "path": "lib/swr/persistent-cache.test.tsx",
+      "baselineSha256": "7788c9c8569ea670770027941e31de2eba60ce80c718228c3ac610e4ed0f8015",
+      "baselineGitBlob": "4918061ebe77b2974dd70119f4e3c3a1954b58b3",
+      "sha256": "d57c1fdf88356395dc67d5f1d81891541bb9ea7800bab8d24cdd26583fbdca30",
+      "gitBlob": "99a37c3f55ab05b6b3e986cc5c1eedd0b68d1460",
+      "bytes": 28784,
+      "added": 132,
+      "removed": 0
+    }
+  ],
+  "protectedFiles": [
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "sha256": "7cadecd350fd73031473a4131edf769c552822a9faf6d26b345e6417dae671c0",
+      "unchangedFromCopyOrigin": true
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "sha256": "040d039af2d8abb6aeb9eb4a4d66d357526d8afa6c0afed0e5bbaf80ba7a87c1",
+      "unchangedFromCopyOrigin": true
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "sha256": "da2c31a515397745e02d3118981751aedc319ac3ea53f01dc22d340c6ed75512",
+      "unchangedFromCopyOrigin": true
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-contract.ts",
+      "sha256": "cdd915dacd21d2e9555896daeaa5e5c1f5b23a193cb48e0b959507e96e990000",
+      "unchangedFromCopyOrigin": true
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "sha256": "5a4a3ec8120558c25c5c9b4db117df1acc3f4f8dfe3f5c66146c6a30d60da00f",
+      "unchangedFromCopyOrigin": true
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch.ts",
+      "sha256": "8aadc849e1de11727a67f03c0d0d07d656136e455f4ef7bf32281f6b10194fdb",
+      "unchangedFromCopyOrigin": true
+    },
+    {
+      "path": "lib/live/revision-read.ts",
+      "sha256": "91b23b11e829e217de8c07942a8cc6f2e59c83e1f2828c566354e0348a8219e2",
+      "unchangedFromCopyOrigin": true
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.test.ts",
+      "sha256": "a548b3d73268bd35f81ce8648b673c66b5931c37ed405ed100479c34c10d5353",
+      "unchangedFromCopyOrigin": true
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch.test.ts",
+      "sha256": "68ccad0a96c16a39bb30df26bf3fdb593a59827857df9dbda3b715809948961b",
+      "unchangedFromCopyOrigin": true
+    },
+    {
+      "path": "tests/live-revision-reads.db.test.ts",
+      "sha256": "49c00de7613ef0f88a78906456d94f90b2438646ead72acdf1afda0a0bd07c3f",
+      "unchangedFromCopyOrigin": true
+    }
+  ],
+  "externalCommitSource": null,
+  "shortShaLookup": "GitHub bd5ed45 returned422; not used as source or evidence",
+  "sourceEditsInRoot": 0,
+  "indexEditsInRoot": 0,
+  "rootEditAttribution": "This child agent edited only its isolated copy; root separately integrated the previous four-file freeze."
+}

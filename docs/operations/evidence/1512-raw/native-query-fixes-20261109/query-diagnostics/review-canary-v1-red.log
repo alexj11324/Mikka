@@ -1,0 +1,98 @@
+✖ diagnostic safety: context and shape identifiers accept primitive strings and read fields once (3.848678ms)
+✖ diagnostic safety: Proxy query configs are rejected before any descriptor or value trap runs (1.561082ms)
+✖ diagnostic safety: statement prefixes cannot admit opaque SET payloads or a second statement (0.475576ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 108.824482
+
+✖ failing tests:
+
+test at apps/desktop/test/db-query-diagnostics.test.mjs:77:1
+✖ diagnostic safety: context and shape identifiers accept primitive strings and read fields once (3.848678ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   value: {
+  +     httpInvocationId: {
+  +       privateCanary: 'PRIVATE_BOXED_ID',
+  +       toString: [Function: toString]
+  +     },
+  +     invocationId: {
+  +       privateCanary: 'PRIVATE_BOXED_ID',
+  +       toString: [Function: toString]
+  +     },
+  +     method: 'GET',
+  +     route: '/api/devices/enrollment',
+  +     rpcAction: null,
+  +     status: 'known'
+  +   }
+  -   reason: 'context_invalid'
+    }
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/issue1512-diagnostics-copy/apps/desktop/test/db-query-diagnostics.test.mjs:80:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: [Object],
+    expected: [Object],
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at apps/desktop/test/db-query-diagnostics.test.mjs:100:1
+✖ diagnostic safety: Proxy query configs are rejected before any descriptor or value trap runs (1.561082ms)
+  AssertionError [ERR_ASSERTION]: the diagnostic must not trigger traps before the original driver sees the config
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/issue1512-diagnostics-copy/apps/desktop/test/db-query-diagnostics.test.mjs:108:10)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at apps/desktop/test/db-query-diagnostics.test.mjs:113:1
+✖ diagnostic safety: statement prefixes cannot admit opaque SET payloads or a second statement (0.475576ms)
+  AssertionError [ERR_ASSERTION]: SET
+  + actual - expected
+  
+  + {
+  +   command: 'SET',
+  +   normalizedStructureId: 'b3e1f6d6bf65',
+  +   parameterCount: 0,
+  +   status: 'known'
+  + }
+  - undefined
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/812e3b7d6d45/issue1512-diagnostics-copy/apps/desktop/test/db-query-diagnostics.test.mjs:118:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: { status: 'known', normalizedStructureId: 'b3e1f6d6bf65', command: 'SET', parameterCount: 0 },
+    expected: undefined,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

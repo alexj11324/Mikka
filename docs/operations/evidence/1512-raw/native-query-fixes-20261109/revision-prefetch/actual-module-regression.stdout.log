@@ -1,0 +1,31 @@
+✔ concurrent owner-wide readers reuse their actual personal home only within the batch (6.602993ms)
+✔ different Live kinds share one revision query before either consumer reads its data (26.16566ms)
+✔ owner observations are separate for parallel batches, owners and database authorities (0.77664ms)
+✔ later reads in one batch keep the earlier revision, while the next batch reads the new revision (0.709118ms)
+✔ a missing or failed revision never becomes fabricated proof and does not poison the next request (0.7237ms)
+✔ ordinary revision readers and different database scopes remain independent (2.17173ms)
+✔ bound after-work cannot reuse an already completed batch authority observation (0.3652ms)
+✔ notification target resolution never inherits an earlier list-read home, even inside the batch (0.182055ms)
+✔ planned owner readers share one earlier observation without exposing each other's keys (1.220248ms)
+✔ an undeclared batch keeps ordinary per-reader observations (1.127578ms)
+✔ a selected team key stays late and total requested and returned keys stay unchanged (4.771626ms)
+✔ owner homes and database authorities do not borrow another planned observation (2.788409ms)
+✔ absent homes and invalid or nonrevision refs never trigger an owner prefetch (7.190016ms)
+✔ an entity or another owner key does not start the resolved home's list prefetch (10.032558ms)
+✔ missing and failed prefetched revisions remain unknown until another request reads (2.825856ms)
+✔ throw and cancellation release the plan as well as its earlier observations (5.018367ms)
+✔ the ordinary version-1 RPC preserves batch order, original results and wire values (14.720385ms)
+✔ every item is validated before any original action runs, including nested and mutating calls (12.416481ms)
+✔ each business failure keeps the single-action HTTP mapping without exposing its error message (2.132102ms)
+✔ thrown and returned authRequired both preserve Main HTTP 401 after all item work settles (2.605812ms)
+✔ parallel batch requests retain their real session and each original ownership check (2.319768ms)
+✔ batch readers share the API request memo while later requests authorize a fresh workspace view (4.933116ms)
+✔ only the validated prepared owner readers contribute revision kinds across different readiness times (11.118678ms)
+ℹ tests 23
+ℹ suites 0
+ℹ pass 23
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2106.424554

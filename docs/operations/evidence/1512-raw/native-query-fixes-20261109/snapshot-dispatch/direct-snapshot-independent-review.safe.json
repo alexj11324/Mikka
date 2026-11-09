@@ -1,0 +1,208 @@
+{
+  "schema": "issue1512.independent-source-review.v1",
+  "kind": "native-direct-snapshot-dispatch-proof",
+  "reviewer": "native_6180_review",
+  "observedAt": "2026-11-08T23:54:21.830521+00:00",
+  "result": "no_blocking_findings",
+  "sourceComparisonBase": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+  "testBaseTreeFromReceipts": "fd1aadd36228359a6ac75f6ed690f8c40877fc07",
+  "reviewedCopy": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/snapshot-dispatch-20261108/checkout",
+  "files": [
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "bytes": 4265,
+      "sha256": "7cadecd350fd73031473a4131edf769c552822a9faf6d26b345e6417dae671c0",
+      "gitBlob": "a9ffaee70d53e2c9c0471b61abbddf80cc244fbe"
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "bytes": 5988,
+      "sha256": "040d039af2d8abb6aeb9eb4a4d66d357526d8afa6c0afed0e5bbaf80ba7a87c1",
+      "gitBlob": "b72659facb8a5a710fb0c0121e2543add0ad8f33"
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "bytes": 58655,
+      "sha256": "da2c31a515397745e02d3118981751aedc319ac3ea53f01dc22d340c6ed75512",
+      "gitBlob": "f981a61d72fb9c0e153e490f89d7328fb014558e"
+    }
+  ],
+  "scope": {
+    "newActions": [
+      "coordinator.pollBotChatSummaries",
+      "bots.pollBots"
+    ],
+    "existingAction": "task-runs.pollTaskRuns",
+    "productionChanges": "Extend the existing response-object WeakMap dispatch proof to the two direct snapshot readers.",
+    "transport": "Native /api/desktop/rpc only",
+    "notExtended": [
+      "Web /api/rpc",
+      "issues.syncIssueList",
+      "task-runs.syncThreadList",
+      "coordinator.syncCoordinatorChat"
+    ]
+  },
+  "findings": [],
+  "verifiedReasoning": [
+    "Both real hooks await exactly one reader, validate owner (and workspace for roster), then return that same snapshot without cached-row merge or another client read.",
+    "observeListRead only adds requestedAt to that snapshot and carries its existing proof to the shallow wrapper.",
+    "Native proof is captured after encodeArgs and the current-scope assertion, immediately before fetch. The Web endpoint cannot capture it.",
+    "A validated, ordered successful batch item receives only the current envelope proof for its own decoded value.result, after current(item); the server Promise.all preserves input order.",
+    "Invalid item shapes, individual errors, stale generations, workspace changes and retired caller guards retain their prior rejection paths.",
+    "The existing observer still requires the actual committed SWR object, successful original callbacks, current cache/key identity, readiness/generation coverage and required revisions.",
+    "No proof is attached to merged issue/thread/chat results; their original revalidation behavior remains."
+  ],
+  "validation": {
+    "independentReviewerRanTests": false,
+    "recordsInspected": true,
+    "focusedRed": {
+      "tests": 12,
+      "pass": 8,
+      "fail": 4,
+      "skip": 0,
+      "exitCode": 1,
+      "failures": [
+        "bots single HTTP after readiness",
+        "bots batch HTTP after readiness",
+        "roster single HTTP after readiness",
+        "roster batch HTTP after readiness"
+      ],
+      "actual": 2,
+      "expected": 1
+    },
+    "focusedGreen": {
+      "tests": 12,
+      "pass": 12,
+      "fail": 0,
+      "skip": 0,
+      "exitCode": 0,
+      "beforeReadinessReads": 2,
+      "afterReadinessReads": 1
+    },
+    "testLiveLists": {
+      "tests": 85,
+      "pass": 85,
+      "fail": 0,
+      "skip": 0,
+      "exitCode": 0
+    },
+    "readBatch": {
+      "tests": 24,
+      "pass": 24,
+      "fail": 0,
+      "skip": 0,
+      "exitCode": 0
+    },
+    "targetedLint": {
+      "exitCode": 0,
+      "warnings": 0
+    },
+    "rendererTypecheck": {
+      "defaultAttempt": {
+        "exitCode": -6,
+        "result": "JavaScript heap OOM; retained as failed attempt"
+      },
+      "fourGiBAttempt": {
+        "exitCode": 0,
+        "maximumOldSpaceMiB": 4096,
+        "endedAt": "2026-11-08T23:49:47.907346+00:00",
+        "stdoutBytes": 0,
+        "sourceChangedBetweenAttempts": false,
+        "rootAlsoConfirmedTerminalSession": 68444
+      }
+    }
+  },
+  "actualTestChain": [
+    "React components and real list hooks",
+    "SWR provider/cache and staleOnFocus middleware",
+    "LiveProvider/LiveChannels/readiness and revision machinery",
+    "Native callAction and read-batch queue",
+    "encodeArgs/decode JSON codec",
+    "actual runtime MessageChannel posted task",
+    "actual fetch-dispatch ordering assertions"
+  ],
+  "fixtureBoundaries": [
+    "Server-action imports delegate to the real Native client callAction in these cases.",
+    "HTTP responses and WebSocket events are fixtures; no external service or model is called."
+  ],
+  "limits": [
+    "This source review and local client-chain regression evidence are not packaged Native execution, SQL-budget proof or production acceptance.",
+    "The known complete Native login 504 > 480 remains RED until a new immutable-source run supplies passing evidence.",
+    "The review is bound to the three frozen copy hashes, not an assumed byte identity with another checkout.",
+    "No source/index modifications or large-suite reruns were performed by this reviewer."
+  ],
+  "evidenceFiles": [
+    {
+      "path": "direct-snapshot-red.receipt.json",
+      "bytes": 486,
+      "sha256": "0c2340f1f255950061a65d627df62c24ece5174846ae25025a838e1b3dfd929f",
+      "gitBlob": "5db983cfcf5c6275a126c9428de9dc7b25f1f62e"
+    },
+    {
+      "path": "direct-snapshot-red.stdout.txt",
+      "bytes": 7256,
+      "sha256": "7991e9a1116f73cb638082a01a0f48c0f6601db72c3ea248c65f2faecdfed6bc",
+      "gitBlob": "8d91ee0d5deae5920d3034287dd530f680c1d368"
+    },
+    {
+      "path": "direct-snapshot-green.receipt.json",
+      "bytes": 483,
+      "sha256": "06fd00f1224c48db2b0968183a601be69537ba46a20b36cb8c55399c4ff0183c",
+      "gitBlob": "03c8abb9f31aeeaacc55b227467101eb1a2a938e"
+    },
+    {
+      "path": "direct-snapshot-green.stdout.txt",
+      "bytes": 4158,
+      "sha256": "a5a00a4392d6095b31460d0f6e05339519d508854618dd28b95a7dace1e8b001",
+      "gitBlob": "94d1c24881c54e7efeb72543d22fb717ea84774b"
+    },
+    {
+      "path": "direct-snapshot-related.receipt.json",
+      "bytes": 489,
+      "sha256": "bc27b2dcc0e216d387e65fd78f91bbeaef2cc32bc45d1bb60c190c2ad74f6c83",
+      "gitBlob": "640cdaa712da18408e8e09c67a7e8c80a031b377"
+    },
+    {
+      "path": "direct-snapshot-related.stdout.txt",
+      "bytes": 12647,
+      "sha256": "dad6e2554da2ee6d44fcc3fcef445a35b1a8d7f805a79dac3a23aed0da12150f",
+      "gitBlob": "4acaf65a56c74838f654054393ed4adefc0c0861"
+    },
+    {
+      "path": "direct-snapshot-checks.receipt.json",
+      "bytes": 892,
+      "sha256": "0b359c2d41c1c3626125e267c34da37a92432132a5f7d415dbc03d829074de9e",
+      "gitBlob": "43548c56191cfa314fe17d3ba19120cc6851cebd"
+    },
+    {
+      "path": "direct-snapshot-check-0.stdout.txt",
+      "bytes": 2211,
+      "sha256": "b1f398e211a981dff10e65396a24844a6c6a6a1e4cb05cedd085333c159cd366",
+      "gitBlob": "3d21a17b651e4e8fe1304e9746216b4e24712fdd"
+    },
+    {
+      "path": "direct-snapshot-check-1.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "direct-snapshot-check-2.stdout.txt",
+      "bytes": 801,
+      "sha256": "0520056b1b9555ea2a36596fcfd3bf23e42fbc5f36068be821a56f6a8fcc6664",
+      "gitBlob": "7cb52094ce46d1217e432dbac8559f3c6a0aae83"
+    },
+    {
+      "path": "direct-snapshot-renderer-typecheck-4g.receipt.json",
+      "bytes": 467,
+      "sha256": "e0ae5d70ca3935e99e4ed5abcd08a98cc3e558e46d5e0e65cede492ce78c726f",
+      "gitBlob": "b3c4df43f0c9a7a52cb0a60efe5eaedc2c0e0530"
+    },
+    {
+      "path": "direct-snapshot-renderer-typecheck-4g.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    }
+  ]
+}

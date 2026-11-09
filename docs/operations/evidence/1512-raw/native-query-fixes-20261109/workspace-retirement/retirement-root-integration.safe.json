@@ -1,0 +1,54 @@
+{
+  "schema": "issue1512.frozen-integration.v1",
+  "createdAt": "2026-11-09T00:13:41.971605+00:00",
+  "beforeTree": "c0fc19c32787d3f86a37ef2836b37440d20d300a",
+  "afterTree": "ab558518c15e0984a06cc7291a5ac52bf1ca7bfa",
+  "files": [
+    {
+      "path": "lib/swr/persistent-cache.ts",
+      "baselineSha256": "b7750de029f5462bee61efba2642ccfa894e08a981a75c97f5852e715b5f9b1f",
+      "sha256": "d1e1793960a0401fc2e8cb3a9b29e2a894828096e444fc086a6d1ebe5d34df1a",
+      "bytes": 10956,
+      "gitBlob": "6776b93c8d98738a3e7c84a383da435af64baa95",
+      "mode": "100644"
+    },
+    {
+      "path": "components/authenticated-read-cache.tsx",
+      "baselineSha256": "186b86f223636a4391cc54a0e76a25280e527a50cd4cbedde55ee8685798ae41",
+      "sha256": "90dc00b1dfd6ad21a5ffee1774db8b4a5225b8457390fcb73bb74dbcf7ff009c",
+      "bytes": 4539,
+      "gitBlob": "54b50bb03a114cdb99dd02d2909553e29b3002fc",
+      "mode": "100644"
+    },
+    {
+      "path": "hooks/use-workspace-switcher.ts",
+      "baselineSha256": "67e18fbbbeb9e0686ce512815df7faf79d075765bf02c74f0ade970cdb930ef8",
+      "sha256": "088f1ed918e101f3cbefbde5329146f04512aef01f90087c820a481782e518e2",
+      "bytes": 4636,
+      "gitBlob": "63550f8517171bafa565327bfb4a72b84d242f7f",
+      "mode": "100644"
+    },
+    {
+      "path": "lib/swr/persistent-cache.test.tsx",
+      "baselineSha256": "7788c9c8569ea670770027941e31de2eba60ce80c718228c3ac610e4ed0f8015",
+      "sha256": "62feef235f6f6096d83bb9e13b647f3f29bea7eb81f39a228c8fa22168d5550c",
+      "bytes": 28698,
+      "gitBlob": "48ed2661b1ce4805f0d8bc2bd8e965a5ddc9ed61",
+      "mode": "100644"
+    }
+  ],
+  "rootReviewedFullFourFileDiff": true,
+  "relatedTests": {
+    "pass": 23,
+    "fail": 0,
+    "skip": 0,
+    "logSha256": "cb4b28a85791542997b3cfa560dac572ba3fee59c84c310fd35bdebb5b7829ce"
+  },
+  "reviewBoundary": "Root full diff and real React/SWR red/green reviewed with no blockers; independent reviewer preliminary full-source review passed, final frozen review receipt required before branch publish.",
+  "notClaimed": [
+    "packaged Native run",
+    "SQL budget pass",
+    "production acceptance",
+    "actual browser document reload"
+  ]
+}

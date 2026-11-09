@@ -1,0 +1,16 @@
+{
+  "command": [
+    "node",
+    "--max-old-space-size=4096",
+    "node_modules/typescript/bin/tsc",
+    "--noEmit",
+    "-p",
+    "apps/desktop/tsconfig.renderer.json"
+  ],
+  "startedAt": "2026-11-08T23:49:04.944712+00:00",
+  "endedAt": "2026-11-08T23:49:47.907346+00:00",
+  "exitCode": 0,
+  "priorAttempt": "direct-snapshot-check-2.stdout.txt",
+  "retryReason": "Default 2GiB JavaScript heap OOM; no source changes between attempts",
+  "maximumOldSpaceMiB": 4096
+}

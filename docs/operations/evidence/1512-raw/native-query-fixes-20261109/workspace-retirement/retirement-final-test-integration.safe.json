@@ -1,0 +1,10 @@
+{
+  "createdAt": "2026-11-09T00:18:18.689947+00:00",
+  "priorTree": "ab558518c15e0984a06cc7291a5ac52bf1ca7bfa",
+  "tree": "766c063fcac276ea55251d76e43b2e616244b62b",
+  "changedOnly": "lib/swr/persistent-cache.test.tsx",
+  "sha256": "d57c1fdf88356395dc67d5f1d81891541bb9ea7800bab8d24cdd26583fbdca30",
+  "runtimeFilesUnchanged": true,
+  "finalRelatedLogSha256": "db811cc86a2e3852f332cdaf3cde329a3840aaee2b8392e0b5ead57aa6ff0619",
+  "validationReuse": "API/frontend typecheck source is unchanged; only the root-included test gained an ordinary default-clear branch. Root typecheck reruns for this test delta."
+}

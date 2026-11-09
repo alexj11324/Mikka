@@ -1,0 +1,46 @@
+✔ concurrent owner-wide readers reuse their actual personal home only within the batch (2.735665ms)
+✔ different Live kinds share one revision query before either consumer reads its data (10.109426ms)
+✔ owner observations are separate for parallel batches, owners and database authorities (0.85475ms)
+✔ later reads in one batch keep the earlier revision, while the next batch reads the new revision (0.721839ms)
+✔ a missing or failed revision never becomes fabricated proof and does not poison the next request (1.469517ms)
+✔ ordinary revision readers and different database scopes remain independent (0.527276ms)
+✔ bound after-work cannot reuse an already completed batch authority observation (0.306221ms)
+✔ notification target resolution never inherits an earlier list-read home, even inside the batch (0.210588ms)
+✔ planned owner readers share one earlier observation without exposing each other's keys (0.939287ms)
+✔ an undeclared batch keeps ordinary per-reader observations (0.596319ms)
+✔ a selected team key stays late and total requested and returned keys stay unchanged (0.876332ms)
+✔ owner homes and database authorities do not borrow another planned observation (5.776781ms)
+✔ absent homes and invalid or nonrevision refs never trigger an owner prefetch (0.315236ms)
+✔ an entity or another owner key does not start the resolved home's list prefetch (2.075731ms)
+✔ missing and failed prefetched revisions remain unknown until another request reads (1.012216ms)
+✔ throw and cancellation release the plan as well as its earlier observations (1.371608ms)
+✔ the ordinary version-1 RPC preserves batch order, original results and wire values (12.197996ms)
+✔ every item is validated before any original action runs, including nested and mutating calls (9.047954ms)
+✔ each business failure keeps the single-action HTTP mapping without exposing its error message (1.453962ms)
+✔ thrown and returned authRequired both preserve Main HTTP 401 after all item work settles (1.494523ms)
+✔ parallel batch requests retain their real session and each original ownership check (1.562546ms)
+✔ batch readers share the API request memo while later requests authorize a fresh workspace view (1.71053ms)
+✔ only the validated prepared owner readers contribute revision kinds across different readiness times (7.902678ms)
+✔ logs paired start/completion lines with safe fields only (5.784914ms)
+✔ 4xx is warn, 5xx is error, anonymous has null user (1.465675ms)
+✔ thrown errors log status 500 with the error name only and rethrow (0.969792ms)
+✔ generates a request id when x-vercel-id is missing or malformed (0.546545ms)
+✔ a failing sink never breaks the request (0.561186ms)
+✔ outcomes allow only fixed values and stay isolated between concurrent requests (1.568195ms)
+✔ request attribution publishes an internal invocation ID before auth and caches each authenticated identity (1.279981ms)
+✔ mobile API context joins the server and database spans with version attribution (11.806965ms)
+✔ mobile attribution stays in its request and cannot overwrite machine routes (7.832543ms)
+✔ untrusted version and unrelated request headers never enter spans (3.735273ms)
+✔ a failed request records its error code on the span, never the message (3.323942ms)
+✔ request attribution stays on each parent chain when concurrent requests share a trace (8.549513ms)
+✔ request attribution channel projects only valid closed metadata (1.219058ms)
+✔ read-batch actions retain separate parent chains and one physical request identity (3.065573ms)
+✔ read-batch failures retain error status without exporting payloads or forcing ordinary sampling (3.205264ms)
+ℹ tests 38
+ℹ suites 0
+ℹ pass 38
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 712.976144

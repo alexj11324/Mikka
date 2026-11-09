@@ -1,0 +1,600 @@
+{
+  "kind": "controlled-source-copy-measurement",
+  "actualNativeFrequency": "unknown_no_batch_item_mapping_in_old_artifact",
+  "realModelCalls": 0,
+  "productionQueries": 0,
+  "results": [
+    {
+      "name": "personal_scope_staggered",
+      "baselineQueries": [
+        {
+          "kinds": [
+            "bot_chat_list",
+            "task_run_list",
+            "thread_list"
+          ],
+          "ids": [
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+          ],
+          "revision": 7,
+          "rowCount": 3,
+          "rowJsonBytes": 251
+        },
+        {
+          "kinds": [
+            "issue_list"
+          ],
+          "ids": [
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+          ],
+          "revision": 7,
+          "rowCount": 1,
+          "rowJsonBytes": 82
+        }
+      ],
+      "prototypeQueries": [
+        {
+          "kinds": [
+            "bot_chat_list",
+            "issue_list",
+            "task_run_list",
+            "thread_list"
+          ],
+          "ids": [
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+          ],
+          "revision": 7,
+          "rowCount": 4,
+          "rowJsonBytes": 332
+        }
+      ],
+      "ownerScopeQueriesEach": 1,
+      "outputEqual": true,
+      "perReaderRefsUnchanged": true,
+      "baselineEvents": [
+        {
+          "index": 0,
+          "event": "action_start",
+          "action": "task-runs.pollTaskRuns"
+        },
+        {
+          "index": 1,
+          "event": "action_start",
+          "action": "task-runs.syncThreadList"
+        },
+        {
+          "index": 2,
+          "event": "action_start",
+          "action": "coordinator.pollBotChatSummaries"
+        },
+        {
+          "index": 3,
+          "event": "action_start",
+          "action": "issues.syncIssueList"
+        },
+        {
+          "index": 4,
+          "event": "authenticate",
+          "action": "task-runs.pollTaskRuns"
+        },
+        {
+          "index": 5,
+          "event": "authenticate",
+          "action": "task-runs.syncThreadList"
+        },
+        {
+          "index": 6,
+          "event": "authenticate",
+          "action": "coordinator.pollBotChatSummaries"
+        },
+        {
+          "index": 7,
+          "event": "authenticate",
+          "action": "issues.syncIssueList"
+        },
+        {
+          "index": 8,
+          "event": "authenticate",
+          "action": "issues.syncIssueList"
+        },
+        {
+          "index": 9,
+          "event": "owner_scope_query",
+          "action": "task-runs.pollTaskRuns",
+          "requestedOwner": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        },
+        {
+          "index": 10,
+          "event": "workspace_context_query_started",
+          "action": "issues.syncIssueList"
+        },
+        {
+          "index": 11,
+          "event": "revision_query",
+          "action": "task-runs.pollTaskRuns",
+          "kinds": [
+            "bot_chat_list",
+            "task_run_list",
+            "thread_list"
+          ],
+          "ids": [
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+          ],
+          "revision": 7
+        },
+        {
+          "index": 12,
+          "event": "revision_observed",
+          "action": "task-runs.pollTaskRuns",
+          "kinds": [
+            "bot_chat_list",
+            "task_run_list",
+            "thread_list"
+          ],
+          "ids": [
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+          ],
+          "revision": 7
+        },
+        {
+          "index": 13,
+          "event": "business_summary_read",
+          "action": "coordinator.pollBotChatSummaries",
+          "revisionAtData": 7
+        },
+        {
+          "index": 14,
+          "event": "business_version_read",
+          "action": "task-runs.syncThreadList",
+          "revisionAtData": 7
+        },
+        {
+          "index": 15,
+          "event": "business_rows_read",
+          "action": "task-runs.pollTaskRuns",
+          "revisionAtData": 7
+        },
+        {
+          "index": 16,
+          "event": "action_end",
+          "action": "coordinator.pollBotChatSummaries"
+        },
+        {
+          "index": 17,
+          "event": "business_rows_read",
+          "action": "task-runs.syncThreadList",
+          "revisionAtData": 7
+        },
+        {
+          "index": 18,
+          "event": "action_end",
+          "action": "task-runs.pollTaskRuns"
+        },
+        {
+          "index": 19,
+          "event": "action_end",
+          "action": "task-runs.syncThreadList"
+        },
+        {
+          "index": 20,
+          "event": "workspace_context_query_completed",
+          "action": "issues.syncIssueList"
+        },
+        {
+          "index": 21,
+          "event": "share_checked",
+          "action": "issues.syncIssueList"
+        },
+        {
+          "index": 22,
+          "event": "revision_query",
+          "action": "issues.syncIssueList",
+          "kinds": [
+            "issue_list"
+          ],
+          "ids": [
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+          ],
+          "revision": 7
+        },
+        {
+          "index": 23,
+          "event": "revision_observed",
+          "action": "issues.syncIssueList",
+          "kinds": [
+            "issue_list"
+          ],
+          "ids": [
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+          ],
+          "revision": 7
+        },
+        {
+          "index": 24,
+          "event": "business_version_read",
+          "action": "issues.syncIssueList",
+          "revisionAtData": 7
+        },
+        {
+          "index": 25,
+          "event": "business_version_read",
+          "action": "issues.syncIssueList",
+          "revisionAtData": 7
+        },
+        {
+          "index": 26,
+          "event": "business_rows_read",
+          "action": "issues.syncIssueList",
+          "revisionAtData": 7
+        },
+        {
+          "index": 27,
+          "event": "action_end",
+          "action": "issues.syncIssueList"
+        }
+      ],
+      "prototypeEvents": [
+        {
+          "index": 0,
+          "event": "action_start",
+          "action": "task-runs.pollTaskRuns"
+        },
+        {
+          "index": 1,
+          "event": "action_start",
+          "action": "task-runs.syncThreadList"
+        },
+        {
+          "index": 2,
+          "event": "action_start",
+          "action": "coordinator.pollBotChatSummaries"
+        },
+        {
+          "index": 3,
+          "event": "action_start",
+          "action": "issues.syncIssueList"
+        },
+        {
+          "index": 4,
+          "event": "authenticate",
+          "action": "task-runs.pollTaskRuns"
+        },
+        {
+          "index": 5,
+          "event": "authenticate",
+          "action": "task-runs.syncThreadList"
+        },
+        {
+          "index": 6,
+          "event": "authenticate",
+          "action": "coordinator.pollBotChatSummaries"
+        },
+        {
+          "index": 7,
+          "event": "authenticate",
+          "action": "issues.syncIssueList"
+        },
+        {
+          "index": 8,
+          "event": "authenticate",
+          "action": "issues.syncIssueList"
+        },
+        {
+          "index": 9,
+          "event": "owner_scope_query",
+          "action": "task-runs.pollTaskRuns",
+          "requestedOwner": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+        },
+        {
+          "index": 10,
+          "event": "workspace_context_query_started",
+          "action": "issues.syncIssueList"
+        },
+        {
+          "index": 11,
+          "event": "revision_query",
+          "action": "task-runs.pollTaskRuns",
+          "kinds": [
+            "bot_chat_list",
+            "issue_list",
+            "task_run_list",
+            "thread_list"
+          ],
+          "ids": [
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+          ],
+          "revision": 7
+        },
+        {
+          "index": 12,
+          "event": "revision_observed",
+          "action": "task-runs.pollTaskRuns",
+          "kinds": [
+            "bot_chat_list",
+            "issue_list",
+            "task_run_list",
+            "thread_list"
+          ],
+          "ids": [
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+          ],
+          "revision": 7
+        },
+        {
+          "index": 13,
+          "event": "business_summary_read",
+          "action": "coordinator.pollBotChatSummaries",
+          "revisionAtData": 7
+        },
+        {
+          "index": 14,
+          "event": "business_version_read",
+          "action": "task-runs.syncThreadList",
+          "revisionAtData": 7
+        },
+        {
+          "index": 15,
+          "event": "business_rows_read",
+          "action": "task-runs.pollTaskRuns",
+          "revisionAtData": 7
+        },
+        {
+          "index": 16,
+          "event": "action_end",
+          "action": "coordinator.pollBotChatSummaries"
+        },
+        {
+          "index": 17,
+          "event": "business_rows_read",
+          "action": "task-runs.syncThreadList",
+          "revisionAtData": 7
+        },
+        {
+          "index": 18,
+          "event": "action_end",
+          "action": "task-runs.pollTaskRuns"
+        },
+        {
+          "index": 19,
+          "event": "action_end",
+          "action": "task-runs.syncThreadList"
+        },
+        {
+          "index": 20,
+          "event": "workspace_context_query_completed",
+          "action": "issues.syncIssueList"
+        },
+        {
+          "index": 21,
+          "event": "share_checked",
+          "action": "issues.syncIssueList"
+        },
+        {
+          "index": 22,
+          "event": "business_version_read",
+          "action": "issues.syncIssueList",
+          "revisionAtData": 7
+        },
+        {
+          "index": 23,
+          "event": "business_version_read",
+          "action": "issues.syncIssueList",
+          "revisionAtData": 7
+        },
+        {
+          "index": 24,
+          "event": "business_rows_read",
+          "action": "issues.syncIssueList",
+          "revisionAtData": 7
+        },
+        {
+          "index": 25,
+          "event": "action_end",
+          "action": "issues.syncIssueList"
+        }
+      ]
+    },
+    {
+      "name": "personal_scope_immediate",
+      "baselineQueries": [
+        {
+          "kinds": [
+            "bot_chat_list",
+            "task_run_list",
+            "thread_list"
+          ],
+          "ids": [
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+          ],
+          "revision": 7,
+          "rowCount": 3,
+          "rowJsonBytes": 251
+        },
+        {
+          "kinds": [
+            "issue_list"
+          ],
+          "ids": [
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+          ],
+          "revision": 7,
+          "rowCount": 1,
+          "rowJsonBytes": 82
+        }
+      ],
+      "prototypeQueries": [
+        {
+          "kinds": [
+            "bot_chat_list",
+            "issue_list",
+            "task_run_list",
+            "thread_list"
+          ],
+          "ids": [
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+          ],
+          "revision": 7,
+          "rowCount": 4,
+          "rowJsonBytes": 332
+        }
+      ],
+      "outputEqual": true
+    },
+    {
+      "name": "selected_team_no_saving",
+      "baselineQueries": [
+        {
+          "kinds": [
+            "bot_chat_list",
+            "task_run_list",
+            "thread_list"
+          ],
+          "ids": [
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+          ],
+          "revision": 7,
+          "rowCount": 3,
+          "rowJsonBytes": 251
+        },
+        {
+          "kinds": [
+            "issue_list",
+            "issue_list"
+          ],
+          "ids": [
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+          ],
+          "revision": 7,
+          "rowCount": 2,
+          "rowJsonBytes": 163
+        }
+      ],
+      "prototypeQueries": [
+        {
+          "kinds": [
+            "bot_chat_list",
+            "issue_list",
+            "task_run_list",
+            "thread_list"
+          ],
+          "ids": [
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+            "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+          ],
+          "revision": 7,
+          "rowCount": 4,
+          "rowJsonBytes": 332
+        },
+        {
+          "kinds": [
+            "issue_list"
+          ],
+          "ids": [
+            "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+          ],
+          "revision": 7,
+          "rowCount": 1,
+          "rowJsonBytes": 82
+        }
+      ],
+      "outputEqual": true
+    },
+    {
+      "name": "concurrent_write",
+      "baselineIssueRevision": 12,
+      "prototypeIssueRevision": 7,
+      "unseenPushAcknowledged": false,
+      "nextBatchIssueRevision": 12,
+      "businessItemsAndVersionEqual": true
+    },
+    {
+      "name": "single_and_non_revision",
+      "rows": [
+        {
+          "name": "task-runs.pollTaskRuns",
+          "queriesEach": 1,
+          "outputEqual": true
+        },
+        {
+          "name": "task-runs.syncThreadList",
+          "queriesEach": 1,
+          "outputEqual": true
+        },
+        {
+          "name": "coordinator.pollBotChatSummaries",
+          "queriesEach": 1,
+          "outputEqual": true
+        },
+        {
+          "name": "issues.syncIssueList",
+          "queriesEach": 1,
+          "outputEqual": true
+        },
+        {
+          "name": "teams.listTeams",
+          "queriesEach": 0,
+          "outputEqual": true
+        }
+      ]
+    },
+    {
+      "name": "revoked_authentication_fixture",
+      "ownerQueriesEach": 0,
+      "revisionQueriesEach": 0,
+      "authRequiredPreserved": true
+    },
+    {
+      "name": "missing_home",
+      "queriesEach": 1,
+      "onlyOriginalSelectedIssueKey": true,
+      "outputEqual": true
+    },
+    {
+      "name": "late_reader_denied",
+      "queriesEach": 1,
+      "outputEqual": true,
+      "limitation": "Closed prepared plan includes one issue_list key whose later reader fails authorization; no extra statement or response key, but one extra safe metadata key is requested."
+    },
+    {
+      "name": "revision_failure",
+      "baselineQueries": 2,
+      "prototypeQueries": 1,
+      "businessItemsAndVersionEqual": true,
+      "fabricatedRevision": false,
+      "nextRequestRecovers": true,
+      "limitation": "Prefetched issue key shares the failed early query instead of making the late baseline query; it lacks revision proof until a later read."
+    },
+    {
+      "name": "parallel_owners",
+      "queriesPerBatch": 1,
+      "scopeIsolation": true,
+      "revisionA": 7,
+      "revisionB": 12
+    }
+  ]
+}

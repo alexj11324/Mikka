@@ -1,0 +1,350 @@
+{
+  "version": 2,
+  "task": "issue-1512-native-query-attribution-diagnostics",
+  "status": "frozen-independent-review-passed",
+  "createdAt": "2026-11-09T00:05:01.456434+00:00",
+  "claim": "Bounded isolated-harness diagnostics correlate original pg.Client.query ordinals to internal ALS origin, exact HTTP method, logical action, closed route/scope and safe SQL structure fingerprint. This patch is not a query-budget fix.",
+  "source": {
+    "version": 2,
+    "createdAt": "2026-11-09T00:02:54.618572+00:00",
+    "base": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+    "baseTree": "7a2e1b485920ae36e0b311519b50ab1ed30dfe69",
+    "isolatedCopy": "/workspace/scratch/812e3b7d6d45/issue1512-diagnostics-copy",
+    "originalCheckoutUntouched": true,
+    "files": [
+      {
+        "path": "lib/request-log.ts",
+        "baselineSha256": "d0a529fd0696397afc89e36c5b07015c33785367e14ce6c9fbf07891d747d054",
+        "candidateSha256": "2884101d84e815ece44d1f3758885cc1c2145932cbe1001dfe17273684c8949a",
+        "candidateBytes": 10743
+      },
+      {
+        "path": "apps/desktop/test/db-metrics.cjs",
+        "baselineSha256": "475df35d2998e1eab7f9dd186261c2ef00d50b2a31a5ec4feb65a786217d5396",
+        "candidateSha256": "814aa821cdc111c25f4632df5c2fa6abcbe2fa725f23a2ce4a397493f2a5e491",
+        "candidateBytes": 8890
+      },
+      {
+        "path": "apps/desktop/test/db-metrics.test.mjs",
+        "baselineSha256": "0062b88ce2823f8ce4e5a64c0927faed7d4ead8dcdbed31920eee92b76efb8d4",
+        "candidateSha256": "2a6e5d42c063c771d770c2e92b804bb88573e3043c2a410a1b9d3374ff1fa346",
+        "candidateBytes": 38470
+      },
+      {
+        "path": "apps/desktop/test/lifecycle-query-counts.mjs",
+        "baselineSha256": "855dac3438434cf643a222a8297bcf09caff2c283064768b50082ae04edc226e",
+        "candidateSha256": "564706188c1b96bc9d9ebadb01bab5be4bc03cd0920131ecda0185b6e07fda7f",
+        "candidateBytes": 23696
+      },
+      {
+        "path": "apps/desktop/test/db-query-diagnostics.cjs",
+        "baselineSha256": null,
+        "candidateSha256": "763d180bfc0d0a62e67a99624a4815eeca953bbcb7290193a5515bb67e24ccad",
+        "candidateBytes": 18406
+      },
+      {
+        "path": "apps/desktop/test/db-query-diagnostics.test.mjs",
+        "baselineSha256": null,
+        "candidateSha256": "236633af2b451f23f26b4dec32f2778881dbe31ebbb3c1e00e0431661b898c23",
+        "candidateBytes": 26054
+      }
+    ],
+    "patchSha256": "8cfecb43ecbf45d0641c58be24dda5175db891ca5cb0d46a98a34700bee81fb0",
+    "reviewDeltaSha256": "3c1166dde2fb16bcc0b7050f0c79c2d05578b15b94ea7da743e0b11cbb5b192f",
+    "supersedesButPreserves": {
+      "manifest": "frozen-source-manifest.safe.json",
+      "manifestSha256": "6c5e44177025206ecc0dd3772290566eadceacefa3211b77a40d9c39e2a1917d",
+      "patch": "query-diagnostics.patch",
+      "patchSha256": "28255779fc5ebaa63c814a27e94a4445a929a33458a32a405f5cc3971a260b7c"
+    },
+    "harnessCommand": [
+      "node",
+      "--test",
+      "apps/desktop/test/db-metrics.test.mjs"
+    ],
+    "harnessExitCode": 0,
+    "harnessTests": 35,
+    "harnessLogSha256": "2febd396f0425b551b2c88e536e9f25cac4ec8c52fbb38ddf161777020d7ea32"
+  },
+  "preservedFailure": {
+    "head": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+    "actualCheckout": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+    "tree": "7a2e1b485920ae36e0b311519b50ab1ed30dfe69",
+    "nativeLoginQueries": 504,
+    "webLoginQueries": 480,
+    "delta": 24,
+    "result": "RED",
+    "rawOriginal": "../native4a07/native-4a07-original/lifecycle.json",
+    "warning": "Neither this local fixture GREEN nor earlier CI evidence replaces the original full-window failure or proves current-candidate Native acceptance."
+  },
+  "scope": {
+    "productFiles": [
+      "lib/request-log.ts"
+    ],
+    "harnessFiles": [
+      "apps/desktop/test/db-metrics.cjs",
+      "apps/desktop/test/db-metrics.test.mjs",
+      "apps/desktop/test/lifecycle-query-counts.mjs",
+      "apps/desktop/test/db-query-diagnostics.cjs",
+      "apps/desktop/test/db-query-diagnostics.test.mjs"
+    ],
+    "rootCheckoutOrIndexChanged": false,
+    "nativeRuns": 0,
+    "databaseRuns": 0,
+    "paidWorkflowRuns": 0,
+    "cloudResourcesCreated": 0
+  },
+  "invariants": [
+    "Product registers metadata-only ALS readers; no subscribers are invoked and no per-query work occurs without the isolated harness.",
+    "The diagnostic reader registry preserves module copies; unavailable, invalid, missing and multiple active readers are explicitly unknown.",
+    "No additional pg wrapper is introduced. Existing manageDatabasePool AsyncLocalStorage.bind owns queued callback restoration.",
+    "Only self-generated internal HTTP/logical UUIDs are joined. External requestId, cookies, headers, arguments and raw user identifiers are excluded.",
+    "Every retained query uses its original queryCalls ordinal at the unchanged Client.query hook; the 17 operation and 78 source counters are preserved.",
+    "Window membership is (before.queryCalls, after.queryCalls], independent of request start or completion timestamps. Inherited after/background work remains counted.",
+    "A captured null action stays null; a later physical completion never assigns pre-authentication SQL to a logical child.",
+    "Unknown context, unknown structure, unmatched or unpaired receipts and cap overflow are visible independently; missing or dropped evidence is never a synthetic zero.",
+    "All four windows and twelve checkpoints are unchanged. Normal metrics snapshots keep the existing fields and 8192-byte bound.",
+    "One bounded diagnostics export occurs after existing measurements and cleanup via rpcActions; it is frozen at the first export until an explicit existing reset.",
+    "Existing physical/logical RPC aggregates are unchanged; historical aggregate-only reports cannot retroactively acquire query-level diagnostics.",
+    "SQL text and parameter values are never retained or exported; normalizedStructureId hashes only the conservative normalized structure, not production raw statementId."
+  ],
+  "bounds": {
+    "queryRows": 8192,
+    "contextDictionaryEntries": 2048,
+    "structureDictionaryEntries": 512,
+    "statementCharacters": 32768,
+    "finalExportBytes": 2097152,
+    "moduleReaders": 16,
+    "exportRequestAttempts": 1,
+    "exportTimeoutMs": 5000
+  },
+  "validation": [
+    {
+      "name": "original preload lacks diagnostics endpoint",
+      "artifact": "preload-endpoint-red.log",
+      "result": "RED",
+      "failures": 3,
+      "variants": [
+        "Next CJS",
+        "Nitro CJS",
+        "Nitro ESM"
+      ],
+      "cause": "404 instead of diagnostics endpoint 200"
+    },
+    {
+      "name": "old actual request-log negative control",
+      "artifact": "getter-negative-control.log",
+      "result": "RED",
+      "tests": 1,
+      "failures": 1,
+      "cause": "actual request-log must register its own safe ALS getter",
+      "restoredCandidateInFinally": true
+    },
+    {
+      "name": "focused harness regressions",
+      "artifact": "harness-regression-v2-green.log",
+      "result": "GREEN",
+      "tests": 35,
+      "failures": 0,
+      "skipped": 0,
+      "runtime": "Node v24.22.1",
+      "coverage": [
+        "actual installed PG and OTel wrappers in three loading variants",
+        "actual request-log ALS and manageDatabasePool with real pg.Pool max1 and controlled in-memory Client",
+        "three queued requests released by a different request, then reused client",
+        "two real module copies and active-scope ambiguity",
+        "strict ordinals and 17/78 bucket conservation",
+        "unknown shapes, context and dictionary/query caps",
+        "one final export after twelve snapshots; unchanged windows and prior RPC report",
+        "oversized, malformed and failed export closed errors without retries",
+        "primitive-only one-time metadata projection, no Proxy traps, one supported SQL statement and exact payload-free transaction words"
+      ]
+    },
+    {
+      "name": "actual product request log and tracing regressions",
+      "artifact": "product-regression-green.log",
+      "result": "GREEN",
+      "tests": 15,
+      "failures": 0,
+      "skipped": 0,
+      "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/request-log.test.ts lib/tracing/clients.test.ts",
+      "sourceBinding": {
+        "path": "lib/request-log.ts",
+        "sha256": "2884101d84e815ece44d1f3758885cc1c2145932cbe1001dfe17273684c8949a",
+        "boundary": "This product file is byte-identical in v1 and v2; the product regression was not rerun and is not presented as a second execution."
+      }
+    },
+    {
+      "name": "targeted lint all six files",
+      "artifact": "targeted-lint-v2.safe.json",
+      "result": "GREEN",
+      "exitCode": 0,
+      "version": "oxlint 1.89.0",
+      "boundary": "Explicit --no-ignore was required because root config excludes apps/desktop. The earlier default invocation is preserved but is not harness lint evidence.",
+      "manifestSha256": "63797e4b42d125878517893a25587c3b12c42243088d54c9253ddbcf668dcb50"
+    },
+    {
+      "name": "independent-review counterexample negative control",
+      "artifact": "review-canary-v1-expanded-red.log",
+      "result": "RED",
+      "tests": 5,
+      "failures": 5,
+      "helperSha256": "53eeebc04adb40f82c90fda9e56858eb5ce5d10e351a4ce3ee66fd864a5fdd18",
+      "testSha256": "010fedfa3a740bcd1f7a084571a75a8a9e4d5e7d0ae600e01b511c9cad3ed4a3",
+      "cases": [
+        "context identifier coercion",
+        "structure identifier coercion",
+        "nonprimitive receipt timestamps",
+        "query-config Proxy traps",
+        "opaque or multi-statement SQL"
+      ]
+    }
+  ],
+  "riskCategories": [
+    {
+      "category": "behavior-and-causality",
+      "boundary": "ALS IDs establish origin correlation only. Equal normalized structures do not prove equal parameters or redundant work. A carried request may execute after its HTTP completion."
+    },
+    {
+      "category": "concurrency-and-completeness",
+      "boundary": "Multiple active modules, foreign registry and overflow remain unknown. Fixture tests cover actual queue restoration and client reuse; compiled Native still needs current-source verification."
+    },
+    {
+      "category": "privacy-and-structure",
+      "boundary": "Only primitive verified metadata is retained; fields are read once. Proxy configs are rejected before traps. A single supported DML statement or exact BEGIN/COMMIT/ROLLBACK word may receive a normalizedStructureId; comments, string/dollar literals, opaque commands and multi-statements remain unknown. No raw SQL, parameters or user content are exported."
+    },
+    {
+      "category": "performance-and-measurement",
+      "boundary": "No SQL, network or polling is added. The bounded collector adds CPU and memory inside the original measurement windows in isolated harness processes; only its single final export occurs after measurements and cleanup. No zero-overhead or production-latency guarantee is claimed. Individual snapshots retain their original fields and 8192-byte limit."
+    },
+    {
+      "category": "verification-and-release",
+      "boundary": "This evidence binds the exact six-file isolated candidate. No live PG, compiled Native, current-head CI or production acceptance ran here. Earlier RED remains RED and old CI is not upgraded to validate the candidate."
+    }
+  ],
+  "artifacts": [
+    {
+      "name": "frozen-source-manifest-v2.safe.json",
+      "bytes": 2599,
+      "sha256": "63797e4b42d125878517893a25587c3b12c42243088d54c9253ddbcf668dcb50"
+    },
+    {
+      "name": "frozen-source-manifest.safe.json",
+      "bytes": 2183,
+      "sha256": "6c5e44177025206ecc0dd3772290566eadceacefa3211b77a40d9c39e2a1917d"
+    },
+    {
+      "name": "getter-negative-control.log",
+      "bytes": 2338,
+      "sha256": "306bb9f7f5aebc3c3690478578bf26e041052bb92a78e9427fd459110fcdc573"
+    },
+    {
+      "name": "harness-regression-green.log",
+      "bytes": 3556,
+      "sha256": "8d6c41e4305ba1234d8c0f39f94af596cef129813474597b66902268af4929f1"
+    },
+    {
+      "name": "harness-regression-v2-green.log",
+      "bytes": 4077,
+      "sha256": "2febd396f0425b551b2c88e536e9f25cac4ec8c52fbb38ddf161777020d7ea32"
+    },
+    {
+      "name": "preload-endpoint-red.log",
+      "bytes": 10903,
+      "sha256": "79ab1611275e2b05cf67e7b10327e6bcf92916bed0992b19aa79861df7079def"
+    },
+    {
+      "name": "product-regression-green.log",
+      "bytes": 1459,
+      "sha256": "34fb28c0f7095f139cadc3b0c58a30b462af1140414d57c03f6f78d0995f4247"
+    },
+    {
+      "name": "query-diagnostics-implementation.safe.json",
+      "bytes": 10946,
+      "sha256": "722cdc61466e5d349dfa18fc35425ac8988df22900e25186fe459527ea2b4124"
+    },
+    {
+      "name": "query-diagnostics-v1-to-v2.patch",
+      "bytes": 12123,
+      "sha256": "3c1166dde2fb16bcc0b7050f0c79c2d05578b15b94ea7da743e0b11cbb5b192f"
+    },
+    {
+      "name": "query-diagnostics-v2.patch",
+      "bytes": 56524,
+      "sha256": "8cfecb43ecbf45d0641c58be24dda5175db891ca5cb0d46a98a34700bee81fb0"
+    },
+    {
+      "name": "query-diagnostics.patch",
+      "bytes": 52711,
+      "sha256": "28255779fc5ebaa63c814a27e94a4445a929a33458a32a405f5cc3971a260b7c"
+    },
+    {
+      "name": "review-canary-v1-expanded-red.log",
+      "bytes": 6099,
+      "sha256": "18349caa12713860e515394b4f0560350c8d0d1627b00e24c3fd0678ed5a5cf9"
+    },
+    {
+      "name": "review-canary-v1-red.log",
+      "bytes": 3915,
+      "sha256": "95cb7b51e7b0a19559506e690ab190167b75b4f509139dfc175939c2d707a390"
+    },
+    {
+      "name": "targeted-lint-no-ignore.safe.json",
+      "bytes": 553,
+      "sha256": "9349b90c1f5607df1735a4a6364d0e8f36ac230fe5c2491201290a0d00fa2f4f"
+    },
+    {
+      "name": "targeted-lint-v2.safe.json",
+      "bytes": 708,
+      "sha256": "eb233c93dd5796c91e9fedec68651f2e4c86d53c899fca6e9a6112da709f321e"
+    },
+    {
+      "name": "targeted-lint.log",
+      "bytes": 1,
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b"
+    }
+  ],
+  "supersedesButPreserves": {
+    "implementation": "query-diagnostics-implementation.safe.json",
+    "sourceManifest": "frozen-source-manifest.safe.json",
+    "patch": "query-diagnostics.patch",
+    "reason": "Independent review identified coercible context/shape/timestamp fields, Proxy descriptor side effects and opaque or multi-statement SQL forms. V1 remains archived with its RED regressions and is not approved for integration."
+  },
+  "independentReview": {
+    "reviewer": "/root/native_6180_review",
+    "verdict": "no must-fix after v2",
+    "manifestSha256": "63797e4b42d125878517893a25587c3b12c42243088d54c9253ddbcf668dcb50",
+    "reviewed": [
+      "all six final source and baseline hashes",
+      "v1-to-v2 exact delta",
+      "preserved v1 patch and manifest hashes",
+      "five original RED failures",
+      "35/35 current harness original log"
+    ],
+    "independentExecution": {
+      "tests": 5,
+      "failures": 0,
+      "result": "GREEN",
+      "scope": "pure review-canary tests only; no duplicate full suite or Native run"
+    },
+    "lintBinding": "Actual post-v2 lint invocation chunk 874e39, exit 0, explicitly --no-ignore on all six files, bound by targeted-lint-v2.safe.json."
+  },
+  "documentationCheck": {
+    "path": "docs/operations/tracing.md",
+    "section": "Desktop startup and login query counts",
+    "review": "Read-only source comparison of owner-list prefetch, same-response snapshot proof and queryDiagnostics boundaries; no false statement found in the supplied 341–490 section. Suggested clarifying that capture runs during the original windows and only the export is deferred until after measurements. No root documentation edits made by this agent."
+  },
+  "captureTiming": {
+    "activation": "First existing /metrics checkpoint; no added snapshot.",
+    "insideOriginalWindows": "Every original pg.Client.query call updates its existing counters first, then the isolated harness collector records a bounded row and parses a conservative SQL shape. That collector adds CPU and memory costs inside the original measurement windows.",
+    "afterOriginalWindows": "Only the single /diagnostics export and existing log projection occur after all original measurements and cleanup.",
+    "claimBoundary": "Unchanged counter semantics and no additional SQL or polling are verified locally; zero timing effect, production CPU cost and current-candidate Native acceptance are not claimed."
+  },
+  "resourceCompletion": {
+    "allLocalTestCommandsExited": true,
+    "nativeOrPaidWorkflowTriggered": false,
+    "databaseOrCloudResourcesCreated": false,
+    "backgroundServicesLeftRunning": false,
+    "isolatedSourceCopyRetainedForRootIntegration": true
+  }
+}

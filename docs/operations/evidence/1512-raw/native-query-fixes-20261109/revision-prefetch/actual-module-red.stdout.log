@@ -1,0 +1,19 @@
+{"actualModules":["createReadBatch","beginOwnerListRead","readRevisions","ownerLiveReadScope","readBatchOwnerScope","readBatchRevisions","readLiveRevisions"],"ownerReads":[{"ownerId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}],"revisionReads":[{"kinds":["task_run_list"],"ids":["bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"],"rowCount":1},{"kinds":["issue_list"],"ids":["bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"],"rowCount":1}],"result":[{"ok":true,"result":{"items":[],"live":{"scope":{"ownerId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","workspaceId":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"},"revisions":{"task_run_list:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb":7}}}},{"ok":true,"result":{"items":[],"version":"fixture-version","live":{"scope":{"ownerId":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","workspaceId":"bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"},"revisions":{"issue_list:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb":7}}}}],"realPostgres":false,"actualModelCalls":0}
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: one already prepared owner batch needs one revision SELECT across staggered readers
+
+2 !== 1
+
+    at <anonymous> (/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/revision-prefetch-triage-20261108/actual-module-red-green.mjs:48:8) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 2,
+  expected: 1,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.22.1

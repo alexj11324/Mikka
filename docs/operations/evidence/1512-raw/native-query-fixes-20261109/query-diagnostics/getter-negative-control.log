@@ -1,0 +1,44 @@
+✖ actual request ALS and manageDatabasePool bind concurrent and reused queued clients without a global current request (223.766775ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 319.471317
+
+✖ failing tests:
+
+test at apps/desktop/test/db-query-diagnostics.test.mjs:231:1
+✖ actual request ALS and manageDatabasePool bind concurrent and reused queued clients without a global current request (223.766775ms)
+  Error: Command failed: /opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node --import /workspace/scratch/af05d9e4f31e/Mikka-observability-1512/node_modules/.pnpm/tsx@4.23.15/node_modules/tsx/dist/loader.mjs /tmp/mikka-query-context-vIUkAa/probe.mjs /workspace/scratch/812e3b7d6d45/issue1512-diagnostics-copy/
+  node:internal/modules/run_main:107
+      triggerUncaughtException(
+      ^
+  
+  AssertionError [ERR_ASSERTION]: actual request-log must register its own safe ALS getter
+      at <anonymous> (/tmp/mikka-query-context-vIUkAa/probe.mjs:10:12) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+  
+  Node.js v24.22.1
+  
+      at genericNodeError (node:internal/errors:986:15)
+      at wrappedFn (node:internal/errors:540:14)
+      at ChildProcess.exithandler (node:child_process:417:12)
+      at ChildProcess.emit (node:events:514:28)
+      at maybeClose (node:internal/child_process:1172:16)
+      at ChildProcess._handle.onexit (node:internal/child_process:335:5) {
+    code: 1,
+    killed: false,
+    signal: null,
+    cmd: '/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node --import /workspace/scratch/af05d9e4f31e/Mikka-observability-1512/node_modules/.pnpm/tsx@4.23.15/node_modules/tsx/dist/loader.mjs /tmp/mikka-query-context-vIUkAa/probe.mjs /workspace/scratch/812e3b7d6d45/issue1512-diagnostics-copy/',
+    stdout: '',
+    stderr: "node:internal/modules/run_main:107\n    triggerUncaughtException(\n    ^\n\nAssertionError [ERR_ASSERTION]: actual request-log must register its own safe ALS getter\n    at <anonymous> (/tmp/mikka-query-context-vIUkAa/probe.mjs:10:12) {\n  generatedMessage: false,\n  code: 'ERR_ASSERTION',\n  actual: false,\n  expected: true,\n  operator: '==',\n  diff: 'simple'\n}\n\nNode.js v24.22.1\n"
+  }

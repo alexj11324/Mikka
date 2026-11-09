@@ -1,0 +1,11 @@
+{
+  "name": "root-type-final-test",
+  "command": [
+    "node_modules/.bin/tsrs",
+    "--noEmit"
+  ],
+  "startedAt": "2026-11-09T00:18:18.893241+00:00",
+  "endedAt": "2026-11-09T00:18:20.181175+00:00",
+  "exitCode": 0,
+  "tree": "766c063fcac276ea55251d76e43b2e616244b62b"
+}

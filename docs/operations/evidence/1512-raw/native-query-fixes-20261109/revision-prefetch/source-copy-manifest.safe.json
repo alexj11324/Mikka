@@ -1,0 +1,225 @@
+{
+  "kind": "offline-source-copy-controlled-dependency-probe",
+  "source": "/workspace/scratch/812e3b7d6d45/Mikka-1512-resume",
+  "sourceFiles": [
+    {
+      "path": "lib/action-error.ts",
+      "bytes": 741,
+      "sha256": "b703bdecc6b1a98254d5caa6133d12f3379e4426d0f49ea17c03474e49c2c606"
+    },
+    {
+      "path": "lib/workspace-error.ts",
+      "bytes": 250,
+      "sha256": "6a6c60acde3a8b6526c8ca4f87f25413f3f9aff1e867d488921779d4d99c610e"
+    },
+    {
+      "path": "lib/cache-read-action.ts",
+      "bytes": 657,
+      "sha256": "b83baef9cecdabcb535d10a50c2e65da477434a3f9245e3fd9d1db9a84ce3f29"
+    },
+    {
+      "path": "lib/list-poll.ts",
+      "bytes": 3269,
+      "sha256": "e676c7e623bcf5f99489027c73e2f741f71a263d8f54a81a3d6d7a7f14f930ab"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch.ts",
+      "bytes": 3066,
+      "sha256": "3d99daae29daec0ca3ee25065c7a69c0d089f769c151e1509cb7d7721ed65045"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "bytes": 3546,
+      "sha256": "4673311b318c705301b14129ce38af905481064c02da19dcc6b2394ce6b94108"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-contract.ts",
+      "bytes": 1004,
+      "sha256": "2a9b5cf31b9cf0936f457336517ec481b7a358496c63a00da2c719eab4467f0d"
+    },
+    {
+      "path": "lib/live/events.ts",
+      "bytes": 4679,
+      "sha256": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5"
+    },
+    {
+      "path": "lib/live/revisions.ts",
+      "bytes": 4070,
+      "sha256": "bd2b351ade97a5b0f3f12f43d606ce9f9d8eca9b90de33400be94203d9d76328"
+    },
+    {
+      "path": "lib/live/owner-scope.ts",
+      "bytes": 1284,
+      "sha256": "d803e41828b7bb49ef89e6571efe43f8080249e121cb4852f7e869d0a2382673"
+    },
+    {
+      "path": "lib/live/revision-read.ts",
+      "bytes": 1712,
+      "sha256": "eddf21c6fe1d381d154ddf257c28ae9923daaeff3ebc1d2b63c621add914af46"
+    },
+    {
+      "path": "lib/live/list-read-server.ts",
+      "bytes": 1249,
+      "sha256": "b6fa906a7eee521f91160f39d77098b33c640c0ec8ee15fc86a3df7e4518aff7"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.test.ts",
+      "bytes": 8536,
+      "sha256": "c6eb4a456b99d693476dedbb7645fc21ad33999e3f99bac4fed3cb9aba4d437e"
+    },
+    {
+      "path": "app/actions/task-runs.ts",
+      "bytes": 13692,
+      "sha256": "4f29acbe6899a1432d4f216cb1f08aeba8672897319106b98848fbfda45767f8"
+    },
+    {
+      "path": "app/actions/coordinator.ts",
+      "bytes": 23196,
+      "sha256": "b70ceec98efa1edfc1074598b2a6cf12b58d4f2539bb351854a562fa43f9d451"
+    },
+    {
+      "path": "app/actions/issues.ts",
+      "bytes": 27134,
+      "sha256": "610a5e47fb5115723e44c229fdb4f5b49135bed51b5dc8fb11032a924ebbf399"
+    },
+    {
+      "path": "lib/workspace-access.ts",
+      "bytes": 7976,
+      "sha256": "db5f3de381689ec358c5862c6f3d0b06823d40ade368791e85006005ea8545cd"
+    }
+  ],
+  "extraction": [
+    {
+      "path": "app/actions/task-runs.ts",
+      "name": "pollTaskRuns",
+      "startLine": 51,
+      "endLine": 53,
+      "sha256": "760554eabd14decddd746e2339c3c6575703dfade1243f61e0f9cc62300935ba"
+    },
+    {
+      "path": "app/actions/task-runs.ts",
+      "name": "readTaskRuns",
+      "startLine": 55,
+      "endLine": 82,
+      "sha256": "3f5d10205c2fa96214f0662fbad1caa3d7d3e45a70952284d7bbd90b368249dd"
+    },
+    {
+      "path": "app/actions/task-runs.ts",
+      "name": "pollThreads",
+      "startLine": 116,
+      "endLine": 120,
+      "sha256": "cfeb126fd5474c7e23e0b58524ce61335637c05fdccf6113f1c0a2f7fb30eb51"
+    },
+    {
+      "path": "app/actions/task-runs.ts",
+      "name": "syncThreadList",
+      "startLine": 122,
+      "endLine": 124,
+      "sha256": "39d8125dac31a4503ed7255503bce331245bfa6327bfde5a9d54521205dddab6"
+    },
+    {
+      "path": "app/actions/task-runs.ts",
+      "name": "readThreads",
+      "startLine": 126,
+      "endLine": 192,
+      "sha256": "573d5926b05eed91880853c544e550d68555157aa9f554c5c4ba5bb94124638d"
+    },
+    {
+      "path": "app/actions/coordinator.ts",
+      "name": "getUser",
+      "startLine": 42,
+      "endLine": 46,
+      "sha256": "d5c12e0cbee426382047223192e230242c2e4c8de2bb783451ff0ddbfdd088a8"
+    },
+    {
+      "path": "app/actions/coordinator.ts",
+      "name": "getUserId",
+      "startLine": 48,
+      "endLine": 50,
+      "sha256": "e6b4d3f05bf175b06e5c366a613cf4d5e1a9a9d53efe459fcbaa1eee285cf98d"
+    },
+    {
+      "path": "app/actions/coordinator.ts",
+      "name": "pollBotChatSummaries",
+      "startLine": 209,
+      "endLine": 211,
+      "sha256": "0963c0f8d6d7b1b5b20a17e21ba73e3490144147d5197710ac97f3b34e84cefc"
+    },
+    {
+      "path": "app/actions/coordinator.ts",
+      "name": "readBotChatSummaries",
+      "startLine": 213,
+      "endLine": 218,
+      "sha256": "a087714b785e0d90f3fefb6564f3810bebba97e87fb10365882c393e12636af7"
+    },
+    {
+      "path": "app/actions/issues.ts",
+      "name": "getUserId",
+      "startLine": 50,
+      "endLine": 54,
+      "sha256": "09e6e9045115785ae86db063b0c512058e1f394b1fd445ceb59a263e86518403"
+    },
+    {
+      "path": "app/actions/issues.ts",
+      "name": "pollIssues",
+      "startLine": 81,
+      "endLine": 85,
+      "sha256": "18b7eaf243807f4777c4bb12bd4526461614bfd20881636f480306f99d382685"
+    },
+    {
+      "path": "app/actions/issues.ts",
+      "name": "syncIssueList",
+      "startLine": 89,
+      "endLine": 91,
+      "sha256": "f2c6099da179c6df23f99c0f0471bbd962a906b7243f997c51b498d3de66327f"
+    },
+    {
+      "path": "app/actions/issues.ts",
+      "name": "readIssues",
+      "startLine": 99,
+      "endLine": 101,
+      "sha256": "29071f52b33d57e659b40ec5177cd383ad9a6dc8b369ddd973b3f9d8a6262c98"
+    },
+    {
+      "path": "app/actions/issues.ts",
+      "name": "readIssueSnapshot",
+      "startLine": 103,
+      "endLine": 169,
+      "sha256": "845cbc786109b9de7619dac669fec1519dca9b4cab68f75e07c40cfa4ee6f2fd"
+    },
+    {
+      "path": "lib/workspace-access.ts",
+      "name": "workspaceLocale",
+      "startLine": 20,
+      "endLine": 22,
+      "sha256": "3b7af8450e7a6bbf147a95b057b5ca6b32be08d3239eb65dcdafb6c3f02792f4"
+    },
+    {
+      "path": "lib/workspace-access.ts",
+      "name": "loadWorkspaceContext",
+      "startLine": 40,
+      "endLine": 47,
+      "sha256": "8baab5eef7804b5b5413217f6902356cae2204b5a3db620c8655d148f42b0cf4"
+    },
+    {
+      "path": "lib/workspace-access.ts",
+      "name": "readWorkspaceContext",
+      "startLine": 51,
+      "endLine": 91,
+      "sha256": "f93c714cb94aa2d77e95aba953e762c0855235bcb67102fc946e72731f2bd0d4"
+    }
+  ],
+  "variants": {
+    "baseline": {
+      "changes": "No changes to copied product functions."
+    },
+    "prototype": {
+      "changes": "Proposal only in independent copy: four closed action kinds, batch-local declaration, original-scope revision refs expansion, per-reader projection. readBatchRevisions itself unchanged."
+    }
+  },
+  "limitations": [
+    "No production query, PostgreSQL server, network, real model or Native lifecycle.",
+    "Original action function bodies are extracted byte-for-byte with the TypeScript AST. Auth, workspace database, data DSL, log and other dependencies are controlled fixtures.",
+    "Only actual live_revisions query calls are counted. Fixture business reads are not a total SQL measurement."
+  ]
+}

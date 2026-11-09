@@ -1,0 +1,253 @@
+{
+  "schemaVersion": 1,
+  "status": "EXCLUDED_AS_REDUNDANT_CACHE_CANDIDATE",
+  "publicHead": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+  "actualCheckout": "353f6606ead0b45e3ea0a6015c326f9825c7229b",
+  "actualTree": "7a2e1b485920ae36e0b311519b50ab1ed30dfe69",
+  "sourceManifest": [
+    {
+      "path": "lib/workspace-access.ts",
+      "gitBlob": "a5c563dcd1e70e7c48749b76924a54da2d1a3982",
+      "sha256": "db5f3de381689ec358c5862c6f3d0b06823d40ade368791e85006005ea8545cd",
+      "matchesPublic4a": true
+    },
+    {
+      "path": "lib/personal-workspace.ts",
+      "gitBlob": "c8eeeac5ce06ee4ba9f39bfe9423fada999d5d04",
+      "sha256": "987ce92bdb824a13fba7ae4a42d0fb4dae6bd8395e951eaa8d23bede8cb991bf",
+      "matchesPublic4a": true
+    },
+    {
+      "path": "apps/api/compat/react.ts",
+      "gitBlob": "7b345fdbfae5024f06cb3783082184c9aead9c3b",
+      "sha256": "55ccdcc85fe2868dc311f4d60c16090c572349c3ccba1e2bbce1d7a09156f3b1",
+      "matchesPublic4a": true
+    },
+    {
+      "path": "apps/api/src/context.ts",
+      "gitBlob": "ee90c3133ebfe8e2ba957a56ed5fd05a30655fda",
+      "sha256": "73b5ecaa23a4848e3224c4c6dab58b732f10162994f497ea2e6803fd0d9e06a5",
+      "matchesPublic4a": true
+    },
+    {
+      "path": "apps/api/compat-aliases.mjs",
+      "gitBlob": "d96e8879be028d54d33d085515bf6bfea8898c00",
+      "sha256": "b32f50f4142886c8f9a5ccb790638dbd28a915f992ac5b1093f047646b75f104",
+      "matchesPublic4a": true
+    },
+    {
+      "path": "apps/api/nitro.config.ts",
+      "gitBlob": "42a351bedadb62f91566188d2a54dee694fd94e3",
+      "sha256": "511a909d92da732f4b40ff49f436d1685396569e4fcd4d943363c7788f018eca",
+      "matchesPublic4a": true
+    },
+    {
+      "path": "apps/api/src/application.ts",
+      "gitBlob": "6fe5ed716899e34c0860e69295ecbec99669b293",
+      "sha256": "3f7f1cec43009acd2778dcfdbb0557f4956de0a0e49ea930861caa2a97c3d315",
+      "matchesPublic4a": true
+    },
+    {
+      "path": "apps/api/src/application.test.ts",
+      "gitBlob": "06c77fecdaf3c65c30d0240e460aa6f70b53efbd",
+      "sha256": "98176f15cf56ecc19fb38c3cd773e247b7f32f62151042404d308d217cdcdc9d",
+      "matchesPublic4a": true
+    },
+    {
+      "path": "apps/api/scripts/workflow-development-aliases.test.mjs",
+      "gitBlob": "78212e6fdee4d17cdffd58f1bb2bc59c40a01d5a",
+      "sha256": "03b4dbbc58cbac6ac6d3d5d85f914832dd74e1f7674a83157fa645e53e1d68c3",
+      "matchesPublic4a": true
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch.ts",
+      "gitBlob": "603982e23fafd342cc38177fa1ece09e2df26be6",
+      "sha256": "3d99daae29daec0ca3ee25065c7a69c0d089f769c151e1509cb7d7721ed65045",
+      "matchesPublic4a": true
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "gitBlob": "48e1ec4556d16393c9b95e65e82c91fc3dd1e0f8",
+      "sha256": "4673311b318c705301b14129ce38af905481064c02da19dcc6b2394ce6b94108",
+      "matchesPublic4a": true
+    },
+    {
+      "path": "app/actions/bots.ts",
+      "gitBlob": "31669b225519bb59eb12df87134b18fd1ac5b24d",
+      "sha256": "41e0a4ade7d04d478c67d118ca9f48507f588db1e6d8dd7ca67590ff98011557",
+      "matchesPublic4a": true
+    },
+    {
+      "path": "app/actions/issues.ts",
+      "gitBlob": "6cefb0dc6e6e895fabad5b8348c7b6de6eba5556",
+      "sha256": "610a5e47fb5115723e44c229fdb4f5b49135bed51b5dc8fb11032a924ebbf399",
+      "matchesPublic4a": true
+    },
+    {
+      "path": "app/actions/projects.ts",
+      "gitBlob": "edd9ead17a12423b8400af5298d160ac574a2607",
+      "sha256": "1743ca495b762c875d93044246b1b980323757df9d117b9ccf6f55c10e550973",
+      "matchesPublic4a": true
+    },
+    {
+      "path": "app/actions/teams.ts",
+      "gitBlob": "7061770c808167b27dfef76746721045bd04c25b",
+      "sha256": "447529822f093e0cc19ab04f4f3a82107289f8aeb7e2da85fd679b5f6f117e9b",
+      "matchesPublic4a": true
+    },
+    {
+      "path": "app/actions/team-relations.ts",
+      "gitBlob": "a5937e7121cf5f996ab699ea27d7ef4074e20484",
+      "sha256": "a88696e7e83e8a5fae31ef9e9f0f552046129ac9730f47e4320073ba058afc98",
+      "matchesPublic4a": true
+    },
+    {
+      "path": "app/actions/coordinator.ts",
+      "gitBlob": "3cde11bdaab0164d179d51f37efdf1d77ec7e938",
+      "sha256": "b70ceec98efa1edfc1074598b2a6cf12b58d4f2539bb351854a562fa43f9d451",
+      "matchesPublic4a": true
+    },
+    {
+      "path": "app/actions/task-runs.ts",
+      "gitBlob": "ae3974497f8c0573dd9c8d0ec5ba880f5a5c72ef",
+      "sha256": "4f29acbe6899a1432d4f216cb1f08aeba8672897319106b98848fbfda45767f8",
+      "matchesPublic4a": true
+    },
+    {
+      "path": "app/actions/execution-settings.ts",
+      "gitBlob": "3b27222dee1b8b84e4b74581e0827de07fc4de8d",
+      "sha256": "f82fc11fda38f8817c260c77a42d06a768b2bbfcfb590463c32111ceffcd0329",
+      "matchesPublic4a": true
+    },
+    {
+      "path": "lib/coordinator/coordinator-bot.ts",
+      "gitBlob": "561752eef3ab1d5a439d39d61be8da7a41ed0a45",
+      "sha256": "fa1ae6aaf4f8271bb620e97d90ed425a9727026d8861675d67dab2930fccb238",
+      "matchesPublic4a": true
+    },
+    {
+      "path": "lib/acting-user.ts",
+      "gitBlob": "771e4c4200ab2eb303f681ade0c32dbc66850162",
+      "sha256": "175ef68ed6181f7f8b9a01dac6c1204255eeb6dc997ebe734cb125f42f35d7d1",
+      "matchesPublic4a": true
+    },
+    {
+      "path": "lib/issue-access.ts",
+      "gitBlob": "4827bb4b4bba2671b0f90a69c6e520b20b8649e8",
+      "sha256": "1851f8c0d5351c77db9bd292aeedc53c4b8d343d69115d0574bd96ec7c84f35f",
+      "matchesPublic4a": true
+    },
+    {
+      "path": "apps/api/compat/server.ts",
+      "gitBlob": "5aecb974bcba2073c963a53abce65668f097b029",
+      "sha256": "8f22ce6266c90e650cf674501775055370cee16abe48a43c089275e0fcac5304",
+      "matchesPublic4a": true
+    },
+    {
+      "path": "lib/background.ts",
+      "gitBlob": "c5cfbf01c9fd6f725f1c2a806ef9f59af57ee8e0",
+      "sha256": "73937274e1c23817cef7eaacf0da24feb4d724b25fd9d562f4cd683869050310",
+      "matchesPublic4a": true
+    }
+  ],
+  "conclusion": "Nitro aliases React.cache to an existing request-owned AsyncLocalStorage cache. Same function/primitive arguments within one Native RPC batch already reuse the Promise including choices and ensurePersonalShare. Adding another equivalent batch cache is not a demonstrated fix for the current +24 SQL budget.",
+  "sourceChain": [
+    "apps/api/nitro.config.ts alias: apiAliases",
+    "apps/api/compat-aliases.mjs react -> apps/api/compat/react.ts",
+    "apps/api/compat/react.ts exports requestCache as cache",
+    "apps/api/src/context.ts requestCache keys scope.memo by function and ordered primitive arguments, stores the Promise synchronously before later continuations",
+    "apps/api/src/application.ts creates one RequestScope for the HTTP request, then runRequestScope around router.fetch",
+    "lib/desktop-rpc/read-batch.ts invokes all validated item readers inside Promise.all and preserves the outer request ALS",
+    "lib/workspace-access.ts loadWorkspaceContext validates requestedId/PAT scope, resolves identity/locale, then calls cached reader with id/email/name/image/requestedId/locale primitives"
+  ],
+  "actionMap": [
+    {
+      "action": "bots.pollBots",
+      "nativeLogicalCalls": 5,
+      "webLogicalCalls": 5,
+      "path": "pollBots -> getOwner -> loadWorkspaceContext(undefined, session.user)",
+      "contextCallsOnSuccessfulBranchPerAction": 1
+    },
+    {
+      "action": "issues.syncIssueList",
+      "nativeLogicalCalls": 5,
+      "webLogicalCalls": 4,
+      "path": "syncIssueList -> pollIssues -> readIssues -> readIssueSnapshot -> loadWorkspaceContext(undefined)",
+      "contextCallsOnSuccessfulBranchPerAction": 1
+    },
+    {
+      "action": "projects.listProjects",
+      "nativeLogicalCalls": 3,
+      "webLogicalCalls": 3,
+      "path": "listProjects -> loadWorkspaceContext()",
+      "contextCallsOnSuccessfulBranchPerAction": 1
+    },
+    {
+      "action": "teams.listTeams",
+      "nativeLogicalCalls": 5,
+      "webLogicalCalls": 5,
+      "path": "listTeams -> loadWorkspaceContext()",
+      "contextCallsOnSuccessfulBranchPerAction": 1
+    },
+    {
+      "action": "coordinator.syncCoordinatorChat",
+      "nativeLogicalCalls": 5,
+      "webLogicalCalls": 4,
+      "path": "syncCoordinatorChat -> pollCoordinatorChat -> readCoordinatorChat -> ownBot -> openChatBotId",
+      "contextCallsOnSuccessfulBranchPerAction": "1 only when botId is null/undefined; 0 for an explicit bot"
+    },
+    {
+      "action": "execution-settings.getBotModelMenu",
+      "nativeLogicalCalls": 3,
+      "webLogicalCalls": 3,
+      "path": "getBotModelMenu -> chatScope",
+      "contextCallsOnSuccessfulBranchPerAction": "1 only when chatBot is null; this action is not batch-enabled"
+    },
+    {
+      "action": "task-runs.pollTaskRuns",
+      "nativeLogicalCalls": 5,
+      "webLogicalCalls": 0,
+      "path": "readTaskRuns -> beginOwnerListRead; no loadWorkspaceContext"
+    },
+    {
+      "action": "task-runs.syncThreadList",
+      "nativeLogicalCalls": 5,
+      "webLogicalCalls": 4,
+      "path": "readThreads -> beginOwnerListRead; no loadWorkspaceContext"
+    },
+    {
+      "action": "coordinator.pollBotChatSummaries",
+      "nativeLogicalCalls": 5,
+      "webLogicalCalls": 4,
+      "path": "readBotChatSummaries -> beginOwnerListRead; no loadWorkspaceContext"
+    },
+    {
+      "action": "team-relations.listProjectTeams",
+      "nativeLogicalCalls": 5,
+      "webLogicalCalls": 5,
+      "path": "requireUser -> accessibleProjects; no loadWorkspaceContext"
+    }
+  ],
+  "countBoundary": "The four unconditional successful branches imply 18 Native/17 Web public loadWorkspaceContext entries, plus up to 5/4 conditional default-chat entries and 3/3 model-menu entries. These are static control-flow counts conditioned on successful branches, not observed cache-body execution or SQL counts. The original receipt has no per-batch membership, arguments, profile keys or query fingerprint. Thus the exact number of distinct cached reader executions cannot be reconstructed.",
+  "existingValidation": {
+    "runId": 42531278865,
+    "jobId": 128886316267,
+    "jobUrl": "https://github.com/alexj11324/Mikka/actions/runs/42531278865/job/128886316267",
+    "originalLogExcerpt": [
+      "2026-11-08T22:42:19.5956736Z ✔ parallel requests retain their own cookie, locale, React cache and all after ALS (3.563313ms)",
+      "2026-11-08T22:42:22.9183920Z # Subtest: native step imports compile workspace protocol and keep API adapters and package singletons across rebuilds",
+      "2026-11-08T22:42:22.9243469Z ok 32 - native step imports compile workspace protocol and keep API adapters and package singletons across rebuilds"
+    ],
+    "meaning": "Exact 4a Source job already executed the real API request cache isolation regression and compiled Workflow alias regression. Inspected tests assert two parallel requests produce two underlying reads while each repeats memo twice, and compiled alias memo yields [1,1]. No duplicate execution was performed now."
+  },
+  "boundaries": [
+    "Cache inputs include user id/profile primitives, effective requested/PAT workspace and locale; cookie selection is fixed to the current request. Authentication and PAT/requested-workspace checks occur before cached reader entry.",
+    "A new HTTP request gets a new memo Map. Outside RequestScope requestCache calls through without memoization.",
+    "ensurePersonalShare also has its own process-level successful-key Set; a warm same-PID fixture cannot be charged repeated share SQL merely from repeated public function entries. Original artifacts do not expose its actual SQL fingerprint.",
+    "Existing batch owner/revision cache is separately active-fenced and cleared in finally; writers and after-COMMIT owner targets intentionally use fresh ownerLiveScope.",
+    "API after callbacks intentionally bind all request ALS and may retain the originating request cache lifetime; do not claim the generic request memo is invalidated immediately at response time. No proposed extension of cached authority into writers or after work.",
+    "Writer authority must continue to be checked inside write transactions; no cross-request, global or cross-identity workspace cache is proposed.",
+    "The comment in workspace-access mentioning one server render describes the React-facing contract; it is insufficient to infer no sharing in Nitro because the compiled API graph supplies the alias.",
+    "This review excludes one proposed root-cause hypothesis. It does not assert the budget is met and does not validate unpublished9794 or a later integration source."
+  ]
+}

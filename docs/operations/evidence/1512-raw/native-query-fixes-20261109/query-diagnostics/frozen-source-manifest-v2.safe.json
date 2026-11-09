@@ -1,0 +1,62 @@
+{
+  "version": 2,
+  "createdAt": "2026-11-09T00:02:54.618572+00:00",
+  "base": "4a07f5bd1d29853edfe26e7aaddb777870b2dae0",
+  "baseTree": "7a2e1b485920ae36e0b311519b50ab1ed30dfe69",
+  "isolatedCopy": "/workspace/scratch/812e3b7d6d45/issue1512-diagnostics-copy",
+  "originalCheckoutUntouched": true,
+  "files": [
+    {
+      "path": "lib/request-log.ts",
+      "baselineSha256": "d0a529fd0696397afc89e36c5b07015c33785367e14ce6c9fbf07891d747d054",
+      "candidateSha256": "2884101d84e815ece44d1f3758885cc1c2145932cbe1001dfe17273684c8949a",
+      "candidateBytes": 10743
+    },
+    {
+      "path": "apps/desktop/test/db-metrics.cjs",
+      "baselineSha256": "475df35d2998e1eab7f9dd186261c2ef00d50b2a31a5ec4feb65a786217d5396",
+      "candidateSha256": "814aa821cdc111c25f4632df5c2fa6abcbe2fa725f23a2ce4a397493f2a5e491",
+      "candidateBytes": 8890
+    },
+    {
+      "path": "apps/desktop/test/db-metrics.test.mjs",
+      "baselineSha256": "0062b88ce2823f8ce4e5a64c0927faed7d4ead8dcdbed31920eee92b76efb8d4",
+      "candidateSha256": "2a6e5d42c063c771d770c2e92b804bb88573e3043c2a410a1b9d3374ff1fa346",
+      "candidateBytes": 38470
+    },
+    {
+      "path": "apps/desktop/test/lifecycle-query-counts.mjs",
+      "baselineSha256": "855dac3438434cf643a222a8297bcf09caff2c283064768b50082ae04edc226e",
+      "candidateSha256": "564706188c1b96bc9d9ebadb01bab5be4bc03cd0920131ecda0185b6e07fda7f",
+      "candidateBytes": 23696
+    },
+    {
+      "path": "apps/desktop/test/db-query-diagnostics.cjs",
+      "baselineSha256": null,
+      "candidateSha256": "763d180bfc0d0a62e67a99624a4815eeca953bbcb7290193a5515bb67e24ccad",
+      "candidateBytes": 18406
+    },
+    {
+      "path": "apps/desktop/test/db-query-diagnostics.test.mjs",
+      "baselineSha256": null,
+      "candidateSha256": "236633af2b451f23f26b4dec32f2778881dbe31ebbb3c1e00e0431661b898c23",
+      "candidateBytes": 26054
+    }
+  ],
+  "patchSha256": "8cfecb43ecbf45d0641c58be24dda5175db891ca5cb0d46a98a34700bee81fb0",
+  "reviewDeltaSha256": "3c1166dde2fb16bcc0b7050f0c79c2d05578b15b94ea7da743e0b11cbb5b192f",
+  "supersedesButPreserves": {
+    "manifest": "frozen-source-manifest.safe.json",
+    "manifestSha256": "6c5e44177025206ecc0dd3772290566eadceacefa3211b77a40d9c39e2a1917d",
+    "patch": "query-diagnostics.patch",
+    "patchSha256": "28255779fc5ebaa63c814a27e94a4445a929a33458a32a405f5cc3971a260b7c"
+  },
+  "harnessCommand": [
+    "node",
+    "--test",
+    "apps/desktop/test/db-metrics.test.mjs"
+  ],
+  "harnessExitCode": 0,
+  "harnessTests": 35,
+  "harnessLogSha256": "2febd396f0425b551b2c88e536e9f25cac4ec8c52fbb38ddf161777020d7ea32"
+}

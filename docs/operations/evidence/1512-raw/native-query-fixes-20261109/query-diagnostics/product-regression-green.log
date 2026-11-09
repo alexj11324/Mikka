@@ -1,0 +1,24 @@
+✔ logs paired start/completion lines with safe fields only (7.906616ms)
+✔ 4xx is warn, 5xx is error, anonymous has null user (0.951245ms)
+✔ thrown errors log status 500 with the error name only and rethrow (0.921249ms)
+✔ generates a request id when x-vercel-id is missing or malformed (0.611403ms)
+✔ a failing sink never breaks the request (0.534466ms)
+✔ outcomes allow only fixed values and stay isolated between concurrent requests (0.891615ms)
+✔ request attribution publishes an internal invocation ID before auth and caches each authenticated identity (1.344608ms)
+✔ mobile API context joins the server and database spans with version attribution (11.395641ms)
+✔ mobile attribution stays in its request and cannot overwrite machine routes (7.700186ms)
+✔ untrusted version and unrelated request headers never enter spans (6.489861ms)
+✔ a failed request records its error code on the span, never the message (3.81174ms)
+✔ request attribution stays on each parent chain when concurrent requests share a trace (11.684837ms)
+✔ request attribution channel projects only valid closed metadata (6.73504ms)
+✔ read-batch actions retain separate parent chains and one physical request identity (4.734482ms)
+✔ read-batch failures retain error status without exporting payloads or forcing ordinary sampling (5.086773ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 858.349775
+
