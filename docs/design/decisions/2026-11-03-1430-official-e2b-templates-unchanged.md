@@ -1032,3 +1032,48 @@ Codex 根证书的 `0644→0777` 已由上述官方对照支持，因此发布�
 对照的权限和摘要转换，以及类型缺失、错误权限、所有者和路径变化。
 这次补齐消费端既有类型约束，不修改 Python matcher 或扩大策略允许集合，
 也不替代 strict 安装前后摘要、官方 CLI、真实订阅和生产时延门槛。
+
+### 2026-11-09：Codex 0.167.0 的匿名初始化版本拒绝
+
+[R7 42690423873/A1 的订阅检查](https://github.com/alexj11324/Mikka/actions/runs/42690423873/job/129425290133)
+绑定产品源 `7848e79df9c5af67e526aeed1c828858db392066`、worker
+`aa7efbbe2969d8b1578bdba093e6400a26749e07`。Claude 的真实订阅及
+bootstrap adoption 完整通过；Codex 的共享订阅执行、真实工具、工具后
+回复及 runtime evidence 通过，但 `template_gate_bootstrap_adoption_missing`
+使发布失败。Codex 的启动回执为1548.509ms，其中正常 `cli_init`
+为88.531ms，准备回执为 unavailable/null；这不是完整 dispatch→agent
+时间，也不能据此报告五秒验收通过。
+
+该轮候选记录的官方 CLI 是 `0.167.0`，原始二进制摘要为
+`e14fc83739c13c1074b12bd1acce4010c893c7f6fbfc1593b4a31d74cabb57af`。
+失败原件 `subscription-diagnostics.json` 保持6384B，SHA256为
+`ca8ad628f11addabacbadfe4c7475d4186b0dfc0ec52ba50860b559f4122541e`。
+原件没有匿名 `initialize` 响应或拒绝原因，不能补造一条已观测的异常。
+源码中的 `startAnonymousCodex.prepare()` 只接受 `0.166.0`，因此正常的
+`0.167.0` user agent 会在发送 `initialized` 前被拒绝。候选随后关闭，
+适配器走原冷启动路径，只有成功采用候选才公开的准备回执保持缺失。
+
+版本扩展依据官方固定提交 `6ff1e1ca3b30fc8b914720681fcf5fe62e95f856`
+（0.166.0）与 `086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a`
+（0.167.0）的定点源码对照：
+[user agent 生成](https://github.com/openai/codex/blob/086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a/codex-rs/login/src/auth/default_client.rs)
+仍使用官方包版本；`initialize` 的请求与响应合同不变，
+[新增的 requiredHumanApproval](https://github.com/openai/codex/blob/086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a/codex-rs/app-server-protocol/src/protocol/v1.rs)
+为默认 false 的选择项。两版 `ThreadStartParams`、
+[线程启动处理](https://github.com/openai/codex/blob/086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a/codex-rs/app-server/src/request_processors/thread_processor.rs)
+的相关完整函数，以及配置合并实现逐字相同。
+
+本修复只明确允许 `0.166.0` 和 `0.167.0` 的匿名初始化，其他版本继续
+拒绝；不降级或覆盖官方 CLI。既有 hint profile 保持原 wire 标识，
+无凭据的匿名握手、fresh claim 身份与环境比对、一次性采用、撤销及
+一 Task 一 VM 边界不变，不给普通 Task 增加字段或轮询。
+固定 `12458fe22e1217f644e8b28f82ab856211e73b72` 基线的合成 IPC
+回归先证明旧保护恰好拒绝3个0.167.0正例，其余29例通过；修复后，
+候选、hosted adapter 与配置保护三套60例全部通过、无跳过。它们使用
+无生产凭据的非 root Linux/Node24.22.1，不执行真实模型，也不证明
+0.167.0 的生产采用或整套上游功能兼容。
+
+官方文件只增不删、原校验和、两条真实订阅及实际 bootstrap adoption
+发布门槛保持原样。后继仍须自己的完整 CI 和正式发布，再以同一实际
+APP/DPL/runtime/worker/template 元组完成 Claude×3、Codex×3 的普通
+生产任务；六次完整 dispatch→agent 各不超过5000ms 后才关闭 #1505。
