@@ -585,11 +585,15 @@ compaction, title/profile and daemon agent calls use the same convention.
 - Tier, effort, their score/confidence and the ZeroCat/Gateway/fallback route
   are attributes. Prompt content, output content and tool arguments are never
   included.
-- Real Gateway/ZeroCat/provider cost receipts set `$ai_total_cost_usd` and
-  `$ai_cost_passthrough=true`. A subscription without an actual per-call cost
-  omits that receipt. PostHog may display a model-catalog estimate from usage;
-  label that as an estimate, not the subscription bill or cash charged by a
-  provider. Unknown cost is not zero.
+- The application sets `$ai_total_cost_usd` and `$ai_cost_passthrough=true`
+  when it supplies a per-call amount. Gateway amounts come from provider
+  metadata. ZeroCat amounts are estimates from token counts and the configured
+  prices in `lib/abuse/zerocat.ts`, rounded up to integer microdollars before
+  conversion to USD. Passthrough alone does not establish an actual charge.
+  A subscription without a per-call amount omits these fields. PostHog may
+  display its own model-catalog estimate from usage; label estimates as such,
+  not as the subscription bill or cash charged by a provider. Unknown cost is
+  not zero.
 
 See PostHog's [APM/AI linkage](https://posthog.com/docs/distributed-tracing/link-ai-observability)
 and [AI traces](https://posthog.com/docs/ai-observability/traces).
