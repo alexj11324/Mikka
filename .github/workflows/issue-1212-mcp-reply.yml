@@ -1,4 +1,4 @@
-name: Issue 1212 ACME MCP bounded read acceptance
+name: Issue 1212 MCP read and cancellation acceptance
 
 # Bound to the verified 3c production source for three MCP read/cancel cases.
 # The job holds the Web deploy queue and the driver checks the public version.
@@ -152,10 +152,8 @@ jobs:
     # bounded to 120s plus normal Stop and session cleanup.
     timeout-minutes: 12
     env:
-      MIKKA_ACCEPTANCE_SHA: '' # Only the verified final production application SHA.
+      MIKKA_ACCEPTANCE_SHA: '01a6bfb3a6c537e2b466911f57429f109b418aa8' # Only the verified final production application SHA.
       MIKKA_GROUP_MODE: mcp
-      # Re-resolve the already-verified shared team from current authorized metadata; no workspace switch.
-      MIKKA_MCP_WORKSPACE_HASH: fb00a1d8c63a0ae1c56ff3273bd259fd0756b8631b83e42f226926d389b3dade
       MIKKA_RELEASE_SOURCE: ${{ github.workspace }}/released
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -191,17 +189,24 @@ jobs:
           }
           const [main,runs] = await Promise.all([read('git/ref/heads/main'),read('actions/runs?head_sha='+sha+'&per_page=100')])
           if(main.object?.sha!==sha || runs.total_count>100) throw Error('RELEASE_SOURCE_CHANGED')
-          if (process.env.MIKKA_MCP_WORKSPACE_HASH) {
+          if (process.env.MIKKA_GROUP_MODE === 'mcp') {
             const p0 = await read('pulls/1636')
-            if (!p0.merged || !/^[a-f0-9]{40}$/.test(p0.merge_commit_sha ?? '')) throw Error('EXPLICIT_MCP_WORKSPACE_RELEASE_REQUIRED')
-            const ancestry = await read('compare/' + p0.merge_commit_sha + '...' + sha)
-            if (!['ahead','identical'].includes(ancestry.status) || ancestry.behind_by !== 0
-              || ancestry.merge_base_commit?.sha !== p0.merge_commit_sha) throw Error('EXPLICIT_MCP_WORKSPACE_SOURCE_CHANGED')
+            let scopedSource = false
+            if (p0.merged) {
+              if (!/^[a-f0-9]{40}$/.test(p0.merge_commit_sha ?? '')) throw Error('EXPLICIT_MCP_WORKSPACE_RELEASE_REQUIRED')
+              const ancestry = await read('compare/' + p0.merge_commit_sha + '...' + sha)
+              scopedSource = ['ahead','identical'].includes(ancestry.status) && ancestry.behind_by === 0
+                && ancestry.merge_base_commit?.sha === p0.merge_commit_sha
+            }
+            const scopedInput = Boolean(process.env.MIKKA_MCP_WORKSPACE_HASH || process.env.MIKKA_MCP_WORKSPACE_ID)
+            if (scopedSource !== scopedInput) throw Error('EXPLICIT_MCP_WORKSPACE_SOURCE_CHANGED')
           }
           const live=await fetch('https://app.aspectlylabs.com/mikka/api/version',{
             headers:{'cache-control':'no-store'},redirect:'error',signal:AbortSignal.timeout(20000)})
           if(!live.ok || (await live.json()).build!==sha) throw Error('PUBLIC_SOURCE_CHANGED')
-          const workflows=['CI','Web deploy','E2B additive runtime release','Self-hosted image'].map(name=>{
+          const required = process.env.MIKKA_GROUP_MODE === 'mcp' ? ['CI','Web deploy']
+            : ['CI','Web deploy','E2B additive runtime release','Self-hosted image']
+          const workflows=required.map(name=>{
             const candidates=runs.workflow_runs.filter(r=>r.name===name&&r.head_sha===sha&&r.head_branch==='main')
               .sort((a,b)=>b.id-a.id || b.run_attempt-a.run_attempt)
             const run=candidates[0]
@@ -209,7 +214,7 @@ jobs:
             return {name,runId:run.id,attempt:run.run_attempt}
           })
           mkdirSync('issue-1212-mcp-report',{recursive:true})
-          writeFileSync('issue-1212-mcp-report/release-gate.json',JSON.stringify({sourceSha:sha,workflows,credentialsDelivered:false})+'\n')
+          writeFileSync('issue-1212-mcp-report/release-gate.json',JSON.stringify({sourceSha:sha,workflows,runtimeUsed:process.env.MIKKA_GROUP_MODE!=='mcp',credentialsDelivered:false})+'\n')
           JS
       - name: Read only the exact released source for normal shared-account helpers
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
