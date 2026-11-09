@@ -1,0 +1,168 @@
+{
+  "version": 1,
+  "status": "ADDITIVE_PARTIAL_RECOVERY",
+  "parentCommit": "84def528e015eee746f6666896a6e30514afd560",
+  "parentTree": "576ff59ee095de2f02faf3ed696eaa852af62e27",
+  "scope": "Only the eleven frozen primary-recovery/production-traces text files plus this explanatory index; no new CI log, source code, patch, binary, DB/model call, or product change.",
+  "parent100FilesUnchanged": true,
+  "parentReadmeAndIndexBoundary": "The unchanged README/file-index in the parent snapshot records that this subtree was then absent. This child adds the eleven files below; it does not retroactively claim that the parent included them.",
+  "fixedTestedLocalSource": "d6835377c820db7d1d4e704afed2c58cdfaec789",
+  "fixedPublishedPrSource": "9ef8cb26d5f131da1fc05a9644c9d7b9e9015cc8",
+  "fixedSourceTree": "91c499c8049ee3450a584f2e09306023b4f1010c",
+  "recoveryManifestSha256": "e0fdfad656f1ec1d100c8174998c66a7d943e63b77cc1b3976aaa0a4736bdeb3",
+  "recoveryClassification": {
+    "exactOriginalFiles": [
+      "main-0e-boundary/metadata.json",
+      "main-0e-boundary/review.md"
+    ],
+    "exactOriginalCount": 2,
+    "comments": {
+      "restoredPath": "main-0e-boundary/reconstructed-comments.json",
+      "restoredBytes": 17927,
+      "restoredSha256": "7c2466a124e0b3f20572134318d04cf447f2ad221c4c9d82bdd74b063944a3e1",
+      "originalBytes": 19167,
+      "originalSha256": "983cf157977452e01a458f4f39e75991ea4ae3f9c88cc1a52b5e021dcb73af58",
+      "byteIdentical": false,
+      "meaning": "Reserialized from retained parsed comments; never represented as the original serialized bytes."
+    },
+    "mcpAndDependencyDocuments": "Explicitly reconstructed descriptions/projections from retained context and source/blob pointers; not the original lost report bytes.",
+    "unrecoverableOriginalStageIndex": {
+      "path": "deliverable-staging/stage-index.json",
+      "bytes": 21585,
+      "sha256": "daf76070495245827837e7c3d4349424c59a08823300548b5f9138eb185b7228",
+      "restored": false,
+      "originalStageFiles": 51,
+      "originalStageBytes": 199095
+    },
+    "otherUnrestoredOriginals": [
+      {
+        "path": "main-0e-boundary/manifest.json",
+        "bytes": 1255,
+        "sha256": "df6b55047cbe4ef4e12957b73cc31c9e32196612cb0194b5100173aa706a56a2",
+        "restored": false
+      },
+      {
+        "path": "main-0e-boundary/comments.json",
+        "bytes": 19167,
+        "sha256": "983cf157977452e01a458f4f39e75991ea4ae3f9c88cc1a52b5e021dcb73af58",
+        "restored": false
+      },
+      {
+        "path": "0a-mcp/manifest.json",
+        "bytes": 586,
+        "sha256": "3bc3c49a1e7b98cd3ce69daf022954502d22e430d563b27a14d73a6491590d83",
+        "restored": false
+      },
+      {
+        "path": "0a-mcp/review.md",
+        "bytes": 7673,
+        "sha256": "dc2490e1e2bbe4e88da45543145b991fbe39f548afa1a4015190df689ebb9b20",
+        "restored": false
+      },
+      {
+        "path": "0a-mcp/source-index.json",
+        "bytes": 7784,
+        "sha256": "05534276e9f02bfa2069591d0f31d7089512b54c7b658dd11e5821f2d23cd887",
+        "restored": false
+      },
+      {
+        "path": "0e-dependency/manifest.json",
+        "bytes": 900,
+        "sha256": "79a78ebee45ae46be51c23af8bf83dbba375c4dbdf94af0f11c84c596b571487",
+        "restored": false
+      }
+    ]
+  },
+  "preservedFailureBoundary": "Full pnpm check remains FAIL at SuggestionsRefresh; baseline main0e reproduced it. Static local fixes/peer review do not establish live release or formal acceptance. New formal six-case executions remain 0.",
+  "files": [
+    {
+      "path": "primary-recovery/production-traces/README.md",
+      "bytes": 1124,
+      "sha256": "8d7a9292da17d6638b05dc508c14f8e933312275fa1945b3e93985fb92985545",
+      "gitBlob": "a77965c5a85b915e88ddf4f315b84237c2d49241",
+      "mode": "100644"
+    },
+    {
+      "path": "primary-recovery/production-traces/dependency-reconstructed/README.md",
+      "bytes": 1204,
+      "sha256": "b07c81baf6bb8271593ca13f43f9c0db16e95fb2aa4471e8b61520f551cabad8",
+      "gitBlob": "eba0e627fda6ec2fe49e3d435d722cdc08185662",
+      "mode": "100644"
+    },
+    {
+      "path": "primary-recovery/production-traces/dependency-reconstructed/intersections.json",
+      "bytes": 2675,
+      "sha256": "6de80cd2d810b4c571b923ad4a93b6998696586b53f21f213bcfaef22d96f04f",
+      "gitBlob": "82bba731d8c69c49c30f0ed140690fb98800f486",
+      "mode": "100644"
+    },
+    {
+      "path": "primary-recovery/production-traces/dependency-reconstructed/source-index.json",
+      "bytes": 2902,
+      "sha256": "612c18001220ffefc46db3b04d306392a45a059a5f7570604a96052325eb4ce5",
+      "gitBlob": "5bb02d6810ebc1fba3d48efaf777ea9d8e764156",
+      "mode": "100644"
+    },
+    {
+      "path": "primary-recovery/production-traces/main-0e-boundary/metadata.json",
+      "bytes": 59784,
+      "sha256": "85bd296d0095b4150d1351b07c9bf8bca8c8cbcf826b0011b6a487fe896aa4fb",
+      "gitBlob": "ac0aa4870b415a802da423e01c8c4c6601812350",
+      "mode": "100644"
+    },
+    {
+      "path": "primary-recovery/production-traces/main-0e-boundary/reconstructed-comments.json",
+      "bytes": 17927,
+      "sha256": "7c2466a124e0b3f20572134318d04cf447f2ad221c4c9d82bdd74b063944a3e1",
+      "gitBlob": "a70bb41d6985c6a8764a107edba84e80def860a9",
+      "mode": "100644"
+    },
+    {
+      "path": "primary-recovery/production-traces/main-0e-boundary/review.md",
+      "bytes": 5102,
+      "sha256": "b04935e8344a761e3c0633df11b015b6125c1d08c3ea22c02e30690fad3d2aff",
+      "gitBlob": "78e47518c62c7f389805f61e98d4a863b7d62914",
+      "mode": "100644"
+    },
+    {
+      "path": "primary-recovery/production-traces/mcp-reconstructed/README.md",
+      "bytes": 1297,
+      "sha256": "3f091e493c8d0602084157a1cbeb10a79992b6d0438ba732a0d1b535fe735b66",
+      "gitBlob": "a4d8a31a4f1bac5d2ee357fce0668269a0b624ab",
+      "mode": "100644"
+    },
+    {
+      "path": "primary-recovery/production-traces/original-known-hashes.json",
+      "bytes": 1286,
+      "sha256": "fe412c832c509d2d2b5598c3aa10f2d158133ef4423f420f9b73d5b3933a63ab",
+      "gitBlob": "f0e367b8ba577e77b2ea1991604429d4b562ad34",
+      "mode": "100644"
+    },
+    {
+      "path": "primary-recovery/production-traces/recovered-files.json",
+      "bytes": 990,
+      "sha256": "3c4cd5cb27ce77b6ac4b86fb0cfb6d3a92f168c82aa2e80df6d5bfe9bbabdce9",
+      "gitBlob": "d3994adfaaa3a40a0df9585fcb3c4e138fa5929c",
+      "mode": "100644"
+    },
+    {
+      "path": "primary-recovery/production-traces/recovery-manifest.json",
+      "bytes": 1966,
+      "sha256": "e0fdfad656f1ec1d100c8174998c66a7d943e63b77cc1b3976aaa0a4736bdeb3",
+      "gitBlob": "4f2ebe5d818dae375334b2b0352f314b03b0d2ac",
+      "mode": "100644"
+    }
+  ],
+  "fileCount": 11,
+  "totalOriginalTextBytes": 96257,
+  "scan": {
+    "scope": "only the eleven authorized frozen text files",
+    "suspectedSecretsOrSignedUrls": 0,
+    "sourcePatchFields": 0
+  },
+  "transport": {
+    "bytes": 119359,
+    "sha256": "d22368b03f7f996773a355e19fa9fca2cdad22adf4c8e0deb4860f7a04299a04",
+    "perBlockAndPerFileSha256Verified": true
+  }
+}

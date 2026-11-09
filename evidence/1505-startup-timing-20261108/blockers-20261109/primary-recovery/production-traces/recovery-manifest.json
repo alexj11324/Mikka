@@ -1,0 +1,62 @@
+{
+  "status": "FROZEN_PARTIAL_RECOVERY",
+  "createdAt": "2026-11-09T04:26:03.135658+00:00",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 1124,
+      "sha256": "8d7a9292da17d6638b05dc508c14f8e933312275fa1945b3e93985fb92985545"
+    },
+    {
+      "path": "dependency-reconstructed/README.md",
+      "bytes": 1204,
+      "sha256": "b07c81baf6bb8271593ca13f43f9c0db16e95fb2aa4471e8b61520f551cabad8"
+    },
+    {
+      "path": "dependency-reconstructed/intersections.json",
+      "bytes": 2675,
+      "sha256": "6de80cd2d810b4c571b923ad4a93b6998696586b53f21f213bcfaef22d96f04f"
+    },
+    {
+      "path": "dependency-reconstructed/source-index.json",
+      "bytes": 2902,
+      "sha256": "612c18001220ffefc46db3b04d306392a45a059a5f7570604a96052325eb4ce5"
+    },
+    {
+      "path": "main-0e-boundary/metadata.json",
+      "bytes": 59784,
+      "sha256": "85bd296d0095b4150d1351b07c9bf8bca8c8cbcf826b0011b6a487fe896aa4fb"
+    },
+    {
+      "path": "main-0e-boundary/reconstructed-comments.json",
+      "bytes": 17927,
+      "sha256": "7c2466a124e0b3f20572134318d04cf447f2ad221c4c9d82bdd74b063944a3e1"
+    },
+    {
+      "path": "main-0e-boundary/review.md",
+      "bytes": 5102,
+      "sha256": "b04935e8344a761e3c0633df11b015b6125c1d08c3ea22c02e30690fad3d2aff"
+    },
+    {
+      "path": "mcp-reconstructed/README.md",
+      "bytes": 1297,
+      "sha256": "3f091e493c8d0602084157a1cbeb10a79992b6d0438ba732a0d1b535fe735b66"
+    },
+    {
+      "path": "original-known-hashes.json",
+      "bytes": 1286,
+      "sha256": "fe412c832c509d2d2b5598c3aa10f2d158133ef4423f420f9b73d5b3933a63ab"
+    },
+    {
+      "path": "recovered-files.json",
+      "bytes": 990,
+      "sha256": "3c4cd5cb27ce77b6ac4b86fb0cfb6d3a92f168c82aa2e80df6d5bfe9bbabdce9"
+    }
+  ],
+  "fileCountExcludingManifest": 10,
+  "exactOriginalFiles": 2,
+  "unknownOriginalSerializationRetainedAsGap": true,
+  "newRemoteReads": 0,
+  "primaryRetries": 0,
+  "sourceCodePatchBinaryIncluded": false
+}

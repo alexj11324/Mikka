@@ -1,0 +1,82 @@
+{
+  "kind": "RECONSTRUCTED_FROM_CACHED_PROJECTION",
+  "data": {
+    "comparison": {
+      "sourceComparison": {
+        "base": "0a355918330f6dac04d2b0ee4716cd056c263162",
+        "head": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+        "paths": 28
+      },
+      "pr1788OldSix": [
+        {
+          "path": "packages/daemon/src/subscription-hosted-runner.ts",
+          "changed": false
+        },
+        {
+          "path": "packages/daemon/src/tracing.test.ts",
+          "changed": false
+        },
+        {
+          "path": "packages/daemon/src/tracing.ts",
+          "changed": false
+        },
+        {
+          "path": "packages/daemon/test/anonymous-codex-hosted.test.ts",
+          "changed": false
+        },
+        {
+          "path": "apps/desktop/test/native-device-ready.mjs",
+          "changed": true
+        },
+        {
+          "path": "apps/desktop/test/native-device-ready.test.mjs",
+          "changed": true
+        }
+      ],
+      "factoryMetadataThree": [
+        {
+          "path": "workflows/coordinator/factory-tools.ts",
+          "changed": false
+        },
+        {
+          "path": "workflows/coordinator/tools.ts",
+          "changed": false
+        },
+        {
+          "path": "lib/agent-kit/tool-defaults-compat.test.ts",
+          "changed": false
+        }
+      ]
+    },
+    "changedPaths": [
+      "apps/desktop/test/native-device-ready.mjs",
+      "apps/desktop/test/native-device-ready.test.mjs",
+      "components/workspace/issue-workspace-settings.test.tsx",
+      "drizzle/20261108233500_coordinator_startup_receipts.sql",
+      "lib/agent-kit/core-entry.test.ts",
+      "lib/agent-kit/message-safety-compat.test.ts",
+      "lib/coordinator/chat-projection-version.test.ts",
+      "lib/coordinator/message-safety-consumers.test.ts",
+      "lib/coordinator/personal-instructions.ts",
+      "lib/coordinator/prompt-context-concurrency.test.ts",
+      "lib/coordinator/prompt-preferences.test.ts",
+      "lib/coordinator/startup-receipt.db.test.ts",
+      "lib/coordinator/startup-receipt.test.ts",
+      "lib/coordinator/startup-receipt.ts",
+      "lib/coordinator/store.ts",
+      "lib/coordinator/summary-model-consumer.test.ts",
+      "lib/coordinator/user-images-entry.test.ts",
+      "lib/coordinator/wake-deadline.test.ts",
+      "lib/coordinator/wake.ts",
+      "lib/db/schema.ts",
+      "lib/operations/write-planning-ingress.test.ts",
+      "lib/preferences.ts",
+      "lib/swr/cache-policy.test.ts",
+      "lib/swr/cache-policy.ts",
+      "package.json",
+      "workflows/coordinator/startup-preparation.ts",
+      "workflows/coordinator/steps.ts",
+      "workflows/coordinator/workflow.ts"
+    ]
+  }
+}

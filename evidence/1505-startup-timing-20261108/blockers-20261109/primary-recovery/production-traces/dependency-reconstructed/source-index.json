@@ -1,0 +1,68 @@
+{
+  "kind": "RECONSTRUCTED_FROM_ALREADY_READ_SOURCE_METADATA",
+  "sources": [
+    {
+      "path": ".github/workflows/publish-daemon.yml",
+      "blob": "c6f861a5ec36468ee9a65bc226613fbbabc797c2",
+      "commit": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+      "lines": "23–26, 60–108",
+      "finding": "Independent publish-daemon group; local npm package seal and own downstream checks/publish."
+    },
+    {
+      "path": "scripts/release/evidence.mjs",
+      "blob": "32e22150b25bb834ce353bb0784725bf629f8ab5",
+      "commit": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+      "lines": "66–76, 93–118",
+      "finding": "Local source/package delta/SBOM/lock/inventory/manifest checks; actual failed check unknown."
+    },
+    {
+      "path": "scripts/release/ci-gate.mjs",
+      "blob": "e5e04a012b6612101bc1cac3b5c64034b6f650be",
+      "commit": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+      "lines": "6, 11–16, 28 onward",
+      "finding": "Local releaseIdentity; later CI gate queries ui-policy.yml."
+    },
+    {
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "blob": "be1f902f97e50628fbe26fa55b9dab0160f749be",
+      "commit": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+      "lines": "59–65, 90, 136–164, 308–323",
+      "finding": "Independent E2B needs graph, no daemon package publication dependency."
+    },
+    {
+      "path": "scripts/release/web-deploy.mjs",
+      "blob": "948caacb60d05c04f21e5d0a55303716192771da",
+      "commit": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+      "lines": "146–211, 287–303",
+      "finding": "Matching Web run, actual steps/public source/current main; no daemon publish check."
+    },
+    {
+      "path": ".github/workflows/web-deploy.yml",
+      "blob": "e15741a3ae51a294593eeb2151311378babd8ce4",
+      "commit": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+      "lines": "15–34, 74–93, 217 onward",
+      "finding": "Runtime refresh binds E2B subscription artifact/template tuple."
+    },
+    {
+      "path": ".github/workflows/e2b-template.yml",
+      "blob": "bb948480beac3370335dd4b8ce59a01e6becf1f0",
+      "commit": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+      "lines": "63",
+      "finding": "build-template.py uses exact GITHUB_SHA."
+    },
+    {
+      "path": "scripts/e2b/build-template.py",
+      "blob": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+      "commit": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+      "lines": "277–308",
+      "finding": "Exact Git recipe/bootstrap and source/worker SHA."
+    },
+    {
+      "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+      "blob": "27c2146b45054c3eb5510afc94ea7ee9696dcb87",
+      "commit": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+      "lines": "55–59, 90–92",
+      "finding": "Fixed Git checkout, filtered frozen pnpm install, build-cloud-worker.mjs; no new daemon npm artifact."
+    }
+  ]
+}

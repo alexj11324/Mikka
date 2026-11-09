@@ -1,0 +1,24 @@
+[
+  {
+    "path": "main-0e-boundary/metadata.json",
+    "bytes": 59784,
+    "sha256": "85bd296d0095b4150d1351b07c9bf8bca8c8cbcf826b0011b6a487fe896aa4fb",
+    "expectedOriginalSha256": "85bd296d0095b4150d1351b07c9bf8bca8c8cbcf826b0011b6a487fe896aa4fb",
+    "exactOriginalRecovered": true
+  },
+  {
+    "path": "main-0e-boundary/reconstructed-comments.json",
+    "bytes": 17927,
+    "sha256": "7c2466a124e0b3f20572134318d04cf447f2ad221c4c9d82bdd74b063944a3e1",
+    "expectedOriginalSha256": "983cf157977452e01a458f4f39e75991ea4ae3f9c88cc1a52b5e021dcb73af58",
+    "exactOriginalRecovered": false,
+    "disposition": "Cached parsed comments reserialized; old bytes not matched, not claimed raw original"
+  },
+  {
+    "path": "main-0e-boundary/review.md",
+    "bytes": 5102,
+    "sha256": "b04935e8344a761e3c0633df11b015b6125c1d08c3ea22c02e30690fad3d2aff",
+    "expectedOriginalSha256": "b04935e8344a761e3c0633df11b015b6125c1d08c3ea22c02e30690fad3d2aff",
+    "exactOriginalRecovered": true
+  }
+]

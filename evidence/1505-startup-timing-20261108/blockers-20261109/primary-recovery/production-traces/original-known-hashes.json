@@ -1,0 +1,46 @@
+[
+  {
+    "path": "main-0e-boundary/manifest.json",
+    "bytes": 1255,
+    "sha256": "df6b55047cbe4ef4e12957b73cc31c9e32196612cb0194b5100173aa706a56a2",
+    "restored": false
+  },
+  {
+    "path": "main-0e-boundary/comments.json",
+    "bytes": 19167,
+    "sha256": "983cf157977452e01a458f4f39e75991ea4ae3f9c88cc1a52b5e021dcb73af58",
+    "restored": false
+  },
+  {
+    "path": "0a-mcp/manifest.json",
+    "bytes": 586,
+    "sha256": "3bc3c49a1e7b98cd3ce69daf022954502d22e430d563b27a14d73a6491590d83",
+    "restored": false
+  },
+  {
+    "path": "0a-mcp/review.md",
+    "bytes": 7673,
+    "sha256": "dc2490e1e2bbe4e88da45543145b991fbe39f548afa1a4015190df689ebb9b20",
+    "restored": false
+  },
+  {
+    "path": "0a-mcp/source-index.json",
+    "bytes": 7784,
+    "sha256": "05534276e9f02bfa2069591d0f31d7089512b54c7b658dd11e5821f2d23cd887",
+    "restored": false
+  },
+  {
+    "path": "0e-dependency/manifest.json",
+    "bytes": 900,
+    "sha256": "79a78ebee45ae46be51c23af8bf83dbba375c4dbdf94af0f11c84c596b571487",
+    "restored": false
+  },
+  {
+    "path": "deliverable-staging/stage-index.json",
+    "bytes": 21585,
+    "sha256": "daf76070495245827837e7c3d4349424c59a08823300548b5f9138eb185b7228",
+    "restored": false,
+    "originalStageFiles": 51,
+    "originalStageBytes": 199095
+  }
+]

@@ -1,0 +1,7 @@
+# MCP 源审恢复说明（重建文档，非原字节）
+
+固定0a的闭式诊断中，CC通过；CX执行、工具、回复、ACK及adoption布尔通过，但runtimeEvidence因mcp_catalogue_observation_missing不可用，原gate失败保留。已读源码证明RunContext总写MIKKA_DECISION_MCP_TRACEPARENT（包括空串），late agents/mikka-mcp-context.mjs的KEYS尚未包含该字段；严格未知键拒绝可发生于导入backend之前，导致观察器无法启动。这是具体静态协议缺口，尚无完整运行时stderr/child证据证明它是此次生产失败唯一原因。
+
+引入commit1778978c93e3bdac87c13048108720d0f763d821未修改该reader whitelist。已读P0 b32、Team7093相关三blob与0a相同。1788四daemon原修复只涉及late startup scope绑定，非MCP whitelist。旧测试以空mcp.env或仅token模拟，未贯通真实producer→private context→native child链。
+
+原review.md 7673B/SHA dc2490e1e2bbe4e88da45543145b991fbe39f548afa1a4015190df689ebb9b20；原source-index.json 7784B/SHA05534276e9f02bfa2069591d0f31d7089512b54c7b658dd11e5821f2d23cd887；原manifest.json 586B/SHA3bc3c49a1e7b98cd3ce69daf022954502d22e430d563b27a14d73a6491590d83。本恢复不声称还原这些原字节，来源为保留上下文/已读结论，没有重新查询。
