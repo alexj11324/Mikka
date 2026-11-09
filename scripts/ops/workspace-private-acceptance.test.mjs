@@ -205,6 +205,14 @@ test('ingress command diagnostics retain only known observations without copying
   assert.equal(result.passed, false)
   assert.deepEqual(result.build.diagnostic.buildLogs.claude.events[0], { phase: 'ingress', detail: 'command', command })
   assert.equal(JSON.stringify(result).includes(privateText), false)
+  for (const operation of ['install_policy', 'list_table', 'list_ruleset', 'create_table', 'new_chain',
+    'base_chain', 'provider_rule', 'reply_rule', 'output_jump']) {
+    const native = { ...command, family: 'inet', operation, extension: 'unknown', revision: null, unsupportedExtensions: [] }
+    event.command = { ...native, stderr: privateText }
+    result = summarizeAcceptance(context, value)
+    assert.deepEqual(result.build.diagnostic.buildLogs.claude.events[0].command, native)
+    assert.equal(JSON.stringify(result).includes(privateText), false)
+  }
   for (const [failureKind, returnCode] of [['timeout', null], ['output_limit', 0], ['execution', null]]) {
     event.command = { ...command, failureKind, returnCode, stderr: privateText }
     result = summarizeAcceptance(context, value)

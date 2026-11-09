@@ -9,16 +9,16 @@ import { pathToFileURL } from 'node:url'
 import { assertOpsContext } from './self-hosted-ingress-probe.mjs'
 
 export const P0 = Object.freeze({
-  source: '472c962a4bb6ff8c6215085ed4fa25c08a8172fb',
-  tree: '3f4dad7a422ed649af55933a3d6de1c100b73358',
-  workerSha: '0c7bd2f4301234062e1a8b6d557eec834cf205b8',
+  source: '37b0e55ddfca6646bc3beea7531048e6e63331c1',
+  tree: '2167f94b74c1ede4b8d37054fb407a462c0b470d',
+  workerSha: '0537b0c49fe197240632ec7c74875c3af0c53260',
   sdks: { nodeMajor: '24', pnpm: '10.34.3', javascriptE2b: '2.61.0', pythonE2b: '2.62.0', next: '16.4.1' },
   files: {
-    'package.json': '0f17119e190637a88295d7b5d50e9b73433c0c3737fc30b8f8ddf766b6d2ee7a',
+    'package.json': 'c56b9a7aab200373926c23b914111825b5293efb8fae80b85fe4f16682cc020d',
     'pnpm-lock.yaml': '345a6e1d97bb3a0028497f3294a86944bc9f617af892de71990d40d2cdf36054',
     'pnpm-workspace.yaml': '8977ce9916b92a015e0f4dad1d45bcf51c9427637a5988fcdc585a1a21a0301e',
-    'scripts/e2b/workspace-candidates.py': 'f8fda73611ead7e3d29a280bafdd80243a12eb9c55ce6260b1d2599aeb45810a',
-    'scripts/e2b/workspace-candidates.test.py': '9913ccce58072abf605912fa4eb94e635d383e4a6cf292a8bfee80b59d68901e',
+    'scripts/e2b/workspace-candidates.py': '5de2fc0d65e453802455bb1863c6a12fa9643306710b85575d51bdfadd6990ee',
+    'scripts/e2b/workspace-candidates.test.py': 'a170f525403a4c934774e27ce8bd1fceee72f0af2165974d69d239452d0245fd',
     'scripts/e2b/build-template.py': 'efe0a20a73749a06b4e2f20fb4b1c8a1bd99a7b7a4fdae961fee9d410b424d85',
     'scripts/e2b/build-template.test.py': '78e367541f0e6441c60944b107b179b78a75ea754bee0d729df0aa9f5bd4749e',
     'scripts/e2b/official-files.py': '6191212b14205c7cb8043efcfb85eaff05670f8cb65c4c801052cf9d3a28babe',
@@ -32,7 +32,7 @@ export const P0 = Object.freeze({
     'scripts/e2b/workspace-terminal-acceptance.test.mjs': '971003d90739338112ae83838abc218811818600dcebe7fdbdd46b5e2214dce3',
     'scripts/e2b/fixtures/preview-frameworks/package.json': 'e0cf3ad9d36941898385fc4e149c65be9a1081d8685b4d0b03e92e547cae964d',
     'scripts/e2b/fixtures/preview-frameworks/package-lock.json': '9c123244b4ea44b3a59b92615e25b9780463135eab9f573b7342ad4df7468ef6',
-    'packages/daemon/scripts/workspace-ingress.py': '9ba51f35553b53a22d94a65915706b0b93a5fdfc8371c168e523f907d16deae5',
+    'packages/daemon/scripts/workspace-ingress.py': 'e56ef2aa5cc34fdd8ac8572a05614093b29c2c06cfc4eab139959fdc3c42fc49',
   },
 })
 const SOURCE_DIRECTORY = 'workspace-acceptance-source'
@@ -71,7 +71,8 @@ const BOOTSTRAP_PHASES = ['validation', 'source', 'node', 'gh', 'dependencies', 
 const INGRESS_DETAILS = ['listener', 'boot', 'identity', 'state', 'receipt', 'provider', 'command', 'tool', 'backend',
   'rule_order', 'late_install', 'worker', 'worker_order', 'operation', 'runtime']
 const INGRESS_COMMAND_OPERATIONS = ['new_chain', 'provider_rule', 'reply_rule', 'output_jump', 'check_output',
-  'check_provider', 'check_reply', 'list_output', 'list_chain']
+  'check_provider', 'check_reply', 'list_output', 'list_chain',
+  'create_table', 'base_chain', 'install_policy', 'list_ruleset', 'list_table']
 const INGRESS_COMMAND_FLAGS = ['unsupportedRevision', 'missingKernelModule', 'missingExtension',
   'operationNotSupported', 'permissionDenied', 'invalidArgument']
 const BUILD_HOST_ERRORS = ['official_cli_kind_invalid', 'official_cli_path_invalid', 'official_cli_baseline_mismatch',
@@ -116,7 +117,7 @@ function buildStatusLookup(value) {
 }
 
 function ingressCommand(value) {
-  if (!value || !['ipv4', 'ipv6'].includes(value.family) || !INGRESS_COMMAND_OPERATIONS.includes(value.operation)
+  if (!value || !['ipv4', 'ipv6', 'inet'].includes(value.family) || !INGRESS_COMMAND_OPERATIONS.includes(value.operation)
     || !['exit', 'timeout', 'output_limit', 'execution'].includes(value.failureKind)
     || !(value.returnCode === null || exitCode(value.returnCode) !== null)
     || INGRESS_COMMAND_FLAGS.some(key => typeof value[key] !== 'boolean')) return null
