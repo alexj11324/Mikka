@@ -1,6 +1,6 @@
 {
   "schema": "issue1512-isolated-pg17-v1",
-  "enabled": true,
+  "enabled": false,
   "opsBranch": "ops/1512-backfill-pg-20261109",
   "admissionMessage": "issue1512: backfill-pg admit 20261109",
   "expiresAt": "2026-11-09T21:28:05.000Z",
@@ -121,5 +121,9 @@
     "greenJobTimeoutMinutes": 12,
     "independentServices": true,
     "productionAccess": false
-  }
+  },
+  "closedAt": "2026-11-09T20:17:33.234Z",
+  "closedReason": "VALID_ASSERTION_RED_AND_COMPLETE_COORDINATOR_FAMILY_GREEN",
+  "closedRunId": 42690271741,
+  "evidenceIndexBlob": "6c46d672305d775f4b028fd5245bc123b29168e2"
 }

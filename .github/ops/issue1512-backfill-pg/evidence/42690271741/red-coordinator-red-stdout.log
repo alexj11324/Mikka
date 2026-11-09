@@ -1,0 +1,379 @@
+TAP version 13
+# (node:3626) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:3626) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: the Coordinator is an ordinary bot row
+    # Subtest: an empty explicit Personal Coordinator uses one Personal read
+    not ok 1 - an empty explicit Personal Coordinator uses one Personal read
+      ---
+      duration_ms: 159.696905
+      type: 'test'
+      location: '/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:1:8043'
+      failureType: 'testCodeFailure'
+      error: |-
+        empty explicit Coordinator backfill must use one Personal SELECT
+        
+        26 !== 1
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: 1
+      actual: 26
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:155:14)
+        process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        async Test.run (node:internal/test_runner/test:1409:7)
+        async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:147:53)
+        async Test.run (node:internal/test_runner/test:1409:7)
+        async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+      ...
+    # Subtest: an empty explicit Team Coordinator uses one Personal read
+    not ok 2 - an empty explicit Team Coordinator uses one Personal read
+      ---
+      duration_ms: 30.107658
+      type: 'test'
+      location: '/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:1:8043'
+      failureType: 'testCodeFailure'
+      error: |-
+        empty explicit Coordinator backfill must use one Personal SELECT
+        
+        26 !== 1
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: 1
+      actual: 26
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:155:14)
+        process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        async Test.run (node:internal/test_runner/test:1409:7)
+        async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:147:53)
+        async Test.run (node:internal/test_runner/test:1409:7)
+        async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+      ...
+    # Subtest: a retained copied agent head still permits the empty Personal read
+    not ok 3 - a retained copied agent head still permits the empty Personal read
+      ---
+      duration_ms: 23.802033
+      type: 'test'
+      location: '/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:1:9137'
+      failureType: 'testCodeFailure'
+      error: |-
+        empty explicit Coordinator backfill must use one Personal SELECT
+        
+        27 !== 1
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: 1
+      actual: 27
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:173:12)
+        process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        async Test.run (node:internal/test_runner/test:1409:7)
+        async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:164:3)
+        async Test.run (node:internal/test_runner/test:1409:7)
+        async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+      ...
+    # Subtest: an explicit Team read retains the real migration for legacy coordinator_messages
+    ok 4 - an explicit Team read retains the real migration for legacy coordinator_messages
+      ---
+      duration_ms: 28.633885
+      type: 'test'
+      ...
+    # Subtest: an explicit Team read retains the real migration for legacy coordinator_sessions
+    ok 5 - an explicit Team read retains the real migration for legacy coordinator_sessions
+      ---
+      duration_ms: 26.928948
+      type: 'test'
+      ...
+    # Subtest: an explicit Team read retains the real migration for legacy coordinator_events
+    ok 6 - an explicit Team read retains the real migration for legacy coordinator_events
+      ---
+      duration_ms: 31.137477
+      type: 'test'
+      ...
+    # Subtest: an explicit Team read retains the real migration for legacy agent_runs
+    ok 7 - an explicit Team read retains the real migration for legacy agent_runs
+      ---
+      duration_ms: 35.456642
+      type: 'test'
+      ...
+    # Subtest: an explicit Team read retains the real migration for legacy factory_tasks
+    ok 8 - an explicit Team read retains the real migration for legacy factory_tasks
+      ---
+      duration_ms: 31.188866
+      type: 'test'
+      ...
+    # Subtest: an explicit Team read retains the real migration for legacy bot_model_choices
+    ok 9 - an explicit Team read retains the real migration for legacy bot_model_choices
+      ---
+      duration_ms: 25.565113
+      type: 'test'
+      ...
+    # Subtest: an explicit Team read retains the real migration for legacy chat_preferences
+    ok 10 - an explicit Team read retains the real migration for legacy chat_preferences
+      ---
+      duration_ms: 25.671791
+      type: 'test'
+      ...
+    # Subtest: an explicit Team read retains the real migration for legacy user_schedules
+    ok 11 - an explicit Team read retains the real migration for legacy user_schedules
+      ---
+      duration_ms: 27.240585
+      type: 'test'
+      ...
+    # Subtest: an explicit Team read retains the real migration for legacy suggestions
+    ok 12 - an explicit Team read retains the real migration for legacy suggestions
+      ---
+      duration_ms: 26.154749
+      type: 'test'
+      ...
+    # Subtest: an explicit Team read retains the real migration for legacy pending_actions
+    ok 13 - an explicit Team read retains the real migration for legacy pending_actions
+      ---
+      duration_ms: 22.369874
+      type: 'test'
+      ...
+    # Subtest: an explicit Team read retains the real migration for legacy agent_kit_heads
+    ok 14 - an explicit Team read retains the real migration for legacy agent_kit_heads
+      ---
+      duration_ms: 23.671211
+      type: 'test'
+      ...
+    # Subtest: a missing Personal workspace reuses the unsuccessful lookup
+    ok 15 - a missing Personal workspace reuses the unsuccessful lookup
+      ---
+      duration_ms: 37.950693
+      type: 'test'
+      ...
+    # Subtest: a missing Personal Coordinator still follows the original creation path
+    ok 16 - a missing Personal Coordinator still follows the original creation path
+      ---
+      duration_ms: 20.731607
+      type: 'test'
+      ...
+    # Subtest: only a boolean false Personal observation can skip the migration
+    ok 17 - only a boolean false Personal observation can skip the migration
+      ---
+      duration_ms: 65.312435
+      type: 'test'
+      ...
+# Coordinator chat move deferred { code: '57014' }
+    # Subtest: a failed Personal observation is retried on the next read
+    ok 18 - a failed Personal observation is retried on the next read
+      ---
+      duration_ms: 19.764919
+      type: 'test'
+      ...
+# Coordinator chat move deferred { code: 'workspaceAccessDenied' }
+    # Subtest: an inactive Personal member cannot certify an empty backfill
+    ok 19 - an inactive Personal member cannot certify an empty backfill
+      ---
+      duration_ms: 30.829215
+      type: 'test'
+      ...
+# Coordinator chat move deferred { code: '55P03' }
+    # Subtest: busy chat locks retain the full migration and the next-read retry
+    ok 20 - busy chat locks retain the full migration and the next-read retry
+      ---
+      duration_ms: 31.192412
+      type: 'test'
+      ...
+    # Subtest: legacy rows committed after an empty read wait for the original next pass
+    not ok 21 - legacy rows committed after an empty read wait for the original next pass
+      ---
+      duration_ms: 30.218345
+      type: 'test'
+      location: '/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:13:4019'
+      failureType: 'testCodeFailure'
+      error: |-
+        empty explicit Coordinator backfill must use one Personal SELECT
+        
+        29 !== 1
+        
+      code: 'ERR_ASSERTION'
+      name: 'AssertionError'
+      expected: 1
+      actual: 29
+      operator: 'strictEqual'
+      stack: |-
+        TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:398:14)
+        process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        async Test.run (node:internal/test_runner/test:1409:7)
+        async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:363:3)
+        async Test.run (node:internal/test_runner/test:1409:7)
+        async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+      ...
+    # Subtest: an empty execution family skips its recursive update after every NOWAIT read
+    ok 22 - an empty execution family skips its recursive update after every NOWAIT read
+      ---
+      duration_ms: 18.814967
+      type: 'test'
+      ...
+    # Subtest: a captured legacy event still runs the execution migration
+    ok 23 - a captured legacy event still runs the execution migration
+      ---
+      duration_ms: 22.711108
+      type: 'test'
+      ...
+    # Subtest: stale attention reads only settlement fields and preserves the decision input and owner log
+    ok 24 - stale attention reads only settlement fields and preserves the decision input and owner log
+      ---
+      duration_ms: 18.552778
+      type: 'test'
+      ...
+    # Subtest: existing Coordinator chat, runs and settings move to its bot row once; a second pass changes nothing
+    ok 25 - existing Coordinator chat, runs and settings move to its bot row once; a second pass changes nothing
+      ---
+      duration_ms: 83.483574
+      type: 'test'
+      ...
+    # Subtest: personal backfill preserves shared and unresolved task events, runs, Factory sources and schedules
+    ok 26 - personal backfill preserves shared and unresolved task events, runs, Factory sources and schedules
+      ---
+      duration_ms: 35.149887
+      type: 'test'
+      ...
+    # Subtest: one shared-tenant task retains its complete null-Bot source family, including a Personal sibling
+    ok 27 - one shared-tenant task retains its complete null-Bot source family, including a Personal sibling
+      ---
+      duration_ms: 36.864306
+      type: 'test'
+      ...
+    # Subtest: a new Coordinator message and a run use the real bot id, stored where they enter
+    ok 28 - a new Coordinator message and a run use the real bot id, stored where they enter
+      ---
+      duration_ms: 80.316742
+      type: 'test'
+      ...
+    # Subtest: a legacy run with no bot finishes for an owner with no workspace; its event is kept, and moved once the Coordinator resolves
+    ok 29 - a legacy run with no bot finishes for an owner with no workspace; its event is kept, and moved once the Coordinator resolves
+      ---
+      duration_ms: 63.479381
+      type: 'test'
+      ...
+    # Subtest: real null-Bot admission retains frozen identity, Factory family and repository authority after backfill
+    ok 30 - real null-Bot admission retains frozen identity, Factory family and repository authority after backfill
+      ---
+      duration_ms: 318.12874
+      type: 'test'
+      ...
+    # Subtest: an unfrozen computer run retains its Factory family and ordinary retry
+    ok 31 - an unfrozen computer run retains its Factory family and ordinary retry
+      ---
+      duration_ms: 77.413491
+      type: 'test'
+      ...
+    # Subtest: an unfrozen group run retains its Factory family and ordinary retry
+    ok 32 - an unfrozen group run retains its Factory family and ordinary retry
+      ---
+      duration_ms: 87.797569
+      type: 'test'
+      ...
+    # Subtest: a publication holding its issue cannot deadlock with the backfill run lock
+    ok 33 - a publication holding its issue cannot deadlock with the backfill run lock
+      ---
+      duration_ms: 26.385921
+      type: 'test'
+      ...
+    # Subtest: migration first holds the issue through its run update; real publication continues after commit
+    ok 34 - migration first holds the issue through its run update; real publication continues after commit
+      ---
+      duration_ms: 87.755799
+      type: 'test'
+      ...
+    # Subtest: a run committed after issue locking retains its family until the next pass
+    ok 35 - a run committed after issue locking retains its family until the next pass
+      ---
+      duration_ms: 53.553802
+      type: 'test'
+      ...
+    # Subtest: a revoked shared-workspace member run keeps its tenant without blocking unrelated Personal history
+    ok 36 - a revoked shared-workspace member run keeps its tenant without blocking unrelated Personal history
+      ---
+      duration_ms: 39.80924
+      type: 'test'
+      ...
+    # Subtest: an in-flight null-Bot route defers migration; its unfrozen history moves after commit
+    ok 37 - an in-flight null-Bot route defers migration; its unfrozen history moves after commit
+      ---
+      duration_ms: 37.266441
+      type: 'test'
+      ...
+    # Subtest: migration first fences a stale source validation before it can create a null-Bot task
+    ok 38 - migration first fences a stale source validation before it can create a null-Bot task
+      ---
+      duration_ms: 39.093581
+      type: 'test'
+      ...
+    # Subtest: a task committed between migration lock statements keeps its source until the next pass
+    ok 39 - a task committed between migration lock statements keeps its source until the next pass
+      ---
+      duration_ms: 39.627291
+      type: 'test'
+      ...
+    # Subtest: a completion committed after the event lock keeps its legacy run until both can move
+    ok 40 - a completion committed after the event lock keeps its legacy run until both can move
+      ---
+      duration_ms: 34.965756
+      type: 'test'
+      ...
+    # Subtest: a chat writer holding its session cannot deadlock against the migration chat lock
+    ok 41 - a chat writer holding its session cannot deadlock against the migration chat lock
+      ---
+      duration_ms: 33.730967
+      type: 'test'
+      ...
+    # Subtest: model choice goes through the ordinary bot path
+    ok 42 - model choice goes through the ordinary bot path
+      ---
+      duration_ms: 17.49675
+      type: 'test'
+      ...
+    # Subtest: the Coordinator stays outside workspace app policy; an ordinary bot does not
+    ok 43 - the Coordinator stays outside workspace app policy; an ordinary bot does not
+      ---
+      duration_ms: 42.497659
+      type: 'test'
+      ...
+    # Subtest: the bot list (left column and mobile home) has that workspace's own Coordinator once, as the Coordinator
+    ok 44 - the bot list (left column and mobile home) has that workspace's own Coordinator once, as the Coordinator
+      ---
+      duration_ms: 36.142008
+      type: 'test'
+      ...
+    # Subtest: one Coordinator per workspace; work with no workspace goes to the personal one, never the oldest
+    ok 45 - one Coordinator per workspace; work with no workspace goes to the personal one, never the oldest
+      ---
+      duration_ms: 426.133436
+      type: 'test'
+      ...
+    # Subtest: a leaving member's Coordinator is paused with their bots and never transferred
+    ok 46 - a leaving member's Coordinator is paused with their bots and never transferred
+      ---
+      duration_ms: 92.16369
+      type: 'test'
+      ...
+    1..46
+not ok 1 - the Coordinator is an ordinary bot row
+  ---
+  duration_ms: 6772.491173
+  type: 'test'
+  location: '/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:1:671'
+  failureType: 'subtestsFailed'
+  error: '4 subtests failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+1..1
+# tests 47
+# suites 0
+# pass 42
+# fail 5
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7211.561925

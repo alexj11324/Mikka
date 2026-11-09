@@ -1,0 +1,1365 @@
+{
+  "schema": "issue1512-isolated-pg17-red-green-evidence-v1",
+  "recordedAt": "2026-11-09 20:17:32 UTC",
+  "outcome": "VALID_ASSERTION_RED_AND_COMPLETE_COORDINATOR_FAMILY_GREEN",
+  "before": {
+    "sha": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+    "tree": "0a0e2a40d82cbcb18963584e7d54f834a3af54fb",
+    "sourceBlob": "a2a6bf1fd1307babd350c9a168b003e38fa4b3cc",
+    "testBlob": "32a8321c981dd6a534f8859fa35f281e874466e6"
+  },
+  "after": {
+    "sha": "5a0c90774b8c48fc390ea05cf782bbc9cbe79a62",
+    "tree": "442e7d50bbec1f78b7508d062e6076627a3e47c7",
+    "sourceBlob": "d73e30c36212029a8951a25a692c4e04a2a5b86d",
+    "testBlob": "c6c92ea2741174b5baadbd1535fc8b0c62b8275e"
+  },
+  "opsControl": {
+    "sha": "54007859ff7b935fad6ed36c3f00eddf2463f7b8",
+    "tree": "2f4f7e2944a17a96867733f042f5d88162188a74",
+    "orderedParents": [
+      "41f1ad8d257c4df3523e751b95c9776209505bd1",
+      "5a0c90774b8c48fc390ea05cf782bbc9cbe79a62"
+    ],
+    "driverBlob": "4e076ee0f7e37e3a843bccad9bdbb2e32f6405d7",
+    "driverSha256": "f114b1ebf4ae0dddcc25d1babdf53c2be5b37884130bbeba299d5b55775b417f",
+    "workflowBlob": "ccbff1788ba0c377637f4b4acfd4031ff35d01ba",
+    "manifestBlob": "dd042e7a71758d0d15ca49d930f9e94f73de70ec",
+    "expiresAt": "2026-11-09T21:28:05.000Z"
+  },
+  "run": {
+    "id": 42690271741,
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/42690271741",
+    "head": "54007859ff7b935fad6ed36c3f00eddf2463f7b8",
+    "attempt": 1,
+    "status": "completed",
+    "conclusion": "success",
+    "createdAt": "2026-11-09T20:09:46Z",
+    "completedAt": "2026-11-09T20:13:59Z"
+  },
+  "jobs": [
+    {
+      "id": 129407869387,
+      "name": "Old source, genuine regression assertion RED",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T20:09:50Z",
+      "completedAt": "2026-11-09T20:11:19Z",
+      "runnerName": "GitHub Actions 1000239587"
+    },
+    {
+      "id": 129408752084,
+      "name": "Candidate, complete Coordinator family GREEN",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T20:11:22Z",
+      "completedAt": "2026-11-09T20:13:59Z",
+      "runnerName": "GitHub Actions 1000239595"
+    }
+  ],
+  "canonical": {
+    "unchangedBlobs": {
+      "package.json": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d",
+      "pnpm-lock.yaml": "539cb8567feb617add97c41bd45be96bc50c5a8a",
+      ".github/actions/pnpm-install/action.yml": "553d718ad413f0db4b12833e06ffb8f29d98e555",
+      "scripts/run-db-tests.mjs": "061d3ad2527420a0de0098e03fdbed87509aedd8",
+      "scripts/setup-e2e-db.mjs": "aaf8571eae3dcdb2f88b0dba5feb5a0878e8af41",
+      "scripts/test-accounts/bootstrap.mjs": "3e29dba60095fb14a3efab57cd1571c6d3a8d8cb",
+      "tests/migrate-empty-db.test.mjs": "8b77ac4fb0757735c70af1fe0bc0e2a6a2744678",
+      "tests/support/workspace-admin-db.ts": "39a66afa93b60da2bf5385964786fe834584136c",
+      "tests/helpers/e2e-target.mjs": "2627923cc99fe2e9c14d88e6949b59d49d5d1640"
+    },
+    "inventorySuites": 72,
+    "selection": [
+      "test:bot-threads-db"
+    ],
+    "familyCommand": "node --test-reporter=tap --experimental-test-module-mocks --test-force-exit --import ./tests/support/server-only.mjs --import tsx --test tests/bot-threads.db.test.ts tests/thread-waiting-device.db.test.ts tests/bot-update.db.test.ts tests/run-machine-fallback.db.test.ts tests/coordinator-model-list.db.test.ts tests/one-thread-per-task.db.test.ts tests/thread-continue.db.test.ts tests/factory-local-question.db.test.ts tests/cloud-runtime-auto.db.test.ts tests/api-key-runs.db.test.ts tests/daemon-contract.db.test.ts tests/model-order.db.test.ts tests/model-routing-settings.db.test.ts tests/model-routing-dispatch.db.test.ts tests/model-provider-health.db.test.ts tests/run-provider-fallback.db.test.ts tests/run-provider-fallback-cloud.db.test.ts tests/run-quota.db.test.ts tests/mobile-bot.db.test.ts tests/coordinator-bot.db.test.ts tests/artifact-delete.db.test.ts tests/shared-subscription-runs.db.test.ts tests/subscription-route-queries.db.test.ts tests/mobile-chat-submission.db.test.ts tests/subscription-allowance.db.test.ts",
+    "familyFiles": 25,
+    "scopeThresholdsUnchanged": true
+  },
+  "testPreservation": {
+    "oldBlob": "32a8321c981dd6a534f8859fa35f281e874466e6",
+    "newBlob": "c6c92ea2741174b5baadbd1535fc8b0c62b8275e",
+    "oldBytes": 65832,
+    "newBytes": 86798,
+    "unchangedPrefixBytes": 7028,
+    "unchangedSuffixBytes": 58804,
+    "insertedBytes": 20966,
+    "oldChildCount": 25,
+    "newChildCount": 21,
+    "redExistingChildrenAllPassed": true,
+    "greenAll46ChildrenPassed": true
+  },
+  "red": {
+    "verdict": {
+      "schema": "issue1512-isolated-pg17-v1",
+      "phase": "red",
+      "workflowRunId": "42690271741",
+      "workflowRunAttempt": "1",
+      "controlSha": "54007859ff7b935fad6ed36c3f00eddf2463f7b8",
+      "before": {
+        "sha": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+        "tree": "0a0e2a40d82cbcb18963584e7d54f834a3af54fb",
+        "sourceBlob": "a2a6bf1fd1307babd350c9a168b003e38fa4b3cc",
+        "testBlob": "32a8321c981dd6a534f8859fa35f281e874466e6"
+      },
+      "after": {
+        "sha": "5a0c90774b8c48fc390ea05cf782bbc9cbe79a62",
+        "tree": "442e7d50bbec1f78b7508d062e6076627a3e47c7",
+        "sourceBlob": "d73e30c36212029a8951a25a692c4e04a2a5b86d",
+        "testBlob": "c6c92ea2741174b5baadbd1535fc8b0c62b8275e"
+      },
+      "manifestSha256": "197652f56d6c2d67525c5c533dddf86ecaca1d4d5825b8c9809e7086c28c824b",
+      "driverSha256": "f114b1ebf4ae0dddcc25d1babdf53c2be5b37884130bbeba299d5b55775b417f",
+      "startedAt": "2026-11-09T20:10:53.199Z",
+      "commands": [
+        {
+          "label": "migration-bootstrap",
+          "executable": "/opt/hostedtoolcache/node/24.22.2/x64/bin/node",
+          "args": [
+            "--experimental-strip-types",
+            "--test",
+            "tests/migrate-empty-db.test.mjs"
+          ],
+          "startedAt": "2026-11-09T20:10:53.632Z",
+          "finishedAt": "2026-11-09T20:10:59.097Z",
+          "code": 0,
+          "signal": null,
+          "timedOut": false,
+          "spawnError": null,
+          "stdout": {
+            "file": "red-migration-bootstrap-stdout.log",
+            "bytes": 1151,
+            "sha256": "136c25e460bbe44dfc9b3caceebf50ea3c9e8add2ce642acc5cf54b7b11ded0f"
+          },
+          "stderr": {
+            "file": "red-migration-bootstrap-stderr.log",
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "label": "e2e-setup",
+          "executable": "pnpm",
+          "args": [
+            "test:e2e:setup"
+          ],
+          "startedAt": "2026-11-09T20:10:59.098Z",
+          "finishedAt": "2026-11-09T20:11:01.677Z",
+          "code": 0,
+          "signal": null,
+          "timedOut": false,
+          "spawnError": null,
+          "stdout": {
+            "file": "red-e2e-setup-stdout.log",
+            "bytes": 20970,
+            "sha256": "a3e39d357db4e26cf6093db7841015ece76ce580eeec97c4e8fb263273c792c6"
+          },
+          "stderr": {
+            "file": "red-e2e-setup-stderr.log",
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "label": "environment-bind",
+          "executable": "/opt/hostedtoolcache/node/24.22.2/x64/bin/node",
+          "args": [
+            "scripts/test-accounts/bootstrap.mjs",
+            "--output",
+            "/home/runner/work/_temp/issue1512-pg/red-environment.json"
+          ],
+          "startedAt": "2026-11-09T20:11:01.678Z",
+          "finishedAt": "2026-11-09T20:11:01.858Z",
+          "code": 0,
+          "signal": null,
+          "timedOut": false,
+          "spawnError": null,
+          "stdout": {
+            "file": "red-environment-bind-stdout.log",
+            "bytes": 153,
+            "sha256": "eef0882707043c7443c8208aecc4ccdaa9498c9243feb9535f2dcb4fb8ab6c8b"
+          },
+          "stderr": {
+            "file": "red-environment-bind-stderr.log",
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "label": "coordinator-red",
+          "executable": "/opt/hostedtoolcache/node/24.22.2/x64/bin/node",
+          "args": [
+            "--test-reporter=tap",
+            "--experimental-test-module-mocks",
+            "--test-force-exit",
+            "--import",
+            "./tests/support/server-only.mjs",
+            "--import",
+            "tsx",
+            "--test",
+            "tests/coordinator-bot.db.test.ts"
+          ],
+          "startedAt": "2026-11-09T20:11:01.859Z",
+          "finishedAt": "2026-11-09T20:11:09.114Z",
+          "code": 1,
+          "signal": null,
+          "timedOut": false,
+          "spawnError": null,
+          "stdout": {
+            "file": "red-coordinator-red-stdout.log",
+            "bytes": 16141,
+            "sha256": "50172221667c2e5d3e0bcad8d8d58fdbe18446b8549efd7e14cbd1142bbfc25b"
+          },
+          "stderr": {
+            "file": "red-coordinator-red-stderr.log",
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      ],
+      "control": {
+        "controlSha": "54007859ff7b935fad6ed36c3f00eddf2463f7b8",
+        "controlTree": "2f4f7e2944a17a96867733f042f5d88162188a74",
+        "workflowBlob": "ccbff1788ba0c377637f4b4acfd4031ff35d01ba",
+        "manifestSha256": "197652f56d6c2d67525c5c533dddf86ecaca1d4d5825b8c9809e7086c28c824b",
+        "driverSha256": "f114b1ebf4ae0dddcc25d1babdf53c2be5b37884130bbeba299d5b55775b417f",
+        "phase": "red",
+        "capturedAt": "2026-11-09T20:10:08.788Z"
+      },
+      "database": {
+        "database": "mikka_e2e",
+        "role": "e2e",
+        "version": "170011",
+        "port": 5432
+      },
+      "node": "v24.22.2",
+      "pnpm": "10.34.3",
+      "verdict": "EXPECTED_ASSERTION_RED",
+      "summary": {
+        "tests": 47,
+        "pass": 42,
+        "fail": 5,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "assertionFailures": [
+        {
+          "name": "an empty explicit Personal Coordinator uses one Personal read",
+          "diagnostic": "\n      ---\n      duration_ms: 159.696905\n      type: 'test'\n      location: '/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:1:8043'\n      failureType: 'testCodeFailure'\n      error: |-\n        empty explicit Coordinator backfill must use one Personal SELECT\n        \n        26 !== 1\n        \n      code: 'ERR_ASSERTION'\n      name: 'AssertionError'\n      expected: 1\n      actual: 26\n      operator: 'strictEqual'\n      stack: |-\n        TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:155:14)\n        process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n        async Test.run (node:internal/test_runner/test:1409:7)\n        async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:147:53)\n        async Test.run (node:internal/test_runner/test:1409:7)\n        async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n      ...",
+          "actualSqlCount": 26
+        },
+        {
+          "name": "an empty explicit Team Coordinator uses one Personal read",
+          "diagnostic": "\n      ---\n      duration_ms: 30.107658\n      type: 'test'\n      location: '/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:1:8043'\n      failureType: 'testCodeFailure'\n      error: |-\n        empty explicit Coordinator backfill must use one Personal SELECT\n        \n        26 !== 1\n        \n      code: 'ERR_ASSERTION'\n      name: 'AssertionError'\n      expected: 1\n      actual: 26\n      operator: 'strictEqual'\n      stack: |-\n        TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:155:14)\n        process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n        async Test.run (node:internal/test_runner/test:1409:7)\n        async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:147:53)\n        async Test.run (node:internal/test_runner/test:1409:7)\n        async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n      ...",
+          "actualSqlCount": 26
+        },
+        {
+          "name": "a retained copied agent head still permits the empty Personal read",
+          "diagnostic": "\n      ---\n      duration_ms: 23.802033\n      type: 'test'\n      location: '/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:1:9137'\n      failureType: 'testCodeFailure'\n      error: |-\n        empty explicit Coordinator backfill must use one Personal SELECT\n        \n        27 !== 1\n        \n      code: 'ERR_ASSERTION'\n      name: 'AssertionError'\n      expected: 1\n      actual: 27\n      operator: 'strictEqual'\n      stack: |-\n        TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:173:12)\n        process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n        async Test.run (node:internal/test_runner/test:1409:7)\n        async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:164:3)\n        async Test.run (node:internal/test_runner/test:1409:7)\n        async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n      ...",
+          "actualSqlCount": 27
+        },
+        {
+          "name": "legacy rows committed after an empty read wait for the original next pass",
+          "diagnostic": "\n      ---\n      duration_ms: 30.218345\n      type: 'test'\n      location: '/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:13:4019'\n      failureType: 'testCodeFailure'\n      error: |-\n        empty explicit Coordinator backfill must use one Personal SELECT\n        \n        29 !== 1\n        \n      code: 'ERR_ASSERTION'\n      name: 'AssertionError'\n      expected: 1\n      actual: 29\n      operator: 'strictEqual'\n      stack: |-\n        TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:398:14)\n        process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n        async Test.run (node:internal/test_runner/test:1409:7)\n        async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/tests/coordinator-bot.db.test.ts:363:3)\n        async Test.run (node:internal/test_runner/test:1409:7)\n        async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)\n      ...",
+          "actualSqlCount": 29
+        }
+      ],
+      "finishedAt": "2026-11-09T20:11:09.116Z"
+    },
+    "originalLogBlob": "34b59d7c8342467dc7db1f2e7f07d8b467f714f4",
+    "originalResponseBlob": "d6b48128759ba96bf93da0f7c629fcc9e181fcb9",
+    "originals": [
+      {
+        "phase": "red",
+        "label": "migration-bootstrap",
+        "stream": "stdout",
+        "file": "red-migration-bootstrap-stdout.log",
+        "bytes": 1151,
+        "sha256": "136c25e460bbe44dfc9b3caceebf50ea3c9e8add2ce642acc5cf54b7b11ded0f",
+        "gitBlobSha": "828639e7c0df9dcd25f0a0f8e9c21051ede2d2bf",
+        "verifiedSha256": "136c25e460bbe44dfc9b3caceebf50ea3c9e8add2ce642acc5cf54b7b11ded0f"
+      },
+      {
+        "phase": "red",
+        "label": "migration-bootstrap",
+        "stream": "stderr",
+        "file": "red-migration-bootstrap-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "verifiedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "phase": "red",
+        "label": "e2e-setup",
+        "stream": "stdout",
+        "file": "red-e2e-setup-stdout.log",
+        "bytes": 20970,
+        "sha256": "a3e39d357db4e26cf6093db7841015ece76ce580eeec97c4e8fb263273c792c6",
+        "gitBlobSha": "48822312808ecf4bb1e5330acc96320eeddb0dcb",
+        "verifiedSha256": "a3e39d357db4e26cf6093db7841015ece76ce580eeec97c4e8fb263273c792c6"
+      },
+      {
+        "phase": "red",
+        "label": "e2e-setup",
+        "stream": "stderr",
+        "file": "red-e2e-setup-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "verifiedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "phase": "red",
+        "label": "environment-bind",
+        "stream": "stdout",
+        "file": "red-environment-bind-stdout.log",
+        "bytes": 153,
+        "sha256": "eef0882707043c7443c8208aecc4ccdaa9498c9243feb9535f2dcb4fb8ab6c8b",
+        "gitBlobSha": "591dcec6f817c7ce89160da72e2b7e8830167515",
+        "verifiedSha256": "eef0882707043c7443c8208aecc4ccdaa9498c9243feb9535f2dcb4fb8ab6c8b"
+      },
+      {
+        "phase": "red",
+        "label": "environment-bind",
+        "stream": "stderr",
+        "file": "red-environment-bind-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "verifiedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "phase": "red",
+        "label": "coordinator-red",
+        "stream": "stdout",
+        "file": "red-coordinator-red-stdout.log",
+        "bytes": 16141,
+        "sha256": "50172221667c2e5d3e0bcad8d8d58fdbe18446b8549efd7e14cbd1142bbfc25b",
+        "gitBlobSha": "3ebf530c0c45f6f9e1f148b67b5b70311357e996",
+        "verifiedSha256": "50172221667c2e5d3e0bcad8d8d58fdbe18446b8549efd7e14cbd1142bbfc25b"
+      },
+      {
+        "phase": "red",
+        "label": "coordinator-red",
+        "stream": "stderr",
+        "file": "red-coordinator-red-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "verifiedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "commands": [
+      {
+        "label": "migration-bootstrap",
+        "executable": "/opt/hostedtoolcache/node/24.22.2/x64/bin/node",
+        "args": [
+          "--experimental-strip-types",
+          "--test",
+          "tests/migrate-empty-db.test.mjs"
+        ],
+        "startedAt": "2026-11-09T20:10:53.632Z",
+        "finishedAt": "2026-11-09T20:10:59.097Z",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "spawnError": null,
+        "stdout": {
+          "file": "red-migration-bootstrap-stdout.log",
+          "bytes": 1151,
+          "sha256": "136c25e460bbe44dfc9b3caceebf50ea3c9e8add2ce642acc5cf54b7b11ded0f"
+        },
+        "stderr": {
+          "file": "red-migration-bootstrap-stderr.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "e2e-setup",
+        "executable": "pnpm",
+        "args": [
+          "test:e2e:setup"
+        ],
+        "startedAt": "2026-11-09T20:10:59.098Z",
+        "finishedAt": "2026-11-09T20:11:01.677Z",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "spawnError": null,
+        "stdout": {
+          "file": "red-e2e-setup-stdout.log",
+          "bytes": 20970,
+          "sha256": "a3e39d357db4e26cf6093db7841015ece76ce580eeec97c4e8fb263273c792c6"
+        },
+        "stderr": {
+          "file": "red-e2e-setup-stderr.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "environment-bind",
+        "executable": "/opt/hostedtoolcache/node/24.22.2/x64/bin/node",
+        "args": [
+          "scripts/test-accounts/bootstrap.mjs",
+          "--output",
+          "/home/runner/work/_temp/issue1512-pg/red-environment.json"
+        ],
+        "startedAt": "2026-11-09T20:11:01.678Z",
+        "finishedAt": "2026-11-09T20:11:01.858Z",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "spawnError": null,
+        "stdout": {
+          "file": "red-environment-bind-stdout.log",
+          "bytes": 153,
+          "sha256": "eef0882707043c7443c8208aecc4ccdaa9498c9243feb9535f2dcb4fb8ab6c8b"
+        },
+        "stderr": {
+          "file": "red-environment-bind-stderr.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "coordinator-red",
+        "executable": "/opt/hostedtoolcache/node/24.22.2/x64/bin/node",
+        "args": [
+          "--test-reporter=tap",
+          "--experimental-test-module-mocks",
+          "--test-force-exit",
+          "--import",
+          "./tests/support/server-only.mjs",
+          "--import",
+          "tsx",
+          "--test",
+          "tests/coordinator-bot.db.test.ts"
+        ],
+        "startedAt": "2026-11-09T20:11:01.859Z",
+        "finishedAt": "2026-11-09T20:11:09.114Z",
+        "code": 1,
+        "signal": null,
+        "timedOut": false,
+        "spawnError": null,
+        "stdout": {
+          "file": "red-coordinator-red-stdout.log",
+          "bytes": 16141,
+          "sha256": "50172221667c2e5d3e0bcad8d8d58fdbe18446b8549efd7e14cbd1142bbfc25b"
+        },
+        "stderr": {
+          "file": "red-coordinator-red-stderr.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    ],
+    "cleanup": {
+      "phase": "red",
+      "serviceId": "8755eeef16c38b6f763cd3c2e1404473d2dfce49991341e5c5bb4a7b89f77147",
+      "startedAt": "2026-11-09T20:11:09.516Z",
+      "stopped": true,
+      "finishedAt": "2026-11-09T20:11:10.710Z",
+      "actionsRemovedContainer": true,
+      "actionsRemovedNetwork": true,
+      "actionsRemovalLines": [
+        "2026-11-09T20:11:17.4880505Z Stop and remove container: 22e4d0f6e7ec4ede978fb01708d6f4ef_postgres17_2bf52a",
+        "2026-11-09T20:11:17.4884986Z ##[command]/usr/bin/docker rm --force 8755eeef16c38b6f763cd3c2e1404473d2dfce49991341e5c5bb4a7b89f77147",
+        "2026-11-09T20:11:17.5106616Z ##[command]/usr/bin/docker network rm github_network_c5cb279aab4c48ba9adedc6236eca498"
+      ]
+    }
+  },
+  "green": {
+    "verdict": {
+      "schema": "issue1512-isolated-pg17-v1",
+      "phase": "green",
+      "workflowRunId": "42690271741",
+      "workflowRunAttempt": "1",
+      "controlSha": "54007859ff7b935fad6ed36c3f00eddf2463f7b8",
+      "before": {
+        "sha": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+        "tree": "0a0e2a40d82cbcb18963584e7d54f834a3af54fb",
+        "sourceBlob": "a2a6bf1fd1307babd350c9a168b003e38fa4b3cc",
+        "testBlob": "32a8321c981dd6a534f8859fa35f281e874466e6"
+      },
+      "after": {
+        "sha": "5a0c90774b8c48fc390ea05cf782bbc9cbe79a62",
+        "tree": "442e7d50bbec1f78b7508d062e6076627a3e47c7",
+        "sourceBlob": "d73e30c36212029a8951a25a692c4e04a2a5b86d",
+        "testBlob": "c6c92ea2741174b5baadbd1535fc8b0c62b8275e"
+      },
+      "manifestSha256": "197652f56d6c2d67525c5c533dddf86ecaca1d4d5825b8c9809e7086c28c824b",
+      "driverSha256": "f114b1ebf4ae0dddcc25d1babdf53c2be5b37884130bbeba299d5b55775b417f",
+      "startedAt": "2026-11-09T20:12:32.302Z",
+      "commands": [
+        {
+          "label": "migration-bootstrap",
+          "executable": "/opt/hostedtoolcache/node/24.22.2/x64/bin/node",
+          "args": [
+            "--experimental-strip-types",
+            "--test",
+            "tests/migrate-empty-db.test.mjs"
+          ],
+          "startedAt": "2026-11-09T20:12:32.560Z",
+          "finishedAt": "2026-11-09T20:12:35.757Z",
+          "code": 0,
+          "signal": null,
+          "timedOut": false,
+          "spawnError": null,
+          "stdout": {
+            "file": "green-migration-bootstrap-stdout.log",
+            "bytes": 1152,
+            "sha256": "b42cb08692815191964d332ec40d786801c1f0cdaaafb6af92d77ac2ac372aa0"
+          },
+          "stderr": {
+            "file": "green-migration-bootstrap-stderr.log",
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "label": "e2e-setup",
+          "executable": "pnpm",
+          "args": [
+            "test:e2e:setup"
+          ],
+          "startedAt": "2026-11-09T20:12:35.757Z",
+          "finishedAt": "2026-11-09T20:12:37.142Z",
+          "code": 0,
+          "signal": null,
+          "timedOut": false,
+          "spawnError": null,
+          "stdout": {
+            "file": "green-e2e-setup-stdout.log",
+            "bytes": 20970,
+            "sha256": "a3e39d357db4e26cf6093db7841015ece76ce580eeec97c4e8fb263273c792c6"
+          },
+          "stderr": {
+            "file": "green-e2e-setup-stderr.log",
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "label": "environment-bind",
+          "executable": "/opt/hostedtoolcache/node/24.22.2/x64/bin/node",
+          "args": [
+            "scripts/test-accounts/bootstrap.mjs",
+            "--output",
+            "/home/runner/work/_temp/issue1512-pg/green-environment.json"
+          ],
+          "startedAt": "2026-11-09T20:12:37.143Z",
+          "finishedAt": "2026-11-09T20:12:37.250Z",
+          "code": 0,
+          "signal": null,
+          "timedOut": false,
+          "spawnError": null,
+          "stdout": {
+            "file": "green-environment-bind-stdout.log",
+            "bytes": 153,
+            "sha256": "f53a33b278d454210f8f0e8e3bda0c59072881cc44b2ac2ae6050723dda34c2c"
+          },
+          "stderr": {
+            "file": "green-environment-bind-stderr.log",
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        },
+        {
+          "label": "coordinator-family-green",
+          "executable": "pnpm",
+          "args": [
+            "test:db"
+          ],
+          "startedAt": "2026-11-09T20:12:37.251Z",
+          "finishedAt": "2026-11-09T20:13:39.406Z",
+          "code": 0,
+          "signal": null,
+          "timedOut": false,
+          "spawnError": null,
+          "stdout": {
+            "file": "green-coordinator-family-green-stdout.log",
+            "bytes": 1144803,
+            "sha256": "e329adce2da4550c6ea728d733acf7637ced5c0089ca3fbda575b3121ccd91eb"
+          },
+          "stderr": {
+            "file": "green-coordinator-family-green-stderr.log",
+            "bytes": 0,
+            "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        }
+      ],
+      "control": {
+        "controlSha": "54007859ff7b935fad6ed36c3f00eddf2463f7b8",
+        "controlTree": "2f4f7e2944a17a96867733f042f5d88162188a74",
+        "workflowBlob": "ccbff1788ba0c377637f4b4acfd4031ff35d01ba",
+        "manifestSha256": "197652f56d6c2d67525c5c533dddf86ecaca1d4d5825b8c9809e7086c28c824b",
+        "driverSha256": "f114b1ebf4ae0dddcc25d1babdf53c2be5b37884130bbeba299d5b55775b417f",
+        "phase": "green",
+        "capturedAt": "2026-11-09T20:11:41.392Z"
+      },
+      "database": {
+        "database": "mikka_e2e",
+        "role": "e2e",
+        "version": "170011",
+        "port": 5432
+      },
+      "node": "v24.22.2",
+      "pnpm": "10.34.3",
+      "verdict": "COMPLETE_COORDINATOR_FAMILY_GREEN",
+      "summary": {
+        "tests": 375,
+        "pass": 375,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "finishedAt": "2026-11-09T20:13:39.413Z"
+    },
+    "originalLogBlob": "3aef9e92bf4e98c13cdb4d22550d991ab0afec74",
+    "originalResponseBlob": "e18933d0ce0c50251b643ac05502a73cbad2a7ab",
+    "originals": [
+      {
+        "phase": "green",
+        "label": "migration-bootstrap",
+        "stream": "stdout",
+        "file": "green-migration-bootstrap-stdout.log",
+        "bytes": 1152,
+        "sha256": "b42cb08692815191964d332ec40d786801c1f0cdaaafb6af92d77ac2ac372aa0",
+        "gitBlobSha": "1a65801a4c6810b1f5bd120240ed8fdaba0f66f8",
+        "verifiedSha256": "b42cb08692815191964d332ec40d786801c1f0cdaaafb6af92d77ac2ac372aa0"
+      },
+      {
+        "phase": "green",
+        "label": "migration-bootstrap",
+        "stream": "stderr",
+        "file": "green-migration-bootstrap-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "verifiedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "phase": "green",
+        "label": "e2e-setup",
+        "stream": "stdout",
+        "file": "green-e2e-setup-stdout.log",
+        "bytes": 20970,
+        "sha256": "a3e39d357db4e26cf6093db7841015ece76ce580eeec97c4e8fb263273c792c6",
+        "gitBlobSha": "48822312808ecf4bb1e5330acc96320eeddb0dcb",
+        "verifiedSha256": "a3e39d357db4e26cf6093db7841015ece76ce580eeec97c4e8fb263273c792c6"
+      },
+      {
+        "phase": "green",
+        "label": "e2e-setup",
+        "stream": "stderr",
+        "file": "green-e2e-setup-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "verifiedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "phase": "green",
+        "label": "environment-bind",
+        "stream": "stdout",
+        "file": "green-environment-bind-stdout.log",
+        "bytes": 153,
+        "sha256": "f53a33b278d454210f8f0e8e3bda0c59072881cc44b2ac2ae6050723dda34c2c",
+        "gitBlobSha": "7725a0413fc1d7e886107119e944bf0f161f4c92",
+        "verifiedSha256": "f53a33b278d454210f8f0e8e3bda0c59072881cc44b2ac2ae6050723dda34c2c"
+      },
+      {
+        "phase": "green",
+        "label": "environment-bind",
+        "stream": "stderr",
+        "file": "green-environment-bind-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "verifiedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "phase": "green",
+        "label": "coordinator-family-green",
+        "stream": "stdout",
+        "file": "green-coordinator-family-green-stdout.log",
+        "bytes": 1144803,
+        "sha256": "e329adce2da4550c6ea728d733acf7637ced5c0089ca3fbda575b3121ccd91eb",
+        "gitBlobSha": "19f5a267d26afb5f5aa56ad4dcbf8f122ec21fd2",
+        "verifiedSha256": "e329adce2da4550c6ea728d733acf7637ced5c0089ca3fbda575b3121ccd91eb"
+      },
+      {
+        "phase": "green",
+        "label": "coordinator-family-green",
+        "stream": "stderr",
+        "file": "green-coordinator-family-green-stderr.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+        "verifiedSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "commands": [
+      {
+        "label": "migration-bootstrap",
+        "executable": "/opt/hostedtoolcache/node/24.22.2/x64/bin/node",
+        "args": [
+          "--experimental-strip-types",
+          "--test",
+          "tests/migrate-empty-db.test.mjs"
+        ],
+        "startedAt": "2026-11-09T20:12:32.560Z",
+        "finishedAt": "2026-11-09T20:12:35.757Z",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "spawnError": null,
+        "stdout": {
+          "file": "green-migration-bootstrap-stdout.log",
+          "bytes": 1152,
+          "sha256": "b42cb08692815191964d332ec40d786801c1f0cdaaafb6af92d77ac2ac372aa0"
+        },
+        "stderr": {
+          "file": "green-migration-bootstrap-stderr.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "e2e-setup",
+        "executable": "pnpm",
+        "args": [
+          "test:e2e:setup"
+        ],
+        "startedAt": "2026-11-09T20:12:35.757Z",
+        "finishedAt": "2026-11-09T20:12:37.142Z",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "spawnError": null,
+        "stdout": {
+          "file": "green-e2e-setup-stdout.log",
+          "bytes": 20970,
+          "sha256": "a3e39d357db4e26cf6093db7841015ece76ce580eeec97c4e8fb263273c792c6"
+        },
+        "stderr": {
+          "file": "green-e2e-setup-stderr.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "environment-bind",
+        "executable": "/opt/hostedtoolcache/node/24.22.2/x64/bin/node",
+        "args": [
+          "scripts/test-accounts/bootstrap.mjs",
+          "--output",
+          "/home/runner/work/_temp/issue1512-pg/green-environment.json"
+        ],
+        "startedAt": "2026-11-09T20:12:37.143Z",
+        "finishedAt": "2026-11-09T20:12:37.250Z",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "spawnError": null,
+        "stdout": {
+          "file": "green-environment-bind-stdout.log",
+          "bytes": 153,
+          "sha256": "f53a33b278d454210f8f0e8e3bda0c59072881cc44b2ac2ae6050723dda34c2c"
+        },
+        "stderr": {
+          "file": "green-environment-bind-stderr.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "label": "coordinator-family-green",
+        "executable": "pnpm",
+        "args": [
+          "test:db"
+        ],
+        "startedAt": "2026-11-09T20:12:37.251Z",
+        "finishedAt": "2026-11-09T20:13:39.406Z",
+        "code": 0,
+        "signal": null,
+        "timedOut": false,
+        "spawnError": null,
+        "stdout": {
+          "file": "green-coordinator-family-green-stdout.log",
+          "bytes": 1144803,
+          "sha256": "e329adce2da4550c6ea728d733acf7637ced5c0089ca3fbda575b3121ccd91eb"
+        },
+        "stderr": {
+          "file": "green-coordinator-family-green-stderr.log",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    ],
+    "cleanup": {
+      "phase": "green",
+      "serviceId": "b6af8a2646da532e23c71f789267cf2afdee7e5ad370aedb58bb5ed0724b4ddc",
+      "startedAt": "2026-11-09T20:13:54.363Z",
+      "stopped": true,
+      "finishedAt": "2026-11-09T20:13:54.919Z",
+      "actionsRemovedContainer": true,
+      "actionsRemovedNetwork": true,
+      "actionsRemovalLines": [
+        "2026-11-09T20:13:56.4734997Z Stop and remove container: d32397272aa245429fc7ea0f1b2ddda4_postgres17_553888",
+        "2026-11-09T20:13:56.4739758Z ##[command]/usr/bin/docker rm --force b6af8a2646da532e23c71f789267cf2afdee7e5ad370aedb58bb5ed0724b4ddc",
+        "2026-11-09T20:13:56.4892397Z ##[command]/usr/bin/docker network rm github_network_16c140573d134d659c664e59aa57d2bc"
+      ]
+    }
+  },
+  "redChildResults": [
+    {
+      "status": "not ok",
+      "index": 1,
+      "name": "an empty explicit Personal Coordinator uses one Personal read"
+    },
+    {
+      "status": "not ok",
+      "index": 2,
+      "name": "an empty explicit Team Coordinator uses one Personal read"
+    },
+    {
+      "status": "not ok",
+      "index": 3,
+      "name": "a retained copied agent head still permits the empty Personal read"
+    },
+    {
+      "status": "ok",
+      "index": 4,
+      "name": "an explicit Team read retains the real migration for legacy coordinator_messages"
+    },
+    {
+      "status": "ok",
+      "index": 5,
+      "name": "an explicit Team read retains the real migration for legacy coordinator_sessions"
+    },
+    {
+      "status": "ok",
+      "index": 6,
+      "name": "an explicit Team read retains the real migration for legacy coordinator_events"
+    },
+    {
+      "status": "ok",
+      "index": 7,
+      "name": "an explicit Team read retains the real migration for legacy agent_runs"
+    },
+    {
+      "status": "ok",
+      "index": 8,
+      "name": "an explicit Team read retains the real migration for legacy factory_tasks"
+    },
+    {
+      "status": "ok",
+      "index": 9,
+      "name": "an explicit Team read retains the real migration for legacy bot_model_choices"
+    },
+    {
+      "status": "ok",
+      "index": 10,
+      "name": "an explicit Team read retains the real migration for legacy chat_preferences"
+    },
+    {
+      "status": "ok",
+      "index": 11,
+      "name": "an explicit Team read retains the real migration for legacy user_schedules"
+    },
+    {
+      "status": "ok",
+      "index": 12,
+      "name": "an explicit Team read retains the real migration for legacy suggestions"
+    },
+    {
+      "status": "ok",
+      "index": 13,
+      "name": "an explicit Team read retains the real migration for legacy pending_actions"
+    },
+    {
+      "status": "ok",
+      "index": 14,
+      "name": "an explicit Team read retains the real migration for legacy agent_kit_heads"
+    },
+    {
+      "status": "ok",
+      "index": 15,
+      "name": "a missing Personal workspace reuses the unsuccessful lookup"
+    },
+    {
+      "status": "ok",
+      "index": 16,
+      "name": "a missing Personal Coordinator still follows the original creation path"
+    },
+    {
+      "status": "ok",
+      "index": 17,
+      "name": "only a boolean false Personal observation can skip the migration"
+    },
+    {
+      "status": "ok",
+      "index": 18,
+      "name": "a failed Personal observation is retried on the next read"
+    },
+    {
+      "status": "ok",
+      "index": 19,
+      "name": "an inactive Personal member cannot certify an empty backfill"
+    },
+    {
+      "status": "ok",
+      "index": 20,
+      "name": "busy chat locks retain the full migration and the next-read retry"
+    },
+    {
+      "status": "not ok",
+      "index": 21,
+      "name": "legacy rows committed after an empty read wait for the original next pass"
+    },
+    {
+      "status": "ok",
+      "index": 22,
+      "name": "an empty execution family skips its recursive update after every NOWAIT read"
+    },
+    {
+      "status": "ok",
+      "index": 23,
+      "name": "a captured legacy event still runs the execution migration"
+    },
+    {
+      "status": "ok",
+      "index": 24,
+      "name": "stale attention reads only settlement fields and preserves the decision input and owner log"
+    },
+    {
+      "status": "ok",
+      "index": 25,
+      "name": "existing Coordinator chat, runs and settings move to its bot row once; a second pass changes nothing"
+    },
+    {
+      "status": "ok",
+      "index": 26,
+      "name": "personal backfill preserves shared and unresolved task events, runs, Factory sources and schedules"
+    },
+    {
+      "status": "ok",
+      "index": 27,
+      "name": "one shared-tenant task retains its complete null-Bot source family, including a Personal sibling"
+    },
+    {
+      "status": "ok",
+      "index": 28,
+      "name": "a new Coordinator message and a run use the real bot id, stored where they enter"
+    },
+    {
+      "status": "ok",
+      "index": 29,
+      "name": "a legacy run with no bot finishes for an owner with no workspace; its event is kept, and moved once the Coordinator resolves"
+    },
+    {
+      "status": "ok",
+      "index": 30,
+      "name": "real null-Bot admission retains frozen identity, Factory family and repository authority after backfill"
+    },
+    {
+      "status": "ok",
+      "index": 31,
+      "name": "an unfrozen computer run retains its Factory family and ordinary retry"
+    },
+    {
+      "status": "ok",
+      "index": 32,
+      "name": "an unfrozen group run retains its Factory family and ordinary retry"
+    },
+    {
+      "status": "ok",
+      "index": 33,
+      "name": "a publication holding its issue cannot deadlock with the backfill run lock"
+    },
+    {
+      "status": "ok",
+      "index": 34,
+      "name": "migration first holds the issue through its run update; real publication continues after commit"
+    },
+    {
+      "status": "ok",
+      "index": 35,
+      "name": "a run committed after issue locking retains its family until the next pass"
+    },
+    {
+      "status": "ok",
+      "index": 36,
+      "name": "a revoked shared-workspace member run keeps its tenant without blocking unrelated Personal history"
+    },
+    {
+      "status": "ok",
+      "index": 37,
+      "name": "an in-flight null-Bot route defers migration; its unfrozen history moves after commit"
+    },
+    {
+      "status": "ok",
+      "index": 38,
+      "name": "migration first fences a stale source validation before it can create a null-Bot task"
+    },
+    {
+      "status": "ok",
+      "index": 39,
+      "name": "a task committed between migration lock statements keeps its source until the next pass"
+    },
+    {
+      "status": "ok",
+      "index": 40,
+      "name": "a completion committed after the event lock keeps its legacy run until both can move"
+    },
+    {
+      "status": "ok",
+      "index": 41,
+      "name": "a chat writer holding its session cannot deadlock against the migration chat lock"
+    },
+    {
+      "status": "ok",
+      "index": 42,
+      "name": "model choice goes through the ordinary bot path"
+    },
+    {
+      "status": "ok",
+      "index": 43,
+      "name": "the Coordinator stays outside workspace app policy; an ordinary bot does not"
+    },
+    {
+      "status": "ok",
+      "index": 44,
+      "name": "the bot list (left column and mobile home) has that workspace's own Coordinator once, as the Coordinator"
+    },
+    {
+      "status": "ok",
+      "index": 45,
+      "name": "one Coordinator per workspace; work with no workspace goes to the personal one, never the oldest"
+    },
+    {
+      "status": "ok",
+      "index": 46,
+      "name": "a leaving member's Coordinator is paused with their bots and never transferred"
+    }
+  ],
+  "greenCoordinatorChildResults": [
+    {
+      "status": "ok",
+      "index": 1,
+      "name": "an empty explicit Personal Coordinator uses one Personal read"
+    },
+    {
+      "status": "ok",
+      "index": 2,
+      "name": "an empty explicit Team Coordinator uses one Personal read"
+    },
+    {
+      "status": "ok",
+      "index": 3,
+      "name": "a retained copied agent head still permits the empty Personal read"
+    },
+    {
+      "status": "ok",
+      "index": 4,
+      "name": "an explicit Team read retains the real migration for legacy coordinator_messages"
+    },
+    {
+      "status": "ok",
+      "index": 5,
+      "name": "an explicit Team read retains the real migration for legacy coordinator_sessions"
+    },
+    {
+      "status": "ok",
+      "index": 6,
+      "name": "an explicit Team read retains the real migration for legacy coordinator_events"
+    },
+    {
+      "status": "ok",
+      "index": 7,
+      "name": "an explicit Team read retains the real migration for legacy agent_runs"
+    },
+    {
+      "status": "ok",
+      "index": 8,
+      "name": "an explicit Team read retains the real migration for legacy factory_tasks"
+    },
+    {
+      "status": "ok",
+      "index": 9,
+      "name": "an explicit Team read retains the real migration for legacy bot_model_choices"
+    },
+    {
+      "status": "ok",
+      "index": 10,
+      "name": "an explicit Team read retains the real migration for legacy chat_preferences"
+    },
+    {
+      "status": "ok",
+      "index": 11,
+      "name": "an explicit Team read retains the real migration for legacy user_schedules"
+    },
+    {
+      "status": "ok",
+      "index": 12,
+      "name": "an explicit Team read retains the real migration for legacy suggestions"
+    },
+    {
+      "status": "ok",
+      "index": 13,
+      "name": "an explicit Team read retains the real migration for legacy pending_actions"
+    },
+    {
+      "status": "ok",
+      "index": 14,
+      "name": "an explicit Team read retains the real migration for legacy agent_kit_heads"
+    },
+    {
+      "status": "ok",
+      "index": 15,
+      "name": "a missing Personal workspace reuses the unsuccessful lookup"
+    },
+    {
+      "status": "ok",
+      "index": 16,
+      "name": "a missing Personal Coordinator still follows the original creation path"
+    },
+    {
+      "status": "ok",
+      "index": 17,
+      "name": "only a boolean false Personal observation can skip the migration"
+    },
+    {
+      "status": "ok",
+      "index": 18,
+      "name": "a failed Personal observation is retried on the next read"
+    },
+    {
+      "status": "ok",
+      "index": 19,
+      "name": "an inactive Personal member cannot certify an empty backfill"
+    },
+    {
+      "status": "ok",
+      "index": 20,
+      "name": "busy chat locks retain the full migration and the next-read retry"
+    },
+    {
+      "status": "ok",
+      "index": 21,
+      "name": "legacy rows committed after an empty read wait for the original next pass"
+    },
+    {
+      "status": "ok",
+      "index": 22,
+      "name": "an empty execution family skips its recursive update after every NOWAIT read"
+    },
+    {
+      "status": "ok",
+      "index": 23,
+      "name": "a captured legacy event still runs the execution migration"
+    },
+    {
+      "status": "ok",
+      "index": 24,
+      "name": "stale attention reads only settlement fields and preserves the decision input and owner log"
+    },
+    {
+      "status": "ok",
+      "index": 25,
+      "name": "existing Coordinator chat, runs and settings move to its bot row once; a second pass changes nothing"
+    },
+    {
+      "status": "ok",
+      "index": 26,
+      "name": "personal backfill preserves shared and unresolved task events, runs, Factory sources and schedules"
+    },
+    {
+      "status": "ok",
+      "index": 27,
+      "name": "one shared-tenant task retains its complete null-Bot source family, including a Personal sibling"
+    },
+    {
+      "status": "ok",
+      "index": 28,
+      "name": "a new Coordinator message and a run use the real bot id, stored where they enter"
+    },
+    {
+      "status": "ok",
+      "index": 29,
+      "name": "a legacy run with no bot finishes for an owner with no workspace; its event is kept, and moved once the Coordinator resolves"
+    },
+    {
+      "status": "ok",
+      "index": 30,
+      "name": "real null-Bot admission retains frozen identity, Factory family and repository authority after backfill"
+    },
+    {
+      "status": "ok",
+      "index": 31,
+      "name": "an unfrozen computer run retains its Factory family and ordinary retry"
+    },
+    {
+      "status": "ok",
+      "index": 32,
+      "name": "an unfrozen group run retains its Factory family and ordinary retry"
+    },
+    {
+      "status": "ok",
+      "index": 33,
+      "name": "a publication holding its issue cannot deadlock with the backfill run lock"
+    },
+    {
+      "status": "ok",
+      "index": 34,
+      "name": "migration first holds the issue through its run update; real publication continues after commit"
+    },
+    {
+      "status": "ok",
+      "index": 35,
+      "name": "a run committed after issue locking retains its family until the next pass"
+    },
+    {
+      "status": "ok",
+      "index": 36,
+      "name": "a revoked shared-workspace member run keeps its tenant without blocking unrelated Personal history"
+    },
+    {
+      "status": "ok",
+      "index": 37,
+      "name": "an in-flight null-Bot route defers migration; its unfrozen history moves after commit"
+    },
+    {
+      "status": "ok",
+      "index": 38,
+      "name": "migration first fences a stale source validation before it can create a null-Bot task"
+    },
+    {
+      "status": "ok",
+      "index": 39,
+      "name": "a task committed between migration lock statements keeps its source until the next pass"
+    },
+    {
+      "status": "ok",
+      "index": 40,
+      "name": "a completion committed after the event lock keeps its legacy run until both can move"
+    },
+    {
+      "status": "ok",
+      "index": 41,
+      "name": "a chat writer holding its session cannot deadlock against the migration chat lock"
+    },
+    {
+      "status": "ok",
+      "index": 42,
+      "name": "model choice goes through the ordinary bot path"
+    },
+    {
+      "status": "ok",
+      "index": 43,
+      "name": "the Coordinator stays outside workspace app policy; an ordinary bot does not"
+    },
+    {
+      "status": "ok",
+      "index": 44,
+      "name": "the bot list (left column and mobile home) has that workspace's own Coordinator once, as the Coordinator"
+    },
+    {
+      "status": "ok",
+      "index": 45,
+      "name": "one Coordinator per workspace; work with no workspace goes to the personal one, never the oldest"
+    },
+    {
+      "status": "ok",
+      "index": 46,
+      "name": "a leaving member's Coordinator is paused with their bots and never transferred"
+    }
+  ],
+  "byteVerification": {
+    "streams": 16,
+    "bytes": 1205493,
+    "allSHA256Matched": true,
+    "rawOriginalsPersistedBeforeAnalysis": true
+  },
+  "originalReader": {
+    "reader": "/root/backfill_pg_runner",
+    "jobOriginalCalls": {
+      "129407869387": 1,
+      "129408752084": 1
+    },
+    "zipOriginalCalls": 0
+  },
+  "artifacts": [
+    {
+      "id": 13706218686,
+      "name": "issue1512-backfill-pg-green-42690271741-1",
+      "size_in_bytes": 126509,
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13706218686",
+      "archive_download_url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13706218686/zip",
+      "expired": false,
+      "created_at": "2026-11-09T20:13:55Z",
+      "expires_at": "2026-11-16T20:13:55Z",
+      "updated_at": "2026-11-09T20:13:55Z",
+      "digest": "sha256:da38aeec7f4a2901915006560a7d5221cb4d54a7a2a46dc8d8dc7a4a82bc4387",
+      "workflow_run": {
+        "id": 42690271741,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "ops/1512-backfill-pg-20261109",
+        "head_sha": "54007859ff7b935fad6ed36c3f00eddf2463f7b8"
+      }
+    },
+    {
+      "id": 13706208246,
+      "name": "issue1512-backfill-pg-red-42690271741-1",
+      "size_in_bytes": 10908,
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13706208246",
+      "archive_download_url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13706208246/zip",
+      "expired": false,
+      "created_at": "2026-11-09T20:11:16Z",
+      "expires_at": "2026-11-16T20:11:10Z",
+      "updated_at": "2026-11-09T20:11:16Z",
+      "digest": "sha256:4fdc8f2523b27926fb1c7b2d3cd038dbc815eb5cd94927213c5a97abe1b00a16",
+      "workflow_run": {
+        "id": 42690271741,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "ops/1512-backfill-pg-20261109",
+        "head_sha": "54007859ff7b935fad6ed36c3f00eddf2463f7b8"
+      }
+    }
+  ],
+  "priorFailuresRetained": {
+    "parserFailureRun": 42688581877,
+    "parserFailureMetadataBlob": "f66fa7f83e48b2b1d8bc1644559683e3ecba06c8",
+    "fixtureFailureRun": 42689043866,
+    "fixtureFailureIndexBlob": "614b4de450478763e2f400b1677ae8d6122fa6b7",
+    "priorClosureCommit": "41f1ad8d257c4df3523e751b95c9776209505bd1",
+    "priorClosureReceiptBlob": "9fc18349e667b2af921419e1837555bfef187ee5",
+    "changedTestCandidate": true,
+    "unchangedSourceReruns": 0
+  },
+  "independentRootRedVerificationBlob": "f94cbbe2c23e10dc3508f7419cf39070f6b4198b",
+  "cleanup": {
+    "independentRunners": true,
+    "independentPostgresServices": true,
+    "noDatabaseCarryover": true,
+    "bothServicesStoppedAndRemoved": true,
+    "bothDockerNetworksRemoved": true,
+    "remainingOwnedDatabaseServices": 0
+  },
+  "limitations": {
+    "productionAcceptance": false,
+    "nativeBudgetAcceptance": false,
+    "noMainOrFeatureRefChanges": true,
+    "noProductionCredentialsOrExternalDatabase": true,
+    "statementCountsApplyToTheseRegressionFixtures": true
+  }
+}
