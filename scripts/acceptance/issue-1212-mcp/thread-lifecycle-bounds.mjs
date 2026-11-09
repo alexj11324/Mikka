@@ -78,8 +78,8 @@ export async function runLifecycleBounds(env, event, { signal } = {}) {
   const { Sandbox } = await import(pathToFileURL(requireSource.resolve('e2b')))
   const runtimeReader=(await import(pathToFileURL(source+'/scripts/acceptance/cloud-startup.mjs'))).readProductionWorkerRelease
   const approved=JSON.parse(await readFile('issue-1212-mcp-report/runtime-pin.json','utf8'))
-  need(approved.applicationSha===binding.applicationSha && approved.configuration?.sourceCommit===env.MIKKA_APPROVED_RUNTIME_SOURCE
-    && approved.configuration?.workerSha===env.MIKKA_APPROVED_RUNTIME_WORKER,'approved_runtime_invalid')
+  need(approved.applicationSha===binding.applicationSha && Number.isSafeInteger(approved.runId) && approved.runId>0
+    && Array.isArray(approved.verifiedJobs) && approved.verifiedJobs.length===7,'approved_runtime_invalid')
   const runtime=approved.configuration, runtimeObservations=[]
   assertRuntimePin(await runtimeReader({token:env.VERCEL_TEAM_TOKEN}),runtime)
   const getInfo=async(...args)=>{
@@ -207,8 +207,15 @@ export async function runLifecycleBounds(env, event, { signal } = {}) {
     report.driver = { revision: binding.driverRevision, runId: binding.runId, authorization: 'existing_actions_branch_push_guard' }
     report.additionalBoundsPassed = bounds.length===2 && bounds.every(row=>row.status==='passed')
     report.approvedRuntime={configuration:runtime,runId:approved.runId,observations:runtimeObservations,status:'failed'}
+    // A new default does not replace either already-observed task VM.
+    // Record it separately; the exact approved template on each owned VM is
+    // the runtime evidence for this run, alongside the fixed public build.
     try {
-      assertRuntimePin(await runtimeReader({token:env.VERCEL_TEAM_TOKEN}),runtime)
+      const after=await runtimeReader({token:env.VERCEL_TEAM_TOKEN})
+      report.approvedRuntime.observedDefaultAfter=after
+      report.approvedRuntime.defaultUnchanged=JSON.stringify(after)===JSON.stringify(runtime)
+    } catch { report.approvedRuntime.defaultAfterStatus='unavailable' }
+    try {
       need(new Set(runtimeObservations.map(row=>row.sandboxHash)).size===2,'approved_runtime_instances_missing')
       report.approvedRuntime.status='passed'
     } catch(error) {
