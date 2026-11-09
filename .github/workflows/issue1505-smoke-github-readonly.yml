@@ -1,0 +1,127 @@
+# Disabled review draft. Root must separately review activation; no production work has run.
+name: Issue 1505 read-only Smoke GitHub repair
+on:
+  push:
+    branches: [ops/1505-smoke-github-readonly-20261109]
+    paths:
+      - .github/workflows/issue1505-smoke-github-readonly.yml
+      - scripts/ops/issue1505/github-readonly-*.mjs
+      - scripts/ops/issue1505/github-readonly.test.mjs
+permissions:
+  contents: read
+concurrency:
+  group: production-smoke-owner-acceptance
+  cancel-in-progress: false
+  queue: max
+jobs:
+  prepare:
+    if: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      MIKKA_EDITION: cloud
+      MIKKA_GITHUB_REPAIR_GO: ''
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Verify source, closed file scope and single-run intent before credentials
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,os,pathlib,subprocess
+          root=pathlib.Path('.')
+          assert os.environ.get('MIKKA_GITHUB_REPAIR_GO')=='root-reviewed-1505-github-readonly-v1'
+          assert os.environ.get('GITHUB_REPOSITORY')=='alexj11324/Mikka'
+          assert os.environ.get('GITHUB_RUN_ATTEMPT')=='1'
+          assert os.environ.get('GITHUB_REF')=='refs/heads/ops/1505-smoke-github-readonly-20261109'
+          def git(*args): return subprocess.check_output(['git',*args],text=True).strip()
+          assert git('rev-parse','HEAD')==os.environ['GITHUB_SHA']
+          base='1d1261b607c8d60a27e2131ef59b463156d346d1'
+          subprocess.run(['git','merge-base','--is-ancestor',base,'HEAD'],check=True)
+          expected={'scripts/ops/issue1505/github-readonly-provider.mjs': '11b100e92c24d91b98200c18eea9a50a9c6a09ac3e3d5ece1166bbcc559f8937', 'scripts/ops/issue1505/github-readonly-helper.mjs': 'dcb7972129083c4b291a490f3965680935799413ad286a97c93042b96a4fe9d0', 'scripts/ops/issue1505/github-readonly-store.mjs': '3170e335a9623575c52a027372093a5eea32d2def30f178c2aa552c5ba176327', 'scripts/ops/issue1505/github-readonly-runner.mjs': '3ef68dd706ef605e68623ec24dcde593a47e8b9a882833069b38d36e1667f2c6', 'scripts/ops/issue1505/github-readonly.test.mjs': 'f4d75ebec6948be7a55e6096b909fcea0d8daf98fb87c2b18636d27974dded78'}
+          allowed=set(expected)|{'.github/workflows/issue1505-smoke-github-readonly.yml'}
+          changed=set(git('diff','--name-only',base,'HEAD').splitlines())
+          assert changed==allowed
+          assert not git('diff','--name-only','HEAD')
+          for path,want in expected.items():
+            assert hashlib.sha256((root/path).read_bytes()).hexdigest()==want,path
+          print(json.dumps({'status':'passed','source':os.environ['GITHUB_SHA'],'base':base,'files':len(expected),'productDelta':False}))
+          PY
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - run: corepack enable && corepack prepare pnpm@10.34.3 --activate && pnpm install --frozen-lockfile
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /neon
+          secret-name: DATABASE_URL
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: MIKKA_DATABASE_URL
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: BETTER_AUTH_SECRET
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: GITHUB_CLIENT_ID
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: GITHUB_CLIENT_SECRET
+          recursive: false
+          include-imports: false
+
+      - name: Prepare only a new scoped read-only child and use normal repository access
+        run: node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1505/github-readonly-runner.mjs --prepare
+        env:
+          NODE_ENV: production
+          VERCEL_ENV: production
+          BETTER_AUTH_URL: https://app.aspectlylabs.com
+          NEXT_PUBLIC_APP_URL: https://app.aspectlylabs.com
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1505-github-readonly-receipt
+          path: issue1505-github-readonly-report/receipt.json
+          if-no-files-found: warn
+          retention-days: 3
