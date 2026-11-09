@@ -13,18 +13,21 @@ const OTHER_OWNER = '00000000-0000-4000-8000-0000000000aa'
 const MEMBER = '00000000-0000-4000-8000-0000000000bb'
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const [A, B, C, D, E, F] = [1, 2, 3, 4, 5, 6].map(id)
+const WORKSPACE = id(90), OTHER_WORKSPACE = id(91)
 const MISSING = id(99)
 
-type Row = { id: string; userId: string; scope: 'personal' | 'workspace'; scopeVersion: number; revision: number; title: string; status: string; priority: string; content: object }
+type Row = { id: string; userId: string; workspaceId: string; ownershipState: 'bound'; scope: 'personal' | 'workspace'; scopeVersion: number; revision: number; title: string; status: string; priority: string; content: object }
 type Member = { issueId: string; userId: string; memberId: string }
 let rows: Row[] = []
 let members: Member[] = []
 let actor = OWNER // the signed-in user returned by requireIssueAccess
+let workspaceMembers = new Set([OWNER, MEMBER])
+let workspaceLease = false
 let writes: { id: string; metadata: IssueMetadata }[] = []
-const reset = (next: Row[]) => { rows = next; members = []; actor = OWNER; writes = [] }
+const reset = (next: Row[]) => { rows = next; members = []; actor = OWNER; workspaceMembers = new Set([OWNER, MEMBER]); workspaceLease = false; writes = [] }
 
 const row = (rowId: string, meta: Partial<IssueMetadata> = {}, extra: Partial<Row> = {}): Row => ({
-  id: rowId, userId: OWNER, scope: 'workspace', scopeVersion: 1, revision: 1, title: rowId, status: 'todo', priority: 'none',
+  id: rowId, userId: OWNER, workspaceId: WORKSPACE, ownershipState: 'bound', scope: 'workspace', scopeVersion: 1, revision: 1, title: rowId, status: 'todo', priority: 'none',
   content: withIssueMetadata({ type: 'doc', content: [] }, metadataSchema.parse(meta)), ...extra,
 })
 
@@ -85,6 +88,7 @@ before(async () => {
   const file = (p: string) => new URL(p, import.meta.url).href
   schema = await import('./db/schema')
   mock.module(file('./db/index.ts'), { namedExports: { db: { transaction: async (fn: (tx: unknown) => unknown) => {
+    assert.equal(workspaceLease, true, 'the relation action enters its app transaction with workspace authority already held')
     const tx = {
       execute: async () => undefined,
       select,
@@ -93,13 +97,24 @@ before(async () => {
     }
     return fn(tx)
   } } } })
-  // Access was granted at lookup time; the transaction re-checks ownership and membership.
+  // Access was granted at lookup time. The action must acquire its workspace
+  // lease before this fixture's APP transaction; the actual cross-DB locks and
+  // revocation races are exercised in issue-scope-detachment.db.test.ts.
   const access = async (issueId: string) => {
     const issue = rows.find(r => r.id === issueId)
     if (!issue) throw new ActionFailureError('issueNotFound' as never)
     return { issue, user: { id: actor } }
   }
   mock.module(file('./issue-access.ts'), { namedExports: { requireIssueAccess: access, requireIssueAccessWithoutBody: access } })
+  mock.module(file('./task-workspace.ts'), { namedExports: {
+    withTaskWorkspace: async (reader: string | { id: string }, workspaceId: string, work: (workspace: { id: string; kind: 'team' }) => Promise<unknown>) => {
+      const userId = typeof reader === 'string' ? reader : reader.id
+      if (workspaceId !== WORKSPACE || !workspaceMembers.has(userId)) throw new ActionFailureError('workspaceAccessDenied')
+      workspaceLease = true
+      try { return await work({ id: workspaceId, kind: 'team' }) }
+      finally { workspaceLease = false }
+    },
+  } })
   mock.module(file('./issue-numbering.ts'), { namedExports: { allocateIssueNumbers: async () => 1 } })
   // Identifier formatting reads account data in current main; relation guards do not.
   mock.module(file('./task-identifier-server.ts'), { namedExports: {
@@ -107,8 +122,8 @@ before(async () => {
     taskIdentifiers: async () => new Map(),
   } })
   mock.module(file('./linear-sync/dispatch.ts'), { namedExports: { dispatchLinearWork: () => {}, dispatchLinearIssueSync: () => {} } })
-  // Team visibility (#169) only filters listIssueConnections; relation guards go through requireIssueAccess above.
-  mock.module(file('./issue-visibility.ts'), { namedExports: { issueVisibility: async () => ({ predicate: undefined, allowedIds: [] }) } })
+  mock.module(file('./live/lists.ts'), { namedExports: { issueListChanged: async () => {} } })
+  mock.module(file('./live/issue-detail.ts'), { namedExports: { issueRelationsChanged: async () => {}, relationIds: () => [] } })
   ;({ updateIssueRelation } = await import('../app/actions/issue-operations'))
 })
 
@@ -213,18 +228,31 @@ test('cross-owner targets are rejected', async () => {
   assert.equal(writes.length, 0)
 })
 
+test('another workspace cannot be linked even for the same owner', async () => {
+  reset([row(A), row(B, {}, { workspaceId: OTHER_WORKSPACE })])
+  for (const kind of ['parent', 'blocks', 'related'] as const) assert.equal((await relate(A, kind, B)).error, 'issueTargetUnavailable', kind)
+  assert.equal(writes.length, 0)
+})
+
 test('a stale revision is outdated', async () => {
   reset([row(A, {}, { revision: 2 }), row(B)])
   assert.equal((await relate(A, 'related', B)).error, 'issueOutdated')
   assert.equal((await relate(A, 'related', B, false, 2)).error, undefined, 'current revision passes')
 })
 
-test('non-owner needs membership on both issues inside the transaction', async () => {
+test('active shared-workspace members need no legacy per-task invitation to edit relations', async () => {
   reset([row(A), row(B)])
   actor = MEMBER
-  members = [{ issueId: A, userId: OWNER, memberId: MEMBER }, { issueId: B, userId: OWNER, memberId: OTHER_OWNER }]
-  assert.equal((await relate(A, 'related', B)).error, 'issueAccessChanged', 'B membership belongs to someone else')
+  assert.equal((await relate(A, 'related', B)).error, undefined)
+  assert.deepEqual(writes.map(write => write.id).sort(), [A, B])
+})
+
+test('legacy task invitations cannot bypass revoked workspace membership after entry lookup', async () => {
+  reset([row(A), row(B)])
+  actor = MEMBER
+  members = [A, B].map(issueId => ({ issueId, userId: OWNER, memberId: MEMBER }))
+  workspaceMembers.delete(MEMBER)
+  assert.equal((await relate(A, 'related', B)).error, 'issueNotFound')
   assert.equal(writes.length, 0)
-  members.push({ issueId: B, userId: OWNER, memberId: MEMBER })
-  assert.equal((await relate(A, 'related', B)).error, undefined, 'member of both')
+  assert.equal(workspaceLease, false)
 })

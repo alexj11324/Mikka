@@ -28,8 +28,8 @@ test('real PG: VM intervals follow confirmed lifecycle and stay inside the Facto
     // parent-column types, unique VM custody and FK cascade semantics.
     await pool.query(`CREATE TABLE "user" (id text PRIMARY KEY);
       CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
-      CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"botId" uuid,"agentDefinition" jsonb DEFAULT '{}');
-      CREATE TABLE factory_tasks (id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"botId" uuid);
+      CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"botId" uuid,"agentDefinition" jsonb DEFAULT '{}',"workspaceId" uuid);
+      CREATE TABLE factory_tasks (id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"botId" uuid,"workspaceId" uuid);
       CREATE TABLE factory_attempts (id uuid PRIMARY KEY,"taskId" uuid,"runId" uuid UNIQUE);
       CREATE TABLE computer_run_bindings ("runId" uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"botId" uuid);
       CREATE TABLE thread_machines ("runId" uuid PRIMARY KEY REFERENCES agent_runs(id) ON DELETE CASCADE,
@@ -39,11 +39,11 @@ test('real PG: VM intervals follow confirmed lifecycle and stay inside the Facto
         "workerLeaseId" uuid,"workerLeaseUntil" timestamptz,epoch integer NOT NULL DEFAULT 1);`)
     await pool.query('INSERT INTO "user" VALUES ($1),($2)', [owner, otherOwner])
     await pool.query('INSERT INTO bots VALUES ($1,$2,$3),($4,$2,$3),($5,$2,$6)', [bot, owner, workspace, chatBot, foreignBot, otherWorkspace])
-    await pool.query('INSERT INTO factory_tasks VALUES ($1,$2,$3,$4)', [task.id, owner, task.issueId, chatBot])
+    await pool.query('INSERT INTO factory_tasks VALUES ($1,$2,$3,$4,$5)', [task.id, owner, task.issueId, chatBot, workspace])
     const run = async (options: { linked?: boolean; state?: string; sandbox?: string | null; start?: string | null } = {}) => {
       const id = randomUUID()
-      await pool.query('INSERT INTO agent_runs VALUES ($1,$2,$3,$4,$5)', [id, owner, task.issueId, bot,
-        JSON.stringify({ executionIdentity: { workspaceId: workspace } })])
+      await pool.query('INSERT INTO agent_runs VALUES ($1,$2,$3,$4,$5,$6)', [id, owner, task.issueId, bot,
+        JSON.stringify({ executionIdentity: { workspaceId: workspace } }), workspace])
       await pool.query('INSERT INTO computer_run_bindings VALUES ($1,$2,$3,$4)', [id, owner, workspace, bot])
       if (options.linked !== false) await pool.query('INSERT INTO factory_attempts VALUES ($1,$2,$3)', [randomUUID(), task.id, id])
       await pool.query(`INSERT INTO thread_machines ("runId","ownerId","workspaceId","botId",state,"sandboxId","runningSince")
@@ -365,6 +365,28 @@ test('real PG: VM intervals follow confirmed lifecycle and stay inside the Facto
       await pool.query('UPDATE agent_runs SET "issueId"=$2 WHERE id=$1', [id, task.issueId])
       await pool.query('UPDATE thread_machine_sessions SET "ownerId"=$2 WHERE "runId"=$1', [id, otherOwner])
       assert.equal((await visible(id)).length, 0)
+    })
+
+    await t.test('botless historical custody cannot bridge a different or unresolved persisted run tenant', async () => {
+      const id = await run({ state:'running',sandbox:'vm-legacy-tenant',start:new Date().toISOString() })
+      try {
+        await pool.query('UPDATE factory_tasks SET "botId"=NULL WHERE id=$1',[task.id])
+        await pool.query('UPDATE agent_runs SET "botId"=NULL,"agentDefinition"=\'{}\' WHERE id=$1',[id])
+        assert.equal((await visible(id)).length,1)
+        await pool.query('UPDATE computer_run_bindings SET "workspaceId"=$2,"botId"=$3 WHERE "runId"=$1',[id,otherWorkspace,foreignBot])
+        await pool.query('UPDATE thread_machine_sessions SET "workspaceId"=$2,"botId"=$3 WHERE "runId"=$1',[id,otherWorkspace,foreignBot])
+        assert.equal((await visible(id)).length,0,'matching legacy custody in B does not belong to the persisted A run/task')
+        await pool.query('UPDATE computer_run_bindings SET "workspaceId"=$2,"botId"=$3 WHERE "runId"=$1',[id,workspace,bot])
+        await pool.query('UPDATE thread_machine_sessions SET "workspaceId"=$2,"botId"=$3 WHERE "runId"=$1',[id,workspace,bot])
+        assert.equal((await visible(id)).length,1)
+        await pool.query('UPDATE agent_runs SET "workspaceId"=NULL WHERE id=$1',[id])
+        assert.equal((await visible(id)).length,0,'unresolved run history remains quarantined')
+        await pool.query('UPDATE agent_runs SET "workspaceId"=$2 WHERE id=$1',[id,workspace])
+        await pool.query('UPDATE factory_tasks SET "workspaceId"=NULL WHERE id=$1',[task.id])
+        assert.equal((await visible(id)).length,0,'unresolved task history remains quarantined')
+      } finally {
+        await pool.query('UPDATE factory_tasks SET "workspaceId"=$2,"botId"=$3 WHERE id=$1',[task.id,workspace,chatBot])
+      }
     })
 
     await t.test('a startup error keeps a running VM; confirmed missing replacement closes it', async () => {

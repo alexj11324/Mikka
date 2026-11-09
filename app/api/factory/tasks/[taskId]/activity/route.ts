@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/api-auth'
-import { actAs } from '@/lib/acting-user'
 import { pool } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
 import { factoryHumanStore } from '@/lib/factory/server'
 import { handleFactoryActivity } from '@/lib/factory/activity-http'
+import { factoryHumanWorkspaceResponse } from '@/lib/factory/workspace-http'
 import { factoryLiveScopes } from '@/lib/live/factory'
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
 
@@ -25,5 +25,5 @@ export const GET = withRequestLog('/api/factory/tasks/[taskId]/activity', async 
     return NextResponse.json(result.status === 200 ? { ...result.body, liveWorkspaceId } : result.body,
       { status: result.status, headers: { 'Cache-Control': 'private, no-store' } })
   }
-  return session?.user ? actAs(session.user, respond) : respond()
+  return factoryHumanWorkspaceResponse(session?.user, respond)
 })

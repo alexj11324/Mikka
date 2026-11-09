@@ -6,13 +6,16 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
 import { dbUrl, seedAgent, seedBot, seedRun, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { enterprisePrincipal } from '../lib/enterprise/principal'
 
 type Caller = { id: string; [key: symbol]: string }
 let caller: Caller | null = null
+let selectedWorkspace: string | undefined
+mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: (key: string) => key === 'mikka-workspace' && selectedWorkspace ? { value: selectedWorkspace } : undefined }) } })
 const removed: string[] = []
 let failRemoval = false
 mock.module(new URL('../lib/mobile-api.ts', import.meta.url).href, { namedExports: {
-  mobileUser: async () => caller,
+  mobileUser: async () => caller ? { ...caller, name: 'Artifact fixture', email: `${caller.id}@example.invalid`, image: null, [enterprisePrincipal]: { kind: 'session', sessionId: 'artifact-delete-fixture' } } : null,
   writeAllowed: () => true,
   unauthorized: () => Response.json({ error: 'authRequired' }, { status: 401 }),
   forbiddenOrigin: () => Response.json({ error: 'originNotAllowed' }, { status: 403 }),
@@ -20,6 +23,8 @@ mock.module(new URL('../lib/mobile-api.ts', import.meta.url).href, { namedExport
 mock.module(new URL('../lib/artifacts/storage.ts', import.meta.url).href, { namedExports: {
   deleteArtifactObject: async (key: string) => { if (failRemoval) throw new Error('storage down'); removed.push(key) },
 } })
+
+mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
 
 test('only the owner deletes an artifact; anything else is 404', { skip: !dbUrl }, async t => {
   const { Pool } = await import('pg')
@@ -59,6 +64,7 @@ test('only the owner deletes an artifact; anything else is 404', { skip: !dbUrl 
   const owner = await person()
   const home = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
   const other = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
+  selectedWorkspace = home.id
 
   await t.test('the owner deletes it with its versions, share links and stored file; again is 404', async () => {
     const id = await artifact(owner, home.id)

@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
 // BE-9: run completion drives Factory reconcile without a Coordinator turn.
 // Real migrations, store, dispatch and reconciler over a disposable *_e2e PG.
@@ -6,6 +7,7 @@ import test from "node:test";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, readdir } from "node:fs/promises";
 import { Pool, type PoolClient } from "pg";
+import { workspacePool } from "../workspace-db";
 import { orderMigrations } from "../../scripts/migration-order.mjs";
 import { adoptProviderContinuation, createFactoryStore as createCurrentFactoryStore } from "./store";
 import { freezeWorkerDefinition } from "../agent-kit/worker";
@@ -50,12 +52,18 @@ test("run completion enters review without the Coordinator; replays do not advan
   const target = new URL(url!);
   target.pathname = `/${database}`;
   const pool = new Pool({ connectionString: target.toString(), max: 8 });
+  const authorityWorkspaces: string[] = [];
   const flags = { r: process.env.MIKKA_FACTORY_ROUTING_ENABLED, l: process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED };
   try {
     const dir = new URL("../../drizzle/", import.meta.url);
     for (const f of orderMigrations((await readdir(dir)).filter((f) => f.endsWith(".sql"))))
       await pool.query(await readFile(new URL(f, dir), "utf8"));
     await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','Fixture','complete@example.invalid',true,now(),now())`);
+    const workspaceId = await seedFixtureWorkspace(pool, 'owner', 'team');
+    // Request database scope changes APP only. Completion still checks the
+    // independent workspace authority, so both stores share this real tenant.
+    await seedFixtureWorkspace(workspacePool, 'owner', 'team', workspaceId);
+    authorityWorkspaces.push(workspaceId);
     const authorize = async (user: string, issue: string, tx: PoolClient) =>
       (await tx.query('SELECT id FROM issues WHERE id=$1 AND "userId"=$2', [issue, user])).rowCount === 1;
     const deviceId = randomUUID(), agentId = randomUUID(), repoId = randomUUID();
@@ -73,11 +81,11 @@ test("run completion enters review without the Coordinator; replays do not advan
     const sweep = createFactoryReconciler(pool, store, questions);
     const reconcileFor = () => (userId: string, runId: string) => sweep.run(userId, runId);
     const issueId = randomUUID(), sourceEventId = randomUUID();
-    await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal')`, [issueId]);
+    await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal',$2,'bound')`, [issueId, workspaceId]);
     /** A routed task on its own issue whose execute attempt is bound to a running run. */
     const runningTask = async (iss?: string) => {
       const ownIssue = iss ?? randomUUID(), src = randomUUID();
-      if (!iss) await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal')`, [ownIssue]);
+      if (!iss) await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal',$2,'bound')`, [ownIssue, workspaceId]);
       await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,'owner','user_message',$2,'{"text":"synthetic"}')`, [src, src]);
       const r = await store.route("owner", { issueId: ownIssue, sourceEventId: src, eventId: randomUUID(), rationale: "Task requested", missingInformation: [], missingPermissions: [], needsSpec: false });
       const run = await dispatch("owner", { binding: factoryBinding(r.task), agentId, deviceRepoId: repoId });
@@ -85,7 +93,7 @@ test("run completion enters review without the Coordinator; replays do not advan
       return { task: r.task, runId: run.runId };
     };
     // Host-owned model references only; no credential values or provider I/O.
-    const providerRepoId = randomUUID(), alternateAgentId = randomUUID(), providerWorkspaceId = randomUUID();
+    const providerRepoId = randomUUID(), alternateAgentId = randomUUID(), providerWorkspaceId = workspaceId;
     await pool.query(`INSERT INTO agents (id,"userId",name,harness,"deviceId") VALUES ($1,'owner','Provider fixture','claude_code',$2)`, [alternateAgentId, deviceId]);
     await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,'owner','v2/github.com/acme/provider-fixture','https://github.com/acme/provider-fixture.git')`, [providerRepoId, deviceId]);
     const providerDefinition = (harness: 'codex' | 'claude_code', prompt: string, targetDevice = deviceId) => {
@@ -190,7 +198,7 @@ test("run completion enters review without the Coordinator; replays do not advan
         } });
       const completed = async () => {
         const issue = randomUUID(), source = randomUUID();
-        await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Profile Decision fixture','{"type":"doc","content":[]}','todo','normal')`, [issue]);
+        await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,'owner','Profile Decision fixture','{"type":"doc","content":[]}','todo','normal',$2,'bound')`, [issue, workspaceId]);
         await pool.query(`INSERT INTO coordinator_events(id,"userId",kind,"dedupeKey",payload) VALUES ($1,'owner','user_message',$2,'{"text":"synthetic"}')`, [source, source]);
         const routed = await currentStore.route('owner', { issueId: issue, sourceEventId: source, eventId: randomUUID(), rationale: 'Task requested', missingInformation: [], missingPermissions: [], needsSpec: false });
         const result = await execute('owner', { binding: factoryBinding(routed.task), agentId, deviceRepoId: repoId });
@@ -588,11 +596,12 @@ test("run completion enters review without the Coordinator; replays do not advan
       const expectedHash = createHash('sha256').update('x'.repeat(84) + '\n').digest('hex');
       const ownerText = `The answered target is exactly 85 bytes, SHA256 ${expectedHash}. Keep all other requirements. token=fixture-private`;
       await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,'owner','/home/user/.mikka/bot-workspaces/answered-fixture')`, [deliverableRepo, deviceId]);
-      await pool.query(`UPDATE agent_runs SET "deviceRepoId"=$2,report=$3,"questionContinuation"=$4 WHERE id=$1`, [f.runId, deliverableRepo,
-        JSON.stringify({ sourceCommit: 'a'.repeat(40), deliverableCommit: 'b'.repeat(40), verify: { status: 'not_run' }, summary: 'Producer observation: 56 bytes; this report is not a new owner requirement.' }),
-        JSON.stringify({ questionId, originRunId: originId, originSessionId: 's1', requireSessionResume: true })]);
+      await pool.query(`UPDATE agent_runs SET "deviceRepoId"=$2,report=$3 WHERE id=$1`, [f.runId, deliverableRepo,
+        JSON.stringify({ sourceCommit: 'a'.repeat(40), deliverableCommit: 'b'.repeat(40), verify: { status: 'not_run' }, summary: 'Producer observation: 56 bytes; this report is not a new owner requirement.' })]);
       await pool.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId",status,"stopReason","sessionId","agentDefinition",prompt)
         SELECT $2,"userId","issueId","agentId","deviceId","deviceRepoId",'stopped','asked_human','s1',"agentDefinition",'Original owner task' FROM agent_runs WHERE id=$1`, [f.runId, originId]);
+      await pool.query(`UPDATE agent_runs SET "questionContinuation"=$2 WHERE id=$1`, [f.runId,
+        JSON.stringify({ questionId, originRunId: originId, originSessionId: 's1', requireSessionResume: true })]);
       await pool.query(`UPDATE factory_attempts SET position=2,ordinal=2,output=output-'requestEpoch' WHERE id=$1`, [f.task.attemptId]);
       await pool.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,"runId","sessionId",reason)
         VALUES($1,$2,'execute',1,1,'waiting',$3,'s1','Owner answer required')`, [originAttemptId, f.task.id, originId]);
@@ -900,11 +909,14 @@ test("run completion enters review without the Coordinator; replays do not advan
         try {
           await tx.query('BEGIN');
           childId = await providerChild(tx, f.runId);
-          if (fault === 'scope') await tx.query(`UPDATE agent_runs SET "agentDefinition"=jsonb_set("agentDefinition",'{executionIdentity,workspaceId}',to_jsonb($2::text)) WHERE id=$1`, [childId, randomUUID()]);
+          if (fault === 'scope') {
+            await assert.rejects(tx.query(`UPDATE agent_runs SET "agentDefinition"=jsonb_set("agentDefinition",'{executionIdentity,workspaceId}',to_jsonb($2::text)) WHERE id=$1`, [childId, randomUUID()]),
+              { code: '23514', message: 'taskWorkspaceMismatch' }, 'a frozen identity cannot move the child into another workspace');
+          }
           if (fault === 'permissions') await tx.query(`UPDATE agent_runs SET "agentDefinition"="agentDefinition"-'readOnly' WHERE id=$1`, [childId]);
           if (fault === 'repository' || fault === 'monitor-placement') await tx.query('UPDATE agent_runs SET "deviceRepoId"=$2 WHERE id=$1', [childId, otherRepoId]);
           if (fault === 'epoch') await tx.query(`UPDATE factory_attempts SET output=jsonb_set(output,'{requestEpoch}',to_jsonb($2::text)) WHERE id=$1`, [f.task.attemptId, randomUUID()]);
-          await assert.rejects(adoptProviderContinuation(tx, 'owner', f.runId, childId, () => store), error => error instanceof FactoryError && ['factoryRunMismatch', 'factoryStale'].includes(error.code), fault);
+          if (fault !== 'scope') await assert.rejects(adoptProviderContinuation(tx, 'owner', f.runId, childId, () => store), error => error instanceof FactoryError && ['factoryRunMismatch', 'factoryStale'].includes(error.code), fault);
         } finally { await tx.query('ROLLBACK'); tx.release(); }
         assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE id=$1', [childId])).rowCount, 0, fault);
         const current = await store.read('owner', f.task.id);
@@ -1115,6 +1127,10 @@ test("run completion enters review without the Coordinator; replays do not advan
   } finally {
     if (flags.r === undefined) delete process.env.MIKKA_FACTORY_ROUTING_ENABLED; else process.env.MIKKA_FACTORY_ROUTING_ENABLED = flags.r;
     if (flags.l === undefined) delete process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED; else process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = flags.l;
+    if (authorityWorkspaces.length) {
+      await workspacePool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=ANY($1::uuid[])', [authorityWorkspaces]);
+      await workspacePool.query('DELETE FROM mikka_workspaces WHERE id=ANY($1::uuid[])', [authorityWorkspaces]);
+    }
     await dropTestDatabase(admin, database, pool);
     await admin.end();
   }

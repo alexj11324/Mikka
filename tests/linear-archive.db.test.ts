@@ -22,7 +22,7 @@ test('personal scope archives the frozen old Linear issue while ordinary sync re
   url.pathname = '/' + database
   for (const key of ['E2E_DATABASE_URL', 'DATABASE_URL', 'MIKKA_DATABASE_URL']) process.env[key] = url.href
   process.env.BETTER_AUTH_SECRET = 'isolated-scope184-archive-auth-fixture'
-  process.env.BETTER_AUTH_URL = 'http://127.0.0.1:31844'
+  process.env.BETTER_AUTH_URL = 'https://scope184-archive.example.invalid'
   process.env.LINEAR_TOKEN_ENCRYPTION_KEY = '1'.repeat(64)
   delete process.env.NEXT_PUBLIC_POSTHOG_KEY
   const migrated = await promisify(execFile)(process.execPath, ['scripts/migrate.mjs'], { env: { ...process.env, MIGRATE: '1', VERCEL_ENV: '' }, maxBuffer: 4 << 20 })
@@ -32,6 +32,7 @@ test('personal scope archives the frozen old Linear issue while ordinary sync re
   console.log(`Retained Linear archive database ${database}`)
 
   const external = new Map<string, { id: string; archivedAt: string | null; team: { id: string } }>()
+  const remoteIds = new Map<string, string>()
   let archiveRequests = 0, stateReads = 0, dropResponse = false
   const receiver = createServer(async (request, response) => {
     assert.equal(request.method, 'POST')
@@ -71,38 +72,52 @@ test('personal scope archives the frozen old Linear issue while ordinary sync re
   const [{ createAppIssueFromLinear }, { seal }, { actAs }, actions, { collectIssueEffects }, { processLinearIssueOutbox }, { issueForUser }, { readRun }, { db }, { linearTeamSyncs }, { eq }] = await Promise.all([
     import('../lib/linear-sync/issue-sync'), import('../lib/linear-sync/crypto'), import('../lib/acting-user'), import('../app/actions/issues'), import('../lib/issue-effects'), import('../lib/linear-sync/worker'), import('../lib/issue-access'), import('../lib/agent-runs'), import('../lib/db'), import('../lib/db/schema'), import('drizzle-orm'),
   ])
+  const { createRequestScope, runRequestScope } = await import('../apps/api/src/context')
   const owner = 'archive-owner-' + randomUUID(), member = 'archive-member-' + randomUUID()
   const workspace = randomUUID(), teamId = randomUUID(), syncId = randomUUID(), agentId = randomUUID()
+  // Select the seeded Team; acting identity and session trust remain unchanged.
+  const actInWorkspace: typeof actAs = (user, work, actor) => runRequestScope(
+    createRequestScope(new Request('http://localhost/actions/issues', { headers: { 'x-mikka-workspace-id': workspace } })),
+    () => actAs(user, work, actor),
+  )
   for (const id of [owner, member]) await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,\'Fixture\',$2,true,now(),now())', [id, id + '@example.invalid'])
   await pool.query('insert into issue_prefixes("userId",prefix) values($1,\'ALEX\')', [owner])
   await pool.query('insert into mikka_workspaces(id,"userId",name) values($1,$2,\'Archive fixture\')', [workspace, owner])
   for (const id of [owner, member]) await pool.query('insert into mikka_workspace_members("workspaceId","userId",name,email,role,status) values($1,$2,\'Fixture\',$3,\'member\',\'active\')', [workspace, id, id + '@example.invalid'])
   await pool.query('insert into mikka_teams(id,"workspaceId","userId",name,identifier) values($1,$2,$3,\'Archive fixture\',\'MIK\')', [teamId, workspace, owner])
-  await pool.query('insert into linear_team_syncs(id,"ownerId","linearTeamId","linearTeamKey","linearTeamName") values($1,$2,$3,\'MIK\',\'Archive fixture\')', [syncId, owner, teamId])
+  await pool.query('insert into linear_team_syncs(id,"ownerId","linearTeamId","linearTeamKey","linearTeamName","workspaceId") values($1,$2,$3,\'MIK\',\'Archive fixture\',$4)', [syncId, owner, teamId, workspace])
   await pool.query('insert into linear_connections("userId","linearUserId","organizationId","organizationName","accessToken","refreshToken","expiresAt") values($1,\'fixture-user\',\'fixture-org\',\'Fixture\',$2,$3,now()+interval \'1 day\')', [owner, seal('synthetic-linear-archive-token'), seal('synthetic-unused-refresh')])
   await pool.query('insert into agents(id,"userId",harness,name) values($1,$2,\'codex\',\'Archive fixture\')', [agentId, member])
   const [team] = await db.select().from(linearTeamSyncs).where(eq(linearTeamSyncs.id, syncId))
   async function seed() {
-    const id = randomUUID()
-    const remote = { id, identifier: 'MIK-184', title: 'Archive fixture', description: '', dueDate: null, priority: 0, url: 'https://example.invalid/fixture', updatedAt: new Date().toISOString(), state: null, team: { id: teamId, key: 'MIK', name: 'Fixture' }, assignee: null, labels: [] }
-    assert.ok(await createAppIssueFromLinear(team, remote))
+    const remoteId = randomUUID()
+    const remote = { id: remoteId, identifier: 'MIK-184', title: 'Archive fixture', description: '', dueDate: null, priority: 0, url: 'https://example.invalid/fixture', updatedAt: new Date().toISOString(), state: null, team: { id: teamId, key: 'MIK', name: 'Fixture' }, assignee: null, labels: [] }
+    const imported = await createAppIssueFromLinear(team, remote)
+    assert.ok(imported)
+    const id = imported.id
+    assert.notEqual(id, remoteId, 'the local task has its own stable identity')
     await pool.query('insert into mikka_team_issues("issueId","teamId","workspaceId","userId") values($1,$2,$3,$4)', [id, teamId, workspace, owner])
     await pool.query('insert into linear_sync_outbox(id,"issueId","scopeVersion") values($1,$2,1) on conflict do nothing', [randomUUID(), id])
-    external.set(id, { id, archivedAt: null, team: { id: teamId } })
+    external.set(remoteId, { id: remoteId, archivedAt: null, team: { id: teamId } })
+    remoteIds.set(id, remoteId)
     return id
   }
   async function retire(id: string, confirmed = false) {
     const effects: import('../lib/issue-effects').IssueEffect[] = []
-    const before = (await pool.query('select content,revision from issues where id=$1', [id])).rows[0]
-    const preview = confirmed ? await actAs(owner, () => actions.previewIssuePersonalScope(id)) : null
+    const before = (await pool.query('select * from issues where id=$1', [id])).rows[0]
+    const original = await (await import('../lib/task-identifier-server')).issueView(before)
+    const preview = confirmed ? await actInWorkspace(owner, () => actions.previewIssuePersonalScope(id)) : null
     if (confirmed) assert.ok(preview && 'preview' in preview && preview.preview)
-    const result = await collectIssueEffects(effects, () => actAs(owner, () => confirmed && preview && 'preview' in preview && preview.preview
+    const result = await collectIssueEffects(effects, () => actInWorkspace(owner, () => confirmed && preview && 'preview' in preview && preview.preview
       ? actions.confirmIssuePersonalScope({ id, revision: before.revision, confirmation: preview.preview.confirmation })
       : actions.setIssueScope({ id, revision: before.revision, scope: 'personal' })))
     assert.ok('issue' in result && result.issue)
-    assert.equal(result.issue.scope, 'personal')
+    assert.equal(result.issue.scope, before.scope, 'the compatibility label does not transfer a task')
+    assert.equal(result.issue.workspaceId, workspace)
+    assert.equal(result.issue.linearSyncPolicy, 'disabled')
     assert.equal(result.issue.scopeSetBy, 'user')
-    assert.equal(result.issue.identifier, `ALEX-${readIssueMetadata(before.content).number}`)
+    assert.equal(result.issue.identifier, original.identifier, 'disabling Linear preserves the existing Mikka identifier')
+    assert.equal(readIssueMetadata(result.issue.content).number, readIssueMetadata(before.content).number)
     assert.deepEqual(effects, [{ kind: 'sync', issueId: id }])
     return result.issue
   }
@@ -111,16 +126,19 @@ test('personal scope archives the frozen old Linear issue while ordinary sync re
   await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status) values($1,$2,$3,$4,\'queued\')', [runId, member, issue, agentId])
   assert.ok(await issueForUser(member, issue))
   assert.ok(await readRun(member, runId))
-  assert.deepEqual(await actAs(member, () => actions.setIssueScope({ id: issue, revision: 1, scope: 'personal' })), { error: 'issueScopeOwnerOnly' })
-  assert.deepEqual(await actAs(owner, () => actions.setIssueScope({ id: issue, revision: 99, scope: 'personal' })), { error: 'issueStale' })
+  assert.deepEqual(await actInWorkspace(member, () => actions.setIssueScope({ id: issue, revision: 1, scope: 'personal' })), { error: 'issueScopeOwnerOnly' })
+  assert.deepEqual(await actInWorkspace(owner, () => actions.setIssueScope({ id: issue, revision: 99, scope: 'personal' })), { error: 'issueStale' })
   await retire(issue)
-  assert.equal(await issueForUser(member, issue), null)
+  assert.equal((await issueForUser(member, issue))?.workspaceId, workspace, 'disabling Linear preserves task tenancy and current collaborators')
+  assert.ok(await readRun(member, runId))
+  assert.equal((await pool.query('select status from agent_runs where id=$1', [runId])).rows[0].status, 'queued')
+  await pool.query("UPDATE mikka_workspace_members SET status='removed' WHERE \"workspaceId\"=$1 AND \"userId\"=$2", [workspace, member])
+  assert.equal(await issueForUser(member, issue), null, 'authoritative membership revocation still denies the task')
   assert.equal(await readRun(member, runId), null)
-  assert.equal((await pool.query('select status from agent_runs where id=$1', [runId])).rows[0].status, 'cancelled')
   assert.equal((await pool.query('select count(*)::int n from linear_issue_links where "issueId"=$1', [issue])).rows[0].n, 0)
   const job = (await pool.query('select * from linear_sync_outbox where "issueId"=$1 and operation=\'archive\'', [issue])).rows[0]
   assert.equal(job.archiveTarget.targetVerified, true)
-  assert.equal(job.archiveTarget.linearIssueId, issue)
+  assert.equal(job.archiveTarget.linearIssueId, remoteIds.get(issue))
   await assert.rejects(pool.query('update linear_sync_outbox set "archiveTarget"=$2 where id=$1', [job.id, { ...job.archiveTarget, linearIssueId: randomUUID() }]), { code: '23514' })
   const oldClaim = await pool.query('update linear_sync_outbox set status=\'processing\',"claimToken"=$2,attempts=attempts+1 where id=$1', [job.id, randomUUID()])
   assert.equal(oldClaim.rowCount, 0, 'old sync workers cannot claim or consume the new archive request')
@@ -130,13 +148,13 @@ test('personal scope archives the frozen old Linear issue while ordinary sync re
   const unknown = (await pool.query('select * from linear_sync_outbox where id=$1', [job.id])).rows[0]
   assert.equal(unknown.status, 'queued')
   assert.ok(unknown.lastError)
-  assert.equal((await pool.query('select "archivedAt" from linear_issue_detachments where "linearIssueId"=$1', [issue])).rows[0].archivedAt, null)
+  assert.equal((await pool.query('select "archivedAt" from linear_issue_detachments where "linearIssueId"=$1', [remoteIds.get(issue)])).rows[0].archivedAt, null)
   await pool.query('update linear_sync_outbox set "availableAt"=now() where id=$1', [job.id])
   await processLinearIssueOutbox(issue)
   assert.equal(archiveRequests, 1, 'retry reads the applied archive instead of mutating again')
   assert.equal((await pool.query('select status from linear_sync_outbox where id=$1', [job.id])).rows[0].status, 'done')
-  assert.ok((await pool.query('select "archivedAt" from linear_issue_detachments where "linearIssueId"=$1', [issue])).rows[0].archivedAt)
-  assert.equal(await createAppIssueFromLinear(team, { id: issue, identifier: 'MIK-184', title: 'Delayed webhook', description: '', dueDate: null, priority: 0, url: 'https://example.invalid/fixture', updatedAt: new Date().toISOString(), state: null, team: { id: teamId, key: 'MIK', name: 'Fixture' }, assignee: null, labels: [] }), null)
+  assert.ok((await pool.query('select "archivedAt" from linear_issue_detachments where "linearIssueId"=$1', [remoteIds.get(issue)])).rows[0].archivedAt)
+  assert.equal(await createAppIssueFromLinear(team, { id: remoteIds.get(issue)!, identifier: 'MIK-184', title: 'Delayed webhook', description: '', dueDate: null, priority: 0, url: 'https://example.invalid/fixture', updatedAt: new Date().toISOString(), state: null, team: { id: teamId, key: 'MIK', name: 'Fixture' }, assignee: null, labels: [] }), null)
 
   const denied = await seed()
   await retire(denied, true)
@@ -149,14 +167,19 @@ test('personal scope archives the frozen old Linear issue while ordinary sync re
   // Same unresolved state as the browser acceptance: no verified link, an
   // inactive sync and a committed reservation whose response was lost.
   await pool.query('update linear_connections set "revokedAt"=null where "userId"=$1', [owner])
-  const created = await collectIssueEffects([], () => actAs(owner, () => actions.saveIssue({ title: 'Unknown Linear publication', content: { type: 'doc', content: [] }, status: 'todo', priority: 'normal' })))
-  assert.ok('issue' in created && created.issue)
-  const { promoteExistingIssueForUser } = await import('../lib/team-issue-promotion')
-  const promoted = await promoteExistingIssueForUser(owner, { requestId: randomUUID(), issueId: created.issue.id, revision: created.issue.revision, teamId, expectedTeamId: null })
-  assert.ok('issue' in promoted && promoted.issue)
-  const pendingIssue = created.issue.id, pendingSync = randomUUID(), pendingPublication = randomUUID(), pendingRemote = randomUUID()
-  await pool.query('insert into linear_team_syncs(id,"ownerId","linearTeamId","linearTeamKey","linearTeamName",active) values($1,$2,$3,\'OLD\',\'Unresolved fixture\',false)', [pendingSync, owner, randomUUID()])
-  await pool.query('insert into linear_issue_publications(id,"issueId","ownerId","teamSyncId","scopeVersion","linearIssueId","writePending") values($1,$2,$3,$4,$5,$6,true)', [pendingPublication, pendingIssue, owner, pendingSync, promoted.issue.scopeVersion, pendingRemote])
+  // Seed a reservation that began under an explicit provider policy. A new
+  // ordinary Team task has publication disabled and cannot mint this receipt.
+  const pendingIssue = randomUUID(), pendingSync = randomUUID(), pendingPublication = randomUUID(), pendingRemote = randomUUID()
+  const { allocateIssueNumbers } = await import('../lib/issue-numbering')
+  const { issues } = await import('../lib/db/schema')
+  await db.transaction(async tx => {
+    const number = await allocateIssueNumbers(tx, owner)
+    await tx.insert(issues).values({ id: pendingIssue, userId: owner, workspaceId: workspace, ownershipState: 'bound', scope: 'workspace', scopeSetBy: 'user', linearSyncPolicy: 'explicit', linearSyncBlocked: false, title: 'Unknown Linear publication', content: { type: 'doc', content: [], attrs: { mikka: { number } } }, status: 'todo', priority: 'normal' })
+  })
+  await pool.query('update linear_team_syncs set active=false where id=$1', [syncId])
+  await pool.query('insert into linear_team_syncs(id,"ownerId","linearTeamId","linearTeamKey","linearTeamName",active,"workspaceId") values($1,$2,$3,\'OLD\',\'Unresolved fixture\',true,$4)', [pendingSync, owner, randomUUID(), workspace])
+  await pool.query('insert into linear_issue_publications(id,"issueId","ownerId","teamSyncId","scopeVersion","linearIssueId","writePending") values($1,$2,$3,$4,1,$5,true)', [pendingPublication, pendingIssue, owner, pendingSync, pendingRemote])
+  await pool.query('update linear_team_syncs set active=false where id=$1', [pendingSync])
   await retire(pendingIssue)
   const beforeUnknownReads = stateReads, beforeUnknownWrites = archiveRequests
   await processLinearIssueOutbox(pendingIssue)

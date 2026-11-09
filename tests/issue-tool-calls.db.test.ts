@@ -28,7 +28,9 @@ async function settledValues<T extends readonly unknown[]>(operations: T) {
 
 test('actual issue actions commit one issue per tool call, roll back partial writes, and preserve history on replay', { skip: !enabled }, async () => {
   const { pool } = await import('../lib/db')
-  const { createIssue, updateIssue } = await import('../lib/mcp/actions')
+  const { createIssue: createIssueAction, updateIssue: updateIssueAction } = await import('../lib/mcp/actions')
+  const { actAs } = await import('../lib/acting-user')
+  const { tokenWorkspace } = await import('../lib/tokens/principal')
   const { createCoordinatorRegistry } = await import('../workflows/coordinator/tools')
   const { systemActor, agentActor } = await import('../lib/activity-actor')
   const { withActivitySession } = await import('./fixtures/activity-runtime.mjs')
@@ -39,13 +41,22 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
   const workspace = randomUUID(), team = randomUUID()
   const legacyAgent = randomUUID()
   const actor = systemActor('coordinator')
+  const personalWorkspaces = new Map<string, string>()
+  // Direct MCP calls carry the workspace resolved by their verified credential.
+  // The registered Coordinator tools resolve theirs from the host Bot instead.
+  const inWorkspace = <T>(userId: string, workspaceId: string, work: () => Promise<T>) => actAs({ id: userId, [tokenWorkspace]: workspaceId }, work)
+  const createIssue = (...args: Parameters<typeof createIssueAction>) => inWorkspace(args[0], personalWorkspaces.get(args[0])!, () => createIssueAction(...args))
+  const updateIssue = (...args: Parameters<typeof updateIssueAction>) => inWorkspace(args[0], personalWorkspaces.get(args[0])!, () => updateIssueAction(...args))
   const input = { title: 'Repair the login flow', labels: ['regression'], assigneeUserId: owner }
   const count = async (table: string) => Number((await pool.query(`select count(*) from ${table} where "userId"=$1`, [owner])).rows[0].count)
   try {
     assert.equal((await pool.query('show server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
     for (const id of [owner, stranger]) await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,false,now(),now())', [id, `${id}@example.invalid`])
     // The owner's Coordinator is an ordinary bot row; its tools write as that bot.
-    const coordinator = (await seedCoordinator(owner)).botId
+    const ownCoordinator = await seedCoordinator(owner)
+    const coordinator = ownCoordinator.botId
+    personalWorkspaces.set(owner, ownCoordinator.workspaceId)
+    personalWorkspaces.set(stranger, (await seedCoordinator(stranger)).workspaceId)
     await pool.query('insert into agents (id,"userId",harness,name) values ($1,$2,\'codex\',\'Legacy fixture\')', [legacyAgent, stranger])
     overrideDeploymentSwitch('issueTools', false)
     const legacy = await createIssue(stranger, { title: 'Existing MCP path without rollout', assigneeAgentId: null }, actor)
@@ -74,6 +85,7 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     assert.equal(await count('issues'), 1)
     assert.equal(await count('issue_tool_calls'), 1)
     const id = results[0].id as string
+    assert.deepEqual((await pool.query('SELECT "workspaceId","ownershipState",scope FROM issues WHERE id=$1', [id])).rows, [{ workspaceId: ownCoordinator.workspaceId, ownershipState: 'bound', scope: 'personal' }])
     assert.deepEqual(await updateIssue(owner, { issueId: id, assigneeAgentId: legacyAgent }, agentActor(legacyAgent)), { error: 'agentNotFound' }, 'legacy MCP cannot assign another owner’s agent')
     const versions = await count('issue_versions')
     overrideDeploymentSwitch('issueTools', false)
@@ -95,33 +107,55 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     assert.equal(await count('issue_tool_calls'), 1)
 
     await pool.query('INSERT INTO issue_members ("issueId","userId","memberId") VALUES ($1,$2,$3)', [id, owner, stranger])
-    const unchanged = async (operation: () => Promise<unknown>) => {
-      const before = (await pool.query('SELECT title,content,revision FROM issues WHERE id=$1', [id])).rows[0]
-      const versions = await count('issue_versions'), receipts = await count('issue_tool_calls')
-      assert.deepEqual(await operation(), { error: 'memberNotJoined' })
-      assert.deepEqual((await pool.query('SELECT title,content,revision FROM issues WHERE id=$1', [id])).rows[0], before)
-      assert.equal(await count('issue_versions'), versions)
-      assert.equal(await count('issue_tool_calls'), receipts)
+    const unchanged = async (operation: () => Promise<unknown>, issueId = id, error = 'memberNotJoined') => {
+      const snapshot = async () => ({
+        issue: (await pool.query('SELECT title,content,revision,"workspaceId","ownershipState" FROM issues WHERE id=$1', [issueId])).rows[0],
+        issues: await count('issues'),
+        versions: (await pool.query('SELECT id FROM issue_versions WHERE "userId"=ANY($1::text[]) ORDER BY id', [[owner, stranger]])).rows,
+        receipts: (await pool.query('SELECT "userId","toolCallId","issueId",result,effects FROM issue_tool_calls WHERE "userId"=ANY($1::text[]) ORDER BY "userId","toolCallId"', [[owner, stranger]])).rows,
+        counters: (await pool.query('SELECT id,"lastIssueNumber" FROM "user" WHERE id=ANY($1::text[]) ORDER BY id', [[owner, stranger]])).rows,
+      })
+      const before = await snapshot()
+      assert.deepEqual(await operation(), { error })
+      assert.deepEqual(await snapshot(), before, 'denied mutations cannot write an issue, history, replay receipt or number reservation')
     }
     await unchanged(() => updateIssue(owner, { issueId: id, title: 'Must not partially write', assigneeUserId: stranger }, actor, `personal-invite-${randomUUID()}`))
-    await pool.query('INSERT INTO mikka_workspaces (id,"userId",name) VALUES ($1,$2,$3)', [workspace, owner, 'Issue tools fixture'])
+    await pool.query('INSERT INTO mikka_workspaces (id,"userId",name,slug,kind) VALUES ($1,$2,$3,$4,\'team\')', [workspace, owner, 'Issue tools fixture', `issue-tools-${workspace}`])
     await pool.query('INSERT INTO mikka_teams (id,"workspaceId","userId",name,identifier) VALUES ($1,$2,$3,$4,$5)', [team, workspace, owner, 'Issue tools', `IT${randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase()}`])
-    await pool.query('INSERT INTO mikka_team_issues ("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,$4)', [id, team, workspace, owner])
     for (const member of [owner, stranger]) await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$3,$4,$5,$6)', [workspace, member, 'Fixture member', `${member}@example.invalid`, 'member', 'active'])
-    // Sharing is a separate explicit human choice, never a Coordinator or SQL
-    // scope inference. Preserve the real receipt/permission transaction here.
+    // A Team attachment never transfers the existing personal task. Create a
+    // separate shared task in its own tenant before testing grouping/assignment.
     const revision = (await pool.query('SELECT revision FROM issues WHERE id=$1', [id])).rows[0].revision
-    const promotion = await withActivitySession(owner, () => promoteIssueToTeam({ requestId: randomUUID(), issueId: id, revision, teamId: team, expectedTeamId: team }))
+    const crossRequestId = randomUUID()
+    const beforeTransfer = (await pool.query('SELECT * FROM issues WHERE id=$1', [id])).rows[0]
+    const crossWorkspace = await withActivitySession(owner, () => promoteIssueToTeam({ requestId: crossRequestId, issueId: id, revision, teamId: team, expectedTeamId: null }), ownCoordinator.workspaceId)
+    assert.deepEqual(crossWorkspace, { error: 'teamIssueAccessDenied', requestId: crossRequestId })
+    assert.deepEqual((await pool.query('SELECT * FROM issues WHERE id=$1', [id])).rows[0], beforeTransfer)
+    assert.equal((await pool.query('SELECT count(*)::int n FROM team_issue_promotions WHERE "requestId"=$1', [crossRequestId])).rows[0].n, 0)
+    assert.equal((await pool.query('SELECT count(*)::int n FROM mikka_team_issues WHERE "issueId"=$1', [id])).rows[0].n, 0)
+    const shared = await inWorkspace(owner, workspace, () => createIssueAction(owner, { title: 'Shared assignment fixture' }, actor, `shared-${randomUUID()}`))
+    assert.ok('id' in shared, JSON.stringify(shared))
+    const sharedId = shared.id
+    assert.deepEqual((await pool.query('SELECT "workspaceId","ownershipState",scope FROM issues WHERE id=$1', [sharedId])).rows, [{ workspaceId: workspace, ownershipState: 'bound', scope: 'workspace' }])
+    await pool.query('INSERT INTO issue_members ("issueId","userId","memberId") VALUES ($1,$2,$3)', [sharedId, owner, stranger])
+    const sharedRevision = (await pool.query('SELECT revision FROM issues WHERE id=$1', [sharedId])).rows[0].revision
+    const promotion = await withActivitySession(owner, () => promoteIssueToTeam({ requestId: randomUUID(), issueId: sharedId, revision: sharedRevision, teamId: team, expectedTeamId: null }), workspace)
     assert.ok('issue' in promotion && promotion.issue, JSON.stringify(promotion))
     assert.equal(promotion.issue.scope, 'workspace')
     assert.equal(promotion.issue.linearSyncBlocked, true)
-    const [humanVersion] = (await pool.query('SELECT id,actor_type,actor_id FROM issue_versions WHERE "issueId"=$1 AND revision=$2', [id, promotion.issue.revision])).rows
+    assert.equal(promotion.issue.workspaceId, workspace)
+    const [humanVersion] = (await pool.query('SELECT id,actor_type,actor_id FROM issue_versions WHERE "issueId"=$1 AND revision=$2', [sharedId, promotion.issue.revision])).rows
     assert.deepEqual({ type: humanVersion.actor_type, id: humanVersion.actor_id }, { type: 'user', id: owner })
-    assert.ok('id' in await updateIssue(owner, { issueId: id, assigneeUserId: stranger }, actor, `active-assignee-${randomUUID()}`), 'currently accessible human members remain assignable')
+    const updateShared = (changes: Omit<Parameters<typeof updateIssueAction>[1], 'issueId'>, toolCallId: string, userId = owner) => inWorkspace(userId, workspace, () => updateIssueAction(userId, { issueId: sharedId, ...changes }, actor, toolCallId))
+    assert.ok('id' in await updateShared({ assigneeUserId: stranger }, `active-assignee-${randomUUID()}`), 'currently accessible human members remain assignable')
+    await unchanged(() => updateIssue(owner, { issueId: sharedId, title: 'Wrong personal credential' }, actor, `wrong-personal-${randomUUID()}`), sharedId, 'issueNotFound')
+    await unchanged(() => inWorkspace(owner, workspace, () => updateIssueAction(owner, { issueId: id, title: 'Wrong shared credential' }, actor, `wrong-shared-${randomUUID()}`)), id, 'issueNotFound')
+    await unchanged(() => inWorkspace(owner, workspace, () => createIssueAction(owner, { ...input }, actor, callId)), id, 'issueNotFound')
     await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [workspace, stranger])
-    await unchanged(() => updateIssue(owner, { issueId: id, assigneeUserId: stranger }, actor, `suspended-assignee-${randomUUID()}`))
+    await unchanged(() => updateShared({ assigneeUserId: stranger }, `suspended-assignee-${randomUUID()}`), sharedId)
+    await unchanged(() => updateShared({ title: 'Suspended member must not write' }, `suspended-actor-${randomUUID()}`, stranger), sharedId, 'workspaceAccessDenied')
     await pool.query('DELETE FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2', [workspace, stranger])
-    await unchanged(() => updateIssue(owner, { issueId: id, assigneeUserId: stranger }, actor, `removed-assignee-${randomUUID()}`))
+    await unchanged(() => updateShared({ assigneeUserId: stranger }, `removed-assignee-${randomUUID()}`), sharedId)
     for (let retry = 0; retry < 2; retry++) {
       const before = (await pool.query('SELECT title,content,revision FROM issues WHERE id=$1', [id])).rows[0]
       assert.deepEqual(await updateIssue(owner, { issueId: id, title: 'No partial edit', assigneeUserId: stranger }, actor), { error: 'issueToolsDisabled' })
@@ -192,6 +226,8 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     assert.equal(new Set(executions.map(r=>'runId' in r?r.runId:null)).size,1)
     const frozen=(await pool.query('SELECT * FROM agent_runs WHERE "issueId"=$1',[first.binding.issueId])).rows
     assert.equal(frozen.length,1);assert.equal(frozen[0].agentDefinition.kind,'worker')
+    assert.equal(frozen[0].workspaceId,ownCoordinator.workspaceId)
+    assert.equal((await pool.query('SELECT "workspaceId" FROM factory_tasks WHERE id=$1',[first.binding.taskId])).rows[0].workspaceId,ownCoordinator.workspaceId)
     assert.equal(frozen[0].agentDefinition.harness,'codex');assert.equal(frozen[0].status,'queued')
     assert.equal(frozen[0].agentDefinition.repositoryAdmission.remoteKey,repository.key)
     assert.deepEqual((await pool.query('SELECT "runId","remoteKey","pushApproved" FROM run_publications WHERE "issueId"=$1',[first.binding.issueId])).rows,[{runId:frozen[0].id,remoteKey:repository.key,pushApproved:true}])

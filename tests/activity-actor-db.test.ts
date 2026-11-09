@@ -51,6 +51,7 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
   const tables = await import('../lib/db/schema')
   const { users, issues, issueVersions, issueMembers, linearTeamSyncs, linearIssueLinks, issueDocuments, telegramLinks, telegramConversations } = tables
   const { actAs } = await import('../lib/acting-user')
+  const { createRequestScope, runRequestScope } = await import('../apps/api/src/context')
   const { agentActor } = await import('../lib/activity-actor')
   const { saveIssue, listIssueVersions, setIssueScope, promoteIssueToTeam, previewIssuePersonalScope, confirmIssuePersonalScope } = await import('../app/actions/issues')
   const { updateIssueMetadata } = await import('../app/actions/issue-metadata')
@@ -65,7 +66,12 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
   const threadId = `actor-test-${randomUUID()}`
   const telegramId = randomUUID()
   const workspace = randomUUID(), workspaceTeam = randomUUID()
-  const input = { title: 'Actor regression', content: { type: 'doc', content: [{ type: 'paragraph' }] }, status: 'todo' as const, priority: 'normal' as const }
+  // Select the seeded Team without adding a human session or changing the actor.
+  const actInWorkspace: typeof actAs = (user, work, actor) => runRequestScope(
+    createRequestScope(new Request('http://localhost/actions/issues', { headers: { 'x-mikka-workspace-id': workspace } })),
+    () => actAs(user, work, actor),
+  )
+  const input = { workspaceId: workspace, title: 'Actor regression', content: { type: 'doc', content: [{ type: 'paragraph' }] }, status: 'todo' as const, priority: 'normal' as const }
   const expectIssue = (result: unknown): typeof issues.$inferSelect => {
     assert.ok(result && typeof result === 'object' && 'issue' in result, JSON.stringify(result))
     return (result as { issue: typeof issues.$inferSelect }).issue
@@ -90,8 +96,8 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
     // Keep the legacy invitation still required by nonowner write actions.
     const share = async (id: string) => {
       const revision = (await latest(id)).revision
-      assert.deepEqual(await actAs(owner, () => setIssueScope({ id, revision, scope: 'workspace' })), { error: 'issueScopeTeamRequired' })
-      const result = await withActivitySession(owner, () => promoteIssueToTeam({ requestId: randomUUID(), issueId: id, revision, teamId: workspaceTeam, expectedTeamId: null }))
+      assert.deepEqual(await actInWorkspace(owner, () => setIssueScope({ id, revision, scope: 'workspace' })), { error: 'issueScopeTeamRequired' })
+      const result = await withActivitySession(owner, () => promoteIssueToTeam({ requestId: randomUUID(), issueId: id, revision, teamId: workspaceTeam, expectedTeamId: null }), workspace)
       const promoted = expectIssue(result)
       assert.equal(promoted.scope, 'workspace')
       assert.equal(promoted.linearSyncBlocked, true)
@@ -102,51 +108,54 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
       await db.insert(issueMembers).values({ issueId: id, userId: owner, memberId: member })
       return (await latest(id)).revision
     }
-    const root = expectIssue(await actAs(owner, () => saveIssue({ ...input, actorType: 'agent', actorId: 'spoof' } as Parameters<typeof saveIssue>[0])))
+    const root = expectIssue(await actInWorkspace(owner, () => saveIssue({ ...input, actorType: 'agent', actorId: 'spoof' } as Parameters<typeof saveIssue>[0])))
     await history(root.id, 'user', owner)
     const shared = await share(root.id)
-    let saved = expectIssue(await actAs(member, () => saveIssue({ ...input, id: root.id, revision: shared, title: 'Member edit' })))
+    let saved = expectIssue(await actInWorkspace(member, () => saveIssue({ ...input, id: root.id, revision: shared, title: 'Member edit' })))
     await history(root.id, 'user', member)
-    saved = expectIssue(await actAs(member, () => updateIssueMetadata({ id: root.id, revision: saved.revision, patch: { estimate: 3 } })))
+    saved = expectIssue(await actInWorkspace(member, () => updateIssueMetadata({ id: root.id, revision: saved.revision, patch: { estimate: 3 } })))
     await history(root.id, 'user', member)
-    const second = expectIssue(await actAs(owner, () => saveIssue({ ...input, title: 'Relation target' })))
+    const second = expectIssue(await actInWorkspace(owner, () => saveIssue({ ...input, title: 'Relation target' })))
     await share(second.id)
-    saved = expectIssue(await actAs(member, () => updateIssueRelation({ id: root.id, revision: saved.revision, kind: 'related', targetId: second.id })))
+    saved = expectIssue(await actInWorkspace(member, () => updateIssueRelation({ id: root.id, revision: saved.revision, kind: 'related', targetId: second.id })))
     await history(root.id, 'user', member)
     await history(second.id, 'user', member)
-    const child = expectIssue(await actAs(member, () => createLinkedIssue({ id: root.id, revision: saved.revision, kind: 'child', title: 'Child' })))
+    const child = expectIssue(await actInWorkspace(member, () => createLinkedIssue({ id: root.id, revision: saved.revision, kind: 'child', title: 'Child' })))
     await history(child.id, 'user', member)
-    const duplicate = expectIssue(await actAs(owner, () => createLinkedIssue({ id: root.id, revision: saved.revision, kind: 'duplicate', includeSubissues: true })))
+    const duplicate = expectIssue(await actInWorkspace(owner, () => createLinkedIssue({ id: root.id, revision: saved.revision, kind: 'duplicate', includeSubissues: true })))
     await history(duplicate.id, 'user', owner)
     const copies = await db.select().from(issues).where(eq(issues.userId, owner))
     const copiedChild = copies.find(row => (row.content.attrs?.mikka as { parentId?: string } | undefined)?.parentId === duplicate.id)
     assert.ok(copiedChild, 'duplicate path actually copied its child')
     await history(copiedChild.id, 'user', owner)
-    saved = expectIssue(await actAs(owner, () => updateIssueMetadata({ id: root.id, revision: saved.revision, patch: { assignee: { kind: 'member', id: member } } })))
+    saved = expectIssue(await actInWorkspace(owner, () => updateIssueMetadata({ id: root.id, revision: saved.revision, patch: { assignee: { kind: 'member', id: member } } })))
     // R-60: crafted action input cannot assign a hidden execution identity.
-    const rejectedAssignee = await actAs(owner, () => updateIssueMetadata({
+    const rejectedAssignee = await actInWorkspace(owner, () => updateIssueMetadata({
       id: root.id, revision: saved.revision, patch: { assignee: { kind: 'agent', id: randomUUID() } },
     } as unknown as Parameters<typeof updateIssueMetadata>[0]))
     assert.deepEqual(rejectedAssignee, { error: 'issueMetadataInvalid' })
     assert.equal((await latest(root.id)).revision, saved.revision)
     assert.equal(readIssueMetadata((await latest(root.id)).content).assignee?.id, member)
-    assert.deepEqual(await actAs(owner, () => removeMember(root.id, member)), { success: true })
+    assert.deepEqual(await actInWorkspace(owner, () => removeMember(root.id, member)), { success: true })
     await history(root.id, 'user', owner)
-    // Root was shared above; flipping it back to personal is the scope writer
-    // under test here, and it immediately gates the former viewer's history read.
-    const personalPreview = await actAs(owner, () => previewIssuePersonalScope(root.id))
+    // Scope changes only the Linear publication policy. History remains in the
+    // frozen workspace until authoritative workspace membership is revoked.
+    const personalPreview = await actInWorkspace(owner, () => previewIssuePersonalScope(root.id))
     assert.ok('preview' in personalPreview && personalPreview.preview)
-    saved = expectIssue(await actAs(owner, async () => confirmIssuePersonalScope({ id: root.id, revision: (await latest(root.id)).revision, confirmation: personalPreview.preview.confirmation })))
+    saved = expectIssue(await actInWorkspace(owner, async () => confirmIssuePersonalScope({ id: root.id, revision: (await latest(root.id)).revision, confirmation: personalPreview.preview.confirmation })))
     await history(root.id, 'user', owner)
+    assert.equal(saved.workspaceId, workspace)
+    assert.ok((await actInWorkspace(member, () => listIssueVersions(root.id))).length > 0)
+    await pool.query(`UPDATE mikka_workspace_members SET status='removed' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspace, member])
     await assert.rejects(actAs(member, () => listIssueVersions(root.id)), { code: 'issueNotFound' })
     const agentId = randomUUID()
-    const agent = expectIssue(await actAs(owner, () => saveIssue({ ...input, actorType: 'user', actorId: 'spoof' } as Parameters<typeof saveIssue>[0]), agentActor(agentId)))
+    const agent = expectIssue(await actInWorkspace(owner, () => saveIssue({ ...input, actorType: 'user', actorId: 'spoof' } as Parameters<typeof saveIssue>[0]), agentActor(agentId)))
     await history(agent.id, 'agent', agentId)
-    expectIssue(await actAs(owner, () => saveIssue({ ...input, id: agent.id, revision: 1, title: 'Agent edit' }), agentActor(agentId)))
+    expectIssue(await actInWorkspace(owner, () => saveIssue({ ...input, id: agent.id, revision: 1, title: 'Agent edit' }), agentActor(agentId)))
     await history(agent.id, 'agent', agentId)
     // Linear import/update exercise the actual local synchronization writers;
     // no remote API, token or customer data is involved.
-    const [team] = await db.insert(linearTeamSyncs).values({ id: randomUUID(), ownerId: owner, linearTeamId: randomUUID(), linearTeamKey: 'ACT', linearTeamName: 'Actor fixture' }).returning()
+    const [team] = await db.insert(linearTeamSyncs).values({ id: randomUUID(), ownerId: owner, workspaceId: workspace, linearTeamId: randomUUID(), linearTeamKey: 'ACT', linearTeamName: 'Actor fixture' }).returning()
     const remote = { id: randomUUID(), identifier: 'ACT-1', title: 'Remote fixture', description: '', dueDate: null, priority: 0, url: 'https://example.invalid/fixture', updatedAt: new Date().toISOString(), state: null, team: { id: team.linearTeamId, key: 'ACT', name: team.linearTeamName }, assignee: null, labels: [] }
     const imported = await createAppIssueFromLinear(team, remote)
     assert.ok(imported)
@@ -163,18 +172,18 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
     assert.ok(conversation.issueId)
     await history(conversation.issueId, 'user', owner)
     assert.equal(posts.length, 1)
-    const visible = await actAs(owner, () => listIssueVersions(root.id))
+    const visible = await actInWorkspace(owner, () => listIssueVersions(root.id))
     assert.equal(visible.find(row => row.actorId === member)?.actor?.name, 'Member')
     await assert.rejects(actAs(stranger, () => listIssueVersions(root.id)), { code: 'issueNotFound' })
     // Historical NULL identity stays NULL, not attributed to today's viewer.
-    const legacy = expectIssue(await actAs(owner, () => saveIssue(input)))
+    const legacy = expectIssue(await actInWorkspace(owner, () => saveIssue(input)))
     await db.update(issueVersions).set({ actorType: null, actorId: null }).where(eq(issueVersions.issueId, legacy.id))
-    assert.equal((await actAs(owner, () => listIssueVersions(legacy.id)))[0].actor, null)
+    assert.equal((await actInWorkspace(owner, () => listIssueVersions(legacy.id)))[0].actor, null)
     // Old execution-assignee metadata is retained when an unrelated property changes.
     const legacyAssignee = { kind: 'agent' as const, id: randomUUID(), name: 'Historical executor', image: null }
     const legacyContent = withIssueMetadata(legacy.content, { ...readIssueMetadata(legacy.content), assignee: legacyAssignee })
     await db.update(issues).set({ content: legacyContent }).where(eq(issues.id, legacy.id))
-    const editedLegacy = expectIssue(await actAs(owner, () => updateIssueMetadata({ id: legacy.id, revision: legacy.revision, patch: { estimate: 8 } })))
+    const editedLegacy = expectIssue(await actInWorkspace(owner, () => updateIssueMetadata({ id: legacy.id, revision: legacy.revision, patch: { estimate: 8 } })))
     assert.deepEqual(readIssueMetadata(editedLegacy.content).assignee, legacyAssignee)
   } finally {
     const owned = await db.select({ id: issues.id }).from(issues).where(eq(issues.userId, owner))

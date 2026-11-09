@@ -1,3 +1,4 @@
+import { factoryWorkspaceResponse } from '@/lib/factory/workspace-http';
 import { actAs } from "@/lib/acting-user";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/api-auth";
@@ -8,7 +9,7 @@ export const dynamic = "force-dynamic";
 /** POST /api/factory/tasks/route: non-LLM routing (BE-10b); contract in lib/factory/route-http.ts. */
 export async function POST(request: Request) {
   const session = await auth.api.getSession({ headers: request.headers });
-  const scoped = async () => {
+  const scoped = () => factoryWorkspaceResponse(session?.user?.id, async () => {
     const result = await handleFactoryRoute(
       async () => {
         const { factoryRuntimeForBot } = await import("@/lib/factory/runtime");
@@ -24,6 +25,6 @@ export async function POST(request: Request) {
       },
     );
     return NextResponse.json(result.body, { status: result.status, headers: { "Cache-Control": "private, no-store" } });
-  };
+  });
   return session?.user ? actAs(session.user, scoped) : scoped();
 }

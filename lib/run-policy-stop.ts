@@ -22,8 +22,9 @@ export function runPolicyStopSQL(scope: RunPolicyStopScope): SQL {
   switch (scope.kind) {
     case 'worker': where = sql`r."userId"=${scope.ownerId} AND r."agentId"=${scope.agentId}`; break
     case 'agent': where = sql`r."userId"=${scope.ownerId} AND r."botId" IS NOT DISTINCT FROM ${scope.botId}::uuid`; break
-    case 'workspace': where = sql`(r."botId" IN (SELECT id FROM bots WHERE "workspaceId"=${scope.workspaceId}::uuid)
-      OR r.cli_policy_hierarchy->>'workspaceId'=${scope.workspaceId})
+    case 'workspace': where = sql`(r."workspaceId"=${scope.workspaceId}::uuid
+      OR (r."workspaceId" IS NULL AND (r."botId" IN (SELECT id FROM bots WHERE "workspaceId"=${scope.workspaceId}::uuid)
+        OR r.cli_policy_hierarchy->>'workspaceId'=${scope.workspaceId})))
       ${scope.ownerId ? sql`AND r."userId"=${scope.ownerId}` : sql``}`; break
     case 'team': case 'project': where = sql`r.cli_policy_hierarchy->>${scope.kind === 'team' ? 'teamId' : 'projectId'}=${scope.scopeId}
       ${scope.ownerId ? sql`AND r."userId"=${scope.ownerId}` : sql``}`; break
