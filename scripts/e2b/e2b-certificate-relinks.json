@@ -4286,5 +4286,23 @@
     "templates": [
       "desktop"
     ]
+  },
+  {
+    "path": "/etc/ssl/certs/1560546e.0",
+    "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+    "target": "e2b-ca.pem",
+    "providerRoot": true,
+    "templates": [
+      "claude"
+    ]
+  },
+  {
+    "path": "/etc/ssl/certs/e2b-ca.pem",
+    "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+    "target": "/usr/local/share/ca-certificates/e2b-ca.crt",
+    "providerRoot": true,
+    "templates": [
+      "claude"
+    ]
   }
 ]
