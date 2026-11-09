@@ -62,7 +62,7 @@ test('a committed acceptance resolves the current producer row while its stored 
   tasks = [accepted()]
   const html = render()
   expectRowGroup(html, 'resolved')
-  assert.match(html, /Resolved<\/span>/)
+  assert.match(html, />Done<\/span>/) // the run-result word (glossary: Run result), not the R-52 group
   assert.equal(threads[0].outcome, 'needs_input')
   assert.equal(threads[0].status, 'succeeded')
 })
