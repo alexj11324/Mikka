@@ -175,6 +175,15 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
   const unrelated=await capture(unrelatedRun,png,'image')
   const activityPath=`/api/factory/tasks/${taskId}/activity`,mediaPath=(id:string)=>`/api/factory/tasks/${taskId}/media/${id}`
   const anonymous=(path:string,token?:string)=>fetch(`${origin}/mikka${path}`,{redirect:'error',signal:AbortSignal.timeout(30_000),headers:token?{authorization:`Bearer ${token}`}:{}})
+  const denied=async(response:Response,status:401|404,path:string)=>{
+    if(path===activityPath){
+      const body=await response.json()
+      assert.deepEqual(Object.keys(body),['error'],'activity denial contains no task data')
+      assert.equal(body.error,status===401?'authRequired':'factoryNotFound')
+    }
+    assert.equal(response.status,status,`${path.endsWith('/activity')?'activity':path.endsWith('/poster')?'poster':'media'} denial status`)
+    assert.equal(response.headers.get('cache-control'),'private, no-store')
+  }
 
   await t.test('real route manifest returns all 24 attempts and every submitted version with base-path-safe links',async()=>{
     const response=await accounts!.owner.request(activityPath)
@@ -199,8 +208,8 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
   })
   await t.test('anonymous and another authenticated workspace member cannot read task-owned originals or render covers',async()=>{
     for(const path of [activityPath,mediaPath(movie),`${mediaPath(movie)}/poster`]){
-      assert.equal((await anonymous(path)).status,401)
-      assert.equal((await accounts!.peer.request(path)).status,404)
+      await denied(await anonymous(path),401,path)
+      await denied(await accounts!.peer.request(path),404,path)
     }
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM run_capture_posters')).rows[0].n,0)
   })
@@ -239,8 +248,8 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
     const allowed=await token(workspace.id),outside=await token(outsideWorkspace.id)
     for(const path of [activityPath,mediaPath(movie),`${mediaPath(movie)}/poster`]){
       const ok=await anonymous(path,allowed);assert.equal(ok.status,200);await ok.body?.cancel()
-      assert.equal((await anonymous(path,outside)).status,404)
-      assert.equal((await anonymous(path,`mkp_${'a'.repeat(43)}`)).status,401)
+      await denied(await anonymous(path,outside),404,path)
+      await denied(await anonymous(path,`mkp_${'a'.repeat(43)}`),401,path)
     }
     const outsideBot=await seedBot(pool,outsideWorkspace.id,owner)
     const mixedRuns:string[]=[],mixedCaptures:string[]=[]
@@ -375,10 +384,10 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
   })
   await t.test('live task-detail boundaries revoke even already-cached cover access after source or membership changes',async()=>{
     await pool.query('UPDATE coordinator_events SET "userId"=$2 WHERE id=$1',[source,peer])
-    for(const path of [activityPath,mediaPath(movie),`${mediaPath(movie)}/poster`])assert.equal((await accounts!.owner.request(path)).status,404)
+    for(const path of [activityPath,mediaPath(movie),`${mediaPath(movie)}/poster`])await denied(await accounts!.owner.request(path),404,path)
     await pool.query('UPDATE coordinator_events SET "userId"=$2 WHERE id=$1',[source,owner])
     await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2',[workspace.id,owner])
-    for(const path of [activityPath,mediaPath(movie),`${mediaPath(movie)}/poster`])assert.equal((await accounts!.owner.request(path)).status,404)
+    for(const path of [activityPath,mediaPath(movie),`${mediaPath(movie)}/poster`])await denied(await accounts!.owner.request(path),404,path)
     await pool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2',[workspace.id,owner])
     assert.equal((await accounts!.owner.request(activityPath)).status,200)
   })
