@@ -11,7 +11,7 @@ import { stripTypeScriptTypes } from 'node:module'
 export const LIVE_SOURCE_CONTENT_BASE = '0e4118020311ae8f9083d0d21cfb990be0282f25'
 // Exact explicitly supplied application source; no deployment claim. The future workflow/control remain disabled
 // until the separately verified production application SHA is supplied.
-export const LIVE_SOURCE_COMMIT = '0e4118020311ae8f9083d0d21cfb990be0282f25'
+export const LIVE_SOURCE_COMMIT = '5ba1f9e2359ce714d83cd16fc040f2567c40a6d0'
 export const LIVE_SOURCE_HASHES = Object.freeze({
   'lib/live/channel.ts': '7d1d16e02ea9ca8256812312eafc96c0591cc1df1c6a463e0216e420d37b8ede',
   'lib/live/tab-share.ts': '38d80a253b7c3f1522cd79366fc03b46a4065ccf7b52a10df5199092664b7b9f',

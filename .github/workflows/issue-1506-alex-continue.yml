@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   baseline:
-    if: false && github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/acceptance/issues-1504-1506'
+    if: github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/acceptance/issues-1504-1506'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:
@@ -44,7 +44,7 @@ jobs:
         if: steps.control.outputs.enabled == 'true'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: 0e4118020311ae8f9083d0d21cfb990be0282f25
+          ref: 5ba1f9e2359ce714d83cd16fc040f2567c40a6d0
           path: live-source
           persist-credentials: false
       - name: Verify the continuation and actual-source live harness offline
