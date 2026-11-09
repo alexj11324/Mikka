@@ -45,3 +45,40 @@ jobs:
           path: ${{ runner.temp }}/preview-shutdown-native-1782/
           if-no-files-found: error
           retention-days: 14
+  native_drain:
+    name: Native daemon original eight, exact lost-reply RED and complete twelve GREEN
+    if: github.repository == 'alexj11324/Mikka' && github.actor == 'alexj11324' && github.ref == 'refs/heads/ops/1782-preview-shutdown-20261109' && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Verify exact failure classification and native Node filter semantics
+        timeout-minutes: 1
+        run: python3 scripts/ops/native-drain-proof-1782.test.py
+      - name: Install the existing frozen workspace dependencies without lifecycle scripts
+        timeout-minutes: 6
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Require native original eight, exact old timeout and all twelve candidate cases
+        timeout-minutes: 4
+        run: python3 scripts/ops/native-drain-proof-1782.py run
+      - name: Retain exact native drain source and closed failure evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: native-drain-proof-1782-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/native-drain-proof-1782/
+          if-no-files-found: error
+          retention-days: 14
