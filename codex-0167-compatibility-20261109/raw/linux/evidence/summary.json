@@ -1,0 +1,20 @@
+{
+  "red": {
+    "passed": 29,
+    "failed": 3,
+    "skipped": 0
+  },
+  "green": {
+    "passed": 60,
+    "failed": 0,
+    "skipped": 0
+  },
+  "typecheck": 0,
+  "sourceCheck": {
+    "exitCode": 1,
+    "localPostgresRefused": true,
+    "dbProvisioned": false
+  },
+  "lint": 0,
+  "postValidationChanges": "hosted test explanatory comment and ADR subscription wording only; no rerun of runtime tests"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "filtered-frozen-install",
+  "command": "corepack",
+  "args": [
+    "pnpm",
+    "--filter",
+    "@mikka/daemon...",
+    "install",
+    "--frozen-lockfile",
+    "--ignore-scripts"
+  ],
+  "cwd": "/vercel/sandbox/issue1505-codex0167/repo",
+  "began": "2026-11-09T20:57:05.797Z",
+  "ended": "2026-11-09T20:57:45.643Z",
+  "ms": 39846.41672,
+  "code": 0,
+  "signal": null
+}

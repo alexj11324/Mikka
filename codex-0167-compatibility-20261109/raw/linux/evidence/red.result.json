@@ -1,0 +1,40 @@
+{
+  "source": "12458fe22e1217f644e8b28f82ab856211e73b72",
+  "sourcePath": "packages/daemon/src/anonymous-codex-spare.ts",
+  "sourceSha256": "b7fac1b0fadd1374377ba27b9fe62d60a70a746218fe029237acf870855d6035",
+  "args": [
+    "node_modules/vitest/vitest.mjs",
+    "run",
+    "test/anonymous-codex-spare.test.ts",
+    "test/anonymous-codex-hosted.test.ts",
+    "--reporter=json",
+    "--outputFile=/vercel/sandbox/issue1505-codex0167/evidence/red.report.json"
+  ],
+  "started": "2026-11-09T20:58:29.309Z",
+  "ended": "2026-11-09T20:58:33.316Z",
+  "exitCode": 1,
+  "signal": null,
+  "numPassedTests": 29,
+  "numFailedTests": 3,
+  "numPendingTests": 0,
+  "failures": [
+    {
+      "name": "records the adopted 0.167.0 child's asynchronous login in the late startup scope without repeating initialize",
+      "failureMessages": [
+        "Error: Anonymous Codex version unavailable\n    at prepare (/vercel/sandbox/issue1505-codex0167/repo/packages/daemon/src/anonymous-codex-spare.ts:138:89)"
+      ]
+    },
+    {
+      "name": "sends only initialize before a repository exists, then adopts that exact 0.167.0 process once",
+      "failureMessages": [
+        "Error: Anonymous Codex version unavailable\n    at prepare (/vercel/sandbox/issue1505-codex0167/repo/packages/daemon/src/anonymous-codex-spare.ts:138:89)"
+      ]
+    },
+    {
+      "name": "retains the true earlier timing origin only for successful 0.167.0 adoption",
+      "failureMessages": [
+        "Error: Anonymous Codex version unavailable\n    at prepare (/vercel/sandbox/issue1505-codex0167/repo/packages/daemon/src/anonymous-codex-spare.ts:138:89)"
+      ]
+    }
+  ]
+}

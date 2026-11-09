@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "status": "reviewed_no_credential_candidates",
+  "filesReviewed": "all archived UTF-8 originals plus decoded original archive members",
+  "patterns": [
+    "privateKey",
+    "githubToken",
+    "providerKey",
+    "jwt",
+    "signedUrl",
+    "authValue",
+    "email"
+  ],
+  "unclassifiedCandidates": 0,
+  "productionCredentials": "none supplied to fixture VM according to environment/setup receipts",
+  "fixtureAuth": "synthetic only",
+  "nativeModelCalls": 0,
+  "signedDownloadUrls": 0,
+  "limits": "Pattern scanning is supporting evidence, not a proof that every arbitrary secret format can be detected."
+}

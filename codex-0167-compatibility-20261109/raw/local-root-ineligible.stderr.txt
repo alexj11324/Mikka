@@ -1,0 +1,144 @@
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 31 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  test/anonymous-codex-hosted.test.ts > adopts one initialized child, retains original login/thread/turn and its late MCP context (diagnostics=false)
+ FAIL  test/anonymous-codex-hosted.test.ts > adopts one initialized child, retains original login/thread/turn and its late MCP context (diagnostics=true)
+ FAIL  test/anonymous-codex-hosted.test.ts > adopts one initialized child, retains original login/thread/turn and its late MCP context (diagnostics=host)
+CodedError: subscription_hosted_runtime_unavailable (host_unsupported)
+ ❯ unavailable src/subscription-hosted-runner.ts:41:40
+     39| type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable…
+     40| const unavailable = (detail: Detail, cause?: unknown) => cause instanc…
+     41|   ? new Error(cause.code, { cause }) : new CodedError('subscription_ho…
+       |                                        ^
+     42|
+     43| const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { t…
+ ❯ createHostedBotRunner src/subscription-hosted-runner.ts:108:71
+ ❯ fixture test/anonymous-codex-hosted.test.ts:57:24
+ ❯ test/anonymous-codex-hosted.test.ts:67:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/31]⎯
+
+ FAIL  test/anonymous-codex-hosted.test.ts > records the adopted 0.166.0 child's asynchronous login in the late startup scope without repeating initialize
+ FAIL  test/anonymous-codex-hosted.test.ts > records the adopted 0.167.0 child's asynchronous login in the late startup scope without repeating initialize
+CodedError: subscription_hosted_runtime_unavailable (host_unsupported)
+ ❯ unavailable src/subscription-hosted-runner.ts:41:40
+     39| type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable…
+     40| const unavailable = (detail: Detail, cause?: unknown) => cause instanc…
+     41|   ? new Error(cause.code, { cause }) : new CodedError('subscription_ho…
+       |                                        ^
+     42|
+     43| const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { t…
+ ❯ createHostedBotRunner src/subscription-hosted-runner.ts:108:71
+ ❯ fixture test/anonymous-codex-hosted.test.ts:57:24
+ ❯ test/anonymous-codex-hosted.test.ts:95:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/31]⎯
+
+ FAIL  test/anonymous-codex-hosted.test.ts > drains an incompatible project before the original cold child receives any login
+CodedError: subscription_hosted_runtime_unavailable (host_unsupported)
+ ❯ unavailable src/subscription-hosted-runner.ts:41:40
+     39| type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable…
+     40| const unavailable = (detail: Detail, cause?: unknown) => cause instanc…
+     41|   ? new Error(cause.code, { cause }) : new CodedError('subscription_ho…
+       |                                        ^
+     42|
+     43| const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { t…
+ ❯ createHostedBotRunner src/subscription-hosted-runner.ts:108:71
+ ❯ fixture test/anonymous-codex-hosted.test.ts:57:24
+ ❯ test/anonymous-codex-hosted.test.ts:135:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/31]⎯
+
+ FAIL  test/anonymous-codex-hosted.test.ts > keeps a real login refusal on the adopted child as failure with no cold retry or task input
+CodedError: subscription_hosted_runtime_unavailable (host_unsupported)
+ ❯ unavailable src/subscription-hosted-runner.ts:41:40
+     39| type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable…
+     40| const unavailable = (detail: Detail, cause?: unknown) => cause instanc…
+     41|   ? new Error(cause.code, { cause }) : new CodedError('subscription_ho…
+       |                                        ^
+     42|
+     43| const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { t…
+ ❯ createHostedBotRunner src/subscription-hosted-runner.ts:108:71
+ ❯ fixture test/anonymous-codex-hosted.test.ts:57:24
+ ❯ test/anonymous-codex-hosted.test.ts:145:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/31]⎯
+
+ FAIL  test/anonymous-codex-hosted.test.ts > cancels before final options without delivering a login or waiting for a repository
+CodedError: subscription_hosted_runtime_unavailable (host_unsupported)
+ ❯ unavailable src/subscription-hosted-runner.ts:41:40
+     39| type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable…
+     40| const unavailable = (detail: Detail, cause?: unknown) => cause instanc…
+     41|   ? new Error(cause.code, { cause }) : new CodedError('subscription_ho…
+       |                                        ^
+     42|
+     43| const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { t…
+ ❯ createHostedBotRunner src/subscription-hosted-runner.ts:108:71
+ ❯ fixture test/anonymous-codex-hosted.test.ts:57:24
+ ❯ test/anonymous-codex-hosted.test.ts:153:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/31]⎯
+
+ FAIL  test/anonymous-codex-hosted.test.ts > drains late primary-config changes before a cold process receives login
+ FAIL  test/anonymous-codex-hosted.test.ts > drains late backlink changes before a cold process receives login
+CodedError: subscription_hosted_runtime_unavailable (host_unsupported)
+ ❯ unavailable src/subscription-hosted-runner.ts:41:40
+     39| type Detail = UserErrorDetail<'subscription_hosted_runtime_unavailable…
+     40| const unavailable = (detail: Detail, cause?: unknown) => cause instanc…
+     41|   ? new Error(cause.code, { cause }) : new CodedError('subscription_ho…
+       |                                        ^
+     42|
+     43| const directSpawnOnly: AgentSandbox = { kind: 'none', async wrap() { t…
+ ❯ createHostedBotRunner src/subscription-hosted-runner.ts:108:71
+ ❯ fixture test/anonymous-codex-hosted.test.ts:57:24
+ ❯ test/anonymous-codex-hosted.test.ts:162:13
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/31]⎯
+
+ FAIL  test/anonymous-codex-spare.test.ts > sends only initialize before a repository exists, then adopts that exact 0.166.0 process once
+ FAIL  test/anonymous-codex-spare.test.ts > sends only initialize before a repository exists, then adopts that exact 0.167.0 process once
+ FAIL  test/anonymous-codex-spare.test.ts > drains project mismatch before any login or task frame
+ FAIL  test/anonymous-codex-spare.test.ts > drains environment mismatch before any login or task frame
+ FAIL  test/anonymous-codex-spare.test.ts > drains identity mismatch before any login or task frame
+ FAIL  test/anonymous-codex-spare.test.ts > keeps revoked authority a failure, including while waiting for initialization
+ FAIL  test/anonymous-codex-spare.test.ts > retains the true earlier timing origin only for successful 0.166.0 adoption
+ FAIL  test/anonymous-codex-spare.test.ts > retains the true earlier timing origin only for successful 0.167.0 adoption
+ FAIL  test/anonymous-codex-spare.test.ts > reaps owned descendants on leader exit before waiting for inherited pipes to close
+ FAIL  test/anonymous-codex-spare.test.ts > does not publish bootstrap adoption timing after initialized candidate project rejection
+ FAIL  test/anonymous-codex-spare.test.ts > does not publish bootstrap adoption timing after initialized candidate environment rejection
+ FAIL  test/anonymous-codex-spare.test.ts > does not publish bootstrap adoption timing after initialized candidate identity rejection
+ FAIL  test/anonymous-codex-spare.test.ts > adopts a native collector with fresh trace context after bootstrap had no context
+ FAIL  test/anonymous-codex-spare.test.ts > drains the unbound native collector when fresh trace context is still absent
+ FAIL  test/anonymous-codex-spare.test.ts > retains the collector-free path when generation tracing is disabled
+ FAIL  test/anonymous-codex-spare.test.ts > cancels the unbound native collector and owned child without publishing
+ FAIL  test/anonymous-codex-spare.test.ts > revokes an adopted collector through the existing authority and drains it once
+Error: Anonymous Codex requires an unconfigured fresh home and parking directory
+ ❯ prepare src/anonymous-codex-spare.ts:93:73
+     91|   const abort = () => { void close().catch(() => undefined) }
+     92|   const prepare = async () => {
+     93|     if (!await codexAnonymousParkingEligible(parking, input.env)) thro…
+       |                                                                         ^
+     94|     lifetime.signal.throwIfAborted()
+     95|     const home = join(input.env.HOME, '.codex')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/31]⎯
+
+ FAIL  test/anonymous-codex-spare.test.ts > does not adopt unverified native protocol version 0.163.0
+ FAIL  test/anonymous-codex-spare.test.ts > does not adopt unverified native protocol version 0.166.1
+ FAIL  test/anonymous-codex-spare.test.ts > does not adopt unverified native protocol version 0.168.0
+ FAIL  test/anonymous-codex-spare.test.ts > does not adopt unverified native protocol version 0.167.0-alpha.1
+AssertionError: expected [Function] to throw error including 'version' but got 'Anonymous Codex requires an unconfigu…'
+
+Expected: "version"
+Received: "Anonymous Codex requires an unconfigured fresh home and parking directory"
+
+ ❯ test/anonymous-codex-spare.test.ts:95:78
+     93| })
+     94| it.each(['0.163.0', '0.166.1', '0.168.0', '0.167.0-alpha.1'])('does no…
+     95|   const f = fixture('normal', true, version); await expect(f.candidate…
+       |                                                                              ^
+     96|   await f.candidate.close(); expect(f.candidate.state).toBe('closed')
+     97|   expect(f.candidate.nativeExitObserved).toBe(true)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/31]⎯
+

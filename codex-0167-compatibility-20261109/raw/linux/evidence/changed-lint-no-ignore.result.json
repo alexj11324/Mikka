@@ -1,0 +1,17 @@
+{
+  "command": "corepack",
+  "args": [
+    "pnpm",
+    "exec",
+    "oxlint",
+    "--no-ignore",
+    "--deny-warnings",
+    "packages/daemon/src/anonymous-codex-spare.ts",
+    "packages/daemon/test/anonymous-codex-spare.test.ts",
+    "packages/daemon/test/anonymous-codex-hosted.test.ts"
+  ],
+  "started": "2026-11-09T21:10:47.470Z",
+  "ended": "2026-11-09T21:10:47.938Z",
+  "exitCode": 1,
+  "signal": null
+}

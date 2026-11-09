@@ -1,0 +1,69 @@
+{
+  "baseCommit": "12458fe22e1217f644e8b28f82ab856211e73b72",
+  "baseTree": "3f804659ce05591aefb6d080ea873ba88e32ad46",
+  "worktree": "/workspace/scratch/263e36984c81/h-codex-0167-1505",
+  "files": [
+    {
+      "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+      "bytes": 99013,
+      "sha256": "a3b8e3d15f0c4d5e3dd87a4f32e05154d50cabe003cb60ab5a6439f26c699ade",
+      "baseGitBlob": "f241e0ab27cc6443de15fb8bde794f376d5ef9ee",
+      "gitBlob": "ea4f398aabb120f760d133168ed4ed49ddd4b767"
+    },
+    {
+      "path": "packages/daemon/src/anonymous-codex-spare.ts",
+      "bytes": 12105,
+      "sha256": "f9c3e82ea67e6a57cf53ef1978c861a7d127cd039e79e2bd9a7da5fd81fcb3ea",
+      "baseGitBlob": "00f476c51799a68c4af5edc38d9a62c91aeea545",
+      "gitBlob": "92e737cc09ac29ac2f64363549a9723f35e7792f"
+    },
+    {
+      "path": "packages/daemon/test/anonymous-codex-hosted.test.ts",
+      "bytes": 13540,
+      "sha256": "b581c76457ddf2ac14833c4141496dbbb144dace5597b94d0c1d4e2a600239ad",
+      "baseGitBlob": "42cb76e8bcaa71490d3a8febb2f1af63342faa2c",
+      "gitBlob": "e2998a4ecf1eea10108202c2a94856518f7f5c1d"
+    },
+    {
+      "path": "packages/daemon/test/anonymous-codex-spare.test.ts",
+      "bytes": 15067,
+      "sha256": "4ff047f7ddfbca99d6ac0b4b5b4524e5b90df7b041e81855242d5cd7acaaed06",
+      "baseGitBlob": "6a2e49857783a337e6be23ee53680b66e4f8a0bd",
+      "gitBlob": "2e3d76a20c67848fb68cfeca8712754f5fc35ca6"
+    }
+  ],
+  "patch": {
+    "path": "patch.diff",
+    "bytes": 13839,
+    "sha256": "21b94cd8e04974b959e33d00c9c78e36d4f413011e2bd068a3cc81787abbaf47"
+  },
+  "commitCreated": false,
+  "remoteRefWritten": false,
+  "productionModified": false,
+  "vm": {
+    "id": "sbx_IPHpRiaKnbhf6KVqsukrUZYTnRbb",
+    "status": "stopped",
+    "stoppedAt": "2026-11-09T21:12:31.817Z",
+    "durationMs": 950267
+  },
+  "validation": {
+    "red": {
+      "passed": 29,
+      "failed": 3,
+      "skipped": 0
+    },
+    "green": {
+      "passed": 60,
+      "failed": 0,
+      "skipped": 0
+    },
+    "typecheck": 0,
+    "sourceCheck": {
+      "exitCode": 1,
+      "localPostgresRefused": true,
+      "dbProvisioned": false
+    },
+    "lint": 0,
+    "postValidationChanges": "hosted test explanatory comment and ADR subscription wording only; no rerun of runtime tests"
+  }
+}

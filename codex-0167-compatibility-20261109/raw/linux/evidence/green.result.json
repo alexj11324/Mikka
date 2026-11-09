@@ -1,0 +1,22 @@
+{
+  "base": "12458fe22e1217f644e8b28f82ab856211e73b72",
+  "sourcePath": "packages/daemon/src/anonymous-codex-spare.ts",
+  "sourceSha256": "f9c3e82ea67e6a57cf53ef1978c861a7d127cd039e79e2bd9a7da5fd81fcb3ea",
+  "args": [
+    "node_modules/vitest/vitest.mjs",
+    "run",
+    "test/anonymous-codex-spare.test.ts",
+    "test/anonymous-codex-hosted.test.ts",
+    "test/codex-startup-config.test.ts",
+    "--reporter=json",
+    "--outputFile=/vercel/sandbox/issue1505-codex0167/evidence/green.report.json"
+  ],
+  "started": "2026-11-09T20:59:22.860Z",
+  "ended": "2026-11-09T20:59:27.451Z",
+  "exitCode": 0,
+  "signal": null,
+  "numPassedTests": 60,
+  "numFailedTests": 0,
+  "numPendingTests": 0,
+  "failures": []
+}

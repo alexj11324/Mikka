@@ -1,0 +1,42 @@
+
+ RUN  v5.0.5 /workspace/scratch/263e36984c81/h-codex-0167-1505/packages/daemon
+
+ ❯ test/anonymous-codex-spare.test.ts (22 tests | 21 failed) 75ms
+   × sends only initialize before a repository exists, then adopts that exact 0.166.0 process once 20ms
+   × sends only initialize before a repository exists, then adopts that exact 0.167.0 process once 2ms
+   × drains project mismatch before any login or task frame 2ms
+   × drains environment mismatch before any login or task frame 2ms
+   × drains identity mismatch before any login or task frame 1ms
+   × keeps revoked authority a failure, including while waiting for initialization 1ms
+   × does not adopt unverified native protocol version 0.163.0 12ms
+   × does not adopt unverified native protocol version 0.166.1 2ms
+   × does not adopt unverified native protocol version 0.168.0 2ms
+   × does not adopt unverified native protocol version 0.167.0-alpha.1 2ms
+   × retains the true earlier timing origin only for successful 0.166.0 adoption 1ms
+   × retains the true earlier timing origin only for successful 0.167.0 adoption 1ms
+   × reaps owned descendants on leader exit before waiting for inherited pipes to close 1ms
+   × does not publish bootstrap adoption timing after initialized candidate project rejection 1ms
+   × does not publish bootstrap adoption timing after initialized candidate environment rejection 1ms
+   × does not publish bootstrap adoption timing after initialized candidate identity rejection 1ms
+   × adopts a native collector with fresh trace context after bootstrap had no context 3ms
+   × drains the unbound native collector when fresh trace context is still absent 5ms
+   × retains the collector-free path when generation tracing is disabled 1ms
+   × cancels the unbound native collector and owned child without publishing 3ms
+   × revokes an adopted collector through the existing authority and drains it once 5ms
+ ❯ test/anonymous-codex-hosted.test.ts (10 tests | 10 failed) 391ms
+   × adopts one initialized child, retains original login/thread/turn and its late MCP context (diagnostics=false) 61ms
+   × adopts one initialized child, retains original login/thread/turn and its late MCP context (diagnostics=true) 40ms
+   × adopts one initialized child, retains original login/thread/turn and its late MCP context (diagnostics=host) 33ms
+   × records the adopted 0.166.0 child's asynchronous login in the late startup scope without repeating initialize 34ms
+   × records the adopted 0.167.0 child's asynchronous login in the late startup scope without repeating initialize 44ms
+   × drains an incompatible project before the original cold child receives any login 37ms
+   × keeps a real login refusal on the adopted child as failure with no cold retry or task input 38ms
+   × cancels before final options without delivering a login or waiting for a repository 34ms
+   × drains late primary-config changes before a cold process receives login 35ms
+   × drains late backlink changes before a cold process receives login 32ms
+
+ Test Files  2 failed (2)
+      Tests  31 failed | 1 passed (32)
+   Start at  15:54:02
+   Duration  2.09s (transform 46%, import 39%, tests 15%)
+

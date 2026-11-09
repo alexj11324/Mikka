@@ -1,0 +1,181 @@
+{
+  "sourceCommits": {
+    "v166": "6ff1e1ca3b30fc8b914720681fcf5fe62e95f856",
+    "v167": "086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a"
+  },
+  "sources": [
+    {
+      "key": "v166_init",
+      "path": "/workspace/scratch/263e36984c81/codex-protocol-0167-review-1505/upstream/v166_init.txt",
+      "url": "https://raw.githubusercontent.com/openai/codex/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/app-server/src/request_processors/initialize_processor.rs",
+      "chars": 10021,
+      "trailingNewlines": 1,
+      "bytes": 10021,
+      "sha256": "8350444d71a45b45bd53274910dfe247674041d655f8b4dc76a328253adc2f66",
+      "gitBlobOid": "6259cf7488f705a6d0d24350ed696ab485a27b78"
+    },
+    {
+      "key": "v167_init",
+      "path": "/workspace/scratch/263e36984c81/codex-protocol-0167-review-1505/upstream/v167_init.txt",
+      "url": "https://raw.githubusercontent.com/openai/codex/086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a/codex-rs/app-server/src/request_processors/initialize_processor.rs",
+      "chars": 10224,
+      "trailingNewlines": 1,
+      "bytes": 10224,
+      "sha256": "3074d588d6dd18067b4b0b380e4903f1176b4bc3f5d1c650d87694b437b541fd",
+      "gitBlobOid": "f6b282e7e107b4bfed3604b22cb2b372885c212b"
+    },
+    {
+      "key": "v166_v1",
+      "path": "/workspace/scratch/263e36984c81/codex-protocol-0167-review-1505/upstream/v166_v1.txt",
+      "url": "https://raw.githubusercontent.com/openai/codex/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/app-server-protocol/src/protocol/v1.rs",
+      "chars": 8916,
+      "trailingNewlines": 1,
+      "bytes": 8916,
+      "sha256": "e0642bd1bc7dbe5e24d508420471d705d5688efe8df3a8b40e3af22be55d7754",
+      "gitBlobOid": "7d05fb1bd4d62bc79954bdd929a7f9f69936ccf3"
+    },
+    {
+      "key": "v1_167",
+      "path": "/workspace/scratch/263e36984c81/codex-protocol-0167-review-1505/upstream/v1_167.txt",
+      "url": "https://raw.githubusercontent.com/openai/codex/086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a/codex-rs/app-server-protocol/src/protocol/v1.rs",
+      "chars": 9203,
+      "trailingNewlines": 1,
+      "bytes": 9203,
+      "sha256": "6e767472256756ec8262097f32a2b88330a469de4a4879255835c9f99f178139",
+      "gitBlobOid": "cdf6ca20a48c9c23447cf17311f0762c846d9281"
+    },
+    {
+      "key": "v166_thread",
+      "path": "/workspace/scratch/263e36984c81/codex-protocol-0167-review-1505/upstream/v166_thread.txt",
+      "url": "https://raw.githubusercontent.com/openai/codex/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/app-server-protocol/src/protocol/v2/thread.rs",
+      "chars": 84643,
+      "trailingNewlines": 1,
+      "bytes": 84643,
+      "sha256": "edc34b2b8cdbeefd48756f7f540b96ab7c4dc4580b9a17c0b8e3aa4f686ae7ce",
+      "gitBlobOid": "1279bb8661c1051f227a250964673445b5337a12"
+    },
+    {
+      "key": "v167_thread",
+      "path": "/workspace/scratch/263e36984c81/codex-protocol-0167-review-1505/upstream/v167_thread.txt",
+      "url": "https://raw.githubusercontent.com/openai/codex/086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a/codex-rs/app-server-protocol/src/protocol/v2/thread.rs",
+      "chars": 86287,
+      "trailingNewlines": 1,
+      "bytes": 86287,
+      "sha256": "f5a99bd250950ddaa3a07a8cae84e434c77d645650c11ec037e140945fa2c500",
+      "gitBlobOid": "aba591b9502774ba018aac144fe94c8041a6ba18"
+    },
+    {
+      "key": "threadProcessor166",
+      "path": "/workspace/scratch/263e36984c81/codex-protocol-0167-review-1505/upstream/threadProcessor166.txt",
+      "url": "https://raw.githubusercontent.com/openai/codex/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/app-server/src/request_processors/thread_processor.rs",
+      "chars": 274696,
+      "trailingNewlines": 1,
+      "bytes": 274696,
+      "sha256": "c03d31e07c8831c7cf153e6429f4ab908d1035b21ba593e701d5a3767121b5a8",
+      "gitBlobOid": "1ef252dcbf47f9346a7539c39a7ca9a3807a290f"
+    },
+    {
+      "key": "threadProcessor167",
+      "path": "/workspace/scratch/263e36984c81/codex-protocol-0167-review-1505/upstream/threadProcessor167.txt",
+      "url": "https://raw.githubusercontent.com/openai/codex/086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a/codex-rs/app-server/src/request_processors/thread_processor.rs",
+      "chars": 275105,
+      "trailingNewlines": 1,
+      "bytes": 275105,
+      "sha256": "a1e9934e1c7f3084f12b52e5cdbd56419b9a0261b9668dd8469078d8c3822ce2",
+      "gitBlobOid": "36d9f435ae87a9d9b566f86da5e8d38cea5dc220"
+    },
+    {
+      "key": "configManager166",
+      "path": "/workspace/scratch/263e36984c81/codex-protocol-0167-review-1505/upstream/configManager166.txt",
+      "url": "https://raw.githubusercontent.com/openai/codex/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/app-server/src/config_manager.rs",
+      "chars": 33732,
+      "trailingNewlines": 1,
+      "bytes": 33732,
+      "sha256": "64568b07bc395b5fcd8f37a3dc062c81a3fd1657a0f9dad6a59db163af5e0a5e",
+      "gitBlobOid": "461920b677da7a40530837e354d89190ad18550f"
+    },
+    {
+      "key": "configManager167",
+      "path": "/workspace/scratch/263e36984c81/codex-protocol-0167-review-1505/upstream/configManager167.txt",
+      "url": "https://raw.githubusercontent.com/openai/codex/086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a/codex-rs/app-server/src/config_manager.rs",
+      "chars": 33732,
+      "trailingNewlines": 1,
+      "bytes": 33732,
+      "sha256": "64568b07bc395b5fcd8f37a3dc062c81a3fd1657a0f9dad6a59db163af5e0a5e",
+      "gitBlobOid": "461920b677da7a40530837e354d89190ad18550f"
+    },
+    {
+      "key": "userAgent166",
+      "path": "/workspace/scratch/263e36984c81/codex-protocol-0167-review-1505/upstream/userAgent166.txt",
+      "url": "https://raw.githubusercontent.com/openai/codex/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/login/src/auth/default_client.rs",
+      "chars": 18113,
+      "trailingNewlines": 1,
+      "bytes": 18113,
+      "sha256": "acfc0eba844d9ba02c9830c66a19ab920b51d8f3a516b95ccf5066f94ef53fcd",
+      "gitBlobOid": "7d524a0e7c9780011e8c64a5af53f53a39e1fe29"
+    },
+    {
+      "key": "userAgent167",
+      "path": "/workspace/scratch/263e36984c81/codex-protocol-0167-review-1505/upstream/userAgent167.txt",
+      "url": "https://raw.githubusercontent.com/openai/codex/086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a/codex-rs/login/src/auth/default_client.rs",
+      "chars": 18113,
+      "trailingNewlines": 1,
+      "bytes": 18113,
+      "sha256": "acfc0eba844d9ba02c9830c66a19ab920b51d8f3a516b95ccf5066f94ef53fcd",
+      "gitBlobOid": "7d524a0e7c9780011e8c64a5af53f53a39e1fe29"
+    },
+    {
+      "key": "common167",
+      "path": "/workspace/scratch/263e36984c81/codex-protocol-0167-review-1505/upstream/common167.txt",
+      "url": "https://raw.githubusercontent.com/openai/codex/086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a/codex-rs/app-server-protocol/src/protocol/common.rs",
+      "chars": 176834,
+      "trailingNewlines": 1,
+      "bytes": 176834,
+      "sha256": "4c449f1da399848c714c780fc1304ba566d0089aeaef8c33c3a9c7eb986e4272",
+      "gitBlobOid": "bf2ebde276a5b66f57b537d518d0233a3a2f5ac4"
+    },
+    {
+      "key": "cargo",
+      "path": "/workspace/scratch/263e36984c81/codex-protocol-0167-review-1505/upstream/cargo.txt",
+      "url": "https://raw.githubusercontent.com/openai/codex/086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a/codex-rs/Cargo.toml",
+      "chars": 22041,
+      "trailingNewlines": 1,
+      "bytes": 22041,
+      "sha256": "7b603471d6b730d14a4e7da819cc7276bb1fc0e59bc8fe0438259cbe87814782",
+      "gitBlobOid": "01075846114cf4579cab2219d5a367be90dc7d1e"
+    },
+    {
+      "key": "common166",
+      "path": "/workspace/scratch/263e36984c81/codex-protocol-0167-review-1505/upstream/common166.txt",
+      "url": "https://raw.githubusercontent.com/openai/codex/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/app-server-protocol/src/protocol/common.rs",
+      "bytes": 176292,
+      "sha256": "b7f0a90dcc822962e59890b252a43142a113cb1355f333d8c6b0f704b97f89f7",
+      "gitBlobOid": "2936c01855e463275d8306df8583ec0303e5c854"
+    },
+    {
+      "key": "loginCargo167",
+      "path": "/workspace/scratch/263e36984c81/codex-protocol-0167-review-1505/upstream/loginCargo167.txt",
+      "url": "https://raw.githubusercontent.com/openai/codex/086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a/codex-rs/login/Cargo.toml",
+      "bytes": 2017,
+      "sha256": "568bbd4f57b96e4d54339b35c9b2dcb628ccb98f2a15d67d654c53a8a9784302",
+      "gitBlobOid": "d9ade5cf5c38cacc339e5025c75ec32ed9e21a23"
+    },
+    {
+      "key": "cargo166",
+      "path": "/workspace/scratch/263e36984c81/codex-protocol-0167-review-1505/upstream/cargo166.txt",
+      "url": "https://raw.githubusercontent.com/openai/codex/6ff1e1ca3b30fc8b914720681fcf5fe62e95f856/codex-rs/Cargo.toml",
+      "bytes": 21926,
+      "sha256": "4f9c16fb73cc8487e40dcbfca545f69e7595e6806e1a59b81ea8045b15364e49",
+      "gitBlobOid": "85cd80b7c4536c5510acc373f8d41d730817a2fb"
+    }
+  ],
+  "independentApiBlobChecks": {
+    "v167_init": "f6b282e7e107b4bfed3604b22cb2b372885c212b",
+    "v1_167": "cdf6ca20a48c9c23447cf17311f0762c846d9281",
+    "v167_thread": "aba591b9502774ba018aac144fe94c8041a6ba18",
+    "threadProcessor167": "36d9f435ae87a9d9b566f86da5e8d38cea5dc220",
+    "configManager167": "461920b677da7a40530837e354d89190ad18550f",
+    "userAgent167": "7d524a0e7c9780011e8c64a5af53f53a39e1fe29",
+    "common167": "bf2ebde276a5b66f57b537d518d0233a3a2f5ac4"
+  }
+}

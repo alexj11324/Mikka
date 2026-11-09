@@ -1,0 +1,4 @@
+
+> @mikka/daemon@0.0.1 typecheck /vercel/sandbox/issue1505-codex0167/repo/packages/daemon
+> tsgo --noEmit -p tsconfig.json
+

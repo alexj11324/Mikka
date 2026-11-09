@@ -1,0 +1,12 @@
+{
+  "name": "source-check",
+  "command": "corepack",
+  "args": [
+    "pnpm",
+    "check"
+  ],
+  "started": "2026-11-09T21:01:19.181Z",
+  "ended": "2026-11-09T21:02:02.174Z",
+  "exitCode": 1,
+  "signal": null
+}

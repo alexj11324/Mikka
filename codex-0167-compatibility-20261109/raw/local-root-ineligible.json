@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "node",
+    "/workspace/scratch/263e36984c81/Mikka-1505/packages/daemon/node_modules/vitest/vitest.mjs",
+    "run",
+    "test/anonymous-codex-spare.test.ts",
+    "test/anonymous-codex-hosted.test.ts"
+  ],
+  "cwd": "/workspace/scratch/263e36984c81/h-codex-0167-1505/packages/daemon",
+  "exitCode": 1,
+  "seconds": 2.497753568000917,
+  "base": "12458fe22e1217f644e8b28f82ab856211e73b72",
+  "productionSourceChanged": false
+}

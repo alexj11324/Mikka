@@ -1,0 +1,14 @@
+{
+  "base": "12458fe22e1217f644e8b28f82ab856211e73b72",
+  "command": "corepack",
+  "args": [
+    "pnpm",
+    "--filter",
+    "@mikka/daemon",
+    "typecheck"
+  ],
+  "started": "2026-11-09T20:59:45.144Z",
+  "ended": "2026-11-09T20:59:50.532Z",
+  "exitCode": 0,
+  "signal": null
+}

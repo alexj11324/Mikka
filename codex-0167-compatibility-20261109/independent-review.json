@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-11-09T21:15:13.311673+00:00",
+  "reviewer": "independent-read-only-agent",
+  "baseCommit": "12458fe22e1217f644e8b28f82ab856211e73b72",
+  "files": [
+    {
+      "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+      "bytes": 99013,
+      "sha256": "a3b8e3d15f0c4d5e3dd87a4f32e05154d50cabe003cb60ab5a6439f26c699ade",
+      "baseGitBlob": "f241e0ab27cc6443de15fb8bde794f376d5ef9ee",
+      "gitBlob": "ea4f398aabb120f760d133168ed4ed49ddd4b767"
+    },
+    {
+      "path": "packages/daemon/src/anonymous-codex-spare.ts",
+      "bytes": 12105,
+      "sha256": "f9c3e82ea67e6a57cf53ef1978c861a7d127cd039e79e2bd9a7da5fd81fcb3ea",
+      "baseGitBlob": "00f476c51799a68c4af5edc38d9a62c91aeea545",
+      "gitBlob": "92e737cc09ac29ac2f64363549a9723f35e7792f"
+    },
+    {
+      "path": "packages/daemon/test/anonymous-codex-hosted.test.ts",
+      "bytes": 13540,
+      "sha256": "b581c76457ddf2ac14833c4141496dbbb144dace5597b94d0c1d4e2a600239ad",
+      "baseGitBlob": "42cb76e8bcaa71490d3a8febb2f1af63342faa2c",
+      "gitBlob": "e2998a4ecf1eea10108202c2a94856518f7f5c1d"
+    },
+    {
+      "path": "packages/daemon/test/anonymous-codex-spare.test.ts",
+      "bytes": 15067,
+      "sha256": "4ff047f7ddfbca99d6ac0b4b5b4524e5b90df7b041e81855242d5cd7acaaed06",
+      "baseGitBlob": "6a2e49857783a337e6be23ee53680b66e4f8a0bd",
+      "gitBlob": "2e3d76a20c67848fb68cfeca8712754f5fc35ca6"
+    }
+  ],
+  "codeVerdict": "passed_no_blocking_findings",
+  "productionDiff": "Only exact supported anonymous initialize versions expand from 0.166.0 to 0.166.0 and 0.167.0; all other versions fail closed.",
+  "unchangedBoundaries": [
+    "fresh run/device/workspace/model/policy identity",
+    "final environment and binary equality",
+    "one-shot adoption",
+    "revocation and final live checks",
+    "no credentials or task input before adoption",
+    "one task per VM"
+  ],
+  "testCoverage": [
+    "supported versions adopt the exact initialized process once",
+    "preparation timing published only after adoption",
+    "hosted adoption performs one login without repeating initialize",
+    "unsupported older/patch/future/prerelease versions exit without adoption or initialized notification"
+  ],
+  "documentReview": "Actual production diagnostic lacks native initialize response; ADR says source mechanism and synthetic proof, not captured native trace or five-second acceptance. Subscription wording and fixed-source comment corrected.",
+  "mergeRisk": {
+    "overall": "medium",
+    "alignment": "good",
+    "impact": "medium",
+    "verification": "decent",
+    "rollbackCost": "low",
+    "errorDetection": "good"
+  },
+  "limits": [
+    "No real native 0.167 binary or real model exercised by these IPC fixtures.",
+    "All OAuth values and RPC responses in fixtures are synthetic.",
+    "Full pnpm check failed because local PostgreSQL 127.0.0.1:5432 was not provisioned.",
+    "No full check PASS, runtime release PASS, production adoption PASS or formal <=5000ms PASS inferred.",
+    "Two final wording changes were linted; no runtime behavior changed after tests."
+  ],
+  "actions": {
+    "testsExecutedByReviewer": 0,
+    "actionsOriginalDownloads": 0,
+    "productionCalls": 0,
+    "productEdits": 0,
+    "refUpdates": 0
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "source": "12458fe22e1217f644e8b28f82ab856211e73b72",
+  "path": "packages/daemon/src/anonymous-codex-spare.ts",
+  "sha256": "b7fac1b0fadd1374377ba27b9fe62d60a70a746218fe029237acf870855d6035",
+  "guard": "/^[A-Za-z0-9._-]+\\/0\\.166\\.0(?:\\s|$)/",
+  "cases": [
+    {
+      "version": "0.166.0",
+      "userAgent": "mikka/0.166.0 (Linux)",
+      "accepted": true
+    },
+    {
+      "version": "0.167.0",
+      "userAgent": "mikka/0.167.0 (Linux)",
+      "accepted": false
+    },
+    {
+      "version": "0.168.0",
+      "userAgent": "mikka/0.168.0 (Linux)",
+      "accepted": false
+    }
+  ],
+  "kind": "exact_source_guard_only_not_full_candidate"
+}

@@ -1,0 +1,170 @@
+diff --git a/docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md b/docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md
+index f241e0ab..ea4f398a 100644
+--- a/docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md
++++ b/docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md
+@@ -1032,3 +1032,48 @@ Codex 根证书的 `0644→0777` 已由上述官方对照支持，因此发布
+ 对照的权限和摘要转换，以及类型缺失、错误权限、所有者和路径变化。
+ 这次补齐消费端既有类型约束，不修改 Python matcher 或扩大策略允许集合，
+ 也不替代 strict 安装前后摘要、官方 CLI、真实订阅和生产时延门槛。
++
++### 2026-11-09：Codex 0.167.0 的匿名初始化版本拒绝
++
++[R7 42690423873/A1 的订阅检查](https://github.com/alexj11324/Mikka/actions/runs/42690423873/job/129425290133)
++绑定产品源 `7848e79df9c5af67e526aeed1c828858db392066`、worker
++`aa7efbbe2969d8b1578bdba093e6400a26749e07`。Claude 的真实订阅及
++bootstrap adoption 完整通过；Codex 的共享订阅执行、真实工具、工具后
++回复及 runtime evidence 通过，但 `template_gate_bootstrap_adoption_missing`
++使发布失败。Codex 的启动回执为1548.509ms，其中正常 `cli_init`
++为88.531ms，准备回执为 unavailable/null；这不是完整 dispatch→agent
++时间，也不能据此报告五秒验收通过。
++
++该轮候选记录的官方 CLI 是 `0.167.0`，原始二进制摘要为
++`e14fc83739c13c1074b12bd1acce4010c893c7f6fbfc1593b4a31d74cabb57af`。
++失败原件 `subscription-diagnostics.json` 保持6384B，SHA256为
++`ca8ad628f11addabacbadfe4c7475d4186b0dfc0ec52ba50860b559f4122541e`。
++原件没有匿名 `initialize` 响应或拒绝原因，不能补造一条已观测的异常。
++源码中的 `startAnonymousCodex.prepare()` 只接受 `0.166.0`，因此正常的
++`0.167.0` user agent 会在发送 `initialized` 前被拒绝。候选随后关闭，
++适配器走原冷启动路径，只有成功采用候选才公开的准备回执保持缺失。
++
++版本扩展依据官方固定提交 `6ff1e1ca3b30fc8b914720681fcf5fe62e95f856`
++（0.166.0）与 `086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a`
++（0.167.0）的定点源码对照：
++[user agent 生成](https://github.com/openai/codex/blob/086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a/codex-rs/login/src/auth/default_client.rs)
++仍使用官方包版本；`initialize` 的请求与响应合同不变，
++[新增的 requiredHumanApproval](https://github.com/openai/codex/blob/086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a/codex-rs/app-server-protocol/src/protocol/v1.rs)
++为默认 false 的选择项。两版 `ThreadStartParams`、
++[线程启动处理](https://github.com/openai/codex/blob/086ccc833bc9cf01024ad2dd6af7dbd421b6bf9a/codex-rs/app-server/src/request_processors/thread_processor.rs)
++的相关完整函数，以及配置合并实现逐字相同。
++
++本修复只明确允许 `0.166.0` 和 `0.167.0` 的匿名初始化，其他版本继续
++拒绝；不降级或覆盖官方 CLI。既有 hint profile 保持原 wire 标识，
++无凭据的匿名握手、fresh claim 身份与环境比对、一次性采用、撤销及
++一 Task 一 VM 边界不变，不给普通 Task 增加字段或轮询。
++固定 `12458fe22e1217f644e8b28f82ab856211e73b72` 基线的合成 IPC
++回归先证明旧保护恰好拒绝3个0.167.0正例，其余29例通过；修复后，
++候选、hosted adapter 与配置保护三套60例全部通过、无跳过。它们使用
++无生产凭据的非 root Linux/Node24.22.1，不执行真实模型，也不证明
++0.167.0 的生产采用或整套上游功能兼容。
++
++官方文件只增不删、原校验和、两条真实订阅及实际 bootstrap adoption
++发布门槛保持原样。后继仍须自己的完整 CI 和正式发布，再以同一实际
++APP/DPL/runtime/worker/template 元组完成 Claude×3、Codex×3 的普通
++生产任务；六次完整 dispatch→agent 各不超过5000ms 后才关闭 #1505。
+diff --git a/packages/daemon/src/anonymous-codex-spare.ts b/packages/daemon/src/anonymous-codex-spare.ts
+index 00f476c5..92e737cc 100644
+--- a/packages/daemon/src/anonymous-codex-spare.ts
++++ b/packages/daemon/src/anonymous-codex-spare.ts
+@@ -135,7 +135,8 @@ export function startAnonymousCodex(input: {
+       untilReady(child!, rpc!.sendRequest<{ userAgent?: string }>('initialize', {
+         clientInfo: { name: 'mikka', title: 'Mikka', version: DAEMON_VERSION }, capabilities: { experimentalApi: true },
+       }), 'anonymous codex initialize', input.initializeTimeoutMs ?? 30000))
+-    if (!/^[A-Za-z0-9._-]+\/0\.166\.0(?:\s|$)/.test(initialized.userAgent ?? '')) throw Error('Anonymous Codex version unavailable')
++    // Keep the versions explicit: anonymous initialization and late thread config are verified together.
++    if (!/^[A-Za-z0-9._-]+\/0\.(?:166|167)\.0(?:\s|$)/.test(initialized.userAgent ?? '')) throw Error('Anonymous Codex version unavailable')
+     await rpc.sendNotification('initialized')
+     systemSkills = await captureCodexSystemSkills(input.env)
+     lifetime.signal.throwIfAborted()
+diff --git a/packages/daemon/test/anonymous-codex-hosted.test.ts b/packages/daemon/test/anonymous-codex-hosted.test.ts
+index 42cb76e8..e2998a4e 100644
+--- a/packages/daemon/test/anonymous-codex-hosted.test.ts
++++ b/packages/daemon/test/anonymous-codex-hosted.test.ts
+@@ -1,5 +1,5 @@
+ // Real hosted adapter + real IPC processes; all OAuth values and RPC responses are synthetic.
+-// Native initialize/config semantics are separately verified with fixed 0.166 bytes.
++// Native initialize/config contracts are compared separately at fixed upstream commits.
+ import { afterEach, expect, it } from 'vitest'
+ import { chmodSync, existsSync, lstatSync, mkdirSync, renameSync, readFileSync, writeFileSync } from 'node:fs'
+ import { join, resolve } from 'node:path'
+@@ -19,7 +19,7 @@ import { worktreeGitWritePaths } from '../src/agents/publish'
+ import { cleanupTempDirs, makeRepo, tempDir } from './helpers'
+ const closing: Array<() => Promise<unknown>> = []
+ afterEach(async () => { for (const close of closing.splice(0).reverse()) await close(); cleanupTempDirs() })
+-async function fixture(diagnostics = false, hostOnly = false) {
++async function fixture(diagnostics = false, hostOnly = false, version = '0.166.0') {
+   const root = tempDir('codex-bootstrap-hosted-'), home = join(root, 'home'), stateDir = join(home, '.mikka', 'worker', 'adapters')
+   mkdirSync(home); mkdirSync(stateDir, { recursive: true })
+   const repositoryRoot = join(home, '.mikka', 'repos', 'repo'); mkdirSync(join(home, '.mikka', 'repos'), { recursive: true }); renameSync(await makeRepo(), repositoryRoot)
+@@ -33,7 +33,7 @@ async function fixture(diagnostics = false, hostOnly = false) {
+     .replace('  if (!method) {', "  appendFileSync(process.env.FIXTURE_WIRE, JSON.stringify({ method, pid: process.pid, cwd: params?.cwd, config: params?.config }) + '\\n')\n  if (!method) {")
+   writeFileSync(binary, fake); chmodSync(binary, 0o700)
+   const env = Object.fromEntries(Object.entries({ ...process.env, HOME: home,
+-    FAKE_CODEX_USER_AGENT: 'mikka/0.166.0 (offline fixture)', FIXTURE_WIRE: trace }).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
++    FAKE_CODEX_USER_AGENT: `mikka/${version} (offline fixture)`, FIXTURE_WIRE: trace }).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
+   const policy = defaultRunPolicy(), policyHash = policySnapshotHash(policy), decisionCatalogue = {
+     version: 1 as const, tool: { name: 'record_decision' as const, title: 'Decision', description: 'Offline catalogue',
+       inputSchema: { type: 'object' as const }, annotations: { idempotentHint: true as const } } }
+@@ -91,8 +91,8 @@ it.each([false, true, 'host'] as const)('adopts one initialized child, retains o
+     } else expect(prepared.preparationTiming).toBeUndefined()
+   } finally { observation?.close(); await prepared.cancel() }
+ })
+-it('records the adopted child\'s asynchronous login in the late startup scope without repeating initialize', async () => {
+-  const f = await fixture(true, true); await f.candidate.ready
++it.each(['0.166.0', '0.167.0'])('records the adopted %s child\'s asynchronous login in the late startup scope without repeating initialize', async version => {
++  const f = await fixture(true, true, version); await f.candidate.ready
+   const prepared = f.runner.prepare(f.assignment, { ...f.options, cwd: join(f.root, 'not-yet-checked-out') }, new AbortController().signal)
+   const timings: DaemonStartupTiming[] = []
+   try {
+diff --git a/packages/daemon/test/anonymous-codex-spare.test.ts b/packages/daemon/test/anonymous-codex-spare.test.ts
+index 6a2e4985..2e3d76a2 100644
+--- a/packages/daemon/test/anonymous-codex-spare.test.ts
++++ b/packages/daemon/test/anonymous-codex-spare.test.ts
+@@ -16,7 +16,7 @@ import type { RunTraceContext } from '@mikka/protocol/trace-context'
+ 
+ const cleanups: Array<() => unknown | Promise<unknown>> = []
+ afterEach(async () => { for (const close of cleanups.splice(0).reverse()) await close() })
+-function fixture(mode = 'normal', diagnostics = false) {
++function fixture(mode = 'normal', diagnostics = false, version = '0.166.0') {
+   const root = mkdtempSync(join(tmpdir(), 'anonymous-codex-')), home = join(root, 'home'), stateDir = join(home, '.mikka', 'worker', 'adapters')
+   mkdirSync(home); cleanups.push(() => rmSync(root, { recursive: true, force: true }))
+   const trace = join(root, 'protocol.jsonl'), binary = join(root, 'codex')
+@@ -28,7 +28,7 @@ rl.createInterface({input:process.stdin}).on('line',line=>{
+   owned.once('spawn',()=>process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:frame.id,result:{started:true}})+'\\n',()=>process.exit(0)));return;
+  }
+  if(frame.method==='initialize'&&process.env.FIXTURE_MODE==='hang')return;
+- if(frame.id!==undefined)process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:frame.id,result:{userAgent:'mikka/'+(process.env.FIXTURE_MODE==='version'?'0.163.0':'0.166.0')+' (Linux)'}})+'\\n');
++ if(frame.id!==undefined)process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:frame.id,result:{userAgent:'mikka/'+process.env.FIXTURE_CODEX_VERSION+' (Linux)'}})+'\\n');
+ });`
+   writeFileSync(binary, '#!' + process.execPath + '\n' + fake, { mode: 0o755 })
+   const runId = randomUUID(), policy = defaultRunPolicy()
+@@ -38,7 +38,7 @@ rl.createInterface({input:process.stdin}).on('line',line=>{
+       version: 1, tool: { name: 'record_decision', title: 'Record', description: 'Test decision', inputSchema: { type: 'object' }, annotations: { idempotentHint: true } },
+     } }
+   const bootstrap = { sha256: hint.bootstrapSha256, deviceId: randomUUID(), workspaceId: randomUUID() }
+-  const env = { HOME: home, PATH: process.env.PATH!, FIXTURE_TRACE: trace, FIXTURE_MODE: mode }, lifetime = new AbortController()
++  const env = { HOME: home, PATH: process.env.PATH!, FIXTURE_TRACE: trace, FIXTURE_MODE: mode, FIXTURE_CODEX_VERSION: version }, lifetime = new AbortController()
+   const candidate = startAnonymousCodex({ hint, bootstrap, stateDir, binary, env, signal: lifetime.signal, initializeTimeoutMs: 1000 })!
+   cleanups.push(candidate.close)
+   const cwd = join(home, '.mikka', 'repos', 'future-repo')
+@@ -60,8 +60,8 @@ rl.createInterface({input:process.stdin}).on('line',line=>{
+     checkout() { mkdirSync(join(cwd, '.git'), { recursive: true }) },
+     events() { return existsSync(trace) ? readFileSync(trace, 'utf8').trim().split('\n').filter(Boolean).map(line => JSON.parse(line).method) : [] } }
+ }
+-it('sends only initialize before a repository exists, then adopts that exact process once', async () => {
+-  const f = fixture(); await f.candidate.ready
++it.each(['0.166.0', '0.167.0'])('sends only initialize before a repository exists, then adopts that exact %s process once', async version => {
++  const f = fixture('normal', false, version); await f.candidate.ready
+   expect(existsSync(f.cwd)).toBe(false); expect(f.events().filter(x => x === 'initialize')).toHaveLength(1); expect(f.events().every(x => ['initialize', 'initialized'].includes(x))).toBe(true)
+   f.checkout()
+   const adopted = await f.candidate.adopt(await f.binding())
+@@ -91,12 +91,16 @@ it('cancels a pending initialize and drains without waiting for a login', async
+   await f.candidate.close(); await expect(f.candidate.ready).rejects.toThrow()
+   expect(f.candidate.state).toBe('closed')
+ })
+-it('does not adopt a different native protocol version', async () => {
+-  const f = fixture('version'); await expect(f.candidate.ready).rejects.toThrow('version')
++it.each(['0.163.0', '0.166.1', '0.168.0', '0.167.0-alpha.1'])('does not adopt unverified native protocol version %s', async version => {
++  const f = fixture('normal', true, version); await expect(f.candidate.ready).rejects.toThrow('version')
+   await f.candidate.close(); expect(f.candidate.state).toBe('closed')
++  expect(f.candidate.nativeExitObserved).toBe(true)
++  expect(await f.candidate.adopt(await f.binding())).toBeUndefined()
++  expect(f.candidate.preparationTiming).toBeUndefined()
++  expect(f.events()).toEqual(['initialize'])
+ })
+-it('retains the true earlier timing origin only for successful adoption', async () => {
+-  const f = fixture('normal', true); await f.candidate.ready; const earlier = Date.now(); f.checkout()
++it.each(['0.166.0', '0.167.0'])('retains the true earlier timing origin only for successful %s adoption', async version => {
++  const f = fixture('normal', true, version); await f.candidate.ready; const earlier = Date.now(); f.checkout()
+   await f.candidate.adopt(await f.binding())
+   const receipt = f.candidate.preparationTiming!
+   expect(receipt.source).toBe('bootstrap_codex_initialize'); expect(receipt.harness).toBe('codex')
