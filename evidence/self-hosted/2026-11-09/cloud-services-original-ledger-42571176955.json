@@ -1,0 +1,151 @@
+{
+  "schema": 1,
+  "previousRun": "42568213173",
+  "startedAt": "2026-11-09T06:08:31.551Z",
+  "status": "ledger_and_eligibility_observed",
+  "modelRequests": 0,
+  "virtualMachines": 0,
+  "http": [
+    {
+      "path": "/mikka/api/auth/sign-in/email",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/bots/2718182a-813d-4c0d-96d1-35c826830633",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/chat",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/model",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/sign-out",
+      "status": 200
+    }
+  ],
+  "cleanup": {
+    "emptyWorkspaceAbsent": true,
+    "workspaceRestored": true,
+    "signedOut": true
+  },
+  "driver": {
+    "head": "7ff20714f272f02d2ff8d32c98a397d79b51625b",
+    "parent": "745cbbde3ada25ecff7358f147c785adf10ac22b",
+    "run": "42571176955"
+  },
+  "databaseConfiguration": {
+    "provided": true,
+    "postgresUrl": true,
+    "unresolvedReference": false
+  },
+  "readOnlyTransactionVerified": true,
+  "ledgerTables": {
+    "calls": true,
+    "usage": true
+  },
+  "originalCloudCalls": [
+    {
+      "model": "deepseek/deepseek-v4.1-flash",
+      "credentialKind": "user",
+      "linked": false,
+      "payer": false,
+      "completed": true,
+      "state": null,
+      "inputTokens": null,
+      "outputTokens": null,
+      "costMicroUsd": null,
+      "generation": false
+    },
+    {
+      "model": "openai/gpt-6-luna-decisions",
+      "credentialKind": "user",
+      "linked": false,
+      "payer": false,
+      "completed": true,
+      "state": null,
+      "inputTokens": null,
+      "outputTokens": null,
+      "costMicroUsd": null,
+      "generation": false
+    }
+  ],
+  "normalUsage": [
+    {
+      "workspaceHash": "a38307f75620de4b",
+      "kind": "team",
+      "state": "verification_required",
+      "verified": false,
+      "ownBalancePositive": false,
+      "subscribed": false,
+      "personal": false
+    },
+    {
+      "workspaceHash": "683a9e11b0c2d41f",
+      "kind": "personal",
+      "state": "ready",
+      "verified": true,
+      "ownBalancePositive": true,
+      "subscribed": false,
+      "personal": true
+    }
+  ],
+  "directChat": {
+    "bot": "2718182a-813d-4c0d-96d1-35c826830633",
+    "working": false,
+    "enabled": true,
+    "personItems": 1,
+    "coordinatorItems": 0,
+    "knownCodes": [
+      "verification_required"
+    ],
+    "hasFailure": true,
+    "quotaWords": false,
+    "authenticationWords": false,
+    "protocolWords": false,
+    "transientWords": false
+  },
+  "directMenu": {
+    "kind": "hosted",
+    "modelId": "",
+    "hostedSource": null,
+    "available": false,
+    "chosen": true
+  },
+  "finishedAt": "2026-11-09T06:08:35.767Z"
+}

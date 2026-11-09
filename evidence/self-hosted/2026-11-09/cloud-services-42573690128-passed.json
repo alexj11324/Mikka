@@ -1,0 +1,171 @@
+{
+  "schema": 1,
+  "kind": "real-self-hosted-cloud-services",
+  "startedAt": "2026-11-09T06:34:01.012Z",
+  "imageSource": "88b144d52d091d7ff566c63fce6e902e33edc59e",
+  "image": "ghcr.io/alexj11324/mikka@sha256:96de4972ea7820dca9d7f03d116f8a4589c662ee6a6db9cb33cf8ad0f89ec98e",
+  "model": "deepseek/deepseek-v4.1-flash",
+  "codingThreadsRequested": 0,
+  "driverVirtualMachines": 0,
+  "billingConfigurationWrites": 0,
+  "uiOpened": false,
+  "cases": {
+    "selfHostedReply": {
+      "phase": "complete",
+      "submissionAttempted": true,
+      "status": "passed",
+      "botId": "f948430f-34fb-42e4-9933-62073265f253",
+      "submissionHttpStatus": 202,
+      "replyBytes": 53,
+      "replySha256": "1bc37351a4bbe431e838d86cdd6f8c9a6207bb67022beee21acdbc944fcfd1d8",
+      "canonicalCodes": [],
+      "firstContentObservedMs": 6918,
+      "completedMs": 6918,
+      "observation": "request_to_first_content_upper_bound_via_live"
+    },
+    "directReply": {
+      "phase": "complete",
+      "submissionAttempted": true,
+      "status": "passed",
+      "botId": "e07d43bf-383e-4c94-ade2-26f21fe5715d",
+      "submissionHttpStatus": 202,
+      "replyBytes": 53,
+      "replySha256": "3149580564d635b051fb92dc0050b93a68d55d2bc68d4b8cf15f315b87f16a45",
+      "canonicalCodes": [],
+      "firstContentObservedMs": 6881,
+      "completedMs": 6881,
+      "observation": "request_to_first_content_upper_bound_via_live"
+    },
+    "zeroWallet": {
+      "phase": "complete",
+      "submissionAttempted": true,
+      "status": "passed",
+      "botId": "4a416ca0-21e3-40a8-ac6b-3bd97bebc19a",
+      "submissionHttpStatus": 202,
+      "code": "cloud_quota_exhausted",
+      "messageKey": "RunErrors.cloud_quota_exhausted.default",
+      "canonicalCodes": [
+        "cloud_quota_exhausted"
+      ],
+      "firstContentObservedMs": null,
+      "completedMs": 1614,
+      "observation": "request_to_first_content_upper_bound_via_live"
+    }
+  },
+  "cleanup": {
+    "turnsStopped": true,
+    "publicTestBotRetention": [
+      {
+        "id": "e07d43bf-383e-4c94-ade2-26f21fe5715d",
+        "reason": "named_test_bot_no_delete_api"
+      }
+    ],
+    "serverRevoked": true,
+    "emptyWorkspaceDeleted": true,
+    "workspaceRestored": true,
+    "sessionsSignedOut": true
+  },
+  "stage": "completed",
+  "status": "passed",
+  "driver": {
+    "sha": "a41e0f241c325c235feab0912cf3017a11fa8ce2",
+    "parent": "7ff20714f272f02d2ff8d32c98a397d79b51625b",
+    "run": "42573690128",
+    "attempt": 1
+  },
+  "privateBefore": {
+    "id": "dpl_H844syuBfzTwdsPxkdb8F7hRZVyi",
+    "source": "4b6b116a2ecffc00dd44a0c096c65a3f2329df16",
+    "state": "READY"
+  },
+  "publicBefore": "02401458a7fe26e00ce4caa653084c7f9680696d",
+  "billingWorkspaceHash": "683a9e11b0c2d41f",
+  "billingSelection": "existing_paid_personal_normal_oauth",
+  "sharedTeamBillingChanged": false,
+  "origin": "https://devon-employee-samba-delays.trycloudflare.com",
+  "imageId": "sha256:1fb3725678739bf9d448be52ca5ba576ed3e7902b4c9e1240bd5c174f13754b4",
+  "serverId": "3ebdbb3c-aa39-493a-9148-1a7bf0532c08",
+  "zeroWallet": {
+    "workspaceHash": "21a74922b03aec62",
+    "ownBalanceZero": true,
+    "sharedPayers": 0,
+    "soloFallbackDisabledByPendingOwnInvitation": true,
+    "personalCardVerified": true,
+    "existingBalancesEditedByFixture": false,
+    "monthlyLimitKeyUsed": false,
+    "topUpWorkspaceMatches": true,
+    "bilingualCopy": {
+      "zh-CN": "Mikka 云服务额度不足或已达到团队上限。",
+      "en": "Mikka Cloud credits are insufficient or the team limit was reached."
+    }
+  },
+  "cloudLedger": [
+    {
+      "selectedWorkspace": true,
+      "zeroWorkspace": false,
+      "model": "deepseek/deepseek-v4.1-flash",
+      "credentialKind": "user",
+      "usageHash": "b51a87f76d2e64f3",
+      "payerHash": "683a9e11b0c2d41f",
+      "state": "settled",
+      "inputTokens": 28963,
+      "outputTokens": 35,
+      "costMicroUsd": 640,
+      "completed": true
+    },
+    {
+      "selectedWorkspace": true,
+      "zeroWorkspace": false,
+      "model": "openai/gpt-6-luna-decisions",
+      "credentialKind": "user",
+      "usageHash": "baf39e46cc37a169",
+      "payerHash": "683a9e11b0c2d41f",
+      "state": "settled",
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "costMicroUsd": 29,
+      "completed": true
+    },
+    {
+      "selectedWorkspace": false,
+      "zeroWorkspace": true,
+      "model": "deepseek/deepseek-v4.1-flash",
+      "credentialKind": "user",
+      "usageHash": null,
+      "payerHash": null,
+      "state": null,
+      "inputTokens": null,
+      "outputTokens": null,
+      "costMicroUsd": null,
+      "completed": true
+    },
+    {
+      "selectedWorkspace": false,
+      "zeroWorkspace": true,
+      "model": "openai/gpt-6-luna-decisions",
+      "credentialKind": "user",
+      "usageHash": null,
+      "payerHash": null,
+      "state": null,
+      "inputTokens": null,
+      "outputTokens": null,
+      "costMicroUsd": null,
+      "completed": true
+    }
+  ],
+  "decisionAccepted": true,
+  "billingPageReceipt": {
+    "workspaceHash": "683a9e11b0c2d41f",
+    "endpoint": "billing.getHostedUsage",
+    "matchedSettledCloudRows": 2,
+    "visuallyInspected": false
+  },
+  "privateAfter": {
+    "id": "dpl_H844syuBfzTwdsPxkdb8F7hRZVyi",
+    "source": "4b6b116a2ecffc00dd44a0c096c65a3f2329df16",
+    "state": "READY"
+  },
+  "publicAfter": "02401458a7fe26e00ce4caa653084c7f9680696d",
+  "firstContentDifferenceMs": 37,
+  "finishedAt": "2026-11-09T06:34:53.424Z"
+}

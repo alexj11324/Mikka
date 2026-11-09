@@ -1,0 +1,130 @@
+{
+  "schema": 1,
+  "previousRun": "42568213173",
+  "startedAt": "2026-11-09T05:57:24.873Z",
+  "status": "recovered_diagnostics_partial",
+  "modelRequests": 0,
+  "virtualMachines": 0,
+  "http": [
+    {
+      "path": "/mikka/api/auth/sign-in/email",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/get-session",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/workspace-general",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/settings/credit-billing",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/bots/2718182a-813d-4c0d-96d1-35c826830633",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/chat",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/mobile/model",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/rpc",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/workspace",
+      "status": 200
+    },
+    {
+      "path": "/mikka/api/auth/sign-out",
+      "status": 200
+    }
+  ],
+  "cleanup": {
+    "emptyWorkspaceDeleted": true,
+    "workspaceRestored": true,
+    "signedOut": true
+  },
+  "driver": {
+    "head": "745cbbde3ada25ecff7358f147c785adf10ac22b",
+    "parent": "afd42554f3284e815c81413a2084d0c85f038bfb",
+    "run": "42570141305"
+  },
+  "ownedEmptyWorkspace": {
+    "hash": "f3d90bac2bd7fa3e",
+    "zero": true,
+    "activeMembers": 1,
+    "pendingInvitations": 1,
+    "explicitShares": null
+  },
+  "databaseConfiguration": {
+    "provided": true,
+    "postgresUrl": true,
+    "unresolvedReference": false
+  },
+  "ledgerDiagnostic": {
+    "status": "failed",
+    "code": null,
+    "sqlstate": "08P01",
+    "errorClass": "OTHER",
+    "transportCode": null
+  },
+  "directChat": {
+    "bot": "2718182a-813d-4c0d-96d1-35c826830633",
+    "working": false,
+    "enabled": true,
+    "personItems": 1,
+    "coordinatorItems": 0,
+    "knownCodes": [
+      "verification_required"
+    ],
+    "hasFailure": true,
+    "quotaWords": false,
+    "authenticationWords": false,
+    "protocolWords": false,
+    "transientWords": false
+  },
+  "directMenu": {
+    "kind": "hosted",
+    "modelId": "",
+    "hostedSource": null,
+    "available": false,
+    "chosen": true
+  },
+  "finishedAt": "2026-11-09T05:57:29.869Z"
+}
