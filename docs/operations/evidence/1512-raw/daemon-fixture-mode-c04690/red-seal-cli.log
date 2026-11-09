@@ -1,0 +1,8 @@
+file:///workspace/scratch/812e3b7d6d45/issue1512-evidence-work/daemon-fixture-mode-20261109/checkout/scripts/release/evidence.mjs:108
+        if (!['packages/daemon/package.json', 'apps/desktop/package.json'].includes(file)) throw Error('releaseCheckoutDirty')
+                                                                                                 ^
+
+Error: releaseCheckoutDirty
+    at file:///workspace/scratch/812e3b7d6d45/issue1512-evidence-work/daemon-fixture-mode-20261109/checkout/scripts/release/evidence.mjs:108:98
+
+Node.js v24.22.1

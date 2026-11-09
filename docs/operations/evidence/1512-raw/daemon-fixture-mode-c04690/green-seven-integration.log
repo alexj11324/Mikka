@@ -1,0 +1,16 @@
+
+ RUN  v5.0.5 /workspace/scratch/812e3b7d6d45/issue1512-evidence-work/daemon-fixture-mode-20261109/checkout/packages/daemon
+
+ ✓ test/claude-generation-abort.test.ts > records one Claude generation through the actual SDK, terminal and child close: normal 107ms
+ ✓ test/codex-generation-completion.test.ts > retains a Codex completed response through actual adapter close: known 159ms
+ ✓ test/codex-generation-completion.test.ts > retains a Codex completed response through actual adapter close: missing_fresh 97ms
+ ✓ test/codex-generation-completion.test.ts > retains a Codex completed response through actual adapter close: missing_reused 114ms
+ ✓ test/claude-generation-abort.test.ts > records one Claude generation through the actual SDK, terminal and child close: aborted 178ms
+ ✓ test/claude-generation-abort.test.ts > records one Claude generation through the actual SDK, terminal and child close: duplicate_abort 179ms
+ ✓ test/claude-generation-abort.test.ts > records one Claude generation through the actual SDK, terminal and child close: abort_then_crash 69ms
+
+ Test Files  2 passed (2)
+      Tests  7 passed (7)
+   Start at  20:26:20
+   Duration  1.64s (import 45%, tests 38%, transform 17%)
+

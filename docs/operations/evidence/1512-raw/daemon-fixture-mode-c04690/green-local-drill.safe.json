@@ -1,0 +1,19 @@
+{
+  "command": [
+    "node",
+    "--input-type=module",
+    "-",
+    "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/daemon-fixture-mode-20261109/candidate",
+    "5975e42ef3436a53546948b556166777d1b0be9d"
+  ],
+  "stdinSource": "run-local-seal-drill.mjs.txt",
+  "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/daemon-fixture-mode-20261109/checkout",
+  "startedAt": "2026-11-09T01:27:24.260629+00:00",
+  "endedAt": "2026-11-09T01:27:24.342561+00:00",
+  "exitCode": 0,
+  "log": "green-local-drill.log",
+  "logSha256": "ecd591f2bbcee411f298a187612c5334aeb820fecf86031574d294f0a1fe4efd",
+  "buildKind": "local-drill",
+  "sourceSha": "5975e42ef3436a53546948b556166777d1b0be9d",
+  "scope": "Unmodified exported sealArtifact + verifyArtifact on a minimal offline artifact/SBOM using the explicit supported local-drill identity; real CLI checkout guard independently covered above."
+}

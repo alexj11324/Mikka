@@ -1,0 +1,242 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512_e2b_candidate_conservation_and_build_cleanup",
+  "sourceCommit": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "workerSha": "68271f9890a0926ab8bc0ada6582c1cbad992a8e",
+  "runId": 42544540108,
+  "runAttempt": 1,
+  "buildJobId": 128926785564,
+  "buildJobConclusion": "success",
+  "candidateFileSha256": "195266b921b74039325f76483e5d94c790d5bb3fb1bfbe536d5cff86e34c2eed",
+  "candidateFileBytes": 330055,
+  "identityBinding": "sourceCommit + exact source/run/attempt/kind template names",
+  "templates": [
+    {
+      "kind": "desktop",
+      "name": "mikka-01a6bfb3a6c5-42544540108-1-desktop",
+      "templateId": "7d1yrqc8xhbcm347q52g",
+      "buildId": "6d073a1f-cb0b-4c8b-85ae-089c88d22642",
+      "baseTemplate": "desktop",
+      "preinstalled": true,
+      "conservationBefore": {
+        "entries": 103085,
+        "sha256": "d24cea6ec8d83925ee793a1deb293bdadbe4f04c2ef5699d628a5e2b30a9783d"
+      },
+      "conservationAfter": {
+        "entries": 103085,
+        "sha256": "d24cea6ec8d83925ee793a1deb293bdadbe4f04c2ef5699d628a5e2b30a9783d"
+      },
+      "finalization": {
+        "finalization": {
+          "policySha256": "365dd3869878fa097c33b70c643b98e7bc7b871baa8cad22b4c5431fcd0fea29",
+          "before": {
+            "entries": 103085,
+            "sha256": "c01e3485eae19e14e2da47358b208985126d5f5ba4fbfbdc52c0783dcb921ae3"
+          },
+          "after": {
+            "entries": 103085,
+            "sha256": "c01e3485eae19e14e2da47358b208985126d5f5ba4fbfbdc52c0783dcb921ae3"
+          },
+          "originalBefore": {
+            "entries": 103085,
+            "sha256": "d24cea6ec8d83925ee793a1deb293bdadbe4f04c2ef5699d628a5e2b30a9783d"
+          },
+          "originalAfter": {
+            "entries": 103085,
+            "sha256": "71af16bd6f1fa847dd152010211760b2015d49e814e43d5b6261402493c48523"
+          },
+          "providerChangeCount": 245
+        },
+        "preloadFinalization": {
+          "policySha256": "365dd3869878fa097c33b70c643b98e7bc7b871baa8cad22b4c5431fcd0fea29",
+          "before": {
+            "entries": 103085,
+            "sha256": "c01e3485eae19e14e2da47358b208985126d5f5ba4fbfbdc52c0783dcb921ae3"
+          },
+          "after": {
+            "entries": 103085,
+            "sha256": "c01e3485eae19e14e2da47358b208985126d5f5ba4fbfbdc52c0783dcb921ae3"
+          },
+          "originalBefore": {
+            "entries": 103085,
+            "sha256": "d24cea6ec8d83925ee793a1deb293bdadbe4f04c2ef5699d628a5e2b30a9783d"
+          },
+          "originalAfter": {
+            "entries": 103085,
+            "sha256": "fb7a9405583979a421811e766ca71aa0d26414330779364a945d3f9d3ae6423c"
+          },
+          "providerChangeCount": 3
+        }
+      }
+    },
+    {
+      "kind": "claude",
+      "name": "mikka-01a6bfb3a6c5-42544540108-1-claude",
+      "templateId": "ek1zwnqzwbghai17b0zd",
+      "buildId": "8c90cea8-8000-40aa-93f4-f055a39e1251",
+      "baseTemplate": "claude",
+      "preinstalled": true,
+      "conservationBefore": {
+        "entries": 44148,
+        "sha256": "86176a4db11d8cce24f167366f9e9bcb0557e676a9f5ed93da4e24d38df5f13d"
+      },
+      "conservationAfter": {
+        "entries": 44148,
+        "sha256": "86176a4db11d8cce24f167366f9e9bcb0557e676a9f5ed93da4e24d38df5f13d"
+      },
+      "finalization": {
+        "finalization": {
+          "policySha256": "365dd3869878fa097c33b70c643b98e7bc7b871baa8cad22b4c5431fcd0fea29",
+          "before": {
+            "entries": 44148,
+            "sha256": "57d647a9474e0939d94cd33f7b03e348b281cf1020cb2e4b7e2fed388f5529dc"
+          },
+          "after": {
+            "entries": 44148,
+            "sha256": "57d647a9474e0939d94cd33f7b03e348b281cf1020cb2e4b7e2fed388f5529dc"
+          },
+          "originalBefore": {
+            "entries": 44148,
+            "sha256": "86176a4db11d8cce24f167366f9e9bcb0557e676a9f5ed93da4e24d38df5f13d"
+          },
+          "originalAfter": {
+            "entries": 44148,
+            "sha256": "f89e0f92e59728f729b31cb1ac902ad399387044173a419c7796e3eb0c1638e4"
+          },
+          "providerChangeCount": 249
+        },
+        "preloadFinalization": {
+          "policySha256": "365dd3869878fa097c33b70c643b98e7bc7b871baa8cad22b4c5431fcd0fea29",
+          "before": {
+            "entries": 44148,
+            "sha256": "57d647a9474e0939d94cd33f7b03e348b281cf1020cb2e4b7e2fed388f5529dc"
+          },
+          "after": {
+            "entries": 44148,
+            "sha256": "57d647a9474e0939d94cd33f7b03e348b281cf1020cb2e4b7e2fed388f5529dc"
+          },
+          "originalBefore": {
+            "entries": 44148,
+            "sha256": "86176a4db11d8cce24f167366f9e9bcb0557e676a9f5ed93da4e24d38df5f13d"
+          },
+          "originalAfter": {
+            "entries": 44148,
+            "sha256": "3254808ef291f9ca523846d448b2aebe470a4d94e9d78244bad62cab2dda481a"
+          },
+          "providerChangeCount": 8
+        }
+      }
+    },
+    {
+      "kind": "codex",
+      "name": "mikka-01a6bfb3a6c5-42544540108-1-codex",
+      "templateId": "6oo73f3frlpn3s0tqqlb",
+      "buildId": "7a7e1986-98f2-44c4-9a62-11c17e1ad90b",
+      "baseTemplate": "codex",
+      "preinstalled": true,
+      "conservationBefore": {
+        "entries": 39646,
+        "sha256": "f39dba38136d1fb07bb0ab17e2a61f7f59350530861cd16d74acb0f045eaec7c"
+      },
+      "conservationAfter": {
+        "entries": 39646,
+        "sha256": "f39dba38136d1fb07bb0ab17e2a61f7f59350530861cd16d74acb0f045eaec7c"
+      },
+      "finalization": {
+        "finalization": {
+          "policySha256": "365dd3869878fa097c33b70c643b98e7bc7b871baa8cad22b4c5431fcd0fea29",
+          "before": {
+            "entries": 39646,
+            "sha256": "3f4847241784d03862c0c4d6d70ab897aa520838967f326974e6508e5f9fd81b"
+          },
+          "after": {
+            "entries": 39646,
+            "sha256": "3f4847241784d03862c0c4d6d70ab897aa520838967f326974e6508e5f9fd81b"
+          },
+          "originalBefore": {
+            "entries": 39646,
+            "sha256": "f39dba38136d1fb07bb0ab17e2a61f7f59350530861cd16d74acb0f045eaec7c"
+          },
+          "originalAfter": {
+            "entries": 39646,
+            "sha256": "c09853629786338f2f0e047ead06fb8f6db9a831581c8cca62940ea142a80227"
+          },
+          "providerChangeCount": 303
+        },
+        "preloadFinalization": {
+          "policySha256": "365dd3869878fa097c33b70c643b98e7bc7b871baa8cad22b4c5431fcd0fea29",
+          "before": {
+            "entries": 39646,
+            "sha256": "3f4847241784d03862c0c4d6d70ab897aa520838967f326974e6508e5f9fd81b"
+          },
+          "after": {
+            "entries": 39646,
+            "sha256": "3f4847241784d03862c0c4d6d70ab897aa520838967f326974e6508e5f9fd81b"
+          },
+          "originalBefore": {
+            "entries": 39646,
+            "sha256": "f39dba38136d1fb07bb0ab17e2a61f7f59350530861cd16d74acb0f045eaec7c"
+          },
+          "originalAfter": {
+            "entries": 39646,
+            "sha256": "5b9d802c898f7b7134a14555dad590087285f84402ff1a5681549662284d7c0c"
+          },
+          "providerChangeCount": 3
+        }
+      }
+    }
+  ],
+  "buildCleanup": {
+    "sourceCommit": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+    "runId": "42544540108",
+    "sandboxes": [],
+    "templates": [],
+    "errors": []
+  },
+  "artifactIntegrity": [
+    {
+      "artifactId": 13643107502,
+      "name": "e2b-candidates-42544540108-1",
+      "zipBytes": 46283,
+      "zipSha256": "bcf688d11ee3c0f8037366f8bf1898c4443e50ec3a12a5b86a0e2a9b85f321d3",
+      "apiSizeAndDigestMatch": true,
+      "zipTestPassed": true,
+      "safePathsVerified": true,
+      "files": [
+        {
+          "file": "candidates.json",
+          "bytes": 330055,
+          "sha256": "195266b921b74039325f76483e5d94c790d5bb3fb1bfbe536d5cff86e34c2eed"
+        }
+      ],
+      "downloadedAtUTC": "2026-11-09T01:27:34.692361+00:00",
+      "downloadCount": 1,
+      "signedUrlOmitted": true
+    },
+    {
+      "artifactId": 13642764508,
+      "name": "e2b-candidate-build-cleanup-42544540108-1",
+      "zipBytes": 268,
+      "zipSha256": "07d63812c21f3c24f9c8575bd8e5edaf1fb305a55ba02c6070b430b60eaa0cab",
+      "apiSizeAndDigestMatch": true,
+      "zipTestPassed": true,
+      "safePathsVerified": true,
+      "files": [
+        {
+          "file": "build-cleanup.json",
+          "bytes": 145,
+          "sha256": "fab563bae165032f22e2cc86e011e9db7f7ecb52fe107a3229b181724486695b"
+        }
+      ],
+      "downloadedAtUTC": "2026-11-09T01:27:34.641021+00:00",
+      "downloadCount": 1,
+      "signedUrlOmitted": true
+    }
+  ],
+  "conservationSemantics": "Mikka installation before/after digests match. Provider finalization and preload use the existing source policy; raw original digests and allowed provider change counts remain visible, and normalized before/after match. This does not claim no provider-managed filesystem changes.",
+  "subscriptionExecutionProven": false,
+  "publicTemplateReleaseProven": false,
+  "productionRuntimeRefreshProven": false,
+  "finalReleaseCleanupProven": false,
+  "rawCandidateAndArchivesRemainLocal": true
+}

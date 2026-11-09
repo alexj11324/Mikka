@@ -1,0 +1,24 @@
+{
+  "createdAt": "2026-11-09T01:26:18.995563+00:00",
+  "commit": "5975e42ef3436a53546948b556166777d1b0be9d",
+  "parent": "df87eb4b8d2952ed3e1aed5ee740ff1231608594",
+  "baseTree": "8c5c12ea993533403d13e21dc75647bb28022767",
+  "tree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+  "scope": "Only two existing fixture executable bits 100644 -> 100755. All blobs and source bytes unchanged. Local normal commit, not pushed.",
+  "rawDiff": ":100644 100755 09e0751562d1164cb3c0ba67fe7e4bc971dc3116 09e0751562d1164cb3c0ba67fe7e4bc971dc3116 M\tpackages/daemon/test/fakes/fake-claude-generation-abort.mjs\n:100644 100755 2b4fd7946c39a83eac97def4bab1cf0839802a3b 2b4fd7946c39a83eac97def4bab1cf0839802a3b M\tpackages/daemon/test/fakes/fake-codex-generation-completion.mjs\n",
+  "patch": "fixture-executable-modes.patch",
+  "patchSha256": "74aa4e5db54a52c72f7988d196bb22b375d2c00fa65632c60f7bfc9afb902d06",
+  "afterCommitTrackedStatusClean": true,
+  "unchangedBlobs": [
+    {
+      "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "gitBlob": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+      "sha256": "a70e04b6b7ad83be663ebe08daee4257f73de7fe07bb3366d05bc83b94eb9c56"
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+      "gitBlob": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+      "sha256": "11fa656bc01369f27d1255e2d912964b4dfae26b5f6ad8de786425e5738ac31c"
+    }
+  ]
+}

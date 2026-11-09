@@ -1,0 +1,277 @@
+{
+  "schema": "issue1512.daemon-fixture-mode-independent-review.v1",
+  "frozenAt": "2026-11-09T01:31:23.878943+00:00",
+  "reviewer": "/root/current_source_review",
+  "decision": "no_additional_source_must_fix_found; preserve actual candidate CI and release gates",
+  "mustFix": [],
+  "source": {
+    "actualFailedMain": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+    "baseTree": "8c5c12ea993533403d13e21dc75647bb28022767",
+    "localSameTreeBaselineCommit": "df87eb4b8d2952ed3e1aed5ee740ff1231608594",
+    "localFixedCommit": "5975e42ef3436a53546948b556166777d1b0be9d",
+    "localFixedParent": "df87eb4b8d2952ed3e1aed5ee740ff1231608594",
+    "fixedTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+    "localCounterfactualIsNotProductionCommit": true,
+    "publishedCandidateNotice": {
+      "pr": 1799,
+      "head": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+      "parent": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+      "tree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+      "source": "parent agent notification; this review independently verifies the exact fixed tree locally, not the remote PR metadata"
+    }
+  },
+  "diff": {
+    "raw": ":100644 100755 09e0751562d1164cb3c0ba67fe7e4bc971dc3116 09e0751562d1164cb3c0ba67fe7e4bc971dc3116 M\tpackages/daemon/test/fakes/fake-claude-generation-abort.mjs\n:100644 100755 2b4fd7946c39a83eac97def4bab1cf0839802a3b 2b4fd7946c39a83eac97def4bab1cf0839802a3b M\tpackages/daemon/test/fakes/fake-codex-generation-completion.mjs\n",
+    "patch": {
+      "path": "daemon-fixture-mode-20261109/fixture-executable-modes.patch",
+      "bytes": 342,
+      "sha256": "74aa4e5db54a52c72f7988d196bb22b375d2c00fa65632c60f7bfc9afb902d06",
+      "gitBlobSha": "e71845db7abc803bc1bfd849ca4daa6225f0e5d8"
+    },
+    "changedPaths": 2,
+    "changedSourceBytes": 0,
+    "addedOrDeletedLines": 0,
+    "files": [
+      {
+        "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+        "beforeMode": "100644",
+        "afterMode": "100755",
+        "gitBlobSha": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+        "bytes": 3767,
+        "sha256": "a70e04b6b7ad83be663ebe08daee4257f73de7fe07bb3366d05bc83b94eb9c56",
+        "contentChanged": false,
+        "nodeShebangPresent": true
+      },
+      {
+        "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+        "beforeMode": "100644",
+        "afterMode": "100755",
+        "gitBlobSha": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+        "bytes": 4466,
+        "sha256": "11fa656bc01369f27d1255e2d912964b4dfae26b5f6ad8de786425e5738ac31c",
+        "contentChanged": false,
+        "nodeShebangPresent": true
+      }
+    ],
+    "sealAndCiGateUnchanged": true,
+    "ignoreRulesUnchanged": true,
+    "fileModeCheckingEnabled": true,
+    "trackedCheckoutCleanAtReview": true
+  },
+  "evidenceReview": {
+    "index": {
+      "path": "daemon-fixture-mode-20261109/review-index.safe.json",
+      "bytes": 5339,
+      "sha256": "1b71ad0f3d218a1bb185ab27c842f6ed3aacc723a69db217f1e6d3dac77e6e27",
+      "gitBlobSha": "12ecb2787b151ba9925d627d834ea7ce682fc17d"
+    },
+    "indexedFilesVerified": 19,
+    "allIndexedBytesHashesAndGitBlobsMatched": true,
+    "sourceReads": [
+      {
+        "path": "AGENTS.md",
+        "bytes": 22111,
+        "sha256": "b581491c31a22dae6693679e6f8455025a07127227d65f2c2b2b03d2a53fe08c",
+        "gitBlobSha": "6e941b46c9d8c2e546990dd05dd2a62fa9c47162"
+      },
+      {
+        "path": "CONTRIBUTING.md",
+        "bytes": 12095,
+        "sha256": "0da1402bcaf890edb16501694c1722816b92bf89de480436b8f462b59a0f2c3f",
+        "gitBlobSha": "958a1f8fb717f45eb53c584c7f3665ccbd65640c"
+      },
+      {
+        "path": "docs/dev-workflow.md",
+        "bytes": 15814,
+        "sha256": "985f99c6a88093c0656327c134ba4e071d4229893327270f00d0b45a7f6b073c",
+        "gitBlobSha": "7b0f89592344835a2ebc306c2b01c7e06da30629"
+      },
+      {
+        "path": ".claude/skills/merge-risk/SKILL.md",
+        "bytes": 2862,
+        "sha256": "1a11fcb7503eeb92a901755c0f729216cfdb8674a4ac2b0890e019d594e1ae17",
+        "gitBlobSha": "c8a545a237d7be29c0302d4aba3f1a8b7cfe9851"
+      },
+      {
+        "path": ".claude/skills/verification-before-completion/SKILL.md",
+        "bytes": 3646,
+        "sha256": "2befe7fc55bcadaa3d97dd9e8efeb633d2561c0ebe74c5a8b17c4d9e7e4520b3",
+        "gitBlobSha": "7d45333cc4a49c57a80df6c1fe2fa777a207afbc"
+      },
+      {
+        "path": "scripts/release/evidence.mjs",
+        "bytes": 7781,
+        "sha256": "7aa1139a36dcf5f5d5377cb0356b21d7d0304c09ad2163cf6e08727d6c46f12a",
+        "gitBlobSha": "32e22150b25bb834ce353bb0784725bf629f8ab5"
+      },
+      {
+        "path": "scripts/release/ci-gate.mjs",
+        "bytes": 3113,
+        "sha256": "0ab693a9140e95567420a638c76a372ef71b60f0d08f7620978f14f2698cc7b9",
+        "gitBlobSha": "e5e04a012b6612101bc1cac3b5c64034b6f650be"
+      },
+      {
+        "path": "scripts/e2b/build-template.py",
+        "bytes": 55730,
+        "sha256": "0adb53fbdd6cbcd61f1d1804aee3e2df1538997c0724556062f2741c5ac1cdb1",
+        "gitBlobSha": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3"
+      },
+      {
+        "path": ".github/workflows/publish-daemon.yml",
+        "bytes": 4881,
+        "sha256": "447c3e4c8cdb3fb55d9061b2571652a5a08bfb8748c06dde599a7bd160f3ef95",
+        "gitBlobSha": "c6f861a5ec36468ee9a65bc226613fbbabc797c2"
+      },
+      {
+        "path": "packages/daemon/test/claude-generation-abort.test.ts",
+        "bytes": 4286,
+        "sha256": "22e464044ffdd60fd7148d1a968334b6d4e19600dc8db512998d2ce07627f6d8",
+        "gitBlobSha": "c9fb96f579fda0c1aa3372756074a1a90713204a"
+      },
+      {
+        "path": "packages/daemon/test/codex-generation-completion.test.ts",
+        "bytes": 4020,
+        "sha256": "0c6684127dbdf037a78c7a1fe99690d8d1a77d2d4134632ccb2d5e736b748a31",
+        "gitBlobSha": "76449ff682615ebd14a533422194946e75441d74"
+      },
+      {
+        "path": "packages/daemon/src/adapters/claude.ts",
+        "bytes": 51190,
+        "sha256": "abe42f89aa17ee63425b679c1019f0d4c140799ad56a4d707a01d038c5d9a3ab",
+        "gitBlobSha": "b5659ce0a1d56aeccd29f964d1aed30dd750282f"
+      },
+      {
+        "path": "packages/daemon/src/adapters/codex.ts",
+        "bytes": 51717,
+        "sha256": "2cfe4babcf59f031a58ffc68a286aef4aa5e9bf4b9f6da8a34126537ce3da9f1",
+        "gitBlobSha": "953af7b99b542aafd9cc724fde76d27f6a6bb2f7"
+      }
+    ],
+    "originalFailure": {
+      "runId": 42544539939,
+      "jobId": 128926576137,
+      "sourceSha": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+      "originalLog": {
+        "path": "production-01a6/private/job-128926576137.original.log",
+        "bytes": 107424,
+        "sha256": "f48d70bd2791a0bb0932f242bd76b93846f213b121efac1bec45a5a84515d1fc",
+        "gitBlobSha": "23229d7417b7d8c2f0c9dc8bdcd470f8e7cae130"
+      },
+      "reviewMethod": "Original log hash plus fixed same-line releaseCheckoutDirty and the two integration-file markers; full log not republished.",
+      "productionChangedFileListObserved": false,
+      "causalBoundary": "The exact production changed-file list was not logged. Cause is supported by the same source tree, both test files observed in that job, local deterministic two-mode post-test diff, and identical unchanged seal rejection."
+    },
+    "counterfactual": {
+      "baselineIntegrationCases": 7,
+      "baselineIntegrationExitCode": 0,
+      "baselineDirtyModePaths": 2,
+      "baselineCliSealExitCode": 1,
+      "baselineError": "releaseCheckoutDirty",
+      "baselineGuardLine": 108,
+      "baselineManifestCreated": false,
+      "fixedIntegrationCases": 7,
+      "fixedIntegrationExitCode": 0,
+      "fixedTrackedCheckoutClean": true,
+      "fixedCliSealExitCode": 0,
+      "fixedCliManifestCreated": true,
+      "fixedLocalDrillSealAndVerifyExitCode": 0,
+      "testCases": [
+        "claude:normal",
+        "claude:aborted",
+        "claude:duplicate_abort",
+        "claude:abort_then_crash",
+        "codex:known",
+        "codex:missing_fresh",
+        "codex:missing_reused"
+      ],
+      "testBoundary": "Real product adapters and actual Claude SDK with fixture child CLIs, memory telemetry exporters and synthetic subscription inputs; no real model/provider acceptance.",
+      "reviewerRepeatedTests": 0,
+      "reviewMethod": "Read complete frozen RED/GREEN logs, command/exit receipts, source assertions and exact Git diff. The reviewer did not rerun the integration or seal commands."
+    },
+    "identityAndArtifactBoundary": {
+      "actualCliUsed": true,
+      "cliGhaShapedInputs": "Local snapshot or fixed local SHA, runId 0, allowed repository/ref/event shape; no GitHub-issued authority, credentials or publication.",
+      "cliManifestBuildKind": "github-actions-main",
+      "cliManifestIsProductionEvidence": false,
+      "cliManifestSha256": "c6c69f9d0a5d382a1983d948be35aad7b988245cf74373ed432dd9f9405c8559",
+      "separateApiBuildKind": "local-drill",
+      "separateApiManifestSha256": "b56c5383f01b529a95a22778b8daf3273a09fc66291799e240846eed2268b1fc",
+      "apiDrillDoesNotReplaceCliCheckoutGuard": true,
+      "artifact": "Minimal offline mikka.js and CycloneDX SBOM, two files; not a full daemon build, package acceptance, dependency graph publication or npm registry receipt."
+    }
+  },
+  "workerHash": {
+    "implementation": "scripts/e2b/build-template.py",
+    "implementationSha256": "0adb53fbdd6cbcd61f1d1804aee3e2df1538997c0724556062f2741c5ac1cdb1",
+    "implementationBoundary": "WORKER_PATHS includes all packages/daemon. worker_hash appends full git ls-tree lines including file modes except projected package.json/pnpm-lock. There is no test-file exclusion. --worker-hash returns before reading E2B_API_KEY or taking any build/publish path.",
+    "commandsActuallyRunByReviewer": [
+      {
+        "argv": [
+          "python",
+          "scripts/e2b/build-template.py",
+          "--worker-hash",
+          "--source-ref",
+          "df87eb4b8d2952ed3e1aed5ee740ff1231608594"
+        ],
+        "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/daemon-fixture-mode-20261109/checkout",
+        "exitCode": 0,
+        "stdout": "68271f9890a0926ab8bc0ada6582c1cbad992a8e\n"
+      },
+      {
+        "argv": [
+          "python",
+          "scripts/e2b/build-template.py",
+          "--worker-hash",
+          "--source-ref",
+          "5975e42ef3436a53546948b556166777d1b0be9d"
+        ],
+        "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/daemon-fixture-mode-20261109/checkout",
+        "exitCode": 0,
+        "stdout": "819b2a0da6d6a8f78ff33586fadeb4ade301834a\n"
+      }
+    ],
+    "baseWorkerHash": "68271f9890a0926ab8bc0ada6582c1cbad992a8e",
+    "fixedWorkerHash": "819b2a0da6d6a8f78ff33586fadeb4ade301834a",
+    "changed": true,
+    "implication": "Two mode bits change the runtime worker identity. Old worker-hash release evidence cannot stand in for the fixed tree. Retain normal writer, exact-main, conservation, both subscription-path and runtime-refresh gates; do not change hash scope or exclude tests to avoid them."
+  },
+  "mergeRisk": {
+    "overall": "medium",
+    "alignment": {
+      "verdict": "good",
+      "assessment": "Repairs a reproduced issue1512 release blocker by recording the intended executable state of two existing CLI fixtures."
+    },
+    "impact": {
+      "verdict": "medium",
+      "assessment": "No product blob, auth, SQL, tracing policy or release guard changes. The mode-sensitive worker digest changes and therefore carries a real release/runtime pipeline impact."
+    },
+    "verification": {
+      "verdict": "decent",
+      "assessment": "Source-bound before/after seven cases and unchanged CLI seal establish the local cause/fix. New PR required CI and real publication/runtime gates remain pending and cannot inherit the local drill as production evidence."
+    },
+    "rollbackCost": {
+      "verdict": "low",
+      "assessment": "Two mode bits can be reverted through a normal PR without data migration; doing so restores the reproduced release failure. Preserve existing valid published runtime for normal rollback."
+    },
+    "errorDetection": {
+      "verdict": "good",
+      "assessment": "Existing dirty-checkout rejection remains fail-closed; exact-main CI gate, package acceptance, manifest verify and npm provenance steps remain intact. No error swallowing or new exception was added."
+    }
+  },
+  "remainingOwnerGates": [
+    "Observe required CI on the actual PR synthetic merge/tree; do not relabel old tree8c5 CI as this candidate.",
+    "Do not move main while the existing exact-main E2B writer is active; retain root serial merge/release coordination.",
+    "Observe actual new-main daemon seal, test:package, exact-main CI gate, verify, npm publish and registry verification.",
+    "Honor changed worker hash through normal E2B release/runtime-refresh and issue1512 production acceptance; no skipped gate is claimed."
+  ],
+  "execution": {
+    "sourceOrIndexWrites": 0,
+    "newTests": 0,
+    "workerHashReadOnlyCommands": 2,
+    "networkRequests": 0,
+    "externalMessages": 0,
+    "ciReruns": 0,
+    "cloudOrModelResources": 0,
+    "activeOwnedProcesses": 0
+  }
+}

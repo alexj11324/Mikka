@@ -1,0 +1,7 @@
+import { sealArtifact, verifyArtifact } from './scripts/release/evidence.mjs'
+import { resolve } from 'node:path'
+const directory=process.argv[2], sourceSha=process.argv[3], sourceLock=resolve('pnpm-lock.yaml')
+const identity={kind:'local-drill',repository:'alexj11324/Mikka',sha:sourceSha,runId:'daemon-fixture-mode-local'}
+const sealed=await sealArtifact({directory,sourceSha,identity,sourceLock})
+const verified=await verifyArtifact({directory,sourceSha,sourceLock,expectedManifestSha256:sealed.sha256,buildRunId:identity.runId,buildKind:'local-drill'})
+console.log(JSON.stringify({kind:'local-drill',sealedSha256:sealed.sha256,verified,network:false,publication:false}))

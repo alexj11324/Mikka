@@ -1,0 +1,19 @@
+{
+  "command": [
+    "node",
+    "node_modules/vitest/vitest.mjs",
+    "run",
+    "test/claude-generation-abort.test.ts",
+    "test/codex-generation-completion.test.ts",
+    "--reporter=verbose"
+  ],
+  "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/daemon-fixture-mode-20261109/checkout/packages/daemon",
+  "startedAt": "2026-11-09T01:24:28.532180+00:00",
+  "endedAt": "2026-11-09T01:24:31.360868+00:00",
+  "exitCode": 0,
+  "log": "red-seven-integration.log",
+  "logSha256": "0635e4e93de315445fb4e28ee2a9b6d80a72ce71c8508b3e9e14484816ac057f",
+  "trackedDiff": ":100644 100755 09e0751562d1164cb3c0ba67fe7e4bc971dc3116 0000000000000000000000000000000000000000 M\tpackages/daemon/test/fakes/fake-claude-generation-abort.mjs\n:100644 100755 2b4fd7946c39a83eac97def4bab1cf0839802a3b 0000000000000000000000000000000000000000 M\tpackages/daemon/test/fakes/fake-codex-generation-completion.mjs\n",
+  "diffSha256": "74aa4e5db54a52c72f7988d196bb22b375d2c00fa65632c60f7bfc9afb902d06",
+  "boundary": "Integration assertions may pass while they dirty tracked executable modes; seal reproduction follows."
+}

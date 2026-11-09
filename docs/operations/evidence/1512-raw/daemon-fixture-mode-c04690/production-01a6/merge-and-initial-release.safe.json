@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "pr": 1675,
+  "mergeSha": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "tree": "8c5c12ea993533403d13e21dc75647bb28022767",
+  "parents": [
+    "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+    "ae1504f1bb266ae3f7b6612898f134dd979f5fdd"
+  ],
+  "acceptedCi": {
+    "runId": 42541312185,
+    "checkout": "0041c6ab2a28b562deed9c692d8572ac4736f64e",
+    "sameTree": true,
+    "checks": {
+      "success": 37,
+      "skipped": 8,
+      "failure": 0,
+      "pending": 0
+    },
+    "nativeLogin": [
+      384,
+      402
+    ],
+    "firstStartup": [
+      168,
+      200
+    ]
+  },
+  "mainWindow": {
+    "start": "2026-11-09T01:15:00Z",
+    "plannedRefreshBy": "2026-11-09T02:30:00Z",
+    "releaseCondition": "E2B publish and cleanup complete; runtime-refresh Web READY and served exact merge SHA",
+    "issueComment": 6729905138,
+    "coordinationComment": 6729907811
+  },
+  "mergeComment": 6729948550,
+  "autoRuns": {
+    "web": 42544540018,
+    "daemon": 42544539939,
+    "e2b": 42544540108
+  },
+  "controlledFailure": {
+    "request": {
+      "requestId": "27e467e8-c793-48bf-ae35-c488d496eaec",
+      "inputs": {
+        "mode": "controlled-failure",
+        "expected-deployment-sha": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+        "model-case": "all",
+        "prepare": "false",
+        "browser-submit": "false",
+        "export-target": "dashboard",
+        "export-id": "",
+        "session-id": "",
+        "trace-id": ""
+      }
+    },
+    "preparedOpsCommit": "19c0064890f4012e1f5e03605e663ec6103689f9",
+    "published": false,
+    "dispatched": false
+  },
+  "productionCases": 0,
+  "issueClosed": false
+}

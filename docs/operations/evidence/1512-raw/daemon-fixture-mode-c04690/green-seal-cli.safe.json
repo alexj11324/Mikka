@@ -1,0 +1,18 @@
+{
+  "command": [
+    "node",
+    "scripts/release/evidence.mjs",
+    "seal",
+    "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/daemon-fixture-mode-20261109/candidate"
+  ],
+  "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/daemon-fixture-mode-20261109/checkout",
+  "startedAt": "2026-11-09T01:27:24.149739+00:00",
+  "endedAt": "2026-11-09T01:27:24.251803+00:00",
+  "exitCode": 0,
+  "log": "green-seal-cli.log",
+  "logSha256": "7fe7c58af2e3935cbb843ada17f829351518070ecd91380c837ce8bff61a6cb3",
+  "manifestCreated": true,
+  "trackedCheckoutClean": true,
+  "sourceSha": "5975e42ef3436a53546948b556166777d1b0be9d",
+  "environmentBoundary": "Local test fixture GITHUB-shaped input with local mode-fix commit SHA and runId 0. No credentials/network/publication; unchanged actual CLI including original checkout guard ran."
+}

@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "checkpoint": 15,
+  "createdAt": "2026-11-09T01:37:51.653625+00:00",
+  "scope": "Exact selected text payload, source-byte binding and necessary public content only.",
+  "originalFilesCopied": 26,
+  "originalBytesCopied": 65295,
+  "sourceBytesChanged": 0,
+  "screening": {
+    "method": "UTF-8 text and recursive JSON string-field scan for credential prefixes, private-key material, JWTs, signed download links, bearer values, URL credentials and email addresses, followed by contextual interpretation of selected fixture/closed fields. Matched values are never printed.",
+    "originalFilesScreened": 26,
+    "findingFieldsOnly": [],
+    "unresolvedCredentialOrEmailPatternHits": 0
+  },
+  "semanticBoundaries": [
+    "CLI GHA-shaped local runId 0 and its generated github-actions-main buildKind are offline fixtures, not production release authority.",
+    "The separately supported local-drill seal is a minimal artifact regression, not package/provider/registry acceptance.",
+    "Original failed production log has no changed-file list; two-mode attribution uses deterministic same-tree reproduction, not unseen CI filesystem data.",
+    "The root-notified actual PR head/parent/tree/file-list binding is attributed to root; this archive step performs no network verification.",
+    "Prepared ops commit and dispatch request are unpublished and undispatched at the retained record; the M1 payload must be rebound before any later use.",
+    "E2B candidate/build-cleanup success is not final public runtime, subscription or release-cleanup success.",
+    "Pending PR CI/E2B await-web status comes from the owner notice, not a new live status read."
+  ],
+  "excludedContent": [
+    "checkout directories",
+    "private complete job logs and API envelopes",
+    "raw candidate directory",
+    "original E2B candidates.json",
+    "all original ZIP archives"
+  ],
+  "originalMaterialPolicy": "Excluded originals remain unmodified locally; only previously recorded identifiers/hashes are referenced. No original is silently redacted.",
+  "publicSafeSelections": [
+    "local fixture commands and source/commit metadata",
+    "exact 2-mode patch",
+    "seven-case and seal RED/GREEN logs",
+    "supported local-drill manifest",
+    "independent review",
+    "existing closed release projections",
+    "explicit unexecuted request and initial merge record"
+  ],
+  "execution": {
+    "networkRequests": 0,
+    "testsRun": 0,
+    "sourceOrGitIndexChanges": 0,
+    "gitHubRefChanges": 0,
+    "paidModelsOrCloudResources": 0,
+    "activeProcesses": 0
+  }
+}

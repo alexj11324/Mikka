@@ -1,0 +1,17 @@
+{
+  "command": [
+    "node",
+    "scripts/release/evidence.mjs",
+    "seal",
+    "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/daemon-fixture-mode-20261109/candidate"
+  ],
+  "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/daemon-fixture-mode-20261109/checkout",
+  "startedAt": "2026-11-09T01:25:13.048129+00:00",
+  "endedAt": "2026-11-09T01:25:13.177371+00:00",
+  "exitCode": 1,
+  "log": "red-seal-cli.log",
+  "logSha256": "2859225d885fc2d2b558f718c608a176e39ce779aec29bf341a10210cdf660f4",
+  "expectedFailureObserved": true,
+  "manifestCreated": false,
+  "environmentBoundary": "Local test fixture GITHUB-shaped input with local snapshot SHA and runId 0; no credentials/network/publication. This is the unchanged CLI guard under test, not production release authority."
+}

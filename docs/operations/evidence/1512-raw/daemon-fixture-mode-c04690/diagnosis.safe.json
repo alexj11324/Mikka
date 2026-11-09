@@ -1,0 +1,154 @@
+{
+  "schema": "issue1512.daemon-release-fixture-mode-fix.v1",
+  "frozenAt": "2026-11-09T01:28:41.260100+00:00",
+  "actualFailedRelease": {
+    "mainSha": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+    "tree": "8c5c12ea993533403d13e21dc75647bb28022767",
+    "runId": 42544539939,
+    "jobId": 128926576137,
+    "log": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/production-01a6/private/job-128926576137.original.log",
+    "bytes": 107424,
+    "sha256": "f48d70bd2791a0bb0932f242bd76b93846f213b121efac1bec45a5a84515d1fc",
+    "necessaryLogEvidence": [
+      "2026-11-09T01:17:15.3824255Z  \u001b[32m\u2713\u001b[39m test/claude-generation-abort.test.ts \u001b[2m(\u001b[22m\u001b[2m4 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 506\u001b[2mms\u001b[22m\u001b[39m",
+      "2026-11-09T01:17:15.5023021Z  \u001b[32m\u2713\u001b[39m test/codex-generation-completion.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 302\u001b[2mms\u001b[22m\u001b[39m",
+      "2026-11-09T01:17:49.0390842Z Error: releaseCheckoutDirty",
+      "2026-11-09T01:17:49.0391201Z     at file:///home/runner/work/Mikka/Mikka/scripts/release/evidence.mjs:108:98"
+    ]
+  },
+  "rootCause": {
+    "paths": [
+      "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "packages/daemon/test/fakes/fake-codex-generation-completion.mjs"
+    ],
+    "cause": "Both actual adapter/SDK integration tests chmod their tracked fake CLI path to 0755. These two new files were committed as 100644; existing analogous fakes are 100755. The tests pass but change tracked modes, and the unchanged release seal rejects those non-manifest paths at evidence.mjs:108.",
+    "inferenceBoundary": "The failed production job did not print its changed-file list. Attribution is independently established by the exact same tree, observed execution of both test files in that job, deterministic two-mode-only post-test diff, and the same unmodified seal failure; no unseen production filesystem diff is claimed."
+  },
+  "fix": {
+    "createdAt": "2026-11-09T01:26:18.995563+00:00",
+    "commit": "5975e42ef3436a53546948b556166777d1b0be9d",
+    "parent": "df87eb4b8d2952ed3e1aed5ee740ff1231608594",
+    "baseTree": "8c5c12ea993533403d13e21dc75647bb28022767",
+    "tree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+    "scope": "Only two existing fixture executable bits 100644 -> 100755. All blobs and source bytes unchanged. Local normal commit, not pushed.",
+    "rawDiff": ":100644 100755 09e0751562d1164cb3c0ba67fe7e4bc971dc3116 09e0751562d1164cb3c0ba67fe7e4bc971dc3116 M\tpackages/daemon/test/fakes/fake-claude-generation-abort.mjs\n:100644 100755 2b4fd7946c39a83eac97def4bab1cf0839802a3b 2b4fd7946c39a83eac97def4bab1cf0839802a3b M\tpackages/daemon/test/fakes/fake-codex-generation-completion.mjs\n",
+    "patch": "fixture-executable-modes.patch",
+    "patchSha256": "74aa4e5db54a52c72f7988d196bb22b375d2c00fa65632c60f7bfc9afb902d06",
+    "afterCommitTrackedStatusClean": true,
+    "unchangedBlobs": [
+      {
+        "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+        "gitBlob": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+        "sha256": "a70e04b6b7ad83be663ebe08daee4257f73de7fe07bb3366d05bc83b94eb9c56"
+      },
+      {
+        "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+        "gitBlob": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+        "sha256": "11fa656bc01369f27d1255e2d912964b4dfae26b5f6ad8de786425e5738ac31c"
+      }
+    ]
+  },
+  "files": [
+    {
+      "path": "packages/daemon/test/claude-generation-abort.test.ts",
+      "sha256": "22e464044ffdd60fd7148d1a968334b6d4e19600dc8db512998d2ce07627f6d8",
+      "bytes": 4286,
+      "gitEntry": "100644 blob c9fb96f579fda0c1aa3372756074a1a90713204a\tpackages/daemon/test/claude-generation-abort.test.ts"
+    },
+    {
+      "path": "packages/daemon/test/codex-generation-completion.test.ts",
+      "sha256": "0c6684127dbdf037a78c7a1fe99690d8d1a77d2d4134632ccb2d5e736b748a31",
+      "bytes": 4020,
+      "gitEntry": "100644 blob 76449ff682615ebd14a533422194946e75441d74\tpackages/daemon/test/codex-generation-completion.test.ts"
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "sha256": "a70e04b6b7ad83be663ebe08daee4257f73de7fe07bb3366d05bc83b94eb9c56",
+      "bytes": 3767,
+      "gitEntry": "100755 blob 09e0751562d1164cb3c0ba67fe7e4bc971dc3116\tpackages/daemon/test/fakes/fake-claude-generation-abort.mjs"
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+      "sha256": "11fa656bc01369f27d1255e2d912964b4dfae26b5f6ad8de786425e5738ac31c",
+      "bytes": 4466,
+      "gitEntry": "100755 blob 2b4fd7946c39a83eac97def4bab1cf0839802a3b\tpackages/daemon/test/fakes/fake-codex-generation-completion.mjs"
+    },
+    {
+      "path": "scripts/release/evidence.mjs",
+      "sha256": "7aa1139a36dcf5f5d5377cb0356b21d7d0304c09ad2163cf6e08727d6c46f12a",
+      "bytes": 7781,
+      "gitEntry": "100644 blob 32e22150b25bb834ce353bb0784725bf629f8ab5\tscripts/release/evidence.mjs"
+    },
+    {
+      "path": "scripts/release/ci-gate.mjs",
+      "sha256": "0ab693a9140e95567420a638c76a372ef71b60f0d08f7620978f14f2698cc7b9",
+      "bytes": 3113,
+      "gitEntry": "100644 blob e5e04a012b6612101bc1cac3b5c64034b6f650be\tscripts/release/ci-gate.mjs"
+    },
+    {
+      "path": "packages/daemon/scripts/build.mjs",
+      "sha256": "def4856fd0f1825cb155d2f0e14ed4e734f62427678817f58071eeed61c7e05d",
+      "bytes": 4100,
+      "gitEntry": "100644 blob 13f7a24627b0d3e360488707d32b42dfcdbd5d4f\tpackages/daemon/scripts/build.mjs"
+    },
+    {
+      "path": "packages/daemon/scripts/release.mjs",
+      "sha256": "87b7acb4ebe9619139d5ae11c917071da914bce997f4cda426c47be9eb1e2bd8",
+      "bytes": 2936,
+      "gitEntry": "100644 blob 886cc2434cb4840dcb8e3402a02ac3adeb7c8e6e\tpackages/daemon/scripts/release.mjs"
+    }
+  ],
+  "minimality": {
+    "changedPaths": 2,
+    "sourceBytesChanged": 0,
+    "addedOrRemovedLines": 0,
+    "sealGuardChanged": false,
+    "testsChanged": false,
+    "ignoreRulesChanged": false,
+    "fileModeCheckingDisabled": false,
+    "publishedOrPushed": false,
+    "rootCheckoutOrIndexModified": false
+  },
+  "verification": {
+    "baseline": "Clean independent Git checkout with tree exactly 8c5; local snapshot commit df87 is explicitly distinct from production M. Existing installed dependencies were reused without installation.",
+    "red": {
+      "integrationTests": 7,
+      "integrationExitCode": 0,
+      "dirtyModePaths": 2,
+      "sealCliExitCode": 1,
+      "sealError": "releaseCheckoutDirty",
+      "sameGuardLine": 108,
+      "manifestCreated": false
+    },
+    "green": {
+      "integrationTests": 7,
+      "integrationExitCode": 0,
+      "trackedCheckoutClean": true,
+      "sealCliExitCode": 0,
+      "sealManifestCreated": true,
+      "localDrillSealAndVerifyExitCode": 0
+    },
+    "identityBoundary": "Unmodified CLI guard ran against local GITHUB-shaped test input with local source SHA/runId 0 and no credentials. A separate actual exported seal/verify uses its explicitly supported kind local-drill. Neither result is a GitHub production release or npm registry proof.",
+    "artifactBoundary": "Minimum local artifact and CycloneDX SBOM were used as authorized to isolate checkout/seal behavior; no full daemon build, npm dependency graph fetch, registry write, or CI rerun was performed."
+  },
+  "mergeRisk": {
+    "alignment": "Removes the demonstrated blocker preventing publication of issue1512 daemon changes while retaining the release integrity gate.",
+    "occurrence": 10,
+    "impact": 7,
+    "score": 70,
+    "scopeRisk": "Low; two executable mode bits on test-only fake CLIs, unchanged blob content.",
+    "verification": "Seven actual adapter/SDK cases before and after, unchanged seal CLI same-line RED then GREEN, supported local-drill seal/verify GREEN, Git mode checking on and clean checkout.",
+    "rollback": "Revert two mode bits; would restore the demonstrated deterministic seal failure.",
+    "errorDetection": "Existing releaseCheckoutDirty guard remains intact and fails any future tracked mutation outside the original version/gitHead exception."
+  },
+  "resources": {
+    "newCloudOrCIOrModelRuns": 0,
+    "networkCalls": 0,
+    "activeOwnedProcesses": 0,
+    "integrationSessions": {
+      "72789": 0,
+      "63729": 0
+    }
+  },
+  "nextOwnerStep": "Independently review the mode-only diff, integrate through the owner PR flow, retain exact candidate CI/source binding, and observe the actual new main daemon publication. Do not report the current failed release as published."
+}

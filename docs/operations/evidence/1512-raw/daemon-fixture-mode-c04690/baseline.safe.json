@@ -1,0 +1,68 @@
+{
+  "createdAt": "2026-11-09T01:24:04.245282+00:00",
+  "actualMain": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "actualMainTree": "8c5c12ea993533403d13e21dc75647bb28022767",
+  "localVerificationCommit": "df87eb4b8d2952ed3e1aed5ee740ff1231608594",
+  "checkout": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/daemon-fixture-mode-20261109/checkout",
+  "localTreeMatchesMain": true,
+  "baselineStatusClean": true,
+  "dependencySymlinks": {
+    "node_modules": "/workspace/scratch/af05d9e4f31e/Mikka-observability-1512/node_modules",
+    "packages/daemon/node_modules": "/workspace/scratch/af05d9e4f31e/Mikka-observability-1512/packages/daemon/node_modules"
+  },
+  "files": [
+    {
+      "path": "packages/daemon/test/claude-generation-abort.test.ts",
+      "bytes": 4286,
+      "sha256": "22e464044ffdd60fd7148d1a968334b6d4e19600dc8db512998d2ce07627f6d8",
+      "gitEntry": "100644 blob c9fb96f579fda0c1aa3372756074a1a90713204a\tpackages/daemon/test/claude-generation-abort.test.ts"
+    },
+    {
+      "path": "packages/daemon/test/codex-generation-completion.test.ts",
+      "bytes": 4020,
+      "sha256": "0c6684127dbdf037a78c7a1fe99690d8d1a77d2d4134632ccb2d5e736b748a31",
+      "gitEntry": "100644 blob 76449ff682615ebd14a533422194946e75441d74\tpackages/daemon/test/codex-generation-completion.test.ts"
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "bytes": 3767,
+      "sha256": "a70e04b6b7ad83be663ebe08daee4257f73de7fe07bb3366d05bc83b94eb9c56",
+      "gitEntry": "100644 blob 09e0751562d1164cb3c0ba67fe7e4bc971dc3116\tpackages/daemon/test/fakes/fake-claude-generation-abort.mjs"
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+      "bytes": 4466,
+      "sha256": "11fa656bc01369f27d1255e2d912964b4dfae26b5f6ad8de786425e5738ac31c",
+      "gitEntry": "100644 blob 2b4fd7946c39a83eac97def4bab1cf0839802a3b\tpackages/daemon/test/fakes/fake-codex-generation-completion.mjs"
+    },
+    {
+      "path": "scripts/release/evidence.mjs",
+      "bytes": 7781,
+      "sha256": "7aa1139a36dcf5f5d5377cb0356b21d7d0304c09ad2163cf6e08727d6c46f12a",
+      "gitEntry": "100644 blob 32e22150b25bb834ce353bb0784725bf629f8ab5\tscripts/release/evidence.mjs"
+    },
+    {
+      "path": "scripts/release/ci-gate.mjs",
+      "bytes": 3113,
+      "sha256": "0ab693a9140e95567420a638c76a372ef71b60f0d08f7620978f14f2698cc7b9",
+      "gitEntry": "100644 blob e5e04a012b6612101bc1cac3b5c64034b6f650be\tscripts/release/ci-gate.mjs"
+    },
+    {
+      "path": "packages/daemon/scripts/build.mjs",
+      "bytes": 4100,
+      "sha256": "def4856fd0f1825cb155d2f0e14ed4e734f62427678817f58071eeed61c7e05d",
+      "gitEntry": "100644 blob 13f7a24627b0d3e360488707d32b42dfcdbd5d4f\tpackages/daemon/scripts/build.mjs"
+    },
+    {
+      "path": "packages/daemon/scripts/release.mjs",
+      "bytes": 2936,
+      "sha256": "87b7acb4ebe9619139d5ae11c917071da914bce997f4cda426c47be9eb1e2bd8",
+      "gitEntry": "100644 blob 886cc2434cb4840dcb8e3402a02ac3adeb7c8e6e\tpackages/daemon/scripts/release.mjs"
+    }
+  ],
+  "productionLog": {
+    "path": "../production-01a6/private/job-128926576137.original.log",
+    "sha256": "f48d70bd2791a0bb0932f242bd76b93846f213b121efac1bec45a5a84515d1fc"
+  },
+  "scope": "Only the seven existing integration cases and actual release seal against isolated fixtures. No network/CI/npm publication/root mutations."
+}

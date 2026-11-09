@@ -1,0 +1,136 @@
+{
+  "schema": "issue1512.daemon-fixture-mode-review-index.v1",
+  "frozenAt": "2026-11-09T01:28:41.260100+00:00",
+  "directory": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/daemon-fixture-mode-20261109",
+  "checkout": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/daemon-fixture-mode-20261109/checkout",
+  "actualMain": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "baseTree": "8c5c12ea993533403d13e21dc75647bb28022767",
+  "localCommit": "5975e42ef3436a53546948b556166777d1b0be9d",
+  "localParent": "df87eb4b8d2952ed3e1aed5ee740ff1231608594",
+  "fixedTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+  "patch": {
+    "path": "fixture-executable-modes.patch",
+    "bytes": 342,
+    "sha256": "74aa4e5db54a52c72f7988d196bb22b375d2c00fa65632c60f7bfc9afb902d06",
+    "gitBlobSha": "e71845db7abc803bc1bfd849ca4daa6225f0e5d8"
+  },
+  "result": "two-mode-only root cause reproduced; unchanged seal RED then GREEN; same seven actual integration cases pass, checkout stays clean after fix",
+  "files": [
+    {
+      "path": "baseline.safe.json",
+      "bytes": 3416,
+      "sha256": "fdc95c1bf8b91cc0df144e5f0a6916bbee78e0ffea669e066322a9d0941692c1",
+      "gitBlobSha": "5c3caf6a714ccaf5844bbe94a46c1b6b621c0154"
+    },
+    {
+      "path": "mode-fix-commit.safe.json",
+      "bytes": 1435,
+      "sha256": "ea1c25dd73b6ab111ddd74bcb024381984b2fbda22348786c23f672fb135cc8c",
+      "gitBlobSha": "3c8ce5f5358c05ee6433effe2cf670d5fa7f4b7d"
+    },
+    {
+      "path": "fixture-executable-modes.patch",
+      "bytes": 342,
+      "sha256": "74aa4e5db54a52c72f7988d196bb22b375d2c00fa65632c60f7bfc9afb902d06",
+      "gitBlobSha": "e71845db7abc803bc1bfd849ca4daa6225f0e5d8"
+    },
+    {
+      "path": "red-seven-integration.log",
+      "bytes": 1218,
+      "sha256": "0635e4e93de315445fb4e28ee2a9b6d80a72ce71c8508b3e9e14484816ac057f",
+      "gitBlobSha": "575512ed51419938dcb8ea0efbd5f86edc4e5212"
+    },
+    {
+      "path": "red-seven-integration.safe.json",
+      "bytes": 1111,
+      "sha256": "0e5e7f495c21706dcd4197f8ffe44eaf09ac202089c709dce487dcbafea17130",
+      "gitBlobSha": "5458abddfc59a201bdec543f8b6b1864d59b2a62"
+    },
+    {
+      "path": "red-after-tests.diff",
+      "bytes": 342,
+      "sha256": "74aa4e5db54a52c72f7988d196bb22b375d2c00fa65632c60f7bfc9afb902d06",
+      "gitBlobSha": "e71845db7abc803bc1bfd849ca4daa6225f0e5d8"
+    },
+    {
+      "path": "red-seal-cli.log",
+      "bytes": 551,
+      "sha256": "2859225d885fc2d2b558f718c608a176e39ce779aec29bf341a10210cdf660f4",
+      "gitBlobSha": "c15c95df4ce3b02d4bb88bc15f8252f88e3d4384"
+    },
+    {
+      "path": "red-seal-cli.safe.json",
+      "bytes": 800,
+      "sha256": "211ee1631e0dfe5962c5723b1324acaac4381b1977fd45bd17dae2d74394c0f2",
+      "gitBlobSha": "6f220745843eeddff4f43223eb9d3cd129233c5c"
+    },
+    {
+      "path": "green-seven-integration.log",
+      "bytes": 1217,
+      "sha256": "d15624c05d23bc6928658c9731ca1a2db8df84e7cee300f1aa8630d46921621d",
+      "gitBlobSha": "fc94949f2d701cf96fcd53ad22080b39048f1e28"
+    },
+    {
+      "path": "green-seven-integration.safe.json",
+      "bytes": 695,
+      "sha256": "46451a9ac7c17a4c6e3f5db7feba3568dfb84592b64382b5a771421a1f3c6ebf",
+      "gitBlobSha": "18bc8dbde9663400e166a24634fdc26e78e4e69c"
+    },
+    {
+      "path": "green-seal-cli.log",
+      "bytes": 168,
+      "sha256": "7fe7c58af2e3935cbb843ada17f829351518070ecd91380c837ce8bff61a6cb3",
+      "gitBlobSha": "07a1dae321e400ac6d2dbba248938abad9fb51e3"
+    },
+    {
+      "path": "green-seal-cli.safe.json",
+      "bytes": 846,
+      "sha256": "5cbee1a196ac75736d3722eae0ea937eb19835f047bdf690aaf5ab6c103e03f6",
+      "gitBlobSha": "9c2815d5b84cb4019a11ff9c0f064563365e678d"
+    },
+    {
+      "path": "green-seal-cli.manifest.original.json",
+      "bytes": 636,
+      "sha256": "c6c69f9d0a5d382a1983d948be35aad7b988245cf74373ed432dd9f9405c8559",
+      "gitBlobSha": "15e11f434d5bdab8ee22eda232cbad0adb13cb20"
+    },
+    {
+      "path": "green-cli.outputs",
+      "bytes": 81,
+      "sha256": "16ba0cca044b6d314bd7193d2397cca6476ab9501ed4f85d222dcae85675ded8",
+      "gitBlobSha": "21880dcc52f2d10cacec58c1647e64c86d059891"
+    },
+    {
+      "path": "green-local-drill.log",
+      "bytes": 260,
+      "sha256": "ecd591f2bbcee411f298a187612c5334aeb820fecf86031574d294f0a1fe4efd",
+      "gitBlobSha": "08f5cd9c3a8b660e243c2b0357f4f80d6e27c0ef"
+    },
+    {
+      "path": "green-local-drill.safe.json",
+      "bytes": 901,
+      "sha256": "341046aa88a37704a4e079eb8075a76a9ba284a8af653981d016c7782e7a191a",
+      "gitBlobSha": "a29b6dd94c2cdc53ac490eeb75f0ac264c25fdab"
+    },
+    {
+      "path": "green-local-drill.manifest.original.json",
+      "bytes": 652,
+      "sha256": "b56c5383f01b529a95a22778b8daf3273a09fc66291799e240846eed2268b1fc",
+      "gitBlobSha": "553dc1d320443d36876c0f9482741a78f27a1882"
+    },
+    {
+      "path": "run-local-seal-drill.mjs.txt",
+      "bytes": 675,
+      "sha256": "091a66c7408c618c92c06f514195495b970cf1f68d722608092afbcf66273541",
+      "gitBlobSha": "ec5e2974624be493128bcfc7b2c2d9c16e693530"
+    },
+    {
+      "path": "diagnosis.safe.json",
+      "bytes": 8661,
+      "sha256": "43dbfa89e3ce6068be430ab0e48f38ff89ba8819427c7df2f1bb6b80eff6909d",
+      "gitBlobSha": "5c52643ca45a9d9f241640b4d348471709895033"
+    }
+  ],
+  "productionPublicationEstablished": false,
+  "resourcesActive": 0
+}

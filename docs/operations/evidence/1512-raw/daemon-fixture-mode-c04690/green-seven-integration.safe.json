@@ -1,0 +1,20 @@
+{
+  "command": [
+    "node",
+    "node_modules/vitest/vitest.mjs",
+    "run",
+    "test/claude-generation-abort.test.ts",
+    "test/codex-generation-completion.test.ts",
+    "--reporter=verbose"
+  ],
+  "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/daemon-fixture-mode-20261109/checkout/packages/daemon",
+  "startedAt": "2026-11-09T01:26:19.525876+00:00",
+  "endedAt": "2026-11-09T01:26:21.833028+00:00",
+  "exitCode": 0,
+  "log": "green-seven-integration.log",
+  "logSha256": "d15624c05d23bc6928658c9731ca1a2db8df84e7cee300f1aa8630d46921621d",
+  "trackedStatus": "",
+  "trackedDiff": "",
+  "trackedCheckoutClean": true,
+  "commit": "5975e42ef3436a53546948b556166777d1b0be9d"
+}

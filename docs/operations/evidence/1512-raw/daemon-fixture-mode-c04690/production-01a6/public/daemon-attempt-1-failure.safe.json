@@ -1,0 +1,258 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512_daemon_release_attempt_failure",
+  "sourceCommit": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "tree": "8c5c12ea993533403d13e21dc75647bb28022767",
+  "run": {
+    "id": 42544539939,
+    "run_number": 551,
+    "run_attempt": 1,
+    "event": "push",
+    "head_branch": "main",
+    "status": "completed",
+    "conclusion": "failure",
+    "created_at": "2026-11-09T01:14:54Z",
+    "updated_at": "2026-11-09T01:17:51Z",
+    "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42544539939"
+  },
+  "job": {
+    "id": 128926576137,
+    "name": "publish",
+    "head_sha": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+    "status": "completed",
+    "conclusion": "failure",
+    "started_at": "2026-11-09T01:14:57Z",
+    "completed_at": "2026-11-09T01:17:51Z",
+    "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42544539939/job/128926576137"
+  },
+  "steps": [
+    {
+      "name": "Set up job",
+      "number": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:14:57Z",
+      "completed_at": "2026-11-09T01:14:58Z"
+    },
+    {
+      "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+      "number": 2,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:14:58Z",
+      "completed_at": "2026-11-09T01:15:03Z"
+    },
+    {
+      "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+      "number": 3,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:15:03Z",
+      "completed_at": "2026-11-09T01:15:04Z"
+    },
+    {
+      "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+      "number": 4,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:15:04Z",
+      "completed_at": "2026-11-09T01:15:32Z"
+    },
+    {
+      "name": "Run npm install --global npm@11.19.0",
+      "number": 5,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:15:32Z",
+      "completed_at": "2026-11-09T01:15:37Z"
+    },
+    {
+      "name": "Prepare release version and check registry",
+      "number": 6,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:15:37Z",
+      "completed_at": "2026-11-09T01:15:38Z"
+    },
+    {
+      "name": "Run pnpm install --frozen-lockfile",
+      "number": 7,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:15:38Z",
+      "completed_at": "2026-11-09T01:15:50Z"
+    },
+    {
+      "name": "Run node --test packages/daemon/test/release.node-test.mjs",
+      "number": 8,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:15:50Z",
+      "completed_at": "2026-11-09T01:15:50Z"
+    },
+    {
+      "name": "Run pnpm --filter @mikka/daemon typecheck",
+      "number": 9,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:15:50Z",
+      "completed_at": "2026-11-09T01:15:53Z"
+    },
+    {
+      "name": "Run pnpm --filter @mikka/daemon test",
+      "number": 10,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:15:53Z",
+      "completed_at": "2026-11-09T01:17:42Z"
+    },
+    {
+      "name": "Run pnpm --filter @mikka/daemon build",
+      "number": 11,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:17:42Z",
+      "completed_at": "2026-11-09T01:17:43Z"
+    },
+    {
+      "name": "Pin and inventory the released runtime dependency graph",
+      "number": 12,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:17:43Z",
+      "completed_at": "2026-11-09T01:17:48Z"
+    },
+    {
+      "name": "Seal the exact candidate before its package acceptance test",
+      "number": 13,
+      "status": "completed",
+      "conclusion": "failure",
+      "started_at": "2026-11-09T01:17:48Z",
+      "completed_at": "2026-11-09T01:17:49Z"
+    },
+    {
+      "name": "Run pnpm --filter @mikka/daemon test:package",
+      "number": 14,
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-11-09T01:17:49Z",
+      "completed_at": "2026-11-09T01:17:49Z"
+    },
+    {
+      "name": "Require successful checks for this exact main commit",
+      "number": 15,
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-11-09T01:17:49Z",
+      "completed_at": "2026-11-09T01:17:49Z"
+    },
+    {
+      "name": "Verify the tested candidate was not changed",
+      "number": 16,
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-11-09T01:17:49Z",
+      "completed_at": "2026-11-09T01:17:49Z"
+    },
+    {
+      "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+      "number": 17,
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-11-09T01:17:49Z",
+      "completed_at": "2026-11-09T01:17:49Z"
+    },
+    {
+      "name": "Publish with npm trusted publishing and provenance",
+      "number": 18,
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-11-09T01:17:49Z",
+      "completed_at": "2026-11-09T01:17:49Z"
+    },
+    {
+      "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+      "number": 34,
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-11-09T01:17:49Z",
+      "completed_at": "2026-11-09T01:17:49Z"
+    },
+    {
+      "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+      "number": 35,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:17:49Z",
+      "completed_at": "2026-11-09T01:17:49Z"
+    },
+    {
+      "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+      "number": 36,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:17:49Z",
+      "completed_at": "2026-11-09T01:17:49Z"
+    },
+    {
+      "name": "Complete job",
+      "number": 37,
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:17:49Z",
+      "completed_at": "2026-11-09T01:17:49Z"
+    }
+  ],
+  "errorExcerpt": [
+    {
+      "line": 1015,
+      "text": "2026-11-09T01:17:49.0390842Z Error: releaseCheckoutDirty"
+    },
+    {
+      "line": 1019,
+      "text": "2026-11-09T01:17:49.0438002Z ##[error]Process completed with exit code 1."
+    }
+  ],
+  "artifactCount": 0,
+  "packageAcceptanceCompleted": false,
+  "exactMainCiGateCompleted": false,
+  "npmPublishCompleted": false,
+  "registryVersionVerified": false,
+  "conclusionBoundary": "Candidate seal failed before package acceptance, exact-main CI gate, evidence upload and npm publication. No successful release is established by this attempt.",
+  "rawIntegrity": [
+    {
+      "file": "private/daemon-final-run.original.json",
+      "bytes": 26443,
+      "sha256": "198dee377c45a907964f214189a2faad12786620fcbec2fd442ea2970b00780e"
+    },
+    {
+      "file": "private/daemon-final-jobs.original.json",
+      "bytes": 12193,
+      "sha256": "78c26416d8c76f723cad446f04f91e2787514fbea43bcb80667235a74c62b346"
+    },
+    {
+      "file": "private/daemon-final-artifacts.original.json",
+      "bytes": 965,
+      "sha256": "57e32bb9a80a2fe9c8df8e3440798ee857cbcb4a6ce930341cf60c1dc9de683b"
+    },
+    {
+      "file": "private/job-128926576137.original.json",
+      "bytes": 123991,
+      "sha256": "d69a018741cf8753c27fede2b66106f7438a07973fb7fd5957e04763e4b88c5e"
+    },
+    {
+      "file": "private/job-128926576137.original.log",
+      "bytes": 107424,
+      "sha256": "f48d70bd2791a0bb0932f242bd76b93846f213b121efac1bec45a5a84515d1fc"
+    }
+  ],
+  "terminalJobLogDownloadCount": 1,
+  "actionsByObserver": {
+    "rerun": 0,
+    "cancel": 0,
+    "configurationChanges": 0,
+    "modelRuns": 0,
+    "resourcesCreated": 0
+  },
+  "omitted": "Original log and complete API envelopes remain local; public projection contains only run/job/source metadata, step outcomes, closed error code and hashes."
+}

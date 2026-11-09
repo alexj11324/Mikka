@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "sourceSha": "5975e42ef3436a53546948b556166777d1b0be9d",
+  "repository": "alexj11324/Mikka",
+  "buildRunId": "0",
+  "buildKind": "github-actions-main",
+  "sourceLockSha256": "345a6e1d97bb3a0028497f3294a86944bc9f617af892de71990d40d2cdf36054",
+  "createdAt": "2026-11-09T01:27:24.244Z",
+  "sbom": "sbom.cdx.json",
+  "files": [
+    {
+      "path": "mikka.js",
+      "size": 37,
+      "sha256": "dd64677eb7d8f47b72272d276e7ce65da5027f0e657ac9d6b4973c670f957fc8"
+    },
+    {
+      "path": "sbom.cdx.json",
+      "size": 150,
+      "sha256": "e9049e7e3cef8bb574a87eceb63c0b0343b71a8b2b275f086ffe229d1e5f1b1b"
+    }
+  ]
+}

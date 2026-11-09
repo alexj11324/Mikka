@@ -1,0 +1,14 @@
+{
+  "requestId": "27e467e8-c793-48bf-ae35-c488d496eaec",
+  "inputs": {
+    "mode": "controlled-failure",
+    "expected-deployment-sha": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+    "model-case": "all",
+    "prepare": "false",
+    "browser-submit": "false",
+    "export-target": "dashboard",
+    "export-id": "",
+    "session-id": "",
+    "trace-id": ""
+  }
+}
