@@ -112,7 +112,7 @@ test('a steps row says what ran: commands and tools, or the plain count without 
   ]
   assert.equal(stepsLabel(steps, 3), '已运行 2 条命令 · 调用了 1 个工具')
   assert.equal(stepsLabel([steps[2]!], 1), '调用了 1 个工具')
-  assert.equal(stepsLabel(undefined, 3), '3 步')
+  assert.equal(stepsLabel(undefined, 3), '执行了 3 步')
   assert.equal(commandText('/bin/bash -lc "pnpm test"'), 'pnpm test')
   assert.equal(commandText(`/bin/bash -lc "python3 - <<'PY' import json…`), `python3 - <<'PY' import json…`)
   assert.deepEqual(stepLine(steps[2]!), { title: 'record_decision', detail: 'Choose provider receipts', code: false })

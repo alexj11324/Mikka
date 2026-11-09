@@ -15,7 +15,7 @@ const OUTPUT_LINES = 8
  * A run's folded tool calls in its conversation (Alex 2026-11-08, after Codex's 「已运行 4 条命令 · 调用了 9 个工具 ›」):
  * a row with what ran and a chevron; a tap lists each command (as typed) or tool (with the input that says what it
  * did), its state and, when the server sends it, how long it took. A step with output opens to it, cut to a few lines
- * with 显示更多. An older server sends only the count: the row reads 「3 步」 and does not open.
+ * with 显示更多. An older server sends only the count: the row reads 「执行了 3 步」 and does not open.
  */
 export function ThreadSteps({ steps, count, live }: { steps?: ThreadStep[]; count: number; live: boolean }) {
   const [open, setOpen] = useState(false)

@@ -9,9 +9,9 @@ export type ThreadStep = { id: string; name: string; detail: string | null; fail
 const COMMANDS = new Set(['bash', 'shell', 'execute'])
 export const isCommand = (step: Pick<ThreadStep, 'name'>) => COMMANDS.has(step.name.toLowerCase())
 
-/** The row's words, as Codex says them: 「已运行 2 条命令 · 调用了 1 个工具」; without the steps, 「3 步」. */
+/** The row's words, as Codex says them: 「已运行 2 条命令 · 调用了 1 个工具」; without the steps, 「执行了 3 步」. No Agent name: the Agent shows only in the header and where it changes. */
 export function stepsLabel(steps: readonly Pick<ThreadStep, 'name'>[] | undefined, count: number) {
-  if (!steps?.length) return `${count} 步`
+  if (!steps?.length) return `执行了 ${count} 步`
   const commands = steps.filter(isCommand).length
   const tools = steps.length - commands
   return [commands ? `已运行 ${commands} 条命令` : null, tools ? `调用了 ${tools} 个工具` : null].filter(Boolean).join(' · ')
