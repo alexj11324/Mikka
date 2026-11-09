@@ -1,0 +1,802 @@
+[
+  {
+    "path": "installation/README.md",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/README.md",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 6034,
+    "sha256": "ae7f8e2dde004e197fae8528826a8c55240521bd6749f0201e318af3bda1d9df",
+    "gitBlob": "fe451b19c718aa7070fb3ea5d737b9a75245a3eb",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/actual-build-result.json",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/actual-build-result.json",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 932,
+    "sha256": "15b1533071f953ec0b3f7451e401e77ecc208b850ecc67a9167a4ceace8b2941",
+    "gitBlob": "832f7f8af9d55071b2f6fa079dede3081906696c",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/actual-build.stderr.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/actual-build.stderr.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/actual-build.stdout.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/actual-build.stdout.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/actual-ignore-config.result.json",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/actual-ignore-config.result.json",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 443,
+    "sha256": "02dda890da699d143a736e22d0831d6d0dee9631491c6051b170a3137cb10792",
+    "gitBlob": "d7e9e201d8de5dcd3c7323ee103ba2f8e8b42e47",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/actual-ignore-config.stderr.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/actual-ignore-config.stderr.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/actual-ignore-config.stdout.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/actual-ignore-config.stdout.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 233,
+    "sha256": "7b4c09cf6a753770c0fdf318db0569a3269902c95ff46a8971544e8b24fa7103",
+    "gitBlob": "92c164adc6cab09e20ed2651d5e71202920e3777",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/actual-install-command.json",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/actual-install-command.json",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 548,
+    "sha256": "7eec37df50c8c0ebfd2083017f0b1716b7bd87891ef7e2981e865c5c82d50a90",
+    "gitBlob": "44097a676965a737c82ba4f72eb4547f55e6ec32",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/actual-install-result.json",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/actual-install-result.json",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 654,
+    "sha256": "b1cbc61e116bff7c276a8e2df07a7ee81b91c540c3a63eccb4ecf31f8dcfe9b8",
+    "gitBlob": "c71464b87a0615124b7d1d5d8430b8b47db155eb",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/actual-install.stderr.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/actual-install.stderr.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/actual-install.stdout.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/actual-install.stdout.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 1036,
+    "sha256": "406eccf101a62d0e2bf01e3ca30bf392f60f6e07609f90329ec1d31f0ab3b2f5",
+    "gitBlob": "da0300f34e9ea2e6a03f42cf55cc9362532794c3",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/baseline-filter.result.json",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/baseline-filter.result.json",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 220,
+    "sha256": "fc91a291fa2d3402f373c52bc66ca470107f819ace03c6eb4abcb777092ef30b",
+    "gitBlob": "4426cbcf49067563a3b7d46a7ea126da73ba3eb3",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/baseline-filter.stderr.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/baseline-filter.stderr.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/baseline-filter.stdout.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/baseline-filter.stdout.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 1341,
+    "sha256": "8b87df0f366c22f3a8c21b75e86f2f29b1c3584e1ea0bb600c914f20d608934e",
+    "gitBlob": "d56a3b41c5df94174b0071211c5be60f315fcd8e",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/bootstrap-syntax-final.stderr.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/bootstrap-syntax-final.stderr.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/bootstrap-syntax-final.stdout.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/bootstrap-syntax-final.stdout.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/bootstrap-syntax.stderr.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/bootstrap-syntax.stderr.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/bootstrap-syntax.stdout.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/bootstrap-syntax.stdout.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/build-resource-verification.json",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/build-resource-verification.json",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 10221,
+    "sha256": "2ed4d17be8570c4f6a84869c727dd0b5ff4264b45079111808f92b83233c9a4f",
+    "gitBlob": "d8b87c594031d1db64d47ba941b2582648753e85",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/build-resource-verification.stderr.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/build-resource-verification.stderr.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/build-resource-verification.stdout.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/build-resource-verification.stdout.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 365,
+    "sha256": "f53ea9a711adc933cf6c3d18effd2310892f8c30d7c74f9af04f9bf435fc0de6",
+    "gitBlob": "283c6ae42c6699034abba053fca29d0c772a5596",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/build-template-tests.stderr.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/build-template-tests.stderr.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 5739,
+    "sha256": "a49acf56ef8127548f73ab693fdfbe47300a9ff0b31f8cf132512eafe54b1a6a",
+    "gitBlob": "cc36aa31b9077fd0797b07050edefd0a89e0e50a",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/build-template-tests.stdout.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/build-template-tests.stdout.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/candidate-ignore-workspace.result.json",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/candidate-ignore-workspace.result.json",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 5394,
+    "sha256": "bd482448c7bdfd3eb7f27f510012e97213b912b7fd7946b35e1db265b2c1fcce",
+    "gitBlob": "1ce56c8adaf39f8ba4977bbd25a979ad62b2bdaa",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/candidate-nonrecursive-config.stderr.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/candidate-nonrecursive-config.stderr.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/candidate-nonrecursive-config.stdout.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/candidate-nonrecursive-config.stdout.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 1173,
+    "sha256": "93396267804fc3c71ba641e6172f8adbb044d828994d213886e96d2cdd8e4f50",
+    "gitBlob": "838d3b6cbb6c09198de3e0ccc6d9721953110c9b",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/candidate-nonrecursive-daemon.stderr.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/candidate-nonrecursive-daemon.stderr.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/candidate-nonrecursive-daemon.stdout.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/candidate-nonrecursive-daemon.stdout.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 923,
+    "sha256": "d32e3ef8e40841545f84aceb26f521f2835de08e8163d5b83f8ec621b0b680d6",
+    "gitBlob": "197aa3457b509c4fd6249ab37c972422e010eb6e",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/candidate-nonrecursive-protocol.stderr.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/candidate-nonrecursive-protocol.stderr.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/candidate-nonrecursive-protocol.stdout.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/candidate-nonrecursive-protocol.stdout.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 923,
+    "sha256": "d567b0ea19ebd0d71e411448c459d893ce08a8fba01042a9ba9492637fff98d8",
+    "gitBlob": "041c9f20a5569986d6e7266fbcaa025e801ac9eb",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/candidate-nonrecursive.result.json",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/candidate-nonrecursive.result.json",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 229,
+    "sha256": "9c90968057c60bd0b7a302a6878de5712b99c9baf3ca15c379960176327eae7d",
+    "gitBlob": "32a7c2d945a5aa72c72fe72555645b4b43918c99",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/candidate-product.diff",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/candidate-product.diff",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 13779,
+    "sha256": "a3f6cc52115d38555863b9c3dcb67f3b4c66804153e2cf114bbcb7d4ac10b230",
+    "gitBlob": "476272381b58cacabeca225dcb3348a9271121da",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/candidate-source-current.json",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/candidate-source-current.json",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 540,
+    "sha256": "99dde3734877d4f159be07cccb0f220728ae997b701f83902db55c1be98cbc3b",
+    "gitBlob": "7e5a3a5d254ee2209e8544a673941c73bb46bef0",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/candidate-source-final.json",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/candidate-source-final.json",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 1483,
+    "sha256": "bb3ec1716a362491ab26f9dfb90855377795f9938b90ebeb419ab41acd8d5fff",
+    "gitBlob": "39a82bf760a267c8e056fded9bc60a24ed2097a2",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/final-related-results.json",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/final-related-results.json",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 2242,
+    "sha256": "27b00e320b3f60b4a199bdb45ad1952078ea4b3ea96d63fefc3b79d7ec9c64c9",
+    "gitBlob": "90962c1f1f44c7643783520b483e7522c00a480e",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/fixture-command-results.json",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/fixture-command-results.json",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 657,
+    "sha256": "5326ca2b55d2be1957e093fd05882f8b8a2adc027c282050009ab6dd25697543",
+    "gitBlob": "b0b35e34a64f809dadbaae16aaf57020b212e3f3",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/fixture-runner.py",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/fixture-runner.py",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 4290,
+    "sha256": "03aa6fd6594f36d44c8d11f77ebd84121643d6ad98836ee9be6ebdb33993166c",
+    "gitBlob": "8029e124c094dd66703fcc953c484f2c8ab458de",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/ignore-config.stderr.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/ignore-config.stderr.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/ignore-config.stdout.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/ignore-config.stdout.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 35,
+    "sha256": "a97699be2437201d88418e8ce5b2b3249594180915363a8ec063d8eb267f583d",
+    "gitBlob": "2dfffc68ba8f68a7956fafe504d1818fb7850213",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/ignore-daemon.stderr.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/ignore-daemon.stderr.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/ignore-daemon.stdout.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/ignore-daemon.stdout.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 1385,
+    "sha256": "2105ecf9fd7e4259995a33a3332400403875eba963338b92e8492ebb57946cef",
+    "gitBlob": "67815a32b862df70d720df16570e6df3ad1fedfc",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/ignore-protocol.stderr.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/ignore-protocol.stderr.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/ignore-protocol.stdout.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/ignore-protocol.stdout.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 1263,
+    "sha256": "b4391ccf2b576cdf412671d2f05c646642699ba019b5989f6de04145e7154b0a",
+    "gitBlob": "81fdf7b7f51f1bd5b3a4f75aeed4c8c9e26a53f1",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/install-lifecycle-coverage.json",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/install-lifecycle-coverage.json",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 661,
+    "sha256": "0fc36eb6928e4c27ba3c7ec11ab2f30f05c7eb8464aacf4e0f5d289f09be0208",
+    "gitBlob": "d3041100a18d09f98ecd8002505b65773d6e44d2",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/local-commit.json",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/local-commit.json",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 956,
+    "sha256": "18f359097989b4e3534386c341fcc34254d99533af6da3f4f82474fa852ce5bd",
+    "gitBlob": "690cac693ad2e843aad0c24b663edb3f3ef09706",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/lockfile.stderr.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/lockfile.stderr.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/lockfile.stdout.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/lockfile.stdout.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 181,
+    "sha256": "ba805e4c1bcabd1f1ba1778325a208f480678167e0e104d44bb4b46eb71f6fa1",
+    "gitBlob": "a9376c72f2441dfbcd4c7cc2ebd3ef40b17f6847",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/ordinary-user-read-privileged-runner.stderr.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/ordinary-user-read-privileged-runner.stderr.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/ordinary-user-read-privileged-runner.stdout.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/ordinary-user-read-privileged-runner.stdout.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 332,
+    "sha256": "1d7cdccb53c78f1737724d0c1d9c6d995c19530a88691890ffc51a468eb9b371",
+    "gitBlob": "f79567be8899c95c449afeb2de78a40a5caf8d12",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/ordinary-user-read.stderr.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/ordinary-user-read.stderr.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 43,
+    "sha256": "c1cc14e19fa494034c45dd75bbd7bed66174aab7bddd04f4406a329f77c97662",
+    "gitBlob": "eaa7f7e037a1aa98d15c9bf195baebe1c19c87fe",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/ordinary-user-read.stdout.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/ordinary-user-read.stdout.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/projection-stage-final-result.json",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/projection-stage-final-result.json",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 261,
+    "sha256": "4293bb2dd7e5fb561372ff945b5d3c85f19096a4d6755bee59dd5e89aa0b197b",
+    "gitBlob": "cbed1aa0a1f952c796bdaa9fbfbe63418fc5a005",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/projection-stage-final.stderr.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/projection-stage-final.stderr.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 103,
+    "sha256": "3872f5a85da677f909ec5c55a5821758c34e2394460567a29f8043b480cc1105",
+    "gitBlob": "3f3ef19b8eec2cfe0dbf5a963b6c64b623834352",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/projection-stage-final.stdout.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/projection-stage-final.stdout.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/projection-unit-final.stderr.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/projection-unit-final.stderr.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 103,
+    "sha256": "4c979c0d06f0e9e2109df48cae7f69ac5d403754045b4cfe404fe744e7390b47",
+    "gitBlob": "a2d898d292338de05d479084a3943a41f3706835",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/projection-unit-final.stdout.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/projection-unit-final.stdout.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/projection-unit-fixed.stderr.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/projection-unit-fixed.stderr.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 103,
+    "sha256": "9f169aa04896ef0203477ff61d8d57406ec0dab00b71ec15cf38cdae22509147",
+    "gitBlob": "4f36f06fec4f4b576de5e19d5057de1d9e299ecc",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/projection-unit-fixed.stdout.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/projection-unit-fixed.stdout.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/projection-unit.stderr.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/projection-unit.stderr.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 3340,
+    "sha256": "77a3056e8d36bd65a8fa692046756c3b73e43f046af5fc7a2f8435c202a55ddf",
+    "gitBlob": "fda2e341595818f8fdf400b93c8ce59112aa9ccb",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/projection-unit.stdout.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/projection-unit.stdout.log",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/relocation-result.json",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/relocation-result.json",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 1236,
+    "sha256": "c142a872a2b7f36c9b3f74cdb9cb4c947f334d6578f044bb543a11d2e8ca6449",
+    "gitBlob": "ae21b47f3d417e2ea39a4c4188c1f985da18c3a5",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/root-final-source-files.json",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/root-final-source-files.json",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 1202,
+    "sha256": "e70e15cfe7d444e76f878ce21422bd907f9e809a9bbc6d497a0f93c220b089c9",
+    "gitBlob": "b48b7d3deca2099a736da49e2bf8d20ab9adeefa",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/source-conservation.json",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/source-conservation.json",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 1273,
+    "sha256": "374344630176003af0189dc5a1088c48334c1ac923798ac70437f2b95b1c32c7",
+    "gitBlob": "48325d04948bb48cda0b0fc190a452aed6cd5b83",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/verify-local-build.mjs",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/verify-local-build.mjs",
+    "declaredInManifest": "installation/manifest.json",
+    "bytes": 3946,
+    "sha256": "ecffa8e040d74900f26294502f817830b90589ff7a3b75ca2deef84369dd8275",
+    "gitBlob": "31dcf9edcb997734dc61dee0ff478650384ea1e3",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "installation/manifest.json",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-024/manifest.json",
+    "isManifest": true,
+    "bytes": 12985,
+    "sha256": "a04f0cb1dd85e4edce811f868bac575177f5564cdb33793b3f78674462bbae3c",
+    "gitBlob": "e1f8907b69ed14f9ff3bfdf0e1c6ad5f6742951b",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "candidate-build/README.md",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-e73-build/README.md",
+    "declaredInManifest": "candidate-build/manifest.json",
+    "bytes": 1605,
+    "sha256": "db0148cde4dff44819826a7f7f625db4d25cb8851700433d6568e300cb211070",
+    "gitBlob": "a7071ead343fd4405829e348b0f9b1cf0bc94a54",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "candidate-build/build-result.json",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-e73-build/build-result.json",
+    "declaredInManifest": "candidate-build/manifest.json",
+    "bytes": 1834,
+    "sha256": "12a60a9eac8ea13a2ae4c0701648081a0d699890ee541befe522ce3663849cf3",
+    "gitBlob": "8f8e324a933f86064ffe936ed8b0228e27ed6011",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "candidate-build/build.stderr.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-e73-build/build.stderr.log",
+    "declaredInManifest": "candidate-build/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "candidate-build/build.stdout.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-e73-build/build.stdout.log",
+    "declaredInManifest": "candidate-build/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "candidate-build/verification.json",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-e73-build/verification.json",
+    "declaredInManifest": "candidate-build/manifest.json",
+    "bytes": 9387,
+    "sha256": "c7d67f351484f6419e0ee4b85b28498bcdf8f3ce21136ee4f72774cc850ec1a7",
+    "gitBlob": "46b9c13c9cf16a0913b96d25fe59526d5583fc73",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "candidate-build/verification.stderr.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-e73-build/verification.stderr.log",
+    "declaredInManifest": "candidate-build/manifest.json",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "candidate-build/verification.stdout.log",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-e73-build/verification.stdout.log",
+    "declaredInManifest": "candidate-build/manifest.json",
+    "bytes": 365,
+    "sha256": "b4fa10ce4a863d17f0d722f4726f3e23476ae672dcf37862f306e1c15433aaab",
+    "gitBlob": "71e1e9864fcf612d2521a1a1e2fb107a64276684",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "candidate-build/verify-build.mjs",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-e73-build/verify-build.mjs",
+    "declaredInManifest": "candidate-build/manifest.json",
+    "bytes": 4288,
+    "sha256": "4cd19756cfe246e92d6cbd2f6062181eb3348868467bcfad4bddc978996dccda",
+    "gitBlob": "f260dc40818b9d925f13c6ee93db7089c24a4e78",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "candidate-build/manifest.json",
+    "localPath": "/vercel/ops-1505/worker-dependency-boundary-e73-build/manifest.json",
+    "isManifest": true,
+    "bytes": 1844,
+    "sha256": "e70460ebe0420a07f67e870acc74b38e924aa4decb61815be2b9b70b1a067c36",
+    "gitBlob": "2d0dbb4fb04ae9ee8ae6e06c538247a211fc4bda",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "peer-review/review.md",
+    "localPath": "/vercel/ops-1505/dependency-projection-review/review.md",
+    "declaredInManifest": "peer-review/manifest.json",
+    "bytes": 4784,
+    "sha256": "7b2e07b1074a14a881fbc8529c84417213e9941b1be08a0aabc1b8c8cb55cc7c",
+    "gitBlob": "57e4271da2f3ff461792d62f9f58dc310d561e70",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "peer-review/review.json",
+    "localPath": "/vercel/ops-1505/dependency-projection-review/review.json",
+    "declaredInManifest": "peer-review/manifest.json",
+    "bytes": 5367,
+    "sha256": "f14e83fdbc9d5379a6ae6a30e46cbf0ffe7fa182c14f0ec46a1ad13cb9612b15",
+    "gitBlob": "321fe61a54a10ddd46d649cef171cdbaa1564b60",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "peer-review/source-index.json",
+    "localPath": "/vercel/ops-1505/dependency-projection-review/source-index.json",
+    "declaredInManifest": "peer-review/manifest.json",
+    "bytes": 3350,
+    "sha256": "66d3f8a5921246bdfe256782fc370d50cdee6a49356d77aa37d22eab1d8067f8",
+    "gitBlob": "798ebfcdb87c3b0eed38f9b42b7110a835405844",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "peer-review/lock-projection-comparison.json",
+    "localPath": "/vercel/ops-1505/dependency-projection-review/lock-projection-comparison.json",
+    "declaredInManifest": "peer-review/manifest.json",
+    "bytes": 1369,
+    "sha256": "a92fd9f4fcc6e4bbcf8c0022087d455cb3610ec2676b7be17a3473dd301d94ea",
+    "gitBlob": "c56950fe66f2d14cee56abfcbaeba00c8602cae1",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "peer-review/manifest.json",
+    "localPath": "/vercel/ops-1505/dependency-projection-review/manifest.json",
+    "isManifest": true,
+    "bytes": 1009,
+    "sha256": "9ea4f27bc1f6135cefddcaf74744634429225964ce3d1cb99f3966544c7bd0f1",
+    "gitBlob": "dfee230b9bf1108331b77f078ff1f8e10d0c0ece",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  },
+  {
+    "path": "root/dependency-adr-review.json",
+    "localPath": "/vercel/ops-1505/dependency-adr-review.json",
+    "explicitExtra": true,
+    "bytes": 452,
+    "sha256": "512801b785e04046f2543d688cd35a686efc089ade8e18384c355f95b3b4f178",
+    "gitBlob": "332450faf4326c0c08d56c14f7b3b4ef560d0fbd",
+    "mode": "100644",
+    "sourceMode": "0o644"
+  }
+]

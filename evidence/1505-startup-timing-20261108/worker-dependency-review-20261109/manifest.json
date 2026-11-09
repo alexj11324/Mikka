@@ -1,0 +1,49 @@
+{
+  "schema": "issue1505-dependency-review.v1",
+  "source": "5fde6ffae3c01769b69aa9c14abec26f2ceddfda",
+  "archivedEvidence": "e7ce8d5826aaf573e026a2ad838ebe71030c8772",
+  "files": [
+    {
+      "path": "archive-summary.json",
+      "bytes": 4227,
+      "sha256": "d999ddbb8d272dba8a537e5c253e77a1d72ccdb6be6836c43fe166c31192e33e",
+      "gitBlob": "ac472cb376a8b86022c4e7589c4f915b33fab338"
+    },
+    {
+      "path": "members.json",
+      "bytes": 33785,
+      "sha256": "2c57202459652ada157cca020885c9fcb24fd364a1de9b67cdf3d9072299a4d2",
+      "gitBlob": "8d8c85115abe11283f6148e69592ccc8e89eb7b3"
+    },
+    {
+      "path": "main927-integration.json",
+      "bytes": 4412,
+      "sha256": "baa315e8ac2f27eb7ebf00f7e4c447bc5272f499671f4c7e67e408e56fe098af",
+      "gitBlob": "cae257feb1cb438eac43cf0dbb563ff173bf914a"
+    },
+    {
+      "path": "root-verification-and-vm-stop.json",
+      "bytes": 1369,
+      "sha256": "cd8c7ece2704e38ca5d046a09ac7220f54216b3cc5747888b2cafd18564302f5",
+      "gitBlob": "57dd8e69773e2375ec28efbf6571d5f4604e0300"
+    },
+    {
+      "path": "merge-risk.md",
+      "bytes": 3092,
+      "sha256": "6b7069fedb8ffb4a475acb656c48b4287b5535555ac766c1db2184a4ef822097",
+      "gitBlob": "0be52e6e4a00fe83aa3d018824af0754e5bc4707"
+    },
+    {
+      "path": "ci-source-job-129013574372.log",
+      "bytes": 133103,
+      "sha256": "4ffa2985c57da2d85feaf5da03debc9a435a3dc3810f5e97dc1f1042f386dcc1",
+      "gitBlob": "c42fb8c92e80eeceeb9d821cf6689febe8da2fd0"
+    },
+    {
+      "path": "ci-source-job-receipt.json",
+      "bytes": 1222,
+      "sha256": "080ea871d4c2e5bb2667570023f793f18b1d5ce6e5462c90ebe5b19797b28bc7",
+      "gitBlob": "65e3e7359577919396c246d56c89fd5e1686c18e"
+    }
+  ]
+}

@@ -1,0 +1,142 @@
+{
+  "version": 1,
+  "observedAt": "2026-11-09T06:36:12Z",
+  "kind": "prospective integration only; no release/runtime/formal pin",
+  "upstreamBefore": "88b144d52d091d7ff566c63fce6e902e33edc59e",
+  "main": {
+    "commit": "927260894305e066e15a4ad50114abce433e6001",
+    "tree": "38e99074df7121191c933ab98193e87c7d128494",
+    "parents": [
+      "88b144d52d091d7ff566c63fce6e902e33edc59e",
+      "d51295d6ef645bf3592d24c8ce10b4fb4c3da37c"
+    ]
+  },
+  "own": {
+    "commit": "5fde6ffae3c01769b69aa9c14abec26f2ceddfda",
+    "tree": "a1c4bfbc53e08307e9f3461c18c31a5f58131048",
+    "parents": [
+      "02401458a7fe26e00ce4caa653084c7f9680696d"
+    ]
+  },
+  "upstreamChangedPaths": [
+    {
+      "path": "app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts",
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "21f972604b4655f119b6de3db264e71bdb06eeee"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "946d198e7f3885cfb94fca3d78cbae5700c03942"
+      }
+    },
+    {
+      "path": "apps/api/generated/routes.json",
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "29b7e32a9dc2ec660998d6258b80f2caead92745"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "8962037c3ef428b77d4417bfc12281aeb7e30c11"
+      }
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "e0f403171f936b63a34f62cc9aad3e2394cbc2fc"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "78fe57ce3f6ceeed2489d569c14b1ae0642aebe0"
+      }
+    },
+    {
+      "path": "lib/factory/execution-claim.test.ts",
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "0382990e1abb834694ddb257be5b4c8aad9b421f"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "4abdffc0e55d849f893c5d397e2aa6242f88aed1"
+      }
+    },
+    {
+      "path": "lib/factory/questions/continuation-delivery-context.ts",
+      "before": null,
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "498310506663ad484ab237a3296b7edbbddee6d8"
+      }
+    },
+    {
+      "path": "lib/self-improvement/benchmark-claim.test.ts",
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "5f4205366c57b97a526a6ef7a8652175216acd5c"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "blob": "f0c4d4b67ad13020b14961f3eb3bf0d734038f27"
+      }
+    }
+  ],
+  "ownChangedPaths": [
+    ".github/workflows/e2b-official-runtime.yml",
+    "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+    "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+    "packages/daemon/scripts/prepare-worker-install.py",
+    "packages/daemon/scripts/prepare-worker-install.test.py"
+  ],
+  "pathOverlap": [],
+  "merge": {
+    "exit": 0,
+    "tree": "2c5c05f5d99dc230eb5fa8edafee143ffa727316",
+    "unreferencedCommit": "8419bbdc565bdcbbbe6e6a0f9aed1ab983e359d0",
+    "parents": [
+      "927260894305e066e15a4ad50114abce433e6001",
+      "5fde6ffae3c01769b69aa9c14abec26f2ceddfda"
+    ],
+    "conflicts": false,
+    "allOtherMainLeavesUnchanged": true,
+    "otherMainLeafCount": 6726,
+    "ownFiveLeavesExact": true,
+    "totalLeaves": 6731
+  },
+  "canonicalHashScript": {
+    "path": "scripts/e2b/build-template.py",
+    "blob": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+    "sameInAllFourSources": true
+  },
+  "workerHashes": {
+    "88b144d52d091d7ff566c63fce6e902e33edc59e": "6ada1d4f809eace6ca84ad0329562f4aacb78452",
+    "927260894305e066e15a4ad50114abce433e6001": "6ada1d4f809eace6ca84ad0329562f4aacb78452",
+    "5fde6ffae3c01769b69aa9c14abec26f2ceddfda": "cd10b53c37242736be3bb91b841f2220772a1681",
+    "8419bbdc565bdcbbbe6e6a0f9aed1ab983e359d0": "cd10b53c37242736be3bb91b841f2220772a1681"
+  },
+  "prospectiveWorkerHash": "cd10b53c37242736be3bb91b841f2220772a1681",
+  "referencesUnchanged": true,
+  "originalWorktreeHead": "e73f12c072786786883ba932689fc00cc8e2ea71",
+  "trackedClean": true,
+  "testsRun": 0,
+  "buildsRun": 0,
+  "installsRun": 0,
+  "productionCalls": 0,
+  "limitations": [
+    "No new CI or runtime acceptance; main can advance after this observation",
+    "Canonical hash is prospective, not a published pin"
+  ]
+}

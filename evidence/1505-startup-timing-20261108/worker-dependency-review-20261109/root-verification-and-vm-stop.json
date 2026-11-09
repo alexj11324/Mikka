@@ -1,0 +1,38 @@
+{
+  "schema": "issue1505-dependency-root-verification.v1",
+  "evidence": {
+    "commit": "e7ce8d5826aaf573e026a2ad838ebe71030c8772",
+    "tree": "8da2376de7b6ef326c23349fdbf829155abaef79",
+    "parent": "2324ff2c8fbdf595661933afca2c79478db6db77",
+    "addedFiles": 80,
+    "bytes": 124461,
+    "allAddedUnderExpectedPrefix": true,
+    "allMembersGitShaSizeModeMatched": true,
+    "sourceManifestHashesMatched": 3,
+    "fastForwardExpectedSha": true,
+    "refReadbackMatched": true
+  },
+  "source": {
+    "remote": "5fde6ffae3c01769b69aa9c14abec26f2ceddfda",
+    "remoteParent": "02401458a7fe26e00ce4caa653084c7f9680696d",
+    "tree": "a1c4bfbc53e08307e9f3461c18c31a5f58131048",
+    "sameTreeLocal": "e73f12c072786786883ba932689fc00cc8e2ea71"
+  },
+  "rawReceiptCaveat": "installation/local-commit.json preserves the original parents token list containing its own commit token; use independently verified Git parent objects. Original bytes were not corrected in place.",
+  "vm": {
+    "id": "sbx_Rcf5EELZ0Z08N5mluQGk0KrGPoc1",
+    "status": "stopped",
+    "stoppedAt": "2026-11-09T06:36:50.118Z",
+    "durationMs": 3529354,
+    "vcpus": 2,
+    "memoryMiB": 4096,
+    "routes": [],
+    "readBack": true
+  },
+  "production": {
+    "newFormalSamples": 0,
+    "newRelease": false,
+    "officialConservationNotYetExecuted": true,
+    "subscriptionsNotYetExecuted": true
+  }
+}

@@ -1,0 +1,122 @@
+{
+  "schema": "issue1505-worker-dependency-git-archive.v1",
+  "status": "UNREFERENCED_COMMIT_VERIFIED_ROOT_FF_PENDING",
+  "commit": "e7ce8d5826aaf573e026a2ad838ebe71030c8772",
+  "tree": "8da2376de7b6ef326c23349fdbf829155abaef79",
+  "parents": [
+    "2324ff2c8fbdf595661933afca2c79478db6db77"
+  ],
+  "message": "docs: preserve isolated worker dependency validation",
+  "prefix": "evidence/1505-startup-timing-20261108/worker-dependency-boundary-20261109/",
+  "counts": {
+    "files": 80,
+    "bytes": 124461,
+    "uniqueBlobs": 54,
+    "sourceManifests": 3
+  },
+  "manifests": [
+    {
+      "path": "installation/manifest.json",
+      "declaredMemberCount": 64,
+      "declaredMemberBytes": 75822,
+      "bytes": 12985,
+      "sha256": "a04f0cb1dd85e4edce811f868bac575177f5564cdb33793b3f78674462bbae3c"
+    },
+    {
+      "path": "candidate-build/manifest.json",
+      "declaredMemberCount": 8,
+      "declaredMemberBytes": 17479,
+      "bytes": 1844,
+      "sha256": "e70460ebe0420a07f67e870acc74b38e924aa4decb61815be2b9b70b1a067c36"
+    },
+    {
+      "path": "peer-review/manifest.json",
+      "declaredMemberCount": 4,
+      "declaredMemberBytes": 14870,
+      "bytes": 1009,
+      "sha256": "9ea4f27bc1f6135cefddcaf74744634429225964ce3d1cb99f3966544c7bd0f1"
+    }
+  ],
+  "extraReceipts": {
+    "alreadyManifestIndexed": [
+      {
+        "extraAlreadyIncluded": "root/local-commit.json",
+        "existingPaths": [
+          "installation/local-commit.json"
+        ]
+      },
+      {
+        "extraAlreadyIncluded": "root/root-final-source-files.json",
+        "existingPaths": [
+          "installation/root-final-source-files.json"
+        ]
+      }
+    ],
+    "additional": "root/dependency-adr-review.json"
+  },
+  "verification": {
+    "allSourceManifestSha256Matched": true,
+    "limitedSecretScan": {
+      "rules": [
+        "github-token",
+        "private-key",
+        "signed-url"
+      ],
+      "findings": []
+    },
+    "allRemoteBlobContentsBytesAndSha256Matched": true,
+    "allTreeModeSizeAndGitBlobMatched": true,
+    "commitReadback": true,
+    "conservation": {
+      "levels": [
+        {
+          "component": "evidence",
+          "oldTree": "75e93fcef768c012a203c3fedee338f33ea4e192",
+          "newTree": "8da2376de7b6ef326c23349fdbf829155abaef79",
+          "unchangedSiblingCount": 58,
+          "allSiblingsIdentical": true
+        },
+        {
+          "component": "1505-startup-timing-20261108",
+          "oldTree": "9717f0542445264f6a7a6e24700b17e99c9146fd",
+          "newTree": "29cf1e1c9f330e58343f3eee980fcf49b3229d1f",
+          "unchangedSiblingCount": 0,
+          "allSiblingsIdentical": true
+        },
+        {
+          "component": "worker-dependency-boundary-20261109",
+          "oldTree": "7055f5054c136cf5038721b9d13cf8e677a7c6b7",
+          "newTree": "65dbe6947bc5f5eaf931fc131b9f09e883d54f96",
+          "unchangedSiblingCount": 12,
+          "allSiblingsIdentical": true
+        }
+      ],
+      "archiveTree": "4ba47223ca997146a19c5072d10d5c56ccd74b84",
+      "verifiedFiles": 80,
+      "verifiedUniqueBlobs": 54,
+      "modes": [
+        "100644"
+      ],
+      "allSizesModesBlobAndSha256Matched": true
+    },
+    "postArchiveLocalSourceHashesMatched": true
+  },
+  "boundaries": {
+    "sourceA": "02401458a7fe26e00ce4caa653084c7f9680696d",
+    "installationManifestCandidateCommitted": false,
+    "installationFunctionalWorkerMarker": "original A024 worker hash; not candidate W",
+    "candidateLocalCommit": "e73f12c072786786883ba932689fc00cc8e2ea71",
+    "candidateTree": "a1c4bfbc53e08307e9f3461c18c31a5f58131048",
+    "candidateWorkerHash": "cd10b53c37242736be3bb91b841f2220772a1681",
+    "remoteCandidateReportedByRoot": "5fde6ffae3c01769b69aa9c14abec26f2ceddfda",
+    "remoteCandidateNotRereadHere": true,
+    "originalFixtureFailuresAndUncommittedReceiptsUnedited": true,
+    "originalTwoCiFailures": "kept by root; not downloaded here, not reclassified",
+    "newFormalSamples": 0,
+    "productionCalls": 0,
+    "dependencyInstalls": 0,
+    "tests": 0,
+    "refWrites": 0,
+    "sourceLocalCommitParentsField": "Original local-commit.json field begins with its own commit token; retained as raw receipt and not interpreted as actual Git parent list."
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "job": 129013574372,
+  "run": 42572633560,
+  "attempt": 1,
+  "bytes": 133103,
+  "sha256": "4ffa2985c57da2d85feaf5da03debc9a435a3dc3810f5e97dc1f1042f386dcc1",
+  "lines": 1732,
+  "readCount": 1,
+  "checkoutExcerpts": [
+    {
+      "line": 111,
+      "text": "2026-11-09T06:23:38.8373276Z ##[group]Checking out the ref"
+    },
+    {
+      "line": 130,
+      "text": "2026-11-09T06:23:39.1995964Z HEAD is now at aaaa97f Merge 5fde6ffae3c01769b69aa9c14abec26f2ceddfda into 88b144d52d091d7ff566c63fce6e902e33edc59e"
+    },
+    {
+      "line": 132,
+      "text": "2026-11-09T06:23:39.2026397Z [command]/usr/bin/git log -1 --format=%H"
+    },
+    {
+      "line": 133,
+      "text": "2026-11-09T06:23:39.2038809Z aaaa97fc745eed66f56e8c3543fa50f61815cc38"
+    }
+  ],
+  "actualCheckout": "aaaa97fc745eed66f56e8c3543fa50f61815cc38",
+  "parents": [
+    "88b144d52d091d7ff566c63fce6e902e33edc59e",
+    "5fde6ffae3c01769b69aa9c14abec26f2ceddfda"
+  ],
+  "checkoutProvedByLog": true,
+  "otherChecksNotClaimedFromThisLog": true,
+  "limitedSecretScan": [
+    {
+      "name": "github-token",
+      "count": 0
+    },
+    {
+      "name": "private-key",
+      "count": 0
+    },
+    {
+      "name": "signed-url",
+      "count": 0
+    }
+  ]
+}
