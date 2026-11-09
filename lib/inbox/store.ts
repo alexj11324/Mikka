@@ -26,11 +26,13 @@ export class InboxStore {
             WHEN r.outcome IN ('failed','blocked') THEN false
             WHEN i.status='review' THEN true
             WHEN EXISTS(SELECT 1 FROM jsonb_array_elements(coalesce(i.content->'attrs'->'mikka'->'pullRequests','[]'::jsonb)) pr WHERE pr->>'state' IN ('open','draft')) THEN true
+            WHEN r.outcome='needs_input' THEN true
             WHEN r.outcome IN ('done','idle') THEN false
             ELSE r.status<>'failed' END AS pending,
           NULL::timestamptz AS "rejectedAt", NULL::text AS "rejectedBy", r.id AS "runId",
-          CASE WHEN r.status='waiting_input' OR r.outcome='needs_input' THEN 'needsReply'
+          CASE WHEN r.status='waiting_input' THEN 'needsReply'
             WHEN i.status='review' OR EXISTS(SELECT 1 FROM jsonb_array_elements(coalesce(i.content->'attrs'->'mikka'->'pullRequests','[]'::jsonb)) pr WHERE pr->>'state' IN ('open','draft')) OR EXISTS(SELECT 1 FROM factory_tasks f WHERE f."issueId"=i.id AND f.stage='approval' AND f.status IN ('pending','waiting')) THEN 'review'
+            WHEN r.outcome='needs_input' THEN 'needsReply'
             ELSE 'confirm' END AS reason
         FROM issues i LEFT JOIN LATERAL (SELECT id,"userId",status,outcome FROM agent_runs WHERE "issueId"=i.id ORDER BY "createdAt" DESC,id DESC LIMIT 1) r ON true
         WHERE coalesce(i.content->'attrs'->'mikka',i.content->'attrs'->'orvilo')->>'deletedAt' IS NULL

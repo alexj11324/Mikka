@@ -41,11 +41,12 @@ test('inbox PostgreSQL: workspace authority, receipts, undo and durable deadline
   for (const [id, botId] of [[suggestion, bot], [teamSuggestion, teamBot]]) await pool.query('INSERT INTO suggestions(id,"userId","botId",source,"externalId",action,title,shown,"decidedBy","occurredAt") VALUES($1::uuid,$2,$3,\'gmail\',$1::text,\'reply\',$1::text,true,\'rule\',now())', [id, owner, botId])
   let now = new Date()
   const pushes: [string, string][] = [], arms: number[] = []
-  const store = new InboxStore(pool, createInboxGuard(pool), async (user, ws) => { pushes.push([user, ws]) }, async () => { arms.push(1) }, () => now)
+  const store = new InboxStore(pool, createInboxGuard(pool, pool), async (user, ws) => { pushes.push([user, ws]) }, async () => { arms.push(1) }, () => now)
   const list = (user = owner, ws = workspace, tab: 'pending' | 'done' | 'snoozed' = 'pending', limit = 50, cursor?: string) => store.list(user, ws, tab, limit, cursor)
   const reject = (id = teamSuggestion, ws = workspace, user = owner) => store.command(user, { workspaceId: ws, type: 'suggestion', id, action: 'reject' })
 
   await t.test('active workspace isolation and task-specific reply authority', async () => {
+    assert.deepEqual(new Set((await list(owner, personal)).items.map(i => i.id)), new Set([privateIssue, suggestion]))
     const mine = await list()
     assert.deepEqual(new Set(mine.items.map(i => i.id)), new Set([issue, teamSuggestion]))
     const shared = await list(peer)

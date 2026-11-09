@@ -6,7 +6,7 @@ import { sendLiveInvalidations } from '@/lib/live/notify'
 import { InboxStore } from './store'
 import { createInboxGuard } from './workspace'
 
-export const inboxGuard = createInboxGuard(workspacePool)
+export const inboxGuard = createInboxGuard(workspacePool, pool)
 
 export async function inboxChanged(userId: string, workspaceId: string) {
   // Existing keys work with the already deployed gateway and clients. The
