@@ -9,12 +9,12 @@ import { pathToFileURL } from 'node:url'
 import { assertOpsContext } from './self-hosted-ingress-probe.mjs'
 
 export const P0 = Object.freeze({
-  source: '141c7834ad187083a04d396bd94a9d3e343719f2',
-  tree: '8553a2bfe4dec5bb95ba13ddf456c7b1e99fa35c',
+  source: '06a3ec1e6567dcd5da95757ad11b1b7db46a127b',
+  tree: '650b5f348ea8c90da2c4389d4f84e9784c69c7ee',
   workerSha: '300c7be89fb2bbb701e29d4c74ec7962694613e1',
   sdks: { nodeMajor: '24', pnpm: '10.34.3', javascriptE2b: '2.61.0', pythonE2b: '2.62.0', next: '16.4.1' },
   files: {
-    'package.json': '306d928ed8f02dad3cbd9fa3b8cf7a6f18ed1c342394a8013a0bfc35ec0dc5e4',
+    'package.json': '42e0321a095d434bb22437cfd2a3685cbbfb0d0d66576e334aeab2d05e50eb47',
     'pnpm-lock.yaml': 'e18697f2dd891b9159e43e40d1f8af4018d087cf2a0e668b9e358a766b020c28',
     'pnpm-workspace.yaml': '5a24e67ade7fae19b2d160b4ca61b58170eb3c04a18f8b06efb9a5a0fae36b9f',
     'scripts/e2b/workspace-candidates.py': '2440d02b368288e4a6e8a618f65e2ecca88f5a0251a0a005f9c71b6c0c977237',
@@ -25,7 +25,7 @@ export const P0 = Object.freeze({
     'scripts/e2b/official-files.test.py': '0d31956e8825cedd739563404ae5d31c80b9388310399968b297344c581a3201',
     'scripts/e2b/cleanup-template-candidates.py': '893b0d50f30f4b21f92f155aee97965e12f84fd0e21ea0ada3dfb3a00392533d',
     'scripts/e2b/cleanup-template-candidates.test.py': '826a489c570a788ea018b6a6ce786fd3e71b41dc8d514cfd8a09e516f8bf84f1',
-    'scripts/e2b/workspace-ingress-acceptance.mjs': 'eefa6e240eb3cc236747a7b7537ef2309e8bc75dc54a2516a28a25c008db9e74',
+    'scripts/e2b/workspace-ingress-acceptance.mjs': '880497f82bb3135b33315abd8d10d1cebe113289cccfd34abb315197c37e102e',
     'scripts/e2b/workspace-ingress-acceptance.test.mjs': '899641f96cb548158b733f043d509640eb6aaf6366bebe4e8199d2fb5aec9b0d',
     'scripts/e2b/workspace-ingress-servers.py': '5c0c12ff3f5573f7a6032a359a372b2a4697b17e44501c7d175bd10c809c74b8',
     'scripts/e2b/workspace-terminal-acceptance.mjs': 'd6d9d535c393e179eca800a44e5dfed508b06135d8891a793af05d539fa8252c',
@@ -61,7 +61,7 @@ const status = value => Number.isInteger(value) && value >= 100 && value <= 599 
 const flags = (value, names) => Object.fromEntries(names.map(key => [key, typeof value?.[key] === 'boolean' ? value[key] : null]))
 const RUNTIME_CODES = ['configuration', 'source', 'candidate', 'scope', 'guard', 'process', 'ready', 'ports',
   'positive_control', 'raw_exposed', 'outbound', 'dependencies', 'preview', 'authentication', 'http', 'hmr',
-  'revoke', 'takeover', 'resume', 'terminal', 'cleanup', 'journal', 'internal']
+  'revoke', 'takeover', 'takeover_bind', 'takeover_not_denied', 'resume', 'terminal', 'cleanup', 'journal', 'internal']
 const BUILDER_CODES = ['api_key_missing', 'candidate_attempt_already_recorded', 'candidate_build_failed', 'candidate_build_not_ready',
   'candidate_build_identity_missing', 'candidate_build_status_invalid', 'candidate_identity_mismatch', 'candidate_name_mismatch', 'candidate_not_exact_private_template', 'candidate_preflight_failed',
   'creation_journal_invalid', 'creation_journal_missing', 'operation_failed', 'operation_interrupted', 'output_directory_invalid',

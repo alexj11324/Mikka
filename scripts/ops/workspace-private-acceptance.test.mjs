@@ -900,3 +900,27 @@ test('fresh conservation changes reuse the strict existing sanitizer and never r
   const redacted = { observedChanges: 1, redactedChanges: 1, truncated: false, changes: [] }
   assert.deepEqual(projectConservationFailure([{ ...base, conservation: redacted }]).normal, [{ ...base, conservation: redacted }])
 })
+
+test('takeover phases remain distinct closed failures without changing runtime or cleanup verdicts', () => {
+  const privateText = 'synthetic-private-https://example.invalid/secret?cookie=do-not-copy'
+  for (const stage of ['next', 'vite']) {
+    for (const failure of ['takeover', 'takeover_bind', 'takeover_not_denied', privateText, 'takeover_bind extra', true, 1, {}]) {
+      const input = fixtureReceipts()
+      Object.assign(input.runtime.claude, { stage, passed: false, failure, frameworks: [],
+        error: { message: privateText, stderr: privateText, port: 34567 } })
+      input.outcomes.acceptance = 'failure'
+      const result = summarizeAcceptance(context, input)
+      const closed = typeof failure === 'string' && ['takeover', 'takeover_bind', 'takeover_not_denied'].includes(failure)
+      assert.equal(result.cases[0].stage, stage)
+      assert.equal(result.cases[0].failure, closed ? failure : 'internal')
+      assert.equal(result.cases[0].identityMatched, true)
+      assert.equal(result.cases[0].runtimePassed, false)
+      assert.equal(result.passed, false)
+      assert.equal(result.runtimeCleanupConfirmed, true)
+      assert.equal(result.templateCleanupConfirmed, true)
+      assert.deepEqual(result.cases[0].frameworks, [])
+      assert.equal(JSON.stringify(result).includes(privateText), false)
+      assert.equal(Object.hasOwn(result.cases[0], 'error'), false)
+    }
+  }
+})
