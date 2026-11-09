@@ -1,0 +1,1226 @@
+[
+  {
+    "phase": "red",
+    "path": "components/workspace/issue-properties.ts",
+    "bytes": 2662,
+    "sha256": "af1fdd24bbde70fc5528c345dbd4b36fdcc1e4934f5c6ca9d97e2c325f297c82"
+  },
+  {
+    "phase": "red",
+    "path": "lib/action-error.ts",
+    "bytes": 741,
+    "sha256": "b703bdecc6b1a98254d5caa6133d12f3379e4426d0f49ea17c03474e49c2c606"
+  },
+  {
+    "phase": "red",
+    "path": "lib/app-policy/apps.ts",
+    "bytes": 1583,
+    "sha256": "64696139956c576b5131ba107619789ce8319ef0c90d4597d473d79868acd84c"
+  },
+  {
+    "phase": "red",
+    "path": "lib/background.ts",
+    "bytes": 2955,
+    "sha256": "73937274e1c23817cef7eaacf0da24feb4d724b25fd9d562f4cd683869050310"
+  },
+  {
+    "phase": "red",
+    "path": "lib/billing/hosted-usage.ts",
+    "bytes": 4781,
+    "sha256": "357fa14ece76b436f628020a8232b37f572eee641817ba8cada270beb8daec8e"
+  },
+  {
+    "phase": "red",
+    "path": "lib/composio-accounts.ts",
+    "bytes": 10392,
+    "sha256": "2d968c04c64e9bc15ceb5d3c9a8fd2a089076331e7841beaa674613ad45d4547"
+  },
+  {
+    "phase": "red",
+    "path": "lib/coordinator/user-attachments.ts",
+    "bytes": 2962,
+    "sha256": "cae39fa6e7c716688c86b0500009071712ed19fd1a55a8eb1cbc46f3b7fc66c6"
+  },
+  {
+    "phase": "red",
+    "path": "lib/db/agent-profile-schema.ts",
+    "bytes": 1618,
+    "sha256": "95bfa74fa772d1cb9259f962b11d01c6b52eee242a8b1a74a6f70a286a97ed9b"
+  },
+  {
+    "phase": "red",
+    "path": "lib/db/commit-effects.ts",
+    "bytes": 6982,
+    "sha256": "83e00e079304c5cce58d142e6af39763c0c331944d84bf5b1fc30b3f88f8bc9a"
+  },
+  {
+    "phase": "red",
+    "path": "lib/db/config.ts",
+    "bytes": 410,
+    "sha256": "0d4b01105bf3059e3af26ce11c656e72170266716784a1867bfc971f04c07652"
+  },
+  {
+    "phase": "red",
+    "path": "lib/db/device-scope.ts",
+    "bytes": 14907,
+    "sha256": "2083d7616e9a18421dcb8d55c309dba8a2761bf140faeba106a5b24393748b98"
+  },
+  {
+    "phase": "red",
+    "path": "lib/db/egress-sample.ts",
+    "bytes": 4294,
+    "sha256": "eb2628088a55ba1141e1b49390629f3e9e01850ef3e197838e1e7ac06ea5764c"
+  },
+  {
+    "phase": "red",
+    "path": "lib/db/pool-lifecycle.ts",
+    "bytes": 1327,
+    "sha256": "25bfe3d3803e2e299d3572ff34b932e430806efecded767cda2b201291e0bdf6"
+  },
+  {
+    "phase": "red",
+    "path": "lib/db/project-map-schema.ts",
+    "bytes": 4205,
+    "sha256": "12d796c0275717373afa6709aa98fb64f387f8193aa2e62734734ad461e1509f"
+  },
+  {
+    "phase": "red",
+    "path": "lib/db/request-scope.ts",
+    "bytes": 4779,
+    "sha256": "67bbb85d950948802449a1d0c2638e62bd4d1731ffe883837bc53059ac50b6f0"
+  },
+  {
+    "phase": "red",
+    "path": "lib/db/schema.ts",
+    "bytes": 92901,
+    "sha256": "f7b4141433a2c72001bab2fc20b84f7115eb4d078bd2bccfc6e7e837f82a08cc"
+  },
+  {
+    "phase": "red",
+    "path": "lib/db/transport-sample.ts",
+    "bytes": 4900,
+    "sha256": "b3d8fe1bfb8a7b1d59869d5e8f5473a3aa582e93425d14faf89bb89e3675911d"
+  },
+  {
+    "phase": "red",
+    "path": "lib/deployment-switches.ts",
+    "bytes": 14890,
+    "sha256": "fb3b81f9cdff4b5d19b83878bdeb0accb8d35388b3bfd61f9b714b963065d40b"
+  },
+  {
+    "phase": "red",
+    "path": "lib/desktop-rpc/read-batch-context.test.ts",
+    "bytes": 26773,
+    "sha256": "ea4cd0de715f0089aa08a6f7fe8555d7b0f245b397d0896c5254814d62fac670"
+  },
+  {
+    "phase": "red",
+    "path": "lib/desktop-rpc/read-batch-context.ts",
+    "bytes": 6263,
+    "sha256": "871d9a5bd92d084919d4124c5c26b90d6ad7195f55f91502e02d52bc55083f6e"
+  },
+  {
+    "phase": "red",
+    "path": "lib/desktop-rpc/read-batch-contract.ts",
+    "bytes": 1637,
+    "sha256": "cdd915dacd21d2e9555896daeaa5e5c1f5b23a193cb48e0b959507e96e990000"
+  },
+  {
+    "phase": "red",
+    "path": "lib/desktop-rpc/read-batch.ts",
+    "bytes": 3099,
+    "sha256": "8aadc849e1de11727a67f03c0d0d07d656136e455f4ef7bf32281f6b10194fdb"
+  },
+  {
+    "phase": "red",
+    "path": "lib/desktop-rpc/schemas.ts",
+    "bytes": 21175,
+    "sha256": "278fd188be7893dda0a4fcd61ce76fc03a7f332f6a38d8a02e3a3496a3f95e64"
+  },
+  {
+    "phase": "red",
+    "path": "lib/desktop-rpc/session-cache-context.ts",
+    "bytes": 1455,
+    "sha256": "5f1bca3ba886cfe56afae1782933f1e745d043c247355fde22df2a326b25214a"
+  },
+  {
+    "phase": "red",
+    "path": "lib/device-gateway-notify.ts",
+    "bytes": 6071,
+    "sha256": "5534c94d6f61599e918dc863e4b445f68085515dcf77f459965c1e743d4a6164"
+  },
+  {
+    "phase": "red",
+    "path": "lib/due-timer.ts",
+    "bytes": 8715,
+    "sha256": "72d9a081b728336162b68069095e3e1759427a5325d33438a5b0b3747e424c96"
+  },
+  {
+    "phase": "red",
+    "path": "lib/edition.ts",
+    "bytes": 660,
+    "sha256": "779f421ebe198e6f99b851eca23e26bfa7a1af90fa1c4c2a277424df7084e12e"
+  },
+  {
+    "phase": "red",
+    "path": "lib/enabled-models-policy.ts",
+    "bytes": 1368,
+    "sha256": "8f8407a2e4149a4da3528c697b9f03ed6f4db47b835c19bb93e36e5d1ae52f74"
+  },
+  {
+    "phase": "red",
+    "path": "lib/execution-identity.ts",
+    "bytes": 11483,
+    "sha256": "5256ea4d36c41ef247cc25b8e0b48aa2dbc61eb5a38b2774a5b770128892842c"
+  },
+  {
+    "phase": "red",
+    "path": "lib/factory/agent-profile-reference.ts",
+    "bytes": 266,
+    "sha256": "f7328c2d3f28d743eb4276949b809834453d97982498fe3b8741c8f5efd08c54"
+  },
+  {
+    "phase": "red",
+    "path": "lib/issue-meta.ts",
+    "bytes": 325,
+    "sha256": "8860eea106c43b20f3d22103ddcb9d3b57d73833a95789bf9f9e824458db8189"
+  },
+  {
+    "phase": "red",
+    "path": "lib/issue-metadata.ts",
+    "bytes": 2921,
+    "sha256": "75f98bb5c22196454094aa55d8e4da2c4487aab21f5a9fab9e706b0561a0a69a"
+  },
+  {
+    "phase": "red",
+    "path": "lib/link-preview-parse.ts",
+    "bytes": 3537,
+    "sha256": "2ec1405c2186e84f956020af45d1c755ec66456a5a266238f0d99d5b2c8d5869"
+  },
+  {
+    "phase": "red",
+    "path": "lib/live/events.ts",
+    "bytes": 4679,
+    "sha256": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5"
+  },
+  {
+    "phase": "red",
+    "path": "lib/live/lists.ts",
+    "bytes": 16950,
+    "sha256": "3b694ceb2db9f826982656ee3c818ab133d150860e63774ccae24bea672f5f15"
+  },
+  {
+    "phase": "red",
+    "path": "lib/live/owner-scope.ts",
+    "bytes": 1284,
+    "sha256": "d803e41828b7bb49ef89e6571efe43f8080249e121cb4852f7e869d0a2382673"
+  },
+  {
+    "phase": "red",
+    "path": "lib/live/panels.ts",
+    "bytes": 11743,
+    "sha256": "5e3257ad5eafe8e19d6065073af0b681152461ebc35519e1117d006cc0f60f92"
+  },
+  {
+    "phase": "red",
+    "path": "lib/live/revisions.ts",
+    "bytes": 4070,
+    "sha256": "bd2b351ade97a5b0f3f12f43d606ce9f9d8eca9b90de33400be94203d9d76328"
+  },
+  {
+    "phase": "red",
+    "path": "lib/loopback.ts",
+    "bytes": 281,
+    "sha256": "5e5402398ef094f067e4cb9194364799f8aa687099c469e3b33ad0a1155dd2c7"
+  },
+  {
+    "phase": "red",
+    "path": "lib/model-api-key-providers.ts",
+    "bytes": 6015,
+    "sha256": "6ecda8d703adbf80b6bad49a57fffe894b96a28db02581bc0b7157180d3a5b6a"
+  },
+  {
+    "phase": "red",
+    "path": "lib/model-api-key-runs.ts",
+    "bytes": 2246,
+    "sha256": "655762178282b64c905e6e5336bc6ca24b732e19cc0da3edd026fdcfcf9ef70f"
+  },
+  {
+    "phase": "red",
+    "path": "lib/model-api-keys.ts",
+    "bytes": 26494,
+    "sha256": "1574f8712bfe1ea8428a86e91cf137e75d2f0849bfea1cec2b0de34db0b8dffb"
+  },
+  {
+    "phase": "red",
+    "path": "lib/model-order-plan.ts",
+    "bytes": 18584,
+    "sha256": "ea0681c559c465624ba273e3183693f7a0f400ada3b00850430f6628915d6836"
+  },
+  {
+    "phase": "red",
+    "path": "lib/personal-policy.test.ts",
+    "bytes": 19713,
+    "sha256": "f0b2950fbb7bc87ef207f0c8357b394c51d21d36c734e469b82165a69c19c12f"
+  },
+  {
+    "phase": "red",
+    "path": "lib/personal-policy.ts",
+    "bytes": 8694,
+    "sha256": "1e09dbc751b0e740d54cbbc6db79b0d4a0bf48cc409137eabc36ecd38f8861f6"
+  },
+  {
+    "phase": "red",
+    "path": "lib/posthog-config.ts",
+    "bytes": 358,
+    "sha256": "cd149157b6e4f2ed3c524e512274b9181858889a1dceca8eab5f38d429560545"
+  },
+  {
+    "phase": "red",
+    "path": "lib/project-input.ts",
+    "bytes": 3095,
+    "sha256": "dc9af502e81855f3fbb420137ec2ed06a015ce392079d6a207a63c6ec0a805b3"
+  },
+  {
+    "phase": "red",
+    "path": "lib/request-log.ts",
+    "bytes": 10743,
+    "sha256": "2884101d84e815ece44d1f3758885cc1c2145932cbe1001dfe17273684c8949a"
+  },
+  {
+    "phase": "red",
+    "path": "lib/secrets/crypto.ts",
+    "bytes": 3404,
+    "sha256": "6b925cdb4f770ddaa85c36512bd5bf69ac0dc0c260ccde2f71ef126ef0d8f8b4"
+  },
+  {
+    "phase": "red",
+    "path": "lib/status-appearance.ts",
+    "bytes": 1658,
+    "sha256": "0cf0618b8a4025bede842aa94deb34ec90b64e878d4de19617b1f3aa87d6707c"
+  },
+  {
+    "phase": "red",
+    "path": "lib/task-destination.ts",
+    "bytes": 815,
+    "sha256": "67c78bee2f801a4ba8f3d679dc16bbe7a79baf91a768daa36687ae264f3a85ce"
+  },
+  {
+    "phase": "red",
+    "path": "lib/tracing/jobs.ts",
+    "bytes": 2650,
+    "sha256": "6ea794db16ebd2020c31c338d4856c4909b4009a618b97a2d4eb5092a30bb8f1"
+  },
+  {
+    "phase": "red",
+    "path": "lib/tracing/labels.ts",
+    "bytes": 2278,
+    "sha256": "39d29ed6eba5cfd364e50a78c21b940136636eb887934170df003217be94da7d"
+  },
+  {
+    "phase": "red",
+    "path": "lib/workspace-error.ts",
+    "bytes": 250,
+    "sha256": "6a6c60acde3a8b6526c8ca4f87f25413f3f9aff1e867d488921779d4d99c610e"
+  },
+  {
+    "phase": "red",
+    "path": "packages/protocol/package.json",
+    "bytes": 3103,
+    "sha256": "cc63fa445e0bf6b64966641eaf8d08b3c1dbe4cffe3216f5c3bec3bc68434f70"
+  },
+  {
+    "phase": "red",
+    "path": "packages/protocol/src/coded-error.ts",
+    "bytes": 4495,
+    "sha256": "01978a3515ee14cf9a75010ad0fbf953287c51f3987ee44427d159228361aca5"
+  },
+  {
+    "phase": "red",
+    "path": "packages/protocol/src/tracing.ts",
+    "bytes": 2589,
+    "sha256": "cef008055b6401d04ba96ba593312592caa4080c1afd911d1a69d8e3aeddcf27"
+  },
+  {
+    "phase": "red",
+    "path": "scripts/preview-database-url.mjs",
+    "bytes": 1081,
+    "sha256": "cd39851905b42387976acc8409b7f040839472fc76e27d309e2e581d1b082925"
+  },
+  {
+    "phase": "red",
+    "path": "scripts/server-test.mjs",
+    "bytes": 408,
+    "sha256": "b58352ccee3ea3f88525bbe0acc3b606f3dfbe0f0047d7502b148d13bbf485c5"
+  },
+  {
+    "phase": "red",
+    "path": "tests/support/server-only.mjs",
+    "bytes": 470,
+    "sha256": "acb095e77a48511ebefadba47142e23d411aae3d4c355acc18cb6b24d2c0d281"
+  },
+  {
+    "phase": "red",
+    "path": "tsconfig.json",
+    "bytes": 873,
+    "sha256": "9aa2e6ca4d1c06eaa646e5e2faa1146772545758cf751314f83a8c78618a4fa6"
+  },
+  {
+    "phase": "red",
+    "path": "app/actions/bots.ts",
+    "bytes": 4487,
+    "sha256": "41e0a4ade7d04d478c67d118ca9f48507f588db1e6d8dd7ca67590ff98011557"
+  },
+  {
+    "phase": "red",
+    "path": "app/actions/coordinator.ts",
+    "bytes": 25249,
+    "sha256": "f73da84cbff308cf16c80dea1017161ca8ad8b44e9281d235eb8a2e622f680bd"
+  },
+  {
+    "phase": "red",
+    "path": "app/actions/issues.ts",
+    "bytes": 28524,
+    "sha256": "717111070002eec4987ab273d6efb738513aed9283ec64be353a1028a4c8abc8"
+  },
+  {
+    "phase": "red",
+    "path": "app/actions/task-runs.ts",
+    "bytes": 14442,
+    "sha256": "685edce7f5f2e06da09ddf360167b97d223a80ea632adeb2d7d2edf1874ad021"
+  },
+  {
+    "phase": "red",
+    "path": "apps/desktop/src/renderer/location.ts",
+    "bytes": 5462,
+    "sha256": "ea1acbd410212e5ae80b914ce33399e38186a0337fe29091eadece42d4f9903d"
+  },
+  {
+    "phase": "red",
+    "path": "apps/desktop/src/renderer/read-batch.ts",
+    "bytes": 6237,
+    "sha256": "a25842776c07816eb8af6a24d62dc9d745ab13fb9cfff513de02673d48926f18"
+  },
+  {
+    "phase": "red",
+    "path": "apps/desktop/src/renderer/rpc.ts",
+    "bytes": 4726,
+    "sha256": "6119f76aa46cf1fcd93dc9b389859221c206fecba7cedf265af061fd6862270e"
+  },
+  {
+    "phase": "red",
+    "path": "apps/desktop/src/renderer/transport-state.ts",
+    "bytes": 771,
+    "sha256": "34a55a9a5ae921b8f55a1963722ef97a1dd76d34b05b8862ff8a5c52bb3c7583"
+  },
+  {
+    "phase": "red",
+    "path": "components/swr-defaults.tsx",
+    "bytes": 4551,
+    "sha256": "847311eb9b775d43bb9f569d6ec395aeb41475a5ed7468e17cd1826b2c73217d"
+  },
+  {
+    "phase": "red",
+    "path": "hooks/use-list-expiry.ts",
+    "bytes": 1233,
+    "sha256": "455bf63b9f5f0a61c8b9596da7ed612c01bfc17c5d7d18464e32360776231d06"
+  },
+  {
+    "phase": "red",
+    "path": "hooks/use-live-key.tsx",
+    "bytes": 8050,
+    "sha256": "5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857"
+  },
+  {
+    "phase": "red",
+    "path": "hooks/use-live-lists.ts",
+    "bytes": 9807,
+    "sha256": "da27e73ae937fed876ae463e988d4418292f9976aeb7bc95a89e786ae80e5fab"
+  },
+  {
+    "phase": "red",
+    "path": "i18n/navigation.ts",
+    "bytes": 191,
+    "sha256": "828bf6aebd6424e7e665aaeb4f11c32e76bb7c101c0b55df76ba263488ab64b8"
+  },
+  {
+    "phase": "red",
+    "path": "lib/app-build.ts",
+    "bytes": 5540,
+    "sha256": "3a1d9fa499b9ede523fa8ec48d505a14d324f9232ad28c384e1c97fb3531c54c"
+  },
+  {
+    "phase": "red",
+    "path": "lib/base-path.ts",
+    "bytes": 841,
+    "sha256": "a631625b71ab151377ef4bff24efc4729f92415d53e3b2eb6bcb62530a387dc1"
+  },
+  {
+    "phase": "red",
+    "path": "lib/cache-read-error.ts",
+    "bytes": 620,
+    "sha256": "2519013a251dc5a6fed4dd2acb837bc09ef50b03a1dc0de87de32f82df8817f1"
+  },
+  {
+    "phase": "red",
+    "path": "lib/desktop-rpc/wire.ts",
+    "bytes": 5364,
+    "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3"
+  },
+  {
+    "phase": "red",
+    "path": "lib/group-messages.ts",
+    "bytes": 9204,
+    "sha256": "3bb32d4cf2059bce2869d6a810c1ad1d3c7a33387c2109250e301dde7418e251"
+  },
+  {
+    "phase": "red",
+    "path": "lib/list-poll.ts",
+    "bytes": 3269,
+    "sha256": "e676c7e623bcf5f99489027c73e2f741f71a263d8f54a81a3d6d7a7f14f930ab"
+  },
+  {
+    "phase": "red",
+    "path": "lib/live/browser-runtime.ts",
+    "bytes": 2455,
+    "sha256": "b640f6de894ec6f94847681567148f35314134455382a2309933f769a6f17c72"
+  },
+  {
+    "phase": "red",
+    "path": "lib/live/channel.ts",
+    "bytes": 24031,
+    "sha256": "7d1d16e02ea9ca8256812312eafc96c0591cc1df1c6a463e0216e420d37b8ede"
+  },
+  {
+    "phase": "red",
+    "path": "lib/live/channels.ts",
+    "bytes": 1580,
+    "sha256": "b54a1ea2cb517ce4135d91423c1999420591f3bfc9487d1a9c11396460a321c8"
+  },
+  {
+    "phase": "red",
+    "path": "lib/live/list-read.ts",
+    "bytes": 3337,
+    "sha256": "7dca0d60ae5aa2bc9f3ed5ca1a2ecc3aba08767df8af26a1d9f666bea7a94fb0"
+  },
+  {
+    "phase": "red",
+    "path": "lib/live/presence.ts",
+    "bytes": 4002,
+    "sha256": "03825f69104f2dad83701a6faa6d6ab76326b5dba6f8214249a60eff46249ea0"
+  },
+  {
+    "phase": "red",
+    "path": "lib/live/tab-share.ts",
+    "bytes": 7849,
+    "sha256": "38d80a253b7c3f1522cd79366fc03b46a4065ccf7b52a10df5199092664b7b9f"
+  },
+  {
+    "phase": "red",
+    "path": "lib/live/telemetry.ts",
+    "bytes": 2564,
+    "sha256": "b9d72ee728f8bcfe68c54dd53106fd3944610b868fb0f31f09c96008b848eea7"
+  },
+  {
+    "phase": "red",
+    "path": "lib/server-pages.ts",
+    "bytes": 1933,
+    "sha256": "f83f035533078d6ffaa0aa1b59373a5cd07d62df8b2df8af3651ee62bcc1095b"
+  },
+  {
+    "phase": "red",
+    "path": "lib/swr/cache-policy.ts",
+    "bytes": 7608,
+    "sha256": "b87b7847e2ea02cf4d25b8d106dc33ba30b2e8b3862d1843a7d6ada4b93e51a0"
+  },
+  {
+    "phase": "red",
+    "path": "lib/swr/indexed-db.ts",
+    "bytes": 4513,
+    "sha256": "a0398fe6d422856d4ab42f316b4888b1f775e92f005e29dabf57dd2ef6ed9809"
+  },
+  {
+    "phase": "red",
+    "path": "lib/swr/keys.ts",
+    "bytes": 3688,
+    "sha256": "baf1f5f7504143c8436341cfe23773db2f4e389d437f296199467c745b2e4fd1"
+  },
+  {
+    "phase": "red",
+    "path": "lib/swr/live-focus.ts",
+    "bytes": 1223,
+    "sha256": "1c67e65b189677a11043ca2c6fffcdfcb6edf10ae043e25c42e4c60f4eba8680"
+  },
+  {
+    "phase": "red",
+    "path": "lib/swr/persistent-cache.ts",
+    "bytes": 10956,
+    "sha256": "d1e1793960a0401fc2e8cb3a9b29e2a894828096e444fc086a6d1ebe5d34df1a"
+  },
+  {
+    "phase": "red",
+    "path": "lib/swr/read-observer.ts",
+    "bytes": 8237,
+    "sha256": "c520e2c86ca83fe382e6131eb48b36b813b6b9f8750dc9d3c09e6e0044412cc9"
+  },
+  {
+    "phase": "red",
+    "path": "lib/swr/retry.ts",
+    "bytes": 2260,
+    "sha256": "23ac4e756571418547fe67d8f42c843fcab6a342783e9f2c336b05527c67c513"
+  },
+  {
+    "phase": "red",
+    "path": "lib/web-connection/selection.ts",
+    "bytes": 1135,
+    "sha256": "93a06522eaecc0726d8b19b44c3531972cb953666088bbc85b5e1e54beebe467"
+  },
+  {
+    "phase": "red",
+    "path": "packages/protocol/src/version.ts",
+    "bytes": 2650,
+    "sha256": "1c0fa22d84ac4dffcb8617ce81ae1a9844ee35d80a2fa4e57d39a4ee06d88194"
+  },
+  {
+    "phase": "red",
+    "path": "scripts/use-live-lists.live.test.tsx",
+    "bytes": 84780,
+    "sha256": "2b1fb0b1d8f701d12506e950676c7acf1bb2eddd83ee13c398583af1288375b1"
+  },
+  {
+    "phase": "red",
+    "path": "components/authenticated-read-cache.tsx",
+    "bytes": 4539,
+    "sha256": "90dc00b1dfd6ad21a5ffee1774db8b4a5225b8457390fcb73bb74dbcf7ff009c"
+  },
+  {
+    "phase": "red",
+    "path": "lib/live/revision-read.ts",
+    "bytes": 2120,
+    "sha256": "7bd1af7dfafddb57c113fb4795a3f42d104516e71ad69034028741ccc7338634"
+  },
+  {
+    "phase": "red",
+    "path": "tests/live-revision-reads.db.test.ts",
+    "bytes": 18747,
+    "sha256": "db04b75ea5d222f34ed61c67680f4850b5486ea0df8edd5a97008dcf0d85247e"
+  },
+  {
+    "phase": "red",
+    "path": "components/workspace/issue-workspace.tsx",
+    "bytes": 56571,
+    "sha256": "1729446b75be85a93c009adee62883f617334c1981ffa3464befc9bba0e3e2b8"
+  },
+  {
+    "phase": "green",
+    "path": "components/workspace/issue-properties.ts",
+    "bytes": 2662,
+    "sha256": "af1fdd24bbde70fc5528c345dbd4b36fdcc1e4934f5c6ca9d97e2c325f297c82"
+  },
+  {
+    "phase": "green",
+    "path": "lib/action-error.ts",
+    "bytes": 741,
+    "sha256": "b703bdecc6b1a98254d5caa6133d12f3379e4426d0f49ea17c03474e49c2c606"
+  },
+  {
+    "phase": "green",
+    "path": "lib/app-policy/apps.ts",
+    "bytes": 1583,
+    "sha256": "64696139956c576b5131ba107619789ce8319ef0c90d4597d473d79868acd84c"
+  },
+  {
+    "phase": "green",
+    "path": "lib/background.ts",
+    "bytes": 2955,
+    "sha256": "73937274e1c23817cef7eaacf0da24feb4d724b25fd9d562f4cd683869050310"
+  },
+  {
+    "phase": "green",
+    "path": "lib/billing/hosted-usage.ts",
+    "bytes": 4781,
+    "sha256": "357fa14ece76b436f628020a8232b37f572eee641817ba8cada270beb8daec8e"
+  },
+  {
+    "phase": "green",
+    "path": "lib/composio-accounts.ts",
+    "bytes": 10392,
+    "sha256": "2d968c04c64e9bc15ceb5d3c9a8fd2a089076331e7841beaa674613ad45d4547"
+  },
+  {
+    "phase": "green",
+    "path": "lib/coordinator/user-attachments.ts",
+    "bytes": 2962,
+    "sha256": "cae39fa6e7c716688c86b0500009071712ed19fd1a55a8eb1cbc46f3b7fc66c6"
+  },
+  {
+    "phase": "green",
+    "path": "lib/db/agent-profile-schema.ts",
+    "bytes": 1618,
+    "sha256": "95bfa74fa772d1cb9259f962b11d01c6b52eee242a8b1a74a6f70a286a97ed9b"
+  },
+  {
+    "phase": "green",
+    "path": "lib/db/commit-effects.ts",
+    "bytes": 6982,
+    "sha256": "83e00e079304c5cce58d142e6af39763c0c331944d84bf5b1fc30b3f88f8bc9a"
+  },
+  {
+    "phase": "green",
+    "path": "lib/db/config.ts",
+    "bytes": 410,
+    "sha256": "0d4b01105bf3059e3af26ce11c656e72170266716784a1867bfc971f04c07652"
+  },
+  {
+    "phase": "green",
+    "path": "lib/db/device-scope.ts",
+    "bytes": 14907,
+    "sha256": "2083d7616e9a18421dcb8d55c309dba8a2761bf140faeba106a5b24393748b98"
+  },
+  {
+    "phase": "green",
+    "path": "lib/db/egress-sample.ts",
+    "bytes": 4294,
+    "sha256": "eb2628088a55ba1141e1b49390629f3e9e01850ef3e197838e1e7ac06ea5764c"
+  },
+  {
+    "phase": "green",
+    "path": "lib/db/pool-lifecycle.ts",
+    "bytes": 1327,
+    "sha256": "25bfe3d3803e2e299d3572ff34b932e430806efecded767cda2b201291e0bdf6"
+  },
+  {
+    "phase": "green",
+    "path": "lib/db/project-map-schema.ts",
+    "bytes": 4205,
+    "sha256": "12d796c0275717373afa6709aa98fb64f387f8193aa2e62734734ad461e1509f"
+  },
+  {
+    "phase": "green",
+    "path": "lib/db/request-scope.ts",
+    "bytes": 4779,
+    "sha256": "67bbb85d950948802449a1d0c2638e62bd4d1731ffe883837bc53059ac50b6f0"
+  },
+  {
+    "phase": "green",
+    "path": "lib/db/schema.ts",
+    "bytes": 92901,
+    "sha256": "f7b4141433a2c72001bab2fc20b84f7115eb4d078bd2bccfc6e7e837f82a08cc"
+  },
+  {
+    "phase": "green",
+    "path": "lib/db/transport-sample.ts",
+    "bytes": 4900,
+    "sha256": "b3d8fe1bfb8a7b1d59869d5e8f5473a3aa582e93425d14faf89bb89e3675911d"
+  },
+  {
+    "phase": "green",
+    "path": "lib/deployment-switches.ts",
+    "bytes": 14890,
+    "sha256": "fb3b81f9cdff4b5d19b83878bdeb0accb8d35388b3bfd61f9b714b963065d40b"
+  },
+  {
+    "phase": "green",
+    "path": "lib/desktop-rpc/read-batch-context.test.ts",
+    "bytes": 26773,
+    "sha256": "ea4cd0de715f0089aa08a6f7fe8555d7b0f245b397d0896c5254814d62fac670"
+  },
+  {
+    "phase": "green",
+    "path": "lib/desktop-rpc/read-batch-context.ts",
+    "bytes": 8621,
+    "sha256": "e4045985f5cca7d09cbfcf86473f24a51c200d1162a498697a817bff54c1a651"
+  },
+  {
+    "phase": "green",
+    "path": "lib/desktop-rpc/read-batch-contract.ts",
+    "bytes": 2241,
+    "sha256": "27b2ca29ec6dd3922ae0660c94766ed3a0312e2bb10955c2c2c5fd67391c3a49"
+  },
+  {
+    "phase": "green",
+    "path": "lib/desktop-rpc/read-batch.ts",
+    "bytes": 3099,
+    "sha256": "8aadc849e1de11727a67f03c0d0d07d656136e455f4ef7bf32281f6b10194fdb"
+  },
+  {
+    "phase": "green",
+    "path": "lib/desktop-rpc/schemas.ts",
+    "bytes": 21175,
+    "sha256": "278fd188be7893dda0a4fcd61ce76fc03a7f332f6a38d8a02e3a3496a3f95e64"
+  },
+  {
+    "phase": "green",
+    "path": "lib/desktop-rpc/session-cache-context.ts",
+    "bytes": 1455,
+    "sha256": "5f1bca3ba886cfe56afae1782933f1e745d043c247355fde22df2a326b25214a"
+  },
+  {
+    "phase": "green",
+    "path": "lib/device-gateway-notify.ts",
+    "bytes": 6071,
+    "sha256": "5534c94d6f61599e918dc863e4b445f68085515dcf77f459965c1e743d4a6164"
+  },
+  {
+    "phase": "green",
+    "path": "lib/due-timer.ts",
+    "bytes": 8715,
+    "sha256": "72d9a081b728336162b68069095e3e1759427a5325d33438a5b0b3747e424c96"
+  },
+  {
+    "phase": "green",
+    "path": "lib/edition.ts",
+    "bytes": 660,
+    "sha256": "779f421ebe198e6f99b851eca23e26bfa7a1af90fa1c4c2a277424df7084e12e"
+  },
+  {
+    "phase": "green",
+    "path": "lib/enabled-models-policy.ts",
+    "bytes": 1368,
+    "sha256": "8f8407a2e4149a4da3528c697b9f03ed6f4db47b835c19bb93e36e5d1ae52f74"
+  },
+  {
+    "phase": "green",
+    "path": "lib/execution-identity.ts",
+    "bytes": 11483,
+    "sha256": "5256ea4d36c41ef247cc25b8e0b48aa2dbc61eb5a38b2774a5b770128892842c"
+  },
+  {
+    "phase": "green",
+    "path": "lib/factory/agent-profile-reference.ts",
+    "bytes": 266,
+    "sha256": "f7328c2d3f28d743eb4276949b809834453d97982498fe3b8741c8f5efd08c54"
+  },
+  {
+    "phase": "green",
+    "path": "lib/issue-meta.ts",
+    "bytes": 325,
+    "sha256": "8860eea106c43b20f3d22103ddcb9d3b57d73833a95789bf9f9e824458db8189"
+  },
+  {
+    "phase": "green",
+    "path": "lib/issue-metadata.ts",
+    "bytes": 2921,
+    "sha256": "75f98bb5c22196454094aa55d8e4da2c4487aab21f5a9fab9e706b0561a0a69a"
+  },
+  {
+    "phase": "green",
+    "path": "lib/link-preview-parse.ts",
+    "bytes": 3537,
+    "sha256": "2ec1405c2186e84f956020af45d1c755ec66456a5a266238f0d99d5b2c8d5869"
+  },
+  {
+    "phase": "green",
+    "path": "lib/live/events.ts",
+    "bytes": 4679,
+    "sha256": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5"
+  },
+  {
+    "phase": "green",
+    "path": "lib/live/lists.ts",
+    "bytes": 16950,
+    "sha256": "3b694ceb2db9f826982656ee3c818ab133d150860e63774ccae24bea672f5f15"
+  },
+  {
+    "phase": "green",
+    "path": "lib/live/owner-scope.ts",
+    "bytes": 1284,
+    "sha256": "d803e41828b7bb49ef89e6571efe43f8080249e121cb4852f7e869d0a2382673"
+  },
+  {
+    "phase": "green",
+    "path": "lib/live/panels.ts",
+    "bytes": 11743,
+    "sha256": "5e3257ad5eafe8e19d6065073af0b681152461ebc35519e1117d006cc0f60f92"
+  },
+  {
+    "phase": "green",
+    "path": "lib/live/revisions.ts",
+    "bytes": 4070,
+    "sha256": "bd2b351ade97a5b0f3f12f43d606ce9f9d8eca9b90de33400be94203d9d76328"
+  },
+  {
+    "phase": "green",
+    "path": "lib/loopback.ts",
+    "bytes": 281,
+    "sha256": "5e5402398ef094f067e4cb9194364799f8aa687099c469e3b33ad0a1155dd2c7"
+  },
+  {
+    "phase": "green",
+    "path": "lib/model-api-key-providers.ts",
+    "bytes": 6015,
+    "sha256": "6ecda8d703adbf80b6bad49a57fffe894b96a28db02581bc0b7157180d3a5b6a"
+  },
+  {
+    "phase": "green",
+    "path": "lib/model-api-key-runs.ts",
+    "bytes": 2246,
+    "sha256": "655762178282b64c905e6e5336bc6ca24b732e19cc0da3edd026fdcfcf9ef70f"
+  },
+  {
+    "phase": "green",
+    "path": "lib/model-api-keys.ts",
+    "bytes": 26494,
+    "sha256": "1574f8712bfe1ea8428a86e91cf137e75d2f0849bfea1cec2b0de34db0b8dffb"
+  },
+  {
+    "phase": "green",
+    "path": "lib/model-order-plan.ts",
+    "bytes": 18584,
+    "sha256": "ea0681c559c465624ba273e3183693f7a0f400ada3b00850430f6628915d6836"
+  },
+  {
+    "phase": "green",
+    "path": "lib/personal-policy.test.ts",
+    "bytes": 19713,
+    "sha256": "f0b2950fbb7bc87ef207f0c8357b394c51d21d36c734e469b82165a69c19c12f"
+  },
+  {
+    "phase": "green",
+    "path": "lib/personal-policy.ts",
+    "bytes": 8694,
+    "sha256": "1e09dbc751b0e740d54cbbc6db79b0d4a0bf48cc409137eabc36ecd38f8861f6"
+  },
+  {
+    "phase": "green",
+    "path": "lib/posthog-config.ts",
+    "bytes": 358,
+    "sha256": "cd149157b6e4f2ed3c524e512274b9181858889a1dceca8eab5f38d429560545"
+  },
+  {
+    "phase": "green",
+    "path": "lib/project-input.ts",
+    "bytes": 3095,
+    "sha256": "dc9af502e81855f3fbb420137ec2ed06a015ce392079d6a207a63c6ec0a805b3"
+  },
+  {
+    "phase": "green",
+    "path": "lib/request-log.ts",
+    "bytes": 10743,
+    "sha256": "2884101d84e815ece44d1f3758885cc1c2145932cbe1001dfe17273684c8949a"
+  },
+  {
+    "phase": "green",
+    "path": "lib/secrets/crypto.ts",
+    "bytes": 3404,
+    "sha256": "6b925cdb4f770ddaa85c36512bd5bf69ac0dc0c260ccde2f71ef126ef0d8f8b4"
+  },
+  {
+    "phase": "green",
+    "path": "lib/status-appearance.ts",
+    "bytes": 1658,
+    "sha256": "0cf0618b8a4025bede842aa94deb34ec90b64e878d4de19617b1f3aa87d6707c"
+  },
+  {
+    "phase": "green",
+    "path": "lib/task-destination.ts",
+    "bytes": 815,
+    "sha256": "67c78bee2f801a4ba8f3d679dc16bbe7a79baf91a768daa36687ae264f3a85ce"
+  },
+  {
+    "phase": "green",
+    "path": "lib/tracing/jobs.ts",
+    "bytes": 2650,
+    "sha256": "6ea794db16ebd2020c31c338d4856c4909b4009a618b97a2d4eb5092a30bb8f1"
+  },
+  {
+    "phase": "green",
+    "path": "lib/tracing/labels.ts",
+    "bytes": 2278,
+    "sha256": "39d29ed6eba5cfd364e50a78c21b940136636eb887934170df003217be94da7d"
+  },
+  {
+    "phase": "green",
+    "path": "lib/workspace-error.ts",
+    "bytes": 250,
+    "sha256": "6a6c60acde3a8b6526c8ca4f87f25413f3f9aff1e867d488921779d4d99c610e"
+  },
+  {
+    "phase": "green",
+    "path": "packages/protocol/package.json",
+    "bytes": 3103,
+    "sha256": "cc63fa445e0bf6b64966641eaf8d08b3c1dbe4cffe3216f5c3bec3bc68434f70"
+  },
+  {
+    "phase": "green",
+    "path": "packages/protocol/src/coded-error.ts",
+    "bytes": 4495,
+    "sha256": "01978a3515ee14cf9a75010ad0fbf953287c51f3987ee44427d159228361aca5"
+  },
+  {
+    "phase": "green",
+    "path": "packages/protocol/src/tracing.ts",
+    "bytes": 2589,
+    "sha256": "cef008055b6401d04ba96ba593312592caa4080c1afd911d1a69d8e3aeddcf27"
+  },
+  {
+    "phase": "green",
+    "path": "scripts/preview-database-url.mjs",
+    "bytes": 1081,
+    "sha256": "cd39851905b42387976acc8409b7f040839472fc76e27d309e2e581d1b082925"
+  },
+  {
+    "phase": "green",
+    "path": "scripts/server-test.mjs",
+    "bytes": 408,
+    "sha256": "b58352ccee3ea3f88525bbe0acc3b606f3dfbe0f0047d7502b148d13bbf485c5"
+  },
+  {
+    "phase": "green",
+    "path": "tests/support/server-only.mjs",
+    "bytes": 470,
+    "sha256": "acb095e77a48511ebefadba47142e23d411aae3d4c355acc18cb6b24d2c0d281"
+  },
+  {
+    "phase": "green",
+    "path": "tsconfig.json",
+    "bytes": 873,
+    "sha256": "9aa2e6ca4d1c06eaa646e5e2faa1146772545758cf751314f83a8c78618a4fa6"
+  },
+  {
+    "phase": "green",
+    "path": "app/actions/bots.ts",
+    "bytes": 4487,
+    "sha256": "41e0a4ade7d04d478c67d118ca9f48507f588db1e6d8dd7ca67590ff98011557"
+  },
+  {
+    "phase": "green",
+    "path": "app/actions/coordinator.ts",
+    "bytes": 25408,
+    "sha256": "e417302a0cbf5810e061e60aa33ba8e13f29636be29bd822fa139eaa9def9d63"
+  },
+  {
+    "phase": "green",
+    "path": "app/actions/issues.ts",
+    "bytes": 28524,
+    "sha256": "717111070002eec4987ab273d6efb738513aed9283ec64be353a1028a4c8abc8"
+  },
+  {
+    "phase": "green",
+    "path": "app/actions/task-runs.ts",
+    "bytes": 14442,
+    "sha256": "685edce7f5f2e06da09ddf360167b97d223a80ea632adeb2d7d2edf1874ad021"
+  },
+  {
+    "phase": "green",
+    "path": "apps/desktop/src/renderer/location.ts",
+    "bytes": 5462,
+    "sha256": "ea1acbd410212e5ae80b914ce33399e38186a0337fe29091eadece42d4f9903d"
+  },
+  {
+    "phase": "green",
+    "path": "apps/desktop/src/renderer/read-batch.ts",
+    "bytes": 6301,
+    "sha256": "f98ecf6e986da17aa66d8c54039f5d683dc7cfb7d2e563eec5efffeff9527bac"
+  },
+  {
+    "phase": "green",
+    "path": "apps/desktop/src/renderer/rpc.ts",
+    "bytes": 4726,
+    "sha256": "6119f76aa46cf1fcd93dc9b389859221c206fecba7cedf265af061fd6862270e"
+  },
+  {
+    "phase": "green",
+    "path": "apps/desktop/src/renderer/transport-state.ts",
+    "bytes": 771,
+    "sha256": "34a55a9a5ae921b8f55a1963722ef97a1dd76d34b05b8862ff8a5c52bb3c7583"
+  },
+  {
+    "phase": "green",
+    "path": "components/swr-defaults.tsx",
+    "bytes": 4551,
+    "sha256": "847311eb9b775d43bb9f569d6ec395aeb41475a5ed7468e17cd1826b2c73217d"
+  },
+  {
+    "phase": "green",
+    "path": "hooks/use-list-expiry.ts",
+    "bytes": 1233,
+    "sha256": "455bf63b9f5f0a61c8b9596da7ed612c01bfc17c5d7d18464e32360776231d06"
+  },
+  {
+    "phase": "green",
+    "path": "hooks/use-live-key.tsx",
+    "bytes": 8050,
+    "sha256": "5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857"
+  },
+  {
+    "phase": "green",
+    "path": "hooks/use-live-lists.ts",
+    "bytes": 9807,
+    "sha256": "da27e73ae937fed876ae463e988d4418292f9976aeb7bc95a89e786ae80e5fab"
+  },
+  {
+    "phase": "green",
+    "path": "i18n/navigation.ts",
+    "bytes": 191,
+    "sha256": "828bf6aebd6424e7e665aaeb4f11c32e76bb7c101c0b55df76ba263488ab64b8"
+  },
+  {
+    "phase": "green",
+    "path": "lib/app-build.ts",
+    "bytes": 5540,
+    "sha256": "3a1d9fa499b9ede523fa8ec48d505a14d324f9232ad28c384e1c97fb3531c54c"
+  },
+  {
+    "phase": "green",
+    "path": "lib/base-path.ts",
+    "bytes": 841,
+    "sha256": "a631625b71ab151377ef4bff24efc4729f92415d53e3b2eb6bcb62530a387dc1"
+  },
+  {
+    "phase": "green",
+    "path": "lib/cache-read-error.ts",
+    "bytes": 620,
+    "sha256": "2519013a251dc5a6fed4dd2acb837bc09ef50b03a1dc0de87de32f82df8817f1"
+  },
+  {
+    "phase": "green",
+    "path": "lib/desktop-rpc/wire.ts",
+    "bytes": 5364,
+    "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3"
+  },
+  {
+    "phase": "green",
+    "path": "lib/group-messages.ts",
+    "bytes": 9204,
+    "sha256": "3bb32d4cf2059bce2869d6a810c1ad1d3c7a33387c2109250e301dde7418e251"
+  },
+  {
+    "phase": "green",
+    "path": "lib/list-poll.ts",
+    "bytes": 3269,
+    "sha256": "e676c7e623bcf5f99489027c73e2f741f71a263d8f54a81a3d6d7a7f14f930ab"
+  },
+  {
+    "phase": "green",
+    "path": "lib/live/browser-runtime.ts",
+    "bytes": 2455,
+    "sha256": "b640f6de894ec6f94847681567148f35314134455382a2309933f769a6f17c72"
+  },
+  {
+    "phase": "green",
+    "path": "lib/live/channel.ts",
+    "bytes": 24031,
+    "sha256": "7d1d16e02ea9ca8256812312eafc96c0591cc1df1c6a463e0216e420d37b8ede"
+  },
+  {
+    "phase": "green",
+    "path": "lib/live/channels.ts",
+    "bytes": 1580,
+    "sha256": "b54a1ea2cb517ce4135d91423c1999420591f3bfc9487d1a9c11396460a321c8"
+  },
+  {
+    "phase": "green",
+    "path": "lib/live/list-read.ts",
+    "bytes": 3337,
+    "sha256": "7dca0d60ae5aa2bc9f3ed5ca1a2ecc3aba08767df8af26a1d9f666bea7a94fb0"
+  },
+  {
+    "phase": "green",
+    "path": "lib/live/presence.ts",
+    "bytes": 4002,
+    "sha256": "03825f69104f2dad83701a6faa6d6ab76326b5dba6f8214249a60eff46249ea0"
+  },
+  {
+    "phase": "green",
+    "path": "lib/live/tab-share.ts",
+    "bytes": 7849,
+    "sha256": "38d80a253b7c3f1522cd79366fc03b46a4065ccf7b52a10df5199092664b7b9f"
+  },
+  {
+    "phase": "green",
+    "path": "lib/live/telemetry.ts",
+    "bytes": 2564,
+    "sha256": "b9d72ee728f8bcfe68c54dd53106fd3944610b868fb0f31f09c96008b848eea7"
+  },
+  {
+    "phase": "green",
+    "path": "lib/server-pages.ts",
+    "bytes": 1933,
+    "sha256": "f83f035533078d6ffaa0aa1b59373a5cd07d62df8b2df8af3651ee62bcc1095b"
+  },
+  {
+    "phase": "green",
+    "path": "lib/swr/cache-policy.ts",
+    "bytes": 7608,
+    "sha256": "b87b7847e2ea02cf4d25b8d106dc33ba30b2e8b3862d1843a7d6ada4b93e51a0"
+  },
+  {
+    "phase": "green",
+    "path": "lib/swr/indexed-db.ts",
+    "bytes": 4513,
+    "sha256": "a0398fe6d422856d4ab42f316b4888b1f775e92f005e29dabf57dd2ef6ed9809"
+  },
+  {
+    "phase": "green",
+    "path": "lib/swr/keys.ts",
+    "bytes": 3688,
+    "sha256": "baf1f5f7504143c8436341cfe23773db2f4e389d437f296199467c745b2e4fd1"
+  },
+  {
+    "phase": "green",
+    "path": "lib/swr/live-focus.ts",
+    "bytes": 1223,
+    "sha256": "1c67e65b189677a11043ca2c6fffcdfcb6edf10ae043e25c42e4c60f4eba8680"
+  },
+  {
+    "phase": "green",
+    "path": "lib/swr/persistent-cache.ts",
+    "bytes": 10956,
+    "sha256": "d1e1793960a0401fc2e8cb3a9b29e2a894828096e444fc086a6d1ebe5d34df1a"
+  },
+  {
+    "phase": "green",
+    "path": "lib/swr/read-observer.ts",
+    "bytes": 8237,
+    "sha256": "c520e2c86ca83fe382e6131eb48b36b813b6b9f8750dc9d3c09e6e0044412cc9"
+  },
+  {
+    "phase": "green",
+    "path": "lib/swr/retry.ts",
+    "bytes": 2260,
+    "sha256": "23ac4e756571418547fe67d8f42c843fcab6a342783e9f2c336b05527c67c513"
+  },
+  {
+    "phase": "green",
+    "path": "lib/web-connection/selection.ts",
+    "bytes": 1135,
+    "sha256": "93a06522eaecc0726d8b19b44c3531972cb953666088bbc85b5e1e54beebe467"
+  },
+  {
+    "phase": "green",
+    "path": "packages/protocol/src/version.ts",
+    "bytes": 2650,
+    "sha256": "1c0fa22d84ac4dffcb8617ce81ae1a9844ee35d80a2fa4e57d39a4ee06d88194"
+  },
+  {
+    "phase": "green",
+    "path": "scripts/use-live-lists.live.test.tsx",
+    "bytes": 84780,
+    "sha256": "2b1fb0b1d8f701d12506e950676c7acf1bb2eddd83ee13c398583af1288375b1"
+  },
+  {
+    "phase": "green",
+    "path": "components/authenticated-read-cache.tsx",
+    "bytes": 4539,
+    "sha256": "90dc00b1dfd6ad21a5ffee1774db8b4a5225b8457390fcb73bb74dbcf7ff009c"
+  },
+  {
+    "phase": "green",
+    "path": "lib/live/revision-read.ts",
+    "bytes": 2332,
+    "sha256": "59eba7ae91f0b1f71eab51800c632f049f9fffe8c61f86c794f4c875781af907"
+  },
+  {
+    "phase": "green",
+    "path": "tests/live-revision-reads.db.test.ts",
+    "bytes": 18747,
+    "sha256": "db04b75ea5d222f34ed61c67680f4850b5486ea0df8edd5a97008dcf0d85247e"
+  },
+  {
+    "phase": "green",
+    "path": "components/workspace/issue-workspace.tsx",
+    "bytes": 56675,
+    "sha256": "d22ee5554f1d942cf7aecd98c2e2398fdfb7ce36073de2e42c488e11ec0215cb"
+  }
+]

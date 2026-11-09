@@ -1,0 +1,193 @@
+diff --git a/lib/desktop-rpc/read-batch-context.ts b/lib/desktop-rpc/read-batch-context.ts
+index e32da5e4d7294af3363eb2de4623a52aeb7e4f47..e1623ab5eabad41e9daa0f6d29a60b709e794085 100644
+--- a/lib/desktop-rpc/read-batch-context.ts
++++ b/lib/desktop-rpc/read-batch-context.ts
+@@ -17,7 +17,18 @@
+   ownerRevisionKinds: ReturnType<typeof readBatchOwnerRevisionKinds>
+ }
+ const batches = new AsyncLocalStorage<BatchContext>()
++type PolicyObservation = Pick<BatchContext, 'active' | 'subscriptionPolicies'>
++const policyObservations = new AsyncLocalStorage<PolicyObservation>()
+ 
++/** Only explicitly read-only callers open this lifetime. Execution and ordinary
++ * permission checks remain fresh; a Native batch keeps its existing observation. */
++export async function withReadOnlyPolicyObservation<T>(read: () => Promise<T>): Promise<T> {
++  if (/^(?:after|cron|workflow):/.test(currentRoute() ?? '') || batches.getStore()?.active || policyObservations.getStore()?.active) return read()
++  const scope: PolicyObservation = { active: true, subscriptionPolicies: new Map() }
++  try { return await policyObservations.run(scope, read) }
++  finally { scope.active = false; scope.subscriptionPolicies.clear() }
++}
++
+ /** Installed only by the bounded read action. Detached after-work cannot keep
+  * using the batch's authority/revision observations once its items settle. */
+ export async function withReadBatchContext<T>(work: () => Promise<T>, actions: readonly BatchReadAction[] = []): Promise<T> {
+@@ -27,11 +38,12 @@
+ }
+ 
+ /** Chat model readers consult the same workspace policy for keys and subscriptions.
++ * Share only its bounded read observation; each consumer keeps its own data
++ * and authority checks. A request proxy must name its actual executor.
+- * Share only its observation in this read batch; each consumer keeps its own
+- * data and authority checks. A request proxy must name its actual executor.
+  * Deferred jobs have their own observation even while the parent is active. */
+ export function readBatchSubscriptionPolicy(database: object, workspaceId: string, read: () => Promise<boolean>): Promise<boolean> {
++  const batch = batches.getStore()
++  const scope = batch?.active ? batch : policyObservations.getStore()
+-  const scope = batches.getStore()
+   if (!scope?.active || /^(?:after|cron|workflow):/.test(currentRoute() ?? '')) return read()
+   const executor = (database as { [COMMIT_EXECUTOR]?: object })[COMMIT_EXECUTOR] ?? database
+   let policies = scope.subscriptionPolicies.get(executor)
+diff --git a/app/actions/coordinator.ts b/app/actions/coordinator.ts
+index bd24ef4c103b670d92d381d396d5c3e1b6aba083..c1af7261fed4907c265041a549441b92f3ba6ab7 100644
+--- a/app/actions/coordinator.ts
++++ b/app/actions/coordinator.ts
+@@ -5,6 +5,7 @@
+ import { desktopHumanSessionId } from '@/lib/desktop-rpc/session'
+ import { ownerListRead } from '@/lib/live/list-read-server'
+ import { beginOwnerListRead, readRevisions } from '@/lib/live/revision-read'
++import { withReadOnlyPolicyObservation } from '@/lib/desktop-rpc/read-batch-context'
+ import type { ListLiveRead } from '@/lib/live/list-read'
+ 
+ import { cookies, headers } from 'next/headers'
+@@ -97,7 +98,7 @@
+   const user = await getUser()
+   const userId = user.id
+   const bot = await ownBot(user, botId)
++  const enabled = await withReadOnlyPolicyObservation(() => coordinatorEnabled(user.id, bot.id))
+-  const enabled = await coordinatorEnabled(user.id, bot.id)
+   // Before the chat: a push at this revision or below is already in what follows.
+   const begun = await beginBotChatRead(userId, bot)
+   const { chat, expiries, observedAt } = await chatStore.chatViewState(userId, 200, bot.id)
+@@ -130,7 +131,7 @@
+   // Each request is authorized on its own: the session and its ownership of this bot.
+   const user = await getUser()
+   const bot = await ownBot(user, botId)
++  const enabled = await withReadOnlyPolicyObservation(() => coordinatorEnabled(user.id, bot.id))
+-  const enabled = await coordinatorEnabled(user.id, bot.id)
+   const parsed = versionSchema.safeParse(known)
+   const proof = continuationSchema.safeParse(continuation)
+   const previous = proof.success && proof.data ? { ...proof.data,
+diff --git a/lib/personal-policy.test.ts b/lib/personal-policy.test.ts
+index fef80337b9b5244d2e8565236c6dd96f7d329acd..0338aed556fe721ba49c2fa7fa066fdd9d63ff96 100644
+--- a/lib/personal-policy.test.ts
++++ b/lib/personal-policy.test.ts
+@@ -5,6 +5,8 @@
+ import { COMMIT_EXECUTOR } from './db/commit-effects'
+ import { createReadBatch } from './desktop-rpc/read-batch'
+ import { withReadBatchContext } from './desktop-rpc/read-batch-context'
++import * as readContext from './desktop-rpc/read-batch-context'
++import { routeScope } from './tracing/labels'
+ import { desktopActionSchemas } from './desktop-rpc/schemas'
+ 
+ const changed = () => assert.fail('a read cannot emit an execution side effect')
+@@ -280,3 +282,110 @@
+     })
+   }
+ })
++
++// On the fixed pre-fix source, run the real consumers without the new lifetime:
++// the RED is the duplicate policy SELECT, never a missing-export exception.
++const observePolicy: <T>(read: () => Promise<T>) => Promise<T> =
++  readContext.withReadOnlyPolicyObservation ?? (read => read())
++
++test('standalone read-only policy consumers share one observation and keep every credential read', async () => {
++  const before = policyReader(), after = policyReader()
++  const expected = await readPolicyConsumers(before.query)
++  assert.equal(before.calls.filter(call => call === 'policy').length, 2, 'ordinary callers keep their existing fresh checks')
++  assert.deepEqual(await observePolicy(() => readPolicyConsumers(after.query)), expected)
++  assert.deepEqual(after.calls, ['policy', 'own-keys', 'shared-keys', 'shared-owners'])
++})
++
++test('standalone policy refusal and absence are observed again by the next read', async () => {
++  const f = policyReader(false)
++  assert.deepEqual(await observePolicy(() => readPolicyConsumers(f.query)), {
++    keys: [{ id: '10000000-0000-4000-8000-000000000002', mine: true }], owners: [],
++  })
++  assert.deepEqual(f.calls, ['policy', 'own-keys'])
++  f.state.allowed = undefined
++  assert.equal((await observePolicy(() => readPolicyConsumers(f.query))).owners.length, 1)
++  assert.equal(f.calls.filter(call => call === 'policy').length, 2)
++})
++
++test('standalone observations isolate parallel reads, exact workspaces and actual executors', async () => {
++  const f = policyReader()
++  const read = () => observePolicy(() => Promise.all([
++    memberSubscriptionsAllowed(f.query, workspace), memberSubscriptionsAllowed(f.query, workspace),
++  ]))
++  assert.deepEqual(await Promise.all([read(), read()]), [[true, true], [true, true]])
++  assert.equal(f.calls.length, 2)
++  const other = policyReader(false)
++  const alias = { [COMMIT_EXECUTOR]: f.query, query: f.query.query.bind(f.query) }
++  assert.deepEqual(await observePolicy(() => Promise.all([
++    memberSubscriptionsAllowed(f.query, workspace),
++    memberSubscriptionsAllowed(alias, workspace),
++    memberSubscriptionsAllowed(f.query, '10000000-0000-4000-8000-000000000004'),
++    memberSubscriptionsAllowed(other.query, workspace),
++  ])), [true, true, true, false])
++  assert.equal(f.calls.length, 4)
++  assert.equal(other.calls.length, 1)
++})
++
++test('standalone policy failures retain their original cause and do not poison the next read', async () => {
++  const f = policyReader(), failure = new Error('synthetic_standalone_policy_failure')
++  f.state.error = failure
++  const settled = await observePolicy(() => Promise.allSettled([
++    memberSubscriptionsAllowed(f.query, workspace), memberSubscriptionsAllowed(f.query, workspace),
++  ]))
++  assert.equal(f.calls.length, 1)
++  for (const result of settled) {
++    assert.equal(result.status, 'rejected')
++    if (result.status === 'rejected') assert.equal(result.reason, failure)
++  }
++  f.state.error = null
++  assert.equal(await observePolicy(() => memberSubscriptionsAllowed(f.query, workspace)), true)
++  assert.equal(f.calls.length, 2)
++})
++
++test('standalone observation closes on fulfillment and rejection before bound after-work runs', async () => {
++  for (const reject of [false, true]) {
++    const f = policyReader(), failure = new Error('synthetic_standalone_read_failure')
++    let after!: () => Promise<boolean>
++    const reading = observePolicy(async () => {
++      assert.equal(await memberSubscriptionsAllowed(f.query, workspace), true)
++      after = AsyncLocalStorage.bind(() => memberSubscriptionsAllowed(f.query, workspace))
++      if (reject) throw failure
++    })
++    if (reject) await assert.rejects(reading, error => error === failure)
++    else await reading
++    f.state.allowed = false
++    assert.equal(await after(), false)
++    f.state.allowed = true
++    assert.equal(await after(), true)
++    assert.equal(f.calls.length, 3)
++  }
++})
++
++test('standalone foreground observation never supplies policy to after, cron or workflow work', async () => {
++  const f = policyReader()
++  await observePolicy(async () => {
++    assert.equal(await memberSubscriptionsAllowed(f.query, workspace), true)
++    for (const route of ['after:policy-fixture', 'cron:policy-fixture', 'workflow:policy-fixture/read']) {
++      await routeScope.run(route, () => observePolicy(async () => {
++        f.state.allowed = false
++        assert.equal(await memberSubscriptionsAllowed(f.query, workspace), false)
++        f.state.allowed = true
++        assert.equal(await memberSubscriptionsAllowed(f.query, workspace), true)
++      }))
++    }
++    assert.equal(await memberSubscriptionsAllowed(f.query, workspace), true)
++    assert.equal(f.calls.length, 7)
++  })
++})
++
++test('standalone read-only observation preserves the surrounding Native batch policy', async () => {
++  const f = policyReader()
++  await withReadBatchContext(async () => {
++    assert.equal(await memberSubscriptionsAllowed(f.query, workspace), true)
++    f.state.allowed = false
++    assert.equal(await observePolicy(() => memberSubscriptionsAllowed(f.query, workspace)), true)
++    assert.equal(f.calls.length, 1)
++  })
++  assert.equal(await observePolicy(() => memberSubscriptionsAllowed(f.query, workspace)), false)
++  assert.equal(f.calls.length, 2)
++})

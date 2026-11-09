@@ -1,0 +1,110 @@
+[
+  {
+    "mode": "red",
+    "path": "lib/desktop-rpc/read-batch-context.test.ts",
+    "bytes": 25799,
+    "sha256": "4f6122410e31b9f60746eb3eb491b6ff208262010308855eaa4c58ddeb528cf6"
+  },
+  {
+    "mode": "red",
+    "path": "lib/desktop-rpc/read-batch-context.ts",
+    "bytes": 6263,
+    "sha256": "871d9a5bd92d084919d4124c5c26b90d6ad7195f55f91502e02d52bc55083f6e"
+  },
+  {
+    "mode": "red",
+    "path": "lib/desktop-rpc/read-batch-contract.ts",
+    "bytes": 1637,
+    "sha256": "cdd915dacd21d2e9555896daeaa5e5c1f5b23a193cb48e0b959507e96e990000"
+  },
+  {
+    "mode": "red",
+    "path": "lib/live/owner-scope.ts",
+    "bytes": 1284,
+    "sha256": "d803e41828b7bb49ef89e6571efe43f8080249e121cb4852f7e869d0a2382673"
+  },
+  {
+    "mode": "red",
+    "path": "lib/live/revisions.ts",
+    "bytes": 4070,
+    "sha256": "bd2b351ade97a5b0f3f12f43d606ce9f9d8eca9b90de33400be94203d9d76328"
+  },
+  {
+    "mode": "red",
+    "path": "lib/live/events.ts",
+    "bytes": 4679,
+    "sha256": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5"
+  },
+  {
+    "mode": "red",
+    "path": "lib/live/scope.ts",
+    "bytes": 1345,
+    "sha256": "b323f66c5c01440d72e3ce1627a4c0a523e019895e71cf3da61c09a1ad056511"
+  },
+  {
+    "mode": "red",
+    "path": "lib/db/commit-effects.ts",
+    "bytes": 6982,
+    "sha256": "83e00e079304c5cce58d142e6af39763c0c331944d84bf5b1fc30b3f88f8bc9a"
+  },
+  {
+    "mode": "red",
+    "path": "lib/tracing/labels.ts",
+    "bytes": 2278,
+    "sha256": "39d29ed6eba5cfd364e50a78c21b940136636eb887934170df003217be94da7d"
+  },
+  {
+    "mode": "green",
+    "path": "lib/desktop-rpc/read-batch-context.test.ts",
+    "bytes": 25799,
+    "sha256": "4f6122410e31b9f60746eb3eb491b6ff208262010308855eaa4c58ddeb528cf6"
+  },
+  {
+    "mode": "green",
+    "path": "lib/desktop-rpc/read-batch-context.ts",
+    "bytes": 8627,
+    "sha256": "98abb4fc778883ebfadcde015799ef7faad1cd47593348a98cc7b04ddd185ee7"
+  },
+  {
+    "mode": "green",
+    "path": "lib/desktop-rpc/read-batch-contract.ts",
+    "bytes": 2241,
+    "sha256": "27b2ca29ec6dd3922ae0660c94766ed3a0312e2bb10955c2c2c5fd67391c3a49"
+  },
+  {
+    "mode": "green",
+    "path": "lib/live/owner-scope.ts",
+    "bytes": 1284,
+    "sha256": "d803e41828b7bb49ef89e6571efe43f8080249e121cb4852f7e869d0a2382673"
+  },
+  {
+    "mode": "green",
+    "path": "lib/live/revisions.ts",
+    "bytes": 4070,
+    "sha256": "bd2b351ade97a5b0f3f12f43d606ce9f9d8eca9b90de33400be94203d9d76328"
+  },
+  {
+    "mode": "green",
+    "path": "lib/live/events.ts",
+    "bytes": 4679,
+    "sha256": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5"
+  },
+  {
+    "mode": "green",
+    "path": "lib/live/scope.ts",
+    "bytes": 1345,
+    "sha256": "b323f66c5c01440d72e3ce1627a4c0a523e019895e71cf3da61c09a1ad056511"
+  },
+  {
+    "mode": "green",
+    "path": "lib/db/commit-effects.ts",
+    "bytes": 6982,
+    "sha256": "83e00e079304c5cce58d142e6af39763c0c331944d84bf5b1fc30b3f88f8bc9a"
+  },
+  {
+    "mode": "green",
+    "path": "lib/tracing/labels.ts",
+    "bytes": 2278,
+    "sha256": "39d29ed6eba5cfd364e50a78c21b940136636eb887934170df003217be94da7d"
+  }
+]

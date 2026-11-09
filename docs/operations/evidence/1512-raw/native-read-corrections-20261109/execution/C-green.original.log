@@ -1,0 +1,62 @@
+TAP version 13
+# (node:1144) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:1144) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: native workspace snapshot: committed-after-ready
+ok 1 - native workspace snapshot: committed-after-ready
+  ---
+  duration_ms: 949.830976
+  type: 'test'
+  ...
+# {"kind":"native_workspace_snapshot_dispatch","scenario":"committed-after-ready","physicalCalls":1,"counts":{"teams.listTeams":1,"team-relations.listProjectTeams":1},"phases":["fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001","dispatch:1","response:1"],"rejected":[]}
+# Subtest: native workspace snapshot: pending-after-ready
+ok 2 - native workspace snapshot: pending-after-ready
+  ---
+  duration_ms: 493.892116
+  type: 'test'
+  ...
+# {"kind":"native_workspace_snapshot_dispatch","scenario":"pending-after-ready","physicalCalls":1,"counts":{"teams.listTeams":1,"team-relations.listProjectTeams":1},"phases":["fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001","dispatch:1","response:1"],"rejected":[]}
+# Subtest: native workspace snapshot: late-subscription
+ok 3 - native workspace snapshot: late-subscription
+  ---
+  duration_ms: 661.026464
+  type: 'test'
+  ...
+# {"kind":"native_workspace_snapshot_dispatch","scenario":"late-subscription","physicalCalls":1,"counts":{"teams.listTeams":1,"team-relations.listProjectTeams":1},"phases":["fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001","dispatch:1","response:1"],"rejected":[]}
+# Subtest: native workspace snapshot: dispatch-before-ready
+ok 4 - native workspace snapshot: dispatch-before-ready
+  ---
+  duration_ms: 652.825059
+  type: 'test'
+  ...
+# {"kind":"native_workspace_snapshot_dispatch","scenario":"dispatch-before-ready","physicalCalls":2,"counts":{"teams.listTeams":2,"team-relations.listProjectTeams":2},"phases":["fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","dispatch:1","response:1","ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001","fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","dispatch:2","response:2"],"rejected":[]}
+# Subtest: native workspace snapshot: newer-push
+ok 5 - native workspace snapshot: newer-push
+  ---
+  duration_ms: 678.041578
+  type: 'test'
+  ...
+# {"kind":"native_workspace_snapshot_dispatch","scenario":"newer-push","physicalCalls":2,"counts":{"teams.listTeams":2,"team-relations.listProjectTeams":2},"phases":["fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001","dispatch:1","fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","dispatch:2","response:2","response:1"],"rejected":[]}
+# Subtest: native workspace snapshot: workspace-change
+ok 6 - native workspace snapshot: workspace-change
+  ---
+  duration_ms: 974.412228
+  type: 'test'
+  ...
+# {"kind":"native_workspace_snapshot_dispatch","scenario":"workspace-change","physicalCalls":2,"counts":{"teams.listTeams":2,"team-relations.listProjectTeams":2},"phases":["fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001","dispatch:1","fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000002","dispatch:2","response:2","response:1"],"rejected":[{"action":"teams.listTeams","code":"desktop_session_changed","status":409},{"action":"team-relations.listProjectTeams","code":"desktop_session_changed","status":409}]}
+# Subtest: native workspace snapshot: identity-change
+ok 7 - native workspace snapshot: identity-change
+  ---
+  duration_ms: 974.349249
+  type: 'test'
+  ...
+# {"kind":"native_workspace_snapshot_dispatch","scenario":"identity-change","physicalCalls":2,"counts":{"teams.listTeams":2,"team-relations.listProjectTeams":2},"phases":["fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001","dispatch:1","fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001","dispatch:2","response:2","response:1"],"rejected":[{"action":"teams.listTeams","code":"desktop_session_changed","status":409},{"action":"team-relations.listProjectTeams","code":"desktop_session_changed","status":409}]}
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 8404.892651

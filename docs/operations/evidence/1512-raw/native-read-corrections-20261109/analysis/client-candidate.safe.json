@@ -1,0 +1,336 @@
+{
+  "schemaVersion": 1,
+  "kind": "native-workspace-array-snapshot-dispatch-candidate",
+  "repository": "alexj11324/Mikka",
+  "baseHead": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+  "baseTree": "05b40c13c233d7f3cef989011705cf624b27c507",
+  "status": "candidate-blobs-only; runtime RED/GREEN not yet executed by author",
+  "sourceFiles": [
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "baseBlob": "67503a9abe7131de3e9bf86629532e015085d4ee",
+      "blob": "e7f6972a23519ae45e059038cd0c404789d44a98",
+      "bytes": 6301,
+      "sha256": "f98ecf6e986da17aa66d8c54039f5d683dc7cfb7d2e563eec5efffeff9527bac"
+    },
+    {
+      "path": "components/workspace/issue-workspace.tsx",
+      "baseBlob": "b043d5c09d02d5f675cd62d28e40bb8dc38b5060",
+      "blob": "383e0446d95a3e490b8e1c808b6e325b0539faaf",
+      "bytes": 56675,
+      "sha256": "d22ee5554f1d942cf7aecd98c2e2398fdfb7ce36073de2e42c488e11ec0215cb"
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "baseBlob": "a4aec5fe968100f283a8d93b963934430a97fcda",
+      "blob": "30ef728a5a2d465d389916a63d40a816d13b1d4c",
+      "bytes": 84780,
+      "sha256": "2b1fb0b1d8f701d12506e950676c7acf1bb2eddd83ee13c398583af1288375b1"
+    }
+  ],
+  "change": {
+    "actions": [
+      "teams.listTeams",
+      "team-relations.listProjectTeams"
+    ],
+    "behavior": "Mark only the two complete-array SWR fetchers as snapshot reads, and allow the existing Native queue to notify pending dispatch and carry actual envelope response proof onto their array results.",
+    "unchanged": [
+      "RPC full-array contract",
+      "all original authorization checks",
+      "scope and identity fences",
+      "readiness and measurement windows",
+      "LiveChannel scheduling",
+      "no cache, timer, polling or database work added"
+    ],
+    "excludedActions": [
+      "projects.listProjects",
+      "issues.syncIssueList",
+      "task-runs.syncThreadList",
+      "coordinator.syncCoordinatorChat"
+    ]
+  },
+  "evidenceLimits": [
+    "A source-level proof propagation gap is established. The original 6414 lifecycle lacks runtime live-event ordering and action arguments, so no specific FIRST209 savings or actual-run causality is claimed.",
+    "workspace_settings is unversioned and both response contracts are arrays. Tests do not invent live revision fields.",
+    "The behavior fixture uses the same two simple marked useSWR fetcher calls and real SWR middleware, LiveChannel and Native RPC queue. It does not mount the complete IssueWorkspace UI; the two production consumer edits were reviewed directly."
+  ],
+  "testPlan": {
+    "runtime": "Node.js 24 with experimental test module mocks and tsx",
+    "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test --test-name-pattern='native workspace snapshot:' scripts/use-live-lists.live.test.tsx",
+    "cases": [
+      "committed-after-ready",
+      "pending-after-ready",
+      "late-subscription",
+      "dispatch-before-ready",
+      "newer-push",
+      "workspace-change",
+      "identity-change"
+    ],
+    "red": "Install candidate test blob on the 6414 baseline, retaining original renderer/read-batch.ts blob 67503a9abe7131de3e9bf86629532e015085d4ee. Post-ready reuse cases should demonstrate excess reads; expected result is behavioral assertion failure, not import/compile/setup failure.",
+    "green": "Use the same test and fixed source closure, replacing the two production files with the candidate blobs. All seven cases must pass.",
+    "expectedQueries": "No external network or database connection is used; fetch and socket boundaries are fixtures.",
+    "existingRegressionGates": [
+      "Existing native dispatch proof and hydration tests in the same live test file",
+      "Existing scope/identity, new-revision, comparator/discard and 404 capability tests",
+      "Existing renderer read-batch tests"
+    ],
+    "caveat": "The final 404 capability fixture must remain last because it permanently disables batching for its document; the candidate cases were inserted before it."
+  },
+  "minimalFilteredRuntimeClosure": {
+    "note": "Runtime static-import closure plus explicit before() and new-case dynamic imports. Mocked server/action modules are resolution leaves. Existing excluded test bodies are not runtime roots.",
+    "files": [
+      {
+        "path": "app/actions/bots.ts",
+        "blob": "31669b225519bb59eb12df87134b18fd1ac5b24d",
+        "mockLeaf": true
+      },
+      {
+        "path": "app/actions/coordinator.ts",
+        "blob": "bd24ef4c103b670d92d381d396d5c3e1b6aba083",
+        "mockLeaf": true
+      },
+      {
+        "path": "app/actions/issues.ts",
+        "blob": "01c1d4bad01d207c39a8d2993ab7ce11ff37771f",
+        "mockLeaf": true
+      },
+      {
+        "path": "app/actions/task-runs.ts",
+        "blob": "f2213c69a435b967feb8d9f335213394c2e08630",
+        "mockLeaf": true
+      },
+      {
+        "path": "apps/desktop/src/renderer/location.ts",
+        "blob": "ac2d1c163497cb165bab470c30661560ae78f053",
+        "mockLeaf": false
+      },
+      {
+        "path": "apps/desktop/src/renderer/read-batch.ts",
+        "blob": "67503a9abe7131de3e9bf86629532e015085d4ee",
+        "mockLeaf": false
+      },
+      {
+        "path": "apps/desktop/src/renderer/rpc.ts",
+        "blob": "dae8798653457afad334c2d909b10b63e9b3956f",
+        "mockLeaf": false
+      },
+      {
+        "path": "apps/desktop/src/renderer/transport-state.ts",
+        "blob": "67f68cae303fef55b7196550fa81827ee4f700bc",
+        "mockLeaf": false
+      },
+      {
+        "path": "components/swr-defaults.tsx",
+        "blob": "9b7a4385896b9aacc69ea898be23636b5a8c62fb",
+        "mockLeaf": false
+      },
+      {
+        "path": "hooks/use-list-expiry.ts",
+        "blob": "89c0b6b515860ac1315919bea4cf149f67ce4aaa",
+        "mockLeaf": false
+      },
+      {
+        "path": "hooks/use-live-key.tsx",
+        "blob": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f",
+        "mockLeaf": false
+      },
+      {
+        "path": "hooks/use-live-lists.ts",
+        "blob": "afd0cae59d1b871cbc5175a6de8f2b44f2d036ca",
+        "mockLeaf": false
+      },
+      {
+        "path": "i18n/navigation.ts",
+        "blob": "84664498a56aaa103db81e4b040484121cd5e178",
+        "mockLeaf": true
+      },
+      {
+        "path": "lib/app-build.ts",
+        "blob": "29d9c1a489eec6269e4c16115fffb00278261538",
+        "mockLeaf": false
+      },
+      {
+        "path": "lib/base-path.ts",
+        "blob": "ffa8c4910a5d5d5ee3ff5f60065088c097fc4ed2",
+        "mockLeaf": false
+      },
+      {
+        "path": "lib/cache-read-error.ts",
+        "blob": "e9e8f68412436bbf3f06da90dcc572c9d2d1b59a",
+        "mockLeaf": false
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-contract.ts",
+        "blob": "45f73181cffbda3a48b61b90e9dc20e3a88cb18b",
+        "mockLeaf": false
+      },
+      {
+        "path": "lib/desktop-rpc/wire.ts",
+        "blob": "2c72b5aafa3e6b8f4df8212072e6663e306d9318",
+        "mockLeaf": false
+      },
+      {
+        "path": "lib/group-messages.ts",
+        "blob": "995cd840ae22e72d76d08268c528f9ce61bd534b",
+        "mockLeaf": false
+      },
+      {
+        "path": "lib/list-poll.ts",
+        "blob": "5dfcf8fff96e66f670513b6471f14338b77cd102",
+        "mockLeaf": false
+      },
+      {
+        "path": "lib/live/browser-runtime.ts",
+        "blob": "c2ba886fd0f55956832060eee83f7a385b1796cf",
+        "mockLeaf": false
+      },
+      {
+        "path": "lib/live/channel.ts",
+        "blob": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+        "mockLeaf": false
+      },
+      {
+        "path": "lib/live/channels.ts",
+        "blob": "d459548cbd8785bf2764d23543109b99ae146d18",
+        "mockLeaf": false
+      },
+      {
+        "path": "lib/live/events.ts",
+        "blob": "2349c85fe5cb1e3a001e88fd0bca9142ae0dcc3a",
+        "mockLeaf": false
+      },
+      {
+        "path": "lib/live/list-read.ts",
+        "blob": "0ddc43d2db3680343288bc524f8f2de4d8ed5969",
+        "mockLeaf": false
+      },
+      {
+        "path": "lib/live/presence.ts",
+        "blob": "0b6ff3baba04a577b5d7f1c94a8519e77b013621",
+        "mockLeaf": false
+      },
+      {
+        "path": "lib/live/revisions.ts",
+        "blob": "dbef48a71d14c0f5a4f68b16c7a0aae32ecd184f",
+        "mockLeaf": false
+      },
+      {
+        "path": "lib/live/tab-share.ts",
+        "blob": "19b47679695258a0e89eb8c87bcbf349a299d3c2",
+        "mockLeaf": false
+      },
+      {
+        "path": "lib/live/telemetry.ts",
+        "blob": "b973a0164e2900f011bc01d7889e34803acf203e",
+        "mockLeaf": false
+      },
+      {
+        "path": "lib/server-pages.ts",
+        "blob": "e0031323ec5ecd6f4ff02f11cf3d3a5899ea336d",
+        "mockLeaf": false
+      },
+      {
+        "path": "lib/swr/cache-policy.ts",
+        "blob": "977431cfdeb11adbe2863794ca7bde010c7842ad",
+        "mockLeaf": false
+      },
+      {
+        "path": "lib/swr/indexed-db.ts",
+        "blob": "cc687bc362692456bd7e3bc512af7fc576042576",
+        "mockLeaf": false
+      },
+      {
+        "path": "lib/swr/keys.ts",
+        "blob": "1470b6e51ae3a522ed57ae0937cc90fccb97f079",
+        "mockLeaf": false
+      },
+      {
+        "path": "lib/swr/live-focus.ts",
+        "blob": "6c8ee26a4a80471b1ec05cad106e69e83fcabb7a",
+        "mockLeaf": false
+      },
+      {
+        "path": "lib/swr/persistent-cache.ts",
+        "blob": "6776b93c8d98738a3e7c84a383da435af64baa95",
+        "mockLeaf": false
+      },
+      {
+        "path": "lib/swr/read-observer.ts",
+        "blob": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+        "mockLeaf": false
+      },
+      {
+        "path": "lib/swr/retry.ts",
+        "blob": "a44b87afb7eb933efe048e70b0183b61ed336fdb",
+        "mockLeaf": false
+      },
+      {
+        "path": "lib/web-connection/selection.ts",
+        "blob": "1e0d7d6513abc34654d5718269c124276dad47fc",
+        "mockLeaf": false
+      },
+      {
+        "path": "packages/protocol/package.json",
+        "blob": "52a7ed583d756b1575697556e29a6f65438d2410",
+        "mockLeaf": false
+      },
+      {
+        "path": "packages/protocol/src/version.ts",
+        "blob": "92d192f02b53d981b1489353009afb6249b9c8ae",
+        "mockLeaf": false
+      },
+      {
+        "path": "scripts/server-test.mjs",
+        "blob": "8bdf8e68b81fa3f28c92b5a1559cf809345d8fae",
+        "mockLeaf": false
+      },
+      {
+        "path": "scripts/use-live-lists.live.test.tsx",
+        "blob": "a4aec5fe968100f283a8d93b963934430a97fcda",
+        "mockLeaf": false
+      },
+      {
+        "path": "tsconfig.json",
+        "blob": "48293d8237e1804840ec535a18bd5d1c7630eea6",
+        "mockLeaf": false
+      }
+    ],
+    "packages": {
+      "happy-dom": "15.11.7",
+      "next": "16.4.1",
+      "react": "19.3.1",
+      "react-dom": "19.3.1",
+      "semver": "7.8.5",
+      "swr": "2.5.1",
+      "tsx": "4.23.15",
+      "zod": "4.6.7"
+    },
+    "localPackage": "Link @mikka/protocol to packages/protocol. The closure includes its original package.json and the runtime version.ts export.",
+    "installConstraint": "Use the parent's existing one bounded Node24 VM and dependency installation; no separate resources are required.",
+    "mocks": "Mocked app/actions and i18n module files are resolver leaves; their server dependency graphs must not execute. next/navigation is also a pre-registered module mock.",
+    "missing": [],
+    "packageVersionSource": {
+      "path": "pnpm-lock.yaml",
+      "blob": "4b67909739360248e279efa0c3bb7344379e04fe",
+      "note": "Root importer resolved versions, replacing earlier declared lower-bound/range versions."
+    }
+  },
+  "actionsTaken": {
+    "sourceRefChanges": false,
+    "testsExecuted": false,
+    "ciRuns": false,
+    "newResources": false,
+    "originalLogReads": false,
+    "originalZipReads": false,
+    "blobsReadBackVerified": true
+  },
+  "fullExistingRuntimeExtra": [
+    {
+      "path": "components/authenticated-read-cache.tsx",
+      "blob": "54b50bb03a114cdb99dd02d2909553e29b3002fc",
+      "note": "All runtime imports already in the filtered closure. The AuthorizedCacheWorkspace import is type-only."
+    }
+  ],
+  "fullExistingCommand": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test scripts/use-live-lists.live.test.tsx",
+  "supersedesManifest": "1de84d6e829dca7daa99584fe65b3faa2123cf70"
+}

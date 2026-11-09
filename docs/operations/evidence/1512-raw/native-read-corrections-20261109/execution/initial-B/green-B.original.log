@@ -1,0 +1,30 @@
+✔ concurrent owner-wide readers reuse their actual personal home only within the batch (2.030386ms)
+✔ different Live kinds share one revision query before either consumer reads its data (7.9626ms)
+✔ owner observations are separate for parallel batches, owners and database authorities (0.729542ms)
+✔ later reads in one batch keep the earlier revision, while the next batch reads the new revision (1.171147ms)
+✔ a missing or failed revision never becomes fabricated proof and does not poison the next request (2.699631ms)
+✔ ordinary revision readers and different database scopes remain independent (0.699379ms)
+✔ bound after-work cannot reuse an already completed batch authority observation (0.27852ms)
+✔ notification target resolution never inherits an earlier list-read home, even inside the batch (0.190403ms)
+✔ planned owner readers share one earlier observation without exposing each other's keys (0.95082ms)
+✔ an undeclared batch keeps ordinary per-reader observations (0.577892ms)
+✔ a selected team key stays late and total requested and returned keys stay unchanged (0.938ms)
+✔ owner homes and database authorities do not borrow another planned observation (0.676632ms)
+✔ absent homes and invalid or nonrevision refs never trigger an owner prefetch (0.500968ms)
+✔ an entity or another owner key does not start the resolved home's list prefetch (1.043048ms)
+✔ missing and failed prefetched revisions remain unknown until another request reads (0.929253ms)
+✔ throw and cancellation release the plan as well as its earlier observations (1.048268ms)
+✔ authorized workspace readers share their earlier Team revisions despite different readiness (0.833432ms)
+✔ authorized Team plans do not resolve a Personal home or borrow a different workspace (0.442993ms)
+✔ entities, unresolved scopes and mismatched workspace refs never start a Team plan (0.491892ms)
+✔ workspace revision observations use the actual executor behind one request proxy (0.416338ms)
+✔ workspace plans never supply foreground revisions to after, cron or workflow reads (0.347065ms)
+✔ workspace plan failure and completed lifetimes never fabricate or retain revision proof (0.480023ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 340.402635

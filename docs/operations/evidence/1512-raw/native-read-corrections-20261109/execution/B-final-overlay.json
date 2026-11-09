@@ -1,0 +1,17 @@
+[
+  {
+    "path": "red/lib/desktop-rpc/read-batch-context.test.ts",
+    "sha256": "ea4cd0de715f0089aa08a6f7fe8555d7b0f245b397d0896c5254814d62fac670",
+    "bytes": 26773
+  },
+  {
+    "path": "green/lib/desktop-rpc/read-batch-context.test.ts",
+    "sha256": "ea4cd0de715f0089aa08a6f7fe8555d7b0f245b397d0896c5254814d62fac670",
+    "bytes": 26773
+  },
+  {
+    "path": "green/lib/desktop-rpc/read-batch-context.ts",
+    "sha256": "e4045985f5cca7d09cbfcf86473f24a51c200d1162a498697a817bff54c1a651",
+    "bytes": 8621
+  }
+]

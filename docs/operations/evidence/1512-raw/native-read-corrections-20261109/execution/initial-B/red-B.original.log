@@ -1,0 +1,101 @@
+✔ concurrent owner-wide readers reuse their actual personal home only within the batch (2.499174ms)
+✔ different Live kinds share one revision query before either consumer reads its data (7.525919ms)
+✔ owner observations are separate for parallel batches, owners and database authorities (0.667412ms)
+✔ later reads in one batch keep the earlier revision, while the next batch reads the new revision (1.173287ms)
+✔ a missing or failed revision never becomes fabricated proof and does not poison the next request (1.144899ms)
+✔ ordinary revision readers and different database scopes remain independent (2.392894ms)
+✔ bound after-work cannot reuse an already completed batch authority observation (0.315755ms)
+✔ notification target resolution never inherits an earlier list-read home, even inside the batch (0.192244ms)
+✔ planned owner readers share one earlier observation without exposing each other's keys (0.647929ms)
+✔ an undeclared batch keeps ordinary per-reader observations (0.364277ms)
+✔ a selected team key stays late and total requested and returned keys stay unchanged (1.282295ms)
+✔ owner homes and database authorities do not borrow another planned observation (0.661511ms)
+✔ absent homes and invalid or nonrevision refs never trigger an owner prefetch (0.493897ms)
+✔ an entity or another owner key does not start the resolved home's list prefetch (0.995142ms)
+✔ missing and failed prefetched revisions remain unknown until another request reads (0.955686ms)
+✔ throw and cancellation release the plan as well as its earlier observations (1.034651ms)
+✖ authorized workspace readers share their earlier Team revisions despite different readiness (11.211497ms)
+✔ authorized Team plans do not resolve a Personal home or borrow a different workspace (0.4934ms)
+✔ entities, unresolved scopes and mismatched workspace refs never start a Team plan (0.36757ms)
+✖ workspace revision observations use the actual executor behind one request proxy (4.716393ms)
+✖ workspace plans never supply foreground revisions to after, cron or workflow reads (0.874557ms)
+✔ workspace plan failure and completed lifetimes never fabricate or retain revision proof (0.493566ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 19
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 420.151727
+
+✖ failing tests:
+
+test at lib/desktop-rpc/read-batch-context.test.ts:1:16093
+✖ authorized workspace readers share their earlier Team revisions despite different readiness (11.211497ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   'task_run_list:cccccccc-cccc-4ccc-8ccc-cccccccccccc': 12
+  -   'task_run_list:cccccccc-cccc-4ccc-8ccc-cccccccccccc': 7
+    }
+  
+      at <anonymous> (/vercel/sandbox/native-regressions/red/lib/desktop-rpc/read-batch-context.test.ts:322:14)
+      at async withReadBatchContext (/vercel/sandbox/native-regressions/red/lib/desktop-rpc/read-batch-context.ts:25:16)
+      at async TestContext.<anonymous> (/vercel/sandbox/native-regressions/red/lib/desktop-rpc/read-batch-context.test.ts:320:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { 'task_run_list:cccccccc-cccc-4ccc-8ccc-cccccccccccc': 12 },
+    expected: { 'task_run_list:cccccccc-cccc-4ccc-8ccc-cccccccccccc': 7 },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at lib/desktop-rpc/read-batch-context.test.ts:1:18655
+✖ workspace revision observations use the actual executor behind one request proxy (4.716393ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   'thread_list:cccccccc-cccc-4ccc-8ccc-cccccccccccc': 7
+  -   'thread_list:cccccccc-cccc-4ccc-8ccc-cccccccccccc': 12
+    }
+  
+      at <anonymous> (/vercel/sandbox/native-regressions/red/lib/desktop-rpc/read-batch-context.test.ts:368:12)
+      at async withReadBatchContext (/vercel/sandbox/native-regressions/red/lib/desktop-rpc/read-batch-context.ts:25:16)
+      at async TestContext.<anonymous> (/vercel/sandbox/native-regressions/red/lib/desktop-rpc/read-batch-context.test.ts:366:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { 'thread_list:cccccccc-cccc-4ccc-8ccc-cccccccccccc': 7 },
+    expected: { 'thread_list:cccccccc-cccc-4ccc-8ccc-cccccccccccc': 12 },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }
+
+test at lib/desktop-rpc/read-batch-context.test.ts:1:19642
+✖ workspace plans never supply foreground revisions to after, cron or workflow reads (0.874557ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
+  + actual - expected
+  
+    {
+  +   'thread_list:cccccccc-cccc-4ccc-8ccc-cccccccccccc': 7
+  -   'thread_list:cccccccc-cccc-4ccc-8ccc-cccccccccccc': 8
+    }
+  
+      at <anonymous> (/vercel/sandbox/native-regressions/red/lib/desktop-rpc/read-batch-context.test.ts:382:14)
+      at async withReadBatchContext (/vercel/sandbox/native-regressions/red/lib/desktop-rpc/read-batch-context.ts:25:16)
+      at async TestContext.<anonymous> (/vercel/sandbox/native-regressions/red/lib/desktop-rpc/read-batch-context.test.ts:377:3)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { 'thread_list:cccccccc-cccc-4ccc-8ccc-cccccccccccc': 7 },
+    expected: { 'thread_list:cccccccc-cccc-4ccc-8ccc-cccccccccccc': 8 },
+    operator: 'deepStrictEqual',
+    diff: 'simple'
+  }

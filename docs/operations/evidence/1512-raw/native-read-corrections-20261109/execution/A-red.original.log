@@ -1,0 +1,252 @@
+TAP version 13
+# (node:1081) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:1081) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: a shared credential check returns its current authorization in one read
+ok 1 - a shared credential check returns its current authorization in one read
+  ---
+  duration_ms: 2.158599
+  type: 'test'
+  ...
+# Subtest: a missing share does not issue an additional read or write
+ok 2 - a missing share does not issue an additional read or write
+  ---
+  duration_ms: 0.232422
+  type: 'test'
+  ...
+# Subtest: a refused share does not issue an additional read or write
+ok 3 - a refused share does not issue an additional read or write
+  ---
+  duration_ms: 0.116606
+  type: 'test'
+  ...
+# Subtest: repeated permission checks observe revoke and restore without reusing an earlier grant
+ok 4 - repeated permission checks observe revoke and restore without reusing an earlier grant
+  ---
+  duration_ms: 0.462149
+  type: 'test'
+  ...
+# Subtest: a failed authorization read propagates its original cause without another query
+ok 5 - a failed authorization read propagates its original cause without another query
+  ---
+  duration_ms: 0.524369
+  type: 'test'
+  ...
+# Subtest: a Native read batch shares its workspace policy across the real key and subscription readers
+ok 6 - a Native read batch shares its workspace policy across the real key and subscription readers
+  ---
+  duration_ms: 2.576383
+  type: 'test'
+  ...
+# Subtest: a refused batch policy still permits own keys and skips every shared credential read
+ok 7 - a refused batch policy still permits own keys and skips every shared credential read
+  ---
+  duration_ms: 1.423325
+  type: 'test'
+  ...
+# Subtest: concurrent batches never share a policy observation, while sibling reads join only their batch
+ok 8 - concurrent batches never share a policy observation, while sibling reads join only their batch
+  ---
+  duration_ms: 0.783211
+  type: 'test'
+  ...
+# Subtest: a batch policy belongs to its actual request database executor and exact workspace
+ok 9 - a batch policy belongs to its actual request database executor and exact workspace
+  ---
+  duration_ms: 776.448804
+  type: 'test'
+  ...
+# Subtest: a failed batch policy preserves its original rejection and cannot poison the next request
+ok 10 - a failed batch policy preserves its original rejection and cannot poison the next request
+  ---
+  duration_ms: 9.00176
+  type: 'test'
+  ...
+# Subtest: bound after-work reads fresh after both fulfilled and rejected batch lifetimes
+ok 11 - bound after-work reads fresh after both fulfilled and rejected batch lifetimes
+  ---
+  duration_ms: 0.502727
+  type: 'test'
+  ...
+# Subtest: only the policy is shared: credential shares and own-key reads remain fresh in the batch
+ok 12 - only the policy is shared: credential shares and own-key reads remain fresh in the batch
+  ---
+  duration_ms: 0.364231
+  type: 'test'
+  ...
+# Subtest: ordinary policy readers observe changes on every call without touching batch metadata
+ok 13 - ordinary policy readers observe changes on every call without touching batch metadata
+  ---
+  duration_ms: 0.162968
+  type: 'test'
+  ...
+# Subtest: afterJob cannot reuse a foreground policy while its parent read batch is still active
+ok 14 - afterJob cannot reuse a foreground policy while its parent read batch is still active
+  ---
+  duration_ms: 75.526749
+  type: 'test'
+  ...
+# Subtest: cron and workflow jobs cannot inherit an active foreground policy observation
+ok 15 - cron and workflow jobs cannot inherit an active foreground policy observation
+  ---
+  duration_ms: 0.991867
+  type: 'test'
+  ...
+# Subtest: standalone read-only policy consumers share one observation and keep every credential read
+not ok 16 - standalone read-only policy consumers share one observation and keep every credential read
+  ---
+  duration_ms: 9.290597
+  type: 'test'
+  location: '/vercel/sandbox/native-regressions/red/lib/personal-policy.test.ts:1:13213'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+        'policy',
+        'own-keys',
+        'shared-keys',
+    +   'policy',
+        'shared-owners'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'policy'
+    1: 'own-keys'
+    2: 'shared-keys'
+    3: 'shared-owners'
+  actual:
+    0: 'policy'
+    1: 'own-keys'
+    2: 'shared-keys'
+    3: 'policy'
+    4: 'shared-owners'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (/vercel/sandbox/native-regressions/red/lib/personal-policy.test.ts:296:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: standalone policy refusal and absence are observed again by the next read
+not ok 17 - standalone policy refusal and absence are observed again by the next read
+  ---
+  duration_ms: 0.61476
+  type: 'test'
+  location: '/vercel/sandbox/native-regressions/red/lib/personal-policy.test.ts:1:13712'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly deep-equal:
+    + actual - expected
+    
+      [
+        'policy',
+        'own-keys',
+    +   'policy'
+      ]
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+    0: 'policy'
+    1: 'own-keys'
+  actual:
+    0: 'policy'
+    1: 'own-keys'
+    2: 'policy'
+  operator: 'deepStrictEqual'
+  stack: |-
+    TestContext.<anonymous> (/vercel/sandbox/native-regressions/red/lib/personal-policy.test.ts:304:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: standalone observations isolate parallel reads, exact workspaces and actual executors
+not ok 18 - standalone observations isolate parallel reads, exact workspaces and actual executors
+  ---
+  duration_ms: 0.412681
+  type: 'test'
+  location: '/vercel/sandbox/native-regressions/red/lib/personal-policy.test.ts:1:14196'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    4 !== 2
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 2
+  actual: 4
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/vercel/sandbox/native-regressions/red/lib/personal-policy.test.ts:316:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: standalone policy failures retain their original cause and do not poison the next read
+not ok 19 - standalone policy failures retain their original cause and do not poison the next read
+  ---
+  duration_ms: 0.334898
+  type: 'test'
+  location: '/vercel/sandbox/native-regressions/red/lib/personal-policy.test.ts:1:15058'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    2 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 2
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/vercel/sandbox/native-regressions/red/lib/personal-policy.test.ts:335:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: standalone observation closes on fulfillment and rejection before bound after-work runs
+ok 20 - standalone observation closes on fulfillment and rejection before bound after-work runs
+  ---
+  duration_ms: 0.327639
+  type: 'test'
+  ...
+# Subtest: standalone foreground observation never supplies policy to after, cron or workflow work
+not ok 21 - standalone foreground observation never supplies policy to after, cron or workflow work
+  ---
+  duration_ms: 0.370579
+  type: 'test'
+  location: '/vercel/sandbox/native-regressions/red/lib/personal-policy.test.ts:1:16391'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    8 !== 7
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 7
+  actual: 8
+  operator: 'strictEqual'
+  stack: |-
+    <anonymous> (/vercel/sandbox/native-regressions/red/lib/personal-policy.test.ts:377:12)
+    async TestContext.<anonymous> (/vercel/sandbox/native-regressions/red/lib/personal-policy.test.ts:366:3)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: standalone read-only observation preserves the surrounding Native batch policy
+ok 22 - standalone read-only observation preserves the surrounding Native batch policy
+  ---
+  duration_ms: 0.206298
+  type: 'test'
+  ...
+1..22
+# tests 22
+# suites 0
+# pass 17
+# fail 5
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2122.869189

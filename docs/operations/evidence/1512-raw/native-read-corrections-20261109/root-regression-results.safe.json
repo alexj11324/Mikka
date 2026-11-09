@@ -1,0 +1,167 @@
+{
+  "schemaVersion": 1,
+  "kind": "root-executed-native-read-regression-results",
+  "base": {
+    "head": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+    "tree": "05b40c13c233d7f3cef989011705cf624b27c507"
+  },
+  "runtime": {
+    "actualNode": "v24.22.1",
+    "image": "vercel/sandbox/universal@sha256:bbec19cffb43ad724eee446d3bd4476e2993849dc0ff0c9f33356f8365d72219",
+    "metadataRuntimeLabel": "node22",
+    "dependencyLock": {
+      "path": "package-lock.json",
+      "gitBlob": "0fb85373064c41f3d8d4b8af0695b522f8734420",
+      "bytes": 69917,
+      "sha256": "1d0e8a4d4d8379da4dfc260a5ac7aea2d5cb8c418985942038feaf55a30f8ce6"
+    },
+    "sourceManifest": {
+      "path": "combined-source-manifest.json",
+      "gitBlob": "0d12117f13f7d3d8179f1e3dd634624f9bf4a3e5",
+      "bytes": 34867,
+      "sha256": "9ce7580a22c41f925be2253e9608e441cfe53f3660f4352e738441bc97e9be63"
+    }
+  },
+  "results": {
+    "A": {
+      "red": {
+        "tests": 22,
+        "pass": 17,
+        "fail": 5,
+        "skipped": 0,
+        "failures": [
+          "not ok 16 - standalone read-only policy consumers share one observation and keep every credential read",
+          "not ok 17 - standalone policy refusal and absence are observed again by the next read",
+          "not ok 18 - standalone observations isolate parallel reads, exact workspaces and actual executors",
+          "not ok 19 - standalone policy failures retain their original cause and do not poison the next read",
+          "not ok 21 - standalone foreground observation never supplies policy to after, cron or workflow work"
+        ],
+        "assertionErrors": 5,
+        "moduleImportErrors": false
+      },
+      "green": {
+        "tests": 22,
+        "pass": 22,
+        "fail": 0,
+        "skipped": 0,
+        "failures": [],
+        "assertionErrors": 0,
+        "moduleImportErrors": false
+      }
+    },
+    "B": {
+      "initial": {
+        "red": {
+          "tests": 22,
+          "pass": 19,
+          "fail": 3,
+          "skip": 0,
+          "failures": [
+            "✖ authorized workspace readers share their earlier Team revisions despite different readiness",
+            "✖ workspace revision observations use the actual executor behind one request proxy",
+            "✖ workspace plans never supply foreground revisions to after, cron or workflow reads"
+          ]
+        },
+        "green": {
+          "tests": 22,
+          "pass": 22,
+          "fail": 0,
+          "skip": 0,
+          "failures": []
+        }
+      },
+      "counterRed": {
+        "tests": 1,
+        "pass": 0,
+        "fail": 1,
+        "skipped": 0,
+        "failures": [
+          "not ok 1 - authorized Team list prefetch reduces three separately ready fixed-revision reads to one SQL"
+        ],
+        "assertionErrors": 1,
+        "moduleImportErrors": false
+      },
+      "finalGreen": {
+        "tests": 23,
+        "pass": 23,
+        "fail": 0,
+        "skipped": 0,
+        "failures": [],
+        "assertionErrors": 0,
+        "moduleImportErrors": false
+      }
+    },
+    "C": {
+      "red": {
+        "tests": 7,
+        "pass": 2,
+        "fail": 5,
+        "skipped": 0,
+        "failures": [
+          "not ok 1 - native workspace snapshot: committed-after-ready",
+          "not ok 2 - native workspace snapshot: pending-after-ready",
+          "not ok 3 - native workspace snapshot: late-subscription",
+          "not ok 6 - native workspace snapshot: workspace-change",
+          "not ok 7 - native workspace snapshot: identity-change"
+        ],
+        "assertionErrors": 5,
+        "moduleImportErrors": false
+      },
+      "green": {
+        "tests": 7,
+        "pass": 7,
+        "fail": 0,
+        "skipped": 0,
+        "failures": [],
+        "assertionErrors": 0,
+        "moduleImportErrors": false
+      }
+    }
+  },
+  "interpretation": {
+    "A": "Single explicit foreground read shares the policy observation; ordinary permission/credential checks and after/cron/workflow remain fresh.",
+    "B": "New independent fixed-revision test runs all three old reads and records actual 3 versus expected 1; final 23 tests pass with one planned SQL and the same per-reader result keys.",
+    "C": "Real React/SWR/LiveChannel/Native MessageChannel cases exercise both complete-array readers. Before-ready dispatch and newer unversioned push remain authoritative re-reads.",
+    "noNativeBudgetPrediction": true
+  },
+  "originalBudget": {
+    "full": {
+      "native": 433,
+      "web": 431,
+      "passed": false
+    },
+    "first": {
+      "pair": 1,
+      "native": 209,
+      "hosted": 147,
+      "passed": false
+    }
+  },
+  "incomplete": {
+    "postgresRegression": "Not run here; required from fixed-source canonical CI.",
+    "wholeLiveFile": {
+      "command": "cmd_50018f295593431cb9e8ea618a14",
+      "startedAt": "2026-11-09T18:39:33.979Z",
+      "lastObservedIncompleteAt": "2026-11-09T18:41:29Z",
+      "terminalOriginalRetrieved": false,
+      "metadataExitCode": null,
+      "postStopLogsStatus": 410,
+      "verdict": "unknown; neither pass nor fail claimed",
+      "deadlineNotExtended": true
+    }
+  },
+  "resources": {
+    "remaining": 0,
+    "cleanup": {
+      "path": "vm-cleanup.safe.json",
+      "gitBlob": "0e3f7fef1a862cc5dd09008b911d7288a65460b9",
+      "bytes": 1826,
+      "sha256": "a7b78187ba164f4b66e83ac287751391fea0ec6ce4a3ed0d4eb71f5dd4641a17"
+    }
+  },
+  "sourcePublished": false,
+  "productionAcceptance": {
+    "passed": 0,
+    "required": 2
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "schemaVersion": 1,
+  "name": "issue1512-native-read-regressions-20261109",
+  "sessionId": "sbx_btRdfCkrcc7YbBiCyagSjz5OFYWA",
+  "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+  "configuration": {
+    "name": "issue1512-native-read-regressions-20261109",
+    "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+    "region": "iad1",
+    "architecture": "amd64",
+    "image": "vercel/sandbox/universal@sha256:bbec19cffb43ad724eee446d3bd4476e2993849dc0ff0c9f33356f8365d72219",
+    "resources": {
+      "vcpus": 1,
+      "memory": 2048
+    },
+    "timeout": 900000,
+    "persistent": false,
+    "ports": [],
+    "networkPolicy": {
+      "mode": "custom",
+      "allowedDomains": [
+        "registry.npmjs.org"
+      ]
+    },
+    "tags": {
+      "issue": "1512",
+      "purpose": "offline-native-regression"
+    }
+  },
+  "createdAt": 1794248830059,
+  "startedAt": 1794248830094,
+  "stoppedAt": 1794249730400,
+  "requestedStopAt": 1794249771241,
+  "stoppedByAbsoluteTimeoutBeforeManualStop": true,
+  "durationMs": 900306,
+  "activeCpuDurationMs": 44224,
+  "networkTransfer": {
+    "ingress": 163363587,
+    "egress": 930052
+  },
+  "extensions": 0,
+  "snapshotsCreated": 0,
+  "routes": [],
+  "deleteSucceeded": true,
+  "exactPostDeleteGet": {
+    "name": "issue1512-native-read-regressions-20261109",
+    "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+    "resume": false,
+    "status": 404,
+    "code": "not_found"
+  },
+  "resourcesRemaining": 0,
+  "cost": {
+    "amount": null,
+    "currency": null,
+    "status": "unknown"
+  },
+  "executionBoundary": {
+    "actualNode": "v24.22.1",
+    "sandboxMetadataRuntimeLabel": "node22",
+    "fullLiveFileRun": "no terminal original was recovered before expiry; not claimed pass or fail",
+    "fullLiveCommand": "cmd_50018f295593431cb9e8ea618a14",
+    "postStopLogsStatus": 410
+  }
+}

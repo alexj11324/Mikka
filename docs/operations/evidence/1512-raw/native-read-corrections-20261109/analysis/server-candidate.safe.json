@@ -1,0 +1,474 @@
+{
+  "schemaVersion": 1,
+  "title": "Native 6414 server read deduplication candidates A and B",
+  "repository": "alexj11324/Mikka",
+  "base": {
+    "head": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+    "actualCheckout": "576c903cd6ede14520a79111d2b71154968ad910",
+    "tree": "05b40c13c233d7f3cef989011705cf624b27c507",
+    "modes": "All seven base and candidate files remain 100644; parent independently confirmed actual tree modes."
+  },
+  "finalCandidate": [
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "mode": "100644",
+      "baseBlob": "e32da5e4d7294af3363eb2de4623a52aeb7e4f47",
+      "baseBytes": 6263,
+      "baseSha256": "871d9a5bd92d084919d4124c5c26b90d6ad7195f55f91502e02d52bc55083f6e",
+      "gitBlob": "ec8497366c9c46cdac494814bd832beb1828c880",
+      "bytes": 8621,
+      "sha256": "e4045985f5cca7d09cbfcf86473f24a51c200d1162a498697a817bff54c1a651"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-contract.ts",
+      "mode": "100644",
+      "baseBlob": "45f73181cffbda3a48b61b90e9dc20e3a88cb18b",
+      "baseBytes": 1637,
+      "baseSha256": "cdd915dacd21d2e9555896daeaa5e5c1f5b23a193cb48e0b959507e96e990000",
+      "gitBlob": "a40f946620ec874320586cb12ddb90c4b2fc438d",
+      "bytes": 2241,
+      "sha256": "27b2ca29ec6dd3922ae0660c94766ed3a0312e2bb10955c2c2c5fd67391c3a49"
+    },
+    {
+      "path": "lib/live/revision-read.ts",
+      "mode": "100644",
+      "baseBlob": "445ea81dccbed5f4b6ad16816757df0154a74b76",
+      "baseBytes": 2120,
+      "baseSha256": "7bd1af7dfafddb57c113fb4795a3f42d104516e71ad69034028741ccc7338634",
+      "gitBlob": "266aa82ba4a683e88d207bc197fd97cee1f2b1ae",
+      "bytes": 2332,
+      "sha256": "59eba7ae91f0b1f71eab51800c632f049f9fffe8c61f86c794f4c875781af907"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.test.ts",
+      "mode": "100644",
+      "baseBlob": "076d59eea10b000cd08df46754d32454609ecdc6",
+      "baseBytes": 18417,
+      "baseSha256": "a548b3d73268bd35f81ce8648b673c66b5931c37ed405ed100479c34c10d5353",
+      "gitBlob": "47ef8ffe0e8b6ac1e7604e96362ba66ed4f015d5",
+      "bytes": 26773,
+      "sha256": "ea4cd0de715f0089aa08a6f7fe8555d7b0f245b397d0896c5254814d62fac670"
+    },
+    {
+      "path": "tests/live-revision-reads.db.test.ts",
+      "mode": "100644",
+      "baseBlob": "960eb24ff24aba996a681bc47468290cf6200398",
+      "baseBytes": 16071,
+      "baseSha256": "49c00de7613ef0f88a78906456d94f90b2438646ead72acdf1afda0a0bd07c3f",
+      "gitBlob": "1cd2dd85dda5e9edd76379d41bd86c3b7f6cc351",
+      "bytes": 18747,
+      "sha256": "db04b75ea5d222f34ed61c67680f4850b5486ea0df8edd5a97008dcf0d85247e"
+    },
+    {
+      "path": "app/actions/coordinator.ts",
+      "mode": "100644",
+      "baseBlob": "bd24ef4c103b670d92d381d396d5c3e1b6aba083",
+      "baseBytes": 25249,
+      "baseSha256": "f73da84cbff308cf16c80dea1017161ca8ad8b44e9281d235eb8a2e622f680bd",
+      "gitBlob": "c1af7261fed4907c265041a549441b92f3ba6ab7",
+      "bytes": 25408,
+      "sha256": "e417302a0cbf5810e061e60aa33ba8e13f29636be29bd822fa139eaa9def9d63"
+    },
+    {
+      "path": "lib/personal-policy.test.ts",
+      "mode": "100644",
+      "baseBlob": "fef80337b9b5244d2e8565236c6dd96f7d329acd",
+      "baseBytes": 14410,
+      "baseSha256": "b7059da0fe12fde89aaf1753e3029ee21868d5e5895e5651ecd6f495786103fe",
+      "gitBlob": "0338aed556fe721ba49c2fa7fa066fdd9d63ff96",
+      "bytes": 19713,
+      "sha256": "f0b2950fbb7bc87ef207f0c8357b394c51d21d36c734e469b82165a69c19c12f"
+    }
+  ],
+  "independentlySelectable": {
+    "A": [
+      {
+        "path": "lib/desktop-rpc/read-batch-context.ts",
+        "mode": "100644",
+        "baseBlob": "e32da5e4d7294af3363eb2de4623a52aeb7e4f47",
+        "baseBytes": 6263,
+        "baseSha256": "871d9a5bd92d084919d4124c5c26b90d6ad7195f55f91502e02d52bc55083f6e",
+        "gitBlob": "e1623ab5eabad41e9daa0f6d29a60b709e794085",
+        "bytes": 7100,
+        "sha256": "bec039a012fb6e772fef6d1bc4d66c44a21f486d2d0330d0cb8fa25382eee412"
+      },
+      {
+        "path": "app/actions/coordinator.ts",
+        "mode": "100644",
+        "baseBlob": "bd24ef4c103b670d92d381d396d5c3e1b6aba083",
+        "baseBytes": 25249,
+        "baseSha256": "f73da84cbff308cf16c80dea1017161ca8ad8b44e9281d235eb8a2e622f680bd",
+        "gitBlob": "c1af7261fed4907c265041a549441b92f3ba6ab7",
+        "bytes": 25408,
+        "sha256": "e417302a0cbf5810e061e60aa33ba8e13f29636be29bd822fa139eaa9def9d63"
+      },
+      {
+        "path": "lib/personal-policy.test.ts",
+        "mode": "100644",
+        "baseBlob": "fef80337b9b5244d2e8565236c6dd96f7d329acd",
+        "baseBytes": 14410,
+        "baseSha256": "b7059da0fe12fde89aaf1753e3029ee21868d5e5895e5651ecd6f495786103fe",
+        "gitBlob": "0338aed556fe721ba49c2fa7fa066fdd9d63ff96",
+        "bytes": 19713,
+        "sha256": "f0b2950fbb7bc87ef207f0c8357b394c51d21d36c734e469b82165a69c19c12f"
+      }
+    ],
+    "B": [
+      {
+        "path": "lib/desktop-rpc/read-batch-context.ts",
+        "mode": "100644",
+        "baseBlob": "e32da5e4d7294af3363eb2de4623a52aeb7e4f47",
+        "baseBytes": 6263,
+        "baseSha256": "871d9a5bd92d084919d4124c5c26b90d6ad7195f55f91502e02d52bc55083f6e",
+        "gitBlob": "e23f38ae4d8bd2b3dae32ad7da8e1607d25b95b0",
+        "bytes": 7784,
+        "sha256": "1897747345092ea3231930e55372fb23bc7a5c27a08238363d5f1714abe2c81f"
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-contract.ts",
+        "mode": "100644",
+        "baseBlob": "45f73181cffbda3a48b61b90e9dc20e3a88cb18b",
+        "baseBytes": 1637,
+        "baseSha256": "cdd915dacd21d2e9555896daeaa5e5c1f5b23a193cb48e0b959507e96e990000",
+        "gitBlob": "a40f946620ec874320586cb12ddb90c4b2fc438d",
+        "bytes": 2241,
+        "sha256": "27b2ca29ec6dd3922ae0660c94766ed3a0312e2bb10955c2c2c5fd67391c3a49"
+      },
+      {
+        "path": "lib/live/revision-read.ts",
+        "mode": "100644",
+        "baseBlob": "445ea81dccbed5f4b6ad16816757df0154a74b76",
+        "baseBytes": 2120,
+        "baseSha256": "7bd1af7dfafddb57c113fb4795a3f42d104516e71ad69034028741ccc7338634",
+        "gitBlob": "266aa82ba4a683e88d207bc197fd97cee1f2b1ae",
+        "bytes": 2332,
+        "sha256": "59eba7ae91f0b1f71eab51800c632f049f9fffe8c61f86c794f4c875781af907"
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-context.test.ts",
+        "mode": "100644",
+        "baseBlob": "076d59eea10b000cd08df46754d32454609ecdc6",
+        "baseBytes": 18417,
+        "baseSha256": "a548b3d73268bd35f81ce8648b673c66b5931c37ed405ed100479c34c10d5353",
+        "gitBlob": "47ef8ffe0e8b6ac1e7604e96362ba66ed4f015d5",
+        "bytes": 26773,
+        "sha256": "ea4cd0de715f0089aa08a6f7fe8555d7b0f245b397d0896c5254814d62fac670"
+      },
+      {
+        "path": "tests/live-revision-reads.db.test.ts",
+        "mode": "100644",
+        "baseBlob": "960eb24ff24aba996a681bc47468290cf6200398",
+        "baseBytes": 16071,
+        "baseSha256": "49c00de7613ef0f88a78906456d94f90b2438646ead72acdf1afda0a0bd07c3f",
+        "gitBlob": "1cd2dd85dda5e9edd76379d41bd86c3b7f6cc351",
+        "bytes": 18747,
+        "sha256": "db04b75ea5d222f34ed61c67680f4850b5486ea0df8edd5a97008dcf0d85247e"
+      }
+    ]
+  },
+  "patches": {
+    "A": {
+      "variant": "A",
+      "path": "native-6414-a-candidate.patch",
+      "gitBlob": "d4f42d81863bd2d30997b8140624e040c380d2d1",
+      "bytes": 10226,
+      "sha256": "93ed257fe9ee300987e73a088faddb08a15f883d7301d71c8bd0e0398bbe7e43",
+      "strictForwardReverse": [
+        {
+          "path": "lib/desktop-rpc/read-batch-context.ts",
+          "forwardExact": true,
+          "reverseExact": true,
+          "hunkCount": 2
+        },
+        {
+          "path": "app/actions/coordinator.ts",
+          "forwardExact": true,
+          "reverseExact": true,
+          "hunkCount": 3
+        },
+        {
+          "path": "lib/personal-policy.test.ts",
+          "forwardExact": true,
+          "reverseExact": true,
+          "hunkCount": 2
+        }
+      ]
+    },
+    "B": {
+      "variant": "B",
+      "path": "native-6414-b-candidate.patch",
+      "gitBlob": "0756a1eb16e50308849caa892d4b56d55bd3e244",
+      "bytes": 19731,
+      "sha256": "d60d6cec7b03e3038988479832237785d9d36adf8cefe875f9769cfd01a8fe82",
+      "strictForwardReverse": [
+        {
+          "path": "lib/desktop-rpc/read-batch-context.ts",
+          "forwardExact": true,
+          "reverseExact": true,
+          "hunkCount": 3
+        },
+        {
+          "path": "lib/desktop-rpc/read-batch-contract.ts",
+          "forwardExact": true,
+          "reverseExact": true,
+          "hunkCount": 1
+        },
+        {
+          "path": "lib/live/revision-read.ts",
+          "forwardExact": true,
+          "reverseExact": true,
+          "hunkCount": 2
+        },
+        {
+          "path": "lib/desktop-rpc/read-batch-context.test.ts",
+          "forwardExact": true,
+          "reverseExact": true,
+          "hunkCount": 2
+        },
+        {
+          "path": "tests/live-revision-reads.db.test.ts",
+          "forwardExact": true,
+          "reverseExact": true,
+          "hunkCount": 1
+        }
+      ]
+    },
+    "AB": {
+      "variant": "AB",
+      "path": "native-6414-ab-candidate.patch",
+      "gitBlob": "4455bca8ba7dbaad0bef17d2eedf6da5f613bb02",
+      "bytes": 29223,
+      "sha256": "a16127353be9e6e35737e104337d49d06246d4eeb154a35b50c08e0d6c53622d",
+      "strictForwardReverse": [
+        {
+          "path": "lib/desktop-rpc/read-batch-context.ts",
+          "forwardExact": true,
+          "reverseExact": true,
+          "hunkCount": 3
+        },
+        {
+          "path": "lib/desktop-rpc/read-batch-contract.ts",
+          "forwardExact": true,
+          "reverseExact": true,
+          "hunkCount": 1
+        },
+        {
+          "path": "lib/live/revision-read.ts",
+          "forwardExact": true,
+          "reverseExact": true,
+          "hunkCount": 2
+        },
+        {
+          "path": "lib/desktop-rpc/read-batch-context.test.ts",
+          "forwardExact": true,
+          "reverseExact": true,
+          "hunkCount": 2
+        },
+        {
+          "path": "tests/live-revision-reads.db.test.ts",
+          "forwardExact": true,
+          "reverseExact": true,
+          "hunkCount": 1
+        },
+        {
+          "path": "app/actions/coordinator.ts",
+          "forwardExact": true,
+          "reverseExact": true,
+          "hunkCount": 3
+        },
+        {
+          "path": "lib/personal-policy.test.ts",
+          "forwardExact": true,
+          "reverseExact": true,
+          "hunkCount": 2
+        }
+      ]
+    }
+  },
+  "sourcePreservation": [
+    {
+      "path": "lib/personal-policy.test.ts",
+      "allOriginalBodiesBytePreserved": true,
+      "baselineBodyBytes": 14000,
+      "baselineBodySha256": "fb0368171d36862ac4002b8f06d1eb1385cbfb81cf73c1cc0afa21608717941e",
+      "onlyImportsBeforeOriginalBodies": true,
+      "additionalTestsAppended": true
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.test.ts",
+      "allOriginalBodiesBytePreserved": true,
+      "baselineBodyBytes": 18116,
+      "baselineBodySha256": "223424a07de2b72ada74c38cea58946c2164777710adc8d615778203bafd5935",
+      "onlyImportsBeforeOriginalBodies": true,
+      "additionalTestsAppended": true
+    },
+    {
+      "path": "tests/live-revision-reads.db.test.ts",
+      "entireOriginalFileBytePrefixPreserved": true,
+      "baselineBytes": 16071,
+      "baselineSha256": "49c00de7613ef0f88a78906456d94f90b2438646ead72acdf1afda0a0bd07c3f",
+      "oneNewPGTestAppended": true
+    }
+  ],
+  "design": {
+    "A": {
+      "purpose": "Share one policy observation only within an explicitly bounded foreground chat model-read operation.",
+      "entrypoints": [
+        "app/actions/coordinator.ts:readFullChat coordinatorEnabled call",
+        "app/actions/coordinator.ts:readCoordinatorChat coordinatorEnabled call"
+      ],
+      "scope": "Fresh ALS lifetime only for this explicit read; existing active Native batch uses its existing observation.",
+      "key": "Actual COMMIT_EXECUTOR object (or database object) plus exact workspaceId.",
+      "cleanup": "finally active=false and map.clear on fulfillment/rejection; inherited callbacks after completion read fresh.",
+      "deferred": "after:/cron:/workflow: bypass both opening and consuming the foreground observation; ordinary permission calls remain fresh.",
+      "unchanged": "Credential query, own/shared key results, pooled owner results, action auth, wake/dispatch/write paths, error propagation and response contracts are unchanged.",
+      "limits": "Both FIRST chat calls were already batched; no claim this new standalone scope directly reduces FIRST."
+    },
+    "B": {
+      "purpose": "Co-read the closed prepared list counters at an already authorized selected workspace before its data reads.",
+      "closedKinds": [
+        "issues.syncIssueList -> issue_list",
+        "task-runs.pollTaskRuns -> task_run_list",
+        "task-runs.syncThreadList -> thread_list"
+      ],
+      "admission": "Only an explicit non-null valid workspace with a requested matching prepared list key can start its workspace plan; the product caller has already authorized that workspace.",
+      "key": "Revision queue now uses actual COMMIT_EXECUTOR object (or database object); values remain keyed by valid kind+exact workspace UUID.",
+      "projection": "Only the caller's original valid requested keys are returned; earlier counters stay conservative for live freshness.",
+      "isolation": "No Personal-home substitution; entity/mismatched/null refs cannot start the Team plan; after/cron/workflow reads bypass the foreground plan and queue.",
+      "unchanged": "Per-action membership/content checks remain in their original callers; no membership results, rows, sessions, or auth grants are cached here.",
+      "limits": "The real PG append tests the helper after caller authorization, not actual membership admission. Its SQL/row metrics exclude wire/TLS bytes."
+    }
+  },
+  "tests": {
+    "authoredAdditions": {
+      "policyBehaviorCases": 7,
+      "workspacePureNodeBehaviorCases": 7,
+      "workspaceRealPGCases": 1
+    },
+    "baselineStrategy": "New tests use namespace lookup with a fallback to the original real reader/queue. Fixed old source can run to behavior assertions; no missing-export error is used as RED.",
+    "preservedOriginalTests": [
+      {
+        "path": "lib/personal-policy.test.ts",
+        "allOriginalBodiesBytePreserved": true,
+        "baselineBodyBytes": 14000,
+        "baselineBodySha256": "fb0368171d36862ac4002b8f06d1eb1385cbfb81cf73c1cc0afa21608717941e",
+        "onlyImportsBeforeOriginalBodies": true,
+        "additionalTestsAppended": true
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-context.test.ts",
+        "allOriginalBodiesBytePreserved": true,
+        "baselineBodyBytes": 18116,
+        "baselineBodySha256": "223424a07de2b72ada74c38cea58946c2164777710adc8d615778203bafd5935",
+        "onlyImportsBeforeOriginalBodies": true,
+        "additionalTestsAppended": true
+      },
+      {
+        "path": "tests/live-revision-reads.db.test.ts",
+        "entireOriginalFileBytePrefixPreserved": true,
+        "baselineBytes": 16071,
+        "baselineSha256": "49c00de7613ef0f88a78906456d94f90b2438646ead72acdf1afda0a0bd07c3f",
+        "oneNewPGTestAppended": true
+      }
+    ],
+    "executedByThisAgent": false,
+    "rootReportedPriorB": {
+      "sourceContext": "25d03defeb562f57dc980143e81cca15c6b4e524",
+      "test": "3b7cf50314a01da7c5175307585ab05d1ac2ea98",
+      "environment": "Node24.22.1, tsx4.23.15, pg8.23.1",
+      "red": {
+        "tests": 22,
+        "pass": 19,
+        "fail": 3,
+        "original16AllPass": true
+      },
+      "green": {
+        "tests": 22,
+        "pass": 22,
+        "fail": 0
+      },
+      "evidenceBoundary": "Reported by root from its executed fixture and raw receipt; this source implementation receipt has not independently read those raw logs.",
+      "redLimits": "The earlier first new test failed on counter value before reaching its query-count assertion; it does not prove old execution performed three queries."
+    },
+    "followupFixedCounterCase": {
+      "testBlob": "47ef8ffe0e8b6ac1e7604e96362ba66ed4f015d5",
+      "name": "authorized Team list prefetch reduces three separately ready fixed-revision reads to one SQL",
+      "expectedOldBehavior": "Three individually completed valid list reads return identical fixed revision7 and original-only keys; only then SQL count3 fails expected1.",
+      "execution": "Root owns one targeted new RED and final full GREEN; no result is assumed here."
+    },
+    "realPG": {
+      "executed": false,
+      "existingEntry": "test:activity-actor-db",
+      "file": "tests/live-revision-reads.db.test.ts",
+      "meaning": "Actual pg query count, exact results/ref/row count and UTF8 JSON row byte comparison, with generated revision keys cleaned in finally."
+    },
+    "canonicalExistingEntries": {
+      "A": "test:execution-rules includes lib/personal-policy.test.ts",
+      "B": "test:desktop-auth includes lib/desktop-rpc/read-batch-context.test.ts",
+      "PG": "test:activity-actor-db includes tests/live-revision-reads.db.test.ts"
+    },
+    "currentSourceTypecheck": false,
+    "currentSourceFullCI": false,
+    "currentSourceNative": false
+  },
+  "minimumNodeClosure": {
+    "path": "native-6414-ab-node-minimal-closure.safe.json",
+    "gitBlob": "9295d7d5ecf911d7865f6127201438fcfe8d57e7",
+    "bytes": 447210,
+    "sha256": "635ff6d522e2e35b2df82b0351d34adfe8a2d1a3a42e9b519cf21caebef446ab",
+    "files": 61
+  },
+  "closureUse": "Closure baselineFiles are exact original source. Use this receipt's finalCandidate rather than the closure's earlier historical candidateOverlays; its extraFinalOverrides points to final ec849/47ef. Original package lock pins exact listed dependencies; no whole-repository pnpm install is needed.",
+  "diagnosis": {
+    "sourceMap": "886c194df4b3df8a724efd09bd5489dfcb74c590",
+    "ledgerDiff": "c5e8690b7774a2e2fba4332d3aad22f9d8872df7",
+    "currentLifecycle": "633c0569408df7076b91df290bd9b4456d7992ef",
+    "previousLifecycle": "62402049a440f8475c427102ec797bc3a6e265d8",
+    "currentFull": {
+      "native": 433,
+      "web": 431
+    },
+    "currentFirst": {
+      "native": 209,
+      "hosted": 147
+    },
+    "budgetResult": "RED remains unchanged. No sample window, first pair, baseline, threshold, unknown SQL, or background traffic has been removed.",
+    "attributionLimits": "5 of +8 known extra query shapes were mapped; 3 statement structures remain unknown. New daemon version and changed batch grouping prevent sole-cause attribution to #1834."
+  },
+  "risks": [
+    {
+      "category": "Authorization",
+      "level": "medium",
+      "assessment": "Explicit single-read policy observations are bounded; actual credentials and member/content guards stay in their existing readers. Team prefetch is metadata after caller authorization, not a new grant."
+    },
+    {
+      "category": "Freshness",
+      "level": "medium",
+      "assessment": "Counters are observed before data, never advanced to imply unseen data. Only requested keys escape; ordinary/deferred/new-request reads remain fresh."
+    },
+    {
+      "category": "Async isolation",
+      "level": "medium",
+      "assessment": "Actual executor and workspace keys plus bounded ALS/finally prevent reuse across request/transaction authorities and expired readers. Targeted tests cover parallel and inherited lifetimes."
+    },
+    {
+      "category": "Performance attribution",
+      "level": "medium",
+      "assessment": "Only concrete duplicate policy/revision work is targeted. No numerical Native improvement or budget PASS is predicted; FIRST wait/crossing effects are not altered."
+    },
+    {
+      "category": "Validation and rollout",
+      "level": "medium",
+      "assessment": "Pure Node execution is owned by root; final full type, canonical PG and Native acceptance remain future exact-source evidence. No production or external model execution performed by this author."
+    }
+  ],
+  "immutableHistory": {
+    "priorContextA": "364584c56058b066fde0c96a6f73f74c0440c200",
+    "priorContextAB": "25d03defeb562f57dc980143e81cca15c6b4e524",
+    "contextChange": "Only two comment lines changed to describe bounded standalone read observation accurately; behavior byte sections unchanged.",
+    "priorWorkspaceTest": "3b7cf50314a01da7c5175307585ab05d1ac2ea98",
+    "testChange": "One appended fixed-counter SQL-count case; prior22 cases retained byte-for-byte.",
+    "noSourceRefWrites": true,
+    "noTestOrDBOrModelOrVMCallsByThisAgent": true
+  }
+}

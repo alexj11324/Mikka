@@ -1,0 +1,142 @@
+TAP version 13
+# (node:1123) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:1123) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: native workspace snapshot: committed-after-ready
+not ok 1 - native workspace snapshot: committed-after-ready
+  ---
+  duration_ms: 1000.431373
+  type: 'test'
+  location: '/vercel/sandbox/native-regressions/red/scripts/use-live-lists.live.test.tsx:1:61132'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    2 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 2
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/vercel/sandbox/native-regressions/red/scripts/use-live-lists.live.test.tsx:1339:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# {"kind":"native_workspace_snapshot_dispatch","scenario":"committed-after-ready","physicalCalls":2,"counts":{"teams.listTeams":2,"team-relations.listProjectTeams":2},"phases":["fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001","dispatch:1","response:1","fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","dispatch:2","response:2"],"rejected":[]}
+# Subtest: native workspace snapshot: pending-after-ready
+not ok 2 - native workspace snapshot: pending-after-ready
+  ---
+  duration_ms: 183.393269
+  type: 'test'
+  location: '/vercel/sandbox/native-regressions/red/scripts/use-live-lists.live.test.tsx:1:61132'
+  failureType: 'testCodeFailure'
+  error: |-
+    the live flush joins both pending post-ready responses
+    
+    2 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 2
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/vercel/sandbox/native-regressions/red/scripts/use-live-lists.live.test.tsx:1300:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# {"kind":"native_workspace_snapshot_dispatch","scenario":"pending-after-ready","physicalCalls":2,"counts":{"teams.listTeams":2,"team-relations.listProjectTeams":2},"phases":["fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001","dispatch:1","fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","dispatch:2","response:2"],"rejected":[]}
+# Subtest: native workspace snapshot: late-subscription
+not ok 3 - native workspace snapshot: late-subscription
+  ---
+  duration_ms: 659.631053
+  type: 'test'
+  location: '/vercel/sandbox/native-regressions/red/scripts/use-live-lists.live.test.tsx:1:61132'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    2 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 2
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/vercel/sandbox/native-regressions/red/scripts/use-live-lists.live.test.tsx:1339:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# {"kind":"native_workspace_snapshot_dispatch","scenario":"late-subscription","physicalCalls":2,"counts":{"teams.listTeams":2,"team-relations.listProjectTeams":2},"phases":["fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001","dispatch:1","response:1","fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","dispatch:2","response:2"],"rejected":[]}
+# Subtest: native workspace snapshot: dispatch-before-ready
+ok 4 - native workspace snapshot: dispatch-before-ready
+  ---
+  duration_ms: 656.280476
+  type: 'test'
+  ...
+# {"kind":"native_workspace_snapshot_dispatch","scenario":"dispatch-before-ready","physicalCalls":2,"counts":{"teams.listTeams":2,"team-relations.listProjectTeams":2},"phases":["fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","dispatch:1","response:1","ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001","fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","dispatch:2","response:2"],"rejected":[]}
+# Subtest: native workspace snapshot: newer-push
+ok 5 - native workspace snapshot: newer-push
+  ---
+  duration_ms: 654.132874
+  type: 'test'
+  ...
+# {"kind":"native_workspace_snapshot_dispatch","scenario":"newer-push","physicalCalls":2,"counts":{"teams.listTeams":2,"team-relations.listProjectTeams":2},"phases":["fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001","dispatch:1","fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","dispatch:2","response:2","response:1"],"rejected":[]}
+# Subtest: native workspace snapshot: workspace-change
+not ok 6 - native workspace snapshot: workspace-change
+  ---
+  duration_ms: 651.481531
+  type: 'test'
+  location: '/vercel/sandbox/native-regressions/red/scripts/use-live-lists.live.test.tsx:1:61132'
+  failureType: 'testCodeFailure'
+  error: |-
+    the current scope reads once while the retired result is refused
+    
+    3 !== 2
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 2
+  actual: 3
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/vercel/sandbox/native-regressions/red/scripts/use-live-lists.live.test.tsx:1325:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# {"kind":"native_workspace_snapshot_dispatch","scenario":"workspace-change","physicalCalls":3,"counts":{"teams.listTeams":3,"team-relations.listProjectTeams":3},"phases":["fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001","dispatch:1","fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000002","dispatch:2","response:2","fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","dispatch:3","response:3","response:1"],"rejected":[{"action":"teams.listTeams","code":"desktop_session_changed","status":409},{"action":"team-relations.listProjectTeams","code":"desktop_session_changed","status":409}]}
+# Subtest: native workspace snapshot: identity-change
+not ok 7 - native workspace snapshot: identity-change
+  ---
+  duration_ms: 654.434734
+  type: 'test'
+  location: '/vercel/sandbox/native-regressions/red/scripts/use-live-lists.live.test.tsx:1:61132'
+  failureType: 'testCodeFailure'
+  error: |-
+    the current scope reads once while the retired result is refused
+    
+    3 !== 2
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 2
+  actual: 3
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/vercel/sandbox/native-regressions/red/scripts/use-live-lists.live.test.tsx:1325:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# {"kind":"native_workspace_snapshot_dispatch","scenario":"identity-change","physicalCalls":3,"counts":{"teams.listTeams":3,"team-relations.listProjectTeams":3},"phases":["fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001","dispatch:1","fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","ready:wss://fixture.invalid/10000000-0000-4000-8000-000000000001","dispatch:2","response:2","fetcher:teams.listTeams","enqueue:teams.listTeams","fetcher:team-relations.listProjectTeams","enqueue:team-relations.listProjectTeams","dispatch:3","response:3","response:1"],"rejected":[{"action":"teams.listTeams","code":"desktop_session_changed","status":409},{"action":"team-relations.listProjectTeams","code":"desktop_session_changed","status":409}]}
+1..7
+# tests 7
+# suites 0
+# pass 2
+# fail 5
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7809.168268

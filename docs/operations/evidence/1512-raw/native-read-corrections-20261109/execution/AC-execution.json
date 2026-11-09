@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "records": [
+    {
+      "name": "A-red",
+      "node": "v24.22.1",
+      "args": [
+        "--experimental-test-module-mocks",
+        "--import",
+        "./scripts/server-test.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "--test-reporter=tap",
+        "lib/personal-policy.test.ts"
+      ],
+      "startedAt": "2026-11-09T18:38:18.224Z",
+      "finishedAt": "2026-11-09T18:38:20.385Z",
+      "exitCode": 1,
+      "signal": null,
+      "error": null,
+      "stdoutBytes": 8929,
+      "stdoutSha256": "3370cd044c4ceaf5d68f48706aa6cf01c36f575d43c73493fa05eb2c369695fa",
+      "stderrBytes": 0,
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": [
+        "# tests 22",
+        "# suites 0",
+        "# pass 17",
+        "# fail 5",
+        "# cancelled 0",
+        "# skipped 0",
+        "# todo 0",
+        "# duration_ms 2122.869189"
+      ],
+      "failed": [
+        "not ok 16 - standalone read-only policy consumers share one observation and keep every credential read",
+        "not ok 17 - standalone policy refusal and absence are observed again by the next read",
+        "not ok 18 - standalone observations isolate parallel reads, exact workspaces and actual executors",
+        "not ok 19 - standalone policy failures retain their original cause and do not poison the next read",
+        "not ok 21 - standalone foreground observation never supplies policy to after, cron or workflow work"
+      ]
+    },
+    {
+      "name": "A-green",
+      "node": "v24.22.1",
+      "args": [
+        "--experimental-test-module-mocks",
+        "--import",
+        "./scripts/server-test.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "--test-reporter=tap",
+        "lib/personal-policy.test.ts"
+      ],
+      "startedAt": "2026-11-09T18:38:20.388Z",
+      "finishedAt": "2026-11-09T18:38:22.531Z",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "stdoutBytes": 5580,
+      "stdoutSha256": "f53e5a5666b53ea4f88666e7390fb34b77205120b72d21de1e23a82d033cd6b0",
+      "stderrBytes": 0,
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": [
+        "# tests 22",
+        "# suites 0",
+        "# pass 22",
+        "# fail 0",
+        "# cancelled 0",
+        "# skipped 0",
+        "# todo 0",
+        "# duration_ms 2098.565745"
+      ],
+      "failed": []
+    },
+    {
+      "name": "C-red",
+      "node": "v24.22.1",
+      "args": [
+        "--experimental-test-module-mocks",
+        "--import",
+        "./scripts/server-test.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "--test-reporter=tap",
+        "--test-name-pattern=native workspace snapshot:",
+        "scripts/use-live-lists.live.test.tsx"
+      ],
+      "startedAt": "2026-11-09T18:38:22.531Z",
+      "finishedAt": "2026-11-09T18:38:30.378Z",
+      "exitCode": 1,
+      "signal": null,
+      "error": null,
+      "stdoutBytes": 9320,
+      "stdoutSha256": "f59a16e14136a6bf1216314aad1b3704653712c4f594322aa01697338f7a37d3",
+      "stderrBytes": 0,
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": [
+        "# tests 7",
+        "# suites 0",
+        "# pass 2",
+        "# fail 5",
+        "# cancelled 0",
+        "# skipped 0",
+        "# todo 0",
+        "# duration_ms 7809.168268"
+      ],
+      "failed": [
+        "not ok 1 - native workspace snapshot: committed-after-ready",
+        "not ok 2 - native workspace snapshot: pending-after-ready",
+        "not ok 3 - native workspace snapshot: late-subscription",
+        "not ok 6 - native workspace snapshot: workspace-change",
+        "not ok 7 - native workspace snapshot: identity-change"
+      ]
+    },
+    {
+      "name": "C-green",
+      "node": "v24.22.1",
+      "args": [
+        "--experimental-test-module-mocks",
+        "--import",
+        "./scripts/server-test.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "--test-reporter=tap",
+        "--test-name-pattern=native workspace snapshot:",
+        "scripts/use-live-lists.live.test.tsx"
+      ],
+      "startedAt": "2026-11-09T18:38:30.379Z",
+      "finishedAt": "2026-11-09T18:38:38.820Z",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "stdoutBytes": 5579,
+      "stdoutSha256": "d80f4b912923be5a0030f19efc8653dc286ae2a27e6195f3eac89f15b8586686",
+      "stderrBytes": 0,
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": [
+        "# tests 7",
+        "# suites 0",
+        "# pass 7",
+        "# fail 0",
+        "# cancelled 0",
+        "# skipped 0",
+        "# todo 0",
+        "# duration_ms 8404.892651"
+      ],
+      "failed": []
+    }
+  ]
+}

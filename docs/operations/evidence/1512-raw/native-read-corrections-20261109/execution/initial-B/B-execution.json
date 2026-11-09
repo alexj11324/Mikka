@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "records": [
+    {
+      "phase": "red",
+      "node": "v24.22.1",
+      "args": [
+        "--import",
+        "tsx",
+        "--test",
+        "lib/desktop-rpc/read-batch-context.test.ts"
+      ],
+      "startedAt": "2026-11-09T18:28:17.737Z",
+      "finishedAt": "2026-11-09T18:28:18.196Z",
+      "exitCode": 1,
+      "signal": null,
+      "error": null,
+      "stdoutBytes": 5848,
+      "stdoutSha256": "1d3b7f1623f333fa516ed57b819b98d32a50f84039c628c2e220d1116d6ece03",
+      "stderrBytes": 0,
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": [],
+      "failed": []
+    },
+    {
+      "phase": "green",
+      "node": "v24.22.1",
+      "args": [
+        "--import",
+        "tsx",
+        "--test",
+        "lib/desktop-rpc/read-batch-context.test.ts"
+      ],
+      "startedAt": "2026-11-09T18:28:18.197Z",
+      "finishedAt": "2026-11-09T18:28:18.569Z",
+      "exitCode": 0,
+      "signal": null,
+      "error": null,
+      "stdoutBytes": 2317,
+      "stdoutSha256": "0503f4e21abe6514f3eb882541ede1781c16cc73c889c10bfa248a0bffcc7775",
+      "stderrBytes": 0,
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": [],
+      "failed": []
+    }
+  ]
+}
