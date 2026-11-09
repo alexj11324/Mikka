@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { readFile } from 'node:fs/promises'
 import { createSessionClient } from '../acceptance/cloud-startup.mjs'
 import { candidateInventory, EPIC_MIGRATIONS, guardContext, guardMain, MAIN, projectRows, publicFailure, searchCandidates, selectScope, snapshot, SQL, verifyScope } from './domain-history-before-1782.mjs'
+import * as beforeDriver from './domain-history-before-1782.mjs'
 
 const id = n => '00000000-0000-4000-8000-' + String(n).padStart(12, '0')
 const owners = ids => Object.fromEntries(ids.map(value => [value, 'smoke-owner']))
@@ -25,6 +26,30 @@ const env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka',
   GITHUB_WORKFLOW_REF: 'alexj11324/Mikka/.github/workflows/issue1782-domain-history-before.yml@refs/heads/ops/self-hosted-vault-closeout-20261108' }
 const event = { repository: { id: 1427517699, owner: { id: 183887963 } }, ref: env.GITHUB_REF,
   after: env.GITHUB_SHA, deleted: false, forced: false }
+
+test('ordinary owner-deleted proof reauthorizes a fixed Task after exact issueNotFound without treating that error as permission', async () => {
+  const deletedAt = new Date(Date.now() - 60000).toISOString(), actions = []
+  const client = createSessionClient('https://synthetic.invalid', async (url, init) => {
+    if (url.pathname.endsWith('/api/auth/get-session')) return Response.json({ user: { id: scope.ownerId } })
+    if (url.pathname.endsWith('/api/workspace')) return Response.json(sharedView())
+    assert.equal(url.pathname, '/mikka/api/rpc')
+    assert.equal(init.headers['x-mikka-workspace-id'], scope.workspaceId)
+    const { action, args } = JSON.parse(init.body); actions.push(action)
+    let result
+    if (action === 'issues.getIssue') result = args[0] === id(1) ? { error: 'issueNotFound' }
+      : { issue: { id: args[0], userId: scope.ownerId, workspaceId: scope.workspaceId, ownershipState: 'bound', scope: 'personal' } }
+    else {
+      assert.equal(action, 'issue-operations.getDeletedIssue'); assert.deepEqual(args, [id(1)])
+      result = { id: id(1), title: 'never-output-this-title', deletedAt }
+    }
+    return Response.json({ ok: true, result })
+  })
+  const taskAccess = { [id(1)]: { mode: 'owned_deleted', deletedAt }, [id(2)]: { mode: 'live', deletedAt: null } }
+  const observed = await verifyScope(client, { ...scope, taskAccess })
+  assert.deepEqual(observed, { live: 1, ownedDeleted: 1 })
+  assert.equal(actions.filter(action => action === 'issue-operations.getDeletedIssue').length, 1)
+  assert.ok(!JSON.stringify(observed).includes('never-output-this-title'))
+})
 
 test('existing real Ops subject accepts only a clean first-attempt owned snapshot job', () => {
   guardContext(env, event, env.GITHUB_SHA, false)
@@ -101,12 +126,14 @@ test('at most ten explicit Task UUIDs, not an arbitrary SQL or all-tenant scan',
 })
 
 function database({ readonly = 'on', isolation = 'repeatable read', epic = 0, legacy = 0, failRun = false, bindingOverride, publicationOverride,
+  accessOverride,
   selected = scope.taskIds.map(value => ({ id: value })) } = {}) {
   const calls = [], rows = fixture()
   return { calls, query: async (sql, args) => {
     calls.push({ sql, args })
     if (sql === SQL.settings) return { rows: [{ readonly, isolation }] }
     if (sql === SQL.ledger) return { rows: [{ epic, legacy, digest: 'c'.repeat(32) }] }
+    if (sql === SQL.taskAccess) return { rows: [accessOverride ?? { present: args[0].length, authorized: args[0].length }] }
     if (sql === SQL.binding) {
       assert.deepEqual(args[1], args[0].map(value => scope.taskOwners[value] ?? scope.ownerId)); assert.equal(args[2], scope.workspaceId)
       return { rows: [bindingOverride ?? { present: args[0].length, bound: args[0].length, published: 2, ended: 2, historical: 2 }] }
@@ -706,4 +733,164 @@ test('inconsistent or negative publication diagnostic counts fail before snapsho
     assert.equal(db.calls.some(row => row.sql === SQL.select), false)
     assert.equal(observed.at(-1).transactionRolledBack, true)
   }
+})
+
+function threadRow(n, issueId = id(n)) {
+  return { id: id(8000 + n), issueId, createdAt: new Date(Date.now() - 60000).toISOString(),
+    prompt: 'never-output-own-prompt', lastReply: 'never-output-own-reply' }
+}
+function historyTransport(response, threads = [threadRow(1), threadRow(2)]) {
+  const actions = [], requests = [], email = 'synthetic@example.invalid'
+  const client = createSessionClient('https://synthetic.invalid', async (url, init) => {
+    requests.push({ path: url.pathname, headers: init.headers })
+    if (url.pathname.endsWith('/api/auth/get-session')) return Response.json({ user: { id: scope.ownerId, email } },
+      { headers: { 'set-cookie': 'mikka-workspace=' + id(999) + '; Path=/; HttpOnly' } })
+    if (url.pathname.endsWith('/api/workspace')) return Response.json(sharedView())
+    assert.equal(url.pathname, '/mikka/api/rpc')
+    assert.equal(init.headers['x-mikka-workspace-id'], scope.workspaceId)
+    assert.equal(init.headers['x-mikka-rpc'], '1')
+    assert.ok(!init.headers.cookie || init.headers.cookie === 'mikka-workspace=' + id(999))
+    const { action, args } = JSON.parse(init.body)
+    actions.push({ action, args })
+    if (action === 'task-runs.pollThreads') { assert.deepEqual(args, []); return Response.json({ ok: true, result: { items: threads } }) }
+    assert.ok(['issues.getIssue', 'issue-operations.getDeletedIssue'].includes(action))
+    const value = response(action, args[0])
+    return value instanceof Response ? value : Response.json({ ok: true, result: value })
+  })
+  return { client, actions, requests, email }
+}
+const liveIssue = (value, owner = scope.ownerId) => ({ issue: { id: value, userId: owner,
+  workspaceId: scope.workspaceId, ownershipState: 'bound', scope: 'personal' } })
+
+test('fixed own-thread discovery authorizes live shared and owner-deleted Tasks through real transport without using titles or switching Workspace', async () => {
+  const deletedAt = new Date(Date.now() - 120000).toISOString(), inventories = []
+  const transport = historyTransport((action, value) => action === 'issues.getIssue'
+    ? value === id(1) ? { error: 'issueNotFound', params: { $mikka: 'undefined' } } : liveIssue(value, 'other-authorized-creator')
+    : { id: value, title: 'never-output-deleted-title', deletedAt }, [threadRow(1), threadRow(2), threadRow(3, id(1)), threadRow(4, null)])
+  const selected = await beforeDriver.selectThreadScope(transport.client, transport.email, counts => inventories.push(counts))
+  assert.deepEqual(selected.candidateTaskIds, [id(1), id(2)])
+  assert.equal(selected.taskOwners[id(1)], scope.ownerId)
+  assert.equal(selected.taskOwners[id(2)], 'other-authorized-creator')
+  assert.deepEqual(selected.taskAccess, { [id(1)]: { mode: 'owned_deleted', deletedAt }, [id(2)]: { mode: 'live', deletedAt: null } })
+  assert.deepEqual(inventories.at(-1), { selection: 'first_100_unique_task_refs_of_own_recent_threads', returnedRuns: 4,
+    runLimitReached: false, maxRuns: 200, recentDays: 30, runsWithoutTask: 1, referencedTasks: 2,
+    candidateCount: 2, discardedLaterTaskRefs: 0, maxCandidates: 100, authorizedLive: 1, authorizedOwnedDeleted: 1 })
+  const rows = fixture(); rows.task[1].owner = 'other-authorized-creator'
+  const projection = projectRows({ ...selected, taskIds: selected.candidateTaskIds }, rows)
+  assert.equal(projection.task[0].accessMode, 'owned_deleted')
+  assert.equal(projection.task[0].deletedAtSha256, createHash('sha256').update(deletedAt).digest('hex'))
+  assert.equal(projection.task[1].accessMode, 'live'); assert.equal(projection.task[1].deletedAtSha256, null)
+  for (const raw of ['never-output-', scope.ownerId, 'other-authorized-creator', deletedAt]) {
+    assert.ok(!JSON.stringify({ inventories, projection }).includes(raw))
+  }
+  assert.equal(transport.actions.filter(row => row.action === 'task-runs.pollThreads').length, 1)
+  assert.equal(transport.actions.filter(row => row.action === 'issue-operations.getDeletedIssue').length, 1)
+  assert.ok(!transport.requests.some(row => /search|switch|restore/.test(row.path)))
+})
+
+for (const [name, response] of [
+  ['auth error', () => ({ error: 'authRequired' })],
+  ['workspace error', () => ({ error: 'workspaceAccessDenied' })],
+  ['unknown action error', () => ({ error: 'issueNotFoundElsewhere' })],
+  ['ambiguous issue and not-found error', () => ({ error: 'issueNotFound', issue: null })],
+  ['empty result', () => null],
+  ['HTTP 404', () => Response.json({ error: 'issueNotFound' }, { status: 404 })],
+  ['RPC envelope refusal', () => Response.json({ ok: false, result: { error: 'issueNotFound' } })],
+  ['live wrong tenant', (_action, value) => ({ issue: { ...liveIssue(value).issue, workspaceId: id(999) } })],
+  ['live pending', (_action, value) => ({ issue: { ...liveIssue(value).issue, ownershipState: 'pending' } })],
+  ['live unknown label', (_action, value) => ({ issue: { ...liveIssue(value).issue, scope: 'unknown' } })],
+]) test('own-thread discovery refuses ' + name + ' without a deleted-detail fallback or database authority', async () => {
+  const transport = historyTransport(response, [threadRow(1)])
+  await assert.rejects(beforeDriver.selectThreadScope(transport.client, transport.email))
+  assert.equal(transport.actions.filter(row => row.action === 'issue-operations.getDeletedIssue').length, 0)
+})
+
+for (const [name, deleted] of [
+  ['null (missing, foreign owner or permission denied)', null],
+  ['wrong Task', { id: id(9), deletedAt: '2026-11-01T12:00:00.000Z' }],
+  ['missing deletion marker', { id: id(1), deletedAt: null }],
+  ['invalid deletion marker', { id: id(1), deletedAt: 'not-a-date' }],
+  ['action refusal', { id: id(1), deletedAt: '2026-11-01T12:00:00.000Z', error: 'workspaceAccessDenied' }],
+]) test('exact not-found plus deleted-detail ' + name + ' cannot authorize a historical Task', async () => {
+  const transport = historyTransport(action => action === 'issues.getIssue' ? { error: 'issueNotFound' } : deleted, [threadRow(1)])
+  await assert.rejects(beforeDriver.selectThreadScope(transport.client, transport.email), error => error.code === 'sample_changed')
+  assert.equal(transport.actions.filter(row => row.action === 'issue-operations.getDeletedIssue').length, 1)
+})
+
+test('generic client action_refused or transport failure never supplies an action code or triggers a deleted read', async () => {
+  for (const error of [Error('startup_action_refused'), Error('issueNotFound'), Object.assign(Error('private transport'), { status: 404 })]) {
+    let reads = 0
+    await assert.rejects(beforeDriver.readHistoryTaskAccess({ json: async () => { reads++; throw error } }, scope, id(1)))
+    assert.equal(reads, 1)
+  }
+})
+
+test('a restored owner-deleted Task reauthorizes through normal live detail without mutating the before access proof', async () => {
+  const deletedAt = '2026-11-01T12:00:00.000Z'
+  const taskAccess = { [id(1)]: { mode: 'owned_deleted', deletedAt }, [id(2)]: { mode: 'live', deletedAt: null } }
+  const transport = historyTransport((_action, value) => liveIssue(value))
+  assert.deepEqual(await verifyScope(transport.client, { ...scope, taskAccess }), { live: 2, ownedDeleted: 0 })
+  assert.deepEqual(taskAccess[id(1)], { mode: 'owned_deleted', deletedAt })
+  assert.equal(transport.actions.filter(row => row.action === 'issue-operations.getDeletedIssue').length, 0)
+  const changed = historyTransport((_action, value) => liveIssue(value, 'new-creator'))
+  await assert.rejects(verifyScope(changed.client, { ...scope, taskAccess }), error => error.code === 'sample_changed')
+})
+
+test('past deletion mode cannot authorize a currently refused Task or relabel another frozen creator as the reader', async () => {
+  const deletedAt = '2026-11-01T12:00:00.000Z'
+  const taskAccess = { [id(1)]: { mode: 'owned_deleted', deletedAt }, [id(2)]: { mode: 'live', deletedAt: null } }
+  const transport = historyTransport(action => action === 'issues.getIssue' ? { error: 'issueNotFound' } : null)
+  await assert.rejects(verifyScope(transport.client, { ...scope, taskAccess }), error => error.code === 'sample_changed')
+  const positive = historyTransport(action => action === 'issues.getIssue' ? { error: 'issueNotFound' } : { id: id(1), deletedAt })
+  await assert.rejects(beforeDriver.readHistoryTaskAccess(positive.client, scope, id(1), 'previous-other-creator'), error => error.code === 'sample_changed')
+})
+
+test('thread discovery keeps the real two-hundred Run and one-hundred unique Task bounds without an invented cursor', async () => {
+  const rows = Array.from({ length: 200 }, (_, i) => threadRow(i + 1, id(i % 150 + 1)))
+  let calls = 0
+  const result = await beforeDriver.threadCandidates({ rpc: async (action, args, extra) => {
+    calls++; assert.equal(action, 'task-runs.pollThreads'); assert.deepEqual(args, [])
+    assert.equal(extra.headers['x-mikka-workspace-id'], scope.workspaceId)
+    return { items: rows }
+  } }, scope)
+  assert.equal(calls, 1); assert.equal(result.candidateTaskIds.length, 100)
+  assert.equal(result.counts.referencedTasks, 150); assert.equal(result.counts.discardedLaterTaskRefs, 50)
+  assert.equal(result.counts.runLimitReached, true)
+  assert.deepEqual(result.candidateTaskIds, Array.from({ length: 100 }, (_, n) => id(n + 1)).sort())
+})
+
+for (const [name, value] of [
+  ['201 runs', () => ({ items: Array.from({ length: 201 }, (_, n) => threadRow(n + 1)) })],
+  ['duplicate Run UUID', () => ({ items: [threadRow(1), threadRow(1)] })],
+  ['invalid Task UUID', () => ({ items: [threadRow(1, 'not-a-task-uuid')] })],
+  ['outside 30-day window', () => ({ items: [{ ...threadRow(1), createdAt: new Date(Date.now() - 31 * 86400000).toISOString() }] })],
+  ['missing createdAt', () => ({ items: [{ ...threadRow(1), createdAt: undefined }] })],
+  ['delta without the complete window', () => ({ items: [threadRow(1)], delta: true })],
+]) test('thread discovery refuses ' + name + ' before Task detail or APP work', async () => {
+  await assert.rejects(beforeDriver.threadCandidates({ rpc: async () => value() }, scope), error => error.code === 'response_invalid')
+})
+
+test('the database must independently match every current normal-API deletion proof inside the read-only transaction', async () => {
+  const taskAccess = { [id(1)]: { mode: 'owned_deleted', deletedAt: '2026-11-01T12:00:00.000Z' }, [id(2)]: { mode: 'live', deletedAt: null } }
+  const db = database(), observed = []
+  const result = await snapshot(db, { ...scope, taskAccess }, value => observed.push(value))
+  assert.deepEqual(db.calls.find(row => row.sql === SQL.taskAccess).args,
+    [scope.taskIds, [scope.ownerId, scope.ownerId], scope.workspaceId, ['owned_deleted', 'live'], [taskAccess[id(1)].deletedAt, null], scope.ownerId])
+  assert.equal(observed.find(row => row.normalApiAccessRechecked).authorizedOwnedDeleted, 1)
+  assert.equal(result.rows.task[0].accessMode, 'owned_deleted')
+  const refused = database({ accessOverride: { present: 2, authorized: 1 } })
+  await assert.rejects(snapshot(refused, { ...scope, taskAccess }), error => error.code === 'database_binding')
+  assert.equal(refused.calls.at(-1).sql, 'ROLLBACK')
+  assert.ok(!refused.calls.some(row => row.sql === SQL.select))
+  const mismatched = { ...scope, taskOwners: { ...scope.taskOwners, [id(1)]: 'another-creator' }, taskAccess }
+  const untouched = database()
+  await assert.rejects(snapshot(untouched, mismatched), error => error.code === 'sample_invalid')
+  assert.equal(untouched.calls.length, 0)
+})
+
+test('production capture chooses only the compiled own-thread entry and retains original bounded live search contracts', async () => {
+  const text = await readFile(new URL('./domain-history-before-1782.mjs', import.meta.url), 'utf8')
+  assert.match(text, /const scope = await selectThreadScope\(client, email, counts/)
+  assert.ok(!/process\.env\.(?:HISTORY_MODE|HISTORY_WORKSPACE|HISTORY_TASK_IDS)/.test(text))
+  assert.equal(typeof beforeDriver.selectScope, 'function'); assert.equal(typeof beforeDriver.searchCandidates, 'function')
 })

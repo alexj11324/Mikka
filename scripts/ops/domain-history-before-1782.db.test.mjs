@@ -40,7 +40,8 @@ test('real PG17 validates paired creators, verified publication, tenant-safe his
     await db.query('SET search_path = domain_history_fixture_1782, pg_catalog')
     await db.query(`CREATE TABLE schema_migrations (name text PRIMARY KEY);
       CREATE TABLE issues (id uuid PRIMARY KEY, "userId" text NOT NULL, "workspaceId" uuid,
-        "ownershipState" text NOT NULL, scope text NOT NULL, "issuedIdentifier" text);
+        "ownershipState" text NOT NULL, scope text NOT NULL, "issuedIdentifier" text,
+        content jsonb NOT NULL DEFAULT '{"type":"doc","attrs":{"mikka":{}}}'::jsonb);
       CREATE TABLE agent_runs (id uuid PRIMARY KEY, "issueId" uuid NOT NULL, "userId" text NOT NULL,
         "workspaceId" uuid, status text NOT NULL, "agentDefinition" jsonb NOT NULL, "baseBranch" text);
       CREATE TABLE run_publications ("runId" uuid PRIMARY KEY, "issueId" uuid NOT NULL, "userId" text NOT NULL,
@@ -49,7 +50,7 @@ test('real PG17 validates paired creators, verified publication, tenant-safe his
       await db.query('TRUNCATE run_publications, agent_runs, issues, schema_migrations')
       await db.query("INSERT INTO schema_migrations VALUES ('synthetic_before_epic')")
       for (let n = 1; n <= count; n++) {
-        await db.query(`INSERT INTO issues VALUES ($1,$2,$3,'bound',$4,$5)`,
+        await db.query(`INSERT INTO issues (id,"userId","workspaceId","ownershipState",scope,"issuedIdentifier") VALUES ($1,$2,$3,'bound',$4,$5)`,
           [id(n), owner(n), workspaceId, n % 2 ? 'personal' : 'workspace', 'SYNTHETIC-' + n])
         // The executor need not be the Task creator. Publication is bound to
         // its actual Run executor, while Task creator identity stays immutable.
@@ -161,6 +162,43 @@ test('real PG17 validates paired creators, verified publication, tenant-safe his
         assert.equal(result.rows[kind].length, 10)
         assert.ok(result.rows[kind].every(row => result.taskIds.includes(row.issueId)))
       }
+    })
+    const deletedAt = '2026-11-01T12:00:00.000Z'
+    const deletedScope = () => ({ ...scopeFor(), ownerId: owner(1),
+      taskAccess: { [id(1)]: { mode: 'owned_deleted', deletedAt }, [id(2)]: { mode: 'live', deletedAt: null } } })
+    const markDeleted = async content => db.query('UPDATE issues SET content=$1::jsonb WHERE id=$2', [JSON.stringify(content), id(1)])
+    for (const [name, content] of [
+      ['current mikka metadata', { type: 'doc', attrs: { mikka: { deletedAt } } }],
+      ['legacy metadata behind JSON-null mikka', { type: 'doc', attrs: { mikka: null, orvilo: { deletedAt } } }],
+    ]) await t.test('owner-deleted published history survives ' + name + ' and is frozen without exporting the content', async () => {
+      await seed(); await markDeleted(content)
+      const observed = [], result = await snapshot(db, deletedScope(), value => observed.push(value))
+      assert.deepEqual(result.taskIds, [id(1), id(2)])
+      assert.equal(result.rows.task[0].accessMode, 'owned_deleted')
+      assert.equal(result.rows.task[0].creatorSha256, digest(owner(1)))
+      assert.equal(result.rows.task[0].deletedAtSha256, digest(deletedAt))
+      assert.equal(result.rows.task[1].accessMode, 'live'); assert.equal(result.rows.task[1].deletedAtSha256, null)
+      assert.equal(result.rows.publication.length, 2); assert.equal(result.rows.run.length, 2)
+      assert.deepEqual(observed.find(value => value.normalApiAccessRechecked),
+        { normalApiAccessRechecked: true, authorizedLive: 1, authorizedOwnedDeleted: 1 })
+      assert.equal(observed.at(-1).transactionRolledBack, true)
+      assert.ok(!JSON.stringify(result).includes(deletedAt))
+      assert.equal((await db.query("SELECT current_setting('transaction_read_only') AS value")).rows[0].value, 'off')
+    })
+    for (const [name, mutation, args] of [
+      ['marker cleared after the API proof', `UPDATE issues SET content='{"attrs":{"mikka":{}}}'::jsonb WHERE id=$1`, [id(1)]],
+      ['marker changed after the API proof', `UPDATE issues SET content='{"attrs":{"mikka":{"deletedAt":"2026-11-02T12:00:00.000Z"}}}'::jsonb WHERE id=$1`, [id(1)]],
+      ['creator changed after the API proof', 'UPDATE issues SET "userId"=$1 WHERE id=$2', [owner(3), id(1)]],
+      ['tenant changed after the API proof', 'UPDATE issues SET "workspaceId"=$1 WHERE id=$2', [foreignWorkspace, id(1)]],
+      ['ownership no longer bound', `UPDATE issues SET "ownershipState"='pending' WHERE id=$1`, [id(1)]],
+      ['live candidate deleted after its API proof', `UPDATE issues SET content='{"attrs":{"mikka":{"deletedAt":"2026-11-01T12:00:00.000Z"}}}'::jsonb WHERE id=$1`, [id(2)]],
+    ]) await t.test('normal-API access proof is rejected with real rollback when ' + name, async () => {
+      await seed(); await markDeleted({ attrs: { mikka: { deletedAt } } }); await db.query(mutation, args)
+      const observed = []
+      await assert.rejects(snapshot(db, deletedScope(), value => observed.push(value)), error => error.code === 'database_binding')
+      assert.equal(observed.at(-1).transactionRolledBack, true)
+      assert.ok(!observed.some(value => value.lastReadStage === 'history_selection'))
+      assert.equal((await db.query("SELECT current_setting('transaction_read_only') AS value")).rows[0].value, 'off')
     })
     await t.test('publication diagnostics exclude every receipt outside the fixed authorized Task pairs', async () => {
       await seed(3)

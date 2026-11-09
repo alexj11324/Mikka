@@ -7,14 +7,17 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { workflowGuard } from './self-hosted-closeout.mjs'
-import { createSessionClient, smokeAcceptanceAccount } from '../acceptance/cloud-startup.mjs'
+import { createSessionClient, decodeWire, smokeAcceptanceAccount } from '../acceptance/cloud-startup.mjs'
 
-export const MAIN = '5ba1f9e2359ce714d83cd16fc040f2567c40a6d0'
+export const MAIN = 'ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d'
 export const ORIGIN = 'https://app.aspectlylabs.com'
 const ADMIN_HASH = '0049e13c050f799070a7d1a95bb843f2a0519b5e8732bf6986e2e1613b8941c3'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const SHA = /^[0-9a-f]{40}$/
 const LABELS = new Set(['workspace', 'personal'])
+const ACCESS_MODES = new Set(['live', 'owned_deleted'])
+const timestamp = value => typeof value === 'string' && value.length <= 64
+  && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(value) && Number.isFinite(Date.parse(value))
 const CODES = new Set(['source_refused', 'main_changed', 'build_changed', 'http_failed', 'response_invalid', 'account_refused',
   'workspace_refused', 'sample_missing', 'sample_invalid', 'sample_changed', 'database_binding', 'database_readonly',
   'sample_too_large', 'history_missing', 'migration_already_applied', 'database_failed', 'signout_failed', 'before_failed'])
@@ -122,7 +125,7 @@ export async function searchCandidates(client, scope, observeInventory = () => {
   return { candidateTaskIds: [...retained.keys()].sort(), taskOwners: Object.fromEntries(retained), counts }
 }
 
-export async function selectScope(client, email, observeInventory = () => {}) {
+async function selectSharedScope(client, email) {
   const session = await client.json('/api/auth/get-session')
   const ownerId = session?.user?.id
   check(typeof ownerId === 'string' && ownerId.length > 0 && session.user.email?.trim().toLowerCase() === email.trim().toLowerCase(), 'account_refused')
@@ -139,16 +142,104 @@ export async function selectScope(client, email, observeInventory = () => {}) {
     if (adminId !== null) matches.push({ workspaceId: choice.id, adminId })
   }
   check(matches.length === 1, 'workspace_refused')
-  const { workspaceId, adminId } = matches[0]
+  return { ownerId, workspaceId: matches[0].workspaceId, workspaceKind: 'team', adminId: matches[0].adminId }
+}
+
+export async function selectScope(client, email, observeInventory = () => {}) {
+  const shared = await selectSharedScope(client, email), { ownerId, workspaceId } = shared
   // The preceding tail run classified no receipts. This fixed first boundary
   // includes the previously unclassified first27 without changing eligibility.
   const { candidateTaskIds, taskOwners } = await searchCandidates(client, { ownerId, workspaceId }, observeInventory, 'first')
   check(candidateTaskIds.length > 0, 'sample_missing')
-  const scope = { ownerId, workspaceId, workspaceKind: 'team', adminId, candidateTaskIds, taskOwners }
+  const scope = { ...shared, candidateTaskIds, taskOwners }
   // Every candidate needs a fresh ordinary detail read before APP is opened.
   // The returned map is private memory; only per-Task hashes enter the artifact.
   await verifyScope(client, { ...scope, taskIds: candidateTaskIds })
   return scope
+}
+
+/** A separate fixed discovery route for the reader's own recent Run references.
+ * Main 5ba's pollThreads is owner + request-Workspace scoped, newest activity
+ * first, at most 200 and 30 days. It does not hide references to deleted Tasks.
+ * A reference never authorizes a Task, or supplies its creator identity. */
+export async function threadCandidates(client, scope, observeInventory = () => {}) {
+  check(UUID.test(scope.workspaceId) && creator(scope.ownerId), 'sample_invalid')
+  const started = Date.now()
+  const value = await client.rpc('task-runs.pollThreads', [], { headers: { 'x-mikka-workspace-id': scope.workspaceId } })
+  check(Array.isArray(value?.items) && value.items.length <= 200 && value.unchanged !== true && value.delta !== true
+    && value.items.every(row => UUID.test(row?.id) && (row.issueId === null || UUID.test(row.issueId))
+      && timestamp(row.createdAt) && Date.parse(row.createdAt) > started - 30 * 86400000
+      && Date.parse(row.createdAt) <= Date.now() + 60000)
+    && new Set(value.items.map(row => row.id)).size === value.items.length, 'response_invalid')
+  const referenced = [...new Set(value.items.filter(row => row.issueId !== null).map(row => row.issueId))]
+  const candidateTaskIds = referenced.slice(0, 100).sort()
+  const counts = { selection: 'first_100_unique_task_refs_of_own_recent_threads', returnedRuns: value.items.length,
+    runLimitReached: value.items.length === 200, maxRuns: 200, recentDays: 30,
+    runsWithoutTask: value.items.filter(row => row.issueId === null).length, referencedTasks: referenced.length,
+    candidateCount: candidateTaskIds.length, discardedLaterTaskRefs: Math.max(0, referenced.length - 100), maxCandidates: 100 }
+  observeInventory({ ...counts })
+  return { candidateTaskIds, counts }
+}
+
+/** The shared rpc() intentionally erases action errors. This closed reader uses
+ * that same session transport/envelope, preserving only issueNotFound as the
+ * one reason to ask the existing owner-only deleted-detail API. No HTTP code,
+ * error message, generic refusal or Run's owner is a deletion/authority proof. */
+export async function readHistoryTaskAccess(client, scope, id, expectedCreator) {
+  check(UUID.test(id) && UUID.test(scope.workspaceId) && creator(scope.ownerId)
+    && (expectedCreator === undefined || creator(expectedCreator)), 'sample_invalid')
+  const read = async action => {
+    const envelope = await client.json('/api/rpc', { ...post({ version: 1, action, args: [id] }), headers: {
+      'content-type': 'application/json', 'x-mikka-rpc': '1', 'x-mikka-workspace-id': scope.workspaceId } })
+    check(envelope?.ok === true && Object.hasOwn(envelope, 'result'), 'response_invalid')
+    return decodeWire(envelope.result)
+  }
+  const value = await read('issues.getIssue'), issue = value?.issue
+  if (issue) {
+    check(!value.error && value.ok !== false && issue.id === id && creator(issue.userId)
+      && (expectedCreator === undefined || issue.userId === expectedCreator) && issue.workspaceId === scope.workspaceId
+      && issue.ownershipState === 'bound' && LABELS.has(issue.scope), 'sample_changed')
+    return { creator: issue.userId, mode: 'live', deletedAt: null }
+  }
+  check(value?.error === 'issueNotFound' && !Object.hasOwn(value, 'issue'), 'sample_changed')
+  const deleted = await read('issue-operations.getDeletedIssue')
+  // Official getDeletedIssue itself checks current membership, bound Task and
+  // exact request Workspace, then requires Task creator === current session.
+  // Its DTO contains id/title/deletedAt only. Do not invent owner/tenant fields.
+  check(deleted?.id === id && !deleted.error && deleted.ok !== false && timestamp(deleted.deletedAt)
+    && (expectedCreator === undefined || expectedCreator === scope.ownerId), 'sample_changed')
+  return { creator: scope.ownerId, mode: 'owned_deleted', deletedAt: deleted.deletedAt }
+}
+
+async function readFixedTasks(ids, read) {
+  let next = 0, failure
+  const rows = new Map()
+  const worker = async () => {
+    while (!failure && next < ids.length) {
+      const id = ids[next++]
+      try { rows.set(id, await read(id)) } catch (error) { failure ??= error }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(4, ids.length) }, worker))
+  if (failure) throw failure
+  return rows
+}
+
+export async function selectThreadScope(client, email, observeInventory = () => {}) {
+  const shared = await selectSharedScope(client, email)
+  const { candidateTaskIds, counts } = await threadCandidates(client, shared, observeInventory)
+  check(candidateTaskIds.length > 0, 'sample_missing')
+  const rows = await readFixedTasks(candidateTaskIds, id => readHistoryTaskAccess(client, shared, id))
+  const taskOwners = Object.fromEntries(candidateTaskIds.map(id => [id, rows.get(id).creator]))
+  const taskAccess = Object.fromEntries(candidateTaskIds.map(id => {
+    const { mode, deletedAt } = rows.get(id)
+    return [id, { mode, deletedAt }]
+  }))
+  check(sharedWorkspace(await client.json('/api/workspace?workspace=' + shared.workspaceId), shared.ownerId,
+    shared.workspaceId, 'sample_changed') === shared.adminId, 'sample_changed')
+  observeInventory({ ...counts, authorizedLive: [...rows.values()].filter(row => row.mode === 'live').length,
+    authorizedOwnedDeleted: [...rows.values()].filter(row => row.mode === 'owned_deleted').length })
+  return { ...shared, candidateTaskIds, taskOwners, taskAccess }
 }
 
 function sharedWorkspace(value, ownerId, workspaceId, code) {
@@ -170,6 +261,18 @@ function pairedCreators(scope, ids) {
   return ids.map(id => scope.taskOwners[id])
 }
 
+function accessPairs(scope, ids) {
+  pairedCreators(scope, ids)
+  check(scope.taskAccess && ids.every(id => {
+    const access = scope.taskAccess[id]
+    return Object.hasOwn(scope.taskAccess, id) && ACCESS_MODES.has(access?.mode)
+      && (access.mode === 'live' ? access.deletedAt === null
+        : scope.taskOwners[id] === scope.ownerId && timestamp(access.deletedAt))
+  }), 'sample_invalid')
+  return [ids, pairedCreators(scope, ids), scope.workspaceId, ids.map(id => scope.taskAccess[id].mode),
+    ids.map(id => scope.taskAccess[id].deletedAt), scope.ownerId]
+}
+
 export async function verifyScope(client, scope) {
   pairedCreators(scope, scope.taskIds)
   const session = await client.json('/api/auth/get-session')
@@ -183,20 +286,23 @@ export async function verifyScope(client, scope) {
   // Normal getIssue performs fresh authorization; no body, title or prompt enters the report.
   // At most four in-flight reads, no retries. A refusal stops new work and all
   // already-started reads settle before caller cleanup or any database access.
-  let next = 0, failure
-  const worker = async () => {
-    while (!failure && next < scope.taskIds.length) {
-      const id = scope.taskIds[next++]
-      try {
-        const value = await client.rpc('issues.getIssue', [id], { headers: { 'x-mikka-workspace-id': scope.workspaceId } }), issue = value?.issue
-        check(issue?.id === id && issue.userId === scope.taskOwners[id] && issue.workspaceId === scope.workspaceId
-          && issue.ownershipState === 'bound' && LABELS.has(issue.scope), 'sample_changed')
-      } catch (error) { failure ??= error }
+  if (scope.taskAccess) accessPairs(scope, scope.taskIds)
+  const observed = { live: 0, ownedDeleted: 0 }
+  await readFixedTasks(scope.taskIds, async id => {
+    if (scope.taskAccess) {
+      const value = await readHistoryTaskAccess(client, scope, id, scope.taskOwners[id])
+      observed[value.mode === 'live' ? 'live' : 'ownedDeleted']++
+      return
     }
-  }
-  await Promise.all(Array.from({ length: Math.min(4, scope.taskIds.length) }, worker))
-  if (failure) throw failure
+    const value = await client.rpc('issues.getIssue', [id], { headers: { 'x-mikka-workspace-id': scope.workspaceId } }), issue = value?.issue
+    check(issue?.id === id && issue.userId === scope.taskOwners[id] && issue.workspaceId === scope.workspaceId
+      && issue.ownershipState === 'bound' && LABELS.has(issue.scope), 'sample_changed')
+  })
   await membership()
+  // A restore can legitimately change the current read route. Fresh normal ACL
+  // must still prove the exact frozen creator and Workspace; never rewrite the
+  // before's access mode or treat a past deletion marker as current permission.
+  if (scope.taskAccess) return observed
 }
 
 // Constant SQL only. UUIDs and their independently API-authorized creators are
@@ -235,6 +341,14 @@ export const SQL = Object.freeze({
   ledger: `SELECT count(*) FILTER (WHERE name IN (${EPIC_MIGRATIONS.canonical.map(name => "'" + name + "'").join(',')}))::int AS epic,
     count(*) FILTER (WHERE name IN (${EPIC_MIGRATIONS.legacy.map(name => "'" + name + "'").join(',')}))::int AS legacy,
     md5(coalesce(string_agg(name, E'\\n' ORDER BY name),'')) AS digest FROM schema_migrations`,
+  taskAccess: `WITH authorized AS (
+    SELECT * FROM unnest($1::uuid[], $2::text[], $4::text[], $5::text[]) AS a(id, creator, mode, deleted_at)
+  ) SELECT count(*)::int AS present, count(*) FILTER (WHERE i."userId"=a.creator
+    AND i."workspaceId"=$3::uuid AND i."ownershipState"='bound' AND i.scope IN ('workspace','personal')
+    AND CASE a.mode WHEN 'live' THEN coalesce(nullif(i.content->'attrs'->'mikka','null'::jsonb),i.content->'attrs'->'orvilo')->>'deletedAt' IS NULL
+      WHEN 'owned_deleted' THEN a.creator=$6::text AND a.deleted_at IS NOT NULL
+        AND coalesce(nullif(i.content->'attrs'->'mikka','null'::jsonb),i.content->'attrs'->'orvilo')->>'deletedAt'=a.deleted_at
+      ELSE false END)::int AS authorized FROM issues i JOIN authorized a ON a.id=i.id`,
   binding: `WITH authorized AS (SELECT * FROM unnest($1::uuid[], $2::text[]) AS a(id, creator)), candidates AS (
     SELECT i.id, i."userId"=a.creator AND i."workspaceId"=$3::uuid AND i."ownershipState"='bound'
       AND i.scope IN ('workspace','personal') AS matches_scope,
@@ -280,6 +394,14 @@ export const SQL = Object.freeze({
     WHERE r.status IN ('succeeded','stopped','failed','cancelled') ORDER BY r.id LIMIT 1001`,
 })
 
+/** Call only inside the caller's verified repeatable read-only transaction. */
+export async function verifyDatabaseTaskAccess(db, scope, ids) {
+  const access = accessPairs(scope, ids), proof = (await db.query(SQL.taskAccess, access)).rows[0]
+  check(proof?.present === ids.length && proof.authorized === ids.length, 'database_binding')
+  return { normalApiAccessRechecked: true, authorizedLive: access[3].filter(mode => mode === 'live').length,
+    authorizedOwnedDeleted: access[3].filter(mode => mode === 'owned_deleted').length }
+}
+
 export function projectRows(scope, rows) {
   check(Array.isArray(scope.taskIds) && scope.taskIds.length > 0 && scope.taskIds.length <= 10
     && scope.taskIds.every(id => UUID.test(id)) && new Set(scope.taskIds).size === scope.taskIds.length, 'sample_invalid')
@@ -295,9 +417,12 @@ export function projectRows(scope, rows) {
   }
   check(rows.run.every(row => typeof row.hasProjectSnapshot === 'boolean' && /^[a-f0-9]{32}$/.test(row.frozenDigest)), 'sample_invalid')
   check(scope.taskIds.every(id => rows.publication.some(row => row.issueId === id) && rows.run.some(row => row.issueId === id)), 'history_missing')
+  if (scope.taskAccess) accessPairs(scope, scope.taskIds)
   const field = value => { check(value === null || typeof value === 'string' && value.length <= 8192, 'sample_invalid'); return hash(JSON.stringify(value)) }
   const result = {
     task: rows.task.map(row => ({ id: row.id, workspaceId: row.workspace, creatorSha256: hash(row.owner),
+      ...(scope.taskAccess ? { accessMode: scope.taskAccess[row.id].mode,
+        deletedAtSha256: scope.taskAccess[row.id].deletedAt === null ? null : hash(scope.taskAccess[row.id].deletedAt) } : {}),
       issuedIdentifierPresent: row.identifier !== '', issuedIdentifierSha256: field(row.identifier) })),
     publication: rows.publication.map(row => ({ id: row.id, issueId: row.issueId,
       ...Object.fromEntries(['identifier', 'branch', 'baseBranch', 'remoteKey'].map(key => [key + 'Sha256', field(row[key])])) })),
@@ -313,6 +438,7 @@ export async function snapshot(db, scope, observe = () => {}) {
     && scope.candidateTaskIds.every(id => UUID.test(id)) && new Set(scope.candidateTaskIds).size === scope.candidateTaskIds.length
     && UUID.test(scope.workspaceId) && typeof scope.ownerId === 'string' && scope.ownerId.length > 0, 'sample_invalid')
   const candidates = [scope.candidateTaskIds, pairedCreators(scope, scope.candidateTaskIds), scope.workspaceId]
+  const access = scope.taskAccess ? accessPairs(scope, scope.candidateTaskIds) : null
   let begun = false
   try {
     await db.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY'); begun = true
@@ -328,6 +454,9 @@ export async function snapshot(db, scope, observe = () => {}) {
     observe({ lastReadStage: ledger.epic === 0 && ledger.legacy === 0 ? 'ledger_verified' : 'ledger_refused',
       ledgerDigest: ledger.digest, canonicalEpicMigrations: ledger.epic, legacyEpicMigrations: ledger.legacy })
     check(ledger.epic === 0 && ledger.legacy === 0, 'migration_already_applied')
+    if (access) {
+      observe(await verifyDatabaseTaskAccess(db, scope, scope.candidateTaskIds))
+    }
     const binding = (await db.query(SQL.binding, candidates)).rows[0]
     const keys = ['present', 'bound', 'published', 'ended', 'historical']
     check(binding && keys.every(key => Number.isSafeInteger(binding[key]) && binding[key] >= 0 && binding[key] <= scope.candidateTaskIds.length), 'database_binding')
@@ -385,14 +514,14 @@ async function main(operation) {
   try {
     const login = await client.request('/api/auth/sign-in/email', post({ email, password, rememberMe: false }))
     signedIn = true; check(login.ok, 'account_refused')
-    const scope = await selectScope(client, email, counts => { report.apiTaskInventory = counts })
+    const scope = await selectThreadScope(client, email, counts => { report.apiTaskInventory = counts })
     report.candidateCount = scope.candidateTaskIds.length
     report.workspaceId = scope.workspaceId
     report.workspaceKind = scope.workspaceKind
-    report.selectionBasis = 'normal_api_unique_policy_admin_workspace_and_per_task_detail_acl'
+    report.selectionBasis = 'normal_api_policy_admin_workspace_own_thread_refs_and_per_task_detail_acl'
     report.readerSha256 = hash(scope.ownerId)
     report.policyAdminSha256 = hash(scope.adminId)
-    report.apiAuthorization = { mode: 'shared_workspace_per_task_detail_acl', taskCount: scope.candidateTaskIds.length,
+    report.apiAuthorization = { mode: 'shared_workspace_live_or_owner_deleted_detail_acl', taskCount: scope.candidateTaskIds.length,
       allPassed: true, maximumConcurrentReads: 4, retries: 0 }
     report.databaseTargetSha256 = hash('app-db-target\0' + target.hostname + '\0' + target.pathname)
     await guardMain(env)
@@ -408,7 +537,7 @@ async function main(operation) {
       scope.taskIds = report.snapshot.taskIds; report.taskIds = scope.taskIds
     }
     finally { db.release() }
-    await verifyScope(client, scope)
+    report.apiAuthorizationAfter = await verifyScope(client, scope)
     report.after = await guardMain(env)
     check(!report.connectionError, 'database_failed')
     report.status = 'captured_before'
