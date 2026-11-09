@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "checkpoint": 39,
+  "prefix": "docs/operations/evidence/1512-raw/claude-control-and-6414-union-20261109",
+  "source": {
+    "head": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+    "tree": "05b40c13c233d7f3cef989011705cf624b27c507",
+    "actualCheckout": "576c903cd6ede14520a79111d2b71154968ad910",
+    "publishedAt": "2026-11-09 17:22:28 UTC"
+  },
+  "officialClaude": {
+    "run": 42661569263,
+    "attempt": 1,
+    "observedAndCleaned": true,
+    "rootIndependentOriginalVerification": true,
+    "originalMembersLosslesslyRecovered": true,
+    "rootProof": "0630402efe0e763042e68a3d37c0bab0910358fd",
+    "providerBaseBuildEnvdIdentity": "not observed"
+  },
+  "ci": {
+    "run": 42663994959,
+    "attempt": 1,
+    "sourceCoreIntegrationE2BPassed": true,
+    "nativeAtCheckpoint": "running",
+    "strictAtCheckpoint": "pending",
+    "fullConclusion": null
+  },
+  "runtime": {
+    "run": 42661874195,
+    "conclusion": "failure",
+    "newFailures": [
+      "Codex rootCA 0644 to0777",
+      "Desktop apt backup SHA change"
+    ],
+    "actualFailurePhases": null,
+    "actualWriterResolved": false,
+    "sourceReviewOnly": true,
+    "sharedControlOwner": "#1505",
+    "ownDuplicateControls": 0
+  },
+  "upstream": {
+    "pr": 1835,
+    "premergedSource": "37fb3818728315151083b7cca409c2ffd6ff4f47",
+    "latestReviewedSource": "8197a48843f9733a775003898ab00eaceb533c66",
+    "latestChange": "control originals/ADR/evidence pointer only; matcher rules unchanged",
+    "canonicalHashStillChanges": true,
+    "ownerMergeStillRequired": true
+  },
+  "productionAcceptance": {
+    "acceptedCases": 0,
+    "issueClosed": false
+  },
+  "files": [
+    {
+      "path": "source-publication.safe.json",
+      "gitBlob": "228663ba83067b881148b30b815c4a93baf5f5c0",
+      "bytes": 6052,
+      "sha256": "e4cc1d26e01be4a20b679a1533bbad5fe3f70dd61e1fb67f7aa56c09031c88a0",
+      "mode": "100644"
+    },
+    {
+      "path": "root-policy-review.safe.json",
+      "gitBlob": "76232c5e3c1a7831ef9d9b823f51525ab838f38d",
+      "bytes": 1528,
+      "sha256": "197c45ef6f721db24434bdf4087cc7d3fd7004b52d0fddadf839097c0cfd4bf8",
+      "mode": "100644"
+    },
+    {
+      "path": "worker-inputs-at-37fb.safe.json",
+      "gitBlob": "b7f8787491a375de780f568ac5906f14f9fdecb7",
+      "bytes": 1667,
+      "sha256": "a2dd52f64ffa036b6734fe1adc769e7110a56cdaf0dda4f35e91a6b7a9f35cd5",
+      "mode": "100644"
+    },
+    {
+      "path": "design.safe.json",
+      "gitBlob": "8a19597b413fb36f0e5a53140c3d95dde5dda812",
+      "bytes": 16065,
+      "sha256": "3ea37cc559ed34264befb162601fd04af123ad4cf64f712a6debfae7abd725dd",
+      "mode": "100644"
+    },
+    {
+      "path": "peerSource.safe.json",
+      "gitBlob": "6ff52fec6e3111418213ca2b888577289d34d730",
+      "bytes": 10021,
+      "sha256": "195a98011bdaf4a17369d0febbb08395ea53c3f28e7808fb46ae952437b3a959",
+      "mode": "100644"
+    },
+    {
+      "path": "peerRedGreen.safe.json",
+      "gitBlob": "6dda620df2a4b9643b1648284d5b61e6653a95fa",
+      "bytes": 22566,
+      "sha256": "d7fac61e1179fdf4a79ae5ab23fc3e26c07ed5036beb8973453b1ddb8f294835",
+      "mode": "100644"
+    },
+    {
+      "path": "official-control-source-review.safe.json",
+      "gitBlob": "55705b72f3cfb6125b4f6994401944d39eb52cbb",
+      "bytes": 11998,
+      "sha256": "08bbe62878bf127bc576d0d6b0b450a968ab75dc2103111a4e18b3dcb3312a32",
+      "mode": "100644"
+    },
+    {
+      "path": "official-control.original-bundle.json",
+      "gitBlob": "868d0b251f884079611cbd9810775fc7146a9426",
+      "bytes": 18164,
+      "sha256": "dc69062c8376cb2a10cf47b7455ff478f7872c709c31c128c1384ecfc7696632",
+      "mode": "100644"
+    },
+    {
+      "path": "root-claude-control.safe.json",
+      "gitBlob": "0630402efe0e763042e68a3d37c0bab0910358fd",
+      "bytes": 7046,
+      "sha256": "f7a1e804b6f11ab3a2acd43c74396d6b2e49361a2e3aa03d6eaa0245415439aa",
+      "mode": "100644"
+    },
+    {
+      "path": "claude.original.json",
+      "gitBlob": "787510c824f115b191a4ba7a0949826ad9ec853b",
+      "bytes": 10322,
+      "sha256": "1e53cae8e0b3feaec3d0454429cc7d89e2ad89f2694b77f72e323a7bb076fff6",
+      "mode": "100644"
+    },
+    {
+      "path": "summary.original.json",
+      "gitBlob": "012b70a89bd5a2550fc45a5be90764ee49d61595",
+      "bytes": 1273,
+      "sha256": "adbc2d857de6efd7eb47fa74cd7c41a964954faee6f0439877e0a02fd5eb1cc5",
+      "mode": "100644"
+    },
+    {
+      "path": "upstream-finalization-with-control-evidence.json",
+      "gitBlob": "ebfb109586df90054ebf216435d1fc7db9afebb5",
+      "bytes": 5242,
+      "sha256": "fd2a8f1a08af17f54e8579db09430d744497b17130314317de8611cfede87098",
+      "mode": "100644"
+    },
+    {
+      "path": "r7-5ba-writer-source-review.safe.json",
+      "gitBlob": "d28e6b9574514469b5a32f7f9380d73b46504c0b",
+      "bytes": 23072,
+      "sha256": "471b73251e5c11c93822af0acbdcbd03e5f4113a6341722c82e265af246b0dec",
+      "mode": "100644"
+    }
+  ],
+  "payloadFiles": 13,
+  "payloadBytes": 135016,
+  "boundaries": [
+    "The source-only reviews preserve their original pending/conditional states; later evidence is in separately named proof files.",
+    "The worker input equality snapshot applies to fixed37fb. The later8197 evidence-pointer update changes policySha256 and canonical recipe hash despite unchanged authorization rules.",
+    "Fixed provider/APT source shows candidate mechanisms, not the deployed version or actual writer.",
+    "Existing CI is kept running; no deadlines, windows, original FIRST pair or assertions were relaxed.",
+    "No original log/ZIP was redundantly downloaded; all root control originals were reconstructed byte-exact from the owner's Git bundle."
+  ]
+}

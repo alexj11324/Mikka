@@ -1,0 +1,336 @@
+{
+  "buildId": "4161f161-aadb-4bf0-a82f-e6970f981e87",
+  "buildStarted": true,
+  "cleanup": {
+    "errors": [],
+    "sandbox": {
+      "absenceConfirmedById": true,
+      "id": "iui98zldpl4fxszi3c2nv"
+    },
+    "status": "complete",
+    "templates": [
+      {
+        "kind": "claude",
+        "name": "mikka-1782-official-claude-control-42661569263-1-claude",
+        "status": "absent",
+        "templateId": "ivedr9vpyweketvct677"
+      }
+    ]
+  },
+  "createStarted": true,
+  "identity": {
+    "application": "mikka-1782-official-claude-control",
+    "opsCommit": "7fd8a2681cd71bb6603a485854c8beda2044911b",
+    "ref": "refs/heads/ops/self-hosted-vault-closeout-20261108",
+    "repository": "alexj11324/Mikka",
+    "runAttempt": "1",
+    "runId": "42661569263",
+    "sourceCommit": "623a1afd8715433a58c3e88ce88f8fbcc29d1761",
+    "sourceTree": "193c7c1a101a56a889f7b22eb615e903981942af"
+  },
+  "kind": "claude",
+  "name": "mikka-1782-official-claude-control-42661569263-1-claude",
+  "observations": {
+    "before": {
+      "bootId": "7b9a053b-b8c9-4695-a917-6f9e44b41f2d",
+      "certificates": [
+        {
+          "chain": [
+            "/etc/ssl/certs/1560546e.0"
+          ],
+          "path": "/etc/ssl/certs/1560546e.0",
+          "status": "observed",
+          "terminalPath": "/etc/ssl/certs/1560546e.0",
+          "terminalSha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1"
+        },
+        {
+          "chain": [
+            "/etc/ssl/certs/e2b-ca.pem"
+          ],
+          "path": "/etc/ssl/certs/e2b-ca.pem",
+          "status": "observed",
+          "terminalPath": "/etc/ssl/certs/e2b-ca.pem",
+          "terminalSha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1"
+        }
+      ],
+      "kind": "claude",
+      "monotonicNs": 21702092077,
+      "nodes": [
+        {
+          "ctimeNs": 1794244105246838102,
+          "device": 23,
+          "gid": 0,
+          "inode": 149,
+          "kind": "file",
+          "mode": 511,
+          "mtimeNs": 1794212008000000000,
+          "path": "/etc/ssl/certs/1560546e.0",
+          "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+          "size": 595,
+          "status": "present",
+          "uid": 0
+        },
+        {
+          "ctimeNs": 1794244105246838102,
+          "device": 23,
+          "gid": 0,
+          "inode": 149,
+          "kind": "file",
+          "mode": 511,
+          "mtimeNs": 1794212008000000000,
+          "path": "/etc/ssl/certs/e2b-ca.pem",
+          "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+          "size": 595,
+          "status": "present",
+          "uid": 0
+        },
+        {
+          "ctimeNs": 1794244107598238268,
+          "device": 65024,
+          "gid": 0,
+          "inode": 3550,
+          "kind": "file",
+          "mode": 511,
+          "mtimeNs": 1794244107598238268,
+          "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+          "sha256": "ee836ee305e23a18319640cafe0c7ebe628d7fbf985c23cfc5bf453d2ea7224d",
+          "size": 595,
+          "status": "present",
+          "uid": 0
+        }
+      ],
+      "phase": "before",
+      "utcNs": 1794244122919622490,
+      "version": 1
+    },
+    "fresh": {
+      "bootId": "48a38586-20df-42ad-8b89-aa4a7b0af701",
+      "certificates": [
+        {
+          "chain": [
+            "/etc/ssl/certs/1560546e.0",
+            "/etc/ssl/certs/e2b-ca.pem",
+            "/usr/local/share/ca-certificates/e2b-ca.crt"
+          ],
+          "path": "/etc/ssl/certs/1560546e.0",
+          "status": "observed",
+          "terminalPath": "/usr/local/share/ca-certificates/e2b-ca.crt",
+          "terminalSha256": "0459a4cfe2cc288afae322259a84a08910e65282d89dc06e94f5e1b80d3c6cb4"
+        },
+        {
+          "chain": [
+            "/etc/ssl/certs/e2b-ca.pem",
+            "/usr/local/share/ca-certificates/e2b-ca.crt"
+          ],
+          "path": "/etc/ssl/certs/e2b-ca.pem",
+          "status": "observed",
+          "terminalPath": "/usr/local/share/ca-certificates/e2b-ca.crt",
+          "terminalSha256": "0459a4cfe2cc288afae322259a84a08910e65282d89dc06e94f5e1b80d3c6cb4"
+        }
+      ],
+      "kind": "claude",
+      "monotonicNs": 11391744020,
+      "nodes": [
+        {
+          "ctimeNs": 1794244135966537016,
+          "device": 23,
+          "gid": 0,
+          "inode": 508,
+          "kind": "link",
+          "mode": 511,
+          "mtimeNs": 1794244135966537016,
+          "path": "/etc/ssl/certs/1560546e.0",
+          "size": 10,
+          "status": "present",
+          "target": "e2b-ca.pem",
+          "uid": 0
+        },
+        {
+          "ctimeNs": 1794244135757266861,
+          "device": 23,
+          "gid": 0,
+          "inode": 451,
+          "kind": "link",
+          "mode": 511,
+          "mtimeNs": 1794244135757266861,
+          "path": "/etc/ssl/certs/e2b-ca.pem",
+          "size": 43,
+          "status": "present",
+          "target": "/usr/local/share/ca-certificates/e2b-ca.crt",
+          "uid": 0
+        },
+        {
+          "ctimeNs": 1794244139540079301,
+          "device": 65024,
+          "gid": 0,
+          "inode": 3550,
+          "kind": "file",
+          "mode": 511,
+          "mtimeNs": 1794244139540079301,
+          "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+          "sha256": "0459a4cfe2cc288afae322259a84a08910e65282d89dc06e94f5e1b80d3c6cb4",
+          "size": 595,
+          "status": "present",
+          "uid": 0
+        }
+      ],
+      "phase": "fresh",
+      "utcNs": 1794244141280188819,
+      "version": 1
+    },
+    "pre_finalization": {
+      "bootId": "7b9a053b-b8c9-4695-a917-6f9e44b41f2d",
+      "certificates": [
+        {
+          "chain": [
+            "/etc/ssl/certs/1560546e.0"
+          ],
+          "path": "/etc/ssl/certs/1560546e.0",
+          "status": "observed",
+          "terminalPath": "/etc/ssl/certs/1560546e.0",
+          "terminalSha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1"
+        },
+        {
+          "chain": [
+            "/etc/ssl/certs/e2b-ca.pem"
+          ],
+          "path": "/etc/ssl/certs/e2b-ca.pem",
+          "status": "observed",
+          "terminalPath": "/etc/ssl/certs/e2b-ca.pem",
+          "terminalSha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1"
+        }
+      ],
+      "kind": "claude",
+      "monotonicNs": 22037024361,
+      "nodes": [
+        {
+          "ctimeNs": 1794244105246838102,
+          "device": 23,
+          "gid": 0,
+          "inode": 149,
+          "kind": "file",
+          "mode": 511,
+          "mtimeNs": 1794212008000000000,
+          "path": "/etc/ssl/certs/1560546e.0",
+          "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+          "size": 595,
+          "status": "present",
+          "uid": 0
+        },
+        {
+          "ctimeNs": 1794244105246838102,
+          "device": 23,
+          "gid": 0,
+          "inode": 149,
+          "kind": "file",
+          "mode": 511,
+          "mtimeNs": 1794212008000000000,
+          "path": "/etc/ssl/certs/e2b-ca.pem",
+          "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+          "size": 595,
+          "status": "present",
+          "uid": 0
+        },
+        {
+          "ctimeNs": 1794244107598238268,
+          "device": 65024,
+          "gid": 0,
+          "inode": 3550,
+          "kind": "file",
+          "mode": 511,
+          "mtimeNs": 1794244107598238268,
+          "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+          "sha256": "ee836ee305e23a18319640cafe0c7ebe628d7fbf985c23cfc5bf453d2ea7224d",
+          "size": 595,
+          "status": "present",
+          "uid": 0
+        }
+      ],
+      "phase": "pre_finalization",
+      "utcNs": 1794244123373407703,
+      "version": 1
+    },
+    "ready": {
+      "bootId": "48a38586-20df-42ad-8b89-aa4a7b0af701",
+      "certificates": [
+        {
+          "chain": [
+            "/etc/ssl/certs/1560546e.0"
+          ],
+          "path": "/etc/ssl/certs/1560546e.0",
+          "status": "observed",
+          "terminalPath": "/etc/ssl/certs/1560546e.0",
+          "terminalSha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1"
+        },
+        {
+          "chain": [
+            "/etc/ssl/certs/e2b-ca.pem"
+          ],
+          "path": "/etc/ssl/certs/e2b-ca.pem",
+          "status": "observed",
+          "terminalPath": "/etc/ssl/certs/e2b-ca.pem",
+          "terminalSha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1"
+        }
+      ],
+      "kind": "claude",
+      "monotonicNs": 4579372141,
+      "nodes": [
+        {
+          "ctimeNs": 1794244127653935066,
+          "device": 23,
+          "gid": 0,
+          "inode": 144,
+          "kind": "file",
+          "mode": 511,
+          "mtimeNs": 1794212008000000000,
+          "path": "/etc/ssl/certs/1560546e.0",
+          "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+          "size": 595,
+          "status": "present",
+          "uid": 0
+        },
+        {
+          "ctimeNs": 1794244127653935066,
+          "device": 23,
+          "gid": 0,
+          "inode": 144,
+          "kind": "file",
+          "mode": 511,
+          "mtimeNs": 1794212008000000000,
+          "path": "/etc/ssl/certs/e2b-ca.pem",
+          "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+          "size": 595,
+          "status": "present",
+          "uid": 0
+        },
+        {
+          "ctimeNs": 1794244131229266861,
+          "device": 65024,
+          "gid": 0,
+          "inode": 3550,
+          "kind": "file",
+          "mode": 511,
+          "mtimeNs": 1794244127785935066,
+          "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+          "sha256": "ee836ee305e23a18319640cafe0c7ebe628d7fbf985c23cfc5bf453d2ea7224d",
+          "size": 595,
+          "status": "present",
+          "uid": 0
+        }
+      ],
+      "phase": "ready",
+      "utcNs": 1794244131379865480,
+      "version": 1
+    }
+  },
+  "policyChanged": false,
+  "probe": {
+    "phase": "complete",
+    "status": "observed"
+  },
+  "releaseAccepted": false,
+  "sandboxId": "iui98zldpl4fxszi3c2nv",
+  "targetedOnly": true,
+  "templateId": "ivedr9vpyweketvct677",
+  "version": 1
+}

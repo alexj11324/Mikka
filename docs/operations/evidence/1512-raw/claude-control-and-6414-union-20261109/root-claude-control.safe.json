@@ -1,0 +1,251 @@
+{
+  "schemaVersion": 1,
+  "verifiedAt": "2026-11-09 17:35:12 UTC",
+  "kind": "root independent Claude official control verification",
+  "sourceBlob": "868d0b251f884079611cbd9810775fc7146a9426",
+  "sourceBytes": 18164,
+  "sourceSha256": "dc69062c8376cb2a10cf47b7455ff478f7872c709c31c128c1384ecfc7696632",
+  "losslessMemberCheck": [
+    {
+      "name": "claude.json",
+      "bytes": 10322,
+      "sha256": "1e53cae8e0b3feaec3d0454429cc7d89e2ad89f2694b77f72e323a7bb076fff6",
+      "topKeys": [
+        "buildId",
+        "buildStarted",
+        "cleanup",
+        "createStarted",
+        "identity",
+        "kind",
+        "name",
+        "observations",
+        "policyChanged",
+        "probe",
+        "releaseAccepted",
+        "sandboxId",
+        "targetedOnly",
+        "templateId",
+        "version"
+      ],
+      "verified": true
+    },
+    {
+      "name": "summary.json",
+      "bytes": 1273,
+      "sha256": "adbc2d857de6efd7eb47fa74cd7c41a964954faee6f0439877e0a02fd5eb1cc5",
+      "topKeys": [
+        "budget",
+        "cleanup",
+        "failure",
+        "identity",
+        "policyChanged",
+        "releaseAccepted",
+        "targetedOnly",
+        "version"
+      ],
+      "verified": true
+    }
+  ],
+  "numberPrecisionBoundary": "All original nanosecond integer lexemes are preserved by text-span extraction. Parsed V8 numbers are not reserialized as originals or used to assert exact nanosecond timing.",
+  "identity": {
+    "application": "mikka-1782-official-claude-control",
+    "opsCommit": "7fd8a2681cd71bb6603a485854c8beda2044911b",
+    "ref": "refs/heads/ops/self-hosted-vault-closeout-20261108",
+    "repository": "alexj11324/Mikka",
+    "runAttempt": "1",
+    "runId": "42661569263",
+    "sourceCommit": "623a1afd8715433a58c3e88ce88f8fbcc29d1761",
+    "sourceTree": "193c7c1a101a56a889f7b22eb615e903981942af"
+  },
+  "run": "https://github.com/alexj11324/Mikka/actions/runs/42661569263",
+  "attempt": 1,
+  "jobId": 129314204150,
+  "rows": [
+    {
+      "phase": "before",
+      "path": "/etc/ssl/certs/1560546e.0",
+      "kind": "file",
+      "modeOctal": "777",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+      "target": null
+    },
+    {
+      "phase": "before",
+      "path": "/etc/ssl/certs/e2b-ca.pem",
+      "kind": "file",
+      "modeOctal": "777",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+      "target": null
+    },
+    {
+      "phase": "before",
+      "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+      "kind": "file",
+      "modeOctal": "777",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "ee836ee305e23a18319640cafe0c7ebe628d7fbf985c23cfc5bf453d2ea7224d",
+      "target": null
+    },
+    {
+      "phase": "pre_finalization",
+      "path": "/etc/ssl/certs/1560546e.0",
+      "kind": "file",
+      "modeOctal": "777",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+      "target": null
+    },
+    {
+      "phase": "pre_finalization",
+      "path": "/etc/ssl/certs/e2b-ca.pem",
+      "kind": "file",
+      "modeOctal": "777",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+      "target": null
+    },
+    {
+      "phase": "pre_finalization",
+      "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+      "kind": "file",
+      "modeOctal": "777",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "ee836ee305e23a18319640cafe0c7ebe628d7fbf985c23cfc5bf453d2ea7224d",
+      "target": null
+    },
+    {
+      "phase": "ready",
+      "path": "/etc/ssl/certs/1560546e.0",
+      "kind": "file",
+      "modeOctal": "777",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+      "target": null
+    },
+    {
+      "phase": "ready",
+      "path": "/etc/ssl/certs/e2b-ca.pem",
+      "kind": "file",
+      "modeOctal": "777",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+      "target": null
+    },
+    {
+      "phase": "ready",
+      "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+      "kind": "file",
+      "modeOctal": "777",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "ee836ee305e23a18319640cafe0c7ebe628d7fbf985c23cfc5bf453d2ea7224d",
+      "target": null
+    },
+    {
+      "phase": "fresh",
+      "path": "/etc/ssl/certs/1560546e.0",
+      "kind": "link",
+      "modeOctal": "777",
+      "uid": 0,
+      "gid": 0,
+      "sha256": null,
+      "target": "e2b-ca.pem"
+    },
+    {
+      "phase": "fresh",
+      "path": "/etc/ssl/certs/e2b-ca.pem",
+      "kind": "link",
+      "modeOctal": "777",
+      "uid": 0,
+      "gid": 0,
+      "sha256": null,
+      "target": "/usr/local/share/ca-certificates/e2b-ca.crt"
+    },
+    {
+      "phase": "fresh",
+      "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+      "kind": "file",
+      "modeOctal": "777",
+      "uid": 0,
+      "gid": 0,
+      "sha256": "0459a4cfe2cc288afae322259a84a08910e65282d89dc06e94f5e1b80d3c6cb4",
+      "target": null
+    }
+  ],
+  "errors": [],
+  "bootRelations": {
+    "beforeEqualsPreFinalization": true,
+    "readyEqualsFresh": true,
+    "beforeDiffersReady": true
+  },
+  "strictMetadataBeforeEqualsPreFinalization": true,
+  "rootBefore": "ee836ee305e23a18319640cafe0c7ebe628d7fbf985c23cfc5bf453d2ea7224d",
+  "rootFresh": "0459a4cfe2cc288afae322259a84a08910e65282d89dc06e94f5e1b80d3c6cb4",
+  "cleanup": {
+    "errors": [],
+    "sandbox": {
+      "absenceConfirmedById": true,
+      "id": "iui98zldpl4fxszi3c2nv"
+    },
+    "status": "complete",
+    "templates": [
+      {
+        "kind": "claude",
+        "name": "mikka-1782-official-claude-control-42661569263-1-claude",
+        "status": "absent",
+        "templateId": "ivedr9vpyweketvct677"
+      }
+    ]
+  },
+  "summaryCleanup": {
+    "errors": [],
+    "sandbox": {
+      "absenceConfirmedById": true,
+      "id": "iui98zldpl4fxszi3c2nv"
+    },
+    "status": "complete",
+    "templates": [
+      {
+        "kind": "claude",
+        "name": "mikka-1782-official-claude-control-42661569263-1-claude",
+        "status": "absent",
+        "templateId": "ivedr9vpyweketvct677"
+      }
+    ]
+  },
+  "budget": {
+    "absoluteDeadline": "2026-11-09T17:22:29Z",
+    "afterObservationDeadlineCleanup": false,
+    "buildObservationSeconds": 600,
+    "cleanupOnlyMaxSeconds": 150,
+    "freshInstances": 1,
+    "modelCalls": 0,
+    "overallSeconds": 900,
+    "privateTemplates": 1,
+    "workerInstallCommands": 0
+  },
+  "unobserved": {
+    "officialBaseTemplateId": null,
+    "officialBaseBuildId": null,
+    "envdVersion": null,
+    "r7SameBuild": false
+  },
+  "interpretation": {
+    "standaloneOfficialNoMikka": true,
+    "exactClaudeShapeSupported": true,
+    "allowOtherTemplateOrPath": false,
+    "doesNotExplainNewCodexModeOrDesktopAptFailure": true,
+    "productionReleaseAccepted": false,
+    "zipOrJobLogRedownloadsByRoot": 0
+  }
+}

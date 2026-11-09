@@ -1,0 +1,592 @@
+{
+  "schemaVersion": 1,
+  "kind": "independent-existing-git-red-green-evidence-review",
+  "issue": 1512,
+  "relatedPullRequest": 1835,
+  "reviewer": "current_source_review",
+  "summary": "Existing immutable Git originals independently confirm the owner-executed old-policy RED and exact candidate 34/34 GREEN. No test was rerun by this reviewer.",
+  "previousSourceOnlyReview": {
+    "gitBlob": "6ff52fec6e3111418213ca2b888577289d34d730",
+    "sha256": "195a98011bdaf4a17369d0febbb08395ea53c3f28e7808fb46ae952437b3a959",
+    "preserved": true,
+    "change": "Only the execution-evidence status is upgraded from owner-reported to independently read/rehashed archive originals; prior control and release limitations remain."
+  },
+  "archive": {
+    "repository": "alexj11324/Mikka",
+    "commit": "800eff40eeead9c78fb83cd2260adc0cf40fbd4f",
+    "tree": "f3aeb1dd5cc1f77044fd67583d8a3c450594a6aa",
+    "parent": "6bc032a7754dff666948b0d0d07472b42c592cc7",
+    "createdAt": "2026-11-09T17:10:11Z",
+    "path": "claude-ca-relink-candidate-20261109",
+    "url": "https://github.com/alexj11324/Mikka/tree/800eff40eeead9c78fb83cd2260adc0cf40fbd4f/claude-ca-relink-candidate-20261109",
+    "manifest": {
+      "path": "claude-ca-relink-candidate-20261109/manifest.json",
+      "gitBlob": "35de85e328d3b9b5c29180413d3c0750099488f9",
+      "bytes": 5769
+    },
+    "manifestDeclaredEntries": 22,
+    "manifestDeclaredBytes": 422794,
+    "entriesIncludingManifest": 23,
+    "bytesIncludingManifest": 428563,
+    "countingBoundary": "The manifest does not list itself. No missing-file inference is made from 22 versus 23.",
+    "candidateStageFlags": "Archive creation records officialControlPending=true and candidateCommit=null for the earlier local execution stage; they are not current PR/ref status."
+  },
+  "source": {
+    "baseline": {
+      "commit": "8db16095f46be955df22f42914e0f89b6e5f3d11",
+      "tree": "18b539c3541594cfa540d1e178985f00d03ab4fc"
+    },
+    "candidate": {
+      "commit": "37fb3818728315151083b7cca409c2ffd6ff4f47",
+      "tree": "2d10e5970b3f58e085df672c87629645c1072bdb",
+      "parent": "8db16095f46be955df22f42914e0f89b6e5f3d11"
+    },
+    "archivedSourceBindings": [
+      {
+        "stage": "original",
+        "path": "scripts/e2b/e2b-certificate-relinks.json",
+        "bytes": 106048,
+        "sha256": "a28165d7a9de3bed0b78af59c728004e82dc4d7815a14f97c2779c1eb090a845",
+        "gitBlob": "335540475a9d8aaae8f34915e087b5a862699b95",
+        "mode": "100644",
+        "archiveTreeIdentityMatches": true
+      },
+      {
+        "stage": "candidate",
+        "path": "scripts/e2b/e2b-certificate-relinks.json",
+        "bytes": 106533,
+        "sha256": "16f3341cf64a4c7fd739a50439e558db4643f23fdd1ec16a51b062c30f037b52",
+        "gitBlob": "ba210a72dff95a34120bcd6fb581fb54aa47b863",
+        "mode": "100644",
+        "archiveTreeIdentityMatches": true
+      },
+      {
+        "stage": "original",
+        "path": "scripts/e2b/e2b-finalization-files.json",
+        "bytes": 4355,
+        "sha256": "835046e60c08e44595df509ad5911ece52f151896e5272ca53d41cec376c6c8b",
+        "gitBlob": "16d858b40d2948ac8c4ce18188843c02960bc40e",
+        "mode": "100644",
+        "archiveTreeIdentityMatches": true
+      },
+      {
+        "stage": "candidate",
+        "path": "scripts/e2b/e2b-finalization-files.json",
+        "bytes": 4355,
+        "sha256": "929fe8392a6ae9f22eed7b36180d3bdce6324a136bd71d0d2b0cf1f5ee96496d",
+        "gitBlob": "34324f43a29b3ad9a6cba88602782e8a3ccf30f3",
+        "mode": "100644",
+        "archiveTreeIdentityMatches": true
+      },
+      {
+        "stage": "original",
+        "path": "scripts/e2b/official-files.py",
+        "bytes": 21445,
+        "sha256": "66911624af52df59ef715eb105af9a3025bacf12460105fadc7f87e4d2dd63b5",
+        "gitBlob": "ea0819bf3e2d4ff83e64482b6336567050376591",
+        "mode": "100644",
+        "archiveTreeIdentityMatches": true
+      },
+      {
+        "stage": "candidate",
+        "path": "scripts/e2b/official-files.py",
+        "bytes": 21445,
+        "sha256": "66911624af52df59ef715eb105af9a3025bacf12460105fadc7f87e4d2dd63b5",
+        "gitBlob": "ea0819bf3e2d4ff83e64482b6336567050376591",
+        "mode": "100644",
+        "archiveTreeIdentityMatches": true
+      },
+      {
+        "stage": "original",
+        "path": "scripts/e2b/official-files.test.py",
+        "bytes": 47201,
+        "sha256": "a02db5389d866cadcbfa743bad6eaecaefb6b1effbfb0bc863a9287d59849b84",
+        "gitBlob": "471c80878c7e2b88cd5e8a0864e6f6ef8354df21",
+        "mode": "100644",
+        "archiveTreeIdentityMatches": true
+      },
+      {
+        "stage": "candidate",
+        "path": "scripts/e2b/official-files.test.py",
+        "bytes": 54158,
+        "sha256": "f494a8253ea8ef380ab0000664d9f8f4859cdb4f5f0a275b159e09bc7f5e1486",
+        "gitBlob": "ce4fbffa210c3e3670cc9c8fbe51c6c11da7a7f4",
+        "mode": "100644",
+        "archiveTreeIdentityMatches": true
+      }
+    ],
+    "testImportsSiblingActualMatcher": true,
+    "matcherReadsPinnedSiblingPolicyFiles": true,
+    "original320RuleObjectsPreserved": true,
+    "appendedClaudeRules": 2,
+    "matcherBytesUnchanged": true,
+    "greenArchivePolicyAndTestBlobsEqualFixedCandidate": true,
+    "adrBoundary": "The local execution archive binds policy/matcher/tests. The PR's ADR is separately source-reviewed; no claim is made about a later unobserved ADR or head."
+  },
+  "evidence": [
+    {
+      "path": "claude-ca-relink-candidate-20261109/evidence/green-result.json",
+      "gitBlob": "afad3a89dd9bd3b78796a8ba49b4bc977823eb08",
+      "bytes": 769,
+      "sha256": "a4988b0a7af0d24eefcd657d0d36d1f26bf082641b2077d424e4ed885dd07168",
+      "independentlyRehashed": true
+    },
+    {
+      "path": "claude-ca-relink-candidate-20261109/evidence/green.log",
+      "gitBlob": "a597c6185fa65163331918c8b015ae134260cfa4",
+      "bytes": 6284,
+      "sha256": "fc20dbf3d8120b95f0d44b0ca47e3f6c6a31de629fa584d083f403e0eba10e16",
+      "independentlyRehashed": true
+    },
+    {
+      "path": "claude-ca-relink-candidate-20261109/evidence/red-result.json",
+      "gitBlob": "b89d303a98c4cb73e304ef5f4ec4cb972cf0fc35",
+      "bytes": 777,
+      "sha256": "3aef8a47e78dcc50b3033cafeea276723bf5eb0b8c46d65f5ec5498461e9cfae",
+      "independentlyRehashed": true
+    },
+    {
+      "path": "claude-ca-relink-candidate-20261109/evidence/red-tests.patch",
+      "gitBlob": "aff199f187e3811b998f33763b977dca8520f0ea",
+      "bytes": 7251,
+      "sha256": "00b549578733680af2597ebb72854f6a44791171b7c23385ba46c229f10960a0",
+      "independentlyRehashed": true
+    },
+    {
+      "path": "claude-ca-relink-candidate-20261109/evidence/red.log",
+      "gitBlob": "19280915feb424ddca701ec78ee9f19ffc88811c",
+      "bytes": 20350,
+      "sha256": "f3e61d9d20d27945dcf98aa5baf026d5a90fbca0322a73b70971d0e11f5991d3",
+      "independentlyRehashed": true
+    },
+    {
+      "path": "claude-ca-relink-candidate-20261109/evidence/syntax-1.log",
+      "gitBlob": "4eb1e9f20973b71074d15958d453713867682cfd",
+      "bytes": 24,
+      "sha256": "cac746fadc7b2fd76d7b95d99bbd2679153b83e4e7eded933c417713716725df",
+      "independentlyRehashed": true
+    },
+    {
+      "path": "claude-ca-relink-candidate-20261109/evidence/syntax-2.log",
+      "gitBlob": "483c22eb9abc900f38b113f845121daa59ba4177",
+      "bytes": 22,
+      "sha256": "d3a3adad3a4d28e26f3bbad885305b8992350943429f40d0c125336f18b90962",
+      "independentlyRehashed": true
+    },
+    {
+      "path": "claude-ca-relink-candidate-20261109/evidence/syntax-result.json",
+      "gitBlob": "74f819131a74660ed42eb16eaa755fc704c760c1",
+      "bytes": 974,
+      "sha256": "127c751ee400a76de709c6f969a7864a63d39a2d8752e6b88e8d16a426bb70bf",
+      "independentlyRehashed": true
+    }
+  ],
+  "execution": {
+    "command": [
+      "python3",
+      "-B",
+      "scripts/e2b/official-files.test.py",
+      "-v"
+    ],
+    "environment": {
+      "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+      "source": "Archived syntax-result.json execution record, not a new environment observation",
+      "dependencies": "Python standard library; no reviewer installation or execution"
+    },
+    "red": {
+      "startedAt": "2026-11-09T16:57:48.254703+00:00",
+      "endedAt": "2026-11-09T16:57:48.805685+00:00",
+      "exitCode": 1,
+      "rawSummary": [
+        "Ran 34 tests in 0.443s",
+        "FAILED (failures=6, errors=2)"
+      ],
+      "methods": 34,
+      "passingMethods": 31,
+      "originalMethodsPassed": 29,
+      "newMethodsPassed": 2,
+      "errorMethods": 2,
+      "failedMethods": 1,
+      "failedSubtests": 6,
+      "skipped": 0,
+      "errors": [
+        {
+          "test": "ClaudeCertificateRelinks.test_claude_relink_receipts_reject_tampering_and_installation_substitution",
+          "rootCause": "Actual files.verify(..., 'claude') rejects both unlisted exact relinks with official_files_changed before proof can be constructed."
+        },
+        {
+          "test": "ClaudeCertificateRelinks.test_claude_relinks_require_finalization_and_preserve_strict_installation",
+          "rootCause": "The same actual verifier refuses the candidate's permitted Claude tuple under the old policy."
+        }
+      ],
+      "failedSubtestInterpretation": {
+        "test": "ClaudeCertificateRelinks.test_claude_relinks_require_the_exact_regular_provider_root_terminal",
+        "paths": [
+          "/etc/ssl/certs/1560546e.0",
+          "/etc/ssl/certs/e2b-ca.pem"
+        ],
+        "defects": [
+          "wrong terminal",
+          "directory terminal",
+          "link terminal"
+        ],
+        "observed": "Old policy rejects earlier with official_files_changed; the new test expects e2b_certificate_target_invalid after a policy-matched relink reaches terminal validation.",
+        "unsafeAcceptanceProven": false,
+        "caution": "These six failures are refusal-code differences, not six accepted unsafe terminals."
+      }
+    },
+    "green": {
+      "startedAt": "2026-11-09T16:58:27.800399+00:00",
+      "endedAt": "2026-11-09T16:58:28.305648+00:00",
+      "exitCode": 0,
+      "rawSummary": [
+        "Ran 34 tests in 0.395s",
+        "OK"
+      ],
+      "methods": 34,
+      "passed": 34,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "originalMethodNamesRetained": 29,
+      "newMethods": 5,
+      "originalTestMaintenance": "One old Claude correct-shape rejection parameter was explicitly changed to a Claude wrong-old-digest rejection; the exact correct shape is now allowed by two Claude-only rules. Original test bodies are otherwise byte-restored by reversing that one parameter and removing the appended class."
+    },
+    "sourceReconstruction": {
+      "redTestsPatch": {
+        "path": "claude-ca-relink-candidate-20261109/evidence/red-tests.patch",
+        "gitBlob": "aff199f187e3811b998f33763b977dca8520f0ea",
+        "bytes": 7251,
+        "sha256": "00b549578733680af2597ebb72854f6a44791171b7c23385ba46c229f10960a0",
+        "independentlyRehashed": true
+      },
+      "strictForwardHunks": 1,
+      "strictReverseRestoresExactOriginal": true,
+      "reconstructedRedTest": {
+        "bytes": 54117,
+        "sha256": "2e8a971eb34381ce4e9d35d23079d7b824743d304cef17524dce8f2a0522163e",
+        "gitBlob": "ca46733bd3836fd6ec0463a41647878e717ba146"
+      },
+      "redHashEqualsRecordedExecution": true,
+      "exactGreenTest": {
+        "bytes": 54158,
+        "sha256": "f494a8253ea8ef380ab0000664d9f8f4859cdb4f5f0a275b159e09bc7f5e1486",
+        "gitBlob": "ce4fbffa210c3e3670cc9c8fbe51c6c11da7a7f4"
+      },
+      "greenHashEqualsRecordedExecution": true,
+      "redToGreenTestDifferenceIsOnlyDeclaredOldNegativeParameter": true,
+      "originalTest": {
+        "bytes": 47201,
+        "sha256": "a02db5389d866cadcbfa743bad6eaecaefb6b1effbfb0bc863a9287d59849b84",
+        "gitBlob": "471c80878c7e2b88cd5e8a0864e6f6ef8354df21"
+      }
+    },
+    "completeMethodLedger": [
+      {
+        "test": "ClaudeCertificateRelinks.test_claude_relink_receipts_reject_tampering_and_installation_substitution",
+        "originalMethod": false,
+        "red": "ERROR",
+        "green": "ok",
+        "redLogLine": 1,
+        "greenLogLine": 1
+      },
+      {
+        "test": "ClaudeCertificateRelinks.test_claude_relinks_do_not_exempt_original_clis_or_unlisted_certificates",
+        "originalMethod": false,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 2,
+        "greenLogLine": 2
+      },
+      {
+        "test": "ClaudeCertificateRelinks.test_claude_relinks_reject_wrong_digest_target_kind_mode_and_owner",
+        "originalMethod": false,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 3,
+        "greenLogLine": 3
+      },
+      {
+        "test": "ClaudeCertificateRelinks.test_claude_relinks_require_finalization_and_preserve_strict_installation",
+        "originalMethod": false,
+        "red": "ERROR",
+        "green": "ok",
+        "redLogLine": 4,
+        "greenLogLine": 4
+      },
+      {
+        "test": "ClaudeCertificateRelinks.test_claude_relinks_require_the_exact_regular_provider_root_terminal",
+        "originalMethod": false,
+        "red": "failed-subtests",
+        "green": "ok",
+        "redLogLine": 5,
+        "greenLogLine": 5
+      },
+      {
+        "test": "CliVerification.test_changed_added_byte_fails_without_resigning_manifest",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 12,
+        "greenLogLine": 6
+      },
+      {
+        "test": "CliVerification.test_cli_emits_only_closed_verification_metadata_on_stderr",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 13,
+        "greenLogLine": 7
+      },
+      {
+        "test": "CliVerification.test_manifest_owner_mode_symlink_size_and_cli_canonical_path_fail_closed",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 14,
+        "greenLogLine": 8
+      },
+      {
+        "test": "CliVerification.test_replacing_a_verified_file_or_manifest_with_identical_bytes_is_rejected",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 15,
+        "greenLogLine": 9
+      },
+      {
+        "test": "CliVerification.test_verifies_real_selected_bytes_through_worker_symlink_without_rewriting_receipt",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 16,
+        "greenLogLine": 10
+      },
+      {
+        "test": "DesktopCertificateRelinks.test_measured_desktop_relinks_and_legacy_codex_scope",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 17,
+        "greenLogLine": 11
+      },
+      {
+        "test": "DesktopCertificateRelinks.test_relink_receipt_rejects_tampering_and_replacement_of_strict_proof",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 18,
+        "greenLogLine": 12
+      },
+      {
+        "test": "DesktopCertificateRelinks.test_relinks_keep_exact_path_digest_target_identity_and_scope_guards",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 19,
+        "greenLogLine": 13
+      },
+      {
+        "test": "DesktopCertificateRelinks.test_verify_requires_exact_regular_provider_root_terminal",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 20,
+        "greenLogLine": 14
+      },
+      {
+        "test": "OfficialFiles.test_addition_is_allowed_but_modifying_or_removing_an_original_fails",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 21,
+        "greenLogLine": 15
+      },
+      {
+        "test": "OfficialFiles.test_an_unreadable_original_directory_cannot_be_silently_skipped",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 22,
+        "greenLogLine": 16
+      },
+      {
+        "test": "OfficialFiles.test_cli_capture_uses_original_realpath_without_executing_or_accepting_private_fallback",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 23,
+        "greenLogLine": 17
+      },
+      {
+        "test": "OfficialFiles.test_cli_manifest_rejects_missing_desktop_harness_and_replacement_of_original",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 24,
+        "greenLogLine": 18
+      },
+      {
+        "test": "OfficialFiles.test_exact_root_ca_exception_keeps_type_owner_target_mode_and_other_paths_protected",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 25,
+        "greenLogLine": 19
+      },
+      {
+        "test": "OfficialFiles.test_exact_root_ca_rotation_receipts_reject_invalid_hashes",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 26,
+        "greenLogLine": 20
+      },
+      {
+        "test": "OfficialFiles.test_finalization_receipt_cannot_replace_strict_installation_proof",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 27,
+        "greenLogLine": 21
+      },
+      {
+        "test": "OfficialFiles.test_measured_exact_root_ca_rotation_requires_finalization_and_strict_installation",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 28,
+        "greenLogLine": 22
+      },
+      {
+        "test": "OfficialFiles.test_missing_original_reports_the_exact_manifest_path_and_preserves_the_filesystem_cause",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 29,
+        "greenLogLine": 23
+      },
+      {
+        "test": "OfficialFiles.test_only_control_proven_fields_may_change_during_e2b_finalization",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 30,
+        "greenLogLine": 24
+      },
+      {
+        "test": "OfficialFiles.test_persistent_paths_outside_package_directories_are_protected",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 31,
+        "greenLogLine": 25
+      },
+      {
+        "test": "OfficialFiles.test_private_root_is_excluded_but_original_links_and_packages_are_protected",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 32,
+        "greenLogLine": 26
+      },
+      {
+        "test": "OfficialFiles.test_provider_ca_digest_changes_only_during_finalization_with_unchanged_identity",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 33,
+        "greenLogLine": 27
+      },
+      {
+        "test": "OfficialFiles.test_provider_ca_finalization_keeps_exact_path_type_owner_and_mode_guards",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 34,
+        "greenLogLine": 28
+      },
+      {
+        "test": "OfficialFiles.test_provider_certificate_relinks_require_exact_measured_target_and_same_certificate_bytes",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 35,
+        "greenLogLine": 29
+      },
+      {
+        "test": "OfficialFiles.test_rotating_provider_ca_bytes_are_accepted_only_at_fresh_finalization",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 36,
+        "greenLogLine": 30
+      },
+      {
+        "test": "OfficialFiles.test_versioned_cli_inventory_survives_atomic_stage_move_and_preserves_previous",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 37,
+        "greenLogLine": 31
+      },
+      {
+        "test": "ProviderDirectoryFinalization.test_directory_receipt_rejects_missing_wrong_kind_and_replaced_installation",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 38,
+        "greenLogLine": 32
+      },
+      {
+        "test": "ProviderDirectoryFinalization.test_directory_rule_rejects_other_identity_fields_modes_paths_and_templates",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 39,
+        "greenLogLine": 33
+      },
+      {
+        "test": "ProviderDirectoryFinalization.test_exact_claude_directory_mode_requires_finalization_and_preserves_kind",
+        "originalMethod": true,
+        "red": "ok",
+        "green": "ok",
+        "redLogLine": 40,
+        "greenLogLine": 34
+      }
+    ],
+    "syntax": {
+      "pythonSourcesParsed": 2,
+      "jsonSourcesParsed": 2,
+      "recordedCommandsExitCodes": [
+        0,
+        0
+      ],
+      "outputsMatchArchivedLogBytes": true
+    }
+  },
+  "safetyAndScope": {
+    "logContents": "Read all red/green output, including complete failure blocks. They contain regression names, public certificate paths/hashes and local test paths; no secret values were observed. This is not a claim of exhaustive secret auditing.",
+    "newTests": "Five methods use synthetic metadata/path-resolution fixtures around the real unchanged verifier and receipt validator. The complete 34-method suite also retains original file/CLI tests.",
+    "notOfficialControl": true,
+    "notR7ReleasePass": true,
+    "notProductionIngestionOrAcceptance": true,
+    "controlOriginalJsonReadByThisReview": false,
+    "controlStatus": "Root and the designated control reviewer separately own official Claude control evidence. This review does not promote public control comments to independently verified raw stat observations.",
+    "oldR7AbsoluteStatUnknownRemains": true,
+    "newProductTestExecutions": 0,
+    "newWorkflowLogDownloads": 0,
+    "newArtifactZipDownloads": 0,
+    "newResources": 0,
+    "sourceEdits": 0,
+    "refUpdates": 0,
+    "performed": "Only immutable Git reads, cached source comparisons, in-memory SHA/Gitblob calculation, strict patch reconstruction, and this safe receipt creation."
+  },
+  "conclusion": {
+    "executionEvidenceVerified": true,
+    "sourceBindingVerified": true,
+    "newCodeBlockerFound": false,
+    "usableFor": "Reuse the exact old-policy RED and candidate 34/34 GREEN as local regression evidence for fixed PR1835 37fb381.",
+    "remainingBoundary": "Official-only Claude control facts and any subsequent final ADR/source revision are separate evidence; full combined CI and actual runtime publication are not established by this local test archive."
+  }
+}

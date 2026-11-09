@@ -1,0 +1,213 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512_pr1835_independent_source_review",
+  "repository": "alexj11324/Mikka",
+  "observedAt": "2026-11-09 17:13:57 UTC",
+  "source": {
+    "head": "37fb3818728315151083b7cca409c2ffd6ff4f47",
+    "tree": "2d10e5970b3f58e085df672c87629645c1072bdb",
+    "orderedParents": [
+      "8db16095f46be955df22f42914e0f89b6e5f3d11"
+    ],
+    "mergeBase": "8db16095f46be955df22f42914e0f89b6e5f3d11",
+    "files": 4,
+    "pr": 1835,
+    "draftAtRead": true,
+    "openAtRead": true
+  },
+  "verdict": {
+    "codeBlockerFound": false,
+    "mergeRisk": "medium",
+    "disposition": "Source-only conditional review, not release or merge approval. Exact official Claude observation and normal latest-source gates remain pending."
+  },
+  "manifest": [
+    {
+      "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+      "gitBlob": "9b410406e21a58c26b30b457de67816f77d135b1",
+      "bytes": 90005,
+      "sha256": "b52cc5990ab63d3fe11729aa29960decc80ebaee51d96d0b32990b350f8d0e2f"
+    },
+    {
+      "path": "scripts/e2b/e2b-certificate-relinks.json",
+      "gitBlob": "ba210a72dff95a34120bcd6fb581fb54aa47b863",
+      "bytes": 106533,
+      "sha256": "16f3341cf64a4c7fd739a50439e558db4643f23fdd1ec16a51b062c30f037b52"
+    },
+    {
+      "path": "scripts/e2b/e2b-finalization-files.json",
+      "gitBlob": "34324f43a29b3ad9a6cba88602782e8a3ccf30f3",
+      "bytes": 4355,
+      "sha256": "929fe8392a6ae9f22eed7b36180d3bdce6324a136bd71d0d2b0cf1f5ee96496d"
+    },
+    {
+      "path": "scripts/e2b/official-files.test.py",
+      "gitBlob": "ce4fbffa210c3e3670cc9c8fbe51c6c11da7a7f4",
+      "bytes": 54158,
+      "sha256": "f494a8253ea8ef380ab0000664d9f8f4859cdb4f5f0a275b159e09bc7f5e1486"
+    }
+  ],
+  "retainedMatcher": {
+    "path": "scripts/e2b/official-files.py",
+    "gitBlob": "ea0819bf3e2d4ff83e64482b6336567050376591",
+    "bytes": 21445,
+    "sha256": "66911624af52df59ef715eb105af9a3025bacf12460105fadc7f87e4d2dd63b5"
+  },
+  "diffProof": {
+    "comparisonUrl": "https://github.com/alexj11324/Mikka/compare/8db16095f46be955df22f42914e0f89b6e5f3d11...37fb3818728315151083b7cca409c2ffd6ff4f47",
+    "files": [
+      {
+        "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+        "hunks": 1,
+        "strictForward": true,
+        "strictReverse": true
+      },
+      {
+        "path": "scripts/e2b/e2b-certificate-relinks.json",
+        "hunks": 1,
+        "strictForward": true,
+        "strictReverse": true
+      },
+      {
+        "path": "scripts/e2b/e2b-finalization-files.json",
+        "hunks": 1,
+        "strictForward": true,
+        "strictReverse": true
+      },
+      {
+        "path": "scripts/e2b/official-files.test.py",
+        "hunks": 2,
+        "strictForward": true,
+        "strictReverse": true
+      }
+    ],
+    "scope": "+155/-2 across exactly four paths; no matcher, workflow, runtime caller, credential, permission or production configuration edit.",
+    "certificateRows": {
+      "before": 320,
+      "after": 322,
+      "first320ObjectsIdentical": true,
+      "appended": [
+        {
+          "path": "/etc/ssl/certs/1560546e.0",
+          "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+          "target": "e2b-ca.pem",
+          "providerRoot": true,
+          "templates": [
+            "claude"
+          ]
+        },
+        {
+          "path": "/etc/ssl/certs/e2b-ca.pem",
+          "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+          "target": "/usr/local/share/ca-certificates/e2b-ca.crt",
+          "providerRoot": true,
+          "templates": [
+            "claude"
+          ]
+        }
+      ]
+    },
+    "finalizationPolicy": {
+      "onlyPinnedCertificateFileShaChanged": true,
+      "pinMatchesActualCertificateFile": true,
+      "sha256": "16f3341cf64a4c7fd739a50439e558db4643f23fdd1ec16a51b062c30f037b52"
+    },
+    "tests": {
+      "originalMethodCount": 29,
+      "newMethodCount": 5,
+      "total": 34,
+      "allOriginalMethodNamesPreserved": true,
+      "exactReversal": "Reverse the one declared Claude negative parameter and remove the appended ClaudeCertificateRelinks class; the result is byte-identical to original blob471c80878c7e2b88cd5e8a0864e6f6ef8354df21.",
+      "oldParameter": "('claude scope', 'claude', 'after', {})",
+      "newParameter": "('claude wrong baseline digest', 'claude', 'before', {'sha256': self.CODEX_SHA})",
+      "meaning": "The old candidate-disallowed Claude tuple overlaps the proposed new behavior. The source and PR explicitly disclose replacing only that expectation with rejection of the known Codex a351 digest under Claude; wrong-kind receipts and other unauthorized tuples remain tested."
+    }
+  },
+  "safetyReview": [
+    {
+      "finding": "Exact scope",
+      "detail": "Only claude gets the two exact paths, original file digest4e04 and literal relative/absolute targets. Existing Desktop/Codex rows and all other320 entries are retained; no mode exception is added."
+    },
+    {
+      "finding": "Strict installation preserved",
+      "detail": "The original verifier still refuses original file-to-link changes without explicit finalization. Original install before/after hashes must match; normalized finalization cannot replace that proof."
+    },
+    {
+      "finding": "Identity and link checks preserved",
+      "detail": "Only declared kind/digest/target differences may change. Undeclared mode/uid/gid changes refuse. A providerRoot link must resolve to the exact canonical root path and a regular file. Root per-boot digest rotation stays existing behavior, not equality with the old packaged alias digest."
+    },
+    {
+      "finding": "Regression scope",
+      "detail": "The five new methods exercise the actual verify/validate_receipt functions using mocked filesystem metadata, not a reimplementation. They cover intended finalization, strict-stage refusal, altered digests/targets/kinds/modes/ownership, wrong/non-file terminal, protected CLI/unlisted paths and tampered/cross-kind receipts."
+    },
+    {
+      "finding": "Evidence boundary disclosed",
+      "detail": "The new class explicitly labels metadata fixtures as candidate regressions, not official-only control or release acceptance. The appended ADR identifies real R7 failure and says Claude control and later release gates remain pending."
+    }
+  ],
+  "executionEvidence": {
+    "reviewerExecutedTests": 0,
+    "ownerReported": {
+      "reference": "https://github.com/alexj11324/Mikka/issues/1724#issuecomment-6746289707",
+      "command": "python3 -B scripts/e2b/official-files.test.py -v",
+      "red": {
+        "exit": 1,
+        "original29Passed": true,
+        "newSubtestFailures": 6,
+        "newErrors": 2,
+        "rawGitBlob": null
+      },
+      "green": {
+        "exit": 0,
+        "tests": 34,
+        "passed": 34,
+        "skipped": 0,
+        "reportedStartedAt": "2026-11-09T16:58:27Z",
+        "reportedEndedAt": "2026-11-09T16:58:28Z",
+        "reportedBytes": 6284,
+        "reportedSha256": "fc20dbf3d8120b95f0d44b0ca47e3f6c6a31de629fa584d083f403e0eba10e16",
+        "rawGitBlob": null
+      },
+      "status": "Owner-reported only; no original local RED/GREEN Git log has been supplied/read by this reviewer."
+    },
+    "sourceConsistencyOnly": "The two positive/receipt-proof methods call the real old verifier and encounter unsupported Claude relinks; six terminal-guard subtests can encounter the old generic refusal instead of the new target error. This is consistent with the reported RED shape, not independent execution evidence."
+  },
+  "officialControlBoundary": {
+    "run": 42661569263,
+    "attempt": 1,
+    "metadataReported": "completed/success at17:09:08; source-only reviewer acceptance_review owns further receipt acquisition.",
+    "opsCommit": "7fd8a2681cd71bb6603a485854c8beda2044911b",
+    "actualProductCheckout": "623a1 cleanup-only checkout (full SHA/source binding is in the independent control review, not substituted with8db here).",
+    "officialControlSourceReviewBlob": "55705b72f3cfb6125b4f6994401944d39eb52cbb",
+    "actualCaStatsReceivedByThisReviewer": false,
+    "rule": "Job success, the Desktop metadata fixture and R7's two-line difference are not substitutes for actual source-bound Claude before/pre-finalization/ready/fresh observation and cleanup."
+  },
+  "r7Boundary": {
+    "failedRun": 42656120803,
+    "attempt": 1,
+    "reportedStage": "Claude fresh conservation; Desktop/Codex reached fresh_receipt.",
+    "originalReaderGitReceipt": null,
+    "fullBeforeFreshAbsoluteStatAndRoot": "unknown pending original owner's safe Git projection; the matcher error JSON only includes changed fields.",
+    "evidenceRule": "Do not fabricate missing absolute R7 stat. A proper independent official Claude control can establish the narrowly permitted transition; old failed R7 remains failed and unknown fields remain unknown. A future corrected full R7 validates actual full-manifest conservation.",
+    "previousMatcherDesignBlob": "8a19597b413fb36f0e5a53140c3d95dde5dda812"
+  },
+  "risks": {
+    "alignment": "good: exact two-path observed failure, explicitly pending control.",
+    "impact": "medium: provider-file conservation policy is sensitive despite narrow data-only diff.",
+    "verification": "decent for source; original local execution and actual official control observations not independently verified here.",
+    "rollbackCost": "low: ordinary source revert, no migration or external side effect from this review.",
+    "errorDetection": "good: existing strict verification and explicit field/path/type refusals remain."
+  },
+  "activity": {
+    "newTests": 0,
+    "vm": 0,
+    "models": 0,
+    "production": 0,
+    "jobLogDownloads": 0,
+    "zipDownloads": 0,
+    "sourceEdits": 0,
+    "refUpdates": 0,
+    "dispatches": 0,
+    "reruns": 0
+  },
+  "privacy": "Only public code identities, public owner reports, exact static comparison and explicit unknowns; no credentials or file contents."
+}

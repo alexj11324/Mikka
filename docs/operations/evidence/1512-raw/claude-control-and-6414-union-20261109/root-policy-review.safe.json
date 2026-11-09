@@ -1,0 +1,44 @@
+{
+  "source": "37fb3818728315151083b7cca409c2ffd6ff4f47",
+  "oldRules": 320,
+  "newRules": [
+    {
+      "path": "/etc/ssl/certs/1560546e.0",
+      "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+      "target": "e2b-ca.pem",
+      "providerRoot": true,
+      "templates": [
+        "claude"
+      ]
+    },
+    {
+      "path": "/etc/ssl/certs/e2b-ca.pem",
+      "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+      "target": "/usr/local/share/ca-certificates/e2b-ca.crt",
+      "providerRoot": true,
+      "templates": [
+        "claude"
+      ]
+    }
+  ],
+  "oldRulesUnchanged": true,
+  "finalizationOnlyPinChanged": true,
+  "oldTestMethods": 29,
+  "newTestMethods": 34,
+  "oldMethodsRetained": true,
+  "oldTestSourceRecoverableByteExactly": true,
+  "addedTestMethods": [
+    "test_claude_relinks_require_finalization_and_preserve_strict_installation",
+    "test_claude_relinks_reject_wrong_digest_target_kind_mode_and_owner",
+    "test_claude_relinks_require_the_exact_regular_provider_root_terminal",
+    "test_claude_relinks_do_not_exempt_original_clis_or_unlisted_certificates",
+    "test_claude_relink_receipts_reject_tampering_and_installation_substitution"
+  ],
+  "hypotheticalUnionTree": "05b40c13c233d7f3cef989011705cf624b27c507",
+  "sameAsMainAllChangedOldBlobs": true,
+  "sourceReviewOnly": true,
+  "controlPending": true,
+  "redGreenEvidence": "owner reported; root has not read original execution logs",
+  "testsExecutedByRoot": 0,
+  "refsUpdated": 0
+}

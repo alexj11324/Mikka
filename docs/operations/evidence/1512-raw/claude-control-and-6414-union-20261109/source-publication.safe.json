@@ -1,0 +1,173 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512 exact 6414 source publication and boundary review",
+  "checkedAt": "2026-11-09 17:46:58 UTC",
+  "repository": "alexj11324/Mikka",
+  "previousHead": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+  "previousTree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+  "actualMain": {
+    "commit": "5ba1f9e2359ce714d83cd16fc040f2567c40a6d0",
+    "tree": "a59d2e3ff90594a2625b131ab5a403393715cf40",
+    "parents": [
+      "8db16095f46be955df22f42914e0f89b6e5f3d11",
+      "76c98369aa63b41d9e83e8b0f15fc9fcfbbb6f84"
+    ],
+    "mergedAt": "2026-11-09T17:09:38Z"
+  },
+  "merges": [
+    {
+      "commit": "7a775984500a626a4400183a59596aacb51b7a5d",
+      "tree": "ff1dbeffb3e082987e9dd219b8d79e7f5e2a38a3",
+      "parents": [
+        "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+        "5ba1f9e2359ce714d83cd16fc040f2567c40a6d0"
+      ]
+    },
+    {
+      "commit": "6414a08ddb4a92962bc82e9e427c391d645cacb2",
+      "tree": "05b40c13c233d7f3cef989011705cf624b27c507",
+      "parents": [
+        "7a775984500a626a4400183a59596aacb51b7a5d",
+        "37fb3818728315151083b7cca409c2ffd6ff4f47"
+      ]
+    }
+  ],
+  "publishedAt": "2026-11-09 17:22:28 UTC",
+  "publication": {
+    "branch": "fix/1512-daemon-fixture-executable-20261109",
+    "expectedOldHead": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+    "normalCAS": true,
+    "force": false,
+    "refUpdates": 1,
+    "mainUpdates": 0
+  },
+  "fullTreeCheck": {
+    "independentMerkleReconstruction": true,
+    "remoteReadback": true,
+    "leaves": 6805,
+    "changedExistingBlobs": 6,
+    "unchangedLeaves": 6799,
+    "modeTypeBlobDifferences": 0,
+    "changes": [
+      {
+        "path": "app/actions/coordinator.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bd24ef4c103b670d92d381d396d5c3e1b6aba083"
+      },
+      {
+        "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9b410406e21a58c26b30b457de67816f77d135b1"
+      },
+      {
+        "path": "scripts/e2b/e2b-certificate-relinks.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ba210a72dff95a34120bcd6fb581fb54aa47b863"
+      },
+      {
+        "path": "scripts/e2b/e2b-finalization-files.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "34324f43a29b3ad9a6cba88602782e8a3ccf30f3"
+      },
+      {
+        "path": "scripts/e2b/official-files.test.py",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ce4fbffa210c3e3670cc9c8fbe51c6c11da7a7f4"
+      },
+      {
+        "path": "tests/read-cache-detail-egress.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d45be9f4f701a0e61865cce1c26e367b95e78bf6"
+      }
+    ]
+  },
+  "preserved": [
+    "recovery journal driver/test/workflow",
+    "tracing and masked Replay code",
+    "Native counters/windows/background/first pair/thresholds",
+    "executable daemon fixture modes"
+  ],
+  "sourceValidation": {
+    "runId": 42663994959,
+    "attempt": 1,
+    "actualCheckout": "576c903cd6ede14520a79111d2b71154968ad910",
+    "actualParents": [
+      "5ba1f9e2359ce714d83cd16fc040f2567c40a6d0",
+      "6414a08ddb4a92962bc82e9e427c391d645cacb2"
+    ],
+    "actualTree": "05b40c13c233d7f3cef989011705cf624b27c507",
+    "sourceIndex": "23864531889b64bee5e3250dad87e598f629b6f0",
+    "coreTargets": 57,
+    "driverPassed": 74,
+    "sourceTAPPassed": 361,
+    "integrationTargets": 29,
+    "prE2BOfficialFilesPassed": 34,
+    "native": "running at this source checkpoint",
+    "strict": "not yet completed at this source checkpoint",
+    "fullCIConclusion": null
+  },
+  "sharedSourceUpdate": {
+    "head": "8197a48843f9733a775003898ab00eaceb533c66",
+    "ancestor": "37fb3818728315151083b7cca409c2ffd6ff4f47",
+    "files": [
+      {
+        "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+        "sha": "f55c94c40159e3da82368c733e8c48037dccd921",
+        "status": "modified"
+      },
+      {
+        "path": "docs/operations/evidence/1782-official-claude-certificate-relinks-20261109.json",
+        "sha": "868d0b251f884079611cbd9810775fc7146a9426",
+        "status": "added"
+      },
+      {
+        "path": "docs/operations/evidence/1782-official-claude-certificate-relinks-20261109.md",
+        "sha": "95770c84ba87e690e45f2ea665b6e5b57d300616",
+        "status": "added"
+      },
+      {
+        "path": "scripts/e2b/e2b-finalization-files.json",
+        "sha": "ebfb109586df90054ebf216435d1fc7db9afebb5",
+        "status": "modified"
+      }
+    ],
+    "onlyFinalizationDataChange": "supplementalControls adds a control evidence pointer; version/common/templates/certificate pin are identical",
+    "matcherReads": "finalization_policy lines173-194 select version, templates, common and certificateRelinksSha256; supplementalControls is not interpreted as authorization rules",
+    "hashBoundary": "The whole finalization raw file SHA is part of receipt policySha256 and canonical worker recipe; its evidence-only update still changes those hashes. It is not byte-identical to 6414.",
+    "upstreamMergeRequired": true,
+    "noFreshnessPushOrNativeCancellation": true
+  },
+  "officialControlProof": "0630402efe0e763042e68a3d37c0bab0910358fd",
+  "knownRuntimeFailure": {
+    "runId": 42661874195,
+    "source": "5ba1f9e2359ce714d83cd16fc040f2567c40a6d0",
+    "actualConclusion": "failure",
+    "ownerReport": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6746771668",
+    "reportedDifferences": [
+      "Codex root CA mode0644 to0777",
+      "Desktop apt backup content SHA change"
+    ],
+    "actualFailurePhases": null,
+    "originalReader": "original #1834 release owner",
+    "rootOriginalRedownloads": 0,
+    "sharedNextControlOwner": "#1505",
+    "newExceptionsAddedByRoot": 0
+  },
+  "production": {
+    "acceptedCases": 0,
+    "issueClosed": false,
+    "ownMainMerge": false
+  },
+  "resources": {
+    "ownNewControls": 0,
+    "ownNewVMs": 0,
+    "modelsStarted": 0,
+    "sourceCIStarted": 1
+  }
+}

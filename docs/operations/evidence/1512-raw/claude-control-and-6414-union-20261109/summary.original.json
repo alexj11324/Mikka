@@ -1,0 +1,46 @@
+{
+  "budget": {
+    "absoluteDeadline": "2026-11-09T17:22:29Z",
+    "afterObservationDeadlineCleanup": false,
+    "buildObservationSeconds": 600,
+    "cleanupOnlyMaxSeconds": 150,
+    "freshInstances": 1,
+    "modelCalls": 0,
+    "overallSeconds": 900,
+    "privateTemplates": 1,
+    "workerInstallCommands": 0
+  },
+  "cleanup": {
+    "claude": {
+      "errors": [],
+      "sandbox": {
+        "absenceConfirmedById": true,
+        "id": "iui98zldpl4fxszi3c2nv"
+      },
+      "status": "complete",
+      "templates": [
+        {
+          "kind": "claude",
+          "name": "mikka-1782-official-claude-control-42661569263-1-claude",
+          "status": "absent",
+          "templateId": "ivedr9vpyweketvct677"
+        }
+      ]
+    }
+  },
+  "failure": null,
+  "identity": {
+    "application": "mikka-1782-official-claude-control",
+    "opsCommit": "7fd8a2681cd71bb6603a485854c8beda2044911b",
+    "ref": "refs/heads/ops/self-hosted-vault-closeout-20261108",
+    "repository": "alexj11324/Mikka",
+    "runAttempt": "1",
+    "runId": "42661569263",
+    "sourceCommit": "623a1afd8715433a58c3e88ce88f8fbcc29d1761",
+    "sourceTree": "193c7c1a101a56a889f7b22eb615e903981942af"
+  },
+  "policyChanged": false,
+  "releaseAccepted": false,
+  "targetedOnly": true,
+  "version": 1
+}

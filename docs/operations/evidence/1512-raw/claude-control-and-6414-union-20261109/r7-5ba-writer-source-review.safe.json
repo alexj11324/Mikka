@@ -1,0 +1,510 @@
+{
+  "schemaVersion": 1,
+  "kind": "1512-actual-r7-source-review",
+  "createdAt": "2026-11-09T17:47:07Z",
+  "repository": "alexj11324/Mikka",
+  "reviewer": "/root/runtime_failure_review",
+  "scope": "Source-level diagnosis and existing archived control review only. This report is not a runtime acceptance or a writer attribution.",
+  "fixedSource": {
+    "commit": "5ba1f9e2359ce714d83cd16fc040f2567c40a6d0",
+    "tree": "a59d2e3ff90594a2625b131ab5a403393715cf40"
+  },
+  "conclusion": {
+    "actualWriterResolved": false,
+    "currentPolicyCorrectlyRejectsReportedChanges": true,
+    "latestFailurePhaseKnown": false,
+    "strictInstallationReceiptOfLatestFailureInspected": false,
+    "summary": "The active Mikka path has no identified direct write to either rejected path. Fixed upstream source supplies plausible natural writers, but the actual R7 provider/APT identities and exact failure phases remain unknown. No finalization rule should be expanded from source resemblance, another template kind, or an absent-baseline control."
+  },
+  "actualR7": {
+    "run": 42661874195,
+    "attempt": 1,
+    "buildJob": 129315609656,
+    "cleanupJob": 129322811155,
+    "status": "failure",
+    "finishedAt": "2026-11-09T17:23:13Z",
+    "provenance": {
+      "originalReader": "PR1834 owner",
+      "publicReport": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6746771668",
+      "publicReportUpdatedAt": "2026-11-09T17:27:22Z",
+      "thisReviewerReadOriginalLogsOrZip": false
+    },
+    "buildDecodedLogSha256": "b51f696964eaca9efd139398e9aff7177040e0eb13fd7b8fb855752cf7101697",
+    "cleanupDecodedLogSha256": "ce73824133972f4c5429a91309e1c1d80a0a5a01d04d8ec19458c01ac109b036",
+    "refusals": [
+      {
+        "kind": "codex",
+        "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+        "changedField": "mode",
+        "beforeOctal": "0644",
+        "afterOctal": "0777",
+        "phase": null,
+        "completeOriginalRow": null,
+        "completeAfterRow": null
+      },
+      {
+        "kind": "desktop",
+        "path": "/var/backups/apt.extended_states.0",
+        "changedField": "sha256",
+        "before": null,
+        "after": null,
+        "phase": null,
+        "completeOriginalRow": null,
+        "completeAfterRow": null
+      }
+    ],
+    "publish": "skipped",
+    "cleanup": {
+      "ownerReportedDeletedThenExactNamesAbsent": true,
+      "templateIds": [
+        "s4tq94dit6crxlar9zcl",
+        "8lh6w0ng9i7qr9rzcwfl",
+        "ay6ibjtnjs9sn2upfdlf"
+      ],
+      "sandboxes": [],
+      "errors": [],
+      "independentlyDownloadedByThisReviewer": false
+    },
+    "missingEvidenceRequest": "https://github.com/alexj11324/Mikka/pull/1834#issuecomment-6746923247"
+  },
+  "activeSourcePath": {
+    "builder": "scripts/e2b/build-template.py:297-323",
+    "runCmds": [
+      {
+        "line": 303,
+        "user": "root",
+        "action": "Require /opt/mikka absent, then create the private root."
+      },
+      {
+        "line": 307,
+        "user": "root",
+        "action": "Capture original filesystem entries and CLI manifest."
+      },
+      {
+        "line": 308,
+        "user": "root",
+        "action": "Run the copied official-e2b-instance-bootstrap.sh at the fixed source and worker identity."
+      },
+      {
+        "line": 309,
+        "user": "user",
+        "action": "Check private npm by executing a generated scratch-only test script."
+      },
+      {
+        "line": 310,
+        "user": "root",
+        "action": "Strict original-files verification, with no E2B-finalization policy."
+      }
+    ],
+    "laterGates": [
+      {
+        "line": "311-321",
+        "stage": "ready",
+        "action": "Start prebuilt worker, verify anonymous ready state and no identity; Desktop also verifies unauthenticated viewer=401; then verify with the exact kind's finalization policy."
+      },
+      {
+        "line": "505-531",
+        "stage": "model receipt",
+        "action": "Read and validate the completed anonymous preload receipt; the current release probe does not invoke a second model catalogue exchange."
+      },
+      {
+        "line": "641-685",
+        "stage": "fresh conservation",
+        "action": "Read strict/install and ready receipts, validate them, run fresh original-files scan with the finalization policy, then kill the disposable sandbox."
+      }
+    ],
+    "phaseBoundary": "A ready-stage refusal and fresh_scan refusal have different sources. The newest public report contains neither phase. Source ordering alone does not prove which latest gate failed.",
+    "diagnosticBoundary": "official-files.py:298-319 emits only changed fields in before/after; fields absent from that diagnostic are unknown. No complete row is reconstructed from an older template.",
+    "strictRule": "Do not turn an installation-stage mismatch into a permitted finalization change. Full original-file installation conservation remains exact.",
+    "legacyBootstrap": {
+      "paths": [
+        "scripts/e2b/bootstrap.sh",
+        "scripts/e2b/bootstrap-desktop.sh"
+      ],
+      "active": false,
+      "reason": "Not copied or called by this builder. Their apt invocations are not an identified writer in the actual active path."
+    }
+  },
+  "installTransitives": {
+    "privateProjection": "prepare-worker-install.py preserves only packageManager/engines/pnpm from the root manifest, creates an empty root importer, and limits workspace importers to daemon/protocol/config. The actual root package has no pnpm key.",
+    "selectedImporters": [
+      "packages/daemon",
+      "packages/protocol",
+      "packages/config"
+    ],
+    "staticClosure": {
+      "algorithm": "Traverse importer name/version references and snapshot dependencies+optionalDependencies, equivalent to build-template.py lock_projection helpers.",
+      "resolvedSnapshots": 414,
+      "missingReferences": [],
+      "sortedSnapshotListSha256": "fa11eade0b8df493c721bfd6f379b2c18ba7b896e666d3ea8e59b0080dc82ec6",
+      "runtimeInstalledList": false
+    },
+    "workspaceInstallLifecycleHooks": [],
+    "allowBuilds": [
+      "@parcel/watcher",
+      "@swc/core",
+      "electron",
+      "esbuild",
+      "ffmpeg-static",
+      "sharp"
+    ],
+    "allowedHookIntersection": [
+      "esbuild@0.28.2"
+    ],
+    "pnpmSemanticsSource": "https://github.com/pnpm/pnpm.io/blob/main/versioned_docs/version-10.x/settings.md#allowbuilds",
+    "esbuild": {
+      "version": "0.28.2",
+      "upstreamCommit": "609683d892977362a0f99026cb74b96263d728a9",
+      "source": "lib/npm/node-install.ts",
+      "observedWrites": "Package-local binary/wrapper files; fallback nested npm install runs in a package-local npm-install directory; direct binary fallback chmods that binary 0755.",
+      "globalRejectedPathsMentioned": false,
+      "installedTarballRead": false
+    },
+    "harnessInstaller": {
+      "source": "packages/daemon/harness/install.mjs:79-130",
+      "operation": "Download the pinned integrity-checked platform archive, extract into private staging, create private links and marker, rename into /opt/mikka/harness. It does not run npm lifecycle scripts."
+    },
+    "desktop": {
+      "source": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh:174-183",
+      "operation": "pip install --target /opt/mikka/computer aiohttp==3.13.3, private cache/HOME, copy desktop scripts/defaults, extract a verified Cua archive into the private computer directory.",
+      "directAptOrBackupWrite": false,
+      "installedPipDistributionList": null,
+      "wheelVersusSourceBuild": null,
+      "transitivePipHookExecution": null,
+      "limitation": "No --only-binary or transitive lock is present. Source-only review cannot replace the actual install receipt or claim every selected pip artifact/hook was inspected."
+    },
+    "directWriteConclusion": "No direct CA-root or apt-backup writer found in the active installer or inspected allowed hook source. This is a bounded source finding, not proof that all third-party binaries or background jobs made no writes."
+  },
+  "startup": {
+    "prebuilt": "start-prebuilt.sh creates the private viewer runtime directory and starts viewer-gateway.py as root for Desktop, then runuser -u user starts cloud-worker --wait-bootstrap.",
+    "modelPreload": "cloud-bootstrap.ts calls probeHostedRuntimeModels; model-probe.ts creates disposable scratch HOME/config directories and exchanges initialize/model-list messages with installed CLIs, then drains/kills children and deletes scratch.",
+    "anonymousSpareBoundary": "startAnonymousCodex/Claude are inside accept(), after consuming a real bootstrap hint. They are not the pre-bootstrap preload path checked by the builder.",
+    "desktopGateway": "At idle startup its own direct writes are /run/mikka-viewer/guard-protocol and viewer counters. start-desktop.sh and the Cua lease driver are not invoked by start-prebuilt's idle gateway.",
+    "caveat": "Installed CLI and dependency native-binary behavior was not dynamically audited. No rootCA uid/gid is inferred for the newest R7 from its publicly reported mode alone."
+  },
+  "upstreamMechanisms": [
+    {
+      "concern": "codex-root-ca-mode",
+      "sourceCommit": "91d09e4b17ddde628d6b37e1b923aba2e9430531",
+      "sourceFacts": [
+        "packages/envd/internal/host/cacerts.go:28 names the exact CA path; :123 starts asynchronous work; :136-138 makes its directory 0755 and writes the CA with creation mode 0644.",
+        "packages/orchestrator/pkg/template/build/phases/finalize/configure.sh:35-36 recursively chmods /usr/local to 0777.",
+        "The same recursive /usr/local chmod remains in the separately read c7cd359318b0d835e1d0ffad02d755dd62f7a1da source."
+      ],
+      "inference": "If the provider has created that original CA before its recursive chmod executes, those source operations can naturally produce the reported mode transition.",
+      "actualR7DeployedRuntimeCommit": null,
+      "actualR7EnvdBinaryIdentity": null,
+      "actualWriterProved": false,
+      "forbiddenInference": "The fixed source is not proof that this R7 deployed either revision, nor that every Codex template will reproduce the transition."
+    },
+    {
+      "concern": "desktop-apt-backup-sha",
+      "sourceCommit": "6b128124271e94bdb0f4e7850d9286170d712b04",
+      "sourceFacts": [
+        "Debian/apt debian/apt.systemd.daily:338-347 compares backup .0 against /var/lib/apt/extended_states, copies live state and rotates it with savelog when different.",
+        "The backup block precedes the APT::Periodic::Enable check at :356.",
+        "The adjacent apt-daily.service starts apt.systemd.daily update; apt-daily.timer is persistent with randomized scheduling."
+      ],
+      "inference": "A naturally scheduled APT maintenance job is a concrete possible backup writer, including when the live state was already different before the sampled interval.",
+      "actualDesktopAptVersion": null,
+      "actualDesktopScriptSha256": null,
+      "actualDesktopTimerOrCronInvocation": null,
+      "actualWriterProved": false,
+      "forbiddenInference": "Do not equate this source revision with the deployed Desktop, infer a package change from backup-only SHA change, or invoke maintenance to force reproduction."
+    }
+  ],
+  "existingEvidence": {
+    "control4": {
+      "run": 42628079564,
+      "attempt": 1,
+      "source": "111a8dfb8b227ac0441324339ff42e4328ea609a",
+      "ops": "08d822da081190364530343bf918bbcc2fbbf624",
+      "archiveGitBlob": "081ae5d6fd6c024abb95d9d0e778b9f051e5a323",
+      "bytes": 26988,
+      "sha256": "a438b3315bbd10bf470aed59ccb21fb502ceddc06102e49164eeeb9ca6416d3f",
+      "archiveReadAndHashVerified": true,
+      "originalZipRedownloaded": false,
+      "codexRootCa": {
+        "before": {
+          "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+          "status": "absent"
+        },
+        "pre_finalization": {
+          "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+          "status": "absent"
+        },
+        "ready": {
+          "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+          "status": "absent"
+        },
+        "fresh": {
+          "gid": 0,
+          "kind": "file",
+          "mode": 420,
+          "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+          "sha256": "aca6dfe34be5499f55308479809cb236576fe6dc57c991dfed338437879345fa",
+          "size": 595,
+          "status": "present",
+          "uid": 0
+        }
+      },
+      "existingOriginalCaModePreconditionCovered": false,
+      "desktopAptObservation": {
+        "before": null,
+        "pre_finalization": null,
+        "ready": null,
+        "fresh": null
+      },
+      "runtimeReleaseAccepted": false
+    },
+    "priorCodexReview": {
+      "gitBlob": "61f471f22fd488d3dfea6570c7fc7dc68dba7f9e",
+      "bytes": 15976,
+      "sha256": "4a21295752c82b8e1c57f1baebdb5e3e5bcb367befa9206817370d5dfb075c93",
+      "scope": "Older 111a run42621280244 had owner-reported Codex ready mode refusal after strict installation passed. That older phase and row gaps must not be copied into the latest 5ba R7."
+    }
+  },
+  "nextEvidence": {
+    "ownerCoordination": "Root reports #1505 owner has taken the unique finite Codex/Desktop official control at PR1834 comment6747040287. Reuse that owner's existing originals; no parallel control is authorized or started by this reviewer.",
+    "first": "Use the designated original reader's safe Git projection for latest exact phase and already-available bounded diffs. Preserve unavailable complete stat rows as unknown.",
+    "codex": {
+      "paths": [
+        "/usr/local/share/ca-certificates/e2b-ca.crt",
+        "/etc/ssl/certs/e2b-ca.pem",
+        "/etc/ssl/certs/1560546e.0"
+      ],
+      "phases": [
+        "before",
+        "pre_finalization",
+        "ready",
+        "fresh"
+      ],
+      "observation": "Record natural presence/absence, lstat fields, hash and fixed reference chains; absence is a valid observed result but does not cover an existing-original-file mode transition."
+    },
+    "desktop": {
+      "paths": [
+        "/var/backups/apt.extended_states.0",
+        "/var/lib/apt/extended_states"
+      ],
+      "phases": [
+        "before",
+        "pre_finalization",
+        "ready",
+        "fresh"
+      ],
+      "observation": "Record the paired kind/mode/uid/gid/size/hash and stable file identity before/after hashing; use no-follow opens. Compare whether changed backup hash matches the live hash at that phase; retain races/absence as such.",
+      "optionalIdentity": "Read-only actual apt script/unit hashes and version can distinguish source resemblance from deployment identity; missing identity remains unknown."
+    },
+    "restrictions": [
+      "No chmod or CA creation to manufacture a baseline.",
+      "No writing backup/live files, apt/savelog execution, timer changes, or restoring system state.",
+      "No repeated runs or added waits solely to obtain the preferred result.",
+      "No broad /usr/local or /var/backups exclusion; no cross-template mode rule transfer.",
+      "Observation complete does not mean transition reproduced or release accepted."
+    ],
+    "ifUnreproduced": "Retain the rejection. Use phase-bound diagnostic gaps from the actual run to choose any further minimal investigation; do not relabel a negative control as evidence for a policy exception."
+  },
+  "sourceDigests": [
+    {
+      "path": "scripts/e2b/build-template.py",
+      "gitBlob": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+      "bytes": 55730,
+      "sha256": "0adb53fbdd6cbcd61f1d1804aee3e2df1538997c0724556062f2741c5ac1cdb1"
+    },
+    {
+      "path": "scripts/e2b/official-files.py",
+      "gitBlob": "ea0819bf3e2d4ff83e64482b6336567050376591",
+      "bytes": 21445,
+      "sha256": "66911624af52df59ef715eb105af9a3025bacf12460105fadc7f87e4d2dd63b5"
+    },
+    {
+      "path": "scripts/e2b/e2b-finalization-files.json",
+      "gitBlob": "16d858b40d2948ac8c4ce18188843c02960bc40e",
+      "bytes": 4355,
+      "sha256": "835046e60c08e44595df509ad5911ece52f151896e5272ca53d41cec376c6c8b"
+    },
+    {
+      "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+      "gitBlob": "c0172bb8a2d0d4adde7e89991fce36c97b8f8460",
+      "bytes": 12114,
+      "sha256": "bada7b22a750386a49824057751150526d59eb9c5056d5dd9d09531e6cf68455"
+    },
+    {
+      "path": "packages/daemon/scripts/prepare-worker-install.py",
+      "gitBlob": "ba5f5ee5cc8356781e7c53e6ef5a7e77b7f8573f",
+      "bytes": 4990,
+      "sha256": "c6c4d4ff4a2b4dba37a458f632565267fb7feb648f5b0e23113e9ccfbc504119"
+    },
+    {
+      "path": "packages/daemon/scripts/build-cloud-worker.mjs",
+      "gitBlob": null,
+      "bytes": 3086,
+      "sha256": "6b8fe0248d563979955a7061316b3cc9b7610ade531d213859800deeae355012"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "gitBlob": null,
+      "bytes": 978470,
+      "sha256": "313a7452044b0d4b780bd2400e70a84aa2bc6a23415e547c5d177f9b7843a52f"
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "gitBlob": null,
+      "bytes": 718,
+      "sha256": "5a24e67ade7fae19b2d160b4ca61b58170eb3c04a18f8b06efb9a5a0fae36b9f"
+    },
+    {
+      "path": "packages/daemon/harness/install.mjs",
+      "gitBlob": null,
+      "bytes": 6742,
+      "sha256": "0b532292ffb5def15872f124bc41a28f0fa7e476f2d60fbbb83e97b7aac5a0f3"
+    },
+    {
+      "path": "scripts/e2b/start-prebuilt.sh",
+      "gitBlob": "f3896e388043441ec99baf57b179b7cc44597017",
+      "bytes": 929,
+      "sha256": "36e6dd8a960ba870cb9c6ec57f8e00c35cf212cc430580631be42ef8124e5165"
+    },
+    {
+      "path": "packages/daemon/bin/cloud-worker.ts",
+      "gitBlob": null,
+      "bytes": 4275,
+      "sha256": "6615659de54e51cb9f18066b21c10fb3bec6b1e210c1ca173cdc3f247ded6f75"
+    },
+    {
+      "path": "packages/daemon/src/cloud-bootstrap.ts",
+      "gitBlob": null,
+      "bytes": 9208,
+      "sha256": "cb0e8ee39ddc117b9891791dc0e57748a701167fe51deeaa4be0b05297860c9c"
+    },
+    {
+      "path": "packages/daemon/src/cloud-model-probe.ts",
+      "gitBlob": null,
+      "bytes": 3219,
+      "sha256": "d0e9fdb356783f1dd94b4ffc64bf205e6cbffb958e81d1e27b9d260633814243"
+    },
+    {
+      "path": "packages/daemon/src/model-probe.ts",
+      "gitBlob": null,
+      "bytes": 7977,
+      "sha256": "0ec9c46cf6a3ddc67cc17fe275f4f6ce0ff8cac3db449bfeec28665795d6a86e"
+    },
+    {
+      "path": "scripts/e2b/start-desktop.sh",
+      "gitBlob": "d65b652c6aba5739dafa4120e928638276719f13",
+      "bytes": 2033,
+      "sha256": "e4927bf802b2245c9cc6c2016c775187841a32c2ecd4d07d938a511bb1aa8580"
+    },
+    {
+      "path": "scripts/e2b/viewer-gateway.py",
+      "gitBlob": null,
+      "bytes": 4062,
+      "sha256": "452adba01d6109aa56f51031c108b6418bce22b2df343a0abfe9cd04303c6d2b"
+    },
+    {
+      "path": "scripts/e2b/lease-driver.py",
+      "gitBlob": null,
+      "bytes": 1487,
+      "sha256": "758a4d09458dc80efc27b9903348cf992d4e6a8312f2a257abc2cf9638253cbe"
+    },
+    {
+      "path": "package.json",
+      "gitBlob": null,
+      "bytes": 80877,
+      "sha256": "ed9893d62d9d90299de21eb0325e73ab3c97202dec5eafe3d9983c04b64a6add"
+    },
+    {
+      "path": "packages/daemon/package.json",
+      "gitBlob": null,
+      "bytes": 2857,
+      "sha256": "11d2828499ff46ddf10ae2eb6653b400ae3863c012b1c979c66a53560120ec30"
+    },
+    {
+      "path": "packages/protocol/package.json",
+      "gitBlob": null,
+      "bytes": 3103,
+      "sha256": "cc63fa445e0bf6b64966641eaf8d08b3c1dbe4cffe3216f5c3bec3bc68434f70"
+    },
+    {
+      "path": "packages/config/package.json",
+      "gitBlob": null,
+      "bytes": 551,
+      "sha256": "98a26a92c9808833716ec5c18647535cad77c8171a650414192ef3d55fd572cc"
+    }
+  ],
+  "upstreamSourceDigests": [
+    {
+      "repository": "e2b-dev/runtime",
+      "commit": "91d09e4b17ddde628d6b37e1b923aba2e9430531",
+      "path": "packages/orchestrator/pkg/template/build/phases/finalize/configure.sh",
+      "url": "https://github.com/e2b-dev/runtime/blob/91d09e4b17ddde628d6b37e1b923aba2e9430531/packages/orchestrator/pkg/template/build/phases/finalize/configure.sh",
+      "bytes": 1269,
+      "sha256": "7e55e568758536690490858429dcd10489fbe53011c1713c8adb90d3ab3e0902"
+    },
+    {
+      "repository": "e2b-dev/runtime",
+      "commit": "91d09e4b17ddde628d6b37e1b923aba2e9430531",
+      "path": "packages/envd/internal/host/cacerts.go",
+      "url": "https://github.com/e2b-dev/runtime/blob/91d09e4b17ddde628d6b37e1b923aba2e9430531/packages/envd/internal/host/cacerts.go",
+      "bytes": 6754,
+      "sha256": "57faa6d0cec0ca8d7c1b5576e190fb5140a01f0015cbe257b9f73126a78cb9ec"
+    },
+    {
+      "repository": "e2b-dev/runtime",
+      "commit": "c7cd359318b0d835e1d0ffad02d755dd62f7a1da",
+      "path": "packages/orchestrator/pkg/template/build/phases/finalize/configure.sh",
+      "url": "https://github.com/e2b-dev/runtime/blob/c7cd359318b0d835e1d0ffad02d755dd62f7a1da/packages/orchestrator/pkg/template/build/phases/finalize/configure.sh",
+      "bytes": 3834,
+      "sha256": "12783250c13a33daa33fbb23a5b487eedb2bc9391819905a0bb1decdf953a90b"
+    },
+    {
+      "repository": "Debian/apt",
+      "commit": "6b128124271e94bdb0f4e7850d9286170d712b04",
+      "path": "debian/apt.systemd.daily",
+      "url": "https://github.com/Debian/apt/blob/6b128124271e94bdb0f4e7850d9286170d712b04/debian/apt.systemd.daily",
+      "bytes": 16325,
+      "sha256": "4949c220a844071ee4709115aadfc00684578d5c7dda9c1b5a5c65a75de9d50f"
+    },
+    {
+      "repository": "Debian/apt",
+      "commit": "6b128124271e94bdb0f4e7850d9286170d712b04",
+      "path": "debian/apt-daily.timer",
+      "url": "https://github.com/Debian/apt/blob/6b128124271e94bdb0f4e7850d9286170d712b04/debian/apt-daily.timer",
+      "bytes": 156,
+      "sha256": "0075e974af4e3a94757e219ba50ccb8348d4d1a8834d938f6cc9b1f4fd1db4e5"
+    },
+    {
+      "repository": "Debian/apt",
+      "commit": "6b128124271e94bdb0f4e7850d9286170d712b04",
+      "path": "debian/apt-daily.service",
+      "url": "https://github.com/Debian/apt/blob/6b128124271e94bdb0f4e7850d9286170d712b04/debian/apt-daily.service",
+      "bytes": 326,
+      "sha256": "90f87047f4ea2f261f9117d02870de8719f808b911bb1808bf039ff3c162e5e9"
+    },
+    {
+      "repository": "evanw/esbuild",
+      "commit": "609683d892977362a0f99026cb74b96263d728a9",
+      "path": "lib/npm/node-install.ts",
+      "url": "https://github.com/evanw/esbuild/blob/609683d892977362a0f99026cb74b96263d728a9/lib/npm/node-install.ts",
+      "bytes": 14500,
+      "sha256": "3edf11e451448e667e437b334da7f78e11d5e555018b98cf6d6b06facfb2d65b"
+    },
+    {
+      "repository": "evanw/esbuild",
+      "commit": "609683d892977362a0f99026cb74b96263d728a9",
+      "path": "lib/npm/node-platform.ts",
+      "url": "https://github.com/evanw/esbuild/blob/609683d892977362a0f99026cb74b96263d728a9/lib/npm/node-platform.ts",
+      "bytes": 12914,
+      "sha256": "50c5522b87e9e993dfe030f39298d27d6288e61daedc9c02beb9f7d46eada443"
+    }
+  ],
+  "actions": {
+    "refsChanged": 0,
+    "testsRun": 0,
+    "workflowDispatches": 0,
+    "vmOrTemplateResourcesCreated": 0,
+    "originalLogsOrZipsRead": 0,
+    "sourceOrPolicyChanges": 0,
+    "proofBlobOnly": true
+  }
+}

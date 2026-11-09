@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "status": "conditional source preparation only",
+  "productHeads": {
+    "own": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+    "actualMain": "5ba1f9e2359ce714d83cd16fc040f2567c40a6d0",
+    "sharedDraft": "37fb3818728315151083b7cca409c2ffd6ff4f47"
+  },
+  "expected": {
+    "ownUnionTree": "05b40c13c233d7f3cef989011705cf624b27c507",
+    "mainWithDraftTree": "dab466157d46f548c151975f18eb51e1d92a623f"
+  },
+  "selectedCount": 480,
+  "selectedManifestSha256": "c179aa191f305be2f7ac7223d1c2f31e9f3ac2d843560495a895a12b6f52e4f9",
+  "selectedInputsIdentical": true,
+  "changesVersus8db": [
+    {
+      "path": "scripts/e2b/e2b-certificate-relinks.json",
+      "old": "335540475a9d8aaae8f34915e087b5a862699b95",
+      "new": "ba210a72dff95a34120bcd6fb581fb54aa47b863",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/e2b/e2b-finalization-files.json",
+      "old": "16d858b40d2948ac8c4ce18188843c02960bc40e",
+      "new": "34324f43a29b3ad9a6cba88602782e8a3ccf30f3",
+      "mode": "100644"
+    }
+  ],
+  "canonicalAlgorithm": {
+    "blob": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+    "sha256": "0adb53fbdd6cbcd61f1d1804aee3e2df1538997c0724556062f2741c5ac1cdb1",
+    "rootPackageProjection": "unchanged and exact between compared inputs"
+  },
+  "numericWorkerHash": null,
+  "boundaries": [
+    "The manifest digest is not numeric canonical W.",
+    "Draft ADR/control completion may change the full trees but is outside selected worker paths.",
+    "Actual control proof, latest source CI and successful runtime publication are separate gates.",
+    "No refs, trees or commits were published; no test/model/resource was started."
+  ]
+}

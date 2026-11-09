@@ -1,0 +1,283 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Independent source-only review of the existing owner Claude CA control; no duplicate control",
+  "observedAt": "2026-11-09T17:10:28Z",
+  "repository": "alexj11324/Mikka",
+  "status": "source_review_no_blocker_owner_originals_pending",
+  "authority": {
+    "ownerAnnouncement": "https://github.com/alexj11324/Mikka/pull/1782#issuecomment-6746329505",
+    "originalReader": "PR1782 owner",
+    "reviewReader": "issue1512 acceptance_review",
+    "originalJobLogsRead": 0,
+    "artifactArchivesDownloaded": 0,
+    "resourceCreates": 0,
+    "modelCalls": 0,
+    "refChanges": 0,
+    "ourFallbackControlPreparedOrActivated": false
+  },
+  "run": {
+    "id": 42661569263,
+    "attempt": 1,
+    "headSha": "7fd8a2681cd71bb6603a485854c8beda2044911b",
+    "branch": "ops/self-hosted-vault-closeout-20261108",
+    "workflow": ".github/workflows/issue1782-official-claude-control.yml",
+    "event": "push",
+    "status": "completed",
+    "conclusion": "success",
+    "createdAt": "2026-11-09T17:07:47Z",
+    "updatedAt": "2026-11-09T17:09:08Z",
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/42661569263"
+  },
+  "operator": {
+    "commit": "7fd8a2681cd71bb6603a485854c8beda2044911b",
+    "tree": "e7152cf5bd7b348f92904d9aa7ea87ec5e532a83",
+    "parents": [
+      "32d3afecbeb1f8d433f9a91c51f3980995207d30"
+    ],
+    "changedPathCount": 9
+  },
+  "cleanupOnlyProduct": {
+    "commit": "623a1afd8715433a58c3e88ce88f8fbcc29d1761",
+    "tree": "193c7c1a101a56a889f7b22eb615e903981942af",
+    "builderPath": "scripts/e2b/build-template.py",
+    "builderBlob": "9743135a430a00333b9c639632f30c8cb5e05878",
+    "builderSha256": "3927d62d13683aab6fc44b869dfccf2b3d76aa5804bfb47b9399838b9667d325",
+    "productInstalledInControl": false
+  },
+  "sources": {
+    "workflow": {
+      "path": ".github/workflows/issue1782-official-claude-control.yml",
+      "blob": "4d5f7fcad779bb2dfea402a5425fb8a27ece9d30",
+      "bytes": 4171,
+      "sha256": "d2c005963af46687d6eb7175d69b21be732edc7bbf13118379a632f6f056932e"
+    },
+    "controller": {
+      "path": "scripts/ops/issue1782-official-claude-control.py",
+      "blob": "e3568e4bf47ff64d97bf2d2c121493e9db14d02e",
+      "bytes": 30612,
+      "sha256": "5f6cb521afa4c908e780131682dfd3c7f4803884e482e8f3a7d425d6ff909ccf"
+    },
+    "tests": {
+      "path": "scripts/ops/issue1782-official-claude-control.test.py",
+      "blob": "03328d6534aba98582d03f68e3a9ff5f67988f23",
+      "bytes": 34738,
+      "sha256": "02d34639c820a2d28816bc00c5c7345dcfffe64e8ea53a941fa82c6fcbc94acc"
+    },
+    "builder": {
+      "blob": "9743135a430a00333b9c639632f30c8cb5e05878",
+      "sha256": "3927d62d13683aab6fc44b869dfccf2b3d76aa5804bfb47b9399838b9667d325",
+      "bytes": 58658
+    }
+  },
+  "metadata": {
+    "totalJobs": 1,
+    "jobs": [
+      {
+        "id": 129314204150,
+        "name": "official_claude_control",
+        "status": "completed",
+        "conclusion": "success",
+        "headSha": "7fd8a2681cd71bb6603a485854c8beda2044911b",
+        "startedAt": "2026-11-09T17:07:51Z",
+        "completedAt": "2026-11-09T17:09:08Z",
+        "steps": [
+          {
+            "number": 1,
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-09T17:07:52Z",
+            "completedAt": "2026-11-09T17:07:53Z"
+          },
+          {
+            "number": 2,
+            "name": "Check out the exact product source for cleanup only",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-09T17:07:53Z",
+            "completedAt": "2026-11-09T17:07:59Z"
+          },
+          {
+            "number": 3,
+            "name": "Check out this owned diagnostic append",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-09T17:07:59Z",
+            "completedAt": "2026-11-09T17:08:06Z"
+          },
+          {
+            "number": 4,
+            "name": "Verify offline guards and the exact sources before credentials",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-09T17:08:06Z",
+            "completedAt": "2026-11-09T17:08:07Z"
+          },
+          {
+            "number": 5,
+            "name": "Install only the pinned host control SDK",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-09T17:08:07Z",
+            "completedAt": "2026-11-09T17:08:14Z"
+          },
+          {
+            "number": 6,
+            "name": "Recheck the absolute observation budget before requesting the key",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-09T17:08:14Z",
+            "completedAt": "2026-11-09T17:08:14Z"
+          },
+          {
+            "number": 7,
+            "name": "Read only the existing E2B key through the existing owned subject",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-09T17:08:14Z",
+            "completedAt": "2026-11-09T17:08:15Z"
+          },
+          {
+            "number": 8,
+            "name": "Observe one official-only Claude derivative and one fresh instance",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-09T17:08:15Z",
+            "completedAt": "2026-11-09T17:09:02Z"
+          },
+          {
+            "number": 9,
+            "name": "Recheck only the exact owned private template and instance",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-09T17:09:02Z",
+            "completedAt": "2026-11-09T17:09:03Z"
+          },
+          {
+            "number": 10,
+            "name": "Preserve only closed public-certificate metadata and cleanup receipts",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-09T17:09:03Z",
+            "completedAt": "2026-11-09T17:09:04Z"
+          },
+          {
+            "number": 19,
+            "name": "Post Check out this owned diagnostic append",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-09T17:09:04Z",
+            "completedAt": "2026-11-09T17:09:05Z"
+          },
+          {
+            "number": 20,
+            "name": "Post Check out the exact product source for cleanup only",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-09T17:09:05Z",
+            "completedAt": "2026-11-09T17:09:05Z"
+          },
+          {
+            "number": 21,
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "startedAt": "2026-11-09T17:09:05Z",
+            "completedAt": "2026-11-09T17:09:05Z"
+          }
+        ]
+      }
+    ]
+  },
+  "sourceFindings": [
+    {
+      "topic": "activation and identity",
+      "anchors": [
+        "controller:53-103",
+        "workflow:20-42"
+      ],
+      "finding": "Exact owned push repository, actor, workflow, ref, attempt1, source commit/tree, single fixed Ops parent, exact nine changed paths, clean trees and builder SHA are checked before key access."
+    },
+    {
+      "topic": "resource and time scope",
+      "anchors": [
+        "controller:16-24",
+        "controller:297-450",
+        "workflow:23-30"
+      ],
+      "finding": "Only Claude is executable. One private derivative template and one fresh Sandbox.create with a 120-second instance TTL; no model, CLI execution, application worker or Smoke. Absolute observation interval is at most 900 seconds (17:07:29–17:22:29 UTC), work cap600 seconds and independent cleanup cap150 seconds. The workflow ceiling20 minutes explicitly permits cleanup after the observation deadline."
+    },
+    {
+      "topic": "observation schema",
+      "anchors": [
+        "controller:146-222",
+        "controller:452-579"
+      ],
+      "finding": "Four named phases each contain exactly the three fixed CA nodes. Each node records full lstat type/mode/UID/GID/device/inode/size/timestamps plus file SHA256 or raw symlink target. Only the two fixed symlink targets and a regular-file terminal root are allowed. Guest reads files with O_NOFOLLOW and identity checks, resolves fixed references, then rechecks the same three nodes. Host recomputes chains; absent/too-large/changed/extra/duplicate nodes cannot be observed-success. No file bytes are serialized."
+    },
+    {
+      "topic": "phase ordering",
+      "anchors": [
+        "controller:320-359"
+      ],
+      "finding": "The source performs before and pre_finalization during derivative build, ready via its start command and fresh in the one created instance. Final evidence must use actual returned phase/boot/time records; this review does not infer unseen timestamps or causal process identity from phase names."
+    },
+    {
+      "topic": "ownership and cleanup",
+      "anchors": [
+        "controller:235-289",
+        "controller:329-374",
+        "controller:416-449",
+        "builder:385-459"
+      ],
+      "finding": "Returned template/build IDs are captured, private nondefault exact alias/name binding checked, and fresh instance identity is checked against exact template/metadata. Cleanup terminates clients first, verifies exact sandbox scope, kills and confirms absence by ID. Builder cleanup prefers known templateID, validates private/name/alias/nondefault ownership, deletes exact ID and checks GET404. Unreturned create/build IDs remain unresolved; alias404 alone is not absence for a known ID. Public/foreign templates are retained/rejected."
+    },
+    {
+      "topic": "test source review",
+      "anchors": [
+        "tests:test_three_fixed_paths_four_phases_and_actual_file_to_link_chain",
+        "tests:test_only_one_official_template_and_fresh_instance_no_product_install",
+        "tests:test_workflow_same_owned_subject_and_bounded_activation_with_cleanup"
+      ],
+      "finding": "The fixed file contains32 offline tests covering shape, no private content, races, ownership, lost IDs and cleanup. This reviewer did not run tests or read the job stdout; metadata reports the existing offline guard step success."
+    }
+  ],
+  "requiredOwnerEvidence": {
+    "paths": [
+      "/etc/ssl/certs/1560546e.0",
+      "/etc/ssl/certs/e2b-ca.pem",
+      "/usr/local/share/ca-certificates/e2b-ca.crt"
+    ],
+    "actualReturnedObservations": null,
+    "actualTemplateBuildAndSandboxIds": null,
+    "exactCleanupReceipts": null,
+    "originalGitBlobs": null,
+    "note": "The owner Git originals have not yet been posted at this finite follow-up read. Metadata success is not substituted for raw stat/cleanup receipts."
+  },
+  "interpretationLimits": {
+    "targetedOnly": true,
+    "wholeFilesystemConservationProven": false,
+    "requestedBaseAlias": "claude",
+    "resolvedOfficialBaseTemplateId": null,
+    "resolvedOfficialBaseBuildId": null,
+    "envdVersion": null,
+    "sameBaseOrBuildAsR7Proven": false,
+    "attribution": "The reviewed control source contains only a bounded metadata observer and no Mikka installation. If its actual observations show the transition, they support an independent provider boot/finalization mechanism inference, not an observed writer-process identity or same-build R7 experiment.",
+    "policyDecision": "No conservation rule or product source was changed by this reviewer. Exact new tuples and preserved negative boundaries remain the policy owner's task."
+  },
+  "priorGapReceipt": {
+    "blob": "2504a9f2a3e7d1305db1eebb5a6f9dfa1bd6c8d2",
+    "sha256": "07b992470beb6687843d288d5190df0e3877903aab6d995221f0a58795ea7249",
+    "bytes": 24944
+  },
+  "followup": {
+    "issues": [
+      1724,
+      1782
+    ],
+    "since": "2026-11-09T17:08:24Z",
+    "observedAt": "2026-11-09T17:10:28Z",
+    "newComments": 0,
+    "pollingContinued": false
+  }
+}

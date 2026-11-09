@@ -1,0 +1,389 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512_r7_claude_certificate_relink_matcher_design_pending_evidence",
+  "repository": "alexj11324/Mikka",
+  "source": {
+    "commit": "8db16095f46be955df22f42914e0f89b6e5f3d11",
+    "tree": "18b539c3541594cfa540d1e178985f00d03ab4fc",
+    "sameMatcherInOwn6cc": true
+  },
+  "status": "Read-only design. No candidate source, test execution, control or release action. Complete R7 stat/root evidence has not yet been provided as a Git blob.",
+  "sourceFiles": [
+    {
+      "path": "scripts/e2b/official-files.py",
+      "gitBlob": "ea0819bf3e2d4ff83e64482b6336567050376591",
+      "bytes": 21445,
+      "sha256": "66911624af52df59ef715eb105af9a3025bacf12460105fadc7f87e4d2dd63b5"
+    },
+    {
+      "path": "scripts/e2b/official-files.test.py",
+      "gitBlob": "471c80878c7e2b88cd5e8a0864e6f6ef8354df21",
+      "bytes": 47201,
+      "sha256": "a02db5389d866cadcbfa743bad6eaecaefb6b1effbfb0bc863a9287d59849b84"
+    },
+    {
+      "path": "scripts/e2b/e2b-certificate-relinks.json",
+      "gitBlob": "335540475a9d8aaae8f34915e087b5a862699b95",
+      "bytes": 106048,
+      "sha256": "a28165d7a9de3bed0b78af59c728004e82dc4d7815a14f97c2779c1eb090a845"
+    },
+    {
+      "path": "scripts/e2b/e2b-finalization-files.json",
+      "gitBlob": "16d858b40d2948ac8c4ce18188843c02960bc40e",
+      "bytes": 4355,
+      "sha256": "835046e60c08e44595df509ad5911ece52f151896e5272ca53d41cec376c6c8b"
+    }
+  ],
+  "reportedFailure": {
+    "runId": 42656120803,
+    "attempt": 1,
+    "buildJob": 129295381232,
+    "failedAt": "2026-11-09T16:47:16Z",
+    "source": "Original owner's public reports, not an independently downloaded job log.",
+    "references": [
+      {
+        "id": 6745930838,
+        "url": "https://github.com/alexj11324/Mikka/pull/1810#issuecomment-6745930838"
+      },
+      {
+        "id": 6745940808,
+        "url": "https://github.com/alexj11324/Mikka/pull/1805#issuecomment-6745940808"
+      }
+    ],
+    "kind": "claude",
+    "stage": "fresh official-file conservation",
+    "entries": [
+      {
+        "path": "/etc/ssl/certs/1560546e.0",
+        "before": {
+          "kind": "file",
+          "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+          "mode": null,
+          "uid": null,
+          "gid": null
+        },
+        "after": {
+          "kind": "link",
+          "target": "e2b-ca.pem",
+          "mode": null,
+          "uid": null,
+          "gid": null
+        }
+      },
+      {
+        "path": "/etc/ssl/certs/e2b-ca.pem",
+        "before": {
+          "kind": "file",
+          "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+          "mode": null,
+          "uid": null,
+          "gid": null
+        },
+        "after": {
+          "kind": "link",
+          "target": "/usr/local/share/ca-certificates/e2b-ca.crt",
+          "mode": null,
+          "uid": null,
+          "gid": null
+        }
+      }
+    ],
+    "nullMeaning": "Unknown until original reader's complete evidence is received; not zero, absence or unchanged.",
+    "rootBefore": null,
+    "rootAfter": null,
+    "resolvedTerminalDigest": null,
+    "fullRawHashAndLinePositions": null,
+    "otherTemplates": "Desktop and Codex reached fresh_receipt according to the owner. Do not relabel this as another Codex-mode failure.",
+    "skipped": [
+      "await-web",
+      "subscriptions",
+      "publish"
+    ],
+    "cleanup": {
+      "job": 129302561228,
+      "completedAt": "2026-11-09T16:47:38Z",
+      "conclusion": "success",
+      "ownerReportedReceiptBytes": 504,
+      "ownerReportedReceiptSha256": "b1c7291d6f92ffa39ba65c4c95bc5b6f3f43ad340a3d0f4b7adedb0630dbdef6",
+      "ownerReported": "Three exact candidate names absent; sandboxes and errors empty.",
+      "independentlyDownloadedOrValidatedHere": false
+    }
+  },
+  "actualPolicy": {
+    "certificateRows": 320,
+    "certificateFileDigest": "a28165d7a9de3bed0b78af59c728004e82dc4d7815a14f97c2779c1eb090a845",
+    "policyDigestMatchesActualFile": true,
+    "exactProviderRootRows": [
+      {
+        "path": "/etc/ssl/certs/1560546e.0",
+        "sha256": "a35101e5d97b20191320ecfcb75e4bea784ba8fa9715193eb3a759d54528eda5",
+        "target": "e2b-ca.pem",
+        "providerRoot": true,
+        "templates": [
+          "codex"
+        ]
+      },
+      {
+        "path": "/etc/ssl/certs/e2b-ca.pem",
+        "sha256": "a35101e5d97b20191320ecfcb75e4bea784ba8fa9715193eb3a759d54528eda5",
+        "target": "/usr/local/share/ca-certificates/e2b-ca.crt",
+        "providerRoot": true,
+        "templates": [
+          "codex"
+        ]
+      },
+      {
+        "path": "/etc/ssl/certs/1560546e.0",
+        "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+        "target": "e2b-ca.pem",
+        "providerRoot": true,
+        "templates": [
+          "desktop"
+        ]
+      },
+      {
+        "path": "/etc/ssl/certs/e2b-ca.pem",
+        "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+        "target": "/usr/local/share/ca-certificates/e2b-ca.crt",
+        "providerRoot": true,
+        "templates": [
+          "desktop"
+        ]
+      }
+    ],
+    "claudeProviderRootRelinkRows": 0,
+    "explanation": "The reported 4e04 file-to-link tuples have only Desktop declarations. Codex has separate a351 declarations. Filtering by kind excludes both for Claude, so the reported changes are refused even before unknown remaining stat details are considered."
+  },
+  "currentMatcherContract": [
+    {
+      "lines": [
+        173,
+        194
+      ],
+      "function": "finalization_policy",
+      "contract": "Verify the pinned certificate-file SHA256; filter each exact entry by template; construct exact path/kind/digest/raw-target transition rules. No directory wildcard."
+    },
+    {
+      "lines": [
+        197,
+        216
+      ],
+      "function": "permitted_provider_change",
+      "contract": "Require original file and file-to-link transition for certificate rules, valid resolved digest, exact declared changed fields; undeclared owner/group/mode differences refuse."
+    },
+    {
+      "lines": [
+        260,
+        282
+      ],
+      "function": "validate_receipt",
+      "contract": "Require strict original installation before==after and matching finalization kind/policy/counts; reject duplicate paths, mismatched change keys or disallowed differences."
+    },
+    {
+      "lines": [
+        285,
+        319
+      ],
+      "function": "verify",
+      "contract": "Compare every original manifest entry. For declared providerRoot links, resolve strictly to /usr/local/share/ca-certificates/e2b-ca.crt and require a regular-file terminal; keep its actual digest. Refuse any unapproved difference."
+    },
+    {
+      "lines": [
+        320,
+        330
+      ],
+      "function": "verify",
+      "contract": "Only explicit e2b_finalization normalizes declared provider fields. Ordinary installation remains exact whole-original-files comparison."
+    }
+  ],
+  "missingEvidence": [
+    "Original reader's source/stage-bound full before and fresh records for both relink paths, including mode, uid and gid; original raw SHA256 and exact line/record locations.",
+    "Root certificate presence in the baseline manifest, before/fresh kind/mode/uid/gid/digest, literal and canonical targets, and independent resolved-terminal digest.",
+    "A Claude official-only control with those same observed fields and stages, without Mikka installation. The sibling control review reports the old targeted Claude control did not observe any of these three CA paths; its final receipt remains separately owned.",
+    "Do not infer unchanged fields merely from the short public difference summary or infer official-only behavior from a derived candidate failure."
+  ],
+  "minimalConditionalDesign": {
+    "condition": "Proceed only after exact R7 records and Claude-specific official control close the relevant preconditions; a non-reproducing control does not authorize an exception.",
+    "likelyFiles": [
+      {
+        "path": "scripts/e2b/e2b-certificate-relinks.json",
+        "change": "Two Claude-only exact declarations if proven, keeping all existing Desktop/Codex declarations and the other certificate rows intact. Use actual before digest and literal targets; a mode transition is allowed only if actually established."
+      },
+      {
+        "path": "scripts/e2b/e2b-finalization-files.json",
+        "change": "Update the certificate file digest and add a source/stage/control-bound Claude evidence reference. Preserve all existing root, directory and template restrictions."
+      },
+      {
+        "path": "scripts/e2b/official-files.test.py",
+        "change": "Retain the original 29 test methods and their safety coverage; add actual-observation positive and negative cases, with the old rejection history retained."
+      }
+    ],
+    "matcherChangeNotAssumed": "No current reason to broaden verify/permitted_provider_change. Whether policy-only is sufficient depends on complete stat/root preconditions. If existing structures cannot express a required distinction, report the exact gap before proposing a narrow matcher change.",
+    "fullManifestRootDependency": "A changed root entry already present in the original manifest remains independently protected by its existing kind/owner/mode rules. If that baseline presence is not established, do not claim root identity conservation from resolvedSha256 alone.",
+    "noWeakening": [
+      "No /etc/ssl wildcard",
+      "No template-agnostic exception",
+      "No acceptance of arbitrary source digest or target",
+      "No permission widening inferred from another template",
+      "No replacement of strict install proof by normalized finalization proof",
+      "No subscriptions/publish bypass"
+    ]
+  },
+  "regressionDesign": {
+    "originalMethods": [
+      {
+        "line": 62,
+        "name": "test_verifies_real_selected_bytes_through_worker_symlink_without_rewriting_receipt"
+      },
+      {
+        "line": 82,
+        "name": "test_changed_added_byte_fails_without_resigning_manifest"
+      },
+      {
+        "line": 95,
+        "name": "test_manifest_owner_mode_symlink_size_and_cli_canonical_path_fail_closed"
+      },
+      {
+        "line": 124,
+        "name": "test_cli_emits_only_closed_verification_metadata_on_stderr"
+      },
+      {
+        "line": 138,
+        "name": "test_replacing_a_verified_file_or_manifest_with_identical_bytes_is_rejected"
+      },
+      {
+        "line": 160,
+        "name": "test_measured_exact_root_ca_rotation_requires_finalization_and_strict_installation"
+      },
+      {
+        "line": 204,
+        "name": "test_exact_root_ca_exception_keeps_type_owner_target_mode_and_other_paths_protected"
+      },
+      {
+        "line": 238,
+        "name": "test_exact_root_ca_rotation_receipts_reject_invalid_hashes"
+      },
+      {
+        "line": 249,
+        "name": "test_missing_original_reports_the_exact_manifest_path_and_preserves_the_filesystem_cause"
+      },
+      {
+        "line": 261,
+        "name": "test_provider_certificate_relinks_require_exact_measured_target_and_same_certificate_bytes"
+      },
+      {
+        "line": 285,
+        "name": "test_cli_capture_uses_original_realpath_without_executing_or_accepting_private_fallback"
+      },
+      {
+        "line": 310,
+        "name": "test_versioned_cli_inventory_survives_atomic_stage_move_and_preserves_previous"
+      },
+      {
+        "line": 343,
+        "name": "test_cli_manifest_rejects_missing_desktop_harness_and_replacement_of_original"
+      },
+      {
+        "line": 361,
+        "name": "test_only_control_proven_fields_may_change_during_e2b_finalization"
+      },
+      {
+        "line": 384,
+        "name": "test_provider_ca_digest_changes_only_during_finalization_with_unchanged_identity"
+      },
+      {
+        "line": 420,
+        "name": "test_finalization_receipt_cannot_replace_strict_installation_proof"
+      },
+      {
+        "line": 435,
+        "name": "test_rotating_provider_ca_bytes_are_accepted_only_at_fresh_finalization"
+      },
+      {
+        "line": 463,
+        "name": "test_provider_ca_finalization_keeps_exact_path_type_owner_and_mode_guards"
+      },
+      {
+        "line": 489,
+        "name": "test_an_unreadable_original_directory_cannot_be_silently_skipped"
+      },
+      {
+        "line": 495,
+        "name": "test_persistent_paths_outside_package_directories_are_protected"
+      },
+      {
+        "line": 508,
+        "name": "test_addition_is_allowed_but_modifying_or_removing_an_original_fails"
+      },
+      {
+        "line": 532,
+        "name": "test_private_root_is_excluded_but_original_links_and_packages_are_protected"
+      },
+      {
+        "line": 571,
+        "name": "test_exact_claude_directory_mode_requires_finalization_and_preserves_kind"
+      },
+      {
+        "line": 586,
+        "name": "test_directory_rule_rejects_other_identity_fields_modes_paths_and_templates"
+      },
+      {
+        "line": 611,
+        "name": "test_directory_receipt_rejects_missing_wrong_kind_and_replaced_installation"
+      },
+      {
+        "line": 661,
+        "name": "test_measured_desktop_relinks_and_legacy_codex_scope"
+      },
+      {
+        "line": 684,
+        "name": "test_relinks_keep_exact_path_digest_target_identity_and_scope_guards"
+      },
+      {
+        "line": 713,
+        "name": "test_verify_requires_exact_regular_provider_root_terminal"
+      },
+      {
+        "line": 729,
+        "name": "test_relink_receipt_rejects_tampering_and_replacement_of_strict_proof"
+      }
+    ],
+    "execution": "Design only; no new tests have run.",
+    "positive": "An exact complete Claude observation should fail on the existing policy and be accepted only in the future Claude finalization mode after the required control evidence exists.",
+    "negatives": [
+      "The same mutation in ordinary strict installation",
+      "Unmeasured template/digest tuple",
+      "Wrong path or literal target",
+      "Changed uid/gid or unmeasured permission transition",
+      "Wrong/non-file/cyclic or missing root terminal",
+      "Invalid or missing resolved digest",
+      "Tampered or cross-kind finalization receipt",
+      "Duplicate path or replacement of strict installation receipt"
+    ],
+    "existingCrossTemplateConflict": {
+      "path": "scripts/e2b/official-files.test.py",
+      "lines": [
+        684,
+        704
+      ],
+      "currentCase": "Desktop fixture uses the two 4e04 files at 0777/root and a 0777/root rotating terminal, and requires kind=claude to reject.",
+      "rule": "If the complete newly observed Claude tuple differs, express only that supported distinction and retain this negative unchanged. If it is exactly identical, the current metadata cannot both accept it as Claude and reject the identical input. Explicitly document and revise only the obsolete unobserved-tuple expectation while retaining the 29 methods and meaningful wrong-template/receipt-kind negatives; never invent a discriminator or silently delete the case.",
+      "currentDisposition": "Unresolved pending actual Claude stat/root evidence. No test has been edited."
+    }
+  },
+  "releaseBoundary": "A policy test or official-only control is not a successful R7. Preserve this failed run, skipped subscription/publish stages and cleanup evidence. A corrected exact source must still pass the existing complete conservation and real subscription release gates.",
+  "followup": "When the original reader supplies a safe Git receipt, compare every reported field to actual source rules and separately bind the official-only control. Do not reacquire workflow logs or ZIP.",
+  "activity": {
+    "jobLogDownloads": 0,
+    "artifactDownloads": 0,
+    "tests": 0,
+    "resources": 0,
+    "models": 0,
+    "production": 0,
+    "sourceEdits": 0,
+    "refUpdates": 0,
+    "dispatches": 0,
+    "reruns": 0
+  },
+  "privacy": "Public source identities, public failure metadata, digest/path/permission schema and explicit unknowns only; no file contents, credentials or user data."
+}
