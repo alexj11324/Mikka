@@ -1,0 +1,209 @@
+{
+  "schema": "issue1512.root-recovery-journal-review.v1",
+  "recordedAt": "2026-11-09 14:37:17 UTC",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "baseHead": "f3466ba479ef51918790f521a288feaef5160e44",
+  "baseTree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+  "candidate": [
+    {
+      "name": "driver",
+      "sha": "104075571c73b97a985458f206dba310e4894490",
+      "bytes": 69119,
+      "sha256": "5c91fd686dbaf6e0a511761cdee5d14ae5f8f5d8c63dc5b6284e8a7ea5e16aec",
+      "gitHash": "104075571c73b97a985458f206dba310e4894490"
+    },
+    {
+      "name": "test",
+      "sha": "2e3c8c7aad0594df165caf8f798c72034b3d484f",
+      "bytes": 94496,
+      "sha256": "12da2b118255f1ea05399d915bd80dd87737e2f42b0a1ab6b7c19bf0d8bff775",
+      "gitHash": "2e3c8c7aad0594df165caf8f798c72034b3d484f"
+    },
+    {
+      "name": "workflow",
+      "sha": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+      "bytes": 14046,
+      "sha256": "be84c5b140af42a7bc57b040597b6098410318b470f90cc69b630911c006e0c5",
+      "lines": 298
+    },
+    {
+      "path": "docs/operations/tracing.md",
+      "sha": "7ec15f7515853877c5940b9e08106df50b0d5c55",
+      "bytes": 67256,
+      "sha256": "f61e248f7f5c8e287440bc4d3645f6c2d53887f105c1bc450e0ff37a79668975"
+    }
+  ],
+  "checks": {
+    "redOriginal63": true,
+    "redNew10": true,
+    "greenFinal74": true,
+    "old63RetainedInGreen": true,
+    "redNamesMatchCorrectedLedger": true,
+    "originalFileBytesContiguous": true,
+    "peerDocsWordsMatch": true,
+    "docsOtherBytesPreserved": true
+  },
+  "patch": [
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "hunks": 18,
+      "forwardExact": true,
+      "reverseExact": true,
+      "sourceSha256": "7fa1c032cb0d9b7c5a88c6262b559368445866691796b001648a95efea856950",
+      "resultSha256": "5c91fd686dbaf6e0a511761cdee5d14ae5f8f5d8c63dc5b6284e8a7ea5e16aec",
+      "resultBlob": "104075571c73b97a985458f206dba310e4894490"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "hunks": 2,
+      "forwardExact": true,
+      "reverseExact": true,
+      "sourceSha256": "b488d49afd89b833298d685dbb468a2520451a5be6f10711b7bdb76d66d5168a",
+      "resultSha256": "12da2b118255f1ea05399d915bd80dd87737e2f42b0a1ab6b7c19bf0d8bff775",
+      "resultBlob": "2e3c8c7aad0594df165caf8f798c72034b3d484f"
+    },
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "hunks": 1,
+      "forwardExact": true,
+      "reverseExact": true,
+      "sourceSha256": "474e7d33bcc1a521ae61ab30040f1715c376b2d8b160b5db89aacf2785aea8c4",
+      "resultSha256": "be84c5b140af42a7bc57b040597b6098410318b470f90cc69b630911c006e0c5",
+      "resultBlob": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4"
+    }
+  ],
+  "execution": {
+    "nodeVersion": "v24.22.1",
+    "exitCode": 0,
+    "tests": 74,
+    "passed": 74,
+    "failed": 0,
+    "skipped": 0,
+    "stdout": {
+      "sha": "a1532877ab93a5eacecba6ab038ee86480d1ac38",
+      "bytes": 8338,
+      "sha256": "515cb629d2017f3467ed762881b42c48a6df08c7b76882b29947a31995dfff1f"
+    },
+    "sourceManifestMatches": [
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "match": true
+      },
+      {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "match": true
+      },
+      {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "match": true
+      },
+      {
+        "path": "lib/desktop-rpc/wire.ts",
+        "match": true
+      },
+      {
+        "path": "lib/live/events.ts",
+        "match": true
+      },
+      {
+        "path": "scripts/acceptance/response-cookie-jar.mjs",
+        "match": true
+      },
+      {
+        "path": "messages/en.json",
+        "match": true
+      },
+      {
+        "path": "messages/zh-CN.json",
+        "match": true
+      }
+    ],
+    "rootExecutedTests": false,
+    "rootReadOriginalStoredOutputs": true,
+    "baselineChildExitCode": null,
+    "baselineExitCodeBoundary": "The first collector printed but did not separately persist the child returncode; MCP command argument echo exhausted its response budget. Complete stdout/stderr and source manifest were recovered and hash-verified. Do not infer or invent child exitCode."
+  },
+  "reviews": {
+    "recovery": {
+      "sha": "661d6db756bd200d50c8fc515b911d752ae2f84d",
+      "bytes": 16904,
+      "sha256": "cadc3c5a54ffb316ec38a03284d15d4a3b23a0da46db4bd093a9e7b368e50449"
+    },
+    "cost": {
+      "sha": "7fe9568e5b8d78f94127b492acef3b2d40228bba",
+      "bytes": 10006,
+      "sha256": "602292f79aab6bdabe13933a680ba03e16b435425d1018e9072166137267c007"
+    }
+  },
+  "cleanup": {
+    "metadata": {
+      "sha": "f0d110e767a1889ed67570d85c63bceef9022f7f",
+      "bytes": 1243,
+      "sha256": "3ee783c6cfe52005b2900209564bc1733e267549a2ab5de2e14aa0d2c7ab1f6f"
+    },
+    "version": 1,
+    "issue": 1512,
+    "provider": "Vercel Sandbox",
+    "scope": {
+      "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+      "teamId": "team_C7lwxVVvnUicFli6112mvxpv",
+      "name": "mikka-1512-recovery-journal-20261109",
+      "sessionId": "sbx_VDZZUEEfpugwSswy9NasNSW8A0BI"
+    },
+    "allocated": {
+      "vcpus": 1,
+      "memoryMiB": 2048,
+      "timeoutMs": 900000,
+      "networkAllowlist": [],
+      "ports": [],
+      "persistent": false,
+      "runtimeLabel": "node22",
+      "actualNode": "v24.22.1",
+      "startedAt": "2026-11-09T14:15:04.275Z"
+    },
+    "stopped": {
+      "status": "stopped",
+      "stoppedAt": "2026-11-09T14:27:42.881Z",
+      "durationMs": 758606,
+      "activeCpuDurationMs": 16360
+    },
+    "deleted": {
+      "status": "stopped",
+      "name": "mikka-1512-recovery-journal-20261109"
+    },
+    "exactAfterDelete": {
+      "operation": "GET /v2/sandboxes/{name}",
+      "status": 404,
+      "code": "not_found",
+      "resume": false
+    },
+    "activeOwnedResources": 0,
+    "productionAccountReads": 0,
+    "modelCalls": 0,
+    "dependencyInstalls": 0,
+    "repositoryRefsChanged": 0,
+    "boundary": "Only one sandbox; fixture HTTP is injected in-process and actual CLI uses a local global.fetch preload. No production account/session or model API was used."
+  },
+  "documentation": {
+    "scope": "One cost provenance paragraph, no full-document audit or new test gate.",
+    "originalBlob": "a02e4a5100c066d8564902ec287c9c92fee0d20e",
+    "rule": "P11: verified behavior against code",
+    "privateOrExternalDataAdded": false,
+    "queryChanged": false,
+    "semantics": "Captured per-call amount is not by itself actual subscription cash charge; ZeroCat computes configured-price usage amount; absent cost stays unknown."
+  },
+  "sourceRefsUpdated": false,
+  "wholeUnionCIClaimed": false,
+  "productionAcceptedCases": 0,
+  "limitations": [
+    "This is source review and byte comparison only. The reviewer did not execute tests or inspect runtime, production or test-run artifacts.",
+    "The final test registration count is a static count, not a claim that tests passed.",
+    "The journal accepts a conservative ASCII identifier grammar for modelId/provider. Legitimate custom model strings allowed by the broader product API can be refused before the case's configuration writes.",
+    "Client persistence and a server mutation are not a single atomic transaction. A lost selection response may leave only an intent; a real implicit binding receipt is never fabricated.",
+    "SIGKILL cannot guarantee JavaScript finally cleanup. The last synced local snapshot may predate a received acknowledgement, and a destroyed runner can prevent artifact upload even with always().",
+    "The existing explicit model picker and fallback boolean APIs have no CAS; this patch retains their prior compare-before-write boundary.",
+    "The fixed recovery path holds one execution snapshot. The initial checkpoint replaces an old same-path snapshot; separate workflow runners and per-run artifacts retain earlier production receipts.",
+    "A recovery journal provides evidence for the existing authorized recovery paths. It does not authorize overwriting concurrent changes or create an automatic general recovery engine."
+  ]
+}

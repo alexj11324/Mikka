@@ -1,0 +1,22 @@
+{
+  "view": {
+    "path": "lib/bot-model-menu-view.ts",
+    "gitBlob": "e67085a6a5f070fe94c635f6efaeaec5795b3f62"
+  },
+  "menu": {
+    "path": "lib/bot-model-menu.ts",
+    "gitBlob": "74b14c3070d37b4c50591cf8849dc43fe5b7de96",
+    "lines": "69,75,87,114-129"
+  },
+  "route": {
+    "path": "app/api/mobile/model/route.ts",
+    "gitBlob": "3dafb8efb5792af91aaa26a386e9426a9a2478a6"
+  },
+  "contract": {
+    "hosted": "all-zero UUID id; modelId empty; provider mikka",
+    "subscription": "UUID binding ID, including shared subscriptions (kind remains subscription)",
+    "apiKey": "apikey:<UUID key ID>:<model>; kind apiKey for own, shared for teammate key",
+    "fields": "kind enum, chosen boolean, modelId/provider/id strings; credentialLabel/quota/owner labels excluded"
+  },
+  "compatibilityBoundary": "Journal identifier grammar is intentionally narrower than the product's trimmed custom model string. Unknown/nonidentifier values fail before configuration mutation; this is not claimed to cover every custom model string."
+}

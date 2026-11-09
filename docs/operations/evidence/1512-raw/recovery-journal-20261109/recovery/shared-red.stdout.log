@@ -1,0 +1,30 @@
+✖ recovery metadata preserves the actual shared API-key menu shape and restores its explicit choice (68.038602ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 234.257936
+
+✖ failing tests:
+
+test at scripts/acceptance/run-observability.test.mjs:1356:1
+✖ recovery metadata preserves the actual shared API-key menu shape and restores its explicit choice (68.038602ms)
+  AssertionError [ERR_ASSERTION]: {"version":1,"issue":1512,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"execute","status":"blocked","startedAt":"2026-11-09T14:22:48.086Z","browserReplayVerified":false,"posthogIngestionVerified":false,"budget":{"submissionsPerModel":1,"nativeRunsByFlowVersion":{"1":3,"2":2},"enforcement":"stop_on_first_observed_excess","timeoutMs":480000,"paidResubmissions":0,"hardDollarCap":false},"modelCase":"claude","submissionSource":"api","cases":[{"case":"claude","model":"claude-haiku-5-5","status":"blocked","cleanup":{"state":"complete","profileArchived":true,"modelRestored":true,"evidence":"retained","ownRunsStopped":true,"ownMachinesEnded":true,"machines":[]},"preflight":{"ownSubscription":true,"cloudReady":true,"workspaceIdle":true,"modelRestorable":true,"paidFallbackOff":true,"soleFixedProfileAvailable":true,"liveReady":true},"code":"recovery_metadata_invalid","durationMs":8}],"sessionClosed":true,"preparation":{"requested":false,"profilesDisabled":0,"profilesRestored":0,"fallbackChanged":false,"restoration":"not_needed"},"recovery":{"version":1,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","scope":{"ownerId":"ordinary-owner","workspaceId":"10000000-0000-4000-8000-000000000001","botId":"10000000-0000-4000-8000-000000000002"},"sequence":3,"checkpointFailures":0,"preparation":{"profiles":[],"fallback":null},"cases":[]},"workspaceId":"10000000-0000-4000-8000-000000000001","workspaceSelection":"current_personal","botId":"10000000-0000-4000-8000-000000000002","finishedAt":"2026-11-09T14:22:48.151Z"}
+  + actual - expected
+  
+  + 'blocked'
+  - 'runtime_verified'
+  
+      at TestContext.<anonymous> (file:///vercel/recovery-journal/scripts/acceptance/run-observability.test.mjs:1374:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'blocked',
+    expected: 'runtime_verified',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

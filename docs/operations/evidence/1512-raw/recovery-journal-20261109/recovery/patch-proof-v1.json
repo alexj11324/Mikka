@@ -1,0 +1,50 @@
+{
+  "forwardExact": true,
+  "reverseExact": true,
+  "commands": [
+    {
+      "cmd": [
+        "git",
+        "apply",
+        "--check",
+        "../recovery-v1.patch"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "cmd": [
+        "git",
+        "apply",
+        "../recovery-v1.patch"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "cmd": [
+        "git",
+        "apply",
+        "--reverse",
+        "--check",
+        "../recovery-v1.patch"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "cmd": [
+        "git",
+        "apply",
+        "--reverse",
+        "../recovery-v1.patch"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ]
+}

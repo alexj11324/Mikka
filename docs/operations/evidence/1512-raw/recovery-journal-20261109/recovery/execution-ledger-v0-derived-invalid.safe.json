@@ -1,0 +1,441 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "environment": {
+    "node": "v24.22.1",
+    "kind": "one disposable Linux sandbox with no application/database/account",
+    "fixtureTestsOnly": true
+  },
+  "baseline": {
+    "driverBlob": "002b8501cd4f4df023148515add7c55e2863dbd3",
+    "testBlob": "df79be1b3ee88168a65865adb7432bbd25bf6f33",
+    "workflowBlob": "b248a4d97240ba895c3c165b2d7d5c4a763ffe23",
+    "command": [
+      "node",
+      "--test",
+      "scripts/acceptance/run-observability.test.mjs"
+    ],
+    "tests": 73,
+    "passed": 63,
+    "failed": 10,
+    "skipped": 0,
+    "nodeExitCode": null,
+    "pythonCollectorExitCode": 0,
+    "nodeExitCodeBoundary": "The first collector printed but did not separately persist the child returncode; MCP command argument echo exhausted its response budget. Complete stdout/stderr and source manifest were recovered and hash-verified. Do not infer or invent child exitCode.",
+    "failures": [
+      {
+        "failureClass": "checkpoint_callback_not_called_before_mutation",
+        "assertionKind": "assertion"
+      },
+      {
+        "test": "recovery journal refuses each new setting write when its preceding checkpoint fails",
+        "failureClass": "model_ack_checkpoint_callback_not_called",
+        "assertionKind": "assertion"
+      },
+      {
+        "test": "recovery journal failure after a model acknowledgement still restores explicit and implicit selections",
+        "failureClass": "preparation_ack_checkpoint_callback_not_called",
+        "assertionKind": "assertion"
+      },
+      {
+        "test": "recovery journal failure after each preparation acknowledgement does not prevent restoration",
+        "failureClass": "persistent_checkpoint_callback_not_called",
+        "assertionKind": "assertion"
+      },
+      {
+        "test": "persistent checkpoint failures cannot interrupt any already-required cleanup or permit another case",
+        "failureClass": "no_recovery_snapshot_callback",
+        "assertionKind": "assertion"
+      },
+      {
+        "test": "recovery journal retains only validated recovery metadata and isolates callback mutation",
+        "failureClass": "report_missing_recovery_cases",
+        "assertionKind": "assertion"
+      },
+      {
+        "test": "failed cleanup reports retain the original explicit model and acknowledged implicit binding without guessing",
+        "failureClass": "report_missing_unacknowledged_intent",
+        "assertionKind": "missing_report_projection"
+      },
+      {
+        "test": "a lost temporary selection response records intent without inventing a binding receipt",
+        "failureClass": "report_missing_profile_recovery_metadata",
+        "assertionKind": "missing_report_projection"
+      },
+      {
+        "test": "an unresolved profile restore retains only the exact acknowledged version and digest",
+        "failureClass": "CLI_did_not_replace_existing_file",
+        "assertionKind": "missing_report_projection"
+      },
+      {
+        "test": "actual CLI writes the fixed atomic 0600 recovery file and blocks before HTTP when persistence fails",
+        "failureClass": "workflow_did_not_include_recovery_file",
+        "assertionKind": "CLI_old_file_not_replaced"
+      },
+      {
+        "test": "the existing safe artifact includes only the fixed recovery filename alongside the reports",
+        "assertionKind": "assertion"
+      }
+    ]
+  },
+  "v1Green": {
+    "nodeVersion": "v24.22.1",
+    "exitCode": 0,
+    "command": [
+      "node",
+      "--test",
+      "scripts/acceptance/run-observability.test.mjs"
+    ],
+    "manifest": [
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "bytes": 69094,
+        "sha256": "31b58c43d56de3c7ddae443551cbc2a20c511796a2f1fc88bd4de723d1fb8b9f"
+      },
+      {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "bytes": 92889,
+        "sha256": "afaa44c730e054274e44048ff9b5125f1ec17d610ffe8a8810eaabd968c0d0c9"
+      },
+      {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "bytes": 14046,
+        "sha256": "be84c5b140af42a7bc57b040597b6098410318b470f90cc69b630911c006e0c5"
+      },
+      {
+        "path": "lib/desktop-rpc/wire.ts",
+        "bytes": 5364,
+        "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3"
+      },
+      {
+        "path": "lib/live/events.ts",
+        "bytes": 4679,
+        "sha256": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5"
+      },
+      {
+        "path": "scripts/acceptance/response-cookie-jar.mjs",
+        "bytes": 2277,
+        "sha256": "7fa2b75283ae1c239bf3c613f9176a861d42debd18256b383d26bbc6b39a4178"
+      },
+      {
+        "path": "messages/en.json",
+        "bytes": 252821,
+        "sha256": "b3bda8ced94b1c0ba9cbbb39de18d06ce9e85dbc1b50ec3099837c6a9ab36efa"
+      },
+      {
+        "path": "messages/zh-CN.json",
+        "bytes": 243494,
+        "sha256": "f81068a50e63fe02f08b46805f635818ca3a29e72a24b98c6d368ad9f3e152e9"
+      }
+    ],
+    "stdoutBytes": 8216,
+    "stdoutSha256": "2f91b10714ad5384081bcf885d04bc83a750b5b923dc15be842cf266507b1dc0",
+    "stderrBytes": 0,
+    "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "schemaCounterexample": {
+    "exitCode": 1,
+    "command": [
+      "node",
+      "--test",
+      "--test-name-pattern=actual shared API-key",
+      "scripts/acceptance/run-observability.test.mjs"
+    ],
+    "driverSha256": "18f7c76f1e80ef9b0f44135d2d225e40c6ae50f33b193bcf457bbc2c906f9fe5",
+    "testSha256": "12da2b118255f1ea05399d915bd80dd87737e2f42b0a1ab6b7c19bf0d8bff775",
+    "tests": 1,
+    "passed": 0,
+    "failed": 1,
+    "reason": "Actual shared API-key current shape was safely refused by the initial UUID-only branch; the final projection accepts the existing apikey:UUID:model form for kind shared."
+  },
+  "beforeWhitespaceOnlyFinal": {
+    "nodeVersion": "v24.22.1",
+    "exitCode": 0,
+    "command": [
+      "node",
+      "--test",
+      "scripts/acceptance/run-observability.test.mjs"
+    ],
+    "manifest": [
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "bytes": 69123,
+        "sha256": "b9b2b727e2a0656636744553d351260c9f1b62b0bf2e0a6700b3f41d270ad5b5"
+      },
+      {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "bytes": 94496,
+        "sha256": "12da2b118255f1ea05399d915bd80dd87737e2f42b0a1ab6b7c19bf0d8bff775"
+      },
+      {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "bytes": 14046,
+        "sha256": "be84c5b140af42a7bc57b040597b6098410318b470f90cc69b630911c006e0c5"
+      },
+      {
+        "path": "lib/desktop-rpc/wire.ts",
+        "bytes": 5364,
+        "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3"
+      },
+      {
+        "path": "lib/live/events.ts",
+        "bytes": 4679,
+        "sha256": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5"
+      },
+      {
+        "path": "scripts/acceptance/response-cookie-jar.mjs",
+        "bytes": 2277,
+        "sha256": "7fa2b75283ae1c239bf3c613f9176a861d42debd18256b383d26bbc6b39a4178"
+      },
+      {
+        "path": "messages/en.json",
+        "bytes": 252821,
+        "sha256": "b3bda8ced94b1c0ba9cbbb39de18d06ce9e85dbc1b50ec3099837c6a9ab36efa"
+      },
+      {
+        "path": "messages/zh-CN.json",
+        "bytes": 243494,
+        "sha256": "f81068a50e63fe02f08b46805f635818ca3a29e72a24b98c6d368ad9f3e152e9"
+      }
+    ],
+    "stdoutBytes": 8334,
+    "stdoutSha256": "6ca72d2968a74d37a6b0a208fc6075208291b7a67f04daf541d893d5c7b30708",
+    "stderrBytes": 0,
+    "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "final": {
+    "nodeVersion": "v24.22.1",
+    "exitCode": 0,
+    "command": [
+      "node",
+      "--test",
+      "scripts/acceptance/run-observability.test.mjs"
+    ],
+    "manifest": [
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "bytes": 69119,
+        "sha256": "5c91fd686dbaf6e0a511761cdee5d14ae5f8f5d8c63dc5b6284e8a7ea5e16aec"
+      },
+      {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "bytes": 94496,
+        "sha256": "12da2b118255f1ea05399d915bd80dd87737e2f42b0a1ab6b7c19bf0d8bff775"
+      },
+      {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "bytes": 14046,
+        "sha256": "be84c5b140af42a7bc57b040597b6098410318b470f90cc69b630911c006e0c5"
+      },
+      {
+        "path": "lib/desktop-rpc/wire.ts",
+        "bytes": 5364,
+        "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3"
+      },
+      {
+        "path": "lib/live/events.ts",
+        "bytes": 4679,
+        "sha256": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5"
+      },
+      {
+        "path": "scripts/acceptance/response-cookie-jar.mjs",
+        "bytes": 2277,
+        "sha256": "7fa2b75283ae1c239bf3c613f9176a861d42debd18256b383d26bbc6b39a4178"
+      },
+      {
+        "path": "messages/en.json",
+        "bytes": 252821,
+        "sha256": "b3bda8ced94b1c0ba9cbbb39de18d06ce9e85dbc1b50ec3099837c6a9ab36efa"
+      },
+      {
+        "path": "messages/zh-CN.json",
+        "bytes": 243494,
+        "sha256": "f81068a50e63fe02f08b46805f635818ca3a29e72a24b98c6d368ad9f3e152e9"
+      }
+    ],
+    "stdoutBytes": 8338,
+    "stdoutSha256": "515cb629d2017f3467ed762881b42c48a6df08c7b76882b29947a31995dfff1f",
+    "stderrBytes": 0,
+    "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tests": 74,
+    "passed": 74,
+    "failed": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "originalTests": {
+    "sourceBlob": "aab0a21c4c8fadb9df81ff87ada4fa23198fa575",
+    "sha256": "b488d49afd89b833298d685dbb468a2520451a5be6f10711b7bdb76d66d5168a",
+    "bodyByteForBytePreserved": true,
+    "prefixOnlyFiveNewImports": true,
+    "originalExecutedTests": 63,
+    "originalNamesRetainedExactlyOnce": true,
+    "originalNames": [
+      "preflight reads both exact subscription paths without creating profiles, changing settings or submitting tasks",
+      "preflight excludes only a version-bound Factory task proven to belong to another workspace",
+      "preflight keeps same-workspace, missing and mismatched Factory scope proofs blocked",
+      "preflight does not convert current-workspace failed or blocked Factory tasks into terminal tasks",
+      "preflight does not request scope details for already settled Factory tasks",
+      "foreign historical Factory tasks remain untouched while failed owned acceptance still cancels its task",
+      "a default team switches only this login session to its verified personal workspace before reading Coordinator",
+      "workspace selection rejects ambiguous choices, teams and another account personal membership before switching",
+      "workspace switch acknowledgement and cookie readback failures stop before Coordinator and close the session",
+      "unsafe configuration blocks before any model call and reports only closed failure codes",
+      "two executed cases retain exact native receipts, restore model/profile state and never fabricate replay evidence",
+      "successful terminal runs close only their own machines and retain task evidence",
+      "a missing machine requires a fresh owned run and an explicit null machine read",
+      "machine failures never turn a completed task green and do not prevent closing another owned machine",
+      "legacy Factory tasks still require review and verify before the normal deliverable acceptance",
+      "missing, failed or stale Factory checks never reach approval, including legacy verify",
+      "deliverable approval requires its receipt, never accepts a repository and never retries a lost response",
+      "uncertain mutation responses never resubmit and still reconcile own temporary settings",
+      "wrong provider/model and an extra native attempt stop the case without retrying",
+      "pure source and budget guards reject shared credentials, inherited model choices and retries",
+      "cleanup preserves a concurrent model edit and reports incomplete restoration",
+      "prepare is explicit, requires execution and restores only its acknowledged settings",
+      "prepare refuses visible activity in authorized workspaces and inherited model choices without changing settings",
+      "a blocked case does not prevent preparation and execution of another available model",
+      "preparation failures restore acknowledged writes but never guess after a lost response",
+      "restoration failures and concurrent edits remain visible without overwriting them",
+      "issue inventory follows real opaque cursors beyond 100 rows and rejects a moving scan",
+      "browser submission requires one executed case and does not authenticate on invalid options",
+      "browser mode publishes readiness then observes the real-shaped UI click through push without an API submission",
+      "browser waiting times out or blocks changed UI text without sending or repeating a task",
+      "live transport waits for actual invalidations, rejects disconnects and keeps capabilities out of reports",
+      "implicit default preflight requires server absence evidence and never writes a preference",
+      "implicit default restores absence with the stored binding and revision, not the catalogue option",
+      "implicit default never overwrites a preference created after preflight",
+      "implicit default stops after a lost or incomplete first selection receipt without guessing ownership",
+      "implicit default preserves a same-value concurrent rewrite when the revision no longer matches",
+      "implicit default checks absence once after a lost restoration response and does not repeat deletion",
+      "all Factory reads, writes, approval and cleanup pin the authorized personal workspace even when a team is listed first",
+      "Factory authority refusals remain failures without retrying an implicit workspace",
+      "Factory cleanup keeps its explicit workspace and exposes revoked authority or mismatch instead of retrying elsewhere",
+      "malformed or foreign personal workspace selection stops before any Factory call",
+      "workspace A idle cannot hide workspace B activity in either scoped reader",
+      "idle proof covers every authorized workspace but reports only the existing 30-day visible window and is not atomic",
+      "workspace inventory errors, missing pages, unknown memberships and the workspace cap fail before changing settings",
+      "a changed workspace inventory cannot turn an incomplete scan into an idle proof",
+      "scoped run reads reject saturation, delta or missing rows, malformed data and a foreign scope",
+      "fresh authorization failures in another workspace and during restoration remain visible",
+      "the scan rejects a 30-day row expiry at or during the scan and never filters it away",
+      "one overall scan deadline and backwards time fail closed without extending the scan per workspace",
+      "a real request AbortSignal expires within the remaining scan deadline and closes the login session",
+      "the finite workspace cap and 199-row boundary can succeed without paging or widening the 30-day read",
+      "profile preflight refuses workspace admission denied instead of treating any 404 as absence",
+      "profile cleanup refuses workspace admission denied without falsely marking an existing profile archived",
+      "profile preflight refuses profile scope denied instead of treating any 404 as absence",
+      "profile cleanup refuses profile scope denied without falsely marking an existing profile archived",
+      "profile preflight refuses unknown error instead of treating any 404 as absence",
+      "profile cleanup refuses unknown error without falsely marking an existing profile archived",
+      "profile preflight refuses nested not-found code instead of treating any 404 as absence",
+      "profile cleanup refuses nested not-found code without falsely marking an existing profile archived",
+      "profile preflight refuses malformed JSON instead of treating any 404 as absence",
+      "profile cleanup refuses malformed JSON without falsely marking an existing profile archived",
+      "profile absence preflight accepts only the normal authorized missing-profile response",
+      "profile absence cleanup accepts an authorized exact missing-profile code without a DELETE retry"
+    ],
+    "finalNames": [
+      "preflight reads both exact subscription paths without creating profiles, changing settings or submitting tasks",
+      "preflight excludes only a version-bound Factory task proven to belong to another workspace",
+      "preflight keeps same-workspace, missing and mismatched Factory scope proofs blocked",
+      "preflight does not convert current-workspace failed or blocked Factory tasks into terminal tasks",
+      "preflight does not request scope details for already settled Factory tasks",
+      "foreign historical Factory tasks remain untouched while failed owned acceptance still cancels its task",
+      "a default team switches only this login session to its verified personal workspace before reading Coordinator",
+      "workspace selection rejects ambiguous choices, teams and another account personal membership before switching",
+      "workspace switch acknowledgement and cookie readback failures stop before Coordinator and close the session",
+      "unsafe configuration blocks before any model call and reports only closed failure codes",
+      "two executed cases retain exact native receipts, restore model/profile state and never fabricate replay evidence",
+      "successful terminal runs close only their own machines and retain task evidence",
+      "a missing machine requires a fresh owned run and an explicit null machine read",
+      "machine failures never turn a completed task green and do not prevent closing another owned machine",
+      "legacy Factory tasks still require review and verify before the normal deliverable acceptance",
+      "missing, failed or stale Factory checks never reach approval, including legacy verify",
+      "deliverable approval requires its receipt, never accepts a repository and never retries a lost response",
+      "uncertain mutation responses never resubmit and still reconcile own temporary settings",
+      "wrong provider/model and an extra native attempt stop the case without retrying",
+      "pure source and budget guards reject shared credentials, inherited model choices and retries",
+      "cleanup preserves a concurrent model edit and reports incomplete restoration",
+      "prepare is explicit, requires execution and restores only its acknowledged settings",
+      "prepare refuses visible activity in authorized workspaces and inherited model choices without changing settings",
+      "a blocked case does not prevent preparation and execution of another available model",
+      "preparation failures restore acknowledged writes but never guess after a lost response",
+      "restoration failures and concurrent edits remain visible without overwriting them",
+      "issue inventory follows real opaque cursors beyond 100 rows and rejects a moving scan",
+      "browser submission requires one executed case and does not authenticate on invalid options",
+      "browser mode publishes readiness then observes the real-shaped UI click through push without an API submission",
+      "browser waiting times out or blocks changed UI text without sending or repeating a task",
+      "live transport waits for actual invalidations, rejects disconnects and keeps capabilities out of reports",
+      "implicit default preflight requires server absence evidence and never writes a preference",
+      "implicit default restores absence with the stored binding and revision, not the catalogue option",
+      "implicit default never overwrites a preference created after preflight",
+      "implicit default stops after a lost or incomplete first selection receipt without guessing ownership",
+      "implicit default preserves a same-value concurrent rewrite when the revision no longer matches",
+      "implicit default checks absence once after a lost restoration response and does not repeat deletion",
+      "all Factory reads, writes, approval and cleanup pin the authorized personal workspace even when a team is listed first",
+      "Factory authority refusals remain failures without retrying an implicit workspace",
+      "Factory cleanup keeps its explicit workspace and exposes revoked authority or mismatch instead of retrying elsewhere",
+      "malformed or foreign personal workspace selection stops before any Factory call",
+      "workspace A idle cannot hide workspace B activity in either scoped reader",
+      "idle proof covers every authorized workspace but reports only the existing 30-day visible window and is not atomic",
+      "workspace inventory errors, missing pages, unknown memberships and the workspace cap fail before changing settings",
+      "a changed workspace inventory cannot turn an incomplete scan into an idle proof",
+      "scoped run reads reject saturation, delta or missing rows, malformed data and a foreign scope",
+      "fresh authorization failures in another workspace and during restoration remain visible",
+      "the scan rejects a 30-day row expiry at or during the scan and never filters it away",
+      "one overall scan deadline and backwards time fail closed without extending the scan per workspace",
+      "a real request AbortSignal expires within the remaining scan deadline and closes the login session",
+      "the finite workspace cap and 199-row boundary can succeed without paging or widening the 30-day read",
+      "profile preflight refuses workspace admission denied instead of treating any 404 as absence",
+      "profile cleanup refuses workspace admission denied without falsely marking an existing profile archived",
+      "profile preflight refuses profile scope denied instead of treating any 404 as absence",
+      "profile cleanup refuses profile scope denied without falsely marking an existing profile archived",
+      "profile preflight refuses unknown error instead of treating any 404 as absence",
+      "profile cleanup refuses unknown error without falsely marking an existing profile archived",
+      "profile preflight refuses nested not-found code instead of treating any 404 as absence",
+      "profile cleanup refuses nested not-found code without falsely marking an existing profile archived",
+      "profile preflight refuses malformed JSON instead of treating any 404 as absence",
+      "profile cleanup refuses malformed JSON without falsely marking an existing profile archived",
+      "profile absence preflight accepts only the normal authorized missing-profile response",
+      "profile absence cleanup accepts an authorized exact missing-profile code without a DELETE retry",
+      "recovery journal refuses each new setting write when its preceding checkpoint fails",
+      "recovery journal failure after a model acknowledgement still restores explicit and implicit selections",
+      "recovery journal failure after each preparation acknowledgement does not prevent restoration",
+      "persistent checkpoint failures cannot interrupt any already-required cleanup or permit another case",
+      "recovery journal retains only validated recovery metadata and isolates callback mutation",
+      "failed cleanup reports retain the original explicit model and acknowledged implicit binding without guessing",
+      "a lost temporary selection response records intent without inventing a binding receipt",
+      "an unresolved profile restore retains only the exact acknowledged version and digest",
+      "actual CLI writes the fixed atomic 0600 recovery file and blocks before HTTP when persistence fails",
+      "the existing safe artifact includes only the fixed recovery filename alongside the reports",
+      "recovery metadata preserves the actual shared API-key menu shape and restores its explicit choice"
+    ]
+  },
+  "sourceValidation": {
+    "gitApplyProofArtifact": "patch-proof-final-indent.json",
+    "allThreeFilesForwardReverseExact": true,
+    "lintRun": false,
+    "typecheckRun": false,
+    "whyNot": "No package installation or unrelated suite execution. Final canonical CI remains required."
+  },
+  "retainedOperationalFailures": [
+    {
+      "kind": "setup_before_process_start",
+      "code": "command_failed",
+      "status": 400,
+      "reason": "single argument exceeded OS argv length",
+      "effect": "No test process started; split argv input then succeeded."
+    },
+    {
+      "kind": "artifact_transport",
+      "reason": "MCP per-string truncation; raw files recovered as fixed byte chunks and SHA-verified; no test rerun for transport"
+    },
+    {
+      "kind": "post_cleanup_read",
+      "status": 404,
+      "reason": "One attempted read of the first command's returncode after deletion was unavailable; no resource restarted."
+    }
+  ]
+}

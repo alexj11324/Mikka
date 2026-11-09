@@ -1,0 +1,456 @@
+✔ preflight reads both exact subscription paths without creating profiles, changing settings or submitting tasks (80.070549ms)
+✔ preflight excludes only a version-bound Factory task proven to belong to another workspace (6.24829ms)
+✔ preflight keeps same-workspace, missing and mismatched Factory scope proofs blocked (42.439341ms)
+✔ preflight does not convert current-workspace failed or blocked Factory tasks into terminal tasks (6.23226ms)
+✔ preflight does not request scope details for already settled Factory tasks (14.458593ms)
+✔ foreign historical Factory tasks remain untouched while failed owned acceptance still cancels its task (21.186548ms)
+✔ a default team switches only this login session to its verified personal workspace before reading Coordinator (3.186565ms)
+✔ workspace selection rejects ambiguous choices, teams and another account personal membership before switching (24.053943ms)
+✔ workspace switch acknowledgement and cookie readback failures stop before Coordinator and close the session (2.255894ms)
+✔ unsafe configuration blocks before any model call and reports only closed failure codes (6.687309ms)
+✔ two executed cases retain exact native receipts, restore model/profile state and never fabricate replay evidence (22.125786ms)
+✔ successful terminal runs close only their own machines and retain task evidence (8.886428ms)
+✔ a missing machine requires a fresh owned run and an explicit null machine read (19.672885ms)
+✔ machine failures never turn a completed task green and do not prevent closing another owned machine (106.674235ms)
+✔ legacy Factory tasks still require review and verify before the normal deliverable acceptance (8.779031ms)
+✔ missing, failed or stale Factory checks never reach approval, including legacy verify (34.093493ms)
+✔ deliverable approval requires its receipt, never accepts a repository and never retries a lost response (23.784638ms)
+✔ uncertain mutation responses never resubmit and still reconcile own temporary settings (7.504773ms)
+✔ wrong provider/model and an extra native attempt stop the case without retrying (12.946945ms)
+✔ pure source and budget guards reject shared credentials, inherited model choices and retries (0.417023ms)
+✔ cleanup preserves a concurrent model edit and reports incomplete restoration (5.259584ms)
+✔ prepare is explicit, requires execution and restores only its acknowledged settings (33.309259ms)
+✔ prepare refuses visible activity in authorized workspaces and inherited model choices without changing settings (2.792471ms)
+✔ a blocked case does not prevent preparation and execution of another available model (15.416324ms)
+✔ preparation failures restore acknowledged writes but never guess after a lost response (16.38139ms)
+✔ restoration failures and concurrent edits remain visible without overwriting them (51.936057ms)
+✔ issue inventory follows real opaque cursors beyond 100 rows and rejects a moving scan (1.708883ms)
+✔ browser submission requires one executed case and does not authenticate on invalid options (0.218023ms)
+✔ browser mode publishes readiness then observes the real-shaped UI click through push without an API submission (25.856706ms)
+✔ browser waiting times out or blocks changed UI text without sending or repeating a task (5.011474ms)
+✔ live transport waits for actual invalidations, rejects disconnects and keeps capabilities out of reports (2.604701ms)
+✔ implicit default preflight requires server absence evidence and never writes a preference (2.513204ms)
+✔ implicit default restores absence with the stored binding and revision, not the catalogue option (5.667552ms)
+✔ implicit default never overwrites a preference created after preflight (1.812768ms)
+✔ implicit default stops after a lost or incomplete first selection receipt without guessing ownership (3.349202ms)
+✔ implicit default preserves a same-value concurrent rewrite when the revision no longer matches (11.18817ms)
+✔ implicit default checks absence once after a lost restoration response and does not repeat deletion (6.700661ms)
+✔ all Factory reads, writes, approval and cleanup pin the authorized personal workspace even when a team is listed first (51.364227ms)
+✔ Factory authority refusals remain failures without retrying an implicit workspace (4.036578ms)
+✔ Factory cleanup keeps its explicit workspace and exposes revoked authority or mismatch instead of retrying elsewhere (25.189564ms)
+✔ malformed or foreign personal workspace selection stops before any Factory call (1.756933ms)
+✔ workspace A idle cannot hide workspace B activity in either scoped reader (8.641471ms)
+✔ idle proof covers every authorized workspace but reports only the existing 30-day visible window and is not atomic (39.473794ms)
+✔ workspace inventory errors, missing pages, unknown memberships and the workspace cap fail before changing settings (12.665702ms)
+✔ a changed workspace inventory cannot turn an incomplete scan into an idle proof (1.259546ms)
+✔ scoped run reads reject saturation, delta or missing rows, malformed data and a foreign scope (38.789879ms)
+✔ fresh authorization failures in another workspace and during restoration remain visible (9.547495ms)
+✔ the scan rejects a 30-day row expiry at or during the scan and never filters it away (5.100666ms)
+✔ one overall scan deadline and backwards time fail closed without extending the scan per workspace (3.685048ms)
+✔ a real request AbortSignal expires within the remaining scan deadline and closes the login session (38.363973ms)
+✔ the finite workspace cap and 199-row boundary can succeed without paging or widening the 30-day read (82.641077ms)
+✔ profile preflight refuses workspace admission denied instead of treating any 404 as absence (1.70477ms)
+✔ profile cleanup refuses workspace admission denied without falsely marking an existing profile archived (5.776452ms)
+✔ profile preflight refuses profile scope denied instead of treating any 404 as absence (1.197239ms)
+✔ profile cleanup refuses profile scope denied without falsely marking an existing profile archived (11.105598ms)
+✔ profile preflight refuses unknown error instead of treating any 404 as absence (1.241255ms)
+✔ profile cleanup refuses unknown error without falsely marking an existing profile archived (13.016958ms)
+✔ profile preflight refuses nested not-found code instead of treating any 404 as absence (1.255913ms)
+✔ profile cleanup refuses nested not-found code without falsely marking an existing profile archived (4.998881ms)
+✔ profile preflight refuses malformed JSON instead of treating any 404 as absence (1.286884ms)
+✔ profile cleanup refuses malformed JSON without falsely marking an existing profile archived (5.412341ms)
+✔ profile absence preflight accepts only the normal authorized missing-profile response (11.939219ms)
+✔ profile absence cleanup accepts an authorized exact missing-profile code without a DELETE retry (7.322226ms)
+✖ recovery journal refuses each new setting write when its preceding checkpoint fails (8.428522ms)
+✖ recovery journal failure after a model acknowledgement still restores explicit and implicit selections (5.573995ms)
+✖ recovery journal failure after each preparation acknowledgement does not prevent restoration (20.103002ms)
+✖ persistent checkpoint failures cannot interrupt any already-required cleanup or permit another case (15.620603ms)
+✖ recovery journal retains only validated recovery metadata and isolates callback mutation (25.198901ms)
+✖ failed cleanup reports retain the original explicit model and acknowledged implicit binding without guessing (9.964545ms)
+✖ a lost temporary selection response records intent without inventing a binding receipt (1.787075ms)
+✖ an unresolved profile restore retains only the exact acknowledged version and digest (8.240123ms)
+✖ actual CLI writes the fixed atomic 0600 recovery file and blocks before HTTP when persistence fails (201.358919ms)
+✖ the existing safe artifact includes only the fixed recovery filename alongside the reports (3.881065ms)
+ℹ tests 73
+ℹ suites 0
+ℹ pass 63
+ℹ fail 10
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1526.26684
+
+✖ failing tests:
+
+test at scripts/acceptance/run-observability.test.mjs:1152:1
+✖ recovery journal refuses each new setting write when its preceding checkpoint fails (8.428522ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///vercel/recovery-journal/scripts/acceptance/run-observability.test.mjs:1161:12)
+      at runNextTicks (node:internal/process/task_queues:65:5)
+      at listOnTimeout (node:internal/timers:644:9)
+      at process.processTimers (node:internal/timers:618:7)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/acceptance/run-observability.test.mjs:1172:1
+✖ recovery journal failure after a model acknowledgement still restores explicit and implicit selections (5.573995ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///vercel/recovery-journal/scripts/acceptance/run-observability.test.mjs:1183:12)
+      at runNextTicks (node:internal/process/task_queues:65:5)
+      at listOnTimeout (node:internal/timers:644:9)
+      at process.processTimers (node:internal/timers:618:7)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/acceptance/run-observability.test.mjs:1196:1
+✖ recovery journal failure after each preparation acknowledgement does not prevent restoration (20.103002ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///vercel/recovery-journal/scripts/acceptance/run-observability.test.mjs:1204:12)
+      at runNextTicks (node:internal/process/task_queues:65:5)
+      at listOnTimeout (node:internal/timers:644:9)
+      at process.processTimers (node:internal/timers:618:7)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/acceptance/run-observability.test.mjs:1215:1
+✖ persistent checkpoint failures cannot interrupt any already-required cleanup or permit another case (15.620603ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (file:///vercel/recovery-journal/scripts/acceptance/run-observability.test.mjs:1222:10)
+      at runNextTicks (node:internal/process/task_queues:65:5)
+      at listOnTimeout (node:internal/timers:644:9)
+      at process.processTimers (node:internal/timers:618:7)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at scripts/acceptance/run-observability.test.mjs:1235:1
+✖ recovery journal retains only validated recovery metadata and isolates callback mutation (25.198901ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(snapshots.length > 0)
+  
+      at TestContext.<anonymous> (file:///vercel/recovery-journal/scripts/acceptance/run-observability.test.mjs:1253:10)
+      at runNextTicks (node:internal/process/task_queues:65:5)
+      at listOnTimeout (node:internal/timers:644:9)
+      at process.processTimers (node:internal/timers:618:7)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at scripts/acceptance/run-observability.test.mjs:1273:1
+✖ failed cleanup reports retain the original explicit model and acknowledged implicit binding without guessing (9.964545ms)
+  TypeError [Error]: Cannot read properties of undefined (reading 'cases')
+      at TestContext.<anonymous> (file:///vercel/recovery-journal/scripts/acceptance/run-observability.test.mjs:1277:44)
+      at runNextTicks (node:internal/process/task_queues:65:5)
+      at listOnTimeout (node:internal/timers:644:9)
+      at process.processTimers (node:internal/timers:618:7)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at scripts/acceptance/run-observability.test.mjs:1290:1
+✖ a lost temporary selection response records intent without inventing a binding receipt (1.787075ms)
+  TypeError [Error]: Cannot read properties of undefined (reading 'cases')
+      at TestContext.<anonymous> (file:///vercel/recovery-journal/scripts/acceptance/run-observability.test.mjs:1294:36)
+      at runNextTicks (node:internal/process/task_queues:65:5)
+      at listOnTimeout (node:internal/timers:644:9)
+      at process.processTimers (node:internal/timers:618:7)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at scripts/acceptance/run-observability.test.mjs:1302:1
+✖ an unresolved profile restore retains only the exact acknowledged version and digest (8.240123ms)
+  TypeError [Error]: Cannot read properties of undefined (reading 'preparation')
+      at TestContext.<anonymous> (file:///vercel/recovery-journal/scripts/acceptance/run-observability.test.mjs:1306:33)
+      at runNextTicks (node:internal/process/task_queues:65:5)
+      at listOnTimeout (node:internal/timers:644:9)
+      at process.processTimers (node:internal/timers:618:7)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at scripts/acceptance/run-observability.test.mjs:1315:1
+✖ actual CLI writes the fixed atomic 0600 recovery file and blocks before HTTP when persistence fails (201.358919ms)
+  SyntaxError [Error]: Unexpected token 'O', "OLD_COMPLETE_FILE
+  " is not valid JSON
+      at JSON.parse (<anonymous>)
+      at TestContext.<anonymous> (file:///vercel/recovery-journal/scripts/acceptance/run-observability.test.mjs:1334:30)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at scripts/acceptance/run-observability.test.mjs:1349:1
+✖ the existing safe artifact includes only the fixed recovery filename alongside the reports (3.881065ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /if: always\(\)[\s\S]*production-run-observability-report\/report\.json\n\s+production-run-observability-report\/recovery\.json\n\s+production-run-observability-report\/browser-actor\.receipt\.json/. Input:
+  
+  'name: Run trace production acceptance\n' +
+    '# Explicit operator runs only. Preflight reads configuration; execute uses the\n' +
+    '# existing tagged account and fixed small subscription models for issue #1512.\n' +
+    '# controlled-failure uses only an owned loopback database and 20 test failures.\n' +
+    'on:\n' +
+    '  workflow_dispatch:\n' +
+    '    inputs:\n' +
+    '      mode:\n' +
+    '        description: Preflight, bounded real tasks, native PNG export, or 20 isolated failures\n' +
+    '        type: choice\n' +
+    '        options: [preflight, execute, export, controlled-failure]\n' +
+    '        default: preflight\n' +
+    '      expected-deployment-sha:\n' +
+    '        description: Exact main commit; already served for production acceptance and export\n' +
+    '        type: string\n' +
+    '        required: true\n' +
+    '      model-case:\n' +
+    '        description: Subscription model case\n' +
+    '        type: choice\n' +
+    '        options: [all, claude, codex]\n' +
+    '        default: all\n' +
+    '      prepare:\n' +
+    '        description: Temporarily prepare and restore idle account settings through normal APIs\n' +
+    '        type: boolean\n' +
+    '        default: false\n' +
+    '      browser-submit:\n' +
+    "        description: Submit one model case once through the runner's real browser New task UI\n" +
+    '        type: boolean\n' +
+    '        default: false\n' +
+    '      export-target:\n' +
+    '        description: Native saved PostHog object to export after verifying production evidence\n' +
+    '        type: choice\n' +
+    '        options: [dashboard, insight]\n' +
+    '        default: dashboard\n' +
+    '      export-id:\n' +
+    '        description: Positive numeric PostHog object ID; required only for export\n' +
+    '        type: string\n' +
+    '        required: false\n' +
+    '      session-id:\n' +
+    '        description: Optional real browser Replay UUID; requires trace-id and export mode\n' +
+    '        type: string\n' +
+    '        required: false\n' +
+    '      trace-id:\n' +
+    '        description: Matching actual APM trace hex ID; requires session-id and export mode\n' +
+    '        type: string\n' +
+    '        required: false\n' +
+    'permissions:\n' +
+    '  contents: read\n' +
+    'concurrency:\n' +
+    '  group: run-trace-production-acceptance\n' +
+    '  cancel-in-progress: false\n' +
+    '  queue: max\n' +
+    'jobs:\n' +
+    '  acceptance:\n' +
+    "    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && (inputs.mode == 'preflight' || inputs.mode == 'execute')\n" +
+    '    runs-on: ubuntu-latest\n' +
+    '    timeout-minutes: 25\n' +
+    '    permissions:\n' +
+    '      contents: read\n' +
+    '      id-token: write\n' +
+    '      issues: write\n' +
+    '    env:\n' +
+    '      MIKKA_EXPECTED_DEPLOYMENT_SHA: ${{ inputs.expected-deployment-sha }}\n' +
+    '      MIKKA_OBSERVABILITY_MODEL_CASE: ${{ inputs.model-case }}\n' +
+    '      ACCEPTANCE_MODE: ${{ inputs.mode }}\n' +
+    '      ACCEPTANCE_PREPARE: ${{ inputs.prepare }}\n' +
+    '      ACCEPTANCE_BROWSER_SUBMIT: ${{ inputs.browser-submit }}\n' +
+    '      REPLAY_SESSION_ID: ${{ inputs.session-id }}\n' +
+    '      REPLAY_TRACE_ID: ${{ inputs.trace-id }}\n' +
+    '    steps:\n' +
+    '      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4\n' +
+    '        with:\n' +
+    '          persist-credentials: false\n' +
+    '      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4\n' +
+    '        with:\n' +
+    '          node-version: 24\n' +
+    '      - name: Bind acceptance to this exact main revision\n' +
+    '        run: |\n' +
+    "          node --input-type=module - <<'JS'\n" +
+    "          import assert from 'node:assert/strict'\n" +
+    "          assert.match(process.env.MIKKA_EXPECTED_DEPLOYMENT_SHA ?? '', /^[a-f0-9]{40}$/)\n" +
+    '          assert.equal(process.env.MIKKA_EXPECTED_DEPLOYMENT_SHA, process.env.GITHUB_SHA)\n' +
+    "          assert.ok(['preflight', 'execute'].includes(process.env.ACCEPTANCE_MODE))\n" +
+    "          assert.ok(process.env.ACCEPTANCE_MODE === 'execute' || (process.env.ACCEPTANCE_PREPARE !== 'true' && process.env.ACCEPTANCE_BROWSER_SUBMIT !== 'true'))\n" +
+    "          assert.ok(process.env.ACCEPTANCE_BROWSER_SUBMIT !== 'true' || process.env.MIKKA_OBSERVABILITY_MODEL_CASE !== 'all')\n" +
+    '          assert.ok(!process.env.REPLAY_SESSION_ID && !process.env.REPLAY_TRACE_ID)\n' +
+    '          JS\n' +
+    '      - name: Verify the acceptance guards before loading credentials\n' +
+    '        run: node --test scripts/acceptance/run-observability.test.mjs scripts/acceptance/run-observability-workflow.test.mjs scripts/acceptance/run-observability-browser.test.mjs\n' +
+    '      - name: Set up the pinned package manager for the optional browser\n' +
+    '        if: inputs.browser-submit\n' +
+    '        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4\n' +
+    '        with:\n' +
+    '          version: 10.34.3\n' +
+    '      - name: Install locked Chromium before loading account credentials\n' +
+    '        if: inputs.browser-submit\n' +
+    '        env:\n' +
+    "          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'\n" +
+    '        run: |\n' +
+    '          pnpm install --frozen-lockfile --ignore-scripts\n' +
+    "          node --input-type=module - <<'JS'\n" +
+    "          import assert from 'node:assert/strict'\n" +
+    "          import { createRequire } from 'node:module'\n" +
+    '          const require = createRequire(import.meta.url)\n' +
+    "          assert.equal(require('@playwright/test/package.json').version, '1.64.1')\n" +
+    '          JS\n' +
+    '          pnpm exec playwright install --with-deps chromium\n' +
+    '      - name: Read the existing production acceptance account\n' +
+    '        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18\n' +
+    '        with:\n' +
+    '          method: oidc\n' +
+    '          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac\n' +
+    '          oidc-audience: mikka-infisical\n' +
+    '          project-id: 89850d6a-f020-4936-863e-df77380dfe40\n' +
+    '          env-slug: prod\n' +
+    '          secret-path: /\n' +
+    '          secret-name: ACME_DEMO_EMAIL\n' +
+    '          include-imports: false\n' +
+    '      - name: Read the account password inside this runner\n' +
+    '        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18\n' +
+    '        with:\n' +
+    '          method: oidc\n' +
+    '          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac\n' +
+    '          oidc-audience: mikka-infisical\n' +
+    '          project-id: 89850d6a-f020-4936-863e-df77380dfe40\n' +
+    '          env-slug: prod\n' +
+    '          secret-path: /\n' +
+    '          secret-name: ACME_DEMO_PASSWORD\n' +
+    '          include-imports: false\n' +
+    '      - name: Run bounded production acceptance\n' +
+    '        env:\n' +
+    '          MIKKA_ACCEPTANCE_PROGRESS_TOKEN: ${{ github.token }}\n' +
+    '        run: |\n' +
+    '          args=()\n' +
+    '          if [ "$ACCEPTANCE_MODE" = execute ]; then\n' +
+    '            args+=(--execute)\n' +
+    '          fi\n' +
+    '          if [ "$ACCEPTANCE_PREPARE" = true ]; then args+=(--prepare); fi\n' +
+    '          if [ "$ACCEPTANCE_BROWSER_SUBMIT" = true ]; then args+=(--browser-submit --runner-browser); fi\n' +
+    '          node scripts/acceptance/run-observability-workflow.mjs "${args[@]}"\n' +
+    '      - name: Preserve only the safe acceptance report\n' +
+    '        if: always()\n' +
+    '        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4\n' +
+    '        with:\n' +
+    '          name: run-trace-acceptance-${{ github.run_id }}\n' +
+    '          path: |\n' +
+    '            production-run-observability-report/report.json\n' +
+    '            production-run-observability-report/browser-actor.receipt.json\n' +
+    '          retention-days: 7\n' +
+    '          if-no-files-found: warn\n' +
+    '  controlled-failure:\n' +
+    "    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && inputs.mode == 'controlled-failure'\n" +
+    '    runs-on: ubuntu-latest\n' +
+    '    timeout-minutes: 10\n' +
+    '    permissions:\n' +
+    '      contents: read\n' +
+    '      id-token: write\n' +
+    '    env:\n' +
+    '      MIKKA_EXPECTED_DEPLOYMENT_SHA: ${{ inputs.expected-deployment-sha }}\n' +
+    '      ACCEPTANCE_MODE: ${{ inputs.mode }}\n' +
+    '      ACCEPTANCE_PREPARE: ${{ inputs.prepare }}\n' +
+    '      ACCEPTANCE_BROWSER_SUBMIT: ${{ inputs.browser-submit }}\n' +
+    '      ACCEPTANCE_MODEL_CASE: ${{ inputs.model-case }}\n' +
+    '      EXPORT_TARGET: ${{ inputs.export-target }}\n' +
+    '      EXPORT_ID: ${{ inputs.export-id }}\n' +
+    '      REPLAY_SESSION_ID: ${{ inputs.session-id }}\n' +
+    '      REPLAY_TRACE_ID: ${{ inputs.trace-id }}\n' +
+    '      E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e\n' +
+    "      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'\n" +
+    '    services:\n' +
+    '      postgres:\n' +
+    '        image: postgres:17\n' +
+    '        env:\n' +
+    '          POSTGRES_USER: e2e\n' +
+    '          POSTGRES_PASSWORD: e2e-local-only\n' +
+    '          POSTGRES_DB: mikka_e2e\n' +
+    '        ports:\n' +
+    '          - 127.0.0.1:5432:5432\n' +
+    '        options: >-\n' +
+    '          --health-cmd "pg_isready -U e2e -d mikka_e2e"\n' +
+    '          --health-interval 5s --health-timeout 5s --health-retries 10\n' +
+    '    steps:\n' +
+    '      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4\n' +
+    '        with:\n' +
+    '          ref: ${{ github.sha }}\n' +
+    '          persist-credentials: false\n' +
+    '      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4\n' +
+    '        with:\n' +
+    '          node-version: 24\n' +
+    '      - name: Bind the isolated probe to this exact main revision\n' +
+    '        run: |\n' +
+    '          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"\n' +
+    "          node --input-type=module - <<'JS'\n" +
+    "          import assert from 'node:assert/strict'\n" +
+    "          assert.match(process.env.MIKKA_EXPECTED_DEPLOYMENT_SHA ?? '', /^[a-f0-9]{40}$/)\n" +
+    '          assert.equal(process.env.MIKKA_EXPECTED_DEPLOYMENT_SHA, process.env.GITHUB_SHA)\n' +
+    "          assert.equal(process.env.ACCEPTANCE_MODE, 'controlled-failure')\n" +
+    "          assert.notEqual(process.env.ACCEPTANCE_PREPARE, 'true')\n" +
+    "          assert.notEqual(process.env.ACCEPTANCE_BROWSER_SUBMIT, 'true')\n" +
+    "          assert.equal(process.env.ACCEPTANCE_MODEL_CASE, 'all')\n" +
+    "          assert.equal(process.env.EXPORT_TARGET, 'dashboard')\n" +
+    '          assert.ok(!process.env.EXPORT_ID && !process.env.REPLAY_SESSION_ID && !process.env.REPLAY_TRACE_ID)\n' +
+    '          JS\n' +
+    '      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4\n' +
+    '        with:\n' +
+    '          version: 10.34.3\n' +
+    '      - name: Install locked dependencies before loading the project token\n' +
+    '        run: pnpm install --frozen-lockfile --ignore-scripts\n' +
+    '      - name: Verify the isolated export and workflow guards before credentials\n' +
+    '        run: node --import ./scripts/server-test.mjs --import tsx --test scripts/ops/run-trace-benchmark.test.ts\n' +
+    '      - name: Measure current-source overhead with the local memory exporters\n' +
+    '        run: |\n' +
+    '          mkdir -p production-run-observability-report\n' +
+    '          node --import ./scripts/server-test.mjs --import tsx scripts/ops/run-trace-benchmark.ts > production-run-observability-report/overhead.receipt.json\n' +
+    '      - name: Read only the existing PostHog project ingestion token\n' +
+    '        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18\n' +
+    '        with:\n' +
+    '          m'... 3984 more characters
+  
+      at TestContext.<anonymous> (file:///vercel/recovery-journal/scripts/acceptance/run-observability.test.mjs:1351:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'name: Run trace production acceptance\n# Explicit operator runs only. Preflight reads configuration; execute uses the\n# existing tagged account and fixed small subscription models for issue #1512.\n# controlled-failure uses only an owned loopback database and 20 test failures.\non:\n  workflow_dispatch:\n    inputs:\n      mode:\n        description: Preflight, bounded real tasks, native PNG export, or 20 isolated failures\n        type: choice\n        options: [preflight, execute, export, controlled-failure]\n        default: preflight\n      expected-deployment-sha:\n        description: Exact main commit; already served for production acceptance and export\n        type: string\n        required: true\n      model-case:\n        description: Subscription model case\n        type: choice\n        options: [all, claude, codex]\n        default: all\n      prepare:\n        description: Temporarily prepare and restore idle account settings through normal APIs\n        type: boolean\n        default: false\n      browser-submit:\n        description: Submit one model case once through the runner\'s real browser New task UI\n        type: boolean\n        default: false\n      export-target:\n        description: Native saved PostHog object to export after verifying production evidence\n        type: choice\n        options: [dashboard, insight]\n        default: dashboard\n      export-id:\n        description: Positive numeric PostHog object ID; required only for export\n        type: string\n        required: false\n      session-id:\n        description: Optional real browser Replay UUID; requires trace-id and export mode\n        type: string\n        required: false\n      trace-id:\n        description: Matching actual APM trace hex ID; requires session-id and export mode\n        type: string\n        required: false\npermissions:\n  contents: read\nconcurrency:\n  group: run-trace-production-acceptance\n  cancel-in-progress: false\n  queue: max\njobs:\n  acceptance:\n    if: github.repository == \'alexj11324/Mikka\' && github.ref == \'refs/heads/main\' && (inputs.mode == \'preflight\' || inputs.mode == \'execute\')\n    runs-on: ubuntu-latest\n    timeout-minutes: 25\n    permissions:\n      contents: read\n      id-token: write\n      issues: write\n    env:\n      MIKKA_EXPECTED_DEPLOYMENT_SHA: ${{ inputs.expected-deployment-sha }}\n      MIKKA_OBSERVABILITY_MODEL_CASE: ${{ inputs.model-case }}\n      ACCEPTANCE_MODE: ${{ inputs.mode }}\n      ACCEPTANCE_PREPARE: ${{ inputs.prepare }}\n      ACCEPTANCE_BROWSER_SUBMIT: ${{ inputs.browser-submit }}\n      REPLAY_SESSION_ID: ${{ inputs.session-id }}\n      REPLAY_TRACE_ID: ${{ inputs.trace-id }}\n    steps:\n      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4\n        with:\n          persist-credentials: false\n      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4\n        with:\n          node-version: 24\n      - name: Bind acceptance to this exact main revision\n        run: |\n          node --input-type=module - <<\'JS\'\n          import assert from \'node:assert/strict\'\n          assert.match(process.env.MIKKA_EXPECTED_DEPLOYMENT_SHA ?? \'\', /^[a-f0-9]{40}$/)\n          assert.equal(process.env.MIKKA_EXPECTED_DEPLOYMENT_SHA, process.env.GITHUB_SHA)\n          assert.ok([\'preflight\', \'execute\'].includes(process.env.ACCEPTANCE_MODE))\n          assert.ok(process.env.ACCEPTANCE_MODE === \'execute\' || (process.env.ACCEPTANCE_PREPARE !== \'true\' && process.env.ACCEPTANCE_BROWSER_SUBMIT !== \'true\'))\n          assert.ok(process.env.ACCEPTANCE_BROWSER_SUBMIT !== \'true\' || process.env.MIKKA_OBSERVABILITY_MODEL_CASE !== \'all\')\n          assert.ok(!process.env.REPLAY_SESSION_ID && !process.env.REPLAY_TRACE_ID)\n          JS\n      - name: Verify the acceptance guards before loading credentials\n        run: node --test scripts/acceptance/run-observability.test.mjs scripts/acceptance/run-observability-workflow.test.mjs scripts/acceptance/run-observability-browser.test.mjs\n      - name: Set up the pinned package manager for the optional browser\n        if: inputs.browser-submit\n        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4\n        with:\n          version: 10.34.3\n      - name: Install locked Chromium before loading account credentials\n        if: inputs.browser-submit\n        env:\n          ELECTRON_SKIP_BINARY_DOWNLOAD: \'1\'\n        run: |\n          pnpm install --frozen-lockfile --ignore-scripts\n          node --input-type=module - <<\'JS\'\n          import assert from \'node:assert/strict\'\n          import { createRequire } from \'node:module\'\n          const require = createRequire(import.meta.url)\n          assert.equal(require(\'@playwright/test/package.json\').version, \'1.64.1\')\n          JS\n          pnpm exec playwright install --with-deps chromium\n      - name: Read the existing production acceptance account\n        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18\n        with:\n          method: oidc\n          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac\n          oidc-audience: mikka-infisical\n          project-id: 89850d6a-f020-4936-863e-df77380dfe40\n          env-slug: prod\n          secret-path: /\n          secret-name: ACME_DEMO_EMAIL\n          include-imports: false\n      - name: Read the account password inside this runner\n        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18\n        with:\n          method: oidc\n          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac\n          oidc-audience: mikka-infisical\n          project-id: 89850d6a-f020-4936-863e-df77380dfe40\n          env-slug: prod\n          secret-path: /\n          secret-name: ACME_DEMO_PASSWORD\n          include-imports: false\n      - name: Run bounded production acceptance\n        env:\n          MIKKA_ACCEPTANCE_PROGRESS_TOKEN: ${{ github.token }}\n        run: |\n          args=()\n          if [ "$ACCEPTANCE_MODE" = execute ]; then\n            args+=(--execute)\n          fi\n          if [ "$ACCEPTANCE_PREPARE" = true ]; then args+=(--prepare); fi\n          if [ "$ACCEPTANCE_BROWSER_SUBMIT" = true ]; then args+=(--browser-submit --runner-browser); fi\n          node scripts/acceptance/run-observability-workflow.mjs "${args[@]}"\n      - name: Preserve only the safe acceptance report\n        if: always()\n        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4\n        with:\n          name: run-trace-acceptance-${{ github.run_id }}\n          path: |\n            production-run-observability-report/report.json\n            production-run-observability-report/browser-actor.receipt.json\n          retention-days: 7\n          if-no-files-found: warn\n  controlled-failure:\n    if: github.repository == \'alexj11324/Mikka\' && github.ref == \'refs/heads/main\' && inputs.mode == \'controlled-failure\'\n    runs-on: ubuntu-latest\n    timeout-minutes: 10\n    permissions:\n      contents: read\n      id-token: write\n    env:\n      MIKKA_EXPECTED_DEPLOYMENT_SHA: ${{ inputs.expected-deployment-sha }}\n      ACCEPTANCE_MODE: ${{ inputs.mode }}\n      ACCEPTANCE_PREPARE: ${{ inputs.prepare }}\n      ACCEPTANCE_BROWSER_SUBMIT: ${{ inputs.browser-submit }}\n      ACCEPTANCE_MODEL_CASE: ${{ inputs.model-case }}\n      EXPORT_TARGET: ${{ inputs.export-target }}\n      EXPORT_ID: ${{ inputs.export-id }}\n      REPLAY_SESSION_ID: ${{ inputs.session-id }}\n      REPLAY_TRACE_ID: ${{ inputs.trace-id }}\n      E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e\n      ELECTRON_SKIP_BINARY_DOWNLOAD: \'1\'\n    services:\n      postgres:\n        image: postgres:17\n        env:\n          POSTGRES_USER: e2e\n          POSTGRES_PASSWORD: e2e-local-only\n          POSTGRES_DB: mikka_e2e\n        ports:\n          - 127.0.0.1:5432:5432\n        options: >-\n          --health-cmd "pg_isready -U e2e -d mikka_e2e"\n          --health-interval 5s --health-timeout 5s --health-retries 10\n    steps:\n      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4\n        with:\n          ref: ${{ github.sha }}\n          persist-credentials: false\n      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4\n        with:\n          node-version: 24\n      - name: Bind the isolated probe to this exact main revision\n        run: |\n          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"\n          node --input-type=module - <<\'JS\'\n          import assert from \'node:assert/strict\'\n          assert.match(process.env.MIKKA_EXPECTED_DEPLOYMENT_SHA ?? \'\', /^[a-f0-9]{40}$/)\n          assert.equal(process.env.MIKKA_EXPECTED_DEPLOYMENT_SHA, process.env.GITHUB_SHA)\n          assert.equal(process.env.ACCEPTANCE_MODE, \'controlled-failure\')\n          assert.notEqual(process.env.ACCEPTANCE_PREPARE, \'true\')\n          assert.notEqual(process.env.ACCEPTANCE_BROWSER_SUBMIT, \'true\')\n          assert.equal(process.env.ACCEPTANCE_MODEL_CASE, \'all\')\n          assert.equal(process.env.EXPORT_TARGET, \'dashboard\')\n          assert.ok(!process.env.EXPORT_ID && !process.env.REPLAY_SESSION_ID && !process.env.REPLAY_TRACE_ID)\n          JS\n      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4\n        with:\n          version: 10.34.3\n      - name: Install locked dependencies before loading the project token\n        run: pnpm install --frozen-lockfile --ignore-scripts\n      - name: Verify the isolated export and workflow guards before credentials\n        run: node --import ./scripts/server-test.mjs --import tsx --test scripts/ops/run-trace-benchmark.test.ts\n      - name: Measure current-source overhead with the local memory exporters\n        run: |\n          mkdir -p production-run-observability-report\n          node --import ./scripts/server-test.mjs --import tsx scripts/ops/run-trace-benchmark.ts > production-run-observability-report/overhead.receipt.json\n      - name: Read only the existing PostHog project ingestion token\n        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18\n        with:\n          m'... 3984 more characters,
+    expected: /if: always\(\)[\s\S]*production-run-observability-report\/report\.json\n\s+production-run-observability-report\/recovery\.json\n\s+production-run-observability-report\/browser-actor\.receipt\.json/,
+    operator: 'match',
+    diff: 'simple'
+  }

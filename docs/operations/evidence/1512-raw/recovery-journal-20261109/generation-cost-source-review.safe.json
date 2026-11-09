@@ -1,0 +1,221 @@
+{
+  "schema_version": 1,
+  "review": "Mikka issue 1512: limited source review of generation cost provenance",
+  "review_date_utc": "2026-11-09",
+  "repository": "alexj11324/Mikka",
+  "issue_number": 1512,
+  "reviewer": "/root/llm_trace",
+  "scope": "Cost source semantics and one documentation paragraph only; not a renewed generation/collector review or production acceptance.",
+  "source_snapshot": {
+    "own_commit": "f3466ba479ef51918790f521a288feaef5160e44",
+    "own_tree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+    "main_commit_supplied_by_root": "76537e4c2996f717cbd19589e1efae328028aa4a"
+  },
+  "conclusions": {
+    "subscription_actual_cost": "Unavailable per generation for the existing Claude Haiku 5.5 and GPT-6 Luna collectors: neither supplies a per-generation billing amount.",
+    "estimated_cost": "A PostHog catalogue/custom-price amount is an API-equivalent estimate, not a subscription bill or proof of cash charged.",
+    "missing_cost": "Keep absent/null; do not replace unknown with zero.",
+    "passthrough": "Application-supplied per-call amount. Passthrough alone does not establish an actual provider or subscription charge.",
+    "aggregate_cost": "Do not allocate a Claude SDK result total or a run/turn aggregate over generations."
+  },
+  "source_evidence": [
+    {
+      "path": "lib/abuse/policy.ts",
+      "blob": "13afd3e12e503bfab499ed2794a607df6e707b9d",
+      "symbol": "gatewayCost",
+      "lines": [
+        51,
+        62
+      ],
+      "finding": "Reads providerMetadata.gateway.cost, accepts a finite nonnegative number or numeric string, and returns Math.ceil(USD * 1e6) integer microdollars."
+    },
+    {
+      "path": "lib/abuse/model.ts",
+      "blob": "4d08e10fa47118d0d7f340fd107936ca9e3ed35d",
+      "lines": [
+        [
+          199,
+          201
+        ],
+        [
+          308,
+          310
+        ]
+      ],
+      "finding": "Gateway uses gatewayCost(providerMetadata); ZeroCat uses zeroCatCost(usage). Both record totalCostUsd after division by 1e6 for nonstreaming and streaming receipts."
+    },
+    {
+      "path": "lib/coordinator/decide.ts",
+      "blob": "a9bde5aa50fa60e3c69354878a2ce93a46985fff",
+      "lines": [
+        79,
+        82
+      ],
+      "finding": "Decision reads payload.provider_metadata.gateway.cost through gatewayCost and reports the per-call amount in USD."
+    },
+    {
+      "path": "lib/abuse/zerocat.ts",
+      "blob": "c91c524e270a3e25f7cf8fe33f0cbc78ad1b4b01",
+      "lines": [
+        [
+          14,
+          19
+        ],
+        [
+          53,
+          62
+        ]
+      ],
+      "finding": "The source explicitly says ZeroCat returns tokens but no cost. Configured USD-per-million-token prices are input 0.12, cached input 0.012, output 1. zeroCatCost computes from usage and rounds up to integer microdollars."
+    },
+    {
+      "path": "lib/tracing/ai.ts",
+      "blob": "a017de1850bf4cc80e1ad31a6b7fb1b8f46ca72f",
+      "lines": [
+        [
+          142,
+          143
+        ],
+        [
+          168,
+          168
+        ],
+        [
+          182,
+          184
+        ]
+      ],
+      "finding": "A supplied numeric per-call amount sets mikka.ai.total_cost_usd on the span and $ai_total_cost_usd plus $ai_cost_passthrough=true on the event. Missing cost is omitted."
+    },
+    {
+      "path": "packages/daemon/src/tracing-ai.ts",
+      "blob": "6f7d7414fb07809880603dc4c20f6525616219ab",
+      "lines": [
+        [
+          30,
+          38
+        ],
+        [
+          98,
+          104
+        ]
+      ],
+      "finding": "Optional totalCostUsd maps to APM/AI numeric fields and enables passthrough only when finite and nonnegative."
+    },
+    {
+      "path": "packages/daemon/src/adapters/generation-metrics.ts",
+      "blob": "4827af84d7b53cff43cea29e73b19a5a780e8572",
+      "symbols": [
+        "ClaudeGenerationMetrics.finish",
+        "CodexGenerationMetrics.observe"
+      ],
+      "finding": "Per-generation emitters provide usage/timing/outcome but no totalCostUsd."
+    },
+    {
+      "path": "packages/daemon/src/codex-generation-telemetry.ts",
+      "blob": "ddf484c21b5ac4bdbe75d5ad8f404ad814710e10",
+      "symbols": [
+        "USAGE",
+        "Codex generation construction"
+      ],
+      "finding": "Native Codex request projection and app-server fallback retain token/timing metadata, without a cost source."
+    },
+    {
+      "path": "packages/daemon/src/adapters/claude.ts",
+      "blob": "b5659ce0a1d56aeccd29f964d1aed30dd750282f",
+      "lines": [
+        225,
+        233
+      ],
+      "finding": "SDK result total_cost_usd enters aggregate data-usage as costUsd, separately from generation telemetry; it is not assigned to individual generations."
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "blob": "953af7b99b542aafd9cc724fde76d27f6a6bb2f7",
+      "lines": [
+        795,
+        801
+      ],
+      "finding": "Turn-level data-usage uses costUsd:null, with a comment about later LiteLLM pricing; no per-generation billing amount is provided."
+    }
+  ],
+  "existing_evidence_helpers": {
+    "query_templates_blob": "07f2013526784be3bff29fd23073f5320a980cf3",
+    "normalizer_blob": "8bd8d631b24cb134e1581e48eca86e8f16d3f557",
+    "reconciler_blob": "521ef985cd815b19b5220025adbd053879ccb41e",
+    "generation_cost_columns": [
+      "total_cost_usd",
+      "cost_passthrough_raw",
+      "cost_model_source",
+      "cost_model_used",
+      "cost_model_provider",
+      "cost_basis"
+    ],
+    "related_context_columns": [
+      "route",
+      "provider",
+      "model",
+      "operation",
+      "harness",
+      "input_tokens",
+      "output_tokens",
+      "cache_read_tokens",
+      "cache_creation_tokens",
+      "cache_reporting_exclusive_raw"
+    ],
+    "apm_cost_column": "captured_cost_usd",
+    "current_cost_basis_labels": [
+      "unknown",
+      "captured_per_call_amount",
+      "catalog_api_equivalent_estimate",
+      "custom_api_equivalent_estimate",
+      "amount_with_unverified_provenance"
+    ],
+    "query_assessment": "Existing captured_per_call_amount is accurate. No query change is proposed.",
+    "normalizer_assessment": "Retains the existing cost columns and allowed cost_basis labels.",
+    "reconciler_limit": "Its required generation comparison columns omit cost, and it explicitly records replay_scouts_failure_retention_privacy_and_cost_accuracy_not_evaluated. A consistent reconciliation is not a cost-accuracy or billing attestation."
+  },
+  "documentation_review": {
+    "path": "docs/operations/tracing.md",
+    "base_blob": "a02e4a5100c066d8564902ec287c9c92fee0d20e",
+    "original_lines": [
+      588,
+      592
+    ],
+    "original_markdown": "- Real Gateway/ZeroCat/provider cost receipts set `$ai_total_cost_usd` and\n  `$ai_cost_passthrough=true`. A subscription without an actual per-call cost\n  omits that receipt. PostHog may display a model-catalog estimate from usage;\n  label that as an estimate, not the subscription bill or cash charged by a\n  provider. Unknown cost is not zero.",
+    "proposed_markdown": "- The application sets `$ai_total_cost_usd` and\n  `$ai_cost_passthrough=true` when it supplies a per-call amount. Gateway\n  amounts come from provider metadata. ZeroCat amounts are estimates from\n  token counts and the configured prices in `lib/abuse/zerocat.ts`, rounded up\n  to integer microdollars before conversion to USD. Passthrough alone does\n  not establish an actual charge. A subscription without a per-call amount\n  omits these fields. PostHog may display its own model-catalog estimate from\n  usage; label estimates as such, not as the subscription bill or cash charged\n  by a provider. Unknown cost is not zero.",
+    "maximum_line_length": 78,
+    "decision": "approve_minimal_factual_correction",
+    "rationale": "The original phrase groups ZeroCat with real provider receipts, but its source computes a token-price amount. The replacement distinguishes provider-reported amounts from a configured-price estimate, explains application passthrough without asserting actual billing, and preserves missing-cost and subscription-estimate caveats.",
+    "remaining_scope": "No code/API/SQL changes; no full-page documentation review; no additional acceptance gate."
+  },
+  "production_evidence_boundary": {
+    "can_show": [
+      "Whether a real captured generation has a cost amount and the associated trace/span IDs.",
+      "The amount's captured/catalog/custom/unknown provenance and model/provider price-matching metadata.",
+      "Whether this project's actual ingested Haiku 5.5 or GPT-6 Luna event matched a price model."
+    ],
+    "cannot_show_from_these_metadata_alone": [
+      "Actual per-generation subscription cash charges.",
+      "A justified allocation of an SDK aggregate to individual generations.",
+      "Project ingestion behavior from the existence of a model in a public catalogue.",
+      "Cost accuracy or actual billing merely from passthrough, a non-null amount, or reconciliation success."
+    ],
+    "apm_ai_difference": "APM stores application-captured cost. AI ingestion can add a catalogue estimate later without backfilling the APM span; these values need not both be present."
+  },
+  "primary_reference": {
+    "source": "PostHog MCP skills and docs-search",
+    "url": "https://posthog.com/docs/ai-observability/calculating-costs",
+    "used_for": "Pricing precedence, model/provider lookup, cost-source metadata and cache-accounting semantics.",
+    "note": "No third-party full text is included."
+  },
+  "execution_record": {
+    "production_queries_run": false,
+    "model_generations_triggered": false,
+    "execution_resources_created": false,
+    "code_or_documentation_modified": false,
+    "git_refs_modified": false,
+    "local_exec": "One initial read-only attempt failed because exec-server was unavailable; no retry after root confirmed the session-wide failure.",
+    "permitted_output": "One immutable Git blob containing this safe JSON review; no commit, tree or ref update."
+  }
+}

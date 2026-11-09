@@ -1,0 +1,429 @@
+{
+  "schema": "issue1512-source-only-conditional-confluence-v1",
+  "repository": "alexj11324/Mikka",
+  "recordedAt": "2026-11-09T14:07:57Z",
+  "reviewMode": "Independent finite source-only proof; no execution evidence.",
+  "outcome": "The fixed source changes can be preserved in the conditional leaf trees below. This is not an actual merge, merge authorization, CI pass, Native pass or production acceptance.",
+  "actualBoundary": {
+    "requestedP0": {
+      "commit": "111a8dfb8b227ac0441324339ff42e4328ea609a",
+      "tree": "6a06f3742fb0dfc35bed19780fe09da2747c1ddc"
+    },
+    "observedMain": {
+      "commit": "76537e4c2996f717cbd19589e1efae328028aa4a",
+      "tree": "42625ba25887f1fbf64fd025446aa9e888677232",
+      "parents": [
+        "111a8dfb8b227ac0441324339ff42e4328ea609a",
+        "2d0e2bb846dcc72a2c5dae1c56d12931bd2ace12"
+      ],
+      "pullRequest": 1823,
+      "scope": "Factory live human session approval; six changed paths."
+    },
+    "feature": {
+      "pullRequest": 1799,
+      "ref": "fix/1512-daemon-fixture-executable-20261109",
+      "head": "f3466ba479ef51918790f521a288feaef5160e44",
+      "tree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+      "direct111aDeltaCount": 57
+    },
+    "nativeBatch": {
+      "pullRequest": 1827,
+      "ref": "batch/2026-11-09-appstore-brand",
+      "head": "486e8542a1201c285f15e4bd51987292c91bdc8e",
+      "tree": "f263167f4ce92cf9e487c3172ab6750714deeedc",
+      "state": "open",
+      "merged": false,
+      "apiReportedBase": "111a8dfb8b227ac0441324339ff42e4328ea609a",
+      "apiReportedBaseIsNotFreshMain": true,
+      "direct111aDeltaCount": 8,
+      "parents": [
+        "a2d368e983e041d447855e0d8175c5ca5d4146b0",
+        "82e8ab553a0e008604f7a56c574f6c5960668d83"
+      ],
+      "ownerPRs": [
+        1819,
+        1825
+      ],
+      "apiReportedSynthetic": {
+        "commit": "225cda55c9a86247c70fa5292f71a8290a3e0e95",
+        "parents": [
+          "111a8dfb8b227ac0441324339ff42e4328ea609a",
+          "486e8542a1201c285f15e4bd51987292c91bdc8e"
+        ],
+        "tree": "f263167f4ce92cf9e487c3172ab6750714deeedc",
+        "doesNotIncludeMain765": true
+      }
+    },
+    "finalDirectRefReadback": {
+      "observedAt": "2026-11-09 14:07:57 UTC",
+      "refs": {
+        "main": {
+          "ref": "refs/heads/main",
+          "sha": "76537e4c2996f717cbd19589e1efae328028aa4a"
+        },
+        "feature1799": {
+          "ref": "refs/heads/fix/1512-daemon-fixture-executable-20261109",
+          "sha": "f3466ba479ef51918790f521a288feaef5160e44"
+        },
+        "native1827": {
+          "ref": "refs/heads/batch/2026-11-09-appstore-brand",
+          "sha": "486e8542a1201c285f15e4bd51987292c91bdc8e"
+        }
+      }
+    }
+  },
+  "directDifferences": {
+    "main765Vs111a": {
+      "count": 6,
+      "paths": [
+        {
+          "path": "components/workspace/issue-workspace-settings.test.tsx",
+          "mode": "100644",
+          "blob": "db3ea66b5755862a86f8d334ec7fbbb1aaeb2e68"
+        },
+        {
+          "path": "docs/design/decisions/2026-11-09-1155-factory-human-session-authentication.md",
+          "mode": "100644",
+          "blob": "e9541d4cf497dddbf325059c66db4e7286b26776"
+        },
+        {
+          "path": "docs/factory/494-approve-and-publish.md",
+          "mode": "100644",
+          "blob": "4f78c11f3bbf96779a4c0f2a4ac2f079235f85ab"
+        },
+        {
+          "path": "lib/factory/approval.test.ts",
+          "mode": "100644",
+          "blob": "b8b065a94adf14274e8af52a3cbf89e9b79a0784"
+        },
+        {
+          "path": "lib/factory/approval.ts",
+          "mode": "100644",
+          "blob": "33c58f3c97c43cfa9c7cc142c8ebeb81042d0de8"
+        },
+        {
+          "path": "lib/factory/browser-human.test.ts",
+          "mode": "100644",
+          "blob": "2810c36beb52dc2e8d0260467ef344bfa63d793a"
+        }
+      ],
+      "intersectionWithFeature": [],
+      "intersectionWithNativeBatch": []
+    },
+    "nativeBatchVs111a": {
+      "count": 8,
+      "paths": [
+        {
+          "path": "apps/mobile/components/MikkaMark.tsx",
+          "mode": "100644",
+          "blob": "ebc27114576f23ff25fb18b4e03b6155443a89c4"
+        },
+        {
+          "path": "apps/mobile/components/SignIn.tsx",
+          "mode": "100644",
+          "blob": "c92163359be141f59b4154059f1fde9878fac7d6"
+        },
+        {
+          "path": "apps/mobile/tests/mikka-mark.test.mts",
+          "mode": "100644",
+          "blob": "9959b52bb3535c5ff73d168eed44a6bae55dfcfc"
+        },
+        {
+          "path": "docs/design/brand.md",
+          "mode": "100644",
+          "blob": "2bc46816656149b9e760806f00ba3faa35d87386"
+        },
+        {
+          "path": "docs/design/components.md",
+          "mode": "100644",
+          "blob": "da7339503dc2fef5f9876157760b58b8f5bbbbbe"
+        },
+        {
+          "path": "package.json",
+          "mode": "100644",
+          "blob": "f1b9d887b5f2cd469a83530d45ed5d8ea39c103b"
+        },
+        {
+          "path": "scripts/release/mobile-screenshots.mjs",
+          "mode": "100644",
+          "blob": "dcfa0cf9943b7be16e95790af7229e38a75e4c90"
+        },
+        {
+          "path": "scripts/release/mobile-screenshots.test.mjs",
+          "mode": "100644",
+          "blob": "6c7fc8c6955837e83ef8ab68a97efe29c6921429"
+        }
+      ],
+      "scope": "Mobile sign-in brand rendering, the existing mobile screenshot login flow launchApp step after driver startup, their tests, docs, and registration of the mark test."
+    },
+    "featureVs111a": {
+      "count": 57,
+      "completeChangesInLeafIndex": true
+    },
+    "featureVsNativeSharedPaths": [
+      "package.json"
+    ],
+    "conflictAssessment": "Only package.json overlaps in these direct content deltas. The two independent full-line byte edits commute. No other shared changed paths, mode collisions or deletions exist. A Git merge was not executed; actual GitHub mergeability of a future source tree is not inferred from this leaf proof.",
+    "packageResolution": {
+      "baseBlob": "b4c7addbf7d0d147409d2f95fe41c14183edf2a0",
+      "featureBlob": "568cfeee161309202699acefd0a57a8edc52bf6e",
+      "batchBlob": "f1b9d887b5f2cd469a83530d45ed5d8ea39c103b",
+      "combinedBlob": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d",
+      "combinedSha256": "ed9893d62d9d90299de21eb0325e73ab3c97202dec5eafe3d9983c04b64a6add",
+      "combinedBytes": 80877,
+      "edits": [
+        {
+          "owner": "#1512 / PR1799",
+          "jsonPointer": "/scripts/test:captures",
+          "exactAddedSuffix": " && node --test scripts/ffmpeg-install.test.mjs",
+          "priorAndSuffix": true
+        },
+        {
+          "owner": "PR1827 / native owner PR1825",
+          "jsonPointer": "/scripts/test:mobile",
+          "exactAddedToken": "apps/mobile/tests/mikka-mark.test.mts",
+          "afterToken": "apps/mobile/tests/theme-tokens.test.mts",
+          "beforeToken": "apps/mobile/tests/chat-pages.test.mts",
+          "onlyTokenAdded": true
+        }
+      ],
+      "allOtherPackageBytesIdentical": true,
+      "editOrderCommutative": true,
+      "noLockfileOrDependencyChangeFrom1827": true
+    },
+    "threeDotComparisonWarning": {
+      "featureThreeDotFileCount": 68,
+      "mergeBase": "521db4799a4a85e1955f7dd86a1ad5ccef143cc8",
+      "reason": "The branch ancestry is diverged. GitHub compare/PR changed_files reports merge-base differences; the requested direct111a leaf-map difference is57. Do not substitute the68-path listing for the57 exact changes."
+    }
+  },
+  "conditionalTrees": [
+    {
+      "name": "actualMain765",
+      "tree": "42625ba25887f1fbf64fd025446aa9e888677232",
+      "leafCount": 6791,
+      "actualCommit": "76537e4c2996f717cbd19589e1efae328028aa4a",
+      "condition": "Actual already observed Git commit tree."
+    },
+    {
+      "name": "actualMain765PlusFeatureF346",
+      "tree": "5e14efc8047ff9eeb8a51077177cf8b346ecd7d3",
+      "leafCount": 6793,
+      "actualCommit": null,
+      "condition": "No other main or feature changes; a subsequent merge must be read back and match this computed tree before using this proof."
+    },
+    {
+      "name": "conditionalMain765PlusNativeBatch486",
+      "tree": "74b7be77de23f66162ae9558c863bb2fc9b06a56",
+      "leafCount": 6793,
+      "actualCommit": null,
+      "condition": "PR1827 is still open. Only if the Native owner merges exactly batch486 into exactly main765 with these unchanged source bytes and no other edits."
+    },
+    {
+      "name": "conditionalMain765PlusNativeBatch486PlusFeatureF346",
+      "tree": "01fc05b948deb2efbbc8141e0d25509d9e713196",
+      "leafCount": 6795,
+      "actualCommit": null,
+      "condition": "Both prior branch identities and current main765 remain exact, the package edits are combined as specified, all other leaves remain exact, and the actual subsequent Git tree is independently read back."
+    }
+  ],
+  "retention": {
+    "mainFeatureDeltaCount": 57,
+    "mainFeatureExact57": {
+      "expected": 57,
+      "preserved": 57,
+      "mismatches": []
+    },
+    "conditionalMainBatchDeltaCount": 8,
+    "conditionalMainFeatureDeltaCount": 57,
+    "conditionalFeaturePreserved": {
+      "expected": 56,
+      "preserved": 56,
+      "mismatches": []
+    },
+    "conditionalBatchPreserved": {
+      "expected": 7,
+      "preserved": 7,
+      "mismatches": []
+    },
+    "actualMainPreserved": {
+      "expected": 6,
+      "preserved": 6,
+      "mismatches": []
+    },
+    "originalFeatureChangedPathsExactlyEqualConditionalDelta": true,
+    "packageCombinedVerified": true,
+    "baseToJointDelta": 70,
+    "mainToJointDelta": 64
+  },
+  "nativeAndRuntimeScope": {
+    "sourceOnlyConclusion": "Batch1827 does not change Desktop lifecycle measurement, request counters, authentication implementation, daemon, E2B worker, tracing or run-observability driver source. Main1823 changes the live human-approval eligibility query as separately audited below.",
+    "ownerBoundary": "UI mark and native App Store screenshot helper remain under the Native owner's PR1827 and original PR1819/1825 ownership. This review only computes the later #1512 condition; it makes no changes or requests to their refs, CI or resources.",
+    "measurements": "No other owner logs/artifacts were read. No existing f346 CI/Native result is extended to any computed combined tree; the running batch CI and future main release remain separate facts."
+  },
+  "factoryNoRepositoryAccept": {
+    "assessment": "No new source blocker for the existing no-repository report/deliverable accept path. This does not establish a real account/session/task production result.",
+    "changedProductionPath": {
+      "path": "lib/factory/approval.ts",
+      "beforeBlob": "e78ad9e26f1f6e37dca2f10ccc5eaede77b52932",
+      "afterBlob": "33c58f3c97c43cfa9c7cc142c8ebeb81042d0de8",
+      "change": "humanApproval removes the linked github/google account EXISTS requirement. Matching userId/sessionId and unexpired session FOR SHARE remain. The calls are approve, reject, and validApproval revalidation; the report/deliverable accept dispatcher does not call humanApproval."
+    },
+    "unchangedPathBindings": [
+      {
+        "path": "app/api/factory/tasks/[taskId]/approval/route.ts",
+        "mode": "100644",
+        "blob": "d3b583a364b8ac587485fab4d38189fbcc28f6a5",
+        "equalAcross": [
+          "111a",
+          "f346",
+          "486",
+          "765"
+        ]
+      },
+      {
+        "path": "lib/factory/approval-http.ts",
+        "mode": "100644",
+        "blob": "28a49b43b624c3e376f6e73c249cd1a75346d930",
+        "equalAcross": [
+          "111a",
+          "f346",
+          "486",
+          "765"
+        ]
+      },
+      {
+        "path": "lib/factory/merge.ts",
+        "mode": "100644",
+        "blob": "2668c61a5f3727deba620e77f184fd6826bd77ba",
+        "equalAcross": [
+          "111a",
+          "f346",
+          "486",
+          "765"
+        ]
+      },
+      {
+        "path": "lib/factory/browser-human.ts",
+        "mode": "100644",
+        "blob": "1fc0360e05cdfa76ef1b59eb6db22a710f39c7ce",
+        "equalAcross": [
+          "111a",
+          "f346",
+          "486",
+          "765"
+        ]
+      }
+    ],
+    "driver": {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "blob": "002b8501cd4f4df023148515add7c55e2863dbd3",
+      "operation": "accept",
+      "once": true,
+      "note": "Existing driver checks exact deliverable bytes then sends the normal Owner accept operation, not reject/approve."
+    },
+    "path": [
+      "The unchanged route obtains a fresh browser/native session with disableCookieCache:true, derives the actor from that verified session, and preserves workspace admission.",
+      "The unchanged approval HTTP handler requires the verified actor, validates same-origin POST, validates taskId/binding, then dispatches accept to merges.accept.",
+      "The unchanged merge.accept requires userId/sessionId, locks the owner/task/issue scope and unexpired same-user session, checks report/deliverable candidate, exact binding, approval stage and pending/waiting status, and reads approval evidence.",
+      "That deliverable branch records acceptance, applies the stage transition and completes the issue in the transaction, then returns accepted before candidatePull or lazy GitHub-token retrieval.",
+      "Code-candidate merge authorization remains a separate later path requiring the person's GitHub token. New PR1823 removes an older provider-link restriction for humanApproval; it does not add such a restriction to no-repository accept."
+    ],
+    "limits": [
+      "Only source read; no test, account, production acceptance, DB, model or VM operation.",
+      "A future runtime refusal on ownership, expired session, stage, binding or evidence remains a real gate; source compatibility is not a bypass."
+    ]
+  },
+  "hashProof": {
+    "method": {
+      "objectFormat": "sha1",
+      "treeEntryOrder": "Git byte ordering with directory trailing slash; entry content mode SP basename NUL 20-byte object id; tree header tree SP payload-byte-length NUL.",
+      "completeRecursiveTreeCrossChecks": [
+        {
+          "key": "baseTree",
+          "expected": "6a06f3742fb0dfc35bed19780fe09da2747c1ddc",
+          "actual": "6a06f3742fb0dfc35bed19780fe09da2747c1ddc",
+          "leaves": 6790,
+          "treeCount": 873,
+          "truncated": false
+        },
+        {
+          "key": "featureTree",
+          "expected": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+          "actual": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+          "leaves": 6792,
+          "treeCount": 873,
+          "truncated": false
+        },
+        {
+          "key": "batchTree",
+          "expected": "f263167f4ce92cf9e487c3172ab6750714deeedc",
+          "actual": "f263167f4ce92cf9e487c3172ab6750714deeedc",
+          "leaves": 6792,
+          "treeCount": 873,
+          "truncated": false
+        },
+        {
+          "key": "newMainTree",
+          "expected": "42625ba25887f1fbf64fd025446aa9e888677232",
+          "actual": "42625ba25887f1fbf64fd025446aa9e888677232",
+          "leaves": 6791,
+          "treeCount": 873,
+          "truncated": false
+        }
+      ],
+      "packageBlobCrossChecks": [
+        {
+          "blob": "b4c7addbf7d0d147409d2f95fe41c14183edf2a0",
+          "bytes": 80792,
+          "sha256": "6fe98887dad71fe87de43540513c2ff519783a2a3db305d6d8bbf6012dacb288"
+        },
+        {
+          "blob": "568cfeee161309202699acefd0a57a8edc52bf6e",
+          "bytes": 80839,
+          "sha256": "d1e4b875976a3076381ad30949da73686ea7dc794f5ff7bc0cc27ccb6111443a"
+        },
+        {
+          "blob": "f1b9d887b5f2cd469a83530d45ed5d8ea39c103b",
+          "bytes": 80830,
+          "sha256": "e1f460a52520893f2198adac22e357da7d7303d8f2102f568cf73250d4e128eb"
+        }
+      ],
+      "noServerSideSourceObjectCreation": true
+    },
+    "completeUntruncatedSourceTreeCount": 4,
+    "completeLeafManifest": {
+      "path": "docs/operations/evidence/1512-raw/conditional-main765-native1827-f346/leaf-index.json",
+      "bytes": 1080092,
+      "sha256": "ba499173577bca649250ccdbbb379b97ef4e45d67ed5f80441a3c1f20dccf16b",
+      "gitBlob": "c063080fc6b3d025cb8dc5e5649af0aaee721f58",
+      "byteForByte": true,
+      "sha256Verified": true,
+      "gitBlobVerified": true
+    }
+  },
+  "conditions": [
+    "Current main must still be exactly765, feature exactlyf346 and Native batch exactly486 for these exact hashes.",
+    "If1827 lands on765, the actual Native-main tree must match74b7be77de23f66162ae9558c863bb2fc9b06a56 before applying the final conditional proof.",
+    "The later merged feature source must match01fc05b948deb2efbbc8141e0d25509d9e713196, including the combined package blob72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d.",
+    "If1827 has not landed,765 plus f346 instead computes5e14efc8047ff9eeb8a51077177cf8b346ecd7d3; this is still uncreated and untested.",
+    "Any head movement, additional paths, conflict resolution differences, mode changes or package edits invalidate application of these fixed tree hashes until a new bounded source comparison.",
+    "Actual release writers, latest-head CI/Native and #1512 production gates remain root-owned and are not marked passed by this proof."
+  ],
+  "actions": {
+    "sourceReads": true,
+    "gitMetadataReads": true,
+    "pureInMemoryHashing": true,
+    "productTests": 0,
+    "ciDispatches": 0,
+    "vmOrSandboxCreated": 0,
+    "modelsCalled": 0,
+    "accountsAccessed": 0,
+    "otherOwnerLogsOrArtifactsRead": 0,
+    "sourceGitTreesCreated": 0,
+    "sourceCommitsCreated": 0,
+    "refsChanged": 0,
+    "PRsChanged": 0,
+    "writes": "Only unreferenced JSON evidence blobs, with byte-for-byte remote readback."
+  }
+}

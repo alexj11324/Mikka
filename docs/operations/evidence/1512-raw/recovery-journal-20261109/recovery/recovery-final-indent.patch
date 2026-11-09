@@ -1,0 +1,554 @@
+--- a/scripts/acceptance/run-observability.mjs
++++ b/scripts/acceptance/run-observability.mjs
+@@ -14,7 +14,7 @@
+  * PostHog/APM ingestion and real browser replay require independent verification.
+  */
+ import { createHash, randomBytes } from 'node:crypto'
+-import { appendFile, mkdir, writeFile } from 'node:fs/promises'
++import { appendFile, mkdir, open, rename, unlink, writeFile } from 'node:fs/promises'
+ import { pathToFileURL } from 'node:url'
+ import { isDeepStrictEqual } from 'node:util'
+ import { decode, encode, DESKTOP_RPC_VERSION } from '../../lib/desktop-rpc/wire.ts'
+@@ -46,7 +46,7 @@
+   'artifact_missing', 'artifact_content', 'cleanup_incomplete', 'acceptance_failed',
+   'owner_busy', 'owner_inventory_incomplete', 'owner_inventory_changed', 'owner_inventory_timeout',
+   'preparation_conflict', 'preparation_restore_failed', 'task_inventory_changed',
+-  'task_checks_missing', 'task_acceptance',
++  'task_checks_missing', 'task_acceptance', 'recovery_metadata_invalid', 'recovery_checkpoint_failed',
+ ])
+ const serverCodes = new Set(['authRequired', 'modelUnavailable', 'modelChanged', 'factoryStale', 'factoryStopped', 'runChainEnded',
+   'agentProfileNotFound', 'agentProfileRequestConflict', 'agentProfileVersionConflict', 'subscriptionConflict',
+@@ -65,6 +65,37 @@
+ const profilePath = (workspaceId, id = '') => '/api/factory/agent-profiles' + (id ? '/' + id : '') + '?workspaceId=' + workspaceId
+ const profileDefinition = value => Object.fromEntries(['name', 'description', 'roles', 'enabled', 'harness', 'model', 'effort', 'instructions', 'skills']
+   .filter(key => value[key] !== undefined).map(key => [key, structuredClone(value[key])]))
++
++
++/** Recovery metadata only: never persist menu labels, quotas or private Profile definitions. */
++function recoveryModel(value) {
++  const { id, kind, modelId, provider, chosen } = value ?? {}
++  const model = typeof modelId === 'string' && (modelId === '' || /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/.test(modelId))
++  const apiKey = typeof id === 'string' && /^apikey:[0-9a-f-]{36}:/i.test(id)
++    && uuid(id.slice(7, 43)) && id.slice(44) === modelId
++  check(['hosted', 'subscription', 'apiKey', 'shared'].includes(kind) && typeof chosen === 'boolean'
++    && model && typeof provider === 'string' && /^[a-z][a-z0-9_-]{0,47}$/.test(provider)
++    && (kind === 'apiKey' || kind === 'shared' ? apiKey && modelId !== '' : uuid(id)), 'recovery_metadata_invalid')
++  return { id, kind, modelId, provider, chosen }
++}
++
++/** Fixed runner-local file; replace the complete 0600 snapshot, never append private state. */
++export async function writeRecoveryJournal(journal) {
++  const directory = 'production-run-observability-report', temporary = directory + '/.recovery.json.tmp'
++  await mkdir(directory, { recursive: true, mode: 0o700 })
++  let created = false
++  try {
++    const file = await open(temporary, 'wx', 0o600)
++    created = true
++    try { await file.writeFile(JSON.stringify(journal, null, 2) + '\n'); await file.sync() }
++    finally { await file.close() }
++    await rename(temporary, directory + '/recovery.json')
++    const parent = await open(directory, 'r')
++    try { await parent.sync() } finally { await parent.close() }
++  } finally {
++    if (created) await unlink(temporary).catch(error => { if (error.code !== 'ENOENT') throw error })
++  }
++}
+ 
+ async function selectOwnPersonalWorkspace(read, rpc, ownerId) {
+   const current = await read('/api/workspace')
+@@ -286,8 +317,8 @@
+ }
+ 
+ export async function runObservabilityAcceptance({ env = process.env, execute = false, prepare = false, browserSubmit = false,
+-  onBrowserReady = emitBrowserReady, fetchImpl = fetch, now = Date.now, openLiveImpl = openLive, signal } = {}) {
+-  check((!prepare && !browserSubmit || execute) && typeof onBrowserReady === 'function', 'configuration_required')
++  onBrowserReady = emitBrowserReady, onRecoveryCheckpoint = async () => {}, fetchImpl = fetch, now = Date.now, openLiveImpl = openLive, signal } = {}) {
++  check((!prepare && !browserSubmit || execute) && typeof onBrowserReady === 'function' && typeof onRecoveryCheckpoint === 'function', 'configuration_required')
+   const revision = env.MIKKA_EXPECTED_DEPLOYMENT_SHA
+   const timeoutMs = Number(env.MIKKA_OBSERVABILITY_TIMEOUT_MS ?? 480_000)
+   const modelCase = env.MIKKA_OBSERVABILITY_MODEL_CASE ?? 'all'
+@@ -305,6 +336,18 @@
+   let ownerId, workspaceId, botId, closeSession = false
+   // Full definitions never leave this closure or appear in the public report.
+   const preparation = { profiles: [], fallback: null }
++  const recovery = report.recovery = { version: 1, revision, scope: null, sequence: 0, checkpointFailures: 0,
++    preparation: { profiles: [], fallback: null }, cases: [] }
++  async function checkpoint(cleanup = false) {
++    // A failed journal blocks new work, but cannot prevent already-required recovery.
++    if (!cleanup && recovery.checkpointFailures) throw new AcceptanceError('recovery_checkpoint_failed')
++    recovery.sequence++
++    try { await onRecoveryCheckpoint(structuredClone(recovery)) }
++    catch (cause) {
++      recovery.checkpointFailures++
++      if (!cleanup) throw new AcceptanceError('recovery_checkpoint_failed', { cause })
++    }
++  }
+   async function request(path, { body, method = body === undefined ? 'GET' : 'POST', headers: extra, cleanup = false, deadline } = {}) {
+     check(path.startsWith('/api/') || path.startsWith('/mikka/api/artifacts/'), 'origin_rejected')
+     const url = new URL(path.startsWith('/mikka/') ? path : '/mikka' + path, ORIGIN)
+@@ -479,10 +522,13 @@
+     if (state.keys.apiKeyAfterQuota) {
+       await ownerIdle()
+       check((await read('/api/settings/api-keys?workspace=' + workspaceId)).apiKeyAfterQuota === true, 'preparation_conflict')
+-      preparation.fallback = { before: true, acknowledged: false }
++      const journal = recovery.preparation.fallback = { before: true, intended: false, write: 'intent', restored: false }
++      await checkpoint()
++      preparation.fallback = { before: true, acknowledged: false, journal }
+       const changed = await rpc('model-api-keys.updateApiKeyAfterQuota', [false, workspaceId])
+       check(changed.apiKeyAfterQuota === false, 'preparation_conflict')
+       preparation.fallback.acknowledged = true; report.preparation.fallbackChanged = true
++      journal.write = 'acknowledged'; await checkpoint()
+     }
+     for (const profile of state.profiles.profiles.filter(value => value.enabled && !value.archivedAt)) {
+       check(uuid(profile.id) && Number.isSafeInteger(profile.version) && profile.version > 0, 'profile_scope')
+@@ -491,16 +537,26 @@
+       check(current?.version === profile.version && typeof profile.digest === 'string' && /^[0-9a-f]{64}$/.test(profile.digest)
+         && current.digest === profile.digest && !current.archivedAt
+         && isDeepStrictEqual(profileDefinition(current), profileDefinition(profile)), 'preparation_conflict')
+-      const entry = { id: profile.id, before: profileDefinition(profile), version: profile.version, written: null, rejected: false }
++      const journal = { id: profile.id, before: { version: profile.version, digest: profile.digest, enabled: profile.enabled },
++        intendedEnabled: false, write: 'intent', written: null, restored: false }
++      check(typeof journal.before.enabled === 'boolean', 'recovery_metadata_invalid')
++      recovery.preparation.profiles.push(journal)
++      await checkpoint()
++      const entry = { id: profile.id, before: profileDefinition(profile), version: profile.version, written: null, rejected: false, journal }
+       preparation.profiles.push(entry)
+       let changed
+       try { changed = (await read(profilePath(workspaceId, entry.id), { method: 'PATCH',
+         body: { workspaceId, version: entry.version, profile: { ...entry.before, enabled: false } } })).profile }
+-      catch (error) { entry.rejected = [400, 401, 403, 404, 409, 422].includes(error.httpStatus); throw error }
++      catch (error) {
++        entry.rejected = [400, 401, 403, 404, 409, 422].includes(error.httpStatus)
++        if (entry.rejected) journal.write = 'rejected'
++        await checkpoint(true); throw error
++      }
+       check(changed?.id === entry.id && changed.version === entry.version + 1 && !changed.archivedAt && /^[0-9a-f]{64}$/.test(changed.digest)
+         && isDeepStrictEqual(profileDefinition(changed), { ...entry.before, enabled: false }), 'preparation_conflict')
+       entry.written = { version: changed.version, digest: changed.digest }
+       report.preparation.profilesDisabled++
++      journal.written = { ...entry.written }; journal.write = 'acknowledged'; await checkpoint()
+     }
+   }
+   async function restoreSettings() {
+@@ -523,12 +579,15 @@
+           // profile. Preserve an unacknowledged/concurrent edit for review.
+           check(entry.written && current.version === entry.written.version && current.digest === entry.written.digest
+             && isDeepStrictEqual(profileDefinition(current), { ...entry.before, enabled: false }), 'preparation_conflict')
++          await checkpoint(true)
+           const restored = (await read(profilePath(workspaceId, entry.id), { method: 'PATCH', cleanup: true,
+             body: { workspaceId, version: current.version, profile: entry.before } })).profile
+           check(restored?.version === current.version + 1 && isDeepStrictEqual(profileDefinition(restored), entry.before), 'preparation_conflict')
+         }
+         summary.profilesRestored++
++        entry.journal.restored = true
+       } catch (error) { failed(error) }
++      await checkpoint(true)
+     }
+     if (preparation.fallback) {
+       try {
+@@ -538,18 +597,21 @@
+           // This existing boolean setting has no version/CAS API. Compare its
+           // last acknowledged value immediately before restoring, never guess.
+           check(preparation.fallback.acknowledged && current === false, 'preparation_conflict')
++          await checkpoint(true)
+           const restored = await rpc('model-api-keys.updateApiKeyAfterQuota', [preparation.fallback.before, workspaceId], { cleanup: true })
+           check(restored.apiKeyAfterQuota === preparation.fallback.before, 'preparation_conflict')
+         }
+         summary.fallbackRestored = true
++        preparation.fallback.journal.restored = true
+       } catch (error) { failed(error) }
++      await checkpoint(true)
+     }
+   }
+   async function runCase(item) {
+     const result = { case: item.id, model: item.model, status: 'running', cleanup: { state: 'not_created' } }
+     const fixture = fixtureTask(revision, item)
+     const started = now()
+-    let baseline, previousModel, selectedModel, temporarySelection, restoreImplicit = false, profileCreated = false, modelTouched = false, submitted = false, browserWaiting = false, live, task, foreignActivity = false
++    let baseline, previousModel, selectedModel, temporarySelection, journal, restoreImplicit = false, profileCreated = false, modelTouched = false, submitted = false, browserWaiting = false, live, task, foreignActivity = false
+     const issueIds = new Set(), runIds = new Set(), proofs = new Map(), workflowIds = new Set()
+     const { title, content, input } = fixture
+     const expectedMessages = new Map(browserSubmit ? ['en', 'zh-CN'].map(locale => [browserSubmissionText(input, locale), locale]) : [[input, 'api']])
+@@ -695,12 +757,15 @@
+           const current = (await profileRead(fixture.profileId, { cleanup: true, missing: true }))?.profile
+           if (current) {
+             check(current.id === fixture.profileId && current.version === 1 && current.name === fixture.marker, 'profile_changed')
++            await checkpoint(true)
+             const archived = await read(profilePath(workspaceId, fixture.profileId), { method: 'DELETE',
+               body: { workspaceId, version: current.version }, cleanup: true })
+             check(Boolean(archived.profile?.archivedAt), 'cleanup_incomplete')
+           }
+           cleanup.profileArchived = true
++          journal.profile.archived = true
+         } catch (error) { cleanup.state = 'incomplete'; cleanup.profileError = publicFailure(error) }
++        await checkpoint(true)
+       }
+       if (cleanup.ownRunsStopped && modelTouched) {
+         try {
+@@ -709,6 +774,7 @@
+             // from equal model values or clear a later human choice.
+             check(temporarySelection, 'cleanup_incomplete')
+             try {
++              await checkpoint(true)
+               const restored = await read('/api/mobile/model', { method: 'PUT',
+                 body: { bot: botId, mode: 'restore-implicit', ...temporarySelection }, cleanup: true })
+               check(restored.restored === true && restored.preferenceState === 'absent', 'model_changed')
+@@ -722,12 +788,15 @@
+             const current = (await menuRead({ cleanup: true })).current
+             if (!sameModel(current, previousModel)) {
+               check(sameModel(current, selectedModel), 'model_changed')
++              await checkpoint(true)
+               const restored = await read('/api/mobile/model', { method: 'PUT', body: { bot: botId, id: previousModel.id }, cleanup: true })
+               check(sameModel(restored.current, previousModel), 'model_changed')
+             }
+           }
+           cleanup.modelRestored = true
++          journal.model.restored = true
+         } catch (error) { cleanup.state = 'incomplete'; cleanup.modelError = publicFailure(error) }
++        await checkpoint(true)
+       }
+       live?.close()
+       if (!cleanup.ownRunsStopped || !cleanup.ownMachinesEnded || !cleanup.profileArchived || !cleanup.modelRestored) cleanup.state = 'incomplete'
+@@ -743,7 +812,13 @@
+       live = await openLiveImpl(read, workspaceId, { now })
+       result.preflight = { ownSubscription: true, cloudReady: true, workspaceIdle: true, modelRestorable: true, paidFallbackOff: true, soleFixedProfileAvailable: true, liveReady: true }
+       if (!execute) { result.status = 'ready'; return result }
++      journal = { case: item.id, profileId: fixture.profileId, profile: { write: 'intent', archived: false },
++        model: { before: restoreImplicit ? { preferenceState: 'absent' } : { preferenceState: 'present', choice: recoveryModel(previousModel) },
++          target: recoveryModel({ ...planned.option, kind: 'subscription', chosen: true }),
++          write: 'not_started', temporarySelection: null, restored: false } }
++      recovery.cases.push(journal)
+       await quiet()
++      await checkpoint()
+       const profile = { name: fixture.marker, description: 'Issue #1512 bounded acceptance', enabled: true, harness: item.harness,
+         model: { mode: 'fixed', harness: item.harness, model: item.model, source: planned.source.source }, effort: 'low', roles: [], skills: [], instructions: '' }
+       // Deterministic request ID prevents a runner retry from spending again.
+@@ -751,23 +826,29 @@
+       const created = await read(profilePath(workspaceId), { body: { workspaceId, requestId: fixture.profileId, profile } })
+       check(created.profile?.id === fixture.profileId && created.profile.version === 1 && created.profile.name === fixture.marker, 'profile_scope')
+       result.profileId = fixture.profileId
++      journal.profile.write = 'acknowledged'; await checkpoint()
+       selectedModel = { ...planned.option, kind: 'subscription', chosen: true }
++      journal.model.write = 'intent'; await checkpoint()
+       modelTouched = true
+       let selected
+       try {
+         selected = await read('/api/mobile/model', { method: 'PUT', body: { bot: botId, id: planned.option.id,
+           ...(restoreImplicit ? { mode: 'temporary-if-absent' } : {}) } })
+       } catch (error) {
+-        if (restoreImplicit && error?.httpStatus === 409 && error?.serverCode === 'modelChanged') modelTouched = false
++        if (restoreImplicit && error?.httpStatus === 409 && error?.serverCode === 'modelChanged') {
++          modelTouched = false; journal.model.write = 'rejected'
++        }
+         throw error
+       }
+       if (restoreImplicit) {
+         const receipt = selected.temporarySelection
+         check(uuid(receipt?.bindingId) && typeof receipt.revision === 'string' && /^[0-9]{1,10}$/.test(receipt.revision), 'response_invalid')
+         temporarySelection = { bindingId: receipt.bindingId, revision: receipt.revision }
++        journal.model.temporarySelection = { ...temporarySelection }; await checkpoint()
+       }
+       check(selected.current?.id === planned.option.id && selected.current.kind === 'subscription' && selected.current.available === true && !selected.current.fallback, 'model_selection')
+       selectedModel = selected.current
++      journal.model.write = 'acknowledged'; await checkpoint()
+       await pin()
+       const available = await profileRead()
+       check(available.profiles.filter(value => value.enabled && !value.archivedAt).every(value => value.id === fixture.profileId)
+@@ -856,6 +937,7 @@
+     return result
+   }
+   try {
++    await checkpoint()
+     await pin()
+     const email = env.ACME_DEMO_EMAIL, password = env.ACME_DEMO_PASSWORD
+     check(typeof email === 'string' && /^[^@\s]+@[^@\s]+$/.test(email) && typeof password === 'string' && password.length > 0, 'account_required')
+@@ -869,10 +951,12 @@
+     const chat = await read('/api/coordinator/messages')
+     check(uuid(chat.botId), 'response_invalid'); botId = chat.botId
+     report.botId = botId
++    check(typeof ownerId === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(ownerId), 'recovery_metadata_invalid')
++    recovery.scope = { ownerId, workspaceId, botId }; await checkpoint()
+     if (prepare) await prepareSettings()
+     for (const item of cases) {
+       const result = await runCase(item); report.cases.push(result)
+-      if (result.cleanup?.state === 'incomplete' || signal?.aborted) break
++      if (result.cleanup?.state === 'incomplete' || recovery.checkpointFailures || signal?.aborted) break
+     }
+     await pin()
+     report.status = report.cases.length === cases.length && report.cases.every(value => value.status === (execute ? 'runtime_verified' : 'ready'))
+@@ -885,6 +969,10 @@
+     cookies.clear()
+     if (closeSession && !report.sessionClosed) { report.status = 'blocked'; report.code = 'cleanup_incomplete' }
+     report.finishedAt = new Date(now()).toISOString()
++    await checkpoint(true)
++    if (recovery.checkpointFailures && ['ready', 'runtime_verified'].includes(report.status)) {
++      report.status = 'blocked'; report.code = 'recovery_checkpoint_failed'
++    }
+   }
+   return report
+ }
+@@ -898,7 +986,7 @@
+     const args = process.argv.slice(2)
+     check(args.every(arg => ['--execute', '--prepare', '--browser-submit'].includes(arg)) && new Set(args).size === args.length, 'configuration_required')
+     report = await runObservabilityAcceptance({ execute: args.includes('--execute'), prepare: args.includes('--prepare'),
+-      browserSubmit: args.includes('--browser-submit'), signal: controller.signal })
++      browserSubmit: args.includes('--browser-submit'), onRecoveryCheckpoint: writeRecoveryJournal, signal: controller.signal })
+   } catch (error) { report = { version: 1, issue: 1512, ...publicFailure(error) } }
+   finally { process.removeListener('SIGINT', interrupt); process.removeListener('SIGTERM', interrupt) }
+   const directory = 'production-run-observability-report'
+--- a/scripts/acceptance/run-observability.test.mjs
++++ b/scripts/acceptance/run-observability.test.mjs
+@@ -1,3 +1,8 @@
++import { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
++import { tmpdir } from 'node:os'
++import { join } from 'node:path'
++import { fileURLToPath } from 'node:url'
++import { spawnSync } from 'node:child_process'
+ import assert from 'node:assert/strict'
+ import { test } from 'node:test'
+ import { decode, encode } from '../../lib/desktop-rpc/wire.ts'
+@@ -1142,3 +1147,234 @@
+   assert.equal(data.calls.some(call => call.method === 'DELETE'), false)
+   assert.equal(report.sessionClosed, true); safe(report)
+ })
++
++
++test('recovery journal refuses each new setting write when its preceding checkpoint fails', async () => {
++  for (const kind of ['fallback', 'profile', 'model']) {
++    const data = fixture({ paidFallback: kind === 'fallback', profileBusy: kind === 'profile' })
++    let refused = false
++    const report = await run(data, true, {}, { prepare: kind !== 'model', onRecoveryCheckpoint: async journal => {
++      const target = kind === 'fallback' ? journal.preparation.fallback
++        : kind === 'profile' ? journal.preparation.profiles[0] : journal.cases[0]?.model
++      if (target?.write === 'intent') { refused = true; throw new Error('PRIVATE_CHECKPOINT_FAILURE') }
++    } })
++    assert.equal(refused, true)
++    assert.equal(report.status, 'blocked')
++    assert.equal(data.submissions.length, 0)
++    assert.equal(data.calls.filter(call => kind === 'fallback' ? call.body?.action === 'model-api-keys.updateApiKeyAfterQuota'
++      : kind === 'profile' ? call.method === 'PATCH' : call.path === '/mikka/api/mobile/model' && call.method === 'PUT').length, 0)
++    assert.equal(data.state.closed, 1)
++    assert.equal(report.recovery.checkpointFailures > 0, true)
++    safe(report)
++  }
++})
++
++test('recovery journal failure after a model acknowledgement still restores explicit and implicit selections', async () => {
++  for (const implicitDefault of [false, true]) {
++    const data = fixture({ implicitDefault })
++    let refused = false
++    const report = await run(data, true, {}, { onRecoveryCheckpoint: async journal => {
++      const model = journal.cases[0]?.model
++      if (!refused && (implicitDefault ? model?.temporarySelection : model?.write === 'acknowledged')) {
++        refused = true
++        throw new Error('PRIVATE_CHECKPOINT_FAILURE')
++      }
++    } })
++    assert.equal(refused, true)
++    assert.equal(report.status, 'blocked')
++    assert.equal(data.submissions.length, 0)
++    assert.equal(report.cases[0].cleanup.modelRestored, true)
++    assert.equal(report.cases[0].cleanup.profileArchived, true)
++    assert.equal(data.state.storedPreference, !implicitDefault)
++    assert.equal(data.state.current.id, original.id)
++    assert.equal(data.state.closed, 1)
++    if (implicitDefault) assert.deepEqual(report.recovery.cases[0].model.temporarySelection, { bindingId: id(991), revision: '12345' })
++    safe(report)
++  }
++})
++
++test('recovery journal failure after each preparation acknowledgement does not prevent restoration', async () => {
++  for (const kind of ['fallback', 'profile']) {
++    const data = fixture({ paidFallback: kind === 'fallback', profileBusy: kind === 'profile' })
++    let refused = false
++    const report = await run(data, true, {}, { prepare: true, onRecoveryCheckpoint: async journal => {
++      const entry = kind === 'fallback' ? journal.preparation.fallback : journal.preparation.profiles[0]
++      if (!refused && entry?.write === 'acknowledged') { refused = true; throw new Error('PRIVATE_CHECKPOINT_FAILURE') }
++    } })
++    assert.equal(refused, true)
++    assert.equal(report.status, 'blocked')
++    assert.equal(report.preparation.restoration, 'complete')
++    assert.equal(data.submissions.length, 0)
++    if (kind === 'fallback') assert.equal(data.state.fallback, true)
++    else assert.equal(data.profiles.get(existingProfile.id).enabled, true)
++    assert.equal(data.state.closed, 1)
++    safe(report)
++  }
++})
++
++test('persistent checkpoint failures cannot interrupt any already-required cleanup or permit another case', async () => {
++  const data = fixture({ paidFallback: true, profileBusy: true })
++  let failing = false
++  const report = await run(data, true, { MIKKA_OBSERVABILITY_MODEL_CASE: 'all' }, { prepare: true, onRecoveryCheckpoint: async journal => {
++    failing ||= journal.cases[0]?.model.write === 'acknowledged'
++    if (failing) throw new Error('PRIVATE_PERSISTENT_CHECKPOINT_FAILURE')
++  } })
++  assert.equal(failing, true)
++  assert.equal(report.status, 'blocked')
++  assert.equal(report.cases.length, 1)
++  assert.equal(report.cases[0].cleanup.state, 'complete')
++  assert.equal(report.preparation.restoration, 'complete')
++  assert.equal(data.profiles.get(existingProfile.id).enabled, true)
++  assert.equal(data.state.fallback, true)
++  assert.equal(data.state.current.id, original.id)
++  assert.equal(data.state.closed, 1)
++  assert.ok(report.recovery.checkpointFailures > 1)
++  safe(report)
++})
++
++test('recovery journal retains only validated recovery metadata and isolates callback mutation', async () => {
++  const data = fixture({ paidFallback: true, profileBusy: true }), snapshots = []
++  const fetchImpl = async (input, init) => {
++    const response = await data.fetchImpl(input, init)
++    if (new URL(input).pathname === '/mikka/api/mobile/model') {
++      const value = await response.json()
++      if (value.current) value.current = { ...value.current, credentialLabel: 'PRIVATE_LABEL',
++        quota: { plan: 'PRIVATE_PLAN', fallback: { keyName: 'PRIVATE_KEY_NAME' } },
++        instructions: 'PRIVATE_MODEL_BODY', token: 'PRIVATE_TOKEN' }
++      return Response.json(value, { status: response.status, headers: response.headers })
++    }
++    return response
++  }
++  const report = await run(data, true, {}, { prepare: true, fetchImpl, onRecoveryCheckpoint: async journal => {
++    snapshots.push(structuredClone(journal))
++    journal.privateInjected = 'PRIVATE_CALLBACK_MUTATION'
++  } })
++  assert.equal(report.status, 'runtime_verified', JSON.stringify(report))
++  assert.ok(snapshots.length > 0)
++  const journal = report.recovery
++  assert.deepEqual(journal.scope, { ownerId, workspaceId, botId })
++  assert.equal(journal.revision, revision)
++  assert.deepEqual(journal.cases[0].model.before, { preferenceState: 'present',
++    choice: { id: original.id, kind: 'hosted', modelId: '', provider: 'mikka', chosen: true } })
++  assert.deepEqual(journal.preparation.profiles[0].before,
++    { version: existingProfile.version, digest: existingProfile.digest, enabled: true })
++  assert.deepEqual(journal.preparation.profiles[0].written, { version: 4, digest: '4'.repeat(64) })
++  assert.equal(journal.preparation.profiles[0].restored, true)
++  assert.equal(journal.preparation.fallback.before, true)
++  assert.equal(journal.preparation.fallback.restored, true)
++  assert.equal(journal.cases[0].profile.archived, true)
++  assert.equal(journal.cases[0].model.restored, true)
++  assert.equal(journal.privateInjected, undefined)
++  safe(journal)
++  for (const snapshot of snapshots) safe(snapshot)
++  safe(report)
++})
++
++test('failed cleanup reports retain the original explicit model and acknowledged implicit binding without guessing', async () => {
++  const explicit = fixture({ failure: 'concurrent_model' })
++  const explicitReport = await run(explicit, true)
++  assert.equal(explicitReport.status, 'blocked')
++  assert.deepEqual(explicitReport.recovery.cases[0].model.before, { preferenceState: 'present',
++    choice: { id: original.id, kind: 'hosted', modelId: '', provider: 'mikka', chosen: true } })
++  assert.equal(explicitReport.recovery.cases[0].model.restored, false)
++  assert.equal(explicit.state.current.id, id(999))
++  const implicit = fixture({ implicitDefault: true, failure: 'temporary_same_value_edit' })
++  const implicitReport = await run(implicit, true)
++  assert.equal(implicitReport.status, 'blocked')
++  assert.deepEqual(implicitReport.recovery.cases[0].model.before, { preferenceState: 'absent' })
++  assert.deepEqual(implicitReport.recovery.cases[0].model.temporarySelection, { bindingId: id(991), revision: '12345' })
++  assert.equal(implicitReport.recovery.cases[0].model.restored, false)
++  safe(explicitReport); safe(implicitReport)
++})
++
++test('a lost temporary selection response records intent without inventing a binding receipt', async () => {
++  const data = fixture({ implicitDefault: true, failure: 'temporary_select_lost' })
++  const report = await run(data, true)
++  assert.equal(report.status, 'blocked')
++  assert.deepEqual(report.recovery.cases[0].model.before, { preferenceState: 'absent' })
++  assert.equal(report.recovery.cases[0].model.write, 'intent')
++  assert.equal(report.recovery.cases[0].model.temporarySelection, null)
++  assert.equal(report.recovery.cases[0].model.restored, false)
++  assert.equal(data.calls.some(call => call.body?.mode === 'restore-implicit'), false)
++  safe(report)
++})
++
++test('an unresolved profile restore retains only the exact acknowledged version and digest', async () => {
++  const data = fixture({ profileBusy: true, failure: 'concurrent_profile' })
++  const report = await run(data, true, {}, { prepare: true })
++  assert.equal(report.status, 'blocked')
++  const entry = report.recovery.preparation.profiles[0]
++  assert.equal(entry.id, existingProfile.id)
++  assert.deepEqual(entry.before, { version: 3, digest: '3'.repeat(64), enabled: true })
++  assert.deepEqual(entry.written, { version: 4, digest: '4'.repeat(64) })
++  assert.equal(entry.restored, false)
++  assert.equal(data.calls.filter(call => call.method === 'PATCH').length, 1)
++  safe(report)
++})
++
++test('actual CLI writes the fixed atomic 0600 recovery file and blocks before HTTP when persistence fails', async () => {
++  const root = await mkdtemp(join(tmpdir(), 'mikka-observability-recovery-'))
++  const driver = fileURLToPath(new URL('./run-observability.mjs', import.meta.url))
++  try {
++    const preload = join(root, 'offline.mjs')
++    await writeFile(preload, "import { writeFileSync } from 'node:fs';globalThis.fetch = async () => { writeFileSync('http-called','1');return Response.json({build:'b'.repeat(40)}) }\n")
++    for (const fail of [false, true]) {
++      const cwd = join(root, fail ? 'fail' : 'ok'), directory = join(cwd, 'production-run-observability-report')
++      await mkdir(directory, { recursive: true })
++      if (fail) await mkdir(join(directory, 'recovery.json'))
++      else await writeFile(join(directory, 'recovery.json'), 'OLD_COMPLETE_FILE\n', { mode: 0o644 })
++      const result = spawnSync(process.execPath, ['--import', preload, driver], { cwd,
++        env: { PATH: process.env.PATH, MIKKA_EXPECTED_DEPLOYMENT_SHA: revision, MIKKA_OBSERVABILITY_MODEL_CASE: 'claude' },
++        encoding: 'utf8', timeout: 10_000 })
++      assert.equal(result.status, 1, result.stderr)
++      const report = JSON.parse(await readFile(join(directory, 'report.json'), 'utf8'))
++      assert.equal(report.code, fail ? 'recovery_checkpoint_failed' : 'build_mismatch')
++      if (fail) await assert.rejects(readFile(join(cwd, 'http-called')), { code: 'ENOENT' })
++      else {
++        const journal = JSON.parse(await readFile(join(directory, 'recovery.json'), 'utf8'))
++        assert.equal(journal.revision, revision)
++        assert.equal(journal.version, 1)
++        assert.equal(journal.scope, null)
++        assert.equal((await stat(join(directory, 'recovery.json'))).mode & 0o777, 0o600)
++        assert.deepEqual(journal, report.recovery)
++        safe(journal)
++      }
++      assert.equal((await readdir(directory)).includes('.recovery.json.tmp'), false)
++      safe(report)
++      assert.doesNotMatch(result.stdout + result.stderr, /PRIVATE_|ACME_DEMO_PASSWORD|PRIVATE_COOKIE/)
++    }
++  } finally { await rm(root, { recursive: true, force: true }) }
++})
++
++test('the existing safe artifact includes only the fixed recovery filename alongside the reports', async () => {
++  const workflow = await readFile(new URL('../../.github/workflows/run-trace-acceptance.yml', import.meta.url), 'utf8')
++  assert.match(workflow, /if: always\(\)[\s\S]*production-run-observability-report\/report\.json\n\s+production-run-observability-report\/recovery\.json\n\s+production-run-observability-report\/browser-actor\.receipt\.json/)
++  assert.doesNotMatch(workflow, /production-run-observability-report\/\*\*?/)
++})
++
++
++test('recovery metadata preserves the actual shared API-key menu shape and restores its explicit choice', async () => {
++  const data = fixture(), writes = []
++  const shared = { id: 'apikey:' + id(77) + ':provider/model-v1', kind: 'shared', modelId: 'provider/model-v1', provider: 'custom', chosen: true, available: true }
++  const fetchImpl = async (input, init = {}) => {
++    const model = new URL(input).pathname === '/mikka/api/mobile/model'
++    let forwarded = init
++    if (model && init.method === 'PUT') {
++      const body = JSON.parse(init.body); writes.push(structuredClone(body))
++      if (body.id === shared.id) forwarded = { ...init, body: JSON.stringify({ ...body, id: original.id }) }
++    }
++    const response = await data.fetchImpl(input, forwarded)
++    if (!model) return response
++    const value = await response.json()
++    value.groups.push({ kind: 'shared', credentialLabel: 'PRIVATE_SHARED_LABEL', options: [shared] })
++    if (value.current?.id === original.id) value.current = { ...shared, credentialLabel: 'PRIVATE_SHARED_LABEL' }
++    return Response.json(value, { status: response.status, headers: response.headers })
++  }
++  const report = await run(data, true, {}, { fetchImpl })
++  assert.equal(report.status, 'runtime_verified', JSON.stringify(report))
++  assert.deepEqual(report.recovery.cases[0].model.before, { preferenceState: 'present',
++    choice: { id: shared.id, kind: shared.kind, modelId: shared.modelId, provider: shared.provider, chosen: true } })
++  assert.equal(writes.at(-1).id, shared.id)
++  assert.equal(report.recovery.cases[0].model.restored, true)
++  safe(report)
++})
+--- a/.github/workflows/run-trace-acceptance.yml
++++ b/.github/workflows/run-trace-acceptance.yml
+@@ -145,6 +145,7 @@
+           name: run-trace-acceptance-${{ github.run_id }}
+           path: |
+             production-run-observability-report/report.json
++            production-run-observability-report/recovery.json
+             production-run-observability-report/browser-actor.receipt.json
+           retention-days: 7
+           if-no-files-found: warn

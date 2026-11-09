@@ -1,0 +1,333 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "repository": "alexj11324/Mikka",
+  "prefix": "acceptance-recovery-journal-20261109",
+  "sourceBase": {
+    "head": "f3466ba479ef51918790f521a288feaef5160e44",
+    "tree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2"
+  },
+  "candidate": [
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "gitBlob": "104075571c73b97a985458f206dba310e4894490",
+      "bytes": 69119,
+      "sha256": "5c91fd686dbaf6e0a511761cdee5d14ae5f8f5d8c63dc5b6284e8a7ea5e16aec"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "gitBlob": "2e3c8c7aad0594df165caf8f798c72034b3d484f",
+      "bytes": 94496,
+      "sha256": "12da2b118255f1ea05399d915bd80dd87737e2f42b0a1ab6b7c19bf0d8bff775"
+    },
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "gitBlob": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+      "bytes": 14046,
+      "sha256": "be84c5b140af42a7bc57b040597b6098410318b470f90cc69b630911c006e0c5"
+    }
+  ],
+  "implementationReceipt": "3af76fdfaed2a158c2ba94917698b06762142455",
+  "executionLedger": "032980ce1efd18b0e4453411a7bc2e499e0e125e",
+  "finalVerification": {
+    "actualNode": "v24.22.1",
+    "tests": 74,
+    "pass": 74,
+    "fail": 0,
+    "skipped": 0,
+    "exitCode": 0,
+    "original63Preserved": true,
+    "strictPatchForwardReverse": true
+  },
+  "baselineBoundary": "Initial RED full stdout proves63pass/10fail; child exitCode was lost in a truncated MCP response and is explicitly unknown. The Python collector returned0 because it collected, rather than forwarded, the child result. Later executions have separately persisted child exit codes.",
+  "resources": {
+    "ownedSandboxCount": 1,
+    "stoppedAt": "2026-11-09T14:27:42.881Z",
+    "deleted": true,
+    "exactAfterDeleteStatus": 404,
+    "active": 0,
+    "productionCalls": 0
+  },
+  "publicBoundary": "All execution was synthetic fixtures and a local offline CLI preload. No production account, model request, Infisical secret read, raw profile definition, cookie or token entered these evidence outputs. Tracked source/test canary literals and public workflow identifiers are retained exactly. Raw MCP envelopes and command argument echoes are not included.",
+  "supersededEvidence": "Original failures and intermediate green logs remain source-bound. execution-ledger-v0-derived-invalid.safe.json contains a parsing-only mistake corrected by execution-ledger.safe.json; it is not used for any pass claim. No old green is relabeled as final-source execution.",
+  "refChanges": 0,
+  "CITriggered": false,
+  "files": [
+    {
+      "path": "recovery-final-indent.patch",
+      "gitBlob": "0795367284e624a09b8caa2d04b689feee272ead",
+      "bytes": 33936,
+      "sha256": "4a4a287fa0a400de570e733166ea81b25c60f6c89207b44ed180a965025096e9",
+      "mode": "100644",
+      "role": "strict-source-diff",
+      "safeToPublish": true
+    },
+    {
+      "path": "patch-proof-final-indent.json",
+      "gitBlob": "a2db52eef0411c426e52d9722f4b62cc02b225d6",
+      "bytes": 1330,
+      "sha256": "eb6b6c548129b4564429b73a65e1c1d2a79b6f5107163d10e33ac0d7c15eb0ee",
+      "mode": "100644",
+      "role": "safe-receipt",
+      "safeToPublish": true
+    },
+    {
+      "path": "green-final-indent.stdout.log",
+      "gitBlob": "a1532877ab93a5eacecba6ab038ee86480d1ac38",
+      "bytes": 8338,
+      "sha256": "515cb629d2017f3467ed762881b42c48a6df08c7b76882b29947a31995dfff1f",
+      "mode": "100644",
+      "role": "original-test-output",
+      "safeToPublish": true
+    },
+    {
+      "path": "green-final-indent.receipt.json",
+      "gitBlob": "dc22f0a5ff568f74823d42e02c3eef01763581db",
+      "bytes": 1714,
+      "sha256": "8810e2fd951ef7a44dbb80734e6bbd9413f75ad16b9229fbadf5338983d0f3f5",
+      "mode": "100644",
+      "role": "safe-receipt",
+      "safeToPublish": true
+    },
+    {
+      "path": "red.stdout.log",
+      "gitBlob": "1def6c59fa0e7c4c91ab7d45670ca27f49aa829a",
+      "bytes": 38759,
+      "sha256": "ddfbae1b520a3552ecf57a711f041b13c7355bcae136b788f3ed5a8664bf75aa",
+      "mode": "100644",
+      "role": "original-test-output",
+      "safeToPublish": true
+    },
+    {
+      "path": "red.stderr.log",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": "100644",
+      "role": "original-test-output",
+      "safeToPublish": true
+    },
+    {
+      "path": "source-manifest-red.json",
+      "gitBlob": "4433f8d065c284b4e286c2f1c5521ecc45648273",
+      "bytes": 1255,
+      "sha256": "7dfdf185ac173049b1030f236abfa0922a301bce9318851a223161c284b745ac",
+      "mode": "100644",
+      "role": "safe-receipt",
+      "safeToPublish": true
+    },
+    {
+      "path": "green-v1.stdout.log",
+      "gitBlob": "ba6a5e7373a519c2908b21a62fa556c181bebe7a",
+      "bytes": 8216,
+      "sha256": "2f91b10714ad5384081bcf885d04bc83a750b5b923dc15be842cf266507b1dc0",
+      "mode": "100644",
+      "role": "original-test-output",
+      "safeToPublish": true
+    },
+    {
+      "path": "green-v1.stderr.log",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": "100644",
+      "role": "original-test-output",
+      "safeToPublish": true
+    },
+    {
+      "path": "green-v1.receipt.json",
+      "gitBlob": "89191d039d29fc6960aeede8a1c3a0c4103ecb81",
+      "bytes": 1714,
+      "sha256": "af85eb0009a3cef37c884a25a52b974feb345fb7efdc43a2f5a40abed926ea16",
+      "mode": "100644",
+      "role": "safe-receipt",
+      "safeToPublish": true
+    },
+    {
+      "path": "recovery-v1.patch",
+      "gitBlob": "f4c47d9e08f64405985359a8d5f4490b2c917d73",
+      "bytes": 32525,
+      "sha256": "45f38845a74c05c510feca8c8238709fbb39e54fb6d3522f7f6535abf4d5baa4",
+      "mode": "100644",
+      "role": "strict-source-diff",
+      "safeToPublish": true
+    },
+    {
+      "path": "patch-proof-v1.json",
+      "gitBlob": "90ed194081396d9d30ee79ed55808354b1c5eabd",
+      "bytes": 791,
+      "sha256": "a58d4e9f0298990475744baed586e11efd517f3774a27af08f38898826642d0f",
+      "mode": "100644",
+      "role": "safe-receipt",
+      "safeToPublish": true
+    },
+    {
+      "path": "shared-red.stdout.log",
+      "gitBlob": "3ccd082eb800976918cde5e876d72472c2f8399b",
+      "bytes": 2503,
+      "sha256": "7025658e12d1b17f233918073713abf90b5e7ab152fcf6a792b2f0745297f079",
+      "mode": "100644",
+      "role": "original-test-output",
+      "safeToPublish": true
+    },
+    {
+      "path": "shared-red.stderr.log",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": "100644",
+      "role": "original-test-output",
+      "safeToPublish": true
+    },
+    {
+      "path": "shared-red.receipt.json",
+      "gitBlob": "14a81231f601d824938f65603d422bf93b8162ce",
+      "bytes": 307,
+      "sha256": "8512c17206fd47207b7d10b737b0c98418cb630166ef25b1393ccd44d07ecba5",
+      "mode": "100644",
+      "role": "safe-receipt",
+      "safeToPublish": true
+    },
+    {
+      "path": "green-final.stdout.log",
+      "gitBlob": "16aa23da3d1a238cd106024687613022bea10459",
+      "bytes": 8334,
+      "sha256": "6ca72d2968a74d37a6b0a208fc6075208291b7a67f04daf541d893d5c7b30708",
+      "mode": "100644",
+      "role": "original-test-output",
+      "safeToPublish": true
+    },
+    {
+      "path": "green-final.stderr.log",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": "100644",
+      "role": "original-test-output",
+      "safeToPublish": true
+    },
+    {
+      "path": "green-final.receipt.json",
+      "gitBlob": "a8c1126c4073beecc1cda44c7d013c226af36237",
+      "bytes": 1714,
+      "sha256": "dc66c784ebdc34e3d7a683419ab0c3f052771f0c34fb61f02f5801cb70952ea7",
+      "mode": "100644",
+      "role": "safe-receipt",
+      "safeToPublish": true
+    },
+    {
+      "path": "recovery-final.patch",
+      "gitBlob": "28301c0f8a5638fda5c632463a061148604f84b3",
+      "bytes": 33940,
+      "sha256": "1ee6f14bb776c9fa9ed2944345afd5621e5d5fe23654becabc89a8fc1e1f5e50",
+      "mode": "100644",
+      "role": "strict-source-diff",
+      "safeToPublish": true
+    },
+    {
+      "path": "patch-proof-final.json",
+      "gitBlob": "d24dd1211262edcda3a64dfc8900b874a457313b",
+      "bytes": 1332,
+      "sha256": "c575e817cb9b87396b04d4418a650b62dbcc5522cf36fc2fe4dcad40229985aa",
+      "mode": "100644",
+      "role": "safe-receipt",
+      "safeToPublish": true
+    },
+    {
+      "path": "green-final-indent.stderr.log",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": "100644",
+      "role": "original-test-output",
+      "safeToPublish": true
+    },
+    {
+      "path": "resource-cleanup.safe.json",
+      "gitBlob": "f0d110e767a1889ed67570d85c63bceef9022f7f",
+      "bytes": 1243,
+      "sha256": "3ee783c6cfe52005b2900209564bc1733e267549a2ab5de2e14aa0d2c7ab1f6f",
+      "mode": "100644",
+      "role": "safe-receipt",
+      "safeToPublish": true
+    },
+    {
+      "path": "execution-ledger-v0-derived-invalid.safe.json",
+      "gitBlob": "b2c9c8503880c45a3ab7caaafda3d2f9a7d0570e",
+      "bytes": 25033,
+      "sha256": "530e2a8c515b9539dc5b97e39e90dcfb7e0095fb2cf44c3ba1b155771a99d94a",
+      "mode": "100644",
+      "role": "superseded-derived-ledger-not-acceptance-evidence",
+      "safeToPublish": true
+    },
+    {
+      "path": "model-schema-binding.safe.json",
+      "gitBlob": "730c03fd5c0df2ab5e0e513ce7d7ecfca480a436",
+      "bytes": 1031,
+      "sha256": "04e8ea05c86e87c7cd633fe50382986d99743e13ab8835c0d32e70f6f3b401b7",
+      "mode": "100644",
+      "role": "safe-receipt",
+      "safeToPublish": true
+    },
+    {
+      "path": "execution-ledger.safe.json",
+      "gitBlob": "032980ce1efd18b0e4453411a7bc2e499e0e125e",
+      "bytes": 25316,
+      "sha256": "dc33804b932dbf880fe06d07bb332da889e5be1d3eb1cafb436dbc14950248bc",
+      "mode": "100644",
+      "role": "safe-receipt",
+      "safeToPublish": true
+    },
+    {
+      "path": "implementation.safe.json",
+      "gitBlob": "3af76fdfaed2a158c2ba94917698b06762142455",
+      "bytes": 7945,
+      "sha256": "241d24036aaed61fd3db56d4cacb7cd2243236ff24851fc5f7269681765e7b09",
+      "mode": "100644",
+      "role": "safe-receipt",
+      "safeToPublish": true
+    },
+    {
+      "path": "candidate/run-observability.mjs",
+      "sourcePath": "scripts/acceptance/run-observability.mjs",
+      "gitBlob": "104075571c73b97a985458f206dba310e4894490",
+      "bytes": 69119,
+      "sha256": "5c91fd686dbaf6e0a511761cdee5d14ae5f8f5d8c63dc5b6284e8a7ea5e16aec",
+      "mode": "100644",
+      "role": "exact-candidate-source",
+      "safeToPublish": true
+    },
+    {
+      "path": "candidate/run-observability.test.mjs",
+      "sourcePath": "scripts/acceptance/run-observability.test.mjs",
+      "gitBlob": "2e3c8c7aad0594df165caf8f798c72034b3d484f",
+      "bytes": 94496,
+      "sha256": "12da2b118255f1ea05399d915bd80dd87737e2f42b0a1ab6b7c19bf0d8bff775",
+      "mode": "100644",
+      "role": "exact-candidate-source",
+      "safeToPublish": true
+    },
+    {
+      "path": "candidate/run-trace-acceptance.yml",
+      "sourcePath": ".github/workflows/run-trace-acceptance.yml",
+      "gitBlob": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+      "bytes": 14046,
+      "sha256": "be84c5b140af42a7bc57b040597b6098410318b470f90cc69b630911c006e0c5",
+      "mode": "100644",
+      "role": "exact-candidate-source",
+      "safeToPublish": true
+    },
+    {
+      "path": "independent-source-review.safe.json",
+      "gitBlob": "661d6db756bd200d50c8fc515b911d752ae2f84d",
+      "bytes": 16904,
+      "sha256": "cadc3c5a54ffb316ec38a03284d15d4a3b23a0da46db4bd093a9e7b368e50449",
+      "mode": "100644",
+      "role": "independent-source-review",
+      "safeToPublish": true,
+      "provenance": "/root/daemon_trace froze and verified its readback; source-only, no duplicate tests/resources."
+    }
+  ],
+  "fileCount": 30,
+  "totalPayloadBytes": 431841
+}

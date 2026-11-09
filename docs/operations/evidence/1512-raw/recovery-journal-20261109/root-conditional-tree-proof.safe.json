@@ -1,0 +1,143 @@
+{
+  "schema": "issue1512.root-conditional-source-proof.v1",
+  "observedAt": "2026-11-09 14:16:33 UTC",
+  "repository": "alexj11324/Mikka",
+  "inputs": {
+    "receipt": {
+      "sha": "c424049c28e1ff0d2d63203549a6e67632a522ca",
+      "bytes": 17699,
+      "sha256": "0668c19028231596f3648170563e1c0e38a1337c8b434b987ce2839d268f709e"
+    },
+    "leafIndex": {
+      "sha": "c063080fc6b3d025cb8dc5e5649af0aaee721f58",
+      "bytes": 1080092,
+      "sha256": "ba499173577bca649250ccdbbb379b97ef4e45d67ed5f80441a3c1f20dccf16b"
+    }
+  },
+  "method": "Root independently hashes raw UTF-8 package blobs and Git binary trees from all leaf entries, applies complete six/57/eight direct deltas, and checks byte-exact two-line combination. No Git source objects or refs created.",
+  "packageChecks": [
+    {
+      "expected": "b4c7addbf7d0d147409d2f95fe41c14183edf2a0",
+      "actual": "b4c7addbf7d0d147409d2f95fe41c14183edf2a0",
+      "bytes": 80792,
+      "sha256": "6fe98887dad71fe87de43540513c2ff519783a2a3db305d6d8bbf6012dacb288",
+      "matches": true
+    },
+    {
+      "expected": "568cfeee161309202699acefd0a57a8edc52bf6e",
+      "actual": "568cfeee161309202699acefd0a57a8edc52bf6e",
+      "bytes": 80839,
+      "sha256": "d1e4b875976a3076381ad30949da73686ea7dc794f5ff7bc0cc27ccb6111443a",
+      "matches": true
+    },
+    {
+      "expected": "f1b9d887b5f2cd469a83530d45ed5d8ea39c103b",
+      "actual": "f1b9d887b5f2cd469a83530d45ed5d8ea39c103b",
+      "bytes": 80830,
+      "sha256": "e1f460a52520893f2198adac22e357da7d7303d8f2102f568cf73250d4e128eb",
+      "matches": true
+    }
+  ],
+  "packageResolution": {
+    "combinedBlob": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d",
+    "bytes": 80877,
+    "sha256": "ed9893d62d9d90299de21eb0325e73ab3c97202dec5eafe3d9983c04b64a6add",
+    "independentEditOrderIdentical": true,
+    "featureOnlyCapturesLine": true,
+    "nativeOnlyMobileLine": true
+  },
+  "treeChecks": [
+    {
+      "name": "base111",
+      "expected": "6a06f3742fb0dfc35bed19780fe09da2747c1ddc",
+      "actual": "6a06f3742fb0dfc35bed19780fe09da2747c1ddc",
+      "leaves": 6790,
+      "subtrees": 873,
+      "matches": true
+    },
+    {
+      "name": "actualMain111aTo765",
+      "expected": "42625ba25887f1fbf64fd025446aa9e888677232",
+      "actual": "42625ba25887f1fbf64fd025446aa9e888677232",
+      "leaves": 6791,
+      "subtrees": 873,
+      "matches": true
+    },
+    {
+      "name": "feature111aToF346",
+      "expected": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+      "actual": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+      "leaves": 6792,
+      "subtrees": 873,
+      "matches": true
+    },
+    {
+      "name": "nativeBatch111aTo486",
+      "expected": "f263167f4ce92cf9e487c3172ab6750714deeedc",
+      "actual": "f263167f4ce92cf9e487c3172ab6750714deeedc",
+      "leaves": 6792,
+      "subtrees": 873,
+      "matches": true
+    },
+    {
+      "name": "actualMain765",
+      "expected": "42625ba25887f1fbf64fd025446aa9e888677232",
+      "actual": "42625ba25887f1fbf64fd025446aa9e888677232",
+      "leaves": 6791,
+      "subtrees": 873,
+      "matches": true
+    },
+    {
+      "name": "actualMain765PlusFeatureF346",
+      "expected": "5e14efc8047ff9eeb8a51077177cf8b346ecd7d3",
+      "actual": "5e14efc8047ff9eeb8a51077177cf8b346ecd7d3",
+      "leaves": 6793,
+      "subtrees": 873,
+      "matches": true
+    },
+    {
+      "name": "conditionalMain765PlusNativeBatch486",
+      "expected": "74b7be77de23f66162ae9558c863bb2fc9b06a56",
+      "actual": "74b7be77de23f66162ae9558c863bb2fc9b06a56",
+      "leaves": 6793,
+      "subtrees": 873,
+      "matches": true
+    },
+    {
+      "name": "conditionalMain765PlusNativeBatch486PlusFeatureF346",
+      "expected": "01fc05b948deb2efbbc8141e0d25509d9e713196",
+      "actual": "01fc05b948deb2efbbc8141e0d25509d9e713196",
+      "leaves": 6795,
+      "subtrees": 873,
+      "matches": true
+    }
+  ],
+  "retention": {
+    "actualMain111aTo765": {
+      "expected": 6,
+      "matched": 6,
+      "mismatch": []
+    },
+    "feature111aToF346": {
+      "expected": 56,
+      "matched": 56,
+      "mismatch": []
+    },
+    "nativeBatch111aTo486": {
+      "expected": 7,
+      "matched": 7,
+      "mismatch": []
+    }
+  },
+  "errors": [],
+  "actualSourceRefsChanged": false,
+  "sourceUnionTestsExecuted": false,
+  "conditions": [
+    "Current main must still be exactly765, feature exactlyf346 and Native batch exactly486 for these exact hashes.",
+    "If1827 lands on765, the actual Native-main tree must match74b7be77de23f66162ae9558c863bb2fc9b06a56 before applying the final conditional proof.",
+    "The later merged feature source must match01fc05b948deb2efbbc8141e0d25509d9e713196, including the combined package blob72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d.",
+    "If1827 has not landed,765 plus f346 instead computes5e14efc8047ff9eeb8a51077177cf8b346ecd7d3; this is still uncreated and untested.",
+    "Any head movement, additional paths, conflict resolution differences, mode changes or package edits invalidate application of these fixed tree hashes until a new bounded source comparison.",
+    "Actual release writers, latest-head CI/Native and #1512 production gates remain root-owned and are not marked passed by this proof."
+  ]
+}

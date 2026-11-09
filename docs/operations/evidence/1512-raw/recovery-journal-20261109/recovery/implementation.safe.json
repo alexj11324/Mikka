@@ -1,0 +1,155 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "status": "implementation-and-isolated-unit-verification-complete-no-ref-published",
+  "base": {
+    "head": "f3466ba479ef51918790f521a288feaef5160e44",
+    "tree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+    "files": [
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "gitBlob": "002b8501cd4f4df023148515add7c55e2863dbd3"
+      },
+      {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "gitBlob": "aab0a21c4c8fadb9df81ff87ada4fa23198fa575"
+      },
+      {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "gitBlob": "b248a4d97240ba895c3c165b2d7d5c4a763ffe23"
+      }
+    ]
+  },
+  "candidate": [
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "gitBlob": "104075571c73b97a985458f206dba310e4894490",
+      "bytes": 69119,
+      "sha256": "5c91fd686dbaf6e0a511761cdee5d14ae5f8f5d8c63dc5b6284e8a7ea5e16aec"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "gitBlob": "2e3c8c7aad0594df165caf8f798c72034b3d484f",
+      "bytes": 94496,
+      "sha256": "12da2b118255f1ea05399d915bd80dd87737e2f42b0a1ab6b7c19bf0d8bff775"
+    },
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "gitBlob": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+      "bytes": 14046,
+      "sha256": "be84c5b140af42a7bc57b040597b6098410318b470f90cc69b630911c006e0c5"
+    }
+  ],
+  "behavior": [
+    "CLI supplies writeRecoveryJournal by default. Initial persistence precedes even the first HTTP call, then scope and each configuration/model intent checkpoint precede mutation flags and requests.",
+    "Driver passes only a structuredClone of the metadata projection to the injected callback; it also returns that safe recovery snapshot in normal and failed report.json.",
+    "Existing explicit model snapshot copies only validated id/kind/modelId/provider/chosen; implicit preference records absence plus the actual acknowledged bindingId/revision immediately on receipt.",
+    "Preparation profile records contain id and original version/digest/enabled, intendedEnabled=false, confirmed written version/digest and restored state. Private profile definitions remain in memory and are not serialized.",
+    "Fallback records contain the actual original boolean, intended value and acknowledgement/restoration states.",
+    "Any normal checkpoint failure blocks subsequent new work. Cleanup checkpoints retain failure counts without throwing, so original end/restoreSettings continues through unchanged ownRunsStopped/ownerIdle and value/version/digest guards.",
+    "Writer uses only production-run-observability-report/.recovery.json.tmp and recovery.json, exclusive temporary create at 0600, file sync, atomic rename and directory sync. Workflow always uploads only the explicitly named recovery file alongside existing safe reports."
+  ],
+  "tests": {
+    "ledgerBlob": "032980ce1efd18b0e4453411a7bc2e499e0e125e",
+    "baseline": {
+      "passed": 63,
+      "failed": 10,
+      "nodeExitCode": null
+    },
+    "sharedSchemaRed": {
+      "passed": 0,
+      "failed": 1,
+      "exitCode": 1
+    },
+    "final": {
+      "passed": 74,
+      "failed": 0,
+      "skipped": 0,
+      "exitCode": 0,
+      "node": "v24.22.1",
+      "rawLogBlob": "a1532877ab93a5eacecba6ab038ee86480d1ac38",
+      "executionReceiptBlob": "dc22f0a5ff568f74823d42e02c3eef01763581db"
+    },
+    "original63BodiesPreserved": true,
+    "newDeclarations": 11,
+    "actualCliOfflineTest": true,
+    "noNewDependencies": true
+  },
+  "verification": {
+    "patchBlob": "0795367284e624a09b8caa2d04b689feee272ead",
+    "strictRoundtripBlob": "a2db52eef0411c426e52d9722f4b62cc02b225d6",
+    "forwardAndReverseAllThreeFilesExact": true,
+    "independentSourceReview": {
+      "agent": "/root/daemon_trace",
+      "blob": "661d6db756bd200d50c8fc515b911d752ae2f84d",
+      "sha256": "cadc3c5a54ffb316ec38a03284d15d4a3b23a0da46db4bd093a9e7b368e50449",
+      "boundary": "source-only; no duplicate tests or resources"
+    }
+  },
+  "privacy": {
+    "projectedMetadataOnly": true,
+    "privateProfileDefinitionPersisted": false,
+    "credentialEnvironmentLoaded": false,
+    "realAccountOrModelCalls": 0,
+    "canaryTestsPassed": true,
+    "publicArtifactsBoundary": "Raw tests/patches may contain explicitly synthetic canary identifiers from tracked fixtures and public workflow identity IDs/local-only e2e DB placeholders. No production secrets, cookies, passwords, profile body or account data were used or copied. MCP envelopes and signed/download URLs are excluded."
+  },
+  "cleanup": {
+    "blob": "f0d110e767a1889ed67570d85c63bceef9022f7f",
+    "stoppedAt": "2026-11-09T14:27:42.881Z",
+    "deleted": true,
+    "exactGetStatus": 404,
+    "activeResources": 0
+  },
+  "limitations": [
+    "No transaction spans the normal product API mutation and the local filesystem checkpoint. A lost API acknowledgement or SIGKILL between mutation and durable acknowledgement leaves an explicitly unconfirmed intent; it cannot invent an implicit binding receipt or prove ownership of an unacknowledged write.",
+    "This is a recovery record, not an automatic resume interface. Restoring later still requires the original normal API authorization, idle and exact version/value checks. Unknown or concurrent state must not be overwritten.",
+    "An unavailable disk or lost runner can prevent final report/upload. GHA always() attempts the existing artifact upload; this change does not establish a storage acknowledgement after runner loss.",
+    "Journal identifier grammar is deliberately narrower than arbitrary custom model strings; unsupported/private-content-like strings fail before changing configuration. All ordinary preset providers, hosted empty modelId, own subscription, API-key and actual shared API-key forms are covered by source review.",
+    "The existing owner inventory is finite/non-atomic; explicit model and fallback boolean writes retain their existing non-CAS boundary.",
+    "Only isolated Node unit/CLI fixture tests and exact patch replay ran here. No full lint/typecheck, browser, Native, database, production acceptance or PostHog ingestion is claimed."
+  ],
+  "preservedVersions": {
+    "v1": [
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "gitBlob": "4aa2b26e95fb397ebe2237b4bee32e7713ef228e",
+        "bytes": 69094,
+        "sha256": "31b58c43d56de3c7ddae443551cbc2a20c511796a2f1fc88bd4de723d1fb8b9f"
+      },
+      {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "gitBlob": "df79be1b3ee88168a65865adb7432bbd25bf6f33",
+        "bytes": 92889,
+        "sha256": "afaa44c730e054274e44048ff9b5125f1ec17d610ffe8a8810eaabd968c0d0c9"
+      },
+      {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "gitBlob": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+        "bytes": 14046,
+        "sha256": "be84c5b140af42a7bc57b040597b6098410318b470f90cc69b630911c006e0c5"
+      }
+    ],
+    "sharedFixBeforeFinalWhitespace": [
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "gitBlob": "8dac2519c4fe665f55a22b8c4812a006beb37348",
+        "bytes": 69123,
+        "sha256": "b9b2b727e2a0656636744553d351260c9f1b62b0bf2e0a6700b3f41d270ad5b5"
+      },
+      {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "gitBlob": "2e3c8c7aad0594df165caf8f798c72034b3d484f",
+        "bytes": 94496,
+        "sha256": "12da2b118255f1ea05399d915bd80dd87737e2f42b0a1ab6b7c19bf0d8bff775"
+      },
+      {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "gitBlob": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+        "bytes": 14046,
+        "sha256": "be84c5b140af42a7bc57b040597b6098410318b470f90cc69b630911c006e0c5"
+      }
+    ],
+    "finalWhitespaceChange": "Only two await indentation lines after the shared-schema fix; exact final full file test rerun retained separately."
+  }
+}

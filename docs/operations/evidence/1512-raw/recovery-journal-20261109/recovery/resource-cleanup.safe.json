@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "provider": "Vercel Sandbox",
+  "scope": {
+    "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+    "teamId": "team_C7lwxVVvnUicFli6112mvxpv",
+    "name": "mikka-1512-recovery-journal-20261109",
+    "sessionId": "sbx_VDZZUEEfpugwSswy9NasNSW8A0BI"
+  },
+  "allocated": {
+    "vcpus": 1,
+    "memoryMiB": 2048,
+    "timeoutMs": 900000,
+    "networkAllowlist": [],
+    "ports": [],
+    "persistent": false,
+    "runtimeLabel": "node22",
+    "actualNode": "v24.22.1",
+    "startedAt": "2026-11-09T14:15:04.275Z"
+  },
+  "stopped": {
+    "status": "stopped",
+    "stoppedAt": "2026-11-09T14:27:42.881Z",
+    "durationMs": 758606,
+    "activeCpuDurationMs": 16360
+  },
+  "deleted": {
+    "status": "stopped",
+    "name": "mikka-1512-recovery-journal-20261109"
+  },
+  "exactAfterDelete": {
+    "operation": "GET /v2/sandboxes/{name}",
+    "status": 404,
+    "code": "not_found",
+    "resume": false
+  },
+  "activeOwnedResources": 0,
+  "productionAccountReads": 0,
+  "modelCalls": 0,
+  "dependencyInstalls": 0,
+  "repositoryRefsChanged": 0,
+  "boundary": "Only one sandbox; fixture HTTP is injected in-process and actual CLI uses a local global.fetch preload. No production account/session or model API was used."
+}

@@ -1,0 +1,55 @@
+{
+  "nodeVersion": "v24.22.1",
+  "exitCode": 0,
+  "command": [
+    "node",
+    "--test",
+    "scripts/acceptance/run-observability.test.mjs"
+  ],
+  "manifest": [
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "bytes": 69123,
+      "sha256": "b9b2b727e2a0656636744553d351260c9f1b62b0bf2e0a6700b3f41d270ad5b5"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "bytes": 94496,
+      "sha256": "12da2b118255f1ea05399d915bd80dd87737e2f42b0a1ab6b7c19bf0d8bff775"
+    },
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "bytes": 14046,
+      "sha256": "be84c5b140af42a7bc57b040597b6098410318b470f90cc69b630911c006e0c5"
+    },
+    {
+      "path": "lib/desktop-rpc/wire.ts",
+      "bytes": 5364,
+      "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3"
+    },
+    {
+      "path": "lib/live/events.ts",
+      "bytes": 4679,
+      "sha256": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5"
+    },
+    {
+      "path": "scripts/acceptance/response-cookie-jar.mjs",
+      "bytes": 2277,
+      "sha256": "7fa2b75283ae1c239bf3c613f9176a861d42debd18256b383d26bbc6b39a4178"
+    },
+    {
+      "path": "messages/en.json",
+      "bytes": 252821,
+      "sha256": "b3bda8ced94b1c0ba9cbbb39de18d06ce9e85dbc1b50ec3099837c6a9ab36efa"
+    },
+    {
+      "path": "messages/zh-CN.json",
+      "bytes": 243494,
+      "sha256": "f81068a50e63fe02f08b46805f635818ca3a29e72a24b98c6d368ad9f3e152e9"
+    }
+  ],
+  "stdoutBytes": 8334,
+  "stdoutSha256": "6ca72d2968a74d37a6b0a208fc6075208291b7a67f04daf541d893d5c7b30708",
+  "stderrBytes": 0,
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

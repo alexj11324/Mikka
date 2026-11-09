@@ -1,0 +1,65 @@
+{
+  "forwardExact": true,
+  "reverseSourceExact": true,
+  "commands": [
+    {
+      "cmd": [
+        "git",
+        "apply",
+        "--check",
+        "../recovery-final.patch"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "cmd": [
+        "git",
+        "apply",
+        "../recovery-final.patch"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "cmd": [
+        "git",
+        "apply",
+        "--reverse",
+        "--check",
+        "../recovery-final.patch"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "cmd": [
+        "git",
+        "apply",
+        "--reverse",
+        "../recovery-final.patch"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "reverseExactAllFiles": true,
+  "baseHashes": [
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "sha256": "7fa1c032cb0d9b7c5a88c6262b559368445866691796b001648a95efea856950"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "sha256": "b488d49afd89b833298d685dbb468a2520451a5be6f10711b7bdb76d66d5168a"
+    },
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "sha256": "474e7d33bcc1a521ae61ab30040f1715c376b2d8b160b5db89aacf2785aea8c4"
+    }
+  ]
+}
