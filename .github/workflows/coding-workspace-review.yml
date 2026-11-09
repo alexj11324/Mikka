@@ -56,3 +56,31 @@ jobs:
           sudo -n env "PATH=$PATH" "$RUNNER_TEMP/coding-review-python/bin/python" scripts/e2b/preview-frameworks.test.py
       - name: Check additive bootstrap syntax
         run: bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh
+  ingress-kernel:
+    name: Real ingress kernel boundaries
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install namespace and netfilter tools
+        run: |
+          sudo -n apt-get update -qq
+          sudo -n apt-get install -y --no-install-recommends iproute2 nftables
+          nft --version
+      - name: Verify all IPv4 and IPv6 ingress cases on the real kernel
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n python3 packages/daemon/scripts/workspace-ingress.kernel.test.py \
+            --guard "$GITHUB_WORKSPACE/packages/daemon/scripts/workspace-ingress.py" \
+            --family both | tee "$RUNNER_TEMP/workspace-ingress-kernel.json"
+      - name: Preserve kernel regression evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: workspace-ingress-kernel-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/workspace-ingress-kernel.json
+          if-no-files-found: error
+          retention-days: 7

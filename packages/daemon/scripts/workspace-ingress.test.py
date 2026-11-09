@@ -7,6 +7,7 @@ from copy import deepcopy
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -17,6 +18,37 @@ from unittest.mock import patch
 spec = importlib.util.spec_from_file_location('ingress', Path(__file__).with_name('workspace-ingress.py'))
 guard = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(guard)
+
+
+def native_ack_rules(ports):
+    """Independent numeric nft fixture; header sizes are bytes, not product helpers."""
+    for family, version in (('ip', 2), ('ip6', 10)):
+        for tcp_bytes in range(20, 61, 4):
+            expr = [
+                {'match': {'op': '==', 'left': {'meta': {'key': 'nfproto'}}, 'right': version}},
+                {'match': {'op': '==', 'left': {'meta': {'key': 'l4proto'}}, 'right': 6}},
+                {'match': {'op': '==', 'left': {'ct': {'key': 'direction'}}, 'right': 1}},
+                {'match': {'op': '==', 'left': {'payload': {'protocol': 'tcp', 'field': 'sport'}},
+                           'right': ports[0] if len(ports) == 1 else {'set': list(ports)}}},
+                {'match': {'op': '==', 'left': {'payload': {'protocol': 'tcp', 'field': 'flags'}}, 'right': 16}},
+            ]
+            if family == 'ip':
+                expr.extend([
+                    {'match': {'op': '==', 'left': {'&': [{'payload': {'protocol': 'ip', 'field': 'frag-off'}}, 16383]}, 'right': 0}},
+                    {'match': {'op': '==', 'left': {'payload': {'protocol': 'ip', 'field': 'hdrlength'}}, 'right': 5}},
+                ])
+            else:
+                expr.append({'match': {'op': '==', 'left': {'payload': {'protocol': 'ip6', 'field': 'length'}}, 'right': tcp_bytes}})
+                expr.append({'match': {'op': '==', 'left': {'payload': {'protocol': 'ip6', 'field': 'nexthdr'}}, 'right': 6}})
+            expr.extend([
+                {'match': {'op': '==', 'left': {'payload': {'protocol': 'tcp', 'field': 'doff'}}, 'right': tcp_bytes // 4}},
+                {'match': {'op': '==', 'left': {'meta': {'key': 'length'}}, 'right': tcp_bytes + (20 if family == 'ip' else 40)}},
+            ])
+            if family == 'ip':
+                expr.append({'match': {'op': '==', 'left': {'payload': {'protocol': 'ip', 'field': 'length'}}, 'right': tcp_bytes + 20}})
+            expr.append({'return': None})
+            yield {'rule': {'family': 'inet', 'table': 'mikka_review_v1', 'chain': 'guard',
+                            'handle': 10 + (0 if family == 'ip' else 11) + (tcp_bytes - 20) // 4, 'expr': expr}}
 
 
 def native_table(ports=(49983,)):
@@ -30,6 +62,7 @@ def native_table(ports=(49983,)):
             {'match': {'op': '==', 'left': {'payload': {'protocol': 'tcp', 'field': 'sport'}},
                        'right': ports[0] if len(ports) == 1 else {'set': list(ports)}}},
             {'return': None}]}},
+        *native_ack_rules(ports),
         {'rule': {'family': 'inet', 'table': 'mikka_review_v1', 'chain': 'guard', 'handle': 5, 'expr': [
             {'match': {'op': '==', 'left': {'meta': {'key': 'l4proto'}}, 'right': 6}},
             {'match': {'op': '==', 'left': {'ct': {'key': 'direction'}}, 'right': 1}},
@@ -101,6 +134,31 @@ class IngressPolicy(unittest.TestCase):
             installed.start()
             self.addCleanup(installed.stop)
 
+    def test_emitted_ack_rules_bind_exact_lengths_to_complete_headers(self):
+        # The netfilter fixture is deliberately independent of policy(). Check
+        # its emitted input too: no packet emulator or product ACK helper is
+        # used to construct the required header-only length relationships.
+        for ports in ([49983], [49983, 50005]):
+            source_ports = '49983' if len(ports) == 1 else '{ 49983, 50005 }'
+            lines = guard.policy(ports).splitlines()
+            self.assertEqual(len(lines), 28)
+            for family, start, ip_bytes in (('ipv4', 4, 20), ('ipv6', 15, 40)):
+                prefix = (f'add rule inet mikka_review_v1 guard meta nfproto {family} '
+                          'meta l4proto tcp ct direction reply tcp sport ' + source_ports
+                          + ' tcp flags == ack ')
+                shape = (r'ip frag-off & 0x3fff == 0 ip hdrlength 5 tcp doff (?P<doff>\d+) '
+                         r'meta length (?P<actual>\d+) ip length (?P<declared>\d+) return'
+                         if family == 'ipv4' else
+                         r'ip6 length (?P<declared>\d+) ip6 nexthdr tcp tcp doff (?P<doff>\d+) '
+                         r'meta length (?P<actual>\d+) return')
+                for line, tcp_bytes in zip(lines[start:start + 11], range(20, 61, 4), strict=True):
+                    with self.subTest(ports=ports, family=family, tcp_bytes=tcp_bytes):
+                        match = re.fullmatch(re.escape(prefix) + shape, line)
+                        self.assertIsNotNone(match, 'ACK rule changed a mandatory predicate or exact flags equality')
+                        values = {key: int(value) for key, value in match.groupdict().items()}
+                        self.assertEqual(values, {'doff': tcp_bytes // 4, 'actual': ip_bytes + tcp_bytes,
+                                                  'declared': tcp_bytes + (20 if family == 'ipv4' else 0)})
+
     def test_fresh_policy_is_global_dual_stack_and_preserves_only_observed_root_provider(self):
         foreign = deepcopy(self.filter.foreign)
         proof = guard.prepare()
@@ -144,11 +202,15 @@ class IngressPolicy(unittest.TestCase):
         self.assertTrue(all(args[0] == 'nft' for args, _ in calls))
         scripts = [value.decode() for args, value in calls if args[1:] == ['-f', '-']]
         self.assertEqual(len(scripts), 1)
-        self.assertEqual(scripts[0].splitlines(), [
+        lines = scripts[0].splitlines()
+        self.assertEqual(len(lines), 28)
+        self.assertEqual(lines[:4], [
             'create table inet mikka_review_v1',
             'add chain inet mikka_review_v1 guard',
             'add chain inet mikka_review_v1 output { type filter hook output priority -1; policy accept; }',
             'add rule inet mikka_review_v1 guard meta l4proto tcp meta skuid 0 tcp sport 49983 return',
+        ])
+        self.assertEqual(lines[-2:], [
             'add rule inet mikka_review_v1 guard meta l4proto tcp ct direction reply meta mark != 1296781398 reject with tcp reset',
             'add rule inet mikka_review_v1 output oifname != "lo" meta l4proto tcp jump guard',
         ])
@@ -214,7 +276,7 @@ class IngressPolicy(unittest.TestCase):
     def test_rule_precedence_and_added_broad_allow_fail_verification(self):
         guard.prepare()
         original = deepcopy(self.filter.value)
-        self.filter.value['nftables'][5]['chain']['prio'] = 0
+        self.filter.value['nftables'][-2]['chain']['prio'] = 0
         with self.assertRaisesRegex(guard.IngressError, 'rule_order'):
             guard.verify()
         self.filter.value = deepcopy(original)
@@ -239,16 +301,16 @@ class IngressPolicy(unittest.TestCase):
             lambda rows: rows[3]['rule']['expr'][0]['match'].update(right=False),
             lambda rows: rows[3]['rule']['expr'][1]['match'].update(right=50005),
             lambda rows: rows[3]['rule']['expr'][-1].update(accept=None),
-            lambda rows: rows[4]['rule']['expr'][0]['match'].update(right=17),
-            lambda rows: rows[4]['rule']['expr'][1]['match'].update(right=0),
-            lambda rows: rows[4]['rule']['expr'][2]['match'].update(left={'ct': {'key': 'mark'}}),
-            lambda rows: rows[4]['rule']['expr'][2]['match'].update(op='=='),
-            lambda rows: rows[5]['chain'].update(prio=-200),
-            lambda rows: rows[5]['chain'].update(hook='input'),
-            lambda rows: rows[6]['rule']['expr'][0]['match'].update(right='eth0'),
+            lambda rows: rows[-3]['rule']['expr'][0]['match'].update(right=17),
+            lambda rows: rows[-3]['rule']['expr'][1]['match'].update(right=0),
+            lambda rows: rows[-3]['rule']['expr'][2]['match'].update(left={'ct': {'key': 'mark'}}),
+            lambda rows: rows[-3]['rule']['expr'][2]['match'].update(op='=='),
+            lambda rows: rows[-2]['chain'].update(prio=-200),
+            lambda rows: rows[-2]['chain'].update(hook='input'),
+            lambda rows: rows[-1]['rule']['expr'][0]['match'].update(right='eth0'),
             lambda rows: rows.append({'set': {'family': 'inet', 'table': 'mikka_review_v1', 'name': 'dynamic'}}),
             lambda rows: rows.append(deepcopy(rows[2])),
-            lambda rows: rows.append(deepcopy(rows[6])),
+            lambda rows: rows.append(deepcopy(rows[-1])),
         )
         for index, change in enumerate(changes):
             with self.subTest(index=index):
@@ -264,9 +326,150 @@ class IngressPolicy(unittest.TestCase):
         self.assertEqual(proof['providerPorts'], [49983, 50005])
         self.assertIn('meta skuid 0 tcp sport { 49983, 50005 } return', self.filter.scripts[0])
         rows = self.filter.value['nftables']
-        rows[3]['rule']['expr'].insert(0, deepcopy(rows[4]['rule']['expr'][0]))
+        rows[3]['rule']['expr'].insert(0, deepcopy(rows[-3]['rule']['expr'][0]))
         rows[1]['table']['flags'] = []
         self.assertEqual(guard.verify()['rulesVerified'], {'ipv4': True, 'ipv6': True})
+
+    def assert_bad_ack_listing(self, original, change):
+        self.filter.value = deepcopy(original)
+        change(self.filter.value['nftables'])
+        with self.assertRaisesRegex(guard.IngressError, 'rule_order'):
+            guard.verify()
+        self.assertEqual(len(self.filter.scripts), 1, 'verification must not repair or reinstall a weakened policy')
+
+    def test_ack_readback_requires_all_22_distinct_ordered_header_cases(self):
+        guard.prepare()
+        original = deepcopy(self.filter.value)
+        for row in range(4, 26):
+            for kind in ('missing', 'duplicate', 'extra', 'misordered'):
+                with self.subTest(row=row, mutation=kind):
+                    def change(rows):
+                        if kind == 'missing':
+                            rows.pop(row)
+                        elif kind == 'duplicate':
+                            rows[row] = deepcopy(rows[4 if row != 4 else 5])
+                        elif kind == 'extra':
+                            rows.insert(row, deepcopy(rows[row]))
+                        else:
+                            rows[row], rows[26] = rows[26], rows[row]
+                    self.assert_bad_ack_listing(original, change)
+
+    def test_ack_readback_cannot_omit_any_safety_predicate_or_return(self):
+        guard.prepare()
+        original = deepcopy(self.filter.value)
+        for row in range(4, 26):
+            expr = original['nftables'][row]['rule']['expr']
+            # The first two expressions are protocol dependencies which nft may
+            # omit when IP/TCP payload fields already imply them. Every other
+            # condition, including the verdict, is independently mandatory.
+            for index in range(2, len(expr)):
+                with self.subTest(row=row, expression=expr[index]):
+                    self.assert_bad_ack_listing(original, lambda rows: rows[row]['rule']['expr'].pop(index))
+
+    def test_ack_readback_rejects_non_exact_flags_and_persistent_flow_authority(self):
+        guard.prepare()
+        original = deepcopy(self.filter.value)
+        for row in range(4, 26):
+            changes = {
+                'ack-bit-only': lambda expr: expr[4]['match'].update(
+                    left={'&': [{'payload': {'protocol': 'tcp', 'field': 'flags'}}, 16]}),
+                'synack': lambda expr: expr[4]['match'].update(right=18),
+                'ack-ece': lambda expr: expr[4]['match'].update(right=80),
+                'ack-inequality': lambda expr: expr[4]['match'].update(op='!='),
+                'accept-verdict': lambda expr: expr.__setitem__(-1, {'accept': None}),
+                'ct-mark-write': lambda expr: expr.insert(-1, {'mangle': {'key': {'ct': {'key': 'mark'}}, 'value': 1296781398}}),
+                'skb-mark-write': lambda expr: expr.insert(-1, {'mangle': {'key': {'meta': {'key': 'mark'}}, 'value': 1296781398}}),
+                'ct-state-instead-of-direction': lambda expr: expr[2]['match'].update(left={'ct': {'key': 'state'}}),
+            }
+            for label, change in changes.items():
+                with self.subTest(row=row, mutation=label):
+                    self.assert_bad_ack_listing(original, lambda rows: change(rows[row]['rule']['expr']))
+
+    def test_ack_readback_lengths_are_exact_correlated_integers(self):
+        guard.prepare()
+        original = deepcopy(self.filter.value)
+        for row in range(4, 26):
+            expr = original['nftables'][row]['rule']['expr']
+            for index, statement in enumerate(expr):
+                match = statement.get('match', {})
+                if type(match.get('right')) is not int:
+                    continue
+                for replacement in (match['right'] + 1, bool(match['right']), float(match['right']), str(match['right']),
+                                    {'range': [match['right'], match['right'] + 1]}):
+                    with self.subTest(row=row, field=match['left'], replacement=replacement):
+                        self.assert_bad_ack_listing(original, lambda rows: rows[row]['rule']['expr'][index]['match'].update(right=replacement))
+            family = 'ip' if row < 15 else 'ip6'
+            length_fields = ({'meta': {'key': 'length'}}, {'payload': {'protocol': family, 'field': 'length'}})
+            length_indexes = [index for index, statement in enumerate(expr)
+                              if statement.get('match', {}).get('left') in length_fields]
+            self.assertEqual(len(length_indexes), 2)
+            for index in length_indexes:
+                with self.subTest(row=row, weakened_length_index=index):
+                    self.assert_bad_ack_listing(original, lambda rows: rows[row]['rule']['expr'][index]['match'].update(op='<='))
+            with self.subTest(row=row, mutation='skb-length-replaced-by-ip-length'):
+                meta_index = next(index for index in length_indexes if expr[index]['match']['left'] == length_fields[0])
+                self.assert_bad_ack_listing(original, lambda rows: rows[row]['rule']['expr'][meta_index]['match'].update(
+                    left=deepcopy(length_fields[1])))
+
+    def test_ack_readback_rejects_fragments_extensions_and_unregistered_ports(self):
+        guard.prepare()
+        original = deepcopy(self.filter.value)
+        for row in range(4, 26):
+            changes = {
+                'optional-port-was-not-present': lambda expr: expr[3]['match'].update(right={'set': [49983, 50005]}),
+                'task-port-added': lambda expr: expr[3]['match'].update(right={'set': [49983, 3000]}),
+                'source-port-range': lambda expr: expr[3]['match'].update(right={'range': [49983, 50005]}),
+                'destination-port': lambda expr: expr[3]['match'].update(left={'payload': {'protocol': 'tcp', 'field': 'dport'}}),
+                'original-direction': lambda expr: expr[2]['match'].update(right=0),
+            }
+            if row < 15:
+                changes.update({
+                    'first-fragment-allowed': lambda expr: expr[5]['match'].update(
+                        left={'&': [{'payload': {'protocol': 'ip', 'field': 'frag-off'}}, 8191]}),
+                    'offset-fragment-allowed': lambda expr: expr[5]['match'].update(
+                        left={'&': [{'payload': {'protocol': 'ip', 'field': 'frag-off'}}, 8192]}),
+                    'ipv4-options-allowed': lambda expr: expr[6]['match'].update(right={'range': [5, 15]}),
+                })
+            else:
+                changes.update({
+                    'fragment-header': lambda expr: expr[6]['match'].update(right=44),
+                    'extension-header-ignored': lambda expr: expr[6]['match'].update(left={'meta': {'key': 'l4proto'}}),
+                })
+            for label, change in changes.items():
+                with self.subTest(row=row, mutation=label):
+                    self.assert_bad_ack_listing(original, lambda rows: change(rows[row]['rule']['expr']))
+
+    def test_ack_readback_accepts_only_known_protocol_dependency_elision(self):
+        guard.prepare()
+        original = deepcopy(self.filter.value)
+        for omitted in ((), (0,), (1,), (0, 1)):
+            with self.subTest(omitted=omitted):
+                self.filter.value = deepcopy(original)
+                for row in self.filter.value['nftables'][4:26]:
+                    row['rule']['expr'] = [statement for index, statement in enumerate(row['rule']['expr']) if index not in omitted]
+                self.assertEqual(guard.verify()['rulesVerified'], {'ipv4': True, 'ipv6': True})
+        self.assertEqual(len(self.filter.scripts), 1)
+
+    def test_observed_nft_ipv6_header_order_keeps_every_safety_condition(self):
+        guard.prepare()
+        # Captured nft 1.0.9 readback: adjacent IPv6 payload loads are printed
+        # in header order, with length before nexthdr. Dependencies are elided,
+        # but nexthdr itself is present and must never be normalized away.
+        observed = {'family': 'inet', 'table': 'mikka_review_v1', 'chain': 'guard', 'expr': [
+            {'match': {'op': '==', 'left': {'ct': {'key': 'direction'}}, 'right': 1}},
+            {'match': {'op': '==', 'left': {'payload': {'protocol': 'tcp', 'field': 'sport'}}, 'right': 49983}},
+            {'match': {'op': '==', 'left': {'payload': {'protocol': 'tcp', 'field': 'flags'}}, 'right': 16}},
+            {'match': {'op': '==', 'left': {'payload': {'protocol': 'ip6', 'field': 'length'}}, 'right': 20}},
+            {'match': {'op': '==', 'left': {'payload': {'protocol': 'ip6', 'field': 'nexthdr'}}, 'right': 6}},
+            {'match': {'op': '==', 'left': {'payload': {'protocol': 'tcp', 'field': 'doff'}}, 'right': 5}},
+            {'match': {'op': '==', 'left': {'meta': {'key': 'length'}}, 'right': 60}},
+            {'return': None},
+        ]}
+        self.filter.value['nftables'][15]['rule'] = deepcopy(observed)
+        self.assertEqual(guard.verify()['rulesVerified'], {'ipv4': True, 'ipv6': True})
+        self.filter.value['nftables'][15]['rule']['expr'].pop(4)
+        with self.assertRaisesRegex(guard.IngressError, 'rule_order'):
+            guard.verify()
 
     def test_malformed_native_listing_never_grants_readiness_or_leaks_its_contents(self):
         guard.prepare()
@@ -368,7 +571,7 @@ elif mode=='native':
             self.assertNotIn(str(self.program.parent), json.dumps(value))
 
     def test_real_native_error_locations_map_only_fixed_stdin_lines_to_closed_operations(self):
-        expected = ('create_table', 'new_chain', 'base_chain', 'provider_rule', 'reply_rule', 'output_jump')
+        expected = ('create_table', 'new_chain', 'base_chain', *('provider_rule',) * 23, 'reply_rule', 'output_jump')
         for number, operation in enumerate(expected, 1):
             location = f'/dev/stdin:{number}:1-99: Error: Operation not supported; {self.private}\n'
             with self.assertRaises(guard.IngressCommandError) as failed:
@@ -379,8 +582,8 @@ elif mode=='native':
             self.assertNotIn(self.private, json.dumps(command))
             self.assertNotIn('stdin', json.dumps(command))
         for location in (f'/private/{self.private}:4:1: Error: Operation not supported\n',
-                         'stdin:7:1: Error: Operation not supported\n',
-                         'stdin:4:1: Error: a\nstdin:5:1: Error: b\n',
+                         'stdin:29:1: Error: Operation not supported\n',
+                         'stdin:4:1: Error: a\nstdin:27:1: Error: b\n',
                          'prefix stdin:4:1: Error: Operation not supported\n'):
             with self.assertRaises(guard.IngressCommandError) as failed:
                 guard.execute(str(self.program), ['native'], family='inet', operation='install_policy', script=location.encode())
