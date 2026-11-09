@@ -6,10 +6,14 @@ import { Pool, type PoolClient } from 'pg';
 import { orderMigrations } from '../../scripts/migration-order.mjs';
 import { assertE2eTarget, disposableDatabase } from '../../tests/helpers/e2e-target.mjs';
 import { dropTestDatabase } from '../../tests/support/drop-test-database';
+import { freezeWorkerDefinition } from '../agent-kit/worker';
+import { observePoolCommits } from '../db/commit-effects';
+import { freezeExecutionIdentity } from '../execution-identity';
 import { createFactoryStore, type FactoryTask } from './store';
 import { factoryBinding } from './dispatch';
 import { syncFactoryPresentation } from './stage-progress';
 import { parseFactorySpecArtifactRef, syncFactorySpecArtifact } from './spec-artifact';
+import { backfillFactorySpecArtifacts, type FactorySpecBackfillCursor } from './spec-artifact-backfill';
 
 const base = process.env.E2E_DATABASE_URL;
 const required = process.env.REQUIRE_DB === '1' || (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true');
@@ -23,6 +27,7 @@ test('spec Artifact: real PG completion, immutable replay, concurrent writes and
   await admin.query(`CREATE DATABASE ${name} TEMPLATE template0`);
   const target = new URL(adminUrl); target.pathname = `/${name}`; assertE2eTarget(target.toString());
   const pool = new Pool({ connectionString: target.toString(), max: 5 });
+  observePoolCommits(pool);
   try {
     assert.equal((await pool.query('SHOW server_version_num')).rows[0].server_version_num.slice(0, 2), '17');
     const dir = new URL('../../drizzle/', import.meta.url);
@@ -137,6 +142,69 @@ test('spec Artifact: real PG completion, immutable replay, concurrent writes and
       const committed = await finish(pending.task, pending.runId);
       const recovered = await synchronize(committed.task);
       assert.equal(recovered?.artifactId, rolledBackArtifact!, 'a retry reuses the same immutable object key');
+    });
+
+    await t.test('explicit historical batches are bounded, quiet, resumable and reauthorize after inspection', async () => {
+      const historical = async () => {
+        const value = await fixture(), currentAttemptId = randomUUID();
+        await pool.query(`UPDATE factory_attempts SET status='passed',"finishedAt"=now() WHERE id=$1`, [value.task.attemptId]);
+        await pool.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,reason,output)
+          VALUES ($1,$2,'execute',1,2,'pending','Historical task continued',$3)`,
+          [currentAttemptId, value.task.id, JSON.stringify({ requestEpoch: value.task.sourceEventId })]);
+        await pool.query(`UPDATE factory_tasks SET "attemptId"=$2,stage='execute',status='pending',revision=revision+1 WHERE id=$1`,
+          [value.task.id, currentAttemptId]);
+        return { ...value, currentAttemptId };
+      };
+      const legacy = await historical(), scopeChanged = await historical(), sessionMismatch = await historical(), revoked = await historical();
+      await pool.query(`UPDATE agent_runs SET report=$2 WHERE id=$1`, [legacy.runId,
+        JSON.stringify({ summary: 'Keep the historical API.\nAPI_TOKEN=historical-private-fixture', filesChanged: [], verify: { status: 'not_run' } })]);
+      await pool.query(`UPDATE factory_attempts SET "sessionId"='other-session' WHERE id=$1`, [sessionMismatch.task.attemptId]);
+      const revokedDevice = randomUUID();
+      await pool.query(`INSERT INTO devices (id,"ownerId",name,harnesses) VALUES ($1,'spec-owner','Revoked fixture','[]')`, [revokedDevice]);
+      const definition = freezeWorkerDefinition({ harness: 'codex', instructions: 'Plan the change', prompt: 'Plan', parent: null, executionId: null });
+      const identity = await freezeExecutionIdentity(pool, { userId: 'spec-owner', botId: null, deviceId: revokedDevice, agentDefinition: definition });
+      await pool.query(`UPDATE agent_runs SET "deviceId"=$2,"agentDefinition"=$3 WHERE id=$1`,
+        [revoked.runId, revokedDevice, JSON.stringify({ ...definition, executionIdentity: identity })]);
+      await pool.query(`UPDATE devices SET enabled=false WHERE id=$1`, [revokedDevice]);
+      const count = async (table: 'artifacts' | 'artifact_versions' | 'coordinator_events') =>
+        Number((await pool.query(`SELECT count(*)::int AS n FROM ${table}`)).rows[0].n);
+      const before = { artifacts: await count('artifacts'), versions: await count('artifact_versions'), events: await count('coordinator_events') };
+      const inspect = await backfillFactorySpecArtifacts(pool, store, 'spec-owner', { limit: 2 });
+      assert.equal(inspect.mode, 'dry-run'); assert.equal(inspect.scanned, 2); assert.ok(inspect.nextCursor);
+      const sum = { scanned: inspect.scanned, wouldCreate: inspect.wouldCreate, unauthorized: inspect.skipped.unauthorized,
+        unavailable: inspect.skipped.sourceUnavailable };
+      let cursor: FactorySpecBackfillCursor | null = inspect.nextCursor;
+      while (cursor) {
+        const batch = await backfillFactorySpecArtifacts(pool, store, 'spec-owner', { limit: 2, cursor });
+        assert.ok(batch.scanned <= 2); assert.equal(batch.cursor.through, inspect.cursor.through);
+        sum.scanned += batch.scanned; sum.wouldCreate += batch.wouldCreate;
+        sum.unauthorized += batch.skipped.unauthorized; sum.unavailable += batch.skipped.sourceUnavailable;
+        cursor = batch.nextCursor;
+      }
+      assert.equal(sum.scanned, 6); assert.equal(sum.wouldCreate, 2);
+      assert.equal(sum.unauthorized, 1); assert.equal(sum.unavailable, 1);
+      assert.equal(await count('artifacts'), before.artifacts); assert.equal(await count('artifact_versions'), before.versions);
+      assert.equal(await count('coordinator_events'), before.events);
+      // Access is checked again when applying, even after a successful dry run.
+      await pool.query(`UPDATE issues SET "userId"='spec-other' WHERE id=$1`, [scopeChanged.issueId]);
+      const currentBefore = (await pool.query('SELECT "attemptId",stage,status,revision FROM factory_tasks WHERE id=$1', [legacy.task.id])).rows[0];
+      const applied = await backfillFactorySpecArtifacts(pool, store, 'spec-owner', { dryRun: false, limit: 100, cursor: inspect.cursor });
+      assert.equal(applied.created, 1); assert.equal(applied.existing, 2);
+      assert.equal(applied.skipped.unauthorized, 2); assert.equal(applied.skipped.sourceUnavailable, 1); assert.equal(applied.nextCursor, null);
+      assert.equal(await count('coordinator_events'), before.events, 'historical copies never queue a new Coordinator turn');
+      assert.deepEqual((await pool.query('SELECT "attemptId",stage,status,revision FROM factory_tasks WHERE id=$1', [legacy.task.id])).rows[0], currentBefore);
+      const legacyRef = parseFactorySpecArtifactRef((await pool.query('SELECT output FROM factory_attempts WHERE id=$1', [legacy.task.attemptId])).rows[0].output.specArtifact);
+      assert.ok(legacyRef); assert.equal(legacyRef.runId, legacy.runId);
+      const { rows: [document] } = await pool.query('SELECT "inlineContent" FROM artifact_versions WHERE "artifactId"=$1 AND version=1', [legacyRef.artifactId]);
+      assert.match(document.inlineContent, /Keep the historical API/);
+      assert.doesNotMatch(document.inlineContent, /historical-private-fixture|PRIVATE_PROMPT|synthetic-session/);
+      const replay = await backfillFactorySpecArtifacts(pool, store, 'spec-owner', { dryRun: false, limit: 100, cursor: inspect.cursor });
+      assert.equal(replay.created, 0); assert.equal(replay.existing, 3);
+      assert.equal(await count('artifacts'), before.artifacts + 1); assert.equal(await count('artifact_versions'), before.versions + 1);
+      assert.equal(await count('coordinator_events'), before.events);
+      assert.equal((await backfillFactorySpecArtifacts(pool, store, 'spec-other', { dryRun: false })).scanned, 0);
+      await assert.rejects(backfillFactorySpecArtifacts(pool, store, 'spec-owner', { limit: 101 }), { code: 'factoryInvalid' });
+      await assert.rejects(backfillFactorySpecArtifacts(pool, store, 'spec-owner', { cursor: { through: '2999-01-01T00:00:00.000Z', afterId: null } }), { code: 'factoryInvalid' });
     });
   } finally {
     await dropTestDatabase(admin, name, pool);

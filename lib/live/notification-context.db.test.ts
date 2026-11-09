@@ -54,6 +54,7 @@ test('real Factory notifications retain their database across COMMIT and delayed
   const requestScope = app.createRequestDatabaseScope(target.toString())
   const { createFactoryStore } = await import('../factory/store')
   const { factoryCommitted } = await import('./factory')
+  const { taskActivityChanged } = await import('../factory/activity-live')
   const owner = `factory-context-${randomUUID()}`, intended = randomUUID(), wrong = randomUUID()
   try {
     for (const pool of pools) await pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,\'Context fixture\',$2,true,now(),now())', [owner, `${owner}@example.invalid`])
@@ -131,6 +132,51 @@ test('real Factory notifications retain their database across COMMIT and delayed
       })
       assert.equal(queued.length, 2, 'Factory and project-map invalidations each retain the originating database'); await drain()
       assert.deepEqual(sent.slice(before), [expected(task)])
+    })
+
+    await t.test('activity invalidation waits for a real commit, deduplicates the run, and retains its database', async () => {
+      const tx = await requestPool.connect(), runId = randomUUID(), agentId = randomUUID()
+      let task: Awaited<ReturnType<typeof route>>
+      try { await tx.query('BEGIN'); task = await route(tx); await tx.query('COMMIT') }
+      finally { await tx.query('ROLLBACK'); tx.release() }
+      await drain()
+      await requestPool.query('INSERT INTO agents(id,"userId",harness,name) VALUES($1,$2,\'codex\',$3)', [agentId,owner,agentId])
+      const writer = await requestPool.connect(), before = sent.length
+      try {
+        await writer.query('BEGIN')
+        await writer.query('INSERT INTO agent_runs(id,"userId","issueId","agentId") VALUES($1,$2,$3,$4)', [runId,owner,task.issueId,agentId])
+        await writer.query('UPDATE factory_attempts SET "runId"=$2 WHERE id=$1 AND "taskId"=$3', [task.attemptId,runId,task.id])
+        await requestScope.run(() => app.withDatabaseClient(writer, () => {
+          taskActivityChanged(app.db, runId)
+          taskActivityChanged(app.db, runId)
+        }))
+        assert.equal(queued.length, 0)
+        assert.equal((await requestPool.query('SELECT id FROM agent_runs WHERE id=$1', [runId])).rowCount, 0)
+        await writer.query('COMMIT') // Deliberately outside the originating request context.
+        assert.equal(queued.length, 1)
+        await drain() // Resolve the run's persisted task, then use the normal Factory sender.
+        await drain()
+        assert.deepEqual(sent.slice(before), [expected(task)])
+
+        for (const savepoint of [false, true]) {
+          await writer.query('BEGIN')
+          if (savepoint) await writer.query('SAVEPOINT activity_reverted')
+          await writer.query('UPDATE agent_runs SET prompt=\'rolled back activity\' WHERE id=$1', [runId])
+          await requestScope.run(() => app.withDatabaseClient(writer, () => taskActivityChanged(app.db, runId)))
+          if (savepoint) { await writer.query('ROLLBACK TO SAVEPOINT activity_reverted'); await writer.query('COMMIT') }
+          else await writer.query('ROLLBACK')
+          assert.equal(queued.length, 0)
+          assert.equal((await requestPool.query('SELECT prompt FROM agent_runs WHERE id=$1', [runId])).rows[0].prompt, '')
+        }
+        assert.deepEqual(sent.slice(before), [expected(task)])
+        for (const [runOwner, issueId] of [[`${owner}-other`, task.issueId], [owner, null]]) {
+          await requestPool.query('UPDATE agent_runs SET "userId"=$2,"issueId"=$3 WHERE id=$1', [runId,runOwner,issueId])
+          await requestScope.run(() => taskActivityChanged(app.pool, runId))
+          await drain(); await drain()
+          assert.deepEqual(sent.slice(before), [expected(task)], 'mismatched run owner or issue cannot invalidate a task')
+        }
+        await requestPool.query('UPDATE agent_runs SET "userId"=$2,"issueId"=$3 WHERE id=$1', [runId,owner,task.issueId])
+      } finally { await writer.query('ROLLBACK'); writer.release() }
     })
 
     await t.test('permission is read after scheduling, so suspended membership suppresses delivery even while the other database is still active', async () => {

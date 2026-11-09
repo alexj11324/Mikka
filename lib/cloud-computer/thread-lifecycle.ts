@@ -4,6 +4,7 @@ import type { Pool, PoolClient } from 'pg'
 import type { ThreadMachineFence } from './thread-machines'
 import { threadLifecycleProvider, type ThreadProviderInfo } from './thread-lifecycle-provider'
 import { logThreadLifecycle, threadLifecycleErrorKind } from './thread-lifecycle-log'
+import { taskActivityChanged } from '../factory/activity-live'
 
 export const THREAD_MACHINE_IDLE_MS = 2 * 60_000
 export const THREAD_MACHINE_PROVIDER_MS = 15 * 60_000
@@ -296,6 +297,7 @@ export async function reconcileThreadMachine(pool: Pool, actor: Actor, runId: st
       if (!restored.rowCount) return now + 1
       row.sandboxId = created.sandboxId
       Object.assign(row, restored.rows[0], { workerLeaseId: null, workerLeaseUntil: null })
+      taskActivityChanged(pool, runId)
       provider = { state: created.state, endAt: created.endAt }
       logThreadLifecycle(row, { phase: row.lifecycle.phase, reason: 'creation_recovered', provider: created.state, deadline: claimUntil,
         computeSeconds: row.computeSeconds, computeSource: row.lifecycle.computeSource })
@@ -320,6 +322,7 @@ export async function reconcileThreadMachine(pool: Pool, actor: Actor, runId: st
       row.state = provider.state
       row.runningSince = updated.rows[0].runningSince
       row.computeSeconds = updated.rows[0].computeSeconds
+      taskActivityChanged(pool, runId)
       if (provider.state === 'running') delete row.lifecycle.pausedAt
       await (await import('@/lib/live/panels')).runChanged(pool, runId)
       if (provider.state === 'paused' && (TERMINAL.has(row.status) || (row.status === 'queued' && !live(row.leaseExpiresAt, now))
@@ -361,7 +364,10 @@ export async function reconcileThreadMachine(pool: Pool, actor: Actor, runId: st
       const missing = await pool.query(`UPDATE thread_machines SET state='error',"runningSince"=NULL,
           "computeSeconds"="computeSeconds"+COALESCE(GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,0)
         WHERE "runId"=$1 AND epoch=$2 AND "sandboxId"=$3 AND lifecycle->>'reconcileId'=$4 AND state<>'ended'`, [runId, row.epoch, row.sandboxId, token])
-      if (missing.rowCount) await (await import('@/lib/live/panels')).runChanged(pool, runId)
+      if (missing.rowCount) {
+        taskActivityChanged(pool, runId)
+        await (await import('@/lib/live/panels')).runChanged(pool, runId)
+      }
     }
     return await finish({ phase: decision.reason === 'stage_handoff' ? 'handoff' : decision.reason === 'paused_retention' ? 'paused'
       : decision.reason === 'provisioning' ? 'provisioning' : decision.reason === 'retirement' && !row.sandboxId ? 'retired' : 'needs_reconciliation', reason: decision.reason, failures: 0,

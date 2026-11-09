@@ -10,6 +10,7 @@ import { seedUser, seedWorkspace, seedBot, seedAgent, seedIssue } from '../../te
 import { createFactoryStore } from './store'
 import { readFactoryActivity } from './activity'
 import { handleFactoryActivity } from './activity-http'
+import { observePoolCommits } from '../db/commit-effects'
 
 const base = process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1') assert.ok(base && disposableDatabase(), 'isolated database is required')
@@ -22,6 +23,7 @@ test('Factory activity: one owner-scoped SQL read model for every run, computer 
   await admin.query(`CREATE DATABASE ${name} TEMPLATE template0`)
   const target = new URL(adminUrl); target.pathname = `/${name}`
   const pool = new Pool({ connectionString: target.toString(), max: 4 })
+  observePoolCommits(pool)
   try {
     assert.equal((await pool.query('SHOW server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
     const dir = new URL('../../drizzle/', import.meta.url)
@@ -38,7 +40,7 @@ test('Factory activity: one owner-scoped SQL read model for every run, computer 
     const fixture = async () => {
       const issueId = await seedIssue(pool, owner), source = randomUUID()
       await pool.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload)
-        VALUES($1,$2,$3,'user_message',$1::text,'{"text":"Synthetic sidebar task"}')`, [source, owner, bot])
+        VALUES($1::uuid,$2,$3,'user_message',$1::text,'{"text":"Synthetic sidebar task"}')`, [source, owner, bot])
       const task = (await store.route(owner, { issueId, sourceEventId: source, eventId: randomUUID(),
         rationale: 'Synthetic task', missingInformation: [], missingPermissions: [], needsSpec: false })).task
       return { task, issueId, source }
@@ -96,7 +98,7 @@ test('Factory activity: one owner-scoped SQL read model for every run, computer 
       assert.equal(view.agents.find(item => item.runId === fix.runId)?.revisionOf, first.attemptId)
       assert.equal(view.agents.find(item => item.runId === retry.runId)?.role, 'fix', 'infra retry retains its parent role')
       assert.deepEqual(view.artifacts.map(item => item.id), [oldCapture,reviewCapture])
-      assert.ok(!view.artifacts.some(item => [foreignCapture,misboundCapture].includes(item.id)))
+      assert.ok(!view.artifacts.some(item => item.id === foreignCapture || item.id === misboundCapture))
       assert.equal(view.timeline.computers.length, 2)
       assert.ok(view.timeline.computers[0].endedAt)
       assert.equal(view.timeline.computers[1].endedAt, null)
@@ -111,7 +113,7 @@ test('Factory activity: one owner-scoped SQL read model for every run, computer 
     })
     await t.test('reads are read-only and a different owner or a mismatched source cannot see the task', async () => {
       const tables = ['factory_events','factory_attempts','artifacts','artifact_versions','run_capture_posters','thread_machine_sessions']
-      const snapshot = async () => Promise.all(tables.map(async table => (await pool.query(`SELECT row_to_json(t) FROM ${table} t ORDER BY 1::text`)).rows))
+      const snapshot = async () => Promise.all(tables.map(async table => (await pool.query(`SELECT row_to_json(t) FROM ${table} t ORDER BY row_to_json(t)::text`)).rows))
       const before = await snapshot()
       await readFactoryActivity(pool, store, owner, f.task.id)
       assert.deepEqual(await snapshot(), before)
@@ -139,6 +141,14 @@ test('Factory activity: one owner-scoped SQL read model for every run, computer 
       assert.ok(!JSON.stringify(view).includes('NO_PRIVATE_'))
       await pool.query('UPDATE coordinator_events SET "userId"=$2 WHERE id=$1',[event,other])
       assert.ok(!(await readFactoryActivity(pool,store,owner,f.task.id)).timeline.waits.some(item => item.id === `question:${q}`))
+      await pool.query('UPDATE coordinator_events SET "userId"=$2 WHERE id=$1',[event,owner])
+      await pool.query(`UPDATE factory_questions SET status='waiting_user',"answeredAt"=NULL,"expiresAt"='2026-11-01T04:00:00Z' WHERE id=$1`,[q])
+      const expired = await readFactoryActivity(pool,store,owner,f.task.id)
+      assert.equal(expired.timeline.waits.find(item => item.id === `question:${q}`)?.endedAt,'2026-11-01T04:00:00.000Z')
+      assert.ok(!expired.timeline.waits.some(item => item.kind === 'question' && item.endedAt === null))
+      await pool.query(`UPDATE factory_questions SET status='cancelled',"updatedAt"='2026-11-01T02:45:00Z' WHERE id=$1`,[q])
+      assert.equal((await readFactoryActivity(pool,store,owner,f.task.id)).timeline.waits.find(item => item.id === `question:${q}`)?.endedAt,
+        '2026-11-01T02:45:00.000Z','a cancellation before expiry ends waiting earlier')
     })
     await t.test('cancel uses the actual persisted cancellation event, preserving a much earlier run finish', async () => {
       const cancelledAt = '2026-11-02T12:00:00.000Z'

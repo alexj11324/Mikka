@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import test from 'node:test'
-import { compileTracing, wrapFunction } from './finalize-build.mjs'
+import { compileTracing, finalizeBuild, wrapFunction } from './finalize-build.mjs'
 
 const exec = promisify(execFile)
 
@@ -47,4 +48,43 @@ test('unexpected generated Vercel handler fails instead of silently changing run
     await writeFile(join(directory, '.vc-config.json'), JSON.stringify({ runtime: 'edge', handler: 'index.js' }))
     await assert.rejects(wrapFunction(directory, Buffer.from('')), /API_FUNCTION_RUNTIME_MISMATCH/)
   } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+test('Node and Vercel bundles preserve the real executable ffmpeg and its licensing files', { timeout: 60_000 }, async t => {
+  const root = process.cwd(), cache = join(root, 'node_modules/.cache')
+  await mkdir(cache, { recursive: true })
+  const directory = await mkdtemp(join(cache, 'mikka-runtime-resources-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const paths = ['node_modules/ffmpeg-static/ffmpeg', 'node_modules/ffmpeg-static/ffmpeg.README',
+    'node_modules/ffmpeg-static/ffmpeg.LICENSE', 'node_modules/ffmpeg-static/LICENSE', 'node_modules/ffmpeg-static/README.md']
+  const expected = await Promise.all(paths.map(async path => {
+    const bytes = await readFile(join(root, path))
+    return { path, bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') }
+  }))
+  for (const preset of ['node-server', 'vercel']) await t.test(preset, async () => {
+    const output = join(directory, preset)
+    const packaged = preset === 'vercel' ? join(output, 'functions/__server.func') : output
+    const server = preset === 'vercel' ? packaged : join(output, 'server')
+    await mkdir(server, { recursive: true })
+    await writeFile(join(server, 'index.mjs'), 'export default null\n')
+    if (preset === 'vercel') {
+      await writeFile(join(output, 'config.json'), JSON.stringify({ version: 3, routes: [] }))
+      await writeFile(join(server, '.vc-config.json'), JSON.stringify({ runtime: 'nodejs24.x', handler: 'index.mjs' }))
+    } else await writeFile(join(server, 'docker-entry.mjs'), 'export const createDockerRuntime = () => {}\n')
+
+    // Exercise the final production copy with the installed binary, not a
+    // fake executable or a source-path assertion. A lost mode bit must fail.
+    const evidence = await finalizeBuild({ root, output, preset,
+      revision: process.env.MIKKA_TEST_DEPLOYMENT_SHA || 'a'.repeat(40) })
+    for (const resource of expected) {
+      assert.deepEqual(evidence.resources.find(item => item.path === resource.path), resource)
+      const copied = await readFile(join(packaged, resource.path))
+      assert.equal(copied.length, resource.bytes)
+      assert.equal(createHash('sha256').update(copied).digest('hex'), resource.sha256)
+    }
+    const { stdout, stderr } = await exec(join(packaged, paths[0]), ['-version'],
+      { cwd: packaged, timeout: 15_000, maxBuffer: 64 * 1024 })
+    assert.match(stdout, /^ffmpeg version /)
+    assert.equal(stderr, '')
+  })
 })

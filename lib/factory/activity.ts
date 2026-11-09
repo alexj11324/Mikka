@@ -1,9 +1,9 @@
 import type { Pool, PoolClient } from 'pg'
 import { withBasePath } from '../base-path'
 import { readFactoryComputerSessions } from '../cloud-computer/thread-machine-sessions'
-import { workspaceLink } from '../../components/workspace/workspace-navigation'
 import { projectFactoryAttempts, type FactoryAttemptViewSource, type FactoryAttemptTransitionSource } from './attempt-view'
 import { readFactoryTaskMedia } from './task-media'
+import { readFactoryActivityDocuments } from './activity-artifacts'
 import { maskFactoryNote } from './note-mask'
 import { readFactoryFlow, type FactoryNeedsYou } from './public-flow'
 import type { createFactoryStore, FactoryTask } from './store'
@@ -48,7 +48,7 @@ function transitionWaits(events: TransitionRow[], attempts: AttemptRow[], endedA
     if (event.revision == null || event.revision <= revision || !event.stage || !event.status || !event.createdAt) continue
     revision = event.revision
     const at = iso(event.createdAt)!, kind = attention(event.stage, event.status)
-    if (open?.kind === kind) continue
+    if ((open as FactoryActivityWait | null)?.kind === kind) continue
     if (open) { open.endedAt = at; waits.push(open); open = null }
     if (kind) open = { id: `event:${event.id}`, kind, attemptId: event.attemptId ?? null,
       runId: byId.get(event.attemptId)?.runId ?? null, startedAt: at, endedAt: null, durationMs: 0 }
@@ -58,10 +58,12 @@ function transitionWaits(events: TransitionRow[], attempts: AttemptRow[], endedA
 }
 
 /** An execution question can escalate without changing the task's stage/status. */
-async function questionWaits(tx: PoolClient, task: FactoryTask, endedAt: string | null, observedAt: string): Promise<FactoryActivityWait[]> {
-  const { rows } = await tx.query<{ id: string; attemptId: string; runId: string; startedAt: Instant; endedAt: Instant }>(
-    `SELECT q.id,q."attemptId",q."originRunId" AS "runId",event."createdAt" AS "startedAt",
-      COALESCE(q."answeredAt",CASE WHEN q.status IN ('cancelled','expired','superseded','resolved') THEN q."updatedAt" END) AS "endedAt"
+async function questionWaits(tx: PoolClient, task: FactoryTask, endedAt: string | null, observedAt: string) {
+  const { rows } = await tx.query<{ id: string; attemptId: string; runId: string; status: string; startedAt: Instant; endedAt: Instant }>(
+    `SELECT q.id,q."attemptId",q."originRunId" AS "runId",q.status,event."createdAt" AS "startedAt",
+      LEAST(COALESCE(q."answeredAt",LEAST(
+        CASE WHEN q."expiresAt"<=$5::timestamptz THEN q."expiresAt" END,
+        CASE WHEN q.status IN ('cancelled','expired','superseded','resolved') THEN q."updatedAt" END)),replaced."createdAt") AS "endedAt"
      FROM factory_questions q
      JOIN factory_attempts attempt ON attempt.id=q."attemptId" AND attempt."taskId"=q."taskId" AND attempt."runId"=q."originRunId"
      JOIN agent_runs run ON run.id=q."originRunId" AND run."userId"=q."userId" AND run."issueId"=q."issueId"
@@ -70,14 +72,20 @@ async function questionWaits(tx: PoolClient, task: FactoryTask, endedAt: string 
        AND event."botId" IS NOT DISTINCT FROM $4::uuid AND event.kind='run_question'
        AND event.payload->>'taskId'=q."taskId"::text AND event.payload->>'questionId'=q.id::text
        AND event.payload->>'needsUser'='true'
+     LEFT JOIN LATERAL (SELECT changed."createdAt" FROM factory_events changed
+       WHERE changed."taskId"=q."taskId" AND changed."createdAt">=event."createdAt"
+         AND changed.result->'task'->>'id'=q."taskId"::text AND changed.result->'task' ? 'candidateId'
+         AND changed.result->'task'->>'candidateId' IS DISTINCT FROM q."candidateId"::text
+       ORDER BY changed."createdAt",changed."eventId" LIMIT 1) replaced ON true
      WHERE q."taskId"=$1 AND q."userId"=$2 AND q."issueId"=$3 ORDER BY event."createdAt",q.id`,
-    [task.id,task.userId,task.issueId,task.botId])
-  return rows.map(row => {
+    [task.id,task.userId,task.issueId,task.botId,observedAt])
+  const waits: FactoryActivityWait[] = rows.map(row => {
     const startedAt = iso(row.startedAt)!
     const end = [iso(row.endedAt),endedAt].filter((value): value is string => value !== null).sort()[0] ?? null
     return { id: `question:${row.id}`, kind: 'question', attemptId: row.attemptId, runId: row.runId,
       startedAt, endedAt: end, durationMs: Math.max(0,Date.parse(end ?? observedAt)-Date.parse(startedAt)) }
   })
+  return { waits, hasWaitingReceipt: rows.some(row => row.status === 'waiting_user') }
 }
 
 /** All three right-hand tabs share one authorized, repeatable-read snapshot.
@@ -85,7 +93,7 @@ async function questionWaits(tx: PoolClient, task: FactoryTask, endedAt: string 
 export async function readFactoryActivity(pool: Pool, store: Pick<ReturnType<typeof createFactoryStore>, 'readTask'>, userId: string, taskId: string) {
   const tx = await pool.connect()
   try {
-    await tx.query('BEGIN ISOLATION LEVEL REPEATABLE READ')
+    await tx.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY')
     const task = await store.readTask(tx, userId, taskId)
     const result = await projectFactoryActivity(tx, task)
     await tx.query('COMMIT')
@@ -145,27 +153,7 @@ export async function projectFactoryActivity(tx: PoolClient, task: FactoryTask) 
   }))
   const computers = await readFactoryComputerSessions(tx, task)
   const media = await readFactoryTaskMedia(tx, task)
-  const { rows: documents } = await tx.query<{ id: string; kind: string; title: string; runId: string; attemptId: string; candidateId: string | null;
-    version: number; size: number; createdAt: Instant; isPlan: boolean; isAcceptance: boolean }>(
-    `SELECT document.id,document.kind,left(document.title,200) AS title,document."runId",attempt.id AS "attemptId",attempt."candidateId",
-      version.version,version.size,document."createdAt",
-      (attempt.stage='spec' AND attempt.output->'specArtifact'->>'artifactId'=document.id::text
-       AND attempt.output->'specArtifact'->>'runId'=document."runId"::text
-       AND attempt.output->'specArtifact'->>'sha256'=version.sha256
-       AND attempt.output->'specArtifact'->>'version'=version.version::text) AS "isPlan",
-      EXISTS(SELECT 1 FROM factory_acceptance_artifacts report WHERE report."taskId"=$1 AND report."artifactId"=document.id
-        AND report."runId"=document."runId" AND report.sha256=version.sha256) AS "isAcceptance"
-    FROM factory_attempts attempt JOIN agent_runs r ON r.id=attempt."runId" AND r."userId"=$2 AND r."issueId"=$3
-    JOIN artifacts document ON document."runId"=r.id AND document."userId"=$2 AND document."issueId"=$3
-    LEFT JOIN LATERAL (SELECT v.version FROM artifact_versions v WHERE v."artifactId"=document.id AND (
-      (attempt.stage='spec' AND attempt.output->'specArtifact'->>'artifactId'=document.id::text
-        AND attempt.output->'specArtifact'->>'runId'=document."runId"::text
-        AND attempt.output->'specArtifact'->>'sha256'=v.sha256
-        AND attempt.output->'specArtifact'->>'version'=v.version::text)
-      OR EXISTS(SELECT 1 FROM factory_acceptance_artifacts report WHERE report."taskId"=$1 AND report."artifactId"=document.id
-        AND report."runId"=document."runId" AND report.sha256=v.sha256)) ORDER BY v.version LIMIT 1) pinned ON true
-    JOIN artifact_versions version ON version."artifactId"=document.id AND version.version=COALESCE(pinned.version,document."latestVersion")
-    WHERE attempt."taskId"=$1 ORDER BY document."createdAt",document.id`, [task.id, task.userId, task.issueId])
+  const documents = await readFactoryActivityDocuments(tx, task)
   const { rows: publications } = await tx.query<{ runId: string; attemptId: string; candidateId: string | null; url: string; title: string | null; state: string | null; createdAt: Instant }>(
     `SELECT r.id AS "runId",attempt.id AS "attemptId",attempt."candidateId",p."pullRequest"->>'url' AS url,
       left(p."pullRequest"->>'title',200) AS title,p."pullRequest"->>'state' AS state,p."createdAt"
@@ -175,11 +163,7 @@ export async function projectFactoryActivity(tx: PoolClient, task: FactoryTask) 
     [task.id, task.userId, task.issueId])
   const attemptsByRun = new Map(attempts.filter(attempt => attempt.runId).map(attempt => [attempt.runId!,attempt.id]))
   const artifacts = [
-    ...documents.map(document => ({ id: document.id, kind: document.isPlan ? 'plan' as const : document.isAcceptance ? 'acceptance' as const : 'document' as const,
-      artifactId: document.id, format: document.kind, title: text(document.title), runId: document.runId, attemptId: document.attemptId,
-      candidateId: document.candidateId, version: document.version, size: document.size, createdAt: iso(document.createdAt),
-      url: withBasePath(workspaceLink({ artifact: document.id })),
-      downloadUrl: withBasePath(`/api/artifacts/${document.id}/versions/${document.version}/download`) })),
+    ...documents,
     ...media.map(capture => ({ ...capture, id: capture.captureId, attemptId: attemptsByRun.get(capture.runId) ?? null })),
     ...publications.flatMap(publication => {
       const url = githubPullRequest(publication.url)
@@ -193,8 +177,8 @@ export async function projectFactoryActivity(tx: PoolClient, task: FactoryTask) 
     const ids = artifactsByRun.get(artifact.runId) ?? []
     ids.push(artifact.id); artifactsByRun.set(artifact.runId, ids)
   }
-  const plans = new Map(documents.filter(document => document.isPlan).map(document => [document.attemptId,
-    { artifactId: document.id, version: document.version, url: withBasePath(workspaceLink({ artifact: document.id })) }]))
+  const plans = new Map(documents.filter(document => document.kind === 'plan').map(document => [document.attemptId,
+    { artifactId: document.artifactId, version: document.version, url: document.url }]))
   for (const attempt of timelineAttempts) {
     attempt.artifactIds = attempt.runId ? artifactsByRun.get(attempt.runId) ?? [] : []
     attempt.plan = plans.get(attempt.id) ?? null
@@ -203,10 +187,12 @@ export async function projectFactoryActivity(tx: PoolClient, task: FactoryTask) 
     agent.artifactIds = artifactsByRun.get(agent.runId) ?? []
     agent.plan = plans.get(agent.attemptId) ?? null
   }
-  const waits = [...transitionWaits(events, attempts, endedAt, observedAt), ...await questionWaits(tx, task, endedAt, observedAt)]
+  const questions = await questionWaits(tx, task, endedAt, observedAt)
+  const waits = [...transitionWaits(events, attempts, endedAt, observedAt), ...questions.waits]
   // Keep the existing current-attention contract even for legacy tasks whose
   // early transition receipts predate this read model.
-  if (flow.needsYou && !waits.some(wait => wait.kind === flow.needsYou!.kind && wait.endedAt === null)) {
+  if (flow.needsYou && !(flow.needsYou.kind === 'question' && questions.hasWaitingReceipt)
+      && !waits.some(wait => wait.kind === flow.needsYou!.kind && wait.endedAt === null)) {
     waits.push({ id: `attention:${task.attemptId}`, kind: flow.needsYou.kind, attemptId: task.attemptId,
       runId: attempts.find(attempt => attempt.id === task.attemptId)?.runId ?? null,
       startedAt: flow.needsYou.since, endedAt: null, durationMs: Math.max(0, Date.parse(observedAt) - Date.parse(flow.needsYou.since)) })
