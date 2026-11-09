@@ -1,0 +1,80 @@
+name: Issue 1505 fixed-run reply diagnosis
+on:
+  push:
+    branches: [ops/1505-codex-reply-diagnosis-20261109]
+permissions:
+  contents: read
+concurrency:
+  group: issue-1505-codex-reply-readonly-20261109
+  cancel-in-progress: false
+  queue: max
+jobs:
+  diagnose:
+    if: github.repository == 'alexj11324/Mikka'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DIAGNOSTIC_SOURCE_COMMIT: 89eae89e9e79422e0a8b4b1346aa1c7fb6470016
+      DIAGNOSTIC_SOURCE_TREE: a850a89f11cbb467df869651ee39beca157c6351
+      DIAGNOSTIC_COLLECTOR_SHA256: 8612ce46b956cb3f32a92fdfbfd5563879a8a8b48f4dd4c6e78026126d751f85
+      DIAGNOSTIC_SOURCE_DIR: ${{ github.workspace }}
+      DIAGNOSTIC_OUTPUT: ${{ runner.temp }}/issue1505-reply-observation.json
+    steps:
+      - name: Check out the exact historical application source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.DIAGNOSTIC_SOURCE_COMMIT }}
+          persist-credentials: false
+      - name: Check out only this reviewed diagnostic collector
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          path: .issue1505-reply-diagnostic
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: scripts/ops/issue1505-codex-reply-diagnostic.mjs
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.22.1
+      - name: Verify fixed source, collector, and local read-only client before credentials
+        env:
+          EXPECTED_DIAGNOSTIC_BRANCH: ops/1505-codex-reply-diagnosis-20261109
+        run: |
+          test "$GITHUB_REF" = "refs/heads/$EXPECTED_DIAGNOSTIC_BRANCH"
+          test "$(git rev-parse HEAD)" = "$DIAGNOSTIC_SOURCE_COMMIT"
+          test "$(git rev-parse HEAD^{tree})" = "$DIAGNOSTIC_SOURCE_TREE"
+          command -v psql >/dev/null
+          node --check .issue1505-reply-diagnostic/scripts/ops/issue1505-codex-reply-diagnostic.mjs
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          import { createHash } from 'node:crypto';
+          assert.equal(createHash('sha256').update(readFileSync('.issue1505-reply-diagnostic/scripts/ops/issue1505-codex-reply-diagnostic.mjs')).digest('hex'), process.env.DIAGNOSTIC_COLLECTOR_SHA256);
+          JS
+          node .issue1505-reply-diagnostic/scripts/ops/issue1505-codex-reply-diagnostic.mjs --source-dir "$DIAGNOSTIC_SOURCE_DIR" --output "$DIAGNOSTIC_OUTPUT" --verify-only
+      - name: Read only the existing application database binding
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: MIKKA_DATABASE_URL
+          recursive: false
+          include-imports: false
+      - name: Read the single retained run and write closed diagnostic predicates
+        id: collector
+        run: node .issue1505-reply-diagnostic/scripts/ops/issue1505-codex-reply-diagnostic.mjs --source-dir "$DIAGNOSTIC_SOURCE_DIR" --output "$DIAGNOSTIC_OUTPUT"
+      - name: Preserve only the closed diagnostic receipt
+        if: always() && steps.collector.outcome != 'skipped'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1505-reply-observation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/issue1505-reply-observation.json
+          if-no-files-found: error
+          retention-days: 1
