@@ -2,7 +2,7 @@
 // Its own push/source guard applies; no GitHub identity or main event is forged.
 import { createHash, randomUUID } from 'node:crypto'
 import { createRequire } from 'node:module'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { configuration } from './mcp-reply-production.mjs'
@@ -11,6 +11,25 @@ const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
 const SHA = /^[a-f0-9]{40}$/
 const need = (value, code) => { if (!value) throw Error('lifecycle_bounds_' + code) }
 const sha = value => createHash('sha256').update(value).digest('hex')
+
+export function assertLifecycleAdmission(env, now=Date.now()) {
+  const value=env.MIKKA_LIFECYCLE_ADMISSION_DEADLINE
+  need(typeof value==='string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(value)
+    && Number.isFinite(Date.parse(value)) && Number.isFinite(now) && now<=Date.parse(value),'admission_expired')
+  return value
+}
+
+export function assertRuntimePin(current, expected, templateId) {
+  for (const value of [current, expected]) {
+    need(SHA.test(value?.sourceCommit ?? '') && SHA.test(value?.workerSha ?? ''), 'approved_runtime_invalid')
+    need(['desktop','claude','codex'].every(kind => /^[A-Za-z0-9_-]{1,100}$/.test(value.templates?.[kind] ?? '')), 'approved_runtime_invalid')
+  }
+  need(current.sourceCommit === expected.sourceCommit && current.workerSha === expected.workerSha
+    && ['desktop','claude','codex'].every(kind => current.templates[kind] === expected.templates[kind]), 'approved_runtime_changed')
+  if (templateId !== undefined) need(Object.values(expected.templates).includes(templateId), 'unapproved_runtime_template')
+  return { sourceCommit: expected.sourceCommit, workerSha: expected.workerSha,
+    templateMatched: templateId === undefined ? null : true }
+}
 
 export function activeCommand(caseId, sourceCommit, phase = 'work') {
   need(UUID.test(caseId) && SHA.test(sourceCommit) && ['work','margin'].includes(phase), 'command_scope')
@@ -57,21 +76,47 @@ export function terminalPauseBound(terminal, provider) {
 }
 
 export async function runLifecycleBounds(env, event, { signal } = {}) {
+  const admissionDeadline=assertLifecycleAdmission(env)
   const binding = configuration(env, event), source = resolve(env.MIKKA_RELEASE_SOURCE)
   need(source.startsWith(resolve(env.GITHUB_WORKSPACE) + '/'), 'source_directory')
   const lifecycle = await import(pathToFileURL(source + '/scripts/acceptance/thread-lifecycle.mjs'))
   const { watchRun, observeChunks, hasStartupInitialization } = await import(pathToFileURL(source + '/scripts/acceptance/cloud-startup.mjs'))
-  const { Pool } = createRequire(source + '/package.json')('pg')
+  const requireSource=createRequire(source+'/package.json')
+  const { Pool } = requireSource('pg')
+  const { Sandbox } = await import(pathToFileURL(requireSource.resolve('e2b')))
+  const runtimeReader=(await import(pathToFileURL(source+'/scripts/acceptance/cloud-startup.mjs'))).readProductionWorkerRelease
+  const approved=JSON.parse(await readFile('issue-1212-mcp-report/runtime-pin.json','utf8'))
+  need(approved.applicationSha===binding.applicationSha && Number.isSafeInteger(approved.runId) && approved.runId>0
+    && Array.isArray(approved.verifiedJobs) && approved.verifiedJobs.length===7,'approved_runtime_invalid')
+  const runtime=approved.configuration, runtimeObservations=[]
+  assertRuntimePin(await runtimeReader({token:env.VERCEL_TEAM_TOKEN}),runtime)
+  const getInfo=async(...args)=>{
+    const info=await Sandbox.getInfo(...args)
+    need(typeof info.templateId==='string','unapproved_runtime_template')
+    runtimeObservations.push({...assertRuntimePin(runtime,runtime,info.templateId),sandboxHash:sha(info.sandboxId).slice(0,16)})
+    return info
+  }
   const target = new URL(env.DATABASE_URL)
   need(['postgres:', 'postgresql:'].includes(target.protocol) && target.hostname.endsWith('.neon.tech')
     && target.pathname === '/orvilo_mvp' && (!target.port || target.port === '5432') && !target.hash, 'database_target')
   const pool = new Pool({ connectionString: target.href, max: 1, statement_timeout: 15000, query_timeout: 20000,
     connectionTimeoutMillis: 5000, options: '-c default_transaction_read_only=on', application_name: 'mikka-owned-lifecycle-bounds' })
   const bounds = []
+  const journal = { issue: 1593, applicationSha: binding.applicationSha, driverRevision: binding.driverRevision, cases: [] }
+  async function checkpoint() {
+    await mkdir('issue-1212-mcp-report',{recursive:true})
+    const path='issue-1212-mcp-report/lifecycle-journal.json'
+    await writeFile(path+'.tmp',JSON.stringify(journal,null,2)+'\n')
+    await rename(path+'.tmp',path)
+  }
   async function oneCase(args) {
     const caseId = randomUUID(), receipt = { harness: args.harness, caseId, status: 'failed', databaseSnapshots: 0,
       startup: { limitMs: 60000, clock: 'driver_monotonic_observation_upper_bound', underFiveSecondTargetAsserted:false }, leases: {}, endRequests: [] }
     bounds.push(receipt)
+    const owned={caseId,harness:args.harness,botId:args.botId,profileId:args.profile.id,
+      workspaceId:args.scope.workspaceId,ownerHash:sha(args.scope.ownerId).slice(0,16),runIds:[],providerObservations:[]}
+    journal.cases.push(owned)
+    await checkpoint()
     let originRunId, dispatchedAt, initialTokenId
     const client = { ...args.client,
       async rpc(action, values, extra) {
@@ -82,7 +127,9 @@ export async function runLifecycleBounds(env, event, { signal } = {}) {
           text.text += '\n\nAdditional active-lease acceptance: before the first before_question snapshot and before ask_human, execute the following exact shell command ONCE, in its own native shell tool call with a 240000ms timeout. It waits for 160 seconds without network, credential reads, file writes or server queries; leave the command running until it returns. Do not repeat it after Owner resume. This is real active execution, not a polling loop.\n\n' + activeCommand(caseId, args.sourceCommit)
             + '\n\nImmediately after that command, execute this second exact command separately with a 60000ms timeout. Its 30-second observation margin keeps the run active while the driver takes its single event-triggered lease snapshot; it does not poll or read the server. After both commands finish, continue the original before_question snapshot and genuine Owner decision task.\n\n' + activeCommand(caseId,args.sourceCommit,'margin')
         }
-        return args.client.rpc(action, values, extra)
+        const value=await args.client.rpc(action, values, extra)
+        if(action==='issues.saveIssue' && UUID.test(value.issue?.id??'')){owned.issueId=value.issue.id;await checkpoint()}
+        return value
       },
       async json(path, init, timeout) {
         const ends = /^\/api\/threads\/[a-f0-9-]{36}\/machine$/.test(path) && init?.method === 'POST' && JSON.parse(init.body).action === 'end'
@@ -91,7 +138,10 @@ export async function runLifecycleBounds(env, event, { signal } = {}) {
         const began = performance.now()
         if (/\/computer\/runs$/.test(path) && init?.method === 'POST') dispatchedAt = performance.now()
         const value = await args.client.json(path, init, timeout)
-        if (/\/computer\/runs$/.test(path) && init?.method === 'POST') originRunId = value.runId
+        if (/\/computer\/runs$/.test(path) && init?.method === 'POST') {
+          originRunId = value.runId
+          if(UUID.test(originRunId??'')){owned.runIds.push(originRunId);await checkpoint()}
+        }
         if (request) {
           Object.assign(request,{ acknowledgedAt:new Date().toISOString(),elapsedMs:Math.ceil(performance.now()-began) })
           if (ends) receipt.endRequests.push({...request,runId:value.runId,state:value.state})
@@ -111,6 +161,7 @@ export async function runLifecycleBounds(env, event, { signal } = {}) {
       receipt.leases[label] = { live: row.live === true, runTokenLive:row.run_token_live===true, expiresAt: row.expiry, status: row.status === 'running' ? 'running' : 'other' }
     }
     const wait = async (c, record, timeout, WebSocketImpl, now, legacy, hooks) => {
+      if(UUID.test(record.runId??'') && !owned.runIds.includes(record.runId)){owned.runIds.push(record.runId);await checkpoint()}
       const telemetry = { runId: record.runId, runIdHash: sha(record.runId).slice(0,16), harness: args.harness }
       return watchRun(c, record, timeout, WebSocketImpl, now, legacy, { ...hooks, observe: async (detail, active) => {
         if (record.runId === originRunId) {
@@ -134,7 +185,18 @@ export async function runLifecycleBounds(env, event, { signal } = {}) {
         return hooks.observe(detail, active)
       } })
     }
-    const result = await lifecycle.runLifecycleCase({ ...args, client, caseId, wait })
+    const observeProvider=async scope=>{
+      const observation=await args.observeProvider(scope)
+      if(observation.ownershipVerified===true){
+        owned.providerObservations.push({sandboxId:scope.sandboxId,originRunId:scope.originRunId,
+          state:observation.state,observedAt:observation.observedAt,ownershipVerified:true})
+        await checkpoint()
+      }
+      return observation
+    }
+    const result = await lifecycle.runLifecycleCase({ ...args, client, caseId, wait, observeProvider })
+    owned.cleanup=result.cleanup
+    await checkpoint()
     try {
       need(receipt.activeCommand && receipt.observationMargin && UUID.test(initialTokenId ?? '') && receipt.leases.before?.live && receipt.leases.after?.live
         && receipt.leases.before.runTokenLive && receipt.leases.after.runTokenLive
@@ -177,9 +239,25 @@ export async function runLifecycleBounds(env, event, { signal } = {}) {
   let report
   try {
     report = await lifecycle.runThreadLifecycle({ sourceCommit: binding.applicationSha, timeoutMs: 420000,
-      reportPath: resolve(env.RUNNER_TEMP,'thread-lifecycle-bounds/report.json') }, { env, signal, runCase: oneCase })
-    report.driver = { revision: binding.driverRevision, runId: binding.runId, authorization: 'existing_actions_branch_push_guard' }
+      reportPath: resolve(env.RUNNER_TEMP,'thread-lifecycle-bounds/report.json') }, { env, signal, runCase: oneCase, getInfo })
+    report.driver = { revision: binding.driverRevision, runId: binding.runId, authorization: 'existing_actions_branch_push_guard', admissionDeadline }
     report.additionalBoundsPassed = bounds.length===2 && bounds.every(row=>row.status==='passed')
+    report.approvedRuntime={configuration:runtime,runId:approved.runId,observations:runtimeObservations,status:'failed'}
+    // A new default does not replace either already-observed task VM.
+    // Record it separately; the exact approved template on each owned VM is
+    // the runtime evidence for this run, alongside the fixed public build.
+    try {
+      const after=await runtimeReader({token:env.VERCEL_TEAM_TOKEN})
+      report.approvedRuntime.observedDefaultAfter=after
+      report.approvedRuntime.defaultUnchanged=JSON.stringify(after)===JSON.stringify(runtime)
+    } catch { report.approvedRuntime.defaultAfterStatus='unavailable' }
+    try {
+      need(new Set(runtimeObservations.map(row=>row.sandboxHash)).size===2,'approved_runtime_instances_missing')
+      report.approvedRuntime.status='passed'
+    } catch(error) {
+      report.approvedRuntime.code=/^lifecycle_bounds_[a-z_]+$/.test(error?.message??'')?error.message:'lifecycle_bounds_runtime_unconfirmed'
+      report.additionalBoundsPassed=false
+    }
     // Preserve the original driver's issueAcceptance and untested-stage limits.
     await mkdir('issue-1212-mcp-report',{recursive:true})
     await writeFile('issue-1212-mcp-report/lifecycle-bounds.json',JSON.stringify(report,null,2)+'\n')
