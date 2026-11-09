@@ -334,8 +334,8 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
   }
   async function read(path, options = {}) {
     const response = await request(path, options)
-    if (options.missing && response.status === 404) return null
     const value = await response.json().catch(() => null)
+    if (options.missing && response.status === 404 && value?.error === 'agentProfileNotFound') return null
     if (!response.ok || value?.error) {
       const error = new AcceptanceError('http_refused')
       error.httpStatus = response.status; error.serverCode = typeof value?.error === 'string' ? value.error : value?.error?.code

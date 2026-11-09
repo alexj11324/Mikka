@@ -1044,3 +1044,101 @@ test('the finite workspace cap and 199-row boundary can succeed without paging o
   for (const call of readsByWorkspace) assert.deepEqual(decode(call.body.args), [])
   assert.equal(report.sessionClosed, true); safe(report)
 })
+
+const profileGet404s = [
+  ['workspace admission denied', () => Response.json({ error: 'factoryNotFound' }, { status: 404 })],
+  ['profile scope denied', () => Response.json({ error: 'agentProfileScopeNotFound' }, { status: 404 })],
+  ['unknown error', () => Response.json({ error: 'unknownFixtureProfileError' }, { status: 404 })],
+  ['nested not-found code', () => Response.json({ error: { code: 'agentProfileNotFound' } }, { status: 404 })],
+  ['malformed JSON', () => new Response('PRIVATE_INVALID_JSON', { status: 404 })],
+]
+for (const [reason, refused] of profileGet404s) {
+  test('profile preflight refuses ' + reason + ' instead of treating any 404 as absence', async () => {
+    const data = fixture(), originalFetch = data.fetchImpl
+    const profileId = fixtureIdentity(revision, CASES[0]).profileId, seen = []
+    data.fetchImpl = (input, init = {}) => {
+      const url = new URL(input)
+      if (url.pathname === '/mikka/api/factory/agent-profiles/' + profileId && init.method === 'GET') {
+        seen.push({ workspace: new Headers(init.headers).get('x-mikka-workspace-id'), query: url.searchParams.get('workspaceId') })
+        return Promise.resolve(refused())
+      }
+      return originalFetch(input, init)
+    }
+    const report = await run(data, true)
+    assert.equal(report.status, 'blocked', JSON.stringify(report))
+    assert.equal(report.cases[0].code, 'http_refused')
+    assert.equal(report.cases[0].httpStatus, 404)
+    assert.deepEqual(seen, [{ workspace: workspaceId, query: workspaceId }])
+    assert.equal(data.profiles.size, 0); assert.equal(data.submissions.length, 0)
+    assert.equal(data.calls.some(call => call.path === '/mikka/api/factory/agent-profiles' && call.method === 'POST'), false)
+    assert.equal(report.sessionClosed, true); safe(report)
+  })
+
+  test('profile cleanup refuses ' + reason + ' without falsely marking an existing profile archived', async () => {
+    const data = fixture(), originalFetch = data.fetchImpl
+    const profileId = fixtureIdentity(revision, CASES[0]).profileId, seen = []
+    data.fetchImpl = (input, init = {}) => {
+      const url = new URL(input)
+      if (url.pathname === '/mikka/api/factory/agent-profiles/' + profileId && init.method === 'GET' && data.profiles.has(profileId)) {
+        assert.equal(data.submissions.length, 1)
+        assert.equal(data.state.accepted.has(data.submissions[0].taskId), true)
+        assert.deepEqual(data.calls.filter(call => call.path.startsWith('/mikka/api/threads/') && call.body?.action === 'end')
+          .map(call => call.path), data.submissions[0].runs.map(runId => '/mikka/api/threads/' + runId + '/machine'))
+        seen.push({ workspace: new Headers(init.headers).get('x-mikka-workspace-id'), query: url.searchParams.get('workspaceId') })
+        return Promise.resolve(refused())
+      }
+      return originalFetch(input, init)
+    }
+    const report = await run(data, true), result = report.cases[0], cleanup = result.cleanup
+    assert.equal(report.status, 'blocked', JSON.stringify(report))
+    assert.equal(result.code, 'cleanup_incomplete')
+    assert.equal(result.acceptanceStatus, 'runtime_verified')
+    assert.equal(cleanup.ownRunsStopped, true); assert.equal(cleanup.ownMachinesEnded, true)
+    assert.equal(cleanup.profileArchived, false); assert.equal(cleanup.modelRestored, true)
+    assert.equal(cleanup.profileError.code, 'http_refused'); assert.equal(cleanup.profileError.httpStatus, 404)
+    assert.deepEqual(seen, [{ workspace: workspaceId, query: workspaceId }])
+    assert.equal(data.profiles.get(profileId).archivedAt, null); assert.equal(data.profiles.get(profileId).enabled, true)
+    assert.equal(data.calls.some(call => call.method === 'DELETE'), false)
+    assert.equal(data.submissions.length, 1); assert.equal(report.sessionClosed, true); safe(report)
+  })
+}
+
+test('profile absence preflight accepts only the normal authorized missing-profile response', async () => {
+  const data = fixture(), originalFetch = data.fetchImpl
+  const profileId = fixtureIdentity(revision, CASES[0]).profileId
+  let missing = 0
+  data.fetchImpl = async (input, init = {}) => {
+    const response = await originalFetch(input, init)
+    if (new URL(input).pathname === '/mikka/api/factory/agent-profiles/' + profileId && init.method === 'GET') {
+      assert.equal(response.status, 404)
+      assert.deepEqual(await response.clone().json(), { error: 'agentProfileNotFound' })
+      missing++
+    }
+    return response
+  }
+  const report = await run(data)
+  assert.equal(report.status, 'ready', JSON.stringify(report)); assert.equal(missing, 1)
+  assert.equal(data.profiles.size, 0); assert.equal(data.submissions.length, 0)
+  assert.equal(report.sessionClosed, true); safe(report)
+})
+
+test('profile absence cleanup accepts an authorized exact missing-profile code without a DELETE retry', async () => {
+  const data = fixture(), originalFetch = data.fetchImpl
+  const profileId = fixtureIdentity(revision, CASES[0]).profileId
+  let missing = 0
+  data.fetchImpl = (input, init = {}) => {
+    if (new URL(input).pathname === '/mikka/api/factory/agent-profiles/' + profileId && init.method === 'GET' && data.profiles.has(profileId)) {
+      assert.equal(data.state.accepted.has(data.submissions[0].taskId), true)
+      data.profiles.delete(profileId); missing++
+      return Promise.resolve(Response.json({ error: 'agentProfileNotFound' }, { status: 404 }))
+    }
+    return originalFetch(input, init)
+  }
+  const report = await run(data, true), cleanup = report.cases[0].cleanup
+  assert.equal(report.status, 'runtime_verified', JSON.stringify(report))
+  assert.equal(missing, 1); assert.equal(data.profiles.has(profileId), false)
+  assert.equal(cleanup.state, 'complete'); assert.equal(cleanup.profileArchived, true)
+  assert.equal(cleanup.ownRunsStopped, true); assert.equal(cleanup.ownMachinesEnded, true)
+  assert.equal(data.calls.some(call => call.method === 'DELETE'), false)
+  assert.equal(report.sessionClosed, true); safe(report)
+})
