@@ -13,9 +13,9 @@ import type { ChatHeaderProps } from './chat-header.types'
  * that opens its page, and ⋯ on the right as a system bar button (a glass circle on iOS 26) with the bot's open
  * tasks, 全部任务 and 资料. Back and its edge swipe are the system's (decision 0120: one title, buttons on the right).
  */
-export function ChatHeader({ name, color, shape, botId, coordinator, tasks, onTask, onAllTasks, onInfo }: ChatHeaderProps) {
+export function ChatHeader({ name, color, shape, botId, coordinator, tasks, onTask, onAllTasks, onInfo, scrolled }: ChatHeaderProps) {
   return (
-    <NavBar title={name} titleView={<ChatTitlePill name={name} color={color} shape={shape} botId={botId} coordinator={coordinator} onPress={onInfo} />}
+    <NavBar title={name} scrolled={scrolled} titleView={<ChatTitlePill name={name} color={color} shape={shape} botId={botId} coordinator={coordinator} onPress={onInfo} />}
       right={name ? {
         icon: 'ellipsis', label: mobileMessages.Nav.more, web: <Symbol name="ellipsis" size={18} color={colors.ink} />, onOpen: () => {},
         items: [

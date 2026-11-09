@@ -9,6 +9,7 @@ import { BotBubble, MyBubble } from '@/components/chat'
 import { Spinner } from '@/components/icons'
 import { Markdown } from '@/components/Markdown'
 import { NavBar, underBar } from '@/components/NavBar'
+import { useScrolledUnderBar } from '@/components/BarBackdrop'
 import { OfflineBanner } from '@/components/OfflineBanner'
 import { ReadNotice } from '@/components/ReadNotice'
 import { StopFailed } from '@/components/StopFailed'
@@ -47,6 +48,7 @@ export function TaskConversationScreen() {
   const { id, attempt } = useLocalSearchParams<{ id: string; attempt?: string }>()
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  const bar = useScrolledUnderBar()
   const home = useHome().data
   // Stable: useLiveApi reads again whenever its reader changes.
   const read = useCallback(() => readConversation(id), [id])
@@ -98,6 +100,7 @@ export function TaskConversationScreen() {
   return (
     <View style={styles.screen}>
       <NavBar
+        scrolled={bar.scrolled}
         back={() => (router.canGoBack() ? router.back() : router.replace(`/task/${id}`))}
         titleView={task ? (
           <View style={styles.titleBox}>
@@ -106,7 +109,7 @@ export function TaskConversationScreen() {
           </View>
         ) : undefined}
       />
-      <KeyboardChatScrollView ref={scroller as never} onContentSizeChange={place} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
+      <KeyboardChatScrollView onScroll={bar.onScroll} scrollEventThrottle={16} ref={scroller as never} onContentSizeChange={place} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
         {!data && !error ? <View style={styles.center}><Spinner /></View> : null}
         <ReadNotice error={error} hasData={Boolean(data)} label={mobileMessages.Coordinator.conversation} onRetry={reload} />
         {data && !segments.length ? <Text style={styles.empty}>{mobileMessages.MobileCore.noAttempts}</Text> : null}

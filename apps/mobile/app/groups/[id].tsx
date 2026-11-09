@@ -10,6 +10,7 @@ import { BotAvatar, Spinner } from '@/components/icons'
 import { BotBubble, MessageActions, MessageRow, MyBubble, Reactions, TimeSeparator } from '@/components/chat'
 import { Markdown } from '@/components/Markdown'
 import { ListTopFade, NavBar } from '@/components/NavBar'
+import { useScrolledUnderBar } from '@/components/BarBackdrop'
 import { Text } from '@/components/Text'
 import { Composer } from '@/features/chat/components/chat-composer'
 import { GlassButton } from '@/components/GlassButton'
@@ -45,6 +46,7 @@ export default function GroupChat() {
   const me = home.data?.user.id
   const list = useRef<ChatListHandle>(null)
   const [atLatest, setAtLatest] = useState(true)
+  const underBar = useScrolledUnderBar()
   const reduceMotion = useReducedMotionPreference()
   const apiContext = apiCache.context()
   const [composerHeight, setComposerHeight] = useState(90)
@@ -198,9 +200,9 @@ export default function GroupChat() {
 
   return (
     <View style={styles.screen}>
-      <NavBar title={title} />
+      <NavBar title={title} scrolled={underBar.scrolled} />
       <View style={{ flex: 1, overflow: 'hidden' }}>
-        <ChatMessageList ref={list} testID="group-chat-scroll" data={messages} scrollEnabled bottomInset={composerHeight} onAtLatestChange={setAtLatest}
+        <ChatMessageList ref={list} testID="group-chat-scroll" data={messages} scrollEnabled onScrollUnderBar={underBar.onScroll} bottomInset={composerHeight} onAtLatestChange={setAtLatest}
           keyOf={message => message.id} renderItem={renderMessage} anchorIndex={anchorIndex}
           onStartReached={before ? () => void loadEarlier() : undefined}
           header={<>
