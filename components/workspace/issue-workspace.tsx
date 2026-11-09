@@ -254,7 +254,8 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   // FRAME_OWNS_HEADER: no 全部线程 list beside the page (the frame shows the waiting count on 收件箱); its old addresses
   // land on 收件箱 (waiting) or 任务 (all), keeping an open thread.
   useEffect(() => {
-    if (FRAME_OWNS_HEADER && threadsView) goTo({ threads: null, section: threadsView === 'waiting' ? 'suggestions' : 'tasks' }, 'replace')
+    if (FRAME_OWNS_HEADER && threadsView) goTo({ threads: null, section: threadsView === 'waiting' ? 'suggestions' : 'tasks', thread: threadId }, 'replace')
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the old address moves; the thread goes with it
   }, [threadsView])
   const tasksPending = useMemo(() => pendingTaskCount(threads, tasks), [threads, tasks])
   useEffect(() => {

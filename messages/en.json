@@ -5958,6 +5958,15 @@
     "open": "Open",
     "runsCount": "{count, plural, one {# run} other {{formatted} runs}}"
   },
+  "HostedShell": {
+    "newTab": "New tab",
+    "searchOrUrl": "Search or enter URL",
+    "tools": "Tools",
+    "noTools": "No tools yet",
+    "moreFor": "More for {name}",
+    "suggested": "Suggested",
+    "noSuggestions": "Nothing suggested right now"
+  },
   "HostedSettings": {
     "back": "Back",
     "general": {
