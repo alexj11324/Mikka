@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   baseline:
-    if: github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/acceptance/issues-1504-1506'
+    if: false && github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/acceptance/issues-1504-1506'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:
