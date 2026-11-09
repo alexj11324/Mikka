@@ -29,6 +29,12 @@ const currentWorkspace = () => {
   return held?.lease.active ? held : undefined
 }
 
+/** Opaque identity of this active top-level Workspace transaction. Nested
+ * savepoints and parallel async branches share it; a new transaction does not. */
+export function workspaceTransactionKey(): object | null {
+  return currentWorkspace()?.lease ?? null
+}
+
 /** Reuse the authoritative membership transaction through composed actions.
  * A second checkout while every pool connection holds a membership lock can
  * deadlock concurrent task creation. Nested writes are ordinary savepoints. */
@@ -71,3 +77,4 @@ export const workspacePool = new Proxy(pool, {
     return typeof value === 'function' ? value.bind(target) : value
   },
 })
+

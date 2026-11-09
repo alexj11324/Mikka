@@ -66,10 +66,11 @@ test('bot chat keys reach only the owner in the bot workspace, after the actual 
     for (const [id, owner, kind] of [[home, 'owner', 'personal'], [team, 'owner', 'team'], [foreignHome, 'foreign', 'personal']]) {
       await database.query(`INSERT INTO mikka_workspaces(id,"userId",name,kind) VALUES ($1,$2,'Fixture',$3)`, [id, owner, kind])
     }
-    // The peer shares the owner's home and team; neither makes the owner's chat theirs.
-    for (const [workspace, userId] of [[home, 'owner'], [home, 'peer'], [team, 'owner'], [team, 'peer'], [foreignHome, 'foreign']]) {
+    // Team membership does not make the owner's private chat the peer's.
+    for (const [workspace, userId] of [[home, 'owner'], [team, 'owner'], [team, 'peer'], [foreignHome, 'foreign']]) {
       await database.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$2,'member','active')`, [workspace, userId])
     }
+    await assert.rejects(database.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,'peer','peer','peer','member','active')`, [home]), { code: '23514' }, 'a Personal workspace cannot admit another owner')
     const bot = randomUUID(), foreignBot = randomUUID(), agent = randomUUID()
     await database.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,'owner',$2,'Scout'),($3,'foreign',$4,'Other')`, [bot, team, foreignBot, foreignHome])
     await database.query(`INSERT INTO agents(id,"userId",name,harness) VALUES($1,'owner','Fixture','codex')`, [agent])

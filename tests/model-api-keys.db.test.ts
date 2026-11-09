@@ -32,12 +32,15 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
   try {
     await pool.query(`CREATE TABLE "user" (id text PRIMARY KEY);
       INSERT INTO "user" VALUES ('alice'),('bob'),('carol');
-      CREATE TABLE byos_connections ("ownerId" text, "workspaceId" text, "removedAt" timestamptz);
+      CREATE TABLE byos_connections (id uuid PRIMARY KEY, "ownerId" text, "workspaceId" text, "removedAt" timestamptz, "modelCatalog" jsonb);
+      CREATE TABLE byos_bindings ("connectionId" uuid, "modelId" text);
       CREATE TABLE bots (id uuid PRIMARY KEY, "workspaceId" uuid NOT NULL, "ownerId" text);
+      CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY,kind text NOT NULL CHECK (kind IN ('personal','team')));
       CREATE TABLE mikka_workspace_members ("workspaceId" uuid,"userId" text,status text);
       CREATE TABLE bot_model_choices ("ownerId" text NOT NULL, "workspaceId" uuid NOT NULL, "botKey" text NOT NULL, "bindingId" uuid, PRIMARY KEY ("ownerId","workspaceId","botKey"));
       CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text NOT NULL, "botId" uuid, "deviceId" uuid, "agentDefinition" jsonb, status text NOT NULL, "stopRequestedAt" timestamptz, "leaseExpiresAt" timestamptz, "updatedAt" timestamptz)`)
     await pool.query(await readFile(new URL('../drizzle/20261101020201_workspace_personal_policies.sql', import.meta.url), 'utf8'))
+    await pool.query(await readFile(new URL('../drizzle/20261109035020_organization_governance.sql', import.meta.url), 'utf8'))
     const migration = await readFile(new URL('../drizzle/20261101021000_model_api_keys.sql', import.meta.url), 'utf8')
     await pool.query(migration)
     await pool.query(migration)
@@ -50,10 +53,14 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     const responsesMigration = await readFile(new URL('../drizzle/20261102190000_model_api_key_responses_api.sql', import.meta.url), 'utf8')
     await pool.query(responsesMigration)
     await pool.query(responsesMigration)
+    const enabledMigration = await readFile(new URL('../drizzle/20261108120101_enabled_models.sql', import.meta.url), 'utf8')
+    await pool.query(enabledMigration)
+    await pool.query(enabledMigration)
     assert.equal(await store.apiKeyAfterQuota(pool, 'alice'), true, 'on by default')
 
     const personal = { id: randomUUID(), kind: 'personal' as const }
     const team = { id: randomUUID(), kind: 'team' as const }
+    await pool.query('INSERT INTO mikka_workspaces(id,kind) VALUES ($1,$2),($3,$4)', [personal.id, personal.kind, team.id, team.kind])
     await pool.query('INSERT INTO mikka_workspace_members VALUES ($1,\'alice\',\'active\'),($1,\'bob\',\'active\'),($1,\'carol\',\'active\')', [team.id])
     // A personal workspace always uses its owner's credentials; in the team Alice shared hers, Bob did not.
     await pool.query('INSERT INTO workspace_subscription_shares ("ownerId","workspaceId") VALUES ($1,$2),($3,$4)', ['alice', personal.id, 'alice', team.id])
@@ -137,10 +144,56 @@ test('API keys: migration replay, sealed storage, shares, picker order and run i
     await pool.query('UPDATE workspace_personal_policies SET subscriptions=false WHERE "workspaceId"=$1', [team.id])
     assert.deepEqual((await store.usableApiKeys(pool, 'alice', team.id)).map(key => [key.provider, key.mine]), [['anthropic', true]], 'the admin switch turns off teammates\' shared keys, never her own')
     const anotherWorkspace = { id: randomUUID(), kind: 'team' as const }
+    await pool.query('INSERT INTO mikka_workspaces(id,kind) VALUES ($1,$2)', [anotherWorkspace.id, anotherWorkspace.kind])
     await pool.query('INSERT INTO workspace_personal_policies ("workspaceId",subscriptions) VALUES ($1,false)', [anotherWorkspace.id])
     assert.deepEqual((await store.usableApiKeys(pool, 'alice', anotherWorkspace.id)).map(key => [key.id, key.mine]), [[anthropic.id, true]], 'an own key works in another workspace with no share rows and sharing disabled')
     assert.equal((await store.listApiKeys(pool, 'alice', anotherWorkspace)).keys.some(key => key.id === anthropic.id), true, 'the account key is still manageable in the other workspace')
     await pool.query('UPDATE workspace_personal_policies SET subscriptions=true WHERE "workspaceId"=$1', [team.id])
+
+    // The real catalogue trigger marks a newly reported model disabled. Keep
+    // it in both catalogues so dropping modelSettings cannot pass by omission.
+    const disabledModel = 'fixture-disabled-api-key-model'
+    await pool.query('UPDATE model_api_keys SET models=models || $2::jsonb WHERE id=ANY($1::uuid[])', [[anthropic.id, gateway.id], JSON.stringify([disabledModel])])
+    const catalogues = (await pool.query('SELECT id,models,"modelSettings" FROM model_api_keys WHERE id=ANY($1::uuid[])', [[anthropic.id, gateway.id]])).rows
+    assert.equal(catalogues.length, 2)
+    for (const key of catalogues) {
+      assert.ok(key.models.includes(disabledModel))
+      assert.deepEqual(key.modelSettings.models[disabledModel], { enabled: false, fresh: true, manual: false })
+    }
+    const governedScope = { ownerId: 'alice', workspaceId: team.id }
+
+    // Empty borrowed-candidate reads can skip sharing policy; a real borrowed
+    // candidate must still observe the current Organization rule and decision.
+    const organization = randomUUID(), approval = randomUUID()
+    await pool.query('INSERT INTO mikka_organizations(id,name,"createdBy") VALUES ($1,\'Fixture organization\',\'bob\')', [organization])
+    await pool.query('INSERT INTO mikka_organization_workspaces("workspaceId","organizationId") VALUES ($1,$2)', [team.id, organization])
+    await pool.query('INSERT INTO mikka_organization_resource_policies("organizationId","modelCredentialSharing") VALUES ($1,\'deny\')', [organization])
+    assert.deepEqual((await store.usableApiKeys(pool, 'alice', team.id)).map(key => [key.id, key.mine]), [[anthropic.id, true]], 'Organization deny removes only borrowed keys')
+    assert.deepEqual((await store.usableApiKeys(pool, 'bob', team.id, gateway.id)).map(key => [key.id, key.mine]), [[gateway.id, true]], 'the owner keeps the exact selected own key')
+    assert.deepEqual((await store.usableApiKeys(pool, 'alice', team.id, anthropic.id)).map(key => [key.mine, key.models]), [[true, ['claude-opus-5-5']]], 'own-key policy remains independent of Organization sharing, while disabled models stay hidden')
+    assert.deepEqual((await store.usableApiKeys(pool, 'bob', team.id, gateway.id)).map(key => key.models), [['qwen-max']], 'the shared key owner gets the same enabled-model filter')
+    assert.deepEqual((await store.usableApiKeys(pool, 'alice', personal.id, anthropic.id)).map(key => [key.id, key.mine, key.models]), [[anthropic.id, true, ['claude-opus-5-5']]], 'Personal owns the key but cannot re-enable a disabled catalogue model')
+    await assert.rejects(store.setBotApiKeyChoice(pool, governedScope, null, anthropic.id, disabledModel), { code: 'executionModelUnknown' })
+    await assert.rejects(store.openApiKeyForChat(pool, 'alice', team.id, gateway.id, env), { code: 'apiKeyNotFound' }, 'Organization deny also closes the actual borrowed-key open')
+    await pool.query('UPDATE mikka_organization_resource_policies SET "modelCredentialSharing"=\'approval_required\' WHERE "organizationId"=$1', [organization])
+    assert.deepEqual(await store.usableApiKeys(pool, 'alice', team.id, gateway.id), [], 'an exact selected borrowed key still needs approval')
+    await assert.rejects(store.openApiKeyForChat(pool, 'alice', team.id, gateway.id, env), { code: 'apiKeyNotFound' }, 'unapproved sharing cannot open the borrowed credential')
+    await pool.query('INSERT INTO mikka_organization_resource_approvals(id,"organizationId","workspaceId",kind,"resourceId","ownerId",status) VALUES ($1,$2,$3,\'api_key\',$4,\'bob\',\'approved\')', [approval, organization, team.id, gateway.id])
+    assert.deepEqual((await store.usableApiKeys(pool, 'alice', team.id, gateway.id)).map(key => [key.id, key.mine]), [[gateway.id, false]], 'approval never widens selectedKeyId')
+    assert.deepEqual((await store.usableApiKeys(pool, 'alice', team.id, gateway.id)).map(key => key.models), [['qwen-max']], 'approval authorizes the key, not its disabled catalogue models')
+    await assert.rejects(store.setBotApiKeyChoice(pool, governedScope, null, gateway.id, disabledModel), { code: 'executionModelUnknown' })
+    assert.deepEqual(await store.setBotApiKeyChoice(pool, governedScope, null, gateway.id, 'qwen-max'), { keyId: gateway.id, model: 'qwen-max', harnesses: ['codex'] })
+    assert.equal((await store.openApiKeyForChat(pool, 'alice', team.id, gateway.id, env)).keyOwnerId, 'bob')
+    await pool.query('UPDATE mikka_organization_resource_approvals SET status=\'denied\' WHERE id=$1', [approval])
+    assert.deepEqual(await store.usableApiKeys(pool, 'alice', team.id, gateway.id), [], 'the same caller observes approval revocation immediately')
+    await assert.rejects(store.openApiKeyForChat(pool, 'alice', team.id, gateway.id, env), { code: 'apiKeyNotFound' }, 'a previously opened borrowed key cannot reopen after approval revocation')
+    await pool.query('UPDATE mikka_organization_resource_policies SET "modelCredentialSharing"=\'allow\' WHERE "organizationId"=$1', [organization])
+    assert.deepEqual(await store.usableApiKeys(pool, 'alice', team.id, gateway.id), [], 'an explicit denial still wins over allow')
+    await pool.query('DELETE FROM mikka_organization_resource_approvals WHERE id=$1', [approval])
+    assert.deepEqual((await store.usableApiKeys(pool, 'alice', team.id, gateway.id)).map(key => [key.id, key.mine]), [[gateway.id, false]], 'a subsequent read observes restored permission')
+    assert.deepEqual((await store.usableApiKeys(pool, 'alice', team.id, gateway.id)).map(key => key.models), [['qwen-max']], 'allow still preserves the modelSettings restriction')
+    await assert.rejects(store.setBotApiKeyChoice(pool, governedScope, null, gateway.id, disabledModel), { code: 'executionModelUnknown' })
+    await pool.query('DELETE FROM mikka_organizations WHERE id=$1', [organization])
 
     // A bot's saved model can be an API key's: usable here, reaching bot chats, a model the key lists.
     const scope = { ownerId: 'alice', workspaceId: team.id }

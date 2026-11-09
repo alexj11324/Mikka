@@ -39,6 +39,7 @@ export class DeviceSession extends DurableObject<GatewayEnv> {
   private liveWatches = new Map<string, LiveWatch>()
   private controls = new Map<string, symbol>()
   private updates = Promise.resolve()
+  private liveRevoked = false
 
   constructor(ctx: DurableObjectState, env: GatewayEnv) {
     super(ctx, env)
@@ -46,6 +47,7 @@ export class DeviceSession extends DurableObject<GatewayEnv> {
     // Attachments stay small; bounded watches survive hibernation in this DO,
     // never in the application database. No alarm is started by construction.
     this.ctx.blockConcurrencyWhile(async () => {
+      this.liveRevoked = await this.ctx.storage.get<boolean>('live-revoked') === true
       const state = await this.ctx.storage.get<PresenceState>('presence-v1')
       this.deviceWatches = new Map((state?.device ?? []).map(watch => [watch.observer, watch]))
       this.liveWatches = new Map((state?.live ?? []).map(watch => [watch.observer, watch]))
@@ -61,6 +63,7 @@ export class DeviceSession extends DurableObject<GatewayEnv> {
     const server = pair[1]
     const url = new URL(request.url)
     const live = url.pathname.startsWith('/v1/live/')
+    if (live && this.liveRevoked) return new Response(null, { status: 401 })
     const revisions = live && url.searchParams.get(LIVE_REVISION_PARAM) === '1'
     const presence = live && url.searchParams.get(LIVE_PRESENCE_PARAM) === '1'
       ? { channel: url.pathname.split('/')[3], socketId: crypto.randomUUID() } : undefined
@@ -330,8 +333,21 @@ export class DeviceSession extends DurableObject<GatewayEnv> {
     }
   }
 
+  /** A capability channel is never reused. Persist before acknowledging so a
+   * hibernated object cannot accept an old signed ticket after revocation. */
+  async revokeLive() {
+    this.liveRevoked = true
+    await this.ctx.storage.put('live-revoked', true)
+    for (const socket of this.ctx.getWebSockets()) {
+      if (!(socket.deserializeAttachment() as ConnectionAttachment | null)?.liveExpiresAt) continue
+      try { socket.close(4001, 'live capability revoked') } catch { /* already closed */ }
+    }
+    await this.pruneLiveWatches()
+  }
+
   /** Browser tabs share a channel; an expired ticket never receives another key. */
   async notifyLive(events: LiveInvalidation[]) {
+    if (this.liveRevoked) return
     const validated = liveInvalidations(events, true)
     if (!validated) return
     const plain = withoutRevisions(validated)
