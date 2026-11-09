@@ -34,6 +34,12 @@ test("cancel and thread end reach a terminal run, then afterRunEnded finalizes t
     process.env.MIKKA_FACTORY_ROUTING_ENABLED = process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = "1";
     const db = await import("../db");
     appPool = db.pool;
+    // Keep completion notification at its existing test transport boundary:
+    // Coordinator backfill migrates this deliberately null-Bot fixture's scope.
+    const { coordinatorWakeTransport } = await import('../coordinator/wake-after-commit');
+    const previousWake = coordinatorWakeTransport.wake;
+    coordinatorWakeTransport.wake = async () => undefined;
+    t.after(() => { coordinatorWakeTransport.wake = previousWake; });
     const { requestRunStop } = await import("../agent-runs");
     const { persistRunCompletion } = await import("../run-publications");
     const { ensureThreadMachine, threadMachineAction, threadMachineProvider } = await import("../cloud-computer/thread-machines");
