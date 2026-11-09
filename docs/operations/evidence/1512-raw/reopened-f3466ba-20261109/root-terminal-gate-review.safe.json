@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-09 13:37:54 UTC",
+  "source": {
+    "head": "f3466ba479ef51918790f521a288feaef5160e44",
+    "actualCheckoutObservedInChanges": "3b51cf11dffdbb3a6167946a18e7302f3cb6035b",
+    "tree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+    "syntheticMergeParents": [
+      "111a8dfb8b227ac0441324339ff42e4328ea609a",
+      "f3466ba479ef51918790f521a288feaef5160e44"
+    ],
+    "checkoutAndTreeEvidence": {
+      "changesOriginalBlob": "fa6ace122d1e11a7a12cf7f72b4105b2de632c9a",
+      "changesReviewIndexBlob": "9bd8a3a54160db049402bd4770a9edbde87f5ec1",
+      "actualTreeAPI": "Previously read independently by Root; not fetched again here."
+    },
+    "otherJobCheckoutBoundary": "The run/head metadata and job completion states are observed. This reviewer did not re-read other individual job logs to assert their own actual checkout or execution counts."
+  },
+  "scope": "Root independently counted stored terminal workflow/job/check records and matched every Actions job ID/status/conclusion/URL/check suite. No original job logs or artifacts read by this review.",
+  "receiptBlob": "83c5c63541b983c6ecabcb4318a133b1658e860e",
+  "indexBlob": "bf23d296799ff2627409b34d52f59b7d0f862661",
+  "totals": {
+    "workflows": {
+      "total": 14,
+      "success": 14,
+      "skipped": 0,
+      "failure": 0,
+      "cancelled": 0,
+      "active": 0
+    },
+    "mainCIJobs": {
+      "total": 22,
+      "success": 21,
+      "skipped": 1,
+      "failure": 0,
+      "cancelled": 0,
+      "active": 0
+    },
+    "allActionsJobs": {
+      "total": 50,
+      "success": 39,
+      "skipped": 11,
+      "failure": 0,
+      "cancelled": 0,
+      "active": 0
+    },
+    "headChecks": {
+      "total": 51,
+      "success": 40,
+      "skipped": 11,
+      "failure": 0,
+      "cancelled": 0,
+      "active": 0
+    }
+  },
+  "uniqueActionJobs": 50,
+  "uniqueChecks": 51,
+  "matchedActionJobCheckPairs": 50,
+  "externalCheckIds": [
+    129175702699
+  ],
+  "pagination": {
+    "filter": "latest",
+    "pages": [
+      100,
+      1
+    ],
+    "reportedTotal": 101,
+    "currentCohortActionsChecks": 50,
+    "currentGitGuardianChecks": 1,
+    "earlierActionsChecksExcluded": 50,
+    "note": "The GitHub latest filter did not eliminate earlier workflow check suites. Records were fully paginated and explicitly scoped by the current cohort suite IDs; counts are not raw101-record totals."
+  },
+  "errors": [],
+  "result": "PASS",
+  "limits": [
+    "Counts are workflow/job/check conclusions, not counts of tests, SQL queries, browser interactions or model calls.",
+    "Browser gate success is not claimed as real browser execution; Production build and browser interactions is the existing database aggregate job, not proof of a production build/browser run.",
+    "UI policy (strict) final job129191852645 is observed as the selected-job aggregate/timing gate; no additional original log was read.",
+    "PR-skipped production publish, subscription, credentials, acceptance and cleanup jobs are listed explicitly. They do not prove production execution or resource deletion.",
+    "Other job cleanup step conclusions are metadata only; this summary does not claim exact provider deletion or absence.",
+    "Earlier completed records keep their actual original source/environment and counts. No earlier leaf count is relabelled as new execution.",
+    "All fourteen workflows are terminal success for this reopened cohort; production acceptance and issue closure remain separate."
+  ]
+}

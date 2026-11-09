@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-09T13:21:08Z",
+  "scope": "Root review of delegated unique original changes acquisition and existing exact Git commit/tree API evidence. Root did not download this job log or artifact again.",
+  "runId": 42621847483,
+  "attempt": 1,
+  "jobId": 129175711149,
+  "actualCheckout": "3b51cf11dffdbb3a6167946a18e7302f3cb6035b",
+  "tree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+  "head": "f3466ba479ef51918790f521a288feaef5160e44",
+  "exactSelection": {
+    "gitBlob": "f9a8897406fe2e318823ceed90a2810744a0b1d5",
+    "bytes": 389272,
+    "sha256": "e1305a79e9240dc4e1c1dca2b997fbea4bf31ef8d520d676c837e7167baed178",
+    "full": true,
+    "docsOnly": false,
+    "unitTasks": 86,
+    "core": 57,
+    "integration": 29,
+    "dbSuites": 72,
+    "shards": [
+      "1/4",
+      "2/4",
+      "3/4",
+      "4/4"
+    ],
+    "byteIdenticalToPriorF346": true
+  },
+  "reviewedArtifacts": [
+    {
+      "path": "reopened-changes-review-index.safe.json",
+      "gitBlob": "9bd8a3a54160db049402bd4770a9edbde87f5ec1",
+      "bytes": 1771,
+      "sha256": "17aa3cae8928822ea961d9fc75ed3d32032554953431c2fe6c4fd3b4951a21d5"
+    },
+    {
+      "path": "reopened-changes-selection-review.safe.json",
+      "name": "reopened-changes-selection-review.safe.json",
+      "bytes": 14570,
+      "sha256": "e6122da16a5dc542f7ebdc12b94974cda4ce0740801c10e65b0701daadd25580",
+      "gitBlob": "4b2f73c4587ad8faa82202574d2466e167aa43c4"
+    }
+  ],
+  "errors": [],
+  "result": "PASS",
+  "limitations": [
+    "This only establishes changes and selection, not complete CI or production acceptance.",
+    "Original source/environment/count boundaries remain unchanged.",
+    "No new source/ref/test/run/resource actions."
+  ]
+}

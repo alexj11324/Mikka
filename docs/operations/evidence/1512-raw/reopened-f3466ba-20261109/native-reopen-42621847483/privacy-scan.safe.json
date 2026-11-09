@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "scope": "All 21 other public payloads before immutable upload; original bytes unmodified",
+  "scannerSha256": "2dbb2cfa9c466c737a9c1900532f7ab0d244592558cb7144df2cc378c10e95ee",
+  "categories": [
+    "private-key",
+    "github-token",
+    "provider-key",
+    "jwt",
+    "email",
+    "credential-url",
+    "authorization",
+    "signed-download-query"
+  ],
+  "files": [
+    {
+      "path": "native-reopen-42621847483/arithmetic.safe.json",
+      "bytes": 23633,
+      "sha256": "f319e46312bb6b5bba6564ef034d4f667655162a4a0376c834b5f65aab24cba7",
+      "findings": []
+    },
+    {
+      "path": "native-reopen-42621847483/cleanup-package.safe.json",
+      "bytes": 11407,
+      "sha256": "bc2cef760d470983b26e8c384742fc50b5b94fecc60127d3378cdaa2d15d80e8",
+      "findings": []
+    },
+    {
+      "path": "native-reopen-42621847483/first-read.safe.json",
+      "bytes": 1588,
+      "sha256": "297a73267b9ccf8d2caf6d539d8679bae64ac743bdeb528a1779387df311e5e6",
+      "findings": []
+    },
+    {
+      "path": "native-reopen-42621847483/original/lifecycle.json",
+      "bytes": 710017,
+      "sha256": "169ced99b5608e940585b5bcf0fb7425609f49865b41391cc8debab97ff37140",
+      "findings": []
+    },
+    {
+      "path": "native-reopen-42621847483/original/mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "79dcf26b6f9b6217d4d9aa6ea8948703505c8865c65d5a56a5bfbe01b8dcf659",
+      "findings": []
+    },
+    {
+      "path": "native-reopen-42621847483/original/native-crypto.json",
+      "bytes": 2868,
+      "sha256": "61b850e285eec7d9d4f3772f6733781b6326aa9cc6ac4d98c35ad3d764697200",
+      "findings": []
+    },
+    {
+      "path": "native-reopen-42621847483/original/parity.json",
+      "bytes": 116368,
+      "sha256": "194603d47ba630534f2022d88c8394e6e0d7c65c11b372c93bc22e23c77bedc4",
+      "findings": []
+    },
+    {
+      "path": "native-reopen-42621847483/original/smoke.json",
+      "bytes": 3105,
+      "sha256": "b8ed386002c95f64ef2a56ace1606ed1d61aaba450976ab7fe6717d8d18b2d25",
+      "findings": []
+    },
+    {
+      "path": "native-reopen-42621847483/original-files-manifest.safe.json",
+      "bytes": 89131,
+      "sha256": "9c11d3b1fd1cad80683240fd8b16e343d09c24462324fb681d3adcdb575642c8",
+      "findings": []
+    },
+    {
+      "path": "native-reopen-42621847483/rpc-diagnostics.safe.json",
+      "bytes": 43518,
+      "sha256": "2f20244142a04eff3f2da7550046b55c517cd976ecddb54e97ecbc9a89252a18",
+      "findings": []
+    },
+    {
+      "path": "native-reopen-42621847483/verification-run.safe.json",
+      "bytes": 887,
+      "sha256": "69621dc9d83298a35eb34312748ba30af995a39c7391e26f1a2eeeeacd9689a9",
+      "findings": []
+    },
+    {
+      "path": "native-reopen-42621847483/verify-artifact-download.py",
+      "bytes": 2809,
+      "sha256": "e5a835df784a02f897bbb856bec3fcddcbc7bec55a2c547617f2c6272b4e924a",
+      "findings": []
+    },
+    {
+      "path": "native-reopen-42621847483/verify-native-originals.py",
+      "bytes": 16075,
+      "sha256": "1db096175ff1927155dbd1502a7612a45db98f4d46c81a59aca06a86e4ecca02",
+      "findings": []
+    },
+    {
+      "path": "native-reopen-42621847483/job-129181846034.original.log",
+      "bytes": 253008,
+      "sha256": "3c0c353ad6b0a3cabbe92b7485675801cb8192e50504dc01fd9ba8f1b099bdff",
+      "findings": []
+    },
+    {
+      "path": "native-reopen-42621847483/job.safe.json",
+      "bytes": 6971,
+      "sha256": "975d4a0f179b1785aa57cdee39c6b3133a279b7d122299833ad35bb6175c809c",
+      "findings": []
+    },
+    {
+      "path": "native-reopen-42621847483/source-binding.safe.json",
+      "bytes": 3265,
+      "sha256": "c3bd148682a72bbe54740f3dd13018b0211ef183e3eb0d905fabcb1423d7d525",
+      "findings": []
+    },
+    {
+      "path": "native-reopen-42621847483/artifact-transfer.safe.json",
+      "bytes": 2761,
+      "sha256": "0344994959d56c01b99db96b661a86909687e25e4a65d86ca157499fc8dfe266",
+      "findings": []
+    },
+    {
+      "path": "native-reopen-42621847483/vm-cleanup.safe.json",
+      "bytes": 1458,
+      "sha256": "6696b1ae44aec11ed2f4959af2412c0f95af2407abc8985c37d28f14399a6b0c",
+      "findings": []
+    },
+    {
+      "path": "native-reopen-42621847483/read-ledger.safe.json",
+      "bytes": 954,
+      "sha256": "464791434cef37fa87fd29f66afd48a13e0f605ef0dd8e3d3d2384779a9a2180",
+      "findings": []
+    },
+    {
+      "path": "native-reopen-42621847483/terminal-review.safe.json",
+      "bytes": 32378,
+      "sha256": "76fe761d1ac006f7d91782a51aa8f1f35cf27143e91af8c96a7851def47697a7",
+      "findings": []
+    },
+    {
+      "path": "native-reopen-42621847483/README.md",
+      "bytes": 6163,
+      "sha256": "f994b4f5ee81bd75c2f5cb001dd17522d8e119ce6db70c685a8026e7e7c454cf",
+      "findings": []
+    }
+  ],
+  "totalFindings": 0,
+  "redactionsPerformed": 0,
+  "excludedFromPublic": [
+    "signed download references",
+    "raw platform metadata containing runner identities",
+    "temporary ZIP copies",
+    "unselected image and binary artifact contents"
+  ],
+  "limitations": "A closed credential/email shape scan is not a universal private-data proof. URLs and platform identities are omitted by construction."
+}

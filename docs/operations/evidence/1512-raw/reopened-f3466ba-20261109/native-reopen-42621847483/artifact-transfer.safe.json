@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "artifacts": [
+    {
+      "kind": "NATIVE",
+      "artifactId": 13678393148,
+      "filename": "native-reopen-42621847483-original.zip",
+      "bytes": 14611133,
+      "sha256": "e82b89d47733adbee8ddc8e31837a9812855fb0b95dcc97490e73a8f8c8f85c3",
+      "name": "desktop-native-evidence-3b51cf11dffdbb3a6167946a18e7302f3cb6035b",
+      "createdAt": "2026-11-09T13:33:53Z",
+      "updatedAt": "2026-11-09T13:33:53Z",
+      "apiDigest": "sha256:e82b89d47733adbee8ddc8e31837a9812855fb0b95dcc97490e73a8f8c8f85c3",
+      "materializedBytesMatch": true,
+      "materializedSha256Match": true,
+      "zipCrcTestPassed": true,
+      "archivePathAndSymlinkChecksPassed": true,
+      "githubDownloadReferenceRequests": 1,
+      "httpMaterializations": 1,
+      "refreshes": 0
+    },
+    {
+      "kind": "PACKAGE",
+      "artifactId": 13678099233,
+      "filename": "package-reopen-42621847483-original.zip",
+      "bytes": 1598,
+      "sha256": "444cf57c6d833291d80141e52b619a52f529c9da97c1d5b1c6d2695593539c56",
+      "name": "desktop-package-evidence-3b51cf11dffdbb3a6167946a18e7302f3cb6035b",
+      "createdAt": "2026-11-09T13:33:48Z",
+      "updatedAt": "2026-11-09T13:33:48Z",
+      "apiDigest": "sha256:444cf57c6d833291d80141e52b619a52f529c9da97c1d5b1c6d2695593539c56",
+      "materializedBytesMatch": true,
+      "materializedSha256Match": true,
+      "zipCrcTestPassed": true,
+      "archivePathAndSymlinkChecksPassed": true,
+      "githubDownloadReferenceRequests": 1,
+      "httpMaterializations": 1,
+      "refreshes": 0
+    }
+  ],
+  "originalFiles": {
+    "path": "original-files-manifest.safe.json",
+    "bytes": 89131,
+    "sha256": "9c11d3b1fd1cad80683240fd8b16e343d09c24462324fb681d3adcdb575642c8",
+    "gitBlob": "e6e7f35f9609ccdf4d699ace94760c3735d2ba39"
+  },
+  "originalFileCounts": {
+    "native": 308,
+    "package": 2,
+    "total": 310
+  },
+  "bundle": {
+    "compressedBytes": 170472,
+    "compressedSha256": "ff97fa2fcd50b26d042fec895928606d2c61416348ccb4c01ef6e0f6e4b819c4",
+    "uncompressedBytes": 1365762,
+    "uncompressedSha256": "19541bf5b9986592ac6066f49b6f1c15b333d4072362f7becae97d28edc71a79",
+    "chunkSize": 1455,
+    "chunks": 118,
+    "fileCount": 13,
+    "missingOriginals": []
+  },
+  "transfer": {
+    "chunks": 118,
+    "chunkBytes": 1455,
+    "compressedShaVerified": true,
+    "uncompressedShaVerified": true,
+    "gzipCrcAndSizeVerified": true,
+    "everyFileBytesShaAndGitBlobVerified": true
+  },
+  "rawZipScope": "Raw ZIPs were verified in the temporary recovery VM. The five selected original JSON files and the complete 310-file hash index are persisted as immutable Git blobs; the temporary ZIP copies were removed with the sandbox.",
+  "downloadReferencesPublic": false,
+  "oldArtifactDownloads": 0
+}

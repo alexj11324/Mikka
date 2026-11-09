@@ -1,0 +1,395 @@
+{
+  "schemaVersion": 1,
+  "issue": 1512,
+  "repository": "alexj11324/Mikka",
+  "projectId": 670821,
+  "preparedAtUTC": "2026-11-09T13:33:27.431Z",
+  "publicPriceResearchStartedAtUTC": "2026-11-09T13:24:22Z",
+  "scope": "Current official public pricing/docs only; frozen11:47–11:49 metadata reused. No new MCP billing, SQL, scan, insight, model, resource or login.",
+  "currency": "USD; public list-price estimates before taxes, negotiated discounts or add-ons",
+  "sources": [
+    {
+      "id": "logs",
+      "url": "https://posthog.com/logs/pricing",
+      "supports": [
+        "APM/Tracing and Logs share an ingested-GB meter",
+        "10 GB monthly free; 10–300 GB $0.25/GB; above300 $0.15/GB",
+        "14-day default retention; custom retention $0.05/GB-month"
+      ]
+    },
+    {
+      "id": "llm_price",
+      "url": "https://posthog.com/ai-observability/pricing",
+      "supports": [
+        "100000 AI events monthly free",
+        "Published volume-tier event rates",
+        "Provider token cost is separate from the observability event charge"
+      ]
+    },
+    {
+      "id": "llm_category",
+      "url": "https://posthog.com/docs/ai-observability/start-here",
+      "supports": [
+        "Every event name beginning $ai_ counts as an LLM event"
+      ]
+    },
+    {
+      "id": "replay",
+      "url": "https://posthog.com/session-replay/pricing",
+      "supports": [
+        "5000 web recordings monthly free",
+        "Published web recording volume tiers"
+      ]
+    },
+    {
+      "id": "vision",
+      "url": "https://posthog.com/replay-vision/pricing",
+      "supports": [
+        "2500 monthly free credits is a limited-time5x offer",
+        "Base credit price $0.01",
+        "Standard observation5 credits; premium15; lightweight2"
+      ]
+    },
+    {
+      "id": "vision_api",
+      "url": "https://posthog.com/docs/replay-vision/api",
+      "supports": [
+        "Default Gemini3Flash inline scan5 credits per session",
+        "Same inline question/session may reuse an earlier answer without another charge"
+      ]
+    },
+    {
+      "id": "self_driving",
+      "url": "https://posthog.com/docs/self-driving/pricing",
+      "supports": [
+        "Open-beta outcome pricing may change",
+        "Only actionable reports becoming PRs are billed; first3 PRs/month free, then$15/PR",
+        "No fixed price per scout schedule/run is documented"
+      ]
+    },
+    {
+      "id": "platform_ai",
+      "url": "https://posthog.com/docs/posthog-ai/pricing",
+      "supports": [
+        "PostHog AI500 credits/month free then$0.01/credit",
+        "Credits depend on provider token cost with20percent markup",
+        "Not a fixed per-query/event/scout-run price"
+      ]
+    },
+    {
+      "id": "organization",
+      "url": "https://posthog.com/pricing",
+      "supports": [
+        "Product usage and free allowances are organization-wide across projects",
+        "USD excluding taxes",
+        "Free-plan quota stops/drops excess ingestion rather than automatically purchasing overage",
+        "Custom Logs retention is separately billed and not capped by ingestion limit"
+      ]
+    },
+    {
+      "id": "llm_billing_rule",
+      "url": "https://posthog.com/docs/ai-observability/basics#the-ai_-prefix",
+      "retrievedVia": "Official PostHog MCP docs-search, one current request",
+      "supports": [
+        "All $ai_ events are billed as AI Observability events and are not billed as Product Analytics events; this includes custom $ai_ names."
+      ]
+    },
+    {
+      "id": "vision_meter",
+      "url": "https://posthog.com/docs/replay-vision/quota-and-limits#workflow-scan-limits",
+      "retrievedVia": "Same single official docs-search request",
+      "supports": [
+        "A successful observation has fixed model-dependent credits:2/5/15",
+        "The observation price is frozen when it runs; the $recording_observed event has a credits property",
+        "Budget is organization/month scoped; free-plan scans stop when free credits are exhausted"
+      ]
+    }
+  ],
+  "rates": {
+    "logs_and_traces": {
+      "unit": "GB ingested, combined",
+      "freeMonthly": 10,
+      "tiers": [
+        [
+          10,
+          300,
+          0.25
+        ],
+        [
+          300,
+          null,
+          0.15
+        ]
+      ],
+      "source": "logs"
+    },
+    "ai_observability": {
+      "unit": "AI event, not provider call",
+      "freeMonthly": 100000,
+      "tiers": [
+        [
+          100000,
+          150000,
+          0.00035
+        ],
+        [
+          150000,
+          250000,
+          0.000175
+        ],
+        [
+          250000,
+          500000,
+          0.0001
+        ],
+        [
+          500000,
+          1000000,
+          0.00008
+        ],
+        [
+          1000000,
+          10000000,
+          0.00007
+        ],
+        [
+          10000000,
+          50000000,
+          0.000065
+        ],
+        [
+          50000000,
+          null,
+          0.00006
+        ]
+      ],
+      "source": "llm_price"
+    },
+    "web_session_replay": {
+      "unit": "web recording, not snapshot/chunk/byte",
+      "freeMonthly": 5000,
+      "tiers": [
+        [
+          5000,
+          15000,
+          0.005
+        ],
+        [
+          15000,
+          50000,
+          0.0035
+        ],
+        [
+          50000,
+          150000,
+          0.002
+        ],
+        [
+          150000,
+          500000,
+          0.0017
+        ],
+        [
+          500000,
+          null,
+          0.0015
+        ]
+      ],
+      "source": "replay"
+    },
+    "replay_vision": {
+      "unit": "credit",
+      "publishedPromotionalFreeMonthly": 2500,
+      "baseUsdPerCredit": 0.01,
+      "standardModelCreditsPerNewObservation": 5,
+      "promotionExpiry": "not stated on reviewed page",
+      "source": "vision"
+    },
+    "posthog_ai": {
+      "unit": "PostHog AI credit",
+      "freeMonthly": 500,
+      "baseUsdPerCredit": 0.01,
+      "creditsPerRequest": "variable; not derivable from number of telemetry events",
+      "source": "platform_ai"
+    },
+    "self_driving": {
+      "unit": "billable actionable PR outcome",
+      "freeMonthly": 3,
+      "usdPerAdditionalPR": 15,
+      "usdPerScoutRun": null,
+      "source": "self_driving"
+    },
+    "logs_custom_retention": {
+      "unit": "retained GB-month",
+      "usdPerUnit": 0.05,
+      "projectSettingVerified": false,
+      "source": "logs"
+    }
+  },
+  "semantics": {
+    "logsAndApmCombined": true,
+    "logsRule": "Use combined ingested volume once; never add the combined series to its APM/Logs component series.",
+    "llmEvents": "Count all admitted billable $ai_ events, not just $ai_generation and not upstream model-call totals.",
+    "productAnalyticsDoubleCharge": {
+      "status": "documented_no_double_charge_for_ai_prefix",
+      "rule": "官方 AI Observability basics 明确：所有以 $ai_ 开头的事件按 AI Observability 计费，不按 Product Analytics 事件计费。",
+      "sourceId": "llm_billing_rule",
+      "evidenceOrigin": "Current official MCP docs-search result; explicit product contract, not an inference from shared events storage.",
+      "scope": "Applies to the same $ai_ event. Separate pageviews/custom non-$ai_ events and separately emitted OTLP records still use their own meters.",
+      "instanceBoundary": "This documented rule does not establish this organization's exact settled invoice or verify case-specific ledger amounts."
+    },
+    "otlpPlusAi": "If a generation emits an OTLP span and an AI event, those are two separate records measured in GB and AI events. The estimate accounts for each actual admitted signal; it does not equate them or assume one substitutes for the other.",
+    "credits": "Replay Vision, PostHog AI and Self-driving have different published pricing bases. Do not apply the PostHog AI500-credit allowance or20percent inference markup to Vision or a scout-run count without a specific applicable billing contract.",
+    "scouts": "Enabled daily scouts do not imply a fixed per-run fee. Current Self-driving docs price actionable PR outcomes; Inbox-only reports are not automatically a billable PR.",
+    "actualProviderCost": "Claude/Codex subscription or provider charges are outside these PostHog telemetry fees. $ai_total_cost_usd observations are not a verified per-call subscription invoice."
+  },
+  "frozenMeasurement": {
+    "indexBlob": "7595c2b389adba6e00c1442a163dc64f8d38a37e",
+    "indexSha256": "fb6f705a837b6a495c1e17bb5dc4a961df089e9fd0e1366827327b52f62a7533",
+    "observationTimes": {
+      "scoutConfigsObservedAtUTC": "2026-11-09T11:49:15.112Z",
+      "scoutMetadataObservedAtUTC": "2026-11-09T11:49:09.482Z",
+      "billingOverviewObservedAtUTC": "2026-11-09T11:47:43.655Z",
+      "projectUsageObservedAtUTC": "2026-11-09T11:49:21.037Z"
+    },
+    "plan": {
+      "billing_provider": "posthog",
+      "billing_plan": "free",
+      "subscription_level": "free",
+      "has_active_subscription": false,
+      "is_annual_plan_customer": false
+    },
+    "exactBillingPeriod": {
+      "current_period_start": "2026-10-17T17:45:01.620Z",
+      "current_period_end": "2026-11-16T17:45:01.620Z",
+      "interval": "month"
+    },
+    "organizationUsage": [
+      {
+        "meter": "Logs product",
+        "usage": 447,
+        "unit": "ingested MB",
+        "freeAllocationAndUsageLimit": 10000
+      },
+      {
+        "meter": "AI Observability",
+        "usage": 1117,
+        "unit": "events",
+        "freeAllocationAndUsageLimit": 100000
+      },
+      {
+        "meter": "Session Replay",
+        "usage": 18,
+        "unit": "recordings",
+        "freeAllocationAndUsageLimit": 5000
+      }
+    ],
+    "project670821DailyWindow": {
+      "fromUTC": "2026-10-17",
+      "toUTCInclusive": "2026-11-09",
+      "logsAndTracesMB": 373,
+      "apmMB": 324,
+      "logsMB": 47,
+      "aiEvents": 857,
+      "recordings": 16
+    },
+    "currentUsdAmounts": null,
+    "nullMeans": "unknown, not actual $0",
+    "preservedDifferences": "Organization snapshot and project/day series are not reconciled. Combined373 MB differs from components324+47=371 MB. No ingestion-delay, rounding or case-attribution assumption fills the gap.",
+    "attribution": "No organization/project-wide usage growth is assigned to this case. Formal ACME cases remain0 in this preparation.",
+    "noFreshBillingRead": true
+  },
+  "formulas": {
+    "notation": "For each tier [a,b,r], contribution is r*max(0,min(x,b)-a); b=null means infinity. Sum tiers to get F_p(x). Free allowance is encoded by the first paid lower bound.",
+    "totalIncremental": "Estimated case cost = sum_p[F_p(U_org,p + delta_case,p) - F_p(U_org,p)] + actual custom-retention GB-months*0.05. U and delta must use the same product unit/billing period.",
+    "products": "Use logs_and_traces, ai_observability, web_session_replay and actually requested Vision/other paid features. If ordinary non-$ai_ Product Analytics events are emitted, add that product's own billable delta; do not add the same $ai_ event again.",
+    "logsExact": "delta_GB = attributable admitted logs_and_traces_MB /1000, using this project's recorded display_divisor1000.",
+    "logsScenarioFromCounts": "If calibrated billing-size coefficients exist: delta_GB_run ≈ (S_run*mean_billable_MB_per_span + L_run*mean_billable_MB_per_log)/1000. S/L are actually retained/admitted signals. Coefficients are presently unknown; raw JSON/OTLP wire bytes are not assumed equal to billed storage bytes.",
+    "aiDelta": "delta_AI_run = actual billable AI-event increment attributable to the run; generations + any additional $ai_ records, not assumed equal to run count or model calls.",
+    "replayDelta": "delta_Replay_run = actual newly billable web recordings for the case, not number of snapshots or repeated playback reads.",
+    "visionDelta": "delta_VisionCredits = sum(new successful billable observations * frozen model credits). Two new standard Gemini3Flash observations:2*5=10credits, nominal10*0.01=$0.10 before free allocation; not a measured charge. Cached reuse/reservations are not assumed newly settled charges.",
+    "posthogAi": "F_PostHogAI(C)=0.01*max(C-500,0), only for features billed under that published credit product; actual per-request credits remain unknown.",
+    "selfDriving": "F_PR(P)=15*max(P-3,0), only when the documented billable actionable-PR outcome occurs. Do not multiply scout runs by this rate.",
+    "freePlanBoundary": "These are PAYG list-price or conditional scenario formulas, not this free organization's actual invoice. Above its active free limits, ingestion may stop instead of buying overage. Below allowance a modeled marginal tariff can be zero without converting null returned USD into an observed $0 charge.",
+    "forecastBoundary": "No monthly forecast or per-run numeric cost is computed because real-case increments and billable span/log size are not yet measured."
+  },
+  "uncertainties": [
+    "Actual per-run billable span/log MB, AI-event and recording increments await real cases and attribution.",
+    "Current account-level USD amounts are null; no per-case bill is available.",
+    "Exact promotional Vision free allowance at execution, credits consumed, concurrent organization usage and any commercial overrides are unknown until actual authorized receipts.",
+    "Any fixed per-scout-run price and mapping of legacy signals credit counters to current outcome pricing are not published/verified here.",
+    "Custom-retention project configuration and retained billable GB-months were not read.",
+    "business-knowledge-documents-search is not enabled on this connection; no organization-specific knowledge or commercial override was established."
+  ],
+  "prParagraphZh": "按2026-11-09官方公开价，APM/Tracing与Logs合并按摄入GB计量（10GB/月免费，首付费档$0.25/GB）；AI Observability为100k事件/月免费、首档$0.00035/事件，Web Replay为5k录屏/月免费、首档$0.005/录屏。官方MCP文档明确$ai_事件只按AI Observability计费，不再按Product Analytics事件收费。最终按真实case各产品增量代入 F(组织已用量+case增量)-F(组织已用量)，不把组织总增长归因本案例。11:47–11:49冻结回执仍为free，组织用量447MB/1117AI事件/18录屏，USD字段null保留unknown。两次标准Replay Vision仅作10credits、未扣免费额$0.10的名义估算；当前2500credits免费额度是限时安排。巡检按现公开Self-driving结果定价（首3个PR免费、其后$15/PR），没有可套用于每次scout运行的固定单价。以上是公开list-price估算，不是实例逐次实付或Claude/Codex订阅账单。",
+  "operations": {
+    "publicWebResearch": true,
+    "newMcpBillingReads": 0,
+    "sqlQueries": 0,
+    "scans": 0,
+    "insightOperations": 0,
+    "models": 0,
+    "resources": 0,
+    "browserLogin": 0,
+    "sourceOrRefChanges": 0,
+    "currentMcpDocsSearches": 1,
+    "currentBusinessKnowledgeAvailabilityChecks": 1,
+    "currentBusinessKnowledgeSearches": 0
+  },
+  "authoritativeKnowledge": {
+    "cachedLearnReuse": [
+      {
+        "name": "posthog:querying-posthog-data",
+        "observedAtUTC": "2026-11-09T11:07:19.125Z",
+        "scope": "Reuse approved billing metric definitions; no raw-event governed measure is computed here."
+      },
+      {
+        "name": "posthog:creating-replay-vision-scanners",
+        "scope": "Previously read official skill: org credits, model-dependent2/5/15credits, credit-period budget alignment, bounded actual-session inline scan; no scan executed."
+      }
+    ],
+    "businessKnowledge": {
+      "observedAtUTC": "2026-11-09T13:31:10.361Z",
+      "originalRequest": {
+        "command": "info business-knowledge-documents-search",
+        "context": "Bounded issue1512 pricing supplement knowledge check only. Previously this official knowledge tool was unavailable; inspect current schema before any call. Do not read billing/account data, tokens, SQL, sessions, or modify settings. Public list estimates remain distinct from actual instance spend.",
+        "llm_model": "gpt-6-astra",
+        "conversation_id": "01a1bffc-8ada-7a55-8d2e-09190763024a"
+      },
+      "responseIsError": true,
+      "originalDecodedResponseBytes": 402,
+      "originalDecodedResponseSha256": "7f270927e75ce959cd745ded1588ba413c8f327157af0a66af429f288090d390",
+      "rawResponsePublished": false,
+      "tool": "business-knowledge-documents-search",
+      "availability": "not_enabled",
+      "structuredErrorCode": "INVALID_ARGUMENT",
+      "actionTaken": "Only info availability/schema read; no guessed arguments, alternative credential, reconnection or bypass.",
+      "actualKnowledgeQueryCount": 0
+    },
+    "docsKnowledge": {
+      "observedAtUTC": "2026-11-09T13:31:45.611Z",
+      "originalRequest": {
+        "command": "call --json docs-search {\"query\":\"Official current pricing/billing: are $ai_ AI Observability (LLM) events excluded from Product Analytics billing, or double-counted? Are Logs and APM tracing billed together? What is the billing basis for scheduled signal scouts (per run/credits versus actionable PR outcomes), and Replay Vision Gemini 3 Flash credits per session? Prefer explicit product documentation; do not infer instance charges.\"}",
+        "context": "One bounded authoritative documentation lookup for issue1512 pricing supplement. Reuse already-read official querying/Replay Vision skills. business-knowledge-documents-search is currently not enabled, as confirmed by info. This is only product-knowledge search, not billing account data or event/SQL access. Public prices remain list estimates; actual organization USD remains unknown.",
+        "llm_model": "gpt-6-astra",
+        "conversation_id": "01a1bffc-8ada-7a55-8d2e-09190763024a"
+      },
+      "responseIsError": false,
+      "originalDecodedResponseBytes": 13426,
+      "originalDecodedResponseSha256": "f027fb4f45201d493de5df9aa1d8252162deb22fbfd6d8a290c7fdf5ed49f2f0",
+      "rawResponsePublished": false,
+      "tool": "docs-search",
+      "actualQueryCount": 1,
+      "directlyEstablished": [
+        "AI $ai_ events are not billed as Product Analytics events",
+        "Replay Vision successful-observation model rates and per-observation credits"
+      ],
+      "unmatchedScope": "Did not establish organization-specific actual prices, settled charges, billing overrides or per-scout-run rates."
+    },
+    "rawStoreKeys": {
+      "business": "posthogPricingSupplement20261109:businessKnowledgeInfo",
+      "docs": "posthogPricingSupplement20261109:docsKnowledge"
+    },
+    "correction": "An earlier unuploaded draft retained no-double-billing as unknown. The current official MCP result supplied the explicit rule; this final document replaces that draft."
+  }
+}

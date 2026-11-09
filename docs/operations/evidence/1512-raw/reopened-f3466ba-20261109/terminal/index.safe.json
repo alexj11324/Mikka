@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "name": "reopened-final-gates-index.safe.json",
+  "prefix": "ci-f346-reopened-terminal-20261109",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequest": 1799,
+  "mainRun": 42621847483,
+  "attempt": 1,
+  "head": "f3466ba479ef51918790f521a288feaef5160e44",
+  "actualChangesCheckout": "3b51cf11dffdbb3a6167946a18e7302f3cb6035b",
+  "tree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+  "cohortCreatedAt": "2026-11-09T13:01:30Z",
+  "terminalMainRunObservedAt": "2026-11-09T13:34:16Z",
+  "finalMetadataBatchAt": "2026-11-09 13:34:34 UTC",
+  "payloadFiles": 1,
+  "payloadBytes": 70569,
+  "artifacts": [
+    {
+      "path": "reopened-final-gates.safe.json",
+      "name": "reopened-final-gates.safe.json",
+      "bytes": 70569,
+      "sha256": "ea7fb1004533f0c07a2717845e7813456cf660d00307c7c4bbcca1ebeafa7baf",
+      "gitBlob": "83c5c63541b983c6ecabcb4318a133b1658e860e"
+    }
+  ],
+  "totals": {
+    "workflows": {
+      "total": 14,
+      "success": 14,
+      "failure": 0,
+      "skipped": 0,
+      "cancelled": 0,
+      "active": 0
+    },
+    "mainCIJobs": {
+      "total": 22,
+      "success": 21,
+      "failure": 0,
+      "skipped": 1,
+      "cancelled": 0,
+      "active": 0
+    },
+    "companionJobs": {
+      "total": 28,
+      "success": 18,
+      "failure": 0,
+      "skipped": 10,
+      "cancelled": 0,
+      "active": 0
+    },
+    "allCurrentActionsJobs": {
+      "total": 50,
+      "success": 39,
+      "failure": 0,
+      "skipped": 11,
+      "cancelled": 0,
+      "active": 0
+    },
+    "currentHeadChecksIncludingGitGuardian": {
+      "total": 51,
+      "success": 40,
+      "failure": 0,
+      "skipped": 11,
+      "cancelled": 0,
+      "active": 0
+    },
+    "jobStepsWithFailureConclusion": 0
+  },
+  "reconciliation": "All50 current Actions jobs match their check IDs/status/conclusion/run URLs. Current head51 adds the one current GitGuardian check. All14 workflows terminal success. Older14 runs/50 Actions checks excluded.",
+  "existingChangesIndex": "9bd8a3a54160db049402bd4770a9edbde87f5ec1",
+  "newJobLogDownloads": 0,
+  "newArtifactDownloads": 0,
+  "nativeOriginalsOwner": "/root/native_6180_review",
+  "nativeBudgetVerificationIncluded": false,
+  "productionAcceptance": false,
+  "newTests": 0,
+  "newResources": 0,
+  "refWrites": 0
+}

@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "observedMain": {
+    "sha": "111a8dfb8b227ac0441324339ff42e4328ea609a",
+    "tree": "6a06f3742fb0dfc35bed19780fe09da2747c1ddc",
+    "parents": [
+      "e78fccffd9dd878edd490b113ea80efcff1525e7",
+      "521db4799a4a85e1955f7dd86a1ad5ccef143cc8"
+    ],
+    "commitTime": "2026-11-09T12:57:16Z",
+    "pullRequest": 1636,
+    "pullRequestMergedAt": "2026-11-09T12:57:17Z",
+    "commitTimeAndMergedAtAreDistinctMetadata": true
+  },
+  "conditionalProofNowMatches": true,
+  "candidate": {
+    "head": "f3466ba479ef51918790f521a288feaef5160e44",
+    "testedTree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+    "newGitHubMergeCommit": "3b51cf11dffdbb3a6167946a18e7302f3cb6035b",
+    "newMergeTree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+    "newMergeParents": [
+      "111a8dfb8b227ac0441324339ff42e4328ea609a",
+      "f3466ba479ef51918790f521a288feaef5160e44"
+    ],
+    "sameTestedTree": true,
+    "directHeadToMainDifference": 57,
+    "pullRequestMergeBaseChangedFiles": 68,
+    "scopeDistinction": "57 is exact tree-to-tree difference;68 is GitHub's merge-base PR display and is not an extra57+11 source addition."
+  },
+  "closure": {
+    "event": 35569669392,
+    "at": "2026-11-09T12:57:21Z",
+    "associatedCommit": "923cb5a70f5c23d6922a161907dcbf191ecfb29b",
+    "associatedMessage": "Merge daemon fixture mode fix #1799 into workspace governance",
+    "mergedFalseConfirmed": true,
+    "headUnchanged": true,
+    "reopenedAt": "2026-11-09T13:01:28Z",
+    "reopenCommentId": 6740717975
+  },
+  "newCi": {
+    "reason": "GitHub pull_request reopened event after correcting automatic close; no manual rerun or source/ref change.",
+    "runId": 42621847483,
+    "attempt": 1,
+    "createdAt": "2026-11-09T13:01:30Z",
+    "originalPreviousEvidenceRetained": true,
+    "statusAtOriginalCapture": "not_terminal",
+    "statusAtSupplement": "completed_success_reported_by_delegated_original_reader",
+    "updatedAt": "2026-11-09T13:34:16Z",
+    "finalMetadataReceipt": "Separate final metadata receipt pending at supplement; original leaf counts are not inferred here."
+  },
+  "issue1512": {
+    "state": "open",
+    "remainingCommitMessagesInspected": 17,
+    "noClosingIssue1512ReferenceObserved": true,
+    "productionAcceptedCases": 0
+  },
+  "limits": {
+    "p0ReadyOrAcceptanceClaimed": false,
+    "p0WindowReleaseClaimed": false,
+    "ownPrMerged": false
+  },
+  "recordedAt": "2026-11-09T13:21:08Z",
+  "supplementObservedAt": "2026-11-09T13:34:42Z"
+}

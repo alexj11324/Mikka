@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-11-09 13:44:39 UTC",
+  "scope": "Root read the existing exact official MCP docs-search result, verified its original digest, and checked the cited passage. No new knowledge, billing, SQL, scan or recording read.",
+  "originalDecodedResponse": {
+    "bytes": 13426,
+    "sha256": "f027fb4f45201d493de5df9aa1d8252162deb22fbfd6d8a290c7fdf5ed49f2f0",
+    "fullTextRepeatedInThisArchive": false
+  },
+  "sources": [
+    {
+      "url": "https://posthog.com/docs/ai-observability/basics#the-ai_-prefix",
+      "shortExcerpt": "It's billed as an AI Observability event, not as a Product Analytics event.",
+      "conclusion": "所有 $ai_ 事件按 AI Observability 计费，不再按 Product Analytics 事件计费。包括自定义 $ai_ 名称；额外 $ai_span/$ai_trace 仍属于 AI 事件计量。"
+    },
+    {
+      "url": "https://posthog.com/docs/replay-vision/quota-and-limits#workflow-scan-limits",
+      "conclusion": "成功 observation 的固定模型价格是2/5/15 credits；Gemini 3 Flash为5，credits记录在 $recording_observed 事件。免费计划额度耗尽后停止扫描。"
+    }
+  ],
+  "perRunBillableSize": "unknown; OTLP or JSON wire bytes are not directly assumed to equal billed storage bytes",
+  "actualUsd": "unknown",
+  "actualCaseQueries": 0,
+  "newPaidFeaturesExecuted": 0,
+  "resourceCleanupVerified": {
+    "sessionId": "sbx_tXmjfrmsfsXDua4JK2tSNLgsCY23",
+    "durationMs": 307538,
+    "exact404": true,
+    "remainingOwnedResources": 0
+  },
+  "nativeManifestReview": {
+    "files": 22,
+    "payloadBytes": 1334469,
+    "retrievedOriginalAndReceiptDigestsChecked": 7,
+    "errors": []
+  }
+}

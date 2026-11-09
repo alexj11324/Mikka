@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "runId": 42621847483,
+  "runAttempt": 1,
+  "jobId": 129181846034,
+  "metadataObservations": 24,
+  "nativeOriginalLogReads": 1,
+  "otherJobOriginalLogReads": 0,
+  "artifactMetadataLists": 1,
+  "artifactDownloadReferences": [
+    {
+      "artifactId": 13678393148,
+      "requests": 1,
+      "materializations": 1,
+      "refreshes": 0
+    },
+    {
+      "artifactId": 13678099233,
+      "requests": 1,
+      "materializations": 1,
+      "refreshes": 0
+    }
+  ],
+  "sameArtifactRepeatDownloads": 0,
+  "oldArtifactReads": 0,
+  "exactCheckoutCommitReads": 1,
+  "vmCreates": 1,
+  "vmExtensions": 0,
+  "vmStops": 1,
+  "vmDeletes": 1,
+  "vmExactNotFoundReads": 1,
+  "sourceEdits": 0,
+  "refWrites": 0,
+  "reruns": 0,
+  "cancellations": 0,
+  "productionRequests": 0,
+  "modelsInvoked": 0,
+  "browsersLaunchedByReader": 0,
+  "remainingOwnedResources": 0,
+  "trigger": "pull_request reopened naturally; not a rerun requested by this reader"
+}

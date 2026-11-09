@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "purpose": "Recover and verify the two already-completed Native artifact ZIPs; no Native/browser/model/test execution",
+  "name": "issue1512-native-reopen-42621847483",
+  "sessionId": "sbx_tXmjfrmsfsXDua4JK2tSNLgsCY23",
+  "limits": {
+    "vcpus": 1,
+    "memoryMiB": 2048,
+    "timeoutMs": 900000,
+    "persistent": false,
+    "publicPorts": [],
+    "runtime": "node22",
+    "architecture": "amd64",
+    "image": "vercel/sandbox/universal@sha256:bbec19cffb43ad724eee446d3bd4476e2993849dc0ff0c9f33356f8365d72219",
+    "networkPolicy": {
+      "mode": "custom",
+      "allowedDomains": [
+        "*.blob.core.windows.net",
+        "*.amazonaws.com",
+        "*.oaiusercontent.com",
+        "chatgpt.com"
+      ]
+    }
+  },
+  "startedAt": "2026-11-09T13:35:00.203Z",
+  "requestedStopAt": "2026-11-09T13:40:07.506Z",
+  "stoppedAt": "2026-11-09T13:40:07.741Z",
+  "durationMs": 307538,
+  "activeCpuDurationMs": 7530,
+  "networkTransfer": {
+    "ingress": 14943740,
+    "egress": 402061
+  },
+  "stop": {
+    "status": "stopped"
+  },
+  "delete": {
+    "sameName": true,
+    "returnedStoppedSandbox": true
+  },
+  "exactGet": {
+    "sameName": true,
+    "resume": false,
+    "status": 404,
+    "code": "not_found"
+  },
+  "extensions": 0,
+  "remainingOwnedResources": 0,
+  "costUsd": null,
+  "costBoundary": "Measured duration, CPU and traffic are recorded; no zero-cost assertion.",
+  "allOriginalJsonRecoveredAndRemoteConfirmedBeforeStop": true
+}
