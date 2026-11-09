@@ -1,0 +1,140 @@
+{
+  "schema": "mikka.issue1512.coordinator-empty-backfill.independent-test-review.v1",
+  "status": "EXACT_SOURCE_AND_TEST_STATIC_REVIEW_NO_BLOCKING_FINDING_AWAITING_ACTUAL_EXECUTION",
+  "reviewer": "e093_budget_diff",
+  "sourceReview": {
+    "gitBlob": "8b59be3ce03b4c5c6fdea5258f53b9ef6109a90b",
+    "bytes": 9530,
+    "sha256": "98d4926bfebb00636cb4c07ccc7e1d2a8428c4d62d31b8e4ab5b1454262807cc",
+    "candidateSource": "d73e30c36212029a8951a25a692c4e04a2a5b86d"
+  },
+  "testIdentity": {
+    "path": "tests/coordinator-bot.db.test.ts",
+    "originalBlob": "32a8321c981dd6a534f8859fa35f281e874466e6",
+    "candidateBlob": "13fb6f222c061d115916557b796006c2073dc628",
+    "originalBytes": 65832,
+    "candidateBytes": 86572,
+    "originalSha256": "d9b998eb6babcaa96ad493d3335a333d0f041cc1c7350d295e5a9fb92fb228b8",
+    "candidateSha256": "e992035655fdfafb5a0a4dc2cb948b836b265a9348d760d08164cd6c6bbeb340",
+    "originalSplitLines": 811,
+    "candidateSplitLines": 1124,
+    "insertedLines": 313,
+    "deletedLines": 0,
+    "insertBeforeOriginalLine": 104,
+    "reconstructedOriginalIdentical": true,
+    "reconstructedOriginalSha256": "d9b998eb6babcaa96ad493d3335a333d0f041cc1c7350d295e5a9fb92fb228b8"
+  },
+  "scope": "Read-only immutable Git source review. No tests were executed and no compute resources were started by this reviewer.",
+  "testCounterAnalysis": {
+    "observes": "Actual primary appPool.query statements and client.query statements inside explicit appPool.connect transactions",
+    "callbackCheckout": "Delegates callback-style Pool.connect without wrapping its client or increasing transaction count; Pool.query was already counted",
+    "explicitConnection": "Counts only zero-argument connect as an explicit transaction connection, wraps each actual client.query and restores methods on release",
+    "restoration": "appPool.query/appPool.connect restored in finally. Each migration's client methods restored before release",
+    "countBoundary": "Warm coordinator target is established with original public coordinatorBot(...,{backfill:false}) before measured helper call",
+    "missingWorkspace": "ensurePersonalWorkspace uses separate workspaceDb/workspacePool transaction; absent appPool migration-connect count is not a claim of no SQL in other pools",
+    "isolation": "Fixture seed/assertion SQL uses separate pool; appPool observer is scoped to awaited coordinatorBot call. Parent nested tests are awaited serially",
+    "limits": "Counter is focused app-backfill regression coverage, not full Native/global budget measurement"
+  },
+  "newCases": [
+    {
+      "name": "Empty explicit Personal",
+      "copies": 1,
+      "expected": "1 actual app SQL, no migration connection, target unchanged, later fresh-cache call0"
+    },
+    {
+      "name": "Empty explicit Team",
+      "copies": 1,
+      "expected": "1 actual Personal observation, separate target unchanged, Personal c.botId proved, later fresh-cache call0"
+    },
+    {
+      "name": "Retained copied agent head",
+      "copies": 1,
+      "expected": "old deny/current ask heads both preserved byte-structurally at selected fields;1 SQL/no transaction"
+    },
+    {
+      "name": "Each legacy source independently",
+      "copies": 11,
+      "families": [
+        "coordinator_messages",
+        "coordinator_sessions",
+        "coordinator_events",
+        "agent_runs",
+        "factory_tasks",
+        "bot_model_choices",
+        "chat_preferences",
+        "user_schedules",
+        "suggestions",
+        "pending_actions",
+        "agent_kit_heads"
+      ],
+      "expected": "All explicit Team requests with existing Personal Coordinator:1 Personal lookup, full original BEGIN/COMMIT migration, selected Team target remains unchanged",
+      "qualifications": [
+        "factory_tasks fixture deliberately retains NULL bot because source is already bound; still must force conservative transaction",
+        "bot_model_choices seeds both Personal and Team coordinator key, asserts only Personal moves",
+        "agent_kit_heads proves policy copy and retained old head, not nonempty definition-version copy"
+      ]
+    },
+    {
+      "name": "Missing Personal workspace",
+      "copies": 1,
+      "expected": "single unsuccessful Personal lookup reused, real creation/check path establishes authorized Personal Coordinator;targetTeamunchanged"
+    },
+    {
+      "name": "Missing Personal Coordinator",
+      "copies": 1,
+      "expected": "existing Personal workspace cannot skip without bot; real original bot creation and migration completes"
+    },
+    {
+      "name": "Strict false only",
+      "copies": 1,
+      "subinputs": [
+        null,
+        "undefined",
+        "string:false",
+        0
+      ],
+      "expected": "Each result mutated after real PG read routes to transaction; no truthiness-based skip"
+    },
+    {
+      "name": "Failed observation",
+      "copies": 1,
+      "expected": "Injected error after real PG read caught as before, targetreturned,nextcallretries Personalread so no false freshness"
+    },
+    {
+      "name": "Inactive Personal membership",
+      "copies": 1,
+      "expected": "Explicit valid Team request finds no authorized Personal row, returns Team and preserves suspended state; reactivate+legacy row migrates next read proving freshness not marked"
+    },
+    {
+      "name": "Busy chat lock",
+      "copies": 1,
+      "expected": "Real separate connection holds advisorychatlock; fullattemptROLLBACK retainslegacy, nextreadCOMMIT movesafterrelease"
+    },
+    {
+      "name": "Late family after snapshot",
+      "copies": 1,
+      "expected": "Separate real writer commits5legacyfamiliesafteremptySELECTbeforehelperreturns; currentcall1SQL/no transaction retainsallNULL; just before10min0SQL;at10minfulltransactionmovesall;followingread0SQL/no duplication"
+    }
+  ],
+  "newSubcaseCount": 21,
+  "clockAndFailureSafety": {
+    "dateNow": "st.mock.method(Date,'now') inside late test; clock.mock.restore() in finally and test mock lifecycle",
+    "targetCache": "At10min minus1ms, original backfill:false target refresh occurs outside counter, separating60sresolvedcachefrom10minbackfill",
+    "crossCase": "All new fixtures use unique seeded owner IDs, preventing per-owner resolved/backfilled maps from sharing values",
+    "locks": "Busy writer rollback/release in finally; late writer rollback on failure and release finally",
+    "extraFixtures": "suggestions/pending_actions register exact-ID st.after deletes before insertion; original parent cleanup remains unchanged",
+    "originalCases": "All original test source bytes retained exactly; assertions are neither removed nor weakened"
+  },
+  "negativeControlExpectation": {
+    "publicExports": "Candidate tests use only pre-existing coordinatorBot/backfillCoordinatorChat interfaces; original module can load them",
+    "expectedOldFailure": "First warmed empty explicit Personal check expects1 but original path executes26 actual SQL; expected failure is behavioral count assertion, not absent export",
+    "notObserved": "This expectation requires runner confirmation; no old-source execution was performed here"
+  },
+  "meaningfulResidualGates": [
+    "Run candidate real PostgreSQL suite with REQUIRE_DB and exact source identities; no skipped DB acceptance",
+    "Run original a2a6 source against same candidate test to prove intended red and then restore exact candidate",
+    "Perform project-required type/build/other gates under parent's chosen candidate checkout",
+    "Full unchanged Native window must be remeasured on a relevant actual source revision; historical e093451>427 remainsRED"
+  ],
+  "reviewDecision": "No source/test changes are required by this independent static review before activating isolated execution. This is not a passed DB suite, a passed Native budget or production acceptance."
+}

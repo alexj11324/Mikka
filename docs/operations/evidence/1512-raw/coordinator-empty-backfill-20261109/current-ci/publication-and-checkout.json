@@ -1,0 +1,50 @@
+{
+  "schema": "mikka.issue1512.feature-publication-and-checkout.v1",
+  "publishedAt": {
+    "current_time": "2026-11-09 20:17:40 UTC"
+  },
+  "branch": "fix/1512-daemon-fixture-executable-20261109",
+  "from": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+  "to": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+  "tree": "e7c7c6ad66acd729278393711c10eeed67c6d7ac",
+  "parents": [
+    "5a0c90774b8c48fc390ea05cf782bbc9cbe79a62",
+    "7848e79df9c5af67e526aeed1c828858db392066"
+  ],
+  "normalCas": true,
+  "force": false,
+  "mainMoved": false,
+  "sourceProof": "0b324e8ad982a216d77e6db2c8e41d3cccd44c6d",
+  "workerProof": "4814eeb45f841e4b117750c2ab8541969bbb61fc",
+  "prePublishActualPg": {
+    "run": 42690271741,
+    "redProof": "f94cbbe2c23e10dc3508f7419cf39070f6b4198b",
+    "greenProof": "8604fe05bf601120e848f3d9aa3be75b96217404",
+    "greenTests": 375,
+    "greenPass": 375,
+    "fail": 0,
+    "skip": 0
+  },
+  "currentCi": {
+    "run": 42691592260,
+    "attempt": 1,
+    "changesJob": 129412416474,
+    "originalLogBlob": "23737565741c868d681966ba65621033e1400af4",
+    "originalWrapperBlob": "791f9e6a56f52c2c862dd02a06bf6eb0abf024a7",
+    "checkout": "197ba2452796ce6d5942309f488009963b7cbc7d",
+    "checkoutTree": "e7c7c6ad66acd729278393711c10eeed67c6d7ac",
+    "checkoutParents": [
+      "7848e79df9c5af67e526aeed1c828858db392066",
+      "84ce7f876817f0d73c34a1ef89797fc27ba8661e"
+    ],
+    "selectionBlob": "d3e61b6b61f088d39c8a2d92f6213b8db4386376"
+  },
+  "historicalNative": {
+    "source": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+    "fullNative": 451,
+    "fullWeb": 427,
+    "verdict": "RED"
+  },
+  "newNative": "NOT_YET_OBSERVED",
+  "productionCases": 0
+}

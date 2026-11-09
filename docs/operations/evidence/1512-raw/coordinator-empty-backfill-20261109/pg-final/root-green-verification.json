@@ -1,0 +1,61 @@
+{
+  "schema": "mikka.issue1512.pg-green.root-recomputation.v1",
+  "run": 42690271741,
+  "job": 129408752084,
+  "source": "5a0c90774b8c48fc390ea05cf782bbc9cbe79a62",
+  "sourceBlob": "d73e30c36212029a8951a25a692c4e04a2a5b86d",
+  "testBlob": "c6c92ea2741174b5baadbd1535fc8b0c62b8275e",
+  "stdout": {
+    "gitBlob": "19f5a267d26afb5f5aa56ad4dcbf8f122ec21fd2",
+    "bytes": 1144803,
+    "sha256": "e329adce2da4550c6ea728d733acf7637ced5c0089ca3fbda575b3121ccd91eb"
+  },
+  "counts": {
+    "tests": 375,
+    "suites": 0,
+    "pass": 375,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "newResults": [
+    {
+      "name": "an empty explicit Personal Coordinator uses one Personal read",
+      "result": "PASS",
+      "line": "ok 1 - an empty explicit Personal Coordinator uses one Personal read"
+    },
+    {
+      "name": "an empty explicit Team Coordinator uses one Personal read",
+      "result": "PASS",
+      "line": "ok 2 - an empty explicit Team Coordinator uses one Personal read"
+    },
+    {
+      "name": "a retained copied agent head still permits the empty Personal read",
+      "result": "PASS",
+      "line": "ok 3 - a retained copied agent head still permits the empty Personal read"
+    },
+    {
+      "name": "legacy rows committed after an empty read wait for the original next pass",
+      "result": "PASS",
+      "line": "ok 21 - legacy rows committed after an empty read wait for the original next pass"
+    }
+  ],
+  "summaries": [
+    "# tests 375",
+    "# suites 0",
+    "# pass 375",
+    "# fail 0",
+    "# cancelled 0",
+    "# skipped 0",
+    "# todo 0",
+    "# duration_ms 61088.404049"
+  ],
+  "canonicalHeaders": [
+    "Required DB selection: {\"shard\":\"all\",\"total\":72,\"scripts\":[\"test:bot-threads-db\"]}",
+    "test:bot-threads-db: OK"
+  ],
+  "parserScope": "Use the bare complete TAP, not the runner's additional prefixed streaming copy; do not double-count mirrored lines.",
+  "verdict": "COMPLETE_COORDINATOR_FAMILY_GREEN",
+  "native": "NOT_YET_REMEASURED"
+}

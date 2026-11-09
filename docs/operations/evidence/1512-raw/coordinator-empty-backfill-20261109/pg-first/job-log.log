@@ -1,0 +1,1063 @@
+﻿2026-11-09T20:02:13.1442594Z Current runner version: '2.338.2'
+2026-11-09T20:02:13.1467544Z ##[group]Runner Image Provisioner
+2026-11-09T20:02:13.1468366Z Hosted Compute Agent
+2026-11-09T20:02:13.1468984Z Version: 20261028.624
+2026-11-09T20:02:13.1469563Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+2026-11-09T20:02:13.1470218Z Build Date: 2026-10-28T21:51:42Z
+2026-11-09T20:02:13.1470874Z Worker ID: {171b22d8-0e59-40df-9e82-8f3565207d46}
+2026-11-09T20:02:13.1471785Z Region: westus3
+2026-11-09T20:02:13.1472278Z Cloud: Azure
+2026-11-09T20:02:13.1472807Z ##[endgroup]
+2026-11-09T20:02:13.1474271Z ##[group]Operating System
+2026-11-09T20:02:13.1474899Z Ubuntu
+2026-11-09T20:02:13.1475386Z 22.04.5
+2026-11-09T20:02:13.1475853Z LTS
+2026-11-09T20:02:13.1476385Z ##[endgroup]
+2026-11-09T20:02:13.1476885Z ##[group]Runner Image
+2026-11-09T20:02:13.1477501Z Image: ubuntu-22.04
+2026-11-09T20:02:13.1478277Z Version: 20261101.347.1
+2026-11-09T20:02:13.1479476Z Included Software: https://github.com/actions/runner-images/blob/ubuntu22/20261101.347/images/ubuntu/Ubuntu2204-Readme.md
+2026-11-09T20:02:13.1480881Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu22%2F20261101.347
+2026-11-09T20:02:13.1481991Z ##[endgroup]
+2026-11-09T20:02:13.1483102Z ##[group]GITHUB_TOKEN Permissions
+2026-11-09T20:02:13.1485608Z Contents: read
+2026-11-09T20:02:13.1486160Z Metadata: read
+2026-11-09T20:02:13.1486676Z ##[endgroup]
+2026-11-09T20:02:13.1489050Z Secret source: Actions
+2026-11-09T20:02:13.1489907Z Cache mode: write
+2026-11-09T20:02:13.1490777Z Prepare workflow directory
+2026-11-09T20:02:13.1932601Z Prepare all required actions
+2026-11-09T20:02:13.1983238Z Getting action download info
+2026-11-09T20:02:13.5248045Z Download action repository 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-11-09T20:02:13.6530897Z Download action repository 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-11-09T20:02:13.8459185Z Complete job name: Old source, genuine regression assertion RED
+2026-11-09T20:02:13.9007668Z ##[group]Checking docker version
+2026-11-09T20:02:13.9020639Z ##[command]/usr/bin/docker version --format '{{.Server.APIVersion}}'
+2026-11-09T20:02:13.9827395Z '1.48'
+2026-11-09T20:02:13.9840131Z Docker daemon API version: '1.48'
+2026-11-09T20:02:13.9841004Z ##[command]/usr/bin/docker version --format '{{.Client.APIVersion}}'
+2026-11-09T20:02:14.0015227Z '1.48'
+2026-11-09T20:02:14.0029482Z Docker client API version: '1.48'
+2026-11-09T20:02:14.0035347Z ##[endgroup]
+2026-11-09T20:02:14.0038117Z ##[group]Clean up resources from previous jobs
+2026-11-09T20:02:14.0044061Z ##[command]/usr/bin/docker ps --all --quiet --no-trunc --filter "label=404f09"
+2026-11-09T20:02:14.0205005Z ##[command]/usr/bin/docker network prune --force --filter "label=404f09"
+2026-11-09T20:02:14.0478338Z ##[endgroup]
+2026-11-09T20:02:14.0478847Z ##[group]Create local container network
+2026-11-09T20:02:14.0488413Z ##[command]/usr/bin/docker network create --label 404f09 github_network_256658d7af5046d2bf1753dd4b692327
+2026-11-09T20:02:14.0947253Z 5782f47a6ad866f03c0017a43a5d830ebf1457ff7881582568634423eafc7461
+2026-11-09T20:02:14.0967452Z ##[endgroup]
+2026-11-09T20:02:14.0994588Z ##[group]Starting postgres service container
+2026-11-09T20:02:14.1016870Z ##[command]/usr/bin/docker pull postgres:17
+2026-11-09T20:02:15.2863655Z 17: Pulling from library/postgres
+2026-11-09T20:02:15.5532778Z 37fb86c2a767: Pulling fs layer
+2026-11-09T20:02:15.5534058Z 56c5b61c6d2b: Pulling fs layer
+2026-11-09T20:02:15.5535138Z c2f4b34f5119: Pulling fs layer
+2026-11-09T20:02:15.5536206Z d717e9509665: Pulling fs layer
+2026-11-09T20:02:15.5537257Z 046371a447cc: Pulling fs layer
+2026-11-09T20:02:15.5538330Z c97a680633a2: Pulling fs layer
+2026-11-09T20:02:15.5539409Z f0f18338e0da: Pulling fs layer
+2026-11-09T20:02:15.5540479Z 0eab0a63b06d: Pulling fs layer
+2026-11-09T20:02:15.5541735Z 9de238338a9a: Pulling fs layer
+2026-11-09T20:02:15.5542797Z 275aa943d416: Pulling fs layer
+2026-11-09T20:02:15.5544268Z 5760334e16b5: Pulling fs layer
+2026-11-09T20:02:15.5545359Z d35c08e535dc: Pulling fs layer
+2026-11-09T20:02:15.5546609Z 4f0fb6572de8: Pulling fs layer
+2026-11-09T20:02:15.5547808Z ceeafc939069: Pulling fs layer
+2026-11-09T20:02:15.5548935Z 9de238338a9a: Waiting
+2026-11-09T20:02:15.5549887Z 275aa943d416: Waiting
+2026-11-09T20:02:15.5550860Z 046371a447cc: Waiting
+2026-11-09T20:02:15.5552061Z 5760334e16b5: Waiting
+2026-11-09T20:02:15.5553020Z c97a680633a2: Waiting
+2026-11-09T20:02:15.5553984Z d35c08e535dc: Waiting
+2026-11-09T20:02:15.5554969Z f0f18338e0da: Waiting
+2026-11-09T20:02:15.5556063Z 4f0fb6572de8: Waiting
+2026-11-09T20:02:15.5557218Z 0eab0a63b06d: Waiting
+2026-11-09T20:02:15.5558295Z ceeafc939069: Waiting
+2026-11-09T20:02:15.5559416Z d717e9509665: Waiting
+2026-11-09T20:02:15.7549965Z 56c5b61c6d2b: Verifying Checksum
+2026-11-09T20:02:15.7550618Z 56c5b61c6d2b: Download complete
+2026-11-09T20:02:15.7752649Z c2f4b34f5119: Verifying Checksum
+2026-11-09T20:02:15.7753552Z c2f4b34f5119: Download complete
+2026-11-09T20:02:15.8487436Z 37fb86c2a767: Verifying Checksum
+2026-11-09T20:02:15.8488161Z 37fb86c2a767: Download complete
+2026-11-09T20:02:15.9652698Z d717e9509665: Verifying Checksum
+2026-11-09T20:02:15.9653388Z d717e9509665: Download complete
+2026-11-09T20:02:15.9979358Z 046371a447cc: Verifying Checksum
+2026-11-09T20:02:15.9983307Z 046371a447cc: Download complete
+2026-11-09T20:02:16.0599190Z c97a680633a2: Verifying Checksum
+2026-11-09T20:02:16.0599818Z c97a680633a2: Download complete
+2026-11-09T20:02:16.1453783Z f0f18338e0da: Verifying Checksum
+2026-11-09T20:02:16.1454364Z f0f18338e0da: Download complete
+2026-11-09T20:02:16.1802582Z 0eab0a63b06d: Verifying Checksum
+2026-11-09T20:02:16.1803244Z 0eab0a63b06d: Download complete
+2026-11-09T20:02:16.3445831Z 275aa943d416: Download complete
+2026-11-09T20:02:16.3794004Z 5760334e16b5: Verifying Checksum
+2026-11-09T20:02:16.3798845Z 5760334e16b5: Download complete
+2026-11-09T20:02:16.5544262Z d35c08e535dc: Verifying Checksum
+2026-11-09T20:02:16.5566004Z d35c08e535dc: Download complete
+2026-11-09T20:02:16.5732957Z 9de238338a9a: Verifying Checksum
+2026-11-09T20:02:16.5733618Z 9de238338a9a: Download complete
+2026-11-09T20:02:16.5851717Z 4f0fb6572de8: Verifying Checksum
+2026-11-09T20:02:16.5852866Z 4f0fb6572de8: Download complete
+2026-11-09T20:02:16.7315181Z 37fb86c2a767: Pull complete
+2026-11-09T20:02:16.7732908Z ceeafc939069: Verifying Checksum
+2026-11-09T20:02:16.7733504Z ceeafc939069: Download complete
+2026-11-09T20:02:17.0113168Z 56c5b61c6d2b: Pull complete
+2026-11-09T20:02:17.1559427Z c2f4b34f5119: Pull complete
+2026-11-09T20:02:17.1861409Z d717e9509665: Pull complete
+2026-11-09T20:02:17.4287905Z 046371a447cc: Pull complete
+2026-11-09T20:02:17.4812607Z c97a680633a2: Pull complete
+2026-11-09T20:02:17.4878020Z f0f18338e0da: Pull complete
+2026-11-09T20:02:17.4942964Z 0eab0a63b06d: Pull complete
+2026-11-09T20:02:20.1766330Z 9de238338a9a: Pull complete
+2026-11-09T20:02:20.1862298Z 275aa943d416: Pull complete
+2026-11-09T20:02:20.2021702Z 5760334e16b5: Pull complete
+2026-11-09T20:02:20.2090536Z d35c08e535dc: Pull complete
+2026-11-09T20:02:20.2160015Z 4f0fb6572de8: Pull complete
+2026-11-09T20:02:20.2230813Z ceeafc939069: Pull complete
+2026-11-09T20:02:20.2265853Z Digest: sha256:ff87138949ad9a46f32ff23bd6852b52ce024a13dffe9b4087be98292cdd3b4f
+2026-11-09T20:02:20.2275637Z Status: Downloaded newer image for postgres:17
+2026-11-09T20:02:20.2287934Z docker.io/library/postgres:17
+2026-11-09T20:02:20.2354633Z ##[command]/usr/bin/docker create --name eecf71fe743646deb0475710f1bf1e9f_postgres17_d21ab8 --label 404f09 --network github_network_256658d7af5046d2bf1753dd4b692327 --network-alias postgres -p 5432:5432 --health-cmd "pg_isready -U e2e -d mikka_e2e" --health-interval 5s --health-timeout 5s --health-retries 10 -e "POSTGRES_USER=e2e" -e "POSTGRES_PASSWORD=e2e-local-only" -e "POSTGRES_DB=mikka_e2e" -e GITHUB_ACTIONS=true -e CI=true postgres:17
+2026-11-09T20:02:20.2594100Z 08b87f0a767f2769d655ebbdb91fa17e37633f52d8936f361958c9000d6b008d
+2026-11-09T20:02:20.2615963Z ##[command]/usr/bin/docker start 08b87f0a767f2769d655ebbdb91fa17e37633f52d8936f361958c9000d6b008d
+2026-11-09T20:02:20.4365712Z 08b87f0a767f2769d655ebbdb91fa17e37633f52d8936f361958c9000d6b008d
+2026-11-09T20:02:20.4384829Z ##[command]/usr/bin/docker ps --all --filter id=08b87f0a767f2769d655ebbdb91fa17e37633f52d8936f361958c9000d6b008d --filter status=running --no-trunc --format "{{.ID}} {{.Status}}"
+2026-11-09T20:02:20.4531054Z 08b87f0a767f2769d655ebbdb91fa17e37633f52d8936f361958c9000d6b008d Up Less than a second (health: starting)
+2026-11-09T20:02:20.4552432Z ##[command]/usr/bin/docker port 08b87f0a767f2769d655ebbdb91fa17e37633f52d8936f361958c9000d6b008d
+2026-11-09T20:02:20.4723026Z 5432/tcp -> 0.0.0.0:5432
+2026-11-09T20:02:20.4733590Z 5432/tcp -> [::]:5432
+2026-11-09T20:02:20.4776524Z ##[endgroup]
+2026-11-09T20:02:20.4786406Z ##[group]Waiting for all services to be ready
+2026-11-09T20:02:20.4800833Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" 08b87f0a767f2769d655ebbdb91fa17e37633f52d8936f361958c9000d6b008d
+2026-11-09T20:02:20.4960426Z starting
+2026-11-09T20:02:20.4986448Z postgres service is starting, waiting 2 seconds before checking again.
+2026-11-09T20:02:22.4989879Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" 08b87f0a767f2769d655ebbdb91fa17e37633f52d8936f361958c9000d6b008d
+2026-11-09T20:02:22.5141872Z starting
+2026-11-09T20:02:22.5153251Z postgres service is starting, waiting 4 seconds before checking again.
+2026-11-09T20:02:26.6696652Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" 08b87f0a767f2769d655ebbdb91fa17e37633f52d8936f361958c9000d6b008d
+2026-11-09T20:02:26.6845327Z healthy
+2026-11-09T20:02:26.6870665Z postgres service is healthy.
+2026-11-09T20:02:26.6871738Z ##[endgroup]
+2026-11-09T20:02:26.7160432Z ##[group]Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+2026-11-09T20:02:26.7161013Z with:
+2026-11-09T20:02:26.7161498Z   ref: 0b5395eb6fa5c1e2787e97c2308d7114a630607e
+2026-11-09T20:02:26.7161839Z   persist-credentials: false
+2026-11-09T20:02:26.7162085Z   repository: alexj11324/Mikka
+2026-11-09T20:02:26.7164643Z   token: ***
+2026-11-09T20:02:26.7164838Z   ssh-strict: true
+2026-11-09T20:02:26.7165044Z   ssh-user: git
+2026-11-09T20:02:26.7165240Z   clean: true
+2026-11-09T20:02:26.7165450Z   sparse-checkout-cone-mode: true
+2026-11-09T20:02:26.7165708Z   fetch-depth: 1
+2026-11-09T20:02:26.7165906Z   fetch-tags: false
+2026-11-09T20:02:26.7166114Z   show-progress: true
+2026-11-09T20:02:26.7166322Z   lfs: false
+2026-11-09T20:02:26.7166507Z   submodules: false
+2026-11-09T20:02:26.7166708Z   set-safe-directory: true
+2026-11-09T20:02:26.7166950Z   allow-unsafe-pr-checkout: false
+2026-11-09T20:02:26.7167472Z env:
+2026-11-09T20:02:26.7167652Z   CI: true
+2026-11-09T20:02:26.7167894Z   REQUIRE_DB: 1
+2026-11-09T20:02:26.7168091Z   MIKKA_EDITION: cloud
+2026-11-09T20:02:26.7168309Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T20:02:26.7168567Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T20:02:26.7168806Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T20:02:26.7169068Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T20:02:26.7169341Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T20:02:26.7169609Z   MIKKA_TEST_DB_PORT: 5432
+2026-11-09T20:02:26.7170087Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:02:26.7170524Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:02:26.7171024Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:02:26.7171639Z   BETTER_AUTH_URL: http://localhost:3100
+2026-11-09T20:02:26.7171914Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T20:02:26.7172144Z ##[endgroup]
+2026-11-09T20:02:26.9380004Z Syncing repository: alexj11324/Mikka
+2026-11-09T20:02:26.9382515Z ##[group]Getting Git version info
+2026-11-09T20:02:26.9383174Z Working directory is '/home/runner/work/Mikka/Mikka'
+2026-11-09T20:02:26.9384135Z [command]/usr/bin/git version
+2026-11-09T20:02:26.9448419Z git version 2.56.0
+2026-11-09T20:02:26.9468224Z ##[endgroup]
+2026-11-09T20:02:26.9483185Z Temporarily overriding HOME='/home/runner/work/_temp/f0e5bd34-15dd-4165-9212-0ae9cb8f7839' before making global git config changes
+2026-11-09T20:02:26.9484664Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T20:02:26.9489229Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T20:02:26.9528918Z Deleting the contents of '/home/runner/work/Mikka/Mikka'
+2026-11-09T20:02:26.9532439Z ##[group]Initializing the repository
+2026-11-09T20:02:26.9537038Z [command]/usr/bin/git init /home/runner/work/Mikka/Mikka
+2026-11-09T20:02:26.9630098Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-09T20:02:26.9632225Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-09T20:02:26.9635626Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-09T20:02:26.9636849Z hint: call:
+2026-11-09T20:02:26.9637943Z hint:
+2026-11-09T20:02:26.9638998Z hint: 	git config --global init.defaultBranch <name>
+2026-11-09T20:02:26.9639935Z hint:
+2026-11-09T20:02:26.9641029Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-09T20:02:26.9641967Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-09T20:02:26.9642558Z hint:
+2026-11-09T20:02:26.9642901Z hint: 	git branch -m <name>
+2026-11-09T20:02:26.9643135Z hint:
+2026-11-09T20:02:26.9643450Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-09T20:02:26.9643976Z Initialized empty Git repository in /home/runner/work/Mikka/Mikka/.git/
+2026-11-09T20:02:26.9645115Z [command]/usr/bin/git remote add origin https://github.com/alexj11324/Mikka
+2026-11-09T20:02:26.9681885Z ##[endgroup]
+2026-11-09T20:02:26.9682953Z ##[group]Disabling automatic garbage collection
+2026-11-09T20:02:26.9687152Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-09T20:02:26.9717911Z ##[endgroup]
+2026-11-09T20:02:26.9718539Z ##[group]Setting up auth
+2026-11-09T20:02:26.9727001Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T20:02:26.9760694Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T20:02:27.0083177Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T20:02:27.0123792Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T20:02:27.0335471Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T20:02:27.0376653Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T20:02:27.0574130Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-09T20:02:27.0611607Z ##[endgroup]
+2026-11-09T20:02:27.0612311Z ##[group]Fetching the repository
+2026-11-09T20:02:27.0621765Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin 0b5395eb6fa5c1e2787e97c2308d7114a630607e
+2026-11-09T20:02:30.3706493Z From https://github.com/alexj11324/Mikka
+2026-11-09T20:02:30.3707185Z  * branch            0b5395eb6fa5c1e2787e97c2308d7114a630607e -> FETCH_HEAD
+2026-11-09T20:02:30.3710842Z ##[endgroup]
+2026-11-09T20:02:30.3711615Z ##[group]Determining the checkout info
+2026-11-09T20:02:30.3714673Z ##[endgroup]
+2026-11-09T20:02:30.3722750Z [command]/usr/bin/git sparse-checkout disable
+2026-11-09T20:02:30.3784037Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-09T20:02:30.3821852Z ##[group]Checking out the ref
+2026-11-09T20:02:30.3822632Z [command]/usr/bin/git checkout --progress --force 0b5395eb6fa5c1e2787e97c2308d7114a630607e
+2026-11-09T20:02:30.9845338Z Note: switching to '0b5395eb6fa5c1e2787e97c2308d7114a630607e'.
+2026-11-09T20:02:30.9845804Z 
+2026-11-09T20:02:30.9846153Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-11-09T20:02:30.9846705Z changes and commit them, and you can discard any commits you make in this
+2026-11-09T20:02:30.9847307Z state without impacting any branches by switching back to a branch.
+2026-11-09T20:02:30.9847779Z 
+2026-11-09T20:02:30.9848149Z If you want to create a new branch to retain commits you create, you may
+2026-11-09T20:02:30.9848850Z do so (now or later) by using -c with the switch command. Example:
+2026-11-09T20:02:30.9849256Z 
+2026-11-09T20:02:30.9849573Z   git switch -c <new-branch-name>
+2026-11-09T20:02:30.9849996Z 
+2026-11-09T20:02:30.9850396Z Or undo this operation with:
+2026-11-09T20:02:30.9850670Z 
+2026-11-09T20:02:30.9850804Z   git switch -
+2026-11-09T20:02:30.9851050Z 
+2026-11-09T20:02:30.9851696Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-11-09T20:02:30.9852263Z 
+2026-11-09T20:02:30.9852541Z HEAD is now at 0b5395e issue1512: backfill-pg admit 20261109
+2026-11-09T20:02:30.9865072Z ##[endgroup]
+2026-11-09T20:02:30.9904864Z [command]/usr/bin/git log -1 --format=%H
+2026-11-09T20:02:30.9930231Z 0b5395eb6fa5c1e2787e97c2308d7114a630607e
+2026-11-09T20:02:30.9944881Z ##[group]Removing auth
+2026-11-09T20:02:30.9945373Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T20:02:30.9976763Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T20:02:31.0176243Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T20:02:31.0198228Z http.https://github.com/.extraheader
+2026-11-09T20:02:31.0205825Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-09T20:02:31.0237446Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T20:02:31.0433493Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T20:02:31.0473977Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T20:02:31.0683903Z ##[endgroup]
+2026-11-09T20:02:31.0864912Z ##[group]Run mkdir -p "$RUNNER_TEMP/issue1512-pg"
+2026-11-09T20:02:31.0865400Z [36;1mmkdir -p "$RUNNER_TEMP/issue1512-pg"[0m
+2026-11-09T20:02:31.0865981Z [36;1mcp .github/ops/issue1512-backfill-pg/driver.mjs "$RUNNER_TEMP/issue1512-pg/driver.mjs"[0m
+2026-11-09T20:02:31.0866783Z [36;1mcp .github/ops/issue1512-backfill-pg/manifest.json "$RUNNER_TEMP/issue1512-pg/manifest.json"[0m
+2026-11-09T20:02:31.0867460Z [36;1mnode "$RUNNER_TEMP/issue1512-pg/driver.mjs" capture red[0m
+2026-11-09T20:02:31.0906455Z shell: /usr/bin/bash -e {0}
+2026-11-09T20:02:31.0906722Z env:
+2026-11-09T20:02:31.0906910Z   CI: true
+2026-11-09T20:02:31.0907094Z   REQUIRE_DB: 1
+2026-11-09T20:02:31.0907314Z   MIKKA_EDITION: cloud
+2026-11-09T20:02:31.0907532Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T20:02:31.0907789Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T20:02:31.0908046Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T20:02:31.0908299Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T20:02:31.0908621Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T20:02:31.0908881Z   MIKKA_TEST_DB_PORT: 5432
+2026-11-09T20:02:31.0909443Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:02:31.0909875Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:02:31.0910356Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:02:31.0910639Z   BETTER_AUTH_URL: http://localhost:3100
+2026-11-09T20:02:31.0911454Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T20:02:31.0911683Z ##[endgroup]
+2026-11-09T20:02:32.7190582Z ISSUE1512_PG_CONTROL {"controlSha":"0b5395eb6fa5c1e2787e97c2308d7114a630607e","controlTree":"96010045c670b62c8fd1d86b354fa5c5c01fa1f4","workflowBlob":"ea28630ad0c8c9681a67589f4328b7a1dc30a11a","manifestSha256":"bccb05e8ee5ce2407b1627b0ca9edcf51717f88a9ccdc9affbd1f8054c86ccc6","driverSha256":"f114b1ebf4ae0dddcc25d1babdf53c2be5b37884130bbeba299d5b55775b417f","phase":"red","capturedAt":"2026-11-09T20:02:32.717Z"}
+2026-11-09T20:02:32.7446990Z ##[group]Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+2026-11-09T20:02:32.7447356Z with:
+2026-11-09T20:02:32.7447574Z   ref: e0934eb89f972d44ef6cffec6e27c16b4ed203bf
+2026-11-09T20:02:32.7447884Z   persist-credentials: false
+2026-11-09T20:02:32.7448135Z   repository: alexj11324/Mikka
+2026-11-09T20:02:32.7450458Z   token: ***
+2026-11-09T20:02:32.7450652Z   ssh-strict: true
+2026-11-09T20:02:32.7450855Z   ssh-user: git
+2026-11-09T20:02:32.7451074Z   clean: true
+2026-11-09T20:02:32.7451566Z   sparse-checkout-cone-mode: true
+2026-11-09T20:02:32.7451837Z   fetch-depth: 1
+2026-11-09T20:02:32.7452040Z   fetch-tags: false
+2026-11-09T20:02:32.7452255Z   show-progress: true
+2026-11-09T20:02:32.7452495Z   lfs: false
+2026-11-09T20:02:32.7452685Z   submodules: false
+2026-11-09T20:02:32.7452894Z   set-safe-directory: true
+2026-11-09T20:02:32.7453135Z   allow-unsafe-pr-checkout: false
+2026-11-09T20:02:32.7453380Z env:
+2026-11-09T20:02:32.7453547Z   CI: true
+2026-11-09T20:02:32.7453781Z   REQUIRE_DB: 1
+2026-11-09T20:02:32.7453981Z   MIKKA_EDITION: cloud
+2026-11-09T20:02:32.7454200Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T20:02:32.7454450Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T20:02:32.7454689Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T20:02:32.7454951Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T20:02:32.7455212Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T20:02:32.7455484Z   MIKKA_TEST_DB_PORT: 5432
+2026-11-09T20:02:32.7455896Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:02:32.7456312Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:02:32.7456725Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:02:32.7457011Z   BETTER_AUTH_URL: http://localhost:3100
+2026-11-09T20:02:32.7457284Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T20:02:32.7457507Z ##[endgroup]
+2026-11-09T20:02:32.8354015Z Syncing repository: alexj11324/Mikka
+2026-11-09T20:02:32.8354837Z ##[group]Getting Git version info
+2026-11-09T20:02:32.8355403Z Working directory is '/home/runner/work/Mikka/Mikka'
+2026-11-09T20:02:32.8389742Z [command]/usr/bin/git version
+2026-11-09T20:02:32.8429186Z git version 2.56.0
+2026-11-09T20:02:32.8448337Z ##[endgroup]
+2026-11-09T20:02:32.8464216Z Temporarily overriding HOME='/home/runner/work/_temp/c5af49b4-961f-414d-ad8e-bb36d2b33312' before making global git config changes
+2026-11-09T20:02:32.8465498Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T20:02:32.8471560Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T20:02:32.8510966Z [command]/usr/bin/git config --local --get remote.origin.url
+2026-11-09T20:02:32.8532431Z https://github.com/alexj11324/Mikka
+2026-11-09T20:02:32.8545797Z ##[group]Removing previously created refs, to avoid conflicts
+2026-11-09T20:02:32.8550451Z [command]/usr/bin/git rev-parse --symbolic-full-name --verify --quiet HEAD
+2026-11-09T20:02:32.8583199Z HEAD
+2026-11-09T20:02:32.8623766Z ##[endgroup]
+2026-11-09T20:02:32.8629438Z [command]/usr/bin/git submodule status
+2026-11-09T20:02:32.8842805Z ##[group]Cleaning the repository
+2026-11-09T20:02:32.8848727Z [command]/usr/bin/git clean -ffdx
+2026-11-09T20:02:32.8988331Z [command]/usr/bin/git reset --hard HEAD
+2026-11-09T20:02:33.6203201Z HEAD is now at 0b5395e issue1512: backfill-pg admit 20261109
+2026-11-09T20:02:33.6212340Z ##[endgroup]
+2026-11-09T20:02:33.6213752Z ##[group]Disabling automatic garbage collection
+2026-11-09T20:02:33.6219636Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-09T20:02:33.6258633Z ##[endgroup]
+2026-11-09T20:02:33.6259035Z ##[group]Setting up auth
+2026-11-09T20:02:33.6259485Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T20:02:33.6290077Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T20:02:33.6493435Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T20:02:33.6526164Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T20:02:33.6729134Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T20:02:33.6762175Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T20:02:33.6966865Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-09T20:02:33.7002849Z ##[endgroup]
+2026-11-09T20:02:33.7003357Z ##[group]Fetching the repository
+2026-11-09T20:02:33.7011786Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin e0934eb89f972d44ef6cffec6e27c16b4ed203bf
+2026-11-09T20:02:37.3026459Z From https://github.com/alexj11324/Mikka
+2026-11-09T20:02:37.3027050Z  * branch            e0934eb89f972d44ef6cffec6e27c16b4ed203bf -> FETCH_HEAD
+2026-11-09T20:02:37.3029835Z ##[endgroup]
+2026-11-09T20:02:37.3030290Z ##[group]Determining the checkout info
+2026-11-09T20:02:37.3033756Z ##[endgroup]
+2026-11-09T20:02:37.3039121Z [command]/usr/bin/git sparse-checkout disable
+2026-11-09T20:02:37.3133052Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-09T20:02:37.3161453Z ##[group]Checking out the ref
+2026-11-09T20:02:37.3166280Z [command]/usr/bin/git checkout --progress --force e0934eb89f972d44ef6cffec6e27c16b4ed203bf
+2026-11-09T20:02:37.3306723Z Warning: you are leaving 1 commit behind, not connected to
+2026-11-09T20:02:37.3307601Z any of your branches:
+2026-11-09T20:02:37.3307919Z 
+2026-11-09T20:02:37.3308124Z   0b5395e issue1512: backfill-pg admit 20261109
+2026-11-09T20:02:37.3308459Z 
+2026-11-09T20:02:37.3308805Z If you want to keep it by creating a new branch, this may be a good time
+2026-11-09T20:02:37.3309429Z to do so with:
+2026-11-09T20:02:37.3309649Z 
+2026-11-09T20:02:37.3392364Z  git branch <new-branch-name> 0b5395e
+2026-11-09T20:02:37.3392800Z 
+2026-11-09T20:02:37.3396592Z HEAD is now at e0934eb Merge reviewed shared certificate controls into Native read corrections
+2026-11-09T20:02:37.3398262Z ##[endgroup]
+2026-11-09T20:02:37.3399196Z [command]/usr/bin/git log -1 --format=%H
+2026-11-09T20:02:37.3399750Z e0934eb89f972d44ef6cffec6e27c16b4ed203bf
+2026-11-09T20:02:37.3400891Z ##[group]Removing auth
+2026-11-09T20:02:37.3401592Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T20:02:37.3420935Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T20:02:37.3624175Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T20:02:37.3646668Z http.https://github.com/.extraheader
+2026-11-09T20:02:37.3653761Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-09T20:02:37.3685632Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T20:02:37.3885098Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T20:02:37.3920121Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T20:02:37.4117992Z ##[endgroup]
+2026-11-09T20:02:37.4341904Z Prepare all required actions
+2026-11-09T20:02:37.4342492Z Getting action download info
+2026-11-09T20:02:37.5667738Z Download action repository 'pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1' (SHA:b906affcce14559ad1aafd4ab0e942779e9f58b1)
+2026-11-09T20:02:38.2095269Z Download action repository 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-11-09T20:02:38.2831341Z Download action repository 'actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830' (SHA:0057852bfaa89a56745cba8c7296529d2fc39830)
+2026-11-09T20:02:38.4188196Z ##[group]Run ./.github/actions/pnpm-install
+2026-11-09T20:02:38.4188479Z with:
+2026-11-09T20:02:38.4190916Z   ffmpeg-github-token: ***
+2026-11-09T20:02:38.4191356Z env:
+2026-11-09T20:02:38.4191562Z   CI: true
+2026-11-09T20:02:38.4191736Z   REQUIRE_DB: 1
+2026-11-09T20:02:38.4191931Z   MIKKA_EDITION: cloud
+2026-11-09T20:02:38.4192150Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T20:02:38.4192453Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T20:02:38.4192697Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T20:02:38.4192949Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T20:02:38.4193216Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T20:02:38.4193478Z   MIKKA_TEST_DB_PORT: 5432
+2026-11-09T20:02:38.4193881Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:02:38.4194291Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:02:38.4194693Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:02:38.4194971Z   BETTER_AUTH_URL: http://localhost:3100
+2026-11-09T20:02:38.4195237Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T20:02:38.4195471Z ##[endgroup]
+2026-11-09T20:02:38.4258223Z ##[start-action display=Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1;id=__self.__pnpm_action-setup]
+2026-11-09T20:02:38.4302384Z ##[group]Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+2026-11-09T20:02:38.4302756Z with:
+2026-11-09T20:02:38.4303017Z   version: 10.34.3
+2026-11-09T20:02:38.4303277Z   dest: ~/setup-pnpm
+2026-11-09T20:02:38.4303482Z   run_install: null
+2026-11-09T20:02:38.4303676Z   cache: false
+2026-11-09T20:02:38.4303980Z   cache_dependency_path: pnpm-lock.yaml
+2026-11-09T20:02:38.4304253Z   package_json_file: package.json
+2026-11-09T20:02:38.4304492Z   standalone: false
+2026-11-09T20:02:38.4304783Z env:
+2026-11-09T20:02:38.4304959Z   CI: true
+2026-11-09T20:02:38.4305136Z   REQUIRE_DB: 1
+2026-11-09T20:02:38.4305332Z   MIKKA_EDITION: cloud
+2026-11-09T20:02:38.4305648Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T20:02:38.4305917Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T20:02:38.4306192Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T20:02:38.4306539Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T20:02:38.4306816Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T20:02:38.4307146Z   MIKKA_TEST_DB_PORT: 5432
+2026-11-09T20:02:38.4307631Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:02:38.4308134Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:02:38.4308540Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:02:38.4308943Z   BETTER_AUTH_URL: http://localhost:3100
+2026-11-09T20:02:38.4309209Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T20:02:38.4309482Z ##[endgroup]
+2026-11-09T20:02:38.5785290Z ##[group]Running self-installer...
+2026-11-09T20:02:39.0426795Z (node:2835) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T20:02:39.0428361Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T20:02:39.2180657Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-09T20:02:39.2274134Z Packages: +1
+2026-11-09T20:02:39.2274513Z +
+2026-11-09T20:02:39.6160209Z Progress: resolved 1, reused 0, downloaded 1, added 1, done
+2026-11-09T20:02:39.6414269Z 
+2026-11-09T20:02:39.6414752Z dependencies:
+2026-11-09T20:02:39.6415550Z + pnpm 10.34.3 (12.18.0 is available)
+2026-11-09T20:02:39.6415757Z 
+2026-11-09T20:02:39.6438114Z Done in 854ms
+2026-11-09T20:02:39.6580965Z ##[endgroup]
+2026-11-09T20:02:39.6581633Z Installation Completed!
+2026-11-09T20:02:39.6663609Z ##[end-action id=__self.__pnpm_action-setup;outcome=success;conclusion=success;duration_ms=1240]
+2026-11-09T20:02:39.6666736Z ##[start-action display=Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020;id=__self.__actions_setup-node]
+2026-11-09T20:02:39.6730933Z ##[group]Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+2026-11-09T20:02:39.6731598Z with:
+2026-11-09T20:02:39.6731794Z   node-version: 24
+2026-11-09T20:02:39.6732001Z   always-auth: false
+2026-11-09T20:02:39.6732214Z   check-latest: false
+2026-11-09T20:02:39.6734495Z   token: ***
+2026-11-09T20:02:39.6734681Z env:
+2026-11-09T20:02:39.6734850Z   CI: true
+2026-11-09T20:02:39.6735017Z   REQUIRE_DB: 1
+2026-11-09T20:02:39.6735209Z   MIKKA_EDITION: cloud
+2026-11-09T20:02:39.6735449Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T20:02:39.6735708Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T20:02:39.6735950Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T20:02:39.6736204Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T20:02:39.6736473Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T20:02:39.6736726Z   MIKKA_TEST_DB_PORT: 5432
+2026-11-09T20:02:39.6737095Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:02:39.6737503Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:02:39.6737901Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:02:39.6738179Z   BETTER_AUTH_URL: http://localhost:3100
+2026-11-09T20:02:39.6738442Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T20:02:39.6738725Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T20:02:39.6739014Z ##[endgroup]
+2026-11-09T20:02:39.8195971Z Found in cache @ /opt/hostedtoolcache/node/24.22.2/x64
+2026-11-09T20:02:39.8200881Z (node:2849) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T20:02:39.8201699Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T20:02:39.8203858Z ##[group]Environment details
+2026-11-09T20:02:40.1835351Z node: v24.22.2
+2026-11-09T20:02:40.1835777Z npm: 11.19.1
+2026-11-09T20:02:40.1836041Z yarn: 1.22.22
+2026-11-09T20:02:40.1836668Z ##[endgroup]
+2026-11-09T20:02:40.1918980Z ##[end-action id=__self.__actions_setup-node;outcome=success;conclusion=success;duration_ms=525]
+2026-11-09T20:02:40.1921683Z ##[start-action display=Run echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT";id=__self.store]
+2026-11-09T20:02:40.1940493Z ##[group]Run echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+2026-11-09T20:02:40.1940962Z [36;1mecho "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"[0m
+2026-11-09T20:02:40.1981499Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-09T20:02:40.1981830Z env:
+2026-11-09T20:02:40.1982012Z   CI: true
+2026-11-09T20:02:40.1982209Z   REQUIRE_DB: 1
+2026-11-09T20:02:40.1982406Z   MIKKA_EDITION: cloud
+2026-11-09T20:02:40.1982627Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T20:02:40.1982877Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T20:02:40.1983117Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T20:02:40.1983370Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T20:02:40.1983640Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T20:02:40.1983905Z   MIKKA_TEST_DB_PORT: 5432
+2026-11-09T20:02:40.1984458Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:02:40.1984898Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:02:40.1985297Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:02:40.1985577Z   BETTER_AUTH_URL: http://localhost:3100
+2026-11-09T20:02:40.1986055Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T20:02:40.1986338Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T20:02:40.1986626Z ##[endgroup]
+2026-11-09T20:02:40.6553505Z ##[end-action id=__self.store;outcome=success;conclusion=success;duration_ms=463]
+2026-11-09T20:02:40.6556093Z ##[start-action display=Run actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830;id=__self.restore]
+2026-11-09T20:02:40.7252011Z ##[group]Run actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
+2026-11-09T20:02:40.7252394Z with:
+2026-11-09T20:02:40.7252645Z   path: /home/runner/setup-pnpm/node_modules/.bin/store/v10
+2026-11-09T20:02:40.7253171Z   key: pnpm-store-v1-Linux-X64-895087cfa2734303e38e1c18638ab5e282b25736308565d20acfad858d1f5d46
+2026-11-09T20:02:40.7253669Z   restore-keys: pnpm-store-v1-Linux-X64-
+
+2026-11-09T20:02:40.7253946Z   enableCrossOsArchive: false
+2026-11-09T20:02:40.7254183Z   fail-on-cache-miss: false
+2026-11-09T20:02:40.7254405Z   lookup-only: false
+2026-11-09T20:02:40.7254622Z env:
+2026-11-09T20:02:40.7254786Z   CI: true
+2026-11-09T20:02:40.7254964Z   REQUIRE_DB: 1
+2026-11-09T20:02:40.7255155Z   MIKKA_EDITION: cloud
+2026-11-09T20:02:40.7255367Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T20:02:40.7255628Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T20:02:40.7255867Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T20:02:40.7256120Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T20:02:40.7256374Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T20:02:40.7256629Z   MIKKA_TEST_DB_PORT: 5432
+2026-11-09T20:02:40.7257096Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:02:40.7257515Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:02:40.7257913Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:02:40.7258193Z   BETTER_AUTH_URL: http://localhost:3100
+2026-11-09T20:02:40.7258471Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T20:02:40.7258748Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T20:02:40.7259036Z ##[endgroup]
+2026-11-09T20:02:40.8387617Z (node:2933) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T20:02:40.8456553Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T20:02:41.0612780Z Cache hit for: pnpm-store-v1-Linux-X64-895087cfa2734303e38e1c18638ab5e282b25736308565d20acfad858d1f5d46
+2026-11-09T20:02:41.0734778Z (node:2933) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T20:02:47.3219160Z Received 50331648 of 1285222027 (3.9%), 48.0 MBs/sec
+2026-11-09T20:02:48.3228998Z Received 218103808 of 1285222027 (17.0%), 103.9 MBs/sec
+2026-11-09T20:02:49.3303195Z Received 360710144 of 1285222027 (28.1%), 114.5 MBs/sec
+2026-11-09T20:02:50.3257436Z Received 499122176 of 1285222027 (38.8%), 118.9 MBs/sec
+2026-11-09T20:02:51.3259013Z Received 612368384 of 1285222027 (47.6%), 116.7 MBs/sec
+2026-11-09T20:02:52.3272159Z Received 738197504 of 1285222027 (57.4%), 117.2 MBs/sec
+2026-11-09T20:02:53.3269595Z Received 864026624 of 1285222027 (67.2%), 117.6 MBs/sec
+2026-11-09T20:02:54.3275756Z Received 981467136 of 1285222027 (76.4%), 116.9 MBs/sec
+2026-11-09T20:02:55.3284801Z Received 1103101952 of 1285222027 (85.8%), 116.8 MBs/sec
+2026-11-09T20:02:56.3293214Z Received 1203765248 of 1285222027 (93.7%), 114.7 MBs/sec
+2026-11-09T20:02:57.2772928Z Received 1285222027 of 1285222027 (100.0%), 111.9 MBs/sec
+2026-11-09T20:02:57.2784953Z Cache Size: ~1226 MB (1285222027 B)
+2026-11-09T20:02:57.2879042Z [command]/usr/bin/tar -xf /home/runner/work/_temp/695b134f-b22a-49df-9c7c-86354e285082/cache.tzst -P -C /home/runner/work/Mikka/Mikka --use-compress-program unzstd
+2026-11-09T20:03:07.3304202Z Cache restored successfully
+2026-11-09T20:03:07.5096161Z Cache restored from key: pnpm-store-v1-Linux-X64-895087cfa2734303e38e1c18638ab5e282b25736308565d20acfad858d1f5d46
+2026-11-09T20:03:07.5216368Z ##[end-action id=__self.restore;outcome=success;conclusion=success;duration_ms=26865]
+2026-11-09T20:03:07.5220288Z ##[start-action display=Run pnpm install --frozen-lockfile;id=__self.__run]
+2026-11-09T20:03:07.6147013Z ##[group]Run pnpm install --frozen-lockfile
+2026-11-09T20:03:07.6147416Z [36;1mpnpm install --frozen-lockfile[0m
+2026-11-09T20:03:07.6184439Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-09T20:03:07.6184764Z env:
+2026-11-09T20:03:07.6184951Z   CI: true
+2026-11-09T20:03:07.6185140Z   REQUIRE_DB: 1
+2026-11-09T20:03:07.6185339Z   MIKKA_EDITION: cloud
+2026-11-09T20:03:07.6185569Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T20:03:07.6185829Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T20:03:07.6186076Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T20:03:07.6186352Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T20:03:07.6186624Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T20:03:07.6186890Z   MIKKA_TEST_DB_PORT: 5432
+2026-11-09T20:03:07.6187381Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:03:07.6187833Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:03:07.6188246Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:03:07.6188547Z   BETTER_AUTH_URL: http://localhost:3100
+2026-11-09T20:03:07.6188828Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T20:03:07.6189121Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T20:03:07.6191521Z   FFMPEG_GITHUB_TOKEN: ***
+2026-11-09T20:03:07.6191768Z ##[endgroup]
+2026-11-09T20:03:07.9728586Z Scope: all 7 workspace projects
+2026-11-09T20:03:08.0777312Z Lockfile is up to date, resolution step is skipped
+2026-11-09T20:03:08.1800516Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-09T20:03:08.3485838Z Packages: +2185
+2026-11-09T20:03:08.3486582Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-11-09T20:03:09.1952822Z Progress: resolved 2185, reused 1113, downloaded 0, added 0
+2026-11-09T20:03:10.1951760Z Progress: resolved 2185, reused 2109, downloaded 0, added 94
+2026-11-09T20:03:11.1955652Z Progress: resolved 2185, reused 2109, downloaded 0, added 469
+2026-11-09T20:03:12.1961993Z Progress: resolved 2185, reused 2109, downloaded 0, added 672
+2026-11-09T20:03:13.1957645Z Progress: resolved 2185, reused 2109, downloaded 0, added 928
+2026-11-09T20:03:14.1958482Z Progress: resolved 2185, reused 2109, downloaded 0, added 1147
+2026-11-09T20:03:15.1973927Z Progress: resolved 2185, reused 2109, downloaded 0, added 1201
+2026-11-09T20:03:16.1975875Z Progress: resolved 2185, reused 2109, downloaded 0, added 1419
+2026-11-09T20:03:17.1957310Z Progress: resolved 2185, reused 2109, downloaded 0, added 1792
+2026-11-09T20:03:18.1965990Z Progress: resolved 2185, reused 2109, downloaded 0, added 2009
+2026-11-09T20:03:19.1503723Z Progress: resolved 2185, reused 2109, downloaded 0, added 2185, done
+2026-11-09T20:03:20.5966539Z  WARN  Failed to create bin at /home/runner/work/Mikka/Mikka/apps/desktop/node_modules/.bin/mikka. ENOENT: no such file or directory, open '/home/runner/work/Mikka/Mikka/packages/daemon/dist/mikka.js'
+2026-11-09T20:03:21.0617510Z 
+2026-11-09T20:03:21.0618157Z dependencies:
+2026-11-09T20:03:21.0618550Z + @ai-sdk/gateway 4.0.121
+2026-11-09T20:03:21.0618888Z + @ai-sdk/mcp 2.0.81
+2026-11-09T20:03:21.0619210Z + @ai-sdk/openai 4.0.99
+2026-11-09T20:03:21.0619551Z + @ai-sdk/openai-compatible 3.0.75
+2026-11-09T20:03:21.0619898Z + @ai-sdk/react 4.0.152
+2026-11-09T20:03:21.0620162Z + @ai-sdk/workflow 2.0.80
+2026-11-09T20:03:21.0620474Z + @base-ui/react 1.9.0
+2026-11-09T20:03:21.0620754Z + @better-auth/core 1.7.12
+2026-11-09T20:03:21.0621060Z + @better-auth/expo 1.7.12
+2026-11-09T20:03:21.0621670Z + @better-auth/oauth-provider 1.7.12
+2026-11-09T20:03:21.0622027Z + @chat-adapter/slack 4.43.0
+2026-11-09T20:03:21.0622368Z + @chat-adapter/state-pg 4.43.0
+2026-11-09T20:03:21.0622708Z + @chat-adapter/telegram 4.43.0
+2026-11-09T20:03:21.0623034Z + @composio/core 0.26.0
+2026-11-09T20:03:21.0623348Z + @dnd-kit/core 6.3.1
+2026-11-09T20:03:21.0623642Z + @dnd-kit/sortable 10.0.0
+2026-11-09T20:03:21.0624370Z + @dnd-kit/utilities 3.2.2
+2026-11-09T20:03:21.0624662Z + @e965/xlsx 0.20.3
+2026-11-09T20:03:21.0624946Z + @floating-ui/dom 1.8.0
+2026-11-09T20:03:21.0625301Z + @formatjs/intl-localematcher 0.8.14
+2026-11-09T20:03:21.0625779Z + @heroui/react 3.2.6
+2026-11-09T20:03:21.0626083Z + @heroui/styles 3.2.6
+2026-11-09T20:03:21.0626477Z + @internationalized/date 3.12.4
+2026-11-09T20:03:21.0627050Z + @mikka/protocol 0.0.1 <- packages/protocol
+2026-11-09T20:03:21.0628338Z + @modelcontextprotocol/server 2.3.1
+2026-11-09T20:03:21.0628780Z + @norbert_bodziony/bloub 0.4.1
+2026-11-09T20:03:21.0629161Z + @novnc/novnc 1.6.0
+2026-11-09T20:03:21.0629540Z + @opentelemetry/api 1.10.0
+2026-11-09T20:03:21.0630173Z + @opentelemetry/api-logs 0.223.0
+2026-11-09T20:03:21.0630611Z + @opentelemetry/core 2.12.0
+2026-11-09T20:03:21.0631406Z + @opentelemetry/exporter-logs-otlp-proto 0.223.0
+2026-11-09T20:03:21.0632231Z + @opentelemetry/exporter-trace-otlp-proto 0.223.0
+2026-11-09T20:03:21.0633034Z + @opentelemetry/instrumentation 0.223.0
+2026-11-09T20:03:21.0633774Z + @opentelemetry/instrumentation-pg 0.76.0
+2026-11-09T20:03:21.0634488Z + @opentelemetry/resources 2.12.0
+2026-11-09T20:03:21.0635131Z + @opentelemetry/sdk-logs 0.223.0
+2026-11-09T20:03:21.0635818Z + @opentelemetry/sdk-trace-base 2.12.0
+2026-11-09T20:03:21.0636471Z + @opentelemetry/sdk-trace-node 2.12.0
+2026-11-09T20:03:21.0637127Z + @opentelemetry/semantic-conventions 1.43.0
+2026-11-09T20:03:21.0637770Z + @openuidev/lang-core 1.0.1
+2026-11-09T20:03:21.0638323Z + @openuidev/react-lang 1.0.1
+2026-11-09T20:03:21.0638887Z + @openuidev/react-ui 0.18.1
+2026-11-09T20:03:21.0639431Z + @pierre/diffs 1.6.4
+2026-11-09T20:03:21.0639869Z + @shadcn/react 0.3.1
+2026-11-09T20:03:21.0640356Z + @solidjs/web 2.0.0-rc.0
+2026-11-09T20:03:21.0640909Z + @stripe/stripe-js 10.1.0
+2026-11-09T20:03:21.0641717Z + @tanstack/react-virtual 3.14.18
+2026-11-09T20:03:21.0642275Z + @tiptap/core 3.32.0
+2026-11-09T20:03:21.0642862Z + @tiptap/extension-collaboration 3.32.0
+2026-11-09T20:03:21.0643643Z + @tiptap/extension-collaboration-caret 3.32.0
+2026-11-09T20:03:21.0644334Z + @tiptap/extension-highlight 3.32.0
+2026-11-09T20:03:21.0645010Z + @tiptap/extension-list 3.32.0
+2026-11-09T20:03:21.0645623Z + @tiptap/extension-mention 3.32.0
+2026-11-09T20:03:21.0646237Z + @tiptap/extension-table 3.32.0
+2026-11-09T20:03:21.0646904Z + @tiptap/extension-text-align 3.32.0
+2026-11-09T20:03:21.0647464Z + @tiptap/extensions 3.32.0
+2026-11-09T20:03:21.0647984Z + @tiptap/pm 3.32.0
+2026-11-09T20:03:21.0648448Z + @tiptap/react 3.32.0
+2026-11-09T20:03:21.0648916Z + @tiptap/starter-kit 3.32.0
+2026-11-09T20:03:21.0649389Z + @tiptap/suggestion 3.32.0
+2026-11-09T20:03:21.0649855Z + @tiptap/y-tiptap 3.0.10
+2026-11-09T20:03:21.0650349Z + @vercel/analytics 1.3.1
+2026-11-09T20:03:21.0650872Z + @vercel/functions 3.10.2
+2026-11-09T20:03:21.0651697Z + @vercel/oidc 4.0.2
+2026-11-09T20:03:21.0652324Z + @workflow/serde 5.0.0
+2026-11-09T20:03:21.0652806Z + @workflow/world-local 5.1.2
+2026-11-09T20:03:21.0653138Z + ai 7.0.148
+2026-11-09T20:03:21.0653477Z + aws4fetch 1.0.20
+2026-11-09T20:03:21.0653735Z + beautiful-mermaid 1.1.3
+2026-11-09T20:03:21.0654032Z + better-auth 1.7.12
+2026-11-09T20:03:21.0654313Z + chat 4.43.0
+2026-11-09T20:03:21.0654632Z + class-variance-authority 0.7.1
+2026-11-09T20:03:21.0654922Z + clsx 2.1.1
+2026-11-09T20:03:21.0655318Z + cmdk 1.1.1
+2026-11-09T20:03:21.0655652Z + cn 0.5.0
+2026-11-09T20:03:21.0656349Z + cookie 1.1.1
+2026-11-09T20:03:21.0659176Z + date-fns 4.1.0
+2026-11-09T20:03:21.0659554Z + diff 8.0.2
+2026-11-09T20:03:21.0659921Z + dompurify 3.4.17
+2026-11-09T20:03:21.0660282Z + drizzle-orm 0.45.4
+2026-11-09T20:03:21.0660613Z + e2b 2.61.0
+2026-11-09T20:03:21.0660963Z + embla-carousel-react 8.5.1
+2026-11-09T20:03:21.0661901Z + fflate 0.8.3
+2026-11-09T20:03:21.0662293Z + ffmpeg-static 5.3.0
+2026-11-09T20:03:21.0662694Z + file-type 22.3.0
+2026-11-09T20:03:21.0663039Z + h3 2.0.8
+2026-11-09T20:03:21.0663359Z + hono 4.13.13
+2026-11-09T20:03:21.0663720Z + input-otp 1.4.1
+2026-11-09T20:03:21.0664383Z + katex 0.16.47
+2026-11-09T20:03:21.0664757Z + lucide-react 1.60.0
+2026-11-09T20:03:21.0665150Z + mcp-handler 2.3.0
+2026-11-09T20:03:21.0665381Z + mermaid 12.2.0
+2026-11-09T20:03:21.0665576Z + motion 14.5.0
+2026-11-09T20:03:21.0665921Z + music-metadata 12.3.4
+2026-11-09T20:03:21.0666160Z + negotiator 1.1.0
+2026-11-09T20:03:21.0666361Z + next 16.4.1
+2026-11-09T20:03:21.0666566Z + next-intl 4.14.9
+2026-11-09T20:03:21.0666783Z + next-themes 0.4.6
+2026-11-09T20:03:21.0666995Z + nodemailer 10.3.1
+2026-11-09T20:03:21.0667217Z + officeparser 8.5.0
+2026-11-09T20:03:21.0667439Z + pg 8.23.1
+2026-11-09T20:03:21.0667646Z + posthog-js 1.438.13
+2026-11-09T20:03:21.0667871Z + posthog-node 5.55.2
+2026-11-09T20:03:21.0668075Z + react 19.3.1
+2026-11-09T20:03:21.0668306Z + react-day-picker 9.8.0
+2026-11-09T20:03:21.0668546Z + react-dom 19.3.1
+2026-11-09T20:03:21.0668762Z + react-markdown 10.1.0
+2026-11-09T20:03:21.0669045Z + react-resizable-panels 4.14.7
+2026-11-09T20:03:21.0669347Z + react-syntax-highlighter 16.1.1
+2026-11-09T20:03:21.0669616Z + recharts 3.10.1
+2026-11-09T20:03:21.0669828Z + rehype-katex 7.0.1
+2026-11-09T20:03:21.0670052Z + remark-gfm 4.0.1
+2026-11-09T20:03:21.0670260Z + remark-math 6.0.0
+2026-11-09T20:03:21.0670461Z + shadcn 4.22.1
+2026-11-09T20:03:21.0670675Z + sharp 0.35.5
+2026-11-09T20:03:21.0670865Z + shiki 4.5.0
+2026-11-09T20:03:21.0671070Z + solid-js 2.0.0-rc.0
+2026-11-09T20:03:21.0671560Z + sonner 1.7.4
+2026-11-09T20:03:21.0671885Z + srvx 1.0.8
+2026-11-09T20:03:21.0672183Z + swr 2.5.1
+2026-11-09T20:03:21.0672510Z + tailwind-merge 3.7.0
+2026-11-09T20:03:21.0672993Z + tw-animate-css 1.4.0
+2026-11-09T20:03:21.0673372Z + undici 7.24.5
+2026-11-09T20:03:21.0673756Z + unstorage 2.0.0-beta.0
+2026-11-09T20:03:21.0674130Z + use-intl 4.14.9
+2026-11-09T20:03:21.0674459Z + vaul 1.1.2
+2026-11-09T20:03:21.0674779Z + workflow 5.2.3
+2026-11-09T20:03:21.0675039Z + y-protocols 1.0.7
+2026-11-09T20:03:21.0675283Z + yjs 13.6.33
+2026-11-09T20:03:21.0675597Z + zod 4.6.7
+2026-11-09T20:03:21.0675765Z 
+2026-11-09T20:03:21.0675890Z devDependencies:
+2026-11-09T20:03:21.0676303Z + @playwright/test 1.64.1
+2026-11-09T20:03:21.0676724Z + @tailwindcss/postcss 4.3.3
+2026-11-09T20:03:21.0677141Z + @types/node 25.9.9
+2026-11-09T20:03:21.0677666Z + @types/pg 8.23.1
+2026-11-09T20:03:21.0678043Z + @types/react 19.3.0
+2026-11-09T20:03:21.0678428Z + @types/react-dom 19.3.0
+2026-11-09T20:03:21.0678945Z + @types/react-syntax-highlighter 15.5.13
+2026-11-09T20:03:21.0679638Z + @typescript/native-preview 7.0.0-dev.20260707.2
+2026-11-09T20:03:21.0680094Z + esbuild 0.28.2
+2026-11-09T20:03:21.0680474Z + fake-indexeddb 6.2.4
+2026-11-09T20:03:21.0680944Z + happy-dom 15.11.7
+2026-11-09T20:03:21.0681344Z + js-yaml 4.3.2
+2026-11-09T20:03:21.0681690Z + nitro 3.0.261103-rc
+2026-11-09T20:03:21.0682006Z + nx 24.0.5
+2026-11-09T20:03:21.0682310Z + oxlint 1.89.0
+2026-11-09T20:03:21.0682648Z + postcss 8.5.31
+2026-11-09T20:03:21.0682959Z + prettier 3.9.10
+2026-11-09T20:03:21.0683345Z + prettier-plugin-tailwindcss 0.7.4
+2026-11-09T20:03:21.0683753Z + rolldown 1.3.0
+2026-11-09T20:03:21.0684081Z + tailwindcss 4.3.3
+2026-11-09T20:03:21.0684439Z + tsrs 0.20.1-ts7.1.0-beta
+2026-11-09T20:03:21.0684868Z + tsx 4.23.15
+2026-11-09T20:03:21.0685170Z + typescript 5.9.3
+2026-11-09T20:03:21.0685545Z + wrangler 4.152.0
+2026-11-09T20:03:21.0685760Z 
+2026-11-09T20:03:21.3428519Z  WARN  Failed to create bin at /home/runner/work/Mikka/Mikka/apps/desktop/node_modules/.bin/mikka. ENOENT: no such file or directory, open '/home/runner/work/Mikka/Mikka/apps/desktop/node_modules/@mikka/daemon/dist/mikka.js'
+2026-11-09T20:03:21.4430044Z ╭ Warning ─────────────────────────────────────────────────────────────────────╮
+2026-11-09T20:03:21.4431665Z │                                                                              │
+2026-11-09T20:03:21.4432907Z │   Ignored build scripts: @openuidev/lang-core@1.0.1, cbor-extract@2.2.2,     │
+2026-11-09T20:03:21.4434107Z │   core-js@3.51.0, electron-winstaller@5.4.0, nx@24.0.5,                      │
+2026-11-09T20:03:21.4435286Z │   tesseract.js@7.0.0, workerd@1.20261019.1.                                  │
+2026-11-09T20:03:21.4436938Z │   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+2026-11-09T20:03:21.4438267Z │   to run scripts.                                                            │
+2026-11-09T20:03:21.4439120Z │                                                                              │
+2026-11-09T20:03:21.4440022Z ╰──────────────────────────────────────────────────────────────────────────────╯
+2026-11-09T20:03:21.4572933Z Done in 13.8s using pnpm v10.34.3
+2026-11-09T20:03:21.5120806Z ##[end-action id=__self.__run;outcome=success;conclusion=success;duration_ms=13989]
+2026-11-09T20:03:21.5124636Z ##[start-action display=Save the pnpm store (main only);id=__self.__actions_cache]
+2026-11-09T20:03:21.5141478Z ##[end-action id=__self.__actions_cache;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-11-09T20:03:21.5173381Z ##[group]Run node --input-type=commonjs - <<'NODE'
+2026-11-09T20:03:21.5173786Z [36;1mnode --input-type=commonjs - <<'NODE'[0m
+2026-11-09T20:03:21.5174187Z [36;1mconst { appendFileSync, writeSync } = require('node:fs')[0m
+2026-11-09T20:03:21.5174630Z [36;1mconst secret = require('node:crypto').randomBytes(32).toString('hex')[0m
+2026-11-09T20:03:21.5175029Z [36;1mwriteSync(1, '::add-mask::' + secret + '\n')[0m
+2026-11-09T20:03:21.5175473Z [36;1mappendFileSync(process.env.GITHUB_ENV, 'BETTER_AUTH_SECRET=' + secret + '\n')[0m
+2026-11-09T20:03:21.5175876Z [36;1mNODE[0m
+2026-11-09T20:03:21.5208728Z shell: /usr/bin/bash -e {0}
+2026-11-09T20:03:21.5208986Z env:
+2026-11-09T20:03:21.5209170Z   CI: true
+2026-11-09T20:03:21.5209356Z   REQUIRE_DB: 1
+2026-11-09T20:03:21.5209555Z   MIKKA_EDITION: cloud
+2026-11-09T20:03:21.5209794Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T20:03:21.5210050Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T20:03:21.5210373Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T20:03:21.5210640Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T20:03:21.5210912Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T20:03:21.5211741Z   MIKKA_TEST_DB_PORT: 5432
+2026-11-09T20:03:21.5212257Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:03:21.5212697Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:03:21.5213111Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:03:21.5213408Z   BETTER_AUTH_URL: http://localhost:3100
+2026-11-09T20:03:21.5213679Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T20:03:21.5213977Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T20:03:21.5214274Z ##[endgroup]
+2026-11-09T20:03:21.5628785Z ##[group]Run node "$RUNNER_TEMP/issue1512-pg/driver.mjs" run red
+2026-11-09T20:03:21.5629257Z [36;1mnode "$RUNNER_TEMP/issue1512-pg/driver.mjs" run red[0m
+2026-11-09T20:03:21.5664150Z shell: /usr/bin/bash -e {0}
+2026-11-09T20:03:21.5664418Z env:
+2026-11-09T20:03:21.5664629Z   CI: true
+2026-11-09T20:03:21.5664820Z   REQUIRE_DB: 1
+2026-11-09T20:03:21.5665034Z   MIKKA_EDITION: cloud
+2026-11-09T20:03:21.5665271Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T20:03:21.5665570Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T20:03:21.5665825Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T20:03:21.5666096Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T20:03:21.5666376Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T20:03:21.5666648Z   MIKKA_TEST_DB_PORT: 5432
+2026-11-09T20:03:21.5667163Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:03:21.5667593Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:03:21.5668062Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:03:21.5668365Z   BETTER_AUTH_URL: http://localhost:3100
+2026-11-09T20:03:21.5668637Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T20:03:21.5668927Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T20:03:21.5669404Z   BETTER_AUTH_SECRET: ***
+2026-11-09T20:03:21.5669628Z ##[endgroup]
+2026-11-09T20:03:22.0053858Z ISSUE1512_PG_COMMAND_START {"phase":"red","label":"migration-bootstrap","executable":"/opt/hostedtoolcache/node/24.22.2/x64/bin/node","args":["--experimental-strip-types","--test","tests/migrate-empty-db.test.mjs"],"startedAt":"2026-11-09T20:03:22.004Z","timeoutMs":240000}
+2026-11-09T20:03:26.9517073Z ISSUE1512_PG_ORIGINAL_BEGIN {"phase":"red","label":"migration-bootstrap","stream":"stdout","file":"red-migration-bootstrap-stdout.log","bytes":1152,"sha256":"331b9af5e4ed69a51cf1059442b645daa6fcdccc6a79e32a19117b2976a067bb"}
+2026-11-09T20:03:26.9546271Z ISSUE1512_PG_ORIGINAL_CHUNK Q3JlYXRlZCByZXRhaW5lZCBtaWdyYXRpb24gdGVzdCBkYXRhYmFzZTogYm9vdHN0cmFwX2E3M2Q2Y2U0MTU4NDQ2ZDlhOWUzNWU1MGQxOWYzMjkwCkNyZWF0ZWQgbWlncmF0aW9uIHRlc3Qgc2NoZW1hOiBib290c3RyYXBfYXBwX2VlNzdhODk4ZWVmNDRjNTBhMzA3MjBmOTI3YTM3M2FjClZlcmlmaWVkIDI2MSBtaWdyYXRpb25zIGZyb20gZW1wdHkgQ0kgc2NoZW1hLCBjdXJyZW50IGFwcC93b3Jrc3BhY2UgY29sdW1ucywgcmVydW4gbGVkZ2VyLCBhbmQgcG9wdWxhdGVkIGJhc2VsaW5lIHJlcGxheSAoc2hhcmVkKQpSZXRhaW5lZCBtaWdyYXRpb24gdGVzdCBzY2hlbWFzOiBib290c3RyYXBfYXBwX2VlNzdhODk4ZWVmNDRjNTBhMzA3MjBmOTI3YTM3M2FjCuKclCBwbnBtIG1pZ3JhdGUgYm9vdHN0cmFwcyBlbXB0eSBzaGFyZWQgdGFyZ2V0IGFuZCBzYWZlbHkgcmVydW5zICgyMjA5LjQ3MzAyOW1zKQpDcmVhdGVkIHJldGFpbmVkIG1pZ3JhdGlvbiB0ZXN0IGRhdGFiYXNlOiBib290c3RyYXBfMDgyNjI3MDQ4MTg2NDQ4Yjk1YzI0OWFhNDU2MmQyYmYKQ3JlYXRlZCBtaWdyYXRpb24gdGVzdCBzY2hlbWE6IGJvb3RzdHJhcF9hcHBfYmQ3YmI5ZWQ3ZDJhNDJhYWIzYWJiYmNkNjRhMjRiMzcKQ3JlYXRlZCBtaWdyYXRpb24gdGVzdCBzY2hlbWE6IGJvb3RzdHJhcF93c183ODAzMGZlOTZhZjA0YTQzYmZkYzdlNjc5MDRmZTlhMwpWZXJpZmllZCAyNjEgbWlncmF0aW9ucyBmcm9tIGVtcHR5IENJIHNjaGVtYSwgY3VycmVudCBhcHAvd29ya3NwYWNlIGNvbHVtbnMsIHJlcnVuIGxlZGdlciwgYW5kIHBvcHVsYXRlZCBiYXNlbGluZSByZXBsYXkgKHNwbGl0KQpSZXRhaW5lZCBtaWdyYXRpb24gdGVzdCBzY2hlbWFzOiBib290c3RyYXBfYXBwX2JkN2JiOWVkN2QyYTQyYWFiM2FiYmJjZDY0YTI0YjM3LCBib290c3RyYXBfd3NfNzgwMzBmZTk2YWYwNGE0M2JmZGM3ZTY3OTA0ZmU5YTMK4pyUIHBucG0gbWlncmF0ZSBib290c3RyYXBzIGVtcHR5IHNlcGFyYXRlIHRhcmdldHMgYW5kIHNhZmVseSByZXJ1bnMgKDIwNzYuNzQ3MzkxbXMpCuKEuSB0ZXN0cyAyCuKEuSBzdWl0ZXMgMArihLkgcGFzcyAyCuKEuSBmYWlsIDAK4oS5IGNhbmNlbGxlZCAwCuKEuSBza2lwcGVkIDAK4oS5IHRvZG8gMArihLkgZHVyYXRpb25fbXMgNDkwOS4xNzY5ODIK
+2026-11-09T20:03:26.9575099Z ISSUE1512_PG_ORIGINAL_END {"phase":"red","label":"migration-bootstrap","stream":"stdout"}
+2026-11-09T20:03:26.9577045Z ISSUE1512_PG_ORIGINAL_BEGIN {"phase":"red","label":"migration-bootstrap","stream":"stderr","file":"red-migration-bootstrap-stderr.log","bytes":0,"sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}
+2026-11-09T20:03:26.9578835Z ISSUE1512_PG_ORIGINAL_END {"phase":"red","label":"migration-bootstrap","stream":"stderr"}
+2026-11-09T20:03:26.9583763Z ISSUE1512_PG_COMMAND_END {"label":"migration-bootstrap","executable":"/opt/hostedtoolcache/node/24.22.2/x64/bin/node","args":["--experimental-strip-types","--test","tests/migrate-empty-db.test.mjs"],"startedAt":"2026-11-09T20:03:22.004Z","finishedAt":"2026-11-09T20:03:26.951Z","code":0,"signal":null,"timedOut":false,"spawnError":null,"stdout":{"file":"red-migration-bootstrap-stdout.log","bytes":1152,"sha256":"331b9af5e4ed69a51cf1059442b645daa6fcdccc6a79e32a19117b2976a067bb"},"stderr":{"file":"red-migration-bootstrap-stderr.log","bytes":0,"sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}}
+2026-11-09T20:03:26.9586331Z ISSUE1512_PG_COMMAND_START {"phase":"red","label":"e2e-setup","executable":"pnpm","args":["test:e2e:setup"],"startedAt":"2026-11-09T20:03:26.952Z","timeoutMs":240000}
+2026-11-09T20:03:29.2970066Z ISSUE1512_PG_ORIGINAL_BEGIN {"phase":"red","label":"e2e-setup","stream":"stdout","file":"red-e2e-setup-stdout.log","bytes":20970,"sha256":"a3e39d357db4e26cf6093db7841015ece76ce580eeec97c4e8fb263273c792c6"}
+2026-11-09T20:03:29.4867420Z ISSUE1512_PG_ORIGINAL_CHUNK Cj4gbmV4dC1hcHBAMC4wLjEgdGVzdDplMmU6c2V0dXAgL2hvbWUvcnVubmVyL3dvcmsvTWlra2EvTWlra2EKPiBub2RlIC0tZXhwZXJpbWVudGFsLXN0cmlwLXR5cGVzIHNjcmlwdHMvc2V0dXAtZTJlLWRiLm1qcwoKbWlncmF0ZTogc3RhcnRpbmcKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyMzIyMTI1OV9hcHBsaWNhdGlvbl9iYXNlbGluZS5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMDAwMV9hZ2VudHNfZGV2aWNlcy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMDAwMl9kZXZpY2VfZW5hYmxlZC5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMDAwM19hZ2VudHNfY29sdW1ucy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMDAwNF9saW5lYXJfc3luYy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMDAwNF90ZWxlZ3JhbV9jaGF0LnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAwMDA1X2xpbmVhcl9zeW5jX3JldHJ5X2FuZF9jb21tZW50X2tleXMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDAwMDVfbWlra2FfaXNzdWVfbWV0YWRhdGEuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDAwMDZfbGluZWFyX2NvbW1lbnRfYXV0aG9yc2hpcC5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMDAwN19jb29yZGluYXRvcl9ldmVudHMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDAwMDdfbGluZWFyX2Rlc2NyaXB0aW9uX3NuYXBzaG90LnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAwMDA4X2Nvb3JkaW5hdG9yX3Nlc3Npb25zLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAwMDA4X2xpbmVhcl9taWtrYV9pc3N1ZV9tZXRhZGF0YS5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMDAwOV9vYXV0aF9wcm92aWRlci5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMDAxMF9jb29yZGluYXRvcl9zZXNzaW9uX2Vycm9yLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAwMDExX2Nvb3JkaW5hdG9yX2V2ZW50X3RpZXIuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDAwMTJfcnVuX3Rva2Vucy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjMxNDMwMDBfZGVjaXNpb25fY2FsbHMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDIzMTUwMDAwX3N1Z2dlc3Rpb25zLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyMzE1NDgwMF9pc3N1ZV9zY29wZS5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjMxNjExMjhfaXNzdWVfc2NvcGVfc291cmNlLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyMzE3MDUwMF9kcm9wX2RlY2lzaW9uX2NhbGxzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyMzE3MTUwMF9zdWdnZXN0aW9uX3RyaWdnZXJfY2hlY2tzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyMzIxMzg1MV9ncm91cF9jb252ZXJzYXRpb25zLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyNTAwMDQwMF9ydW5fcmV0cmllcy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjUwMDU2MDBfbWlra2FfbGluZWFyX3N5bmNfc2V0dGluZy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjUwMTM0MDBfcnVuX2NoZWNrcG9pbnRzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyNTA0MzAwMF9wZW5kaW5nX2FjdGlvbnMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI1MjAwMDAwX2FjdGl2aXR5X3ZlcnNpb25fYWN0b3Iuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI1MjMyMjAwX2lzc3VlX2xpc3RfaW5kZXhlcy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjYwMTMwMDBfaXNzdWVfc2VhcmNoX3BnX3RyZ20uc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI2MDEzMDAxX2lzc3VlX3NlYXJjaF90aXRsZV9pZHguc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI2MDEzMDAyX2lzc3VlX3NlYXJjaF9yZWNlbnRfaWR4LnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyNjAxMzAwM19pc3N1ZV9zZWFyY2hfbnVtYmVyX2lkeC5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjYxNzAwMDBfbmF0aXZlX2Nvb3JkaW5hdG9yLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyNzAxMDAwMF9ib3RzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyNzE2NDUwMF9hcnRpZmFjdF9sZWdhY3lfY29tcGF0LnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyNzAxMDEwMF9hcnRpZmFjdHMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI3MDEwMjAwX2JvdF9jb252ZXJzYXRpb25zLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyNzAxMTA0Nl91c2VyX3RpbWVfem9uZXMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI3MTIwMDAwX2Nvb3JkaW5hdG9yX2F0dGVudGlvbi5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjcxNjQ1MDFfY2xvdWRfY29tcHV0ZXJzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyNzE2NDUwMl9jb21wdXRlcl9ydW5fYmluZGluZ3Muc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI3MTY0NTAzX2J5b3NfY3JlZGVudGlhbF9wdWJsaWNhdGlvbnMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI3MTY0NTA0X2J5b3NfYmluZGluZ3Nfb2F1dGguc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI3MTY0NTA1X2J5b3NfZGV2aWNlX2F1dGhvcml6YXRpb24uc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI3MTY0NTA2X2J5b3NfYWNjZXNzX2FuZF9jbGVhbnVwLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyNzE2NDUwN19ieW9zX25hdGl2ZV9ydW5zLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyNzE2NDUwOF9ieW9zX2Vucm9sbG1lbnRfdHJhbnNmZXJzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyNzE2NDUwOV9ieW9zX2Vucm9sbG1lbnRfY2xlYW51cC5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjcxNjQ1MTBfbG9jYWxfY29tcHV0ZXJfcmV2aWV3cy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjcxNjQ1MTFfY2xvdWRfZGV2aWNlX3Njb3BlLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyNzE2NDUxMl9jbG91ZF93b3JrZXJfbGVhc2VzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyNzE2NDUxM19jb21wdXRlcl9ydW5fYXBwcm92YWxzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyNzE2NDUxNF9ib3RfY2xvdWRfcnVudGltZXMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI3MTY0NTE1X3dvcmtzcGFjZV9jb21wdXRlcl9wb2xpY3kuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI3MTgxMDAwX2FnZW50X2tpdC5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjcyMDM2NDdfbW9iaWxlX3B1c2guc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI3MjMxODE1X3VzZXJfZmFjdHMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI4MDE1MzMwX2lzc3VlX3Rvb2xfY2FsbHMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI4MTQzOTIwX29wZXJhdGlvbl9sZWRnZXIuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI4MTQzOTIxX2FwcHJvdmVkX3dyaXRlX2JpbmRpbmcuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI4MjI0NzM3X3J1bl9sYXN0X3JlcGx5LnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyOTAxMDQ0Nl9kZXZpY2VfY29tcHV0ZXJfY2FwYWJpbGl0eS5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjkwMTA0NDdfd29ya3NwYWNlX2NvbXB1dGVyX3BvbGljeV9hbGxvdy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjkwMTE2MTRfY29vcmRpbmF0b3JfdHJpYWdlX2F0dGVtcHQuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI5MDExNjM1X3N1YmFnZW50c190aHJlYWRfbWFjaGluZXMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI5MDExNzAwX2FnZW50X3Rvb2xfYXBwcm92YWxzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyOTAxMTcwMV9jbGlfcnVuX3BvbGljeS5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjkwMTIwMjdfYWNjb3VudF9jcmVkZW50aWFsX3ZhdWx0LnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyOTAyMjM1M19sb2NhbF9yZXBvc2l0b3J5X2RlZmF1bHRzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyOTAyMzEyMV9kZXZpY2VfYXV0aG9yaXphdGlvbi5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjkwMjQxMjRfcnVuX3B1YmxpY2F0aW9ucy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjkwNDM2MzBfY29tcG9zaW9fYWNjb3VudHMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI5MDQzNjMxX2J5b3NfYWNjb3VudF9sYWJlbC5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjkwNDM2MzJfY29tcG9zaW9fYWNjb3VudF9lbWFpbF9jaGVja3Muc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI5MDQzNjMzX2J5b3NfY29ubmVjdGlvbl9yZW1vdmVkLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyOTA0MzYzNF9ncm91cF90dXJucy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjkwNDM2MzVfcGVuZGluZ19hY3Rpb25fYWNjb3VudC5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjkwNDM2MzZfcnVuX2NhcHR1cmVzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyOTA0MzYzN19wZXJzb25hbF9zY29wZV9kZXRhY2htZW50LnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyOTA0MzYzOF9pc3N1ZV9zY29wZV9nZW5lcmF0aW9uLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyOTA0MzYzOV9saW5lYXJfcHVibGljYXRpb25zLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyOTA0MzY0MF9leHBsaWNpdF93b3Jrc3BhY2Vfc2NvcGUuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI5MDQzNjQxX3RlYW1faXNzdWVfY3JlYXRpb25fZ2F0ZS5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjkwNDM2NDNfcmVxdWlyZV92ZXJpZmllZF90ZWFtX3Byb21vdGlvbi5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjkwNDM2NDRfdGVhbV9pc3N1ZV9wcm9tb3Rpb25zLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyOTA0MzY0Nl9hZ2VudF9leHRlcm5hbF93cml0ZV9wb2xpY3kuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI5MDQzNjQ3X3dvcmtzcGFjZV9leHRlcm5hbF93cml0ZV9wb2xpY3kuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI5MDQ0MDAwX2ZhY3RvcnlfMTkyX3JvdXRpbmcuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI5MDQ0MDAxX2ZhY3RvcnlfMTkyX3F1ZXN0aW9uX3NvdXJjZV9pZGVudGl0eS5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjkwNDQwMDJfcnVuX2Rpc3BhdGNoX2tleXMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI5MDQ0MDAzX2ZhY3RvcnlfMTkyX3N0YWdlcy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjkwNDQwMDRfZmFjdG9yeV8xOTRfYXBwcm92YWxzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyOTA0NDAwNV9mYWN0b3J5XzE5NV9tb25pdG9yLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyOTA0NDAwNl9mYWN0b3J5XzE5Ml9xdWVzdGlvbnMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI5MDQ0MDA3X3NlbGZfaW1wcm92ZW1lbnQuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI5MDQ0MDA4X2ltcHJvdmVtZW50X3NraWxsX2Fzc2lnbm1lbnRzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyOTA0NDAwOV9za2lsbF9jYW5kaWRhdGVfcmVnaXN0cnkuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI5MDQ0MDEwX3NraWxsX21vdW50X2V2aWRlbmNlLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyOTA0NDAxMV9mZWVkYmFja19jYW5kaWRhdGVfZ2VuZXJhdGlvbi5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjkwNDQwMTJfc2tpbGxfZXZhbHVhdGlvbnMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI5MDQ0MDEzX2ZhY3Rvcnlfc2tpbGxfYWN0aXZhdGlvbi5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjkwNDQwMTRfc2tpbGxfbGlmZWN5Y2xlX29wZXJhdGlvbnMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI5MDQ0MDE1X2lzc3VlX3N0YXR1c19jb2Rlcy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjkwNDQwMTZfZmFjdG9yeV9wdWJsaWNfY29uc3VtZXJzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyOTA0NDAxN19ydW5fcHVibGljYXRpb25fc2NvcGUuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI5MDQ0MDE4X2ZhY3Rvcnlfc2NvcGVfZ2VuZXJhdGlvbi5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjkwODAwMDBfdW5hdHRlbmRlZF9icm93c2VyX3J1bnRpbWUuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI5MDgwMDAxX293bmVyX2Nsb3VkX21hY2hpbmVzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyOTE2MDQxMV9pc3N1ZV9yZWFkX2NvbXBhdGliaWxpdHkuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI5MjEzOTM1X3RocmVhZF9tYWNoaW5lX2NvbXB1dGVfc2Vjb25kcy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjkyMTM5MzZfc2V0dGluZ3NfcHJlZmVyZW5jZXMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI5MjEzOTM3X3NldHRpbmdzX2FjdGl2aXR5X2RldmljZXMuc3FsIHRv
+2026-11-09T20:03:29.7765329Z ISSUE1512_PG_ORIGINAL_CHUNK IE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI5MjEzOTM5X3dvcmtzcGFjZV9hZG1pbl9zZXR0aW5ncy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjkyMTM5NDBfYWNjb3VudF9zZXR0aW5ncy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjkyMTM5NDFfcGVuZGluZ19hY3Rpb25zX3VzZXJfZGVjaWRlZF9pZHguc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI5MjEzOTQyX2JvdF9zdWJhZ2VudHNfb3duZXJfZmtleV92YWxpZGF0ZS5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjkyMzAwMDBfZGVza3RvcF9hdXRoX3JlcXVlc3RzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAzMDA3NDAwMF9mYWN0b3J5X3B1YmxpY2F0aW9uX2ZhaWxlZC5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMzAwNzQxMDBfZmFjdG9yeV9wdWJsaWNhdGlvbnNfYWN0aXZlX2tleS5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMzAwNzQyMDBfZmFjdG9yeV9wdWJsaWNhdGlvbnNfZHJvcF9sb2dpY2FsX3VuaXF1ZS5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMzAwNzQzMDBfZmFjdG9yeV9wdWJsaWNhdGlvbl9mYWlsZWRfdmFsaWRhdGUuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDMwMTkzMDAwX2RldmljZV9lbnJvbGxtZW50X21hbmFnZW1lbnQuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDMwMTk1MDIyX2ZhY3RvcnlfYXBwcm92YWxfZXZpZGVuY2Vfb3B0aW9uYWwuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDMwMjAwNjEwX2V4ZWN1dGlvbl9ydWxlcy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMzAyMDQ3NTFfd29ya3NwYWNlX2NvbXB1dGVyX3BvbGljeV9kZWZhdWx0X2FsbG93LnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAzMDIwNDgyOV93b3Jrc3BhY2VfYXBwX3BvbGljaWVzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAzMDIwNDgzM193b3Jrc3BhY2VfYXVkaXRfZXZlbnRzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAzMDIwNDgzNF9wZXJzb25hbF9hY2Nlc3NfdG9rZW5zLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAzMDIwNDgzNV93b3Jrc3BhY2Vfc2VjcmV0c19lbnYuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDMwMjA0ODM2X2FnZW50X3Rvb2xfYXBwcm92YWxfaW5wdXRfZGlnZXN0LnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAzMDIxMzI1NF91c2VyX29uYm9hcmRpbmcuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDMwMjMwMDAwX2hvc3RlZF91c2FnZS5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMzAyMzExMjJfZGV2aWNlX3VuaW5zdGFsbF9jb21tYW5kLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAzMDIzMzAwMV9mYWN0b3J5X2NhbmRpZGF0ZV9kZXRhaWxzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAzMDIzMzAwMl9ieW9zX21vZGVsX2NhdGFsb2cuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDMwMjM0NjM2X3J1bl9odW1hbl9jb250cm9sX3BhdXNlLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAzMTAwMDI1MF9pc3N1ZV9udW1iZXJfY291bnRlcl9leHBhbmQuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDMxMDAwMjUxX2lzc3VlX293bmVyX251bWJlcl91bmlxdWUuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDMxMDAwMzAwX3BvaW50c19wdXJjaGFzZV9kZXRhaWxzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAzMTAwMjYwNF9jb29yZGluYXRvcl93YWtlX3JlY292ZXJ5LnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAzMTAwMjYwNV9kYWVtb25fY3JlZGVudGlhbF9yZXZvY2F0aW9uLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAzMTAwMjYwNl91c2VyX3NjaGVkdWxlcy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMzEwMDI2MDdfY2hlY2twb2ludF9yZWNvdmVyeV9hdmFpbGFiaWxpdHkuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDMxMDA0MjAwX2NhcmRfdmVyaWZpY2F0aW9uX2NoZWNrb3V0LnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAzMTA0MDAwMF9wZXJzb25hbF9wbHVnaW5zLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAzMTA1MDcyOV93b3Jrc3BhY2VfbW9kZWxfYWRtaXNzaW9uLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAzMTA1MDczMV9hY2NvdW50X2RlbGV0aW9uX2pvYnMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDMxMDUwNzMzX3RlYW1fc2tpbGxfbWV0YWRhdGEuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDMxMDUwNzM0X2F1ZGl0X3JldGVudGlvbl9wb2xpY3kuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDMxMDUwNzM1X2FyY2hpdmVfbGluZWFyX29uX3BlcnNvbmFsX3Njb3BlLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAzMTA1MDczNl9vcHNfbW9uaXRvcl9vYnNlcnZhdGlvbnMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDMxMDUwNzM3X2FjY291bnRfZGVsZXRpb25fd2FybmluZ3Muc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDMxMDU0MDE1X3ZhbGlkYXRlX2FjdGl2aXR5X2FjdG9yX3R5cGUuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDMxMDU0MDE2X3ZhbGlkYXRlX2FjdGl2aXR5X2FjdG9yX2lkLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAzMTA1NDAxN19leHBsaWNpdF9leGVjdXRpb24uc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDMxMDYwNTEwX21vbml0b3JfZm9sbG93dXBfaXNzdWVzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAzMTA2MDUxMV9tb25pdG9yX2dpdGh1Yl9pc3N1ZV9saW5rcy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMzExMDQ0NDFfY2xpX3RlYW1fcHJvamVjdF9wb2xpY3kuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDMxMTUxMzUzX3B1c2hfZmluaXNoZWRfZGVmYXVsdF9vbi5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMzExNTM1MTFfZ3JvdXBfYm90X21lbWJlcnMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDMxMjM0NTAwX2RldmljZV9hdXRvX3NjaGVkdWxlLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwMTAwMTIwMF9ib3RfbW9kZWxfaG9zdGVkX2Nob2ljZS5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDEwMjAwMDBfZHJvcF91bm1lcmdlZF9icmFuY2hfc2NoZW1hLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwMTAyMDEwMF9wZXJzb25hbF9tYWlsYm94X3NjaGVtYS5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDEwMjAyMDFfd29ya3NwYWNlX3BlcnNvbmFsX3BvbGljaWVzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwMTAyMDIwMl9ib3RfYXJjaGl2ZS5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDEwMjAyMDNfd29ya3NwYWNlX3BheW1lbnRfZGVzaWduYXRpb25zLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwMTAyMDUwMF9tZXNzYWdlX3JlYWN0aW9ucy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDEwMjA2MDBfY2hhdF9wcmVmZXJlbmNlcy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDEwMjEwMDBfbW9kZWxfYXBpX2tleXMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTAxMDIxMTAwX2JvdF9hcGlfa2V5X2Nob2ljZS5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDEwMjU3MTVfZ2l0aHViX2Nvbm5lY3Rpb25zLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwMTEyMDAwMF9ieW9zX2Nvbm5lY3Rpb25fcGF1c2VkLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwMTEyMTAwMF9mYWN0b3J5X21lcmdlcy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDExMjExMDBfcnVuX2NhcHR1cmVfc3RlcHMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTAxMTMwMDAwX2hvc3RlZF91c2FnZV9jb25jdXJyZW50LnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwMTE0MDAwMF9jb29yZGluYXRvcl9ib3RzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwMTE0MDEwMF91c2VyX2UyYl9rZXlzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwMTE1MDAwMF9ydW5fcXVvdGFfcmVzZXRzX2F0LnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwMTE2MDAwMF9jaGF0X2JvdF9vbl9wcm9wb3NhbHMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTAxMTcwMDAwX3dvcmtzcGFjZV9jcmVkaXRfc2hhcmVzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwMTE4MDAwMF9jb21wb3Npb19uZWVkc19yZWNvbm5lY3Quc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTAxMTkxMDAwX2Jyb3dzZXJfYXNrX3JldGlyZWQuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTAxMTkxMTAwX2dpdGh1Yl9wdXNoX2dyYW50LnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwMTE5MTIwMF9ub19hc2tfZm9yX2FwcF9ncmFudGVkLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwMTE5MzAwMF90aHJlYWRfbWFjaGluZV90YXNrLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwMTE5NDAwMF90aHJlYWRfbWFjaGluZV9sb2dfdGFpbC5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDEyMDAwMDBfcnVuX3RocmVhZF9jb250aW51YXRpb25zLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwMTIwMTAwMF9ydW5fb3V0Y29tZXMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTAxMjAyMDAwX21haWxib3hfcHVzaF9ub3RpZmljYXRpb25zLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwMjAzMTAwMF9ib3RzX291dGxpdmVfb3duZXIuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTAyMDMxMDAxX2JvdHNfb3duZXJfZmtleV92YWxpZGF0ZS5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDIwMzEwMDJfd29ya3NwYWNlX2RlbGV0aW9ucy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDIxMTUwMzBfc2FuZGJveF9raWxsX3JldHJpZXMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTAyMTIwMDAwX21vZGVsX2FwaV9rZXlfbW9kZWxzX2Vycm9yLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwMjE0MDAwMF9tb2RlbF9vcmRlci5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDIxNzAwMDBfZGV2aWNlX2NvZGVfY2xpZW50X2luZm8uc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTAyMTkwMDAwX21vZGVsX2FwaV9rZXlfcmVzcG9uc2VzX2FwaS5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDIyMDAwMDBfbW9kZWxfb3JkZXJfcHJlZmVycmVkX2FnZW50LnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwMjIxMzAwMF9kZXZpY2VfdXBkYXRlX2ZhaWx1cmUuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTAyMjIwMDAwX3dvcmtzcGFjZV9zZWNyZXRfbm90ZXMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTAyMjMwMDAwX3VzZXJfc2VjcmV0cy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDIyMzMwMDBfbW9kZWxfb3JkZXJfY2xvdWRfZmlyc3Quc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTAzMDIwMDAwX2dpdGh1Yl9jb25uZWN0X2ludGVudHMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTAzMDMwMDAwX2dpdGh1Yl9jb25uZWN0X2xvb3BiYWNrLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwMzA2MDAwMF9mYWN0b3J5X2RlbGl2ZXJhYmxlcy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDMxMzAwMDBfY2hhdF9hdHRhY2htZW50cy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDMyMjAyMDBfZXhlY3V0aW9uX2lkZW50aXR5X3Byb3ZlbmFuY2Uuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTAzMjIwMjAxX2dyb3VwX2ZhY3Rvcnkuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTAzMjIwMzAwX2dyb3VwX2RlY2lzaW9uX3F1YWxpdHkuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTA0MDAzMDAwX21jcF93b3Jrc3BhY2Vfc2hhcmVzLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwNDIxMzAwMF9wcm9qZWN0X2RlY2lzaW9ucy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDQyMzEwMDBfYWdlbnRfcHJvZmlsZXMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTA1MDQxNTAwX3ByZWZlcnJlZF9hZ2VudF9mcm9tX2ZpcnN0X3Jvdy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDUxNDAwMDBfbW9kZWxfZGlmZmljdWx0eV9yb3V0aW5nLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwNTE1MDAwMF9ieW9zX2FjcXVpcmVfZXhwaXJ5LnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwNTE2MDAwMF9jaGF0X2F0dGFjaG1lbnRfdXBsb2FkX2V4cGlyeV9pZHguc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTA1MTcwMDAwX2xpdmVfcmV2aXNpb25zLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwNTE4MDAwMF9mYWN0b3J5X2Zsb3dfdmlldy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDUyMDMwMDBfY2hhdF9wcmVmZXJlbmNlc19ob21lX3Jvd3Muc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTA2MTEwMDAwX2lzc3VlX3Nob3J0X3RpdGxlcy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDYxNjAwMDBfcnVuX3Byb21wdF90YXNrX3JhbmdlLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwNjE3MDAwMF9pc3N1ZV9udW1i
+2026-11-09T20:03:29.9333973Z ISSUE1512_PG_ORIGINAL_CHUNK ZXJfcmVxdWlyZWQuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTA2MTgxMDAwX3RocmVhZF9tYWNoaW5lX3RlbXBsYXRlX2tpbmQuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTA2MTkyNTAwX3J1bl9tYWNoaW5lX2F1dGhvcml0eS5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDcxMjAwMDBfdGhyZWFkX21hY2hpbmVfbGlmZWN5Y2xlLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwNzEyMDAwMV9tY3BfcmVwbHlfbm90aWZpY2F0aW9ucy5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDcxNjAwMDBfbGl2ZV9zZXNzaW9uX3Jldm9jYXRpb24uc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTA3MTcwMDAwX3J1bl9mYWlsdXJlX2RldGFpbHMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTA3MTcxMDAwX3NlcnZlcl9naXRodWJfYXBwLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwNzE3MTAwMV9jbG91ZF9zZXJ2aWNlX2NsaWVudC5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDcxNzEwMDJfY2xvdWRfZ2l0aHViLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwNzE3MTAwM19jbG91ZF9wdXNoLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwNzE3MTAwNF9waG9uZV9wdXNoX3JlY2VpcHRfcmVjb3Zlcnkuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTA4MTIwMDAwX3NlY3JldF9kZWxpdmVyeS5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDgxMjAxMDFfZW5hYmxlZF9tb2RlbHMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTA4MjMzNTAwX2Nvb3JkaW5hdG9yX3N0YXJ0dXBfcmVjZWlwdHMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTA5MDEwMDAxX3RocmVhZF9tYWNoaW5lX3Nlc3Npb25zLnNxbCB0byBNSUtLQV9EQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwOTAxMDAwMl9jYXB0dXJlX3Bvc3RlcnMuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTA5MDM1MDAwX3Rhc2tfd29ya3NwYWNlX293bmVyc2hpcC5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDkwMzUwMDFfbGluZWFyX3dvcmtzcGFjZV9wb2xpY3kuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTA5MDM1MDAyX3Bob25lX3B1c2hfc2Vzc2lvbi5zcWwgdG8gTUlLS0FfREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDkwMzUwMDNfYWNjb3VudF90YXNrX2hpc3Rvcnkuc3FsIHRvIE1JS0tBX0RBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDAwMDRfbWlra2Ffd29ya3NwYWNlX3RhYmxlcy5zcWwgdG8gREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMDAwNl93b3Jrc3BhY2VfdGFibGVzLnNxbCB0byBEQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAwMDE0X3dvcmtzcGFjZV90ZWFtcy5zcWwgdG8gREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjUwMDU1MDBfbWlra2FfdGVhbV90YWJsZXMuc3FsIHRvIERBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI1MjMyMjAxX3dvcmtzcGFjZV9saXN0X2luZGV4ZXMuc3FsIHRvIERBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDI5MDQzNjQyX3RlYW1faXNzdWVfY3JlYXRlX3JlY2VpcHRzLnNxbCB0byBEQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAyOTA0MzY0NV90ZWFtX2lzc3VlX3Byb21vdGlvbl9yZWNlaXB0cy5zcWwgdG8gREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjEwMjkyMTM5Mzhfd29ya3NwYWNlX2FkbWluX2lkZW50aXR5LnNxbCB0byBEQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTAzMDIzMDAwMV9sZWdhY3lfaG9zdGVkX3dvcmtzcGFjZXMuc3FsIHRvIERBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDMxMDUwNzMwX2F1ZGl0X2V4cG9ydF9zbmFwc2hvdHMuc3FsIHRvIERBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDMxMDUwNzMyX3dvcmtzcGFjZV9kZWxldGlvbl9ndWFyZHMuc3FsIHRvIERBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMDMxMDYwNTEyX3dvcmtzcGFjZV9hdWRpdF9vdXRib3guc3FsIHRvIERBVEFCQVNFX1VSTAptaWdyYXRlOiBhcHBsaWVkIDIwMjYxMTAxMDIwMjAwX3BlcnNvbmFsX3dvcmtzcGFjZV9raW5kLnNxbCB0byBEQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwNDIwNTAxMF9vcGVyYXRpb25fbGVkZ2VyX3BlcnNvbmFsX3Njb3BlX2d1YXJkLnNxbCB0byBEQVRBQkFTRV9VUkwKbWlncmF0ZTogYXBwbGllZCAyMDI2MTEwNjE3MDAwMV90ZWFtX2lzc3VlX251bWJlci5zcWwgdG8gREFUQUJBU0VfVVJMCm1pZ3JhdGU6IGFwcGxpZWQgMjAyNjExMDcxMjAwMDJfbWNwX21lbWJlcnNoaXBfbm90aWZpY2F0aW9ucy5zcWwgdG8gREFUQUJBU0VfVVJMCm1pZ3JhdGU6IHRhc2sgd29ya3NwYWNlIG93bmVyc2hpcCBib3VuZD0wIHBlbmRpbmc9MArni6znq4sgRTJFIOaVsOaNruW6k+W3suWwsee7qu+8m+iupOivgeihqOS9v+eUqCBCZXR0ZXIgQXV0aCDov4Hnp7vvvIzkuJrliqHooajmnaXoh6rnjrDmnIkgRHJpenpsZSBzY2hlbWHjgIIK
+2026-11-09T20:03:29.9574436Z ISSUE1512_PG_ORIGINAL_END {"phase":"red","label":"e2e-setup","stream":"stdout"}
+2026-11-09T20:03:29.9575557Z ISSUE1512_PG_ORIGINAL_BEGIN {"phase":"red","label":"e2e-setup","stream":"stderr","file":"red-e2e-setup-stderr.log","bytes":0,"sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}
+2026-11-09T20:03:29.9576481Z ISSUE1512_PG_ORIGINAL_END {"phase":"red","label":"e2e-setup","stream":"stderr"}
+2026-11-09T20:03:29.9579017Z ISSUE1512_PG_COMMAND_END {"label":"e2e-setup","executable":"pnpm","args":["test:e2e:setup"],"startedAt":"2026-11-09T20:03:26.952Z","finishedAt":"2026-11-09T20:03:29.296Z","code":0,"signal":null,"timedOut":false,"spawnError":null,"stdout":{"file":"red-e2e-setup-stdout.log","bytes":20970,"sha256":"a3e39d357db4e26cf6093db7841015ece76ce580eeec97c4e8fb263273c792c6"},"stderr":{"file":"red-e2e-setup-stderr.log","bytes":0,"sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}}
+2026-11-09T20:03:29.9582525Z ISSUE1512_PG_COMMAND_START {"phase":"red","label":"environment-bind","executable":"/opt/hostedtoolcache/node/24.22.2/x64/bin/node","args":["scripts/test-accounts/bootstrap.mjs","--output","/home/runner/work/_temp/issue1512-pg/red-environment.json"],"startedAt":"2026-11-09T20:03:29.297Z","timeoutMs":240000}
+2026-11-09T20:03:29.9585459Z ISSUE1512_PG_ORIGINAL_BEGIN {"phase":"red","label":"environment-bind","stream":"stdout","file":"red-environment-bind-stdout.log","bytes":153,"sha256":"b2ed5a23d87271064d2f7772bff513a77d6131e5a76f56cf8947208cffdedabc"}
+2026-11-09T20:03:29.9588828Z ISSUE1512_PG_ORIGINAL_CHUNK eyJlbnZpcm9ubWVudElkIjoiZ2l0aHViLTQyNjg5MDQzODY2LTEiLCJkZXBsb3ltZW50U2hhIjoiZTA5MzRlYjg5Zjk3MmQ0NGVmNmNmZmVjNmUyN2MxNmI0ZWQyMDNiZiIsIm9yaWdpbiI6Imh0dHA6Ly9sb2NhbGhvc3Q6MzEwMCIsInN0YXR1cyI6InByZXBhcmVkIn0K
+2026-11-09T20:03:29.9590321Z ISSUE1512_PG_ORIGINAL_END {"phase":"red","label":"environment-bind","stream":"stdout"}
+2026-11-09T20:03:29.9591715Z ISSUE1512_PG_ORIGINAL_BEGIN {"phase":"red","label":"environment-bind","stream":"stderr","file":"red-environment-bind-stderr.log","bytes":0,"sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}
+2026-11-09T20:03:29.9592724Z ISSUE1512_PG_ORIGINAL_END {"phase":"red","label":"environment-bind","stream":"stderr"}
+2026-11-09T20:03:29.9596308Z ISSUE1512_PG_COMMAND_END {"label":"environment-bind","executable":"/opt/hostedtoolcache/node/24.22.2/x64/bin/node","args":["scripts/test-accounts/bootstrap.mjs","--output","/home/runner/work/_temp/issue1512-pg/red-environment.json"],"startedAt":"2026-11-09T20:03:29.297Z","finishedAt":"2026-11-09T20:03:29.453Z","code":0,"signal":null,"timedOut":false,"spawnError":null,"stdout":{"file":"red-environment-bind-stdout.log","bytes":153,"sha256":"b2ed5a23d87271064d2f7772bff513a77d6131e5a76f56cf8947208cffdedabc"},"stderr":{"file":"red-environment-bind-stderr.log","bytes":0,"sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}}
+2026-11-09T20:03:29.9602787Z ISSUE1512_PG_COMMAND_START {"phase":"red","label":"coordinator-red","executable":"/opt/hostedtoolcache/node/24.22.2/x64/bin/node","args":["--test-reporter=tap","--experimental-test-module-mocks","--test-force-exit","--import","./tests/support/server-only.mjs","--import","tsx","--test","tests/coordinator-bot.db.test.ts"],"startedAt":"2026-11-09T20:03:29.454Z","timeoutMs":240000}
+2026-11-09T20:03:36.8038969Z ISSUE1512_PG_ORIGINAL_BEGIN {"phase":"red","label":"coordinator-red","stream":"stdout","file":"red-coordinator-red-stdout.log","bytes":17918,"sha256":"0836c8a69b6aff2e17872287713f71ba37298017f225bc0010d9ddc5128fb2d4"}
+2026-11-09T20:03:36.9198840Z ISSUE1512_PG_ORIGINAL_CHUNK VEFQIHZlcnNpb24gMTMKIyAobm9kZTozNDUxKSBFeHBlcmltZW50YWxXYXJuaW5nOiBNb2R1bGUgbW9ja2luZyBpcyBhbiBleHBlcmltZW50YWwgZmVhdHVyZSBhbmQgbWlnaHQgY2hhbmdlIGF0IGFueSB0aW1lCiMgKFVzZSBgbm9kZSAtLXRyYWNlLXdhcm5pbmdzIC4uLmAgdG8gc2hvdyB3aGVyZSB0aGUgd2FybmluZyB3YXMgY3JlYXRlZCkKIyAobm9kZTozNDUxKSBEZXByZWNhdGlvbldhcm5pbmc6IG1vY2subW9kdWxlKCk6IG9wdGlvbnMubmFtZWRFeHBvcnRzIGlzIGRlcHJlY2F0ZWQuIFVzZSBvcHRpb25zLmV4cG9ydHMgaW5zdGVhZC4KIyBTdWJ0ZXN0OiB0aGUgQ29vcmRpbmF0b3IgaXMgYW4gb3JkaW5hcnkgYm90IHJvdwogICAgIyBTdWJ0ZXN0OiBhbiBlbXB0eSBleHBsaWNpdCBQZXJzb25hbCBDb29yZGluYXRvciB1c2VzIG9uZSBQZXJzb25hbCByZWFkCiAgICBub3Qgb2sgMSAtIGFuIGVtcHR5IGV4cGxpY2l0IFBlcnNvbmFsIENvb3JkaW5hdG9yIHVzZXMgb25lIFBlcnNvbmFsIHJlYWQKICAgICAgLS0tCiAgICAgIGR1cmF0aW9uX21zOiAxNTguNzYxNDAxCiAgICAgIHR5cGU6ICd0ZXN0JwogICAgICBsb2NhdGlvbjogJy9ob21lL3J1bm5lci93b3JrL01pa2thL01pa2thL3Rlc3RzL2Nvb3JkaW5hdG9yLWJvdC5kYi50ZXN0LnRzOjE6ODA0MycKICAgICAgZmFpbHVyZVR5cGU6ICd0ZXN0Q29kZUZhaWx1cmUnCiAgICAgIGVycm9yOiB8LQogICAgICAgIGVtcHR5IGV4cGxpY2l0IENvb3JkaW5hdG9yIGJhY2tmaWxsIG11c3QgdXNlIG9uZSBQZXJzb25hbCBTRUxFQ1QKICAgICAgICAKICAgICAgICAyNiAhPT0gMQogICAgICAgIAogICAgICBjb2RlOiAnRVJSX0FTU0VSVElPTicKICAgICAgbmFtZTogJ0Fzc2VydGlvbkVycm9yJwogICAgICBleHBlY3RlZDogMQogICAgICBhY3R1YWw6IDI2CiAgICAgIG9wZXJhdG9yOiAnc3RyaWN0RXF1YWwnCiAgICAgIHN0YWNrOiB8LQogICAgICAgIFRlc3RDb250ZXh0Ljxhbm9ueW1vdXM+ICgvaG9tZS9ydW5uZXIvd29yay9NaWtrYS9NaWtrYS90ZXN0cy9jb29yZGluYXRvci1ib3QuZGIudGVzdC50czoxNTU6MTQpCiAgICAgICAgcHJvY2Vzcy5wcm9jZXNzVGlja3NBbmRSZWplY3Rpb25zIChub2RlOmludGVybmFsL3Byb2Nlc3MvdGFza19xdWV1ZXM6MTA0OjUpCiAgICAgICAgYXN5bmMgVGVzdC5ydW4gKG5vZGU6aW50ZXJuYWwvdGVzdF9ydW5uZXIvdGVzdDoxNDA5OjcpCiAgICAgICAgYXN5bmMgVGVzdENvbnRleHQuPGFub255bW91cz4gKC9ob21lL3J1bm5lci93b3JrL01pa2thL01pa2thL3Rlc3RzL2Nvb3JkaW5hdG9yLWJvdC5kYi50ZXN0LnRzOjE0Nzo1MykKICAgICAgICBhc3luYyBUZXN0LnJ1biAobm9kZTppbnRlcm5hbC90ZXN0X3J1bm5lci90ZXN0OjE0MDk6NykKICAgICAgICBhc3luYyBzdGFydFN1YnRlc3RBZnRlckJvb3RzdHJhcCAobm9kZTppbnRlcm5hbC90ZXN0X3J1bm5lci9oYXJuZXNzOjM4NzozKQogICAgICAuLi4KICAgICMgU3VidGVzdDogYW4gZW1wdHkgZXhwbGljaXQgVGVhbSBDb29yZGluYXRvciB1c2VzIG9uZSBQZXJzb25hbCByZWFkCiAgICBub3Qgb2sgMiAtIGFuIGVtcHR5IGV4cGxpY2l0IFRlYW0gQ29vcmRpbmF0b3IgdXNlcyBvbmUgUGVyc29uYWwgcmVhZAogICAgICAtLS0KICAgICAgZHVyYXRpb25fbXM6IDI4LjE5NTk2NwogICAgICB0eXBlOiAndGVzdCcKICAgICAgbG9jYXRpb246ICcvaG9tZS9ydW5uZXIvd29yay9NaWtrYS9NaWtrYS90ZXN0cy9jb29yZGluYXRvci1ib3QuZGIudGVzdC50czoxOjgwNDMnCiAgICAgIGZhaWx1cmVUeXBlOiAndGVzdENvZGVGYWlsdXJlJwogICAgICBlcnJvcjogfC0KICAgICAgICBlbXB0eSBleHBsaWNpdCBDb29yZGluYXRvciBiYWNrZmlsbCBtdXN0IHVzZSBvbmUgUGVyc29uYWwgU0VMRUNUCiAgICAgICAgCiAgICAgICAgMjYgIT09IDEKICAgICAgICAKICAgICAgY29kZTogJ0VSUl9BU1NFUlRJT04nCiAgICAgIG5hbWU6ICdBc3NlcnRpb25FcnJvcicKICAgICAgZXhwZWN0ZWQ6IDEKICAgICAgYWN0dWFsOiAyNgogICAgICBvcGVyYXRvcjogJ3N0cmljdEVxdWFsJwogICAgICBzdGFjazogfC0KICAgICAgICBUZXN0Q29udGV4dC48YW5vbnltb3VzPiAoL2hvbWUvcnVubmVyL3dvcmsvTWlra2EvTWlra2EvdGVzdHMvY29vcmRpbmF0b3ItYm90LmRiLnRlc3QudHM6MTU1OjE0KQogICAgICAgIHByb2Nlc3MucHJvY2Vzc1RpY2tzQW5kUmVqZWN0aW9ucyAobm9kZTppbnRlcm5hbC9wcm9jZXNzL3Rhc2tfcXVldWVzOjEwNDo1KQogICAgICAgIGFzeW5jIFRlc3QucnVuIChub2RlOmludGVybmFsL3Rlc3RfcnVubmVyL3Rlc3Q6MTQwOTo3KQogICAgICAgIGFzeW5jIFRlc3RDb250ZXh0Ljxhbm9ueW1vdXM+ICgvaG9tZS9ydW5uZXIvd29yay9NaWtrYS9NaWtrYS90ZXN0cy9jb29yZGluYXRvci1ib3QuZGIudGVzdC50czoxNDc6NTMpCiAgICAgICAgYXN5bmMgVGVzdC5ydW4gKG5vZGU6aW50ZXJuYWwvdGVzdF9ydW5uZXIvdGVzdDoxNDA5OjcpCiAgICAgICAgYXN5bmMgc3RhcnRTdWJ0ZXN0QWZ0ZXJCb290c3RyYXAgKG5vZGU6aW50ZXJuYWwvdGVzdF9ydW5uZXIvaGFybmVzczozODc6MykKICAgICAgLi4uCiAgICAjIFN1YnRlc3Q6IGEgcmV0YWluZWQgY29waWVkIGFnZW50IGhlYWQgc3RpbGwgcGVybWl0cyB0aGUgZW1wdHkgUGVyc29uYWwgcmVhZAogICAgbm90IG9rIDMgLSBhIHJldGFpbmVkIGNvcGllZCBhZ2VudCBoZWFkIHN0aWxsIHBlcm1pdHMgdGhlIGVtcHR5IFBlcnNvbmFsIHJlYWQKICAgICAgLS0tCiAgICAgIGR1cmF0aW9uX21zOiA5LjA0NzkzMwogICAgICB0eXBlOiAndGVzdCcKICAgICAgbG9jYXRpb246ICcvaG9tZS9ydW5uZXIvd29yay9NaWtrYS9NaWtrYS90ZXN0cy9jb29yZGluYXRvci1ib3QuZGIudGVzdC50czoxOjkxMzcnCiAgICAgIGZhaWx1cmVUeXBlOiAndGVzdENvZGVGYWlsdXJlJwogICAgICBlcnJvcjogJ2luY29uc2lzdGVudCB0eXBlcyBkZWR1Y2VkIGZvciBwYXJhbWV0ZXIgJDInCiAgICAgIGNvZGU6ICc0MlAwOCcKICAgICAgbmFtZTogJ2Vycm9yJwogICAgICBzdGFjazogfC0KICAgICAgICAvaG9tZS9ydW5uZXIvd29yay9NaWtrYS9NaWtrYS9ub2RlX21vZHVsZXMvLnBucG0vcGctcG9vbEAzLjE0LjBfcGdAOC4yMy4xL25vZGVfbW9kdWxlcy9wZy1wb29sL2luZGV4LmpzOjQ1OjExCiAgICAgICAgcHJvY2Vzcy5wcm9jZXNzVGlja3NBbmRSZWplY3Rpb25zIChub2RlOmludGVybmFsL3Byb2Nlc3MvdGFza19xdWV1ZXM6MTA0OjUpCiAgICAgICAgYXN5bmMgVGVzdENvbnRleHQuPGFub255bW91cz4gKC9ob21lL3J1bm5lci93b3JrL01pa2thL01pa2thL3Rlc3RzL2Nvb3JkaW5hdG9yLWJvdC5kYi50ZXN0LnRzOjE2ODo1KQogICAgICAgIGFzeW5jIFRlc3QucnVuIChub2RlOmludGVybmFsL3Rlc3RfcnVubmVyL3Rlc3Q6MTQwOTo3KQogICAgICAgIGFzeW5jIFRlc3RDb250ZXh0Ljxhbm9ueW1vdXM+ICgvaG9tZS9ydW5uZXIvd29yay9NaWtrYS9NaWtrYS90ZXN0cy9jb29yZGluYXRvci1ib3QuZGIudGVzdC50czoxNjQ6MykKICAgICAgICBhc3luYyBUZXN0LnJ1biAobm9kZTppbnRlcm5hbC90ZXN0X3J1bm5lci90ZXN0OjE0MDk6NykKICAgICAgICBhc3luYyBzdGFydFN1YnRlc3RBZnRlckJvb3RzdHJhcCAobm9kZTppbnRlcm5hbC90ZXN0X3J1bm5lci9oYXJuZXNzOjM4NzozKQogICAgICAuLi4KICAgICMgU3VidGVzdDogYW4gZXhwbGljaXQgVGVhbSByZWFkIHJldGFpbnMgdGhlIHJlYWwgbWlncmF0aW9uIGZvciBsZWdhY3kgY29vcmRpbmF0b3JfbWVzc2FnZXMKICAgIG9rIDQgLSBhbiBleHBsaWNpdCBUZWFtIHJlYWQgcmV0YWlucyB0aGUgcmVhbCBtaWdyYXRpb24gZm9yIGxlZ2FjeSBjb29yZGluYXRvcl9tZXNzYWdlcwogICAgICAtLS0KICAgICAgZHVyYXRpb25fbXM6IDQwLjg0OTQ4NwogICAgICB0eXBlOiAndGVzdCcKICAgICAgLi4uCiAgICAjIFN1YnRlc3Q6IGFuIGV4cGxpY2l0IFRlYW0gcmVhZCByZXRhaW5zIHRoZSByZWFsIG1pZ3JhdGlvbiBmb3IgbGVnYWN5IGNvb3JkaW5hdG9yX3Nlc3Npb25zCiAgICBvayA1IC0gYW4gZXhwbGljaXQgVGVhbSByZWFkIHJldGFpbnMgdGhlIHJlYWwgbWlncmF0aW9uIGZvciBsZWdhY3kgY29vcmRpbmF0b3Jfc2Vzc2lvbnMKICAgICAgLS0tCiAgICAgIGR1cmF0aW9uX21zOiAyNS43OTE4NjgKICAgICAgdHlwZTogJ3Rlc3QnCiAgICAgIC4uLgogICAgIyBTdWJ0ZXN0OiBhbiBleHBsaWNpdCBUZWFtIHJlYWQgcmV0YWlucyB0aGUgcmVhbCBtaWdyYXRpb24gZm9yIGxlZ2FjeSBjb29yZGluYXRvcl9ldmVudHMKICAgIG9rIDYgLSBhbiBleHBsaWNpdCBUZWFtIHJlYWQgcmV0YWlucyB0aGUgcmVhbCBtaWdyYXRpb24gZm9yIGxlZ2FjeSBjb29yZGluYXRvcl9ldmVudHMKICAgICAgLS0tCiAgICAgIGR1cmF0aW9uX21zOiAzMS41Mzk4NTMKICAgICAgdHlwZTogJ3Rlc3QnCiAgICAgIC4uLgogICAgIyBTdWJ0ZXN0OiBhbiBleHBsaWNpdCBUZWFtIHJlYWQgcmV0YWlucyB0aGUgcmVhbCBtaWdyYXRpb24gZm9yIGxlZ2FjeSBhZ2VudF9ydW5zCiAgICBvayA3IC0gYW4gZXhwbGljaXQgVGVhbSByZWFkIHJldGFpbnMgdGhlIHJlYWwgbWlncmF0aW9uIGZvciBsZWdhY3kgYWdlbnRfcnVucwogICAgICAtLS0KICAgICAgZHVyYXRpb25fbXM6IDM3Ljg2NjM2OAogICAgICB0eXBlOiAndGVzdCcKICAgICAgLi4uCiAgICAjIFN1YnRlc3Q6IGFuIGV4cGxpY2l0IFRlYW0gcmVhZCByZXRhaW5zIHRoZSByZWFsIG1pZ3JhdGlvbiBmb3IgbGVnYWN5IGZhY3RvcnlfdGFza3MKICAgIG5vdCBvayA4IC0gYW4gZXhwbGljaXQgVGVhbSByZWFkIHJldGFpbnMgdGhlIHJlYWwgbWlncmF0aW9uIGZvciBsZWdhY3kgZmFjdG9yeV90YXNrcwogICAgICAtLS0KICAgICAgZHVyYXRpb25fbXM6IDE2Ljg3MjU5MwogICAgICB0eXBlOiAndGVzdCcKICAgICAgbG9jYXRpb246ICcvaG9tZS9ydW5uZXIvd29yay9NaWtrYS9NaWtrYS90ZXN0cy9jb29yZGluYXRvci1ib3QuZGIudGVzdC50czoyOjg5NCcKICAgICAgZmFpbHVyZVR5cGU6ICd0ZXN0Q29kZUZhaWx1cmUnCiAgICAgIGVycm9yOiAnaW5zZXJ0IG9yIHVwZGF0ZSBvbiB0YWJsZSAiZmFjdG9yeV90YXNrcyIgdmlvbGF0ZXMgZm9yZWlnbiBrZXkgY29uc3RyYWludCAiZmFjdG9yeV90YXNrc19hdHRlbXB0X2ZrIicKICAgICAgY29kZTogJzIzNTAzJwogICAgICBuYW1lOiAnZXJyb3InCiAgICAgIHN0YWNrOiB8LQogICAgICAgIC9ob21lL3J1bm5lci93b3JrL01pa2thL01pa2thL25vZGVfbW9kdWxlcy8ucG5wbS9wZy1wb29sQDMuMTQuMF9wZ0A4LjIzLjEvbm9kZV9tb2R1bGVzL3BnLXBvb2wvaW5kZXguanM6NDU6MTEKICAgICAgICBwcm9jZXNzLnByb2Nlc3NUaWNrc0FuZFJlamVjdGlvbnMgKG5vZGU6aW50ZXJuYWwvcHJvY2Vzcy90YXNrX3F1ZXVlczoxMDQ6NSkKICAgICAgICBhc3luYyBUZXN0Q29udGV4dC48YW5vbnltb3VzPiAoL2hvbWUvcnVubmVyL3dvcmsvTWlra2EvTWlra2EvdGVzdHMvY29vcmRpbmF0b3ItYm90LmRiLnRlc3QudHM6MjExOjkpCiAgICAgICAgYXN5bmMgVGVzdC5ydW4gKG5vZGU6aW50ZXJuYWwvdGVzdF9ydW5uZXIvdGVzdDoxNDA5OjcpCiAgICAgICAgYXN5bmMgVGVzdENvbnRleHQuPGFub255bW91cz4gKC9ob21lL3J1bm5lci93b3JrL01pa2thL01pa2thL3Rlc3RzL2Nvb3JkaW5hdG9yLWJvdC5kYi50ZXN0LnRzOjE4Mjo2KQogICAgICAgIGFzeW5jIFRlc3QucnVuIChub2RlOmludGVybmFsL3Rlc3RfcnVubmVyL3Rlc3Q6MTQwOTo3KQogICAgICAgIGFzeW5jIHN0YXJ0U3VidGVzdEFmdGVyQm9vdHN0cmFwIChub2RlOmludGVybmFsL3Rlc3RfcnVubmVyL2hhcm5lc3M6Mzg3OjMpCiAgICAgIC4uLgogICAgIyBTdWJ0ZXN0OiBhbiBleHBsaWNpdCBUZWFtIHJlYWQgcmV0YWlucyB0aGUgcmVhbCBtaWdyYXRpb24gZm9yIGxlZ2FjeSBib3RfbW9kZWxfY2hvaWNlcwogICAgb2sgOSAtIGFuIGV4cGxpY2l0IFRlYW0gcmVhZCByZXRhaW5zIHRoZSByZWFsIG1pZ3JhdGlvbiBmb3IgbGVnYWN5IGJvdF9tb2RlbF9jaG9pY2VzCiAgICAgIC0tLQogICAgICBkdXJhdGlvbl9tczogMzcuOTAyNDE4CiAgICAgIHR5cGU6ICd0ZXN0JwogICAgICAuLi4KICAgICMgU3VidGVzdDogYW4gZXhwbGljaXQgVGVhbSByZWFkIHJldGFpbnMgdGhlIHJlYWwgbWlncmF0aW9uIGZvciBsZWdhY3kgY2hhdF9wcmVmZXJlbmNlcwogICAgb2sgMTAgLSBhbiBleHBsaWNpdCBUZWFtIHJlYWQgcmV0YWlucyB0aGUgcmVhbCBtaWdyYXRpb24gZm9yIGxlZ2FjeSBjaGF0X3ByZWZlcmVuY2VzCiAgICAgIC0tLQogICAgICBkdXJhdGlvbl9tczogMjIuOTI5ODgKICAgICAgdHlwZTogJ3Rlc3QnCiAgICAgIC4uLgogICAgIyBTdWJ0ZXN0OiBhbiBleHBsaWNpdCBUZWFtIHJlYWQgcmV0YWlucyB0aGUgcmVhbCBtaWdyYXRpb24gZm9yIGxlZ2FjeSB1c2VyX3NjaGVkdWxlcwogICAgb2sgMTEgLSBhbiBleHBsaWNpdCBUZWFtIHJlYWQgcmV0YWlucyB0aGUgcmVhbCBtaWdyYXRpb24gZm9yIGxlZ2FjeSB1c2VyX3NjaGVkdWxlcwogICAgICAtLS0KICAgICAgZHVyYXRpb25fbXM6IDI2LjUwMzk2NwogICAgICB0eXBlOiAndGVzdCcKICAgICAgLi4uCiAgICAjIFN1YnRlc3Q6IGFuIGV4cGxpY2l0IFRlYW0gcmVhZCByZXRhaW5zIHRoZSByZWFsIG1pZ3JhdGlvbiBmb3IgbGVnYWN5IHN1Z2dlc3Rpb25zCiAgICBub3Qgb2sgMTIgLSBhbiBleHBsaWNpdCBUZWFtIHJlYWQgcmV0YWlucyB0aGUgcmVhbCBtaWdyYXRpb24gZm9yIGxlZ2FjeSBzdWdnZXN0aW9ucwogICAgICAtLS0KICAgICAgZHVyYXRpb25fbXM6IDIwLjcyNjE4CiAgICAgIHR5cGU6ICd0ZXN0JwogICAgICBsb2NhdGlvbjogJy9ob21lL3J1bm5lci93b3JrL01pa2thL01pa2thL3Rlc3RzL2Nvb3JkaW5hdG9yLWJvdC5kYi50ZXN0LnRzOjI6ODk0JwogICAgICBmYWlsdXJlVHlwZTogJ3Rlc3RDb2RlRmFpbHVyZScKICAgICAgZXJyb3I6ICdpbmNvbnNpc3RlbnQgdHlwZXMgZGVkdWNlZCBmb3IgcGFyYW1ldGVyICQxJwogICAgICBjb2RlOiAnNDJQMDgnCiAgICAgIG5hbWU6ICdlcnJvcicKICAgICAgc3RhY2s6IHwtCiAgICAgICAgL2hvbWUvcnVubmVyL3dvcmsvTWlra2EvTWlra2Evbm9kZV9tb2R1bGVzLy5wbnBtL3BnLXBvb2xAMy4xNC4wX3BnQDguMjMuMS9ub2RlX21vZHVsZXMvcGctcG9vbC9pbmRleC5qczo0NToxMQogICAgICAgIHByb2Nlc3MucHJvY2Vzc1RpY2tzQW5kUmVqZWN0aW9ucyAobm9kZTppbnRlcm5hbC9wcm9jZXNzL3Rhc2tfcXVldWVzOjEwNDo1KQogICAgICAgIGFzeW5jIFRlc3RDb250ZXh0Ljxhbm9ueW1vdXM+ICgvaG9tZS9ydW5uZXIvd29yay9NaWtrYS9NaWtrYS90ZXN0cy9jb29yZGluYXRvci1ib3QuZGIudGVzdC50czoyNDI6OSkKICAgICAgICBhc3luYyBUZXN0LnJ1biAobm9kZTppbnRlcm5hbC90ZXN0X3J1bm5lci90ZXN0OjE0MDk6NykKICAgICAgICBhc3luYyBUZXN0Q29udGV4dC48YW5vbnltb3VzPiAoL2hvbWUvcnVubmVyL3dvcmsvTWlra2EvTWlra2EvdGVzdHMvY29vcmRpbmF0b3ItYm90LmRiLnRlc3QudHM6MTgyOjYpCiAgICAgICAgYXN5bmMgVGVzdC5ydW4gKG5vZGU6aW50ZXJuYWwvdGVzdF9ydW5uZXIvdGVzdDoxNDA5OjcpCiAgICAgICAgYXN5bmMgc3RhcnRTdWJ0ZXN0QWZ0ZXJCb290c3RyYXAgKG5vZGU6aW50ZXJuYWwvdGVzdF9ydW5uZXIvaGFybmVzczozODc6MykKICAgICAgLi4uCiAgICAjIFN1YnRlc3Q6IGFuIGV4cGxpY2l0IFRlYW0gcmVhZCByZXRhaW5zIHRoZSByZWFsIG1pZ3JhdGlvbiBmb3IgbGVnYWN5IHBlbmRpbmdfYWN0aW9ucwogICAgb2sgMTMgLSBhbiBleHBsaWNpdCBUZWFtIHJlYWQgcmV0YWlucyB0aGUgcmVhbCBtaWdyYXRpb24gZm9yIGxlZ2FjeSBwZW5kaW5nX2FjdGlvbnMKICAgICAgLS0tCiAgICAgIGR1cmF0aW9uX21zOiAyNy4yNzU2MjUKICAgICAgdHlwZTogJ3Rlc3QnCiAgICAgIC4uLgogICAgIyBTdWJ0ZXN0OiBhbiBleHBsaWNpdCBUZWFtIHJlYWQgcmV0YWlucyB0aGUgcmVhbCBtaWdyYXRpb24gZm9yIGxlZ2FjeSBhZ2VudF9raXRfaGVhZHMKICAgIG9rIDE0IC0gYW4gZXhwbGljaXQgVGVhbSByZWFkIHJldGFpbnMgdGhlIHJlYWwgbWlncmF0aW9uIGZvciBsZWdhY3kgYWdlbnRfa2l0X2hlYWRzCiAgICAgIC0tLQogICAgICBkdXJhdGlvbl9tczogMjcuNTA1NzExCiAgICAgIHR5cGU6ICd0ZXN0JwogICAgICAuLi4KICAgICMgU3VidGVzdDogYSBtaXNzaW5nIFBlcnNvbmFsIHdvcmtzcGFjZSByZXVzZXMgdGhlIHVuc3VjY2Vzc2Z1bCBsb29rdXAKICAgIG9rIDE1IC0gYSBtaXNzaW5nIFBlcnNvbmFsIHdvcmtzcGFjZSByZXVzZXMgdGhlIHVuc3VjY2Vzc2Z1bCBsb29rdXAKICAgICAgLS0tCiAgICAgIGR1cmF0aW9uX21zOiAzOC42OTkwNTcKICAgICAgdHlwZTogJ3Rlc3QnCiAgICAgIC4uLgogICAgIyBTdWJ0ZXN0OiBhIG1pc3NpbmcgUGVyc29uYWwgQ29vcmRpbmF0b3Igc3RpbGwgZm9sbG93cyB0aGUgb3JpZ2luYWwgY3JlYXRpb24gcGF0aAogICAgb2sgMTYgLSBhIG1pc3NpbmcgUGVyc29uYWwgQ29vcmRpbmF0b3Igc3RpbGwgZm9sbG93cyB0aGUgb3JpZ2luYWwgY3JlYXRpb24gcGF0aAogICAgICAtLS0KICAgICAgZHVyYXRpb25fbXM6IDIwLjc4OTY2OQogICAgICB0eXBlOiAndGVzdCcKICAgICAgLi4uCiAgICAjIFN1YnRlc3Q6IG9ubHkgYSBib29sZWFuIGZhbHNlIFBlcnNvbmFsIG9ic2VydmF0aW9uIGNhbiBza2lwIHRoZSBtaWdyYXRpb24KICAgIG9rIDE3IC0gb25seSBhIGJvb2xlYW4gZmFsc2UgUGVyc29uYWwgb2JzZXJ2YXRpb24gY2FuIHNraXAgdGhlIG1pZ3JhdGlvbgogICAgICAtLS0KICAgICAgZHVyYXRpb25fbXM6IDYxLjYxOTIwOAogICAgICB0eXBlOiAndGVzdCcKICAgICAgLi4uCiMgQ29vcmRpbmF0b3IgY2hhdCBtb3ZlIGRlZmVycmVkIHsgY29kZTogJzU3MDE0JyB9CiAgICAjIFN1YnRlc3Q6IGEgZmFpbGVkIFBlcnNvbmFsIG9ic2VydmF0aW9uIGlzIHJldHJpZWQgb24gdGhlIG5leHQg
+2026-11-09T20:03:37.1482524Z ISSUE1512_PG_ORIGINAL_CHUNK cmVhZAogICAgb2sgMTggLSBhIGZhaWxlZCBQZXJzb25hbCBvYnNlcnZhdGlvbiBpcyByZXRyaWVkIG9uIHRoZSBuZXh0IHJlYWQKICAgICAgLS0tCiAgICAgIGR1cmF0aW9uX21zOiAxOS44ODAyNDMKICAgICAgdHlwZTogJ3Rlc3QnCiAgICAgIC4uLgojIENvb3JkaW5hdG9yIGNoYXQgbW92ZSBkZWZlcnJlZCB7IGNvZGU6ICd3b3Jrc3BhY2VBY2Nlc3NEZW5pZWQnIH0KICAgICMgU3VidGVzdDogYW4gaW5hY3RpdmUgUGVyc29uYWwgbWVtYmVyIGNhbm5vdCBjZXJ0aWZ5IGFuIGVtcHR5IGJhY2tmaWxsCiAgICBvayAxOSAtIGFuIGluYWN0aXZlIFBlcnNvbmFsIG1lbWJlciBjYW5ub3QgY2VydGlmeSBhbiBlbXB0eSBiYWNrZmlsbAogICAgICAtLS0KICAgICAgZHVyYXRpb25fbXM6IDMzLjMzMjU3MwogICAgICB0eXBlOiAndGVzdCcKICAgICAgLi4uCiMgQ29vcmRpbmF0b3IgY2hhdCBtb3ZlIGRlZmVycmVkIHsgY29kZTogJzU1UDAzJyB9CiAgICAjIFN1YnRlc3Q6IGJ1c3kgY2hhdCBsb2NrcyByZXRhaW4gdGhlIGZ1bGwgbWlncmF0aW9uIGFuZCB0aGUgbmV4dC1yZWFkIHJldHJ5CiAgICBvayAyMCAtIGJ1c3kgY2hhdCBsb2NrcyByZXRhaW4gdGhlIGZ1bGwgbWlncmF0aW9uIGFuZCB0aGUgbmV4dC1yZWFkIHJldHJ5CiAgICAgIC0tLQogICAgICBkdXJhdGlvbl9tczogMzAuNTQ4NTIxCiAgICAgIHR5cGU6ICd0ZXN0JwogICAgICAuLi4KICAgICMgU3VidGVzdDogbGVnYWN5IHJvd3MgY29tbWl0dGVkIGFmdGVyIGFuIGVtcHR5IHJlYWQgd2FpdCBmb3IgdGhlIG9yaWdpbmFsIG5leHQgcGFzcwogICAgbm90IG9rIDIxIC0gbGVnYWN5IHJvd3MgY29tbWl0dGVkIGFmdGVyIGFuIGVtcHR5IHJlYWQgd2FpdCBmb3IgdGhlIG9yaWdpbmFsIG5leHQgcGFzcwogICAgICAtLS0KICAgICAgZHVyYXRpb25fbXM6IDM1LjgwMDcyNAogICAgICB0eXBlOiAndGVzdCcKICAgICAgbG9jYXRpb246ICcvaG9tZS9ydW5uZXIvd29yay9NaWtrYS9NaWtrYS90ZXN0cy9jb29yZGluYXRvci1ib3QuZGIudGVzdC50czoxMDo0MDE5JwogICAgICBmYWlsdXJlVHlwZTogJ3Rlc3RDb2RlRmFpbHVyZScKICAgICAgZXJyb3I6IHwtCiAgICAgICAgZW1wdHkgZXhwbGljaXQgQ29vcmRpbmF0b3IgYmFja2ZpbGwgbXVzdCB1c2Ugb25lIFBlcnNvbmFsIFNFTEVDVAogICAgICAgIAogICAgICAgIDI5ICE9PSAxCiAgICAgICAgCiAgICAgIGNvZGU6ICdFUlJfQVNTRVJUSU9OJwogICAgICBuYW1lOiAnQXNzZXJ0aW9uRXJyb3InCiAgICAgIGV4cGVjdGVkOiAxCiAgICAgIGFjdHVhbDogMjkKICAgICAgb3BlcmF0b3I6ICdzdHJpY3RFcXVhbCcKICAgICAgc3RhY2s6IHwtCiAgICAgICAgVGVzdENvbnRleHQuPGFub255bW91cz4gKC9ob21lL3J1bm5lci93b3JrL01pa2thL01pa2thL3Rlc3RzL2Nvb3JkaW5hdG9yLWJvdC5kYi50ZXN0LnRzOjM5NToxNCkKICAgICAgICBwcm9jZXNzLnByb2Nlc3NUaWNrc0FuZFJlamVjdGlvbnMgKG5vZGU6aW50ZXJuYWwvcHJvY2Vzcy90YXNrX3F1ZXVlczoxMDQ6NSkKICAgICAgICBhc3luYyBUZXN0LnJ1biAobm9kZTppbnRlcm5hbC90ZXN0X3J1bm5lci90ZXN0OjE0MDk6NykKICAgICAgICBhc3luYyBUZXN0Q29udGV4dC48YW5vbnltb3VzPiAoL2hvbWUvcnVubmVyL3dvcmsvTWlra2EvTWlra2EvdGVzdHMvY29vcmRpbmF0b3ItYm90LmRiLnRlc3QudHM6MzYwOjMpCiAgICAgICAgYXN5bmMgVGVzdC5ydW4gKG5vZGU6aW50ZXJuYWwvdGVzdF9ydW5uZXIvdGVzdDoxNDA5OjcpCiAgICAgICAgYXN5bmMgc3RhcnRTdWJ0ZXN0QWZ0ZXJCb290c3RyYXAgKG5vZGU6aW50ZXJuYWwvdGVzdF9ydW5uZXIvaGFybmVzczozODc6MykKICAgICAgLi4uCiAgICAjIFN1YnRlc3Q6IGFuIGVtcHR5IGV4ZWN1dGlvbiBmYW1pbHkgc2tpcHMgaXRzIHJlY3Vyc2l2ZSB1cGRhdGUgYWZ0ZXIgZXZlcnkgTk9XQUlUIHJlYWQKICAgIG9rIDIyIC0gYW4gZW1wdHkgZXhlY3V0aW9uIGZhbWlseSBza2lwcyBpdHMgcmVjdXJzaXZlIHVwZGF0ZSBhZnRlciBldmVyeSBOT1dBSVQgcmVhZAogICAgICAtLS0KICAgICAgZHVyYXRpb25fbXM6IDE5Ljk2NDkyOAogICAgICB0eXBlOiAndGVzdCcKICAgICAgLi4uCiAgICAjIFN1YnRlc3Q6IGEgY2FwdHVyZWQgbGVnYWN5IGV2ZW50IHN0aWxsIHJ1bnMgdGhlIGV4ZWN1dGlvbiBtaWdyYXRpb24KICAgIG9rIDIzIC0gYSBjYXB0dXJlZCBsZWdhY3kgZXZlbnQgc3RpbGwgcnVucyB0aGUgZXhlY3V0aW9uIG1pZ3JhdGlvbgogICAgICAtLS0KICAgICAgZHVyYXRpb25fbXM6IDIwLjg4NDkzMwogICAgICB0eXBlOiAndGVzdCcKICAgICAgLi4uCiAgICAjIFN1YnRlc3Q6IHN0YWxlIGF0dGVudGlvbiByZWFkcyBvbmx5IHNldHRsZW1lbnQgZmllbGRzIGFuZCBwcmVzZXJ2ZXMgdGhlIGRlY2lzaW9uIGlucHV0IGFuZCBvd25lciBsb2cKICAgIG9rIDI0IC0gc3RhbGUgYXR0ZW50aW9uIHJlYWRzIG9ubHkgc2V0dGxlbWVudCBmaWVsZHMgYW5kIHByZXNlcnZlcyB0aGUgZGVjaXNpb24gaW5wdXQgYW5kIG93bmVyIGxvZwogICAgICAtLS0KICAgICAgZHVyYXRpb25fbXM6IDIwLjUxNTI4OQogICAgICB0eXBlOiAndGVzdCcKICAgICAgLi4uCiAgICAjIFN1YnRlc3Q6IGV4aXN0aW5nIENvb3JkaW5hdG9yIGNoYXQsIHJ1bnMgYW5kIHNldHRpbmdzIG1vdmUgdG8gaXRzIGJvdCByb3cgb25jZTsgYSBzZWNvbmQgcGFzcyBjaGFuZ2VzIG5vdGhpbmcKICAgIG9rIDI1IC0gZXhpc3RpbmcgQ29vcmRpbmF0b3IgY2hhdCwgcnVucyBhbmQgc2V0dGluZ3MgbW92ZSB0byBpdHMgYm90IHJvdyBvbmNlOyBhIHNlY29uZCBwYXNzIGNoYW5nZXMgbm90aGluZwogICAgICAtLS0KICAgICAgZHVyYXRpb25fbXM6IDgwLjQ1OTcwOAogICAgICB0eXBlOiAndGVzdCcKICAgICAgLi4uCiAgICAjIFN1YnRlc3Q6IHBlcnNvbmFsIGJhY2tmaWxsIHByZXNlcnZlcyBzaGFyZWQgYW5kIHVucmVzb2x2ZWQgdGFzayBldmVudHMsIHJ1bnMsIEZhY3Rvcnkgc291cmNlcyBhbmQgc2NoZWR1bGVzCiAgICBvayAyNiAtIHBlcnNvbmFsIGJhY2tmaWxsIHByZXNlcnZlcyBzaGFyZWQgYW5kIHVucmVzb2x2ZWQgdGFzayBldmVudHMsIHJ1bnMsIEZhY3Rvcnkgc291cmNlcyBhbmQgc2NoZWR1bGVzCiAgICAgIC0tLQogICAgICBkdXJhdGlvbl9tczogMzIuMTE4NzY2CiAgICAgIHR5cGU6ICd0ZXN0JwogICAgICAuLi4KICAgICMgU3VidGVzdDogb25lIHNoYXJlZC10ZW5hbnQgdGFzayByZXRhaW5zIGl0cyBjb21wbGV0ZSBudWxsLUJvdCBzb3VyY2UgZmFtaWx5LCBpbmNsdWRpbmcgYSBQZXJzb25hbCBzaWJsaW5nCiAgICBvayAyNyAtIG9uZSBzaGFyZWQtdGVuYW50IHRhc2sgcmV0YWlucyBpdHMgY29tcGxldGUgbnVsbC1Cb3Qgc291cmNlIGZhbWlseSwgaW5jbHVkaW5nIGEgUGVyc29uYWwgc2libGluZwogICAgICAtLS0KICAgICAgZHVyYXRpb25fbXM6IDM0LjY3NjM1MgogICAgICB0eXBlOiAndGVzdCcKICAgICAgLi4uCiAgICAjIFN1YnRlc3Q6IGEgbmV3IENvb3JkaW5hdG9yIG1lc3NhZ2UgYW5kIGEgcnVuIHVzZSB0aGUgcmVhbCBib3QgaWQsIHN0b3JlZCB3aGVyZSB0aGV5IGVudGVyCiAgICBvayAyOCAtIGEgbmV3IENvb3JkaW5hdG9yIG1lc3NhZ2UgYW5kIGEgcnVuIHVzZSB0aGUgcmVhbCBib3QgaWQsIHN0b3JlZCB3aGVyZSB0aGV5IGVudGVyCiAgICAgIC0tLQogICAgICBkdXJhdGlvbl9tczogODcuMDkzMDk4CiAgICAgIHR5cGU6ICd0ZXN0JwogICAgICAuLi4KICAgICMgU3VidGVzdDogYSBsZWdhY3kgcnVuIHdpdGggbm8gYm90IGZpbmlzaGVzIGZvciBhbiBvd25lciB3aXRoIG5vIHdvcmtzcGFjZTsgaXRzIGV2ZW50IGlzIGtlcHQsIGFuZCBtb3ZlZCBvbmNlIHRoZSBDb29yZGluYXRvciByZXNvbHZlcwogICAgb2sgMjkgLSBhIGxlZ2FjeSBydW4gd2l0aCBubyBib3QgZmluaXNoZXMgZm9yIGFuIG93bmVyIHdpdGggbm8gd29ya3NwYWNlOyBpdHMgZXZlbnQgaXMga2VwdCwgYW5kIG1vdmVkIG9uY2UgdGhlIENvb3JkaW5hdG9yIHJlc29sdmVzCiAgICAgIC0tLQogICAgICBkdXJhdGlvbl9tczogNjUuNDE2NjU4CiAgICAgIHR5cGU6ICd0ZXN0JwogICAgICAuLi4KICAgICMgU3VidGVzdDogcmVhbCBudWxsLUJvdCBhZG1pc3Npb24gcmV0YWlucyBmcm96ZW4gaWRlbnRpdHksIEZhY3RvcnkgZmFtaWx5IGFuZCByZXBvc2l0b3J5IGF1dGhvcml0eSBhZnRlciBiYWNrZmlsbAogICAgb2sgMzAgLSByZWFsIG51bGwtQm90IGFkbWlzc2lvbiByZXRhaW5zIGZyb3plbiBpZGVudGl0eSwgRmFjdG9yeSBmYW1pbHkgYW5kIHJlcG9zaXRvcnkgYXV0aG9yaXR5IGFmdGVyIGJhY2tmaWxsCiAgICAgIC0tLQogICAgICBkdXJhdGlvbl9tczogMzM5LjI4MjExNgogICAgICB0eXBlOiAndGVzdCcKICAgICAgLi4uCiAgICAjIFN1YnRlc3Q6IGFuIHVuZnJvemVuIGNvbXB1dGVyIHJ1biByZXRhaW5zIGl0cyBGYWN0b3J5IGZhbWlseSBhbmQgb3JkaW5hcnkgcmV0cnkKICAgIG9rIDMxIC0gYW4gdW5mcm96ZW4gY29tcHV0ZXIgcnVuIHJldGFpbnMgaXRzIEZhY3RvcnkgZmFtaWx5IGFuZCBvcmRpbmFyeSByZXRyeQogICAgICAtLS0KICAgICAgZHVyYXRpb25fbXM6IDc5LjAxMjMwNgogICAgICB0eXBlOiAndGVzdCcKICAgICAgLi4uCiAgICAjIFN1YnRlc3Q6IGFuIHVuZnJvemVuIGdyb3VwIHJ1biByZXRhaW5zIGl0cyBGYWN0b3J5IGZhbWlseSBhbmQgb3JkaW5hcnkgcmV0cnkKICAgIG9rIDMyIC0gYW4gdW5mcm96ZW4gZ3JvdXAgcnVuIHJldGFpbnMgaXRzIEZhY3RvcnkgZmFtaWx5IGFuZCBvcmRpbmFyeSByZXRyeQogICAgICAtLS0KICAgICAgZHVyYXRpb25fbXM6IDcwLjgwODU4MwogICAgICB0eXBlOiAndGVzdCcKICAgICAgLi4uCiAgICAjIFN1YnRlc3Q6IGEgcHVibGljYXRpb24gaG9sZGluZyBpdHMgaXNzdWUgY2Fubm90IGRlYWRsb2NrIHdpdGggdGhlIGJhY2tmaWxsIHJ1biBsb2NrCiAgICBvayAzMyAtIGEgcHVibGljYXRpb24gaG9sZGluZyBpdHMgaXNzdWUgY2Fubm90IGRlYWRsb2NrIHdpdGggdGhlIGJhY2tmaWxsIHJ1biBsb2NrCiAgICAgIC0tLQogICAgICBkdXJhdGlvbl9tczogMjQuODYxNjExCiAgICAgIHR5cGU6ICd0ZXN0JwogICAgICAuLi4KICAgICMgU3VidGVzdDogbWlncmF0aW9uIGZpcnN0IGhvbGRzIHRoZSBpc3N1ZSB0aHJvdWdoIGl0cyBydW4gdXBkYXRlOyByZWFsIHB1YmxpY2F0aW9uIGNvbnRpbnVlcyBhZnRlciBjb21taXQKICAgIG9rIDM0IC0gbWlncmF0aW9uIGZpcnN0IGhvbGRzIHRoZSBpc3N1ZSB0aHJvdWdoIGl0cyBydW4gdXBkYXRlOyByZWFsIHB1YmxpY2F0aW9uIGNvbnRpbnVlcyBhZnRlciBjb21taXQKICAgICAgLS0tCiAgICAgIGR1cmF0aW9uX21zOiAxMDguMjA5MzgKICAgICAgdHlwZTogJ3Rlc3QnCiAgICAgIC4uLgogICAgIyBTdWJ0ZXN0OiBhIHJ1biBjb21taXR0ZWQgYWZ0ZXIgaXNzdWUgbG9ja2luZyByZXRhaW5zIGl0cyBmYW1pbHkgdW50aWwgdGhlIG5leHQgcGFzcwogICAgb2sgMzUgLSBhIHJ1biBjb21taXR0ZWQgYWZ0ZXIgaXNzdWUgbG9ja2luZyByZXRhaW5zIGl0cyBmYW1pbHkgdW50aWwgdGhlIG5leHQgcGFzcwogICAgICAtLS0KICAgICAgZHVyYXRpb25fbXM6IDQ5Ljc4NjQxMQogICAgICB0eXBlOiAndGVzdCcKICAgICAgLi4uCiAgICAjIFN1YnRlc3Q6IGEgcmV2b2tlZCBzaGFyZWQtd29ya3NwYWNlIG1lbWJlciBydW4ga2VlcHMgaXRzIHRlbmFudCB3aXRob3V0IGJsb2NraW5nIHVucmVsYXRlZCBQZXJzb25hbCBoaXN0b3J5CiAgICBvayAzNiAtIGEgcmV2b2tlZCBzaGFyZWQtd29ya3NwYWNlIG1lbWJlciBydW4ga2VlcHMgaXRzIHRlbmFudCB3aXRob3V0IGJsb2NraW5nIHVucmVsYXRlZCBQZXJzb25hbCBoaXN0b3J5CiAgICAgIC0tLQogICAgICBkdXJhdGlvbl9tczogMzYuOTI5NDczCiAgICAgIHR5cGU6ICd0ZXN0JwogICAgICAuLi4KICAgICMgU3VidGVzdDogYW4gaW4tZmxpZ2h0IG51bGwtQm90IHJvdXRlIGRlZmVycyBtaWdyYXRpb247IGl0cyB1bmZyb3plbiBoaXN0b3J5IG1vdmVzIGFmdGVyIGNvbW1pdAogICAgb2sgMzcgLSBhbiBpbi1mbGlnaHQgbnVsbC1Cb3Qgcm91dGUgZGVmZXJzIG1pZ3JhdGlvbjsgaXRzIHVuZnJvemVuIGhpc3RvcnkgbW92ZXMgYWZ0ZXIgY29tbWl0CiAgICAgIC0tLQogICAgICBkdXJhdGlvbl9tczogMzUuNjU5MDE4CiAgICAgIHR5cGU6ICd0ZXN0JwogICAgICAuLi4KICAgICMgU3VidGVzdDogbWlncmF0aW9uIGZpcnN0IGZlbmNlcyBhIHN0YWxlIHNvdXJjZSB2YWxpZGF0aW9uIGJlZm9yZSBpdCBjYW4gY3JlYXRlIGEgbnVsbC1Cb3QgdGFzawogICAgb2sgMzggLSBtaWdyYXRpb24gZmlyc3QgZmVuY2VzIGEgc3RhbGUgc291cmNlIHZhbGlkYXRpb24gYmVmb3JlIGl0IGNhbiBjcmVhdGUgYSBudWxsLUJvdCB0YXNrCiAgICAgIC0tLQogICAgICBkdXJhdGlvbl9tczogMzUuMzk5MzY0CiAgICAgIHR5cGU6ICd0ZXN0JwogICAgICAuLi4KICAgICMgU3VidGVzdDogYSB0YXNrIGNvbW1pdHRlZCBiZXR3ZWVuIG1pZ3JhdGlvbiBsb2NrIHN0YXRlbWVudHMga2VlcHMgaXRzIHNvdXJjZSB1bnRpbCB0aGUgbmV4dCBwYXNzCiAgICBvayAzOSAtIGEgdGFzayBjb21taXR0ZWQgYmV0d2VlbiBtaWdyYXRpb24gbG9jayBzdGF0ZW1lbnRzIGtlZXBzIGl0cyBzb3VyY2UgdW50aWwgdGhlIG5leHQgcGFzcwogICAgICAtLS0KICAgICAgZHVyYXRpb25fbXM6IDM1LjY0NTM2NgogICAgICB0eXBlOiAndGVzdCcKICAgICAgLi4uCiAgICAjIFN1YnRlc3Q6IGEgY29tcGxldGlvbiBjb21taXR0ZWQgYWZ0ZXIgdGhlIGV2ZW50IGxvY2sga2VlcHMgaXRzIGxlZ2FjeSBydW4gdW50aWwgYm90aCBjYW4gbW92ZQogICAgb2sgNDAgLSBhIGNvbXBsZXRpb24gY29tbWl0dGVkIGFmdGVyIHRoZSBldmVudCBsb2NrIGtlZXBzIGl0cyBsZWdhY3kgcnVuIHVudGlsIGJvdGggY2FuIG1vdmUKICAgICAgLS0tCiAgICAgIGR1cmF0aW9uX21zOiAzMy45ODc5OTkKICAgICAgdHlwZTogJ3Rlc3QnCiAgICAgIC4uLgogICAgIyBTdWJ0ZXN0OiBhIGNoYXQgd3JpdGVyIGhvbGRpbmcgaXRzIHNlc3Npb24gY2Fubm90IGRlYWRsb2NrIGFnYWluc3QgdGhlIG1pZ3JhdGlvbiBjaGF0IGxvY2sKICAgIG9rIDQxIC0gYSBjaGF0IHdyaXRlciBob2xkaW5nIGl0cyBzZXNzaW9uIGNhbm5vdCBkZWFkbG9jayBhZ2FpbnN0IHRoZSBtaWdyYXRpb24gY2hhdCBsb2NrCiAgICAgIC0tLQogICAgICBkdXJhdGlvbl9tczogMjIuNDU2ODc4CiAgICAgIHR5cGU6ICd0ZXN0JwogICAgICAuLi4KICAgICMgU3VidGVzdDogbW9kZWwgY2hvaWNlIGdvZXMgdGhyb3VnaCB0aGUgb3JkaW5hcnkgYm90IHBhdGgKICAgIG9rIDQyIC0gbW9kZWwgY2hvaWNlIGdvZXMgdGhyb3VnaCB0aGUgb3JkaW5hcnkgYm90IHBhdGgKICAgICAgLS0tCiAgICAgIGR1cmF0aW9uX21zOiAyOS4xNzA3MDgKICAgICAgdHlwZTogJ3Rlc3QnCiAgICAgIC4uLgogICAgIyBTdWJ0ZXN0OiB0aGUgQ29vcmRpbmF0b3Igc3RheXMgb3V0c2lkZSB3b3Jrc3BhY2UgYXBwIHBvbGljeTsgYW4gb3JkaW5hcnkgYm90IGRvZXMgbm90CiAgICBvayA0MyAtIHRoZSBDb29yZGluYXRvciBzdGF5cyBvdXRzaWRlIHdvcmtzcGFjZSBhcHAgcG9saWN5OyBhbiBvcmRpbmFyeSBib3QgZG9lcyBub3QKICAgICAgLS0tCiAgICAgIGR1cmF0aW9uX21zOiA0NS44NzUzNTEKICAgICAgdHlwZTogJ3Rlc3QnCiAgICAgIC4uLgogICAgIyBTdWJ0ZXN0OiB0aGUgYm90IGxpc3QgKGxlZnQgY29sdW1uIGFuZCBtb2JpbGUgaG9tZSkgaGFzIHRoYXQgd29ya3NwYWNlJ3Mgb3duIENvb3JkaW5hdG9yIG9uY2UsIGFzIHRoZSBDb29yZGluYXRvcgogICAgb2sgNDQgLSB0aGUgYm90IGxpc3QgKGxlZnQgY29sdW1uIGFuZCBtb2JpbGUgaG9tZSkgaGFzIHRoYXQgd29ya3NwYWNlJ3Mgb3duIENvb3JkaW5hdG9yIG9uY2UsIGFzIHRoZSBDb29yZGluYXRvcgogICAgICAtLS0KICAgICAgZHVyYXRpb25fbXM6IDM5LjkzOTQ3MQogICAgICB0eXBlOiAndGVzdCcKICAgICAgLi4uCiAgICAjIFN1YnRlc3Q6IG9uZSBDb29yZGluYXRvciBwZXIgd29ya3NwYWNlOyB3b3JrIHdpdGggbm8gd29ya3NwYWNlIGdvZXMgdG8gdGhlIHBlcnNvbmFsIG9uZSwgbmV2ZXIgdGhlIG9sZGVzdAogICAgb2sgNDUgLSBvbmUgQ29vcmRpbmF0b3IgcGVyIHdvcmtzcGFjZTsgd29yayB3aXRoIG5vIHdvcmtzcGFjZSBnb2VzIHRvIHRoZSBwZXJzb25hbCBvbmUsIG5ldmVyIHRoZSBvbGRlc3QKICAgICAgLS0tCiAgICAgIGR1cmF0aW9uX21zOiA0NjYuMzk5OTgxCiAgICAgIHR5cGU6ICd0ZXN0JwogICAgICAuLi4KICAgICMgU3VidGVzdDogYSBsZWF2aW5nIG1lbWJlcidzIENvb3JkaW5hdG9yIGlzIHBhdXNlZCB3aXRoIHRoZWlyIGJvdHMgYW5kIG5ldmVyIHRyYW5zZmVycmVkCiAgICBvayA0NiAtIGEgbGVhdmluZyBtZW1iZXIncyBDb29yZGluYXRvciBpcyBwYXVzZWQgd2l0aCB0aGVpciBib3RzIGFuZCBuZXZlciB0cmFuc2ZlcnJlZAogICAgICAtLS0KICAgICAgZHVyYXRpb25fbXM6IDk0Ljk3NTM4MQogICAgICB0eXBlOiAndGVzdCcKICAgICAgLi4uCiAgICAxLi40Ngpub3Qgb2sgMSAtIHRoZSBDb29yZGluYXRvciBpcyBhbiBvcmRpbmFyeSBib3Qgcm93CiAgLS0tCiAgZHVyYXRpb25fbXM6IDY4NTcuNTg2NDc0CiAgdHlwZTogJ3Rlc3QnCiAgbG9jYXRpb246ICcvaG9tZS9ydW5uZXIvd29yay9NaWtrYS9NaWtrYS90ZXN0cy9jb29yZGluYXRvci1ib3QuZGIudGVzdC50czoxOjY3MScKICBmYWlsdXJlVHlwZTogJ3N1YnRlc3RzRmFpbGVkJwogIGVycm9yOiAnNiBzdWJ0ZXN0cyBmYWlsZWQnCiAgY29kZTogJ0VSUl9URVNUX0ZBSUxVUkUnCiAgLi4uCjEuLjEKIyB0ZXN0cyA0NwojIHN1aXRlcyAwCiMgcGFzcyA0MAojIGZhaWwgNwojIGNhbmNlbGxlZCAwCiMgc2tpcHBlZCAwCiMgdG9kbyAwCiMgZHVyYXRpb25fbXMgNzMwMS4zMTQ1NQo=
+2026-11-09T20:03:37.2614858Z ISSUE1512_PG_ORIGINAL_END {"phase":"red","label":"coordinator-red","stream":"stdout"}
+2026-11-09T20:03:37.2615999Z ISSUE1512_PG_ORIGINAL_BEGIN {"phase":"red","label":"coordinator-red","stream":"stderr","file":"red-coordinator-red-stderr.log","bytes":0,"sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}
+2026-11-09T20:03:37.2616996Z ISSUE1512_PG_ORIGINAL_END {"phase":"red","label":"coordinator-red","stream":"stderr"}
+2026-11-09T20:03:37.2634636Z ISSUE1512_PG_VERDICT {"schema":"issue1512-isolated-pg17-v1","phase":"red","workflowRunId":"42689043866","workflowRunAttempt":"1","controlSha":"0b5395eb6fa5c1e2787e97c2308d7114a630607e","before":{"sha":"e0934eb89f972d44ef6cffec6e27c16b4ed203bf","tree":"0a0e2a40d82cbcb18963584e7d54f834a3af54fb","sourceBlob":"a2a6bf1fd1307babd350c9a168b003e38fa4b3cc","testBlob":"32a8321c981dd6a534f8859fa35f281e874466e6"},"after":{"sha":"a9ff5afc1cae3d18ad2827a3119c85ab46f7d3d4","tree":"e4f12292616357f46a981cfa92588248f1ad452b","sourceBlob":"d73e30c36212029a8951a25a692c4e04a2a5b86d","testBlob":"13fb6f222c061d115916557b796006c2073dc628"},"manifestSha256":"bccb05e8ee5ce2407b1627b0ca9edcf51717f88a9ccdc9affbd1f8054c86ccc6","driverSha256":"f114b1ebf4ae0dddcc25d1babdf53c2be5b37884130bbeba299d5b55775b417f","startedAt":"2026-11-09T20:03:21.606Z","commands":[{"label":"migration-bootstrap","executable":"/opt/hostedtoolcache/node/24.22.2/x64/bin/node","args":["--experimental-strip-types","--test","tests/migrate-empty-db.test.mjs"],"startedAt":"2026-11-09T20:03:22.004Z","finishedAt":"2026-11-09T20:03:26.951Z","code":0,"signal":null,"timedOut":false,"spawnError":null,"stdout":{"file":"red-migration-bootstrap-stdout.log","bytes":1152,"sha256":"331b9af5e4ed69a51cf1059442b645daa6fcdccc6a79e32a19117b2976a067bb"},"stderr":{"file":"red-migration-bootstrap-stderr.log","bytes":0,"sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}},{"label":"e2e-setup","executable":"pnpm","args":["test:e2e:setup"],"startedAt":"2026-11-09T20:03:26.952Z","finishedAt":"2026-11-09T20:03:29.296Z","code":0,"signal":null,"timedOut":false,"spawnError":null,"stdout":{"file":"red-e2e-setup-stdout.log","bytes":20970,"sha256":"a3e39d357db4e26cf6093db7841015ece76ce580eeec97c4e8fb263273c792c6"},"stderr":{"file":"red-e2e-setup-stderr.log","bytes":0,"sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}},{"label":"environment-bind","executable":"/opt/hostedtoolcache/node/24.22.2/x64/bin/node","args":["scripts/test-accounts/bootstrap.mjs","--output","/home/runner/work/_temp/issue1512-pg/red-environment.json"],"startedAt":"2026-11-09T20:03:29.297Z","finishedAt":"2026-11-09T20:03:29.453Z","code":0,"signal":null,"timedOut":false,"spawnError":null,"stdout":{"file":"red-environment-bind-stdout.log","bytes":153,"sha256":"b2ed5a23d87271064d2f7772bff513a77d6131e5a76f56cf8947208cffdedabc"},"stderr":{"file":"red-environment-bind-stderr.log","bytes":0,"sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}},{"label":"coordinator-red","executable":"/opt/hostedtoolcache/node/24.22.2/x64/bin/node","args":["--test-reporter=tap","--experimental-test-module-mocks","--test-force-exit","--import","./tests/support/server-only.mjs","--import","tsx","--test","tests/coordinator-bot.db.test.ts"],"startedAt":"2026-11-09T20:03:29.454Z","finishedAt":"2026-11-09T20:03:36.803Z","code":1,"signal":null,"timedOut":false,"spawnError":null,"stdout":{"file":"red-coordinator-red-stdout.log","bytes":17918,"sha256":"0836c8a69b6aff2e17872287713f71ba37298017f225bc0010d9ddc5128fb2d4"},"stderr":{"file":"red-coordinator-red-stderr.log","bytes":0,"sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}}],"control":{"controlSha":"0b5395eb6fa5c1e2787e97c2308d7114a630607e","controlTree":"96010045c670b62c8fd1d86b354fa5c5c01fa1f4","workflowBlob":"ea28630ad0c8c9681a67589f4328b7a1dc30a11a","manifestSha256":"bccb05e8ee5ce2407b1627b0ca9edcf51717f88a9ccdc9affbd1f8054c86ccc6","driverSha256":"f114b1ebf4ae0dddcc25d1babdf53c2be5b37884130bbeba299d5b55775b417f","phase":"red","capturedAt":"2026-11-09T20:02:32.717Z"},"database":{"database":"mikka_e2e","role":"e2e","version":"170011","port":5432},"node":"v24.22.2","pnpm":"10.34.3","verdict":"BLOCKED_OR_UNEXPECTED_FAILURE","failure":{"name":"AssertionError","message":"Only the four new empty SQL-count assertions may fail\n+ actual - expected\n\n  [\n    'a retained copied agent head still permits the empty Personal read',\n    'an empty explicit Personal Coordinator uses one Personal read',\n    'an empty explicit Team Coordinator uses one Personal read',\n+   'an explicit Team read retains the real migration for legacy factory_tasks',\n+   'an explicit Team read retains the real migration for legacy suggestions',\n    'legacy rows committed after an empty read wait for the original next pass'\n  ]\n","code":"ERR_ASSERTION"},"finishedAt":"2026-11-09T20:03:36.805Z"}
+2026-11-09T20:03:37.2650546Z ISSUE1512_PG_COMMAND_END {"label":"coordinator-red","executable":"/opt/hostedtoolcache/node/24.22.2/x64/bin/node","args":["--test-reporter=tap","--experimental-test-module-mocks","--test-force-exit","--import","./tests/support/server-only.mjs","--import","tsx","--test","tests/coordinator-bot.db.test.ts"],"startedAt":"2026-11-09T20:03:29.454Z","finishedAt":"2026-11-09T20:03:36.803Z","code":1,"signal":null,"timedOut":false,"spawnError":null,"stdout":{"file":"red-coordinator-red-stdout.log","bytes":17918,"sha256":"0836c8a69b6aff2e17872287713f71ba37298017f225bc0010d9ddc5128fb2d4"},"stderr":{"file":"red-coordinator-red-stderr.log","bytes":0,"sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}}
+2026-11-09T20:03:37.2667742Z ##[error]Process completed with exit code 1.
+2026-11-09T20:03:37.2716030Z ##[group]Run node --input-type=commonjs - <<'NODE'
+2026-11-09T20:03:37.2716465Z [36;1mnode --input-type=commonjs - <<'NODE'[0m
+2026-11-09T20:03:37.2716802Z [36;1mconst assert = require('node:assert/strict')[0m
+2026-11-09T20:03:37.2717176Z [36;1mconst { execFileSync } = require('node:child_process')[0m
+2026-11-09T20:03:37.2717586Z [36;1mconst { mkdirSync, writeFileSync } = require('node:fs')[0m
+2026-11-09T20:03:37.2718081Z [36;1mconst { join } = require('node:path')[0m
+2026-11-09T20:03:37.2718479Z [36;1mconst root = join(process.env.RUNNER_TEMP, 'issue1512-pg', 'originals')[0m
+2026-11-09T20:03:37.2718890Z [36;1mmkdirSync(root, { recursive: true })[0m
+2026-11-09T20:03:37.2719471Z [36;1mconst receipt = { phase: 'red', serviceId: process.env.ISSUE1512_SERVICE_ID, startedAt: new Date().toISOString(), stopped: false }[0m
+2026-11-09T20:03:37.2720027Z [36;1mtry {[0m
+2026-11-09T20:03:37.2720299Z [36;1m  assert.match(receipt.serviceId, /^[a-f0-9]{32,64}$/)[0m
+2026-11-09T20:03:37.2720847Z [36;1m  execFileSync('docker', ['stop', '--time', '5', receipt.serviceId], { timeout: 30000, stdio: 'pipe' })[0m
+2026-11-09T20:03:37.2721775Z [36;1m  const running = execFileSync('docker', ['inspect', '--format', '{{.State.Running}}', receipt.serviceId], { encoding: 'utf8', timeout: 10000 }).trim()[0m
+2026-11-09T20:03:37.2722384Z [36;1m  assert.equal(running, 'false')[0m
+2026-11-09T20:03:37.2722698Z [36;1m  receipt.stopped = true[0m
+2026-11-09T20:03:37.2722969Z [36;1m} catch (error) {[0m
+2026-11-09T20:03:37.2723296Z [36;1m  receipt.error = { name: error.name, message: error.message }[0m
+2026-11-09T20:03:37.2723656Z [36;1m  process.exitCode = 1[0m
+2026-11-09T20:03:37.2723909Z [36;1m}[0m
+2026-11-09T20:03:37.2724156Z [36;1mreceipt.finishedAt = new Date().toISOString()[0m
+2026-11-09T20:03:37.2724626Z [36;1mwriteFileSync(join(root, 'red-cleanup.json'), JSON.stringify(receipt, null, 2) + '\n')[0m
+2026-11-09T20:03:37.2725159Z [36;1mconsole.log('ISSUE1512_PG_CLEANUP ' + JSON.stringify(receipt))[0m
+2026-11-09T20:03:37.2725523Z [36;1mNODE[0m
+2026-11-09T20:03:37.2759015Z shell: /usr/bin/bash -e {0}
+2026-11-09T20:03:37.2759296Z env:
+2026-11-09T20:03:37.2759484Z   CI: true
+2026-11-09T20:03:37.2759668Z   REQUIRE_DB: 1
+2026-11-09T20:03:37.2759870Z   MIKKA_EDITION: cloud
+2026-11-09T20:03:37.2760113Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T20:03:37.2760373Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T20:03:37.2760638Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T20:03:37.2760910Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T20:03:37.2761287Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T20:03:37.2761566Z   MIKKA_TEST_DB_PORT: 5432
+2026-11-09T20:03:37.2762063Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:03:37.2762496Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:03:37.2762908Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:03:37.2763201Z   BETTER_AUTH_URL: http://localhost:3100
+2026-11-09T20:03:37.2763484Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T20:03:37.2763791Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T20:03:37.2764260Z   BETTER_AUTH_SECRET: ***
+2026-11-09T20:03:37.2764639Z   ISSUE1512_SERVICE_ID: 08b87f0a767f2769d655ebbdb91fa17e37633f52d8936f361958c9000d6b008d
+2026-11-09T20:03:37.2765046Z ##[endgroup]
+2026-11-09T20:03:38.4388257Z ISSUE1512_PG_CLEANUP {"phase":"red","serviceId":"08b87f0a767f2769d655ebbdb91fa17e37633f52d8936f361958c9000d6b008d","startedAt":"2026-11-09T20:03:37.310Z","stopped":true,"finishedAt":"2026-11-09T20:03:38.438Z"}
+2026-11-09T20:03:38.4489974Z ##[group]Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+2026-11-09T20:03:38.4490641Z with:
+2026-11-09T20:03:38.4491026Z   name: issue1512-backfill-pg-red-42689043866-1
+2026-11-09T20:03:38.4491829Z   path: /home/runner/work/_temp/issue1512-pg/originals/
+2026-11-09T20:03:38.4492331Z   if-no-files-found: error
+2026-11-09T20:03:38.4492676Z   retention-days: 7
+2026-11-09T20:03:38.4493004Z   compression-level: 6
+2026-11-09T20:03:38.4493355Z   overwrite: false
+2026-11-09T20:03:38.4493702Z   include-hidden-files: false
+2026-11-09T20:03:38.4494076Z env:
+2026-11-09T20:03:38.4494364Z   CI: true
+2026-11-09T20:03:38.4494672Z   REQUIRE_DB: 1
+2026-11-09T20:03:38.4494978Z   MIKKA_EDITION: cloud
+2026-11-09T20:03:38.4495328Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T20:03:38.4495731Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T20:03:38.4496139Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T20:03:38.4496918Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T20:03:38.4497437Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T20:03:38.4497869Z   MIKKA_TEST_DB_PORT: 5432
+2026-11-09T20:03:38.4498611Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:03:38.4499348Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:03:38.4500068Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T20:03:38.4500540Z   BETTER_AUTH_URL: http://localhost:3100
+2026-11-09T20:03:38.4501035Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T20:03:38.4501662Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T20:03:38.4502496Z   BETTER_AUTH_SECRET: ***
+2026-11-09T20:03:38.4502851Z ##[endgroup]
+2026-11-09T20:03:38.6172710Z (node:3598) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T20:03:38.6173469Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T20:03:38.6263086Z With the provided path, there will be 10 files uploaded
+2026-11-09T20:03:38.6269720Z Artifact name is valid!
+2026-11-09T20:03:38.6271552Z Root directory input is valid!
+2026-11-09T20:03:38.9686501Z Beginning upload of artifact content to blob storage
+2026-11-09T20:03:39.0076671Z (node:3598) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T20:03:39.2284084Z Uploaded bytes 10768
+2026-11-09T20:03:39.4339715Z Finished uploading artifact content to blob storage!
+2026-11-09T20:03:39.4341437Z SHA256 digest of uploaded artifact zip is 5e18b766b3d49865b80140d1dfd5d139af206238ec38aac0caedc46019b8d513
+2026-11-09T20:03:39.4342647Z Finalizing artifact upload
+2026-11-09T20:03:39.9379402Z Artifact issue1512-backfill-pg-red-42689043866-1.zip successfully finalized. Artifact ID 13706182044
+2026-11-09T20:03:39.9380790Z Artifact issue1512-backfill-pg-red-42689043866-1 has been successfully uploaded! Final size is 10768 bytes. Artifact ID is 13706182044
+2026-11-09T20:03:39.9387016Z Artifact download URL: https://github.com/alexj11324/Mikka/actions/runs/42689043866/artifacts/13706182044
+2026-11-09T20:03:39.9564602Z Post job cleanup.
+2026-11-09T20:03:39.9568887Z ##[start-action display=Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020;id=__f04744c2-a5e4-470c-8964-b8c11c5e7569.__actions_setup-node]
+2026-11-09T20:03:39.9571462Z ##[end-action id=__f04744c2-a5e4-470c-8964-b8c11c5e7569.__actions_setup-node;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-11-09T20:03:39.9573737Z ##[start-action display=Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1;id=__f04744c2-a5e4-470c-8964-b8c11c5e7569.__pnpm_action-setup]
+2026-11-09T20:03:39.9603523Z Post job cleanup.
+2026-11-09T20:03:40.1070343Z Pruning is unnecessary.
+2026-11-09T20:03:40.1171063Z ##[end-action id=__f04744c2-a5e4-470c-8964-b8c11c5e7569.__pnpm_action-setup;outcome=success;conclusion=success;duration_ms=159]
+2026-11-09T20:03:40.1243021Z Post job cleanup.
+2026-11-09T20:03:40.2169164Z [command]/usr/bin/git version
+2026-11-09T20:03:40.2208081Z git version 2.56.0
+2026-11-09T20:03:40.2248649Z Temporarily overriding HOME='/home/runner/work/_temp/40d23020-bf2f-4764-bf5a-0a025aa1710a' before making global git config changes
+2026-11-09T20:03:40.2250322Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T20:03:40.2255982Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T20:03:40.2295975Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T20:03:40.2331817Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T20:03:40.2557602Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T20:03:40.2592456Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T20:03:40.2832585Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T20:03:40.2866133Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T20:03:40.3270822Z Post job cleanup.
+2026-11-09T20:03:40.4146478Z [command]/usr/bin/git version
+2026-11-09T20:03:40.4186430Z git version 2.56.0
+2026-11-09T20:03:40.4225338Z Temporarily overriding HOME='/home/runner/work/_temp/c86a5665-7582-454a-8f33-2961d99c6c9d' before making global git config changes
+2026-11-09T20:03:40.4227147Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T20:03:40.4232209Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T20:03:40.4276613Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T20:03:40.4312865Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T20:03:40.4565231Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T20:03:40.4604118Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T20:03:40.4847914Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T20:03:40.4886515Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T20:03:40.5266616Z Print service container logs: eecf71fe743646deb0475710f1bf1e9f_postgres17_d21ab8
+2026-11-09T20:03:40.5274800Z ##[command]/usr/bin/docker logs --details 08b87f0a767f2769d655ebbdb91fa17e37633f52d8936f361958c9000d6b008d
+2026-11-09T20:03:40.5439418Z  The files belonging to this database system will be owned by user "postgres".
+2026-11-09T20:03:40.5440099Z  This user must also own the server process.
+2026-11-09T20:03:40.5440553Z  
+2026-11-09T20:03:40.5441004Z  The database cluster will be initialized with locale "en_US.utf8".
+2026-11-09T20:03:40.5441907Z  The default database encoding has accordingly been set to "UTF8".
+2026-11-09T20:03:40.5442376Z  The default text search configuration will be set to "english".
+2026-11-09T20:03:40.5442702Z  
+2026-11-09T20:03:40.5442901Z  Data page checksums are disabled.
+2026-11-09T20:03:40.5443154Z  
+2026-11-09T20:03:40.5443442Z  fixing permissions on existing directory /var/lib/postgresql/data ... ok
+2026-11-09T20:03:40.5443894Z  creating subdirectories ... ok
+2026-11-09T20:03:40.5444228Z  selecting dynamic shared memory implementation ... posix
+2026-11-09T20:03:40.5444587Z  selecting default "max_connections" ... 100
+2026-11-09T20:03:40.5444891Z  selecting default "shared_buffers" ... 128MB
+2026-11-09T20:03:40.5445191Z  selecting default time zone ... Etc/UTC
+2026-11-09T20:03:40.5445470Z  creating configuration files ... ok
+2026-11-09T20:03:40.5445760Z  running bootstrap script ... ok
+2026-11-09T20:03:40.5446055Z  performing post-bootstrap initialization ... ok
+2026-11-09T20:03:40.5446363Z  syncing data to disk ... ok
+2026-11-09T20:03:40.5446595Z  
+2026-11-09T20:03:40.5446779Z  
+2026-11-09T20:03:40.5447009Z  Success. You can now start the database server using:
+2026-11-09T20:03:40.5447306Z  
+2026-11-09T20:03:40.5447552Z      pg_ctl -D /var/lib/postgresql/data -l logfile start
+2026-11-09T20:03:40.5447845Z  
+2026-11-09T20:03:40.5448473Z  waiting for server to start....2026-11-09 20:02:20.960 UTC [49] LOG:  starting PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+2026-11-09T20:03:40.5449663Z  2026-11-09 20:02:20.960 UTC [49] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-11-09T20:03:40.5450210Z  2026-11-09 20:02:20.963 UTC [52] LOG:  database system was shut down at 2026-11-09 20:02:20 UTC
+2026-11-09T20:03:40.5450725Z  2026-11-09 20:02:20.966 UTC [49] LOG:  database system is ready to accept connections
+2026-11-09T20:03:40.5451096Z   done
+2026-11-09T20:03:40.5451481Z  server started
+2026-11-09T20:03:40.5451698Z  CREATE DATABASE
+2026-11-09T20:03:40.5451910Z  
+2026-11-09T20:03:40.5452088Z  
+2026-11-09T20:03:40.5452420Z  /usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+2026-11-09T20:03:40.5452801Z  
+2026-11-09T20:03:40.5453158Z  waiting for server to shut down....2026-11-09 20:02:21.128 UTC [49] LOG:  received fast shutdown request
+2026-11-09T20:03:40.5453660Z  2026-11-09 20:02:21.129 UTC [49] LOG:  aborting any active transactions
+2026-11-09T20:03:40.5454227Z  2026-11-09 20:02:21.131 UTC [49] LOG:  background worker "logical replication launcher" (PID 55) exited with exit code 1
+2026-11-09T20:03:40.5454736Z  2026-11-09 20:02:21.131 UTC [50] LOG:  shutting down
+2026-11-09T20:03:40.5455122Z  2026-11-09 20:02:21.131 UTC [50] LOG:  checkpoint starting: shutdown immediate
+2026-11-09T20:03:40.5456129Z  2026-11-09 20:02:21.144 UTC [50] LOG:  checkpoint complete: wrote 925 buffers (5.6%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.011 s, sync=0.002 s, total=0.014 s; sync files=301, longest=0.001 s, average=0.001 s; distance=4256 kB, estimate=4256 kB; lsn=0/19179A8, redo lsn=0/19179A8
+2026-11-09T20:03:40.5457134Z  2026-11-09 20:02:21.148 UTC [49] LOG:  database system is shut down
+2026-11-09T20:03:40.5457448Z   done
+2026-11-09T20:03:40.5457629Z  server stopped
+2026-11-09T20:03:40.5457836Z  
+2026-11-09T20:03:40.5458069Z  PostgreSQL init process complete; ready for start up.
+2026-11-09T20:03:40.5458363Z  
+2026-11-09T20:03:40.5460352Z  initdb: warning: enabling "trust" authentication for local connections
+2026-11-09T20:03:40.5461028Z  initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-11-09T20:03:40.5473133Z  2026-11-09 20:02:21.249 UTC [1] LOG:  starting PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+2026-11-09T20:03:40.5473833Z  2026-11-09 20:02:21.249 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-11-09T20:03:40.5474286Z  2026-11-09 20:02:21.249 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-11-09T20:03:40.5474796Z  2026-11-09 20:02:21.250 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-11-09T20:03:40.5475328Z  2026-11-09 20:02:21.253 UTC [65] LOG:  database system was shut down at 2026-11-09 20:02:21 UTC
+2026-11-09T20:03:40.5475819Z  2026-11-09 20:02:21.257 UTC [1] LOG:  database system is ready to accept connections
+2026-11-09T20:03:40.5476417Z  2026-11-09 20:03:24.166 UTC [170] ERROR:  new row for relation "issues" violates check constraint "issues_status_check"
+2026-11-09T20:03:40.5477684Z  2026-11-09 20:03:24.166 UTC [170] DETAIL:  Failing row contains (43d89c8b-eeda-4848-9fc8-87e49e6b6c8f, existing-owner, Keep this issue, {"type": "doc", "attrs": {"mikka": {"number": 1}}}, unsupported, low, 1, 2026-11-09 20:03:24.156308+00, 2026-11-09 20:03:24.156308+00, personal, agent, null, 1, f, 1, null, null, null, pending, disabled).
+2026-11-09T20:03:40.5478857Z  2026-11-09 20:03:24.166 UTC [170] STATEMENT:  update issues set status=$2 where id=$1
+2026-11-09T20:03:40.5479434Z  2026-11-09 20:03:24.174 UTC [174] ERROR:  new row for relation "issues" violates check constraint "issues_priority_check"
+2026-11-09T20:03:40.5480689Z  2026-11-09 20:03:24.174 UTC [174] DETAIL:  Failing row contains (43d89c8b-eeda-4848-9fc8-87e49e6b6c8f, existing-owner, Keep this issue, {"type": "doc", "attrs": {"mikka": {"number": 1}}}, duplicate, none, 1, 2026-11-09 20:03:24.156308+00, 2026-11-09 20:03:24.156308+00, personal, agent, null, 1, f, 1, null, null, null, pending, disabled).
+2026-11-09T20:03:40.5482697Z  2026-11-09 20:03:24.174 UTC [174] STATEMENT:  update issues set priority=$2 where id=$1
+2026-11-09T20:03:40.5483267Z  2026-11-09 20:03:26.300 UTC [180] ERROR:  new row for relation "issues" violates check constraint "issues_status_check"
+2026-11-09T20:03:40.5484490Z  2026-11-09 20:03:26.300 UTC [180] DETAIL:  Failing row contains (95977369-7105-427f-887a-55a74b0aed66, existing-owner, Keep this issue, {"type": "doc", "attrs": {"mikka": {"number": 1}}}, unsupported, low, 1, 2026-11-09 20:03:26.292501+00, 2026-11-09 20:03:26.292501+00, personal, agent, null, 1, f, 1, null, null, null, pending, disabled).
+2026-11-09T20:03:40.5485625Z  2026-11-09 20:03:26.300 UTC [180] STATEMENT:  update issues set status=$2 where id=$1
+2026-11-09T20:03:40.5486200Z  2026-11-09 20:03:26.307 UTC [184] ERROR:  new row for relation "issues" violates check constraint "issues_priority_check"
+2026-11-09T20:03:40.5487444Z  2026-11-09 20:03:26.307 UTC [184] DETAIL:  Failing row contains (95977369-7105-427f-887a-55a74b0aed66, existing-owner, Keep this issue, {"type": "doc", "attrs": {"mikka": {"number": 1}}}, duplicate, none, 1, 2026-11-09 20:03:26.292501+00, 2026-11-09 20:03:26.292501+00, personal, agent, null, 1, f, 1, null, null, null, pending, disabled).
+2026-11-09T20:03:40.5488586Z  2026-11-09 20:03:26.307 UTC [184] STATEMENT:  update issues set priority=$2 where id=$1
+2026-11-09T20:03:40.5489125Z  2026-11-09 20:03:34.204 UTC [211] ERROR:  inconsistent types deduced for parameter $2 at character 132
+2026-11-09T20:03:40.5489611Z  2026-11-09 20:03:34.204 UTC [211] DETAIL:  uuid versus text
+2026-11-09T20:03:40.5490147Z  2026-11-09 20:03:34.204 UTC [211] STATEMENT:  INSERT INTO agent_kit_heads (owner_id,bot_key,bot_id,workspace_id,cli_run_policy)
+2026-11-09T20:03:40.5490729Z  	      VALUES ($1,'coordinator',NULL,NULL,$4),($1,$2,$2::uuid,$3,$5)
+2026-11-09T20:03:40.5491716Z  2026-11-09 20:03:34.359 UTC [212] ERROR:  insert or update on table "factory_tasks" violates foreign key constraint "factory_tasks_attempt_fk"
+2026-11-09T20:03:40.5492680Z  2026-11-09 20:03:34.359 UTC [212] DETAIL:  Key (id, attemptId)=(f83d7e50-6f38-45a5-b06f-5934fd844bc0, bb3c8c2c-0529-4ae3-a12b-c5865821c474) is not present in table "factory_attempts".
+2026-11-09T20:03:40.5493523Z  2026-11-09 20:03:34.461 UTC [213] ERROR:  inconsistent types deduced for parameter $1 at character 121
+2026-11-09T20:03:40.5493998Z  2026-11-09 20:03:34.461 UTC [213] DETAIL:  text versus uuid
+2026-11-09T20:03:40.5494600Z  2026-11-09 20:03:34.461 UTC [213] STATEMENT:  INSERT INTO suggestions (id,"userId",source,"externalId",action,title,shown,"decidedBy","occurredAt")
+2026-11-09T20:03:40.5495281Z  	          VALUES ($1,$2,'github',$1::text,'read','Legacy suggestion',false,'rule',now())
+2026-11-09T20:03:40.5495783Z  2026-11-09 20:03:35.631 UTC [218] ERROR:  could not obtain lock on row in relation "issues"
+2026-11-09T20:03:40.5496279Z  2026-11-09 20:03:35.631 UTC [218] STATEMENT:  SELECT i.id FROM issues i WHERE EXISTS (
+2026-11-09T20:03:40.5496814Z  	    SELECT 1 FROM agent_runs r WHERE r."userId"=$1 AND r."botId" IS NULL AND r."issueId"=i.id
+2026-11-09T20:03:40.5497263Z  	  ) ORDER BY i.id FOR SHARE OF i NOWAIT
+2026-11-09T20:03:40.5497639Z  2026-11-09 20:03:35.633 UTC [214] WARNING:  there is no transaction in progress
+2026-11-09T20:03:40.5498068Z  2026-11-09 20:03:35.826 UTC [214] ERROR:  taskWorkspaceMismatch
+2026-11-09T20:03:40.5498566Z  2026-11-09 20:03:35.826 UTC [214] CONTEXT:  PL/pgSQL function require_run_task_workspace() line 28 at RAISE
+2026-11-09T20:03:40.5499126Z  2026-11-09 20:03:35.826 UTC [214] STATEMENT:  UPDATE agent_runs SET "botId"=$2 WHERE id=$1
+2026-11-09T20:03:40.5499674Z  2026-11-09 20:03:35.861 UTC [219] ERROR:  could not obtain lock on row in relation "coordinator_events"
+2026-11-09T20:03:40.5500378Z  2026-11-09 20:03:35.861 UTC [219] STATEMENT:  SELECT id FROM coordinator_events WHERE "userId"=$1 AND "botId" IS NULL ORDER BY id FOR UPDATE NOWAIT
+2026-11-09T20:03:40.5501625Z  2026-11-09 20:03:35.872 UTC [218] WARNING:  there is no transaction in progress
+2026-11-09T20:03:40.5502175Z  2026-11-09 20:03:35.993 UTC [217] ERROR:  could not obtain lock on row in relation "coordinator_sessions"
+2026-11-09T20:03:40.5502901Z  2026-11-09 20:03:35.993 UTC [217] STATEMENT:  SELECT 1 FROM coordinator_sessions WHERE "userId"=$1 AND ("botId" IS NULL OR "botId"=$2) FOR UPDATE NOWAIT
+2026-11-09T20:03:40.5503536Z  2026-11-09 20:03:37.407 UTC [1] LOG:  received fast shutdown request
+2026-11-09T20:03:40.5503938Z  2026-11-09 20:03:37.407 UTC [1] LOG:  aborting any active transactions
+2026-11-09T20:03:40.5504491Z  2026-11-09 20:03:37.410 UTC [1] LOG:  background worker "logical replication launcher" (PID 68) exited with exit code 1
+2026-11-09T20:03:40.5504990Z  2026-11-09 20:03:37.411 UTC [63] LOG:  shutting down
+2026-11-09T20:03:40.5505377Z  2026-11-09 20:03:37.411 UTC [63] LOG:  checkpoint starting: shutdown immediate
+2026-11-09T20:03:40.5506410Z  2026-11-09 20:03:38.253 UTC [63] LOG:  checkpoint complete: wrote 4121 buffers (25.2%); 0 WAL file(s) added, 0 removed, 2 recycled; write=0.050 s, sync=0.790 s, total=0.843 s; sync files=4771, longest=0.120 s, average=0.001 s; distance=34705 kB, estimate=34705 kB; lsn=0/3AFBFF0, redo lsn=0/3AFBFF0
+2026-11-09T20:03:40.5507422Z  2026-11-09 20:03:38.263 UTC [1] LOG:  database system is shut down
+2026-11-09T20:03:40.5514472Z Stop and remove container: eecf71fe743646deb0475710f1bf1e9f_postgres17_d21ab8
+2026-11-09T20:03:40.5520357Z ##[command]/usr/bin/docker rm --force 08b87f0a767f2769d655ebbdb91fa17e37633f52d8936f361958c9000d6b008d
+2026-11-09T20:03:40.5678656Z 08b87f0a767f2769d655ebbdb91fa17e37633f52d8936f361958c9000d6b008d
+2026-11-09T20:03:40.5705525Z Remove container network: github_network_256658d7af5046d2bf1753dd4b692327
+2026-11-09T20:03:40.5709968Z ##[command]/usr/bin/docker network rm github_network_256658d7af5046d2bf1753dd4b692327
+2026-11-09T20:03:40.6842308Z github_network_256658d7af5046d2bf1753dd4b692327
+2026-11-09T20:03:40.6922441Z Cleaning up orphan processes
+2026-11-09T20:03:40.7263704Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830, actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020, actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02, pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

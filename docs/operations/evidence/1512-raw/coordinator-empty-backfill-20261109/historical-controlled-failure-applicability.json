@@ -1,0 +1,937 @@
+{
+  "schemaVersion": 1,
+  "kind": "historical_controlled_failure_overhead_applicability_source_review",
+  "reviewedAtUTC": "2026-11-09T20:20:40Z",
+  "status": "historical_evidence_reusable_with_explicit_scope_no_blanket_rerun_required",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "authority": {
+    "parentTask": "Read immutable evidence and final candidate dependency blobs; no runtime, query, model or resource action.",
+    "commentUrl": "https://github.com/alexj11324/Mikka/issues/1512#issuecomment-6697400007"
+  },
+  "sources": {
+    "actualHistoricalExecution": {
+      "commit": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+      "tree": "c3e93199894eca7441610e108ff3cee485b39e03",
+      "parents": [
+        "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+        "78f2133be5bcfce8ba71ab63262c4453082c02f1"
+      ],
+      "runId": 42552094175,
+      "attempt": 1,
+      "jobId": 128949713707,
+      "artifactId": 13645667123
+    },
+    "candidate": {
+      "commit": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+      "tree": "e7c7c6ad66acd729278393711c10eeed67c6d7ac",
+      "parents": [
+        "5a0c90774b8c48fc390ea05cf782bbc9cbe79a62",
+        "7848e79df9c5af67e526aeed1c828858db392066"
+      ],
+      "mainBase": "7848e79df9c5af67e526aeed1c828858db392066",
+      "candidateWasExecutedByThisReview": false
+    },
+    "archive": {
+      "commit": "a995674f93b90ee0110dce9bdb71348cb0019647",
+      "actualPrefix": "docs/operations/evidence/1512-raw/followup-548790-20261109/controlled-failure-1d126/public",
+      "preparationPrefix": "docs/operations/evidence/1512-raw/controlled-failure-ae1504",
+      "preparationIndex": "a68ca7850f50917b2d17d3fa5d495d8da8a7b648",
+      "preparationWasNotExecution": true
+    }
+  },
+  "correction": {
+    "exactExecutedRevisionIs": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+    "ae1504DirectoryMeaning": "Source and offline preparation checkpoint; its own index explicitly records no new backend or HTTP benchmark execution.",
+    "terminology": "600 measured requests per condition and 100 warmups per condition, alternating 20-request blocks with order reversal. Do not describe this as 600 randomized per-request pairs.",
+    "historicalReceiptsUnchanged": true,
+    "noRetroactiveCurrentCandidateAcceptance": true
+  },
+  "historicalEvidence": [
+    {
+      "path": "docs/operations/evidence/1512-raw/followup-548790-20261109/controlled-failure-1d126/public/source-binding.safe.json",
+      "gitBlob": "e7f3948f5a43c9763860de6ec6ad7f2cd50c9bb1",
+      "bytes": 1412,
+      "sha256": "13130b583b97ed9ff96f9993197586f7431d411952983e735d9deb77c0f4623e"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/followup-548790-20261109/controlled-failure-1d126/public/controlled-failure-final-index.safe.json",
+      "gitBlob": "fa0e6c370e4b58e39b4f007234eb3a6f0441c34d",
+      "bytes": 12320,
+      "sha256": "0d795b608e5a69d8d30135563e9f1fce66095b8cdce59b70142c26a26de43889"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/followup-548790-20261109/controlled-failure-1d126/public/controlled-failure.receipt.json",
+      "gitBlob": "e8e1e114fe4edfa4c9e9c674ff0f503e5010058d",
+      "bytes": 8829,
+      "sha256": "bd60679a1d6169815dcc16488f60973b1f2a5a7d6f83624c380b483490c99115"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/followup-548790-20261109/controlled-failure-1d126/public/controlled-failure-reconciliation.safe.json",
+      "gitBlob": "09979537824953ae9cf45bd952e80c9a6927038d",
+      "bytes": 67306,
+      "sha256": "60e6b131f16f9b78fea8ee980d61f3732936612dc3acb940931be1688625cc54"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/followup-548790-20261109/controlled-failure-1d126/public/overhead.receipt.json",
+      "gitBlob": "7e7856cbe3bac470133110f81c92e9873fc1d8f6",
+      "bytes": 1348,
+      "sha256": "aac5169ba36d1ce5be053911eb6a5fa6d2e64a452f0b34911fadfe442c9216b5"
+    },
+    {
+      "path": "docs/operations/evidence/1512-raw/followup-548790-20261109/controlled-failure-1d126/public/overhead-verification.safe.json",
+      "gitBlob": "ca53d82a482087c55d424457e6dbce92a0b8a5e4",
+      "bytes": 2325,
+      "sha256": "7d8a3b66f81f7cc2eda51655a964aaf79a5e0990f11c8987a495dab25c3b3059"
+    }
+  ],
+  "measuredFailureScope": {
+    "service": "mikka-web",
+    "environment": "dev",
+    "windowUTC": [
+      "2026-11-09T02:43:10Z",
+      "2026-11-09T02:43:12Z"
+    ],
+    "actualCounts": {
+      "completeFailureTraces": 20,
+      "spanRows": 80,
+      "uniqueTraceSpanPairs": 80,
+      "errorLogRows": 40,
+      "uniqueErrorLogSpanPairs": 40,
+      "missingTraces": 0,
+      "duplicateSpans": 0,
+      "duplicateLogs": 0,
+      "initialUnsampled": 17
+    },
+    "ordinaryNoncriticalHttp500Requests": 20,
+    "configuredHeadRate": 0.1,
+    "initialUnsampled": 17,
+    "effectiveRetainedRate": 1,
+    "retention": "error_or_slow",
+    "localReceiptBackendObserved": false,
+    "separateReconciliationBackendObserved": true,
+    "twoStableSnapshots": true,
+    "posthogQueryCountInHistoricalOwnerEvidence": 9,
+    "sourceBoundAssertions": [
+      "Actual local root/PG span ID sets agree with independent backend enumeration.",
+      "Every trace contains a root and three PG children; one PG error plus root error each has a linked ERROR log.",
+      "Root error code/detail are closed; PostgreSQL 22012 is in the root/log cause chain. Null code/type on PG ERROR spans remain null.",
+      "No missing or physical duplicate rows in this finite case set."
+    ],
+    "notClaims": [
+      "Not 20 production coding/model failures.",
+      "Not unconditional delivery under collector outage, bounded queue exhaustion or arbitrary concurrency.",
+      "Not validation of all daemon, CLI/native OTLP or model failure semantics.",
+      "Original local receipt backendObserved=false was not rewritten to true."
+    ]
+  },
+  "measuredOverheadScope": {
+    "sourceRevision": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+    "environment": {
+      "node": "v24.22.2",
+      "platform": "linux",
+      "postgres": "real loopback",
+      "requests_per_condition": 600,
+      "queries_per_request": 3
+    },
+    "warmupPerCondition": 100,
+    "measuredPerCondition": 600,
+    "totalMeasuredRequests": 1200,
+    "queriesPerRequest": 3,
+    "design": "Sequential conditions in alternating 20-request blocks with alternating order; not a per-request randomized paired-statistics experiment.",
+    "handler": {
+      "off": {
+        "n": 600,
+        "mean_ms": 0.3718352466666721,
+        "p50_ms": 0.31988400000000183,
+        "p95_ms": 0.6043230000000221,
+        "p99_ms": 1.1887460000000374
+      },
+      "on": {
+        "n": 600,
+        "mean_ms": 0.7164181533333314,
+        "p50_ms": 0.6461860000001707,
+        "p95_ms": 1.0409030000000712,
+        "p99_ms": 2.0854009999999334
+      },
+      "delta_mean_ms": 0.34458290666665925,
+      "delta_p95_ms": 0.43658000000004904
+    },
+    "roundTrip": {
+      "off": {
+        "n": 600,
+        "mean_ms": 0.6335694116666621,
+        "p50_ms": 0.5292990000000373,
+        "p95_ms": 1.0960360000000264,
+        "p99_ms": 2.7947229999999763
+      },
+      "on": {
+        "n": 600,
+        "mean_ms": 0.9801910766666668,
+        "p50_ms": 0.8727990000002137,
+        "p95_ms": 1.536832000000004,
+        "p99_ms": 2.8573880000000145
+      },
+      "delta_mean_ms": 0.3466216650000047,
+      "delta_p95_ms": 0.44079599999997754
+    },
+    "retention": {
+      "critical": "600/600",
+      "controlled_failures": "20/20",
+      "linked_error_logs": 20,
+      "safe_cause_chain": true,
+      "raw_sql_error_exported": false
+    },
+    "excludes": [
+      "Remote PostHog collector transmission and network.",
+      "Provider/model latency, cloud provisioning and daemon/CLI execution.",
+      "Production concurrency and serverless waitUntil lifetime.",
+      "Current-candidate exact performance or a population confidence interval."
+    ],
+    "disposition": "Keep as a completed historical same-source Web HTTP/PG memory-exporter baseline. Never relabel +0.34458290666665925 ms / +0.43658000000004904 ms as an 84ce measurement or whole-daemon cost."
+  },
+  "probeDependencyMatrix": [
+    {
+      "path": "scripts/ops/run-trace-benchmark.ts",
+      "before": "09280f0dfb945157aa8c692699fecbc2989f15dc",
+      "after": "09280f0dfb945157aa8c692699fecbc2989f15dc",
+      "same": true
+    },
+    {
+      "path": "apps/api/runtime/request-trace.ts",
+      "before": "d875b1cbcb97eaecccb80a190ebd0778aee9bc3b",
+      "after": "d875b1cbcb97eaecccb80a190ebd0778aee9bc3b",
+      "same": true
+    },
+    {
+      "path": "lib/tracing/node.ts",
+      "before": "3037a3b0cc2538451917cdd8e454a376553fc47c",
+      "after": "00775a5928228262a66b12b845ee0dc18f6c6047",
+      "same": false
+    },
+    {
+      "path": "lib/tracing/config.ts",
+      "before": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483",
+      "after": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483",
+      "same": true
+    },
+    {
+      "path": "lib/tracing/context.ts",
+      "before": "fe005d26c2ea903250683d9351334b95ef328383",
+      "after": "fe005d26c2ea903250683d9351334b95ef328383",
+      "same": true
+    },
+    {
+      "path": "lib/tracing/spans.ts",
+      "before": "9822a772a135fa77f4f4bb604cf40b17f7635a96",
+      "after": "9822a772a135fa77f4f4bb604cf40b17f7635a96",
+      "same": true
+    },
+    {
+      "path": "lib/tracing/sampling.ts",
+      "before": "62ffc81009b4b317b2242f42b56f072b594a44d0",
+      "after": "62ffc81009b4b317b2242f42b56f072b594a44d0",
+      "same": true
+    },
+    {
+      "path": "lib/tracing/sanitize.ts",
+      "before": "2389f07e8b9f6ec9ff84496f9b7a6f8ea060ffc5",
+      "after": "9857985199066a39fdc96ba73f7047d21ba6406f",
+      "same": false
+    },
+    {
+      "path": "lib/tracing/logs.ts",
+      "before": "ac6a917887a94a6a673410753d4645e2dba25d21",
+      "after": "ac6a917887a94a6a673410753d4645e2dba25d21",
+      "same": true
+    },
+    {
+      "path": "lib/tracing/flush.ts",
+      "before": "0149083f1f9e36adca769c2e799afe84a90bd139",
+      "after": "0149083f1f9e36adca769c2e799afe84a90bd139",
+      "same": true
+    },
+    {
+      "path": "lib/tracing/labels.ts",
+      "before": "4eddcee8197d25708e18fc1070ce13b4e0125126",
+      "after": "4eddcee8197d25708e18fc1070ce13b4e0125126",
+      "same": true
+    },
+    {
+      "path": "packages/protocol/src/tracing.ts",
+      "before": "0bb62e9bb2eac7c17ae076cb55f9da05b571c502",
+      "after": "0bb62e9bb2eac7c17ae076cb55f9da05b571c502",
+      "same": true
+    },
+    {
+      "path": "packages/protocol/src/coded-error.ts",
+      "before": "53c619750e667cba008192495928112da5de16f1",
+      "after": "53c619750e667cba008192495928112da5de16f1",
+      "same": true
+    },
+    {
+      "path": "packages/protocol/src/trace-context.ts",
+      "before": "0c1a8c2fc1b7cbf4273b2ba53961d69337c11530",
+      "after": "0c1a8c2fc1b7cbf4273b2ba53961d69337c11530",
+      "same": true
+    },
+    {
+      "path": "lib/base-path-config.mjs",
+      "before": "a5338d3516d88e4f911031a316ae5187a379ba33",
+      "after": "a5338d3516d88e4f911031a316ae5187a379ba33",
+      "same": true
+    },
+    {
+      "path": "scripts/test-accounts/database-target.mjs",
+      "before": "64a4ee0af06f9521bbe80123afd553ce977a69c4",
+      "after": "64a4ee0af06f9521bbe80123afd553ce977a69c4",
+      "same": true
+    },
+    {
+      "path": "packages/protocol/src/local-test-mode.ts",
+      "before": "02b4d3a979ac917a67b3d280c53896e8e46a33d9",
+      "after": "02b4d3a979ac917a67b3d280c53896e8e46a33d9",
+      "same": true
+    },
+    {
+      "path": "scripts/server-test.mjs",
+      "before": "8bdf8e68b81fa3f28c92b5a1559cf809345d8fae",
+      "after": "8bdf8e68b81fa3f28c92b5a1559cf809345d8fae",
+      "same": true
+    },
+    {
+      "path": "packages/protocol/package.json",
+      "before": "52a7ed583d756b1575697556e29a6f65438d2410",
+      "after": "52a7ed583d756b1575697556e29a6f65438d2410",
+      "same": true
+    },
+    {
+      "path": "lib/posthog-config.ts",
+      "before": "b90fa7ae1d89462360dce3e5688852fb12a41977",
+      "after": "b90fa7ae1d89462360dce3e5688852fb12a41977",
+      "same": true
+    }
+  ],
+  "extraFileMatrix": [
+    {
+      "path": "scripts/ops/run-trace-benchmark.test.ts",
+      "before": "aecb57c52b21e99ffb6fdbeb8df287e542a14440",
+      "after": "aecb57c52b21e99ffb6fdbeb8df287e542a14440",
+      "same": true
+    },
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "before": "b248a4d97240ba895c3c165b2d7d5c4a763ffe23",
+      "after": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+      "same": false
+    },
+    {
+      "path": "lib/request-log.ts",
+      "before": "3c4b95e5cf716717b1e8d64208013783e8e93862",
+      "after": "3c4b95e5cf716717b1e8d64208013783e8e93862",
+      "same": true
+    },
+    {
+      "path": "scripts/error-cause-policy.mjs",
+      "before": "a3578a3a622e988cdfd09e65fc66ad483d1bb23d",
+      "after": "822fbde9b131115a119eaa1fd9693dc65164dda2",
+      "same": false
+    },
+    {
+      "path": "scripts/error-cause-policy.test.mjs",
+      "before": "4e02f91c689b1277c4b6a1f1a4451f4c585be617",
+      "after": "4e02f91c689b1277c4b6a1f1a4451f4c585be617",
+      "same": true
+    },
+    {
+      "path": "lib/tracing/logs.test.ts",
+      "before": "8e6dc9b951d1126376ab29d4d0a80f276391a58a",
+      "after": "737fa373e4a8333a4a703bf6133f9a533d585460",
+      "same": false
+    },
+    {
+      "path": "lib/tracing/workflow-transport.test.ts",
+      "before": null,
+      "after": "a92aa052db23cb4448bd73538da70d3cab0634e6",
+      "same": false
+    },
+    {
+      "path": "scripts/ops/posthog/alert-source-anomaly.sql",
+      "before": "f3f8e98d1f54c0c4ad8236669b486249e981f989",
+      "after": "f3f8e98d1f54c0c4ad8236669b486249e981f989",
+      "same": true
+    },
+    {
+      "path": "package.json",
+      "before": "01bae60264a909518999d02fa1ec52c1c62ce786",
+      "after": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d",
+      "same": false
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "before": "e51af63418cc3c508a4525727f7bd92409e90ee8",
+      "after": "539cb8567feb617add97c41bd45be96bc50c5a8a",
+      "same": false
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "before": "bec66a3f1d621df47d05019100129a0abcc779a2",
+      "after": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d",
+      "same": false
+    }
+  ],
+  "actualRelevantChanges": [
+    {
+      "path": "lib/tracing/node.ts",
+      "before": "3037a3b0cc2538451917cdd8e454a376553fc47c",
+      "after": "00775a5928228262a66b12b845ee0dc18f6c6047",
+      "exactDelta": [
+        {
+          "op": "+",
+          "oldLine": 86,
+          "newLine": 86,
+          "text": "    // The SDK batch flush drains queued spans, but not an export its timer"
+        },
+        {
+          "op": "+",
+          "oldLine": 86,
+          "newLine": 87,
+          "text": "    // already started. Keep that transport in waitUntil as well."
+        },
+        {
+          "op": "+",
+          "oldLine": 86,
+          "newLine": 88,
+          "text": "    spanProcessors: [new RouteAttributesProcessor(), new RetainingSpanProcessor(logger ? new StageLogProcessor(logger, batcher) : batcher), new FlushOnRootEnd(async () => { await Promise.allSettled([batcher.forceFlush().finally(() => exporter.forceFlush?.()), flushTelemetry()]) }, serverless)],"
+        },
+        {
+          "op": "-",
+          "oldLine": 86,
+          "newLine": 89,
+          "text": "    spanProcessors: [new RouteAttributesProcessor(), new RetainingSpanProcessor(logger ? new StageLogProcessor(logger, batcher) : batcher), new FlushOnRootEnd(async () => { await Promise.allSettled([batcher.forceFlush(), flushTelemetry()]) }, serverless)],"
+        }
+      ],
+      "semantic": "Serverless root-end lifetime now waits for an already in-flight exporter after the batch queue drains. SafeExporter methods, batch sizes, RunSampler/RetainingSpanProcessor wiring and createPgInstrumentation are unchanged.",
+      "probeReachability": "run-trace-benchmark.ts:95 explicitly sets serverless:false; node.ts:63 returns before scheduling the changed callback. Repeating this unchanged probe does not test this new serverless path.",
+      "existingTargetedSource": {
+        "path": "lib/tracing/logs.test.ts",
+        "gitBlob": "737fa373e4a8333a4a703bf6133f9a533d585460",
+        "tests": [
+          "HTTP completes while waitUntil retains an earlier in-flight Workflow trace export",
+          "exporter forceFlush reject does not fail the HTTP response or retained lifetime",
+          "exporter forceFlush throw does not fail the HTTP response or retained lifetime"
+        ],
+        "executionByThisReview": false
+      },
+      "remainingObservation": "Retain source-bound CI evidence for those existing regressions and inspect the already-required real production Coordinator/deferred trace and Logs. This is not an extra blanket controlled-failure run gate."
+    },
+    {
+      "path": "lib/tracing/sanitize.ts",
+      "before": "2389f07e8b9f6ec9ff84496f9b7a6f8ea060ffc5",
+      "after": "9857985199066a39fdc96ba73f7047d21ba6406f",
+      "exactDelta": [
+        {
+          "op": "+",
+          "oldLine": 68,
+          "newLine": 68,
+          "text": "    // Workflow uses HTTP-shaped spans for WS writes too. Keep only the"
+        },
+        {
+          "op": "+",
+          "oldLine": 68,
+          "newLine": 69,
+          "text": "    // transport enum; socket URLs, request ids and payloads remain private."
+        },
+        {
+          "op": "+",
+          "oldLine": 68,
+          "newLine": 70,
+          "text": "    if (key === 'workflow.events.transport') {"
+        },
+        {
+          "op": "+",
+          "oldLine": 68,
+          "newLine": 71,
+          "text": "      if (value === 'http' || value === 'ws') clean[key] = value"
+        },
+        {
+          "op": "+",
+          "oldLine": 68,
+          "newLine": 72,
+          "text": "      continue"
+        },
+        {
+          "op": "+",
+          "oldLine": 68,
+          "newLine": 73,
+          "text": "    }"
+        }
+      ],
+      "semantic": "One closed workflow.events.transport enum: only http/ws survive. Existing safe errors, SQL normalization, request attributes and span IDs/status/links behavior are unchanged.",
+      "probeReachability": "The probe does not set workflow.events.transport; the false key comparison still adds an unmeasured per-attribute branch. Historical numeric timing therefore remains a baseline, not a bit-identical cost claim.",
+      "disposition": "No concrete retention/cause-chain regression or reason to replay the same failure set was found."
+    },
+    {
+      "path": "scripts/error-cause-policy.mjs",
+      "before": "a3578a3a622e988cdfd09e65fc66ad483d1bb23d",
+      "after": "822fbde9b131115a119eaa1fd9693dc65164dda2",
+      "exactDelta": [
+        {
+          "op": "-",
+          "oldLine": 130,
+          "newLine": 130,
+          "text": "  'lib/factory/agent-profile-store.ts': 1,"
+        }
+      ],
+      "semantic": "Removes one legacy lib/factory/agent-profile-store.ts allowance. Static policy checker; not an imported probe runtime dependency. Runtime coded-error/safeErrorAttributes remain identical."
+    },
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "exactDelta": [
+        {
+          "op": "+",
+          "oldLine": 148,
+          "newLine": 148,
+          "text": "            production-run-observability-report/recovery.json"
+        }
+      ],
+      "semantic": "Adds production recovery.json to the execute report artifact. The controlled-failure job, precredential overhead invocation, source guards and cleanup are byte-preserved."
+    }
+  ],
+  "installedDependencyScope": {
+    "rootPackageBefore": "01bae60264a909518999d02fa1ec52c1c62ce786",
+    "rootPackageAfter": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d",
+    "rootDependencyChangeOnly": "Adds ffmpeg-static 5.3.0; devDependencies, engines, packageManager remain equal.",
+    "packageManager": "pnpm@10.34.3",
+    "lockBefore": "e51af63418cc3c508a4525727f7bd92409e90ee8",
+    "lockAfter": "539cb8567feb617add97c41bd45be96bc50c5a8a",
+    "allExistingPackageAndSnapshotRecordsUnchanged": true,
+    "addedPackageRecords": [
+      {
+        "key": "'@derhuerst/http-basic@8.2.4'",
+        "beforeBytes": null,
+        "afterBytes": 190,
+        "changed": false
+      },
+      {
+        "key": "'@lobehub/icons-static-svg@1.102.0'",
+        "beforeBytes": null,
+        "afterBytes": 165,
+        "changed": false
+      },
+      {
+        "key": "'@types/node@10.17.60'",
+        "beforeBytes": null,
+        "afterBytes": 152,
+        "changed": false
+      },
+      {
+        "key": "caseless@0.12.0",
+        "beforeBytes": null,
+        "afterBytes": 145,
+        "changed": false
+      },
+      {
+        "key": "concat-stream@2.0.0",
+        "beforeBytes": null,
+        "afterBytes": 181,
+        "changed": false
+      },
+      {
+        "key": "ffmpeg-static@5.3.0",
+        "beforeBytes": null,
+        "afterBytes": 177,
+        "changed": false
+      },
+      {
+        "key": "http-response-object@3.0.2",
+        "beforeBytes": null,
+        "afterBytes": 156,
+        "changed": false
+      },
+      {
+        "key": "parse-cache-control@1.0.1",
+        "beforeBytes": null,
+        "afterBytes": 155,
+        "changed": false
+      },
+      {
+        "key": "typedarray@0.0.6",
+        "beforeBytes": null,
+        "afterBytes": 146,
+        "changed": false
+      }
+    ],
+    "unchangedRuntimeRecords": [
+      {
+        "key": "'@opentelemetry/api-logs@0.223.0'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/api@1.10.0'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/api@1.9.0'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/context-async-hooks@2.12.0(@opentelemetry/api@1.10.0)'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/core@2.12.0(@opentelemetry/api@1.10.0)'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/core@2.12.0(@opentelemetry/api@1.9.0)'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/exporter-logs-otlp-proto@0.223.0(@opentelemetry/api@1.10.0)'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/exporter-logs-otlp-proto@0.223.0(@opentelemetry/api@1.9.0)'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/exporter-trace-otlp-proto@0.223.0(@opentelemetry/api@1.10.0)'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/exporter-trace-otlp-proto@0.223.0(@opentelemetry/api@1.9.0)'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/instrumentation-pg@0.76.0(@opentelemetry/api@1.10.0)'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/instrumentation@0.223.0(@opentelemetry/api@1.10.0)'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/otlp-exporter-base@0.223.0(@opentelemetry/api@1.10.0)'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/otlp-exporter-base@0.223.0(@opentelemetry/api@1.9.0)'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/otlp-transformer@0.223.0(@opentelemetry/api@1.10.0)'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/otlp-transformer@0.223.0(@opentelemetry/api@1.9.0)'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/resources@2.12.0(@opentelemetry/api@1.10.0)'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/resources@2.12.0(@opentelemetry/api@1.9.0)'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/sdk-logs@0.223.0(@opentelemetry/api@1.10.0)'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/sdk-logs@0.223.0(@opentelemetry/api@1.9.0)'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/sdk-metrics@2.12.0(@opentelemetry/api@1.10.0)'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/sdk-metrics@2.12.0(@opentelemetry/api@1.9.0)'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.10.0)'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/sdk-trace-base@2.12.0(@opentelemetry/api@1.9.0)'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/sdk-trace-node@2.12.0(@opentelemetry/api@1.10.0)'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/sdk-trace@2.12.0(@opentelemetry/api@1.10.0)'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/sdk-trace@2.12.0(@opentelemetry/api@1.9.0)'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/semantic-conventions@1.43.0'",
+        "equal": true
+      },
+      {
+        "key": "'@opentelemetry/sql-common@0.42.0(@opentelemetry/api@1.10.0)'",
+        "equal": true
+      },
+      {
+        "key": "'@vercel/functions@3.10.2(@aws-sdk/credential-provider-web-identity@3.972.49)(ws@8.22.0)'",
+        "equal": true
+      },
+      {
+        "key": "pg-cloudflare@1.4.1",
+        "equal": true
+      },
+      {
+        "key": "pg-connection-string@2.14.1",
+        "equal": true
+      },
+      {
+        "key": "pg-int8@1.0.1",
+        "equal": true
+      },
+      {
+        "key": "pg-pool@3.14.0(pg@8.23.1)",
+        "equal": true
+      },
+      {
+        "key": "pg-protocol@1.16.1",
+        "equal": true
+      },
+      {
+        "key": "pg-types@2.2.0",
+        "equal": true
+      },
+      {
+        "key": "pg@8.23.1",
+        "equal": true
+      },
+      {
+        "key": "tsx@4.23.15",
+        "equal": true
+      }
+    ],
+    "workspaceDelta": [
+      {
+        "op": "+",
+        "oldLine": 25,
+        "newLine": 25,
+        "text": "  ffmpeg-static: true"
+      },
+      {
+        "op": "+",
+        "oldLine": 29,
+        "newLine": 30,
+        "text": "  ffmpeg-static@5.3.0: patches/ffmpeg-static@5.3.0.patch"
+      }
+    ],
+    "boundary": "Git lock/source equality, not a new install or runtime version measurement. Added ffmpeg/mobile-icon dependency records are outside the probe's import graph."
+  },
+  "daemonOutsideProbe": {
+    "noDaemonModuleImportedByProbe": true,
+    "selectedSourceMatrix": [
+      {
+        "path": "packages/daemon/bin/cloud-worker.ts",
+        "before": "1333ebefe933b780b9951717169819976b0d552f",
+        "after": "1333ebefe933b780b9951717169819976b0d552f",
+        "same": true
+      },
+      {
+        "path": "packages/daemon/src/adapters/generation-metrics.ts",
+        "before": "4827af84d7b53cff43cea29e73b19a5a780e8572",
+        "after": "4827af84d7b53cff43cea29e73b19a5a780e8572",
+        "same": true
+      },
+      {
+        "path": "packages/daemon/src/codex-generation-telemetry.ts",
+        "before": "ddf484c21b5ac4bdbe75d5ad8f404ad814710e10",
+        "after": "ddf484c21b5ac4bdbe75d5ad8f404ad814710e10",
+        "same": true
+      },
+      {
+        "path": "packages/daemon/src/runs/supervisor.ts",
+        "before": "7796539da83b3ca3ee410e1b3b0d7f8a9e0da007",
+        "after": "3367adf7b454b4b044d09858fa2e55ef24ae1195",
+        "same": false
+      },
+      {
+        "path": "packages/daemon/src/subscription-hosted-runner.ts",
+        "before": "f4ae431e3a25255bda41939be9176b359a22c525",
+        "after": "62a2d8edd244293b511a00da618849638a943ac0",
+        "same": false
+      },
+      {
+        "path": "packages/daemon/src/tracing-ai.ts",
+        "before": "6f7d7414fb07809880603dc4c20f6525616219ab",
+        "after": "6f7d7414fb07809880603dc4c20f6525616219ab",
+        "same": true
+      },
+      {
+        "path": "packages/daemon/src/tracing-logs.ts",
+        "before": "e8da68cec5d9976ed404e4494ba59037c9b4966e",
+        "after": "e8da68cec5d9976ed404e4494ba59037c9b4966e",
+        "same": true
+      },
+      {
+        "path": "packages/daemon/src/tracing-sampling.ts",
+        "before": "06d2c47f82853e5d0630dc79feda2d8d0eafe8d3",
+        "after": "06d2c47f82853e5d0630dc79feda2d8d0eafe8d3",
+        "same": true
+      },
+      {
+        "path": "packages/daemon/src/tracing.ts",
+        "before": "152318cbebb9a120e8ef69f010659f7d9fd724e7",
+        "after": "0eed0277c933b0d2457909851bab458a482c184d",
+        "same": false
+      }
+    ],
+    "boundary": "Some daemon orchestration/tracing files differ; even identical daemon files were never exercised by the Web HTTP/PG probe. Do not transfer the Web timings or finite error receipts to daemon/native collection.",
+    "existingNarrowMicrobenchmarks": "Other already archived AI-wrapper/native-projection measurements may retain their own declared source/component scope. They are not whole-daemon cost measurements and were not re-read or rerun in this task."
+  },
+  "applicabilityDecision": {
+    "isolatedControlledFailure": "Completed historical pass remains usable for the unchanged finite Web error-retention/export/privacy path; this new source-only delta review documents relevance to 84ce without calling old traces 84ce traces.",
+    "retentionPolicy": "Sampler, bounded tail retention, request/error stamping, safe error protocol, pg hooks and native-log exporter implementation are unchanged. No actual remaining retention defect was identified from this comparison.",
+    "overhead": "Completed historical Web baseline remains useful. Sanitizer extra enum branch and serverless drain are not numerically measured by the old result; no new performance failure or mandatory same-SHA rerun rule was identified.",
+    "repeatSameProbeRecommended": false,
+    "remeasurementTriggers": [
+      "A concrete change to exercised sampling/retention/error sanitizer/exporter/PG instrumentation or pinned runtime dependency that could invalidate the finite claim.",
+      "An observed missing/error-chain regression in the required source-bound production evidence.",
+      "An explicit request for exact current-component timing or a changed performance contract."
+    ],
+    "nonTriggers": [
+      "App commit SHA alone.",
+      "Unrelated application/Factory/SQL/UI changes outside the probe route.",
+      "A blanket desire to relabel historical evidence as latest-source evidence."
+    ],
+    "currentProductionCases": 0,
+    "finalProductionAcceptance": false,
+    "suggestedSummary": "历史 1d126 的隔离故意失败/100%有限集合保留及 Web 开销基线已完成；84ce 的关键路径适用性经源码比较。最终双模型生产 trace/AI/Replay/Logs 仍待实际验收，历史数据不冒称新源或全部 daemon 性能。"
+  },
+  "comment6697400007": {
+    "exactCommentSha256": "c22ab34b7ce4514e6a987e4d4c6ab2232433c0c22394cab647209cb5de5329c3",
+    "requested": [
+      "New or median-zero routes must not use median multiplier alone: use an absolute floor and/or minimum history; include user and RPC action breakdown.",
+      "Record one Desktop startup and login and matched Web query totals; confirm Desktop is not higher; keep RPC action in span or log and report observed duplicate actions."
+    ],
+    "notRequested": [
+      "No mandatory N full days if a sound minimum-history/floor policy is used.",
+      "No need to force an alert breach, send synthetic production events, or wait 24 new hours before applying a correct rule.",
+      "The incident's Google login description does not require adding a new Google OAuth trial to the already-defined comparable normal-login measurement."
+    ],
+    "sourceSql": {
+      "path": "scripts/ops/posthog/alert-source-anomaly.sql",
+      "gitBlob": "f3f8e98d1f54c0c4ad8236669b486249e981f989",
+      "bytes": 11298,
+      "sha256": "0380c78c1ba9ef7ed04ec70d4f5155da166c75ca71313ab44fc83e626488bbd4",
+      "sameIn1d126And84ce": true
+    },
+    "existingConfigurationProof": {
+      "path": "docs/operations/evidence/1512-raw/alert-source/20261109-config-verified.safe.json",
+      "gitBlob": "34e859004b0a5085f79eabade5dd5bd2872cfb88",
+      "bytes": 3595,
+      "sha256": "fa2c563065935bdbe9c17449ddc25d0bec97e7b92ffc2156eb0fa07751e70d53"
+    },
+    "savedConfiguration": {
+      "observedUTC": {
+        "readStarted": "2026-11-09 00:38:58 UTC",
+        "readCompleted": "2026-11-09 00:39:32 UTC"
+      },
+      "projectId": 670821,
+      "insightId": 13703263,
+      "shortId": "k3M88Rs8",
+      "alertId": "01a1a9eb-1a3a-0000-6f0b-151446674319",
+      "enabled": true,
+      "frequency": "hourly",
+      "column": "value",
+      "labelColumn": "source",
+      "thresholdUpper": 0.5,
+      "exactSqlMatches84ce": true,
+      "alertEmbeddedSqlMatches": true,
+      "rule": {
+        "evaluation": "last complete UTC hour",
+        "lookbackDays": 7,
+        "sourceScanDays": 8,
+        "minimumCoveredFullHoursPerRoute": 24,
+        "historyStartsAfterOwnFirstPartialHour": true,
+        "queryThreshold": {
+          "comparison": "greater_than",
+          "historicalMedianMultiplier": 3,
+          "absoluteMinimum": 2000
+        },
+        "byteThreshold": {
+          "comparison": "greater_than",
+          "historicalMedianMultiplier": 3,
+          "absoluteMinimum": 10000000,
+          "minimumWeightedCoverage": 0.95
+        },
+        "breakdown": {
+          "authenticatedHashTopCount": 3,
+          "rpcActionTopCount": 5,
+          "scope": "same_request_only",
+          "unattributedCountsIncluded": true
+        },
+        "absentCurrentTelemetry": "null"
+      }
+    },
+    "existingEngineAndReadbackProof": {
+      "path": "docs/operations/evidence/1512-raw/alert-source/validation-final.json",
+      "gitBlob": "097e11f65595cbcf0094a96caa04410720d634fd",
+      "bytes": 16556,
+      "sha256": "e038c16a08230252c614c3e75d03ee7063e94daaccf2cddce02452b76775608d"
+    },
+    "engineEvidence": {
+      "literalFixtureWasNotIngested": true,
+      "oldNewRoute": {
+        "queries": 8830,
+        "falseHistoryHours": 49,
+        "breach": 1
+      },
+      "correctedNewRoute": {
+        "queries": 8830,
+        "historyHours": 0,
+        "breach": 0,
+        "warmup": true
+      },
+      "establishedRoute": {
+        "queries": 3090,
+        "historyHours": 49,
+        "breach": 1
+      },
+      "missingOrConflictingAttributionUnattributedUserAndAction": 50,
+      "actualInitialProductionCompatibility": {
+        "evaluatedRoutes": 181,
+        "breaches": 0,
+        "requestAttributionNotYetDeployed": true,
+        "topUserAndActionUnattributed": 80
+      }
+    },
+    "remainingEvidenceAndLimits": [
+      "Rule implementation, saved insight/linked alert configuration and route-warmup fixture/readback are already complete. Their SQL bytes are identical in 84ce; no new configuration mutation or repeat query is implied by a new App SHA.",
+      "The saved-config proof is metadata as of 2026-11-09 00:39:32 UTC, not proof of later notification delivery or a newly evaluated hour.",
+      "If the final report claims actual production user/action contribution values, those values need actual authorized scoped rows; configuration/fixture hashes cannot fabricate them. Reuse already-required production evidence if it contains those fields; absent/conflicting attribution remains unattributed. Do not add a forced breach or broad user scan.",
+      "The final Native candidate still needs its ordinary CI's unshifted complete login/startup windows with matched Web conditions, actual source/app/harness binding, cumulative counter conservation, and cleanup. Historical Native pass/failure numbers keep their original source binding.",
+      "Use actual safe RPC invocation/completion evidence to report repeated action counts and cross-window/incomplete boundaries. Action call counts are not SQL query counts and must not be converted into them.",
+      "A later empty or unattributed bucket alone does not require another alert run; only evidence of drift or a concrete semantic problem does."
+    ],
+    "finalCountGateFromThisReview": "not_evaluated",
+    "newAlertQueryOrMutationRequiredByThisReview": false
+  },
+  "procedure": {
+    "reads": "Immutable Git source, source trees, original public JSON receipts/indexes; archived original joblogs and artifact ZIPs were not read.",
+    "gitBlobShaVerifiedOnEveryFetchedSourceAndReceipt": true,
+    "existingOriginalBytesModified": false,
+    "testsRun": 0,
+    "postgresCalls": 0,
+    "posthogQueries": 0,
+    "modelCalls": 0,
+    "vmResourcesCreated": 0,
+    "dispatches": 0,
+    "refChanges": 0,
+    "persistence": "Only this unreferenced review blob; does not replace historical receipt statuses or close issue 1512."
+  }
+}

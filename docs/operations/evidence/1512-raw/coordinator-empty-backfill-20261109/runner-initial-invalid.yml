@@ -1,0 +1,201 @@
+name: Issue 1512 isolated Coordinator PG17 regression
+
+on:
+  push:
+    branches: ['ops/1512-backfill-pg-20261109']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: issue1512-backfill-pg-20261109
+  cancel-in-progress: false
+
+env:
+  CI: 'true'
+  REQUIRE_DB: '1'
+  MIKKA_EDITION: cloud
+  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+  MIKKA_SIGNUP_IP_HOURLY: '1000'
+  MIKKA_SIGNUP_GLOBAL_HOURLY: '10000'
+  MIKKA_VERIFICATION_IP_HOURLY: '1000'
+  MIKKA_VERIFICATION_GLOBAL_HOURLY: '10000'
+  MIKKA_TEST_DB_PORT: '5432'
+  E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+  MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+  DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+  BETTER_AUTH_URL: http://localhost:3100
+  NEXT_TELEMETRY_DISABLED: '1'
+
+jobs:
+
+  red:
+    name: Old source, genuine regression assertion RED
+    if: ${{ github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1512-backfill-pg-20261109' && github.event_name == 'push' && github.run_attempt == '1' && github.event.head_commit.message == 'issue1512: backfill-pg admit 20261109' }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e-local-only
+          POSTGRES_DB: mikka_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e -d mikka_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Read the admitted immutable Ops controller
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Preserve and verify controller before switching source
+        run: |
+          mkdir -p "$RUNNER_TEMP/issue1512-pg"
+          cp .github/ops/issue1512-backfill-pg/driver.mjs "$RUNNER_TEMP/issue1512-pg/driver.mjs"
+          cp .github/ops/issue1512-backfill-pg/manifest.json "$RUNNER_TEMP/issue1512-pg/manifest.json"
+          node "$RUNNER_TEMP/issue1512-pg/driver.mjs" capture red
+      - name: Check out exact old source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 'e0934eb89f972d44ef6cffec6e27c16b4ed203bf'
+          persist-credentials: false
+      - uses: ./.github/actions/pnpm-install
+        with:
+          ffmpeg-github-token: ${{ github.token }}
+      - name: Generate ephemeral test-only auth secret
+        run: |
+          node --input-type=commonjs - <<'NODE'
+          const { appendFileSync, writeSync } = require('node:fs')
+          const secret = require('node:crypto').randomBytes(32).toString('hex')
+          writeSync(1, '::add-mask::' + secret + '\n')
+          appendFileSync(process.env.GITHUB_ENV, 'BETTER_AUTH_SECRET=' + secret + '\n')
+          NODE
+      - name: Run canonical setup and bounded RED verification
+        run: node "$RUNNER_TEMP/issue1512-pg/driver.mjs" run red
+      - name: Stop this job's isolated Postgres service
+        if: always()
+        env:
+          ISSUE1512_SERVICE_ID: ${{ job.services.postgres.id }}
+        run: |
+          node --input-type=commonjs - <<'NODE'
+          const assert = require('node:assert/strict')
+          const { execFileSync } = require('node:child_process')
+          const { mkdirSync, writeFileSync } = require('node:fs')
+          const { join } = require('node:path')
+          const root = join(process.env.RUNNER_TEMP, 'issue1512-pg', 'originals')
+          mkdirSync(root, { recursive: true })
+          const receipt = { phase: 'red', serviceId: process.env.ISSUE1512_SERVICE_ID, startedAt: new Date().toISOString(), stopped: false }
+          try {
+            assert.match(receipt.serviceId, /^[a-f0-9]{32,64}$/)
+            execFileSync('docker', ['stop', '--time', '5', receipt.serviceId], { timeout: 30000, stdio: 'pipe' })
+            const running = execFileSync('docker', ['inspect', '--format', '{{.State.Running}}', receipt.serviceId], { encoding: 'utf8', timeout: 10000 }).trim()
+            assert.equal(running, 'false')
+            receipt.stopped = true
+          } catch (error) {
+            receipt.error = { name: error.name, message: error.message }
+            process.exitCode = 1
+          }
+          receipt.finishedAt = new Date().toISOString()
+          writeFileSync(join(root, 'red-cleanup.json'), JSON.stringify(receipt, null, 2) + '\n')
+          console.log('ISSUE1512_PG_CLEANUP ' + JSON.stringify(receipt))
+          NODE
+      - name: Retain only synthetic original logs and receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1512-backfill-pg-red-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/issue1512-pg/originals/
+          if-no-files-found: error
+          retention-days: 7
+
+  green:
+    name: Candidate, complete Coordinator family GREEN
+    needs: red
+    if: ${{ github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1512-backfill-pg-20261109' && github.event_name == 'push' && github.run_attempt == '1' && github.event.head_commit.message == 'issue1512: backfill-pg admit 20261109' && needs.red.result == 'success' }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e-local-only
+          POSTGRES_DB: mikka_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e -d mikka_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Read the admitted immutable Ops controller
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Preserve and verify controller before switching source
+        run: |
+          mkdir -p "$RUNNER_TEMP/issue1512-pg"
+          cp .github/ops/issue1512-backfill-pg/driver.mjs "$RUNNER_TEMP/issue1512-pg/driver.mjs"
+          cp .github/ops/issue1512-backfill-pg/manifest.json "$RUNNER_TEMP/issue1512-pg/manifest.json"
+          node "$RUNNER_TEMP/issue1512-pg/driver.mjs" capture green
+      - name: Check out exact candidate source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 'a9ff5afc1cae3d18ad2827a3119c85ab46f7d3d4'
+          persist-credentials: false
+      - uses: ./.github/actions/pnpm-install
+        with:
+          ffmpeg-github-token: ${{ github.token }}
+      - name: Generate ephemeral test-only auth secret
+        run: |
+          node --input-type=commonjs - <<'NODE'
+          const { appendFileSync, writeSync } = require('node:fs')
+          const secret = require('node:crypto').randomBytes(32).toString('hex')
+          writeSync(1, '::add-mask::' + secret + '\n')
+          appendFileSync(process.env.GITHUB_ENV, 'BETTER_AUTH_SECRET=' + secret + '\n')
+          NODE
+      - name: Run canonical setup and bounded GREEN verification
+        run: node "$RUNNER_TEMP/issue1512-pg/driver.mjs" run green
+      - name: Stop this job's isolated Postgres service
+        if: always()
+        env:
+          ISSUE1512_SERVICE_ID: ${{ job.services.postgres.id }}
+        run: |
+          node --input-type=commonjs - <<'NODE'
+          const assert = require('node:assert/strict')
+          const { execFileSync } = require('node:child_process')
+          const { mkdirSync, writeFileSync } = require('node:fs')
+          const { join } = require('node:path')
+          const root = join(process.env.RUNNER_TEMP, 'issue1512-pg', 'originals')
+          mkdirSync(root, { recursive: true })
+          const receipt = { phase: 'green', serviceId: process.env.ISSUE1512_SERVICE_ID, startedAt: new Date().toISOString(), stopped: false }
+          try {
+            assert.match(receipt.serviceId, /^[a-f0-9]{32,64}$/)
+            execFileSync('docker', ['stop', '--time', '5', receipt.serviceId], { timeout: 30000, stdio: 'pipe' })
+            const running = execFileSync('docker', ['inspect', '--format', '{{.State.Running}}', receipt.serviceId], { encoding: 'utf8', timeout: 10000 }).trim()
+            assert.equal(running, 'false')
+            receipt.stopped = true
+          } catch (error) {
+            receipt.error = { name: error.name, message: error.message }
+            process.exitCode = 1
+          }
+          receipt.finishedAt = new Date().toISOString()
+          writeFileSync(join(root, 'green-cleanup.json'), JSON.stringify(receipt, null, 2) + '\n')
+          console.log('ISSUE1512_PG_CLEANUP ' + JSON.stringify(receipt))
+          NODE
+      - name: Retain only synthetic original logs and receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1512-backfill-pg-green-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/issue1512-pg/originals/
+          if-no-files-found: error
+          retention-days: 7

@@ -1,0 +1,80 @@
+{
+  "schema": "mikka.issue1512.empty-backfill.root-candidate-and-runner-review.v1",
+  "reviewedAt": "2026-11-09T19:59:00Z",
+  "candidate": {
+    "sha": "a9ff5afc1cae3d18ad2827a3119c85ab46f7d3d4",
+    "tree": "e4f12292616357f46a981cfa92588248f1ad452b",
+    "parents": [
+      "e0934eb89f972d44ef6cffec6e27c16b4ed203bf"
+    ],
+    "files": [
+      {
+        "path": "lib/coordinator/coordinator-bot.ts",
+        "blob": "d73e30c36212029a8951a25a692c4e04a2a5b86d",
+        "additions": 38,
+        "deletions": 3
+      },
+      {
+        "path": "tests/coordinator-bot.db.test.ts",
+        "blob": "13fb6f222c061d115916557b796006c2073dc628",
+        "additions": 313,
+        "deletions": 0
+      }
+    ]
+  },
+  "sourceReviewBlob": "8b59be3ce03b4c5c6fdea5258f53b9ef6109a90b",
+  "testReviewBlob": "5559a0bf56187697f841bb16755808095ea38d78",
+  "implementationManifestBlob": "21319eec523b064b47bfc250a57c3d746ad5011f",
+  "rootReview": {
+    "candidateSourceAndTestBytesVerified": true,
+    "commitSingleParentAndTwoFileDiffVerified": true,
+    "oldMigrationTailIdentical": true,
+    "newCases": 21,
+    "existingTestsUnchanged": true
+  },
+  "runner": {
+    "commit": "122238cb3b8dbbd6fab65398e1fc5c1eed7dbc78",
+    "tree": "5cbc41a023163cd86c63cf85b5130b71ec167d00",
+    "soleParent": "a9ff5afc1cae3d18ad2827a3119c85ab46f7d3d4",
+    "files": {
+      "driver": "4e076ee0f7e37e3a843bccad9bdbb2e32f6405d7",
+      "workflow": "2c29e68f5b39a07d6a12887019681508d7cd7f20",
+      "manifest": "cd91a3303961f9631e5a6666b258db708918f433"
+    },
+    "reviewedDriverAndWorkflowFullText": true,
+    "boundManifestOnlyChanges": [
+      "enabled",
+      "expiresAt",
+      "after"
+    ],
+    "boundWorkflowOnlyChange": "Green checkout exact a9ff candidate SHA",
+    "red": "Exact e093 source with the candidate test only; whole test file; only four specified actual>1 expected1 ERR_ASSERTION leaves accepted",
+    "green": "Exact a9ff source; canonical required DB runner with full unchanged72 inventory and selected25-file test:bot-threads-db",
+    "isolation": "Two independent PostgreSQL17 services on separate GitHub-hosted jobs, loopback mikka_e2e, generated ephemeral auth, no production credentials or shared production concurrency",
+    "attempt": 1,
+    "timeoutMinutes": {
+      "red": 8,
+      "green": 12
+    },
+    "admissionExpiresAt": "2026-11-09T21:28:05.000Z",
+    "cleanup": "Always stop and inspect the owned service, then platform post-job removes container/network; close own Ops manifest after terminal",
+    "originalReader": "/root/backfill_pg_runner",
+    "activationAuthorized": true,
+    "activationObserved": false
+  },
+  "acceptance": {
+    "actualPgResult": "NOT_YET_OBSERVED",
+    "historicalNativeFull": {
+      "native": 451,
+      "web": 427,
+      "result": "RED"
+    },
+    "productionCasesCompleted": 0,
+    "issue1512": "OPEN"
+  },
+  "exclusions": [
+    "No feature/main ref move by root",
+    "No test result inferred from static review",
+    "No predicted SQL subtraction used as observed Native acceptance"
+  ]
+}

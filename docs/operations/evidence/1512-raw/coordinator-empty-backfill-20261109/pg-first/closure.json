@@ -1,0 +1,43 @@
+{
+  "schema": "issue1512-pg-regression-closure-receipt-v1",
+  "closureCommit": "41f1ad8d257c4df3523e751b95c9776209505bd1",
+  "closureTree": "c2a74ec2e364648cd5f752be8e8b0a826eaa9b96",
+  "closedManifestBlob": "c75a05e02f70a4e38616970951db5a2035911a76",
+  "evidenceIndexBlob": "614b4de450478763e2f400b1677ae8d6122fa6b7",
+  "evidenceIndexPath": ".github/ops/issue1512-backfill-pg/evidence/42689043866/index.json",
+  "ref": {
+    "ref": "refs/heads/ops/1512-backfill-pg-20261109",
+    "node_id": "REF_kwDOVRYxA9oAKHJlZnMvaGVhZHMvb3BzLzE1MTItYmFja2ZpbGwtcGctMjAyNjExMDk",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/refs/heads/ops/1512-backfill-pg-20261109",
+    "object": {
+      "sha": "41f1ad8d257c4df3523e751b95c9776209505bd1",
+      "type": "commit",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/41f1ad8d257c4df3523e751b95c9776209505bd1"
+    }
+  },
+  "closingRunId": 42689759187,
+  "closingJobs": [
+    {
+      "id": 129406078843,
+      "name": "Candidate, complete Coordinator family GREEN",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 42689759187,
+      "logs_url": null,
+      "steps": null
+    },
+    {
+      "id": 129406080091,
+      "name": "Old source, genuine regression assertion RED",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 42689759187,
+      "logs_url": null,
+      "steps": null
+    }
+  ],
+  "ownedServicesRemaining": 0,
+  "failedRunId": 42689043866,
+  "originalsReadOnce": true,
+  "zipDownloads": 0
+}

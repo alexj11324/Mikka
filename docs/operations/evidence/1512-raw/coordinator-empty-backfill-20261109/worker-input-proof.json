@@ -1,0 +1,837 @@
+{
+  "schema": "mikka.issue1512.coordinator-main-canonical-worker-source-equality.v1",
+  "observedAtUtc": "2026-11-09T20:15:27.852Z",
+  "status": "CANONICAL_SOURCE_INPUT_EQUALITY_PROVED_NO_RUNTIME_EXECUTION_OR_PUBLICATION",
+  "scope": {
+    "finalCommit": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+    "finalTree": "e7c7c6ad66acd729278393711c10eeed67c6d7ac",
+    "actualMainCommit": "7848e79df9c5af67e526aeed1c828858db392066",
+    "actualMainTree": "87b4344eebdc24b12ffdafa9101d0c9f51ad6b70",
+    "earlierPolicyFix": "a83b2a0fbd0b8f45f2e59ce7ceda2f1e06d21055",
+    "applicationCandidate": "5a0c90774b8c48fc390ea05cf782bbc9cbe79a62"
+  },
+  "canonicalDefinition": {
+    "gitBlob": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+    "bytes": 55730,
+    "sha256": "0adb53fbdd6cbcd61f1d1804aee3e2df1538997c0724556062f2741c5ac1cdb1",
+    "path": "scripts/e2b/build-template.py",
+    "workerPaths": [
+      "package.json",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      "packages/daemon",
+      "packages/protocol",
+      "packages/config",
+      "patches"
+    ],
+    "recipePaths": [
+      "scripts/e2b/official-files.py",
+      "scripts/e2b/e2b-finalization-files.json",
+      "scripts/e2b/e2b-certificate-relinks.json",
+      "scripts/e2b/start-prebuilt.sh",
+      "scripts/e2b/build-template.py",
+      "scripts/e2b/template-capabilities.json",
+      "scripts/e2b/acceptance-daemon.mts",
+      "scripts/e2b/acceptance-bootstrap.mts",
+      "scripts/e2b/start-desktop.sh",
+      "scripts/e2b/viewer-gateway.py",
+      "scripts/e2b/lease-driver.py"
+    ],
+    "selectorDefinitionLines": "32-41",
+    "projectionAndHashLines": "99-275",
+    "selection": "git ls-tree -r fixedCommit -- exact WORKER_PATHS and RECIPE_PATHS;non-package/lock entries use listing;package files use package_projection;lock uses lock_projection",
+    "fixedPriorProof": {
+      "gitBlob": "290373941494c7d953e1a8262c04de52bffe8845",
+      "bytes": 47650,
+      "sha256": "aa602d6e16151313a1e947b805e0aa3a257ff219fb45a6a0247f74b5c0dfe2e3"
+    }
+  },
+  "applicationAndPublicationPathMembership": [
+    {
+      "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+      "matchingCanonicalSelector": null,
+      "selected": false
+    },
+    {
+      "path": "lib/coordinator/coordinator-bot.ts",
+      "matchingCanonicalSelector": null,
+      "selected": false
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.mjs",
+      "matchingCanonicalSelector": null,
+      "selected": false
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.test.mjs",
+      "matchingCanonicalSelector": null,
+      "selected": false
+    },
+    {
+      "path": "tests/coordinator-bot.db.test.ts",
+      "matchingCanonicalSelector": null,
+      "selected": false
+    }
+  ],
+  "actualMainVersusFinal": {
+    "selectorCount": 18,
+    "rawIdenticalSelectorCount": 18,
+    "entries": [
+      {
+        "path": "package.json",
+        "actualMain": {
+          "path": "package.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d",
+          "size": 80877
+        },
+        "finalMerge": {
+          "path": "package.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d",
+          "size": 80877
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "pnpm-lock.yaml",
+        "actualMain": {
+          "path": "pnpm-lock.yaml",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "539cb8567feb617add97c41bd45be96bc50c5a8a",
+          "size": 978765
+        },
+        "finalMerge": {
+          "path": "pnpm-lock.yaml",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "539cb8567feb617add97c41bd45be96bc50c5a8a",
+          "size": 978765
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "pnpm-workspace.yaml",
+        "actualMain": {
+          "path": "pnpm-workspace.yaml",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d",
+          "size": 718
+        },
+        "finalMerge": {
+          "path": "pnpm-workspace.yaml",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d",
+          "size": 718
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "packages/daemon",
+        "actualMain": {
+          "path": "daemon",
+          "mode": "040000",
+          "type": "tree",
+          "sha": "62332d7b3c0d21ab5f1d0aaf228aea807dc76b2d"
+        },
+        "finalMerge": {
+          "path": "daemon",
+          "mode": "040000",
+          "type": "tree",
+          "sha": "62332d7b3c0d21ab5f1d0aaf228aea807dc76b2d"
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "packages/protocol",
+        "actualMain": {
+          "path": "protocol",
+          "mode": "040000",
+          "type": "tree",
+          "sha": "79e9742fe7f571df75241876f837a52b0e26ecf4"
+        },
+        "finalMerge": {
+          "path": "protocol",
+          "mode": "040000",
+          "type": "tree",
+          "sha": "79e9742fe7f571df75241876f837a52b0e26ecf4"
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "packages/config",
+        "actualMain": {
+          "path": "config",
+          "mode": "040000",
+          "type": "tree",
+          "sha": "1f9cc584ac6d509d02112f53e0609af455e62ff4"
+        },
+        "finalMerge": {
+          "path": "config",
+          "mode": "040000",
+          "type": "tree",
+          "sha": "1f9cc584ac6d509d02112f53e0609af455e62ff4"
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "patches",
+        "actualMain": {
+          "path": "patches",
+          "mode": "040000",
+          "type": "tree",
+          "sha": "56ec44ccab41876f1e7a28741d7241ab72c2df1a"
+        },
+        "finalMerge": {
+          "path": "patches",
+          "mode": "040000",
+          "type": "tree",
+          "sha": "56ec44ccab41876f1e7a28741d7241ab72c2df1a"
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "scripts/e2b/official-files.py",
+        "actualMain": {
+          "path": "official-files.py",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "ea0819bf3e2d4ff83e64482b6336567050376591",
+          "size": 21445
+        },
+        "finalMerge": {
+          "path": "official-files.py",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "ea0819bf3e2d4ff83e64482b6336567050376591",
+          "size": 21445
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "scripts/e2b/e2b-finalization-files.json",
+        "actualMain": {
+          "path": "e2b-finalization-files.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e6d19b5ed954d71c53a3ef32eed9c96a30943116",
+          "size": 6238
+        },
+        "finalMerge": {
+          "path": "e2b-finalization-files.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e6d19b5ed954d71c53a3ef32eed9c96a30943116",
+          "size": 6238
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "scripts/e2b/e2b-certificate-relinks.json",
+        "actualMain": {
+          "path": "e2b-certificate-relinks.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "ba210a72dff95a34120bcd6fb581fb54aa47b863",
+          "size": 106533
+        },
+        "finalMerge": {
+          "path": "e2b-certificate-relinks.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "ba210a72dff95a34120bcd6fb581fb54aa47b863",
+          "size": 106533
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "scripts/e2b/start-prebuilt.sh",
+        "actualMain": {
+          "path": "start-prebuilt.sh",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "f3896e388043441ec99baf57b179b7cc44597017",
+          "size": 929
+        },
+        "finalMerge": {
+          "path": "start-prebuilt.sh",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "f3896e388043441ec99baf57b179b7cc44597017",
+          "size": 929
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "scripts/e2b/build-template.py",
+        "actualMain": {
+          "path": "build-template.py",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+          "size": 55730
+        },
+        "finalMerge": {
+          "path": "build-template.py",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+          "size": 55730
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "scripts/e2b/template-capabilities.json",
+        "actualMain": {
+          "path": "template-capabilities.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "dbebb3a7d80185bd409c7d8fc0ba13d137f5c50c",
+          "size": 93
+        },
+        "finalMerge": {
+          "path": "template-capabilities.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "dbebb3a7d80185bd409c7d8fc0ba13d137f5c50c",
+          "size": 93
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "scripts/e2b/acceptance-daemon.mts",
+        "actualMain": {
+          "path": "acceptance-daemon.mts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "bf546a0ef670b41f273d9f4c2e391220cfb6837c",
+          "size": 7331
+        },
+        "finalMerge": {
+          "path": "acceptance-daemon.mts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "bf546a0ef670b41f273d9f4c2e391220cfb6837c",
+          "size": 7331
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "scripts/e2b/acceptance-bootstrap.mts",
+        "actualMain": {
+          "path": "acceptance-bootstrap.mts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e41ff490bc9e9eb0b22ae3e8a7119cea077befad",
+          "size": 7290
+        },
+        "finalMerge": {
+          "path": "acceptance-bootstrap.mts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e41ff490bc9e9eb0b22ae3e8a7119cea077befad",
+          "size": 7290
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "scripts/e2b/start-desktop.sh",
+        "actualMain": {
+          "path": "start-desktop.sh",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "d65b652c6aba5739dafa4120e928638276719f13",
+          "size": 2033
+        },
+        "finalMerge": {
+          "path": "start-desktop.sh",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "d65b652c6aba5739dafa4120e928638276719f13",
+          "size": 2033
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "scripts/e2b/viewer-gateway.py",
+        "actualMain": {
+          "path": "viewer-gateway.py",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "c3d0d4586be6c934c8eb610ab85bfaad2e8d3d25",
+          "size": 4062
+        },
+        "finalMerge": {
+          "path": "viewer-gateway.py",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "c3d0d4586be6c934c8eb610ab85bfaad2e8d3d25",
+          "size": 4062
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "scripts/e2b/lease-driver.py",
+        "actualMain": {
+          "path": "lease-driver.py",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "09875ebc971e631131883b4ef595329cf8b45266",
+          "size": 1487
+        },
+        "finalMerge": {
+          "path": "lease-driver.py",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "09875ebc971e631131883b4ef595329cf8b45266",
+          "size": 1487
+        },
+        "rawIdentical": true
+      }
+    ],
+    "method": "Compare exact selected blob metadata and recursively complete subtree identities using verified Git tree object hashes. Equal directories preserve all descendant leaves; no directory-name inference and no need to enumerate an unchanged480-leaf listing.",
+    "conclusion": "The actual main and final application merge have identical raw selected source inputs. All package/lock projection outputs therefore also match under the same fixed builder."
+  },
+  "earlierA83VersusFinal": {
+    "rawIdenticalSelectors": 17,
+    "selectorCount": 18,
+    "entries": [
+      {
+        "path": "package.json",
+        "earlierA83": {
+          "path": "package.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d",
+          "size": 80877
+        },
+        "finalMerge": {
+          "path": "package.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d",
+          "size": 80877
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "pnpm-lock.yaml",
+        "earlierA83": {
+          "path": "pnpm-lock.yaml",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "4b67909739360248e279efa0c3bb7344379e04fe",
+          "size": 978470
+        },
+        "finalMerge": {
+          "path": "pnpm-lock.yaml",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "539cb8567feb617add97c41bd45be96bc50c5a8a",
+          "size": 978765
+        },
+        "rawIdentical": false
+      },
+      {
+        "path": "pnpm-workspace.yaml",
+        "earlierA83": {
+          "path": "pnpm-workspace.yaml",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d",
+          "size": 718
+        },
+        "finalMerge": {
+          "path": "pnpm-workspace.yaml",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d",
+          "size": 718
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "packages/daemon",
+        "earlierA83": {
+          "path": "daemon",
+          "mode": "040000",
+          "type": "tree",
+          "sha": "62332d7b3c0d21ab5f1d0aaf228aea807dc76b2d"
+        },
+        "finalMerge": {
+          "path": "daemon",
+          "mode": "040000",
+          "type": "tree",
+          "sha": "62332d7b3c0d21ab5f1d0aaf228aea807dc76b2d"
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "packages/protocol",
+        "earlierA83": {
+          "path": "protocol",
+          "mode": "040000",
+          "type": "tree",
+          "sha": "79e9742fe7f571df75241876f837a52b0e26ecf4"
+        },
+        "finalMerge": {
+          "path": "protocol",
+          "mode": "040000",
+          "type": "tree",
+          "sha": "79e9742fe7f571df75241876f837a52b0e26ecf4"
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "packages/config",
+        "earlierA83": {
+          "path": "config",
+          "mode": "040000",
+          "type": "tree",
+          "sha": "1f9cc584ac6d509d02112f53e0609af455e62ff4"
+        },
+        "finalMerge": {
+          "path": "config",
+          "mode": "040000",
+          "type": "tree",
+          "sha": "1f9cc584ac6d509d02112f53e0609af455e62ff4"
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "patches",
+        "earlierA83": {
+          "path": "patches",
+          "mode": "040000",
+          "type": "tree",
+          "sha": "56ec44ccab41876f1e7a28741d7241ab72c2df1a"
+        },
+        "finalMerge": {
+          "path": "patches",
+          "mode": "040000",
+          "type": "tree",
+          "sha": "56ec44ccab41876f1e7a28741d7241ab72c2df1a"
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "scripts/e2b/official-files.py",
+        "earlierA83": {
+          "path": "official-files.py",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "ea0819bf3e2d4ff83e64482b6336567050376591",
+          "size": 21445
+        },
+        "finalMerge": {
+          "path": "official-files.py",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "ea0819bf3e2d4ff83e64482b6336567050376591",
+          "size": 21445
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "scripts/e2b/e2b-finalization-files.json",
+        "earlierA83": {
+          "path": "e2b-finalization-files.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e6d19b5ed954d71c53a3ef32eed9c96a30943116",
+          "size": 6238
+        },
+        "finalMerge": {
+          "path": "e2b-finalization-files.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e6d19b5ed954d71c53a3ef32eed9c96a30943116",
+          "size": 6238
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "scripts/e2b/e2b-certificate-relinks.json",
+        "earlierA83": {
+          "path": "e2b-certificate-relinks.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "ba210a72dff95a34120bcd6fb581fb54aa47b863",
+          "size": 106533
+        },
+        "finalMerge": {
+          "path": "e2b-certificate-relinks.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "ba210a72dff95a34120bcd6fb581fb54aa47b863",
+          "size": 106533
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "scripts/e2b/start-prebuilt.sh",
+        "earlierA83": {
+          "path": "start-prebuilt.sh",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "f3896e388043441ec99baf57b179b7cc44597017",
+          "size": 929
+        },
+        "finalMerge": {
+          "path": "start-prebuilt.sh",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "f3896e388043441ec99baf57b179b7cc44597017",
+          "size": 929
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "scripts/e2b/build-template.py",
+        "earlierA83": {
+          "path": "build-template.py",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+          "size": 55730
+        },
+        "finalMerge": {
+          "path": "build-template.py",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+          "size": 55730
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "scripts/e2b/template-capabilities.json",
+        "earlierA83": {
+          "path": "template-capabilities.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "dbebb3a7d80185bd409c7d8fc0ba13d137f5c50c",
+          "size": 93
+        },
+        "finalMerge": {
+          "path": "template-capabilities.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "dbebb3a7d80185bd409c7d8fc0ba13d137f5c50c",
+          "size": 93
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "scripts/e2b/acceptance-daemon.mts",
+        "earlierA83": {
+          "path": "acceptance-daemon.mts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "bf546a0ef670b41f273d9f4c2e391220cfb6837c",
+          "size": 7331
+        },
+        "finalMerge": {
+          "path": "acceptance-daemon.mts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "bf546a0ef670b41f273d9f4c2e391220cfb6837c",
+          "size": 7331
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "scripts/e2b/acceptance-bootstrap.mts",
+        "earlierA83": {
+          "path": "acceptance-bootstrap.mts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e41ff490bc9e9eb0b22ae3e8a7119cea077befad",
+          "size": 7290
+        },
+        "finalMerge": {
+          "path": "acceptance-bootstrap.mts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e41ff490bc9e9eb0b22ae3e8a7119cea077befad",
+          "size": 7290
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "scripts/e2b/start-desktop.sh",
+        "earlierA83": {
+          "path": "start-desktop.sh",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "d65b652c6aba5739dafa4120e928638276719f13",
+          "size": 2033
+        },
+        "finalMerge": {
+          "path": "start-desktop.sh",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "d65b652c6aba5739dafa4120e928638276719f13",
+          "size": 2033
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "scripts/e2b/viewer-gateway.py",
+        "earlierA83": {
+          "path": "viewer-gateway.py",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "c3d0d4586be6c934c8eb610ab85bfaad2e8d3d25",
+          "size": 4062
+        },
+        "finalMerge": {
+          "path": "viewer-gateway.py",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "c3d0d4586be6c934c8eb610ab85bfaad2e8d3d25",
+          "size": 4062
+        },
+        "rawIdentical": true
+      },
+      {
+        "path": "scripts/e2b/lease-driver.py",
+        "earlierA83": {
+          "path": "lease-driver.py",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "09875ebc971e631131883b4ef595329cf8b45266",
+          "size": 1487
+        },
+        "finalMerge": {
+          "path": "lease-driver.py",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "09875ebc971e631131883b4ef595329cf8b45266",
+          "size": 1487
+        },
+        "rawIdentical": true
+      }
+    ],
+    "bridgeFromInitiallyComparedTree": "The18 selectors were first compared against f0c40c06eb54d53747654fbed208b207e7bdf97d. Final treee7c7c6ad66acd729278393711c10eeed67c6d7ac differs only in tests/coordinator-bot.db.test.ts, outside every canonical selector.",
+    "lockProjectionProof": {
+      "projectionExactlyIdentical": true,
+      "sources": [
+        {
+          "name": "a83",
+          "blob": "4b67909739360248e279efa0c3bb7344379e04fe",
+          "rawBytes": 978470,
+          "rawSha256": "313a7452044b0d4b780bd2400e70a84aa2bc6a23415e547c5d177f9b7843a52f",
+          "projectionBytes": 130563,
+          "projectionSha256": "27d4f15ebccffc05a872408f7726eb779e45a0623626280069c25d2a4daaf89c",
+          "importers": [
+            "packages/config",
+            "packages/daemon",
+            "packages/protocol"
+          ],
+          "packages": 411,
+          "snapshots": 414
+        },
+        {
+          "name": "preparedMerge",
+          "blob": "539cb8567feb617add97c41bd45be96bc50c5a8a",
+          "rawBytes": 978765,
+          "rawSha256": "e18697f2dd891b9159e43e40d1f8af4018d087cf2a0e668b9e358a766b020c28",
+          "projectionBytes": 130563,
+          "projectionSha256": "27d4f15ebccffc05a872408f7726eb779e45a0623626280069c25d2a4daaf89c",
+          "importers": [
+            "packages/config",
+            "packages/daemon",
+            "packages/protocol"
+          ],
+          "packages": 411,
+          "snapshots": 414
+        }
+      ],
+      "rawMultisetLineDelta": [
+        {
+          "line": "",
+          "a83": 4812,
+          "preparedMerge": 4814
+        },
+        {
+          "line": "      '@lobehub/icons-static-svg':",
+          "a83": 0,
+          "preparedMerge": 1
+        },
+        {
+          "line": "        specifier: 1.102.0",
+          "a83": 0,
+          "preparedMerge": 1
+        },
+        {
+          "line": "        version: 1.102.0",
+          "a83": 0,
+          "preparedMerge": 1
+        },
+        {
+          "line": "  '@lobehub/icons-static-svg@1.102.0':",
+          "a83": 0,
+          "preparedMerge": 1
+        },
+        {
+          "line": "    resolution: {integrity: sha512-3Na6S2kdslmsfnBjuL0PQWQClrmuWe/pWThRN/3J2VzPg5MhVghy8knVu7kd1/lqA9ydZBvwmnKLzuBo0Wm6Qw==}",
+          "a83": 0,
+          "preparedMerge": 1
+        },
+        {
+          "line": "  '@lobehub/icons-static-svg@1.102.0': {}",
+          "a83": 0,
+          "preparedMerge": 1
+        }
+      ]
+    },
+    "projectionReproduction": {
+      "gitBlob": "2910bc7b0931bf046c707fc314fde5b0cb5e4fa5",
+      "bytes": 5294,
+      "sha256": "050d884c3c38b2d70bfeffe85a5624358df52d16cedd3d983d40aff6e0375660"
+    },
+    "projectionMethod": "Executed a pure V8 reproduction of fixed Python lock_projection on both full verified Git lock blobs;compared complete130563-byte projection strings, not only their hashes. No Python worker_hash invocation and no full worker digest claimed.",
+    "dependencyChange": "Raw line-multiset differences consist only of @lobehub/icons-static-svg@1.102.0 importer/package/snapshot entries and blank lines. The complete selected daemon/protocol/config lock projections remain identical.",
+    "conclusion": "Earlier a83 and final application merge also have equivalent processed canonical worker inputs despite different raw lock blobs."
+  },
+  "policyDeltaAgainstPreMergeMain": {
+    "oldMain": "d8e09ac218f5656763a5bc42a75e45fc385caede",
+    "actualChangedSelectedLeaves": [
+      {
+        "path": "scripts/e2b/e2b-certificate-relinks.json",
+        "before": "335540475a9d8aaae8f34915e087b5a862699b95",
+        "after": "ba210a72dff95a34120bcd6fb581fb54aa47b863"
+      },
+      {
+        "path": "scripts/e2b/e2b-finalization-files.json",
+        "before": "16d858b40d2948ac8c4ce18188843c02960bc40e",
+        "after": "e6d19b5ed954d71c53a3ef32eed9c96a30943116"
+      }
+    ],
+    "conclusion": "The earlier certificate-relink/finalization policy updates remain real worker recipe changes relative to d8. This application-only correction does not remove that pre-existing runtime publication requirement."
+  },
+  "boundaries": {
+    "pythonWorkerHashExecuted": false,
+    "canonicalFullWorkerDigestComputed": false,
+    "workerBuildExecuted": false,
+    "templatePublication": false,
+    "effectiveRuntimeProved": false,
+    "appShaEqualsRuntimeShaRequired": false,
+    "interpretation": "Different App commits may share canonical worker inputs. Source-input equality is not a substitute for actual effective RuntimeSHA/build identity or production traces.",
+    "historicalNative": "e093451>427 RED preserved;no result rewritten",
+    "postgres": "Actual rerun owned by root;not certified by this source check"
+  },
+  "activity": {
+    "readOnlySourceInputs": true,
+    "workflowOriginalLogOrZipReads": 0,
+    "computeResourcesCreated": 0,
+    "refMutations": 0,
+    "ciDispatches": 0
+  }
+}

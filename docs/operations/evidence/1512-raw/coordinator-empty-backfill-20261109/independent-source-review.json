@@ -1,0 +1,185 @@
+{
+  "schema": "mikka.issue1512.coordinator-empty-backfill.source-review.v1",
+  "status": "EXACT_SOURCE_REVIEW_NO_BLOCKING_FINDING_TEST_REVIEW_PENDING",
+  "reviewer": "e093_budget_diff",
+  "scope": {
+    "repository": "alexj11324/Mikka",
+    "path": "lib/coordinator/coordinator-bot.ts",
+    "originalBlob": "a2a6bf1fd1307babd350c9a168b003e38fa4b3cc",
+    "candidateBlob": "d73e30c36212029a8951a25a692c4e04a2a5b86d",
+    "originalBytes": 22425,
+    "candidateBytes": 24861,
+    "originalSha256": "691007c37fea38fbc794c83e6a75e28ac40491ff7e2f57ddf5fc92947b9a7257",
+    "candidateSha256": "8c0ebcda8279f5cff5f3596099835fe7c1a2a4c58c8a12c8c6c6c16e133c2f49"
+  },
+  "method": [
+    "Fetched both immutable Git blobs through github_fetch_blob; no workflow log or ZIP reads",
+    "Decoded UTF8, independently recomputed byte lengths and SHA256",
+    "Line LCS exact diff reviewed, untouched source segments compared byte-for-byte",
+    "Matched 11 legacy predicates to original move functions and existing ensure/create authority behavior",
+    "No application source edits, resource creation, test execution or budget rerun by this reviewer"
+  ],
+  "sourceChangeSummary": [
+    "personalWorkspaceId's existing missing-row user lookup/create tail extracted into createPersonalWorkspace with identical body",
+    "New private personalCoordinatorForBackfill reuses explicit-workspace branch's one required Personal lookup, adds actual Personal Coordinator LEFT JOIN and conservative legacy work boolean",
+    "Only truthy found id, truthy actual Personal Coordinator botId and legacyWork === false returns null to skip original empty migration",
+    "Every other found/no-found/unknown legacy result routes to unchanged ensureFor; no-found routes directly to extracted create tail without reissuing Personal lookup",
+    "Explicit workspace truthiness condition remains unchanged; it is not treated as a Team classifier",
+    "backfilled timestamp is still set only after successful helper/migration; caught errors do not mark fresh"
+  ],
+  "unchangedSegments": [
+    {
+      "name": "migrationTail",
+      "identical": true,
+      "oldBytes": 15747,
+      "newBytes": 15747,
+      "sha256": "089302cc641d47a997180fbe1add9bdaa7e98447a8a1e2fc9132603b244a59bc",
+      "newSha256": "089302cc641d47a997180fbe1add9bdaa7e98447a8a1e2fc9132603b244a59bc"
+    },
+    {
+      "name": "fromChatBotId",
+      "identical": true,
+      "oldBytes": 17936,
+      "newBytes": 17936,
+      "sha256": "61204f73d507a4f2d6282e97aa51debfa3176daa371e2f94ea582a6bd8b3f8ac",
+      "newSha256": "61204f73d507a4f2d6282e97aa51debfa3176daa371e2f94ea582a6bd8b3f8ac"
+    },
+    {
+      "name": "ensureFor",
+      "identical": true,
+      "oldBytes": 674,
+      "newBytes": 674,
+      "sha256": "4d8941a7046dae2e6c22f072b385a157dd3f6b06593104db382f6bddaffc6ead",
+      "newSha256": "4d8941a7046dae2e6c22f072b385a157dd3f6b06593104db382f6bddaffc6ead"
+    },
+    {
+      "name": "cacheConstants",
+      "identical": true,
+      "oldBytes": 383,
+      "newBytes": 383,
+      "sha256": "8f898e37732acfa2d66fafc38af47c6877f545042c98072d134353c17764c624",
+      "newSha256": "8f898e37732acfa2d66fafc38af47c6877f545042c98072d134353c17764c624"
+    },
+    {
+      "name": "targetResolution",
+      "identical": true,
+      "oldBytes": 324,
+      "newBytes": 324,
+      "sha256": "e7502517f4314c7d49be4e42d46f46fd2d29669d0483f3345f00598eda513011",
+      "newSha256": "e7502517f4314c7d49be4e42d46f46fd2d29669d0483f3345f00598eda513011"
+    },
+    {
+      "name": "originalMissingWorkspaceUserLookupAndCreationTail",
+      "identical": true,
+      "oldBytes": 347,
+      "newBytes": 347,
+      "oldSha256": "bb1d84341a13356eff50f7f6e778320057ddf23ba1f82962076b485b3523f6e6",
+      "newSha256": "bb1d84341a13356eff50f7f6e778320057ddf23ba1f82962076b485b3523f6e6"
+    }
+  ],
+  "authorityReview": {
+    "ownedPersonal": "WHERE w.userId=$1 AND w.kind='personal'",
+    "activeMembership": "JOIN mikka_workspace_members ON matching w.id, owner userId, status='active'",
+    "actualCoordinator": "LEFT JOIN coordinator_bots ON ownerId=$1 AND workspaceId=w.id; explicit requested workspace is not used for legacy destination",
+    "strictFalse": "found?.id && found.botId && found.legacyWork === false",
+    "existingBotSideEffects": "Referenced e42b1f98ca05f7e499a181bc1fae2aecdb4a5dde: ensureCoordinatorBot immediately returns existing botId. No required repair/write is omitted on proven-empty path",
+    "missingActivePersonal": "Fallback calls extracted original user read/ensurePersonalWorkspace tail, then unchanged ensureFor active-membership check; existing inactive Personal is not treated as authorized",
+    "cache": "Existing target resolved cache and TTL behavior is preserved; this change does not add a separate authorization guarantee beyond existing semantics"
+  },
+  "predicateReview": [
+    {
+      "table": "coordinator_messages",
+      "owner": "userId=$1",
+      "legacy": "botId IS NULL",
+      "target": "moveChat"
+    },
+    {
+      "table": "coordinator_sessions",
+      "owner": "userId=$1",
+      "legacy": "botId IS NULL",
+      "target": "moveChat"
+    },
+    {
+      "table": "agent_runs",
+      "owner": "userId=$1",
+      "legacy": "botId IS NULL",
+      "target": "moveExecutionRows",
+      "conservative": "Includes frozen, retained and other-workspace rows; no exclusion based on assumed movability"
+    },
+    {
+      "table": "coordinator_events",
+      "owner": "userId=$1",
+      "legacy": "botId IS NULL",
+      "target": "moveExecutionRows",
+      "conservative": "Includes retained/unresolved rows"
+    },
+    {
+      "table": "factory_tasks",
+      "owner": "userId=$1",
+      "legacy": "botId IS NULL",
+      "target": "moveExecutionRows",
+      "conservative": "Includes retained/unresolved rows"
+    },
+    {
+      "table": "bot_model_choices",
+      "owner": "ownerId=$1",
+      "legacy": "workspaceId=w.id AND botKey='coordinator'",
+      "target": "moveKeyedRows",
+      "authority": "Uses actual owned Personal w.id"
+    },
+    {
+      "table": "chat_preferences",
+      "owner": "userId=$1",
+      "legacy": "chatKey='coordinator'",
+      "target": "moveKeyedRows"
+    },
+    {
+      "table": "user_schedules",
+      "owner": "owner_id=$1",
+      "legacy": "bot_id IS NULL",
+      "target": "moveKeyedRows",
+      "conservative": "Includes NULL workspace or retained rows; later event movement can make schedules movable"
+    },
+    {
+      "table": "suggestions",
+      "owner": "userId=$1",
+      "legacy": "botId IS NULL",
+      "target": "moveKeyedRows"
+    },
+    {
+      "table": "pending_actions",
+      "owner": "userId=$1",
+      "legacy": "botId IS NULL",
+      "target": "moveKeyedRows"
+    },
+    {
+      "table": "agent_kit_heads",
+      "owner": "old_head.owner_id=$1",
+      "legacy": "old_head.bot_key='coordinator' AND NOT EXISTS current head keyed ownerId+actual Personal c.botId",
+      "target": "copyAgentHead",
+      "qualification": "Narrower than initial design's any-old-head predicate, but matches original insert ON CONFLICT(owner_id,bot_key) DO NOTHING and immediate return for existing current head; old immutable history is not removed"
+    }
+  ],
+  "racesAndLimits": [
+    "Single SELECT observes one committed PostgreSQL statement snapshot. A legacy write or target-head removal after the snapshot may be serviced on the next original 10-minute due pass",
+    "The previous migration already excludes late execution rows and preserves them for a next pass; no claim of immediate late-write visibility is made",
+    "No existing migration lock/order/transaction statements were removed from the nonempty/fallback path",
+    "Skipping proven-empty lock-taking can allow an in-flight old writer to become visible only after the current snapshot; this must remain documented/tested as next-pass behavior",
+    "One query count is not execution-latency proof; actual DB/Native validation remains required",
+    "The historical e093 full Native451 > Web427 (+24) remains RED; no hypothetical subtraction or retrospective acceptance"
+  ],
+  "testReviewRequests": [
+    "Real DB explicit Personal warmed-resolution empty case: due backfill is exactly one counted app query, no BEGIN, next within-TTL call none",
+    "Separate warmed target setup from count after 10-minute clock advancement because the existing target resolution TTL is only60 seconds",
+    "Each of11 predicate families independently must force unchanged migration or safe deferral; aggregate seed alone could hide omitted disjunct",
+    "Old-only agent head copies policies/definition; old+current uses empty branch and preserves current policies/version",
+    "Explicit Team requested workspace still migrates legacy to actual Personal Coordinator",
+    "Missing Personal workspace: no duplicate Personal lookup, original creation/check path retained",
+    "Missing Personal Coordinator: original ensure creation and migration preserved",
+    "Inactive Personal membership with valid Team target: no false empty skip or backfilled freshness; after reactivation pending legacy can migrate",
+    "Late legacy after empty observation: unchanged next due pass services it",
+    "Unknown/nonboolean boolean result fails closed to fallback",
+    "Suggestions/pending_actions fixture cleanup must be explicit or cascade-proven; original parent cleanup list omits both"
+  ],
+  "requiredFollowup": "Read exact test candidate and parent-run evidence before closing review. This artifact certifies source comparison only, not test or production acceptance."
+}

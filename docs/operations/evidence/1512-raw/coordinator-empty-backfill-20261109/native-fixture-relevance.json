@@ -1,0 +1,153 @@
+{
+  "schema": "mikka.issue1512.empty-backfill.native-fixture-source-correlation.v1",
+  "status": "READ_ONLY_SOURCE_CORRELATION_NOT_RUNTIME_ZERO_ROW_PROOF",
+  "reviewer": "e093_budget_diff",
+  "sources": [
+    {
+      "path": "apps/desktop/test/lifecycle.mjs",
+      "gitBlob": "3f21ee7f6a4eb8948778a35db72fb5e61aeca9ab",
+      "bytes": 33181,
+      "sha256": "45a0f56985f256f5f392ad015e0c4442a784e1b9ff1ebd8703829ecc61152a77",
+      "exactCheckout": "114d370f807c465c0f6fe1be47e941aa19adf62a"
+    },
+    {
+      "path": "apps/desktop/test/parity-fixtures.mjs",
+      "gitBlob": "b2700f11040452a42c8c2a8fac55d500fab8a617",
+      "bytes": 15446,
+      "sha256": "16d279afcb1185a1b469338e35bc361c64a1ba2666f1c999cd7a6a3e410f8ec7",
+      "exactCheckout": "114d370f807c465c0f6fe1be47e941aa19adf62a"
+    },
+    {
+      "path": "apps/desktop/test/parity-reader-defaults.mjs",
+      "gitBlob": "61892d691e38f3a35dae7de2a701da5bd8ac1b35",
+      "bytes": 3446,
+      "sha256": "ac5d8ee6887454a65830d80c5cf37ffd7df584da999e1905d040b3a391ebd5a2",
+      "exactCheckout": "114d370f807c465c0f6fe1be47e941aa19adf62a"
+    },
+    {
+      "path": "apps/desktop/test/parity-reads.mjs",
+      "gitBlob": "f8fcd9552d773f882e4e6fdb8409d5208c143935",
+      "bytes": 2347,
+      "sha256": "902687052c359a45d33106520098b66bb13f6a00c782a9324eb8bdbd91ed2bfe",
+      "exactCheckout": "114d370f807c465c0f6fe1be47e941aa19adf62a"
+    },
+    {
+      "path": "scripts/test-accounts/session.mjs",
+      "gitBlob": "4d178439f9ebdf0528f265c0682c04f27fd5e91d",
+      "bytes": 23152,
+      "sha256": "aeee1b4115955a5814a3bf8d95e70c469274b1926685410cd1ea64d054c4facf",
+      "exactCheckout": "114d370f807c465c0f6fe1be47e941aa19adf62a"
+    },
+    {
+      "path": "apps/desktop/test/account-release-observer.mjs",
+      "gitBlob": "f53b3643bf8084de20363e8e3e0aa48cde89154e",
+      "bytes": 6116,
+      "sha256": "55c7a76d05fe3cb1f51a56879c4732c0f6add98e6b857b342c73805e9f428439",
+      "exactCheckout": "114d370f807c465c0f6fe1be47e941aa19adf62a"
+    }
+  ],
+  "knownEvidence": {
+    "lifecycleGitBlob": "028b012e7b284b08dd52412680237986e5c093e9",
+    "lifecycleSha256": "315abc8b4dc7e9fd66a833a8e038d6e91ebfaf9ca2ebf9574615ea2f7905c093",
+    "comparisonProof": "7a8f92b45e8e60f7e85d0abefbd9eab56443d802",
+    "fullNative451vsWeb427": "RED+24",
+    "incrementalNativeBots26": "One third bots.pollBots invocation has28 instead of2 queries; old migration source matches26 due-backfill statements",
+    "noOriginalLogReads": true
+  },
+  "sourceFacts": [
+    {
+      "source": "apps/desktop/test/lifecycle.mjs",
+      "lines": "300-326",
+      "fact": "Creates full-query counter, acquires existing/authenticated leased accounts, captures release observer, then calls createParityFixtures(scope,{includePeerCoordinator:true})"
+    },
+    {
+      "source": "apps/desktop/test/lifecycle.mjs",
+      "lines": "332-356",
+      "fact": "Original complete Web and Native ordinary auth/windows use same fixture; these windows are unchanged by the application candidate"
+    },
+    {
+      "source": "scripts/test-accounts/session.mjs",
+      "lines": "256-286",
+      "fact": "After real signup/login/get-session, initializes workspace via/api/workspace and Personal Coordinator chat via/api/conversations/coordinator/read, then opens landing; only freshly provisioned accounts are sealed afterwards"
+    },
+    {
+      "source": "apps/desktop/test/parity-fixtures.mjs",
+      "lines": "19-45,110-148",
+      "fact": "Reserves and inserts fresh Team workspace, active members, explicit Coordinator bot rows, ordinarybot, issue/endedrun/artifacts/conversations; run and four messages have explicit nonNULL botId"
+    },
+    {
+      "source": "apps/desktop/test/parity-fixtures.mjs",
+      "lines": "1-155",
+      "fact": "No direct INSERT to bot_model_choices,chat_preferences,user_schedules,suggestions,pending_actions oragent_kit_heads; no direct NULLbot legacy message/session/event/run/task seeds"
+    },
+    {
+      "source": "apps/desktop/test/parity-reader-defaults.mjs",
+      "lines": "1-53",
+      "fact": "Captures attention_settings,user_time_zones,briefings and later removes only proven created defaults; does not insert six keyed legacy families"
+    },
+    {
+      "source": "apps/desktop/test/parity-reads.mjs",
+      "lines": "1-32",
+      "fact": "Captures specified conversation_reads and later deletes owned created receipts; no legacy keyed writes"
+    },
+    {
+      "source": "apps/desktop/test/account-release-observer.mjs",
+      "lines": "29-67",
+      "fact": "Keeps private whole-account baseline fingerprint and exposes only aggregate comparisons, not row-level affected counts for the measured call"
+    }
+  ],
+  "lifecycleAccountObservation": {
+    "observed": true,
+    "state": "released",
+    "blockedReason": null,
+    "owner": {
+      "matchesSealedBaselineBefore": false,
+      "matchesSealedBaselineAfter": true,
+      "changedTableCount": 1,
+      "changes": [
+        {
+          "table": "workspace_audit_outbox",
+          "beforeRows": 1,
+          "afterRows": 0,
+          "changedFieldValueSets": [
+            "createdAt",
+            "id",
+            "workspaceId"
+          ],
+          "otherChangedFieldCount": 3
+        }
+      ]
+    },
+    "peer": {
+      "matchesSealedBaselineBefore": false,
+      "matchesSealedBaselineAfter": true,
+      "changedTableCount": 1,
+      "changes": [
+        {
+          "table": "workspace_audit_outbox",
+          "beforeRows": 1,
+          "afterRows": 0,
+          "changedFieldValueSets": [
+            "createdAt",
+            "id",
+            "workspaceId"
+          ],
+          "otherChangedFieldCount": 3
+        }
+      ]
+    }
+  },
+  "interpretation": {
+    "supported": "The app candidate changes the exact real due-backfill path. The fixed Native fixture does not intentionally seed the remaining keyed legacy categories, and initializes the real Personal Coordinator before measured login windows",
+    "notProved": "Original diagnostics contain statement ordinals/shapes/counts, not affected-row counts or an authoritative11-category snapshot at that invocation. Neither fixture-source absence nor cleanup fingerprint proves every keyed DML affectedzero rows at that instant",
+    "scopeOfReasoning": "This is corroborating source evidence. Existing leased-account state and any concurrent real app writes cannot be ruled out by fixture source alone",
+    "acceptance": "Do not replace measured451 with451-minus26. Only unchanged full Native actual execution of the relevant new source can establish its budget"
+  },
+  "resourceAndMutation": {
+    "sourceEdits": 0,
+    "workflowLogOrZipReads": 0,
+    "computeResourcesStarted": 0,
+    "productionReadsOrWrites": 0,
+    "harnessChanges": 0
+  }
+}

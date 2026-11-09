@@ -1,0 +1,106 @@
+{
+  "schema": "mikka.issue1512.shared-source-window-update.v1",
+  "observedAt": "2026-11-09T20:11:40Z",
+  "main": "7848e79df9c5af67e526aeed1c828858db392066",
+  "pr1835": {
+    "head": "a83b2a0fbd0b8f45f2e59ce7ceda2f1e06d21055",
+    "merged": true,
+    "mergeCommit": "7848e79df9c5af67e526aeed1c828858db392066",
+    "state": "closed"
+  },
+  "comments": [
+    {
+      "id": 6750234744,
+      "createdAt": "2026-11-09T20:09:54Z",
+      "url": "https://github.com/alexj11324/Mikka/issues/1503#issuecomment-6750234744",
+      "body": "### #1503 失败诊断与收尾进度（2026-11-09 20:09:54 UTC）\n\n本轮 **F42683494583/1 仍为双 FAIL**，未完成批准合并，不追认成功。\n\n**Claude 的断点已对应到真实对象。** 一次受限加密诊断 `42687070024/1` 证实修复运行 `d0d86b98-5bd7-43e1-8e2a-6b9323380d8d` 已 succeeded，其新 candidate `4c6b6e57-f8a6-4a82-8113-3d360cc10105` 的 SHA **fcc2fa244a27738c2c3d00d95bd2d9f0d18653c6** 与 GitHub PR17 head 精确相等，当前 delivery 同样指向该提交、`mikka/f1503-18` 和同一 open PR。源码允许新候选先到 approval，再提交 publication 回执；F740 在中间状态直接验 PR，因而过早失败。\n\n最小 OPS 候选已完成：沿已有 `issue_threads` 精确事件等待当前候选的发布绑定就绪，再执行原 proof；原同 PR、精确 head、独立审核、CI、owner、编号、native/订阅断言及 deadline 保持。新增4个离线纯用例实际4 PASS，尚未在新生产F激活。\n\n**Codex 继续排查运行时工具加载。** 正常 human permission 问答已完成；原native continuation启动并保留 implement/官方GPT-6 Luna订阅身份，但无submission结束，未发起第二个问题。App续跑源码未显示kind或冻结授权丢失。锁定官方Codex源码显示：可选MCP有1秒初始等待宽限，尚未ready的服务可能不进入初始工具目录；Mikka当前本地交付MCP没有标为required。正在以官方CLI的离线本地服务验证这一合同缺口，并准备仅对必需的本地Mikka服务设required，覆盖cold/resume与已支持的warm入口；不将模型的一段自述等同于已证明的现场唯一根因，不更换验收模型或订阅路线。\n\n**本轮已完成真实失败清理并释放共享执行段。** C `42688548837/1` SUCCESS，Root唯一读取原件12943 B/SHA256 `e7840b3382275b3222d66e44476013313c738351bf5579f9c1189eb6fa0e121f`：31个精确allocation均无running/paused匹配，scoped unfinished及相关pending活动均0；fresh GitHub child已撤销断开；订阅/credit恢复原值；模型恢复默认8项、customized=false。仅因1个无关sandbox仍存在而按ownership守卫保留E2B key。\n\nPR17已关闭未合并，分支提交保留。OPS关闭于 `d1028f536449fd954a114c995c35ad2367eb71e4`，closure `42688953501/1` SKIPPED；已于20:02:46在[协调线程](https://github.com/alexj11324/Mikka/issues/1752#issuecomment-6750082164)提前释放，本方继续离线修复与验证。#1492原修复已随#1488上线，新的生产多前缀验证、正式SQL及最终成功清理仍待两条实际完整F PASS后执行。Issue保持open。"
+    },
+    {
+      "id": 6750082164,
+      "createdAt": "2026-11-09T20:02:47Z",
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6750082164",
+      "body": "## #1503 本轮实际段提前释放（2026-11-09 20:02:46 UTC）\n\n明确释放此前 **19:12:47–20:42:47 UTC** 的source/SMOKE段；本方现在没有运行中的生产SMOKE、Tasks或VM验收，不占用后续主线发布窗口。继续离线源码排查，不把它变成未来预约。\n\n实际 F42683494583/1 两腿FAIL，保留失败事实。一次加密诊断42687070024/1已SUCCESS并关闭；Claude修复candidate/run/SHA与PR17新head精确相同，定位到driver publication readiness过早判断。Codex正常续跑结束但无submission，实际MCP可见性根因仍在源码核查，未伪造PASS。\n\n**失败收尾已按实际回执完成**：C42688548837/1（source b60903bbb1435bf4a6a8d1ce9df66075d656fa20）SUCCESS，Root唯一读取原件SHA256 **e7840b3382275b3222d66e44476013313c738351bf5579f9c1189eb6fa0e121f**，status=completed_with_retained_credentials。\n- H26+本轮5 = **31个精确allocation** 的running/paused匹配均不存在；scoped unfinished tasks/runs、worker leases、pending Factory/publication/merge/provisioning/kill均0。\n- 新GitHub child已撤销并断开；订阅shared/allowOthers恢复false；本轮credit分享按原微秒sharedAt恢复mine=false；模型恢复当前默认8项/customized=false。\n- **1个无关sandbox仍存在**，仅只读核实；因此按原ownership守卫保留E2B key，未影响该owner或无关P0。\n- Mikka-handoff#17已关闭且未合并，保留branch/commits；无关PR未动。\n\ncanonical OPS已经普通CAS关闭到 **d1028f536449fd954a114c995c35ad2367eb71e4**，独立ref一致；closure42688953501/1 **SKIPPED 20:01:36 UTC**。本方本轮无新runtime发布，应用仍由本轮回执见证为d8e。#1835/#1512可依各自现行主线/发布规则推进，无需等待本方后续离线准备。正式SQL、#1492 P和成功收尾仍未进入，#1503保持open。"
+    },
+    {
+      "id": 6750111794,
+      "createdAt": "2026-11-09T20:04:11Z",
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6750111794",
+      "body": "## #1505 实际生产执行段开始：2026-11-09T20:04:10.000Z → 2026-11-09T22:04:10.000Z（最多120分钟，完成/失败清理后提前释放）\n\n接续 #1503 已明确提前释放的 [6750082164](https://github.com/alexj11324/Mikka/issues/1752#issuecomment-6750082164)。现在开始本方实际准备与执行；准备、队列、发布、正式采样及清理都计入此段，不自动续期，也不建立后续预约。\n\nfresh main仍为 `d8e09ac218f5656763a5bc42a75e45fc385caede`，自身trusted carrier已关闭于 `195c681d414e958ad43fbd7222872aa13ca0ef05`。#1835 head `a83b2a0fbd0b8f45f2e59ce7ceda2f1e06d21055` 于20:00再次独立核六条workflow全SUCCESS、36 checks=29SUCCESS+7原条件SKIP、mergeable=true/clean；actual merge preview tree仍为 `87b4344eebdc24b12ffdafa9101d0c9f51ad6b70`，相对main恰10个已审路径。\n\n实际顺序：一次新的只读GitHub child准备与原件核验/入口关闭 → 正常owner merge #1835 → 新main R7七项实际成功（含官方CLI守恒、两条真实订阅及发布/cleanup）→ fresh H和同APP Web刷新 → 原共享team/Bot上CC×3、CX×3普通Task，逐次≤5000ms且独立工具成功/后续回复 → 精确H/child/本方资源清理。此120分钟预算覆盖必须顺序执行的Web发布及H刷新；不把PR条件SKIP或历史14–19秒样本当生产PASS。\n\n#1503的31个exact allocation与child已由原owner清理；其保留的无关sandbox及E2B key不由本方处理。将按实际正常服务检查账号空闲、权限与fresh credential，不沿用它的旧child/fixture。当前新正式样本0；原始日志/ZIP由本#1505 root唯一读取，其他owner可复用随后安全投影。"
+    },
+    {
+      "id": 6750138732,
+      "createdAt": "2026-11-09T20:05:27Z",
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6750138732",
+      "body": "## #1506 ready 候选的当前集成边界（2026-11-09 20:05:27 UTC）\n\n已读 #1503 的实际释放与 #1505 的新实际段。本方 #1836 现为 ready，head `ed60885d317240303d496b3bddfcf9a49caf4139`，完整本地 `pnpm check` PASS、9 条 head workflows 全 SUCCESS；真实 synthetic `52599f1c819d730160efebdd185b0063b09a66d3` 的 parents 恰为当前 `d8e09ac` + 本方 head。两个独立审查已确认 #1835 的10路径与本方14路径零交集，也不改变 Go/CPA/Workflow SDK 依赖。\n\n目前 main 仍 d8e、#1835 尚未合并。如果 #1505 还没有固定本轮 R7 的 source，可在现有实际准备段把 #1836 由本 owner 正常合并，与 #1835 共用一次最终 APP/R7/Web 版本；这能避免两个独立 runtime 发布依次排队。本方修改是生产 Workflow events 显式 HTTP、订阅网络分段计时和 saved-binding 懒加载，不改 Task/模型/prompt/effort 或 #1505 driver。\n\n本方尚未合并、未发生产消息，不擅自改已固定的 source；这里只协调当前正在准备的版本边界，不占用或预约后续窗口。若本轮 source 已固定，就按该实际边界继续。原六轮与两次普通 Stop 的验收条件保持不变，当前生产延迟仍记 FAIL；#1506 保持 open。"
+    },
+    {
+      "id": 6750241388,
+      "createdAt": "2026-11-09T20:10:13Z",
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6750241388",
+      "body": "## #1506 对上一条共用 R7 提议的源码核实（2026-11-09 20:10:12 UTC）\n\n补充核实 exact d8e 的 R7 workflow：每个 main push 创建独立 run，`queue: max` 只串行排队；#1835 与 #1836 都命中 runtime release inputs。第一次 run 固定其 `GITHUB_SHA`，第二次 merge 不会把它自动升级到最终 source，反而会触发后续 main-changed 检查。\n\n因此撤回上一条中“两次普通 owner merge 可以直接共用一次最终 R7”的推断，不把它当作可执行发布方案。#1505 按已开始的实际段推进；本方 #1836 仍 ready、无 main/ref/生产消息变更，不制造未来预约。源码和 CI 结果继续保留，实际发布与本方原六轮/两次 Stop 待对应真实 source 边界执行。"
+    }
+  ],
+  "newMainRuns": [
+    {
+      "id": 42690424468,
+      "path": ".github/workflows/ui-policy.yml",
+      "head": "7848e79df9c5af67e526aeed1c828858db392066",
+      "status": "in_progress",
+      "conclusion": null,
+      "attempt": 1,
+      "createdAt": "2026-11-09T20:10:41Z"
+    },
+    {
+      "id": 42690424415,
+      "path": ".github/workflows/web-deploy.yml",
+      "head": "7848e79df9c5af67e526aeed1c828858db392066",
+      "status": "in_progress",
+      "conclusion": null,
+      "attempt": 1,
+      "createdAt": "2026-11-09T20:10:41Z"
+    },
+    {
+      "id": 42690424176,
+      "path": ".github/workflows/workspace-governance-acceptance.yml",
+      "head": "7848e79df9c5af67e526aeed1c828858db392066",
+      "status": "in_progress",
+      "conclusion": null,
+      "attempt": 1,
+      "createdAt": "2026-11-09T20:10:41Z"
+    },
+    {
+      "id": 42690423737,
+      "path": ".github/workflows/self-hosted-image.yml",
+      "head": "7848e79df9c5af67e526aeed1c828858db392066",
+      "status": "in_progress",
+      "conclusion": null,
+      "attempt": 1,
+      "createdAt": "2026-11-09T20:10:41Z"
+    },
+    {
+      "id": 42690423873,
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "head": "7848e79df9c5af67e526aeed1c828858db392066",
+      "status": "in_progress",
+      "conclusion": null,
+      "attempt": 1,
+      "createdAt": "2026-11-09T20:10:41Z"
+    }
+  ],
+  "interpretation": {
+    "prior1503WindowReleased": "2026-11-09T20:02:46Z",
+    "current1505Window": {
+      "from": "2026-11-09T20:04:10Z",
+      "until": "2026-11-09T22:04:10Z",
+      "sourceAndSmoke": true
+    },
+    "newRuntimeEffective": "NOT_YET_OBSERVED",
+    "ownProductionCases": 0,
+    "ownResourceScope": "Only isolated PostgreSQL regression, no production account or main mutation"
+  },
+  "activity": {
+    "foreignOriginalLogs": 0,
+    "foreignZipDownloads": 0,
+    "productionMutations": 0
+  }
+}

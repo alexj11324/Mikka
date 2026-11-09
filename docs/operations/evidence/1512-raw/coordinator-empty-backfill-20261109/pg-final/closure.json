@@ -1,0 +1,70 @@
+{
+  "schema": "issue1512-pg17-success-closure-v1",
+  "recordedAt": "2026-11-09 20:18:14 UTC",
+  "runId": 42690271741,
+  "admissionControl": "54007859ff7b935fad6ed36c3f00eddf2463f7b8",
+  "candidate": "5a0c90774b8c48fc390ea05cf782bbc9cbe79a62",
+  "outcome": "VALID_ASSERTION_RED_AND_COMPLETE_COORDINATOR_FAMILY_GREEN",
+  "closedRef": {
+    "ref": "refs/heads/ops/1512-backfill-pg-20261109",
+    "node_id": "REF_kwDOVRYxA9oAKHJlZnMvaGVhZHMvb3BzLzE1MTItYmFja2ZpbGwtcGctMjAyNjExMDk",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/refs/heads/ops/1512-backfill-pg-20261109",
+    "object": {
+      "sha": "215f846817f5a73c88ee37031ab9b91a21268cee",
+      "type": "commit",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/215f846817f5a73c88ee37031ab9b91a21268cee"
+    }
+  },
+  "closingCommit": "215f846817f5a73c88ee37031ab9b91a21268cee",
+  "closingTree": "f47a8dc43ec5cff6195b6efd9ba74307fda7168c",
+  "closedManifestBlob": "4b70c01ca262106f3605a32fdaf81db1eded862e",
+  "evidenceIndexBlob": "6c46d672305d775f4b028fd5245bc123b29168e2",
+  "evidenceIndexPath": ".github/ops/issue1512-backfill-pg/evidence/42690271741/index.json",
+  "closingRun": {
+    "id": 42691624148,
+    "status": "completed",
+    "conclusion": "skipped",
+    "url": "https://github.com/alexj11324/Mikka/actions/runs/42691624148"
+  },
+  "closingJobs": [
+    {
+      "id": 129412532708,
+      "name": "Old source, genuine regression assertion RED",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 42691624148,
+      "logs_url": null,
+      "steps": null
+    },
+    {
+      "id": 129412533990,
+      "name": "Candidate, complete Coordinator family GREEN",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 42691624148,
+      "logs_url": null,
+      "steps": null
+    }
+  ],
+  "remainingOwnedDatabaseServices": 0,
+  "redCleanup": {
+    "phase": "red",
+    "serviceId": "8755eeef16c38b6f763cd3c2e1404473d2dfce49991341e5c5bb4a7b89f77147",
+    "startedAt": "2026-11-09T20:11:09.516Z",
+    "stopped": true,
+    "finishedAt": "2026-11-09T20:11:10.710Z"
+  },
+  "greenCleanup": {
+    "phase": "green",
+    "serviceId": "b6af8a2646da532e23c71f789267cf2afdee7e5ad370aedb58bb5ed0724b4ddc",
+    "startedAt": "2026-11-09T20:13:54.363Z",
+    "stopped": true,
+    "finishedAt": "2026-11-09T20:13:54.919Z"
+  },
+  "originalRequests": {
+    "redJobLog": 1,
+    "greenJobLog": 1,
+    "zip": 0
+  },
+  "productionAcceptance": false
+}

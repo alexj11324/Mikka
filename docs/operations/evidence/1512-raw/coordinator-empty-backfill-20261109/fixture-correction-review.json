@@ -1,0 +1,189 @@
+{
+  "schema": "mikka.issue1512.coordinator-fixture-fix-independent-review.v1",
+  "status": "FIXTURE_ONLY_SOURCE_REVIEW_PASSED_ACTUAL_RERUN_PENDING",
+  "reviewer": "e093_budget_diff",
+  "originalTest": "32a8321c981dd6a534f8859fa35f281e874466e6",
+  "supersededCandidateTest": "13fb6f222c061d115916557b796006c2073dc628",
+  "fixedCandidateTest": {
+    "gitBlob": "c6c92ea2741174b5baadbd1535fc8b0c62b8275e",
+    "bytes": 86798,
+    "sha256": "80e713858cc61e23094cff2c16281b643e06796b5ed0cf8a382922dcddfb4bcd"
+  },
+  "sourceCandidate": {
+    "gitBlob": "d73e30c36212029a8951a25a692c4e04a2a5b86d",
+    "changedByFixtureCorrection": false
+  },
+  "newCandidateCommit": {
+    "sha": "5a0c90774b8c48fc390ea05cf782bbc9cbe79a62",
+    "tree": "442e7d50bbec1f78b7508d062e6076627a3e47c7",
+    "parents": [
+      "a9ff5afc1cae3d18ad2827a3119c85ab46f7d3d4"
+    ],
+    "gitObjectReadbackVerified": true
+  },
+  "actualPriorFailure": {
+    "tapGitBlob": "689ae48e0efe13c9b13afe4edcc05984b32f6999",
+    "bytes": 17918,
+    "sha256": "0836c8a69b6aff2e17872287713f71ba37298017f225bc0010d9ddc5128fb2d4",
+    "gitBlobSha1Verified": true,
+    "provenance": "Parent provided this as the original-source real PostgreSQL negative-control TAP. Reviewer independently read the Git blob and verified results; TAP alone does not bind checkout SHA.",
+    "summary": {
+      "tests": 47,
+      "pass": 40,
+      "fail": 7,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "failedLeafSubtests": 6,
+      "failedParentTests": 1
+    },
+    "intendedBehaviorFailures": [
+      {
+        "case": "empty explicit Personal",
+        "expected": 1,
+        "actual": 26
+      },
+      {
+        "case": "empty explicit Team",
+        "expected": 1,
+        "actual": 26
+      },
+      {
+        "case": "late family after empty read",
+        "expected": 1,
+        "actual": 29
+      }
+    ],
+    "unintendedFixtureFailures": [
+      {
+        "case": "retained copied agent head",
+        "sqlstate": "42P08",
+        "error": "inconsistent types deduced for parameter $2"
+      },
+      {
+        "case": "single factory_tasks source",
+        "sqlstate": "23503",
+        "error": "factory_tasks_attempt_fk"
+      },
+      {
+        "case": "single suggestions source",
+        "sqlstate": "42P08",
+        "error": "inconsistent types deduced for parameter $1"
+      }
+    ],
+    "classification": "The count failures are real behavioral red assertions. The3fixture errors are separate failures requiring correction; they do not satisfy negative-control acceptance."
+  },
+  "exactFixtureDiff": [
+    {
+      "type": "+",
+      "old": null,
+      "new": 169,
+      "line": "      VALUES ($1,'coordinator',NULL,NULL,$4),($1,$2,$6,$3,$5)`, [p.id, coordinator.botId, p.workspaceId, oldPolicy, currentPolicy, coordinator.botId])"
+    },
+    {
+      "type": "-",
+      "old": 169,
+      "new": null,
+      "line": "      VALUES ($1,'coordinator',NULL,NULL,$4),($1,$2,$2::uuid,$3,$5)`, [p.id, coordinator.botId, p.workspaceId, oldPolicy, currentPolicy])"
+    },
+    {
+      "type": "+",
+      "old": null,
+      "new": 211,
+      "line": "        await pool.query(`WITH task AS ("
+    },
+    {
+      "type": "+",
+      "old": null,
+      "new": 212,
+      "line": "          INSERT INTO factory_tasks (id,\"userId\",\"issueId\",\"sourceEventId\",\"workspaceId\",route,stage,status,\"attemptId\",reason)"
+    },
+    {
+      "type": "+",
+      "old": null,
+      "new": 213,
+      "line": "          VALUES ($1,$2,$3,$4,$5,'{}','execute','running',$6,'Single legacy task fixture') RETURNING id)"
+    },
+    {
+      "type": "+",
+      "old": null,
+      "new": 214,
+      "line": "          INSERT INTO factory_attempts (id,\"taskId\",stage,status,ordinal,position,reason)"
+    },
+    {
+      "type": "+",
+      "old": null,
+      "new": 215,
+      "line": "          SELECT $6,id,'execute','running',1,1,'Single legacy task fixture' FROM task`,"
+    },
+    {
+      "type": "-",
+      "old": 211,
+      "new": null,
+      "line": "        await pool.query(`INSERT INTO factory_tasks (id,\"userId\",\"issueId\",\"sourceEventId\",\"workspaceId\",route,stage,status,\"attemptId\",reason)"
+    },
+    {
+      "type": "-",
+      "old": 212,
+      "new": null,
+      "line": "          VALUES ($1,$2,$3,$4,$5,'{}','execute','running',$6,'Single legacy task fixture')`,"
+    },
+    {
+      "type": "+",
+      "old": null,
+      "new": 246,
+      "line": "          VALUES ($1,$2,'github',$3,'read','Legacy suggestion',false,'rule',now())`, [id, p.id, id])"
+    },
+    {
+      "type": "-",
+      "old": 243,
+      "new": null,
+      "line": "          VALUES ($1,$2,'github',$1::text,'read','Legacy suggestion',false,'rule',now())`, [id, p.id])"
+    }
+  ],
+  "semanticReview": [
+    {
+      "fixture": "retained head",
+      "before": "$2 reused for text bot_key and UUID bot_id",
+      "after": "$2 text and separate $6 UUID both receive coordinator.botId",
+      "effect": "Avoid inconsistent parameter inference while preserving both rows, IDs and contrasting policies"
+    },
+    {
+      "fixture": "suggestions",
+      "before": "$1 reused for UUID id and text externalId",
+      "after": "$1 UUID and separate $3 text both receive the same fresh id",
+      "effect": "Avoid inconsistent parameter inference while preserving source, external identity and target assertion"
+    },
+    {
+      "fixture": "factory_tasks",
+      "before": "Single autocommit INSERT referenced missing attempt",
+      "after": "WITH task AS(INSERT...RETURNING id) INSERT factory_attempts SELECT same fresh attemptId,id",
+      "effect": "Task and required attempt exist by statement end; identical existing fixture shape at original test lines265-270; NULL-Bot conservative-retention assertion unchanged"
+    }
+  ],
+  "conservation": {
+    "reconstructsOriginal": true,
+    "insertedLines": 316,
+    "allAssertionCounterClockLinesIdentical": true,
+    "counterHelperIdentical": true,
+    "newSubcases": 21,
+    "caseDefinitionsIdentical": true,
+    "newLinesVersusV1": 7,
+    "removedLinesVersusV1": 4,
+    "newBlockLinesVersusOriginal": 316,
+    "existingOriginalBytesPreserved": 65832,
+    "existingOriginalSha256": "d9b998eb6babcaa96ad493d3335a333d0f041cc1c7350d295e5a9fb92fb228b8",
+    "noAssertionOrTimingOrQueryCountRelaxation": true
+  },
+  "preparedObjectInvalidation": {
+    "oldCommit": "4298859e7f7de2912a35a720f760aa762e56b35a",
+    "oldManifest": "5aad481ceeebe3117ae20ee195655143691cbe61",
+    "reason": "Its test blob13fb was superseded by real PostgreSQL fixture corrections;do not activate old prepared object"
+  },
+  "limits": [
+    "This is an exact fixture/source review, not a successful rerun",
+    "Previous historical Native451>427 RED staysunchanged",
+    "No workflow original logs/ZIPs read;only supplied Git TAP artifact",
+    "No source edit,VM,container,templateorproduction operation by this reviewer"
+  ]
+}

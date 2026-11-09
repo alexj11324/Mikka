@@ -1,0 +1,20 @@
+{
+  "schema": "mikka.issue1512.fixture-correction.exact-diff.v1",
+  "base": "a9ff5afc1cae3d18ad2827a3119c85ab46f7d3d4",
+  "head": "5a0c90774b8c48fc390ea05cf782bbc9cbe79a62",
+  "appUnchanged": "d73e30c36212029a8951a25a692c4e04a2a5b86d",
+  "beforeTest": "13fb6f222c061d115916557b796006c2073dc628",
+  "afterTest": "c6c92ea2741174b5baadbd1535fc8b0c62b8275e",
+  "files": [
+    {
+      "path": "tests/coordinator-bot.db.test.ts",
+      "sha": "c6c92ea2741174b5baadbd1535fc8b0c62b8275e",
+      "additions": 7,
+      "deletions": 4,
+      "patch": "@@ -166,7 +166,7 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {\n     const coordinator = await bots.coordinatorBot(p.id, p.workspaceId, { backfill: false })\n     const oldPolicy = { permissions: { git_push: 'deny' } }, currentPolicy = { permissions: { git_push: 'ask' } }\n     await pool.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,bot_id,workspace_id,cli_run_policy)\n-      VALUES ($1,'coordinator',NULL,NULL,$4),($1,$2,$2::uuid,$3,$5)`, [p.id, coordinator.botId, p.workspaceId, oldPolicy, currentPolicy])\n+      VALUES ($1,'coordinator',NULL,NULL,$4),($1,$2,$6,$3,$5)`, [p.id, coordinator.botId, p.workspaceId, oldPolicy, currentPolicy, coordinator.botId])\n     const heads = () => pool.query('SELECT bot_key,active_version,cli_run_policy FROM agent_kit_heads WHERE owner_id=$1 ORDER BY bot_key', [p.id]).then(result => result.rows)\n     const before = await heads()\n     const observed = await observeCoordinatorCall(p.id, p.workspaceId)\n@@ -208,8 +208,11 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {\n       case 'factory_tasks': {\n         const event = await sourceEvent(p.id)\n         await pool.query('UPDATE coordinator_events SET \"botId\"=$2 WHERE id=$1', [event, personal.botId])\n-        await pool.query(`INSERT INTO factory_tasks (id,\"userId\",\"issueId\",\"sourceEventId\",\"workspaceId\",route,stage,status,\"attemptId\",reason)\n-          VALUES ($1,$2,$3,$4,$5,'{}','execute','running',$6,'Single legacy task fixture')`,\n+        await pool.query(`WITH task AS (\n+          INSERT INTO factory_tasks (id,\"userId\",\"issueId\",\"sourceEventId\",\"workspaceId\",route,stage,status,\"attemptId\",reason)\n+          VALUES ($1,$2,$3,$4,$5,'{}','execute','running',$6,'Single legacy task fixture') RETURNING id)\n+          INSERT INTO factory_attempts (id,\"taskId\",stage,status,ordinal,position,reason)\n+          SELECT $6,id,'execute','running',1,1,'Single legacy task fixture' FROM task`,\n         [id, p.id, await seedIssue(pool, p.id), event, p.workspaceId, randomUUID()])\n         statement = 'SELECT \"botId\" AS value FROM factory_tasks WHERE id=$1'\n         // A source already outside the captured null-Bot family retains the task.\n@@ -240,7 +243,7 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {\n       case 'suggestions':\n         st.after(() => pool.query('DELETE FROM suggestions WHERE id=$1', [id]))\n         await pool.query(`INSERT INTO suggestions (id,\"userId\",source,\"externalId\",action,title,shown,\"decidedBy\",\"occurredAt\")\n-          VALUES ($1,$2,'github',$1::text,'read','Legacy suggestion',false,'rule',now())`, [id, p.id])\n+          VALUES ($1,$2,'github',$3,'read','Legacy suggestion',false,'rule',now())`, [id, p.id, id])\n         statement = 'SELECT \"botId\" AS value FROM suggestions WHERE id=$1'\n         break\n       case 'pending_actions':"
+    }
+  ],
+  "originalTestPreserved": true,
+  "newSubtests": 21,
+  "assertionsUnchanged": true
+}

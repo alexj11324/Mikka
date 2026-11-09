@@ -1,0 +1,54 @@
+{
+  "schema": "mikka.issue1512.pg-red.root-recomputation.v1",
+  "run": 42690271741,
+  "job": 129407869387,
+  "source": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+  "test": "c6c92ea2741174b5baadbd1535fc8b0c62b8275e",
+  "tap": {
+    "gitBlob": "3ebf530c0c45f6f9e1f148b67b5b70311357e996",
+    "bytes": 16141,
+    "sha256": "50172221667c2e5d3e0bcad8d8d58fdbe18446b8549efd7e14cbd1142bbfc25b"
+  },
+  "counts": {
+    "tests": 47,
+    "suites": 0,
+    "pass": 42,
+    "fail": 5,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "children": 46,
+  "newChildren": 21,
+  "existingChildren": 25,
+  "existingAllPass": true,
+  "failures": [
+    {
+      "name": "an empty explicit Personal Coordinator uses one Personal read",
+      "ordinal": 1,
+      "actual": 26,
+      "expected": 1
+    },
+    {
+      "name": "an empty explicit Team Coordinator uses one Personal read",
+      "ordinal": 2,
+      "actual": 26,
+      "expected": 1
+    },
+    {
+      "name": "a retained copied agent head still permits the empty Personal read",
+      "ordinal": 3,
+      "actual": 27,
+      "expected": 1
+    },
+    {
+      "name": "legacy rows committed after an empty read wait for the original next pass",
+      "ordinal": 21,
+      "actual": 29,
+      "expected": 1
+    }
+  ],
+  "verdict": "VALID_REGRESSION_RED",
+  "green": "NOT_YET_OBSERVED",
+  "native": "HISTORICAL_E093_REMAINS_RED"
+}

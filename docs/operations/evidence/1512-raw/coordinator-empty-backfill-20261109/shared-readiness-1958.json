@@ -1,0 +1,214 @@
+{
+  "schema": "mikka.issue1512.shared-release-window-increment.v1",
+  "observedAtUtc": "2026-11-09T19:58:40Z",
+  "sinceUtc": "2026-11-09T19:40:00Z",
+  "repository": "alexj11324/Mikka",
+  "precedingIndependentSourceProof": "290373941494c7d953e1a8262c04de52bffe8845",
+  "main": {
+    "sha": "d8e09ac218f5656763a5bc42a75e45fc385caede",
+    "source": "fresh Git ref metadata; no mutation"
+  },
+  "pr1835": {
+    "state": "open",
+    "head": "a83b2a0fbd0b8f45f2e59ce7ceda2f1e06d21055",
+    "merged": false,
+    "mergedAt": null,
+    "updatedAt": "2026-11-09T19:30:14Z",
+    "mergePreview": "2d23ef77561009c01ad34decdf7cec1401c3b1e1",
+    "mergePreviewIsNotActualMerge": true,
+    "newCommentsSince1925": []
+  },
+  "production1503": {
+    "currentExplicitWindow": {
+      "start": "2026-11-09T19:12:47Z",
+      "absoluteEnd": "2026-11-09T20:42:47Z",
+      "source": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6748990292",
+      "scope": "actual production source + SMOKE; setup, queue and cleanup included",
+      "earlyReleaseObserved": false,
+      "extensionObserved": false
+    },
+    "ownerLatest": {
+      "id": 6749628522,
+      "createdAt": "2026-11-09T19:41:17Z",
+      "url": "https://github.com/alexj11324/Mikka/issues/1503#issuecomment-6749628522",
+      "summary": "Both actual F42683494583/A1 legs failed. Owner is preparing actual-scope failure cleanup and investigating the two fixed failures. Formal SQL/success closeout is not started.",
+      "limits": "This reviewer did not reread those original receipts or infer failure details beyond the public owner status."
+    },
+    "commentsSince1940": [
+      {
+        "id": 6749628522,
+        "createdAt": "2026-11-09T19:41:17Z",
+        "updatedAt": "2026-11-09T19:41:17Z",
+        "url": "https://github.com/alexj11324/Mikka/issues/1503#issuecomment-6749628522"
+      }
+    ],
+    "opsRef": "a6d639e7a026183025feff1201848ed13d68480d",
+    "newWorkflowMetadata": [
+      {
+        "id": 42687395602,
+        "name": "Issue 1503 encrypted failed task diagnosis",
+        "head": "a6d639e7a026183025feff1201848ed13d68480d",
+        "branch": "ops/issue-1503-production-smoke",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAt": "2026-11-09T19:51:48Z",
+        "startedAt": "2026-11-09T19:51:48Z",
+        "updatedAt": "2026-11-09T19:51:49Z"
+      },
+      {
+        "id": 42687070024,
+        "name": "Issue 1503 encrypted failed task diagnosis",
+        "head": "d7d15b29825c002614dd78270645018c260222d3",
+        "branch": "ops/issue-1503-production-smoke",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "createdAt": "2026-11-09T19:49:44Z",
+        "startedAt": "2026-11-09T19:49:44Z",
+        "updatedAt": "2026-11-09T19:50:41Z"
+      }
+    ],
+    "diagnosisJobs": [
+      {
+        "id": 129396618790,
+        "name": "diagnose",
+        "head": "d7d15b29825c002614dd78270645018c260222d3",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T19:49:48Z",
+        "completedAt": "2026-11-09T19:50:40Z",
+        "steps": [
+          {
+            "number": 1,
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "number": 2,
+            "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "number": 3,
+            "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "number": 4,
+            "name": "Run corepack enable && corepack prepare pnpm@10.34.3 --activate && pnpm install --frozen-lockfile",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "number": 5,
+            "name": "Run Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "number": 6,
+            "name": "Read and encrypt the two fixed failed targets once",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "number": 7,
+            "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "number": 13,
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "number": 14,
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "status": "completed",
+            "conclusion": "success"
+          },
+          {
+            "number": 15,
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success"
+          }
+        ]
+      }
+    ],
+    "interpretation": "New actual activity is a bounded failed-target diagnosis, not resource cleanup. Its read/encrypt step succeeded and the following closure run skipped. The latest ten branch runs include no newer cleanup workflow. No cleanup completion or explicit window release is recorded in the new comments.",
+    "uncertainty": "No assertion that a model or production task is currently running. No claim that any credential was revoked, child deleted, VM deleted or temporary configuration restored; no cleanup receipt or private encrypted artifact was read.",
+    "reasonNotFutureReservation": "The explicit finite window was already activated by actual Setup and F execution; this incremental review does not invent a new hold from any planned work."
+  },
+  "otherOwners": {
+    "owner1505": {
+      "commentId": 6749658086,
+      "createdAt": "2026-11-09T19:42:44Z",
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6749658086",
+      "summary": "Publication preparation ready, exact a83 six workflows successful and owner-reported36 checks29success+7original skips. Carrier prep is closed/unbound; zero new child/template/VM/model. Owner explicitly waits for1503 cleanup/release before a new finite real execution window and own normal1835 merge.",
+      "actualNewWindow": false,
+      "futurePlanIsHold": false,
+      "newIssue1505Comments": []
+    },
+    "owner1506": {
+      "commentId": 6749753084,
+      "createdAt": "2026-11-09T19:47:15Z",
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6749753084",
+      "summary": "Source/test preparation and archived restored snapshots; owner reports0runningVM/0production account/0model sends and closed operator. No actual source/account window started.",
+      "actualNewWindow": false,
+      "futurePlanIsHold": false
+    }
+  },
+  "runtime": {
+    "mainWorkflowMetadata": [
+      {
+        "id": 42675680821,
+        "name": "E2B additive runtime release",
+        "head": "d8e09ac218f5656763a5bc42a75e45fc385caede",
+        "branch": "main",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "failure",
+        "createdAt": "2026-11-09T18:37:41Z",
+        "startedAt": "2026-11-09T18:37:41Z",
+        "updatedAt": "2026-11-09T18:46:38Z"
+      },
+      {
+        "id": 42675680440,
+        "name": "Web deploy",
+        "head": "d8e09ac218f5656763a5bc42a75e45fc385caede",
+        "branch": "main",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "createdAt": "2026-11-09T18:37:41Z",
+        "startedAt": "2026-11-09T18:37:41Z",
+        "updatedAt": "2026-11-09T19:05:00Z"
+      }
+    ],
+    "conclusion": "Main remains d8. Its only listed E2B runtime release is42675680821/A1 completed failure. No new main merge or new R7 appears in these exact-source workflow metadata; no newly published runtime is established by this review.",
+    "notInferred": "Do not use a closed preparation carrier, a successful PR-only test gate or an encrypted diagnosis as production R7 acceptance."
+  },
+  "limits": {
+    "metadataOnly": true,
+    "noOriginalLogOrZipRead": true,
+    "noPrivateDiagnosisOrRuntimeWitnessRead": true,
+    "noFreshProductionEndpointRequest": true,
+    "doesNotSupersedeLaterOwnerEvents": true
+  },
+  "activity": {
+    "newResources": 0,
+    "originalJobLogReads": 0,
+    "artifactZipDownloads": 0,
+    "ciReruns": 0,
+    "sourceOrRefMutations": 0,
+    "productionAccountOrModelCalls": 0
+  }
+}

@@ -1,0 +1,1592 @@
+{
+  "schema": "mikka.issue1512.unreferenced-prepared-actual-main-coordinator-merge.v2",
+  "observedAtUtc": "2026-11-09T20:16:50.966Z",
+  "status": "FINAL_PREPARED_OBJECT_ONLY_ACTUAL_PG_AND_NATIVE_GATES_NOT_CERTIFIED",
+  "repository": "alexj11324/Mikka",
+  "preparedCommit": {
+    "sha": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+    "tree": "e7c7c6ad66acd729278393711c10eeed67c6d7ac",
+    "parents": [
+      "5a0c90774b8c48fc390ea05cf782bbc9cbe79a62",
+      "7848e79df9c5af67e526aeed1c828858db392066"
+    ],
+    "message": "Merge main into Coordinator backfill correction\n\nInclude the actual main merge of PR #1835 at 7848e79 while retaining the reviewed Coordinator empty-legacy backfill source and corrected PostgreSQL fixtures from 5a0c907. Preserve all main changes, the existing Native read corrections, and the unchanged Native measurement harness.",
+    "refUpdatedByThisTask": false,
+    "ciDispatchedByThisTask": false
+  },
+  "inputs": {
+    "applicationCandidate": {
+      "sha": "5a0c90774b8c48fc390ea05cf782bbc9cbe79a62",
+      "tree": "442e7d50bbec1f78b7508d062e6076627a3e47c7",
+      "parents": [
+        "a9ff5afc1cae3d18ad2827a3119c85ab46f7d3d4"
+      ]
+    },
+    "initialApplicationCandidate": {
+      "sha": "a9ff5afc1cae3d18ad2827a3119c85ab46f7d3d4",
+      "tree": "e4f12292616357f46a981cfa92588248f1ad452b",
+      "parents": [
+        "e0934eb89f972d44ef6cffec6e27c16b4ed203bf"
+      ]
+    },
+    "actualMain": {
+      "sha": "7848e79df9c5af67e526aeed1c828858db392066",
+      "tree": "87b4344eebdc24b12ffdafa9101d0c9f51ad6b70",
+      "parents": [
+        "d8e09ac218f5656763a5bc42a75e45fc385caede",
+        "a83b2a0fbd0b8f45f2e59ce7ceda2f1e06d21055"
+      ],
+      "message": "Merge pull request #1835 from alexj11324/root/issue1505-claude-ca-relinks-20261109\n\nfix(e2b): 用官方对照补齐 Claude/Codex 证书保全规则"
+    },
+    "publicationFix": {
+      "sha": "a83b2a0fbd0b8f45f2e59ce7ceda2f1e06d21055",
+      "tree": "99833a63d69f6b88c64b7c44b44df06d1a0506c5",
+      "parents": [
+        "cb2f771eeac0c8793e9f94b485dd87c7d5866b4c"
+      ]
+    },
+    "oldPreparedMerge": {
+      "sha": "b1ce3e10fe5c5ae95584e6bcbc6008462593ef39",
+      "tree": "d1360faedd0d0067530f1325f7955732a618279d",
+      "parents": [
+        "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+        "a83b2a0fbd0b8f45f2e59ce7ceda2f1e06d21055"
+      ]
+    },
+    "originalSource": {
+      "sha": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+      "tree": "0a0e2a40d82cbcb18963584e7d54f834a3af54fb"
+    }
+  },
+  "method": [
+    "Read each immutable commit's Git object, tree and ordered parents",
+    "Read nontruncated Git trees; recompute actual Git tree SHA1 including modes, UTF8 names and binary child SHA bytes",
+    "Recursively expand mismatched subtrees and compare every path/mode/type/SHA; equal subtree SHAs preserve every contained leaf without re-enumeration",
+    "Confirm original b1-e093 exact3 leaves equal exact a83 leaves; independently read and SHA256/GitblobSHA1 verify all3 target bodies",
+    "Create tree from exact a9ff base using only those3 leaves; verify computed union root equals readback tree",
+    "Create ordinary two-parent merge object, then independently read commit metadata and full structural differences",
+    "Corroborate exact3/exact5 path sets using independent GitHub compare endpoints",
+    "After real PostgreSQL exposed3fixture bugs, independently review only3fixture fixes and preserve all assertions/counter/timing;new candidate testc6 supersedes13fb",
+    "Read actual main7848 Git merge object;prove its d8 first parent is an ancestor of5a0 using compare metadata",
+    "Expand actual main versus d8 tree delta:all10 changed leaf values are already present exactly in reusable e7c tree",
+    "Compare actual main versus a83:20of21 differing paths already equal5a0;remaining coordinator action equalsd8 onmain andexistinge093 onownbranch, preserving previously reviewed own correction",
+    "Create final ordinary merge with ordered parents[5a0,actualmain7848] and verified reusablee7c tree;read back commit and exact3/exact5 compare results"
+  ],
+  "createTreeInput": {
+    "repository_full_name": "alexj11324/Mikka",
+    "base_tree_sha": "442e7d50bbec1f78b7508d062e6076627a3e47c7",
+    "tree_elements": [
+      {
+        "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f241e0ab27cc6443de15fb8bde794f376d5ef9ee"
+      },
+      {
+        "path": "scripts/e2b/publish-template-env.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "676e0cf7af622b19ad3a1f530d91b4e6b4cc3095"
+      },
+      {
+        "path": "scripts/e2b/publish-template-env.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "52fac123eb4f1e6ba8513b38148295f2c2648458"
+      }
+    ]
+  },
+  "treeUnionProof": {
+    "computedTree": "e7c7c6ad66acd729278393711c10eeed67c6d7ac",
+    "observedTree": "e7c7c6ad66acd729278393711c10eeed67c6d7ac",
+    "exactEntryMatch": true,
+    "allUnchangedRootEntries": 57
+  },
+  "exactDiffVersusApplicationCandidate": [
+    {
+      "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+      "old": {
+        "path": "2026-11-03-1430-official-e2b-templates-unchanged.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ed5767a9fe2a96d38c9423fa79fa05d8a1124e1d",
+        "size": 94478
+      },
+      "new": {
+        "path": "2026-11-03-1430-official-e2b-templates-unchanged.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f241e0ab27cc6443de15fb8bde794f376d5ef9ee",
+        "size": 95749
+      }
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.mjs",
+      "old": {
+        "path": "publish-template-env.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "56ca3993bf11e33ca02a28ccf0678a45ee509215",
+        "size": 17883
+      },
+      "new": {
+        "path": "publish-template-env.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "676e0cf7af622b19ad3a1f530d91b4e6b4cc3095",
+        "size": 17955
+      }
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.test.mjs",
+      "old": {
+        "path": "publish-template-env.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "86843115336fa4021df9ac33e387caab5cc04e64",
+        "size": 33829
+      },
+      "new": {
+        "path": "publish-template-env.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "52fac123eb4f1e6ba8513b38148295f2c2648458",
+        "size": 35635
+      }
+    }
+  ],
+  "exactDiffVersusOriginalE093": [
+    {
+      "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+      "old": {
+        "path": "2026-11-03-1430-official-e2b-templates-unchanged.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ed5767a9fe2a96d38c9423fa79fa05d8a1124e1d",
+        "size": 94478
+      },
+      "new": {
+        "path": "2026-11-03-1430-official-e2b-templates-unchanged.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f241e0ab27cc6443de15fb8bde794f376d5ef9ee",
+        "size": 95749
+      }
+    },
+    {
+      "path": "lib/coordinator/coordinator-bot.ts",
+      "old": {
+        "path": "coordinator-bot.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a2a6bf1fd1307babd350c9a168b003e38fa4b3cc",
+        "size": 22425
+      },
+      "new": {
+        "path": "coordinator-bot.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d73e30c36212029a8951a25a692c4e04a2a5b86d",
+        "size": 24861
+      }
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.mjs",
+      "old": {
+        "path": "publish-template-env.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "56ca3993bf11e33ca02a28ccf0678a45ee509215",
+        "size": 17883
+      },
+      "new": {
+        "path": "publish-template-env.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "676e0cf7af622b19ad3a1f530d91b4e6b4cc3095",
+        "size": 17955
+      }
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.test.mjs",
+      "old": {
+        "path": "publish-template-env.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "86843115336fa4021df9ac33e387caab5cc04e64",
+        "size": 33829
+      },
+      "new": {
+        "path": "publish-template-env.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "52fac123eb4f1e6ba8513b38148295f2c2648458",
+        "size": 35635
+      }
+    },
+    {
+      "path": "tests/coordinator-bot.db.test.ts",
+      "old": {
+        "path": "coordinator-bot.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "32a8321c981dd6a534f8859fa35f281e874466e6",
+        "size": 65832
+      },
+      "new": {
+        "path": "coordinator-bot.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c6c92ea2741174b5baadbd1535fc8b0c62b8275e",
+        "size": 86798
+      }
+    }
+  ],
+  "exactDiffVersusOldB1Merge": [
+    {
+      "path": "lib/coordinator/coordinator-bot.ts",
+      "old": {
+        "path": "coordinator-bot.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a2a6bf1fd1307babd350c9a168b003e38fa4b3cc",
+        "size": 22425
+      },
+      "new": {
+        "path": "coordinator-bot.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d73e30c36212029a8951a25a692c4e04a2a5b86d",
+        "size": 24861
+      }
+    },
+    {
+      "path": "tests/coordinator-bot.db.test.ts",
+      "old": {
+        "path": "coordinator-bot.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "32a8321c981dd6a534f8859fa35f281e874466e6",
+        "size": 65832
+      },
+      "new": {
+        "path": "coordinator-bot.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c6c92ea2741174b5baadbd1535fc8b0c62b8275e",
+        "size": 86798
+      }
+    }
+  ],
+  "threePublicationFiles": [
+    {
+      "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+      "gitBlob": "f241e0ab27cc6443de15fb8bde794f376d5ef9ee",
+      "mode": "100644",
+      "bytes": 95749,
+      "sha256": "f8f139bace1d139f0872beacce19ade048acc5ebc4e7965172d77043eed7d05f",
+      "inA83AndB1Identical": true
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.mjs",
+      "gitBlob": "676e0cf7af622b19ad3a1f530d91b4e6b4cc3095",
+      "mode": "100644",
+      "bytes": 17955,
+      "sha256": "15ed43dd07a4fe1a0ad81e04aa984bc468aa65f1b1d756cff293fd43dcd7b2ea",
+      "inA83AndB1Identical": true
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.test.mjs",
+      "gitBlob": "52fac123eb4f1e6ba8513b38148295f2c2648458",
+      "mode": "100644",
+      "bytes": 35635,
+      "sha256": "c87eedc8823434026cecca793b5bea924ce510d570dfbce23f73f89aabd898d8",
+      "inA83AndB1Identical": true
+    }
+  ],
+  "candidateFilesPreserved": [
+    {
+      "path": "lib/coordinator/coordinator-bot.ts",
+      "gitBlob": "d73e30c36212029a8951a25a692c4e04a2a5b86d",
+      "bytes": 24861,
+      "sha256": "8c0ebcda8279f5cff5f3596099835fe7c1a2a4c58c8a12c8c6c6c16e133c2f49",
+      "identicalTo5a0": true
+    },
+    {
+      "path": "tests/coordinator-bot.db.test.ts",
+      "gitBlob": "c6c92ea2741174b5baadbd1535fc8b0c62b8275e",
+      "bytes": 86798,
+      "sha256": "80e713858cc61e23094cff2c16281b643e06796b5ed0cf8a382922dcddfb4bcd",
+      "identicalTo5a0": true
+    }
+  ],
+  "independentSourceReview": {
+    "sourceProof": "8b59be3ce03b4c5c6fdea5258f53b9ef6109a90b",
+    "initialTestReview": "5559a0bf56187697f841bb16755808095ea38d78",
+    "correctedFixtureReview": "0d40d0165ce8711ad35e2e8a72235e58841fe065",
+    "nativeFixtureCorrelation": "5685554ea83a500b39b53818d382d987ebe84499"
+  },
+  "compareReadback": {
+    "versus5a0": {
+      "repository_full_name": "alexj11324/Mikka",
+      "base": "5a0c90774b8c48fc390ea05cf782bbc9cbe79a62",
+      "head": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+      "status": "ahead",
+      "ahead_by": 3,
+      "behind_by": 0,
+      "total_commits": 3,
+      "too_large": null,
+      "base_commit": {
+        "sha": "5a0c90774b8c48fc390ea05cf782bbc9cbe79a62",
+        "url": "https://api.github.com/repos/alexj11324/Mikka/commits/5a0c90774b8c48fc390ea05cf782bbc9cbe79a62",
+        "html_url": "https://github.com/alexj11324/Mikka/commit/5a0c90774b8c48fc390ea05cf782bbc9cbe79a62"
+      },
+      "merge_base_commit": {
+        "sha": "5a0c90774b8c48fc390ea05cf782bbc9cbe79a62",
+        "url": "https://api.github.com/repos/alexj11324/Mikka/commits/5a0c90774b8c48fc390ea05cf782bbc9cbe79a62",
+        "html_url": "https://github.com/alexj11324/Mikka/commit/5a0c90774b8c48fc390ea05cf782bbc9cbe79a62"
+      },
+      "files": [
+        {
+          "filename": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+          "status": "modified",
+          "additions": 18,
+          "deletions": 1,
+          "changes": 19,
+          "previous_filename": null
+        },
+        {
+          "filename": "scripts/e2b/publish-template-env.mjs",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 0,
+          "changes": 1,
+          "previous_filename": null
+        },
+        {
+          "filename": "scripts/e2b/publish-template-env.test.mjs",
+          "status": "modified",
+          "additions": 31,
+          "deletions": 1,
+          "changes": 32,
+          "previous_filename": null
+        }
+      ]
+    },
+    "versusE093": {
+      "repository_full_name": "alexj11324/Mikka",
+      "base": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+      "head": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+      "status": "ahead",
+      "ahead_by": 5,
+      "behind_by": 0,
+      "total_commits": 5,
+      "too_large": null,
+      "base_commit": {
+        "sha": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+        "url": "https://api.github.com/repos/alexj11324/Mikka/commits/e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+        "html_url": "https://github.com/alexj11324/Mikka/commit/e0934eb89f972d44ef6cffec6e27c16b4ed203bf"
+      },
+      "merge_base_commit": {
+        "sha": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+        "url": "https://api.github.com/repos/alexj11324/Mikka/commits/e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+        "html_url": "https://github.com/alexj11324/Mikka/commit/e0934eb89f972d44ef6cffec6e27c16b4ed203bf"
+      },
+      "files": [
+        {
+          "filename": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+          "status": "modified",
+          "additions": 18,
+          "deletions": 1,
+          "changes": 19,
+          "previous_filename": null
+        },
+        {
+          "filename": "lib/coordinator/coordinator-bot.ts",
+          "status": "modified",
+          "additions": 38,
+          "deletions": 3,
+          "changes": 41,
+          "previous_filename": null
+        },
+        {
+          "filename": "scripts/e2b/publish-template-env.mjs",
+          "status": "modified",
+          "additions": 1,
+          "deletions": 0,
+          "changes": 1,
+          "previous_filename": null
+        },
+        {
+          "filename": "scripts/e2b/publish-template-env.test.mjs",
+          "status": "modified",
+          "additions": 31,
+          "deletions": 1,
+          "changes": 32,
+          "previous_filename": null
+        },
+        {
+          "filename": "tests/coordinator-bot.db.test.ts",
+          "status": "modified",
+          "additions": 316,
+          "deletions": 0,
+          "changes": 316,
+          "previous_filename": null
+        }
+      ]
+    }
+  },
+  "verifiedTreeObjects": [
+    {
+      "sha": "d1360faedd0d0067530f1325f7955732a618279d",
+      "entries": 59
+    },
+    {
+      "sha": "e4f12292616357f46a981cfa92588248f1ad452b",
+      "entries": 59
+    },
+    {
+      "sha": "0a0e2a40d82cbcb18963584e7d54f834a3af54fb",
+      "entries": 59
+    },
+    {
+      "sha": "248e8979e196017502700b51e14b8deb1e89d2a9",
+      "entries": 46
+    },
+    {
+      "sha": "3e5b7226ce1dfa4d094ac3ded904cfbc0ad31743",
+      "entries": 713
+    },
+    {
+      "sha": "0ea26cfa21760c9e573d82f49c6d4e5b5ab84255",
+      "entries": 713
+    },
+    {
+      "sha": "2baf27bac92fa9a14bfec1df9250422935826fed",
+      "entries": 46
+    },
+    {
+      "sha": "3f099792311c316177a51334a930808eedf99b38",
+      "entries": 155
+    },
+    {
+      "sha": "c1a3ca6b4f66cdef15a2c0d127508a93fd8cf431",
+      "entries": 57
+    },
+    {
+      "sha": "f84334cfe1c35abc7fca48fadd9d7f459b860b2f",
+      "entries": 155
+    },
+    {
+      "sha": "563f073765dd5f751a96e445c605da09afd7bf2d",
+      "entries": 57
+    },
+    {
+      "sha": "ee05d704ab9b242c00145f31a3c4db72df75edd8",
+      "entries": 200
+    },
+    {
+      "sha": "efc8be656692c852373a64f23caa16625d16895e",
+      "entries": 202
+    },
+    {
+      "sha": "231cbc1c1399a0c0a31f492283a1ad4a29a2a925",
+      "entries": 202
+    },
+    {
+      "sha": "1c5e872a71a2fe8ca6f8e695a6305a614de72959",
+      "entries": 200
+    },
+    {
+      "sha": "46329e2264a040156696d0516ae9cba05894a252",
+      "entries": 177
+    },
+    {
+      "sha": "8ea6ff4f076cd98810eb44ec65667526c4e885f5",
+      "entries": 177
+    },
+    {
+      "sha": "0979834bf0521db7f56b93792cad4e54312226ec",
+      "entries": 53
+    },
+    {
+      "sha": "13084098b059b4f70205b8be0ff882fcb7fb2ef2",
+      "entries": 53
+    },
+    {
+      "sha": "99833a63d69f6b88c64b7c44b44df06d1a0506c5",
+      "entries": 59
+    },
+    {
+      "sha": "df5aae410b532572a41350db5ab51646a1c2dfff",
+      "entries": 46
+    },
+    {
+      "sha": "f407f965fc586c45229279ffe83fae0cb9bc5020",
+      "entries": 177
+    },
+    {
+      "sha": "b01fb25037b4ddada6092010d625a75e5070bf2d",
+      "entries": 56
+    },
+    {
+      "sha": "d3b9eaa8ba6a98bef9c332c04f937a92a13eb84a",
+      "entries": 53
+    },
+    {
+      "sha": "f0c40c06eb54d53747654fbed208b207e7bdf97d",
+      "entries": 59
+    },
+    {
+      "sha": "db151222120ed732ba0146071027170434d9fc66",
+      "entries": 4
+    },
+    {
+      "sha": "442e7d50bbec1f78b7508d062e6076627a3e47c7",
+      "entries": 59
+    },
+    {
+      "sha": "d4e50031d32db21fe912f48a087d442be2024e42",
+      "entries": 200
+    },
+    {
+      "sha": "e7c7c6ad66acd729278393711c10eeed67c6d7ac",
+      "entries": 59
+    },
+    {
+      "sha": "87b4344eebdc24b12ffdafa9101d0c9f51ad6b70",
+      "entries": 59
+    },
+    {
+      "sha": "0ba5a0b490eed420d5d2fd630b1fbb726a8eae47",
+      "entries": 11
+    },
+    {
+      "sha": "bb8b8f66b77a44583b571ad18191f62f20ca18eb",
+      "entries": 11
+    },
+    {
+      "sha": "26a78e133ce860a99f7abd5cfff26084657f9c4c",
+      "entries": 38
+    },
+    {
+      "sha": "58786b2b3e31cfd7416c90e865e677ebb7499741",
+      "entries": 38
+    },
+    {
+      "sha": "4559f7c0d17fd4ba9a7b5a80f152b0fb9e91598f",
+      "entries": 4
+    },
+    {
+      "sha": "6770f3edcee5143fb0325484160dc45c8e8d4dd6",
+      "entries": 4
+    },
+    {
+      "sha": "9df6629f623d843271089f073f7937c6a31fe729",
+      "entries": 23
+    },
+    {
+      "sha": "15c4a259433d7adda74830bdd59968b49aa4a667",
+      "entries": 24
+    },
+    {
+      "sha": "b6198cec4cee3f2879a3efc21d0b65d34266ef06",
+      "entries": 8
+    },
+    {
+      "sha": "53f4a2c2b64e694df4b3195cbef642b4beb3f92e",
+      "entries": 8
+    },
+    {
+      "sha": "bc941641cab6bc4dc65a6064609c27240009191f",
+      "entries": 3
+    },
+    {
+      "sha": "258b63a405520b3186164fab2c93dc17520251d6",
+      "entries": 3
+    },
+    {
+      "sha": "696a43bd209ea0fdfb5cb06898bcdc1ce8129ce3",
+      "entries": 4
+    },
+    {
+      "sha": "667d158dbbae18bfbffc7fb52015859d77c9d1ab",
+      "entries": 3
+    },
+    {
+      "sha": "302ecca8c7b8fe5e7f3c3d9d4f53c4d508a37f9f",
+      "entries": 5
+    },
+    {
+      "sha": "e0174ef71232b0f7128b17d4174e6a57417af157",
+      "entries": 4
+    },
+    {
+      "sha": "b87beaa7f392cd0391d204d69ff960bbc0c3ccb2",
+      "entries": 3
+    },
+    {
+      "sha": "bca75d497b6282d2a0a6f9219e6d8b3892fc4672",
+      "entries": 3
+    },
+    {
+      "sha": "172d97c5562c1fa9badf575e35e3c7a79f05b242",
+      "entries": 4
+    },
+    {
+      "sha": "b63049655d525092136205b568f13c703f00e050",
+      "entries": 4
+    },
+    {
+      "sha": "ed633ae2275e5765b86914338c8a692f452eaf85",
+      "entries": 60
+    },
+    {
+      "sha": "eb3030f3bbe09344c44c650a3d6dc677b29a9a61",
+      "entries": 60
+    },
+    {
+      "sha": "b1fc06bc11683162958963801045e837fc14dbff",
+      "entries": 46
+    },
+    {
+      "sha": "b9cd1d8f53dee05c4ad9bd5f27588eac5e484cb8",
+      "entries": 713
+    },
+    {
+      "sha": "2584fa16b118e7b364222701cc156e06740b5c98",
+      "entries": 713
+    },
+    {
+      "sha": "58cc0c46acd1bbd956a719ef004456ce3c5c3f37",
+      "entries": 2
+    },
+    {
+      "sha": "a026c82e5d8aff3e21ca05291e87b91e2dc37495",
+      "entries": 2
+    },
+    {
+      "sha": "ac965f60a0dab4e5aa4ca180bee2c9dd8ba24171",
+      "entries": 200
+    },
+    {
+      "sha": "e69c275b09d34efb0585dbc83b828e6b01591045",
+      "entries": 200
+    },
+    {
+      "sha": "51ad6e9cf47d72340486233c35c7110ad9addb4d",
+      "entries": 11
+    },
+    {
+      "sha": "b19894343c278a1ff310af4d4c929226b77fc83f",
+      "entries": 38
+    },
+    {
+      "sha": "df84aa5b4ca013fdc2465d400e8e096e36b28a8d",
+      "entries": 4
+    },
+    {
+      "sha": "6a088438df9050ac0e4df41ac41de57f2403ac99",
+      "entries": 59
+    },
+    {
+      "sha": "61295b6722d72bde3aeea08ca6cbedbf4df2d737",
+      "entries": 46
+    },
+    {
+      "sha": "f60e078fc30d1db40f823c0d7e4eb4b8a394b41a",
+      "entries": 57
+    },
+    {
+      "sha": "9406cae3e21bdf60d952d7ffe96d643c3fea5cd5",
+      "entries": 202
+    },
+    {
+      "sha": "bb96cc40e2948c921dd1846ae01804b342fd5224",
+      "entries": 18
+    },
+    {
+      "sha": "29eba5f5fc3f5110b0a9370cac5f333f6689f912",
+      "entries": 18
+    },
+    {
+      "sha": "02afdfd610589b335315b7e080deb53eff8dd2e7",
+      "entries": 6
+    },
+    {
+      "sha": "72b66d0a296279b5fae83193b9f0c1c1202cc9ae",
+      "entries": 10
+    },
+    {
+      "sha": "8f37dc98f3858899eeafd85eaa34e39ca77bc87a",
+      "entries": 177
+    },
+    {
+      "sha": "f4648d8c2f9ea7b5bd96897cf4a27122346ab389",
+      "entries": 53
+    },
+    {
+      "sha": "cd50db76c0f035b7b468d65f1e24938e5dbf5e68",
+      "entries": 18
+    }
+  ],
+  "workerInputReview": {
+    "proof": {
+      "gitBlob": "4814eeb45f841e4b117750c2ab8541969bbb61fc",
+      "bytes": 26484,
+      "sha256": "1333fc640049db6a1d92489dda8c6bc59b064cf6f774174b6bc30f203027dd6d"
+    },
+    "canonicalBuilder": {
+      "gitBlob": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+      "bytes": 55730,
+      "sha256": "0adb53fbdd6cbcd61f1d1804aee3e2df1538997c0724556062f2741c5ac1cdb1"
+    },
+    "actualMainVersusFinal": "All18 canonical raw selector entries identical, including complete daemon/protocol/config/patches subtrees and both root package and lock files.",
+    "a83VersusFinal": "17of18 raw selectors identical;different raw lock blobs have exactly identical130563-byte canonical lock projections (SHA25627d4f15ebccffc05a872408f7726eb779e45a0623626280069c25d2a4daaf89c), computed by pureV8 reproduction of fixed builder.",
+    "applicationAndTestPathsExcluded": true,
+    "publicationThreePathsExcluded": true,
+    "pythonWorkerHashExecuted": false,
+    "canonicalFullWorkerDigestComputed": false,
+    "effectiveRuntimeProved": false,
+    "appShaEqualsRuntimeShaGate": false
+  },
+  "preservedAcceptance": {
+    "historicalE093FullNative451VsWeb427": "RED+24 remains unchanged",
+    "firstPairNative205VsHosted207": "Original first pair preserved;does not override fullRED",
+    "postgresGate": "Root owns actual corrected-candidate rerun and old-source negative control;no result certified by this preparation",
+    "newNativeGate": "No new Native execution or hypothetical-count acceptance performed",
+    "productionGate": "No effective runtime publication or production acceptance granted",
+    "invalidateIf": "If actual PostgreSQL or later source review requires source/test changes, this prepared object must be superseded;do not activate it as-is"
+  },
+  "activity": {
+    "scope": "All preparatory objects remain unreferenced by this reviewer",
+    "gitCreateTreeCalls": 2,
+    "gitCreateCommitCalls": 3,
+    "refMutations": 0,
+    "ciDispatches": 0,
+    "workflowOriginalLogOrZipReads": 0,
+    "gitTapArtifactsRead": 1,
+    "computeResourcesCreated": 0,
+    "templatesBuiltOrPublished": 0,
+    "pythonWorkerHashExecuted": false,
+    "sourceOrHarnessEditsByReviewer": 0
+  },
+  "actualMainInclusion": {
+    "d8AncestorOfApplication": {
+      "base": "d8e09ac218f5656763a5bc42a75e45fc385caede",
+      "head": "5a0c90774b8c48fc390ea05cf782bbc9cbe79a62",
+      "status": "ahead",
+      "mergeBase": "d8e09ac218f5656763a5bc42a75e45fc385caede",
+      "aheadBy": 32,
+      "behindBy": 0
+    },
+    "mainDeltaFromD8": [
+      {
+        "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+        "old": {
+          "path": "2026-11-03-1430-official-e2b-templates-unchanged.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "f1e46c854eb04b42c10afb2e251bab8499f6bc4b",
+          "size": 88166
+        },
+        "new": {
+          "path": "2026-11-03-1430-official-e2b-templates-unchanged.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "f241e0ab27cc6443de15fb8bde794f376d5ef9ee",
+          "size": 95749
+        },
+        "finalEntry": {
+          "path": "2026-11-03-1430-official-e2b-templates-unchanged.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "f241e0ab27cc6443de15fb8bde794f376d5ef9ee",
+          "size": 95749
+        },
+        "exactActualMainValueIncluded": true
+      },
+      {
+        "path": "docs/operations/evidence/1505-official-path-control-20261109.json",
+        "old": null,
+        "new": {
+          "path": "1505-official-path-control-20261109.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "1dbd1907aca7c820be90ed6779fc2962717e5fec",
+          "size": 31180
+        },
+        "finalEntry": {
+          "path": "1505-official-path-control-20261109.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "1dbd1907aca7c820be90ed6779fc2962717e5fec",
+          "size": 31180
+        },
+        "exactActualMainValueIncluded": true
+      },
+      {
+        "path": "docs/operations/evidence/1505-official-path-control-20261109.md",
+        "old": null,
+        "new": {
+          "path": "1505-official-path-control-20261109.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "274f83e8c45c7f04acabf3bd0da15364a9cf879d",
+          "size": 6713
+        },
+        "finalEntry": {
+          "path": "1505-official-path-control-20261109.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "274f83e8c45c7f04acabf3bd0da15364a9cf879d",
+          "size": 6713
+        },
+        "exactActualMainValueIncluded": true
+      },
+      {
+        "path": "docs/operations/evidence/1782-official-claude-certificate-relinks-20261109.json",
+        "old": null,
+        "new": {
+          "path": "1782-official-claude-certificate-relinks-20261109.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "868d0b251f884079611cbd9810775fc7146a9426",
+          "size": 18164
+        },
+        "finalEntry": {
+          "path": "1782-official-claude-certificate-relinks-20261109.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "868d0b251f884079611cbd9810775fc7146a9426",
+          "size": 18164
+        },
+        "exactActualMainValueIncluded": true
+      },
+      {
+        "path": "docs/operations/evidence/1782-official-claude-certificate-relinks-20261109.md",
+        "old": null,
+        "new": {
+          "path": "1782-official-claude-certificate-relinks-20261109.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "95770c84ba87e690e45f2ea665b6e5b57d300616",
+          "size": 5450
+        },
+        "finalEntry": {
+          "path": "1782-official-claude-certificate-relinks-20261109.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "95770c84ba87e690e45f2ea665b6e5b57d300616",
+          "size": 5450
+        },
+        "exactActualMainValueIncluded": true
+      },
+      {
+        "path": "scripts/e2b/e2b-certificate-relinks.json",
+        "old": {
+          "path": "e2b-certificate-relinks.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "335540475a9d8aaae8f34915e087b5a862699b95",
+          "size": 106048
+        },
+        "new": {
+          "path": "e2b-certificate-relinks.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "ba210a72dff95a34120bcd6fb581fb54aa47b863",
+          "size": 106533
+        },
+        "finalEntry": {
+          "path": "e2b-certificate-relinks.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "ba210a72dff95a34120bcd6fb581fb54aa47b863",
+          "size": 106533
+        },
+        "exactActualMainValueIncluded": true
+      },
+      {
+        "path": "scripts/e2b/e2b-finalization-files.json",
+        "old": {
+          "path": "e2b-finalization-files.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "16d858b40d2948ac8c4ce18188843c02960bc40e",
+          "size": 4355
+        },
+        "new": {
+          "path": "e2b-finalization-files.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e6d19b5ed954d71c53a3ef32eed9c96a30943116",
+          "size": 6238
+        },
+        "finalEntry": {
+          "path": "e2b-finalization-files.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e6d19b5ed954d71c53a3ef32eed9c96a30943116",
+          "size": 6238
+        },
+        "exactActualMainValueIncluded": true
+      },
+      {
+        "path": "scripts/e2b/official-files.test.py",
+        "old": {
+          "path": "official-files.test.py",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "471c80878c7e2b88cd5e8a0864e6f6ef8354df21",
+          "size": 47201
+        },
+        "new": {
+          "path": "official-files.test.py",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "f980c7258243a77a123207ccfe03911d4483064d",
+          "size": 61113
+        },
+        "finalEntry": {
+          "path": "official-files.test.py",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "f980c7258243a77a123207ccfe03911d4483064d",
+          "size": 61113
+        },
+        "exactActualMainValueIncluded": true
+      },
+      {
+        "path": "scripts/e2b/publish-template-env.mjs",
+        "old": {
+          "path": "publish-template-env.mjs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "56ca3993bf11e33ca02a28ccf0678a45ee509215",
+          "size": 17883
+        },
+        "new": {
+          "path": "publish-template-env.mjs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "676e0cf7af622b19ad3a1f530d91b4e6b4cc3095",
+          "size": 17955
+        },
+        "finalEntry": {
+          "path": "publish-template-env.mjs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "676e0cf7af622b19ad3a1f530d91b4e6b4cc3095",
+          "size": 17955
+        },
+        "exactActualMainValueIncluded": true
+      },
+      {
+        "path": "scripts/e2b/publish-template-env.test.mjs",
+        "old": {
+          "path": "publish-template-env.test.mjs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "86843115336fa4021df9ac33e387caab5cc04e64",
+          "size": 33829
+        },
+        "new": {
+          "path": "publish-template-env.test.mjs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "52fac123eb4f1e6ba8513b38148295f2c2648458",
+          "size": 35635
+        },
+        "finalEntry": {
+          "path": "publish-template-env.test.mjs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "52fac123eb4f1e6ba8513b38148295f2c2648458",
+          "size": 35635
+        },
+        "exactActualMainValueIncluded": true
+      }
+    ],
+    "actualMainVersusA83": [
+      {
+        "path": "app/actions/coordinator.ts",
+        "old": {
+          "path": "coordinator.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "15a1af5331c957b575bae1491864e08dfa88f893",
+          "size": 24899
+        },
+        "new": {
+          "path": "coordinator.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "bd24ef4c103b670d92d381d396d5c3e1b6aba083",
+          "size": 25249
+        },
+        "inApplicationCandidate": {
+          "path": "coordinator.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "c1af7261fed4907c265041a549441b92f3ba6ab7",
+          "size": 25408
+        },
+        "candidateAlreadyHasActualMainValue": false
+      },
+      {
+        "path": "apps/mobile/env.d.ts",
+        "old": {
+          "path": "env.d.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "12818353e787dc9957efbd98254bcd9e1961b694",
+          "size": 89
+        },
+        "new": {
+          "path": "env.d.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "6348e9efe8f814ee98b2296df100101d2ef49b0c",
+          "size": 241
+        },
+        "inApplicationCandidate": {
+          "path": "env.d.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "6348e9efe8f814ee98b2296df100101d2ef49b0c",
+          "size": 241
+        },
+        "candidateAlreadyHasActualMainValue": true
+      },
+      {
+        "path": "apps/mobile/features/tasks/components/agent-name.tsx",
+        "old": null,
+        "new": {
+          "path": "agent-name.tsx",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "4de5addd93e811ebf26e1970069d82f9eac42652",
+          "size": 1611
+        },
+        "inApplicationCandidate": {
+          "path": "agent-name.tsx",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "4de5addd93e811ebf26e1970069d82f9eac42652",
+          "size": 1611
+        },
+        "candidateAlreadyHasActualMainValue": true
+      },
+      {
+        "path": "apps/mobile/features/tasks/model/agent-marks.ts",
+        "old": null,
+        "new": {
+          "path": "agent-marks.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "ef97a8e88bae8d42435e54c5a5ae2b353c565362",
+          "size": 504
+        },
+        "inApplicationCandidate": {
+          "path": "agent-marks.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "ef97a8e88bae8d42435e54c5a5ae2b353c565362",
+          "size": 504
+        },
+        "candidateAlreadyHasActualMainValue": true
+      },
+      {
+        "path": "apps/mobile/features/tasks/model/task-conversation.ts",
+        "old": {
+          "path": "task-conversation.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "1d68dd6497db7ee3ca7074ebf06061d05f16fdf1",
+          "size": 4866
+        },
+        "new": {
+          "path": "task-conversation.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "2547660a03611901985e229c4d31c3434d0ae7d6",
+          "size": 4136
+        },
+        "inApplicationCandidate": {
+          "path": "task-conversation.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "2547660a03611901985e229c4d31c3434d0ae7d6",
+          "size": 4136
+        },
+        "candidateAlreadyHasActualMainValue": true
+      },
+      {
+        "path": "apps/mobile/features/tasks/screens/task-conversation-screen.tsx",
+        "old": {
+          "path": "task-conversation-screen.tsx",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "cccc9fe967434782b357623ea6a11a26444f29d4",
+          "size": 14588
+        },
+        "new": {
+          "path": "task-conversation-screen.tsx",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "b6506cb28b8998ebdbc03def8ec737f2691167b1",
+          "size": 14643
+        },
+        "inApplicationCandidate": {
+          "path": "task-conversation-screen.tsx",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "b6506cb28b8998ebdbc03def8ec737f2691167b1",
+          "size": 14643
+        },
+        "candidateAlreadyHasActualMainValue": true
+      },
+      {
+        "path": "apps/mobile/features/tasks/screens/task-screen.tsx",
+        "old": {
+          "path": "task-screen.tsx",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "8e467252a4cf15e39457283f5b20e43f8154b787",
+          "size": 11659
+        },
+        "new": {
+          "path": "task-screen.tsx",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "be36830bcbbb155ae7cc8c8896278626c2456ef8",
+          "size": 11791
+        },
+        "inApplicationCandidate": {
+          "path": "task-screen.tsx",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "be36830bcbbb155ae7cc8c8896278626c2456ef8",
+          "size": 11791
+        },
+        "candidateAlreadyHasActualMainValue": true
+      },
+      {
+        "path": "apps/mobile/metro-svg-transformer.js",
+        "old": null,
+        "new": {
+          "path": "metro-svg-transformer.js",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "7e94379c9552333bbbc469dbbead083f4f31e854",
+          "size": 645
+        },
+        "inApplicationCandidate": {
+          "path": "metro-svg-transformer.js",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "7e94379c9552333bbbc469dbbead083f4f31e854",
+          "size": 645
+        },
+        "candidateAlreadyHasActualMainValue": true
+      },
+      {
+        "path": "apps/mobile/metro.config.js",
+        "old": {
+          "path": "metro.config.js",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "1c4016f1651e77cd3b1e20d46d2dc1b40acb8a30",
+          "size": 654
+        },
+        "new": {
+          "path": "metro.config.js",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "76e82b29e5abfb7e5a6cecb8b2ba705032d33389",
+          "size": 981
+        },
+        "inApplicationCandidate": {
+          "path": "metro.config.js",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "76e82b29e5abfb7e5a6cecb8b2ba705032d33389",
+          "size": 981
+        },
+        "candidateAlreadyHasActualMainValue": true
+      },
+      {
+        "path": "apps/mobile/package.json",
+        "old": {
+          "path": "package.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "d1395d63b840839c199e05fd70a15367941a1715",
+          "size": 1981
+        },
+        "new": {
+          "path": "package.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "cc0946570bbdc34fc1d5dbbf576d9b45c97bf649",
+          "size": 2025
+        },
+        "inApplicationCandidate": {
+          "path": "package.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "cc0946570bbdc34fc1d5dbbf576d9b45c97bf649",
+          "size": 2025
+        },
+        "candidateAlreadyHasActualMainValue": true
+      },
+      {
+        "path": "apps/mobile/scripts/tasks-screenshots.mjs",
+        "old": {
+          "path": "tasks-screenshots.mjs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "4222780b21fdf2927ee9592ef3648e408763c3f2",
+          "size": 13723
+        },
+        "new": {
+          "path": "tasks-screenshots.mjs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e947208c8771099198b27835d5ea9101fba43afd",
+          "size": 13822
+        },
+        "inApplicationCandidate": {
+          "path": "tasks-screenshots.mjs",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e947208c8771099198b27835d5ea9101fba43afd",
+          "size": 13822
+        },
+        "candidateAlreadyHasActualMainValue": true
+      },
+      {
+        "path": "apps/mobile/tests/messages.test.mts",
+        "old": {
+          "path": "messages.test.mts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "b2f9dd006c95ded34707994bfc0ae1b0d6d21891",
+          "size": 1638
+        },
+        "new": {
+          "path": "messages.test.mts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "170dfbef3b490e760d630a6c01334fac2337cc14",
+          "size": 1544
+        },
+        "inApplicationCandidate": {
+          "path": "messages.test.mts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "170dfbef3b490e760d630a6c01334fac2337cc14",
+          "size": 1544
+        },
+        "candidateAlreadyHasActualMainValue": true
+      },
+      {
+        "path": "apps/mobile/tests/task-groups.test.mts",
+        "old": {
+          "path": "task-groups.test.mts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "c74b2ca09f8c6b1c38f31e2ccce3e452edbdc803",
+          "size": 14419
+        },
+        "new": {
+          "path": "task-groups.test.mts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "0174671b3acc6e60857c90c628c92e8e3bb849db",
+          "size": 15121
+        },
+        "inApplicationCandidate": {
+          "path": "task-groups.test.mts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "0174671b3acc6e60857c90c628c92e8e3bb849db",
+          "size": 15121
+        },
+        "candidateAlreadyHasActualMainValue": true
+      },
+      {
+        "path": "docs/design/agent-switch-no-verb",
+        "old": null,
+        "new": {
+          "path": "agent-switch-no-verb",
+          "mode": "040000",
+          "type": "tree",
+          "sha": "98ea4209b4735768314315ae821cd6fce136859c"
+        },
+        "inApplicationCandidate": {
+          "path": "agent-switch-no-verb",
+          "mode": "040000",
+          "type": "tree",
+          "sha": "98ea4209b4735768314315ae821cd6fce136859c"
+        },
+        "candidateAlreadyHasActualMainValue": true
+      },
+      {
+        "path": "docs/design/components.md",
+        "old": {
+          "path": "components.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "da7339503dc2fef5f9876157760b58b8f5bbbbbe",
+          "size": 44943
+        },
+        "new": {
+          "path": "components.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "cca3d71b98f6b21f39a9fe34180f1bb8716584fd",
+          "size": 45410
+        },
+        "inApplicationCandidate": {
+          "path": "components.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "cca3d71b98f6b21f39a9fe34180f1bb8716584fd",
+          "size": 45410
+        },
+        "candidateAlreadyHasActualMainValue": true
+      },
+      {
+        "path": "lib/mobile-threads.ts",
+        "old": {
+          "path": "mobile-threads.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "7773fa456185fa529bd18efc67c9edd148f3612c",
+          "size": 12314
+        },
+        "new": {
+          "path": "mobile-threads.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "38ec55340fb276134e991c9ce5d61e1e547ce4c4",
+          "size": 12515
+        },
+        "inApplicationCandidate": {
+          "path": "mobile-threads.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "38ec55340fb276134e991c9ce5d61e1e547ce4c4",
+          "size": 12515
+        },
+        "candidateAlreadyHasActualMainValue": true
+      },
+      {
+        "path": "messages/en.json",
+        "old": {
+          "path": "en.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "7c56dc09490258db5f15a772b3ff176efaf3450c",
+          "size": 252821
+        },
+        "new": {
+          "path": "en.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "4d6b1a40230130fbb4d7e8afb1defbc4f5e2dd04",
+          "size": 252645
+        },
+        "inApplicationCandidate": {
+          "path": "en.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "4d6b1a40230130fbb4d7e8afb1defbc4f5e2dd04",
+          "size": 252645
+        },
+        "candidateAlreadyHasActualMainValue": true
+      },
+      {
+        "path": "messages/zh-CN.json",
+        "old": {
+          "path": "zh-CN.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e61e3a62e6879189fb4f469c870abbffbfe7bb73",
+          "size": 243494
+        },
+        "new": {
+          "path": "zh-CN.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "1fd3ad6714b3efdb93eede541bb156843b2d74d9",
+          "size": 243343
+        },
+        "inApplicationCandidate": {
+          "path": "zh-CN.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "1fd3ad6714b3efdb93eede541bb156843b2d74d9",
+          "size": 243343
+        },
+        "candidateAlreadyHasActualMainValue": true
+      },
+      {
+        "path": "pnpm-lock.yaml",
+        "old": {
+          "path": "pnpm-lock.yaml",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "4b67909739360248e279efa0c3bb7344379e04fe",
+          "size": 978470
+        },
+        "new": {
+          "path": "pnpm-lock.yaml",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "539cb8567feb617add97c41bd45be96bc50c5a8a",
+          "size": 978765
+        },
+        "inApplicationCandidate": {
+          "path": "pnpm-lock.yaml",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "539cb8567feb617add97c41bd45be96bc50c5a8a",
+          "size": 978765
+        },
+        "candidateAlreadyHasActualMainValue": true
+      },
+      {
+        "path": "tests/mobile-bot.db.test.ts",
+        "old": {
+          "path": "mobile-bot.db.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "db251ff0ce0d0d291db173f490ecc39c99eef1e6",
+          "size": 10124
+        },
+        "new": {
+          "path": "mobile-bot.db.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "f1ed6a60a48a9e22a806ff3fe0cc17f12dc391a3",
+          "size": 13186
+        },
+        "inApplicationCandidate": {
+          "path": "mobile-bot.db.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "f1ed6a60a48a9e22a806ff3fe0cc17f12dc391a3",
+          "size": 13186
+        },
+        "candidateAlreadyHasActualMainValue": true
+      },
+      {
+        "path": "tests/read-cache-detail-egress.db.test.ts",
+        "old": {
+          "path": "read-cache-detail-egress.db.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "279266686e7883303fa581753c6ce4ce564bfe16",
+          "size": 38421
+        },
+        "new": {
+          "path": "read-cache-detail-egress.db.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "d45be9f4f701a0e61865cce1c26e367b95e78bf6",
+          "size": 43801
+        },
+        "inApplicationCandidate": {
+          "path": "read-cache-detail-egress.db.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "d45be9f4f701a0e61865cce1c26e367b95e78bf6",
+          "size": 43801
+        },
+        "candidateAlreadyHasActualMainValue": true
+      }
+    ],
+    "existingOwnActionPreserved": {
+      "path": "app/actions/coordinator.ts",
+      "actualMain": {
+        "path": "coordinator.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bd24ef4c103b670d92d381d396d5c3e1b6aba083",
+        "size": 25249
+      },
+      "d8": {
+        "path": "coordinator.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bd24ef4c103b670d92d381d396d5c3e1b6aba083",
+        "size": 25249
+      },
+      "candidate": {
+        "path": "coordinator.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c1af7261fed4907c265041a549441b92f3ba6ab7",
+        "size": 25408
+      },
+      "e093": {
+        "path": "coordinator.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c1af7261fed4907c265041a549441b92f3ba6ab7",
+        "size": 25408
+      },
+      "mainDidNotModifyAfterD8": true,
+      "candidatePreservesExistingE093Correction": true
+    },
+    "allActualMainDeltaLeavesIncluded": true
+  },
+  "exactDiffVersusSuperseded429Tree": [
+    {
+      "path": "tests/coordinator-bot.db.test.ts",
+      "old": {
+        "path": "coordinator-bot.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "13fb6f222c061d115916557b796006c2073dc628",
+        "size": 86572
+      },
+      "new": {
+        "path": "coordinator-bot.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c6c92ea2741174b5baadbd1535fc8b0c62b8275e",
+        "size": 86798
+      }
+    }
+  ],
+  "fixtureCorrectionReview": {
+    "gitBlob": "0d40d0165ce8711ad35e2e8a72235e58841fe065",
+    "bytes": 6881,
+    "sha256": "f922b79e25b3e993296814eac985e2071ff55a5f6de9fd09e4de72437122d48e"
+  },
+  "preparedObjectHistory": [
+    {
+      "commit": "4298859e7f7de2912a35a720f760aa762e56b35a",
+      "tree": "f0c40c06eb54d53747654fbed208b207e7bdf97d",
+      "status": "SUPERSEDED_DO_NOT_ACTIVATE",
+      "reason": "Tests13fb contained3realPGfixtureerrors;replacedbyc6"
+    },
+    {
+      "commit": "771fe2c1d574c406cac8990f8b776c712a7a87db",
+      "tree": "e7c7c6ad66acd729278393711c10eeed67c6d7ac",
+      "status": "SUPERSEDED_DO_NOT_ACTIVATE",
+      "reason": "Preparedagainstpolicyfixparenta83;finalmustincludeactualmainmerge7848"
+    },
+    {
+      "commit": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+      "tree": "e7c7c6ad66acd729278393711c10eeed67c6d7ac",
+      "status": "FINAL_PREPARED_UNREFERENCED_BY_THIS_TASK",
+      "reason": "Correctedfixturesandactualmainorderedparentreadbackverified"
+    }
+  ],
+  "handoff": "Final candidate commit84ce is available for root's later gate-controlled feature integration;this reviewer does notCASanyref,mutatemain,useproductionaccountsorclaimruntimeacceptance."
+}

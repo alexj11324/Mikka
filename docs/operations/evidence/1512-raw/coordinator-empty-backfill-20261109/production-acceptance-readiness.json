@@ -1,0 +1,656 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512-production-entry-and-evidence-source-review",
+  "reviewedAtUtc": "2026-11-09 20:13:40 UTC",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "issueUrl": "https://github.com/alexj11324/Mikka/issues/1512",
+  "issueUpdatedAt": "2026-11-09T20:00:58Z",
+  "scope": {
+    "fixedDriverBlobs": true,
+    "dependencyRevision": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+    "dependencyTree": "0a0e2a40d82cbcb18963584e7d54f834a3af54fb",
+    "productionCasesPassed": 0,
+    "productionCasesRequired": 2,
+    "productionStatusSource": "root task, not a new production read",
+    "sourceFilesAndIssueMetadataOnly": true,
+    "testsExecuted": 0,
+    "posthogQueriesExecuted": 0,
+    "productionAccountAccess": 0,
+    "jobOriginalLogReads": 0,
+    "artifactZipReads": 0,
+    "resourceCreates": 0,
+    "referenceMutations": 0
+  },
+  "verdict": {
+    "uiCoordinatorEntry": "source-supported; one actual New task UI submit calls the normal Coordinator message action and wakes a real model turn; not a direct Factory-create shortcut",
+    "sameTraceProduction": "not_observed",
+    "codeBlockerIdentified": false,
+    "acceptanceBlocker": "Two actual production cases and the independent PostHog/Replay/Logs/manual phase proofs remain unobserved; runtime_verified and sets_consistent cannot satisfy them",
+    "minimalRecommendation": "Use the existing browser-submit path for each separate fixed-model case; after its natural terminal cleanup, retain complete raw metadata and manually attest the real Coordinator-to-first-agent parent chain. No additional UI message or source change is needed solely to establish the entry semantics."
+  },
+  "fixedInputs": [
+    {
+      "key": "driver",
+      "blob": "104075571c73b97a985458f206dba310e4894490",
+      "bytes": 69119,
+      "sha256": "5c91fd686dbaf6e0a511761cdee5d14ae5f8f5d8c63dc5b6284e8a7ea5e16aec",
+      "gitBlobMatches": true,
+      "path": "scripts/acceptance/run-observability.mjs",
+      "mode": "100644",
+      "modeSource": "fixed_candidate_tree"
+    },
+    {
+      "key": "browser",
+      "blob": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+      "bytes": 25516,
+      "sha256": "c78a8bbe27c6f7a06279ef6ec5332026bb92ba1283f1051ed035d94b98ca7606",
+      "gitBlobMatches": true,
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "mode": "100644",
+      "modeSource": "fixed_candidate_tree"
+    },
+    {
+      "key": "workflow",
+      "blob": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+      "bytes": 14046,
+      "sha256": "be84c5b140af42a7bc57b040597b6098410318b470f90cc69b630911c006e0c5",
+      "gitBlobMatches": true,
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "mode": "100644",
+      "modeSource": "fixed_candidate_tree"
+    },
+    {
+      "key": "tests",
+      "blob": "2e3c8c7aad0594df165caf8f798c72034b3d484f",
+      "bytes": 94496,
+      "sha256": "12da2b118255f1ea05399d915bd80dd87737e2f42b0a1ab6b7c19bf0d8bff775",
+      "gitBlobMatches": true,
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "mode": "100644",
+      "modeSource": "fixed_candidate_tree"
+    },
+    {
+      "key": "queries",
+      "blob": "07f2013526784be3bff29fd23073f5320a980cf3",
+      "bytes": 58165,
+      "sha256": "a52df37feff2ef4c304d4bc47960657dc5c5badbde0fba4416f0e9bf4fea4c68",
+      "gitBlobMatches": true,
+      "path": "docs/operations/evidence/1512-raw/source85-profile1f-b527-8ff/production-evidence-query-templates.json",
+      "mode": null,
+      "modeSource": "parent_provided_archive_path_not_refreshed_tree"
+    },
+    {
+      "key": "normalizer",
+      "blob": "8bd8d631b24cb134e1581e48eca86e8f16d3f557",
+      "bytes": 19913,
+      "sha256": "56ce0805aa5e75fece1efcd06ab9c0652ab90037c7e453e7e4fe6b7748b36ae5",
+      "gitBlobMatches": true,
+      "path": "docs/operations/evidence/1512-raw/source85-profile1f-b527-8ff/normalize-posthog-metadata.mjs",
+      "mode": null,
+      "modeSource": "parent_provided_archive_path_not_refreshed_tree"
+    },
+    {
+      "key": "reconciler",
+      "blob": "521ef985cd815b19b5220025adbd053879ccb41e",
+      "bytes": 28367,
+      "sha256": "52884757d76555bd8478ec7e3154a0b58746a6c9bbe56e7c15083494526626d2",
+      "gitBlobMatches": true,
+      "path": "docs/operations/evidence/1512-raw/source85-profile1f-b527-8ff/reconcile-production-evidence.mjs",
+      "mode": null,
+      "modeSource": "parent_provided_archive_path_not_refreshed_tree"
+    }
+  ],
+  "sourceIndex": [
+    {
+      "path": "components/coordinator/new-task-dialog.tsx",
+      "mode": "100644",
+      "blob": "c5691916503f0140aa2a919ec88d2a04ace055aa",
+      "bytes": 17396,
+      "sha256": "ab9ac90a2fc5cb3e7b4443ef28ef5fc8f227a29eaa1d3a96640c5df0f2b2052f"
+    },
+    {
+      "path": "components/coordinator/use-coordinator-submit.ts",
+      "mode": "100644",
+      "blob": "7883d5406b7e1d96e9a61fb58ce48d0462e74606",
+      "bytes": 3077,
+      "sha256": "e9c04bda8492d04a2c55c860e1b7de0e667989f2c87ddb8bd3cc4c6dca9acbf7"
+    },
+    {
+      "path": "app/actions/coordinator.ts",
+      "mode": "100644",
+      "blob": "c1af7261fed4907c265041a549441b92f3ba6ab7",
+      "bytes": 25408,
+      "sha256": "e417302a0cbf5810e061e60aa33ba8e13f29636be29bd822fa139eaa9def9d63"
+    },
+    {
+      "path": "lib/coordinator-submission.ts",
+      "mode": "100644",
+      "blob": "c44e932689bb3d6d7431fd836d0621584d5788b9",
+      "bytes": 6754,
+      "sha256": "fc1caade7684ff9f2fc725a88eaf4603d9bd7e84bd3b4b262392fc0338338859"
+    },
+    {
+      "path": "lib/background.ts",
+      "mode": "100644",
+      "blob": "c5cfbf01c9fd6f725f1c2a806ef9f59af57ee8e0",
+      "bytes": 2955,
+      "sha256": "73937274e1c23817cef7eaacf0da24feb4d724b25fd9d562f4cd683869050310"
+    },
+    {
+      "path": "lib/tracing/jobs.ts",
+      "mode": "100644",
+      "blob": "6cec226926da96c89acc06479a6b6c13902b0470",
+      "bytes": 2650,
+      "sha256": "6ea794db16ebd2020c31c338d4856c4909b4009a618b97a2d4eb5092a30bb8f1"
+    },
+    {
+      "path": "lib/coordinator/wake.ts",
+      "mode": "100644",
+      "blob": "7c7f86098b104c57f434d08fdd384ce748db7fc9",
+      "bytes": 8328,
+      "sha256": "7630a102ddb5cfed7859d50e799fd8db0d2bd4e697bc21a78a6fe1b6abf8704f"
+    },
+    {
+      "path": "workflows/coordinator/workflow.ts",
+      "mode": "100644",
+      "blob": "cf1205e23d288ab8311f56b8452b958f2bedbc4d",
+      "bytes": 21057,
+      "sha256": "a5b98ba69f93f7732efb3be04f2dfe67f2660156e6a372970cfbd87519847092"
+    },
+    {
+      "path": "workflows/coordinator/steps.ts",
+      "mode": "100644",
+      "blob": "d500795e9a62631b6c7619c4ffd1df67f137ee54",
+      "bytes": 93440,
+      "sha256": "5f577830a5aee9f0acee251b3a406161c8bd4d6a38e9ac7e6aadc5224ba0048d"
+    },
+    {
+      "path": "workflows/coordinator/tools.ts",
+      "mode": "100644",
+      "blob": "d789c6de31fe8615374f9be7b0fef7f14393f8db",
+      "bytes": 35845,
+      "sha256": "3042e425e23c5fedebd7771bbf4833888127d6318c04de2b3d3cd8f83b8d605b"
+    },
+    {
+      "path": "lib/tracing/node.ts",
+      "mode": "100644",
+      "blob": "00775a5928228262a66b12b845ee0dc18f6c6047",
+      "bytes": 7287,
+      "sha256": "e1ccb4a2aaba54d8e3be4d27d9ff18b31dd9fc683f72117f6dd0ea730099f4d0"
+    },
+    {
+      "path": "lib/tracing/context.ts",
+      "mode": "100644",
+      "blob": "fe005d26c2ea903250683d9351334b95ef328383",
+      "bytes": 4360,
+      "sha256": "c0c6ced12ec5f1f2f406221b1dd94b9bf2af72c130bc706e615beab2f774b168"
+    },
+    {
+      "path": "lib/factory/queue-cloud.ts",
+      "mode": "100644",
+      "blob": "b37420f33f4dac6f6e583bdf4d5d5a4b8aa45818",
+      "bytes": 2395,
+      "sha256": "a583a048bb26e27220d7ba04588cbc4840f0895b6cb5ecace7ac57fbe23aa110"
+    },
+    {
+      "path": "lib/computer/queue-run.ts",
+      "mode": "100644",
+      "blob": "3b82afaeccaee589fb3db9826acfff87e9944fde",
+      "bytes": 13566,
+      "sha256": "df672c21a953d39e0ad562862faa9abb0e0fb1d1200611f91e669f7221c30a11"
+    },
+    {
+      "path": "lib/cloud-computer/thread-machines.ts",
+      "mode": "100644",
+      "blob": "9d2cb49a991f7ab0bf89718aabc08fe78b78b66e",
+      "bytes": 105207,
+      "sha256": "7ea633fcbb55fae1e4006b57552074bef791d02bee4148691b695cf4c671c79b"
+    },
+    {
+      "path": "instrumentation-client.ts",
+      "mode": "100644",
+      "blob": "9109982d1c3245179b85a42d6969003aec2f5047",
+      "bytes": 2442,
+      "sha256": "4a3754d2791fe87607ef12414673d411172415cbf77ac3323c88e076fb6a57dc"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.md",
+      "mode": "100644",
+      "blob": "4ca2cf35c1f499b338469556836ae0505649e82a",
+      "bytes": 19730,
+      "sha256": "b7440f5402350d0c3513576dbddc60978bb7b37d701632e1247b73725d93aa1a"
+    },
+    {
+      "path": "docs/operations/tracing.md",
+      "mode": "100644",
+      "blob": "7ec15f7515853877c5940b9e08106df50b0d5c55",
+      "bytes": 67256,
+      "sha256": "f61e248f7f5c8e287440bc4d3645f6c2d53887f105c1bc450e0ff37a79668975"
+    },
+    {
+      "path": "AGENTS.md",
+      "mode": "100644",
+      "blob": "fa963e4d0a342002661c58772d370484e8af740a",
+      "bytes": 22984,
+      "sha256": "7e89cb779a7da12e7d76da89c14d2d42c8ea9513da497cc6de22ff917657f98a"
+    }
+  ],
+  "entryChain": [
+    {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "lines": [
+        271,
+        329
+      ],
+      "fact": "Fresh Chromium context signs in through the real email form, validates the account and exact selected personal workspace; no credential/cookie/session injection."
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "lines": [
+        331,
+        360
+      ],
+      "fact": "Actual root-page Search everything -> New task; Coordinator, Mikka Cloud and the unique temporary Profile are selected; fixture text is typed into Task description."
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "lines": [
+        374,
+        399
+      ],
+      "fact": "Requires actual PostHog SDK session/recording/sanitized-snapshot readiness, then exactly one Create task click; dialog disappearance is only UI submission evidence, not completed model work."
+    },
+    {
+      "path": "components/coordinator/new-task-dialog.tsx",
+      "lines": [
+        143,
+        170
+      ],
+      "fact": "submit composes the ordinary translated task/cloud message and calls submitMessage; it does not invoke a Factory create endpoint."
+    },
+    {
+      "path": "components/coordinator/use-coordinator-submit.ts",
+      "lines": [
+        38,
+        45
+      ],
+      "fact": "The ordinary immutable submitter invokes sendCoordinatorMessage with the actual browser-generated submission ID, bot, destination and Profile."
+    },
+    {
+      "path": "app/actions/coordinator.ts",
+      "lines": [
+        245,
+        304
+      ],
+      "fact": "Authenticated action resolves the owned bot, requires Coordinator availability for a task submission, records a personal submission, and schedules after:coordinator-wake."
+    },
+    {
+      "path": "lib/coordinator-submission.ts",
+      "lines": [
+        47,
+        71
+      ],
+      "fact": "A real user_message event is inserted with fixed bot, task destination and Profile; dedupe preserves the first message. This is not a synthetic driver-only message."
+    },
+    {
+      "path": "lib/coordinator/wake.ts",
+      "lines": [
+        61,
+        103
+      ],
+      "fact": "Normal wake claims the inbox and starts coordinatorTurn(userId, botId, 1)."
+    },
+    {
+      "path": "workflows/coordinator/workflow.ts",
+      "lines": [
+        93,
+        167
+      ],
+      "fact": "A held nonempty inbox creates a Coordinator stream and executes runHostedWorkflowTurn or nativeCoordinatorTurn, with the real tool catalogue. No test shortcut is called by the actor."
+    },
+    {
+      "path": "workflows/coordinator/tools.ts",
+      "lines": [
+        185,
+        188
+      ],
+      "fact": "The requested no-repository file uses the normal dispatch_bot_computer tool; repository dispatch_run is a different path and must not be required as a literal span name for this fixture."
+    },
+    {
+      "path": "workflows/coordinator/steps.ts",
+      "lines": [
+        827,
+        937
+      ],
+      "fact": "dispatchComputerThread selects the authorized cloud Profile/subscription; dispatchComputerTask queues a Factory cloud run and calls ensureThreadMachine, then starts the thread lifecycle."
+    }
+  ],
+  "traceSourceSupport": [
+    {
+      "path": "lib/background.ts",
+      "lines": [
+        43,
+        46
+      ],
+      "fact": "Captures context.active before deferred work and restores it when running the after job."
+    },
+    {
+      "path": "lib/tracing/jobs.ts",
+      "lines": [
+        31,
+        53
+      ],
+      "fact": "After job creates a child of a valid scheduling span; only absent/invalid context creates a root."
+    },
+    {
+      "path": "lib/tracing/node.ts",
+      "lines": [
+        109,
+        122
+      ],
+      "fact": "Enabled tracing sets WORKFLOW_TRACE_MODE=continuous and registers W3C plus bounded RunContext propagators."
+    },
+    {
+      "path": "lib/tracing/context.ts",
+      "lines": [
+        23,
+        48
+      ],
+      "fact": "Captures the actual current span and propagates only validated trace context/lookup metadata."
+    },
+    {
+      "path": "lib/computer/queue-run.ts",
+      "lines": [
+        112,
+        113
+      ],
+      "fact": "The actual queued agent definition carries captured context, runId, threadId and taskId=input.issueId."
+    },
+    {
+      "path": "lib/cloud-computer/thread-machines.ts",
+      "lines": [
+        637,
+        637
+      ],
+      "fact": "Provision is wrapped in cloud.thread.provision."
+    },
+    {
+      "path": "lib/cloud-computer/thread-machines.ts",
+      "lines": [
+        1057,
+        1063
+      ],
+      "fact": "The exact bootstrap JSON includes captureTraceContext({runId}) and daemonTraceSettings before its checksum is computed."
+    },
+    {
+      "path": "lib/cloud-computer/thread-machines.ts",
+      "lines": [
+        1135,
+        1135
+      ],
+      "fact": "Provision wrapper receives the persisted run.agentDefinition.traceContext."
+    },
+    {
+      "path": "instrumentation-client.ts",
+      "lines": [
+        32,
+        57
+      ],
+      "fact": "posthog-js supplies permitted host identity/session tracing headers and masked Replay readiness. This source does not claim a browser W3C parent span or click-to-response duration was exported."
+    }
+  ],
+  "runtimeResultBoundary": {
+    "driverAnchors": [
+      [
+        626,
+        690
+      ],
+      [
+        875,
+        930
+      ],
+      [
+        939,
+        977
+      ]
+    ],
+    "actualChecks": [
+      "one exact fresh persisted Coordinator person message and position in browser mode",
+      "at least one real workflow-run ID collected from the Coordinator stream",
+      "exact owned run/issue/Profile/model/harness/credential route and execution identity",
+      "current Factory candidate/current-epoch execute plus independent review (legacy verify only when frozen flowVersion requires it)",
+      "exact downloaded Artifact bytes and ordinary owner deliverable acceptance receipt",
+      "own run/machine/Profile/model/preparation/session cleanup"
+    ],
+    "absentChecks": [
+      "no PostHog backend query in this driver",
+      "no equality check of actual Coordinator/server/daemon trace IDs",
+      "no requirement for named Coordinator/dispatch/cloud/bootstrap/registration/first-generation spans",
+      "no independent read of AI-event emission or backend Replay playback"
+    ],
+    "flags": {
+      "browserReplayVerified": false,
+      "posthogIngestionVerified": false
+    },
+    "testBoundary": {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "lines": [
+        620,
+        669
+      ],
+      "meaning": "The source test injects real-shaped message data into its fixture and proves the driver does not submit the API in browser mode; it is not an executed Chromium/Coordinator/production trace in this review."
+    }
+  },
+  "identityMapping": {
+    "reportFactoryTaskId": {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "line": 688,
+      "field": "report.cases[].taskId",
+      "meaning": "Factory task UUID"
+    },
+    "reportIssueId": {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "line": 688,
+      "field": "report.cases[].issueId",
+      "meaning": "Issue UUID"
+    },
+    "traceCarrierTaskId": {
+      "path": "lib/computer/queue-run.ts",
+      "line": 112,
+      "field": "mikka.task_id",
+      "meaning": "input.issueId on this queued cloud path"
+    },
+    "recommendation": "Use the actual run/thread IDs for initial lookup; set task_id only from its actual telemetry meaning (this queue uses issueId), not blindly from report.taskId. Keep both issue and Factory task IDs in the case evidence."
+  },
+  "cases": [
+    {
+      "case": "claude",
+      "model": "claude-haiku-5-5",
+      "harness": "claude_code",
+      "nativeRoute": "claude_code_cli",
+      "status": "not_run_in_production",
+      "submission": "one real browser New task click"
+    },
+    {
+      "case": "codex",
+      "model": "gpt-6-luna",
+      "harness": "codex",
+      "nativeRoute": "codex_cli",
+      "status": "not_run_in_production",
+      "submission": "one real browser New task click"
+    }
+  ],
+  "authorityAndBudget": {
+    "account": "Issue #1512 explicitly requires ACME_DEMO_EMAIL / ACME_DEMO_PASSWORD from existing prod:/; never include their values in evidence.",
+    "workspace": "Unique personal workspace and owner-only subscription/runtime are current driver guards, not an additional restriction stated by the issue. Do not silently substitute ordinary shared SMOKE acceptance or relax guards before a concrete preflight failure.",
+    "models": "AGENTS requires the two exact official subscription paths independently. No API-key/DeepSeek leg or provider/model switch; built-in Decision openai/gpt-6-luna-decisions is separate permitted system work and must be included in telemetry evidence if observed.",
+    "ordering": "Preflight first. Each browser execute is a separate single-model invocation (browser-submit with model-case=all is rejected). Let cleanup/restoration finish before the next case. A path-local provider block does not substitute for the other path; uncertain submission/cleanup is not a reason to resubmit.",
+    "workflow": "main-only; expected-deployment-sha exactly equals GITHUB_SHA; job budget25min; per-case default480000ms, allowed60000..600000ms. Current account/source/runtime gates remain Root's release responsibility.",
+    "spending": "At most one driver submission per case/revision, v2 native execute+review or legacy execute+review+verify; observed excess cancels, not an atomic provider/dollar cap."
+  },
+  "cleanupRequired": {
+    "driverLines": [
+      693,
+      806
+    ],
+    "steps": [
+      "reconcile late/uncertain browser click through existing reads",
+      "stop shared Coordinator only if fresh human messages remain exclusively this fixture",
+      "cancel only its unsettled Factory task; preserve an accepted deliverable",
+      "stop exact own active runs and wait for owned terminal state",
+      "end every exact run machine through the normal API; HTTP200 exact run/state or HTTP404 plus fresh owned terminal run and explicit null machine",
+      "archive temporary Profile only after owned work is quiet",
+      "restore original explicit composer value conditionally, or use acknowledged temporary binding/xmin restoration for originally absent preference; no guessed delete after lost first receipt",
+      "restore prepared Profile/fallback settings without overriding concurrent changes",
+      "sign out driver session and browser session; verify anonymous browser state; close page/context/browser"
+    ],
+    "journal": "Preserve report.json, recovery.json and browser-actor.receipt.json as original UTF8 bytes with source/run/attempt/hash binding. Missing journal acknowledgement or any cleanup gap remains blocked.",
+    "browserCleanupLines": [
+      180,
+      229
+    ]
+  },
+  "queryPlan": {
+    "projectId": 670821,
+    "status": "prepared_not_production_validated",
+    "acceptedIds": null,
+    "templateBlob": "07f2013526784be3bff29fd23073f5320a980cf3",
+    "allQueries": [
+      "lookup_trace_by_ids",
+      "lookup_trace_count",
+      "span_timeline",
+      "trace_integrity",
+      "generation_receipts",
+      "tail_error_retention",
+      "safe_native_logs",
+      "source_correlation",
+      "replay_correlation",
+      "capture_summary",
+      "apm_generation_spans",
+      "ai_capture_summary",
+      "apm_session_links",
+      "native_generation_collection"
+    ],
+    "paginated": [
+      "lookup_trace_by_ids",
+      "span_timeline",
+      "generation_receipts",
+      "safe_native_logs",
+      "apm_generation_spans",
+      "native_generation_collection"
+    ],
+    "execution": "Use actual nonempty case IDs and fixed UTC [start,end), ordinarily <=1hour. Retain the exact inner HogQL request with truncate:false and every untouched MCP response. Six detail/lookup queries use pages500; an exactly500-row last observed page is not completion: fetch the next actual page, including empty final page. Collect two complete stable snapshots with independent counts; no changing scope or fabricated zeros.",
+    "rawEvidence": "Retain full exact request/response bytes, parameter binding, query/template/source hashes, raw UUIDs/trace/span/session IDs, all page offsets and independent totals. Normalizer only accepts the reviewed inner SQL response shape; it is not a CLI-envelope parser.",
+    "clusters": {
+      "Logs": "APM spans and native Logs",
+      "Default": "AI events and Replay"
+    },
+    "normalizerBoundary": {
+      "blob": "8bd8d631b24cb134e1581e48eca86e8f16d3f557",
+      "lines": [
+        200,
+        245
+      ],
+      "rowsetTruncated": null,
+      "meaning": "truncate:false concerns cell text; the MCP response does not certify rowset transport completeness. Do not rewrite null to false."
+    },
+    "reconcilerBoundary": {
+      "blob": "521ef985cd815b19b5220025adbd053879ccb41e",
+      "lines": [
+        [
+          14,
+          30
+        ],
+        [
+          59,
+          79
+        ],
+        [
+          150,
+          180
+        ],
+        [
+          220,
+          275
+        ]
+      ],
+      "overallAcceptance": null,
+      "statusMeaning": "sets_consistent/database enumeration is not final acceptance",
+      "notEvaluated": [
+        "tail_error_retention",
+        "source_correlation",
+        "replay_correlation",
+        "apm_session_links"
+      ],
+      "noRequiredPhaseGate": true,
+      "externalMissingParents": "A limitation requiring the actual execution/source proof, not permission to accept missing internal ancestors.",
+      "upstreamCompleteness": "not_proven",
+      "logsPhysicalMultiplicity": "not_proven"
+    },
+    "manualRequired": [
+      "one selected real browser/Coordinator server entry must connect by actual trace/parent IDs through its workflow turn, real dispatch path, cloud/daemon startup and first agent generation",
+      "read every discovered trace, not just the first; identify unrelated control/approval traces separately and do not hide broken run ancestry",
+      "AI/APM span-ID sets must match both directions with model, operation, parentage and available usage; include Coordinator/bot/Decision and every observed native generation",
+      "retain unknown native flush and unavailable Claude independent upstream counts; database enumeration does not prove invisible upstream requests",
+      "inspect tail retention, source correlation, session links and Replay independently; source service.version is not the canonical worker fingerprint",
+      "verify actual token/cache/latency/TTFT/cost fields; distinguish captured amount from catalogue/custom API-equivalent estimate, never call it the subscription's actual bill"
+    ]
+  },
+  "remainingEvidence": [
+    {
+      "requirement": "Coordinator message -> first agent model including cloud/daemon",
+      "existing": "Source chain and driver guard only",
+      "pending": "Actual case original reports plus full matching PostHog parent tree and timing; native APM URL and a native rendered screenshot/export showing the real run; no fabricated client span."
+    },
+    {
+      "requirement": "Every actual model generation",
+      "existing": "Generation instrumentation/query/helper sources; no current production case",
+      "pending": "Actual AI events/APM per-span mapping for both models and all Coordinator/Decision/native buckets, numeric usage/cache/timing and cost provenance, real error/incomplete counters."
+    },
+    {
+      "requirement": "Trace -> Logs",
+      "existing": "safe_native_logs and capture_summary definitions",
+      "pending": "Actual trace/span-linked workflow and daemon closed native Logs, all unique log UUIDs, native Logs link; preserve cause name/code and no free message content."
+    },
+    {
+      "requirement": "Trace -> Replay",
+      "existing": "Browser requires client session/recording/sanitized snapshot; uploadAcknowledged remains null",
+      "pending": "Same real session in APM and event window; retained recording metadata/actual segment receipt; actual visual playback from that session. One snapshot-source read has playback_verified=false and does not complete this item."
+    },
+    {
+      "requirement": "Screenshot and timeline entry",
+      "existing": "Notebook C9vQAc1L and native saved insight/dashboard export path",
+      "pending": "Fill actual case IDs and retained UTC window; run current notebook tables/readback; create or use real numeric saved object for native PNG with exact query/source identity. A bounded20-row image alone is not complete raw timeline evidence; do not mislabel a reconstructed plot as APM/Replay UI."
+    },
+    {
+      "requirement": "Controlled failure retained100% with safe cause",
+      "existing": "Previously completed isolated failure/retention evidence; fixed docs record600/600 critical and20/20 controlled failures",
+      "pending": "Cite existing immutable source-bound receipt and state applicability at final source; do not call it undone or impose an unnecessary repeat. Any newly authorized isolated probe contributes its own actual receipt and scope."
+    },
+    {
+      "requirement": "Overhead within a few ms / cost estimate",
+      "existing": "Previously completed HTTP/PG, AI-wrapper, native-projection and attribution benchmarks with stated exclusions",
+      "pending": "Carry exact historical source/hash and measurement scope into final PR, review final increment applicability and any newly planned measurement separately; no production latency/billing claim from the local fixture."
+    },
+    {
+      "requirement": "Signals scouts enabled",
+      "existing": "Saved APM01a1b247-0a2c-7611-9061-0f7e791cfd2e and AI01a1b247-09d7-7388-be42-a8d96310c44b prior configuration",
+      "pending": "One current readback of enabled/active/emit/schedule/precheck and Inbox destination; no-data skip is not generation acceptance; no need to launch a new scout as an invented gate."
+    },
+    {
+      "requirement": "Issue comment6697400007 source alert and Desktop counts",
+      "existing": "Separate source warm-up/user-action attribution work and real Native evidence are preserved by Root",
+      "pending": "Use final actual source-bound Native/Web full-login and FIRST budgets and current alert readback in the final issue map; do not transfer an earlier passing source or treat CI-green as budget proof."
+    }
+  ],
+  "closureRule": "Only Root's final source-bound assessment of both actual model cases, same-trace UI entry chain, all required telemetry/Replay/Logs and actual cleanup plus applicable existing failure/overhead/scout/timeline evidence can close1512. This source review makes no PASS claim.",
+  "limitations": [
+    "No production/model/provider/database request was made.",
+    "No PostHog configuration/queries/scouts/recordings were accessed in this review.",
+    "No product tests or services were executed.",
+    "Only Git issue/source/evidence bytes and metadata were read; no other owner's job logs or ZIPs.",
+    "Future source changes invalidate affected anchors unless the fixed blobs remain identical.",
+    "Previously completed failure/overhead and current release/runtime status are not newly re-proven here."
+  ]
+}

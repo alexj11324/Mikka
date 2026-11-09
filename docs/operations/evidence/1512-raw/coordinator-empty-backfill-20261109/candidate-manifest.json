@@ -1,0 +1,134 @@
+{
+  "schema": "mikka.issue1512.coordinator-empty-backfill.candidate.v1",
+  "repository": "alexj11324/Mikka",
+  "baseHead": "e0934eb89f972d44ef6cffec6e27c16b4ed203bf",
+  "baseTree": "0a0e2a40d82cbcb18963584e7d54f834a3af54fb",
+  "actualCheckoutForOriginalMeasurement": "114d370f807c465c0f6fe1be47e941aa19adf62a",
+  "authorization": "Exactly lib/coordinator/coordinator-bot.ts and tests/coordinator-bot.db.test.ts, immutable candidate blobs only; no ref mutation.",
+  "files": [
+    {
+      "path": "lib/coordinator/coordinator-bot.ts",
+      "gitBlob": "d73e30c36212029a8951a25a692c4e04a2a5b86d",
+      "bytes": 24861,
+      "sha256": "8c0ebcda8279f5cff5f3596099835fe7c1a2a4c58c8a12c8c6c6c16e133c2f49",
+      "mode": "100644",
+      "oldGitBlob": "a2a6bf1fd1307babd350c9a168b003e38fa4b3cc",
+      "oldBytes": 22425,
+      "oldSha256": "691007c37fea38fbc794c83e6a75e28ac40491ff7e2f57ddf5fc92947b9a7257"
+    },
+    {
+      "path": "tests/coordinator-bot.db.test.ts",
+      "gitBlob": "13fb6f222c061d115916557b796006c2073dc628",
+      "bytes": 86572,
+      "sha256": "e992035655fdfafb5a0a4dc2cb948b836b265a9348d760d08164cd6c6bbeb340",
+      "mode": "100644",
+      "oldGitBlob": "32a8321c981dd6a534f8859fa35f281e874466e6",
+      "oldBytes": 65832,
+      "oldSha256": "d9b998eb6babcaa96ad493d3335a333d0f041cc1c7350d295e5a9fb92fb228b8"
+    }
+  ],
+  "diff": {
+    "gitBlob": "65fa9a0f56f33afe04d7089942e09e0ae28ec33c",
+    "bytes": 25835,
+    "sha256": "399d375f00e687c8a7263ae66919fef4b92024d3e51017cda82d11a2bf3d7428"
+  },
+  "diffStat": [
+    {
+      "path": "lib/coordinator/coordinator-bot.ts",
+      "added": 38,
+      "removed": 3,
+      "hunks": 2
+    },
+    {
+      "path": "tests/coordinator-bot.db.test.ts",
+      "added": 313,
+      "removed": 0,
+      "hunks": 1
+    }
+  ],
+  "invariants": {
+    "migrationAndFollowingSourceByteForByteEqual": true,
+    "originalTestSourceByteForBytePreserved": true,
+    "onlyAuthorizedSourceFiles": true,
+    "noTTLChanges": true,
+    "noNewSqlRoundTrip": true,
+    "noBackgroundTask": true,
+    "noAuthorizationCacheExpansion": true,
+    "noHarnessChanges": true
+  },
+  "change": {
+    "explicitWorkspaceMeans": "Any truthy workspaceId, including selected Personal; null-workspace direct-bot branch is unchanged.",
+    "emptyGate": "The original active-owned-Personal SELECT now projects existing coordinator and conservative 11-source EXISTS. Only found.id && found.botId && legacyWork === false skips original ensure + migration.",
+    "sourceFamilies": [
+      "coordinator_messages",
+      "coordinator_sessions",
+      "agent_runs",
+      "coordinator_events",
+      "factory_tasks",
+      "Personal bot_model_choices",
+      "chat_preferences",
+      "all owner null-bot user_schedules",
+      "suggestions",
+      "pending_actions",
+      "old agent_kit_heads only if current Personal head absent"
+    ],
+    "fallback": "Any missing/indeterminate row or bot, or nonfalse legacy observation, follows existing ensure and full backfill. A failed Personal lookup reuses the missing result and calls extracted create tail, without duplicating the lookup.",
+    "headRule": "Old head remains history. Old+current is already an INSERT ON CONFLICT DO NOTHING no-op, so it may certify empty if all other sources are empty.",
+    "lateWriteSemantics": "A row committed after the empty snapshot remains untouched until next original ten-minute pass; no immediate-visibility claim."
+  },
+  "validation": {
+    "status": "NOT_EXECUTED_BY_THIS_AGENT; immutable candidate ready for isolated canonical PostgreSQL 17 RED/GREEN operator.",
+    "operator": "/root/backfill_pg_runner",
+    "newSubtests": [
+      "an empty explicit Personal Coordinator uses one Personal read",
+      "an empty explicit Team Coordinator uses one Personal read",
+      "a retained copied agent head still permits the empty Personal read",
+      "an explicit Team read retains the real migration for legacy coordinator_messages",
+      "an explicit Team read retains the real migration for legacy coordinator_sessions",
+      "an explicit Team read retains the real migration for legacy coordinator_events",
+      "an explicit Team read retains the real migration for legacy agent_runs",
+      "an explicit Team read retains the real migration for legacy factory_tasks",
+      "an explicit Team read retains the real migration for legacy bot_model_choices",
+      "an explicit Team read retains the real migration for legacy chat_preferences",
+      "an explicit Team read retains the real migration for legacy user_schedules",
+      "an explicit Team read retains the real migration for legacy suggestions",
+      "an explicit Team read retains the real migration for legacy pending_actions",
+      "an explicit Team read retains the real migration for legacy agent_kit_heads",
+      "a missing Personal workspace reuses the unsuccessful lookup",
+      "a missing Personal Coordinator still follows the original creation path",
+      "only a boolean false Personal observation can skip the migration",
+      "a failed Personal observation is retried on the next read",
+      "an inactive Personal member cannot certify an empty backfill",
+      "busy chat locks retain the full migration and the next-read retry",
+      "legacy rows committed after an empty read wait for the original next pass"
+    ],
+    "newSubtestCount": 21,
+    "oldSuite": "All original source bytes retained; whole coordinator-bot DB file on old app + new tests.",
+    "redExpectedFailures": [
+      "an empty explicit Personal Coordinator uses one Personal read",
+      "an empty explicit Team Coordinator uses one Personal read",
+      "a retained copied agent head still permits the empty Personal read",
+      "legacy rows committed after an empty read wait for the original next pass"
+    ],
+    "redExpectedAssertion": "empty explicit Coordinator backfill must use one Personal SELECT",
+    "redFailureMeaning": "Old actual query count exceeds 1. Imports/fixture/infrastructure failures are not accepted as RED.",
+    "singleFileCommand": "node --test-reporter=tap --experimental-test-module-mocks --test-force-exit --import ./tests/support/server-only.mjs --import tsx --test tests/coordinator-bot.db.test.ts",
+    "canonicalFamilyCommand": "pnpm run test:bot-threads-db",
+    "greenRequirement": "Full original 25-file test:bot-threads-db family with candidate app+tests against required isolated PG17.",
+    "counterSemantics": "Pool.query counts one SQL statement; callback-style internal checkout is not double-counted. Only explicit promise-style connect is a migration/creation transaction. Separate target-cache priming excluded in both versions.",
+    "limits": "No test claims non-null agent-kit definition/version copy; old-only policy copy and retained old+current policies/head snapshot are covered."
+  },
+  "originalEvidence": {
+    "lifecycleBlob": "028b012e7b284b08dd52412680237986e5c093e9",
+    "budgetDiffBlob": "7a8f92b45e8e60f7e85d0abefbd9eab56443d802",
+    "sourceDiagnosisBlob": "41a06f27d4c9a17171ef2e53ae9b9913642d9f5c",
+    "sourceIndependentReviewBlob": "8b59be3ce03b4c5c6fdea5258f53b9ef6109a90b",
+    "invocation": "1d8876b5-c245-45fb-8318-1b0c88335843",
+    "observedExtraSql": 26,
+    "knownExtraShapes": 18,
+    "unknownExtraRecordsRetained": 8,
+    "minimumSequenceInference": "No query between captured-run SELECT ordinal30338 and session lock30339: fixed source did not enter recursive migration; captured NULL tasks/events/runs arrays were empty. Four unknown records after old-session SELECT occupy the four mandatory keyed statements, with no extra old-session branch. One unknown after pending UPDATE precedes COMMIT, with no old-head INSERT branch.",
+    "unproven": "Rows affected by unconditional keyed writes are unobserved. Full legacy emptiness is not established by the sequence. No unknown record reclassification or synthetic rowCounts.",
+    "forecast": "If actual next Native observation is empty, backfill prelude+transaction 26→1 saves25; original451→426 versus Web427 is only a counterfactual, never acceptance."
+  }
+}
