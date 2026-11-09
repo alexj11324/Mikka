@@ -10,6 +10,61 @@ import { observeReads, pageReady, selectParityWorkspace, selectWorkspaceMenuItem
 import { compareImages } from './parity-images.mjs'
 
 const ids = { coordinator: 'coordinator-bot', bot: 'bot', coordinatorUser: 'c1', coordinatorReply: 'c2', botUser: 'b1', botReply: 'b2' }
+const workspaceMessages = {
+  Common: { loadMore: 'Earlier messages' },
+  Coordinator: { conversation: 'Conversation with your Coordinator' },
+  Nav: { bots: 'Bots', coordinator: 'Coordinator' },
+  Shell: { panel: { label: 'Overview', computer: 'Computer' } },
+}
+
+function workspaceReadiness() {
+  const refreshed = Promise.withResolvers()
+  const ready = { waitFor: async () => undefined }
+  const history = { _apiName: 'Locator', async _expect(expression, options) {
+    assert.equal(expression, 'to.have.count')
+    assert.equal(options.expectedNumber, 0)
+    assert.equal(options.timeout, 45_000)
+    await refreshed.promise
+    return { matches: true }
+  } }
+  const node = { ...ready, getByText: () => ready, getByRole: () => node }
+  const page = { getByRole(role, options) {
+    if (role !== 'region') return node
+    assert.deepEqual(options, { name: workspaceMessages.Coordinator.conversation, exact: true })
+    return { getByRole(role, options) {
+      assert.equal(role, 'button')
+      assert.deepEqual(options, { name: workspaceMessages.Common.loadMore, exact: true })
+      return history
+    } }
+  } }
+  return { page, refreshed }
+}
+
+test('workspace-link waits for the two-message fixture to replace its cached history preview', async t => {
+  const { page, refreshed } = workspaceReadiness()
+  t.after(refreshed.resolve)
+  let completed = false
+  const ready = pageReady(page, 'workspace-link', { botName: 'Ada', groupName: 'Release review' }, workspaceMessages)
+    .then(() => { completed = true })
+  await new Promise(resolve => setImmediate(resolve))
+  assert.equal(completed, false, 'cached messages and a ready roster do not prove the transcript read has finished')
+  refreshed.resolve()
+  await ready
+  assert.equal(completed, true)
+})
+
+test('workspace-link preserves a failed transcript readiness check', async () => {
+  const { page, refreshed } = workspaceReadiness()
+  const failure = new Error('TRANSCRIPT_NOT_REFRESHED')
+  const ready = pageReady(page, 'workspace-link', { botName: 'Ada', groupName: 'Release review' }, workspaceMessages)
+  const rejected = assert.rejects(ready, error => error === failure)
+  void rejected.catch(() => {})
+  await new Promise(resolve => setImmediate(resolve))
+  refreshed.promise.catch(() => {})
+  refreshed.reject(failure)
+  await rejected
+})
+
 const coordinator = { conversationId: 'coordinator', lastReadMessageId: 'c2', lastReadPosition: 2 }
 function fixture(initial = []) {
   const state = { reads: initial, messages: [{ id: 'c2', position: 2, botId: ids.coordinator }, { id: 'b2', position: 2, botId: ids.bot }], deletes: [] }

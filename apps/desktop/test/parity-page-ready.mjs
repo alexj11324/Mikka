@@ -108,7 +108,7 @@ export function pageReadRequirements(name) {
   return []
 }
 
-export async function pageReady(page, name, fixture, messages, observed = {}) {
+export async function pageReady(page, name, fixture, messages, _observed = {}) {
   const text = value => page.getByText(value, { exact: true }).first().waitFor()
   const threadRows = async root => {
     const resolved = root.getByRole('button', { name: messages.Shell.threads.group.resolved.replace('{count}', '1'), exact: true })
@@ -130,6 +130,11 @@ export async function pageReady(page, name, fixture, messages, observed = {}) {
     const overview = page.getByRole('complementary', { name: messages.Shell.panel.label, exact: true })
     await overview.getByRole('heading', { name: messages.Nav.coordinator, exact: true }).waitFor()
     await overview.getByRole('tab', { name: messages.Shell.panel.computer, exact: true }).waitFor()
+    // The fixture has exactly positions 1 and 2. A restored persistent preview
+    // temporarily advertises historyBefore=1; its real transcript read removes
+    // that control. Cached message text and a ready roster cannot gate capture.
+    await expect(page.getByRole('region', { name: messages.Coordinator.conversation, exact: true })
+      .getByRole('button', { name: messages.Common.loadMore, exact: true })).toHaveCount(0, { timeout: 45_000 })
   } else if (name === 'all-threads' || name === 'bot-thread-list') {
     await threadRows(page.getByRole('region', { name: messages.Shell.panel.allThreads, exact: true }))
   } else if (name === 'projects' || name === 'team-projects') {
