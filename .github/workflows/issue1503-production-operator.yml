@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   cancel_exact_setup:
-    if: github.repository == 'alexj11324/Mikka'
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
