@@ -1,0 +1,190 @@
+{
+  "schemaVersion": 1,
+  "issue": 1512,
+  "repository": "alexj11324/Mikka",
+  "generatedAtUTC": "2026-11-09T11:24:04.500Z",
+  "purpose": "冻结 14 模板语法/字段准备复核的安全证据索引",
+  "outcome": "1 次新增 synthetic lookup count 执行成功；13 份历史证据按 5+2+6 层级复用。没有发现需改 SQL 的具体错误。",
+  "productionAccepted": false,
+  "productionCasesExecuted": 0,
+  "frozenInputs": {
+    "queries": {
+      "bytes": 58165,
+      "sha256": "a52df37feff2ef4c304d4bc47960657dc5c5badbde0fba4416f0e9bf4fea4c68",
+      "gitBlob": "07f2013526784be3bff29fd23073f5320a980cf3",
+      "path": "docs/operations/evidence/1512-raw/source85-profile1f-b527-8ff/production-evidence-query-templates.json"
+    },
+    "normalizer": {
+      "bytes": 19913,
+      "sha256": "56ce0805aa5e75fece1efcd06ab9c0652ab90037c7e453e7e4fe6b7748b36ae5",
+      "gitBlob": "8bd8d631b24cb134e1581e48eca86e8f16d3f557",
+      "normalizerExecuted": false
+    },
+    "frozenQueryCount": 14,
+    "allCurrentSqlHashesMatchPinnedNormalizer": true,
+    "inputFilesModified": false
+  },
+  "coverage": {
+    "exactHistoricalRawEchoAndColumns": {
+      "count": 5,
+      "names": [
+        "lookup_trace_by_ids",
+        "span_timeline",
+        "safe_native_logs",
+        "apm_generation_spans",
+        "native_generation_collection"
+      ],
+      "evidenceBlob": "63d39e407d96d2408b099f467b19acdab80a51a1"
+    },
+    "exactHistoricalSqlHashesWithoutIndependentRaw": {
+      "count": 2,
+      "names": [
+        "generation_receipts",
+        "ai_capture_summary"
+      ],
+      "evidenceBlob": "07f2013526784be3bff29fd23073f5320a980cf3",
+      "sourceField": "live_schema_preflight"
+    },
+    "immutableBaselineChangeChainWithoutIndependentRaw": {
+      "count": 6,
+      "names": [
+        "trace_integrity",
+        "tail_error_retention",
+        "source_correlation",
+        "replay_correlation",
+        "capture_summary",
+        "apm_session_links"
+      ],
+      "evidenceBlob": "07f2013526784be3bff29fd23073f5320a980cf3",
+      "limit": "仅历史 compiled/row-count 摘要与 unchanged 变更链；没有独立原始 echo/columns，也没有本轮服务器执行。"
+    },
+    "newSyntheticExecution": {
+      "count": 1,
+      "name": "lookup_trace_count",
+      "result": {
+        "returnedAggregateRows": 1,
+        "trace_count": 0
+      },
+      "utcWindow": {
+        "start": "2026-11-08 00:00:00",
+        "endExclusive": "2026-11-08 00:00:01"
+      },
+      "completedAtUTC": "2026-11-09T11:15:05.210Z",
+      "sqlSha256": "22a7e82a1321e441aef01970b1c703cfba6341b56ac5dd20811fb8b69028599d"
+    },
+    "total": 14,
+    "allCurrentTemplateHashesMatchFrozenNormalizer": true,
+    "normalizerExecuted": false,
+    "freshExecutionCountIsNot14": true
+  },
+  "projectBinding": {
+    "observedAtUTC": "2026-11-09T11:14:28.936Z",
+    "toolIsError": false,
+    "accessibleProjectCount": 1,
+    "requestedProjectId": 670821,
+    "targetFound": true,
+    "soleAccessibleProjectIsTarget": true,
+    "projectTokensReturned": false,
+    "projectSwitchPerformed": false
+  },
+  "permissionBoundary": {
+    "projectGetAutomaticRejection": true,
+    "projectGetRetried": false,
+    "credentialReturned": false,
+    "successfulTokenFreeAlternative": "projects-get",
+    "projectSwitchPerformed": false,
+    "fullPlatformAccountMetadataPublished": false
+  },
+  "officialTools": {
+    "sqlValidateExplainMode": "未在当前已暴露工具/execute-sql schema 中发现；不主张 PostHog 全平台不存在。",
+    "actualCall": "call --json execute-sql",
+    "truncate": false,
+    "connectionIdOmitted": true,
+    "physicalClusterReported": false,
+    "originalDecodedRequestAndResponsePreserved": true,
+    "rawHttpWireBytesClaimed": false
+  },
+  "files": [
+    {
+      "path": "posthog-query-syntax-20261109/public/lookup-trace-count.request.original.json",
+      "bytes": 1860,
+      "sha256": "1637f902c1ec96815d66d2449f9e3c4cca4adf46e73ecf410fa028ffe19fbf3c",
+      "blob": "42245f2a6ecdbe6630095edf2c2e2166790e4fce"
+    },
+    {
+      "path": "posthog-query-syntax-20261109/public/lookup-trace-count.response.original.json",
+      "bytes": 1178,
+      "sha256": "738ce409cfe22358a7320cdc2687fc5bdff90bdcb35481d17c368b14bcc99bdd",
+      "blob": "7313fc89baca98319f7e0dd0cd32a9cc0deb7e92"
+    },
+    {
+      "path": "posthog-query-syntax-20261109/public/lookup-trace-count.executed.sql",
+      "bytes": 890,
+      "sha256": "22a7e82a1321e441aef01970b1c703cfba6341b56ac5dd20811fb8b69028599d",
+      "blob": "637caabfa6ec3db460de134ec2041c4d750bc2a3"
+    },
+    {
+      "path": "posthog-query-syntax-20261109/public/frozen-template-preflight-review.safe.json",
+      "bytes": 56079,
+      "sha256": "013b534c210936089c551cd3e38971181ce1b87805073c8ecdfd7188f4958ca3",
+      "blob": "ed3884e6353920409e99a04bd0665e81c52385ef",
+      "privacyScan": {
+        "ruleCount": 5,
+        "findings": 0,
+        "limitation": "Pattern scan supplements explicit field allowlist; not a proof of absence of all possible sensitive text."
+      }
+    }
+  ],
+  "manifestScope": {
+    "payloadFileCount": 4,
+    "payloadBytes": 60007,
+    "thisIndexSeparate": true,
+    "totalFilesIncludingIndex": 5
+  },
+  "evidenceReuse": {
+    "queryHelperHandoff": "30eecf17de950ad85bd374aec84bcba85e54f935",
+    "previousLookupCountGapReceipt": "a28c85764d80ed27bf6d80a86f2ca42a02eb7688",
+    "offsetCapabilityOnly": "ae2a62cb59cbf3896a3c38aeae12cc1875e92549",
+    "previousQueriesNotRepeated": true,
+    "oldSourcesNotModified": true
+  },
+  "limits": [
+    "本轮不是 14 次新执行或 14 份同等强度的独立原始响应验证。",
+    "历史 schema 证据并未重新证明当前所有字段/值形状；6 份 baseline 层明确保留较弱证据边界。",
+    "零 ID 查询及历史空结果不证明生产运行的行数完整、入库稳定、上游 generation 总数、CLI flush、采样覆盖、usage/TTFT/cost 准确。",
+    "没有实际 Replay 渲染、原生 PostHog PNG 导出或 ACME 模型 case。",
+    "实际生产仍按冻结模板的原始 IDs/时间窗、完整分页、双稳定快照及独立 APM trace total 对账。",
+    "原自动审批拒绝通过无 token 元数据这一更窄方式解决，没有绕过凭证读取限制。"
+  ],
+  "operations": {
+    "newSqlCalls": 1,
+    "newSqlRetries": 0,
+    "maxAuthorizedNewSqlCalls": 14,
+    "posthogWrites": 0,
+    "models": 0,
+    "resourcesStarted": 0,
+    "sourceChanges": 0,
+    "refChanges": 0,
+    "recordingsEnumerated": 0,
+    "browserAuthAttempts": 0,
+    "allPosthogWorkStopped": true
+  },
+  "privacy": {
+    "explicitFieldAllowlist": true,
+    "noAccountEmailNameOrUserId": true,
+    "noCredentialsOrSignedUrls": true,
+    "noPromptOutputToolArgumentOrRecordingContent": true,
+    "originalPrivatePlatformMetadataRetainedInFunctionsStore": true,
+    "reviewPatternScan": {
+      "ruleCount": 5,
+      "findings": 0,
+      "limitation": "Pattern scan supplements explicit field allowlist; not a proof of absence of all possible sensitive text."
+    }
+  },
+  "artifactStorage": {
+    "indexStoreKey": "posthog14Syntax20261109:index:safeJSON",
+    "reviewStoreKey": "posthog14Syntax20261109:review:safeJSON",
+    "payloadStorePrefix": "posthog14Syntax20261109:artifact:",
+    "gitBlobsCreatedWithoutRefChange": true
+  }
+}

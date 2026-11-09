@@ -1,0 +1,641 @@
+{
+  "schemaVersion": 1,
+  "issue": 1512,
+  "scope": "18 ae10 companion decoded original job logs",
+  "scannedAtUTC": "2026-11-09T10:58:02.947Z",
+  "approvedAtUTC": "2026-11-09T10:59:25.785Z",
+  "patterns": [
+    "email",
+    "provider-token",
+    "jwt",
+    "credential-uri",
+    "authorization",
+    "signed-query",
+    "private-key"
+  ],
+  "classificationSource": {
+    "path": ".github/workflows/site-search.yml",
+    "bytes": 4072,
+    "sha256": "f0f4d26487b769faf85440c95f40f169219460e2a82240e8517f291053247f1e",
+    "gitBlob": "299e09591558bced0eafcc05c7d5a6d295078438"
+  },
+  "decision": "All 18 decoded job logs may be published byte-for-byte. Only masked auth values, public isolated test auth literal, loopback origins and systemd filename false-positive were found by the recorded patterns. Platform response envelopes remain private.",
+  "logs": [
+    {
+      "jobId": 129114377094,
+      "bytes": 50846,
+      "sha256": "7156d6e1937f5a6fddc3f94f2c46ea43148ae766f03255cd4cd4e835addc7953",
+      "gitBlob": "ef2759d2cd691cdf5d05c1940015253d0ed282c3",
+      "patternMatches": [
+        {
+          "kind": "authorization",
+          "line": 89,
+          "classification": "GitHub-masked-checkout-header"
+        }
+      ],
+      "sensitiveEnv": [],
+      "publicOriginalUnmodified": true
+    },
+    {
+      "jobId": 129114378009,
+      "bytes": 45630,
+      "sha256": "1e9ca25000cab995bc11ddbab36fb4dcfc210bd56d127bd565ae09e05019136d",
+      "gitBlob": "fc3c147ca3ff688c471cefafba32b2f86eeea608",
+      "patternMatches": [
+        {
+          "kind": "authorization",
+          "line": 89,
+          "classification": "GitHub-masked-checkout-header"
+        }
+      ],
+      "sensitiveEnv": [
+        {
+          "line": 231,
+          "key": "FFMPEG_GITHUB_TOKEN",
+          "classification": "GitHub-masked-value"
+        }
+      ],
+      "publicOriginalUnmodified": true
+    },
+    {
+      "jobId": 129114376539,
+      "bytes": 35649,
+      "sha256": "54d622b9093c587857125011325d4148500208c12ceec32c744ef203ce818107",
+      "gitBlob": "4fe8f62fa9f83a1e4f3eacca2daaf023e72ccfd9",
+      "patternMatches": [
+        {
+          "kind": "authorization",
+          "line": 91,
+          "classification": "GitHub-masked-checkout-header"
+        }
+      ],
+      "sensitiveEnv": [],
+      "publicOriginalUnmodified": true
+    },
+    {
+      "jobId": 129114377003,
+      "bytes": 127283,
+      "sha256": "dc94025b5b17a0d6eacc1e2af149d0cb02d196db37b32775654fbeb3a0469bb9",
+      "gitBlob": "7da7bfc708ae0c3acb1cec7079d4de95198bd3cb",
+      "patternMatches": [
+        {
+          "kind": "authorization",
+          "line": 90,
+          "classification": "GitHub-masked-checkout-header"
+        }
+      ],
+      "sensitiveEnv": [],
+      "publicOriginalUnmodified": true
+    },
+    {
+      "jobId": 129114864067,
+      "bytes": 45423,
+      "sha256": "3a00df643c76158db562c9905f771144f27bc5a568496fe8dc734e755e66163c",
+      "gitBlob": "44df60a99a20d766f153044d62a9816e520dde3b",
+      "patternMatches": [
+        {
+          "kind": "authorization",
+          "line": 93,
+          "classification": "GitHub-masked-checkout-header"
+        }
+      ],
+      "sensitiveEnv": [],
+      "publicOriginalUnmodified": true
+    },
+    {
+      "jobId": 129114864188,
+      "bytes": 44144,
+      "sha256": "6a4476d9cd635b77cf2232b94f67ba571a0b6f2494347f2cb4c07547df26c38b",
+      "gitBlob": "eb054b092468257a58c4aec553fc2ca2a184ce91",
+      "patternMatches": [
+        {
+          "kind": "authorization",
+          "line": 93,
+          "classification": "GitHub-masked-checkout-header"
+        }
+      ],
+      "sensitiveEnv": [],
+      "publicOriginalUnmodified": true
+    },
+    {
+      "jobId": 129114376039,
+      "bytes": 71308,
+      "sha256": "51df589d765631c814c16a51d32b3c3e1f96e4a11fd1bd51526b8246ce111491",
+      "gitBlob": "b75037fd3a2783e555e68e42257dc446fc73b3cf",
+      "patternMatches": [
+        {
+          "kind": "authorization",
+          "line": 200,
+          "classification": "GitHub-masked-checkout-header"
+        }
+      ],
+      "sensitiveEnv": [],
+      "publicOriginalUnmodified": true
+    },
+    {
+      "jobId": 129114376356,
+      "bytes": 21958,
+      "sha256": "419a99622fa7d1ca9e1e09300a7970bdc9989b5d4ac486fe8c4f824edc77d26b",
+      "gitBlob": "2bbc95f2e6026c5fca12f3669fc1c056a8580ca0",
+      "patternMatches": [
+        {
+          "kind": "authorization",
+          "line": 94,
+          "classification": "GitHub-masked-checkout-header"
+        },
+        {
+          "kind": "authorization",
+          "line": 173,
+          "classification": "GitHub-masked-release-download-header"
+        }
+      ],
+      "sensitiveEnv": [
+        {
+          "line": 181,
+          "key": "GITHUB_TOKEN",
+          "classification": "GitHub-masked-value"
+        }
+      ],
+      "publicOriginalUnmodified": true
+    },
+    {
+      "jobId": 129114376382,
+      "bytes": 29554,
+      "sha256": "25d41b2925171d38bde872ff14817545da515e905e936555727209acf9d86d9a",
+      "gitBlob": "d67cd8f7b7561bfa3521b28fd68cf10965ebc4c8",
+      "patternMatches": [
+        {
+          "kind": "authorization",
+          "line": 93,
+          "classification": "GitHub-masked-checkout-header"
+        },
+        {
+          "kind": "authorization",
+          "line": 170,
+          "classification": "GitHub-masked-release-download-header"
+        }
+      ],
+      "sensitiveEnv": [
+        {
+          "line": 178,
+          "key": "GITHUB_TOKEN",
+          "classification": "GitHub-masked-value"
+        }
+      ],
+      "publicOriginalUnmodified": true
+    },
+    {
+      "jobId": 129114375938,
+      "bytes": 217104,
+      "sha256": "f613d7076194ae0b248ca2f99b82345f872f57f87786788a56fd5655831af0f5",
+      "gitBlob": "638f8a19a4db1e57d4ded475a1cf911b2b7723b2",
+      "patternMatches": [
+        {
+          "kind": "authorization",
+          "line": 92,
+          "classification": "GitHub-masked-checkout-header"
+        }
+      ],
+      "sensitiveEnv": [],
+      "publicOriginalUnmodified": true
+    },
+    {
+      "jobId": 129114376159,
+      "bytes": 235435,
+      "sha256": "a5c9ac91544c8fcb479ffdf7a8b9a124a06d88dd5228331800df1c575e06ad6a",
+      "gitBlob": "e1a242276fbfa5adc9a84225b88c809c1b63f7c0",
+      "patternMatches": [
+        {
+          "kind": "authorization",
+          "line": 216,
+          "classification": "GitHub-masked-checkout-header"
+        }
+      ],
+      "sensitiveEnv": [
+        {
+          "line": 166,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 265,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 294,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 335,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 368,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 399,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 443,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 455,
+          "key": "FFMPEG_GITHUB_TOKEN",
+          "classification": "GitHub-masked-value"
+        },
+        {
+          "line": 671,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 738,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 761,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 773,
+          "key": "BETTER_AUTH_SECRET",
+          "classification": "GitHub-masked-value"
+        },
+        {
+          "line": 1053,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 1065,
+          "key": "BETTER_AUTH_SECRET",
+          "classification": "GitHub-masked-value"
+        },
+        {
+          "line": 1078,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 1090,
+          "key": "BETTER_AUTH_SECRET",
+          "classification": "GitHub-masked-value"
+        },
+        {
+          "line": 2412,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 2424,
+          "key": "BETTER_AUTH_SECRET",
+          "classification": "GitHub-masked-value"
+        },
+        {
+          "line": 2437,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 2449,
+          "key": "BETTER_AUTH_SECRET",
+          "classification": "GitHub-masked-value"
+        },
+        {
+          "line": 2475,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 2487,
+          "key": "BETTER_AUTH_SECRET",
+          "classification": "GitHub-masked-value"
+        }
+      ],
+      "publicOriginalUnmodified": true
+    },
+    {
+      "jobId": 129114376806,
+      "bytes": 71533,
+      "sha256": "b9a6a50d75467d3211ff5735364d6eec5624aa52e3cf9337251b4d66e1ad0824",
+      "gitBlob": "56520b93d1c5e2ddca632d80c7e9f7c2d1736193",
+      "patternMatches": [
+        {
+          "kind": "authorization",
+          "line": 89,
+          "classification": "GitHub-masked-checkout-header"
+        }
+      ],
+      "sensitiveEnv": [],
+      "publicOriginalUnmodified": true
+    },
+    {
+      "jobId": 129114376538,
+      "bytes": 51107,
+      "sha256": "686dd56716ab201440ffb3ec0982fe1203cb041da4cfd5214caeab25df624eb6",
+      "gitBlob": "c0547d52badcf923ae9ef83b87b48f3085bca1c2",
+      "patternMatches": [
+        {
+          "kind": "authorization",
+          "line": 90,
+          "classification": "GitHub-masked-checkout-header"
+        }
+      ],
+      "sensitiveEnv": [],
+      "publicOriginalUnmodified": true
+    },
+    {
+      "jobId": 129114376243,
+      "bytes": 2194,
+      "sha256": "2e6d09e0131ad7858839f9c3f968a76d1e8b6fca6b3957f97cba61e17df7be97",
+      "gitBlob": "208a81bbcdbb5db7b2ab7bfe3239c66a500dbd13",
+      "patternMatches": [],
+      "sensitiveEnv": [],
+      "publicOriginalUnmodified": true
+    },
+    {
+      "jobId": 129114376489,
+      "bytes": 302963,
+      "sha256": "a94cf99fc1b7ecbccd4becfa5a31496fc5ab238b2b653cd6e6a6eea2416c7f82",
+      "gitBlob": "b5eb8e42baacd15dc1667eddc75cf0c8d604ed7f",
+      "patternMatches": [
+        {
+          "kind": "authorization",
+          "line": 230,
+          "classification": "GitHub-masked-checkout-header"
+        }
+      ],
+      "sensitiveEnv": [
+        {
+          "line": 187,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 188,
+          "key": "BETTER_AUTH_SECRET",
+          "classification": "public-workflow-isolated-test-auth-literal"
+        },
+        {
+          "line": 282,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 283,
+          "key": "BETTER_AUTH_SECRET",
+          "classification": "public-workflow-isolated-test-auth-literal"
+        },
+        {
+          "line": 317,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 318,
+          "key": "BETTER_AUTH_SECRET",
+          "classification": "public-workflow-isolated-test-auth-literal"
+        },
+        {
+          "line": 359,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 360,
+          "key": "BETTER_AUTH_SECRET",
+          "classification": "public-workflow-isolated-test-auth-literal"
+        },
+        {
+          "line": 563,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 564,
+          "key": "BETTER_AUTH_SECRET",
+          "classification": "public-workflow-isolated-test-auth-literal"
+        },
+        {
+          "line": 961,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 962,
+          "key": "BETTER_AUTH_SECRET",
+          "classification": "public-workflow-isolated-test-auth-literal"
+        },
+        {
+          "line": 1095,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 1096,
+          "key": "BETTER_AUTH_SECRET",
+          "classification": "public-workflow-isolated-test-auth-literal"
+        },
+        {
+          "line": 1381,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 1382,
+          "key": "BETTER_AUTH_SECRET",
+          "classification": "public-workflow-isolated-test-auth-literal"
+        },
+        {
+          "line": 1667,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 1668,
+          "key": "BETTER_AUTH_SECRET",
+          "classification": "public-workflow-isolated-test-auth-literal"
+        },
+        {
+          "line": 3013,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 3014,
+          "key": "BETTER_AUTH_SECRET",
+          "classification": "public-workflow-isolated-test-auth-literal"
+        },
+        {
+          "line": 3060,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 3061,
+          "key": "BETTER_AUTH_SECRET",
+          "classification": "public-workflow-isolated-test-auth-literal"
+        }
+      ],
+      "publicOriginalUnmodified": true
+    },
+    {
+      "jobId": 129114376689,
+      "bytes": 160341,
+      "sha256": "e1043a6b41d0287c57a435cf134c9086ff4fd10cf220511c97c504ca3d350779",
+      "gitBlob": "bb2b9c97367cc9a24bba694432fc5b3ff3b0cf69",
+      "patternMatches": [
+        {
+          "kind": "authorization",
+          "line": 199,
+          "classification": "GitHub-masked-checkout-header"
+        },
+        {
+          "kind": "email",
+          "line": 1292,
+          "classification": "systemd-unit-filename-not-email"
+        }
+      ],
+      "sensitiveEnv": [],
+      "publicOriginalUnmodified": true
+    },
+    {
+      "jobId": 129114376529,
+      "bytes": 117452,
+      "sha256": "9bf0515a506a14a4cd84b4c0782136870149d9635c47534a35599bf88f53f7d1",
+      "gitBlob": "71b6a12fcd4c88a73874153df302484c1abb9d9a",
+      "patternMatches": [
+        {
+          "kind": "authorization",
+          "line": 219,
+          "classification": "GitHub-masked-checkout-header"
+        }
+      ],
+      "sensitiveEnv": [
+        {
+          "line": 164,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 278,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 313,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 360,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 399,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 436,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 487,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 504,
+          "key": "FFMPEG_GITHUB_TOKEN",
+          "classification": "empty-value"
+        },
+        {
+          "line": 749,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 778,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 795,
+          "key": "BETTER_AUTH_SECRET",
+          "classification": "GitHub-masked-value"
+        },
+        {
+          "line": 1076,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 1093,
+          "key": "BETTER_AUTH_SECRET",
+          "classification": "GitHub-masked-value"
+        },
+        {
+          "line": 1245,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 1262,
+          "key": "BETTER_AUTH_SECRET",
+          "classification": "GitHub-masked-value"
+        },
+        {
+          "line": 1294,
+          "key": "BETTER_AUTH_URL",
+          "classification": "isolated-loopback-origin"
+        },
+        {
+          "line": 1311,
+          "key": "BETTER_AUTH_SECRET",
+          "classification": "GitHub-masked-value"
+        }
+      ],
+      "publicOriginalUnmodified": true
+    },
+    {
+      "jobId": 129114377655,
+      "bytes": 37950,
+      "sha256": "ef71979eab5744cf2c0736aa22aee436bb6af1f3c092e592c402b19b718ba37d",
+      "gitBlob": "0af6d3dbe1f29809bc7ee900ae389a3913610df8",
+      "patternMatches": [
+        {
+          "kind": "authorization",
+          "line": 88,
+          "classification": "GitHub-masked-checkout-header"
+        }
+      ],
+      "sensitiveEnv": [
+        {
+          "line": 228,
+          "key": "FFMPEG_GITHUB_TOKEN",
+          "classification": "GitHub-masked-value"
+        }
+      ],
+      "publicOriginalUnmodified": true
+    }
+  ],
+  "unresolvedCount": 0,
+  "redactionsApplied": 0,
+  "originalEnvelopesPublished": false,
+  "temporaryURLsPublished": false,
+  "limitation": "Pattern screening and reviewed fixture/public-source classifications support publication of these bytes. Masked logs are not proof of process credential isolation, complete resource cleanup, or production acceptance."
+}

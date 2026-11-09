@@ -1,0 +1,119 @@
+{
+  "version": 1,
+  "repository": "alexj11324/Mikka",
+  "runId": 42603781956,
+  "jobId": 129117574595,
+  "runAttempt": 1,
+  "candidate": {
+    "commit": "ae10f28aa471dbfc64f04d981b8934d374476259",
+    "tree": "1acbe0b8d50a7102543e24b9bd0395355bcba438"
+  },
+  "actual": {
+    "commit": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4",
+    "tree": "1acbe0b8d50a7102543e24b9bd0395355bcba438",
+    "parents": [
+      "a2198c8c2f608f7b8169329b9da853067618dba6",
+      "ae10f28aa471dbfc64f04d981b8934d374476259"
+    ],
+    "basis": [
+      "own Native job checkout output",
+      "build ready revision output",
+      "same exact commit read-only Git API",
+      "lifecycle and smoke revision; parity app/harness revision; crypto revision"
+    ],
+    "sameTreeAsCandidate": true
+  },
+  "mergeProof": {
+    "blob": "9ae47079427fed4b589e30b977e42c8a128e2aa0",
+    "sha256": "5f400ba08869301e71483a7966aac5e862176b8db3fd7bd9e15970bae16eea7b"
+  },
+  "originalJobLog": {
+    "bytes": 259836,
+    "sha256": "8d08a3f9efebf9523e1aebdd417132f9c78e631b5799e4f2ba8acfcf2338d6d6",
+    "gitBlobSha1": "0d2d5447ac8f39fa98d4690818e42631df25d342"
+  },
+  "sourceLines": [
+    "2026-11-09T10:54:52.4961330Z HEAD is now at ddbc7e9 Merge ae10f28aa471dbfc64f04d981b8934d374476259 into a2198c8c2f608f7b8169329b9da853067618dba6",
+    "2026-11-09T10:54:52.5300000Z ddbc7e9b8e156493af730f00ed4a6efd3de475b4",
+    "2026-11-09T11:03:35.1123810Z {\"status\":\"built\",\"revision\":\"ddbc7e9b8e156493af730f00ed4a6efd3de475b4\",\"preset\":\"node-server\",\"functions\":0,\"resources\":51}",
+    "2026-11-09T11:05:22.0337020Z {\"status\":\"ready\",\"revision\":\"ddbc7e9b8e156493af730f00ed4a6efd3de475b4\",\"origin\":\"http://localhost:3000\",\"gateway\":\"http://127.0.0.1:49236\"}"
+  ],
+  "unchangedMeasurementSources": [
+    {
+      "path": "apps/desktop/test/lifecycle.mjs",
+      "mode": "100644",
+      "gitBlob": "3f21ee7f6a4eb8948778a35db72fb5e61aeca9ab",
+      "unchangedFromF095": true
+    },
+    {
+      "path": "apps/desktop/test/lifecycle-query-counts.mjs",
+      "mode": "100644",
+      "gitBlob": "39e1facecdf28a661511f72e14580fdb4b1ae967",
+      "unchangedFromF095": true
+    },
+    {
+      "path": "apps/desktop/test/parity.mjs",
+      "mode": "100644",
+      "gitBlob": "71157e93057ca19159a054fd4d41c9c0e0650fca",
+      "unchangedFromF095": true
+    },
+    {
+      "path": "apps/desktop/test/parity-reads.mjs",
+      "mode": "100644",
+      "gitBlob": "f8fcd9552d773f882e4e6fdb8409d5208c143935",
+      "unchangedFromF095": true
+    },
+    {
+      "path": "apps/desktop/test/parity-clock.mjs",
+      "mode": "100644",
+      "gitBlob": "0fa02f04de614d40c1d52d364c89a2a173b1fe29",
+      "unchangedFromF095": true
+    },
+    {
+      "path": "apps/desktop/test/smoke.mjs",
+      "mode": "100644",
+      "gitBlob": "b56fbf8cc9167adf2d9bce5f2a5fbf229fd69ae9",
+      "unchangedFromF095": true
+    }
+  ],
+  "preRunHarnessReview": {
+    "bundledSmoke": {
+      "blob": "9a85ff52f207ca7790bb90c0b8ab50832914ab87",
+      "change": "existing selectBundledServer helper replaces fire-and-forget selection, no measurement boundary change"
+    },
+    "parityFixtures": {
+      "blob": "b2700f11040452a42c8c2a8fac55d500fab8a617",
+      "change": "explicit workspaceId/ownershipState fixture binding, no measurement boundary change"
+    }
+  },
+  "nativeWorker": {
+    "runnerLabels": [
+      "macos-26"
+    ],
+    "runnerGroup": "GitHub Actions",
+    "platform": "darwin",
+    "architecture": "arm64",
+    "independentWorkerSourceHash": "not present in the Native original job log; not inferred from installed daemon"
+  },
+  "installedDaemon": [
+    {
+      "mode": "bundled",
+      "version": "0.0.551",
+      "protocolVersion": 3,
+      "installedRevision": "facb389f6cc06c453e9135bb60ada1b0f302e0d9",
+      "installedVersion": "0.0.551"
+    },
+    {
+      "mode": "hosted",
+      "version": "0.0.551",
+      "protocolVersion": 3,
+      "installedRevision": "facb389f6cc06c453e9135bb60ada1b0f302e0d9",
+      "installedVersion": "0.0.551"
+    }
+  ],
+  "limits": {
+    "independentCandidateRuntimeExecution": "this exact Native job only",
+    "productionAcceptance": false,
+    "oldNativeArtifactRead": false
+  }
+}

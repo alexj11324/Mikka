@@ -1,0 +1,247 @@
+{
+  "version": 1,
+  "kind": "root-image-original-review",
+  "head": "ae10f28aa471dbfc64f04d981b8934d374476259",
+  "checkout": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4",
+  "tree": "1acbe0b8d50a7102543e24b9bd0395355bcba438",
+  "job": {
+    "jobId": 129115238663,
+    "bytes": 360018,
+    "sha256": "60cb07d0b0ff101059832925fe587ab61c7f547de887815110e09f47798acfcc",
+    "lines": 3930,
+    "downloadCount": 1,
+    "conclusion": "success"
+  },
+  "localSyntheticServiceReceipts": [
+    {
+      "line": 2716,
+      "value": {
+        "status": "passed",
+        "edition": "community",
+        "revision": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4",
+        "origin": "http://localhost:3000",
+        "desktopDiscovery": true,
+        "serverInfo": true,
+        "communityUI": false
+      }
+    },
+    {
+      "line": 2727,
+      "value": {
+        "kind": "isolated-self-hosted-services",
+        "revision": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4",
+        "origin": "http://localhost:3000",
+        "provider": "synthetic-openai-compatible",
+        "synthetic": true,
+        "productionAcceptance": false,
+        "checks": {
+          "mailpit": {
+            "verificationReceived": true,
+            "passwordResetReceived": true,
+            "configuredSender": true,
+            "verifiedSignIn": true
+          },
+          "officialWeb": {
+            "transport": "actual-http",
+            "protocol": "v1",
+            "discovery": true,
+            "corsPreflight": true,
+            "bearerOnly": true,
+            "explicitSameOriginReturn": true,
+            "independentSession": true,
+            "fragmentCodeOnly": true,
+            "replayRejected": true,
+            "sessionRpc": true,
+            "maliciousOriginRejected": true,
+            "visualAcceptance": false,
+            "workspaceRead": true,
+            "attachmentUploadAndDownload": true,
+            "messageSubmitted": true,
+            "messageReplyRead": true,
+            "replyProvider": "synthetic-openai-compatible",
+            "revokeImmediate": true,
+            "sourceCookieSurvives": true,
+            "bearerBoundLive": true,
+            "liveClosedOnRevoke": true
+          },
+          "live": {
+            "applications": 2,
+            "sharedPostgres": true,
+            "cloudflare": false,
+            "businessMutationReceivedAcrossReplicas": true
+          },
+          "minio": {
+            "applicationUpload": true,
+            "privateObject": true,
+            "presignedDownload": true,
+            "bytesVerified": true
+          },
+          "chat": {
+            "messages": 31,
+            "replies": 31,
+            "provider": "synthetic-openai-compatible",
+            "synthetic": true,
+            "hostedUsageRows": 0,
+            "subscriptionAcceptance": false
+          }
+        },
+        "status": "passed",
+        "stage": "complete",
+        "chatProgress": {
+          "confirmedReplies": 31
+        }
+      }
+    },
+    {
+      "line": 3147,
+      "value": {
+        "kind": "isolated-source-daemon",
+        "revision": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4",
+        "origin": "http://localhost:3000",
+        "status": "passed",
+        "checks": {
+          "target": true,
+          "enrollment": true,
+          "realProcess": true,
+          "heartbeat": true,
+          "builtinGatewayPong": true,
+          "ownerDeviceOnline": true,
+          "builtinPresenceReady": true,
+          "builtinPresenceAck": true
+        },
+        "cleanup": {
+          "credentialRevoked": true,
+          "revokedCredentialRefused": true,
+          "daemonUnregistered": true,
+          "revocationCheckedOnNextSync": true,
+          "deviceRemoved": true,
+          "sessionClosed": true,
+          "privateFilesRemoved": true
+        },
+        "taskCompletion": false,
+        "subscriptionAcceptance": false,
+        "modelRequests": false,
+        "process": {
+          "pid": 27892,
+          "daemonVersion": "0.0.1",
+          "protocolVersion": 3
+        }
+      }
+    },
+    {
+      "line": 3712,
+      "value": {
+        "status": "passed",
+        "checks": [
+          "real_community_discovery_and_explicit_server_selection",
+          "normal_email_login_and_authenticated_remote_rpc",
+          "actual_builtin_live_ticket_and_socket",
+          "real_chat_submission_and_fixture_reply_over_live_invalidations",
+          "normal_first_run_dismissed_and_reply_visible",
+          "sign_out_and_return_to_bundled_default_server"
+        ],
+        "cleanup": {
+          "session": true,
+          "electron": true,
+          "daemon": true,
+          "privateFile": true
+        }
+      }
+    },
+    {
+      "line": 3829,
+      "value": {
+        "status": "passed",
+        "edition": "community",
+        "revision": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4",
+        "origin": "http://localhost:3000",
+        "desktopDiscovery": true,
+        "serverInfo": true,
+        "communityUI": false
+      }
+    },
+    {
+      "line": 3850,
+      "value": {
+        "status": "passed",
+        "edition": "community",
+        "revision": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4",
+        "origin": "http://localhost:3000",
+        "desktopDiscovery": true,
+        "serverInfo": true,
+        "communityUI": true
+      }
+    },
+    {
+      "line": 3857,
+      "value": {
+        "status": "passed",
+        "edition": "community",
+        "revision": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4",
+        "origin": "http://localhost:3000",
+        "desktopDiscovery": true,
+        "serverInfo": true,
+        "communityUI": false
+      }
+    }
+  ],
+  "removed": [
+    {
+      "line": 3872,
+      "text": " Container mikka-selfhost-ci-app-replica-1  Removed"
+    },
+    {
+      "line": 3876,
+      "text": " Container mikka-selfhost-ci-app-1  Removed"
+    },
+    {
+      "line": 3883,
+      "text": " Container mikka-selfhost-ci-model-1  Removed"
+    },
+    {
+      "line": 3888,
+      "text": " Container mikka-selfhost-ci-postgres-1  Removed"
+    },
+    {
+      "line": 3889,
+      "text": " Container mikka-selfhost-ci-minio-1  Removed"
+    },
+    {
+      "line": 3892,
+      "text": " Container mikka-selfhost-ci-mailpit-1  Removed"
+    },
+    {
+      "line": 3897,
+      "text": " Volume mikka-selfhost-ci_replica-data  Removed"
+    },
+    {
+      "line": 3898,
+      "text": " Network mikka-selfhost-ci_default  Removed"
+    },
+    {
+      "line": 3899,
+      "text": " Volume mikka-selfhost-ci_postgres-data  Removed"
+    },
+    {
+      "line": 3900,
+      "text": " Volume mikka-selfhost-ci_app-data  Removed"
+    }
+  ],
+  "tokenEnv": [
+    {
+      "line": 531,
+      "text": "#20 [build 6/7] RUN --mount=type=cache,id=mikka-pnpm,target=/pnpm/store     --mount=type=secret,id=ffmpeg_github_token,env=FFMPEG_GITHUB_TOKEN,required=false     pnpm install --frozen-lockfile --store-dir /pnpm/store"
+    },
+    {
+      "line": 2918,
+      "text": "  FFMPEG_GITHUB_TOKEN: "
+    }
+  ],
+  "sourceBoundary": "Isolated self-hosted image plus real daemon/packaged desktop fixtures; synthetic model replies and no hosted production/subscription acceptance.",
+  "cleanupCounts": {
+    "containers": 6,
+    "volumes": 3,
+    "networks": 1
+  },
+  "wholeCIComplete": false
+}

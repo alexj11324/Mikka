@@ -1,0 +1,248 @@
+{
+  "version": 1,
+  "purpose": "Immutable source-bound Native artifact evidence; no Git ref update",
+  "repository": "alexj11324/Mikka",
+  "runId": 42603781956,
+  "jobId": 129117574595,
+  "head": "ae10f28aa471dbfc64f04d981b8934d374476259",
+  "actualRevision": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4",
+  "actualTree": "1acbe0b8d50a7102543e24b9bd0395355bcba438",
+  "nativeJobConclusion": "success",
+  "budget": {
+    "fullLogin": {
+      "native": 429,
+      "web": 435,
+      "passed": true
+    },
+    "originalFirstPair": {
+      "pair": 1,
+      "native": 197,
+      "hosted": 230,
+      "passed": true
+    }
+  },
+  "diagnosticsStatus": "incomplete",
+  "lifecycleWorkspaceNameRestored": false,
+  "smokeAndLifecycleBaselinesSeparated": true,
+  "productionAcceptance": false,
+  "payloadFiles": 22,
+  "payloadBytes": 1310822,
+  "indexExcludedFromPayloadCount": true,
+  "files": [
+    {
+      "path": "native-ae10/arithmetic.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 23633,
+      "sha256": "a0ec70b54c73307abe330f5360332ddfc10c874a458f18eeaf54b442cef71208",
+      "gitBlob": "1488988529d2535798a670d878d82f4b214a1712",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-ae10/artifact-transfer.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 2220,
+      "sha256": "2a89c4525872882b483d9078f4af0a3ab00a522b9a2dda1585956da3f2d5253f",
+      "gitBlob": "db33dfca0d808924c6e5a32a9213fddeef813f78",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-ae10/cleanup-package.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 12052,
+      "sha256": "1699372edd082831ee719cecd7cd153594ac5d4c91dc0c7beb3924a600a9ed26",
+      "gitBlob": "a32e60bd6791246133dda148803ca4f1c54d7fbc",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-ae10/first-read.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 1588,
+      "sha256": "8c2a9d5452398ded8f0dd507ef6aa90b72dfbfe1c25179e7c8b35f62a378467b",
+      "gitBlob": "6d41079069fae77991f8dad5421e2518a938b4cf",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-ae10/job-129117574595.original.log",
+      "kind": "original-job-log",
+      "mode": "100644",
+      "bytes": 259836,
+      "sha256": "8d08a3f9efebf9523e1aebdd417132f9c78e631b5799e4f2ba8acfcf2338d6d6",
+      "gitBlob": "0d2d5447ac8f39fa98d4690818e42631df25d342",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-ae10/job.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 7075,
+      "sha256": "e62f53e0f68a50143007f3c5178626e0ced59fd642b750a73030b23d7a4fac49",
+      "gitBlob": "12fa32ecc1b10fcde4c11d5c612a961b0d3a329b",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-ae10/original-files-manifest.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 84763,
+      "sha256": "27cf164dee51227694e89fb5feb591eb13ad4ac3e70fba616afe6a0396a2dc1d",
+      "gitBlob": "c6dd2f4f400d10987018a1496e77ba951584119c",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-ae10/original/lifecycle.json",
+      "kind": "exact-original-JSON",
+      "mode": "100644",
+      "bytes": 703382,
+      "sha256": "4abf78dbbd4386265f407f349d3a8497772e2f1dc8083ed82150c3688d418f04",
+      "gitBlob": "058323e976d1649f1865cd8588d3a56875df5432",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-ae10/original/mac-acceptance-package.json",
+      "kind": "exact-original-JSON",
+      "mode": "100644",
+      "bytes": 957,
+      "sha256": "2760ba79d43f3d082bd5db542acd1af771d73f4558066d10921ad20b379bfb94",
+      "gitBlob": "d20b7ef8a42b446acd0ea3c4b1fb59338c599d03",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-ae10/original/native-crypto.json",
+      "kind": "exact-original-JSON",
+      "mode": "100644",
+      "bytes": 2868,
+      "sha256": "8403afccd69a690d274e422f7b8bd82fc7edabb8d1c20e624ea85ea2c6ca61fd",
+      "gitBlob": "580373c88484fcf8c75ae05dfc29c72d1069ae11",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-ae10/original/parity.json",
+      "kind": "exact-original-JSON",
+      "mode": "100644",
+      "bytes": 116435,
+      "sha256": "0be010455c21f409a741338de1de5b1c95bf2919d4c06220e2dbb33d5f48c6d4",
+      "gitBlob": "573e676f4034cb135fde404f9cc4f89cec350ef6",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-ae10/original/smoke.json",
+      "kind": "exact-original-JSON",
+      "mode": "100644",
+      "bytes": 3144,
+      "sha256": "89454768c8afcadde6cf198d6eb5dd8ba16e284062d8df4dbd2c92c9cfa9926c",
+      "gitBlob": "d6728a2b8efb3776ddbaac3c18657d724f6f2026",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-ae10/privacy-scan.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 4656,
+      "sha256": "7e25b9961700108b3e794816e05c5a17b4db5b347feb2dcad800402082983ade",
+      "gitBlob": "b8cf277a27d362fc0863b45ffe2ea860fbb3b7e4",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-ae10/read-ledger.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 1176,
+      "sha256": "44b5a724994adb3e23a06b0be66eb4a9dd6b5438ed950ade7f35f90e2b091aa2",
+      "gitBlob": "9c90bd04cd0f874e38e9d1ad516a1f4f0f4bca83",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-ae10/README.md",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 3925,
+      "sha256": "d986aea598dcec8478d368084a0222a2d9860935aa0aeba77769f6ebd0138839",
+      "gitBlob": "716544c7df961179b223f9dd2f53667fee823dd8",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-ae10/rpc-diagnostics.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 42122,
+      "sha256": "55780483d2fab30c1d34a2941fc739dad0e20601a29913a8a49e67a493850d8a",
+      "gitBlob": "9e9a101e7fff7ea7c7577624f8058c067dff3250",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-ae10/source-binding.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 4172,
+      "sha256": "abb53759d46f9193ec3d17a05774c94b15871f0c91030962438992d652a475e9",
+      "gitBlob": "51500da45b0bd414dfede3e824d3a7b5500ff1a4",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-ae10/terminal-review.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 15206,
+      "sha256": "900c3ffdf6586d6cca3086b2d0af4dc7279faa7c517541732e7347a43366b698",
+      "gitBlob": "21bf9749ca8dfb725c51e92878d6a23e07c31e47",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-ae10/verification-run.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 887,
+      "sha256": "ef0d7a2cb0524a0c05ffd24b1f07146e7895da840a9ffce9cb7a2cbf61e15824",
+      "gitBlob": "e6eccfd7f6e9ca1a852b5daa9686206faee2cba6",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-ae10/verify-artifact-download.py",
+      "kind": "exact-verification-script",
+      "mode": "100644",
+      "bytes": 2781,
+      "sha256": "c8b81ecd81e687c88749614aead83b013f34b5f1c820499062b4908d73d9ec6e",
+      "gitBlob": "5fd383efae54814be6abc3279d11f22e1bcf96c7",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-ae10/verify-native-originals.py",
+      "kind": "exact-verification-script",
+      "mode": "100644",
+      "bytes": 16005,
+      "sha256": "d87717fed1426985adda6692fbdf91e6ea195826e8c0c49804c1efa31ace7475",
+      "gitBlob": "c3bdd60e082a905b8b89aeb3b612a804bd633504",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "native-ae10/vm-cleanup.safe.json",
+      "kind": "safe-evidence",
+      "mode": "100644",
+      "bytes": 1939,
+      "sha256": "0f6e45a531db961712271c248ae6ec97e1b88a3fdda6480419192925ba5865b9",
+      "gitBlob": "32f66cb05cfc140a027b14e536bec9fe3d59f9a6",
+      "remoteConfirmed": true
+    }
+  ],
+  "readLedger": {
+    "originalJobLog": 1,
+    "artifactDownloads": 2,
+    "artifactRefreshes": 0,
+    "ciReruns": 0,
+    "oldArtifactReads": 0
+  },
+  "resources": {
+    "created": 1,
+    "stopped": 1,
+    "deleted": 1,
+    "exact404Verified": true,
+    "currentOwnedActive": 0
+  },
+  "noRefWrites": true,
+  "originalBytesPreserved": true,
+  "frozenAt": "2026-11-09T11:23:39.065Z"
+}

@@ -1,0 +1,330 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "head": "ae10f28aa471dbfc64f04d981b8934d374476259",
+    "tree": "1acbe0b8d50a7102543e24b9bd0395355bcba438",
+    "checkout": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4",
+    "checkoutParents": [
+      "a2198c8c2f608f7b8169329b9da853067618dba6",
+      "ae10f28aa471dbfc64f04d981b8934d374476259"
+    ]
+  },
+  "fullWorkflow": {
+    "id": 42603781956,
+    "event": "pull_request",
+    "head_sha": "ae10f28aa471dbfc64f04d981b8934d374476259",
+    "head_branch": "fix/1512-daemon-fixture-executable-20261109",
+    "run_attempt": 1,
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-11-09T10:47:37Z",
+    "updated_at": "2026-11-09T11:15:02Z",
+    "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42603781956"
+  },
+  "finalGates": {
+    "jobs": 22,
+    "jobConclusions": {
+      "success": 21,
+      "skipped": 1
+    },
+    "checks": 51,
+    "checkConclusions": {
+      "success": 40,
+      "skipped": 11
+    }
+  },
+  "selection": {
+    "coreTargets": 57,
+    "integrationTargets": 29,
+    "pgSuites": 72,
+    "allAreasSelected": true,
+    "unitCacheExplicitlyDisabled": true
+  },
+  "core": {
+    "pass": 4705,
+    "skip": 0,
+    "targets": 57,
+    "nodeSummaryGroups": 92
+  },
+  "integration": {
+    "tests": 2204,
+    "pass": 2192,
+    "skip": 12,
+    "targets": 29,
+    "nodeSummaryGroups": 59,
+    "skipBoundary": "11 database-file skips in this mixed unit lane plus one demo-replies skip; actual required PG lane separately has zero skips."
+  },
+  "postgres": {
+    "suites": 72,
+    "inventoryFiles": 312,
+    "nodeSummaryGroups": 91,
+    "pass": 3904,
+    "skip": 0,
+    "standaloneBootstrapPassOutsideInventory": 10,
+    "rootVerifiedRows": 72,
+    "rootVerifiedMetricCells": 546,
+    "rawRootRedownloads": 0
+  },
+  "daemon": {
+    "passingFiles": 139,
+    "skippedFiles": 1,
+    "pass": 1577,
+    "skip": 2
+  },
+  "companions": {
+    "logs": 18,
+    "rawBytes": 1667874,
+    "checkouts": 17,
+    "node": 1529,
+    "nodeGroups": 42,
+    "vitest": 1767,
+    "vitestSkip": 2,
+    "vitestGroups": 7,
+    "python": 81,
+    "pythonGroups": 6,
+    "playwright": 7,
+    "totalPass": 3384
+  },
+  "native": {
+    "records": 24,
+    "checkpoints": 12,
+    "segments": 8,
+    "bucketCells": 2280,
+    "ordinalRows": 1291,
+    "errors": []
+  },
+  "nativeBudgets": {
+    "fullLogin": {
+      "native": 429,
+      "web": 435,
+      "passed": true
+    },
+    "originalFirstPair": {
+      "pair": 1,
+      "native": 197,
+      "hosted": 230,
+      "passed": true
+    }
+  },
+  "posthog": {
+    "newSqlCalls": 1,
+    "retries": 0,
+    "templateCount": 14,
+    "coverage": {
+      "exactHistoricalRawEchoAndColumns": {
+        "count": 5,
+        "names": [
+          "lookup_trace_by_ids",
+          "span_timeline",
+          "safe_native_logs",
+          "apm_generation_spans",
+          "native_generation_collection"
+        ],
+        "evidenceBlob": "63d39e407d96d2408b099f467b19acdab80a51a1"
+      },
+      "exactHistoricalSqlHashesWithoutIndependentRaw": {
+        "count": 2,
+        "names": [
+          "generation_receipts",
+          "ai_capture_summary"
+        ],
+        "evidenceBlob": "07f2013526784be3bff29fd23073f5320a980cf3",
+        "sourceField": "live_schema_preflight"
+      },
+      "immutableBaselineChangeChainWithoutIndependentRaw": {
+        "count": 6,
+        "names": [
+          "trace_integrity",
+          "tail_error_retention",
+          "source_correlation",
+          "replay_correlation",
+          "capture_summary",
+          "apm_session_links"
+        ],
+        "evidenceBlob": "07f2013526784be3bff29fd23073f5320a980cf3",
+        "limit": "仅历史 compiled/row-count 摘要与 unchanged 变更链；没有独立原始 echo/columns，也没有本轮服务器执行。"
+      },
+      "newSyntheticExecution": {
+        "count": 1,
+        "name": "lookup_trace_count",
+        "result": {
+          "returnedAggregateRows": 1,
+          "trace_count": 0
+        },
+        "utcWindow": {
+          "start": "2026-11-08 00:00:00",
+          "endExclusive": "2026-11-08 00:00:01"
+        },
+        "completedAtUTC": "2026-11-09T11:15:05.210Z",
+        "sqlSha256": "22a7e82a1321e441aef01970b1c703cfba6341b56ac5dd20811fb8b69028599d"
+      },
+      "total": 14,
+      "allCurrentTemplateHashesMatchFrozenNormalizer": true,
+      "normalizerExecuted": false,
+      "freshExecutionCountIsNot14": true
+    },
+    "rootNewSqlEchoVerified": true,
+    "rootOriginalResponseRead": true,
+    "executedSqlSha256": "22a7e82a1321e441aef01970b1c703cfba6341b56ac5dd20811fb8b69028599d",
+    "result": {
+      "aggregateRows": 1,
+      "traceCount": 0
+    },
+    "productionAcceptedCases": 0,
+    "normalizerRuntimeNotExecutedInThisPreflight": true
+  },
+  "resources": {
+    "native": {
+      "version": 1,
+      "purpose": "existing artifact byte recovery only",
+      "sessionId": "sbx_PX9yu7GOxcJDCgUoEtuWOlooF6fI",
+      "name": "issue1512-native-ae10-42603781956",
+      "createdAt": "2026-11-09T11:15:35.470Z",
+      "startedAt": "2026-11-09T11:15:35.499Z",
+      "stoppedAt": "2026-11-09T11:19:11.709Z",
+      "status": "stopped",
+      "resources": {
+        "vcpus": 1,
+        "memoryMiB": 2048,
+        "region": "iad1",
+        "architecture": "amd64",
+        "image": "vercel/sandbox/universal@sha256:bbec19cffb43ad724eee446d3bd4476e2993849dc0ff0c9f33356f8365d72219",
+        "persistent": false,
+        "ports": [],
+        "timeoutMs": 900000,
+        "extensions": 0,
+        "networkPolicy": {
+          "mode": "custom",
+          "allowedDomains": [
+            "*.blob.core.windows.net",
+            "*.amazonaws.com",
+            "*.oaiusercontent.com",
+            "chatgpt.com"
+          ]
+        }
+      },
+      "consumption": {
+        "durationMs": 216210,
+        "activeCpuDurationMs": 8702,
+        "ingressBytes": 14935862,
+        "egressBytes": 383521,
+        "cost": "not measured; no zero-cost claim"
+      },
+      "deletion": {
+        "requestedWithConfirm": true,
+        "returnedStoppedSandbox": true,
+        "exactNamedRead": {
+          "resume": false,
+          "httpStatus": 404,
+          "code": "not_found",
+          "sameProjectAndTeam": true
+        },
+        "verifiedAbsent": true
+      },
+      "currentOwnedActiveResources": 0,
+      "criticalFilesRecoveredBeforeStop": 13,
+      "criticalOriginalBlobsConfirmedBeforeStop": 5,
+      "commandCorrections": [
+        {
+          "stage": "first materialization command",
+          "error": "cwd /vercel/sandbox did not exist",
+          "processStarted": false,
+          "bytesDownloaded": 0,
+          "correction": "used actual image cwd /vercel; script creates extraction directory"
+        },
+        {
+          "stage": "first bundle command",
+          "error": "FORENSIC_ROOT environment missing",
+          "exitCode": 1,
+          "bytesDownloaded": 0,
+          "correction": "passed extraction root explicitly; same original bytes retained"
+        }
+      ]
+    },
+    "rootNewResources": 0,
+    "posthogNewResources": 0,
+    "pgReaderNewResources": 0,
+    "companionsReaderNewResources": 0,
+    "limitations": "Companion runner cleanup observations are bounded to their original receipts; this does not assert global absence of every GHA-owned or other-owner resource."
+  },
+  "privacy": {
+    "newRawLogPatternAudit": [
+      {
+        "key": "core",
+        "bytes": 1016228,
+        "hits": {
+          "signedUrl": 0,
+          "githubToken": 0,
+          "privateKey": 0,
+          "actualBearer": 0
+        }
+      },
+      {
+        "key": "integration",
+        "bytes": 673214,
+        "hits": {
+          "signedUrl": 0,
+          "githubToken": 0,
+          "privateKey": 0,
+          "actualBearer": 0
+        }
+      },
+      {
+        "key": "desktopSmoke",
+        "bytes": 312454,
+        "hits": {
+          "signedUrl": 0,
+          "githubToken": 0,
+          "privateKey": 0,
+          "actualBearer": 0
+        }
+      },
+      {
+        "key": "analyticsSSR",
+        "bytes": 228297,
+        "hits": {
+          "signedUrl": 0,
+          "githubToken": 0,
+          "privateKey": 0,
+          "actualBearer": 0
+        }
+      },
+      {
+        "key": "image",
+        "bytes": 360018,
+        "hits": {
+          "signedUrl": 0,
+          "githubToken": 0,
+          "privateKey": 0,
+          "actualBearer": 0
+        }
+      },
+      {
+        "key": "uiStrict",
+        "bytes": 14086,
+        "hits": {
+          "signedUrl": 0,
+          "githubToken": 0,
+          "privateKey": 0,
+          "actualBearer": 0
+        }
+      }
+    ],
+    "originalsNotModified": true,
+    "rawTokenOrSignedUrlEnvelopesExcluded": true,
+    "limit": "Pattern scans are supplemental; per-source allowlists and CI credential audits retain their original boundaries."
+  },
+  "sourceAndAcceptanceBoundaries": [
+    "All CI and Apple source results bind to checkout ddbc7e9 and tree 1ac, exactly candidate ae10's tree, rather than event metadata alone.",
+    "P0#1636 remains original owner’s first merge; own PR unmerged and production release unexecuted.",
+    "The aggregate named Production build and browser interactions is only DB-result gating plus timing.",
+    "Analytics SSR blocks external requests and does not prove PostHog ingestion.",
+    "Native installed daemon0.0.551/facb is not the app candidate source and does not prove final daemon release.",
+    "Native query fine attribution remains incomplete, while all 1291 measured-window ordinals are accounted for.",
+    "100 parity rows use original thresholds; root has not directly viewed their PNG pixels.",
+    "Lifecycle workspaceNameCleanup.restored=false/unchanged and baseline-before=false are retained separately from smoke/parity restored=true.",
+    "Current PostHog query preflight is 5 exact historical echoes +2 exact hashes +6 baseline change-chain summaries +1 new synthetic execution, not14 new or equal-strength server executions.",
+    "All actual ACME model cases, native timeline PNG, replay rendering, complete generation/count/paging reconciliation, final controlled failures/overhead/scouts/cost and production cleanup remain required.",
+    "Earlier partial review files preserve their then-current pending fields; this final receipt supersedes only their pending status, not their historical measurements."
+  ]
+}

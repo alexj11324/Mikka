@@ -1,0 +1,1250 @@
+{
+  "version": 1,
+  "kind": "root-pg-ledger-independent-arithmetic",
+  "source": "Actual checkout is proven independently in all five raw job logs. Root's immutable commit API verification binds that checkout to the same tree as event head and parents [a219,ae10]; event head alone was not used as checkout proof.",
+  "ledger": "e4af52ed79d76dd56a6be846fa15cba55a0dbd01",
+  "originalReader": "current_source_review",
+  "originalJobsNotDownloadedAgain": true,
+  "all72CommandsMatchActualMergedPackage": true,
+  "completeBidirectionalSelection": true,
+  "nodeSummaries": 91,
+  "metricCells": 546,
+  "totals": {
+    "tests": 3904,
+    "pass": 3904,
+    "fail": 0,
+    "skipped": 0,
+    "todo": 0,
+    "cancelled": 0
+  },
+  "rows": [
+    {
+      "jobId": 129114785119,
+      "script": "test:group-turns",
+      "range": [
+        1557,
+        1733
+      ],
+      "nodeSummaries": 2,
+      "counts": {
+        "tests": 129,
+        "pass": 129,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785119,
+      "script": "test:audit-db",
+      "range": [
+        1812,
+        1909
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 44,
+        "pass": 44,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785119,
+      "script": "test:conversation-reads",
+      "range": [
+        2045,
+        2091
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 22,
+        "pass": 22,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785119,
+      "script": "test:device-revocation-db",
+      "range": [
+        2209,
+        2298
+      ],
+      "nodeSummaries": 3,
+      "counts": {
+        "tests": 32,
+        "pass": 32,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785119,
+      "script": "test:plugins-db",
+      "range": [
+        2329,
+        2380
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 18,
+        "pass": 18,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785119,
+      "script": "test:abuse-db",
+      "range": [
+        2397,
+        2480
+      ],
+      "nodeSummaries": 2,
+      "counts": {
+        "tests": 29,
+        "pass": 29,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785119,
+      "script": "test:agent-kit-db",
+      "range": [
+        2559,
+        2618
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 23,
+        "pass": 23,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785119,
+      "script": "test:chat-attachments-db",
+      "range": [
+        2848,
+        2864
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 6,
+        "pass": 6,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785119,
+      "script": "test:web-auth-db",
+      "range": [
+        3020,
+        3168
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 14,
+        "pass": 14,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785119,
+      "script": "test:coordinator-task-binding-db",
+      "range": [
+        3212,
+        3223
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 1,
+        "pass": 1,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785119,
+      "script": "test:scope-detachment-db",
+      "range": [
+        3295,
+        3400
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 75,
+        "pass": 75,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785119,
+      "script": "test:session-mailbox-db",
+      "range": [
+        3437,
+        3452
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 5,
+        "pass": 5,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785119,
+      "script": "test:suggestion-artifact-db",
+      "range": [
+        3483,
+        3500
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 4,
+        "pass": 4,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785119,
+      "script": "test:local-repository-migration-db",
+      "range": [
+        3518,
+        3529
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 1,
+        "pass": 1,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785119,
+      "script": "test:factory-checks-db",
+      "range": [
+        3624,
+        4061
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 321,
+        "pass": 321,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785119,
+      "script": "test:ops-db",
+      "range": [
+        4119,
+        4173
+      ],
+      "nodeSummaries": 2,
+      "counts": {
+        "tests": 17,
+        "pass": 17,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785119,
+      "script": "test:run-dispatch",
+      "range": [
+        4197,
+        4217
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 10,
+        "pass": 10,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785119,
+      "script": "test:factory-activity-http-db",
+      "range": [
+        4239,
+        4258
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 8,
+        "pass": 8,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785357,
+      "script": "test:execution-settings-db",
+      "range": [
+        1287,
+        1308
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 5,
+        "pass": 5,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785357,
+      "script": "test:test-accounts-db",
+      "range": [
+        1373,
+        1400
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 17,
+        "pass": 17,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785357,
+      "script": "test:account-db",
+      "range": [
+        1445,
+        1506
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 43,
+        "pass": 43,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785357,
+      "script": "test:worker-authorization-db",
+      "range": [
+        1868,
+        2010
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 76,
+        "pass": 76,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785357,
+      "script": "test:cloud-backend-db",
+      "range": [
+        3580,
+        5069
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 215,
+        "pass": 215,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785357,
+      "script": "test:secrets-db",
+      "range": [
+        5160,
+        5268
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 93,
+        "pass": 93,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785357,
+      "script": "test:groups",
+      "range": [
+        5284,
+        5422
+      ],
+      "nodeSummaries": 2,
+      "counts": {
+        "tests": 94,
+        "pass": 94,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785357,
+      "script": "test:pat-api-db",
+      "range": [
+        5630,
+        5802
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 39,
+        "pass": 39,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785357,
+      "script": "test:bot-chats-db",
+      "range": [
+        5817,
+        6066
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 144,
+        "pass": 144,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785357,
+      "script": "test:coordinator-issue-create-db",
+      "range": [
+        6124,
+        6144
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 10,
+        "pass": 10,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785357,
+      "script": "test:credentials-db",
+      "range": [
+        6187,
+        6199
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 3,
+        "pass": 3,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785357,
+      "script": "test:run-publication-db",
+      "range": [
+        6260,
+        6340
+      ],
+      "nodeSummaries": 2,
+      "counts": {
+        "tests": 25,
+        "pass": 25,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785357,
+      "script": "test:migration-steps-db",
+      "range": [
+        6368,
+        6381
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 1,
+        "pass": 1,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785357,
+      "script": "test:preview-driver",
+      "range": [
+        6411,
+        6421
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 1,
+        "pass": 1,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785357,
+      "script": "test:factory-all-dispatch-db",
+      "range": [
+        6475,
+        6529
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 2,
+        "pass": 2,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785357,
+      "script": "test:settings-activity-db",
+      "range": [
+        6552,
+        6572
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 6,
+        "pass": 6,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785357,
+      "script": "test:factory-monitor-db",
+      "range": [
+        6598,
+        6644
+      ],
+      "nodeSummaries": 2,
+      "counts": {
+        "tests": 12,
+        "pass": 12,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785357,
+      "script": "test:agent-tool-approval-db",
+      "range": [
+        6657,
+        6712
+      ],
+      "nodeSummaries": 2,
+      "counts": {
+        "tests": 20,
+        "pass": 20,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785156,
+      "script": "test:desktop-auth",
+      "range": [
+        2713,
+        2980
+      ],
+      "nodeSummaries": 4,
+      "counts": {
+        "tests": 129,
+        "pass": 129,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785156,
+      "script": "test:workspace-admin-db",
+      "range": [
+        5169,
+        5522
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 116,
+        "pass": 116,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785156,
+      "script": "test:self-improvement-db",
+      "range": [
+        6728,
+        6773
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 28,
+        "pass": 28,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785156,
+      "script": "test:factory",
+      "range": [
+        7664,
+        8222
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 511,
+        "pass": 511,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785156,
+      "script": "test:factory-approval-db",
+      "range": [
+        8689,
+        8807
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 52,
+        "pass": 52,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785156,
+      "script": "test:project-decisions-db",
+      "range": [
+        9647,
+        10129
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 39,
+        "pass": 39,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785156,
+      "script": "test:approved-writes-db",
+      "range": [
+        10481,
+        10508
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 10,
+        "pass": 10,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785156,
+      "script": "test:bot-threads-db",
+      "range": [
+        10601,
+        15274
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 350,
+        "pass": 350,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785156,
+      "script": "test:cloud-services-db",
+      "range": [
+        15303,
+        15328
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 10,
+        "pass": 10,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785156,
+      "script": "test:factory-routing-db",
+      "range": [
+        15405,
+        16026
+      ],
+      "nodeSummaries": 2,
+      "counts": {
+        "tests": 291,
+        "pass": 291,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785156,
+      "script": "test:run-recovery-db",
+      "range": [
+        16066,
+        16500
+      ],
+      "nodeSummaries": 5,
+      "counts": {
+        "tests": 62,
+        "pass": 62,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785156,
+      "script": "test:model-admission-db",
+      "range": [
+        16514,
+        16576
+      ],
+      "nodeSummaries": 2,
+      "counts": {
+        "tests": 14,
+        "pass": 14,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785156,
+      "script": "test:coordinator-issue-tools-db",
+      "range": [
+        16593,
+        16606
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 2,
+        "pass": 2,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785156,
+      "script": "test:pat-db",
+      "range": [
+        16642,
+        16664
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 12,
+        "pass": 12,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785156,
+      "script": "test:user-facts-db",
+      "range": [
+        16690,
+        16700
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 1,
+        "pass": 1,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785156,
+      "script": "test:issue-search-db",
+      "range": [
+        16739,
+        16767
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 8,
+        "pass": 8,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785156,
+      "script": "test:active-agents",
+      "range": [
+        16779,
+        16803
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 14,
+        "pass": 14,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785156,
+      "script": "test:settings-prefs-db",
+      "range": [
+        16815,
+        16839
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 11,
+        "pass": 11,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785141,
+      "script": "test:self-improvement-unit",
+      "range": [
+        1429,
+        1568
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 100,
+        "pass": 100,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785141,
+      "script": "test:visibility-db",
+      "range": [
+        1714,
+        1839
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 57,
+        "pass": 57,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785141,
+      "script": "test:coordinator-native",
+      "range": [
+        1894,
+        1945
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 36,
+        "pass": 36,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785141,
+      "script": "test:computer-db",
+      "range": [
+        1986,
+        2012
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 8,
+        "pass": 8,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785141,
+      "script": "test:github-connections-db",
+      "range": [
+        2126,
+        2216
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 24,
+        "pass": 24,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785141,
+      "script": "test:factory-activity-db",
+      "range": [
+        2340,
+        2403
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 49,
+        "pass": 49,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785141,
+      "script": "test:personal-mailbox-default-off-db",
+      "range": [
+        2453,
+        2512
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 42,
+        "pass": 42,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785141,
+      "script": "test:schedules-db",
+      "range": [
+        2596,
+        2624
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 16,
+        "pass": 16,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785141,
+      "script": "test:skill-semantic-db",
+      "range": [
+        2642,
+        2656
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 2,
+        "pass": 2,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785141,
+      "script": "test:artifact-migration-db",
+      "range": [
+        2670,
+        2680
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 1,
+        "pass": 1,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785141,
+      "script": "test:captures-db",
+      "range": [
+        2756,
+        2810
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 29,
+        "pass": 29,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785141,
+      "script": "test:factory-check-independence-db",
+      "range": [
+        2880,
+        2946
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 55,
+        "pass": 55,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785141,
+      "script": "test:onboarding-db",
+      "range": [
+        2969,
+        2988
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 5,
+        "pass": 5,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785141,
+      "script": "test:device-enrollment-db",
+      "range": [
+        3165,
+        3195
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 13,
+        "pass": 13,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785141,
+      "script": "test:workspace-migration-db",
+      "range": [
+        3209,
+        3219
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 1,
+        "pass": 1,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785141,
+      "script": "test:relation-cycle",
+      "range": [
+        3231,
+        3255
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 6,
+        "pass": 6,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785141,
+      "script": "test:activity-actor-db",
+      "range": [
+        3318,
+        3505
+      ],
+      "nodeSummaries": 1,
+      "counts": {
+        "tests": 60,
+        "pass": 60,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    },
+    {
+      "jobId": 129114785141,
+      "script": "test:live-db",
+      "range": [
+        3555,
+        3851
+      ],
+      "nodeSummaries": 2,
+      "counts": {
+        "tests": 175,
+        "pass": 175,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    }
+  ],
+  "rawLogHashesReviewedViaImmutableIndex": true,
+  "privacyUnresolved": 0,
+  "rawLogsReadByRoot": false,
+  "productionAccepted": false
+}

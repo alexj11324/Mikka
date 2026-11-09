@@ -1,0 +1,530 @@
+{
+  "version": 1,
+  "runId": 42603781956,
+  "jobId": 129117574595,
+  "jobConclusion": "success",
+  "revision": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4",
+  "tree": "1acbe0b8d50a7102543e24b9bd0395355bcba438",
+  "originalLifecycle": {
+    "path": "original/lifecycle.json",
+    "bytes": 703382,
+    "sha256": "4abf78dbbd4386265f407f349d3a8497772e2f1dc8083ed82150c3688d418f04",
+    "gitBlobSha1": "058323e976d1649f1865cd8588d3a56875df5432"
+  },
+  "fourOriginalWindows": {
+    "webLogin": {
+      "queryCalls": 435,
+      "startedAt": "2026-11-09T11:12:46.604Z",
+      "finishedAt": "2026-11-09T11:12:51.953Z",
+      "pair": null,
+      "pgProtocolReceiveBytes": 90147,
+      "pgProtocolSendBytes": 271082,
+      "closedConnections": 0,
+      "unknownReadings": 0,
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19,
+          "pgProtocolReceiveBytes": 5911,
+          "pgProtocolSendBytes": 5248,
+          "closedConnections": 0,
+          "unknownReadings": 0
+        },
+        {
+          "phase": "web-navigation-to-dom-content-loaded",
+          "queryCalls": 0,
+          "pgProtocolReceiveBytes": 0,
+          "pgProtocolSendBytes": 0,
+          "closedConnections": 0,
+          "unknownReadings": 0
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 416,
+          "pgProtocolReceiveBytes": 84236,
+          "pgProtocolSendBytes": 265834,
+          "closedConnections": 0,
+          "unknownReadings": 0
+        }
+      ]
+    },
+    "nativeLogin": {
+      "queryCalls": 429,
+      "startedAt": "2026-11-09T11:12:53.999Z",
+      "finishedAt": "2026-11-09T11:13:01.106Z",
+      "pair": null,
+      "pgProtocolReceiveBytes": 88417,
+      "pgProtocolSendBytes": 280505,
+      "closedConnections": 1,
+      "unknownReadings": 0,
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19,
+          "pgProtocolReceiveBytes": 5911,
+          "pgProtocolSendBytes": 5248,
+          "closedConnections": 0,
+          "unknownReadings": 0
+        },
+        {
+          "phase": "native-pkce-and-automatic-renderer-to-public-session",
+          "queryCalls": 13,
+          "pgProtocolReceiveBytes": 3382,
+          "pgProtocolSendBytes": 4341,
+          "closedConnections": 1,
+          "unknownReadings": 0
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 397,
+          "pgProtocolReceiveBytes": 79124,
+          "pgProtocolSendBytes": 270916,
+          "closedConnections": 0,
+          "unknownReadings": 0
+        }
+      ]
+    },
+    "startup-bundled": {
+      "queryCalls": 197,
+      "startedAt": "2026-11-09T11:13:25.573Z",
+      "finishedAt": "2026-11-09T11:13:28.615Z",
+      "pair": 1,
+      "pgProtocolReceiveBytes": 42044,
+      "pgProtocolSendBytes": 133023,
+      "closedConnections": 0,
+      "unknownReadings": 0,
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 197,
+          "pgProtocolReceiveBytes": 42044,
+          "pgProtocolSendBytes": 133023,
+          "closedConnections": 0,
+          "unknownReadings": 0
+        }
+      ]
+    },
+    "startup-hosted": {
+      "queryCalls": 230,
+      "startedAt": "2026-11-09T11:13:29.679Z",
+      "finishedAt": "2026-11-09T11:13:33.805Z",
+      "pair": 1,
+      "pgProtocolReceiveBytes": 51417,
+      "pgProtocolSendBytes": 179595,
+      "closedConnections": 0,
+      "unknownReadings": 0,
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 230,
+          "pgProtocolReceiveBytes": 51417,
+          "pgProtocolSendBytes": 179595,
+          "closedConnections": 0,
+          "unknownReadings": 0
+        }
+      ]
+    }
+  },
+  "fullLoginBudgetPassed": true,
+  "firstPairBudgetPassed": true,
+  "conservation": {
+    "records": 24,
+    "checkpoints": 12,
+    "segments": 8,
+    "operationBuckets": 17,
+    "sourceBuckets": 78,
+    "allSnapshotSegmentAndWindowSumsVerified": true,
+    "windowQueryOrdinals": 1291,
+    "perWindowOrdinalsContiguous": true,
+    "noDuplicateOrdinalAcrossMeasuredWindows": true,
+    "ordinalScopeCountsMatchOriginalBuckets": true
+  },
+  "diagnostics": {
+    "status": "incomplete",
+    "capture": {
+      "fromQueryCalls": 29617,
+      "toQueryCalls": 34206,
+      "droppedQueries": 0,
+      "overflow": false,
+      "reasons": {
+        "context_missing": 1185,
+        "statement_syntax": 1533,
+        "context_invalid": 111
+      }
+    },
+    "receiptStatus": "complete",
+    "receiptCount": 177,
+    "contexts": 549,
+    "statements": 110,
+    "windows": {
+      "nativeLogin": {
+        "status": "incomplete",
+        "reasons": [
+          "query_context_unknown",
+          "statement_structure_unknown"
+        ],
+        "queries": 429,
+        "unknownContext": 91,
+        "unknownStatement": 130,
+        "unknownContextByScope": {
+          "/api/desktop/return": 2,
+          "/api/devices/enrollment": 4,
+          "/api/conversations/[id]/read": 13,
+          "/api/pending-actions": 4,
+          "/api/conversations": 18,
+          "/api/approved-writes": 40,
+          "otherScoped": 10
+        },
+        "unknownStatementByScope": {
+          "/api/conversations/[id]/read": 3,
+          "/api/workspace": 4,
+          "/api/workspace/switcher": 4,
+          "/api/desktop/rpc": 23,
+          "/actions/threads/poll": 11,
+          "/actions/coordinator/summaries": 8,
+          "/actions/task-runs/read": 4,
+          "/actions/coordinator/poll": 33,
+          "/api/live/ticket": 3,
+          "/api/conversations": 4,
+          "/api/approved-writes": 12,
+          "/actions/issues/poll": 15,
+          "/api/mobile/reactions": 1,
+          "otherScoped": 5
+        }
+      },
+      "webLogin": {
+        "status": "incomplete",
+        "reasons": [
+          "query_context_unknown",
+          "statement_structure_unknown"
+        ],
+        "queries": 435,
+        "unknownContext": 87,
+        "unknownStatement": 132,
+        "unknownContextByScope": {
+          "/api/conversations/[id]/read": 15,
+          "/api/pending-actions": 4,
+          "/api/approved-writes": 40,
+          "/api/conversations": 18,
+          "otherScoped": 10
+        },
+        "unknownStatementByScope": {
+          "/api/conversations/[id]/read": 4,
+          "/api/workspace": 4,
+          "/api/workspace/switcher": 4,
+          "/actions/coordinator/summaries": 8,
+          "/api/rpc": 23,
+          "/actions/threads/poll": 11,
+          "/api/approved-writes": 12,
+          "/actions/coordinator/poll": 36,
+          "/actions/issues/poll": 17,
+          "/api/live/ticket": 3,
+          "/api/conversations": 4,
+          "/api/mobile/reactions": 1,
+          "otherScoped": 5
+        }
+      },
+      "startup-bundled": {
+        "status": "incomplete",
+        "reasons": [
+          "query_context_unknown",
+          "statement_structure_unknown"
+        ],
+        "queries": 197,
+        "unknownContext": 48,
+        "unknownStatement": 69,
+        "unknownContextByScope": {
+          "/api/devices/enrollment": 2,
+          "/api/conversations/[id]/read": 4,
+          "otherScoped": 10,
+          "/api/conversations": 10,
+          "/api/pending-actions": 2,
+          "/api/approved-writes": 20
+        },
+        "unknownStatementByScope": {
+          "/api/live/ticket": 2,
+          "/api/conversations/[id]/read": 1,
+          "/api/workspace/switcher": 2,
+          "/api/workspace": 2,
+          "otherScoped": 5,
+          "/api/conversations": 2,
+          "/api/mobile/reactions": 1,
+          "/api/desktop/rpc": 11,
+          "/actions/coordinator/summaries": 4,
+          "/actions/threads/poll": 4,
+          "/actions/task-runs/read": 2,
+          "/actions/issues/poll": 9,
+          "/actions/coordinator/poll": 18,
+          "/api/approved-writes": 6
+        }
+      },
+      "startup-hosted": {
+        "status": "incomplete",
+        "reasons": [
+          "query_context_unknown",
+          "statement_structure_unknown"
+        ],
+        "queries": 230,
+        "unknownContext": 48,
+        "unknownStatement": 78,
+        "unknownContextByScope": {
+          "/api/devices/enrollment": 2,
+          "/api/conversations/[id]/read": 4,
+          "otherScoped": 10,
+          "/api/conversations": 10,
+          "/api/pending-actions": 2,
+          "/api/approved-writes": 20
+        },
+        "unknownStatementByScope": {
+          "/api/live/ticket": 2,
+          "/api/conversations/[id]/read": 1,
+          "otherScoped": 5,
+          "/api/conversations": 2,
+          "/api/workspace/switcher": 2,
+          "/api/workspace": 2,
+          "/api/mobile/reactions": 1,
+          "/actions/coordinator/summaries": 4,
+          "/actions/task-runs/read": 2,
+          "/api/rpc": 11,
+          "/actions/issues/poll": 12,
+          "/actions/threads/poll": 4,
+          "/api/approved-writes": 6,
+          "/actions/coordinator/poll": 24
+        }
+      }
+    },
+    "unknownsRetained": true,
+    "fullNonWindowCaptureRows": "not present in exported original; only the four measured windows are projected",
+    "noSqlTextOrValues": true
+  },
+  "rpc": {
+    "webLogin": {
+      "physical": 35,
+      "physicalCompleted": 35,
+      "logical": 35,
+      "logicalCompleted": 35,
+      "crossesStart": 0,
+      "crossesEnd": 0
+    },
+    "nativeLogin": {
+      "physical": 15,
+      "physicalCompleted": 15,
+      "logical": 40,
+      "logicalCompleted": 40,
+      "crossesStart": 0,
+      "crossesEnd": 0
+    },
+    "startup-bundled": {
+      "physical": 7,
+      "physicalCompleted": 7,
+      "logical": 19,
+      "logicalCompleted": 19,
+      "crossesStart": 0,
+      "crossesEnd": 0
+    },
+    "startup-hosted": {
+      "physical": 19,
+      "physicalCompleted": 19,
+      "logical": 19,
+      "logicalCompleted": 19,
+      "crossesStart": 0,
+      "crossesEnd": 0
+    }
+  },
+  "exactActionTables": "rpc-diagnostics.safe.json preserves every physical and logical action and all completion/crossing counts",
+  "cleanup": {
+    "lifecycle": {
+      "stages": [
+        {
+          "stage": "browser-close",
+          "result": "passed"
+        },
+        {
+          "stage": "daemon-drain",
+          "result": "passed"
+        },
+        {
+          "stage": "native-resources",
+          "result": "passed"
+        },
+        {
+          "stage": "fixtures",
+          "result": "passed"
+        },
+        {
+          "stage": "workspace-generated-name",
+          "result": "passed"
+        },
+        {
+          "stage": "lease-release",
+          "result": "passed"
+        }
+      ],
+      "native": {
+        "cleaned": true,
+        "counts": {
+          "desktop_auth_requests": 2,
+          "device_token_devices": 1,
+          "device_management_commands": 0,
+          "device_repos": 0,
+          "agents": 2,
+          "device_tokens": 1,
+          "device_enrollments": 0,
+          "devices": 1
+        }
+      },
+      "observation": {
+        "owner": {
+          "matchesSealedBaselineBefore": false,
+          "matchesSealedBaselineAfter": true,
+          "changedTableCount": 1
+        },
+        "peer": {
+          "matchesSealedBaselineBefore": false,
+          "matchesSealedBaselineAfter": true,
+          "changedTableCount": 1
+        }
+      },
+      "state": "released",
+      "workspaceNameRestored": false,
+      "workspaceOwnerBaselineAfter": true,
+      "workspacePeerBaselineAfter": true
+    },
+    "smoke": {
+      "stages": [
+        {
+          "stage": "browser-close",
+          "result": "passed"
+        },
+        {
+          "stage": "electron-close",
+          "result": "passed"
+        },
+        {
+          "stage": "daemon-drain",
+          "result": "passed"
+        },
+        {
+          "stage": "native-resources",
+          "result": "passed"
+        },
+        {
+          "stage": "workspace-generated-name",
+          "result": "passed"
+        },
+        {
+          "stage": "lease-release",
+          "result": "passed"
+        }
+      ],
+      "native": {
+        "cleaned": true,
+        "counts": {
+          "desktop_auth_requests": 1,
+          "device_token_devices": 0,
+          "device_management_commands": 0,
+          "device_repos": 0,
+          "agents": 0,
+          "device_tokens": 0,
+          "device_enrollments": 0,
+          "devices": 0
+        }
+      },
+      "observation": {
+        "owner": {
+          "matchesSealedBaselineBefore": true,
+          "matchesSealedBaselineAfter": true,
+          "changedTableCount": 0
+        },
+        "peer": {
+          "matchesSealedBaselineBefore": true,
+          "matchesSealedBaselineAfter": true,
+          "changedTableCount": 0
+        }
+      },
+      "state": "released",
+      "workspaceNameRestored": true,
+      "workspaceOwnerBaselineAfter": true,
+      "workspacePeerBaselineAfter": true
+    },
+    "parity": {
+      "cleanup": "passed",
+      "native": {
+        "cleaned": true,
+        "counts": {
+          "desktop_auth_requests": 1,
+          "device_token_devices": 1,
+          "device_management_commands": 0,
+          "device_repos": 0,
+          "agents": 2,
+          "device_tokens": 1,
+          "device_enrollments": 0,
+          "devices": 1
+        }
+      },
+      "workspaceNameRestored": true,
+      "workspaceOwnerBaselineAfter": true,
+      "workspacePeerBaselineAfter": true
+    }
+  },
+  "crypto": {
+    "passed": true,
+    "distinctProcesses": 3,
+    "sameImmutablePackage": true,
+    "cleanup": "passed"
+  },
+  "package": {
+    "version": 1,
+    "variant": "acceptance",
+    "passed": true,
+    "signatureVerifiedStrictDeep": true,
+    "bundleIdentifier": "com.aspectlylabs.mikka.dev",
+    "urlScheme": "mikka-dev-auth",
+    "architecture": "arm64",
+    "identity": {
+      "adHoc": true,
+      "teamIdentifier": "none",
+      "hardenedRuntime": true,
+      "cdHash": "24d3c09b0dfb6a2c9d48bf8e1c0410d342da82dc"
+    },
+    "signedBundleCount": 9,
+    "entitlements": {
+      "hardenedRuntime": true,
+      "devOnlyLibraryValidationException": true,
+      "unexpected": false,
+      "executables": 5,
+      "libraries": 4,
+      "librariesWithoutEntitlements": 4
+    },
+    "fuses": {
+      "RunAsNode": false,
+      "EnableCookieEncryption": false,
+      "EnableNodeOptionsEnvironmentVariable": false,
+      "EnableNodeCliInspectArguments": true,
+      "EnableEmbeddedAsarIntegrityValidation": false,
+      "OnlyLoadAppFromAsar": true,
+      "LoadBrowserProcessSpecificV8Snapshot": false,
+      "GrantFileProtocolExtraPrivileges": true
+    }
+  },
+  "coldStart": {
+    "pairs": 5,
+    "bundledMedianMs": 2572.55,
+    "hostedMedianMs": 3477.6,
+    "differenceMs": -905.0499999999997,
+    "bundledFaster": true,
+    "improvementPercent": 26.03
+  },
+  "boundaries": {
+    "allBackgroundIncluded": true,
+    "originalEmailAndNativePkceIncluded": true,
+    "firstPairOnly": true,
+    "queryDeductions": 0,
+    "diagnosticsIncompleteNotOverwritten": true,
+    "lifecycleWorkspaceNameRestored": false,
+    "lifecycleAndSmokeBaselineBeforeKeptSeparate": true,
+    "installedDaemonRevisionIsNotCandidateRevision": true,
+    "wholeWorkflowConclusionNotInferredFromNative": true,
+    "productionAcceptance": false
+  }
+}

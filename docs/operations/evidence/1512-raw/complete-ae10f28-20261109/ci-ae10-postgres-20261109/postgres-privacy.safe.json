@@ -1,0 +1,399 @@
+{
+  "schemaVersion": 1,
+  "kind": "postgres-public-log-privacy-review",
+  "actualCheckout": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4",
+  "method": "Pattern-assisted review of all five original decoded GitHub log strings; matches retain only category/location in this safe receipt. One normalized email is bound to exact same-checkout fixture and SQL source; bearer-shaped candidates are natural-language test titles, including streamed/grouped copies.",
+  "rawLogOrigin": "Official GitHub decoded-log text; original text, BOM/ANSI where present, and platform masking unchanged.",
+  "patterns": [
+    "provider-token-shaped",
+    "private-key-header",
+    "email-shaped",
+    "authorization-bearer-shaped",
+    "authorization-header-shaped",
+    "credential-url-shaped",
+    "signed-url-shaped",
+    "credential-label-assignment"
+  ],
+  "findings": [
+    {
+      "jobId": 129114785119,
+      "line": 1393,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785119,
+      "line": 1401,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785119,
+      "line": 1857,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785119,
+      "line": 1861,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785119,
+      "line": 4456,
+      "category": "email-shaped",
+      "resolved": true,
+      "resolution": "Same-checkout deliberately colliding synthetic signup fixture; two source literals normalize to this sole logged value under the exact migration function."
+    },
+    {
+      "jobId": 129114785141,
+      "line": 2273,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785141,
+      "line": 2500,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 1230,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 1237,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 1238,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 1239,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 1273,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 1274,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 1275,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 1354,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 2676,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 2677,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 2678,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 2683,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 2686,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 2694,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 2727,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 2734,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 2735,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 2736,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 2770,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 2771,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 2772,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 2846,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 2945,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 2946,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 2947,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 2952,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 2955,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785156,
+      "line": 2963,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785357,
+      "line": 5450,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785357,
+      "line": 5545,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785357,
+      "line": 5659,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    },
+    {
+      "jobId": 129114785357,
+      "line": 5719,
+      "category": "authorization-bearer-shaped",
+      "resolved": true,
+      "resolution": "Natural-language test title, in streamed progress or retained complete test output; not an authorization header or credential."
+    }
+  ],
+  "perLog": [
+    {
+      "jobId": 129114785119,
+      "categories": {
+        "authorization-bearer-shaped": 4,
+        "email-shaped": 1
+      },
+      "totalCandidates": 5
+    },
+    {
+      "jobId": 129114785141,
+      "categories": {
+        "authorization-bearer-shaped": 2
+      },
+      "totalCandidates": 2
+    },
+    {
+      "jobId": 129114785156,
+      "categories": {
+        "authorization-bearer-shaped": 28
+      },
+      "totalCandidates": 28
+    },
+    {
+      "jobId": 129114785357,
+      "categories": {
+        "authorization-bearer-shaped": 4
+      },
+      "totalCandidates": 4
+    },
+    {
+      "jobId": 129117884767,
+      "categories": {},
+      "totalCandidates": 0
+    }
+  ],
+  "syntheticEmailProof": {
+    "jobId": 129114785119,
+    "logLine": 4456,
+    "category": "synthetic normalized test-email duplicate",
+    "sourcePath": "lib/abuse/store.db.test.ts",
+    "sourceBlob": "04792f1c02a965cabff134f30f938d14c97d62aa",
+    "fixtureSourceLines": [
+      386,
+      390
+    ],
+    "normalizingLiteralMatches": 2,
+    "matchedValuesNotProjected": true,
+    "normalizerPath": "drizzle/20261030230000_hosted_usage.sql",
+    "normalizerBlob": "41c55d332822f397f51a75eb95bdeafc2abc685a",
+    "normalizerSourceLines": [
+      38,
+      39,
+      40,
+      41
+    ],
+    "exactSqlRuleRead": true
+  },
+  "credentialLabelReview": {
+    "total": 36,
+    "unmasked": [],
+    "byKey": {
+      "token": 9,
+      "FFMPEG_GITHUB_TOKEN": 4,
+      "BETTER_AUTH_SECRET": 22,
+      "GITHUB_TOKEN": 1
+    },
+    "allMasked": true,
+    "unmaskedValuesExported": false,
+    "processScopeBoundary": "Masked logs alone do not prove dependency process credential isolation; that source risk is reviewed separately."
+  },
+  "unresolvedCandidates": 0,
+  "publicDisposition": "Publish all five original decoded log strings without edits. Exclude tool/API envelopes, platform account metadata and temporary download URLs.",
+  "limitations": "Pattern and source checks do not prove universal absence of personal data. These jobs use isolated synthetic CI fixtures, not production business-data reads.",
+  "downloadAccounting": [
+    {
+      "jobId": 129114785119,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1
+    },
+    {
+      "jobId": 129114785141,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1
+    },
+    {
+      "jobId": 129114785156,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1
+    },
+    {
+      "jobId": 129114785357,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1
+    },
+    {
+      "jobId": 129117884767,
+      "reviewerDownloads": 1,
+      "teamDownloads": 1
+    }
+  ],
+  "resources": {
+    "created": 0,
+    "testsRerun": 0,
+    "productionOrModelCalls": 0,
+    "refsChanged": false
+  }
+}

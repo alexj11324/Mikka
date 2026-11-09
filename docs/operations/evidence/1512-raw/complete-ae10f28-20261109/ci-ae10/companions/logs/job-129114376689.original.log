@@ -1,0 +1,1688 @@
+﻿2026-11-09T10:47:40.6400615Z Current runner version: '2.338.2'
+2026-11-09T10:47:40.6449992Z ##[group]Runner Image Provisioner
+2026-11-09T10:47:40.6450838Z Hosted Compute Agent
+2026-11-09T10:47:40.6451407Z Version: 20261028.624
+2026-11-09T10:47:40.6452029Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+2026-11-09T10:47:40.6452710Z Build Date: 2026-10-28T21:51:42Z
+2026-11-09T10:47:40.6453354Z Worker ID: {836c3d59-9674-491b-a454-e62507b0cbcf}
+2026-11-09T10:47:40.6454020Z Region: eastus3
+2026-11-09T10:47:40.6454523Z Cloud: Azure
+2026-11-09T10:47:40.6455037Z ##[endgroup]
+2026-11-09T10:47:40.6457016Z ##[group]Operating System
+2026-11-09T10:47:40.6457647Z Ubuntu
+2026-11-09T10:47:40.6458117Z 24.04.5
+2026-11-09T10:47:40.6458584Z LTS
+2026-11-09T10:47:40.6459374Z ##[endgroup]
+2026-11-09T10:47:40.6459885Z ##[group]Runner Image
+2026-11-09T10:47:40.6460470Z Image: ubuntu-24.04
+2026-11-09T10:47:40.6461033Z Version: 20261101.360.1
+2026-11-09T10:47:40.6462217Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261101.360/images/ubuntu/Ubuntu2404-Readme.md
+2026-11-09T10:47:40.6463908Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261101.360
+2026-11-09T10:47:40.6464780Z ##[endgroup]
+2026-11-09T10:47:40.6465854Z ##[group]GITHUB_TOKEN Permissions
+2026-11-09T10:47:40.6468327Z Contents: read
+2026-11-09T10:47:40.6469123Z Metadata: read
+2026-11-09T10:47:40.6469629Z ##[endgroup]
+2026-11-09T10:47:40.6471889Z Secret source: Actions
+2026-11-09T10:47:40.6472754Z Cache mode: write
+2026-11-09T10:47:40.6473810Z Prepare workflow directory
+2026-11-09T10:47:40.6904354Z Prepare all required actions
+2026-11-09T10:47:40.6955691Z Getting action download info
+2026-11-09T10:47:40.9435868Z Download action repository 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-11-09T10:47:41.0299846Z Download action repository 'pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1' (SHA:b906affcce14559ad1aafd4ab0e942779e9f58b1)
+2026-11-09T10:47:41.3396347Z Download action repository 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-11-09T10:47:41.5112902Z Complete job name: ssh
+2026-11-09T10:47:41.5824604Z ##[group]Checking docker version
+2026-11-09T10:47:41.5837910Z ##[command]/usr/bin/docker version --format '{{.Server.APIVersion}}'
+2026-11-09T10:47:41.6688994Z '1.48'
+2026-11-09T10:47:41.6708138Z Docker daemon API version: '1.48'
+2026-11-09T10:47:41.6709190Z ##[command]/usr/bin/docker version --format '{{.Client.APIVersion}}'
+2026-11-09T10:47:41.6908942Z '1.48'
+2026-11-09T10:47:41.6920181Z Docker client API version: '1.48'
+2026-11-09T10:47:41.6927489Z ##[endgroup]
+2026-11-09T10:47:41.6940338Z ##[group]Clean up resources from previous jobs
+2026-11-09T10:47:41.6945892Z ##[command]/usr/bin/docker ps --all --quiet --no-trunc --filter "label=73a845"
+2026-11-09T10:47:41.7148269Z ##[command]/usr/bin/docker network prune --force --filter "label=73a845"
+2026-11-09T10:47:41.7323653Z ##[endgroup]
+2026-11-09T10:47:41.7324209Z ##[group]Create local container network
+2026-11-09T10:47:41.7336695Z ##[command]/usr/bin/docker network create --label 73a845 github_network_3728151d58894806849a2d8b6af0ac60
+2026-11-09T10:47:41.7784649Z 3c01fc543dfc8b3064b00e84365c84cc2afa003075b01738b280f0f6a8cf0cbb
+2026-11-09T10:47:41.7806521Z ##[endgroup]
+2026-11-09T10:47:41.7833512Z ##[group]Starting postgres service container
+2026-11-09T10:47:41.7858611Z ##[command]/usr/bin/docker pull postgres:17
+2026-11-09T10:47:42.1754154Z 17: Pulling from library/postgres
+2026-11-09T10:47:42.2878057Z 37fb86c2a767: Pulling fs layer
+2026-11-09T10:47:42.2880933Z 56c5b61c6d2b: Pulling fs layer
+2026-11-09T10:47:42.2882338Z c2f4b34f5119: Pulling fs layer
+2026-11-09T10:47:42.2883656Z d717e9509665: Pulling fs layer
+2026-11-09T10:47:42.2884777Z 046371a447cc: Pulling fs layer
+2026-11-09T10:47:42.2885825Z c97a680633a2: Pulling fs layer
+2026-11-09T10:47:42.2886918Z f0f18338e0da: Pulling fs layer
+2026-11-09T10:47:42.2887964Z 0eab0a63b06d: Pulling fs layer
+2026-11-09T10:47:42.2889687Z 9de238338a9a: Pulling fs layer
+2026-11-09T10:47:42.2890937Z 275aa943d416: Pulling fs layer
+2026-11-09T10:47:42.2891832Z 5760334e16b5: Pulling fs layer
+2026-11-09T10:47:42.2892739Z d35c08e535dc: Pulling fs layer
+2026-11-09T10:47:42.2893659Z 4f0fb6572de8: Pulling fs layer
+2026-11-09T10:47:42.2894617Z ceeafc939069: Pulling fs layer
+2026-11-09T10:47:42.2895604Z d717e9509665: Waiting
+2026-11-09T10:47:42.2896385Z 046371a447cc: Waiting
+2026-11-09T10:47:42.2897180Z c97a680633a2: Waiting
+2026-11-09T10:47:42.2897968Z f0f18338e0da: Waiting
+2026-11-09T10:47:42.2898956Z 0eab0a63b06d: Waiting
+2026-11-09T10:47:42.2899820Z 9de238338a9a: Waiting
+2026-11-09T10:47:42.2900617Z 4f0fb6572de8: Waiting
+2026-11-09T10:47:42.2901443Z 275aa943d416: Waiting
+2026-11-09T10:47:42.2902391Z 5760334e16b5: Waiting
+2026-11-09T10:47:42.2903353Z ceeafc939069: Waiting
+2026-11-09T10:47:42.2904329Z d35c08e535dc: Waiting
+2026-11-09T10:47:42.3541572Z 56c5b61c6d2b: Download complete
+2026-11-09T10:47:42.3804777Z c2f4b34f5119: Verifying Checksum
+2026-11-09T10:47:42.3807876Z c2f4b34f5119: Download complete
+2026-11-09T10:47:42.4283252Z d717e9509665: Verifying Checksum
+2026-11-09T10:47:42.4286630Z d717e9509665: Download complete
+2026-11-09T10:47:42.4750723Z 046371a447cc: Verifying Checksum
+2026-11-09T10:47:42.4752692Z 046371a447cc: Download complete
+2026-11-09T10:47:42.5059137Z c97a680633a2: Verifying Checksum
+2026-11-09T10:47:42.5061168Z c97a680633a2: Download complete
+2026-11-09T10:47:42.5160423Z 37fb86c2a767: Verifying Checksum
+2026-11-09T10:47:42.5161508Z 37fb86c2a767: Download complete
+2026-11-09T10:47:42.5382575Z f0f18338e0da: Verifying Checksum
+2026-11-09T10:47:42.5384277Z f0f18338e0da: Download complete
+2026-11-09T10:47:42.5727221Z 0eab0a63b06d: Verifying Checksum
+2026-11-09T10:47:42.5728039Z 0eab0a63b06d: Download complete
+2026-11-09T10:47:42.6087871Z 275aa943d416: Verifying Checksum
+2026-11-09T10:47:42.6088733Z 275aa943d416: Download complete
+2026-11-09T10:47:42.6402340Z 5760334e16b5: Verifying Checksum
+2026-11-09T10:47:42.6403377Z 5760334e16b5: Download complete
+2026-11-09T10:47:42.7026629Z d35c08e535dc: Verifying Checksum
+2026-11-09T10:47:42.7028735Z d35c08e535dc: Download complete
+2026-11-09T10:47:42.7121328Z 4f0fb6572de8: Verifying Checksum
+2026-11-09T10:47:42.7122144Z 4f0fb6572de8: Download complete
+2026-11-09T10:47:42.7998330Z ceeafc939069: Verifying Checksum
+2026-11-09T10:47:42.7999877Z ceeafc939069: Download complete
+2026-11-09T10:47:42.9179612Z 9de238338a9a: Verifying Checksum
+2026-11-09T10:47:42.9182700Z 9de238338a9a: Download complete
+2026-11-09T10:47:43.4204135Z 37fb86c2a767: Pull complete
+2026-11-09T10:47:44.1467186Z 56c5b61c6d2b: Pull complete
+2026-11-09T10:47:44.2933114Z c2f4b34f5119: Pull complete
+2026-11-09T10:47:44.3224192Z d717e9509665: Pull complete
+2026-11-09T10:47:44.5814068Z 046371a447cc: Pull complete
+2026-11-09T10:47:44.6404475Z c97a680633a2: Pull complete
+2026-11-09T10:47:44.6501444Z f0f18338e0da: Pull complete
+2026-11-09T10:47:44.6632175Z 0eab0a63b06d: Pull complete
+2026-11-09T10:47:47.4471124Z 9de238338a9a: Pull complete
+2026-11-09T10:47:47.4594527Z 275aa943d416: Pull complete
+2026-11-09T10:47:47.4865774Z 5760334e16b5: Pull complete
+2026-11-09T10:47:47.4947749Z d35c08e535dc: Pull complete
+2026-11-09T10:47:47.5025142Z 4f0fb6572de8: Pull complete
+2026-11-09T10:47:47.5126026Z ceeafc939069: Pull complete
+2026-11-09T10:47:47.5161327Z Digest: sha256:ff87138949ad9a46f32ff23bd6852b52ce024a13dffe9b4087be98292cdd3b4f
+2026-11-09T10:47:47.5175818Z Status: Downloaded newer image for postgres:17
+2026-11-09T10:47:47.5185482Z docker.io/library/postgres:17
+2026-11-09T10:47:47.5242013Z ##[command]/usr/bin/docker create --name ff743d60523a4e2eadc70b9b2c0f7504_postgres17_6d6b2b --label 73a845 --network github_network_3728151d58894806849a2d8b6af0ac60 --network-alias postgres -p 55491:5432 --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10 -e "POSTGRES_HOST_AUTH_METHOD=trust" -e "POSTGRES_DB=mikka_491_e2e" -e GITHUB_ACTIONS=true -e CI=true postgres:17
+2026-11-09T10:47:47.5499680Z 75762772aa07956352ceb29a5ebc606bff904ea32379a585c706e2603c1cf6a3
+2026-11-09T10:47:47.5521515Z ##[command]/usr/bin/docker start 75762772aa07956352ceb29a5ebc606bff904ea32379a585c706e2603c1cf6a3
+2026-11-09T10:47:47.7404529Z 75762772aa07956352ceb29a5ebc606bff904ea32379a585c706e2603c1cf6a3
+2026-11-09T10:47:47.7423266Z ##[command]/usr/bin/docker ps --all --filter id=75762772aa07956352ceb29a5ebc606bff904ea32379a585c706e2603c1cf6a3 --filter status=running --no-trunc --format "{{.ID}} {{.Status}}"
+2026-11-09T10:47:47.7572312Z 75762772aa07956352ceb29a5ebc606bff904ea32379a585c706e2603c1cf6a3 Up Less than a second (health: starting)
+2026-11-09T10:47:47.7595070Z ##[command]/usr/bin/docker port 75762772aa07956352ceb29a5ebc606bff904ea32379a585c706e2603c1cf6a3
+2026-11-09T10:47:47.7741934Z 5432/tcp -> 0.0.0.0:55491
+2026-11-09T10:47:47.7743100Z 5432/tcp -> [::]:55491
+2026-11-09T10:47:47.7791440Z ##[endgroup]
+2026-11-09T10:47:47.7800151Z ##[group]Waiting for all services to be ready
+2026-11-09T10:47:47.7814113Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" 75762772aa07956352ceb29a5ebc606bff904ea32379a585c706e2603c1cf6a3
+2026-11-09T10:47:47.7971776Z starting
+2026-11-09T10:47:47.7993527Z postgres service is starting, waiting 2 seconds before checking again.
+2026-11-09T10:47:49.8002057Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" 75762772aa07956352ceb29a5ebc606bff904ea32379a585c706e2603c1cf6a3
+2026-11-09T10:47:49.8147851Z starting
+2026-11-09T10:47:49.8159784Z postgres service is starting, waiting 3 seconds before checking again.
+2026-11-09T10:47:53.7814807Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" 75762772aa07956352ceb29a5ebc606bff904ea32379a585c706e2603c1cf6a3
+2026-11-09T10:47:53.7966431Z healthy
+2026-11-09T10:47:53.7980573Z postgres service is healthy.
+2026-11-09T10:47:53.7981338Z ##[endgroup]
+2026-11-09T10:47:53.8272239Z ##[group]Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+2026-11-09T10:47:53.8272900Z with:
+2026-11-09T10:47:53.8273107Z   repository: alexj11324/Mikka
+2026-11-09T10:47:53.8275994Z   token: ***
+2026-11-09T10:47:53.8276194Z   ssh-strict: true
+2026-11-09T10:47:53.8276390Z   ssh-user: git
+2026-11-09T10:47:53.8276609Z   persist-credentials: true
+2026-11-09T10:47:53.8276840Z   clean: true
+2026-11-09T10:47:53.8277052Z   sparse-checkout-cone-mode: true
+2026-11-09T10:47:53.8277306Z   fetch-depth: 1
+2026-11-09T10:47:53.8277496Z   fetch-tags: false
+2026-11-09T10:47:53.8277696Z   show-progress: true
+2026-11-09T10:47:53.8277894Z   lfs: false
+2026-11-09T10:47:53.8278077Z   submodules: false
+2026-11-09T10:47:53.8278279Z   set-safe-directory: true
+2026-11-09T10:47:53.8278514Z   allow-unsafe-pr-checkout: false
+2026-11-09T10:47:53.8279126Z ##[endgroup]
+2026-11-09T10:47:54.0579049Z Syncing repository: alexj11324/Mikka
+2026-11-09T10:47:54.0580704Z ##[group]Getting Git version info
+2026-11-09T10:47:54.0581116Z Working directory is '/home/runner/work/Mikka/Mikka'
+2026-11-09T10:47:54.0581672Z [command]/usr/bin/git version
+2026-11-09T10:47:54.0639144Z git version 2.56.0
+2026-11-09T10:47:54.0659984Z ##[endgroup]
+2026-11-09T10:47:54.0681406Z Temporarily overriding HOME='/home/runner/work/_temp/c113e1cb-3bd1-4cc4-92f6-a108b58caa65' before making global git config changes
+2026-11-09T10:47:54.0690253Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T10:47:54.0691339Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T10:47:54.0732635Z Deleting the contents of '/home/runner/work/Mikka/Mikka'
+2026-11-09T10:47:54.0742261Z ##[group]Initializing the repository
+2026-11-09T10:47:54.0744372Z [command]/usr/bin/git init /home/runner/work/Mikka/Mikka
+2026-11-09T10:47:54.0834876Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-09T10:47:54.0835766Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-09T10:47:54.0836572Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-09T10:47:54.0837046Z hint: call:
+2026-11-09T10:47:54.0837240Z hint:
+2026-11-09T10:47:54.0837572Z hint: 	git config --global init.defaultBranch <name>
+2026-11-09T10:47:54.0837864Z hint:
+2026-11-09T10:47:54.0838146Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-09T10:47:54.0839035Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-09T10:47:54.0839586Z hint:
+2026-11-09T10:47:54.0839914Z hint: 	git branch -m <name>
+2026-11-09T10:47:54.0840292Z hint:
+2026-11-09T10:47:54.0840806Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-09T10:47:54.0843048Z Initialized empty Git repository in /home/runner/work/Mikka/Mikka/.git/
+2026-11-09T10:47:54.0872104Z [command]/usr/bin/git remote add origin https://github.com/alexj11324/Mikka
+2026-11-09T10:47:54.0916655Z ##[endgroup]
+2026-11-09T10:47:54.0917375Z ##[group]Disabling automatic garbage collection
+2026-11-09T10:47:54.0920807Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-09T10:47:54.0964003Z ##[endgroup]
+2026-11-09T10:47:54.0964666Z ##[group]Setting up auth
+2026-11-09T10:47:54.0972085Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T10:47:54.1010458Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T10:47:54.1349409Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T10:47:54.1387231Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T10:47:54.1601337Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T10:47:54.1636925Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T10:47:54.1830232Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-09T10:47:54.1871802Z ##[endgroup]
+2026-11-09T10:47:54.1872494Z ##[group]Fetching the repository
+2026-11-09T10:47:54.1883856Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +ddbc7e9b8e156493af730f00ed4a6efd3de475b4:refs/remotes/pull/1799/merge
+2026-11-09T10:47:55.5801543Z From https://github.com/alexj11324/Mikka
+2026-11-09T10:47:55.5802500Z  * [new ref]         ddbc7e9b8e156493af730f00ed4a6efd3de475b4 -> pull/1799/merge
+2026-11-09T10:47:55.5814886Z ##[endgroup]
+2026-11-09T10:47:55.5815456Z ##[group]Determining the checkout info
+2026-11-09T10:47:55.5816199Z ##[endgroup]
+2026-11-09T10:47:55.5816710Z [command]/usr/bin/git sparse-checkout disable
+2026-11-09T10:47:55.5870896Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-09T10:47:55.5899790Z ##[group]Checking out the ref
+2026-11-09T10:47:55.5929851Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/1799/merge
+2026-11-09T10:47:56.1787971Z Note: switching to 'refs/remotes/pull/1799/merge'.
+2026-11-09T10:47:56.1788395Z 
+2026-11-09T10:47:56.1788677Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-11-09T10:47:56.1789364Z changes and commit them, and you can discard any commits you make in this
+2026-11-09T10:47:56.1789834Z state without impacting any branches by switching back to a branch.
+2026-11-09T10:47:56.1790101Z 
+2026-11-09T10:47:56.1790381Z If you want to create a new branch to retain commits you create, you may
+2026-11-09T10:47:56.1790811Z do so (now or later) by using -c with the switch command. Example:
+2026-11-09T10:47:56.1791066Z 
+2026-11-09T10:47:56.1791217Z   git switch -c <new-branch-name>
+2026-11-09T10:47:56.1791381Z 
+2026-11-09T10:47:56.1791716Z Or undo this operation with:
+2026-11-09T10:47:56.1791864Z 
+2026-11-09T10:47:56.1791954Z   git switch -
+2026-11-09T10:47:56.1792079Z 
+2026-11-09T10:47:56.1792284Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-11-09T10:47:56.1792565Z 
+2026-11-09T10:47:56.1792884Z HEAD is now at ddbc7e9 Merge ae10f28aa471dbfc64f04d981b8934d374476259 into a2198c8c2f608f7b8169329b9da853067618dba6
+2026-11-09T10:47:56.1813962Z ##[endgroup]
+2026-11-09T10:47:56.1859061Z [command]/usr/bin/git log -1 --format=%H
+2026-11-09T10:47:56.1883731Z ddbc7e9b8e156493af730f00ed4a6efd3de475b4
+2026-11-09T10:47:56.2108017Z ##[group]Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+2026-11-09T10:47:56.2108393Z with:
+2026-11-09T10:47:56.2108577Z   version: 10.34.3
+2026-11-09T10:47:56.2108987Z   dest: ~/setup-pnpm
+2026-11-09T10:47:56.2109245Z   run_install: null
+2026-11-09T10:47:56.2109435Z   cache: false
+2026-11-09T10:47:56.2109641Z   cache_dependency_path: pnpm-lock.yaml
+2026-11-09T10:47:56.2109933Z   package_json_file: package.json
+2026-11-09T10:47:56.2110178Z   standalone: false
+2026-11-09T10:47:56.2110367Z ##[endgroup]
+2026-11-09T10:47:56.3585872Z ##[group]Running self-installer...
+2026-11-09T10:47:56.7774232Z (node:2685) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T10:47:56.7775900Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T10:47:56.8891513Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-09T10:47:56.8983760Z Packages: +1
+2026-11-09T10:47:56.8984264Z +
+2026-11-09T10:47:57.2620962Z Progress: resolved 1, reused 0, downloaded 1, added 1, done
+2026-11-09T10:47:57.2940844Z 
+2026-11-09T10:47:57.2941413Z dependencies:
+2026-11-09T10:47:57.2941828Z + pnpm 10.34.3 (12.18.0 is available)
+2026-11-09T10:47:57.2942126Z 
+2026-11-09T10:47:57.2967104Z Done in 754ms
+2026-11-09T10:47:57.3170083Z ##[endgroup]
+2026-11-09T10:47:57.3170866Z Installation Completed!
+2026-11-09T10:47:57.3350305Z ##[group]Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+2026-11-09T10:47:57.3350796Z with:
+2026-11-09T10:47:57.3351126Z   node-version: 24.22.1
+2026-11-09T10:47:57.3351396Z   cache: pnpm
+2026-11-09T10:47:57.3351709Z   always-auth: false
+2026-11-09T10:47:57.3352237Z   check-latest: false
+2026-11-09T10:47:57.3355125Z   token: ***
+2026-11-09T10:47:57.3355410Z env:
+2026-11-09T10:47:57.3355750Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T10:47:57.3356179Z ##[endgroup]
+2026-11-09T10:47:57.4789631Z Attempting to download 24.22.1...
+2026-11-09T10:47:57.4895704Z (node:2699) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T10:47:57.4896610Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T10:47:58.1316595Z Acquiring 24.22.1 - x64 from https://github.com/actions/node-versions/releases/download/24.22.1-39619001896/node-24.22.1-linux-x64.tar.gz
+2026-11-09T10:47:58.6462545Z Extracting ...
+2026-11-09T10:47:58.6587935Z [command]/usr/bin/tar xz --strip 1 --warning=no-unknown-keyword --overwrite -C /home/runner/work/_temp/322217cc-e835-48d2-9390-78a6f0b10e22 -f /home/runner/work/_temp/9474dfef-e45e-4540-b455-cdf9d205c3a2
+2026-11-09T10:47:59.8559868Z Adding to the cache ...
+2026-11-09T10:48:01.1686548Z ##[group]Environment details
+2026-11-09T10:48:01.3968018Z node: v24.22.1
+2026-11-09T10:48:01.3968459Z npm: 11.19.1
+2026-11-09T10:48:01.3969180Z yarn: 1.22.22
+2026-11-09T10:48:01.3970079Z ##[endgroup]
+2026-11-09T10:48:01.4094380Z [command]/home/runner/setup-pnpm/node_modules/.bin/pnpm store path --silent
+2026-11-09T10:48:01.8129280Z /home/runner/setup-pnpm/node_modules/.bin/store/v10
+2026-11-09T10:48:01.9269445Z Cache hit for: node-cache-Linux-x64-pnpm-54b3618e3cf47efbec4384bce0c968e977f7f497c903a30e612e08a79a0791c9
+2026-11-09T10:48:01.9390815Z (node:2699) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T10:48:03.0459868Z Received 268435456 of 1127814902 (23.8%), 245.0 MBs/sec
+2026-11-09T10:48:04.0449618Z Received 566231040 of 1127814902 (50.2%), 264.1 MBs/sec
+2026-11-09T10:48:05.0485147Z Received 843055104 of 1127814902 (74.8%), 263.7 MBs/sec
+2026-11-09T10:48:06.0520501Z Received 1123620598 of 1127814902 (99.6%), 264.6 MBs/sec
+2026-11-09T10:48:06.0731859Z Received 1127814902 of 1127814902 (100.0%), 264.1 MBs/sec
+2026-11-09T10:48:06.0732296Z Cache Size: ~1076 MB (1127814902 B)
+2026-11-09T10:48:06.0797377Z [command]/usr/bin/tar -xf /home/runner/work/_temp/08f84ebd-1b69-402e-8af8-09aa9bad7cb2/cache.tzst -P -C /home/runner/work/Mikka/Mikka --use-compress-program unzstd
+2026-11-09T10:48:15.7191990Z Cache restored successfully
+2026-11-09T10:48:15.7872987Z Cache restored from key: node-cache-Linux-x64-pnpm-54b3618e3cf47efbec4384bce0c968e977f7f497c903a30e612e08a79a0791c9
+2026-11-09T10:48:15.8316572Z ##[group]Run pnpm install --frozen-lockfile
+2026-11-09T10:48:15.8317039Z [36;1mpnpm install --frozen-lockfile[0m
+2026-11-09T10:48:15.8334778Z shell: /usr/bin/bash -e {0}
+2026-11-09T10:48:15.8335049Z env:
+2026-11-09T10:48:15.8335307Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T10:48:15.8335625Z ##[endgroup]
+2026-11-09T10:48:16.2243721Z Scope: all 7 workspace projects
+2026-11-09T10:48:16.3385865Z Lockfile is up to date, resolution step is skipped
+2026-11-09T10:48:16.4471109Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-09T10:48:16.6582706Z Packages: +2184
+2026-11-09T10:48:16.6583442Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-11-09T10:48:17.4693207Z Progress: resolved 2184, reused 561, downloaded 0, added 0
+2026-11-09T10:48:18.4691323Z Progress: resolved 2184, reused 2070, downloaded 0, added 0
+2026-11-09T10:48:19.4699449Z Progress: resolved 2184, reused 2108, downloaded 0, added 458
+2026-11-09T10:48:20.4699716Z Progress: resolved 2184, reused 2108, downloaded 0, added 656
+2026-11-09T10:48:21.4700327Z Progress: resolved 2184, reused 2108, downloaded 0, added 990
+2026-11-09T10:48:22.4714182Z Progress: resolved 2184, reused 2108, downloaded 0, added 1200
+2026-11-09T10:48:23.4715053Z Progress: resolved 2184, reused 2108, downloaded 0, added 1422
+2026-11-09T10:48:24.4724115Z Progress: resolved 2184, reused 2108, downloaded 0, added 1858
+2026-11-09T10:48:25.4729226Z Progress: resolved 2184, reused 2108, downloaded 0, added 2181
+2026-11-09T10:48:25.7566587Z Progress: resolved 2184, reused 2108, downloaded 0, added 2184, done
+2026-11-09T10:48:27.3426883Z  WARN  Failed to create bin at /home/runner/work/Mikka/Mikka/apps/desktop/node_modules/.bin/mikka. ENOENT: no such file or directory, open '/home/runner/work/Mikka/Mikka/packages/daemon/dist/mikka.js'
+2026-11-09T10:48:27.8830677Z 
+2026-11-09T10:48:27.8831805Z dependencies:
+2026-11-09T10:48:27.8832324Z + @ai-sdk/gateway 4.0.121
+2026-11-09T10:48:27.8832852Z + @ai-sdk/mcp 2.0.81
+2026-11-09T10:48:27.8833310Z + @ai-sdk/openai 4.0.99
+2026-11-09T10:48:27.8833859Z + @ai-sdk/openai-compatible 3.0.75
+2026-11-09T10:48:27.8834430Z + @ai-sdk/react 4.0.152
+2026-11-09T10:48:27.8834903Z + @ai-sdk/workflow 2.0.80
+2026-11-09T10:48:27.8835360Z + @base-ui/react 1.9.0
+2026-11-09T10:48:27.8835844Z + @better-auth/core 1.7.12
+2026-11-09T10:48:27.8836383Z + @better-auth/expo 1.7.12
+2026-11-09T10:48:27.8836987Z + @better-auth/oauth-provider 1.7.12
+2026-11-09T10:48:27.8837591Z + @chat-adapter/slack 4.43.0
+2026-11-09T10:48:27.8838182Z + @chat-adapter/state-pg 4.43.0
+2026-11-09T10:48:27.8838723Z + @chat-adapter/telegram 4.43.0
+2026-11-09T10:48:27.8839526Z + @composio/core 0.26.0
+2026-11-09T10:48:27.8839937Z + @dnd-kit/core 6.3.1
+2026-11-09T10:48:27.8840371Z + @dnd-kit/sortable 10.0.0
+2026-11-09T10:48:27.8840856Z + @dnd-kit/utilities 3.2.2
+2026-11-09T10:48:27.8841337Z + @e965/xlsx 0.20.3
+2026-11-09T10:48:27.8841721Z + @floating-ui/dom 1.8.0
+2026-11-09T10:48:27.8842394Z + @formatjs/intl-localematcher 0.8.14
+2026-11-09T10:48:27.8842739Z + @heroui/react 3.2.6
+2026-11-09T10:48:27.8843050Z + @heroui/styles 3.2.6
+2026-11-09T10:48:27.8843535Z + @internationalized/date 3.12.4
+2026-11-09T10:48:27.8843972Z + @mikka/protocol 0.0.1 <- packages/protocol
+2026-11-09T10:48:27.8844370Z + @modelcontextprotocol/server 2.3.1
+2026-11-09T10:48:27.8844729Z + @norbert_bodziony/bloub 0.4.1
+2026-11-09T10:48:27.8845031Z + @novnc/novnc 1.6.0
+2026-11-09T10:48:27.8845342Z + @opentelemetry/api 1.10.0
+2026-11-09T10:48:27.8845679Z + @opentelemetry/api-logs 0.223.0
+2026-11-09T10:48:27.8846001Z + @opentelemetry/core 2.12.0
+2026-11-09T10:48:27.8846410Z + @opentelemetry/exporter-logs-otlp-proto 0.223.0
+2026-11-09T10:48:27.8846890Z + @opentelemetry/exporter-trace-otlp-proto 0.223.0
+2026-11-09T10:48:27.8847324Z + @opentelemetry/instrumentation 0.223.0
+2026-11-09T10:48:27.8847733Z + @opentelemetry/instrumentation-pg 0.76.0
+2026-11-09T10:48:27.8848111Z + @opentelemetry/resources 2.12.0
+2026-11-09T10:48:27.8848682Z + @opentelemetry/sdk-logs 0.223.0
+2026-11-09T10:48:27.8849333Z + @opentelemetry/sdk-trace-base 2.12.0
+2026-11-09T10:48:27.8849724Z + @opentelemetry/sdk-trace-node 2.12.0
+2026-11-09T10:48:27.8850121Z + @opentelemetry/semantic-conventions 1.43.0
+2026-11-09T10:48:27.8850496Z + @openuidev/lang-core 1.0.1
+2026-11-09T10:48:27.8850821Z + @openuidev/react-lang 1.0.1
+2026-11-09T10:48:27.8851161Z + @openuidev/react-ui 0.18.1
+2026-11-09T10:48:27.8851520Z + @pierre/diffs 1.6.4
+2026-11-09T10:48:27.8851809Z + @shadcn/react 0.3.1
+2026-11-09T10:48:27.8852090Z + @solidjs/web 2.0.0-rc.0
+2026-11-09T10:48:27.8852396Z + @stripe/stripe-js 10.1.0
+2026-11-09T10:48:27.8852734Z + @tanstack/react-virtual 3.14.18
+2026-11-09T10:48:27.8853058Z + @tiptap/core 3.32.0
+2026-11-09T10:48:27.8853391Z + @tiptap/extension-collaboration 3.32.0
+2026-11-09T10:48:27.8853806Z + @tiptap/extension-collaboration-caret 3.32.0
+2026-11-09T10:48:27.8854216Z + @tiptap/extension-highlight 3.32.0
+2026-11-09T10:48:27.8854569Z + @tiptap/extension-list 3.32.0
+2026-11-09T10:48:27.8854927Z + @tiptap/extension-mention 3.32.0
+2026-11-09T10:48:27.8855286Z + @tiptap/extension-table 3.32.0
+2026-11-09T10:48:27.8855639Z + @tiptap/extension-text-align 3.32.0
+2026-11-09T10:48:27.8855970Z + @tiptap/extensions 3.32.0
+2026-11-09T10:48:27.8856294Z + @tiptap/pm 3.32.0
+2026-11-09T10:48:27.8856566Z + @tiptap/react 3.32.0
+2026-11-09T10:48:27.8856846Z + @tiptap/starter-kit 3.32.0
+2026-11-09T10:48:27.8857149Z + @tiptap/suggestion 3.32.0
+2026-11-09T10:48:27.8857448Z + @tiptap/y-tiptap 3.0.10
+2026-11-09T10:48:27.8857739Z + @vercel/analytics 1.3.1
+2026-11-09T10:48:27.8858020Z + @vercel/functions 3.10.2
+2026-11-09T10:48:27.8858313Z + @vercel/oidc 4.0.2
+2026-11-09T10:48:27.8858715Z + @workflow/serde 5.0.0
+2026-11-09T10:48:27.8859632Z + @workflow/world-local 5.1.2
+2026-11-09T10:48:27.8860024Z + ai 7.0.148
+2026-11-09T10:48:27.8860439Z + aws4fetch 1.0.20
+2026-11-09T10:48:27.8860820Z + beautiful-mermaid 1.1.3
+2026-11-09T10:48:27.8861116Z + better-auth 1.7.12
+2026-11-09T10:48:27.8861410Z + chat 4.43.0
+2026-11-09T10:48:27.8861863Z + class-variance-authority 0.7.1
+2026-11-09T10:48:27.8862170Z + clsx 2.1.1
+2026-11-09T10:48:27.8862461Z + cmdk 1.1.1
+2026-11-09T10:48:27.8862793Z + cn 0.5.0
+2026-11-09T10:48:27.8863010Z + cookie 1.1.1
+2026-11-09T10:48:27.8863250Z + date-fns 4.1.0
+2026-11-09T10:48:27.8863480Z + diff 8.0.2
+2026-11-09T10:48:27.8863719Z + dompurify 3.4.17
+2026-11-09T10:48:27.8863979Z + drizzle-orm 0.45.4
+2026-11-09T10:48:27.8864234Z + e2b 2.61.0
+2026-11-09T10:48:27.8864581Z + embla-carousel-react 8.5.1
+2026-11-09T10:48:27.8865032Z + fflate 0.8.3
+2026-11-09T10:48:27.8865295Z + ffmpeg-static 5.3.0
+2026-11-09T10:48:27.8865637Z + file-type 22.3.0
+2026-11-09T10:48:27.8866002Z + h3 2.0.8
+2026-11-09T10:48:27.8866367Z + hono 4.13.13
+2026-11-09T10:48:27.8866789Z + input-otp 1.4.1
+2026-11-09T10:48:27.8867070Z + katex 0.16.47
+2026-11-09T10:48:27.8867317Z + lucide-react 1.60.0
+2026-11-09T10:48:27.8867588Z + mcp-handler 2.3.0
+2026-11-09T10:48:27.8867826Z + mermaid 12.2.0
+2026-11-09T10:48:27.8868364Z + motion 14.5.0
+2026-11-09T10:48:27.8868631Z + music-metadata 12.3.4
+2026-11-09T10:48:27.8869205Z + negotiator 1.1.0
+2026-11-09T10:48:27.8869600Z + next 16.4.1
+2026-11-09T10:48:27.8869870Z + next-intl 4.14.9
+2026-11-09T10:48:27.8870121Z + next-themes 0.4.6
+2026-11-09T10:48:27.8870368Z + nodemailer 10.3.1
+2026-11-09T10:48:27.8870624Z + officeparser 8.5.0
+2026-11-09T10:48:27.8870873Z + pg 8.23.1
+2026-11-09T10:48:27.8871115Z + posthog-js 1.438.13
+2026-11-09T10:48:27.8871386Z + posthog-node 5.55.2
+2026-11-09T10:48:27.8871628Z + react 19.3.1
+2026-11-09T10:48:27.8871885Z + react-day-picker 9.8.0
+2026-11-09T10:48:27.8872176Z + react-dom 19.3.1
+2026-11-09T10:48:27.8872434Z + react-markdown 10.1.0
+2026-11-09T10:48:27.8872764Z + react-resizable-panels 4.14.7
+2026-11-09T10:48:27.8873117Z + react-syntax-highlighter 16.1.1
+2026-11-09T10:48:27.8873441Z + recharts 3.10.1
+2026-11-09T10:48:27.8873695Z + rehype-katex 7.0.1
+2026-11-09T10:48:27.8873960Z + remark-gfm 4.0.1
+2026-11-09T10:48:27.8874215Z + remark-math 6.0.0
+2026-11-09T10:48:27.8874727Z + shadcn 4.22.1
+2026-11-09T10:48:27.8875013Z + sharp 0.35.5
+2026-11-09T10:48:27.8875401Z + shiki 4.5.0
+2026-11-09T10:48:27.8875815Z + solid-js 2.0.0-rc.0
+2026-11-09T10:48:27.8876219Z + sonner 1.7.4
+2026-11-09T10:48:27.8876596Z + srvx 1.0.8
+2026-11-09T10:48:27.8876933Z + swr 2.5.1
+2026-11-09T10:48:27.8877257Z + tailwind-merge 3.7.0
+2026-11-09T10:48:27.8877618Z + tw-animate-css 1.4.0
+2026-11-09T10:48:27.8877954Z + undici 7.24.5
+2026-11-09T10:48:27.8878313Z + unstorage 2.0.0-beta.0
+2026-11-09T10:48:27.8878695Z + use-intl 4.14.9
+2026-11-09T10:48:27.8879326Z + vaul 1.1.2
+2026-11-09T10:48:27.8879630Z + workflow 5.2.3
+2026-11-09T10:48:27.8879913Z + y-protocols 1.0.7
+2026-11-09T10:48:27.8880106Z + yjs 13.6.33
+2026-11-09T10:48:27.8880287Z + zod 4.6.7
+2026-11-09T10:48:27.8880400Z 
+2026-11-09T10:48:27.8880500Z devDependencies:
+2026-11-09T10:48:27.8880722Z + @playwright/test 1.64.1
+2026-11-09T10:48:27.8880975Z + @tailwindcss/postcss 4.3.3
+2026-11-09T10:48:27.8881231Z + @types/node 25.9.9
+2026-11-09T10:48:27.8881476Z + @types/pg 8.23.1
+2026-11-09T10:48:27.8881720Z + @types/react 19.3.0
+2026-11-09T10:48:27.8881949Z + @types/react-dom 19.3.0
+2026-11-09T10:48:27.8882244Z + @types/react-syntax-highlighter 15.5.13
+2026-11-09T10:48:27.8882612Z + @typescript/native-preview 7.0.0-dev.20260707.2
+2026-11-09T10:48:27.8882905Z + esbuild 0.28.2
+2026-11-09T10:48:27.8883121Z + fake-indexeddb 6.2.4
+2026-11-09T10:48:27.8883341Z + happy-dom 15.11.7
+2026-11-09T10:48:27.8883550Z + js-yaml 4.3.2
+2026-11-09T10:48:27.8883751Z + nitro 3.0.261103-rc
+2026-11-09T10:48:27.8883947Z + nx 24.0.5
+2026-11-09T10:48:27.8884127Z + oxlint 1.89.0
+2026-11-09T10:48:27.8884510Z + postcss 8.5.31
+2026-11-09T10:48:27.8884808Z + prettier 3.9.10
+2026-11-09T10:48:27.8885339Z + prettier-plugin-tailwindcss 0.7.4
+2026-11-09T10:48:27.8885766Z + rolldown 1.3.0
+2026-11-09T10:48:27.8886038Z + tailwindcss 4.3.3
+2026-11-09T10:48:27.8886254Z + tsrs 0.20.1-ts7.1.0-beta
+2026-11-09T10:48:27.8886476Z + tsx 4.23.15
+2026-11-09T10:48:27.8886680Z + typescript 5.9.3
+2026-11-09T10:48:27.8886903Z + wrangler 4.152.0
+2026-11-09T10:48:27.8887108Z 
+2026-11-09T10:48:28.1616431Z  WARN  Failed to create bin at /home/runner/work/Mikka/Mikka/apps/desktop/node_modules/.bin/mikka. ENOENT: no such file or directory, open '/home/runner/work/Mikka/Mikka/apps/desktop/node_modules/@mikka/daemon/dist/mikka.js'
+2026-11-09T10:48:28.2620485Z ╭ Warning ─────────────────────────────────────────────────────────────────────╮
+2026-11-09T10:48:28.2621598Z │                                                                              │
+2026-11-09T10:48:28.2622723Z │   Ignored build scripts: @openuidev/lang-core@1.0.1, cbor-extract@2.2.2,     │
+2026-11-09T10:48:28.2623819Z │   core-js@3.51.0, electron-winstaller@5.4.0, nx@24.0.5,                      │
+2026-11-09T10:48:28.2624888Z │   tesseract.js@7.0.0, workerd@1.20261019.1.                                  │
+2026-11-09T10:48:28.2625992Z │   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+2026-11-09T10:48:28.2627568Z │   to run scripts.                                                            │
+2026-11-09T10:48:28.2628442Z │                                                                              │
+2026-11-09T10:48:28.2629598Z ╰──────────────────────────────────────────────────────────────────────────────╯
+2026-11-09T10:48:28.2765640Z Done in 12.4s using pnpm v10.34.3
+2026-11-09T10:48:28.3321268Z ##[group]Run pnpm --filter @mikka/daemon typecheck
+2026-11-09T10:48:28.3321679Z [36;1mpnpm --filter @mikka/daemon typecheck[0m
+2026-11-09T10:48:28.3321997Z [36;1mpnpm --filter @mikka/desktop test[0m
+2026-11-09T10:48:28.3322705Z [36;1mpnpm --filter @mikka/daemon exec vitest run test/auto-update.test.ts test/service.test.ts test/registration-login.test.ts test/device-file.test.ts test/commands.test.ts[0m
+2026-11-09T10:48:28.3337411Z shell: /usr/bin/bash -e {0}
+2026-11-09T10:48:28.3337691Z env:
+2026-11-09T10:48:28.3337948Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T10:48:28.3338256Z ##[endgroup]
+2026-11-09T10:48:28.7065116Z 
+2026-11-09T10:48:28.7066242Z > @mikka/daemon@0.0.1 typecheck /home/runner/work/Mikka/Mikka/packages/daemon
+2026-11-09T10:48:28.7067258Z > tsgo --noEmit -p tsconfig.json
+2026-11-09T10:48:28.7067639Z 
+2026-11-09T10:48:32.6477712Z 
+2026-11-09T10:48:32.6478630Z > @mikka/desktop@0.1.2 test /home/runner/work/Mikka/Mikka/apps/desktop
+2026-11-09T10:48:32.6482608Z > node --import tsx --test src/main/*.test.ts && node --test scripts/*.test.mjs test/native-cleanup.test.mjs test/account-release-observer.test.mjs test/generated-workspace-name.test.mjs test/native-cleanup-close.test.mjs test/bundled-session.test.mjs test/parity-reads.test.mjs test/parity-fixtures.test.mjs test/parity-clock.test.mjs test/native-auth-diagnostics.test.mjs test/native-device-ready.test.mjs test/native-node.test.mjs test/parity-reader-defaults.test.mjs test/native-crypto.test.mjs test/production-application.test.mjs test/live-worker.test.mjs test/self-hosted.test.mjs test/db-metrics.test.mjs test/native-document.test.mjs test/native-code-cache.test.mjs
+2026-11-09T10:48:32.6484854Z 
+2026-11-09T10:48:33.0230817Z ✔ each flavor has its own scheme, never the internal renderer scheme (1.393388ms)
+2026-11-09T10:48:33.0272505Z ✔ only the exact done path with one well-formed id parses (0.919445ms)
+2026-11-09T10:48:33.0301233Z ✔ a second instance passes the link as an argument; other arguments are not links (0.265716ms)
+2026-11-09T10:48:33.0315278Z ✔ only a link this process handed out, and only until it expires, is accepted (0.932662ms)
+2026-11-09T10:48:33.0370576Z ✔ older links are dropped once too many sign-ins are pending (0.423745ms)
+2026-11-09T10:48:33.0654385Z ✔ the callback page opens the app link, then offers it as a button under a nonce-only CSP (74.834334ms)
+2026-11-09T10:48:33.0783656Z ✔ the hosted callback page carries the same link in English (16.999495ms)
+2026-11-09T10:48:36.0901807Z ✔ the shared approval reader accepts its verified owner and server clock through the native proxy (45.388944ms)
+2026-11-09T10:48:36.0903386Z ✔ the native proxy does not manufacture approval ownership for missing viewer proof (2.587335ms)
+2026-11-09T10:48:36.0904676Z ✔ the native proxy does not manufacture approval ownership for different-owner viewer proof (1.516332ms)
+2026-11-09T10:48:36.0906893Z ✔ startup diagnostics distinguish HTTP headers from awaited private persistence without releasing the response early (9.647103ms)
+2026-11-09T10:48:36.0908146Z ✔ signed-out bootstrap creates no authenticated startup timing record (0.856395ms)
+2026-11-09T10:48:36.0909498Z ✔ accepts the actual community ticket base path and the existing Worker ticket path (28.809264ms)
+2026-11-09T10:48:36.0910553Z ✔ retains exact channel paths, TLS and ticket URL boundaries (2.800122ms)
+2026-11-09T10:48:36.0911804Z ✔ custom origin is explicit; opaque, lookalike, embedded and resource frames are unprivileged (2.268091ms)
+2026-11-09T10:48:36.0913356Z ✔ path policy rejects traversal, encoded delimiters, absolute targets and unknown API routes (2.913786ms)
+2026-11-09T10:48:36.0915164Z ✔ renderer CSP has no remote code, eval, inline scripts, external fetch, workers or object (0.334414ms)
+2026-11-09T10:48:36.0916328Z ✔ Factory flow accepts only a strict UUID and its two declared methods (0.287103ms)
+2026-11-09T10:48:36.0920789Z ✔ local entry/assets load without backend; missing assets and symlink escape fail closed (47.764909ms)
+2026-11-09T10:48:36.0923187Z ✔ proxy strips credentials, cookies, redirects and remote policy; preserves streaming resume headers (5.735867ms)
+2026-11-09T10:48:36.0924913Z ✔ OS-encrypted vault round trips, rejects wrong server/corruption and never writes plaintext (7.752251ms)
+2026-11-09T10:48:36.0926514Z ✔ unavailable OS keychain fails closed instead of persisting a plaintext session (2.045169ms)
+2026-11-09T10:48:36.0933483Z ✔ main bearer never appears in public session and only validated workspace selector persists (8.295956ms)
+2026-11-09T10:48:36.0934979Z ✔ loopback validates nonce/code exactly, ignores wrong attempts and accepts once on localhost (44.359813ms)
+2026-11-09T10:48:36.0936492Z ✔ browser handoff creates/exchanges PKCE only in main and publishes only public identity (22.771976ms)
+2026-11-09T10:48:36.0937891Z ✔ pending PKCE skips only the navigating main window and ordinary changes still notify it (0.549604ms)
+2026-11-09T10:48:36.0939672Z ▶ PKCE navigation failure restores notification only for its current authentication generation
+2026-11-09T10:48:36.0940603Z   ✔ current sign-in (14.232957ms)
+2026-11-09T10:48:36.0941195Z   ✔ signed out during navigation (10.007212ms)
+2026-11-09T10:48:36.0942355Z ✔ PKCE navigation failure restores notification only for its current authentication generation (25.202215ms)
+2026-11-09T10:48:36.0943911Z ✔ password session rotation is accepted only for its RPC and refreshes public session id privately (7.997461ms)
+2026-11-09T10:48:36.0945558Z ✔ saved-account switching uses that account bearer, safely projects choices and fences stale responses (8.027597ms)
+2026-11-09T10:48:36.0947169Z ✔ live hands renderer only owner-bound handles and refuses cross-window use or arbitrary messages (1.582831ms)
+2026-11-09T10:48:36.0948624Z ✔ viewer grants permit only the backend E2B viewer gateways and bounded expiries (0.627649ms)
+2026-11-09T10:48:36.0952517Z ✔ main binary viewer hides credentials, scopes ownership/workspace, and bounds send/receive data (1.722274ms)
+2026-11-09T10:48:36.0954078Z ✔ the vault keeps each account's exact server and refuses a widened or plain-HTTP one (8.246278ms)
+2026-11-09T10:48:36.0955444Z ✔ each account's bearer goes only to its own server; the switcher names servers once they differ (36.064917ms)
+2026-11-09T10:48:36.0956907Z ✔ switching to an account on another server moves the window and the sign-in target with it (30.709059ms)
+2026-11-09T10:48:36.0958299Z ✔ only a probed server can be chosen; signed out, requests and sign-in then go there (7.013007ms)
+2026-11-09T10:48:36.0960338Z ✔ an email sign-in on a self-hosted server stores that server with the account (4.713386ms)
+2026-11-09T10:48:36.0961500Z ✔ the same user id from a different server is refused, not merged (6.78463ms)
+2026-11-09T10:48:36.0963023Z ✔ disconnecting a server signs out only its accounts and moves to an account elsewhere (5.74171ms)
+2026-11-09T10:48:36.0964217Z ✔ a broken servers file falls back to the cloud (9.464587ms)
+2026-11-09T10:48:36.0965513Z ✔ REST cache fallback extracts only exact SDK cache cookies, including contiguous chunks (2.813801ms)
+2026-11-09T10:48:36.0967356Z ✔ REST cache fallback rejects ambiguous versions, malformed chunks and oversized proof (1.892271ms)
+2026-11-09T10:48:36.0969419Z ✔ REST cache fallback accepts SDK direct/chunk transitions and explicit private clears win (0.738495ms)
+2026-11-09T10:48:36.0970939Z ✔ a REST-only Set-Cookie renewal is retained encrypted and never forwarded to renderer (31.20823ms)
+2026-11-09T10:48:36.0972508Z ✔ signed cache survives encrypted cold restore but cannot cross the renderer header boundary (35.427453ms)
+2026-11-09T10:48:36.0973842Z ✔ native email handoff carries existing auth cache privately before its first bootstrap (7.499571ms)
+2026-11-09T10:48:36.0975690Z ✔ password rotation cannot replay the previous bearer cache, and revocation clears the encrypted record (11.780793ms)
+2026-11-09T10:48:36.0977097Z ✔ an old account cache response cannot overwrite the active account during encrypted commit (14.407258ms)
+2026-11-09T10:48:36.0980431Z ✔ signout during encrypted sign-in commit cannot resurrect that account after restart (6.681332ms)
+2026-11-09T10:48:36.0981942Z ✔ five maximum-size signed proofs fit only inside the bounded encrypted vault (5.106292ms)
+2026-11-09T10:48:36.0983400Z ✔ an existing bootstrap quietly refreshes only the current safe profile without another auth read (9.111048ms)
+2026-11-09T10:48:36.0984925Z ✔ a bootstrap body arriving after signout cannot restore the safe profile or escape its scope (6.499347ms)
+2026-11-09T10:48:36.0986391Z ✔ local assets load during vault restoration; authenticated transport waits and uses the restored identity (29.766026ms)
+2026-11-09T10:48:36.0987911Z ✔ a sign-out during restore revokes and clears the retained account rather than resurrecting it (2.678226ms)
+2026-11-09T10:48:36.0989883Z ✔ email sign-in and account reads cannot overtake initial restore (3.184217ms)
+2026-11-09T10:48:36.0991373Z ✔ all waiters join one restore and an empty vault preserves ordinary signed-out behavior (0.756331ms)
+2026-11-09T10:48:36.0992810Z ✔ OAuth continuation mints in main and opens only existing account-confirmed handoff (24.716819ms)
+2026-11-09T10:48:36.0994173Z ✔ no token is minted for an external origin, auth endpoint or unrecognized page (1.030563ms)
+2026-11-09T10:48:36.0995523Z ✔ missing, expired or changed native session cannot open a browser with another account (1.872818ms)
+2026-11-09T10:48:36.0996779Z ✔ malformed token response never reaches the browser or a caller (4.987611ms)
+2026-11-09T10:48:36.0997854Z ✔ maps a running daemon to the local device the UI shows (1.456463ms)
+2026-11-09T10:48:36.0999107Z ✔ keeps an unregistered daemon online but without an identity (0.206434ms)
+2026-11-09T10:48:36.1000086Z ✔ the offline device carries no identity at all (0.12062ms)
+2026-11-09T10:48:36.1001228Z ✔ main reads the current authenticated device account without caching or following a redirect (32.163374ms)
+2026-11-09T10:48:36.1002633Z ✔ setup admission reads only the fresh owner while daemon verification still reads devices (3.359914ms)
+2026-11-09T10:48:36.1004244Z ✔ the bridge setup follows A→B→A in one process, preserves a workspace switch, and only reports owned devices online (3.715345ms)
+2026-11-09T10:48:36.1005659Z ✔ asks the daemon on this computer to update and passes on its answer (2.94338ms)
+2026-11-09T10:48:36.1006913Z ✔ the dev app reaches only the dev daemon; the production app only the production one (0.544133ms)
+2026-11-09T10:48:36.1007992Z ✔ no daemon on this computer: nothing is asked (0.511376ms)
+2026-11-09T10:48:36.1009372Z ✔ an older daemon without daemon.update keeps its own hourly check (0.409344ms)
+2026-11-09T10:48:36.1010413Z ✔ a failed request never throws into the app launch (0.413716ms)
+2026-11-09T10:48:36.1011277Z ✔ no update: the app opens and the gate stops listening (7.166172ms)
+2026-11-09T10:48:36.1012331Z ✔ offline or a failed check: the app opens; a failed check never locks anyone out (2.852813ms)
+2026-11-09T10:48:36.1013593Z ✔ no answer within five seconds: the app opens, and a late answer is ignored (0.376829ms)
+2026-11-09T10:48:36.1014869Z ✔ a new version: progress, then install and restart; no way in on the old version (2.959477ms)
+2026-11-09T10:48:36.1016077Z ✔ a failed download shows why and offers 重试; 重试 downloads again (1.126067ms)
+2026-11-09T10:48:36.1017103Z ✔ an update downloaded on an earlier run installs at once (1.181379ms)
+2026-11-09T10:48:36.1018106Z ✔ the window shows a heading, progress and 重试 only when it can help (0.530817ms)
+2026-11-09T10:48:36.1019583Z ✔ installation failure keeps complete output beyond the old 4 KB stderr tail (47.263183ms)
+2026-11-09T10:48:36.1021142Z ✔ local install uses its own npm prefix and cache and preserves the selected Node for service/login/status (3.229814ms)
+2026-11-09T10:48:36.1022897Z ✔ check failure is structured, writes a private full log, and never starts npm (5.949983ms)
+2026-11-09T10:48:36.1024221Z ✔ stdin registration credentials are redacted even when a failed child echoes them (50.124016ms)
+2026-11-09T10:48:36.1027565Z ✔ discovery includes nvm, fnm, Volta and Homebrew instead of relying on interactive shell setup (0.737049ms)
+2026-11-09T10:48:38.6239142Z ✔ the loopback listener hands back the in-app finish URL (35.162587ms)
+2026-11-09T10:48:38.6240067Z ✔ a callback with the wrong nonce never reaches the finish page (7.242089ms)
+2026-11-09T10:48:38.6240832Z ✔ the return page follows the browser language and defaults to Chinese (5.151884ms)
+2026-11-09T10:48:38.6331097Z ✔ shows each notification id once (3.730322ms)
+2026-11-09T10:48:38.6332199Z ✔ caps notifications at five per minute (0.354742ms)
+2026-11-09T10:48:38.6333425Z ✔ allows a new notification after the window passes (0.253427ms)
+2026-11-09T10:48:38.6334674Z ✔ does nothing where notifications are unsupported (0.236394ms)
+2026-11-09T10:48:38.6335843Z ✔ refuses an invalid payload instead of showing it (0.962539ms)
+2026-11-09T10:48:38.6336770Z ✔ badge counts are bounded (0.502589ms)
+2026-11-09T10:48:38.6337905Z ✔ a finished thread (线程完成) is a desktop notification kind (0.256081ms)
+2026-11-09T10:48:38.6339223Z ✔ offline reconnects back off and keep going (2.285009ms)
+2026-11-09T10:48:38.6340247Z ✔ the failed URL's error page does not count as an app load (0.243249ms)
+2026-11-09T10:48:38.6341557Z ✔ a retry that fails again keeps the offline page retrying; one that succeeds stops it (0.115574ms)
+2026-11-09T10:48:38.6343082Z ✔ the offline page says whether this computer or Mikka is unreachable (review C9) (0.126305ms)
+2026-11-09T10:48:39.2634459Z ✔ the return listener tells the app the result once and shows the browser one line (38.830259ms)
+2026-11-09T10:48:39.2635984Z ✔ a return with another state or result never reaches the app, and the listener keeps waiting (18.695879ms)
+2026-11-09T10:48:39.2637404Z ✔ a state that is not the renderer's 43-character nonce is refused before listening (1.632983ms)
+2026-11-09T10:48:39.2760702Z ✔ only the exact app origin is trusted (1.809833ms)
+2026-11-09T10:48:39.2770953Z ✔ credentials and non-URLs have no origin (0.296185ms)
+2026-11-09T10:48:39.2776063Z ✔ navigation keeps only the app, opens every other HTTPS URL externally (0.535503ms)
+2026-11-09T10:48:39.2777356Z ✔ external opens accept only HTTP(S) and mailto without credentials (0.348816ms)
+2026-11-09T10:48:39.2778409Z ✔ external app-origin opens stay on the app origin (0.408698ms)
+2026-11-09T10:48:39.2779441Z ✔ loopback auth callback becomes the in-app token exchange page (0.655905ms)
+2026-11-09T10:48:39.2780289Z ✔ loopback auth callbacks reject invalid tokens and paths (0.303164ms)
+2026-11-09T10:48:39.2780753Z ✔ the loopback nonce is bounded (0.203539ms)
+2026-11-09T10:48:39.2781343Z ✔ plain-HTTP links open in the system browser like HTTPS; other schemes stay denied (1.741991ms)
+2026-11-09T10:48:39.2782115Z ✔ typed addresses become one canonical HTTPS base; plain HTTP only on this computer (1.396646ms)
+2026-11-09T10:48:39.2782885Z ✔ discovery needs a name, version, edition, base path, protocol range and sign-in methods (1.082946ms)
+2026-11-09T10:48:39.2783648Z ✔ a bare host finds the server under /mikka and keeps exactly the origin that answered (23.65194ms)
+2026-11-09T10:48:39.2784378Z ✔ unreachable, not Mikka and a redirect stay distinct; a redirect is never followed (2.25611ms)
+2026-11-09T10:48:39.2785110Z ✔ version answers: server too old, app too old, and an older Mikka without discovery (3.50952ms)
+2026-11-09T10:48:39.2785828Z ✔ five accounts and their workspace selections round-trip only as encrypted data (22.990926ms)
+2026-11-09T10:48:39.2786578Z ✔ v1 ciphertext migrates atomically to one active v2 account and retains its selector (4.446133ms)
+2026-11-09T10:48:39.2787369Z ✔ duplicate owners, an unknown active owner, excess accounts and malformed secrets fail closed (7.325755ms)
+2026-11-09T10:48:39.2789202Z ✔ queued writes snapshot their accounts and preserve the last explicit active selection (4.858963ms)
+2026-11-09T10:48:39.2790020Z ✔ wrong origins, a locked keychain, malformed ciphertext and logout expose no retained account (5.150979ms)
+2026-11-09T10:48:39.2790858Z ✔ SSH host parsing rejects options, commands and invalid ports (2.125709ms)
+2026-11-09T10:48:39.2791572Z ✔ first key requires explicit confirmation, then follows all steps without exposing the token (22.580368ms)
+2026-11-09T10:48:39.2792286Z ✔ host check failure names the step, keeps the reason and allows retry (2.110348ms)
+2026-11-09T10:48:39.2792949Z ✔ failures identify the exact installation step and never advance past it (3.631707ms)
+2026-11-09T10:48:39.2793587Z ✔ process runner returns output and maps failures and timeouts (127.604659ms)
+2026-11-09T10:48:39.2794234Z ✔ cancelled and timed out commands stop their own installer descendants (1837.715843ms)
+2026-11-09T10:48:39.2794900Z ✔ host details use OpenSSH resolution, with explicit aliases only (2.242049ms)
+2026-11-09T10:48:39.2795555Z ✔ cancel kills the in-flight process, preserves the step, and retry completes (6.247742ms)
+2026-11-09T10:48:39.2796226Z ✔ cancel during host discovery and fingerprint confirmation never installs (5.83143ms)
+2026-11-09T10:48:39.2796975Z ✔ 添加这台电脑 installs, starts and signs in the daemon here as a laptop, with no SSH (1.812945ms)
+2026-11-09T10:48:39.2797515Z ✔ a dev desktop adds its own dev daemon (0.560812ms)
+2026-11-09T10:48:39.2798163Z ✔ 重新连接 for this computer restarts its daemon and waits; it neither installs nor signs in again (0.497309ms)
+2026-11-09T10:48:39.2800778Z ✔ the login shell is $SHELL when it is a plain path, else the platform default (0.23823ms)
+2026-11-09T10:48:39.2801640Z ✔ automatic repair restarts a daemon that is already set up, without installing or signing in again (0.456167ms)
+2026-11-09T10:48:39.2802482Z ✔ automatic repair never reports another account's recovered daemon as this person's device (0.711685ms)
+2026-11-09T10:48:39.2803282Z ✔ an unconfirmed account fails repair without registering again or reporting online (3.605989ms)
+2026-11-09T10:48:39.2804006Z ✔ automatic repair installs and signs in when the restart fails (first launch) (0.799278ms)
+2026-11-09T10:48:39.2804685Z ✔ a failed automatic install keeps the reason and 重试 installs again (2.131218ms)
+2026-11-09T10:48:39.2805375Z ✔ repair registers an already running unregistered daemon without reinstalling it (2.917385ms)
+2026-11-09T10:48:39.2806141Z ✔ recovered daemon registration denial fails without another install or credential attempt (8.757154ms)
+2026-11-09T10:48:39.2806892Z ✔ recovered daemon registration still rejects a device owned by another account (7.624777ms)
+2026-11-09T10:48:39.2807679Z ✔ repair does not replace a starting or unconfirmed credential based on the initial server state (3.456457ms)
+2026-11-09T10:48:39.2808382Z ✔ only a Claude page returning to the registered callback is accepted (1.2888ms)
+2026-11-09T10:48:39.2809228Z ✔ catches the return, opens the browser once, and frees the port (42.046497ms)
+2026-11-09T10:48:39.2809838Z ✔ a declined sign-in, a newer attempt and a timeout resolve null (76.551188ms)
+2026-11-09T10:48:39.2810402Z ✔ a taken port rejects so the page can offer the paste (3.463963ms)
+2026-11-09T10:48:39.4224068Z ✔ downloads in the background and installs on quit (1.383847ms)
+2026-11-09T10:48:39.4240535Z ✔ a background check opens no dialog; only a downloaded update reaches the rail (1.384944ms)
+2026-11-09T10:48:39.4242420Z ✔ a menu check that finds a new version says nothing until it has downloaded, then offers the restart (0.344927ms)
+2026-11-09T10:48:39.4246893Z ✔ a menu check reports up to date and errors, including a failed download it started (0.628273ms)
+2026-11-09T10:48:39.4257624Z ✔ install restarts only once an update is downloaded (0.257542ms)
+2026-11-09T10:48:39.4260510Z ✔ the menu check speaks Chinese unless the system language is not (0.451407ms)
+2026-11-09T10:48:39.4499188Z ✔ macOS uses the sidebar material behind a transparent page in both themes (1.23885ms)
+2026-11-09T10:48:39.4500656Z ✔ Reduce transparency keeps the opaque macOS window (0.2332ms)
+2026-11-09T10:48:39.4501644Z ✔ Windows and Linux keep the opaque window and native title bar (1.009784ms)
+2026-11-09T10:48:39.4506468Z ℹ tests 156
+2026-11-09T10:48:39.4507284Z ℹ suites 0
+2026-11-09T10:48:39.4507652Z ℹ pass 156
+2026-11-09T10:48:39.4507965Z ℹ fail 0
+2026-11-09T10:48:39.4508300Z ℹ cancelled 0
+2026-11-09T10:48:39.4508652Z ℹ skipped 0
+2026-11-09T10:48:39.4510079Z ℹ todo 0
+2026-11-09T10:48:39.4510491Z ℹ duration_ms 6771.301045
+2026-11-09T10:48:39.6171113Z ✔ bundled IPC does not return a false signed-out projection while the vault is restoring (37.264941ms)
+2026-11-09T10:48:39.6332103Z ▶ a destroyed or newly untrusted sender cannot run queued IPC after restoration
+2026-11-09T10:48:39.6337479Z   ✔ destroyed (15.877145ms)
+2026-11-09T10:48:39.6495982Z   ✔ navigation (14.493419ms)
+2026-11-09T10:48:39.6514239Z ✔ a destroyed or newly untrusted sender cannot run queued IPC after restoration (31.867918ms)
+2026-11-09T10:48:39.8910809Z ✔ official asset download keeps authentication on the API and writes the exact CDN body (46.891415ms)
+2026-11-09T10:48:39.8920328Z ✔ a release digest differing from the locked package fails before fetching any asset (1.781471ms)
+2026-11-09T10:48:39.8921802Z ✔ an off-domain asset redirect is rejected without sending the token or fetching it (1.468275ms)
+2026-11-09T10:48:39.8923248Z ✔ a mismatched filename cannot select another platform or version from release metadata (0.204401ms)
+2026-11-09T10:48:39.8924841Z ✔ the native ARM64 asset can be streamed directly from the authenticated official API (5.378775ms)
+2026-11-09T10:48:39.8925827Z   • using cached artifact  label=electron
+2026-11-09T10:48:39.8947308Z ✔ the locked SDK cache and checksum seed are consumed by the actual builder without network or disabled checksums (275.094074ms)
+2026-11-09T10:48:39.9079610Z ✔ the real desktop runtime starts one retained-session code hint before the application graph finishes (36.300586ms)
+2026-11-09T10:48:39.9101000Z ▶ the early desktop entry keeps signed-out and public/auth documents lazy and excludes foreign/web origins
+2026-11-09T10:48:39.9102417Z   ✔ mikka://app/mikka (17.034663ms)
+2026-11-09T10:48:39.9103520Z   ✔ mikka://app/mikka/en/sign-in (13.867561ms)
+2026-11-09T10:48:39.9104513Z   ✔ mikka://app/mikka/en/a/shared-fixture (14.222114ms)
+2026-11-09T10:48:39.9105366Z   ✔ mikka://app/mikka/en/device (15.945658ms)
+2026-11-09T10:48:39.9106163Z   ✔ mikka://other/mikka/en (11.742218ms)
+2026-11-09T10:48:39.9107013Z   ✔ https://app.example/mikka/en (17.448097ms)
+2026-11-09T10:48:39.9108528Z ✔ the early desktop entry keeps signed-out and public/auth documents lazy and excludes foreign/web origins (92.892376ms)
+2026-11-09T10:48:39.9110730Z ✔ the web runtime remains its existing production/development instrumentation entry without the desktop warm-up (0.461032ms)
+2026-11-09T10:48:39.9112628Z ✔ a failed early identity hint cannot prevent the normal application or authenticated lazy path (14.415115ms)
+2026-11-09T10:48:40.1484803Z ✔ a completed preload waits for authentication, then renders synchronously without a fallback (23.339121ms)
+2026-11-09T10:48:40.4797881Z ✔ an unfinished preload keeps normal Suspense and never changes component type after resolving (330.895289ms)
+2026-11-09T10:48:40.7949940Z ✔ a rejected preload is never promoted to a resolved component and reaches the normal error boundary (316.198784ms)
+2026-11-09T10:48:40.8113579Z ✔ actual early Mac failure audits without an account descriptor, scanner or database (171.906922ms)
+2026-11-09T10:48:40.8115629Z ✔ strict report schemas reject extra credential or arbitrary diagnostic fields at every nesting level (16.668375ms)
+2026-11-09T10:48:40.8117359Z ✔ a passing report requires the actual package gates and all three prior-canary checks (4.096022ms)
+2026-11-09T10:48:40.8119265Z ✔ close failure reasons are optional closed enums, never arbitrary diagnostics or a passing result (1.617238ms)
+2026-11-09T10:48:40.8121417Z ✔ the shared writer refuses invalid evidence before creating an output file (5.149264ms)
+2026-11-09T10:48:40.8122723Z ✔ duplicate JSON keys cannot hide bytes from the audited projection (4.42363ms)
+2026-11-09T10:48:40.8124459Z ✔ account JSON, logs and symlinks cannot enter the independent native report upload (4.686101ms)
+2026-11-09T10:48:40.8126050Z ✔ audit failure emits only a fixed error code, never untrusted fields or paths (125.396224ms)
+2026-11-09T10:48:40.8150687Z ✔ staple retries back off for about five minutes (2.307544ms)
+2026-11-09T10:48:40.8174085Z ✔ a staple that fails twice then succeeds waits the first two delays (2.378103ms)
+2026-11-09T10:48:40.8175593Z ✔ a staple that never succeeds throws the last error after every retry (1.097962ms)
+2026-11-09T10:48:40.8176962Z ✔ credentials come from the same variables electron-builder reads (0.575645ms)
+2026-11-09T10:48:40.8178490Z ✔ on CI missing credentials fail the build; only a local build may skip notarization (0.376196ms)
+2026-11-09T10:48:40.8180348Z ✔ a failed notarytool or stapler call reports its exit code and last stderr line, never a credential (1.570691ms)
+2026-11-09T10:48:40.8181801Z ✔ the staple retry log carries only the quiet error message (0.580112ms)
+2026-11-09T10:48:40.8183403Z ✔ the bundled offline card restores standalone font rendering instead of inheriting application typography (30.140578ms)
+2026-11-09T10:48:40.8208306Z ✔ standalone and bundled offline surfaces use the same factual state copy without a display timer (36.112655ms)
+2026-11-09T10:48:40.8210482Z ✔ Dev ad-hoc signing cannot inherit release credentials and does not mutate the parent environment (1.767446ms)
+2026-11-09T10:48:40.8212113Z ✔ Dev build still requires an explicit isolated credential-free backend (0.41626ms)
+2026-11-09T10:48:40.8213733Z ✔ ad-hoc library validation exception is confined to Dev and inherited acceptance packaging (12.965827ms)
+2026-11-09T10:48:40.8215271Z   • loaded configuration  file=/home/runner/work/Mikka/Mikka/apps/desktop/electron-builder.yml
+2026-11-09T10:48:40.8216813Z   • loaded configuration  file=/home/runner/work/Mikka/Mikka/apps/desktop/electron-builder.dev.yml
+2026-11-09T10:48:40.8218434Z   • loaded parent configuration  file=/home/runner/work/Mikka/Mikka/apps/desktop/electron-builder.yml
+2026-11-09T10:48:40.8220221Z   • loaded configuration  file=/home/runner/work/Mikka/Mikka/apps/desktop/electron-builder.acceptance.yml
+2026-11-09T10:48:40.8221906Z   • loaded parent configuration  file=/home/runner/work/Mikka/Mikka/apps/desktop/electron-builder.dev.yml
+2026-11-09T10:48:40.8223525Z   • loaded parent configuration  file=/home/runner/work/Mikka/Mikka/apps/desktop/electron-builder.yml
+2026-11-09T10:48:40.8225225Z ✔ each flavor declares only its own sign-in link scheme after electron-builder merges extends (139.469149ms)
+2026-11-09T10:48:40.8226786Z   • loaded configuration  file=/home/runner/work/Mikka/Mikka/apps/desktop/electron-builder.yml
+2026-11-09T10:48:40.8228231Z   • loaded configuration  file=/home/runner/work/Mikka/Mikka/apps/desktop/electron-builder.dev.yml
+2026-11-09T10:48:40.8230158Z   • loaded parent configuration  file=/home/runner/work/Mikka/Mikka/apps/desktop/electron-builder.yml
+2026-11-09T10:48:40.8231789Z   • loaded configuration  file=/home/runner/work/Mikka/Mikka/apps/desktop/electron-builder.acceptance.yml
+2026-11-09T10:48:40.8233484Z   • loaded parent configuration  file=/home/runner/work/Mikka/Mikka/apps/desktop/electron-builder.dev.yml
+2026-11-09T10:48:40.8235032Z   • loaded parent configuration  file=/home/runner/work/Mikka/Mikka/apps/desktop/electron-builder.yml
+2026-11-09T10:48:40.8236702Z ✔ every packaged flavor excludes workspace dependencies through the actual node-module matcher (17.810339ms)
+2026-11-09T10:48:41.0952452Z ✔ Native coalesces allowed reads in one turn with one codec pass and ordered results (81.927376ms)
+2026-11-09T10:48:41.1440297Z ✔ one startup read wave stays together across the real hydration gates used by SWR and list fetchers (48.233052ms)
+2026-11-09T10:48:41.1868519Z ✔ single reads, excluded actions and Web keep their ordinary single-request path without a read cache (45.327573ms)
+2026-11-09T10:48:41.2188363Z ✔ Native splits at sixteen items and captures each locale before the posted flush (31.346893ms)
+2026-11-09T10:48:41.2536809Z ✔ only an exact unknown batch action on 404 falls back and disables batching for this page (32.612057ms)
+2026-11-09T10:48:41.2780561Z ▶ batch HTTP and network failures do not retry or fall back
+2026-11-09T10:48:41.2843218Z   ✔ 404:not_found (25.793712ms)
+2026-11-09T10:48:41.3156339Z   ✔ 500:desktop_rpc_action_unknown (29.542227ms)
+2026-11-09T10:48:41.3390922Z   ✔ 401:authRequired (29.318991ms)
+2026-11-09T10:48:41.3625042Z   ✔ 426:desktop_client_update_required (23.796439ms)
+2026-11-09T10:48:41.3978189Z   ✔ 503:desktop_rpc_failed (34.71882ms)
+2026-11-09T10:48:41.4211407Z   ✔ network (23.919156ms)
+2026-11-09T10:48:41.4212689Z ✔ batch HTTP and network failures do not retry or fall back (169.989021ms)
+2026-11-09T10:48:41.4516224Z ✔ batch item failures retain their own error and status without failing successful siblings (29.390073ms)
+2026-11-09T10:48:41.4751199Z ▶ malformed batch item count or shape rejects every item without retrying
+2026-11-09T10:48:41.4752416Z   ✔ [{"ok":true,"result":null}] (23.379465ms)
+2026-11-09T10:48:41.5050145Z   ✔ [{"ok":true,"result":null},{"ok":false,"status":"403","error":{"code":"workspaceAccessDenied"}}] (29.599978ms)
+2026-11-09T10:48:41.5060940Z ✔ malformed batch item count or shape rejects every item without retrying (53.769304ms)
+2026-11-09T10:48:41.5277531Z ✔ scope reset after a microtask rejects unsent old-identity reads before the posted flush (22.35027ms)
+2026-11-09T10:48:41.5574952Z ✔ workspace selector changes cannot pair queued arguments with the new workspace before React effects run (29.722584ms)
+2026-11-09T10:48:41.5796218Z ✔ explicit isCurrent guards drop stale queued reads and remain independent from other guards (22.477446ms)
+2026-11-09T10:48:41.6115158Z ▶ retired in-flight batches cannot change current transport state or trigger old-server fallback
+2026-11-09T10:48:41.6116313Z   ✔ 401 (30.064402ms)
+2026-11-09T10:48:41.6494102Z   ✔ 503 (38.46194ms)
+2026-11-09T10:48:41.6733209Z   ✔ 404 (22.663972ms)
+2026-11-09T10:48:41.6734895Z ✔ retired in-flight batches cannot change current transport state or trigger old-server fallback (92.105594ms)
+2026-11-09T10:48:41.7014757Z ✔ an isCurrent change while a batch body is pending prevents stale results and state updates (29.202078ms)
+2026-11-09T10:48:41.7288450Z ✔ retained-account local module loading overlaps the real bootstrap promise without mounting or an extra backend read (84.817507ms)
+2026-11-09T10:48:41.7292306Z ▶ signed-out root and public/auth routes do not preload the workspace graph
+2026-11-09T10:48:41.7293270Z   ✔ /mikka (41.491036ms)
+2026-11-09T10:48:41.7293898Z   ✔ /mikka/en/sign-in (33.83819ms)
+2026-11-09T10:48:41.7294606Z   ✔ /mikka/en/a/public-share (30.709635ms)
+2026-11-09T10:48:41.7295722Z ✔ signed-out root and public/auth routes do not preload the workspace graph (107.555116ms)
+2026-11-09T10:48:41.7297347Z ✔ failure of the optional main identity hint leaves the normal bootstrap and lazy path available (31.406325ms)
+2026-11-09T10:48:41.7367057Z ✔ local routing preserves workspace history state, locale, query and fragment without treating opaque origins as equal (63.981892ms)
+2026-11-09T10:48:41.7997025Z ✔ generated action stubs preserve declaration arity, including SWR zero-argument fetchers (76.986956ms)
+2026-11-09T10:48:41.8067364Z ✔ action inventory includes the actual billing re-export chain and excludes type-only aliases (5.029534ms)
+2026-11-09T10:48:41.8466601Z ✔ real billing client re-exports reach the native RPC with only their declared parameters (41.411302ms)
+2026-11-09T10:48:41.8578172Z ✔ public configuration keeps only existing flags and discards the previous owner snapshot on reset (6.366288ms)
+2026-11-09T10:48:41.8852696Z ✔ RPC sends only the versioned local envelope and preserves shared cache access-denial semantics (28.023184ms)
+2026-11-09T10:48:41.9096479Z ✔ bootstrap only transports a workspace selector and uses server-proved cache authority (25.263232ms)
+2026-11-09T10:48:41.9304689Z ✔ an old safe-session IPC completion cannot restore the previous account after an owner change (21.605941ms)
+2026-11-09T10:48:41.9571661Z ✔ native logout waits for queued shared-cache writes and clears them before returning (22.659955ms)
+2026-11-09T10:48:41.9942797Z ✔ unsupported renderer state cannot be cleared by an older in-flight success (37.30192ms)
+2026-11-09T10:48:42.0046146Z ✔ live transport uses a local handle, subscribes before connecting, and closes an aborted preparation (10.764729ms)
+2026-11-09T10:48:42.0143764Z ✔ noVNC raw channel forwards exact binary slices and rejects malformed local handles (11.598409ms)
+2026-11-09T10:48:42.0243600Z ✔ viewer HTTP seam retains shared response errors and routes ordinary requests through the unchanged web transport (13.130151ms)
+2026-11-09T10:48:42.0535640Z ✔ native startup evidence keeps exact numeric phases and drops URLs, arbitrary marks and resource metadata (3.663628ms)
+2026-11-09T10:48:42.0550916Z ✔ absent marks in the unchanged hosted renderer are explicit null, never a fabricated zero duration (1.690306ms)
+2026-11-09T10:48:44.0282990Z ✔ the native shared palette retains the web build color space for neutral color mixing (2107.75988ms)
+2026-11-09T10:48:44.1713079Z ✔ final package verification checks deep strict signatures, nested identities and actual fuses (4.43391ms)
+2026-11-09T10:48:44.1790991Z ✔ failed signature verification cannot be replaced with plausible identity metadata (0.444549ms)
+2026-11-09T10:48:44.1861518Z ✔ signed but wrong identity, architecture, hardened runtime or entitlements fails closed (1.49539ms)
+2026-11-09T10:48:44.1933518Z ✔ downloadable Dev inspector fuse must be off, and removed or missing security fuses reject (1.005395ms)
+2026-11-09T10:48:44.1935948Z ✔ identity parsing rejects duplicate fields instead of guessing which signature to trust (0.289313ms)
+2026-11-09T10:48:44.1936911Z ✔ empty entitlement is permitted only for a real DYLIB, never a renamed executable (0.558077ms)
+2026-11-09T10:48:44.1937806Z ✔ Mach-O classification reads actual ARM64 filetype and rejects unknown or truncated headers (0.533311ms)
+2026-11-09T10:48:44.1938674Z ✔ actual file reads follow only sealed in-app binaries and bound FAT offsets (44.395149ms)
+2026-11-09T10:48:44.1940304Z ✔ signed production release reads its own package and requires the production fuse policy (1.453744ms)
+2026-11-09T10:48:44.1941389Z ✔ release fuse verification rejects the inspector or incomplete wire and preserves read failures (0.79905ms)
+2026-11-09T10:48:44.1942279Z ✔ release verification uses the installed fuse SDK to read an actual fixture file (10.704403ms)
+2026-11-09T10:48:44.1943602Z ✔ observer preserves actual release identity while reporting only changed field names and counts (3.440167ms)
+2026-11-09T10:48:44.1944418Z ✔ clean release stays clean; a different lease is never observed (0.697287ms)
+2026-11-09T10:48:44.1945548Z ✔ original rejection and observation read failure never alter release behavior (2.651924ms)
+2026-11-09T10:48:44.1946388Z ✔ per-step checkpoints expose only the actual transition and preserve final release (0.865404ms)
+2026-11-09T10:48:44.1947670Z ✔ native session wait retries resolved null/false and another account, returning the matching value (9.363794ms)
+2026-11-09T10:48:44.1948564Z ✔ native session wait tolerates the actual callback navigation but preserves IPC failures (2.652767ms)
+2026-11-09T10:48:44.1950008Z ✔ native session wait fails with a bounded safe diagnostic instead of accepting a Promise (19.896644ms)
+2026-11-09T10:48:44.1951148Z ✔ SQL structures hash only a bounded parameterized subset and never read parameter/config getters (4.954723ms)
+2026-11-09T10:48:44.1952457Z ✔ request diagnostics reject foreign registries, concurrent module scopes and arbitrary metadata (1.782857ms)
+2026-11-09T10:48:44.1953884Z ✔ diagnostic safety: context identifiers accept primitive strings and read fields once (0.406608ms)
+2026-11-09T10:48:44.1955516Z ✔ diagnostic safety: structure identifiers cannot preserve objects through implicit coercion (1.109338ms)
+2026-11-09T10:48:44.1956910Z ✔ diagnostic safety: receipt timestamps accept primitive strings only (1.92292ms)
+2026-11-09T10:48:44.1958403Z ✔ diagnostic safety: Proxy query configs are rejected before any descriptor or value trap runs (0.325205ms)
+2026-11-09T10:48:44.1959768Z ✔ diagnostic safety: statement prefixes cannot admit opaque SET payloads or a second statement (0.618884ms)
+2026-11-09T10:48:44.1961311Z ✔ query capture starts at the existing checkpoint, freezes once and reset creates a new diagnostic history (0.716492ms)
+2026-11-09T10:48:44.1962996Z ✔ ordinal windows retain carried requests, unknown shapes and all overflow as nonzero unknown costs (1.536919ms)
+2026-11-09T10:48:44.1965034Z ✔ query receipts retain exact HTTP method and batch siblings, ignore external IDs and detect mismatches (4.074025ms)
+2026-11-09T10:48:44.1966777Z ✔ malformed diagnostic payloads, reset identities and absent checkpoints are never manufactured zeroes (0.709372ms)
+2026-11-09T10:48:44.1968476Z ✔ maximum query/context/structure cardinality stays under the final export bound (145.690168ms)
+2026-11-09T10:48:44.1970651Z ✔ the final projection reads one bounded export after all twelve unchanged snapshots and preserves the original windows (133.373634ms)
+2026-11-09T10:48:44.1972655Z ✔ actual request ALS and manageDatabasePool bind concurrent and reused queued clients without a global current request (611.551334ms)
+2026-11-09T10:48:44.1974407Z ✔ next cjs: bind the actual PG after tracing, with distinct copies and no double count (331.984244ms)
+2026-11-09T10:48:44.1976275Z ✔ nitro cjs: bind the actual PG after tracing, with distinct copies and no double count (376.037642ms)
+2026-11-09T10:48:44.1977760Z ✔ nitro esm: bind the actual PG after tracing, with distinct copies and no double count (364.891129ms)
+2026-11-09T10:48:44.4160883Z ✔ Nitro cannot fall back to source PG when its traced dependency is absent or points outside the output (235.658357ms)
+2026-11-09T10:48:44.4162857Z ✔ lifecycle query windows retain exact counter deltas and omit unrelated content (0.679372ms)
+2026-11-09T10:48:44.4167072Z ✔ operation SQL counts partition the original full window without removing unknown or background work (0.487318ms)
+2026-11-09T10:48:44.4170086Z ✔ operation SQL attribution refuses unknown labels, missing buckets, inconsistent totals and partial histories (1.062539ms)
+2026-11-09T10:48:44.4175873Z ✔ unattributed source refinement conserves the original partition and full-window deltas (0.767372ms)
+2026-11-09T10:48:44.4179766Z ✔ unattributed source refinement rejects incomplete evidence without upgrading legacy reports (1.957352ms)
+2026-11-09T10:48:44.4182637Z ✔ unattributed source refinement fits the unchanged control-response limit at the largest safe count (0.638972ms)
+2026-11-09T10:48:44.4184441Z ✔ the 78-source refinement rejects a historical 75-key partition without backfilling it (0.692692ms)
+2026-11-09T10:48:44.4203535Z ✔ lifecycle query windows refuse a changed process, reset, missing driver and unknown readings (0.61991ms)
+2026-11-09T10:48:44.4210135Z ✔ lifecycle reads only the attested primary metric socket, with bounded closed errors (1.515701ms)
+2026-11-09T10:48:44.4222459Z ✔ RPC diagnostics count four windows by request start, deduplicate unordered receipts and discard private fields (7.441883ms)
+2026-11-09T10:48:44.4346343Z ✔ RPC diagnostics retain unknown attribution and missing boundaries without double counting conflicting receipts (12.15504ms)
+2026-11-09T10:48:44.4394472Z ✔ RPC diagnostic missing, partial and oversized logs remain unavailable rather than reporting zero calls (4.637419ms)
+2026-11-09T10:48:44.4451025Z ✔ RPC diagnostics accept only the descriptor-bound primary log and complete measured windows (3.773135ms)
+2026-11-09T10:48:44.4481557Z ✔ RPC phase attribution separates handoff from workspace reads and preserves a completed login when startup is unavailable (3.508477ms)
+2026-11-09T10:48:44.4511321Z ✔ RPC phase attribution refuses private labels and non-partition boundaries without fabricating phases (3.916125ms)
+2026-11-09T10:48:44.4561278Z ✔ RPC batch diagnostics separate physical requests from logical actions without losing phase boundaries (3.730301ms)
+2026-11-09T10:48:44.4610707Z ✔ RPC batch diagnostics refuse missing, mismatched and out-of-parent action evidence (6.681132ms)
+2026-11-09T10:48:44.4783454Z ✔ restores only a proven localized generated name through normal authenticated RPC, then exact cleanup (96.340776ms)
+2026-11-09T10:48:44.4785254Z ✔ unchanged name needs no reauthentication or RPC and drain is mandatory (28.780306ms)
+2026-11-09T10:48:44.4786731Z ✔ custom names, unrelated owner fields and peer changes all fail before reauthentication (96.887474ms)
+2026-11-09T10:48:44.4788055Z ✔ a rejected normal RPC or a new unrelated change cannot report successful cleanup (65.913056ms)
+2026-11-09T10:48:44.4789628Z ✔ the Worker has its own process, private initialization and an actual disposal-and-exit barrier (6.100496ms)
+2026-11-09T10:48:44.4791155Z ✔ an invalid or foreign ready URL is refused and the newly owned Worker is still disposed (5.744381ms)
+2026-11-09T10:48:44.4792676Z ✔ startup timeout and owner cancellation both dispose the owned child before returning failure (6.972017ms)
+2026-11-09T10:48:44.4794240Z ✔ an exit without successful disposal and a later failed exit cannot become clean evidence (4.454342ms)
+2026-11-09T10:48:44.4795483Z ✔ authentication diagnostics use a closed route vocabulary (4.174507ms)
+2026-11-09T10:48:44.4796562Z ✔ malformed and encoded credential paths cannot escape as output (0.406851ms)
+2026-11-09T10:48:44.4797778Z ✔ failure diagnostics keep only closed error categories and bounded causes (1.687773ms)
+2026-11-09T10:48:44.4799367Z ✔ exchange observation consumes only the product JSON call and preserves original promises and values (5.865784ms)
+2026-11-09T10:48:44.4801239Z ✔ a real Response stays unread until the product consumes it and its inherited method is restored (43.922323ms)
+2026-11-09T10:48:44.4803120Z ✔ JSON parse and invalid identity failures stay distinguishable without exporting response data (4.365353ms)
+2026-11-09T10:48:44.4804978Z ✔ parsed response shape and observed superseding attempts are closed booleans, not an invented generation (2.740951ms)
+2026-11-09T10:48:44.4806905Z ✔ real availability and encrypt calls are observed without additional calls or substituted output (7.061778ms)
+2026-11-09T10:48:44.4808470Z ✔ encryption rejection and synchronous native exceptions keep the same error objects (1.823762ms)
+2026-11-09T10:48:44.4828124Z ✔ file observation is restricted to the exact owned vault and its PID temporary file (2.356929ms)
+2026-11-09T10:48:44.4829851Z ▶ each vault I/O rejection is attributed to its exact stage with the original rejection preserved
+2026-11-09T10:48:44.4830751Z   ✔ mkdir (1.444508ms)
+2026-11-09T10:48:44.4831278Z   ✔ open-temporary (1.108821ms)
+2026-11-09T10:48:44.4831783Z   ✔ write (1.328479ms)
+2026-11-09T10:48:44.4840813Z   ✔ sync (1.153297ms)
+2026-11-09T10:48:44.4841280Z   ✔ close (1.366622ms)
+2026-11-09T10:48:44.4841730Z   ✔ rename (3.245394ms)
+2026-11-09T10:48:44.4842208Z   ✔ remove-final (1.543333ms)
+2026-11-09T10:48:44.4843416Z ✔ each vault I/O rejection is attributed to its exact stage with the original rejection preserved (12.500397ms)
+2026-11-09T10:48:44.4845185Z ✔ non-writable observation targets do not alter the original call and report only observer availability (1.14998ms)
+2026-11-09T10:48:44.4846794Z ✔ stop restores descriptors and pending calls cannot install later observation wrappers (1.227127ms)
+2026-11-09T10:48:44.4848253Z ✔ observation refuses another profile and keeps a bounded closed event stream (16.253172ms)
+2026-11-09T10:48:44.4849938Z ✔ cleanup stages preserve asynchronous completion and the exact original release error (0.687662ms)
+2026-11-09T10:48:44.4851580Z ✔ cleanup projection retains closed browser and aggregate causes without message or identifiers (0.623152ms)
+2026-11-09T10:48:44.4853192Z ✔ cleanup diagnostics refuse unknown stages and never replace the original rejection (0.478957ms)
+2026-11-09T10:48:44.4854596Z ✔ fixture cleanup retains its exact rejection and exposes only existing ownership guard codes (0.402546ms)
+2026-11-09T10:48:44.4862268Z ✔ navigation during the installer read repeats the real cancellation contract before a clean original-child exit (72.619501ms)
+2026-11-09T10:48:44.4864248Z ✔ concurrent and later close calls share one operation, including after actual process exit (51.417432ms)
+2026-11-09T10:48:44.4865899Z ✔ unknown renderer failures remain failures and cannot be erased by an idempotent cleanup call (59.693973ms)
+2026-11-09T10:48:44.4867664Z ✔ an active installer cancellation failure still fails even when Electron subsequently exits cleanly (49.537519ms)
+2026-11-09T10:48:46.8165932Z ✔ drain authenticates exact profiles and waits past socket closure to process exit (2823.745686ms)
+2026-11-09T10:48:48.9368402Z ✔ a recorded starting daemon is drained when its socket appears within the same cleanup deadline (2123.223393ms)
+2026-11-09T10:48:49.8780876Z ✔ an authenticated socket with a different PID cannot drain or authorize cleanup (941.68109ms)
+2026-11-09T10:48:50.9277935Z ✔ a wrong profile secret cannot drain or authorize cleanup (1049.593023ms)
+2026-11-09T10:48:52.1789473Z ✔ metadata reads only the actual authenticated hello and never leaks secrets or stops the daemon (1250.589434ms)
+2026-11-09T10:48:52.8468570Z ✔ an already closed socket still waits for the recorded daemon process to finish (668.024265ms)
+2026-11-09T10:48:53.4134654Z ✔ a refused socket without its daemon PID cannot authorize database cleanup (566.762462ms)
+2026-11-09T10:48:53.7452536Z ✔ absent own profiles are stopped and relative paths are refused (331.693837ms)
+2026-11-09T10:48:53.7869983Z ✔ the shipped local scheme enables ordinary V8 caching without adding execution privileges (109.705337ms)
+2026-11-09T10:48:53.7871624Z ✔ the real-runtime probe cannot silently extract another registration or execute source expressions (17.506664ms)
+2026-11-09T10:48:53.7873166Z ✔ three fresh main instances verify both prior canaries across profile and mode changes (179.617224ms)
+2026-11-09T10:48:53.7874531Z ✔ availability alone cannot pass an actual encryption failure or write a canary (6.181761ms)
+2026-11-09T10:48:53.7875796Z ✔ unavailable OS encryption and wrong profile fail before encryption (2.963229ms)
+2026-11-09T10:48:53.7877131Z ✔ second instance must genuinely decrypt the prior process canary, not only create a new one (8.00603ms)
+2026-11-09T10:48:53.7878480Z ✔ canary reads cannot follow a substituted symlink outside the owned artifact (3.555855ms)
+2026-11-09T10:48:53.7879884Z ✔ native Keychain diagnostics retain only closed status codes across split chunks (2.507709ms)
+2026-11-09T10:48:53.7880940Z ✔ close diagnostics classify only known lifecycle errors and never return original renderer text (0.581567ms)
+2026-11-09T10:48:53.7881782Z ✔ native readiness requires the real bridge, daemon identity, authentication and server connection (15.745473ms)
+2026-11-09T10:48:53.7883087Z ✔ installer failures are a closed projection, never raw npm output, identifiers, arguments or exception strings (6.200877ms)
+2026-11-09T10:48:53.7883899Z ✔ rejected or unavailable IPC reads fail readiness without exporting the cause (1.601817ms)
+2026-11-09T10:48:53.7884678Z ✔ bounded waiter retries real false states, records transitions and preserves a failed gate (7.090422ms)
+2026-11-09T10:48:53.7885417Z ✔ metadata failures cannot replace a lease failure or turn it into readiness (0.793915ms)
+2026-11-09T10:48:53.7886206Z ✔ main profile inspection rejects other profiles and reports only fixed service argument comparisons (4.240735ms)
+2026-11-09T10:48:53.7886951Z ✔ launchd bootstrap diagnostics retain only a bounded numeric code (9.627632ms)
+2026-11-09T10:48:53.7887707Z ✔ one destroyed navigation context requires new leased snapshots and the unchanged ready predicate (2.99748ms)
+2026-11-09T10:48:53.7888554Z ✔ repeated destroyed navigation contexts exhaust the original deadline without passing readiness (2.225027ms)
+2026-11-09T10:48:53.7889693Z ▶ navigation handling preserves permanent, closed-page and authentication failures verbatim
+2026-11-09T10:48:53.7890227Z   ✔ permanent read failure (0.617365ms)
+2026-11-09T10:48:53.7890562Z   ✔ closed page error (0.284004ms)
+2026-11-09T10:48:53.7891072Z   ✔ page already closed (0.359434ms)
+2026-11-09T10:48:53.7891506Z   ✔ page openness unavailable (0.251008ms)
+2026-11-09T10:48:53.7892090Z   ✔ authentication failure (0.192626ms)
+2026-11-09T10:48:53.7892695Z   ✔ authentication code retains authority (0.21176ms)
+2026-11-09T10:48:53.7893123Z   ✔ authentication cause retains authority (0.877453ms)
+2026-11-09T10:48:53.7893496Z   ✔ different exception kind (0.250782ms)
+2026-11-09T10:48:53.7894143Z ✔ navigation handling preserves permanent, closed-page and authentication failures verbatim (7.483802ms)
+2026-11-09T10:48:53.7894859Z ✔ a navigation interruption never bypasses the next fresh lease check (0.449406ms)
+2026-11-09T10:48:53.7895550Z ✔ an already loaded bundled SPA auth route needs no new document navigation (11.744211ms)
+2026-11-09T10:48:53.7896318Z ✔ a completed blank document and available preload cannot bypass the bundled DOMContentLoaded (8.534991ms)
+2026-11-09T10:48:53.7897146Z ✔ a matching bundled document still waits for both DOMContentLoaded and the real IPC predicate (2.401893ms)
+2026-11-09T10:48:53.7897984Z ✔ blank, foreign, credential-bearing and non-application namespace URLs never satisfy readiness (2.252178ms)
+2026-11-09T10:48:53.7899226Z ✔ navigation evidence records bounded main-document transitions without URLs or query values (0.541355ms)
+2026-11-09T10:48:53.7900104Z ✔ same-document History routes have a closed bundled classification without revealing their paths (0.442625ms)
+2026-11-09T10:48:53.7900877Z ✔ failure evidence retains a closed error class and owned source locations only (0.808688ms)
+2026-11-09T10:48:53.7901599Z ✔ server selection waits for a new main document after a destroyed evaluate reply (4.079335ms)
+2026-11-09T10:48:53.7902394Z ✔ returning to the built-in server accepts a target document arriving before the destroyed reply (1.832258ms)
+2026-11-09T10:48:53.7903166Z ✔ a successful server select reply alone does not acknowledge the old ready document (2.925196ms)
+2026-11-09T10:48:53.7903849Z ▶ server selection preserves unknown failures even when a target document exists
+2026-11-09T10:48:53.7904301Z   ✔ renderer-refused (1.592912ms)
+2026-11-09T10:48:53.7904621Z   ✔ unknown-transport (1.404906ms)
+2026-11-09T10:48:53.7905176Z ✔ server selection preserves unknown failures even when a target document exists (3.728549ms)
+2026-11-09T10:48:53.7905877Z ▶ a destroyed server-select reply without a new document keeps timeout and close failures
+2026-11-09T10:48:53.7906338Z   ✔ TimeoutError (1.81706ms)
+2026-11-09T10:48:53.7906635Z   ✔ PageClosedError (1.712719ms)
+2026-11-09T10:48:53.7907223Z ✔ a destroyed server-select reply without a new document keeps timeout and close failures (4.062637ms)
+2026-11-09T10:48:53.7908017Z ▶ a new document cannot hide a wrong server or foreign renderer
+2026-11-09T10:48:53.7908381Z   ✔ wrong-server (3.569364ms)
+2026-11-09T10:48:53.7908678Z   ✔ foreign-document (1.30857ms)
+2026-11-09T10:48:53.7909547Z ✔ a new document cannot hide a wrong server or foreign renderer (5.410179ms)
+2026-11-09T10:48:53.7910320Z ✔ a target read failing after the server document is not retried or treated as a select reply (2.372245ms)
+2026-11-09T10:48:53.7911078Z ✔ an unfinished current document cannot supply the server selection acknowledgement (5.06546ms)
+2026-11-09T10:48:53.7912076Z ✔ real shell startup reselects the actual Node24 binary after startup shadows inherited PATH (157.333321ms)
+2026-11-09T10:48:53.7912887Z ✔ profile export preserves a selected binary directory containing shell metacharacters (65.168294ms)
+2026-11-09T10:48:53.7913572Z ✔ a symlink login profile is refused without modifying its target (18.804393ms)
+2026-11-09T10:48:53.7914195Z ✔ probe diagnostics never return startup output or malformed values (9.636573ms)
+2026-11-09T10:48:53.7914880Z ✔ capture time is explicit, canonical, shared across the pair and never future (3.906026ms)
+2026-11-09T10:48:53.7915592Z ✔ the real useNow first render no longer crosses the observed 5.5-hour boundary (76.554547ms)
+2026-11-09T10:48:53.7916475Z ✔ setFixedTime keeps actual timeout, interval and monotonic clock advancing (107.477963ms)
+2026-11-09T10:48:53.7917380Z ✔ ordinary parity retains its owner-only fixture and never adopts or deletes peer rows (162.158328ms)
+2026-11-09T10:48:53.7918247Z ✔ both leased members have separately owned, pre-reserved coordinators before UI reads (183.544601ms)
+2026-11-09T10:48:53.7919436Z ✔ cleanup removes only reserved coordinator IDs and leaves personal or untracked peer rows dirty (221.798959ms)
+2026-11-09T10:48:53.7920329Z ✔ a refused peer reservation prevents every fixture insertion and cleanup write (167.08265ms)
+2026-11-09T10:48:53.7921141Z ✔ pre-existing reader defaults are refused without adopting or deleting them (2.647803ms)
+2026-11-09T10:48:53.7922164Z ✔ only exact default rows created during this UI session are removed (2.491073ms)
+2026-11-09T10:48:53.7949130Z ✔ foreign, old, modified and meaningful rows fail before any deletion (6.51128ms)
+2026-11-09T10:48:53.7950456Z ✔ workspace capture completes the cold two-message history through its real button (13.763569ms)
+2026-11-09T10:48:53.7951601Z ✔ workspace capture completes the restored two-message history through its real button (4.276575ms)
+2026-11-09T10:48:53.7952453Z ✔ receipt reservation uses actual fresh bot keys, never raw IDs or the shared coordinator label (0.33903ms)
+2026-11-09T10:48:53.7953181Z ✔ a pre-existing coordinator receipt is refused without any deletion (1.049115ms)
+2026-11-09T10:48:53.7953885Z ✔ only new receipts for the seeded owner messages and exact positions are removed (17.853605ms)
+2026-11-09T10:48:53.7954684Z ✔ foreign messages, changed positions and unproven message owners fail before any row deletion (0.937051ms)
+2026-11-09T10:48:53.7955444Z ✔ a completed Next action does not wait for its ongoing page Flight stream (8.027285ms)
+2026-11-09T10:48:53.7956049Z ✔ ordinary RPC waits for both the body and parsed JSON (36.413017ms)
+2026-11-09T10:48:53.7956777Z ✔ browser RPC refuses missing protocol results and business failures after real JSON completion (3.242416ms)
+2026-11-09T10:48:53.7957522Z ✔ HTTP success does not hide API/RPC error data or a non-JSON redirect page (1.308077ms)
+2026-11-09T10:48:53.7958211Z ✔ an action auth redirect or wrong response type is not successful completion (1.052551ms)
+2026-11-09T10:48:53.7959205Z ✔ only the exact successful Linear unavailable payload enables its existing status message (4.535809ms)
+2026-11-09T10:48:53.7960019Z ✔ workspace selection waits for the new document even when its URL and old DOM already match (5.759801ms)
+2026-11-09T10:48:53.7960858Z ✔ the already-selected workspace closes its menu once without awaiting a nonexistent navigation (0.340352ms)
+2026-11-09T10:48:53.7961898Z ✔ workspace selection preserves a failed document wait and never retries the switch (0.860415ms)
+2026-11-09T10:48:53.7962723Z ✔ workspace selection preserves click failures while its pending document observer is safely settled (1.175589ms)
+2026-11-09T10:48:53.7964193Z ✔ lifecycle workspace selection waits for the switched document before its viewport readiness read (3.318499ms)
+2026-11-09T10:48:53.7965283Z ✔ lifecycle workspace selection keeps the current default-locale document without waiting for navigation (1.066655ms)
+2026-11-09T10:48:53.7966112Z ✔ lifecycle workspace selection preserves navigation failure before any viewport read (2.117746ms)
+2026-11-09T10:48:53.7966931Z ✔ lifecycle workspace selection preserves a single click failure and drains its pending observer (1.815382ms)
+2026-11-09T10:48:53.7967756Z ✔ artifact-markdown waits for both visible thread cards, not background or partial matches (36.768882ms)
+2026-11-09T10:48:53.7968462Z ✔ artifact-markdown requires the final reply in the dialog thread (14.283195ms)
+2026-11-09T10:48:53.7969502Z ✔ artifact-markdown fails when a required thread card never arrives (10.62759ms)
+2026-11-09T10:48:53.7970319Z ✔ artifact-html waits for both visible thread cards, not background or partial matches (12.617434ms)
+2026-11-09T10:48:53.7971003Z ✔ artifact-html requires the final reply in the dialog thread (15.46788ms)
+2026-11-09T10:48:53.7971786Z ✔ artifact-html fails when a required thread card never arrives (13.317998ms)
+2026-11-09T10:48:53.7972442Z ✔ artifact HTML still requires the rendered iframe document (11.365615ms)
+2026-11-09T10:48:53.7973230Z ✔ task-thread capture waits for verified even when all its other reads are ready (13.834997ms)
+2026-11-09T10:48:53.7974095Z ✔ task-thread capture waits for editable-title even when all its other reads are ready (1.655833ms)
+2026-11-09T10:48:53.7974946Z ✔ task-thread capture waits for description even when all its other reads are ready (1.30151ms)
+2026-11-09T10:48:53.7975761Z ✔ task-thread capture waits for activity even when all its other reads are ready (1.252709ms)
+2026-11-09T10:48:53.7976613Z ✔ task-thread capture waits for thread-row even when all its other reads are ready (1.467357ms)
+2026-11-09T10:48:53.7977676Z ✔ task-thread capture waits for thread-reply even when all its other reads are ready (1.12772ms)
+2026-11-09T10:48:53.7978631Z ✔ identical pixels with different mask geometry still fail and retain both geometries (19.829083ms)
+2026-11-09T10:48:53.7979680Z ✔ matching masks preserve the unchanged strict pixel comparison (27.198891ms)
+2026-11-09T10:48:53.7980443Z ✔ the old baseline launches its actual compiled Next revision with the metrics preload first (19.537483ms)
+2026-11-09T10:48:53.7981257Z ✔ the new product uses start-app only after validating its compiled revision and entry (41.591605ms)
+2026-11-09T10:48:53.7982041Z ✔ missing compiled proof, symlinked manifests and malformed launch arguments fail closed (6.184706ms)
+2026-11-09T10:48:53.7982766Z ✔ shutdown waits for the actual owned child exit after its graceful signal (1.897051ms)
+2026-11-09T10:48:53.7983576Z ✔ a forced owned exit is proven but remains a failed shutdown, and an unproven exit fails separately (15.763588ms)
+2026-11-09T10:48:53.7984357Z ✔ each idle listener authenticates browser RPC only at its own configured origin (422.428501ms)
+2026-11-09T10:48:53.7985104Z ✔ packaged desktop only accepts the exact disposable image and generated identity (10.535113ms)
+2026-11-09T10:48:53.7985557Z ℹ tests 294
+2026-11-09T10:48:53.7985774Z ℹ suites 0
+2026-11-09T10:48:53.7985985Z ℹ pass 294
+2026-11-09T10:48:53.7986188Z ℹ fail 0
+2026-11-09T10:48:53.7986437Z ℹ cancelled 0
+2026-11-09T10:48:53.7986713Z ℹ skipped 0
+2026-11-09T10:48:53.7986951Z ℹ todo 0
+2026-11-09T10:48:53.7987235Z ℹ duration_ms 14294.298108
+2026-11-09T10:48:54.4419557Z 
+2026-11-09T10:48:54.4431090Z [1m[30m[46m RUN [49m[39m[22m [36mv5.0.5 [39m[90m/home/runner/work/Mikka/Mikka/packages/daemon[39m
+2026-11-09T10:48:54.4431822Z 
+2026-11-09T10:48:54.8159188Z  [32m✓[39m test/service.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+2026-11-09T10:48:55.8194296Z  [32m✓[39m test/registration-login.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+2026-11-09T10:48:56.6148585Z  [32m✓[39m test/auto-update.test.ts [2m([22m[2m26 tests[22m[2m)[22m[32m 52[2mms[22m[39m
+2026-11-09T10:48:56.7833299Z  [32m✓[39m test/device-file.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+2026-11-09T10:48:59.1343257Z  [32m✓[39m test/commands.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 2569[2mms[22m[39m
+2026-11-09T10:48:59.1345193Z    [33m[2m✓[22m[39m uninstall waits for active threads, persists and sends its receipt, removes the service and credentials, then exits[33m 382[2mms[22m[39m
+2026-11-09T10:48:59.1346413Z    [32m✓[39m run commands [2m(6)[22m
+2026-11-09T10:48:59.1347396Z      [33m[2m✓[22m[39m hands a person's message to the running agent and acks it once[33m 365[2mms[22m[39m
+2026-11-09T10:48:59.1348733Z      [33m[2m✓[22m[39m cancels the run when a person stops it, and closes its message[33m 503[2mms[22m[39m
+2026-11-09T10:48:59.1350485Z      [33m[2m✓[22m[39m keeps taking messages for other runs while one is being stopped[33m 350[2mms[22m[39m
+2026-11-09T10:48:59.1351795Z      [33m[2m✓[22m[39m ignores commands for runs it does not have, and keeps polling after a network cut[33m 453[2mms[22m[39m
+2026-11-09T10:48:59.1387782Z 
+2026-11-09T10:48:59.1392265Z [2m Test Files [22m [1m[32m5 passed[39m[22m[90m (5)[39m
+2026-11-09T10:48:59.1393560Z [2m      Tests [22m [1m[32m50 passed[39m[22m[90m (50)[39m
+2026-11-09T10:48:59.1394655Z [2m   Start at [22m 10:48:54
+2026-11-09T10:48:59.1398454Z [2m   Duration [22m 4.68s[2m (import 37%, tests 32%, transform 30%)[22m
+2026-11-09T10:48:59.1411945Z 
+2026-11-09T10:48:59.1855390Z ##[group]Run pnpm test:device-enrollment-db
+2026-11-09T10:48:59.1855748Z [36;1mpnpm test:device-enrollment-db[0m
+2026-11-09T10:48:59.1869244Z shell: /usr/bin/bash -e {0}
+2026-11-09T10:48:59.1869516Z env:
+2026-11-09T10:48:59.1869767Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T10:48:59.1870183Z   E2E_DATABASE_URL: postgres://postgres@127.0.0.1:55491/mikka_491_e2e
+2026-11-09T10:48:59.1870527Z ##[endgroup]
+2026-11-09T10:48:59.5232308Z 
+2026-11-09T10:48:59.5233245Z > next-app@0.0.1 test:device-enrollment-db /home/runner/work/Mikka/Mikka
+2026-11-09T10:48:59.5235075Z > node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/device-enrollment.db.test.ts
+2026-11-09T10:48:59.5235990Z 
+2026-11-09T10:49:00.8882311Z (node:4746) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+2026-11-09T10:49:00.8883743Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-11-09T10:49:00.8890700Z (node:4746) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+2026-11-09T10:49:01.1341933Z ✔ desktop account context reads only the current browser owner's active local devices (244.469932ms)
+2026-11-09T10:49:01.1482643Z ✔ local setup owner view retains fresh session checks without reading unused devices (6.824781ms)
+2026-11-09T10:49:01.1735800Z ✔ owner token pagination preserves microsecond ordering and rejects foreign or malformed anchors (33.524639ms)
+2026-11-09T10:49:01.1844318Z ✔ registration grant is user-bound, expires, and has one concurrent winner (12.29608ms)
+2026-11-09T10:49:01.1875637Z ✔ registration grant consumption uses one PostgreSQL statement (1.928992ms)
+2026-11-09T10:49:01.1877215Z ℹ {"scenario":"enrollment-consumption","statements":1}
+2026-11-09T10:49:01.1971683Z ✔ a failed credential insertion does not consume the enrollment grant (8.744232ms)
+2026-11-09T10:49:01.2146118Z ✔ daemon acceptance follows real local enrollment and owner routes without a cloud token binding (17.303654ms)
+2026-11-09T10:49:15.2035952Z ✔ online removal offers only uninstall, and its own receipt revokes credentials (13988.755982ms)
+2026-11-09T10:49:15.2218519Z ✔ unacknowledged uninstall expires after ten minutes; offline removal revokes immediately (18.571531ms)
+2026-11-09T10:49:15.2373773Z ✔ management queue is owner-scoped, serial and acknowledges only its device (15.808468ms)
+2026-11-09T10:49:15.2413067Z {"level":"info","msg":"db_sample","timestamp":"2026-11-09T10:49:15.240Z","sampleRate":0.01,"route":null,"command":"SELECT","tables":["devices","device_management_commands"],"statement":"c5e97f7b241a","rows":1,"bytes":66}
+2026-11-09T10:49:15.2471812Z ✔ pending commands without receipts are one read and preserve current device removal state (8.845776ms)
+2026-11-09T10:49:15.2473400Z ℹ {"scenario":"disabled-device","statements":1}
+2026-11-09T10:49:15.2474263Z ℹ {"scenario":"removed-device","statements":1}
+2026-11-09T10:49:15.2475124Z ℹ {"scenario":"empty-device","statements":1}
+2026-11-09T10:49:15.2475936Z ℹ {"scenario":"missing-device","statements":1}
+2026-11-09T10:49:15.2689837Z {"level":"info","msg":"db_sample","timestamp":"2026-11-09T10:49:15.268Z","sampleRate":0.01,"route":null,"command":"UPDATE","tables":["device_tokens"],"statement":"0a5d35015c3d","rows":0,"bytes":0}
+2026-11-09T10:49:15.2882220Z ✔ a fresh login cannot admit an old daemon, and updating cannot revive a revoked credential (27.814361ms)
+2026-11-09T10:49:15.2973964Z ✔ registration metadata cannot disguise an old daemon behind a current header (22.256971ms)
+2026-11-09T10:49:35.2845422Z {"level":"info","msg":"db_transport_sample","timestamp":"2026-11-09T10:49:35.283Z","runtime":"e608d538-bdc8-4a6f-b07d-9633be90aac2","windowStart":"2026-11-09T10:49:00.928Z","windowEnd":"2026-11-09T10:49:35.283Z","elapsedMs":34355,"measurement":"postgres_protocol_plaintext_received","pgProtocolReceiveBytes":72040,"knownPgProtocolReceiveBytes":72040,"connections":4,"scopes":["device_fence","request"],"unknownReadings":0,"coverage":"observed_connections","startupExcluded":true,"excludes":["TLS","TCP","startup_before_registration","other_runtimes","Go_workers","supplier_metering"]}
+2026-11-09T10:49:35.3341653Z ℹ tests 13
+2026-11-09T10:49:35.3343393Z ℹ suites 0
+2026-11-09T10:49:35.3343834Z ℹ pass 13
+2026-11-09T10:49:35.3344210Z ℹ fail 0
+2026-11-09T10:49:35.3344603Z ℹ cancelled 0
+2026-11-09T10:49:35.3345021Z ℹ skipped 0
+2026-11-09T10:49:35.3345462Z ℹ todo 0
+2026-11-09T10:49:35.3345979Z ℹ duration_ms 35775.984152
+2026-11-09T10:49:35.3521735Z ##[group]Run node tests/ssh-install/run.mjs
+2026-11-09T10:49:35.3522065Z [36;1mnode tests/ssh-install/run.mjs[0m
+2026-11-09T10:49:35.3535712Z shell: /usr/bin/bash -e {0}
+2026-11-09T10:49:35.3535970Z env:
+2026-11-09T10:49:35.3536219Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T10:49:35.3536526Z ##[endgroup]
+2026-11-09T10:49:45.6967971Z [33m[plugin builtin:vite-reporter] 
+2026-11-09T10:49:45.6968556Z (!) Some chunks are larger than 500 kB after minification. Consider:
+2026-11-09T10:49:45.6969368Z - Using dynamic import() to code-split the application
+2026-11-09T10:49:45.6970196Z - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+2026-11-09T10:49:45.6971136Z - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+2026-11-09T10:49:46.3116098Z 
+2026-11-09T10:49:46.3116873Z   apps/desktop/dist/main.cjs  1.8mb ⚠️
+2026-11-09T10:49:46.3117133Z 
+2026-11-09T10:49:46.3117356Z ⚡ Done in 167ms
+2026-11-09T10:49:46.3170986Z 
+2026-11-09T10:49:46.3171546Z   apps/desktop/dist/preload.cjs  10.1kb
+2026-11-09T10:49:46.3171948Z 
+2026-11-09T10:49:46.3172311Z ⚡ Done in 4ms
+2026-11-09T10:49:46.7383066Z #0 building with "default" instance using docker driver
+2026-11-09T10:49:46.7383498Z 
+2026-11-09T10:49:46.7383844Z #1 [internal] load build definition from Dockerfile
+2026-11-09T10:49:46.7384525Z #1 transferring dockerfile: 629B done
+2026-11-09T10:49:46.7384984Z #1 DONE 0.0s
+2026-11-09T10:49:46.7385224Z 
+2026-11-09T10:49:46.7385624Z #2 [auth] library/node:pull token for registry-1.docker.io
+2026-11-09T10:49:46.8890994Z #2 DONE 0.0s
+2026-11-09T10:49:46.8891299Z 
+2026-11-09T10:49:46.8892091Z #3 [internal] load metadata for docker.io/library/node:24-bookworm-slim
+2026-11-09T10:49:47.1670220Z #3 DONE 0.5s
+2026-11-09T10:49:47.2802007Z 
+2026-11-09T10:49:47.2802952Z #4 [internal] load .dockerignore
+2026-11-09T10:49:47.2803506Z #4 transferring context: 2B done
+2026-11-09T10:49:47.2803785Z #4 DONE 0.0s
+2026-11-09T10:49:47.2803915Z 
+2026-11-09T10:49:47.2804429Z #5 [1/4] FROM docker.io/library/node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9
+2026-11-09T10:49:47.2805363Z #5 resolve docker.io/library/node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 done
+2026-11-09T10:49:47.2806302Z #5 sha256:ed61b9f2bb56ed1684866e971964fa114c1fcab4b4c671795f9eb91183282bb8 0B / 1.71MB 0.1s
+2026-11-09T10:49:47.2807378Z #5 sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 3.93kB / 3.93kB done
+2026-11-09T10:49:47.2808481Z #5 sha256:c0a93797ee78814ae6d32fcca2561fdbbe423149c3f5389aad32d86e9fd85bd4 1.93kB / 1.93kB done
+2026-11-09T10:49:47.2809457Z #5 sha256:280af3207172947339cc2e8c9d2efac585716fd906af49f57d6fdf0dbb829a73 6.71kB / 6.71kB done
+2026-11-09T10:49:47.2810155Z #5 sha256:dd051e1b8c92ff101fa3071ab97ea4924885942f15644e01c3dc095764e863e3 7.34MB / 28.25MB 0.1s
+2026-11-09T10:49:47.2810871Z #5 sha256:67dd44e03538482c8d0ffbd8e50ba292c566a215d908905b94069c2cc0583590 3.31kB / 3.31kB 0.1s done
+2026-11-09T10:49:47.2811580Z #5 sha256:0485e61ce4657409e991d0f4164383df7d64c2b6b074b45324c8dae73935ba38 26.21MB / 51.08MB 0.1s
+2026-11-09T10:49:47.3924017Z #5 sha256:ed61b9f2bb56ed1684866e971964fa114c1fcab4b4c671795f9eb91183282bb8 1.71MB / 1.71MB 0.1s done
+2026-11-09T10:49:47.3925087Z #5 sha256:dd051e1b8c92ff101fa3071ab97ea4924885942f15644e01c3dc095764e863e3 28.25MB / 28.25MB 0.2s done
+2026-11-09T10:49:47.3926347Z #5 sha256:0485e61ce4657409e991d0f4164383df7d64c2b6b074b45324c8dae73935ba38 45.09MB / 51.08MB 0.2s
+2026-11-09T10:49:47.3927583Z #5 sha256:f3db01672604e7946d0e84f5d03bcff2478a5aaff2852a87241a2a3fd9ddd13f 449B / 449B 0.1s done
+2026-11-09T10:49:47.3928684Z #5 extracting sha256:dd051e1b8c92ff101fa3071ab97ea4924885942f15644e01c3dc095764e863e3
+2026-11-09T10:49:47.4964596Z #5 sha256:0485e61ce4657409e991d0f4164383df7d64c2b6b074b45324c8dae73935ba38 51.08MB / 51.08MB 0.2s done
+2026-11-09T10:49:48.2636602Z #5 extracting sha256:dd051e1b8c92ff101fa3071ab97ea4924885942f15644e01c3dc095764e863e3 0.9s done
+2026-11-09T10:49:48.2640302Z #5 extracting sha256:67dd44e03538482c8d0ffbd8e50ba292c566a215d908905b94069c2cc0583590
+2026-11-09T10:49:48.4146121Z #5 extracting sha256:67dd44e03538482c8d0ffbd8e50ba292c566a215d908905b94069c2cc0583590 done
+2026-11-09T10:49:48.5045994Z #5 extracting sha256:0485e61ce4657409e991d0f4164383df7d64c2b6b074b45324c8dae73935ba38
+2026-11-09T10:49:49.6991841Z #5 extracting sha256:0485e61ce4657409e991d0f4164383df7d64c2b6b074b45324c8dae73935ba38 1.1s done
+2026-11-09T10:49:49.6992569Z #5 extracting sha256:ed61b9f2bb56ed1684866e971964fa114c1fcab4b4c671795f9eb91183282bb8
+2026-11-09T10:49:49.9106166Z #5 extracting sha256:ed61b9f2bb56ed1684866e971964fa114c1fcab4b4c671795f9eb91183282bb8 0.0s done
+2026-11-09T10:49:49.9107024Z #5 extracting sha256:f3db01672604e7946d0e84f5d03bcff2478a5aaff2852a87241a2a3fd9ddd13f done
+2026-11-09T10:49:49.9107465Z #5 DONE 2.6s
+2026-11-09T10:49:49.9107596Z 
+2026-11-09T10:49:49.9108391Z #6 [2/4] RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends openssh-server systemd systemd-sysv dbus-user-session sudo && rm -rf /var/lib/apt/lists/*
+2026-11-09T10:49:49.9156295Z #6 0.156 Get:1 http://deb.debian.org/debian bookworm InRelease [151 kB]
+2026-11-09T10:49:50.1209297Z #6 0.203 Get:2 http://deb.debian.org/debian bookworm-updates InRelease [55.4 kB]
+2026-11-09T10:49:50.1210524Z #6 0.221 Get:3 http://deb.debian.org/debian-security bookworm-security InRelease [34.8 kB]
+2026-11-09T10:49:50.1211664Z #6 0.255 Get:4 http://deb.debian.org/debian bookworm/main amd64 Packages [8790 kB]
+2026-11-09T10:49:50.1212774Z #6 0.361 Get:5 http://deb.debian.org/debian bookworm-updates/main amd64 Packages [6924 B]
+2026-11-09T10:49:50.2713849Z #6 0.361 Get:6 http://deb.debian.org/debian-security bookworm-security/main amd64 Packages [363 kB]
+2026-11-09T10:49:50.9134698Z #6 1.153 Fetched 9402 kB in 1s (9082 kB/s)
+2026-11-09T10:49:51.3706006Z #6 1.153 Reading package lists...
+2026-11-09T10:49:51.8433798Z #6 1.630 Reading package lists...
+2026-11-09T10:49:51.9802344Z #6 2.097 Building dependency tree...
+2026-11-09T10:49:52.1118647Z #6 2.220 Reading state information...
+2026-11-09T10:49:52.1119596Z #6 2.352 The following additional packages will be installed:
+2026-11-09T10:49:52.1120405Z #6 2.352   dbus dbus-bin dbus-daemon dbus-session-bus-common dbus-system-bus-common
+2026-11-09T10:49:52.1121268Z #6 2.352   dmsetup libapparmor1 libargon2-1 libbsd0 libcbor0.8 libcryptsetup12
+2026-11-09T10:49:52.2648306Z #6 2.352   libdbus-1-3 libdevmapper1.02.1 libedit2 libexpat1 libfdisk1 libfido2-1
+2026-11-09T10:49:52.2649732Z #6 2.352   libgssapi-krb5-2 libip4tc2 libjson-c5 libk5crypto3 libkeyutils1 libkmod2
+2026-11-09T10:49:52.2650962Z #6 2.353   libkrb5-3 libkrb5support0 libncursesw6 libnsl2 libpam-systemd libproc2-0
+2026-11-09T10:49:52.2652197Z #6 2.353   libssl3 libsystemd-shared libtirpc-common libtirpc3 libwrap0 openssh-client
+2026-11-09T10:49:52.2653342Z #6 2.353   openssh-sftp-server procps runit-helper sensible-utils ucf
+2026-11-09T10:49:52.2654081Z #6 2.354 Suggested packages:
+2026-11-09T10:49:52.2654996Z #6 2.354   krb5-doc krb5-user keychain libpam-ssh monkeysphere ssh-askpass molly-guard
+2026-11-09T10:49:52.2656131Z #6 2.354   ufw systemd-container systemd-homed systemd-userdbd systemd-boot
+2026-11-09T10:49:52.2657304Z #6 2.354   systemd-resolved libqrencode4 libtss2-esys-3.0.2-0 libtss2-mu0 libtss2-rc0
+2026-11-09T10:49:52.2658158Z #6 2.354   polkitd | policykit-1
+2026-11-09T10:49:52.2658713Z #6 2.354 Recommended packages:
+2026-11-09T10:49:52.2659734Z #6 2.354   krb5-locales libgpm2 xauth ncurses-term psmisc systemd-timesyncd
+2026-11-09T10:49:52.2660486Z #6 2.354   | time-daemon libnss-systemd
+2026-11-09T10:49:52.3112119Z #6 2.551 The following NEW packages will be installed:
+2026-11-09T10:49:52.3113070Z #6 2.551   dbus dbus-bin dbus-daemon dbus-session-bus-common dbus-system-bus-common
+2026-11-09T10:49:52.4538260Z #6 2.551   dbus-user-session dmsetup libapparmor1 libargon2-1 libbsd0 libcbor0.8
+2026-11-09T10:49:52.4539966Z #6 2.551   libcryptsetup12 libdbus-1-3 libdevmapper1.02.1 libedit2 libexpat1 libfdisk1
+2026-11-09T10:49:52.4540915Z #6 2.551   libfido2-1 libgssapi-krb5-2 libip4tc2 libjson-c5 libk5crypto3 libkeyutils1
+2026-11-09T10:49:52.4541779Z #6 2.551   libkmod2 libkrb5-3 libkrb5support0 libncursesw6 libnsl2 libpam-systemd
+2026-11-09T10:49:52.4542512Z #6 2.552   libproc2-0 libssl3 libsystemd-shared libtirpc-common libtirpc3 libwrap0
+2026-11-09T10:49:52.4543218Z #6 2.552   openssh-client openssh-server openssh-sftp-server procps runit-helper
+2026-11-09T10:49:52.4543866Z #6 2.552   sensible-utils sudo systemd systemd-sysv ucf
+2026-11-09T10:49:52.4544462Z #6 2.599 0 upgraded, 45 newly installed, 0 to remove and 0 not upgraded.
+2026-11-09T10:49:52.4545001Z #6 2.599 Need to get 14.3 MB of archives.
+2026-11-09T10:49:52.4545619Z #6 2.599 After this operation, 47.3 MB of additional disk space will be used.
+2026-11-09T10:49:52.4546364Z #6 2.599 Get:1 http://deb.debian.org/debian-security bookworm-security/main amd64 libssl3 amd64 3.0.22-1~deb12u2 [2040 kB]
+2026-11-09T10:49:52.4547296Z #6 2.694 Get:2 http://deb.debian.org/debian bookworm/main amd64 libargon2-1 amd64 0~20171227-0.3+deb12u1 [19.4 kB]
+2026-11-09T10:49:52.5587834Z #6 2.694 Get:3 http://deb.debian.org/debian bookworm/main amd64 dmsetup amd64 2:1.02.185-2 [82.0 kB]
+2026-11-09T10:49:52.5589875Z #6 2.696 Get:4 http://deb.debian.org/debian bookworm/main amd64 libdevmapper1.02.1 amd64 2:1.02.185-2 [133 kB]
+2026-11-09T10:49:52.5591464Z #6 2.696 Get:5 http://deb.debian.org/debian bookworm/main amd64 libjson-c5 amd64 0.16-2 [44.1 kB]
+2026-11-09T10:49:52.5593242Z #6 2.696 Get:6 http://deb.debian.org/debian bookworm/main amd64 libcryptsetup12 amd64 2:2.6.1-4~deb12u2 [223 kB]
+2026-11-09T10:49:52.5595038Z #6 2.711 Get:7 http://deb.debian.org/debian bookworm/main amd64 libfdisk1 amd64 2.38.1-5+deb12u3 [194 kB]
+2026-11-09T10:49:52.5596602Z #6 2.712 Get:8 http://deb.debian.org/debian bookworm/main amd64 libkmod2 amd64 30+20221128-1 [57.9 kB]
+2026-11-09T10:49:52.5597985Z #6 2.714 Get:9 http://deb.debian.org/debian bookworm/main amd64 libapparmor1 amd64 3.0.8-3 [41.2 kB]
+2026-11-09T10:49:52.5599598Z #6 2.714 Get:10 http://deb.debian.org/debian bookworm/main amd64 libip4tc2 amd64 1.8.9-2 [19.0 kB]
+2026-11-09T10:49:52.5600869Z #6 2.714 Get:11 http://deb.debian.org/debian bookworm/main amd64 libsystemd-shared amd64 252.39-1~deb12u2 [1696 kB]
+2026-11-09T10:49:52.5602061Z #6 2.723 Get:12 http://deb.debian.org/debian bookworm/main amd64 systemd amd64 252.39-1~deb12u2 [3044 kB]
+2026-11-09T10:49:52.5603289Z #6 2.735 Get:13 http://deb.debian.org/debian bookworm/main amd64 systemd-sysv amd64 252.39-1~deb12u2 [42.9 kB]
+2026-11-09T10:49:52.5604452Z #6 2.735 Get:14 http://deb.debian.org/debian bookworm/main amd64 libdbus-1-3 amd64 1.14.10-1~deb12u1 [201 kB]
+2026-11-09T10:49:52.5605616Z #6 2.736 Get:15 http://deb.debian.org/debian bookworm/main amd64 dbus-bin amd64 1.14.10-1~deb12u1 [105 kB]
+2026-11-09T10:49:52.5606849Z #6 2.737 Get:16 http://deb.debian.org/debian bookworm/main amd64 dbus-session-bus-common all 1.14.10-1~deb12u1 [78.2 kB]
+2026-11-09T10:49:52.5608142Z #6 2.738 Get:17 http://deb.debian.org/debian-security bookworm-security/main amd64 libexpat1 amd64 2.5.0-1+deb12u5 [108 kB]
+2026-11-09T10:49:52.5609468Z #6 2.741 Get:18 http://deb.debian.org/debian bookworm/main amd64 dbus-daemon amd64 1.14.10-1~deb12u1 [184 kB]
+2026-11-09T10:49:52.5610764Z #6 2.741 Get:19 http://deb.debian.org/debian bookworm/main amd64 dbus-system-bus-common all 1.14.10-1~deb12u1 [79.3 kB]
+2026-11-09T10:49:52.5612137Z #6 2.741 Get:20 http://deb.debian.org/debian bookworm/main amd64 dbus amd64 1.14.10-1~deb12u1 [97.4 kB]
+2026-11-09T10:49:52.5613096Z #6 2.741 Get:21 http://deb.debian.org/debian bookworm/main amd64 libbsd0 amd64 0.11.7-2 [117 kB]
+2026-11-09T10:49:52.5614209Z #6 2.755 Get:22 http://deb.debian.org/debian bookworm/main amd64 libedit2 amd64 3.1-20221030-2 [93.0 kB]
+2026-11-09T10:49:52.5614936Z #6 2.756 Get:23 http://deb.debian.org/debian bookworm/main amd64 libcbor0.8 amd64 0.8.0-2+b1 [27.4 kB]
+2026-11-09T10:49:52.5615832Z #6 2.756 Get:24 http://deb.debian.org/debian bookworm/main amd64 libfido2-1 amd64 1.12.0-2+b1 [77.2 kB]
+2026-11-09T10:49:52.5616571Z #6 2.757 Get:25 http://deb.debian.org/debian bookworm/main amd64 libkrb5support0 amd64 1.20.1-2+deb12u5 [33.2 kB]
+2026-11-09T10:49:52.5617308Z #6 2.757 Get:26 http://deb.debian.org/debian bookworm/main amd64 libk5crypto3 amd64 1.20.1-2+deb12u5 [79.7 kB]
+2026-11-09T10:49:52.5618002Z #6 2.768 Get:27 http://deb.debian.org/debian bookworm/main amd64 libkeyutils1 amd64 1.6.3-2 [8808 B]
+2026-11-09T10:49:52.5618698Z #6 2.769 Get:28 http://deb.debian.org/debian bookworm/main amd64 libkrb5-3 amd64 1.20.1-2+deb12u5 [332 kB]
+2026-11-09T10:49:52.5619670Z #6 2.770 Get:29 http://deb.debian.org/debian bookworm/main amd64 libgssapi-krb5-2 amd64 1.20.1-2+deb12u5 [135 kB]
+2026-11-09T10:49:52.5620423Z #6 2.771 Get:30 http://deb.debian.org/debian bookworm/main amd64 openssh-client amd64 1:9.2p1-2+deb12u10 [994 kB]
+2026-11-09T10:49:52.5621218Z #6 2.774 Get:31 http://deb.debian.org/debian bookworm/main amd64 openssh-sftp-server amd64 1:9.2p1-2+deb12u10 [65.9 kB]
+2026-11-09T10:49:52.5621935Z #6 2.784 Get:32 http://deb.debian.org/debian bookworm/main amd64 libncursesw6 amd64 6.4-4 [134 kB]
+2026-11-09T10:49:52.5622590Z #6 2.784 Get:33 http://deb.debian.org/debian bookworm/main amd64 libproc2-0 amd64 2:4.0.2-3 [62.8 kB]
+2026-11-09T10:49:52.5623275Z #6 2.785 Get:34 http://deb.debian.org/debian bookworm/main amd64 procps amd64 2:4.0.2-3 [709 kB]
+2026-11-09T10:49:52.5623945Z #6 2.787 Get:35 http://deb.debian.org/debian bookworm/main amd64 sensible-utils all 0.0.17+nmu1 [19.0 kB]
+2026-11-09T10:49:52.5624631Z #6 2.787 Get:36 http://deb.debian.org/debian bookworm/main amd64 ucf all 3.0043+nmu1+deb12u1 [55.3 kB]
+2026-11-09T10:49:52.5625438Z #6 2.798 Get:37 http://deb.debian.org/debian bookworm/main amd64 runit-helper all 2.15.2 [6520 B]
+2026-11-09T10:49:52.6790465Z #6 2.799 Get:38 http://deb.debian.org/debian bookworm/main amd64 libtirpc-common all 1.3.3+ds-1 [14.0 kB]
+2026-11-09T10:49:52.6791325Z #6 2.799 Get:39 http://deb.debian.org/debian bookworm/main amd64 libtirpc3 amd64 1.3.3+ds-1 [85.2 kB]
+2026-11-09T10:49:52.6791990Z #6 2.799 Get:40 http://deb.debian.org/debian bookworm/main amd64 libnsl2 amd64 1.3.0-2 [39.5 kB]
+2026-11-09T10:49:52.6792645Z #6 2.800 Get:41 http://deb.debian.org/debian bookworm/main amd64 libwrap0 amd64 7.6.q-32 [54.9 kB]
+2026-11-09T10:49:52.6793367Z #6 2.814 Get:42 http://deb.debian.org/debian bookworm/main amd64 openssh-server amd64 1:9.2p1-2+deb12u10 [457 kB]
+2026-11-09T10:49:52.6794094Z #6 2.816 Get:43 http://deb.debian.org/debian bookworm/main amd64 sudo amd64 1.9.13p3-1+deb12u4 [1890 kB]
+2026-11-09T10:49:52.6794808Z #6 2.824 Get:44 http://deb.debian.org/debian bookworm/main amd64 libpam-systemd amd64 252.39-1~deb12u2 [226 kB]
+2026-11-09T10:49:52.8442783Z #6 2.825 Get:45 http://deb.debian.org/debian bookworm/main amd64 dbus-user-session amd64 1.14.10-1~deb12u1 [78.1 kB]
+2026-11-09T10:49:52.8443573Z #6 2.919 debconf: delaying package configuration, since apt-utils is not installed
+2026-11-09T10:49:52.8444025Z #6 2.940 Fetched 14.3 MB in 0s (53.5 MB/s)
+2026-11-09T10:49:52.8444434Z #6 2.951 Selecting previously unselected package libssl3:amd64.
+2026-11-09T10:49:52.8444807Z #6 2.951 (Reading database ... 
+2026-11-09T10:49:52.8445064Z (Reading database ... 5%
+2026-11-09T10:49:52.8445314Z (Reading database ... 10%
+2026-11-09T10:49:52.8445560Z (Reading database ... 15%
+2026-11-09T10:49:52.8445789Z (Reading database ... 20%
+2026-11-09T10:49:52.8446021Z (Reading database ... 25%
+2026-11-09T10:49:52.8446245Z (Reading database ... 30%
+2026-11-09T10:49:52.8446481Z (Reading database ... 35%
+2026-11-09T10:49:52.8446705Z (Reading database ... 40%
+2026-11-09T10:49:52.8446933Z (Reading database ... 45%
+2026-11-09T10:49:52.8447185Z (Reading database ... 50%
+2026-11-09T10:49:52.8447412Z (Reading database ... 55%
+2026-11-09T10:49:52.8447774Z (Reading database ... 60%
+2026-11-09T10:49:52.8448111Z (Reading database ... 65%
+2026-11-09T10:49:52.8448491Z (Reading database ... 70%
+2026-11-09T10:49:52.8449699Z (Reading database ... 75%
+2026-11-09T10:49:52.8450023Z (Reading database ... 80%
+2026-11-09T10:49:52.8450267Z (Reading database ... 85%
+2026-11-09T10:49:52.8450588Z (Reading database ... 90%
+2026-11-09T10:49:52.8450847Z (Reading database ... 95%
+2026-11-09T10:49:52.8451085Z (Reading database ... 100%
+2026-11-09T10:49:52.8451474Z (Reading database ... 6096 files and directories currently installed.)
+2026-11-09T10:49:52.8451994Z #6 2.956 Preparing to unpack .../00-libssl3_3.0.22-1~deb12u2_amd64.deb ...
+2026-11-09T10:49:52.8452672Z #6 2.958 Unpacking libssl3:amd64 (3.0.22-1~deb12u2) ...
+2026-11-09T10:49:52.8453372Z #6 3.084 Selecting previously unselected package libargon2-1:amd64.
+2026-11-09T10:49:52.9617238Z #6 3.085 Preparing to unpack .../01-libargon2-1_0~20171227-0.3+deb12u1_amd64.deb ...
+2026-11-09T10:49:52.9617856Z #6 3.086 Unpacking libargon2-1:amd64 (0~20171227-0.3+deb12u1) ...
+2026-11-09T10:49:52.9618304Z #6 3.097 Selecting previously unselected package dmsetup.
+2026-11-09T10:49:52.9618946Z #6 3.098 Preparing to unpack .../02-dmsetup_2%3a1.02.185-2_amd64.deb ...
+2026-11-09T10:49:52.9619385Z #6 3.098 Unpacking dmsetup (2:1.02.185-2) ...
+2026-11-09T10:49:52.9619828Z #6 3.114 Selecting previously unselected package libdevmapper1.02.1:amd64.
+2026-11-09T10:49:52.9620373Z #6 3.115 Preparing to unpack .../03-libdevmapper1.02.1_2%3a1.02.185-2_amd64.deb ...
+2026-11-09T10:49:52.9620877Z #6 3.116 Unpacking libdevmapper1.02.1:amd64 (2:1.02.185-2) ...
+2026-11-09T10:49:52.9621328Z #6 3.135 Selecting previously unselected package libjson-c5:amd64.
+2026-11-09T10:49:52.9621977Z #6 3.136 Preparing to unpack .../04-libjson-c5_0.16-2_amd64.deb ...
+2026-11-09T10:49:52.9622588Z #6 3.137 Unpacking libjson-c5:amd64 (0.16-2) ...
+2026-11-09T10:49:52.9624121Z #6 3.150 Selecting previously unselected package libcryptsetup12:amd64.
+2026-11-09T10:49:52.9624855Z #6 3.151 Preparing to unpack .../05-libcryptsetup12_2%3a2.6.1-4~deb12u2_amd64.deb ...
+2026-11-09T10:49:52.9625575Z #6 3.152 Unpacking libcryptsetup12:amd64 (2:2.6.1-4~deb12u2) ...
+2026-11-09T10:49:52.9626196Z #6 3.177 Selecting previously unselected package libfdisk1:amd64.
+2026-11-09T10:49:52.9626754Z #6 3.178 Preparing to unpack .../06-libfdisk1_2.38.1-5+deb12u3_amd64.deb ...
+2026-11-09T10:49:52.9627292Z #6 3.178 Unpacking libfdisk1:amd64 (2.38.1-5+deb12u3) ...
+2026-11-09T10:49:52.9627758Z #6 3.202 Selecting previously unselected package libkmod2:amd64.
+2026-11-09T10:49:53.1294834Z #6 3.203 Preparing to unpack .../07-libkmod2_30+20221128-1_amd64.deb ...
+2026-11-09T10:49:53.1295561Z #6 3.203 Unpacking libkmod2:amd64 (30+20221128-1) ...
+2026-11-09T10:49:53.1296259Z #6 3.218 Selecting previously unselected package libapparmor1:amd64.
+2026-11-09T10:49:53.1296882Z #6 3.218 Preparing to unpack .../08-libapparmor1_3.0.8-3_amd64.deb ...
+2026-11-09T10:49:53.1297351Z #6 3.219 Unpacking libapparmor1:amd64 (3.0.8-3) ...
+2026-11-09T10:49:53.1297788Z #6 3.232 Selecting previously unselected package libip4tc2:amd64.
+2026-11-09T10:49:53.1298268Z #6 3.233 Preparing to unpack .../09-libip4tc2_1.8.9-2_amd64.deb ...
+2026-11-09T10:49:53.1298668Z #6 3.234 Unpacking libip4tc2:amd64 (1.8.9-2) ...
+2026-11-09T10:49:53.1299563Z #6 3.244 Selecting previously unselected package libsystemd-shared:amd64.
+2026-11-09T10:49:53.1300299Z #6 3.245 Preparing to unpack .../10-libsystemd-shared_252.39-1~deb12u2_amd64.deb ...
+2026-11-09T10:49:53.1300935Z #6 3.246 Unpacking libsystemd-shared:amd64 (252.39-1~deb12u2) ...
+2026-11-09T10:49:53.1301572Z #6 3.369 Setting up libssl3:amd64 (3.0.22-1~deb12u2) ...
+2026-11-09T10:49:53.3103343Z #6 3.384 Selecting previously unselected package systemd.
+2026-11-09T10:49:53.3103929Z #6 3.384 (Reading database ... 
+2026-11-09T10:49:53.3104199Z (Reading database ... 5%
+2026-11-09T10:49:53.3104488Z (Reading database ... 10%
+2026-11-09T10:49:53.3104737Z (Reading database ... 15%
+2026-11-09T10:49:53.3104966Z (Reading database ... 20%
+2026-11-09T10:49:53.3105197Z (Reading database ... 25%
+2026-11-09T10:49:53.3105422Z (Reading database ... 30%
+2026-11-09T10:49:53.3105960Z (Reading database ... 35%
+2026-11-09T10:49:53.3106203Z (Reading database ... 40%
+2026-11-09T10:49:53.3106434Z (Reading database ... 45%
+2026-11-09T10:49:53.3106668Z (Reading database ... 50%
+2026-11-09T10:49:53.3106899Z (Reading database ... 55%
+2026-11-09T10:49:53.3107124Z (Reading database ... 60%
+2026-11-09T10:49:53.3107356Z (Reading database ... 65%
+2026-11-09T10:49:53.3107584Z (Reading database ... 70%
+2026-11-09T10:49:53.3107812Z (Reading database ... 75%
+2026-11-09T10:49:53.3108035Z (Reading database ... 80%
+2026-11-09T10:49:53.3108273Z (Reading database ... 85%
+2026-11-09T10:49:53.3108501Z (Reading database ... 90%
+2026-11-09T10:49:53.3108730Z (Reading database ... 95%
+2026-11-09T10:49:53.3109256Z (Reading database ... 100%
+2026-11-09T10:49:53.3109658Z (Reading database ... 6182 files and directories currently installed.)
+2026-11-09T10:49:53.3110176Z #6 3.388 Preparing to unpack .../systemd_252.39-1~deb12u2_amd64.deb ...
+2026-11-09T10:49:53.3110631Z #6 3.400 Unpacking systemd (252.39-1~deb12u2) ...
+2026-11-09T10:49:53.3737287Z #6 3.614 Setting up libargon2-1:amd64 (0~20171227-0.3+deb12u1) ...
+2026-11-09T10:49:53.4806477Z #6 3.615 Setting up libjson-c5:amd64 (0.16-2) ...
+2026-11-09T10:49:53.4807669Z #6 3.617 Setting up libfdisk1:amd64 (2.38.1-5+deb12u3) ...
+2026-11-09T10:49:53.4808613Z #6 3.619 Setting up libkmod2:amd64 (30+20221128-1) ...
+2026-11-09T10:49:53.4809517Z #6 3.620 Setting up libapparmor1:amd64 (3.0.8-3) ...
+2026-11-09T10:49:53.4810251Z #6 3.622 Setting up libip4tc2:amd64 (1.8.9-2) ...
+2026-11-09T10:49:53.4811086Z #6 3.623 Setting up libsystemd-shared:amd64 (252.39-1~deb12u2) ...
+2026-11-09T10:49:53.4811969Z #6 3.625 Setting up libdevmapper1.02.1:amd64 (2:1.02.185-2) ...
+2026-11-09T10:49:53.4812921Z #6 3.627 Setting up libcryptsetup12:amd64 (2:2.6.1-4~deb12u2) ...
+2026-11-09T10:49:53.4814125Z #6 3.628 Setting up systemd (252.39-1~deb12u2) ...
+2026-11-09T10:49:53.4816146Z #6 3.637 Created symlink /etc/systemd/system/getty.target.wants/getty@tty1.service → /lib/systemd/system/getty@.service.
+2026-11-09T10:49:53.4816870Z 
+2026-11-09T10:49:53.4817636Z #6 3.640 Created symlink /etc/systemd/system/multi-user.target.wants/remote-fs.target → /lib/systemd/system/remote-fs.target.
+2026-11-09T10:49:53.4818131Z 
+2026-11-09T10:49:53.4818938Z #6 3.644 Created symlink /etc/systemd/system/sysinit.target.wants/systemd-pstore.service → /lib/systemd/system/systemd-pstore.service.
+2026-11-09T10:49:53.4819486Z 
+2026-11-09T10:49:53.4819696Z #6 3.648 Initializing machine ID from random generator.
+2026-11-09T10:49:53.4820008Z 
+2026-11-09T10:49:53.4820343Z #6 3.663 Creating group 'systemd-journal' with GID 999.
+2026-11-09T10:49:53.4820704Z 
+2026-11-09T10:49:53.4821016Z #6 3.663 Creating group 'systemd-network' with GID 998.
+2026-11-09T10:49:53.4821391Z 
+2026-11-09T10:49:53.4821943Z #6 3.663 Creating user 'systemd-network' (systemd Network Management) with UID 998 and GID 998.
+2026-11-09T10:49:53.4822490Z 
+2026-11-09T10:49:53.4822802Z #6 3.684 Setting up dmsetup (2:1.02.185-2) ...
+2026-11-09T10:49:53.4823455Z #6 3.701 Selecting previously unselected package systemd-sysv.
+2026-11-09T10:49:53.4823828Z #6 3.701 (Reading database ... 
+2026-11-09T10:49:53.4824085Z (Reading database ... 5%
+2026-11-09T10:49:53.4824325Z (Reading database ... 10%
+2026-11-09T10:49:53.4824571Z (Reading database ... 15%
+2026-11-09T10:49:53.4824839Z (Reading database ... 20%
+2026-11-09T10:49:53.4825070Z (Reading database ... 25%
+2026-11-09T10:49:53.4825303Z (Reading database ... 30%
+2026-11-09T10:49:53.4825525Z (Reading database ... 35%
+2026-11-09T10:49:53.4825752Z (Reading database ... 40%
+2026-11-09T10:49:53.4825988Z (Reading database ... 45%
+2026-11-09T10:49:53.4826217Z (Reading database ... 50%
+2026-11-09T10:49:53.4826446Z (Reading database ... 55%
+2026-11-09T10:49:53.4826679Z (Reading database ... 60%
+2026-11-09T10:49:53.4826917Z (Reading database ... 65%
+2026-11-09T10:49:53.4827143Z (Reading database ... 70%
+2026-11-09T10:49:53.4827372Z (Reading database ... 75%
+2026-11-09T10:49:53.4827610Z (Reading database ... 80%
+2026-11-09T10:49:53.4828048Z (Reading database ... 85%
+2026-11-09T10:49:53.4828285Z (Reading database ... 90%
+2026-11-09T10:49:53.4828518Z (Reading database ... 95%
+2026-11-09T10:49:53.4828912Z (Reading database ... 100%
+2026-11-09T10:49:53.4829364Z (Reading database ... 7031 files and directories currently installed.)
+2026-11-09T10:49:53.4829946Z #6 3.707 Preparing to unpack .../00-systemd-sysv_252.39-1~deb12u2_amd64.deb ...
+2026-11-09T10:49:53.4830421Z #6 3.708 Unpacking systemd-sysv (252.39-1~deb12u2) ...
+2026-11-09T10:49:53.4830859Z #6 3.721 Selecting previously unselected package libdbus-1-3:amd64.
+2026-11-09T10:49:53.5825380Z #6 3.722 Preparing to unpack .../01-libdbus-1-3_1.14.10-1~deb12u1_amd64.deb ...
+2026-11-09T10:49:53.5826159Z #6 3.722 Unpacking libdbus-1-3:amd64 (1.14.10-1~deb12u1) ...
+2026-11-09T10:49:53.5826644Z #6 3.745 Selecting previously unselected package dbus-bin.
+2026-11-09T10:49:53.5827216Z #6 3.746 Preparing to unpack .../02-dbus-bin_1.14.10-1~deb12u1_amd64.deb ...
+2026-11-09T10:49:53.5827752Z #6 3.747 Unpacking dbus-bin (1.14.10-1~deb12u1) ...
+2026-11-09T10:49:53.5828271Z #6 3.763 Selecting previously unselected package dbus-session-bus-common.
+2026-11-09T10:49:53.5829214Z #6 3.765 Preparing to unpack .../03-dbus-session-bus-common_1.14.10-1~deb12u1_all.deb ...
+2026-11-09T10:49:53.5829852Z #6 3.765 Unpacking dbus-session-bus-common (1.14.10-1~deb12u1) ...
+2026-11-09T10:49:53.5830331Z #6 3.780 Selecting previously unselected package libexpat1:amd64.
+2026-11-09T10:49:53.5831164Z #6 3.781 Preparing to unpack .../04-libexpat1_2.5.0-1+deb12u5_amd64.deb ...
+2026-11-09T10:49:53.5831738Z #6 3.782 Unpacking libexpat1:amd64 (2.5.0-1+deb12u5) ...
+2026-11-09T10:49:53.5832243Z #6 3.799 Selecting previously unselected package dbus-daemon.
+2026-11-09T10:49:53.5834875Z #6 3.800 Preparing to unpack .../05-dbus-daemon_1.14.10-1~deb12u1_amd64.deb ...
+2026-11-09T10:49:53.5835560Z #6 3.800 Unpacking dbus-daemon (1.14.10-1~deb12u1) ...
+2026-11-09T10:49:53.5836073Z #6 3.822 Selecting previously unselected package dbus-system-bus-common.
+2026-11-09T10:49:53.6901483Z #6 3.824 Preparing to unpack .../06-dbus-system-bus-common_1.14.10-1~deb12u1_all.deb ...
+2026-11-09T10:49:53.6902724Z #6 3.824 Unpacking dbus-system-bus-common (1.14.10-1~deb12u1) ...
+2026-11-09T10:49:53.6903754Z #6 3.841 Selecting previously unselected package dbus.
+2026-11-09T10:49:53.6904675Z #6 3.842 Preparing to unpack .../07-dbus_1.14.10-1~deb12u1_amd64.deb ...
+2026-11-09T10:49:53.6905562Z #6 3.844 Unpacking dbus (1.14.10-1~deb12u1) ...
+2026-11-09T10:49:53.6906385Z #6 3.861 Selecting previously unselected package libbsd0:amd64.
+2026-11-09T10:49:53.6907308Z #6 3.862 Preparing to unpack .../08-libbsd0_0.11.7-2_amd64.deb ...
+2026-11-09T10:49:53.6908108Z #6 3.863 Unpacking libbsd0:amd64 (0.11.7-2) ...
+2026-11-09T10:49:53.6909101Z #6 3.881 Selecting previously unselected package libedit2:amd64.
+2026-11-09T10:49:53.6911147Z #6 3.882 Preparing to unpack .../09-libedit2_3.1-20221030-2_amd64.deb ...
+2026-11-09T10:49:53.6912228Z #6 3.883 Unpacking libedit2:amd64 (3.1-20221030-2) ...
+2026-11-09T10:49:53.6913781Z #6 3.899 Selecting previously unselected package libcbor0.8:amd64.
+2026-11-09T10:49:53.6914592Z #6 3.900 Preparing to unpack .../10-libcbor0.8_0.8.0-2+b1_amd64.deb ...
+2026-11-09T10:49:53.6915327Z #6 3.901 Unpacking libcbor0.8:amd64 (0.8.0-2+b1) ...
+2026-11-09T10:49:53.6916462Z #6 3.913 Selecting previously unselected package libfido2-1:amd64.
+2026-11-09T10:49:53.6917287Z #6 3.914 Preparing to unpack .../11-libfido2-1_1.12.0-2+b1_amd64.deb ...
+2026-11-09T10:49:53.6918014Z #6 3.915 Unpacking libfido2-1:amd64 (1.12.0-2+b1) ...
+2026-11-09T10:49:53.6919340Z #6 3.930 Selecting previously unselected package libkrb5support0:amd64.
+2026-11-09T10:49:53.7934701Z #6 3.931 Preparing to unpack .../12-libkrb5support0_1.20.1-2+deb12u5_amd64.deb ...
+2026-11-09T10:49:53.7935625Z #6 3.932 Unpacking libkrb5support0:amd64 (1.20.1-2+deb12u5) ...
+2026-11-09T10:49:53.7936251Z #6 3.945 Selecting previously unselected package libk5crypto3:amd64.
+2026-11-09T10:49:53.7937110Z #6 3.946 Preparing to unpack .../13-libk5crypto3_1.20.1-2+deb12u5_amd64.deb ...
+2026-11-09T10:49:53.7937714Z #6 3.946 Unpacking libk5crypto3:amd64 (1.20.1-2+deb12u5) ...
+2026-11-09T10:49:53.7938291Z #6 3.962 Selecting previously unselected package libkeyutils1:amd64.
+2026-11-09T10:49:53.7939271Z #6 3.963 Preparing to unpack .../14-libkeyutils1_1.6.3-2_amd64.deb ...
+2026-11-09T10:49:53.7940078Z #6 3.964 Unpacking libkeyutils1:amd64 (1.6.3-2) ...
+2026-11-09T10:49:53.7941041Z #6 3.975 Selecting previously unselected package libkrb5-3:amd64.
+2026-11-09T10:49:53.7941861Z #6 3.976 Preparing to unpack .../15-libkrb5-3_1.20.1-2+deb12u5_amd64.deb ...
+2026-11-09T10:49:53.7942433Z #6 3.976 Unpacking libkrb5-3:amd64 (1.20.1-2+deb12u5) ...
+2026-11-09T10:49:53.7943039Z #6 4.011 Selecting previously unselected package libgssapi-krb5-2:amd64.
+2026-11-09T10:49:53.7943632Z #6 4.012 Preparing to unpack .../16-libgssapi-krb5-2_1.20.1-2+deb12u5_amd64.deb ...
+2026-11-09T10:49:53.7944252Z #6 4.012 Unpacking libgssapi-krb5-2:amd64 (1.20.1-2+deb12u5) ...
+2026-11-09T10:49:53.7944724Z #6 4.033 Selecting previously unselected package openssh-client.
+2026-11-09T10:49:53.8955451Z #6 4.034 Preparing to unpack .../17-openssh-client_1%3a9.2p1-2+deb12u10_amd64.deb ...
+2026-11-09T10:49:53.8956053Z #6 4.038 Unpacking openssh-client (1:9.2p1-2+deb12u10) ...
+2026-11-09T10:49:53.8956538Z #6 4.119 Selecting previously unselected package openssh-sftp-server.
+2026-11-09T10:49:53.8957125Z #6 4.120 Preparing to unpack .../18-openssh-sftp-server_1%3a9.2p1-2+deb12u10_amd64.deb ...
+2026-11-09T10:49:53.8957672Z #6 4.120 Unpacking openssh-sftp-server (1:9.2p1-2+deb12u10) ...
+2026-11-09T10:49:53.8958147Z #6 4.136 Selecting previously unselected package libncursesw6:amd64.
+2026-11-09T10:49:53.9996406Z #6 4.137 Preparing to unpack .../19-libncursesw6_6.4-4_amd64.deb ...
+2026-11-09T10:49:53.9997182Z #6 4.137 Unpacking libncursesw6:amd64 (6.4-4) ...
+2026-11-09T10:49:53.9997628Z #6 4.157 Selecting previously unselected package libproc2-0:amd64.
+2026-11-09T10:49:53.9998124Z #6 4.158 Preparing to unpack .../20-libproc2-0_2%3a4.0.2-3_amd64.deb ...
+2026-11-09T10:49:53.9998560Z #6 4.159 Unpacking libproc2-0:amd64 (2:4.0.2-3) ...
+2026-11-09T10:49:53.9999410Z #6 4.174 Selecting previously unselected package procps.
+2026-11-09T10:49:53.9999846Z #6 4.175 Preparing to unpack .../21-procps_2%3a4.0.2-3_amd64.deb ...
+2026-11-09T10:49:54.0000242Z #6 4.183 Unpacking procps (2:4.0.2-3) ...
+2026-11-09T10:49:54.0000633Z #6 4.240 Selecting previously unselected package sensible-utils.
+2026-11-09T10:49:54.1037211Z #6 4.241 Preparing to unpack .../22-sensible-utils_0.0.17+nmu1_all.deb ...
+2026-11-09T10:49:54.1037777Z #6 4.241 Unpacking sensible-utils (0.0.17+nmu1) ...
+2026-11-09T10:49:54.1038185Z #6 4.254 Selecting previously unselected package ucf.
+2026-11-09T10:49:54.1038672Z #6 4.255 Preparing to unpack .../23-ucf_3.0043+nmu1+deb12u1_all.deb ...
+2026-11-09T10:49:54.1039404Z #6 4.257 Moving old data out of the way
+2026-11-09T10:49:54.1039744Z #6 4.258 Unpacking ucf (3.0043+nmu1+deb12u1) ...
+2026-11-09T10:49:54.1040176Z #6 4.271 Selecting previously unselected package runit-helper.
+2026-11-09T10:49:54.1040638Z #6 4.272 Preparing to unpack .../24-runit-helper_2.15.2_all.deb ...
+2026-11-09T10:49:54.1041036Z #6 4.273 Unpacking runit-helper (2.15.2) ...
+2026-11-09T10:49:54.1041444Z #6 4.282 Selecting previously unselected package libtirpc-common.
+2026-11-09T10:49:54.1041935Z #6 4.283 Preparing to unpack .../25-libtirpc-common_1.3.3+ds-1_all.deb ...
+2026-11-09T10:49:54.1042370Z #6 4.284 Unpacking libtirpc-common (1.3.3+ds-1) ...
+2026-11-09T10:49:54.1042787Z #6 4.295 Selecting previously unselected package libtirpc3:amd64.
+2026-11-09T10:49:54.1043260Z #6 4.296 Preparing to unpack .../26-libtirpc3_1.3.3+ds-1_amd64.deb ...
+2026-11-09T10:49:54.1043675Z #6 4.296 Unpacking libtirpc3:amd64 (1.3.3+ds-1) ...
+2026-11-09T10:49:54.1044084Z #6 4.312 Selecting previously unselected package libnsl2:amd64.
+2026-11-09T10:49:54.1044529Z #6 4.313 Preparing to unpack .../27-libnsl2_1.3.0-2_amd64.deb ...
+2026-11-09T10:49:54.1045193Z #6 4.314 Unpacking libnsl2:amd64 (1.3.0-2) ...
+2026-11-09T10:49:54.1045605Z #6 4.326 Selecting previously unselected package libwrap0:amd64.
+2026-11-09T10:49:54.1046079Z #6 4.327 Preparing to unpack .../28-libwrap0_7.6.q-32_amd64.deb ...
+2026-11-09T10:49:54.1046485Z #6 4.328 Unpacking libwrap0:amd64 (7.6.q-32) ...
+2026-11-09T10:49:54.1046896Z #6 4.343 Selecting previously unselected package openssh-server.
+2026-11-09T10:49:54.2566684Z #6 4.344 Preparing to unpack .../29-openssh-server_1%3a9.2p1-2+deb12u10_amd64.deb ...
+2026-11-09T10:49:54.2567262Z #6 4.349 Unpacking openssh-server (1:9.2p1-2+deb12u10) ...
+2026-11-09T10:49:54.2567680Z #6 4.392 Selecting previously unselected package sudo.
+2026-11-09T10:49:54.2568149Z #6 4.394 Preparing to unpack .../30-sudo_1.9.13p3-1+deb12u4_amd64.deb ...
+2026-11-09T10:49:54.2568602Z #6 4.395 Unpacking sudo (1.9.13p3-1+deb12u4) ...
+2026-11-09T10:49:54.2569208Z #6 4.497 Selecting previously unselected package libpam-systemd:amd64.
+2026-11-09T10:49:54.3704285Z #6 4.498 Preparing to unpack .../31-libpam-systemd_252.39-1~deb12u2_amd64.deb ...
+2026-11-09T10:49:54.3705075Z #6 4.498 Unpacking libpam-systemd:amd64 (252.39-1~deb12u2) ...
+2026-11-09T10:49:54.3705570Z #6 4.524 Selecting previously unselected package dbus-user-session.
+2026-11-09T10:49:54.3706125Z #6 4.525 Preparing to unpack .../32-dbus-user-session_1.14.10-1~deb12u1_amd64.deb ...
+2026-11-09T10:49:54.3706831Z #6 4.525 Unpacking dbus-user-session (1.14.10-1~deb12u1) ...
+2026-11-09T10:49:54.3707248Z #6 4.549 Setting up libexpat1:amd64 (2.5.0-1+deb12u5) ...
+2026-11-09T10:49:54.3707748Z #6 4.551 Setting up runit-helper (2.15.2) ...
+2026-11-09T10:49:54.3708239Z #6 4.552 Setting up systemd-sysv (252.39-1~deb12u2) ...
+2026-11-09T10:49:54.3708703Z #6 4.555 Setting up libkeyutils1:amd64 (1.6.3-2) ...
+2026-11-09T10:49:54.3709668Z #6 4.556 Setting up libtirpc-common (1.3.3+ds-1) ...
+2026-11-09T10:49:54.3710044Z #6 4.558 Setting up libcbor0.8:amd64 (0.8.0-2+b1) ...
+2026-11-09T10:49:54.3710620Z #6 4.560 Setting up libkrb5support0:amd64 (1.20.1-2+deb12u5) ...
+2026-11-09T10:49:54.3711068Z #6 4.561 Setting up libdbus-1-3:amd64 (1.14.10-1~deb12u1) ...
+2026-11-09T10:49:54.3711458Z #6 4.563 Setting up libproc2-0:amd64 (2:4.0.2-3) ...
+2026-11-09T10:49:54.3711949Z #6 4.564 Setting up sudo (1.9.13p3-1+deb12u4) ...
+2026-11-09T10:49:54.3712456Z #6 4.584 invoke-rc.d: could not determine current runlevel
+2026-11-09T10:49:54.3713021Z #6 4.587 invoke-rc.d: policy-rc.d denied execution of start.
+2026-11-09T10:49:54.3713540Z #6 4.588 Setting up libncursesw6:amd64 (6.4-4) ...
+2026-11-09T10:49:54.3713979Z #6 4.589 Setting up libk5crypto3:amd64 (1.20.1-2+deb12u5) ...
+2026-11-09T10:49:54.3714462Z #6 4.591 Setting up sensible-utils (0.0.17+nmu1) ...
+2026-11-09T10:49:54.3714887Z #6 4.592 Setting up dbus-session-bus-common (1.14.10-1~deb12u1) ...
+2026-11-09T10:49:54.3715382Z #6 4.594 Setting up procps (2:4.0.2-3) ...
+2026-11-09T10:49:54.3716039Z #6 4.610 Setting up libkrb5-3:amd64 (1.20.1-2+deb12u5) ...
+2026-11-09T10:49:54.4967224Z #6 4.612 Setting up dbus-system-bus-common (1.14.10-1~deb12u1) ...
+2026-11-09T10:49:54.4968173Z #6 4.649 Setting up libfido2-1:amd64 (1.12.0-2+b1) ...
+2026-11-09T10:49:54.4968988Z #6 4.651 Setting up libbsd0:amd64 (0.11.7-2) ...
+2026-11-09T10:49:54.4969516Z #6 4.653 Setting up dbus-bin (1.14.10-1~deb12u1) ...
+2026-11-09T10:49:54.4969895Z #6 4.654 Setting up libedit2:amd64 (3.1-20221030-2) ...
+2026-11-09T10:49:54.4970345Z #6 4.655 Setting up dbus-daemon (1.14.10-1~deb12u1) ...
+2026-11-09T10:49:54.4970788Z #6 4.664 Setting up dbus (1.14.10-1~deb12u1) ...
+2026-11-09T10:49:54.4971175Z #6 4.679 invoke-rc.d: could not determine current runlevel
+2026-11-09T10:49:54.4971799Z #6 4.681 invoke-rc.d: policy-rc.d denied execution of start.
+2026-11-09T10:49:54.4972456Z #6 4.682 Setting up libgssapi-krb5-2:amd64 (1.20.1-2+deb12u5) ...
+2026-11-09T10:49:54.4972877Z #6 4.685 Setting up ucf (3.0043+nmu1+deb12u1) ...
+2026-11-09T10:49:54.4973555Z #6 4.737 Setting up libpam-systemd:amd64 (252.39-1~deb12u2) ...
+2026-11-09T10:49:54.6279771Z #6 4.825 Setting up libtirpc3:amd64 (1.3.3+ds-1) ...
+2026-11-09T10:49:54.6280879Z #6 4.827 Setting up openssh-client (1:9.2p1-2+deb12u10) ...
+2026-11-09T10:49:54.6281651Z #6 4.868 Setting up dbus-user-session (1.14.10-1~deb12u1) ...
+2026-11-09T10:49:54.7361363Z #6 4.870 Setting up libnsl2:amd64 (1.3.0-2) ...
+2026-11-09T10:49:54.7362539Z #6 4.872 Setting up openssh-sftp-server (1:9.2p1-2+deb12u10) ...
+2026-11-09T10:49:54.7363507Z #6 4.874 Setting up libwrap0:amd64 (7.6.q-32) ...
+2026-11-09T10:49:54.7364362Z #6 4.877 Setting up openssh-server (1:9.2p1-2+deb12u10) ...
+2026-11-09T10:49:54.7365005Z #6 4.958 
+2026-11-09T10:49:54.7365762Z #6 4.958 Creating config file /etc/ssh/sshd_config with new version
+2026-11-09T10:49:55.4323696Z #6 4.976 Creating SSH2 RSA key; this may take some time ...
+2026-11-09T10:49:55.5876158Z #6 5.675 3072 SHA256:h9lqQPoWdPZZf1KK0kmLWsFADODXv+a8CdlPYA8/TD4 root@buildkitsandbox (RSA)
+2026-11-09T10:49:55.5877420Z #6 5.678 Creating SSH2 ECDSA key; this may take some time ...
+2026-11-09T10:49:55.5878563Z #6 5.685 256 SHA256:1vriulofMdwI/jR10co7WAsdAxnx9920FM3pmb+2q7Y root@buildkitsandbox (ECDSA)
+2026-11-09T10:49:55.5879883Z #6 5.686 Creating SSH2 ED25519 key; this may take some time ...
+2026-11-09T10:49:55.5880964Z #6 5.692 256 SHA256:U+0PuLPLOHDRwISevv42IdnAalTbsoAIHR+PQZlRryA root@buildkitsandbox (ED25519)
+2026-11-09T10:49:55.5882041Z #6 5.738 invoke-rc.d: could not determine current runlevel
+2026-11-09T10:49:55.5882925Z #6 5.740 invoke-rc.d: policy-rc.d denied execution of start.
+2026-11-09T10:49:55.5884445Z #6 5.828 Created symlink /etc/systemd/system/sshd.service → /lib/systemd/system/ssh.service.
+2026-11-09T10:49:55.5885228Z 
+2026-11-09T10:49:55.5886199Z #6 5.828 Created symlink /etc/systemd/system/multi-user.target.wants/ssh.service → /lib/systemd/system/ssh.service.
+2026-11-09T10:49:55.5887190Z 
+2026-11-09T10:49:55.7110520Z #6 5.893 Processing triggers for libc-bin (2.36-9+deb12u14) ...
+2026-11-09T10:49:55.7111207Z #6 DONE 5.9s
+2026-11-09T10:49:55.8345448Z 
+2026-11-09T10:49:55.8348002Z #7 [3/4] RUN useradd --create-home --shell /bin/bash mikka && echo 'mikka ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/mikka && mkdir -p /run/sshd && ssh-keygen -A && systemctl enable ssh && mkdir -p /home/mikka/.ssh && chmod 700 /home/mikka/.ssh && chown -R mikka:mikka /home/mikka/.ssh
+2026-11-09T10:49:55.8349580Z #7 0.124 Synchronizing state of ssh.service with SysV service script with /lib/systemd/systemd-sysv-install.
+2026-11-09T10:49:55.8350189Z #7 0.124 Executing: /lib/systemd/systemd-sysv-install enable ssh
+2026-11-09T10:49:55.9735152Z #7 DONE 0.1s
+2026-11-09T10:49:55.9735410Z 
+2026-11-09T10:49:55.9735889Z #8 [4/4] RUN echo 'PasswordAuthentication no' >> /etc/ssh/sshd_config
+2026-11-09T10:49:55.9736458Z #8 DONE 0.1s
+2026-11-09T10:49:56.1247844Z 
+2026-11-09T10:49:56.1248724Z #9 exporting to image
+2026-11-09T10:49:56.1249629Z #9 exporting layers
+2026-11-09T10:49:56.4170745Z #9 exporting layers 0.4s done
+2026-11-09T10:49:56.4311003Z #9 writing image sha256:28fac0d7134f08849944ff4f085b012c858e10fe05436b9f8142bddf01080397 done
+2026-11-09T10:49:56.4312558Z #9 naming to docker.io/library/mikka-491-ssh-test done
+2026-11-09T10:49:56.4313183Z #9 DONE 0.4s
+2026-11-09T10:49:56.5991207Z Failed to connect to bus: No such file or directory
+2026-11-09T10:49:58.5227566Z (node:6522) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+2026-11-09T10:49:58.5239795Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-11-09T10:49:58.5241971Z (node:6522) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+2026-11-09T10:52:28.6246671Z {"automaticUpdate":{"from":"1.0.0","to":"1.0.1","previousPid":"271","updatedPid":"384","failedPid":"646","enrollments":1,"registrations":5,"heartbeats":17,"pollsAskingForReleases":9,"registryQueries":2,"downloads":1,"failedDownloads":1}}
+2026-11-09T10:52:43.3947855Z {"heartbeat":18,"command":"redetect","acknowledged":false}
+2026-11-09T10:52:43.9179549Z {"heartbeat":19,"command":"redetect","acknowledged":true}
+2026-11-09T10:52:58.9187351Z {"heartbeat":20,"command":"restart","acknowledged":false}
+2026-11-09T10:53:04.8734813Z {"heartbeat":21,"command":"restart","acknowledged":true}
+2026-11-09T10:53:05.3754894Z {"heartbeat":22,"command":"uninstall","acknowledged":false}
+2026-11-09T10:53:05.3796850Z {"heartbeat":23,"command":"uninstall","acknowledged":true}
+2026-11-09T10:53:05.6211252Z ✔ real SSH install → systemd → automatic npm update → opt-out/failure → commands → uninstall (187289.533559ms)
+2026-11-09T10:53:05.6338020Z ℹ tests 1
+2026-11-09T10:53:05.6338329Z ℹ suites 0
+2026-11-09T10:53:05.6338543Z ℹ pass 1
+2026-11-09T10:53:05.6338863Z ℹ fail 0
+2026-11-09T10:53:05.6339196Z ℹ cancelled 0
+2026-11-09T10:53:05.6339502Z ℹ skipped 0
+2026-11-09T10:53:05.6339745Z ℹ todo 0
+2026-11-09T10:53:05.6339996Z ℹ duration_ms 187645.473296
+2026-11-09T10:53:15.8151339Z Post job cleanup.
+2026-11-09T10:53:15.9718141Z (node:8879) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T10:53:15.9719622Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T10:53:15.9723498Z Cache hit occurred on the primary key node-cache-Linux-x64-pnpm-54b3618e3cf47efbec4384bce0c968e977f7f497c903a30e612e08a79a0791c9, not saving cache.
+2026-11-09T10:53:15.9849423Z Post job cleanup.
+2026-11-09T10:53:16.1518611Z Pruning is unnecessary.
+2026-11-09T10:53:16.1759864Z Post job cleanup.
+2026-11-09T10:53:16.3034544Z [command]/usr/bin/git version
+2026-11-09T10:53:16.3087867Z git version 2.56.0
+2026-11-09T10:53:16.3137017Z Temporarily overriding HOME='/home/runner/work/_temp/074f6e1b-a6c7-48f0-97f2-95bc7fb6efd4' before making global git config changes
+2026-11-09T10:53:16.3182466Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T10:53:16.3186675Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T10:53:16.3211689Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T10:53:16.3263696Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T10:53:16.3631544Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T10:53:16.3663809Z http.https://github.com/.extraheader
+2026-11-09T10:53:16.3676196Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-09T10:53:16.3719741Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T10:53:16.3972892Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T10:53:16.4014228Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T10:53:16.4461883Z Print service container logs: ff743d60523a4e2eadc70b9b2c0f7504_postgres17_6d6b2b
+2026-11-09T10:53:16.4467155Z ##[command]/usr/bin/docker logs --details 75762772aa07956352ceb29a5ebc606bff904ea32379a585c706e2603c1cf6a3
+2026-11-09T10:53:16.4639597Z  ********************************************************************************
+2026-11-09T10:53:16.4640427Z  WARNING: POSTGRES_HOST_AUTH_METHOD has been set to "trust". This will allow
+2026-11-09T10:53:16.4641252Z           anyone with access to the Postgres port to access your database without
+2026-11-09T10:53:16.4641746Z           a password, even if POSTGRES_PASSWORD is set. See PostgreSQL
+2026-11-09T10:53:16.4642093Z           documentation about "trust":
+2026-11-09T10:53:16.4642465Z           https://www.postgresql.org/docs/current/auth-trust.html
+2026-11-09T10:53:16.4642879Z           In Docker's default configuration, this is effectively any other
+2026-11-09T10:53:16.4643233Z           container on the same system.
+2026-11-09T10:53:16.4643532Z  
+2026-11-09T10:53:16.4643805Z           It is not recommended to use POSTGRES_HOST_AUTH_METHOD=trust. Replace
+2026-11-09T10:53:16.4644246Z           it with "-e POSTGRES_PASSWORD=password" instead to set a password in
+2026-11-09T10:53:16.4644599Z           "docker run".
+2026-11-09T10:53:16.4644850Z  ********************************************************************************
+2026-11-09T10:53:16.4645237Z  initdb: warning: enabling "trust" authentication for local connections
+2026-11-09T10:53:16.4646323Z  initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-11-09T10:53:16.4647558Z  The files belonging to this database system will be owned by user "postgres".
+2026-11-09T10:53:16.4648268Z  This user must also own the server process.
+2026-11-09T10:53:16.4648734Z  
+2026-11-09T10:53:16.4649427Z  The database cluster will be initialized with locale "en_US.utf8".
+2026-11-09T10:53:16.4650008Z  The default database encoding has accordingly been set to "UTF8".
+2026-11-09T10:53:16.4650531Z  The default text search configuration will be set to "english".
+2026-11-09T10:53:16.4650849Z  
+2026-11-09T10:53:16.4651042Z  Data page checksums are disabled.
+2026-11-09T10:53:16.4651278Z  
+2026-11-09T10:53:16.4651660Z  fixing permissions on existing directory /var/lib/postgresql/data ... ok
+2026-11-09T10:53:16.4652274Z  creating subdirectories ... ok
+2026-11-09T10:53:16.4652762Z  selecting dynamic shared memory implementation ... posix
+2026-11-09T10:53:16.4653293Z  selecting default "max_connections" ... 100
+2026-11-09T10:53:16.4653737Z  selecting default "shared_buffers" ... 128MB
+2026-11-09T10:53:16.4654344Z  selecting default time zone ... Etc/UTC
+2026-11-09T10:53:16.4655129Z  creating configuration files ... ok
+2026-11-09T10:53:16.4655610Z  running bootstrap script ... ok
+2026-11-09T10:53:16.4656144Z  performing post-bootstrap initialization ... ok
+2026-11-09T10:53:16.4656699Z  syncing data to disk ... ok
+2026-11-09T10:53:16.4657134Z  
+2026-11-09T10:53:16.4657447Z  
+2026-11-09T10:53:16.4657890Z  Success. You can now start the database server using:
+2026-11-09T10:53:16.4658406Z  
+2026-11-09T10:53:16.4658995Z      pg_ctl -D /var/lib/postgresql/data -l logfile start
+2026-11-09T10:53:16.4659530Z  
+2026-11-09T10:53:16.4660498Z  2026-11-09 10:47:48.548 UTC [1] LOG:  starting PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+2026-11-09T10:53:16.4661636Z  2026-11-09 10:47:48.548 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-11-09T10:53:16.4662449Z  2026-11-09 10:47:48.548 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-11-09T10:53:16.4663210Z  2026-11-09 10:47:48.549 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-11-09T10:53:16.4664104Z  2026-11-09 10:47:48.551 UTC [65] LOG:  database system was shut down at 2026-11-09 10:47:48 UTC
+2026-11-09T10:53:16.4665085Z  2026-11-09 10:47:48.554 UTC [1] LOG:  database system is ready to accept connections
+2026-11-09T10:53:16.4665806Z  2026-11-09 10:47:52.796 UTC [76] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4666407Z  2026-11-09 10:47:57.851 UTC [84] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4667110Z  2026-11-09 10:48:02.929 UTC [92] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4667654Z  2026-11-09 10:48:08.006 UTC [99] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4668187Z  2026-11-09 10:48:13.082 UTC [107] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4668733Z  2026-11-09 10:48:18.157 UTC [115] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4669430Z  2026-11-09 10:48:23.264 UTC [123] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4670068Z  2026-11-09 10:48:28.406 UTC [132] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4670752Z  2026-11-09 10:48:33.473 UTC [140] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4671332Z  2026-11-09 10:48:38.533 UTC [148] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4672025Z  2026-11-09 10:48:43.624 UTC [156] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4672616Z  2026-11-09 10:48:48.682 UTC [165] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4673017Z  2026-11-09 10:48:53.745 UTC [172] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4673380Z  2026-11-09 10:48:58.803 UTC [180] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4673933Z  2026-11-09 10:49:01.189 UTC [183] ERROR:  new row for relation "device_tokens" violates check constraint "enrollment_insert_failure"
+2026-11-09T10:53:16.4675093Z  2026-11-09 10:49:01.189 UTC [183] DETAIL:  Failing row contains (0ee3c16a-8bff-43ec-ad00-45b3e7d5a0e9, rollback-owner, dff48039cb400d08f915242bf51237658595ccec49c9276ca1f283cf5557f626, SSH, 2026-11-09 10:49:01.189421+00, null, null, null, null, null, null).
+2026-11-09T10:53:16.4676115Z  2026-11-09 10:49:01.189 UTC [183] STATEMENT:  WITH consumed AS (
+2026-11-09T10:53:16.4676728Z  	    DELETE FROM device_enrollments WHERE "tokenHash"=$1 AND "expiresAt">now() RETURNING "userId"
+2026-11-09T10:53:16.4677222Z  	  ) INSERT INTO device_tokens (id,"userId","tokenHash",name)
+2026-11-09T10:53:16.4677579Z  	    SELECT $2,"userId",$3,'SSH' FROM consumed RETURNING id
+2026-11-09T10:53:16.4677940Z  2026-11-09 10:49:03.877 UTC [191] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4678323Z  2026-11-09 10:49:08.934 UTC [200] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4678688Z  2026-11-09 10:49:13.992 UTC [208] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4679317Z  2026-11-09 10:49:15.192 UTC [192] FATAL:  terminating connection due to idle-in-transaction timeout
+2026-11-09T10:53:16.4679794Z  2026-11-09 10:49:19.049 UTC [219] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4680343Z  2026-11-09 10:49:24.107 UTC [227] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4680713Z  2026-11-09 10:49:29.168 UTC [235] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4681107Z  2026-11-09 10:49:34.228 UTC [243] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4681482Z  2026-11-09 10:49:39.332 UTC [252] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4681853Z  2026-11-09 10:49:44.467 UTC [260] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4682237Z  2026-11-09 10:49:49.539 UTC [267] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4682594Z  2026-11-09 10:49:54.599 UTC [275] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4682958Z  2026-11-09 10:49:59.663 UTC [284] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4683319Z  2026-11-09 10:50:04.732 UTC [292] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4683676Z  2026-11-09 10:50:09.794 UTC [300] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4684033Z  2026-11-09 10:50:14.855 UTC [308] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4684392Z  2026-11-09 10:50:19.913 UTC [318] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4684746Z  2026-11-09 10:50:24.971 UTC [326] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4685193Z  2026-11-09 10:50:30.027 UTC [334] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4685560Z  2026-11-09 10:50:35.083 UTC [342] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4685916Z  2026-11-09 10:50:40.149 UTC [351] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4686273Z  2026-11-09 10:50:45.226 UTC [358] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4686649Z  2026-11-09 10:50:50.287 UTC [366] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4687006Z  2026-11-09 10:50:55.344 UTC [374] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4687366Z  2026-11-09 10:51:00.402 UTC [383] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4687742Z  2026-11-09 10:51:05.460 UTC [391] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4688101Z  2026-11-09 10:51:10.521 UTC [399] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4688454Z  2026-11-09 10:51:15.578 UTC [407] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4688964Z  2026-11-09 10:51:20.637 UTC [416] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4689334Z  2026-11-09 10:51:25.706 UTC [424] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4689695Z  2026-11-09 10:51:30.767 UTC [431] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4690056Z  2026-11-09 10:51:35.833 UTC [439] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4690427Z  2026-11-09 10:51:40.890 UTC [448] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4690788Z  2026-11-09 10:51:45.948 UTC [456] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4691153Z  2026-11-09 10:51:51.005 UTC [464] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4691527Z  2026-11-09 10:51:56.062 UTC [472] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4691903Z  2026-11-09 10:52:01.118 UTC [481] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4692271Z  2026-11-09 10:52:06.180 UTC [489] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4692651Z  2026-11-09 10:52:11.238 UTC [497] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4693019Z  2026-11-09 10:52:16.295 UTC [505] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4693388Z  2026-11-09 10:52:21.360 UTC [514] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4693758Z  2026-11-09 10:52:26.415 UTC [522] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4694123Z  2026-11-09 10:52:31.484 UTC [530] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4694483Z  2026-11-09 10:52:36.543 UTC [538] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4694860Z  2026-11-09 10:52:41.606 UTC [547] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4695224Z  2026-11-09 10:52:46.664 UTC [555] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4695795Z  2026-11-09 10:52:48.651 UTC [63] LOG:  checkpoint starting: time
+2026-11-09T10:53:16.4696180Z  2026-11-09 10:52:51.721 UTC [563] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4696550Z  2026-11-09 10:52:56.777 UTC [571] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4696930Z  2026-11-09 10:53:01.833 UTC [580] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4697901Z  2026-11-09 10:53:02.183 UTC [63] LOG:  checkpoint complete: wrote 138 buffers (0.8%); 0 WAL file(s) added, 0 removed, 0 recycled; write=13.530 s, sync=0.001 s, total=13.532 s; sync files=95, longest=0.001 s, average=0.001 s; distance=880 kB, estimate=880 kB; lsn=0/19F3C00, redo lsn=0/19F3B70
+2026-11-09T10:53:16.4698997Z  2026-11-09 10:53:06.889 UTC [588] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4699366Z  2026-11-09 10:53:11.944 UTC [596] FATAL:  role "root" does not exist
+2026-11-09T10:53:16.4700096Z  waiting for server to start....2026-11-09 10:47:48.260 UTC [49] LOG:  starting PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+2026-11-09T10:53:16.4700915Z  2026-11-09 10:47:48.261 UTC [49] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-11-09T10:53:16.4701528Z  2026-11-09 10:47:48.263 UTC [52] LOG:  database system was shut down at 2026-11-09 10:47:48 UTC
+2026-11-09T10:53:16.4702007Z  2026-11-09 10:47:48.266 UTC [49] LOG:  database system is ready to accept connections
+2026-11-09T10:53:16.4702361Z   done
+2026-11-09T10:53:16.4702545Z  server started
+2026-11-09T10:53:16.4702745Z  CREATE DATABASE
+2026-11-09T10:53:16.4702934Z  
+2026-11-09T10:53:16.4703114Z  
+2026-11-09T10:53:16.4703425Z  /usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+2026-11-09T10:53:16.4703798Z  
+2026-11-09T10:53:16.4704145Z  waiting for server to shut down...2026-11-09 10:47:48.430 UTC [49] LOG:  received fast shutdown request
+2026-11-09T10:53:16.4704638Z  .2026-11-09 10:47:48.430 UTC [49] LOG:  aborting any active transactions
+2026-11-09T10:53:16.4705184Z  2026-11-09 10:47:48.432 UTC [49] LOG:  background worker "logical replication launcher" (PID 55) exited with exit code 1
+2026-11-09T10:53:16.4705694Z  2026-11-09 10:47:48.432 UTC [50] LOG:  shutting down
+2026-11-09T10:53:16.4706065Z  2026-11-09 10:47:48.433 UTC [50] LOG:  checkpoint starting: shutdown immediate
+2026-11-09T10:53:16.4707057Z  2026-11-09 10:47:48.444 UTC [50] LOG:  checkpoint complete: wrote 925 buffers (5.6%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.008 s, sync=0.003 s, total=0.013 s; sync files=301, longest=0.002 s, average=0.001 s; distance=4256 kB, estimate=4256 kB; lsn=0/1917920, redo lsn=0/1917920
+2026-11-09T10:53:16.4708024Z  2026-11-09 10:47:48.449 UTC [49] LOG:  database system is shut down
+2026-11-09T10:53:16.4708333Z   done
+2026-11-09T10:53:16.4708513Z  server stopped
+2026-11-09T10:53:16.4708709Z  
+2026-11-09T10:53:16.4709083Z  PostgreSQL init process complete; ready for start up.
+2026-11-09T10:53:16.4709379Z  
+2026-11-09T10:53:16.4715626Z Stop and remove container: ff743d60523a4e2eadc70b9b2c0f7504_postgres17_6d6b2b
+2026-11-09T10:53:16.4720705Z ##[command]/usr/bin/docker rm --force 75762772aa07956352ceb29a5ebc606bff904ea32379a585c706e2603c1cf6a3
+2026-11-09T10:53:16.6070246Z 75762772aa07956352ceb29a5ebc606bff904ea32379a585c706e2603c1cf6a3
+2026-11-09T10:53:16.6115106Z Remove container network: github_network_3728151d58894806849a2d8b6af0ac60
+2026-11-09T10:53:16.6120598Z ##[command]/usr/bin/docker network rm github_network_3728151d58894806849a2d8b6af0ac60
+2026-11-09T10:53:16.6933048Z github_network_3728151d58894806849a2d8b6af0ac60
+2026-11-09T10:53:16.7057989Z Cleaning up orphan processes
+2026-11-09T10:53:16.7536837Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020, pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

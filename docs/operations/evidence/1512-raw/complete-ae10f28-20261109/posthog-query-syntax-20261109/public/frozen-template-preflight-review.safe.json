@@ -1,0 +1,1739 @@
+{
+  "schemaVersion": 1,
+  "issue": 1512,
+  "repository": "alexj11324/Mikka",
+  "purpose": "冻结 14 个 PostHog 查询模板的分层语法/字段准备复核；复用已有证据，只补实际缺口。",
+  "preparedAtUTC": "2026-11-09T11:22:47.610Z",
+  "status": "bounded_syntax_preflight_completed_with_explicit_historical_provenance_tiers",
+  "productionAcceptance": false,
+  "inputFiles": {
+    "queries": {
+      "bytes": 58165,
+      "sha256": "a52df37feff2ef4c304d4bc47960657dc5c5badbde0fba4416f0e9bf4fea4c68",
+      "gitBlob": "07f2013526784be3bff29fd23073f5320a980cf3",
+      "path": "docs/operations/evidence/1512-raw/source85-profile1f-b527-8ff/production-evidence-query-templates.json"
+    },
+    "normalizer": {
+      "bytes": 19913,
+      "sha256": "56ce0805aa5e75fece1efcd06ab9c0652ab90037c7e453e7e4fe6b7748b36ae5",
+      "gitBlob": "8bd8d631b24cb134e1581e48eca86e8f16d3f557",
+      "normalizerExecuted": false
+    },
+    "frozenQueryCount": 14,
+    "allCurrentSqlHashesMatchPinnedNormalizer": true,
+    "inputFilesModified": false
+  },
+  "conclusion": {
+    "statement": "本轮实际执行 1 个缺口查询成功；另外 13 个查询按 5 + 2 + 6 三种历史证据强度复用。没有将这 14 项表述为 14 次新增执行或同等强度的新验证。",
+    "discoveredSyntaxOrSchemaErrors": [],
+    "codeOrSqlFixRecommended": false,
+    "currentProductionStatusRemains": "prepared_not_production_validated",
+    "historyMetadataClarification": "模板内 pagination_review/live_compile_status 与 enumeration_review 保存的是生成时状态，不覆盖后续独立历史回执或本次回执；原文件未改写。",
+    "independentCurrentServerCoverage": "lookup_trace_count only",
+    "historicalCurrentServerDriftNotRetested": true
+  },
+  "projectBinding": {
+    "intendedProjectId": 670821,
+    "regionFromFrozenConfiguration": "US",
+    "safeObservedMetadata": {
+      "observedAtUTC": "2026-11-09T11:14:28.936Z",
+      "toolIsError": false,
+      "accessibleProjectCount": 1,
+      "requestedProjectId": 670821,
+      "targetFound": true,
+      "soleAccessibleProjectIsTarget": true,
+      "projectTokensReturned": false,
+      "projectSwitchPerformed": false
+    },
+    "method": "使用现有授权上下文；官方 projects-get 返回恰好 1 个可访问项目且为 670821，未切换项目。",
+    "limits": "execute-sql 没有显式 project_id 参数，也不在结果中回显物理集群；不将目录推导写成实际集群标识。",
+    "blockedAction": {
+      "tool": "project-get",
+      "automaticApprovalReviewRejected": true,
+      "executed": false,
+      "credentialReturned": false,
+      "retried": false,
+      "reasonSummary": "该工具可能返回项目 API token；仅为项目识别读取凭证没有必要。",
+      "materiallySaferAlternative": "官方只读 projects-get 的无 token 项目元数据；仅做一次，不改项目设置或授权。"
+    },
+    "originalPlatformResponses": "保留在私有 functions store；本公开投影不包含账号、组织成员、token 或平台 envelope。"
+  },
+  "officialCapabilityReview": {
+    "skillsRead": [
+      "posthog:posthog",
+      "posthog:querying-posthog-data",
+      "posthog:querying-posthog-data/references/guidelines.md",
+      "posthog:querying-posthog-data/references/models-apm-spans.md",
+      "posthog:querying-posthog-data/references/models-logs.md"
+    ],
+    "executeSqlInputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The final SQL query to be executed."
+        },
+        "context": {
+          "description": "Why this query runs, and the governed-catalog outcome behind it: state \"governed catalog consulted: no match\" here when no approved metric covered the measure. This rides alongside the query and never reaches the person who asked, so catalog bookkeeping belongs here instead of in the answer.",
+          "type": "string"
+        },
+        "truncate": {
+          "default": true,
+          "description": "Whether to truncate large blob/JSON values in results. Defaults to true. Set to false when you need full untruncated results (e.g., for dumping to a file).",
+          "type": "boolean"
+        },
+        "connectionId": {
+          "description": "Optional id of a data warehouse connection (e.g. Postgres, MySQL, Snowflake, Redshift). When set, the query runs live against that source instead of the ClickHouse catalog, and may only reference that source's tables. Discover connection ids with external-data-sources-connections-list, then list a connection's tables by running `SELECT table_name FROM system.information_schema.tables` with that connectionId set.",
+          "type": "string"
+        },
+        "sendRawQuery": {
+          "description": "Send `query` to the connection verbatim instead of compiling it from HogQL first. Use this for SQL only that connection's own engine understands, such as vendor-specific functions. Requires connectionId, and works only on a pure direct connection (access_method 'direct'), not on a synced source with live queries enabled. The connection is read-only and accepts a single statement.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "query"
+      ]
+    },
+    "exposedValidateOrExplainSqlModeFound": false,
+    "capabilityBoundary": "当前已暴露的 tool 搜索及 execute-sql schema 没有 SQL validate/explain/parse-only 能力；这不等于断言 PostHog 所有接口均无此能力。",
+    "noUnrelatedToolsInvoked": [
+      "explain-chart",
+      "canvas-validate-create",
+      "llma-parser-recipe-create"
+    ],
+    "officialBusinessKnowledgeSearch": "info 返回未启用；没有绕过。",
+    "existingSqlAppropriate": "本任务检查冻结 SQL 的兼容性，不构建业务指标；使用官方 execute-sql 既有 SQL 入口。",
+    "exactRawResponseSwitch": "call --json execute-sql",
+    "truncateFalseMeaning": "取消大型 JSON/blob 单元格缩略，不证明行数或分页完整性。",
+    "connectionIdMeaning": "外部 data warehouse 连接 ID，不是 Logs/Default 集群选择器；本轮未提供。",
+    "routing": "APM/Logs 使用 posthog.trace_spans/logs；默认项目目录按表解析。事件/Replay 查询保持既有单集群边界；本轮未执行跨集群 JOIN/UNION。",
+    "modelReferenceNotLiveProjectScan": "当前官方 APM/Logs 模型文档用于静态字段和编码核对；没有额外查询 project event catalog、用户录屏或业务内容。",
+    "knownFieldContract": {
+      "apmTable": "posthog.trace_spans",
+      "logTable": "logs",
+      "storedTraceAndSpanIds": "base64; templates decode to hex for comparison/display",
+      "attributes": "attributes/resource_attributes maps",
+      "statusCode": {
+        "unset": 0,
+        "ok": 1,
+        "error": 2
+      },
+      "filters": "保留原模板的明确 UTC [start,end)、service、environment 与 ID 约束。",
+      "metadataProjection": "不读取模型输入输出、工具参数或原始用户内容。"
+    },
+    "sourceUrls": [
+      "https://posthog.com/docs/sql",
+      "https://posthog.com/docs/distributed-tracing/link-ai-observability",
+      "https://posthog.com/docs/ai-observability/generations",
+      "https://posthog.com/docs/ai-observability/link-session-replay",
+      "https://posthog.com/docs/ai-observability/generations#event-properties",
+      "https://posthog.com/docs/ai-observability/calculating-costs"
+    ],
+    "officialReadFingerprints": [
+      {
+        "key": "execute-info",
+        "observedAtUTC": "2026-11-09T11:07:07.337Z",
+        "originalDecodedMcpResponse": {
+          "bytes": 46605,
+          "sha256": "96e504a80f879d6643ba039f7afdcc868f33dda83cde3417c909f3bb0158969e",
+          "serialization": "JSON.stringify(response), no added whitespace or newline; hash only, not a published Git object"
+        },
+        "decodedText": {
+          "bytes": 45725,
+          "sha256": "66bfcf5b6e2cc18ffcb307428adf802560011c12acbb8f9d91f354ed46474d16"
+        },
+        "responseIsError": false
+      },
+      {
+        "key": "query-skill",
+        "observedAtUTC": "2026-11-09T11:07:19.125Z",
+        "originalDecodedMcpResponse": {
+          "bytes": 21802,
+          "sha256": "41739b326b050f1158461ac2dae8ed5aeb9742f94d4dfca67894fee4a8fc56af",
+          "serialization": "JSON.stringify(response), no added whitespace or newline; hash only, not a published Git object"
+        },
+        "decodedText": {
+          "bytes": 21474,
+          "sha256": "ac4ee97c038bc3c59f30f897bcffdea147937ea55eb5d83a6630411087b0889e"
+        },
+        "responseIsError": false
+      },
+      {
+        "key": "guidelines",
+        "observedAtUTC": "2026-11-09T11:09:09.288Z",
+        "originalDecodedMcpResponse": {
+          "bytes": 24778,
+          "sha256": "0596c87657ca5f6801400da64b94dafec00fcd488dcacefb083c7d2726e3ef64",
+          "serialization": "JSON.stringify(response), no added whitespace or newline; hash only, not a published Git object"
+        },
+        "decodedText": {
+          "bytes": 24248,
+          "sha256": "ed9486a6b3bb584c46d2f55cf10312fd3c024911faea133cb1e30206e9185bbf"
+        },
+        "responseIsError": false
+      },
+      {
+        "key": "apm-schema",
+        "observedAtUTC": "2026-11-09T11:09:13.136Z",
+        "originalDecodedMcpResponse": {
+          "bytes": 8733,
+          "sha256": "4465d183f41d34d163d7cf9b5de10b33849e180a1c4b5a2626a402c7ef59ea05",
+          "serialization": "JSON.stringify(response), no added whitespace or newline; hash only, not a published Git object"
+        },
+        "decodedText": {
+          "bytes": 8537,
+          "sha256": "319735badf39144319a4bef2ed77cbaebfc634ffec5b9e1ce7e311ffcce8a597"
+        },
+        "responseIsError": false
+      },
+      {
+        "key": "logs-schema",
+        "observedAtUTC": "2026-11-09T11:09:18.740Z",
+        "originalDecodedMcpResponse": {
+          "bytes": 15288,
+          "sha256": "f1bfc0cd07ac44bb0f7e61d0010c83cbd56d963e04056f90fbe51ed6493611c0",
+          "serialization": "JSON.stringify(response), no added whitespace or newline; hash only, not a published Git object"
+        },
+        "decodedText": {
+          "bytes": 14957,
+          "sha256": "cd18a360a5b0697d09c2087a876873495df4abda784d3bc644d0834f65bdc435"
+        },
+        "responseIsError": false
+      },
+      {
+        "key": "projects-get-info",
+        "observedAtUTC": "2026-11-09T11:14:04.775Z",
+        "originalDecodedMcpResponse": {
+          "bytes": 435,
+          "sha256": "48976353b8159f39ac301a325be5fd2113720dad402d17e3e27e1a8364162004",
+          "serialization": "JSON.stringify(response), no added whitespace or newline; hash only, not a published Git object"
+        },
+        "decodedText": {
+          "bytes": 336,
+          "sha256": "a6fdc08d57b97bda193b488a2f30890d2389ac5751c5de7d835a0979c21616da"
+        },
+        "responseIsError": false
+      },
+      {
+        "key": "validate-search",
+        "observedAtUTC": "2026-11-09T11:10:12.045Z",
+        "originalDecodedMcpResponse": {
+          "bytes": 1277,
+          "sha256": "fe47bfe4f3b5134cfa38e09ea3f6a0dd6b6ad0297e832fe38f88173d12bc2d69",
+          "serialization": "JSON.stringify(response), no added whitespace or newline; hash only, not a published Git object"
+        },
+        "decodedText": {
+          "bytes": 1131,
+          "sha256": "c6c2da804141a7ed52b826dcb83077e14ea4bd4c8c66188315fe34c6ce1d1671"
+        },
+        "responseIsError": false
+      }
+    ]
+  },
+  "coverageTotals": {
+    "independentlyComparedHistoricalRawEchoAndColumns": 5,
+    "exactHistoricalTemplateAndExecutedSqlHashReuseWithoutRaw": 2,
+    "unchangedBaselineEditChainSummaryReuseWithoutRaw": 6,
+    "newlyExecutedSyntheticLookupCount": 1,
+    "total": 14
+  },
+  "queries": [
+    {
+      "name": "lookup_trace_by_ids",
+      "templateSha256": "9508fdb7327e3688a12377021e821bf7d6dbd3acb85ef956207091d3136d8fdb",
+      "normalizerHashMatches": true,
+      "expectedColumns": [
+        {
+          "name": "trace_id_hex",
+          "type": "trace"
+        },
+        {
+          "name": "started_utc",
+          "type": "time"
+        },
+        {
+          "name": "ended_utc",
+          "type": "time"
+        },
+        {
+          "name": "services",
+          "type": "service[]"
+        },
+        {
+          "name": "observed_span_ids",
+          "type": "int"
+        },
+        {
+          "name": "run_ids",
+          "type": "id[]"
+        },
+        {
+          "name": "thread_ids",
+          "type": "id[]"
+        },
+        {
+          "name": "task_ids",
+          "type": "id[]"
+        }
+      ],
+      "evidenceTier": "raw-pagination-receipt",
+      "evidence": {
+        "name": "lookup_trace_by_ids",
+        "templateHash": "9508fdb7327e3688a12377021e821bf7d6dbd3acb85ef956207091d3136d8fdb",
+        "matchesNormalizerHash": true,
+        "priorEntryKeys": [
+          "name",
+          "compiled",
+          "executed_once",
+          "returned_rows",
+          "column_count",
+          "acceptance_evidence",
+          "executed_query",
+          "raw_response"
+        ],
+        "exactExecutedSqlMatchesCurrent": true,
+        "originalResponseError": false,
+        "columnCount": 8,
+        "expectedColumnCount": 8,
+        "exactColumnsMatch": true,
+        "recordedRows": 0,
+        "compiled": true,
+        "originalResponseFormattedOverrideMatches": true,
+        "executedQuerySha256": "a53abadb3bb61aa8786f9deaec99978675d9bd3ec752f6486c46ede56ed7412f",
+        "rawResponseSha256": "f2164a335a5f5894cbe80083fc99fa066a34ae3569df587ec0698b1052bfdb13"
+      },
+      "productionAcceptance": false
+    },
+    {
+      "name": "lookup_trace_count",
+      "templateSha256": "e7568116c4ba4d329a4f929a314557646ef9172185c16beb92bb08320239086d",
+      "normalizerHashMatches": true,
+      "expectedColumns": [
+        {
+          "name": "trace_count",
+          "type": "int"
+        }
+      ],
+      "evidenceTier": "new_synthetic_server_execution",
+      "evidence": {
+        "name": "lookup_trace_count",
+        "templateSha256": "e7568116c4ba4d329a4f929a314557646ef9172185c16beb92bb08320239086d",
+        "executedQuerySha256": "22a7e82a1321e441aef01970b1c703cfba6341b56ac5dd20811fb8b69028599d",
+        "startedAtUTC": "2026-11-09T11:14:58.936Z",
+        "completedAtUTC": "2026-11-09T11:15:05.210Z",
+        "queryEchoMatches": true,
+        "formattedOverrideMatches": true,
+        "isError": false,
+        "actualColumns": [
+          "trace_count"
+        ],
+        "expectedColumns": [
+          "trace_count"
+        ],
+        "columnOrderMatches": true,
+        "aggregateReturnedRows": 1,
+        "actualResultCells": [
+          [
+            "0"
+          ]
+        ],
+        "matchedTraceCount": 0,
+        "responseMcpShapeMatchesFrozenNormalizer": true,
+        "normalizerExecuted": false,
+        "productionAcceptance": false,
+        "syntheticBindingOnly": true,
+        "physicalClusterReported": false,
+        "queryTarget": "Default project catalog resolves posthog.trace_spans to its Logs workload; no connectionId or cluster parameter provided"
+      },
+      "productionAcceptance": false
+    },
+    {
+      "name": "span_timeline",
+      "templateSha256": "ea6a0f5e5a26dc82e9d44e2cf7707e316b89169265f49d52f79e871083c5d2b3",
+      "normalizerHashMatches": true,
+      "expectedColumns": [
+        {
+          "name": "started_utc",
+          "type": "time"
+        },
+        {
+          "name": "span_row_uuid",
+          "type": "uuid"
+        },
+        {
+          "name": "offset_ms",
+          "type": "num"
+        },
+        {
+          "name": "duration_ms",
+          "type": "num"
+        },
+        {
+          "name": "service",
+          "type": "service"
+        },
+        {
+          "name": "stage",
+          "type": "stage"
+        },
+        {
+          "name": "workflow",
+          "type": "label?"
+        },
+        {
+          "name": "workflow_step",
+          "type": "label?"
+        },
+        {
+          "name": "span_id_hex",
+          "type": "span"
+        },
+        {
+          "name": "parent_span_id_hex",
+          "type": "span"
+        },
+        {
+          "name": "parent_stage",
+          "type": "stage0?"
+        },
+        {
+          "name": "parent_presence",
+          "type": "parent"
+        },
+        {
+          "name": "status_code",
+          "type": "int"
+        },
+        {
+          "name": "run_id",
+          "type": "id?"
+        },
+        {
+          "name": "thread_id",
+          "type": "id?"
+        },
+        {
+          "name": "task_id",
+          "type": "id?"
+        },
+        {
+          "name": "workflow_run_id",
+          "type": "id?"
+        },
+        {
+          "name": "session_id",
+          "type": "id?"
+        }
+      ],
+      "evidenceTier": "raw-pagination-receipt",
+      "evidence": {
+        "name": "span_timeline",
+        "templateHash": "ea6a0f5e5a26dc82e9d44e2cf7707e316b89169265f49d52f79e871083c5d2b3",
+        "matchesNormalizerHash": true,
+        "priorEntryKeys": [
+          "name",
+          "compiled",
+          "executed_once",
+          "returned_rows",
+          "column_count",
+          "acceptance_evidence",
+          "executed_query",
+          "raw_response"
+        ],
+        "exactExecutedSqlMatchesCurrent": true,
+        "originalResponseError": false,
+        "columnCount": 18,
+        "expectedColumnCount": 18,
+        "exactColumnsMatch": true,
+        "recordedRows": 27,
+        "compiled": true,
+        "originalResponseFormattedOverrideMatches": true,
+        "executedQuerySha256": "c0c30b24d3f28bec24b155d797ce4fadf3c05dcc72b20d4ad8703ece2d5fb64e",
+        "rawResponseSha256": "966ee8d0944c7036060d6b2f21801fc03d056d32fcebc86f7f7dcd50895cc1a8"
+      },
+      "productionAcceptance": false
+    },
+    {
+      "name": "trace_integrity",
+      "templateSha256": "f925cc10817c9903888b5d014d049bd70fa79aa29de29db259aaad0dd8a4036e",
+      "normalizerHashMatches": true,
+      "expectedColumns": [
+        {
+          "name": "span_rows",
+          "type": "int"
+        },
+        {
+          "name": "distinct_span_ids",
+          "type": "int"
+        },
+        {
+          "name": "native_roots",
+          "type": "int"
+        },
+        {
+          "name": "external_or_missing_parent_rows",
+          "type": "int"
+        },
+        {
+          "name": "self_parent_rows",
+          "type": "int"
+        },
+        {
+          "name": "services",
+          "type": "service[]"
+        },
+        {
+          "name": "started_utc",
+          "type": "time"
+        },
+        {
+          "name": "ended_utc",
+          "type": "time"
+        },
+        {
+          "name": "elapsed_ms",
+          "type": "num"
+        },
+        {
+          "name": "run_ids",
+          "type": "id[]"
+        },
+        {
+          "name": "task_ids",
+          "type": "id[]"
+        },
+        {
+          "name": "session_ids",
+          "type": "id[]"
+        }
+      ],
+      "evidenceTier": "unchanged-baseline-chain",
+      "evidence": {
+        "name": "trace_integrity",
+        "templateSha256": "f925cc10817c9903888b5d014d049bd70fa79aa29de29db259aaad0dd8a4036e",
+        "normalizerTemplateSha256": "f925cc10817c9903888b5d014d049bd70fa79aa29de29db259aaad0dd8a4036e",
+        "templateMatchesNormalizer": true,
+        "recordedBaseline": {
+          "compiled": true,
+          "row_count": 1,
+          "taxonomy_warning": false
+        },
+        "absenceFromLocalChangedList": true,
+        "absenceFromPaginationChangedList": true,
+        "enumerationExplicitlyPreservesOther13": true,
+        "originalRawResponseIndependentlyRead": false,
+        "originalHistoricalSqlHashAvailableInBaselineSummary": false,
+        "reexecutedThisReview": false,
+        "provenanceLimit": "Reused immutable baseline compiled/row-count summary and explicit unchanged edit-chain declarations; no independent historical SQL echo, raw response or current server execution."
+      },
+      "productionAcceptance": false
+    },
+    {
+      "name": "generation_receipts",
+      "templateSha256": "621c07e4b85df37f0793f4dce6786c5447a8612d9b9f120f6129b093dcc206a5",
+      "normalizerHashMatches": true,
+      "expectedColumns": [
+        {
+          "name": "started_utc",
+          "type": "time"
+        },
+        {
+          "name": "event_uuid",
+          "type": "uuid"
+        },
+        {
+          "name": "span_id_hex",
+          "type": "span"
+        },
+        {
+          "name": "parent_span_id_hex",
+          "type": "span"
+        },
+        {
+          "name": "valid_span_id",
+          "type": "bool"
+        },
+        {
+          "name": "provider",
+          "type": "label?"
+        },
+        {
+          "name": "model",
+          "type": "label?"
+        },
+        {
+          "name": "operation",
+          "type": "label?"
+        },
+        {
+          "name": "harness",
+          "type": "label?"
+        },
+        {
+          "name": "route",
+          "type": "label?"
+        },
+        {
+          "name": "fallback_reason",
+          "type": "label?"
+        },
+        {
+          "name": "zerocat_ms",
+          "type": "num?"
+        },
+        {
+          "name": "tier",
+          "type": "label?"
+        },
+        {
+          "name": "tier_score",
+          "type": "num?"
+        },
+        {
+          "name": "tier_confidence",
+          "type": "num?"
+        },
+        {
+          "name": "effort",
+          "type": "label?"
+        },
+        {
+          "name": "effort_score",
+          "type": "num?"
+        },
+        {
+          "name": "effort_confidence",
+          "type": "num?"
+        },
+        {
+          "name": "timing_basis",
+          "type": "label?"
+        },
+        {
+          "name": "ttft_basis",
+          "type": "label?"
+        },
+        {
+          "name": "model_basis",
+          "type": "label?"
+        },
+        {
+          "name": "native_unavailable_reason",
+          "type": "label?"
+        },
+        {
+          "name": "first_output_item_ms",
+          "type": "num?"
+        },
+        {
+          "name": "input_tokens",
+          "type": "num?"
+        },
+        {
+          "name": "output_tokens",
+          "type": "num?"
+        },
+        {
+          "name": "cache_read_tokens",
+          "type": "num?"
+        },
+        {
+          "name": "cache_creation_tokens",
+          "type": "num?"
+        },
+        {
+          "name": "cache_reporting_exclusive_raw",
+          "type": "flag?"
+        },
+        {
+          "name": "latency_ms",
+          "type": "num?"
+        },
+        {
+          "name": "ttft_ms",
+          "type": "num?"
+        },
+        {
+          "name": "total_cost_usd",
+          "type": "num?"
+        },
+        {
+          "name": "cost_passthrough_raw",
+          "type": "flag?"
+        },
+        {
+          "name": "cost_model_source",
+          "type": "label?"
+        },
+        {
+          "name": "cost_model_used",
+          "type": "label?"
+        },
+        {
+          "name": "cost_model_provider",
+          "type": "label?"
+        },
+        {
+          "name": "cost_basis",
+          "type": "cost"
+        },
+        {
+          "name": "is_error",
+          "type": "bool"
+        },
+        {
+          "name": "server_outcome",
+          "type": "label?"
+        },
+        {
+          "name": "session_id",
+          "type": "id?"
+        },
+        {
+          "name": "run_id",
+          "type": "id?"
+        },
+        {
+          "name": "thread_id",
+          "type": "id?"
+        },
+        {
+          "name": "task_id",
+          "type": "id?"
+        }
+      ],
+      "evidenceTier": "exact-hash-live-schema-receipt",
+      "evidence": {
+        "name": "generation_receipts",
+        "templateSha256": "621c07e4b85df37f0793f4dce6786c5447a8612d9b9f120f6129b093dcc206a5",
+        "recordedTemplateSha256": "621c07e4b85df37f0793f4dce6786c5447a8612d9b9f120f6129b093dcc206a5",
+        "templateHashMatches": true,
+        "executedQuerySha256": "cc7afd98d49e925180467d80984af5d8b9ffb19c7e0f6d2977f3be96996d5b9a",
+        "recordedExecutedQuerySha256": "cc7afd98d49e925180467d80984af5d8b9ffb19c7e0f6d2977f3be96996d5b9a",
+        "executedHashMatches": true,
+        "recordedColumns": 42,
+        "expectedColumns": 42,
+        "recordedRows": 0,
+        "rawResponseIndependentlyRead": false,
+        "sourceBlob": "07f2013526784be3bff29fd23073f5320a980cf3",
+        "sourceField": "live_schema_preflight.queries.generation_receipts"
+      },
+      "productionAcceptance": false
+    },
+    {
+      "name": "tail_error_retention",
+      "templateSha256": "93cadd4c63825a6c291f53e857a28de50695311137f0e533589415c80c70f727",
+      "normalizerHashMatches": true,
+      "expectedColumns": [
+        {
+          "name": "service",
+          "type": "service"
+        },
+        {
+          "name": "span_rows",
+          "type": "int"
+        },
+        {
+          "name": "span_ids",
+          "type": "int"
+        },
+        {
+          "name": "error_span_rows",
+          "type": "int"
+        },
+        {
+          "name": "http_failure_span_rows",
+          "type": "int"
+        },
+        {
+          "name": "slow_span_rows",
+          "type": "int"
+        },
+        {
+          "name": "tail_retained_span_rows",
+          "type": "int"
+        },
+        {
+          "name": "critical_child_retained_rows",
+          "type": "int"
+        },
+        {
+          "name": "full_rate_span_rows",
+          "type": "int"
+        },
+        {
+          "name": "missing_rate_rows",
+          "type": "int"
+        },
+        {
+          "name": "nonfull_rate_rows",
+          "type": "int"
+        },
+        {
+          "name": "retention_reasons",
+          "type": "label[]"
+        }
+      ],
+      "evidenceTier": "unchanged-baseline-chain",
+      "evidence": {
+        "name": "tail_error_retention",
+        "templateSha256": "93cadd4c63825a6c291f53e857a28de50695311137f0e533589415c80c70f727",
+        "normalizerTemplateSha256": "93cadd4c63825a6c291f53e857a28de50695311137f0e533589415c80c70f727",
+        "templateMatchesNormalizer": true,
+        "recordedBaseline": {
+          "compiled": true,
+          "row_count": 1,
+          "taxonomy_warning": false
+        },
+        "absenceFromLocalChangedList": true,
+        "absenceFromPaginationChangedList": true,
+        "enumerationExplicitlyPreservesOther13": true,
+        "originalRawResponseIndependentlyRead": false,
+        "originalHistoricalSqlHashAvailableInBaselineSummary": false,
+        "reexecutedThisReview": false,
+        "provenanceLimit": "Reused immutable baseline compiled/row-count summary and explicit unchanged edit-chain declarations; no independent historical SQL echo, raw response or current server execution."
+      },
+      "productionAcceptance": false
+    },
+    {
+      "name": "safe_native_logs",
+      "templateSha256": "8008fa8570622dd8a11d26968fd72f0392fab91521dc774ed432e8de5efde394",
+      "normalizerHashMatches": true,
+      "expectedColumns": [
+        {
+          "name": "emitted_utc",
+          "type": "time"
+        },
+        {
+          "name": "log_uuid",
+          "type": "uuid"
+        },
+        {
+          "name": "service",
+          "type": "service"
+        },
+        {
+          "name": "severity_text",
+          "type": "label"
+        },
+        {
+          "name": "body_code",
+          "type": "body"
+        },
+        {
+          "name": "safe_body_shape",
+          "type": "bool"
+        },
+        {
+          "name": "stage",
+          "type": "stage?"
+        },
+        {
+          "name": "duration_ms",
+          "type": "num?"
+        },
+        {
+          "name": "trace_id_hex",
+          "type": "trace"
+        },
+        {
+          "name": "span_id_hex",
+          "type": "span"
+        },
+        {
+          "name": "has_matching_apm_span",
+          "type": "bool"
+        },
+        {
+          "name": "run_id",
+          "type": "id?"
+        },
+        {
+          "name": "thread_id",
+          "type": "id?"
+        },
+        {
+          "name": "task_id",
+          "type": "id?"
+        },
+        {
+          "name": "session_id",
+          "type": "id?"
+        },
+        {
+          "name": "error_code",
+          "type": "label?"
+        },
+        {
+          "name": "error_type",
+          "type": "label?"
+        }
+      ],
+      "evidenceTier": "raw-pagination-receipt",
+      "evidence": {
+        "name": "safe_native_logs",
+        "templateHash": "8008fa8570622dd8a11d26968fd72f0392fab91521dc774ed432e8de5efde394",
+        "matchesNormalizerHash": true,
+        "priorEntryKeys": [
+          "name",
+          "compiled",
+          "executed_once",
+          "returned_rows",
+          "column_count",
+          "acceptance_evidence",
+          "executed_query",
+          "raw_response"
+        ],
+        "exactExecutedSqlMatchesCurrent": true,
+        "originalResponseError": false,
+        "columnCount": 17,
+        "expectedColumnCount": 17,
+        "exactColumnsMatch": true,
+        "recordedRows": 0,
+        "compiled": true,
+        "originalResponseFormattedOverrideMatches": true,
+        "executedQuerySha256": "6c402492091a517a787b400b2795735a2fc40f60373276402793e52f98462d68",
+        "rawResponseSha256": "4f165ec17538fea6ff409efb2510003f0c18893c55a923a17ac24befbe12cfdc"
+      },
+      "productionAcceptance": false
+    },
+    {
+      "name": "source_correlation",
+      "templateSha256": "a460dfed6c168ab732064df0ab1a9cc1fdadbf64077eee81a75bd632cf4fa8b3",
+      "normalizerHashMatches": true,
+      "expectedColumns": [
+        {
+          "name": "service",
+          "type": "service"
+        },
+        {
+          "name": "service_version",
+          "type": "version"
+        },
+        {
+          "name": "span_rows",
+          "type": "int"
+        },
+        {
+          "name": "span_ids",
+          "type": "int"
+        },
+        {
+          "name": "client_kinds",
+          "type": "label[]"
+        },
+        {
+          "name": "run_ids",
+          "type": "id[]"
+        },
+        {
+          "name": "thread_ids",
+          "type": "id[]"
+        },
+        {
+          "name": "task_ids",
+          "type": "id[]"
+        },
+        {
+          "name": "workflow_run_ids",
+          "type": "id[]"
+        },
+        {
+          "name": "session_ids",
+          "type": "id[]"
+        }
+      ],
+      "evidenceTier": "unchanged-baseline-chain",
+      "evidence": {
+        "name": "source_correlation",
+        "templateSha256": "a460dfed6c168ab732064df0ab1a9cc1fdadbf64077eee81a75bd632cf4fa8b3",
+        "normalizerTemplateSha256": "a460dfed6c168ab732064df0ab1a9cc1fdadbf64077eee81a75bd632cf4fa8b3",
+        "templateMatchesNormalizer": true,
+        "recordedBaseline": {
+          "compiled": true,
+          "row_count": 1,
+          "taxonomy_warning": false
+        },
+        "absenceFromLocalChangedList": true,
+        "absenceFromPaginationChangedList": true,
+        "enumerationExplicitlyPreservesOther13": true,
+        "originalRawResponseIndependentlyRead": false,
+        "originalHistoricalSqlHashAvailableInBaselineSummary": false,
+        "reexecutedThisReview": false,
+        "provenanceLimit": "Reused immutable baseline compiled/row-count summary and explicit unchanged edit-chain declarations; no independent historical SQL echo, raw response or current server execution."
+      },
+      "productionAcceptance": false
+    },
+    {
+      "name": "replay_correlation",
+      "templateSha256": "07cbb3f5c660377a577aafd882d3e64436fd61d907656643bbf21a1b82b36304",
+      "normalizerHashMatches": true,
+      "expectedColumns": [
+        {
+          "name": "session_id",
+          "type": "id"
+        },
+        {
+          "name": "recording_chunks",
+          "type": "int"
+        },
+        {
+          "name": "recorded_bytes",
+          "type": "int"
+        },
+        {
+          "name": "replay_events",
+          "type": "int"
+        },
+        {
+          "name": "recording_started_utc",
+          "type": "time?"
+        },
+        {
+          "name": "recording_ended_utc",
+          "type": "time?"
+        },
+        {
+          "name": "deleted",
+          "type": "bool?"
+        },
+        {
+          "name": "console_logs",
+          "type": "int?"
+        },
+        {
+          "name": "console_warnings",
+          "type": "int?"
+        },
+        {
+          "name": "console_errors",
+          "type": "int?"
+        },
+        {
+          "name": "correlated_generations",
+          "type": "int"
+        }
+      ],
+      "evidenceTier": "unchanged-baseline-chain",
+      "evidence": {
+        "name": "replay_correlation",
+        "templateSha256": "07cbb3f5c660377a577aafd882d3e64436fd61d907656643bbf21a1b82b36304",
+        "normalizerTemplateSha256": "07cbb3f5c660377a577aafd882d3e64436fd61d907656643bbf21a1b82b36304",
+        "templateMatchesNormalizer": true,
+        "recordedBaseline": {
+          "compiled": true,
+          "row_count": 1,
+          "taxonomy_warning": true
+        },
+        "absenceFromLocalChangedList": true,
+        "absenceFromPaginationChangedList": true,
+        "enumerationExplicitlyPreservesOther13": true,
+        "originalRawResponseIndependentlyRead": false,
+        "originalHistoricalSqlHashAvailableInBaselineSummary": false,
+        "reexecutedThisReview": false,
+        "provenanceLimit": "Reused immutable baseline compiled/row-count summary and explicit unchanged edit-chain declarations; no independent historical SQL echo, raw response or current server execution."
+      },
+      "productionAcceptance": false
+    },
+    {
+      "name": "capture_summary",
+      "templateSha256": "9b7d18e1e1596aef96ab253706b32d81ea25a89f9a74299b36e3c9d7522639e9",
+      "normalizerHashMatches": true,
+      "expectedColumns": [
+        {
+          "name": "signal",
+          "type": "signal"
+        },
+        {
+          "name": "observed_count",
+          "type": "int"
+        }
+      ],
+      "evidenceTier": "unchanged-baseline-chain",
+      "evidence": {
+        "name": "capture_summary",
+        "templateSha256": "9b7d18e1e1596aef96ab253706b32d81ea25a89f9a74299b36e3c9d7522639e9",
+        "normalizerTemplateSha256": "9b7d18e1e1596aef96ab253706b32d81ea25a89f9a74299b36e3c9d7522639e9",
+        "templateMatchesNormalizer": true,
+        "recordedBaseline": {
+          "compiled": true,
+          "row_count": 3,
+          "taxonomy_warning": false
+        },
+        "absenceFromLocalChangedList": true,
+        "absenceFromPaginationChangedList": true,
+        "enumerationExplicitlyPreservesOther13": true,
+        "originalRawResponseIndependentlyRead": false,
+        "originalHistoricalSqlHashAvailableInBaselineSummary": false,
+        "reexecutedThisReview": false,
+        "provenanceLimit": "Reused immutable baseline compiled/row-count summary and explicit unchanged edit-chain declarations; no independent historical SQL echo, raw response or current server execution."
+      },
+      "productionAcceptance": false
+    },
+    {
+      "name": "apm_generation_spans",
+      "templateSha256": "1d43fcc835476f143ba6c51c390a8cfbc5c522fc9a0c8184374046ec76050b40",
+      "normalizerHashMatches": true,
+      "expectedColumns": [
+        {
+          "name": "started_utc",
+          "type": "time"
+        },
+        {
+          "name": "span_row_uuid",
+          "type": "uuid"
+        },
+        {
+          "name": "service",
+          "type": "service"
+        },
+        {
+          "name": "stage",
+          "type": "stage"
+        },
+        {
+          "name": "span_id_hex",
+          "type": "span"
+        },
+        {
+          "name": "parent_span_id_hex",
+          "type": "span"
+        },
+        {
+          "name": "model",
+          "type": "label0"
+        },
+        {
+          "name": "provider",
+          "type": "label?"
+        },
+        {
+          "name": "outcome",
+          "type": "label?"
+        },
+        {
+          "name": "operation",
+          "type": "label?"
+        },
+        {
+          "name": "harness",
+          "type": "label?"
+        },
+        {
+          "name": "route",
+          "type": "label?"
+        },
+        {
+          "name": "fallback_reason",
+          "type": "label?"
+        },
+        {
+          "name": "zerocat_ms",
+          "type": "num?"
+        },
+        {
+          "name": "tier",
+          "type": "label?"
+        },
+        {
+          "name": "tier_score",
+          "type": "num?"
+        },
+        {
+          "name": "tier_confidence",
+          "type": "num?"
+        },
+        {
+          "name": "effort",
+          "type": "label?"
+        },
+        {
+          "name": "effort_score",
+          "type": "num?"
+        },
+        {
+          "name": "effort_confidence",
+          "type": "num?"
+        },
+        {
+          "name": "timing_basis",
+          "type": "label?"
+        },
+        {
+          "name": "ttft_basis",
+          "type": "label?"
+        },
+        {
+          "name": "model_basis",
+          "type": "label?"
+        },
+        {
+          "name": "native_unavailable_reason",
+          "type": "label?"
+        },
+        {
+          "name": "first_output_item_ms",
+          "type": "num?"
+        },
+        {
+          "name": "sample_rate",
+          "type": "num?"
+        },
+        {
+          "name": "run_id",
+          "type": "id?"
+        },
+        {
+          "name": "thread_id",
+          "type": "id?"
+        },
+        {
+          "name": "task_id",
+          "type": "id?"
+        },
+        {
+          "name": "span_duration_ms",
+          "type": "num"
+        },
+        {
+          "name": "model_latency_ms",
+          "type": "num?"
+        },
+        {
+          "name": "ttft_ms",
+          "type": "num?"
+        },
+        {
+          "name": "input_tokens",
+          "type": "num?"
+        },
+        {
+          "name": "output_tokens",
+          "type": "num?"
+        },
+        {
+          "name": "cache_read_tokens",
+          "type": "num?"
+        },
+        {
+          "name": "cache_creation_tokens",
+          "type": "num?"
+        },
+        {
+          "name": "captured_cost_usd",
+          "type": "num?"
+        },
+        {
+          "name": "session_id",
+          "type": "id?"
+        }
+      ],
+      "evidenceTier": "raw-pagination-receipt",
+      "evidence": {
+        "name": "apm_generation_spans",
+        "templateHash": "1d43fcc835476f143ba6c51c390a8cfbc5c522fc9a0c8184374046ec76050b40",
+        "matchesNormalizerHash": true,
+        "priorEntryKeys": [
+          "name",
+          "compiled",
+          "executed_once",
+          "returned_rows",
+          "column_count",
+          "acceptance_evidence",
+          "executed_query",
+          "raw_response"
+        ],
+        "exactExecutedSqlMatchesCurrent": true,
+        "originalResponseError": false,
+        "columnCount": 38,
+        "expectedColumnCount": 38,
+        "exactColumnsMatch": true,
+        "recordedRows": 0,
+        "compiled": true,
+        "originalResponseFormattedOverrideMatches": true,
+        "executedQuerySha256": "91cdf445eb41823e3bc637b02db87631d11da6ce1cd4d22302458196a9a3595f",
+        "rawResponseSha256": "1bba1199907e4a92e7d9a33a2bc16a4345d3f81b2d0993677009cf45de3ae6b8"
+      },
+      "productionAcceptance": false
+    },
+    {
+      "name": "ai_capture_summary",
+      "templateSha256": "d0f778fb375bdebc0de8643d79f74d2a17ba9125581409be58c55645afaf47ec",
+      "normalizerHashMatches": true,
+      "expectedColumns": [
+        {
+          "name": "generation_rows",
+          "type": "int"
+        },
+        {
+          "name": "generation_event_ids",
+          "type": "int"
+        },
+        {
+          "name": "generation_span_ids",
+          "type": "int"
+        },
+        {
+          "name": "invalid_span_id_rows",
+          "type": "int"
+        },
+        {
+          "name": "with_input_usage",
+          "type": "int"
+        },
+        {
+          "name": "with_output_usage",
+          "type": "int"
+        },
+        {
+          "name": "with_cache_read_usage",
+          "type": "int"
+        },
+        {
+          "name": "with_cache_creation_usage",
+          "type": "int"
+        },
+        {
+          "name": "cache_inclusive_rows",
+          "type": "int"
+        },
+        {
+          "name": "cache_exclusive_rows",
+          "type": "int"
+        },
+        {
+          "name": "cache_semantics_unknown_rows",
+          "type": "int"
+        },
+        {
+          "name": "with_latency",
+          "type": "int"
+        },
+        {
+          "name": "with_ttft",
+          "type": "int"
+        },
+        {
+          "name": "native_request_generations",
+          "type": "int"
+        },
+        {
+          "name": "app_server_fallback_generations",
+          "type": "int"
+        },
+        {
+          "name": "ttft_bases",
+          "type": "label[]"
+        },
+        {
+          "name": "native_unavailable_reasons",
+          "type": "label[]"
+        },
+        {
+          "name": "captured_per_call_cost_rows",
+          "type": "int"
+        },
+        {
+          "name": "catalog_api_estimate_rows",
+          "type": "int"
+        },
+        {
+          "name": "custom_api_estimate_rows",
+          "type": "int"
+        },
+        {
+          "name": "unverified_cost_provenance_rows",
+          "type": "int"
+        },
+        {
+          "name": "cost_passthrough_values",
+          "type": "flag[]"
+        },
+        {
+          "name": "cost_model_sources",
+          "type": "label[]"
+        },
+        {
+          "name": "cost_models_used",
+          "type": "label[]"
+        },
+        {
+          "name": "cost_model_providers",
+          "type": "label[]"
+        },
+        {
+          "name": "unknown_cost_rows",
+          "type": "int"
+        }
+      ],
+      "evidenceTier": "exact-hash-live-schema-receipt",
+      "evidence": {
+        "name": "ai_capture_summary",
+        "templateSha256": "d0f778fb375bdebc0de8643d79f74d2a17ba9125581409be58c55645afaf47ec",
+        "recordedTemplateSha256": "d0f778fb375bdebc0de8643d79f74d2a17ba9125581409be58c55645afaf47ec",
+        "templateHashMatches": true,
+        "executedQuerySha256": "f76df0238d81742e3388c641967c32af5e2f9358169b95b21f338da52d739b92",
+        "recordedExecutedQuerySha256": "f76df0238d81742e3388c641967c32af5e2f9358169b95b21f338da52d739b92",
+        "executedHashMatches": true,
+        "recordedColumns": 26,
+        "expectedColumns": 26,
+        "recordedRows": 1,
+        "rawResponseIndependentlyRead": false,
+        "sourceBlob": "07f2013526784be3bff29fd23073f5320a980cf3",
+        "sourceField": "live_schema_preflight.queries.ai_capture_summary"
+      },
+      "productionAcceptance": false
+    },
+    {
+      "name": "apm_session_links",
+      "templateSha256": "6ac78767b11634edf38640c61fd37f5f34d393bcf44adbab9ea0cf109ffa1edb",
+      "normalizerHashMatches": true,
+      "expectedColumns": [
+        {
+          "name": "session_id",
+          "type": "id"
+        },
+        {
+          "name": "service",
+          "type": "service"
+        },
+        {
+          "name": "correlated_span_ids",
+          "type": "int"
+        },
+        {
+          "name": "run_ids",
+          "type": "id[]"
+        },
+        {
+          "name": "task_ids",
+          "type": "id[]"
+        }
+      ],
+      "evidenceTier": "unchanged-baseline-chain",
+      "evidence": {
+        "name": "apm_session_links",
+        "templateSha256": "6ac78767b11634edf38640c61fd37f5f34d393bcf44adbab9ea0cf109ffa1edb",
+        "normalizerTemplateSha256": "6ac78767b11634edf38640c61fd37f5f34d393bcf44adbab9ea0cf109ffa1edb",
+        "templateMatchesNormalizer": true,
+        "recordedBaseline": {
+          "compiled": true,
+          "row_count": 0,
+          "taxonomy_warning": false
+        },
+        "absenceFromLocalChangedList": true,
+        "absenceFromPaginationChangedList": true,
+        "enumerationExplicitlyPreservesOther13": true,
+        "originalRawResponseIndependentlyRead": false,
+        "originalHistoricalSqlHashAvailableInBaselineSummary": false,
+        "reexecutedThisReview": false,
+        "provenanceLimit": "Reused immutable baseline compiled/row-count summary and explicit unchanged edit-chain declarations; no independent historical SQL echo, raw response or current server execution."
+      },
+      "productionAcceptance": false
+    },
+    {
+      "name": "native_generation_collection",
+      "templateSha256": "8de7a9e941869dc778ab5dd9bc61ac9a0484626d8d2e08518a2bbd17fc08bde4",
+      "normalizerHashMatches": true,
+      "expectedColumns": [
+        {
+          "name": "emitted_utc",
+          "type": "time"
+        },
+        {
+          "name": "span_row_uuid",
+          "type": "uuid"
+        },
+        {
+          "name": "collection_span_id_hex",
+          "type": "span"
+        },
+        {
+          "name": "parent_span_id_hex",
+          "type": "span"
+        },
+        {
+          "name": "run_id",
+          "type": "id?"
+        },
+        {
+          "name": "thread_id",
+          "type": "id?"
+        },
+        {
+          "name": "task_id",
+          "type": "id?"
+        },
+        {
+          "name": "workflow_run_id",
+          "type": "id?"
+        },
+        {
+          "name": "session_id",
+          "type": "id?"
+        },
+        {
+          "name": "harness",
+          "type": "label?"
+        },
+        {
+          "name": "native_unavailable_reason",
+          "type": "label?"
+        },
+        {
+          "name": "sample_rate",
+          "type": "num?"
+        },
+        {
+          "name": "native_generations",
+          "type": "num?"
+        },
+        {
+          "name": "fallback_generations",
+          "type": "num?"
+        },
+        {
+          "name": "matched_fallbacks",
+          "type": "num?"
+        },
+        {
+          "name": "missing_native",
+          "type": "num?"
+        },
+        {
+          "name": "incomplete_requests",
+          "type": "num?"
+        },
+        {
+          "name": "invalid_spans",
+          "type": "num?"
+        },
+        {
+          "name": "rejected_batches",
+          "type": "num?"
+        },
+        {
+          "name": "duplicate_completions",
+          "type": "num?"
+        },
+        {
+          "name": "collection_truncated_raw",
+          "type": "flag?"
+        },
+        {
+          "name": "cli_exit_observed_raw",
+          "type": "flag?"
+        },
+        {
+          "name": "native_flush_confirmed_raw",
+          "type": "flag?"
+        }
+      ],
+      "evidenceTier": "raw-pagination-receipt",
+      "evidence": {
+        "name": "native_generation_collection",
+        "templateHash": "8de7a9e941869dc778ab5dd9bc61ac9a0484626d8d2e08518a2bbd17fc08bde4",
+        "matchesNormalizerHash": true,
+        "priorEntryKeys": [
+          "name",
+          "compiled",
+          "executed_once",
+          "returned_rows",
+          "column_count",
+          "acceptance_evidence",
+          "executed_query",
+          "raw_response"
+        ],
+        "exactExecutedSqlMatchesCurrent": true,
+        "originalResponseError": false,
+        "columnCount": 23,
+        "expectedColumnCount": 23,
+        "exactColumnsMatch": true,
+        "recordedRows": 0,
+        "compiled": true,
+        "originalResponseFormattedOverrideMatches": true,
+        "executedQuerySha256": "4b16db217b600cade4f453c4b093d9f7a4f523b16646abcba79bca9aaf1939cd",
+        "rawResponseSha256": "8ddcb42bfc144cb1e744766e984bd56e08d5f0734b190f6a1597f5e1ec507933"
+      },
+      "productionAcceptance": false
+    }
+  ],
+  "historicalRawFive": {
+    "blob": "63d39e407d96d2408b099f467b19acdab80a51a1",
+    "bytes": 42221,
+    "sha256": "073282f96a6da1a1a49b0c1d4fdf05441038672b44e9d0a336197e3e95fe4d74",
+    "priorPath": "evidence/posthog-pagination-schema-191fcce2.json",
+    "validatedAtUTC": "2026-11-07 10:31:54 UTC",
+    "candidate": "191fcce2391c1d24b502bc256a2c8a0e27359f1c",
+    "fixedScope": {
+      "trace_id_hex": "77cad3a99b9e154b27aaa2c6c0226283",
+      "window_start_utc": "2026-11-06 20:00:00",
+      "window_end_utc": "2026-11-06 20:10:00",
+      "row_offset": 0,
+      "lookup_ids": "intentionally empty; compiler check only, no trace discovery"
+    },
+    "check": "按历史固定参数代入当前原模板，逐字比较 executed_query 与原返回 query echo，核当前 normalizer 的完整列名与顺序。",
+    "historicalRows": {
+      "lookup_trace_by_ids": 0,
+      "span_timeline": 27,
+      "safe_native_logs": 0,
+      "apm_generation_spans": 0,
+      "native_generation_collection": 0
+    },
+    "rowCountBoundary": "这是历史 web-only 编译 fixture；27 不是本轮实际生产 span 数。",
+    "oldPreExecutionErrors": "旧回执记录 5 次 JSON 参数解析失败发生在 SQL 执行之前，再有 5 次成功执行；本次没有重复这些调用。",
+    "noNewExecutionThisReview": true
+  },
+  "historicalHashTwo": {
+    "sourceBlob": "07f2013526784be3bff29fd23073f5320a980cf3",
+    "sourceField": "live_schema_preflight.queries",
+    "validatedAtUTC": "2026-11-07 03:22:38 UTC",
+    "exactTemplateAndReconstructedExecutedSqlHashesMatch": true,
+    "recordedColumnCountsMatchExpected": true,
+    "rawResponseAndHeaderIndependentlyRead": false,
+    "warningsPreserved": "generation_receipts 与 ai_capture_summary 历史 taxonomy_warning=true；generation_rows_in_fixture=0。",
+    "noNewExecutionThisReview": true
+  },
+  "historicalBaselineSix": {
+    "sourceBlob": "07f2013526784be3bff29fd23073f5320a980cf3",
+    "sourceFields": [
+      "baseline_validation",
+      "local_query_review.changed_queries",
+      "pagination_review.changed_queries",
+      "cost_source_review.query_changes_since_baseline",
+      "enumeration_review.other_13_sql_unchanged"
+    ],
+    "costChangesOnly": [
+      "generation_receipts adds cost-model source/model/provider columns",
+      "ai_capture_summary adds cost-model source/model/provider arrays"
+    ],
+    "evidence": "只复用已公开 immutable baseline compiled/row-count 摘要和明确 unchanged 变更链；不冒称有独立原始 query echo、完整列头或当前服务器执行。",
+    "replayBoundary": "replay_correlation 的历史 aggregate row=1 不等于 1 条真实录屏；原 fixture chunks/bytes=0，不能证明上传、可读或播放。",
+    "rawResponsesIndependentlyRead": false,
+    "currentServerExecution": false
+  },
+  "newLookupCount": {
+    "name": "lookup_trace_count",
+    "templateSha256": "e7568116c4ba4d329a4f929a314557646ef9172185c16beb92bb08320239086d",
+    "executedQuerySha256": "22a7e82a1321e441aef01970b1c703cfba6341b56ac5dd20811fb8b69028599d",
+    "startedAtUTC": "2026-11-09T11:14:58.936Z",
+    "completedAtUTC": "2026-11-09T11:15:05.210Z",
+    "queryEchoMatches": true,
+    "formattedOverrideMatches": true,
+    "isError": false,
+    "actualColumns": [
+      "trace_count"
+    ],
+    "expectedColumns": [
+      "trace_count"
+    ],
+    "columnOrderMatches": true,
+    "aggregateReturnedRows": 1,
+    "actualResultCells": [
+      [
+        "0"
+      ]
+    ],
+    "matchedTraceCount": 0,
+    "responseMcpShapeMatchesFrozenNormalizer": true,
+    "normalizerExecuted": false,
+    "productionAcceptance": false,
+    "syntheticBindingOnly": true,
+    "physicalClusterReported": false,
+    "queryTarget": "Default project catalog resolves posthog.trace_spans to its Logs workload; no connectionId or cluster parameter provided",
+    "parameters": {
+      "trace_id_hex": "00000000000000000000000000000000",
+      "run_id": "00000000-0000-0000-0000-000000000000",
+      "thread_id": "00000000-0000-0000-0000-000000000000",
+      "task_id": "00000000-0000-0000-0000-000000000000",
+      "session_id": "00000000-0000-0000-0000-000000000000",
+      "window_start_utc": "2026-11-08 00:00:00",
+      "window_end_utc": "2026-11-08 00:00:01",
+      "row_offset": 0
+    },
+    "usedParameterNames": [
+      "run_id",
+      "thread_id",
+      "task_id",
+      "window_start_utc",
+      "window_end_utc"
+    ],
+    "unusedGenericBindingFields": [
+      "trace_id_hex",
+      "session_id",
+      "row_offset"
+    ],
+    "actualMethod": "Official PostHog MCP call --json execute-sql",
+    "inputOptions": {
+      "truncate": false,
+      "connectionIdOmitted": true,
+      "sendRawQueryOmitted": true
+    },
+    "scope": "固定历史 1 秒 UTC 窗口 + 明确 synthetic 全零 run/thread/task UUID，保留所有原 service/production 环境谓词。",
+    "resultDescription": "实际返回 1 行聚合结果 trace_count=0；不是零返回行，也不是实际 ACME trace 查找。",
+    "unchangedTemplate": true,
+    "sqlRetries": 0,
+    "artifactFiles": [
+      {
+        "path": "posthog-query-syntax-20261109/public/lookup-trace-count.request.original.json",
+        "bytes": 1860,
+        "sha256": "1637f902c1ec96815d66d2449f9e3c4cca4adf46e73ecf410fa028ffe19fbf3c",
+        "blob": "42245f2a6ecdbe6630095edf2c2e2166790e4fce"
+      },
+      {
+        "path": "posthog-query-syntax-20261109/public/lookup-trace-count.response.original.json",
+        "bytes": 1178,
+        "sha256": "738ce409cfe22358a7320cdc2687fc5bdff90bdcb35481d17c368b14bcc99bdd",
+        "blob": "7313fc89baca98319f7e0dd0cd32a9cc0deb7e92"
+      },
+      {
+        "path": "posthog-query-syntax-20261109/public/lookup-trace-count.executed.sql",
+        "bytes": 890,
+        "sha256": "22a7e82a1321e441aef01970b1c703cfba6341b56ac5dd20811fb8b69028599d",
+        "blob": "637caabfa6ec3db460de134ec2041c4d750bc2a3"
+      }
+    ],
+    "transportBoundary": "JSON 原件是完整 decoded MCP request/result 对象及内层原始文本的确定序列化；不是原始 HTTP wire bytes。"
+  },
+  "olderCapabilityOnlyEvidence": {
+    "offsetProbeBlob": "ae2a62cb59cbf3896a3c38aeae12cc1875e92549",
+    "claim": "已有两个 WHERE 0/LIMIT 0/OFFSET 500 的最小探针仅支持 OFFSET 能力，不计作 14 个完整模板复核。",
+    "repeated": false,
+    "countGapPreparationBlob": "a28c85764d80ed27bf6d80a86f2ca42a02eb7688",
+    "countGapPreparationRecordedAttempts": 0,
+    "handoffBlob": "30eecf17de950ad85bd374aec84bcba85e54f935"
+  },
+  "unresolvedProductionEvidence": [
+    "真实 Claude/Codex case 的完整 IDs、固定 UTC 窗口与精确 source/version 绑定。",
+    "按冻结分页规则取齐全部页并做两次稳定快照；当前 syntax preflight 不证明服务器行枚举或传输完整性。",
+    "真实 APM span、Logs、AI generation/collection 的双向身份与计数对账，以及上游未报告总数/flush 仍 unknown 的既有限制。",
+    "真实 usage/cache/latency/TTFT/cost 字段的值与缺失语义；零数据编译不证明它们存在、准确或等于订阅账单。",
+    "真实 Session Replay 后端可用与官方渲染/帧推进；metadata 或 blob 不能替代实际播放。",
+    "原生 PostHog 同 trace 全阶段时间线 PNG 的实际像素覆盖与导出边界；本任务没有创建或导出图片。",
+    "冻结 normalizer 的实际生产运行；本轮只核输入哈希、响应形状与列合同，没有运行 Node normalizer。"
+  ],
+  "operationalLimits": {
+    "allowedMaximumNewSqlCalls": 14,
+    "actualNewSqlCalls": 1,
+    "sqlRetries": 0,
+    "actualProductionCases": 0,
+    "modelCalls": 0,
+    "recordingScans": 0,
+    "posthogObjectWrites": 0,
+    "projectSettingsChanges": 0,
+    "credentialReads": 0,
+    "browserLoginAttempts": 0,
+    "vmOrOtherResourceCreated": 0,
+    "gitRefChanges": 0,
+    "sourceChanges": 0,
+    "existingEvidenceReadsOnlyBeyondOneSyntheticSql": true
+  },
+  "publicationPrivacy": {
+    "allowlist": "源码/查询哈希、文档/schema、query 名与列、固定 synthetic 值、项目 ID、历史已公开安全回执引用、计数与 UTC。",
+    "excluded": "项目/组织账号 metadata、用户姓名/email、凭证、录屏内容、模型输入输出、业务文本、平台完整 account envelope、签名 URL。",
+    "originalPrivateResponsesRetainedInFunctionsStore": true
+  }
+}

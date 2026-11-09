@@ -1,0 +1,1416 @@
+﻿2026-11-09T10:47:41.3185960Z Current runner version: '2.338.2'
+2026-11-09T10:47:41.3216465Z ##[group]Runner Image Provisioner
+2026-11-09T10:47:41.3218034Z Hosted Compute Agent
+2026-11-09T10:47:41.3218722Z Version: 20261028.624
+2026-11-09T10:47:41.3219399Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+2026-11-09T10:47:41.3220274Z Build Date: 2026-10-28T21:51:42Z
+2026-11-09T10:47:41.3221021Z Worker ID: {caef23c3-3cea-48fc-a7d6-72aa894e3965}
+2026-11-09T10:47:41.3221797Z Region: westus
+2026-11-09T10:47:41.3222400Z Cloud: Azure
+2026-11-09T10:47:41.3222980Z ##[endgroup]
+2026-11-09T10:47:41.3224673Z ##[group]Operating System
+2026-11-09T10:47:41.3225433Z Ubuntu
+2026-11-09T10:47:41.3226180Z 22.04.5
+2026-11-09T10:47:41.3226767Z LTS
+2026-11-09T10:47:41.3227322Z ##[endgroup]
+2026-11-09T10:47:41.3228203Z ##[group]Runner Image
+2026-11-09T10:47:41.3228897Z Image: ubuntu-22.04
+2026-11-09T10:47:41.3229487Z Version: 20261101.347.1
+2026-11-09T10:47:41.3230960Z Included Software: https://github.com/actions/runner-images/blob/ubuntu22/20261101.347/images/ubuntu/Ubuntu2204-Readme.md
+2026-11-09T10:47:41.3232652Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu22%2F20261101.347
+2026-11-09T10:47:41.3233658Z ##[endgroup]
+2026-11-09T10:47:41.3235060Z ##[group]GITHUB_TOKEN Permissions
+2026-11-09T10:47:41.3237453Z Contents: read
+2026-11-09T10:47:41.3238368Z Metadata: read
+2026-11-09T10:47:41.3239092Z ##[endgroup]
+2026-11-09T10:47:41.3241574Z Secret source: Actions
+2026-11-09T10:47:41.3242838Z Cache mode: write
+2026-11-09T10:47:41.3243664Z Prepare workflow directory
+2026-11-09T10:47:41.3991280Z Prepare all required actions
+2026-11-09T10:47:41.4044222Z Getting action download info
+2026-11-09T10:47:41.7752036Z Download action repository 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-11-09T10:47:41.9747423Z Download action repository 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-11-09T10:47:42.2617121Z Complete job name: Workspace governance HTTP (Item 11)
+2026-11-09T10:47:42.3336767Z ##[group]Checking docker version
+2026-11-09T10:47:42.3352263Z ##[command]/usr/bin/docker version --format '{{.Server.APIVersion}}'
+2026-11-09T10:47:42.4140571Z '1.48'
+2026-11-09T10:47:42.4156565Z Docker daemon API version: '1.48'
+2026-11-09T10:47:42.4157481Z ##[command]/usr/bin/docker version --format '{{.Client.APIVersion}}'
+2026-11-09T10:47:42.4400179Z '1.48'
+2026-11-09T10:47:42.4422468Z Docker client API version: '1.48'
+2026-11-09T10:47:42.4431789Z ##[endgroup]
+2026-11-09T10:47:42.4435290Z ##[group]Clean up resources from previous jobs
+2026-11-09T10:47:42.4441774Z ##[command]/usr/bin/docker ps --all --quiet --no-trunc --filter "label=e42470"
+2026-11-09T10:47:42.4656417Z ##[command]/usr/bin/docker network prune --force --filter "label=e42470"
+2026-11-09T10:47:42.4859670Z ##[endgroup]
+2026-11-09T10:47:42.4860411Z ##[group]Create local container network
+2026-11-09T10:47:42.4871781Z ##[command]/usr/bin/docker network create --label e42470 github_network_23b3c0fe18c3461ba3e749504c36eee7
+2026-11-09T10:47:42.5563549Z 2b5e32aebb501e41d37ad15cccb70cf49f3ecfe12482fbe969716ecc333b332c
+2026-11-09T10:47:42.5593291Z ##[endgroup]
+2026-11-09T10:47:42.5626211Z ##[group]Starting postgres service container
+2026-11-09T10:47:42.5652564Z ##[command]/usr/bin/docker pull postgres:17
+2026-11-09T10:47:43.4507961Z 17: Pulling from library/postgres
+2026-11-09T10:47:43.7195739Z 37fb86c2a767: Pulling fs layer
+2026-11-09T10:47:43.7197328Z 56c5b61c6d2b: Pulling fs layer
+2026-11-09T10:47:43.7198934Z c2f4b34f5119: Pulling fs layer
+2026-11-09T10:47:43.7200002Z d717e9509665: Pulling fs layer
+2026-11-09T10:47:43.7200998Z 046371a447cc: Pulling fs layer
+2026-11-09T10:47:43.7201956Z c97a680633a2: Pulling fs layer
+2026-11-09T10:47:43.7202789Z f0f18338e0da: Pulling fs layer
+2026-11-09T10:47:43.7203769Z 0eab0a63b06d: Pulling fs layer
+2026-11-09T10:47:43.7204764Z 9de238338a9a: Pulling fs layer
+2026-11-09T10:47:43.7205738Z 275aa943d416: Pulling fs layer
+2026-11-09T10:47:43.7207313Z 5760334e16b5: Pulling fs layer
+2026-11-09T10:47:43.7208534Z d35c08e535dc: Pulling fs layer
+2026-11-09T10:47:43.7209773Z 4f0fb6572de8: Pulling fs layer
+2026-11-09T10:47:43.7210915Z ceeafc939069: Pulling fs layer
+2026-11-09T10:47:43.7211981Z 046371a447cc: Waiting
+2026-11-09T10:47:43.7212917Z c97a680633a2: Waiting
+2026-11-09T10:47:43.7213731Z f0f18338e0da: Waiting
+2026-11-09T10:47:43.7214702Z 0eab0a63b06d: Waiting
+2026-11-09T10:47:43.7215648Z 9de238338a9a: Waiting
+2026-11-09T10:47:43.7216591Z d717e9509665: Waiting
+2026-11-09T10:47:43.7217856Z 4f0fb6572de8: Waiting
+2026-11-09T10:47:43.7219190Z 275aa943d416: Waiting
+2026-11-09T10:47:43.7220505Z ceeafc939069: Waiting
+2026-11-09T10:47:43.7221816Z d35c08e535dc: Waiting
+2026-11-09T10:47:43.9458386Z 56c5b61c6d2b: Verifying Checksum
+2026-11-09T10:47:43.9460264Z 56c5b61c6d2b: Download complete
+2026-11-09T10:47:43.9631298Z c2f4b34f5119: Verifying Checksum
+2026-11-09T10:47:43.9635155Z c2f4b34f5119: Download complete
+2026-11-09T10:47:44.0584629Z 37fb86c2a767: Verifying Checksum
+2026-11-09T10:47:44.0587031Z 37fb86c2a767: Download complete
+2026-11-09T10:47:44.1747172Z d717e9509665: Verifying Checksum
+2026-11-09T10:47:44.1752053Z d717e9509665: Download complete
+2026-11-09T10:47:44.2070512Z 046371a447cc: Verifying Checksum
+2026-11-09T10:47:44.2073347Z 046371a447cc: Download complete
+2026-11-09T10:47:44.2805894Z c97a680633a2: Verifying Checksum
+2026-11-09T10:47:44.2808015Z c97a680633a2: Download complete
+2026-11-09T10:47:44.3925494Z f0f18338e0da: Verifying Checksum
+2026-11-09T10:47:44.3927451Z f0f18338e0da: Download complete
+2026-11-09T10:47:44.4315293Z 0eab0a63b06d: Download complete
+2026-11-09T10:47:44.6100633Z 275aa943d416: Verifying Checksum
+2026-11-09T10:47:44.6102918Z 275aa943d416: Download complete
+2026-11-09T10:47:44.6470234Z 5760334e16b5: Verifying Checksum
+2026-11-09T10:47:44.6474857Z 5760334e16b5: Download complete
+2026-11-09T10:47:44.8272987Z d35c08e535dc: Download complete
+2026-11-09T10:47:44.8731859Z 4f0fb6572de8: Verifying Checksum
+2026-11-09T10:47:44.8732668Z 4f0fb6572de8: Download complete
+2026-11-09T10:47:44.9037975Z 9de238338a9a: Verifying Checksum
+2026-11-09T10:47:44.9038666Z 9de238338a9a: Download complete
+2026-11-09T10:47:45.0410024Z ceeafc939069: Download complete
+2026-11-09T10:47:45.2511622Z 37fb86c2a767: Pull complete
+2026-11-09T10:47:45.5354035Z 56c5b61c6d2b: Pull complete
+2026-11-09T10:47:45.7132715Z c2f4b34f5119: Pull complete
+2026-11-09T10:47:45.7532162Z d717e9509665: Pull complete
+2026-11-09T10:47:46.0909315Z 046371a447cc: Pull complete
+2026-11-09T10:47:46.1517791Z c97a680633a2: Pull complete
+2026-11-09T10:47:46.1612961Z f0f18338e0da: Pull complete
+2026-11-09T10:47:46.1746002Z 0eab0a63b06d: Pull complete
+2026-11-09T10:47:49.3509986Z 9de238338a9a: Pull complete
+2026-11-09T10:47:49.3714855Z 275aa943d416: Pull complete
+2026-11-09T10:47:49.3813704Z 5760334e16b5: Pull complete
+2026-11-09T10:47:49.3906654Z d35c08e535dc: Pull complete
+2026-11-09T10:47:49.4036309Z 4f0fb6572de8: Pull complete
+2026-11-09T10:47:49.4125709Z ceeafc939069: Pull complete
+2026-11-09T10:47:49.4168132Z Digest: sha256:ff87138949ad9a46f32ff23bd6852b52ce024a13dffe9b4087be98292cdd3b4f
+2026-11-09T10:47:49.4179939Z Status: Downloaded newer image for postgres:17
+2026-11-09T10:47:49.4195101Z docker.io/library/postgres:17
+2026-11-09T10:47:49.4279760Z ##[command]/usr/bin/docker create --name c1e30988d23648109980a33af1ee5a24_postgres17_6f1926 --label e42470 --network github_network_23b3c0fe18c3461ba3e749504c36eee7 --network-alias postgres -p 127.0.0.1:5432:5432 --health-cmd "pg_isready -U e2e -d mikka_e2e" --health-interval 5s --health-timeout 5s --health-retries 10 -e "POSTGRES_USER=e2e" -e "POSTGRES_PASSWORD=e2e-local-only" -e "POSTGRES_DB=mikka_e2e" -e GITHUB_ACTIONS=true -e CI=true postgres:17
+2026-11-09T10:47:49.4590378Z 2c5370f253b775453971ac2b2078dafdcf72f085682f7bc01a371ecdd76ce587
+2026-11-09T10:47:49.4623701Z ##[command]/usr/bin/docker start 2c5370f253b775453971ac2b2078dafdcf72f085682f7bc01a371ecdd76ce587
+2026-11-09T10:47:49.6947110Z 2c5370f253b775453971ac2b2078dafdcf72f085682f7bc01a371ecdd76ce587
+2026-11-09T10:47:49.6978400Z ##[command]/usr/bin/docker ps --all --filter id=2c5370f253b775453971ac2b2078dafdcf72f085682f7bc01a371ecdd76ce587 --filter status=running --no-trunc --format "{{.ID}} {{.Status}}"
+2026-11-09T10:47:49.7173043Z 2c5370f253b775453971ac2b2078dafdcf72f085682f7bc01a371ecdd76ce587 Up Less than a second (health: starting)
+2026-11-09T10:47:49.7202085Z ##[command]/usr/bin/docker port 2c5370f253b775453971ac2b2078dafdcf72f085682f7bc01a371ecdd76ce587
+2026-11-09T10:47:49.7399667Z 5432/tcp -> 127.0.0.1:5432
+2026-11-09T10:47:49.7463305Z ##[endgroup]
+2026-11-09T10:47:49.7474487Z ##[group]Waiting for all services to be ready
+2026-11-09T10:47:49.7492036Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" 2c5370f253b775453971ac2b2078dafdcf72f085682f7bc01a371ecdd76ce587
+2026-11-09T10:47:49.7702859Z starting
+2026-11-09T10:47:49.7736260Z postgres service is starting, waiting 2 seconds before checking again.
+2026-11-09T10:47:51.7731097Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" 2c5370f253b775453971ac2b2078dafdcf72f085682f7bc01a371ecdd76ce587
+2026-11-09T10:47:51.7896724Z starting
+2026-11-09T10:47:51.7915263Z postgres service is starting, waiting 4 seconds before checking again.
+2026-11-09T10:47:55.8649064Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" 2c5370f253b775453971ac2b2078dafdcf72f085682f7bc01a371ecdd76ce587
+2026-11-09T10:47:55.8824084Z healthy
+2026-11-09T10:47:55.8854740Z postgres service is healthy.
+2026-11-09T10:47:55.8855486Z ##[endgroup]
+2026-11-09T10:47:55.9286478Z ##[group]Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+2026-11-09T10:47:55.9287192Z with:
+2026-11-09T10:47:55.9287443Z   ref: ddbc7e9b8e156493af730f00ed4a6efd3de475b4
+2026-11-09T10:47:55.9287986Z   persist-credentials: false
+2026-11-09T10:47:55.9288234Z   repository: alexj11324/Mikka
+2026-11-09T10:47:55.9290979Z   token: ***
+2026-11-09T10:47:55.9291217Z   ssh-strict: true
+2026-11-09T10:47:55.9291418Z   ssh-user: git
+2026-11-09T10:47:55.9291608Z   clean: true
+2026-11-09T10:47:55.9291805Z   sparse-checkout-cone-mode: true
+2026-11-09T10:47:55.9292054Z   fetch-depth: 1
+2026-11-09T10:47:55.9292244Z   fetch-tags: false
+2026-11-09T10:47:55.9292452Z   show-progress: true
+2026-11-09T10:47:55.9292652Z   lfs: false
+2026-11-09T10:47:55.9292829Z   submodules: false
+2026-11-09T10:47:55.9293031Z   set-safe-directory: true
+2026-11-09T10:47:55.9293270Z   allow-unsafe-pr-checkout: false
+2026-11-09T10:47:55.9293771Z env:
+2026-11-09T10:47:55.9293957Z   LOCAL_LOOP_ITEMS: 11
+2026-11-09T10:47:55.9294236Z   MIKKA_LOCAL_TEST_ACCOUNTS: 1
+2026-11-09T10:47:55.9294471Z   MIKKA_EDITION: cloud
+2026-11-09T10:47:55.9294664Z   REQUIRE_DB: 1
+2026-11-09T10:47:55.9295145Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:47:55.9295601Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:47:55.9296041Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:47:55.9296340Z   BETTER_AUTH_URL: http://localhost:3110
+2026-11-09T10:47:55.9296625Z   E2E_BASE_URL: http://localhost:3110
+2026-11-09T10:47:55.9296967Z   MIKKA_TEST_DEPLOYMENT_SHA: ddbc7e9b8e156493af730f00ed4a6efd3de475b4
+2026-11-09T10:47:55.9297380Z   MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
+2026-11-09T10:47:55.9297999Z   MIKKA_DEV_PORT: 3110
+2026-11-09T10:47:55.9298281Z   MIKKA_DEV_DAEMON_DIR: .cache/wg-ci/daemon
+2026-11-09T10:47:55.9298546Z   MIKKA_DEV_SKIP_DAEMON: 1
+2026-11-09T10:47:55.9298770Z   MIKKA_DEV_SKIP_MODEL_SETUP: 1
+2026-11-09T10:47:55.9299000Z   MIKKA_DEV_SKIP_ENV_FILES: 1
+2026-11-09T10:47:55.9299242Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T10:47:55.9299491Z   NODE_OPTIONS: --max-old-space-size=2048
+2026-11-09T10:47:55.9299768Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T10:47:55.9300024Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T10:47:55.9300258Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T10:47:55.9300508Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T10:47:55.9301078Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T10:47:55.9301333Z ##[endgroup]
+2026-11-09T10:47:56.1649087Z Syncing repository: alexj11324/Mikka
+2026-11-09T10:47:56.1651452Z ##[group]Getting Git version info
+2026-11-09T10:47:56.1652134Z Working directory is '/home/runner/work/Mikka/Mikka'
+2026-11-09T10:47:56.1653053Z [command]/usr/bin/git version
+2026-11-09T10:47:56.1716843Z git version 2.56.0
+2026-11-09T10:47:56.1747978Z ##[endgroup]
+2026-11-09T10:47:56.1769552Z Temporarily overriding HOME='/home/runner/work/_temp/21af6f96-b129-4971-9eac-6d8649c59a79' before making global git config changes
+2026-11-09T10:47:56.1771096Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T10:47:56.1778062Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T10:47:56.1836369Z Deleting the contents of '/home/runner/work/Mikka/Mikka'
+2026-11-09T10:47:56.1841316Z ##[group]Initializing the repository
+2026-11-09T10:47:56.1847133Z [command]/usr/bin/git init /home/runner/work/Mikka/Mikka
+2026-11-09T10:47:56.1990677Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-09T10:47:56.2016019Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-09T10:47:56.2020117Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-09T10:47:56.2020663Z hint: call:
+2026-11-09T10:47:56.2021016Z hint:
+2026-11-09T10:47:56.2021495Z hint: 	git config --global init.defaultBranch <name>
+2026-11-09T10:47:56.2021818Z hint:
+2026-11-09T10:47:56.2022670Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-09T10:47:56.2023452Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-09T10:47:56.2023857Z hint:
+2026-11-09T10:47:56.2024079Z hint: 	git branch -m <name>
+2026-11-09T10:47:56.2024319Z hint:
+2026-11-09T10:47:56.2024865Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-09T10:47:56.2025998Z Initialized empty Git repository in /home/runner/work/Mikka/Mikka/.git/
+2026-11-09T10:47:56.2028171Z [command]/usr/bin/git remote add origin https://github.com/alexj11324/Mikka
+2026-11-09T10:47:56.2071426Z ##[endgroup]
+2026-11-09T10:47:56.2072143Z ##[group]Disabling automatic garbage collection
+2026-11-09T10:47:56.2078398Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-09T10:47:56.2130567Z ##[endgroup]
+2026-11-09T10:47:56.2131236Z ##[group]Setting up auth
+2026-11-09T10:47:56.2141215Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T10:47:56.2202151Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T10:47:56.2633876Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T10:47:56.2682615Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T10:47:56.2978283Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T10:47:56.3028694Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T10:47:56.3323885Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-09T10:47:56.3381516Z ##[endgroup]
+2026-11-09T10:47:56.3382251Z ##[group]Fetching the repository
+2026-11-09T10:47:56.3403386Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin ddbc7e9b8e156493af730f00ed4a6efd3de475b4
+2026-11-09T10:48:01.7571485Z From https://github.com/alexj11324/Mikka
+2026-11-09T10:48:01.7572914Z  * branch            ddbc7e9b8e156493af730f00ed4a6efd3de475b4 -> FETCH_HEAD
+2026-11-09T10:48:01.7578826Z ##[endgroup]
+2026-11-09T10:48:01.7579581Z ##[group]Determining the checkout info
+2026-11-09T10:48:01.7582471Z ##[endgroup]
+2026-11-09T10:48:01.7589143Z [command]/usr/bin/git sparse-checkout disable
+2026-11-09T10:48:01.7660553Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-09T10:48:01.7715387Z ##[group]Checking out the ref
+2026-11-09T10:48:01.7722482Z [command]/usr/bin/git checkout --progress --force ddbc7e9b8e156493af730f00ed4a6efd3de475b4
+2026-11-09T10:48:02.5557007Z Note: switching to 'ddbc7e9b8e156493af730f00ed4a6efd3de475b4'.
+2026-11-09T10:48:02.5557866Z 
+2026-11-09T10:48:02.5558648Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-11-09T10:48:02.5559554Z changes and commit them, and you can discard any commits you make in this
+2026-11-09T10:48:02.5560377Z state without impacting any branches by switching back to a branch.
+2026-11-09T10:48:02.5560878Z 
+2026-11-09T10:48:02.5561183Z If you want to create a new branch to retain commits you create, you may
+2026-11-09T10:48:02.5561953Z do so (now or later) by using -c with the switch command. Example:
+2026-11-09T10:48:02.5562384Z 
+2026-11-09T10:48:02.5562547Z   git switch -c <new-branch-name>
+2026-11-09T10:48:02.5562812Z 
+2026-11-09T10:48:02.5562957Z Or undo this operation with:
+2026-11-09T10:48:02.5563222Z 
+2026-11-09T10:48:02.5563352Z   git switch -
+2026-11-09T10:48:02.5563566Z 
+2026-11-09T10:48:02.5563943Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-11-09T10:48:02.5564475Z 
+2026-11-09T10:48:02.5565555Z HEAD is now at ddbc7e9 Merge ae10f28aa471dbfc64f04d981b8934d374476259 into a2198c8c2f608f7b8169329b9da853067618dba6
+2026-11-09T10:48:02.5597357Z ##[endgroup]
+2026-11-09T10:48:02.5657094Z [command]/usr/bin/git log -1 --format=%H
+2026-11-09T10:48:02.5699653Z ddbc7e9b8e156493af730f00ed4a6efd3de475b4
+2026-11-09T10:48:02.5713997Z ##[group]Removing auth
+2026-11-09T10:48:02.5720333Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T10:48:02.5773463Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T10:48:02.6114245Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T10:48:02.6154949Z http.https://github.com/.extraheader
+2026-11-09T10:48:02.6168060Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-09T10:48:02.6229585Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T10:48:02.6583734Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T10:48:02.6646081Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T10:48:02.7001692Z ##[endgroup]
+2026-11-09T10:48:02.7429833Z Prepare all required actions
+2026-11-09T10:48:02.7430569Z Getting action download info
+2026-11-09T10:48:02.8914270Z Download action repository 'pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1' (SHA:b906affcce14559ad1aafd4ab0e942779e9f58b1)
+2026-11-09T10:48:03.3321382Z Download action repository 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-11-09T10:48:03.4852972Z Download action repository 'actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830' (SHA:0057852bfaa89a56745cba8c7296529d2fc39830)
+2026-11-09T10:48:03.6852984Z ##[group]Run ./.github/actions/pnpm-install
+2026-11-09T10:48:03.6853285Z with:
+2026-11-09T10:48:03.6853462Z env:
+2026-11-09T10:48:03.6853647Z   LOCAL_LOOP_ITEMS: 11
+2026-11-09T10:48:03.6853873Z   MIKKA_LOCAL_TEST_ACCOUNTS: 1
+2026-11-09T10:48:03.6854120Z   MIKKA_EDITION: cloud
+2026-11-09T10:48:03.6854565Z   REQUIRE_DB: 1
+2026-11-09T10:48:03.6855176Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:03.6855638Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:03.6856099Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:03.6856389Z   BETTER_AUTH_URL: http://localhost:3110
+2026-11-09T10:48:03.6856672Z   E2E_BASE_URL: http://localhost:3110
+2026-11-09T10:48:03.6857022Z   MIKKA_TEST_DEPLOYMENT_SHA: ddbc7e9b8e156493af730f00ed4a6efd3de475b4
+2026-11-09T10:48:03.6857459Z   MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
+2026-11-09T10:48:03.6858277Z   MIKKA_DEV_PORT: 3110
+2026-11-09T10:48:03.6858527Z   MIKKA_DEV_DAEMON_DIR: .cache/wg-ci/daemon
+2026-11-09T10:48:03.6858810Z   MIKKA_DEV_SKIP_DAEMON: 1
+2026-11-09T10:48:03.6859050Z   MIKKA_DEV_SKIP_MODEL_SETUP: 1
+2026-11-09T10:48:03.6859290Z   MIKKA_DEV_SKIP_ENV_FILES: 1
+2026-11-09T10:48:03.6859530Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T10:48:03.6859787Z   NODE_OPTIONS: --max-old-space-size=2048
+2026-11-09T10:48:03.6860090Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T10:48:03.6860364Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T10:48:03.6860612Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T10:48:03.6860872Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T10:48:03.6861137Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T10:48:03.6861395Z ##[endgroup]
+2026-11-09T10:48:03.6933175Z ##[start-action display=Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1;id=__self.__pnpm_action-setup]
+2026-11-09T10:48:03.6991336Z ##[group]Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+2026-11-09T10:48:03.6991733Z with:
+2026-11-09T10:48:03.6991943Z   version: 10.34.3
+2026-11-09T10:48:03.6992151Z   dest: ~/setup-pnpm
+2026-11-09T10:48:03.6992367Z   run_install: null
+2026-11-09T10:48:03.6992563Z   cache: false
+2026-11-09T10:48:03.6992786Z   cache_dependency_path: pnpm-lock.yaml
+2026-11-09T10:48:03.6993070Z   package_json_file: package.json
+2026-11-09T10:48:03.6993314Z   standalone: false
+2026-11-09T10:48:03.6993524Z env:
+2026-11-09T10:48:03.6993704Z   LOCAL_LOOP_ITEMS: 11
+2026-11-09T10:48:03.6993948Z   MIKKA_LOCAL_TEST_ACCOUNTS: 1
+2026-11-09T10:48:03.6994182Z   MIKKA_EDITION: cloud
+2026-11-09T10:48:03.6994380Z   REQUIRE_DB: 1
+2026-11-09T10:48:03.6994884Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:03.6995327Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:03.6995736Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:03.6996024Z   BETTER_AUTH_URL: http://localhost:3110
+2026-11-09T10:48:03.6996323Z   E2E_BASE_URL: http://localhost:3110
+2026-11-09T10:48:03.6996682Z   MIKKA_TEST_DEPLOYMENT_SHA: ddbc7e9b8e156493af730f00ed4a6efd3de475b4
+2026-11-09T10:48:03.6997104Z   MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
+2026-11-09T10:48:03.6997426Z   MIKKA_DEV_PORT: 3110
+2026-11-09T10:48:03.6997836Z   MIKKA_DEV_DAEMON_DIR: .cache/wg-ci/daemon
+2026-11-09T10:48:03.6998112Z   MIKKA_DEV_SKIP_DAEMON: 1
+2026-11-09T10:48:03.6998345Z   MIKKA_DEV_SKIP_MODEL_SETUP: 1
+2026-11-09T10:48:03.6998601Z   MIKKA_DEV_SKIP_ENV_FILES: 1
+2026-11-09T10:48:03.6999094Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T10:48:03.6999366Z   NODE_OPTIONS: --max-old-space-size=2048
+2026-11-09T10:48:03.6999649Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T10:48:03.6999895Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T10:48:03.7000140Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T10:48:03.7000396Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T10:48:03.7000666Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T10:48:03.7000932Z ##[endgroup]
+2026-11-09T10:48:03.8831523Z ##[group]Running self-installer...
+2026-11-09T10:48:04.4148154Z (node:2570) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T10:48:04.4150440Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T10:48:04.5468297Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-09T10:48:04.5583085Z Packages: +1
+2026-11-09T10:48:04.5583645Z +
+2026-11-09T10:48:05.0207439Z Progress: resolved 1, reused 0, downloaded 1, added 1, done
+2026-11-09T10:48:05.0563652Z 
+2026-11-09T10:48:05.0564239Z dependencies:
+2026-11-09T10:48:05.0564777Z + pnpm 10.34.3 (12.18.0 is available)
+2026-11-09T10:48:05.0565159Z 
+2026-11-09T10:48:05.0596338Z Done in 931ms
+2026-11-09T10:48:05.0838697Z ##[endgroup]
+2026-11-09T10:48:05.0839211Z Installation Completed!
+2026-11-09T10:48:05.0955181Z ##[end-action id=__self.__pnpm_action-setup;outcome=success;conclusion=success;duration_ms=1402]
+2026-11-09T10:48:05.0959763Z ##[start-action display=Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020;id=__self.__actions_setup-node]
+2026-11-09T10:48:05.1039082Z ##[group]Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+2026-11-09T10:48:05.1039465Z with:
+2026-11-09T10:48:05.1039652Z   node-version: 24
+2026-11-09T10:48:05.1039857Z   always-auth: false
+2026-11-09T10:48:05.1040087Z   check-latest: false
+2026-11-09T10:48:05.1042628Z   token: ***
+2026-11-09T10:48:05.1042840Z env:
+2026-11-09T10:48:05.1043017Z   LOCAL_LOOP_ITEMS: 11
+2026-11-09T10:48:05.1043240Z   MIKKA_LOCAL_TEST_ACCOUNTS: 1
+2026-11-09T10:48:05.1043472Z   MIKKA_EDITION: cloud
+2026-11-09T10:48:05.1043673Z   REQUIRE_DB: 1
+2026-11-09T10:48:05.1044042Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:05.1044503Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:05.1044922Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:05.1045219Z   BETTER_AUTH_URL: http://localhost:3110
+2026-11-09T10:48:05.1045499Z   E2E_BASE_URL: http://localhost:3110
+2026-11-09T10:48:05.1045851Z   MIKKA_TEST_DEPLOYMENT_SHA: ddbc7e9b8e156493af730f00ed4a6efd3de475b4
+2026-11-09T10:48:05.1046279Z   MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
+2026-11-09T10:48:05.1046599Z   MIKKA_DEV_PORT: 3110
+2026-11-09T10:48:05.1046824Z   MIKKA_DEV_DAEMON_DIR: .cache/wg-ci/daemon
+2026-11-09T10:48:05.1047108Z   MIKKA_DEV_SKIP_DAEMON: 1
+2026-11-09T10:48:05.1047348Z   MIKKA_DEV_SKIP_MODEL_SETUP: 1
+2026-11-09T10:48:05.1047732Z   MIKKA_DEV_SKIP_ENV_FILES: 1
+2026-11-09T10:48:05.1047977Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T10:48:05.1048232Z   NODE_OPTIONS: --max-old-space-size=2048
+2026-11-09T10:48:05.1048510Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T10:48:05.1048809Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T10:48:05.1049050Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T10:48:05.1049311Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T10:48:05.1049572Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T10:48:05.1049882Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T10:48:05.1050200Z ##[endgroup]
+2026-11-09T10:48:05.3081100Z Found in cache @ /opt/hostedtoolcache/node/24.22.2/x64
+2026-11-09T10:48:05.3088109Z (node:2607) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T10:48:05.3089612Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T10:48:05.3093958Z ##[group]Environment details
+2026-11-09T10:48:07.9560927Z node: v24.22.2
+2026-11-09T10:48:07.9561525Z npm: 11.19.1
+2026-11-09T10:48:07.9561898Z yarn: 1.22.22
+2026-11-09T10:48:07.9562707Z ##[endgroup]
+2026-11-09T10:48:07.9692676Z ##[end-action id=__self.__actions_setup-node;outcome=success;conclusion=success;duration_ms=2873]
+2026-11-09T10:48:07.9696254Z ##[start-action display=Run echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT";id=__self.store]
+2026-11-09T10:48:07.9735592Z ##[group]Run echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+2026-11-09T10:48:07.9736183Z [36;1mecho "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"[0m
+2026-11-09T10:48:07.9866796Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-09T10:48:07.9867189Z env:
+2026-11-09T10:48:07.9867406Z   LOCAL_LOOP_ITEMS: 11
+2026-11-09T10:48:07.9867888Z   MIKKA_LOCAL_TEST_ACCOUNTS: 1
+2026-11-09T10:48:07.9868175Z   MIKKA_EDITION: cloud
+2026-11-09T10:48:07.9868740Z   REQUIRE_DB: 1
+2026-11-09T10:48:07.9869642Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:07.9870240Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:07.9870740Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:07.9871079Z   BETTER_AUTH_URL: http://localhost:3110
+2026-11-09T10:48:07.9871417Z   E2E_BASE_URL: http://localhost:3110
+2026-11-09T10:48:07.9871981Z   MIKKA_TEST_DEPLOYMENT_SHA: ddbc7e9b8e156493af730f00ed4a6efd3de475b4
+2026-11-09T10:48:07.9872637Z   MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
+2026-11-09T10:48:07.9873012Z   MIKKA_DEV_PORT: 3110
+2026-11-09T10:48:07.9873286Z   MIKKA_DEV_DAEMON_DIR: .cache/wg-ci/daemon
+2026-11-09T10:48:07.9873608Z   MIKKA_DEV_SKIP_DAEMON: 1
+2026-11-09T10:48:07.9873887Z   MIKKA_DEV_SKIP_MODEL_SETUP: 1
+2026-11-09T10:48:07.9874170Z   MIKKA_DEV_SKIP_ENV_FILES: 1
+2026-11-09T10:48:07.9874457Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T10:48:07.9874767Z   NODE_OPTIONS: --max-old-space-size=2048
+2026-11-09T10:48:07.9875109Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T10:48:07.9875419Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T10:48:07.9875713Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T10:48:07.9876023Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T10:48:07.9876352Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T10:48:07.9876733Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T10:48:07.9877093Z ##[endgroup]
+2026-11-09T10:48:08.7412865Z ##[end-action id=__self.store;outcome=success;conclusion=success;duration_ms=771]
+2026-11-09T10:48:08.7416506Z ##[start-action display=Run actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830;id=__self.restore]
+2026-11-09T10:48:08.8215293Z ##[group]Run actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
+2026-11-09T10:48:08.8215809Z with:
+2026-11-09T10:48:08.8216141Z   path: /home/runner/setup-pnpm/node_modules/.bin/store/v10
+2026-11-09T10:48:08.8216875Z   key: pnpm-store-v1-Linux-X64-54b3618e3cf47efbec4384bce0c968e977f7f497c903a30e612e08a79a0791c9
+2026-11-09T10:48:08.8217516Z   restore-keys: pnpm-store-v1-Linux-X64-
+
+2026-11-09T10:48:08.8218245Z   enableCrossOsArchive: false
+2026-11-09T10:48:08.8218544Z   fail-on-cache-miss: false
+2026-11-09T10:48:08.8218804Z   lookup-only: false
+2026-11-09T10:48:08.8219039Z env:
+2026-11-09T10:48:08.8219238Z   LOCAL_LOOP_ITEMS: 11
+2026-11-09T10:48:08.8219482Z   MIKKA_LOCAL_TEST_ACCOUNTS: 1
+2026-11-09T10:48:08.8219739Z   MIKKA_EDITION: cloud
+2026-11-09T10:48:08.8219963Z   REQUIRE_DB: 1
+2026-11-09T10:48:08.8220597Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:08.8221099Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:08.8221588Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:08.8221926Z   BETTER_AUTH_URL: http://localhost:3110
+2026-11-09T10:48:08.8222253Z   E2E_BASE_URL: http://localhost:3110
+2026-11-09T10:48:08.8222655Z   MIKKA_TEST_DEPLOYMENT_SHA: ddbc7e9b8e156493af730f00ed4a6efd3de475b4
+2026-11-09T10:48:08.8223161Z   MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
+2026-11-09T10:48:08.8223799Z   MIKKA_DEV_PORT: 3110
+2026-11-09T10:48:08.8224072Z   MIKKA_DEV_DAEMON_DIR: .cache/wg-ci/daemon
+2026-11-09T10:48:08.8224382Z   MIKKA_DEV_SKIP_DAEMON: 1
+2026-11-09T10:48:08.8224644Z   MIKKA_DEV_SKIP_MODEL_SETUP: 1
+2026-11-09T10:48:08.8224915Z   MIKKA_DEV_SKIP_ENV_FILES: 1
+2026-11-09T10:48:08.8225183Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T10:48:08.8225472Z   NODE_OPTIONS: --max-old-space-size=2048
+2026-11-09T10:48:08.8225789Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T10:48:08.8226076Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T10:48:08.8226351Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T10:48:08.8226639Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T10:48:08.8226922Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T10:48:08.8227241Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T10:48:08.8227827Z ##[endgroup]
+2026-11-09T10:48:08.9643310Z (node:2668) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T10:48:08.9645391Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T10:48:09.2239752Z Cache hit for restore-key: pnpm-store-v1-Linux-X64-26887853ce3297e6708e0c03416269ff2ff7c9a97fdc1198bb5ec2d42546f1ee
+2026-11-09T10:48:09.2422777Z (node:2668) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T10:48:10.5009581Z Received 4194304 of 1283900859 (0.3%), 4.0 MBs/sec
+2026-11-09T10:48:11.5073615Z Received 130023424 of 1283900859 (10.1%), 61.9 MBs/sec
+2026-11-09T10:48:12.5059525Z Received 239075328 of 1283900859 (18.6%), 75.8 MBs/sec
+2026-11-09T10:48:13.5104608Z Received 335544320 of 1283900859 (26.1%), 79.8 MBs/sec
+2026-11-09T10:48:14.5181070Z Received 486539264 of 1283900859 (37.9%), 92.6 MBs/sec
+2026-11-09T10:48:15.5159737Z Received 603979776 of 1283900859 (47.0%), 95.8 MBs/sec
+2026-11-09T10:48:16.5164569Z Received 742391808 of 1283900859 (57.8%), 100.9 MBs/sec
+2026-11-09T10:48:17.5219877Z Received 872415232 of 1283900859 (68.0%), 103.8 MBs/sec
+2026-11-09T10:48:18.5180928Z Received 1010827264 of 1283900859 (78.7%), 106.9 MBs/sec
+2026-11-09T10:48:19.5209247Z Received 1128267776 of 1283900859 (87.9%), 107.4 MBs/sec
+2026-11-09T10:48:20.5222159Z Received 1249902592 of 1283900859 (97.4%), 108.2 MBs/sec
+2026-11-09T10:48:20.9213019Z Received 1283900859 of 1283900859 (100.0%), 107.2 MBs/sec
+2026-11-09T10:48:20.9239156Z Cache Size: ~1224 MB (1283900859 B)
+2026-11-09T10:48:20.9328880Z [command]/usr/bin/tar -xf /home/runner/work/_temp/3b045be8-0b29-445f-8c61-8046dc42eac0/cache.tzst -P -C /home/runner/work/Mikka/Mikka --use-compress-program unzstd
+2026-11-09T10:48:36.7696259Z Cache restored successfully
+2026-11-09T10:48:37.0419316Z Cache restored from key: pnpm-store-v1-Linux-X64-26887853ce3297e6708e0c03416269ff2ff7c9a97fdc1198bb5ec2d42546f1ee
+2026-11-09T10:48:37.0658087Z ##[end-action id=__self.restore;outcome=success;conclusion=success;duration_ms=28324]
+2026-11-09T10:48:37.0662454Z ##[start-action display=Run pnpm install --frozen-lockfile;id=__self.__run]
+2026-11-09T10:48:37.0731487Z ##[group]Run pnpm install --frozen-lockfile
+2026-11-09T10:48:37.0732103Z [36;1mpnpm install --frozen-lockfile[0m
+2026-11-09T10:48:37.0828418Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-09T10:48:37.0829063Z env:
+2026-11-09T10:48:37.0829397Z   LOCAL_LOOP_ITEMS: 11
+2026-11-09T10:48:37.0829788Z   MIKKA_LOCAL_TEST_ACCOUNTS: 1
+2026-11-09T10:48:37.0830238Z   MIKKA_EDITION: cloud
+2026-11-09T10:48:37.0830602Z   REQUIRE_DB: 1
+2026-11-09T10:48:37.0831404Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:37.0832239Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:37.0833043Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:37.0833610Z   BETTER_AUTH_URL: http://localhost:3110
+2026-11-09T10:48:37.0834151Z   E2E_BASE_URL: http://localhost:3110
+2026-11-09T10:48:37.0835272Z   MIKKA_TEST_DEPLOYMENT_SHA: ddbc7e9b8e156493af730f00ed4a6efd3de475b4
+2026-11-09T10:48:37.0836107Z   MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
+2026-11-09T10:48:37.0836721Z   MIKKA_DEV_PORT: 3110
+2026-11-09T10:48:37.0837158Z   MIKKA_DEV_DAEMON_DIR: .cache/wg-ci/daemon
+2026-11-09T10:48:37.0837980Z   MIKKA_DEV_SKIP_DAEMON: 1
+2026-11-09T10:48:37.0838423Z   MIKKA_DEV_SKIP_MODEL_SETUP: 1
+2026-11-09T10:48:37.0838876Z   MIKKA_DEV_SKIP_ENV_FILES: 1
+2026-11-09T10:48:37.0839264Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T10:48:37.0839786Z   NODE_OPTIONS: --max-old-space-size=2048
+2026-11-09T10:48:37.0840291Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T10:48:37.0840765Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T10:48:37.0841204Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T10:48:37.0841677Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T10:48:37.0842170Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T10:48:37.0842764Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T10:48:37.0843789Z   FFMPEG_GITHUB_TOKEN: 
+2026-11-09T10:48:37.0844223Z ##[endgroup]
+2026-11-09T10:48:37.5460537Z Scope: all 7 workspace projects
+2026-11-09T10:48:37.7452272Z Lockfile is up to date, resolution step is skipped
+2026-11-09T10:48:37.8759316Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-09T10:48:38.1603236Z Packages: +2184
+2026-11-09T10:48:38.1603984Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-11-09T10:48:38.8790570Z Progress: resolved 2184, reused 531, downloaded 0, added 0
+2026-11-09T10:48:39.8777108Z Progress: resolved 2184, reused 1627, downloaded 0, added 0
+2026-11-09T10:48:40.8782604Z Progress: resolved 2184, reused 2108, downloaded 0, added 133
+2026-11-09T10:48:41.8785286Z Progress: resolved 2184, reused 2108, downloaded 0, added 455
+2026-11-09T10:48:42.8793331Z Progress: resolved 2184, reused 2108, downloaded 0, added 637
+2026-11-09T10:48:43.8785232Z Progress: resolved 2184, reused 2108, downloaded 0, added 916
+2026-11-09T10:48:44.8785372Z Progress: resolved 2184, reused 2108, downloaded 0, added 1163
+2026-11-09T10:48:45.8790143Z Progress: resolved 2184, reused 2108, downloaded 0, added 1227
+2026-11-09T10:48:46.8793337Z Progress: resolved 2184, reused 2108, downloaded 0, added 1645
+2026-11-09T10:48:47.8800622Z Progress: resolved 2184, reused 2108, downloaded 0, added 1967
+2026-11-09T10:48:48.8801840Z Progress: resolved 2184, reused 2108, downloaded 0, added 2172
+2026-11-09T10:48:49.2609813Z Progress: resolved 2184, reused 2108, downloaded 0, added 2184, done
+2026-11-09T10:48:50.7426009Z .../node_modules/ffmpeg-static install$ node install.js
+2026-11-09T10:48:52.1032543Z .../node_modules/ffmpeg-static install: ffmpeg binary, README and LICENSE verified.
+2026-11-09T10:48:52.1127198Z .../node_modules/ffmpeg-static install: Done
+2026-11-09T10:48:52.5677428Z  WARN  Failed to create bin at /home/runner/work/Mikka/Mikka/apps/desktop/node_modules/.bin/mikka. ENOENT: no such file or directory, open '/home/runner/work/Mikka/Mikka/packages/daemon/dist/mikka.js'
+2026-11-09T10:48:53.0227308Z 
+2026-11-09T10:48:53.0228357Z dependencies:
+2026-11-09T10:48:53.0228955Z + @ai-sdk/gateway 4.0.121
+2026-11-09T10:48:53.0229378Z + @ai-sdk/mcp 2.0.81
+2026-11-09T10:48:53.0229814Z + @ai-sdk/openai 4.0.99
+2026-11-09T10:48:53.0230368Z + @ai-sdk/openai-compatible 3.0.75
+2026-11-09T10:48:53.0230915Z + @ai-sdk/react 4.0.152
+2026-11-09T10:48:53.0231396Z + @ai-sdk/workflow 2.0.80
+2026-11-09T10:48:53.0231839Z + @base-ui/react 1.9.0
+2026-11-09T10:48:53.0232301Z + @better-auth/core 1.7.12
+2026-11-09T10:48:53.0232862Z + @better-auth/expo 1.7.12
+2026-11-09T10:48:53.0233404Z + @better-auth/oauth-provider 1.7.12
+2026-11-09T10:48:53.0233963Z + @chat-adapter/slack 4.43.0
+2026-11-09T10:48:53.0234549Z + @chat-adapter/state-pg 4.43.0
+2026-11-09T10:48:53.0235201Z + @chat-adapter/telegram 4.43.0
+2026-11-09T10:48:53.0235646Z + @composio/core 0.26.0
+2026-11-09T10:48:53.0236097Z + @dnd-kit/core 6.3.1
+2026-11-09T10:48:53.0236547Z + @dnd-kit/sortable 10.0.0
+2026-11-09T10:48:53.0237061Z + @dnd-kit/utilities 3.2.2
+2026-11-09T10:48:53.0242538Z + @e965/xlsx 0.20.3
+2026-11-09T10:48:53.0243227Z + @floating-ui/dom 1.8.0
+2026-11-09T10:48:53.0244052Z + @formatjs/intl-localematcher 0.8.14
+2026-11-09T10:48:53.0244720Z + @heroui/react 3.2.6
+2026-11-09T10:48:53.0245259Z + @heroui/styles 3.2.6
+2026-11-09T10:48:53.0245887Z + @internationalized/date 3.12.4
+2026-11-09T10:48:53.0246693Z + @mikka/protocol 0.0.1 <- packages/protocol
+2026-11-09T10:48:53.0247348Z + @modelcontextprotocol/server 2.3.1
+2026-11-09T10:48:53.0248183Z + @norbert_bodziony/bloub 0.4.1
+2026-11-09T10:48:53.0248637Z + @novnc/novnc 1.6.0
+2026-11-09T10:48:53.0249043Z + @opentelemetry/api 1.10.0
+2026-11-09T10:48:53.0249547Z + @opentelemetry/api-logs 0.223.0
+2026-11-09T10:48:53.0250024Z + @opentelemetry/core 2.12.0
+2026-11-09T10:48:53.0250621Z + @opentelemetry/exporter-logs-otlp-proto 0.223.0
+2026-11-09T10:48:53.0251345Z + @opentelemetry/exporter-trace-otlp-proto 0.223.0
+2026-11-09T10:48:53.0252046Z + @opentelemetry/instrumentation 0.223.0
+2026-11-09T10:48:53.0252660Z + @opentelemetry/instrumentation-pg 0.76.0
+2026-11-09T10:48:53.0253003Z + @opentelemetry/resources 2.12.0
+2026-11-09T10:48:53.0253320Z + @opentelemetry/sdk-logs 0.223.0
+2026-11-09T10:48:53.0253632Z + @opentelemetry/sdk-trace-base 2.12.0
+2026-11-09T10:48:53.0253956Z + @opentelemetry/sdk-trace-node 2.12.0
+2026-11-09T10:48:53.0254309Z + @opentelemetry/semantic-conventions 1.43.0
+2026-11-09T10:48:53.0254623Z + @openuidev/lang-core 1.0.1
+2026-11-09T10:48:53.0254892Z + @openuidev/react-lang 1.0.1
+2026-11-09T10:48:53.0255162Z + @openuidev/react-ui 0.18.1
+2026-11-09T10:48:53.0255411Z + @pierre/diffs 1.6.4
+2026-11-09T10:48:53.0255637Z + @shadcn/react 0.3.1
+2026-11-09T10:48:53.0255862Z + @solidjs/web 2.0.0-rc.0
+2026-11-09T10:48:53.0256111Z + @stripe/stripe-js 10.1.0
+2026-11-09T10:48:53.0256390Z + @tanstack/react-virtual 3.14.18
+2026-11-09T10:48:53.0256665Z + @tiptap/core 3.32.0
+2026-11-09T10:48:53.0256950Z + @tiptap/extension-collaboration 3.32.0
+2026-11-09T10:48:53.0257331Z + @tiptap/extension-collaboration-caret 3.32.0
+2026-11-09T10:48:53.0258082Z + @tiptap/extension-highlight 3.32.0
+2026-11-09T10:48:53.0258660Z + @tiptap/extension-list 3.32.0
+2026-11-09T10:48:53.0259016Z + @tiptap/extension-mention 3.32.0
+2026-11-09T10:48:53.0259325Z + @tiptap/extension-table 3.32.0
+2026-11-09T10:48:53.0259632Z + @tiptap/extension-text-align 3.32.0
+2026-11-09T10:48:53.0259928Z + @tiptap/extensions 3.32.0
+2026-11-09T10:48:53.0260173Z + @tiptap/pm 3.32.0
+2026-11-09T10:48:53.0260400Z + @tiptap/react 3.32.0
+2026-11-09T10:48:53.0260648Z + @tiptap/starter-kit 3.32.0
+2026-11-09T10:48:53.0260902Z + @tiptap/suggestion 3.32.0
+2026-11-09T10:48:53.0261163Z + @tiptap/y-tiptap 3.0.10
+2026-11-09T10:48:53.0261413Z + @vercel/analytics 1.3.1
+2026-11-09T10:48:53.0261652Z + @vercel/functions 3.10.2
+2026-11-09T10:48:53.0261887Z + @vercel/oidc 4.0.2
+2026-11-09T10:48:53.0262226Z + @workflow/serde 5.0.0
+2026-11-09T10:48:53.0262478Z + @workflow/world-local 5.1.2
+2026-11-09T10:48:53.0262728Z + ai 7.0.148
+2026-11-09T10:48:53.0262947Z + aws4fetch 1.0.20
+2026-11-09T10:48:53.0263176Z + beautiful-mermaid 1.1.3
+2026-11-09T10:48:53.0263410Z + better-auth 1.7.12
+2026-11-09T10:48:53.0263609Z + chat 4.43.0
+2026-11-09T10:48:53.0263862Z + class-variance-authority 0.7.1
+2026-11-09T10:48:53.0264106Z + clsx 2.1.1
+2026-11-09T10:48:53.0264284Z + cmdk 1.1.1
+2026-11-09T10:48:53.0264465Z + cn 0.5.0
+2026-11-09T10:48:53.0264645Z + cookie 1.1.1
+2026-11-09T10:48:53.0264832Z + date-fns 4.1.0
+2026-11-09T10:48:53.0265024Z + diff 8.0.2
+2026-11-09T10:48:53.0265231Z + dompurify 3.4.17
+2026-11-09T10:48:53.0265449Z + drizzle-orm 0.45.4
+2026-11-09T10:48:53.0265649Z + e2b 2.61.0
+2026-11-09T10:48:53.0265875Z + embla-carousel-react 8.5.1
+2026-11-09T10:48:53.0266107Z + fflate 0.8.3
+2026-11-09T10:48:53.0266312Z + ffmpeg-static 5.3.0
+2026-11-09T10:48:53.0266542Z + file-type 22.3.0
+2026-11-09T10:48:53.0266736Z + h3 2.0.8
+2026-11-09T10:48:53.0266912Z + hono 4.13.13
+2026-11-09T10:48:53.0267111Z + input-otp 1.4.1
+2026-11-09T10:48:53.0267332Z + katex 0.16.47
+2026-11-09T10:48:53.0267870Z + lucide-react 1.60.0
+2026-11-09T10:48:53.0268591Z + mcp-handler 2.3.0
+2026-11-09T10:48:53.0269021Z + mermaid 12.2.0
+2026-11-09T10:48:53.0269343Z + motion 14.5.0
+2026-11-09T10:48:53.0269581Z + music-metadata 12.3.4
+2026-11-09T10:48:53.0269820Z + negotiator 1.1.0
+2026-11-09T10:48:53.0270030Z + next 16.4.1
+2026-11-09T10:48:53.0270235Z + next-intl 4.14.9
+2026-11-09T10:48:53.0270446Z + next-themes 0.4.6
+2026-11-09T10:48:53.0270669Z + nodemailer 10.3.1
+2026-11-09T10:48:53.0270881Z + officeparser 8.5.0
+2026-11-09T10:48:53.0271085Z + pg 8.23.1
+2026-11-09T10:48:53.0271286Z + posthog-js 1.438.13
+2026-11-09T10:48:53.0271525Z + posthog-node 5.55.2
+2026-11-09T10:48:53.0271733Z + react 19.3.1
+2026-11-09T10:48:53.0271966Z + react-day-picker 9.8.0
+2026-11-09T10:48:53.0272393Z + react-dom 19.3.1
+2026-11-09T10:48:53.0272829Z + react-markdown 10.1.0
+2026-11-09T10:48:53.0273127Z + react-resizable-panels 4.14.7
+2026-11-09T10:48:53.0273658Z + react-syntax-highlighter 16.1.1
+2026-11-09T10:48:53.0274241Z + recharts 3.10.1
+2026-11-09T10:48:53.0274466Z + rehype-katex 7.0.1
+2026-11-09T10:48:53.0274708Z + remark-gfm 4.0.1
+2026-11-09T10:48:53.0274939Z + remark-math 6.0.0
+2026-11-09T10:48:53.0275144Z + shadcn 4.22.1
+2026-11-09T10:48:53.0275338Z + sharp 0.35.5
+2026-11-09T10:48:53.0275526Z + shiki 4.5.0
+2026-11-09T10:48:53.0275739Z + solid-js 2.0.0-rc.0
+2026-11-09T10:48:53.0275950Z + sonner 1.7.4
+2026-11-09T10:48:53.0276138Z + srvx 1.0.8
+2026-11-09T10:48:53.0276322Z + swr 2.5.1
+2026-11-09T10:48:53.0276531Z + tailwind-merge 3.7.0
+2026-11-09T10:48:53.0276768Z + tw-animate-css 1.4.0
+2026-11-09T10:48:53.0277168Z + undici 7.24.5
+2026-11-09T10:48:53.0277801Z + unstorage 2.0.0-beta.0
+2026-11-09T10:48:53.0278260Z + use-intl 4.14.9
+2026-11-09T10:48:53.0278537Z + vaul 1.1.2
+2026-11-09T10:48:53.0278729Z + workflow 5.2.3
+2026-11-09T10:48:53.0279148Z + y-protocols 1.0.7
+2026-11-09T10:48:53.0279506Z + yjs 13.6.33
+2026-11-09T10:48:53.0279868Z + zod 4.6.7
+2026-11-09T10:48:53.0280089Z 
+2026-11-09T10:48:53.0280254Z devDependencies:
+2026-11-09T10:48:53.0280535Z + @playwright/test 1.64.1
+2026-11-09T10:48:53.0281015Z + @tailwindcss/postcss 4.3.3
+2026-11-09T10:48:53.0281489Z + @types/node 25.9.9
+2026-11-09T10:48:53.0281937Z + @types/pg 8.23.1
+2026-11-09T10:48:53.0282365Z + @types/react 19.3.0
+2026-11-09T10:48:53.0282708Z + @types/react-dom 19.3.0
+2026-11-09T10:48:53.0283223Z + @types/react-syntax-highlighter 15.5.13
+2026-11-09T10:48:53.0283830Z + @typescript/native-preview 7.0.0-dev.20260707.2
+2026-11-09T10:48:53.0284320Z + esbuild 0.28.2
+2026-11-09T10:48:53.0284701Z + fake-indexeddb 6.2.4
+2026-11-09T10:48:53.0285065Z + happy-dom 15.11.7
+2026-11-09T10:48:53.0285409Z + js-yaml 4.3.2
+2026-11-09T10:48:53.0285766Z + nitro 3.0.261103-rc
+2026-11-09T10:48:53.0286109Z + nx 24.0.5
+2026-11-09T10:48:53.0286417Z + oxlint 1.89.0
+2026-11-09T10:48:53.0286798Z + postcss 8.5.31
+2026-11-09T10:48:53.0287250Z + prettier 3.9.10
+2026-11-09T10:48:53.0288068Z + prettier-plugin-tailwindcss 0.7.4
+2026-11-09T10:48:53.0288517Z + rolldown 1.3.0
+2026-11-09T10:48:53.0288854Z + tailwindcss 4.3.3
+2026-11-09T10:48:53.0289225Z + tsrs 0.20.1-ts7.1.0-beta
+2026-11-09T10:48:53.0289547Z + tsx 4.23.15
+2026-11-09T10:48:53.0289933Z + typescript 5.9.3
+2026-11-09T10:48:53.0290221Z + wrangler 4.152.0
+2026-11-09T10:48:53.0290389Z 
+2026-11-09T10:48:53.3058687Z  WARN  Failed to create bin at /home/runner/work/Mikka/Mikka/apps/desktop/node_modules/.bin/mikka. ENOENT: no such file or directory, open '/home/runner/work/Mikka/Mikka/apps/desktop/node_modules/@mikka/daemon/dist/mikka.js'
+2026-11-09T10:48:53.4035098Z ╭ Warning ─────────────────────────────────────────────────────────────────────╮
+2026-11-09T10:48:53.4035941Z │                                                                              │
+2026-11-09T10:48:53.4036788Z │   Ignored build scripts: @openuidev/lang-core@1.0.1, cbor-extract@2.2.2,     │
+2026-11-09T10:48:53.4038072Z │   core-js@3.51.0, electron-winstaller@5.4.0, nx@24.0.5,                      │
+2026-11-09T10:48:53.4038987Z │   tesseract.js@7.0.0, workerd@1.20261019.1.                                  │
+2026-11-09T10:48:53.4040330Z │   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+2026-11-09T10:48:53.4041243Z │   to run scripts.                                                            │
+2026-11-09T10:48:53.4041983Z │                                                                              │
+2026-11-09T10:48:53.4042766Z ╰──────────────────────────────────────────────────────────────────────────────╯
+2026-11-09T10:48:53.4307994Z Done in 16.2s using pnpm v10.34.3
+2026-11-09T10:48:53.5314561Z ##[end-action id=__self.__run;outcome=success;conclusion=success;duration_ms=16465]
+2026-11-09T10:48:53.5318028Z ##[start-action display=Save the pnpm store (main only);id=__self.__actions_cache]
+2026-11-09T10:48:53.5330042Z ##[end-action id=__self.__actions_cache;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-11-09T10:48:53.5370244Z ##[group]Run node --input-type=module <<'JS'
+2026-11-09T10:48:53.5370689Z [36;1mnode --input-type=module <<'JS'[0m
+2026-11-09T10:48:53.5371233Z [36;1mimport assert from 'node:assert/strict'[0m
+2026-11-09T10:48:53.5371594Z [36;1mimport { execFileSync } from 'node:child_process'[0m
+2026-11-09T10:48:53.5371954Z [36;1mimport { appendFileSync } from 'node:fs'[0m
+2026-11-09T10:48:53.5372294Z [36;1mimport { randomBytes } from 'node:crypto'[0m
+2026-11-09T10:48:53.5372684Z [36;1mimport { assertDevLocal } from './scripts/dev-local/guard.mjs'[0m
+2026-11-09T10:48:53.5373050Z [36;1m[0m
+2026-11-09T10:48:53.5373284Z [36;1massert.equal(process.platform, 'linux')[0m
+2026-11-09T10:48:53.5373691Z [36;1massert.equal(Number(process.versions.node.split('.')[0]), 24)[0m
+2026-11-09T10:48:53.5374092Z [36;1massert.equal(process.env.CI, 'true')[0m
+2026-11-09T10:48:53.5374431Z [36;1massert.equal(process.env.GITHUB_ACTIONS, 'true')[0m
+2026-11-09T10:48:53.5374905Z [36;1massert.equal(process.env.RUNNER_ENVIRONMENT, 'github-hosted')[0m
+2026-11-09T10:48:53.5375375Z [36;1massert.equal(process.env.GITHUB_REPOSITORY, 'alexj11324/Mikka')[0m
+2026-11-09T10:48:53.5375948Z [36;1massert.ok(['pull_request', 'merge_group', 'push'].includes(process.env.GITHUB_EVENT_NAME))[0m
+2026-11-09T10:48:53.5376513Z [36;1mif (process.env.GITHUB_EVENT_NAME === 'pull_request') {[0m
+2026-11-09T10:48:53.5376991Z [36;1m  assert.match(process.env.GITHUB_REF, /^refs\/pull\/[0-9]+\/merge$/)[0m
+2026-11-09T10:48:53.5377372Z [36;1m}[0m
+2026-11-09T10:48:53.5378097Z [36;1mif (process.env.GITHUB_EVENT_NAME === 'push') assert.equal(process.env.GITHUB_REF, 'refs/heads/main')[0m
+2026-11-09T10:48:53.5378764Z [36;1mconst revision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()[0m
+2026-11-09T10:48:53.5379242Z [36;1massert.match(revision, /^[a-f0-9]{40}$/)[0m
+2026-11-09T10:48:53.5379590Z [36;1massert.equal(revision, process.env.GITHUB_SHA)[0m
+2026-11-09T10:48:53.5380010Z [36;1massert.equal(revision, process.env.MIKKA_TEST_DEPLOYMENT_SHA)[0m
+2026-11-09T10:48:53.5380620Z [36;1massert.equal(execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { encoding: 'utf8' }), '')[0m
+2026-11-09T10:48:53.5381195Z [36;1massert.equal(process.env.LOCAL_LOOP_ITEMS, '11')[0m
+2026-11-09T10:48:53.5381569Z [36;1massert.equal(process.env.MIKKA_EDITION, 'cloud')[0m
+2026-11-09T10:48:53.5381952Z [36;1massert.equal(process.env.MIKKA_DEV_SKIP_DAEMON, '1')[0m
+2026-11-09T10:48:53.5382368Z [36;1massert.equal(process.env.MIKKA_DEV_SKIP_MODEL_SETUP, '1')[0m
+2026-11-09T10:48:53.5382748Z [36;1massertDevLocal(process.env)[0m
+2026-11-09T10:48:53.5383080Z [36;1mconst target = new URL(process.env.E2E_DATABASE_URL)[0m
+2026-11-09T10:48:53.5383455Z [36;1massert.equal(target.hostname, '127.0.0.1')[0m
+2026-11-09T10:48:53.5383771Z [36;1massert.equal(target.port, '5432')[0m
+2026-11-09T10:48:53.5384089Z [36;1massert.equal(target.pathname, '/mikka_e2e')[0m
+2026-11-09T10:48:53.5384427Z [36;1massert.equal(target.username, 'e2e')[0m
+2026-11-09T10:48:53.5384857Z [36;1massert.equal(process.env.MIKKA_DATABASE_URL, process.env.E2E_DATABASE_URL)[0m
+2026-11-09T10:48:53.5385418Z [36;1massert.equal(process.env.DATABASE_URL, process.env.E2E_DATABASE_URL)[0m
+2026-11-09T10:48:53.5385876Z [36;1mconst secret = randomBytes(32).toString('hex')[0m
+2026-11-09T10:48:53.5386217Z [36;1mconsole.log('::add-mask::' + secret)[0m
+2026-11-09T10:48:53.5386639Z [36;1mappendFileSync(process.env.GITHUB_ENV, 'BETTER_AUTH_SECRET=' + secret + '\n')[0m
+2026-11-09T10:48:53.5387053Z [36;1mJS[0m
+2026-11-09T10:48:53.5455328Z shell: /usr/bin/bash -e {0}
+2026-11-09T10:48:53.5455606Z env:
+2026-11-09T10:48:53.5455808Z   LOCAL_LOOP_ITEMS: 11
+2026-11-09T10:48:53.5456039Z   MIKKA_LOCAL_TEST_ACCOUNTS: 1
+2026-11-09T10:48:53.5456280Z   MIKKA_EDITION: cloud
+2026-11-09T10:48:53.5456498Z   REQUIRE_DB: 1
+2026-11-09T10:48:53.5457053Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:53.5458090Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:53.5458601Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:53.5458899Z   BETTER_AUTH_URL: http://localhost:3110
+2026-11-09T10:48:53.5459382Z   E2E_BASE_URL: http://localhost:3110
+2026-11-09T10:48:53.5459748Z   MIKKA_TEST_DEPLOYMENT_SHA: ddbc7e9b8e156493af730f00ed4a6efd3de475b4
+2026-11-09T10:48:53.5460184Z   MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
+2026-11-09T10:48:53.5460507Z   MIKKA_DEV_PORT: 3110
+2026-11-09T10:48:53.5460750Z   MIKKA_DEV_DAEMON_DIR: .cache/wg-ci/daemon
+2026-11-09T10:48:53.5461030Z   MIKKA_DEV_SKIP_DAEMON: 1
+2026-11-09T10:48:53.5461260Z   MIKKA_DEV_SKIP_MODEL_SETUP: 1
+2026-11-09T10:48:53.5461502Z   MIKKA_DEV_SKIP_ENV_FILES: 1
+2026-11-09T10:48:53.5461752Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T10:48:53.5462011Z   NODE_OPTIONS: --max-old-space-size=2048
+2026-11-09T10:48:53.5462305Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T10:48:53.5462570Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T10:48:53.5462830Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T10:48:53.5463107Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T10:48:53.5463384Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T10:48:53.5463714Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T10:48:53.5464030Z ##[endgroup]
+2026-11-09T10:48:53.9874094Z ##[group]Run pnpm test:e2e:setup
+2026-11-09T10:48:53.9874457Z [36;1mpnpm test:e2e:setup[0m
+2026-11-09T10:48:53.9943065Z shell: /usr/bin/bash -e {0}
+2026-11-09T10:48:53.9943391Z env:
+2026-11-09T10:48:53.9943617Z   LOCAL_LOOP_ITEMS: 11
+2026-11-09T10:48:53.9943888Z   MIKKA_LOCAL_TEST_ACCOUNTS: 1
+2026-11-09T10:48:53.9944169Z   MIKKA_EDITION: cloud
+2026-11-09T10:48:53.9944416Z   REQUIRE_DB: 1
+2026-11-09T10:48:53.9945044Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:53.9945648Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:53.9946171Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:53.9946537Z   BETTER_AUTH_URL: http://localhost:3110
+2026-11-09T10:48:53.9946894Z   E2E_BASE_URL: http://localhost:3110
+2026-11-09T10:48:53.9947342Z   MIKKA_TEST_DEPLOYMENT_SHA: ddbc7e9b8e156493af730f00ed4a6efd3de475b4
+2026-11-09T10:48:53.9948267Z   MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
+2026-11-09T10:48:53.9948745Z   MIKKA_DEV_PORT: 3110
+2026-11-09T10:48:53.9949042Z   MIKKA_DEV_DAEMON_DIR: .cache/wg-ci/daemon
+2026-11-09T10:48:53.9949386Z   MIKKA_DEV_SKIP_DAEMON: 1
+2026-11-09T10:48:53.9949679Z   MIKKA_DEV_SKIP_MODEL_SETUP: 1
+2026-11-09T10:48:53.9949978Z   MIKKA_DEV_SKIP_ENV_FILES: 1
+2026-11-09T10:48:53.9950269Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T10:48:53.9950607Z   NODE_OPTIONS: --max-old-space-size=2048
+2026-11-09T10:48:53.9950975Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T10:48:53.9951306Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T10:48:53.9951616Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T10:48:53.9951961Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T10:48:53.9952305Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T10:48:53.9952706Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T10:48:53.9953367Z   BETTER_AUTH_SECRET: ***
+2026-11-09T10:48:53.9953653Z ##[endgroup]
+2026-11-09T10:48:54.3972363Z 
+2026-11-09T10:48:54.3973439Z > next-app@0.0.1 test:e2e:setup /home/runner/work/Mikka/Mikka
+2026-11-09T10:48:54.3974266Z > node --experimental-strip-types scripts/setup-e2e-db.mjs
+2026-11-09T10:48:54.3974651Z 
+2026-11-09T10:48:55.6949921Z migrate: starting
+2026-11-09T10:48:55.7624276Z migrate: applied 20261023221259_application_baseline.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.7756271Z migrate: applied 0001_agents_devices.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.7770666Z migrate: applied 0002_device_enabled.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.7802768Z migrate: applied 0003_agents_columns.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.8002173Z migrate: applied 0004_linear_sync.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.8142471Z migrate: applied 0004_telegram_chat.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.8178655Z migrate: applied 0005_linear_sync_retry_and_comment_keys.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.8211863Z migrate: applied 0005_mikka_issue_metadata.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.8228727Z migrate: applied 0006_linear_comment_authorship.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.8269788Z migrate: applied 0007_coordinator_events.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.8283068Z migrate: applied 0007_linear_description_snapshot.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.8325822Z migrate: applied 0008_coordinator_sessions.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.8341469Z migrate: applied 0008_linear_mikka_issue_metadata.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.8502914Z migrate: applied 0009_oauth_provider.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.8517334Z migrate: applied 0010_coordinator_session_error.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.8531001Z migrate: applied 0011_coordinator_event_tier.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.8579863Z migrate: applied 0012_run_tokens.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.8613893Z migrate: applied 20261023143000_decision_calls.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.8658491Z migrate: applied 20261023150000_suggestions.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.8710070Z migrate: applied 20261023154800_issue_scope.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.8735033Z migrate: applied 20261023161128_issue_scope_source.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.8754370Z migrate: applied 20261023170500_drop_decision_calls.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.8776965Z migrate: applied 20261023171500_suggestion_trigger_checks.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.8888910Z migrate: applied 20261023213851_group_conversations.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.8905950Z migrate: applied 20261025000400_run_retries.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.8922574Z migrate: applied 20261025005600_mikka_linear_sync_setting.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.8949838Z migrate: applied 20261025013400_run_checkpoints.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.8972781Z migrate: applied 20261025043000_pending_actions.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.8989576Z migrate: applied 20261025200000_activity_version_actor.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.9010511Z migrate: applied 20261025232200_issue_list_indexes.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.9094774Z migrate: applied 20261026013000_issue_search_pg_trgm.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.9149039Z migrate: applied 20261026013001_issue_search_title_idx.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.9193887Z migrate: applied 20261026013002_issue_search_recent_idx.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.9241998Z migrate: applied 20261026013003_issue_search_number_idx.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.9310648Z migrate: applied 20261026170000_native_coordinator.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.9371524Z migrate: applied 20261027010000_bots.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.9479218Z migrate: applied 20261027164500_artifact_legacy_compat.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.9561894Z migrate: applied 20261027010100_artifacts.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.9616430Z migrate: applied 20261027010200_bot_conversations.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.9647159Z migrate: applied 20261027011046_user_time_zones.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.9721234Z migrate: applied 20261027120000_coordinator_attention.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.9783591Z migrate: applied 20261027164501_cloud_computers.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.9829698Z migrate: applied 20261027164502_computer_run_bindings.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.9882762Z migrate: applied 20261027164503_byos_credential_publications.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.9946580Z migrate: applied 20261027164504_byos_bindings_oauth.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:55.9966947Z migrate: applied 20261027164505_byos_device_authorization.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.0022076Z migrate: applied 20261027164506_byos_access_and_cleanup.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.0051651Z migrate: applied 20261027164507_byos_native_runs.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.0091927Z migrate: applied 20261027164508_byos_enrollment_transfers.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.0140064Z migrate: applied 20261027164509_byos_enrollment_cleanup.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.0176754Z migrate: applied 20261027164510_local_computer_reviews.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.0206116Z migrate: applied 20261027164511_cloud_device_scope.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.0221374Z migrate: applied 20261027164512_cloud_worker_leases.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.0235491Z migrate: applied 20261027164513_computer_run_approvals.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.0275487Z migrate: applied 20261027164514_bot_cloud_runtimes.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.0305421Z migrate: applied 20261027164515_workspace_computer_policy.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.0496183Z migrate: applied 20261027181000_agent_kit.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.0545182Z migrate: applied 20261027203647_mobile_push.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.0612146Z migrate: applied 20261027231815_user_facts.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.0641109Z migrate: applied 20261028015330_issue_tool_calls.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.0674009Z migrate: applied 20261028143920_operation_ledger.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.0691375Z migrate: applied 20261028143921_approved_write_binding.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.0709590Z migrate: applied 20261028224737_run_last_reply.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.0723943Z migrate: applied 20261029010446_device_computer_capability.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.0736909Z migrate: applied 20261029010447_workspace_computer_policy_allow.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.0748482Z migrate: applied 20261029011614_coordinator_triage_attempt.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.0868583Z migrate: applied 20261029011635_subagents_thread_machines.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.0904388Z migrate: applied 20261029011700_agent_tool_approvals.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.0990352Z migrate: applied 20261029011701_cli_run_policy.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.1113748Z migrate: applied 20261029012027_account_credential_vault.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.1139205Z migrate: applied 20261029022353_local_repository_defaults.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.1166954Z migrate: applied 20261029023121_device_authorization.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.1222237Z migrate: applied 20261029024124_run_publications.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.1255644Z migrate: applied 20261029043630_composio_accounts.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.1271551Z migrate: applied 20261029043631_byos_account_label.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.1283161Z migrate: applied 20261029043632_composio_account_email_checks.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.1298057Z migrate: applied 20261029043633_byos_connection_removed.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.1358514Z migrate: applied 20261029043634_group_turns.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.1371220Z migrate: applied 20261029043635_pending_action_account.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.1443489Z migrate: applied 20261029043636_run_captures.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.1493959Z migrate: applied 20261029043637_personal_scope_detachment.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.1510574Z migrate: applied 20261029043638_issue_scope_generation.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.1580912Z migrate: applied 20261029043639_linear_publications.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.1596467Z migrate: applied 20261029043640_explicit_workspace_scope.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.1639700Z migrate: applied 20261029043641_team_issue_creation_gate.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.1679965Z migrate: applied 20261029043643_require_verified_team_promotion.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.1711225Z migrate: applied 20261029043644_team_issue_promotions.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.1730511Z migrate: applied 20261029043646_agent_external_write_policy.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.1746012Z migrate: applied 20261029043647_workspace_external_write_policy.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.1870864Z migrate: applied 20261029044000_factory_192_routing.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.1938702Z migrate: applied 20261029044001_factory_192_question_source_identity.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.1955438Z migrate: applied 20261029044002_run_dispatch_keys.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.1975078Z migrate: applied 20261029044003_factory_192_stages.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.2069011Z migrate: applied 20261029044004_factory_194_approvals.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.2144454Z migrate: applied 20261029044005_factory_195_monitor.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.2160897Z migrate: applied 20261029044006_factory_192_questions.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.2268432Z migrate: applied 20261029044007_self_improvement.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.2349191Z migrate: applied 20261029044008_improvement_skill_assignments.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.2432195Z migrate: applied 20261029044009_skill_candidate_registry.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.2472050Z migrate: applied 20261029044010_skill_mount_evidence.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.2485391Z migrate: applied 20261029044011_feedback_candidate_generation.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.2589291Z migrate: applied 20261029044012_skill_evaluations.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.2605801Z migrate: applied 20261029044013_factory_skill_activation.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.2629693Z migrate: applied 20261029044014_skill_lifecycle_operations.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.2644365Z migrate: applied 20261029044015_issue_status_codes.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.2680320Z migrate: applied 20261029044016_factory_public_consumers.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.2692713Z migrate: applied 20261029044017_run_publication_scope.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.2702991Z migrate: applied 20261029044018_factory_scope_generation.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.2719805Z migrate: applied 20261029080000_unattended_browser_runtime.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.2773706Z migrate: applied 20261029080001_owner_cloud_machines.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.2785262Z migrate: applied 20261029160411_issue_read_compatibility.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.2798975Z migrate: applied 20261029213935_thread_machine_compute_seconds.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.2821432Z migrate: applied 20261029213936_settings_preferences.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.2860730Z migrate: applied 20261029213937_settings_activity_devices.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.2945275Z migrate: applied 20261029213939_workspace_admin_settings.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.2995586Z migrate: applied 20261029213940_account_settings.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3030310Z migrate: applied 20261029213941_pending_actions_user_decided_idx.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3048428Z migrate: applied 20261029213942_bot_subagents_owner_fkey_validate.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3083059Z migrate: applied 20261029230000_desktop_auth_requests.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3100903Z migrate: applied 20261030074000_factory_publication_failed.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3136095Z migrate: applied 20261030074100_factory_publications_active_key.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3149080Z migrate: applied 20261030074200_factory_publications_drop_logical_unique.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3163128Z migrate: applied 20261030074300_factory_publication_failed_validate.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3208912Z migrate: applied 20261030193000_device_enrollment_management.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3222033Z migrate: applied 20261030195022_factory_approval_evidence_optional.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3272962Z migrate: applied 20261030200610_execution_rules.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3290775Z migrate: applied 20261030204751_workspace_computer_policy_default_allow.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3315379Z migrate: applied 20261030204829_workspace_app_policies.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3354132Z migrate: applied 20261030204833_workspace_audit_events.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3392171Z migrate: applied 20261030204834_personal_access_tokens.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3438223Z migrate: applied 20261030204835_workspace_secrets_env.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3452003Z migrate: applied 20261030204836_agent_tool_approval_input_digest.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3481114Z migrate: applied 20261030213254_user_onboarding.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3594822Z migrate: applied 20261030230000_hosted_usage.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3608400Z migrate: applied 20261030231122_device_uninstall_command.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3619332Z migrate: applied 20261030233001_factory_candidate_details.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3630402Z migrate: applied 20261030233002_byos_model_catalog.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3641511Z migrate: applied 20261030234636_run_human_control_pause.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3705959Z migrate: applied 20261031000250_issue_number_counter_expand.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3744650Z migrate: applied 20261031000251_issue_owner_number_unique.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3761471Z migrate: applied 20261031000300_points_purchase_details.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3779868Z migrate: applied 20261031002604_coordinator_wake_recovery.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3815868Z migrate: applied 20261031002605_daemon_credential_revocation.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3897918Z migrate: applied 20261031002606_user_schedules.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3909529Z migrate: applied 20261031002607_checkpoint_recovery_availability.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3928876Z migrate: applied 20261031004200_card_verification_checkout.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.3998583Z migrate: applied 20261031040000_personal_plugins.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.4011313Z migrate: applied 20261031050729_workspace_model_admission.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.4327439Z migrate: applied 20261031050731_account_deletion_jobs.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.4392408Z migrate: applied 20261031050733_team_skill_metadata.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.4420443Z migrate: applied 20261031050734_audit_retention_policy.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.4471919Z migrate: applied 20261031050735_archive_linear_on_personal_scope.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.4504747Z migrate: applied 20261031050736_ops_monitor_observations.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.4520809Z migrate: applied 20261031050737_account_deletion_warnings.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.4532855Z migrate: applied 20261031054015_validate_activity_actor_type.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.4546558Z migrate: applied 20261031054016_validate_activity_actor_id.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.4602114Z migrate: applied 20261031054017_explicit_execution.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.4620943Z migrate: applied 20261031060510_monitor_followup_issues.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.4666513Z migrate: applied 20261031060511_monitor_github_issue_links.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.4696847Z migrate: applied 20261031104441_cli_team_project_policy.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.4714075Z migrate: applied 20261031151353_push_finished_default_on.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.4739622Z migrate: applied 20261031153511_group_bot_members.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.4752929Z migrate: applied 20261031234500_device_auto_schedule.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.4769189Z migrate: applied 20261101001200_bot_model_hosted_choice.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.4801310Z migrate: applied 20261101020000_drop_unmerged_branch_schema.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.4924283Z migrate: applied 20261101020100_personal_mailbox_schema.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.4971743Z migrate: applied 20261101020201_workspace_personal_policies.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.4984897Z migrate: applied 20261101020202_bot_archive.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.5013676Z migrate: applied 20261101020203_workspace_payment_designations.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.5046707Z migrate: applied 20261101020500_message_reactions.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6238104Z migrate: applied 20261101020600_chat_preferences.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6289559Z migrate: applied 20261101021000_model_api_keys.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6306576Z migrate: applied 20261101021100_bot_api_key_choice.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6329056Z migrate: applied 20261101025715_github_connections.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6339733Z migrate: applied 20261101120000_byos_connection_paused.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6378015Z migrate: applied 20261101121000_factory_merges.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6407829Z migrate: applied 20261101121100_run_capture_steps.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6427887Z migrate: applied 20261101130000_hosted_usage_concurrent.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6457147Z migrate: applied 20261101140000_coordinator_bots.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6483219Z migrate: applied 20261101140100_user_e2b_keys.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6493558Z migrate: applied 20261101150000_run_quota_resets_at.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6503715Z migrate: applied 20261101160000_chat_bot_on_proposals.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6524851Z migrate: applied 20261101170000_workspace_credit_shares.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6534120Z migrate: applied 20261101180000_composio_needs_reconnect.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6547964Z migrate: applied 20261101191000_browser_ask_retired.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6556914Z migrate: applied 20261101191100_github_push_grant.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6576790Z migrate: applied 20261101191200_no_ask_for_app_granted.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6591850Z migrate: applied 20261101193000_thread_machine_task.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6601214Z migrate: applied 20261101194000_thread_machine_log_tail.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6623586Z migrate: applied 20261101200000_run_thread_continuations.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6639692Z migrate: applied 20261101201000_run_outcomes.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6657252Z migrate: applied 20261101202000_mailbox_push_notifications.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6679234Z migrate: applied 20261102031000_bots_outlive_owner.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6692406Z migrate: applied 20261102031001_bots_owner_fkey_validate.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6708201Z migrate: applied 20261102031002_workspace_deletions.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6734803Z migrate: applied 20261102115030_sandbox_kill_retries.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6747156Z migrate: applied 20261102120000_model_api_key_models_error.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6790315Z migrate: applied 20261102140000_model_order.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6800980Z migrate: applied 20261102170000_device_code_client_info.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6812517Z migrate: applied 20261102190000_model_api_key_responses_api.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6824072Z migrate: applied 20261102200000_model_order_preferred_agent.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6834625Z migrate: applied 20261102213000_device_update_failure.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6847446Z migrate: applied 20261102220000_workspace_secret_notes.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6878844Z migrate: applied 20261102230000_user_secrets.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6890910Z migrate: applied 20261102233000_model_order_cloud_first.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6919449Z migrate: applied 20261103020000_github_connect_intents.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6935269Z migrate: applied 20261103030000_github_connect_loopback.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.6970787Z migrate: applied 20261103060000_factory_deliverables.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7027362Z migrate: applied 20261103130000_chat_attachments.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7037849Z migrate: applied 20261103220200_execution_identity_provenance.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7092231Z migrate: applied 20261103220201_group_factory.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7130403Z migrate: applied 20261103220300_group_decision_quality.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7154219Z migrate: applied 20261104003000_mcp_workspace_shares.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7242139Z migrate: applied 20261104213000_project_decisions.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7300871Z migrate: applied 20261104231000_agent_profiles.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7314535Z migrate: applied 20261105041500_preferred_agent_from_first_row.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7325686Z migrate: applied 20261105140000_model_difficulty_routing.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7338020Z migrate: applied 20261105150000_byos_acquire_expiry.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7352651Z migrate: applied 20261105160000_chat_attachment_upload_expiry_idx.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7372530Z migrate: applied 20261105170000_live_revisions.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7440033Z migrate: applied 20261105180000_factory_flow_view.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7453707Z migrate: applied 20261105203000_chat_preferences_home_rows.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7464848Z migrate: applied 20261106110000_issue_short_titles.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7477191Z migrate: applied 20261106160000_run_prompt_task_range.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7500197Z migrate: applied 20261106170000_issue_number_required.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7514488Z migrate: applied 20261106181000_thread_machine_template_kind.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7526078Z migrate: applied 20261106192500_run_machine_authority.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7545673Z migrate: applied 20261107120000_thread_machine_lifecycle.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7560981Z migrate: applied 20261107120001_mcp_reply_notifications.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7570526Z migrate: applied 20261107160000_live_session_revocation.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7582542Z migrate: applied 20261107170000_run_failure_details.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7627501Z migrate: applied 20261107171000_server_github_app.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7688075Z migrate: applied 20261107171001_cloud_service_client.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7739605Z migrate: applied 20261107171002_cloud_github.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7771416Z migrate: applied 20261107171003_cloud_push.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7790552Z migrate: applied 20261107171004_phone_push_receipt_recovery.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7810504Z migrate: applied 20261108120000_secret_delivery.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7838017Z migrate: applied 20261108120101_enabled_models.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7870706Z migrate: applied 20261108233500_coordinator_startup_receipts.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7922713Z migrate: applied 20261109010001_thread_machine_sessions.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.7952896Z migrate: applied 20261109010002_capture_posters.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.8044791Z migrate: applied 20261109035000_task_workspace_ownership.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.8072057Z migrate: applied 20261109035001_linear_workspace_policy.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.8081489Z migrate: applied 20261109035002_phone_push_session.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.8100112Z migrate: applied 20261109035003_account_task_history.sql to MIKKA_DATABASE_URL
+2026-11-09T10:48:56.8124636Z migrate: applied 0004_mikka_workspace_tables.sql to DATABASE_URL
+2026-11-09T10:48:56.8212172Z migrate: applied 0006_workspace_tables.sql to DATABASE_URL
+2026-11-09T10:48:56.8299226Z migrate: applied 0014_workspace_teams.sql to DATABASE_URL
+2026-11-09T10:48:56.8334529Z migrate: applied 20261025005500_mikka_team_tables.sql to DATABASE_URL
+2026-11-09T10:48:56.8357431Z migrate: applied 20261025232201_workspace_list_indexes.sql to DATABASE_URL
+2026-11-09T10:48:56.8392992Z migrate: applied 20261029043642_team_issue_create_receipts.sql to DATABASE_URL
+2026-11-09T10:48:56.8418228Z migrate: applied 20261029043645_team_issue_promotion_receipts.sql to DATABASE_URL
+2026-11-09T10:48:56.8440568Z migrate: applied 20261029213938_workspace_admin_identity.sql to DATABASE_URL
+2026-11-09T10:48:56.8459789Z migrate: applied 20261030230001_legacy_hosted_workspaces.sql to DATABASE_URL
+2026-11-09T10:48:56.8485879Z migrate: applied 20261031050730_audit_export_snapshots.sql to DATABASE_URL
+2026-11-09T10:48:56.9018163Z migrate: applied 20261031050732_workspace_deletion_guards.sql to DATABASE_URL
+2026-11-09T10:48:56.9050237Z migrate: applied 20261031060512_workspace_audit_outbox.sql to DATABASE_URL
+2026-11-09T10:48:56.9085011Z migrate: applied 20261101020200_personal_workspace_kind.sql to DATABASE_URL
+2026-11-09T10:48:56.9096837Z migrate: applied 20261104205010_operation_ledger_personal_scope_guard.sql to DATABASE_URL
+2026-11-09T10:48:56.9127768Z migrate: applied 20261106170001_team_issue_number.sql to DATABASE_URL
+2026-11-09T10:48:56.9138294Z migrate: applied 20261107120002_mcp_membership_notifications.sql to DATABASE_URL
+2026-11-09T10:48:56.9228634Z migrate: task workspace ownership bound=0 pending=0
+2026-11-09T10:48:57.1218106Z 独立 E2E 数据库已就绪；认证表使用 Better Auth 迁移，业务表来自现有 Drizzle schema。
+2026-11-09T10:48:57.1850306Z ##[group]Run node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
+2026-11-09T10:48:57.1851099Z [36;1mnode scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json[0m
+2026-11-09T10:48:57.1922138Z shell: /usr/bin/bash -e {0}
+2026-11-09T10:48:57.1922470Z env:
+2026-11-09T10:48:57.1922715Z   LOCAL_LOOP_ITEMS: 11
+2026-11-09T10:48:57.1922998Z   MIKKA_LOCAL_TEST_ACCOUNTS: 1
+2026-11-09T10:48:57.1923294Z   MIKKA_EDITION: cloud
+2026-11-09T10:48:57.1923560Z   REQUIRE_DB: 1
+2026-11-09T10:48:57.1924199Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:57.1924759Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:57.1925279Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:57.1925649Z   BETTER_AUTH_URL: http://localhost:3110
+2026-11-09T10:48:57.1926014Z   E2E_BASE_URL: http://localhost:3110
+2026-11-09T10:48:57.1926458Z   MIKKA_TEST_DEPLOYMENT_SHA: ddbc7e9b8e156493af730f00ed4a6efd3de475b4
+2026-11-09T10:48:57.1928004Z   MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
+2026-11-09T10:48:57.1928484Z   MIKKA_DEV_PORT: 3110
+2026-11-09T10:48:57.1928784Z   MIKKA_DEV_DAEMON_DIR: .cache/wg-ci/daemon
+2026-11-09T10:48:57.1929130Z   MIKKA_DEV_SKIP_DAEMON: 1
+2026-11-09T10:48:57.1929426Z   MIKKA_DEV_SKIP_MODEL_SETUP: 1
+2026-11-09T10:48:57.1929727Z   MIKKA_DEV_SKIP_ENV_FILES: 1
+2026-11-09T10:48:57.1930023Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T10:48:57.1930347Z   NODE_OPTIONS: --max-old-space-size=2048
+2026-11-09T10:48:57.1930715Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T10:48:57.1931038Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T10:48:57.1931346Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T10:48:57.1931683Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T10:48:57.1932018Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T10:48:57.1932425Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T10:48:57.1933079Z   BETTER_AUTH_SECRET: ***
+2026-11-09T10:48:57.1933357Z ##[endgroup]
+2026-11-09T10:48:57.4029768Z {"environmentId":"local-4f5e8c99-ddb9-45b2-a5b1-9868c0f1ec3f","deploymentSha":"ddbc7e9b8e156493af730f00ed4a6efd3de475b4","origin":"http://localhost:3110","status":"prepared"}
+2026-11-09T10:48:57.4261294Z ##[group]Run node --import ./tests/support/server-only.mjs --import tsx --input-type=module <<'JS'
+2026-11-09T10:48:57.4262609Z [36;1mnode --import ./tests/support/server-only.mjs --import tsx --input-type=module <<'JS'[0m
+2026-11-09T10:48:57.4263136Z [36;1mimport assert from 'node:assert/strict'[0m
+2026-11-09T10:48:57.4263522Z [36;1mimport { spawn, execFileSync } from 'node:child_process'[0m
+2026-11-09T10:48:57.4263917Z [36;1mimport { randomUUID } from 'node:crypto'[0m
+2026-11-09T10:48:57.4264256Z [36;1mimport { once } from 'node:events'[0m
+2026-11-09T10:48:57.4264715Z [36;1mimport { mkdir, readFile, writeFile, appendFile, copyFile } from 'node:fs/promises'[0m
+2026-11-09T10:48:57.4265204Z [36;1mimport { resolve, join } from 'node:path'[0m
+2026-11-09T10:48:57.4265608Z [36;1mimport { setTimeout as delay } from 'node:timers/promises'[0m
+2026-11-09T10:48:57.4266011Z [36;1mimport pg from 'pg'[0m
+2026-11-09T10:48:57.4266497Z [36;1mimport { loadEnvironment } from './scripts/test-accounts/environment.mjs'[0m
+2026-11-09T10:48:57.4267238Z [36;1mimport { acquireTestAccounts, recordAuthenticationSecrets, auditEvidence } from './scripts/test-accounts/session.mjs'[0m
+2026-11-09T10:48:57.4268554Z [36;1mimport { verifyWorkspaceGovernance } from './scripts/dev-local/workspace-governance-acceptance.mjs'[0m
+2026-11-09T10:48:57.4269074Z [36;1m[0m
+2026-11-09T10:48:57.4269329Z [36;1massert.equal(process.env.LOCAL_LOOP_ITEMS, '11')[0m
+2026-11-09T10:48:57.4269802Z [36;1mconst root = process.cwd(), privateDirectory = resolve('.cache/wg-ci')[0m
+2026-11-09T10:48:57.4270298Z [36;1mawait mkdir(privateDirectory, { recursive: true, mode: 0o700 })[0m
+2026-11-09T10:48:57.4270715Z [36;1mconst environment = await loadEnvironment()[0m
+2026-11-09T10:48:57.4271103Z [36;1massert.equal(environment.kind, 'isolated-ci')[0m
+2026-11-09T10:48:57.4271561Z [36;1massert.equal(environment.deploymentSha, process.env.GITHUB_SHA)[0m
+2026-11-09T10:48:57.4272106Z [36;1massert.equal(environment.origin, 'http://localhost:3110')[0m
+2026-11-09T10:48:57.4272557Z [36;1massert.equal(environment.database.name, 'mikka_e2e')[0m
+2026-11-09T10:48:57.4273106Z [36;1mconst sourceTree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { encoding: 'utf8' }).trim()[0m
+2026-11-09T10:48:57.4273679Z [36;1mconst runId = randomUUID(), controller = new AbortController()[0m
+2026-11-09T10:48:57.4274155Z [36;1mconst progressFile = join(privateDirectory, 'progress.jsonl')[0m
+2026-11-09T10:48:57.4274764Z [36;1mconst report = { sourceSha: process.env.GITHUB_SHA, sourceTree, selectedItems: [11], passedItems: [],[0m
+2026-11-09T10:48:57.4275533Z [36;1m  database: { host: environment.database.host, name: environment.database.name }, origin: environment.origin,[0m
+2026-11-09T10:48:57.4276246Z [36;1m  runId, startedAt: new Date().toISOString(), sourceUnchanged: false, result: 'failed' }[0m
+2026-11-09T10:48:57.4277142Z [36;1mlet stage = 'runtime-ready', failure, stack, accounts, pool, stopping = false, output = ''[0m
+2026-11-09T10:48:57.4277959Z [36;1mconst progress = async (step, status, detail) => {[0m
+2026-11-09T10:48:57.4278701Z [36;1m  await appendFile(progressFile, JSON.stringify({ step, status, ...(detail ? { detail } : {}) }) + '\n', { mode: 0o600 })[0m
+2026-11-09T10:48:57.4279281Z [36;1m  console.log(step + ' ' + status)[0m
+2026-11-09T10:48:57.4279552Z [36;1m}[0m
+2026-11-09T10:48:57.4279833Z [36;1mconst deadline = async (work, milliseconds, label) => {[0m
+2026-11-09T10:48:57.4280170Z [36;1m  let timer[0m
+2026-11-09T10:48:57.4280372Z [36;1m  try {[0m
+2026-11-09T10:48:57.4280679Z [36;1m    return await Promise.race([work, new Promise((_, reject) => {[0m
+2026-11-09T10:48:57.4281262Z [36;1m      timer = setTimeout(() => { controller.abort(); reject(new Error(label + '_timeout')) }, milliseconds)[0m
+2026-11-09T10:48:57.4281746Z [36;1m    })])[0m
+2026-11-09T10:48:57.4281973Z [36;1m  } finally { clearTimeout(timer) }[0m
+2026-11-09T10:48:57.4282242Z [36;1m}[0m
+2026-11-09T10:48:57.4282703Z [36;1mtry {[0m
+2026-11-09T10:48:57.4282940Z [36;1m  await progress(stage, 'start')[0m
+2026-11-09T10:48:57.4283366Z [36;1m  const ready = Promise.withResolvers(), terminated = Promise.withResolvers()[0m
+2026-11-09T10:48:57.4283910Z [36;1m  // The existing stack announces readiness after writing runtime.json and[0m
+2026-11-09T10:48:57.4284461Z [36;1m  // warming the API. Listen to that event; add no polling or synthetic identity.[0m
+2026-11-09T10:48:57.4284967Z [36;1m  stack = spawn(process.execPath, ['scripts/dev-local.mjs'], {[0m
+2026-11-09T10:48:57.4285476Z [36;1m    cwd: root, env: process.env, stdio: ['ignore', 'pipe', 'pipe'], detached: true,[0m
+2026-11-09T10:48:57.4285887Z [36;1m  })[0m
+2026-11-09T10:48:57.4286121Z [36;1m  void terminated.promise.catch(() => {})[0m
+2026-11-09T10:48:57.4286502Z [36;1m  stack.once('error', error => terminated.reject(error))[0m
+2026-11-09T10:48:57.4286898Z [36;1m  stack.once('exit', (code, signal) => {[0m
+2026-11-09T10:48:57.4287243Z [36;1m    report.runtimeExit = { code, signal }[0m
+2026-11-09T10:48:57.4287824Z [36;1m    if (!stopping) {[0m
+2026-11-09T10:48:57.4288124Z [36;1m      controller.abort()[0m
+2026-11-09T10:48:57.4288471Z [36;1m      terminated.reject(new Error('owned_runtime_exited'))[0m
+2026-11-09T10:48:57.4288816Z [36;1m    }[0m
+2026-11-09T10:48:57.4289012Z [36;1m  })[0m
+2026-11-09T10:48:57.4289232Z [36;1m  let readinessOutput = ''[0m
+2026-11-09T10:48:57.4289519Z [36;1m  stack.stdout.on('data', chunk => {[0m
+2026-11-09T10:48:57.4289868Z [36;1m    output = (output + chunk.toString()).slice(-128_000)[0m
+2026-11-09T10:48:57.4290324Z [36;1m    readinessOutput = (readinessOutput + chunk.toString()).slice(-4096)[0m
+2026-11-09T10:48:57.4290934Z [36;1m    if (readinessOutput.includes('dev:local ready: http://localhost:3110/mikka')) ready.resolve()[0m
+2026-11-09T10:48:57.4291417Z [36;1m  })[0m
+2026-11-09T10:48:57.4291783Z [36;1m  stack.stderr.on('data', chunk => { output = (output + chunk.toString()).slice(-128_000) })[0m
+2026-11-09T10:48:57.4292427Z [36;1m  await deadline(Promise.race([ready.promise, terminated.promise]), 240_000, 'runtime_ready')[0m
+2026-11-09T10:48:57.4293064Z [36;1m  const runtime = JSON.parse(await readFile('.cache/dev-local/runtime.json', 'utf8'))[0m
+2026-11-09T10:48:57.4293596Z [36;1m  assert.equal(runtime.server, environment.origin + '/mikka')[0m
+2026-11-09T10:48:57.4294125Z [36;1m  assert.equal(runtime.daemonDataDir, resolve(process.env.MIKKA_DEV_DAEMON_DIR))[0m
+2026-11-09T10:48:57.4294578Z [36;1m  await progress(stage, 'ok')[0m
+2026-11-09T10:48:57.4294848Z [36;1m  stage = 'account-lease'[0m
+2026-11-09T10:48:57.4295115Z [36;1m  await progress(stage, 'start')[0m
+2026-11-09T10:48:57.4295535Z [36;1m  pool = new pg.Pool({ connectionString: process.env.E2E_DATABASE_URL, max: 3,[0m
+2026-11-09T10:48:57.4296054Z [36;1m    connectionTimeoutMillis: 5000, statement_timeout: 10000 })[0m
+2026-11-09T10:48:57.4296766Z [36;1m  // Real signup/sign-in and the existing exact-SHA/database HMAC attestation[0m
+2026-11-09T10:48:57.4297309Z [36;1m  // precede the renewable owner/peer lease. Its HTTP/DB calls are bounded.[0m
+2026-11-09T10:48:57.4298150Z [36;1m  accounts = await acquireTestAccounts({ environment, database: pool, runId,[0m
+2026-11-09T10:48:57.4298660Z [36;1m    workerId: 'workspace-governance-ci', requestId: runId })[0m
+2026-11-09T10:48:57.4299035Z [36;1m  await progress(stage, 'ok')[0m
+2026-11-09T10:48:57.4299339Z [36;1m  stage = 'item11-workspace-governance'[0m
+2026-11-09T10:48:57.4299651Z [36;1m  await progress(stage, 'start')[0m
+2026-11-09T10:48:57.4299949Z [36;1m  await deadline(Promise.race([[0m
+2026-11-09T10:48:57.4300425Z [36;1m    verifyWorkspaceGovernance({ accounts, pool, progress, signal: controller.signal, runId,[0m
+2026-11-09T10:48:57.4301078Z [36;1m      recordSecrets: values => recordAuthenticationSecrets(values, { environment }) }),[0m
+2026-11-09T10:48:57.4301553Z [36;1m    terminated.promise,[0m
+2026-11-09T10:48:57.4302053Z [36;1m  ]), 180_000, 'workspace_governance')[0m
+2026-11-09T10:48:57.4302385Z [36;1m  await accounts.assertActive()[0m
+2026-11-09T10:48:57.4302686Z [36;1m  report.passedItems = [11][0m
+2026-11-09T10:48:57.4302968Z [36;1m  await progress(stage, 'ok')[0m
+2026-11-09T10:48:57.4303240Z [36;1m} catch (error) {[0m
+2026-11-09T10:48:57.4303471Z [36;1m  failure = error[0m
+2026-11-09T10:48:57.4303705Z [36;1m} finally {[0m
+2026-11-09T10:48:57.4303929Z [36;1m  controller.abort()[0m
+2026-11-09T10:48:57.4304291Z [36;1m  // Keep the API available while its real leased sessions are released.[0m
+2026-11-09T10:48:57.4304751Z [36;1m  try { await accounts?.release({ outcome: 'dirty' }) }[0m
+2026-11-09T10:48:57.4305212Z [36;1m  catch (error) { if (!failure) { failure = error; stage = 'account-release' } }[0m
+2026-11-09T10:48:57.4305615Z [36;1m  stopping = true[0m
+2026-11-09T10:48:57.4305844Z [36;1m  try {[0m
+2026-11-09T10:48:57.4306166Z [36;1m    if (stack?.pid && stack.exitCode === null && stack.signalCode === null) {[0m
+2026-11-09T10:48:57.4306628Z [36;1m      const exited = once(stack, 'exit').then(() => true)[0m
+2026-11-09T10:48:57.4307002Z [36;1m      process.kill(-stack.pid, 'SIGTERM')[0m
+2026-11-09T10:48:57.4307420Z [36;1m      if (!await Promise.race([exited, delay(10_000, false, { ref: false })])) {[0m
+2026-11-09T10:48:57.4308142Z [36;1m        process.kill(-stack.pid, 'SIGKILL')[0m
+2026-11-09T10:48:57.4308688Z [36;1m        assert.ok(await Promise.race([exited, delay(5000, false, { ref: false })]), 'owned_runtime_cleanup_failed')[0m
+2026-11-09T10:48:57.4309191Z [36;1m      }[0m
+2026-11-09T10:48:57.4309382Z [36;1m    }[0m
+2026-11-09T10:48:57.4309720Z [36;1m  } catch (error) { if (!failure) { failure = error; stage = 'runtime-cleanup' } }[0m
+2026-11-09T10:48:57.4310133Z [36;1m  try { await pool?.end() }[0m
+2026-11-09T10:48:57.4310514Z [36;1m  catch (error) { if (!failure) { failure = error; stage = 'database-close' } }[0m
+2026-11-09T10:48:57.4310921Z [36;1m  try {[0m
+2026-11-09T10:48:57.4311354Z [36;1m    assert.equal(execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), report.sourceSha)[0m
+2026-11-09T10:48:57.4312090Z [36;1m    assert.equal(execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { encoding: 'utf8' }), '')[0m
+2026-11-09T10:48:57.4312639Z [36;1m    report.sourceUnchanged = true[0m
+2026-11-09T10:48:57.4313039Z [36;1m  } catch (error) { if (!failure) { failure = error; stage = 'fixed-source' } }[0m
+2026-11-09T10:48:57.4313581Z [36;1m  // Private process output is never an artifact. Publish only scanner-approved[0m
+2026-11-09T10:48:57.4314130Z [36;1m  // metadata, assertion locations and the item's fixed evidence statements.[0m
+2026-11-09T10:48:57.4314724Z [36;1m  await writeFile(join(privateDirectory, 'runtime-private.log'), output, { mode: 0o600 })[0m
+2026-11-09T10:48:57.4315439Z [36;1m  report.finishedAt = new Date().toISOString()[0m
+2026-11-09T10:48:57.4315751Z [36;1m  if (failure) {[0m
+2026-11-09T10:48:57.4316175Z [36;1m    report.failure = { stage, kind: failure?.name === 'AssertionError' ? 'assertion' : 'runtime',[0m
+2026-11-09T10:48:57.4316682Z [36;1m      ...(failure?.name === 'AssertionError' ? {[0m
+2026-11-09T10:48:57.4317100Z [36;1m        assertion: String(failure.message).split('\n')[0].slice(0, 240),[0m
+2026-11-09T10:48:57.4318013Z [36;1m        ...(typeof failure.actual === 'number' || typeof failure.actual === 'boolean' ? { actual: failure.actual } : {}),[0m
+2026-11-09T10:48:57.4318819Z [36;1m        ...(typeof failure.expected === 'number' || typeof failure.expected === 'boolean' ? { expected: failure.expected } : {}),[0m
+2026-11-09T10:48:57.4319368Z [36;1m      } : {}),[0m
+2026-11-09T10:48:57.4319820Z [36;1m      location: String(failure?.stack ?? '').match(/workspace-governance-acceptance\.mjs:\d+:\d+/)?.[0] }[0m
+2026-11-09T10:48:57.4320351Z [36;1m  } else report.result = 'passed'[0m
+2026-11-09T10:48:57.4320725Z [36;1m  const reportFile = join(privateDirectory, 'report.json')[0m
+2026-11-09T10:48:57.4321477Z [36;1m  await writeFile(reportFile, JSON.stringify(report, null, 2) + '\n', { mode: 0o600 })[0m
+2026-11-09T10:48:57.4322047Z [36;1m  await auditEvidence([reportFile, progressFile], { environment })[0m
+2026-11-09T10:48:57.4322625Z [36;1m  console.log(JSON.stringify({ event: 'workspace_governance_result', ...report }))[0m
+2026-11-09T10:48:57.4323174Z [36;1m  const artifacts = process.env.WORKSPACE_GOVERNANCE_ARTIFACT_DIR[0m
+2026-11-09T10:48:57.4323631Z [36;1m  await mkdir(artifacts, { recursive: true, mode: 0o700 })[0m
+2026-11-09T10:48:57.4324068Z [36;1m  await copyFile(reportFile, join(artifacts, 'report.json'))[0m
+2026-11-09T10:48:57.4324539Z [36;1m  await copyFile(progressFile, join(artifacts, 'progress.jsonl'))[0m
+2026-11-09T10:48:57.4325186Z [36;1m  await appendFile(process.env.GITHUB_STEP_SUMMARY, '## Workspace governance HTTP\n\nSource: ' + report.sourceSha +[0m
+2026-11-09T10:48:57.4326005Z [36;1m    '\n\nTree: ' + sourceTree + '\n\nItem 11: **' + report.result + '**. No model or daemon execution is part of this item.\n')[0m
+2026-11-09T10:48:57.4326791Z [36;1m  if (failure) { console.error('Workspace governance acceptance failed at ' + stage); process.exitCode = 1 }[0m
+2026-11-09T10:48:57.4327300Z [36;1m}[0m
+2026-11-09T10:48:57.4327482Z [36;1mJS[0m
+2026-11-09T10:48:57.4397454Z shell: /usr/bin/bash -e {0}
+2026-11-09T10:48:57.4398161Z env:
+2026-11-09T10:48:57.4398396Z   LOCAL_LOOP_ITEMS: 11
+2026-11-09T10:48:57.4398646Z   MIKKA_LOCAL_TEST_ACCOUNTS: 1
+2026-11-09T10:48:57.4398897Z   MIKKA_EDITION: cloud
+2026-11-09T10:48:57.4399116Z   REQUIRE_DB: 1
+2026-11-09T10:48:57.4399709Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:57.4400180Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:57.4400610Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:48:57.4400914Z   BETTER_AUTH_URL: http://localhost:3110
+2026-11-09T10:48:57.4401258Z   E2E_BASE_URL: http://localhost:3110
+2026-11-09T10:48:57.4401620Z   MIKKA_TEST_DEPLOYMENT_SHA: ddbc7e9b8e156493af730f00ed4a6efd3de475b4
+2026-11-09T10:48:57.4425469Z   MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
+2026-11-09T10:48:57.4426206Z   MIKKA_DEV_PORT: 3110
+2026-11-09T10:48:57.4426598Z   MIKKA_DEV_DAEMON_DIR: .cache/wg-ci/daemon
+2026-11-09T10:48:57.4426925Z   MIKKA_DEV_SKIP_DAEMON: 1
+2026-11-09T10:48:57.4427176Z   MIKKA_DEV_SKIP_MODEL_SETUP: 1
+2026-11-09T10:48:57.4427431Z   MIKKA_DEV_SKIP_ENV_FILES: 1
+2026-11-09T10:48:57.4428034Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T10:48:57.4428314Z   NODE_OPTIONS: --max-old-space-size=2048
+2026-11-09T10:48:57.4428606Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T10:48:57.4428866Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T10:48:57.4429134Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T10:48:57.4429404Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T10:48:57.4429683Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T10:48:57.4430550Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T10:48:57.4431203Z   BETTER_AUTH_SECRET: ***
+2026-11-09T10:48:57.4431642Z   WORKSPACE_GOVERNANCE_ARTIFACT_DIR: /home/runner/work/_temp/workspace-governance-acceptance
+2026-11-09T10:48:57.4432103Z ##[endgroup]
+2026-11-09T10:48:57.7908967Z runtime-ready start
+2026-11-09T10:49:31.6809264Z runtime-ready ok
+2026-11-09T10:49:31.6816481Z account-lease start
+2026-11-09T10:49:34.3645979Z account-lease ok
+2026-11-09T10:49:34.3648167Z item11-workspace-governance start
+2026-11-09T10:49:35.1515420Z item11-workspace-governance evidence
+2026-11-09T10:49:37.9069827Z item11-workspace-governance evidence
+2026-11-09T10:49:38.8117146Z item11-workspace-governance evidence
+2026-11-09T10:49:38.8146810Z item11-workspace-governance ok
+2026-11-09T10:49:39.0129337Z {"event":"workspace_governance_result","sourceSha":"ddbc7e9b8e156493af730f00ed4a6efd3de475b4","sourceTree":"1acbe0b8d50a7102543e24b9bd0395355bcba438","selectedItems":[11],"passedItems":[11],"database":{"host":"127.0.0.1","name":"mikka_e2e"},"origin":"http://localhost:3110","runId":"208bafd3-741a-4b9b-8586-069801ff18ee","startedAt":"2026-11-09T10:48:57.789Z","sourceUnchanged":true,"result":"passed","runtimeExit":{"code":0,"signal":null},"finishedAt":"2026-11-09T10:49:39.007Z"}
+2026-11-09T10:49:39.0471009Z ##[group]Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+2026-11-09T10:49:39.0471480Z with:
+2026-11-09T10:49:39.0471841Z   name: workspace-governance-ddbc7e9b8e156493af730f00ed4a6efd3de475b4-1
+2026-11-09T10:49:39.0472665Z   path: /home/runner/work/_temp/workspace-governance-acceptance/report.json
+/home/runner/work/_temp/workspace-governance-acceptance/progress.jsonl
+
+2026-11-09T10:49:39.0473356Z   if-no-files-found: warn
+2026-11-09T10:49:39.0473604Z   retention-days: 7
+2026-11-09T10:49:39.0473822Z   compression-level: 6
+2026-11-09T10:49:39.0474043Z   overwrite: false
+2026-11-09T10:49:39.0474264Z   include-hidden-files: false
+2026-11-09T10:49:39.0474516Z env:
+2026-11-09T10:49:39.0474734Z   LOCAL_LOOP_ITEMS: 11
+2026-11-09T10:49:39.0474969Z   MIKKA_LOCAL_TEST_ACCOUNTS: 1
+2026-11-09T10:49:39.0475233Z   MIKKA_EDITION: cloud
+2026-11-09T10:49:39.0475452Z   REQUIRE_DB: 1
+2026-11-09T10:49:39.0475983Z   E2E_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:49:39.0476499Z   MIKKA_DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:49:39.0476937Z   DATABASE_URL: ***127.0.0.1:5432/mikka_e2e
+2026-11-09T10:49:39.0477254Z   BETTER_AUTH_URL: http://localhost:3110
+2026-11-09T10:49:39.0477554Z   E2E_BASE_URL: http://localhost:3110
+2026-11-09T10:49:39.0478321Z   MIKKA_TEST_DEPLOYMENT_SHA: ddbc7e9b8e156493af730f00ed4a6efd3de475b4
+2026-11-09T10:49:39.0478767Z   MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
+2026-11-09T10:49:39.0479096Z   MIKKA_DEV_PORT: 3110
+2026-11-09T10:49:39.0479337Z   MIKKA_DEV_DAEMON_DIR: .cache/wg-ci/daemon
+2026-11-09T10:49:39.0479616Z   MIKKA_DEV_SKIP_DAEMON: 1
+2026-11-09T10:49:39.0479858Z   MIKKA_DEV_SKIP_MODEL_SETUP: 1
+2026-11-09T10:49:39.0480121Z   MIKKA_DEV_SKIP_ENV_FILES: 1
+2026-11-09T10:49:39.0480366Z   NEXT_TELEMETRY_DISABLED: 1
+2026-11-09T10:49:39.0480632Z   NODE_OPTIONS: --max-old-space-size=2048
+2026-11-09T10:49:39.0480925Z   SEGMENT_DOWNLOAD_TIMEOUT_MINS: 2
+2026-11-09T10:49:39.0481182Z   MIKKA_SIGNUP_IP_HOURLY: 1000
+2026-11-09T10:49:39.0481453Z   MIKKA_SIGNUP_GLOBAL_HOURLY: 10000
+2026-11-09T10:49:39.0481717Z   MIKKA_VERIFICATION_IP_HOURLY: 1000
+2026-11-09T10:49:39.0481998Z   MIKKA_VERIFICATION_GLOBAL_HOURLY: 10000
+2026-11-09T10:49:39.0482323Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T10:49:39.0482842Z   BETTER_AUTH_SECRET: ***
+2026-11-09T10:49:39.0483069Z ##[endgroup]
+2026-11-09T10:49:39.2646571Z (node:3334) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T10:49:39.2647449Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T10:49:39.2736820Z Multiple search paths detected. Calculating the least common ancestor of all paths
+2026-11-09T10:49:39.2740705Z The least common ancestor is /home/runner/work/_temp/workspace-governance-acceptance. This will be the root directory of the artifact
+2026-11-09T10:49:39.2742360Z With the provided path, there will be 2 files uploaded
+2026-11-09T10:49:39.2743729Z Artifact name is valid!
+2026-11-09T10:49:39.2744397Z Root directory input is valid!
+2026-11-09T10:49:39.6555167Z Beginning upload of artifact content to blob storage
+2026-11-09T10:49:39.6781566Z (node:3334) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T10:49:39.9366806Z Uploaded bytes 894
+2026-11-09T10:49:40.0089434Z Finished uploading artifact content to blob storage!
+2026-11-09T10:49:40.0090845Z SHA256 digest of uploaded artifact zip is a31ac4550886c76f74981fc9f5ee4306a6448f9bd87e97f23f855c393aa67df1
+2026-11-09T10:49:40.0091886Z Finalizing artifact upload
+2026-11-09T10:49:40.4333824Z Artifact workspace-governance-ddbc7e9b8e156493af730f00ed4a6efd3de475b4-1.zip successfully finalized. Artifact ID 13667102429
+2026-11-09T10:49:40.4337250Z Artifact workspace-governance-ddbc7e9b8e156493af730f00ed4a6efd3de475b4-1 has been successfully uploaded! Final size is 894 bytes. Artifact ID is 13667102429
+2026-11-09T10:49:40.4343057Z Artifact download URL: https://github.com/alexj11324/Mikka/actions/runs/42603781808/artifacts/13667102429
+2026-11-09T10:49:40.4594316Z Post job cleanup.
+2026-11-09T10:49:40.4600183Z ##[start-action display=Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020;id=__fb5e40a7-3947-4b4d-9720-b865d847e750.__actions_setup-node]
+2026-11-09T10:49:40.4651849Z Post job cleanup.
+2026-11-09T10:49:40.6148885Z (node:3348) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T10:49:40.6150298Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T10:49:40.6260408Z ##[end-action id=__fb5e40a7-3947-4b4d-9720-b865d847e750.__actions_setup-node;outcome=success;conclusion=success;duration_ms=165]
+2026-11-09T10:49:40.6263691Z ##[start-action display=Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1;id=__fb5e40a7-3947-4b4d-9720-b865d847e750.__pnpm_action-setup]
+2026-11-09T10:49:40.6305859Z Post job cleanup.
+2026-11-09T10:49:40.8114071Z Pruning is unnecessary.
+2026-11-09T10:49:40.8260482Z ##[end-action id=__fb5e40a7-3947-4b4d-9720-b865d847e750.__pnpm_action-setup;outcome=success;conclusion=success;duration_ms=199]
+2026-11-09T10:49:40.8405109Z Post job cleanup.
+2026-11-09T10:49:40.9559510Z [command]/usr/bin/git version
+2026-11-09T10:49:40.9623155Z git version 2.56.0
+2026-11-09T10:49:40.9674944Z Temporarily overriding HOME='/home/runner/work/_temp/e57fea71-5506-43ad-a4da-9c7a4195cdb8' before making global git config changes
+2026-11-09T10:49:40.9676762Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T10:49:40.9685048Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T10:49:40.9750741Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T10:49:40.9810430Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T10:49:41.0204130Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T10:49:41.0263143Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T10:49:41.0770222Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T10:49:41.0831356Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T10:49:41.1308961Z Print service container logs: c1e30988d23648109980a33af1ee5a24_postgres17_6f1926
+2026-11-09T10:49:41.1315135Z ##[command]/usr/bin/docker logs --details 2c5370f253b775453971ac2b2078dafdcf72f085682f7bc01a371ecdd76ce587
+2026-11-09T10:49:41.1504331Z  The files belonging to this database system will be owned by user "postgres".
+2026-11-09T10:49:41.1505467Z  This user must also own the server process.
+2026-11-09T10:49:41.1509751Z  initdb: warning: enabling "trust" authentication for local connections
+2026-11-09T10:49:41.1510640Z  initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-11-09T10:49:41.1511660Z  2026-11-09 10:47:50.754 UTC [1] LOG:  starting PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+2026-11-09T10:49:41.1512459Z  2026-11-09 10:47:50.754 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-11-09T10:49:41.1513484Z  2026-11-09 10:47:50.754 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-11-09T10:49:41.1514156Z  
+2026-11-09T10:49:41.1514778Z  2026-11-09 10:47:50.755 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-11-09T10:49:41.1515841Z  2026-11-09 10:47:50.759 UTC [64] LOG:  database system was shut down at 2026-11-09 10:47:50 UTC
+2026-11-09T10:49:41.1516783Z  2026-11-09 10:47:50.765 UTC [1] LOG:  database system is ready to accept connections
+2026-11-09T10:49:41.1517845Z  The database cluster will be initialized with locale "en_US.utf8".
+2026-11-09T10:49:41.1518714Z  The default database encoding has accordingly been set to "UTF8".
+2026-11-09T10:49:41.1519537Z  The default text search configuration will be set to "english".
+2026-11-09T10:49:41.1520156Z  
+2026-11-09T10:49:41.1520494Z  Data page checksums are disabled.
+2026-11-09T10:49:41.1520935Z  
+2026-11-09T10:49:41.1521457Z  fixing permissions on existing directory /var/lib/postgresql/data ... ok
+2026-11-09T10:49:41.1522209Z  creating subdirectories ... ok
+2026-11-09T10:49:41.1522755Z  selecting dynamic shared memory implementation ... posix
+2026-11-09T10:49:41.1523381Z  selecting default "max_connections" ... 100
+2026-11-09T10:49:41.1523929Z  selecting default "shared_buffers" ... 128MB
+2026-11-09T10:49:41.1524454Z  selecting default time zone ... Etc/UTC
+2026-11-09T10:49:41.1524954Z  creating configuration files ... ok
+2026-11-09T10:49:41.1525428Z  running bootstrap script ... ok
+2026-11-09T10:49:41.1525945Z  performing post-bootstrap initialization ... ok
+2026-11-09T10:49:41.1526488Z  syncing data to disk ... ok
+2026-11-09T10:49:41.1526888Z  
+2026-11-09T10:49:41.1527174Z  
+2026-11-09T10:49:41.1527823Z  Success. You can now start the database server using:
+2026-11-09T10:49:41.1528195Z  
+2026-11-09T10:49:41.1528440Z      pg_ctl -D /var/lib/postgresql/data -l logfile start
+2026-11-09T10:49:41.1528749Z  
+2026-11-09T10:49:41.1529539Z  waiting for server to start....2026-11-09 10:47:50.429 UTC [48] LOG:  starting PostgreSQL 17.11 (Debian 17.11-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+2026-11-09T10:49:41.1531049Z  2026-11-09 10:47:50.430 UTC [48] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-11-09T10:49:41.1532083Z  2026-11-09 10:47:50.433 UTC [51] LOG:  database system was shut down at 2026-11-09 10:47:50 UTC
+2026-11-09T10:49:41.1532810Z  2026-11-09 10:47:50.438 UTC [48] LOG:  database system is ready to accept connections
+2026-11-09T10:49:41.1533197Z   done
+2026-11-09T10:49:41.1533382Z  server started
+2026-11-09T10:49:41.1533586Z  CREATE DATABASE
+2026-11-09T10:49:41.1533779Z  
+2026-11-09T10:49:41.1533954Z  
+2026-11-09T10:49:41.1534275Z  /usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+2026-11-09T10:49:41.1534682Z  
+2026-11-09T10:49:41.1535051Z  waiting for server to shut down...2026-11-09 10:47:50.629 UTC [48] LOG:  received fast shutdown request
+2026-11-09T10:49:41.1536151Z  .2026-11-09 10:47:50.629 UTC [48] LOG:  aborting any active transactions
+2026-11-09T10:49:41.1536760Z  2026-11-09 10:47:50.631 UTC [48] LOG:  background worker "logical replication launcher" (PID 54) exited with exit code 1
+2026-11-09T10:49:41.1537312Z  2026-11-09 10:47:50.632 UTC [49] LOG:  shutting down
+2026-11-09T10:49:41.1538080Z  2026-11-09 10:47:50.633 UTC [49] LOG:  checkpoint starting: shutdown immediate
+2026-11-09T10:49:41.1539220Z  2026-11-09 10:47:50.652 UTC [49] LOG:  checkpoint complete: wrote 925 buffers (5.6%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.016 s, sync=0.002 s, total=0.020 s; sync files=301, longest=0.001 s, average=0.001 s; distance=4256 kB, estimate=4256 kB; lsn=0/19179A8, redo lsn=0/19179A8
+2026-11-09T10:49:41.1540328Z  2026-11-09 10:47:50.660 UTC [48] LOG:  database system is shut down
+2026-11-09T10:49:41.1540672Z   done
+2026-11-09T10:49:41.1540856Z  server stopped
+2026-11-09T10:49:41.1541060Z  
+2026-11-09T10:49:41.1541300Z  PostgreSQL init process complete; ready for start up.
+2026-11-09T10:49:41.1541628Z  
+2026-11-09T10:49:41.1549181Z Stop and remove container: c1e30988d23648109980a33af1ee5a24_postgres17_6f1926
+2026-11-09T10:49:41.1554639Z ##[command]/usr/bin/docker rm --force 2c5370f253b775453971ac2b2078dafdcf72f085682f7bc01a371ecdd76ce587
+2026-11-09T10:49:41.4338910Z 2c5370f253b775453971ac2b2078dafdcf72f085682f7bc01a371ecdd76ce587
+2026-11-09T10:49:41.4405844Z Remove container network: github_network_23b3c0fe18c3461ba3e749504c36eee7
+2026-11-09T10:49:41.4411482Z ##[command]/usr/bin/docker network rm github_network_23b3c0fe18c3461ba3e749504c36eee7
+2026-11-09T10:49:41.5697074Z github_network_23b3c0fe18c3461ba3e749504c36eee7
+2026-11-09T10:49:41.5793993Z Cleaning up orphan processes
+2026-11-09T10:49:41.6240431Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830, actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020, actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02, pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

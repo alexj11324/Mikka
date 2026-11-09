@@ -1,0 +1,487 @@
+﻿2026-11-09T10:47:40.4491654Z Current runner version: '2.338.2'
+2026-11-09T10:47:40.4541744Z ##[group]Runner Image Provisioner
+2026-11-09T10:47:40.4542791Z Hosted Compute Agent
+2026-11-09T10:47:40.4543851Z Version: 20261028.624
+2026-11-09T10:47:40.4544620Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+2026-11-09T10:47:40.4545531Z Build Date: 2026-10-28T21:51:42Z
+2026-11-09T10:47:40.4546377Z Worker ID: {915af1f9-7407-4489-820a-107f9dfc9e07}
+2026-11-09T10:47:40.4547201Z Region: eastus
+2026-11-09T10:47:40.4547820Z Cloud: Azure
+2026-11-09T10:47:40.4548485Z ##[endgroup]
+2026-11-09T10:47:40.4550600Z ##[group]Operating System
+2026-11-09T10:47:40.4551309Z Ubuntu
+2026-11-09T10:47:40.4552052Z 22.04.5
+2026-11-09T10:47:40.4552618Z LTS
+2026-11-09T10:47:40.4553625Z ##[endgroup]
+2026-11-09T10:47:40.4554300Z ##[group]Runner Image
+2026-11-09T10:47:40.4554939Z Image: ubuntu-22.04
+2026-11-09T10:47:40.4555652Z Version: 20261101.347.1
+2026-11-09T10:47:40.4557031Z Included Software: https://github.com/actions/runner-images/blob/ubuntu22/20261101.347/images/ubuntu/Ubuntu2204-Readme.md
+2026-11-09T10:47:40.4558778Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu22%2F20261101.347
+2026-11-09T10:47:40.4559765Z ##[endgroup]
+2026-11-09T10:47:40.4561047Z ##[group]GITHUB_TOKEN Permissions
+2026-11-09T10:47:40.4563642Z Contents: read
+2026-11-09T10:47:40.4564465Z Metadata: read
+2026-11-09T10:47:40.4565433Z ##[endgroup]
+2026-11-09T10:47:40.4568098Z Secret source: Actions
+2026-11-09T10:47:40.4569131Z Cache mode: write
+2026-11-09T10:47:40.4569988Z Prepare workflow directory
+2026-11-09T10:47:40.4912046Z Prepare all required actions
+2026-11-09T10:47:40.4961708Z Getting action download info
+2026-11-09T10:47:40.7460446Z Download action repository 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-11-09T10:47:40.9858688Z Complete job name: Core production offline guards
+2026-11-09T10:47:41.0821151Z ##[group]Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+2026-11-09T10:47:41.0822249Z with:
+2026-11-09T10:47:41.0822733Z   persist-credentials: false
+2026-11-09T10:47:41.0823513Z   repository: alexj11324/Mikka
+2026-11-09T10:47:41.0827440Z   token: ***
+2026-11-09T10:47:41.0827893Z   ssh-strict: true
+2026-11-09T10:47:41.0828343Z   ssh-user: git
+2026-11-09T10:47:41.0828783Z   clean: true
+2026-11-09T10:47:41.0829245Z   sparse-checkout-cone-mode: true
+2026-11-09T10:47:41.0829793Z   fetch-depth: 1
+2026-11-09T10:47:41.0830247Z   fetch-tags: false
+2026-11-09T10:47:41.0830700Z   show-progress: true
+2026-11-09T10:47:41.0831150Z   lfs: false
+2026-11-09T10:47:41.0831570Z   submodules: false
+2026-11-09T10:47:41.0832033Z   set-safe-directory: true
+2026-11-09T10:47:41.0832552Z   allow-unsafe-pr-checkout: false
+2026-11-09T10:47:41.0833587Z ##[endgroup]
+2026-11-09T10:47:41.3409251Z Syncing repository: alexj11324/Mikka
+2026-11-09T10:47:41.3412301Z ##[group]Getting Git version info
+2026-11-09T10:47:41.3413924Z Working directory is '/home/runner/work/Mikka/Mikka'
+2026-11-09T10:47:41.3415755Z [command]/usr/bin/git version
+2026-11-09T10:47:41.3506510Z git version 2.56.0
+2026-11-09T10:47:41.3536278Z ##[endgroup]
+2026-11-09T10:47:41.3543532Z Temporarily overriding HOME='/home/runner/work/_temp/8f2f65c4-1818-4aad-bbb9-21c860b6e4a5' before making global git config changes
+2026-11-09T10:47:41.3546104Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T10:47:41.3548460Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T10:47:41.3614948Z Deleting the contents of '/home/runner/work/Mikka/Mikka'
+2026-11-09T10:47:41.3619962Z ##[group]Initializing the repository
+2026-11-09T10:47:41.3625855Z [command]/usr/bin/git init /home/runner/work/Mikka/Mikka
+2026-11-09T10:47:41.3772027Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-09T10:47:41.3774172Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-09T10:47:41.3776197Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-09T10:47:41.3778466Z hint: call:
+2026-11-09T10:47:41.3779026Z hint:
+2026-11-09T10:47:41.3779727Z hint: 	git config --global init.defaultBranch <name>
+2026-11-09T10:47:41.3780569Z hint:
+2026-11-09T10:47:41.3781364Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-09T10:47:41.3782608Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-09T10:47:41.3783859Z hint:
+2026-11-09T10:47:41.3784504Z hint: 	git branch -m <name>
+2026-11-09T10:47:41.3785036Z hint:
+2026-11-09T10:47:41.3785739Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-09T10:47:41.3786972Z Initialized empty Git repository in /home/runner/work/Mikka/Mikka/.git/
+2026-11-09T10:47:41.3803417Z [command]/usr/bin/git remote add origin https://github.com/alexj11324/Mikka
+2026-11-09T10:47:41.3838829Z ##[endgroup]
+2026-11-09T10:47:41.3840140Z ##[group]Disabling automatic garbage collection
+2026-11-09T10:47:41.3843214Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-09T10:47:41.3883631Z ##[endgroup]
+2026-11-09T10:47:41.3884702Z ##[group]Setting up auth
+2026-11-09T10:47:41.3893195Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T10:47:41.3933730Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T10:47:41.4427362Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T10:47:41.4468766Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T10:47:41.4767745Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T10:47:41.4818306Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T10:47:41.5136841Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-09T10:47:41.5197311Z ##[endgroup]
+2026-11-09T10:47:41.5199022Z ##[group]Fetching the repository
+2026-11-09T10:47:41.5209268Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +ddbc7e9b8e156493af730f00ed4a6efd3de475b4:refs/remotes/pull/1799/merge
+2026-11-09T10:47:45.2277911Z From https://github.com/alexj11324/Mikka
+2026-11-09T10:47:45.2279998Z  * [new ref]         ddbc7e9b8e156493af730f00ed4a6efd3de475b4 -> pull/1799/merge
+2026-11-09T10:47:45.2287822Z ##[endgroup]
+2026-11-09T10:47:45.2289401Z ##[group]Determining the checkout info
+2026-11-09T10:47:45.2290984Z ##[endgroup]
+2026-11-09T10:47:45.2295963Z [command]/usr/bin/git sparse-checkout disable
+2026-11-09T10:47:45.2358251Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-09T10:47:45.2417447Z ##[group]Checking out the ref
+2026-11-09T10:47:45.2420594Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/1799/merge
+2026-11-09T10:47:45.9955674Z Note: switching to 'refs/remotes/pull/1799/merge'.
+2026-11-09T10:47:45.9956285Z 
+2026-11-09T10:47:45.9956653Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-11-09T10:47:45.9957577Z changes and commit them, and you can discard any commits you make in this
+2026-11-09T10:47:45.9958489Z state without impacting any branches by switching back to a branch.
+2026-11-09T10:47:45.9959066Z 
+2026-11-09T10:47:45.9959463Z If you want to create a new branch to retain commits you create, you may
+2026-11-09T10:47:45.9960283Z do so (now or later) by using -c with the switch command. Example:
+2026-11-09T10:47:45.9960751Z 
+2026-11-09T10:47:45.9961043Z   git switch -c <new-branch-name>
+2026-11-09T10:47:45.9961375Z 
+2026-11-09T10:47:45.9961580Z Or undo this operation with:
+2026-11-09T10:47:45.9962321Z 
+2026-11-09T10:47:45.9962505Z   git switch -
+2026-11-09T10:47:45.9962778Z 
+2026-11-09T10:47:45.9963449Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-11-09T10:47:45.9964086Z 
+2026-11-09T10:47:45.9964720Z HEAD is now at ddbc7e9 Merge ae10f28aa471dbfc64f04d981b8934d374476259 into a2198c8c2f608f7b8169329b9da853067618dba6
+2026-11-09T10:47:45.9990420Z ##[endgroup]
+2026-11-09T10:47:46.0039972Z [command]/usr/bin/git log -1 --format=%H
+2026-11-09T10:47:46.0071961Z ddbc7e9b8e156493af730f00ed4a6efd3de475b4
+2026-11-09T10:47:46.0082136Z ##[group]Removing auth
+2026-11-09T10:47:46.0086595Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T10:47:46.0125869Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T10:47:46.0400813Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T10:47:46.0430467Z http.https://github.com/.extraheader
+2026-11-09T10:47:46.0437691Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-09T10:47:46.0481161Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T10:47:46.0748922Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T10:47:46.0787859Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T10:47:46.1051435Z ##[endgroup]
+2026-11-09T10:47:46.1388470Z Prepare all required actions
+2026-11-09T10:47:46.1389057Z Getting action download info
+2026-11-09T10:47:46.2232656Z Download action repository 'pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1' (SHA:b906affcce14559ad1aafd4ab0e942779e9f58b1)
+2026-11-09T10:47:46.3924907Z Download action repository 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-11-09T10:47:46.4849148Z Download action repository 'actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830' (SHA:0057852bfaa89a56745cba8c7296529d2fc39830)
+2026-11-09T10:47:46.6290469Z ##[group]Run ./.github/actions/pnpm-install
+2026-11-09T10:47:46.6290773Z with:
+2026-11-09T10:47:46.6293918Z   ffmpeg-github-token: ***
+2026-11-09T10:47:46.6294181Z ##[endgroup]
+2026-11-09T10:47:46.6353817Z ##[start-action display=Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1;id=__self.__pnpm_action-setup]
+2026-11-09T10:47:46.6454842Z ##[group]Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+2026-11-09T10:47:46.6455228Z with:
+2026-11-09T10:47:46.6455406Z   version: 10.34.3
+2026-11-09T10:47:46.6455609Z   dest: ~/setup-pnpm
+2026-11-09T10:47:46.6455811Z   run_install: null
+2026-11-09T10:47:46.6456009Z   cache: false
+2026-11-09T10:47:46.6456213Z   cache_dependency_path: pnpm-lock.yaml
+2026-11-09T10:47:46.6456489Z   package_json_file: package.json
+2026-11-09T10:47:46.6456726Z   standalone: false
+2026-11-09T10:47:46.6456923Z ##[endgroup]
+2026-11-09T10:47:46.8058483Z ##[group]Running self-installer...
+2026-11-09T10:47:47.2632524Z (node:2148) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T10:47:47.2634668Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T10:47:47.3871731Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-09T10:47:47.3990378Z Packages: +1
+2026-11-09T10:47:47.3993181Z +
+2026-11-09T10:47:47.8378367Z Progress: resolved 1, reused 0, downloaded 1, added 1, done
+2026-11-09T10:47:47.8695291Z 
+2026-11-09T10:47:47.8695740Z dependencies:
+2026-11-09T10:47:47.8696193Z + pnpm 10.34.3 (12.18.0 is available)
+2026-11-09T10:47:47.8696858Z 
+2026-11-09T10:47:47.8719891Z Done in 867ms
+2026-11-09T10:47:47.8924346Z ##[endgroup]
+2026-11-09T10:47:47.8924738Z Installation Completed!
+2026-11-09T10:47:47.9029311Z ##[end-action id=__self.__pnpm_action-setup;outcome=success;conclusion=success;duration_ms=1267]
+2026-11-09T10:47:47.9032710Z ##[start-action display=Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020;id=__self.__actions_setup-node]
+2026-11-09T10:47:47.9125681Z ##[group]Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+2026-11-09T10:47:47.9126044Z with:
+2026-11-09T10:47:47.9126242Z   node-version: 24
+2026-11-09T10:47:47.9126449Z   always-auth: false
+2026-11-09T10:47:47.9126660Z   check-latest: false
+2026-11-09T10:47:47.9129278Z   token: ***
+2026-11-09T10:47:47.9129473Z env:
+2026-11-09T10:47:47.9129717Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T10:47:47.9130023Z ##[endgroup]
+2026-11-09T10:47:48.0677889Z Found in cache @ /opt/hostedtoolcache/node/24.22.2/x64
+2026-11-09T10:47:48.0682021Z (node:2163) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T10:47:48.0683302Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T10:47:48.0685191Z ##[group]Environment details
+2026-11-09T10:47:50.4144744Z node: v24.22.2
+2026-11-09T10:47:50.4145208Z npm: 11.19.1
+2026-11-09T10:47:50.4145578Z yarn: 1.22.22
+2026-11-09T10:47:50.4146319Z ##[endgroup]
+2026-11-09T10:47:50.4258635Z ##[end-action id=__self.__actions_setup-node;outcome=success;conclusion=success;duration_ms=2522]
+2026-11-09T10:47:50.4261366Z ##[start-action display=Run echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT";id=__self.store]
+2026-11-09T10:47:50.4295876Z ##[group]Run echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+2026-11-09T10:47:50.4296435Z [36;1mecho "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"[0m
+2026-11-09T10:47:50.4425492Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-09T10:47:50.4425881Z env:
+2026-11-09T10:47:50.4426145Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T10:47:50.4426467Z ##[endgroup]
+2026-11-09T10:47:51.0965376Z ##[end-action id=__self.store;outcome=success;conclusion=success;duration_ms=670]
+2026-11-09T10:47:51.0970391Z ##[start-action display=Run actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830;id=__self.restore]
+2026-11-09T10:47:51.1642023Z ##[group]Run actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
+2026-11-09T10:47:51.1642399Z with:
+2026-11-09T10:47:51.1642653Z   path: /home/runner/setup-pnpm/node_modules/.bin/store/v10
+2026-11-09T10:47:51.1643658Z   key: pnpm-store-v1-Linux-X64-54b3618e3cf47efbec4384bce0c968e977f7f497c903a30e612e08a79a0791c9
+2026-11-09T10:47:51.1644177Z   restore-keys: pnpm-store-v1-Linux-X64-
+
+2026-11-09T10:47:51.1644464Z   enableCrossOsArchive: false
+2026-11-09T10:47:51.1644702Z   fail-on-cache-miss: false
+2026-11-09T10:47:51.1644922Z   lookup-only: false
+2026-11-09T10:47:51.1645130Z env:
+2026-11-09T10:47:51.1645349Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T10:47:51.1645641Z ##[endgroup]
+2026-11-09T10:47:51.2761585Z (node:2226) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T10:47:51.2763096Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T10:47:51.3586018Z Cache hit for restore-key: pnpm-store-v1-Linux-X64-26887853ce3297e6708e0c03416269ff2ff7c9a97fdc1198bb5ec2d42546f1ee
+2026-11-09T10:47:51.3725184Z (node:2226) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T10:47:57.4242659Z Received 213909504 of 1283900859 (16.7%), 204.2 MBs/sec
+2026-11-09T10:47:58.4221629Z Received 402653184 of 1283900859 (31.4%), 192.1 MBs/sec
+2026-11-09T10:47:59.4221579Z Received 666894336 of 1283900859 (51.9%), 212.1 MBs/sec
+2026-11-09T10:48:00.4304818Z Received 838860800 of 1283900859 (65.3%), 199.8 MBs/sec
+2026-11-09T10:48:01.5061077Z Received 1073741824 of 1283900859 (83.6%), 201.5 MBs/sec
+2026-11-09T10:48:02.5449869Z Received 1283900859 of 1283900859 (100.0%), 200.2 MBs/sec
+2026-11-09T10:48:02.5450792Z Cache Size: ~1224 MB (1283900859 B)
+2026-11-09T10:48:02.5529761Z [command]/usr/bin/tar -xf /home/runner/work/_temp/ab0e58fb-dfc9-43ed-b604-a3f76f9257a5/cache.tzst -P -C /home/runner/work/Mikka/Mikka --use-compress-program unzstd
+2026-11-09T10:48:17.3830872Z Cache restored successfully
+2026-11-09T10:48:17.6187962Z Cache restored from key: pnpm-store-v1-Linux-X64-26887853ce3297e6708e0c03416269ff2ff7c9a97fdc1198bb5ec2d42546f1ee
+2026-11-09T10:48:17.6392053Z ##[end-action id=__self.restore;outcome=success;conclusion=success;duration_ms=26542]
+2026-11-09T10:48:17.6397413Z ##[start-action display=Run pnpm install --frozen-lockfile;id=__self.__run]
+2026-11-09T10:48:17.6418933Z ##[group]Run pnpm install --frozen-lockfile
+2026-11-09T10:48:17.6419343Z [36;1mpnpm install --frozen-lockfile[0m
+2026-11-09T10:48:17.6486623Z shell: /usr/bin/bash --noprofile --norc -e -o pipefail {0}
+2026-11-09T10:48:17.6486976Z env:
+2026-11-09T10:48:17.6487227Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T10:48:17.6490039Z   FFMPEG_GITHUB_TOKEN: ***
+2026-11-09T10:48:17.6490280Z ##[endgroup]
+2026-11-09T10:48:18.0275055Z Scope: all 7 workspace projects
+2026-11-09T10:48:18.1317084Z Lockfile is up to date, resolution step is skipped
+2026-11-09T10:48:18.2370319Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-09T10:48:18.4327234Z Packages: +2184
+2026-11-09T10:48:18.4328444Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-11-09T10:48:19.2387754Z Progress: resolved 2184, reused 872, downloaded 0, added 0
+2026-11-09T10:48:20.2499154Z Progress: resolved 2184, reused 2108, downloaded 0, added 8
+2026-11-09T10:48:21.2489884Z Progress: resolved 2184, reused 2108, downloaded 0, added 241
+2026-11-09T10:48:22.2487532Z Progress: resolved 2184, reused 2108, downloaded 0, added 547
+2026-11-09T10:48:23.2514869Z Progress: resolved 2184, reused 2108, downloaded 0, added 797
+2026-11-09T10:48:24.2495907Z Progress: resolved 2184, reused 2108, downloaded 0, added 1037
+2026-11-09T10:48:25.2504692Z Progress: resolved 2184, reused 2108, downloaded 0, added 1202
+2026-11-09T10:48:26.2502317Z Progress: resolved 2184, reused 2108, downloaded 0, added 1508
+2026-11-09T10:48:27.2494404Z Progress: resolved 2184, reused 2108, downloaded 0, added 1888
+2026-11-09T10:48:28.2504613Z Progress: resolved 2184, reused 2108, downloaded 0, added 2087
+2026-11-09T10:48:28.8874688Z Progress: resolved 2184, reused 2108, downloaded 0, added 2184, done
+2026-11-09T10:48:30.3057488Z .../node_modules/ffmpeg-static install$ node install.js
+2026-11-09T10:48:31.3999462Z .../node_modules/ffmpeg-static install: ffmpeg binary, README and LICENSE verified.
+2026-11-09T10:48:31.4087418Z .../node_modules/ffmpeg-static install: Done
+2026-11-09T10:48:32.0123642Z  WARN  Failed to create bin at /home/runner/work/Mikka/Mikka/apps/desktop/node_modules/.bin/mikka. ENOENT: no such file or directory, open '/home/runner/work/Mikka/Mikka/packages/daemon/dist/mikka.js'
+2026-11-09T10:48:32.4911394Z 
+2026-11-09T10:48:32.4912092Z dependencies:
+2026-11-09T10:48:32.4912591Z + @ai-sdk/gateway 4.0.121
+2026-11-09T10:48:32.4913294Z + @ai-sdk/mcp 2.0.81
+2026-11-09T10:48:32.4913699Z + @ai-sdk/openai 4.0.99
+2026-11-09T10:48:32.4914190Z + @ai-sdk/openai-compatible 3.0.75
+2026-11-09T10:48:32.4914702Z + @ai-sdk/react 4.0.152
+2026-11-09T10:48:32.4915169Z + @ai-sdk/workflow 2.0.80
+2026-11-09T10:48:32.4915618Z + @base-ui/react 1.9.0
+2026-11-09T10:48:32.4916055Z + @better-auth/core 1.7.12
+2026-11-09T10:48:32.4916565Z + @better-auth/expo 1.7.12
+2026-11-09T10:48:32.4917076Z + @better-auth/oauth-provider 1.7.12
+2026-11-09T10:48:32.4917638Z + @chat-adapter/slack 4.43.0
+2026-11-09T10:48:32.4918113Z + @chat-adapter/state-pg 4.43.0
+2026-11-09T10:48:32.4918944Z + @chat-adapter/telegram 4.43.0
+2026-11-09T10:48:32.4919353Z + @composio/core 0.26.0
+2026-11-09T10:48:32.4919722Z + @dnd-kit/core 6.3.1
+2026-11-09T10:48:32.4920102Z + @dnd-kit/sortable 10.0.0
+2026-11-09T10:48:32.4920499Z + @dnd-kit/utilities 3.2.2
+2026-11-09T10:48:32.4920861Z + @e965/xlsx 0.20.3
+2026-11-09T10:48:32.4921275Z + @floating-ui/dom 1.8.0
+2026-11-09T10:48:32.4921801Z + @formatjs/intl-localematcher 0.8.14
+2026-11-09T10:48:32.4922318Z + @heroui/react 3.2.6
+2026-11-09T10:48:32.4922734Z + @heroui/styles 3.2.6
+2026-11-09T10:48:32.4923522Z + @internationalized/date 3.12.4
+2026-11-09T10:48:32.4924132Z + @mikka/protocol 0.0.1 <- packages/protocol
+2026-11-09T10:48:32.4924752Z + @modelcontextprotocol/server 2.3.1
+2026-11-09T10:48:32.4925329Z + @norbert_bodziony/bloub 0.4.1
+2026-11-09T10:48:32.4925780Z + @novnc/novnc 1.6.0
+2026-11-09T10:48:32.4926190Z + @opentelemetry/api 1.10.0
+2026-11-09T10:48:32.4926902Z + @opentelemetry/api-logs 0.223.0
+2026-11-09T10:48:32.4927406Z + @opentelemetry/core 2.12.0
+2026-11-09T10:48:32.4928019Z + @opentelemetry/exporter-logs-otlp-proto 0.223.0
+2026-11-09T10:48:32.4928744Z + @opentelemetry/exporter-trace-otlp-proto 0.223.0
+2026-11-09T10:48:32.4929410Z + @opentelemetry/instrumentation 0.223.0
+2026-11-09T10:48:32.4930020Z + @opentelemetry/instrumentation-pg 0.76.0
+2026-11-09T10:48:32.4930603Z + @opentelemetry/resources 2.12.0
+2026-11-09T10:48:32.4931136Z + @opentelemetry/sdk-logs 0.223.0
+2026-11-09T10:48:32.4931687Z + @opentelemetry/sdk-trace-base 2.12.0
+2026-11-09T10:48:32.4932270Z + @opentelemetry/sdk-trace-node 2.12.0
+2026-11-09T10:48:32.4932876Z + @opentelemetry/semantic-conventions 1.43.0
+2026-11-09T10:48:32.4935114Z + @openuidev/lang-core 1.0.1
+2026-11-09T10:48:32.4935605Z + @openuidev/react-lang 1.0.1
+2026-11-09T10:48:32.4936571Z + @openuidev/react-ui 0.18.1
+2026-11-09T10:48:32.4937032Z + @pierre/diffs 1.6.4
+2026-11-09T10:48:32.4937442Z + @shadcn/react 0.3.1
+2026-11-09T10:48:32.4937843Z + @solidjs/web 2.0.0-rc.0
+2026-11-09T10:48:32.4938277Z + @stripe/stripe-js 10.1.0
+2026-11-09T10:48:32.4938744Z + @tanstack/react-virtual 3.14.18
+2026-11-09T10:48:32.4939161Z + @tiptap/core 3.32.0
+2026-11-09T10:48:32.4939616Z + @tiptap/extension-collaboration 3.32.0
+2026-11-09T10:48:32.4940204Z + @tiptap/extension-collaboration-caret 3.32.0
+2026-11-09T10:48:32.4940774Z + @tiptap/extension-highlight 3.32.0
+2026-11-09T10:48:32.4941279Z + @tiptap/extension-list 3.32.0
+2026-11-09T10:48:32.4941828Z + @tiptap/extension-mention 3.32.0
+2026-11-09T10:48:32.4942340Z + @tiptap/extension-table 3.32.0
+2026-11-09T10:48:32.4942859Z + @tiptap/extension-text-align 3.32.0
+2026-11-09T10:48:32.4943628Z + @tiptap/extensions 3.32.0
+2026-11-09T10:48:32.4944106Z + @tiptap/pm 3.32.0
+2026-11-09T10:48:32.4944489Z + @tiptap/react 3.32.0
+2026-11-09T10:48:32.4944911Z + @tiptap/starter-kit 3.32.0
+2026-11-09T10:48:32.4945348Z + @tiptap/suggestion 3.32.0
+2026-11-09T10:48:32.4945765Z + @tiptap/y-tiptap 3.0.10
+2026-11-09T10:48:32.4946181Z + @vercel/analytics 1.3.1
+2026-11-09T10:48:32.4946594Z + @vercel/functions 3.10.2
+2026-11-09T10:48:32.4947002Z + @vercel/oidc 4.0.2
+2026-11-09T10:48:32.4947406Z + @workflow/serde 5.0.0
+2026-11-09T10:48:32.4947886Z + @workflow/world-local 5.1.2
+2026-11-09T10:48:32.4948275Z + ai 7.0.148
+2026-11-09T10:48:32.4948622Z + aws4fetch 1.0.20
+2026-11-09T10:48:32.4949003Z + beautiful-mermaid 1.1.3
+2026-11-09T10:48:32.4949408Z + better-auth 1.7.12
+2026-11-09T10:48:32.4949746Z + chat 4.43.0
+2026-11-09T10:48:32.4950167Z + class-variance-authority 0.7.1
+2026-11-09T10:48:32.4950579Z + clsx 2.1.1
+2026-11-09T10:48:32.4950883Z + cmdk 1.1.1
+2026-11-09T10:48:32.4951191Z + cn 0.5.0
+2026-11-09T10:48:32.4951487Z + cookie 1.1.1
+2026-11-09T10:48:32.4951804Z + date-fns 4.1.0
+2026-11-09T10:48:32.4952123Z + diff 8.0.2
+2026-11-09T10:48:32.4952461Z + dompurify 3.4.17
+2026-11-09T10:48:32.4953101Z + drizzle-orm 0.45.4
+2026-11-09T10:48:32.4953450Z + e2b 2.61.0
+2026-11-09T10:48:32.4953816Z + embla-carousel-react 8.5.1
+2026-11-09T10:48:32.4954207Z + fflate 0.8.3
+2026-11-09T10:48:32.4954563Z + ffmpeg-static 5.3.0
+2026-11-09T10:48:32.4955195Z + file-type 22.3.0
+2026-11-09T10:48:32.4955525Z + h3 2.0.8
+2026-11-09T10:48:32.4955832Z + hono 4.13.13
+2026-11-09T10:48:32.4956172Z + input-otp 1.4.1
+2026-11-09T10:48:32.4956510Z + katex 0.16.47
+2026-11-09T10:48:32.4956861Z + lucide-react 1.60.0
+2026-11-09T10:48:32.4957242Z + mcp-handler 2.3.0
+2026-11-09T10:48:32.4957595Z + mermaid 12.2.0
+2026-11-09T10:48:32.4957920Z + motion 14.5.0
+2026-11-09T10:48:32.4958279Z + music-metadata 12.3.4
+2026-11-09T10:48:32.4958667Z + negotiator 1.1.0
+2026-11-09T10:48:32.4959036Z + next 16.4.1
+2026-11-09T10:48:32.4959393Z + next-intl 4.14.9
+2026-11-09T10:48:32.4959768Z + next-themes 0.4.6
+2026-11-09T10:48:32.4960152Z + nodemailer 10.3.1
+2026-11-09T10:48:32.4960531Z + officeparser 8.5.0
+2026-11-09T10:48:32.4960889Z + pg 8.23.1
+2026-11-09T10:48:32.4961250Z + posthog-js 1.438.13
+2026-11-09T10:48:32.4961655Z + posthog-node 5.55.2
+2026-11-09T10:48:32.4962010Z + react 19.3.1
+2026-11-09T10:48:32.4962392Z + react-day-picker 9.8.0
+2026-11-09T10:48:32.4962814Z + react-dom 19.3.1
+2026-11-09T10:48:32.4963517Z + react-markdown 10.1.0
+2026-11-09T10:48:32.4964016Z + react-resizable-panels 4.14.7
+2026-11-09T10:48:32.4964564Z + react-syntax-highlighter 16.1.1
+2026-11-09T10:48:32.4965020Z + recharts 3.10.1
+2026-11-09T10:48:32.4965279Z + rehype-katex 7.0.1
+2026-11-09T10:48:32.4965512Z + remark-gfm 4.0.1
+2026-11-09T10:48:32.4965748Z + remark-math 6.0.0
+2026-11-09T10:48:32.4966148Z + shadcn 4.22.1
+2026-11-09T10:48:32.4966495Z + sharp 0.35.5
+2026-11-09T10:48:32.4969246Z + shiki 4.5.0
+2026-11-09T10:48:32.4969657Z + solid-js 2.0.0-rc.0
+2026-11-09T10:48:32.4970058Z + sonner 1.7.4
+2026-11-09T10:48:32.4970402Z + srvx 1.0.8
+2026-11-09T10:48:32.4970742Z + swr 2.5.1
+2026-11-09T10:48:32.4971113Z + tailwind-merge 3.7.0
+2026-11-09T10:48:32.4971786Z + tw-animate-css 1.4.0
+2026-11-09T10:48:32.4972199Z + undici 7.24.5
+2026-11-09T10:48:32.4972584Z + unstorage 2.0.0-beta.0
+2026-11-09T10:48:32.4973231Z + use-intl 4.14.9
+2026-11-09T10:48:32.4973594Z + vaul 1.1.2
+2026-11-09T10:48:32.4973942Z + workflow 5.2.3
+2026-11-09T10:48:32.4974337Z + y-protocols 1.0.7
+2026-11-09T10:48:32.4974697Z + yjs 13.6.33
+2026-11-09T10:48:32.4975033Z + zod 4.6.7
+2026-11-09T10:48:32.4975219Z 
+2026-11-09T10:48:32.4975318Z devDependencies:
+2026-11-09T10:48:32.4975566Z + @playwright/test 1.64.1
+2026-11-09T10:48:32.4975843Z + @tailwindcss/postcss 4.3.3
+2026-11-09T10:48:32.4976097Z + @types/node 25.9.9
+2026-11-09T10:48:32.4976315Z + @types/pg 8.23.1
+2026-11-09T10:48:32.4976532Z + @types/react 19.3.0
+2026-11-09T10:48:32.4976765Z + @types/react-dom 19.3.0
+2026-11-09T10:48:32.4977384Z + @types/react-syntax-highlighter 15.5.13
+2026-11-09T10:48:32.4978137Z + @typescript/native-preview 7.0.0-dev.20260707.2
+2026-11-09T10:48:32.4978715Z + esbuild 0.28.2
+2026-11-09T10:48:32.4979112Z + fake-indexeddb 6.2.4
+2026-11-09T10:48:32.4979561Z + happy-dom 15.11.7
+2026-11-09T10:48:32.4979877Z + js-yaml 4.3.2
+2026-11-09T10:48:32.4980247Z + nitro 3.0.261103-rc
+2026-11-09T10:48:32.4980619Z + nx 24.0.5
+2026-11-09T10:48:32.4980917Z + oxlint 1.89.0
+2026-11-09T10:48:32.4981271Z + postcss 8.5.31
+2026-11-09T10:48:32.4981644Z + prettier 3.9.10
+2026-11-09T10:48:32.4982113Z + prettier-plugin-tailwindcss 0.7.4
+2026-11-09T10:48:32.4982565Z + rolldown 1.3.0
+2026-11-09T10:48:32.4983195Z + tailwindcss 4.3.3
+2026-11-09T10:48:32.4983642Z + tsrs 0.20.1-ts7.1.0-beta
+2026-11-09T10:48:32.4983983Z + tsx 4.23.15
+2026-11-09T10:48:32.4984350Z + typescript 5.9.3
+2026-11-09T10:48:32.4984727Z + wrangler 4.152.0
+2026-11-09T10:48:32.4984943Z 
+2026-11-09T10:48:32.7768544Z  WARN  Failed to create bin at /home/runner/work/Mikka/Mikka/apps/desktop/node_modules/.bin/mikka. ENOENT: no such file or directory, open '/home/runner/work/Mikka/Mikka/apps/desktop/node_modules/@mikka/daemon/dist/mikka.js'
+2026-11-09T10:48:32.8833518Z ╭ Warning ─────────────────────────────────────────────────────────────────────╮
+2026-11-09T10:48:32.8834208Z │                                                                              │
+2026-11-09T10:48:32.8834862Z │   Ignored build scripts: @openuidev/lang-core@1.0.1, cbor-extract@2.2.2,     │
+2026-11-09T10:48:32.8836028Z │   core-js@3.51.0, electron-winstaller@5.4.0, nx@24.0.5,                      │
+2026-11-09T10:48:32.8836716Z │   tesseract.js@7.0.0, workerd@1.20261019.1.                                  │
+2026-11-09T10:48:32.8837410Z │   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+2026-11-09T10:48:32.8838064Z │   to run scripts.                                                            │
+2026-11-09T10:48:32.8838604Z │                                                                              │
+2026-11-09T10:48:32.8839250Z ╰──────────────────────────────────────────────────────────────────────────────╯
+2026-11-09T10:48:32.9074683Z Done in 15.2s using pnpm v10.34.3
+2026-11-09T10:48:32.9898532Z ##[end-action id=__self.__run;outcome=success;conclusion=success;duration_ms=15350]
+2026-11-09T10:48:32.9902683Z ##[start-action display=Save the pnpm store (main only);id=__self.__actions_cache]
+2026-11-09T10:48:32.9916772Z ##[end-action id=__self.__actions_cache;outcome=skipped;conclusion=skipped;duration_ms=0]
+2026-11-09T10:48:32.9956173Z ##[group]Run node --import tsx --test scripts/acceptance/self-hosted-production.test.mjs scripts/ops/production-mobile-daemon.test.mjs
+2026-11-09T10:48:32.9957248Z [36;1mnode --import tsx --test scripts/acceptance/self-hosted-production.test.mjs scripts/ops/production-mobile-daemon.test.mjs[0m
+2026-11-09T10:48:33.0021851Z shell: /usr/bin/bash -e {0}
+2026-11-09T10:48:33.0022098Z env:
+2026-11-09T10:48:33.0022343Z   PNPM_HOME: /home/runner/setup-pnpm/node_modules/.bin
+2026-11-09T10:48:33.0022651Z ##[endgroup]
+2026-11-09T10:48:33.4220625Z ✔ core production accepts only the actual same-repository main Web workflow_run, not a relabelled dispatch (2.891053ms)
+2026-11-09T10:48:33.4223277Z ✔ target proof never accesses owner credentials and requires actual publication, current main and runtime cloud guard (46.103163ms)
+2026-11-09T10:48:33.4225089Z ✔ all related issues closed is an explicit skip before credentials or application requests (2.422536ms)
+2026-11-09T10:48:33.4226908Z ✔ a proof from another driver/attempt, an expired proof or subsequent target drift cannot authorize owner work (5.999643ms)
+2026-11-09T10:48:33.4228316Z ✔ tickets cannot leave the existing gateway, swap scope or carry arbitrary URL/query credentials (1.69281ms)
+2026-11-09T10:48:33.4646423Z ✔ real Node WebSockets observe the owner live key and source-device ping/pong, then close both sockets (64.840675ms)
+2026-11-09T10:48:33.4649305Z ✔ ordinary flags preserve cloud UI rollout values without billing mutations or team elevation (1.277072ms)
+2026-11-09T10:48:33.4693854Z ✔ the dedicated workflow has only the existing narrow OIDC delivery and API/CLI production entry (2.218143ms)
+2026-11-09T10:48:34.2742497Z ✔ real source HTTP client proves mobile owner, enroll, disabled heartbeat, revoke and normal offline removal (668.450441ms)
+2026-11-09T10:48:34.2745216Z ✔ complete paginated token history preserves all 263 originals through enrollment and cleanup (18.093488ms)
+2026-11-09T10:48:34.2747290Z ✔ an old truncated page or an invalid cursor cannot authorize resource creation (6.167648ms)
+2026-11-09T10:48:34.2749375Z ✔ wrong ops context and wrong mobile owner cannot create production resources (2.242839ms)
+2026-11-09T10:48:34.2752685Z ✔ a missing published cleanup action stops before credential issuance (2.293063ms)
+2026-11-09T10:48:34.2756115Z ✔ ambiguous new credentials are never guessed, registered or revoked (8.485098ms)
+2026-11-09T10:48:34.2759644Z ✔ a lost registration reply is not replayed and only this nonce device is reconciled and removed (8.708315ms)
+2026-11-09T10:48:34.2763663Z ✔ complete token baseline rejects eviction or altered unrelated permissions (0.573995ms)
+2026-11-09T10:48:34.2766270Z ✔ unknown exchange results never adopt or revoke a newly visible unrelated token (3.933145ms)
+2026-11-09T10:48:34.2768413Z ✔ a returned id with a different nonce never authorizes disabling or removing that device (5.078289ms)
+2026-11-09T10:48:34.2770314Z ✔ a malformed login reply with a real session cookie still uses normal sign-out (0.879437ms)
+2026-11-09T10:48:34.2773253Z ✔ deployed target mobile proof keeps the real driver client distinct from the immutable application (13.875851ms)
+2026-11-09T10:48:34.2777091Z ✔ deployed target mobile rejects an attestation from another driver before owner login (1.330131ms)
+2026-11-09T10:48:34.2782127Z ✔ a deployed target drift cannot pass after exact daemon credential/device/session cleanup (11.602154ms)
+2026-11-09T10:48:34.2789202Z ✔ failed mobile business or cleanup still observes the final target without replacing original errors (30.250652ms)
+2026-11-09T10:48:34.2791098Z ✔ mobile refuses missing or ambiguous admin-bound teams before resource creation and still signs out (3.630107ms)
+2026-11-09T10:48:34.2793244Z ✔ mobile requires the switched cookie readback and the actual home to identify the selected team (3.629125ms)
+2026-11-09T10:48:34.2795033Z ✔ core workflow_run composes real source daemon HTTP, current target guards, both sockets and exact cleanup (28.657799ms)
+2026-11-09T10:48:34.2796508Z ✔ core gateway refusal and later deployment drift still close sockets and clean only this attempt (21.041037ms)
+2026-11-09T10:48:34.3438547Z ℹ tests 27
+2026-11-09T10:48:34.3439312Z ℹ suites 0
+2026-11-09T10:48:34.3439856Z ℹ pass 27
+2026-11-09T10:48:34.3440320Z ℹ fail 0
+2026-11-09T10:48:34.3441133Z ℹ cancelled 0
+2026-11-09T10:48:34.3441544Z ℹ skipped 0
+2026-11-09T10:48:34.3441917Z ℹ todo 0
+2026-11-09T10:48:34.3442362Z ℹ duration_ms 1301.107761
+2026-11-09T10:48:34.3650784Z Post job cleanup.
+2026-11-09T10:48:34.3655725Z ##[start-action display=Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020;id=__9629ba3c-27d8-4fcd-b504-542efff3db0a.__actions_setup-node]
+2026-11-09T10:48:34.3736786Z Post job cleanup.
+2026-11-09T10:48:34.5062796Z (node:2335) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T10:48:34.5064074Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T10:48:34.5175577Z ##[end-action id=__9629ba3c-27d8-4fcd-b504-542efff3db0a.__actions_setup-node;outcome=success;conclusion=success;duration_ms=151]
+2026-11-09T10:48:34.5180314Z ##[start-action display=Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1;id=__9629ba3c-27d8-4fcd-b504-542efff3db0a.__pnpm_action-setup]
+2026-11-09T10:48:34.5219703Z Post job cleanup.
+2026-11-09T10:48:34.6806776Z Pruning is unnecessary.
+2026-11-09T10:48:34.6919183Z ##[end-action id=__9629ba3c-27d8-4fcd-b504-542efff3db0a.__pnpm_action-setup;outcome=success;conclusion=success;duration_ms=173]
+2026-11-09T10:48:34.7054783Z Post job cleanup.
+2026-11-09T10:48:34.8000975Z [command]/usr/bin/git version
+2026-11-09T10:48:34.8031352Z git version 2.56.0
+2026-11-09T10:48:34.8096238Z Temporarily overriding HOME='/home/runner/work/_temp/054523e6-16bc-4d87-9200-730c96c06514' before making global git config changes
+2026-11-09T10:48:34.8097872Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T10:48:34.8102803Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T10:48:34.8165078Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T10:48:34.8212217Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T10:48:34.8639934Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T10:48:34.8695431Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T10:48:34.9100919Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T10:48:34.9154546Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T10:48:34.9611389Z Cleaning up orphan processes
+2026-11-09T10:48:35.0015893Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830, actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020, pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

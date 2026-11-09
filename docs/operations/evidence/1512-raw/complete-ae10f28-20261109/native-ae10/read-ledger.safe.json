@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "runId": 42603781956,
+  "jobId": 129117574595,
+  "originalJobLogRequests": 1,
+  "artifactMetadataRequests": 1,
+  "artifactDownloadReferenceRequests": {
+    "native": 1,
+    "package": 1
+  },
+  "archiveHttpMaterializations": {
+    "native": 1,
+    "package": 1
+  },
+  "downloadReferenceRefreshes": 0,
+  "otherJobOriginalLogReads": 0,
+  "oldArtifactReads": 0,
+  "nativeReruns": 0,
+  "cancellations": 0,
+  "headChanges": 0,
+  "modelsInvoked": 0,
+  "productionRequests": 0,
+  "readOnlyActualCommitApiReads": 1,
+  "metadataObservations": 27,
+  "firstReadAfterTerminal": true,
+  "jobCompletedAt": "2026-11-09T11:14:49Z",
+  "logsPreserveOriginalUtf8": true,
+  "normalizationUsedOnlyForSourceParsing": true,
+  "resource": {
+    "created": 1,
+    "timeoutExtensions": 0,
+    "stopped": 1,
+    "deleted": 1,
+    "exact404Read": 1
+  },
+  "byteRecovery": {
+    "chunks": 118,
+    "allChunkLengthsChecked": true,
+    "gzipCrcAndIsizeVerified": true,
+    "compressedAndUncompressedSha256Verified": true,
+    "eachRecoveredFileSha256AndGitBlobVerified": true
+  },
+  "noSourceTestsExecutedDuringRecovery": true,
+  "noGitRefWrites": true,
+  "productionAcceptance": false
+}

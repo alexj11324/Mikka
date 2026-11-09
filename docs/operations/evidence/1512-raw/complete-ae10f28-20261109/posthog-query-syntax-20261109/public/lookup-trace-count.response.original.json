@@ -1,0 +1,10 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"query\":{\"kind\":\"HogQLQuery\",\"query\":\"SELECT count() AS trace_count\\nFROM (\\n    SELECT trace_id\\n    FROM posthog.trace_spans\\n    WHERE timestamp >= toDateTime('2026-11-08 00:00:00', 'UTC')\\n          AND timestamp < toDateTime('2026-11-08 00:00:01', 'UTC')\\n        AND service_name IN ('mikka-web', 'mikka-daemon')\\n        AND coalesce(nullIf(resource_attributes['deployment.environment.name'], ''), resource_attributes['deployment.environment']) = 'production'\\n        AND (\\n            ('00000000-0000-0000-0000-000000000000' != '' AND attributes['mikka.run_id'] = '00000000-0000-0000-0000-000000000000')\\n            OR ('00000000-0000-0000-0000-000000000000' != '' AND attributes['mikka.thread_id'] = '00000000-0000-0000-0000-000000000000')\\n            OR ('00000000-0000-0000-0000-000000000000' != '' AND attributes['mikka.task_id'] = '00000000-0000-0000-0000-000000000000')\\n        )\\n    GROUP BY trace_id\\n) AS matched_traces\"},\"results\":\"trace_count\\n0\",\"__formatted_results_override\":\"trace_count\\n0\"}"
+    }
+  ],
+  "structuredContent": null,
+  "isError": false
+}

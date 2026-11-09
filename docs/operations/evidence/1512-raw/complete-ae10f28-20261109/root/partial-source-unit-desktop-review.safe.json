@@ -1,0 +1,5279 @@
+{
+  "version": 1,
+  "kind": "root-current-ci-source-unit-desktop-ssr-review",
+  "run": 42603781956,
+  "head": "ae10f28aa471dbfc64f04d981b8934d374476259",
+  "actualCheckout": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4",
+  "tree": "1acbe0b8d50a7102543e24b9bd0395355bcba438",
+  "sameTreeByActualGitApi": true,
+  "source": {
+    "metadata": {
+      "jobId": 129114784935,
+      "bytes": 138798,
+      "sha256": "f661fe72c2028a54088ddd6bb9a7fbddc3ec51c662a555ad4795a8fa16dd178d",
+      "lines": 1787,
+      "downloadCount": 1,
+      "sha": "38bf977089b0ca71c735d992d5d849f4195adcbb",
+      "privacyScanMatched": []
+    },
+    "nodeSummaries": [
+      {
+        "line": 680,
+        "tests": 46,
+        "suites": 0,
+        "pass": 46,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      {
+        "line": 711,
+        "tests": 7,
+        "suites": 0,
+        "pass": 7,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      {
+        "line": 764,
+        "tests": 29,
+        "suites": 0,
+        "pass": 29,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      {
+        "line": 870,
+        "tests": 63,
+        "suites": 0,
+        "pass": 63,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      {
+        "line": 1046,
+        "tests": 102,
+        "suites": 0,
+        "pass": 102,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      {
+        "line": 1520,
+        "tests": 69,
+        "suites": 0,
+        "pass": 69,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      {
+        "line": 1607,
+        "tests": 45,
+        "suites": 0,
+        "pass": 45,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    ],
+    "nitroStartupAndHotReplacementPassed": true,
+    "driverComplete63Passed": true,
+    "canonical": {
+      "command": "node apps/api/scripts/generate-routes.mjs --check",
+      "routes": 243,
+      "methods": 315,
+      "checkFlagImplemented": false
+    },
+    "fullTypeAndCodeRuntimeLintPassed": true
+  },
+  "units": {
+    "core": {
+      "key": "core",
+      "source": {
+        "jobId": 129114784847,
+        "bytes": 1016228,
+        "sha256": "8dc3a78b98c61a317909ff2561f3bcc68c5b3cb336fcc41d51f68f5b4c8fde7b",
+        "lines": 7846,
+        "downloadCount": 1,
+        "conclusion": "success"
+      },
+      "expectedTargets": [
+        "ci-tasks:core-2",
+        "ci-tasks:core-3",
+        "ci-tasks:core-4",
+        "ci-tasks:core-5",
+        "ci-tasks:core-6",
+        "ci-tasks:core-7",
+        "ci-tasks:core-8",
+        "ci-tasks:core-9",
+        "ci-tasks:core-10",
+        "ci-tasks:core-11",
+        "ci-tasks:core-12",
+        "ci-tasks:core-13",
+        "ci-tasks:core-14",
+        "ci-tasks:core-15",
+        "ci-tasks:core-16",
+        "ci-tasks:core-17",
+        "ci-tasks:core-18",
+        "ci-tasks:core-19",
+        "ci-tasks:core-20",
+        "ci-tasks:core-21",
+        "ci-tasks:core-22",
+        "ci-tasks:core-23",
+        "ci-tasks:core-24",
+        "ci-tasks:core-25",
+        "ci-tasks:core-26",
+        "ci-tasks:core-27",
+        "ci-tasks:core-28",
+        "ci-tasks:core-29",
+        "ci-tasks:core-30",
+        "ci-tasks:core-31",
+        "ci-tasks:core-32",
+        "ci-tasks:core-33",
+        "ci-tasks:core-34",
+        "ci-tasks:core-35",
+        "ci-tasks:core-36",
+        "ci-tasks:core-37",
+        "ci-tasks:core-38",
+        "ci-tasks:core-39",
+        "ci-tasks:core-40",
+        "ci-tasks:core-41",
+        "ci-tasks:core-42",
+        "ci-tasks:core-43",
+        "ci-tasks:core-44",
+        "ci-tasks:core-45",
+        "ci-tasks:core-46",
+        "ci-tasks:core-47",
+        "ci-tasks:core-48",
+        "ci-tasks:core-49",
+        "ci-tasks:core-50",
+        "ci-tasks:core-51",
+        "ci-tasks:core-52",
+        "ci-tasks:core-53",
+        "ci-tasks:core-54",
+        "ci-tasks:core-55",
+        "ci-tasks:core-56",
+        "ci-tasks:core-57",
+        "ci-tasks:core-triage"
+      ],
+      "actualTargets": [
+        "ci-tasks:core-2",
+        "ci-tasks:core-3",
+        "ci-tasks:core-4",
+        "ci-tasks:core-5",
+        "ci-tasks:core-6",
+        "ci-tasks:core-7",
+        "ci-tasks:core-8",
+        "ci-tasks:core-9",
+        "ci-tasks:core-10",
+        "ci-tasks:core-11",
+        "ci-tasks:core-12",
+        "ci-tasks:core-13",
+        "ci-tasks:core-14",
+        "ci-tasks:core-15",
+        "ci-tasks:core-16",
+        "ci-tasks:core-17",
+        "ci-tasks:core-18",
+        "ci-tasks:core-19",
+        "ci-tasks:core-20",
+        "ci-tasks:core-21",
+        "ci-tasks:core-22",
+        "ci-tasks:core-23",
+        "ci-tasks:core-24",
+        "ci-tasks:core-25",
+        "ci-tasks:core-26",
+        "ci-tasks:core-27",
+        "ci-tasks:core-28",
+        "ci-tasks:core-29",
+        "ci-tasks:core-30",
+        "ci-tasks:core-31",
+        "ci-tasks:core-32",
+        "ci-tasks:core-33",
+        "ci-tasks:core-34",
+        "ci-tasks:core-35",
+        "ci-tasks:core-36",
+        "ci-tasks:core-37",
+        "ci-tasks:core-38",
+        "ci-tasks:core-39",
+        "ci-tasks:core-40",
+        "ci-tasks:core-41",
+        "ci-tasks:core-42",
+        "ci-tasks:core-43",
+        "ci-tasks:core-44",
+        "ci-tasks:core-45",
+        "ci-tasks:core-46",
+        "ci-tasks:core-47",
+        "ci-tasks:core-48",
+        "ci-tasks:core-49",
+        "ci-tasks:core-50",
+        "ci-tasks:core-51",
+        "ci-tasks:core-52",
+        "ci-tasks:core-53",
+        "ci-tasks:core-54",
+        "ci-tasks:core-55",
+        "ci-tasks:core-56",
+        "ci-tasks:core-57",
+        "ci-tasks:core-triage"
+      ],
+      "missing": [],
+      "extra": [],
+      "counts": {
+        "tests": 4705,
+        "pass": 4705,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "nodeSummaryCount": 92,
+      "summaries": [
+        {
+          "line": 770,
+          "metric": "tests",
+          "value": 244
+        },
+        {
+          "line": 772,
+          "metric": "pass",
+          "value": 244
+        },
+        {
+          "line": 773,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 774,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 775,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 776,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 827,
+          "metric": "tests",
+          "value": 21
+        },
+        {
+          "line": 829,
+          "metric": "pass",
+          "value": 21
+        },
+        {
+          "line": 830,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 831,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 832,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 833,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 857,
+          "metric": "tests",
+          "value": 22
+        },
+        {
+          "line": 859,
+          "metric": "pass",
+          "value": 22
+        },
+        {
+          "line": 860,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 861,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 862,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 863,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 902,
+          "metric": "tests",
+          "value": 34
+        },
+        {
+          "line": 904,
+          "metric": "pass",
+          "value": 34
+        },
+        {
+          "line": 905,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 906,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 907,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 908,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 940,
+          "metric": "tests",
+          "value": 13
+        },
+        {
+          "line": 942,
+          "metric": "pass",
+          "value": 13
+        },
+        {
+          "line": 943,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 944,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 945,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 946,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 1383,
+          "metric": "tests",
+          "value": 305
+        },
+        {
+          "line": 1385,
+          "metric": "pass",
+          "value": 305
+        },
+        {
+          "line": 1386,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1387,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1388,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1389,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 1505,
+          "metric": "tests",
+          "value": 135
+        },
+        {
+          "line": 1507,
+          "metric": "pass",
+          "value": 135
+        },
+        {
+          "line": 1508,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1509,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1510,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1511,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 1518,
+          "metric": "tests",
+          "value": 9
+        },
+        {
+          "line": 1520,
+          "metric": "pass",
+          "value": 9
+        },
+        {
+          "line": 1521,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1522,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1523,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1524,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 1536,
+          "metric": "tests",
+          "value": 5
+        },
+        {
+          "line": 1538,
+          "metric": "pass",
+          "value": 5
+        },
+        {
+          "line": 1539,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1540,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1541,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1542,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 1563,
+          "metric": "tests",
+          "value": 14
+        },
+        {
+          "line": 1565,
+          "metric": "pass",
+          "value": 14
+        },
+        {
+          "line": 1566,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1567,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1568,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1569,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 1596,
+          "metric": "tests",
+          "value": 5
+        },
+        {
+          "line": 1598,
+          "metric": "pass",
+          "value": 5
+        },
+        {
+          "line": 1599,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1600,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1601,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1602,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 1615,
+          "metric": "tests",
+          "value": 10
+        },
+        {
+          "line": 1617,
+          "metric": "pass",
+          "value": 10
+        },
+        {
+          "line": 1618,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1619,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1620,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1621,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 1663,
+          "metric": "tests",
+          "value": 34
+        },
+        {
+          "line": 1665,
+          "metric": "pass",
+          "value": 34
+        },
+        {
+          "line": 1666,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1667,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1668,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1669,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 1816,
+          "metric": "tests",
+          "value": 7
+        },
+        {
+          "line": 1818,
+          "metric": "pass",
+          "value": 7
+        },
+        {
+          "line": 1819,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1820,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1821,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1822,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 1879,
+          "metric": "tests",
+          "value": 151
+        },
+        {
+          "line": 1881,
+          "metric": "pass",
+          "value": 151
+        },
+        {
+          "line": 1882,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1883,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1884,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1885,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 1908,
+          "metric": "tests",
+          "value": 14
+        },
+        {
+          "line": 1910,
+          "metric": "pass",
+          "value": 14
+        },
+        {
+          "line": 1911,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1912,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1913,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1914,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 1946,
+          "metric": "tests",
+          "value": 16
+        },
+        {
+          "line": 1948,
+          "metric": "pass",
+          "value": 16
+        },
+        {
+          "line": 1949,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1950,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1951,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1952,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 1987,
+          "metric": "tests",
+          "value": 15
+        },
+        {
+          "line": 1989,
+          "metric": "pass",
+          "value": 15
+        },
+        {
+          "line": 1990,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1991,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1992,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1993,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2261,
+          "metric": "tests",
+          "value": 101
+        },
+        {
+          "line": 2263,
+          "metric": "pass",
+          "value": 101
+        },
+        {
+          "line": 2264,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2265,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2266,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2267,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2363,
+          "metric": "tests",
+          "value": 191
+        },
+        {
+          "line": 2365,
+          "metric": "pass",
+          "value": 191
+        },
+        {
+          "line": 2366,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2367,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2368,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2369,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2373,
+          "metric": "tests",
+          "value": 1
+        },
+        {
+          "line": 2375,
+          "metric": "pass",
+          "value": 1
+        },
+        {
+          "line": 2376,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2377,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2378,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2379,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2486,
+          "metric": "tests",
+          "value": 53
+        },
+        {
+          "line": 2488,
+          "metric": "pass",
+          "value": 53
+        },
+        {
+          "line": 2489,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2490,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2491,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2492,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2520,
+          "metric": "tests",
+          "value": 8
+        },
+        {
+          "line": 2522,
+          "metric": "pass",
+          "value": 8
+        },
+        {
+          "line": 2523,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2524,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2525,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2526,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2531,
+          "metric": "tests",
+          "value": 3
+        },
+        {
+          "line": 2533,
+          "metric": "pass",
+          "value": 3
+        },
+        {
+          "line": 2534,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2535,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2536,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2537,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2604,
+          "metric": "tests",
+          "value": 31
+        },
+        {
+          "line": 2606,
+          "metric": "pass",
+          "value": 31
+        },
+        {
+          "line": 2607,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2608,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2609,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2610,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2646,
+          "metric": "tests",
+          "value": 11
+        },
+        {
+          "line": 2648,
+          "metric": "pass",
+          "value": 11
+        },
+        {
+          "line": 2649,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2650,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2651,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2652,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2678,
+          "metric": "tests",
+          "value": 18
+        },
+        {
+          "line": 2680,
+          "metric": "pass",
+          "value": 18
+        },
+        {
+          "line": 2681,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2682,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2683,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2684,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2697,
+          "metric": "tests",
+          "value": 3
+        },
+        {
+          "line": 2699,
+          "metric": "pass",
+          "value": 3
+        },
+        {
+          "line": 2700,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2701,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2702,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2703,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2730,
+          "metric": "tests",
+          "value": 14
+        },
+        {
+          "line": 2732,
+          "metric": "pass",
+          "value": 14
+        },
+        {
+          "line": 2733,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2734,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2735,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2736,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2747,
+          "metric": "tests",
+          "value": 3
+        },
+        {
+          "line": 2749,
+          "metric": "pass",
+          "value": 3
+        },
+        {
+          "line": 2750,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2751,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2752,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2753,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2804,
+          "metric": "tests",
+          "value": 13
+        },
+        {
+          "line": 2806,
+          "metric": "pass",
+          "value": 13
+        },
+        {
+          "line": 2807,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2808,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2809,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2810,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2864,
+          "metric": "tests",
+          "value": 46
+        },
+        {
+          "line": 2866,
+          "metric": "pass",
+          "value": 46
+        },
+        {
+          "line": 2867,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2868,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2869,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2870,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3079,
+          "metric": "tests",
+          "value": 56
+        },
+        {
+          "line": 3081,
+          "metric": "pass",
+          "value": 56
+        },
+        {
+          "line": 3082,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3083,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3084,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3085,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3362,
+          "metric": "tests",
+          "value": 97
+        },
+        {
+          "line": 3364,
+          "metric": "pass",
+          "value": 97
+        },
+        {
+          "line": 3365,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3366,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3367,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3368,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3385,
+          "metric": "tests",
+          "value": 10
+        },
+        {
+          "line": 3387,
+          "metric": "pass",
+          "value": 10
+        },
+        {
+          "line": 3388,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3389,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3390,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3391,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3621,
+          "metric": "tests",
+          "value": 214
+        },
+        {
+          "line": 3623,
+          "metric": "pass",
+          "value": 214
+        },
+        {
+          "line": 3624,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3625,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3626,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3627,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3650,
+          "metric": "tests",
+          "value": 143
+        },
+        {
+          "line": 3652,
+          "metric": "pass",
+          "value": 143
+        },
+        {
+          "line": 3653,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3654,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3655,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3656,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3795,
+          "metric": "tests",
+          "value": 63
+        },
+        {
+          "line": 3797,
+          "metric": "pass",
+          "value": 63
+        },
+        {
+          "line": 3798,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3799,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3800,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3801,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3860,
+          "metric": "tests",
+          "value": 13
+        },
+        {
+          "line": 3862,
+          "metric": "pass",
+          "value": 13
+        },
+        {
+          "line": 3863,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3864,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3865,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3866,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3923,
+          "metric": "tests",
+          "value": 48
+        },
+        {
+          "line": 3925,
+          "metric": "pass",
+          "value": 48
+        },
+        {
+          "line": 3926,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3927,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3928,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3929,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4240,
+          "metric": "tests",
+          "value": 10
+        },
+        {
+          "line": 4242,
+          "metric": "pass",
+          "value": 10
+        },
+        {
+          "line": 4243,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4244,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4245,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4246,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4397,
+          "metric": "tests",
+          "value": 214
+        },
+        {
+          "line": 4399,
+          "metric": "pass",
+          "value": 214
+        },
+        {
+          "line": 4400,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4401,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4402,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4403,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4429,
+          "metric": "tests",
+          "value": 37
+        },
+        {
+          "line": 4431,
+          "metric": "pass",
+          "value": 37
+        },
+        {
+          "line": 4432,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4433,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4434,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4435,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4472,
+          "metric": "tests",
+          "value": 23
+        },
+        {
+          "line": 4474,
+          "metric": "pass",
+          "value": 23
+        },
+        {
+          "line": 4475,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4476,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4477,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4478,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4486,
+          "metric": "tests",
+          "value": 10
+        },
+        {
+          "line": 4488,
+          "metric": "pass",
+          "value": 10
+        },
+        {
+          "line": 4489,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4490,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4491,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4492,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4532,
+          "metric": "tests",
+          "value": 33
+        },
+        {
+          "line": 4534,
+          "metric": "pass",
+          "value": 33
+        },
+        {
+          "line": 4535,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4536,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4537,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4538,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4547,
+          "metric": "tests",
+          "value": 4
+        },
+        {
+          "line": 4549,
+          "metric": "pass",
+          "value": 4
+        },
+        {
+          "line": 4550,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4551,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4552,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4553,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4590,
+          "metric": "tests",
+          "value": 26
+        },
+        {
+          "line": 4592,
+          "metric": "pass",
+          "value": 26
+        },
+        {
+          "line": 4593,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4594,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4595,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4596,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4631,
+          "metric": "tests",
+          "value": 11
+        },
+        {
+          "line": 4633,
+          "metric": "pass",
+          "value": 11
+        },
+        {
+          "line": 4634,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4635,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4636,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4637,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4688,
+          "metric": "tests",
+          "value": 3
+        },
+        {
+          "line": 4690,
+          "metric": "pass",
+          "value": 3
+        },
+        {
+          "line": 4691,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4692,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4693,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4694,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4717,
+          "metric": "tests",
+          "value": 21
+        },
+        {
+          "line": 4719,
+          "metric": "pass",
+          "value": 21
+        },
+        {
+          "line": 4720,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4721,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4722,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4723,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4818,
+          "metric": "tests",
+          "value": 3
+        },
+        {
+          "line": 4820,
+          "metric": "pass",
+          "value": 3
+        },
+        {
+          "line": 4821,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4822,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4823,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4824,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4859,
+          "metric": "tests",
+          "value": 148
+        },
+        {
+          "line": 4861,
+          "metric": "pass",
+          "value": 148
+        },
+        {
+          "line": 4862,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4863,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4864,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4865,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 5002,
+          "metric": "tests",
+          "value": 85
+        },
+        {
+          "line": 5004,
+          "metric": "pass",
+          "value": 85
+        },
+        {
+          "line": 5005,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 5006,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 5007,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 5008,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 5051,
+          "metric": "tests",
+          "value": 11
+        },
+        {
+          "line": 5053,
+          "metric": "pass",
+          "value": 11
+        },
+        {
+          "line": 5054,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 5055,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 5056,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 5057,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 5100,
+          "metric": "tests",
+          "value": 34
+        },
+        {
+          "line": 5102,
+          "metric": "pass",
+          "value": 34
+        },
+        {
+          "line": 5103,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 5104,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 5105,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 5106,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 5195,
+          "metric": "tests",
+          "value": 20
+        },
+        {
+          "line": 5197,
+          "metric": "pass",
+          "value": 20
+        },
+        {
+          "line": 5198,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 5199,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 5200,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 5201,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 5565,
+          "metric": "tests",
+          "value": 257
+        },
+        {
+          "line": 5567,
+          "metric": "pass",
+          "value": 257
+        },
+        {
+          "line": 5568,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 5569,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 5570,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 5571,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 5604,
+          "metric": "tests",
+          "value": 18
+        },
+        {
+          "line": 5606,
+          "metric": "pass",
+          "value": 18
+        },
+        {
+          "line": 5607,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 5608,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 5609,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 5610,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 5711,
+          "metric": "tests",
+          "value": 78
+        },
+        {
+          "line": 5713,
+          "metric": "pass",
+          "value": 78
+        },
+        {
+          "line": 5714,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 5715,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 5716,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 5717,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 5739,
+          "metric": "tests",
+          "value": 22
+        },
+        {
+          "line": 5741,
+          "metric": "pass",
+          "value": 22
+        },
+        {
+          "line": 5742,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 5743,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 5744,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 5745,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 5755,
+          "metric": "tests",
+          "value": 4
+        },
+        {
+          "line": 5757,
+          "metric": "pass",
+          "value": 4
+        },
+        {
+          "line": 5758,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 5759,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 5760,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 5761,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 5769,
+          "metric": "tests",
+          "value": 2
+        },
+        {
+          "line": 5771,
+          "metric": "pass",
+          "value": 2
+        },
+        {
+          "line": 5772,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 5773,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 5774,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 5775,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 6024,
+          "metric": "tests",
+          "value": 107
+        },
+        {
+          "line": 6026,
+          "metric": "pass",
+          "value": 107
+        },
+        {
+          "line": 6027,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6028,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6029,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6030,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 6117,
+          "metric": "tests",
+          "value": 11
+        },
+        {
+          "line": 6119,
+          "metric": "pass",
+          "value": 11
+        },
+        {
+          "line": 6120,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6121,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6122,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6123,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 6209,
+          "metric": "tests",
+          "value": 31
+        },
+        {
+          "line": 6211,
+          "metric": "pass",
+          "value": 31
+        },
+        {
+          "line": 6212,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6213,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6214,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6215,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 6239,
+          "metric": "tests",
+          "value": 17
+        },
+        {
+          "line": 6241,
+          "metric": "pass",
+          "value": 17
+        },
+        {
+          "line": 6242,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6243,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6244,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6245,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 6249,
+          "metric": "tests",
+          "value": 2
+        },
+        {
+          "line": 6251,
+          "metric": "pass",
+          "value": 2
+        },
+        {
+          "line": 6252,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6253,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6254,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6255,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 6298,
+          "metric": "tests",
+          "value": 135
+        },
+        {
+          "line": 6300,
+          "metric": "pass",
+          "value": 135
+        },
+        {
+          "line": 6301,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6302,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6303,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6304,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 6329,
+          "metric": "tests",
+          "value": 7
+        },
+        {
+          "line": 6331,
+          "metric": "pass",
+          "value": 7
+        },
+        {
+          "line": 6332,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6333,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6334,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6335,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 6349,
+          "metric": "tests",
+          "value": 4
+        },
+        {
+          "line": 6351,
+          "metric": "pass",
+          "value": 4
+        },
+        {
+          "line": 6352,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6353,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6354,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6355,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 6369,
+          "metric": "tests",
+          "value": 7
+        },
+        {
+          "line": 6371,
+          "metric": "pass",
+          "value": 7
+        },
+        {
+          "line": 6372,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6373,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6374,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6375,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 6405,
+          "metric": "tests",
+          "value": 8
+        },
+        {
+          "line": 6407,
+          "metric": "pass",
+          "value": 8
+        },
+        {
+          "line": 6408,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6409,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6410,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6411,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 6437,
+          "metric": "tests",
+          "value": 19
+        },
+        {
+          "line": 6439,
+          "metric": "pass",
+          "value": 19
+        },
+        {
+          "line": 6440,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6441,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6442,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6443,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 6476,
+          "metric": "tests",
+          "value": 6
+        },
+        {
+          "line": 6478,
+          "metric": "pass",
+          "value": 6
+        },
+        {
+          "line": 6479,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6480,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6481,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6482,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 6654,
+          "metric": "tests",
+          "value": 30
+        },
+        {
+          "line": 6656,
+          "metric": "pass",
+          "value": 30
+        },
+        {
+          "line": 6657,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6658,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6659,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6660,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 6704,
+          "metric": "tests",
+          "value": 184
+        },
+        {
+          "line": 6706,
+          "metric": "pass",
+          "value": 184
+        },
+        {
+          "line": 6707,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6708,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6709,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6710,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 6730,
+          "metric": "tests",
+          "value": 9
+        },
+        {
+          "line": 6732,
+          "metric": "pass",
+          "value": 9
+        },
+        {
+          "line": 6733,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6734,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6735,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6736,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 6821,
+          "metric": "tests",
+          "value": 21
+        },
+        {
+          "line": 6823,
+          "metric": "pass",
+          "value": 21
+        },
+        {
+          "line": 6824,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6825,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6826,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6827,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 6874,
+          "metric": "tests",
+          "value": 90
+        },
+        {
+          "line": 6876,
+          "metric": "pass",
+          "value": 90
+        },
+        {
+          "line": 6877,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6878,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6879,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6880,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 6883,
+          "metric": "tests",
+          "value": 1
+        },
+        {
+          "line": 6885,
+          "metric": "pass",
+          "value": 1
+        },
+        {
+          "line": 6886,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 6887,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 6888,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 6889,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 7026,
+          "metric": "tests",
+          "value": 73
+        },
+        {
+          "line": 7028,
+          "metric": "pass",
+          "value": 73
+        },
+        {
+          "line": 7029,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 7030,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 7031,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 7032,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 7075,
+          "metric": "tests",
+          "value": 11
+        },
+        {
+          "line": 7077,
+          "metric": "pass",
+          "value": 11
+        },
+        {
+          "line": 7078,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 7079,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 7080,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 7081,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 7189,
+          "metric": "tests",
+          "value": 186
+        },
+        {
+          "line": 7191,
+          "metric": "pass",
+          "value": 186
+        },
+        {
+          "line": 7192,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 7193,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 7194,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 7195,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 7212,
+          "metric": "tests",
+          "value": 9
+        },
+        {
+          "line": 7214,
+          "metric": "pass",
+          "value": 9
+        },
+        {
+          "line": 7215,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 7216,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 7217,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 7218,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 7257,
+          "metric": "tests",
+          "value": 19
+        },
+        {
+          "line": 7259,
+          "metric": "pass",
+          "value": 19
+        },
+        {
+          "line": 7260,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 7261,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 7262,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 7263,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 7405,
+          "metric": "tests",
+          "value": 129
+        },
+        {
+          "line": 7407,
+          "metric": "pass",
+          "value": 129
+        },
+        {
+          "line": 7408,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 7409,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 7410,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 7411,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 7473,
+          "metric": "tests",
+          "value": 28
+        },
+        {
+          "line": 7475,
+          "metric": "pass",
+          "value": 28
+        },
+        {
+          "line": 7476,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 7477,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 7478,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 7479,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 7518,
+          "metric": "tests",
+          "value": 34
+        },
+        {
+          "line": 7520,
+          "metric": "pass",
+          "value": 34
+        },
+        {
+          "line": 7521,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 7522,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 7523,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 7524,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 7532,
+          "metric": "tests",
+          "value": 27
+        },
+        {
+          "line": 7534,
+          "metric": "pass",
+          "value": 27
+        },
+        {
+          "line": 7535,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 7536,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 7537,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 7538,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 7622,
+          "metric": "tests",
+          "value": 64
+        },
+        {
+          "line": 7624,
+          "metric": "pass",
+          "value": 64
+        },
+        {
+          "line": 7625,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 7626,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 7627,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 7628,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 7798,
+          "metric": "tests",
+          "value": 168
+        },
+        {
+          "line": 7800,
+          "metric": "pass",
+          "value": 168
+        },
+        {
+          "line": 7801,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 7802,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 7803,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 7804,
+          "metric": "todo",
+          "value": 0
+        }
+      ],
+      "aggregateMessages": [
+        "##[group]Run node scripts/ci/run-units.mjs core",
+        "node scripts/ci/run-units.mjs core",
+        " NX   Successfully ran targets core-2, core-3, core-4, core-5, core-6, core-7, core-8, core-9, core-10, core-11, core-12, core-13, core-14, core-15, core-16, core-17, core-18, core-19, core-20, core-21, core-22, core-23, core-24, core-25, core-26, core-27, core-28, core-29, core-30, core-31, core-32, core-33, core-34, core-35, core-36, core-37, core-38, core-39, core-40, core-41, core-42, core-43, core-44, core-45, core-46, core-47, core-48, core-49, core-50, core-51, core-52, core-53, core-54, core-55, core-56, core-57, core-triage for project ci-tasks",
+        "  Cache:             Skipped (--skip-nx-cache)",
+        "    - Cache: drop --skip-nx-cache to restore unchanged tasks instantly."
+      ],
+      "skipLines": [
+        {
+          "line": 490,
+          "text": "##[end-action id=__self.__actions_cache;outcome=skipped;conclusion=skipped;duration_ms=0]"
+        },
+        {
+          "line": 1595,
+          "text": "ci-tasks: ✔ isSafeTarget catches a target that skipped validation (0.23078ms)"
+        },
+        {
+          "line": 1844,
+          "text": "ci-tasks: ✔ pending step metadata never hides a failed, cancelled or skipped required step (2.50648ms)"
+        },
+        {
+          "line": 1848,
+          "text": "ci-tasks: ✔ a docs-only skipped build or incomplete upload never passes even if public already has that SHA (3.655295ms)"
+        },
+        {
+          "line": 1852,
+          "text": "ci-tasks: ✔ pending step metadata does not hide a required step that already failed or skipped (2.726841ms)"
+        },
+        {
+          "line": 2298,
+          "text": "ci-tasks: ✔ ordered fallback: quota used up, signed out, or no device moves to the next model, and says why each was skipped (0.641928ms)"
+        },
+        {
+          "line": 4753,
+          "text": "ci-tasks: ✔ skipped, incomplete, stale-attempt or unsuccessful release jobs cannot authorize active work (1.945458ms)"
+        },
+        {
+          "line": 7352,
+          "text": "ci-tasks: ✔ live observations describe received, skipped and read keys without changing reads (1.019982ms)"
+        }
+      ]
+    },
+    "integration": {
+      "key": "integration",
+      "source": {
+        "jobId": 129114785029,
+        "bytes": 673214,
+        "sha256": "edcd8b0c5ca8bedf0546634c2f1a832d22bfb5092c4e45a546f34bc4586375ef",
+        "lines": 5007,
+        "downloadCount": 1,
+        "conclusion": "success"
+      },
+      "expectedTargets": [
+        "ci-tasks:integration-2",
+        "ci-tasks:integration-3",
+        "ci-tasks:integration-4",
+        "ci-tasks:integration-5",
+        "ci-tasks:integration-6",
+        "ci-tasks:integration-7",
+        "ci-tasks:integration-8",
+        "ci-tasks:integration-9",
+        "ci-tasks:integration-10",
+        "ci-tasks:integration-11",
+        "ci-tasks:integration-12",
+        "ci-tasks:integration-13",
+        "ci-tasks:integration-14",
+        "ci-tasks:integration-15",
+        "ci-tasks:integration-16",
+        "ci-tasks:integration-17",
+        "ci-tasks:integration-18",
+        "ci-tasks:integration-19",
+        "ci-tasks:integration-20",
+        "ci-tasks:integration-21",
+        "ci-tasks:integration-22",
+        "ci-tasks:integration-23",
+        "ci-tasks:integration-24",
+        "ci-tasks:integration-25",
+        "ci-tasks:integration-26",
+        "ci-tasks:integration-27",
+        "ci-tasks:integration-28",
+        "ci-tasks:integration-29",
+        "ci-tasks:integration-factory-activity"
+      ],
+      "actualTargets": [
+        "ci-tasks:integration-2",
+        "ci-tasks:integration-3",
+        "ci-tasks:integration-4",
+        "ci-tasks:integration-5",
+        "ci-tasks:integration-6",
+        "ci-tasks:integration-7",
+        "ci-tasks:integration-8",
+        "ci-tasks:integration-9",
+        "ci-tasks:integration-10",
+        "ci-tasks:integration-11",
+        "ci-tasks:integration-12",
+        "ci-tasks:integration-13",
+        "ci-tasks:integration-14",
+        "ci-tasks:integration-15",
+        "ci-tasks:integration-16",
+        "ci-tasks:integration-17",
+        "ci-tasks:integration-18",
+        "ci-tasks:integration-19",
+        "ci-tasks:integration-20",
+        "ci-tasks:integration-21",
+        "ci-tasks:integration-22",
+        "ci-tasks:integration-23",
+        "ci-tasks:integration-24",
+        "ci-tasks:integration-25",
+        "ci-tasks:integration-26",
+        "ci-tasks:integration-27",
+        "ci-tasks:integration-28",
+        "ci-tasks:integration-29",
+        "ci-tasks:integration-factory-activity"
+      ],
+      "missing": [],
+      "extra": [],
+      "counts": {
+        "tests": 2204,
+        "pass": 2192,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 12,
+        "todo": 0
+      },
+      "nodeSummaryCount": 59,
+      "summaries": [
+        {
+          "line": 531,
+          "metric": "tests",
+          "value": 8
+        },
+        {
+          "line": 533,
+          "metric": "pass",
+          "value": 8
+        },
+        {
+          "line": 534,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 535,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 536,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 537,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 548,
+          "metric": "tests",
+          "value": 9
+        },
+        {
+          "line": 550,
+          "metric": "pass",
+          "value": 8
+        },
+        {
+          "line": 551,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 552,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 553,
+          "metric": "skipped",
+          "value": 1
+        },
+        {
+          "line": 554,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 687,
+          "metric": "tests",
+          "value": 48
+        },
+        {
+          "line": 689,
+          "metric": "pass",
+          "value": 48
+        },
+        {
+          "line": 690,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 691,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 692,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 693,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 696,
+          "metric": "tests",
+          "value": 1
+        },
+        {
+          "line": 698,
+          "metric": "pass",
+          "value": 1
+        },
+        {
+          "line": 699,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 700,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 701,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 702,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 713,
+          "metric": "tests",
+          "value": 73
+        },
+        {
+          "line": 715,
+          "metric": "pass",
+          "value": 73
+        },
+        {
+          "line": 716,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 717,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 718,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 719,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 731,
+          "metric": "tests",
+          "value": 10
+        },
+        {
+          "line": 733,
+          "metric": "pass",
+          "value": 10
+        },
+        {
+          "line": 734,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 735,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 736,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 737,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 756,
+          "metric": "tests",
+          "value": 12
+        },
+        {
+          "line": 758,
+          "metric": "pass",
+          "value": 11
+        },
+        {
+          "line": 759,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 760,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 761,
+          "metric": "skipped",
+          "value": 1
+        },
+        {
+          "line": 762,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 939,
+          "metric": "tests",
+          "value": 82
+        },
+        {
+          "line": 941,
+          "metric": "pass",
+          "value": 82
+        },
+        {
+          "line": 942,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 943,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 944,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 945,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 1557,
+          "metric": "tests",
+          "value": 25
+        },
+        {
+          "line": 1559,
+          "metric": "pass",
+          "value": 25
+        },
+        {
+          "line": 1560,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1561,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1562,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1563,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 1713,
+          "metric": "tests",
+          "value": 119
+        },
+        {
+          "line": 1715,
+          "metric": "pass",
+          "value": 110
+        },
+        {
+          "line": 1716,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1717,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1718,
+          "metric": "skipped",
+          "value": 9
+        },
+        {
+          "line": 1719,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 1731,
+          "metric": "tests",
+          "value": 5
+        },
+        {
+          "line": 1733,
+          "metric": "pass",
+          "value": 5
+        },
+        {
+          "line": 1734,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1735,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1736,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1737,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 1863,
+          "metric": "tests",
+          "value": 97
+        },
+        {
+          "line": 1865,
+          "metric": "pass",
+          "value": 97
+        },
+        {
+          "line": 1866,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1867,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1868,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1869,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 1882,
+          "metric": "tests",
+          "value": 9
+        },
+        {
+          "line": 1884,
+          "metric": "pass",
+          "value": 9
+        },
+        {
+          "line": 1885,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1886,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1887,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1888,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 1980,
+          "metric": "tests",
+          "value": 71
+        },
+        {
+          "line": 1982,
+          "metric": "pass",
+          "value": 71
+        },
+        {
+          "line": 1983,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 1984,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1985,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1986,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2016,
+          "metric": "tests",
+          "value": 14
+        },
+        {
+          "line": 2018,
+          "metric": "pass",
+          "value": 14
+        },
+        {
+          "line": 2019,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2020,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2021,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2022,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2053,
+          "metric": "tests",
+          "value": 21
+        },
+        {
+          "line": 2055,
+          "metric": "pass",
+          "value": 21
+        },
+        {
+          "line": 2056,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2057,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2058,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2059,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2070,
+          "metric": "tests",
+          "value": 6
+        },
+        {
+          "line": 2072,
+          "metric": "pass",
+          "value": 6
+        },
+        {
+          "line": 2073,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2074,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2075,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2076,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2084,
+          "metric": "tests",
+          "value": 4
+        },
+        {
+          "line": 2086,
+          "metric": "pass",
+          "value": 4
+        },
+        {
+          "line": 2087,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2088,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2089,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2090,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2106,
+          "metric": "tests",
+          "value": 7
+        },
+        {
+          "line": 2108,
+          "metric": "pass",
+          "value": 7
+        },
+        {
+          "line": 2109,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2110,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2111,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2112,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2352,
+          "metric": "tests",
+          "value": 170
+        },
+        {
+          "line": 2354,
+          "metric": "pass",
+          "value": 170
+        },
+        {
+          "line": 2355,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2356,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2357,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2358,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2372,
+          "metric": "tests",
+          "value": 7
+        },
+        {
+          "line": 2374,
+          "metric": "pass",
+          "value": 7
+        },
+        {
+          "line": 2375,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2376,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2377,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2378,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2405,
+          "metric": "tests",
+          "value": 22
+        },
+        {
+          "line": 2407,
+          "metric": "pass",
+          "value": 22
+        },
+        {
+          "line": 2408,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2409,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2410,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2411,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2427,
+          "metric": "tests",
+          "value": 9
+        },
+        {
+          "line": 2429,
+          "metric": "pass",
+          "value": 9
+        },
+        {
+          "line": 2430,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2431,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2432,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2433,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2455,
+          "metric": "tests",
+          "value": 12
+        },
+        {
+          "line": 2457,
+          "metric": "pass",
+          "value": 12
+        },
+        {
+          "line": 2458,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2459,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2460,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2461,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2473,
+          "metric": "tests",
+          "value": 5
+        },
+        {
+          "line": 2475,
+          "metric": "pass",
+          "value": 5
+        },
+        {
+          "line": 2476,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2477,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2478,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2479,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2606,
+          "metric": "tests",
+          "value": 82
+        },
+        {
+          "line": 2608,
+          "metric": "pass",
+          "value": 81
+        },
+        {
+          "line": 2609,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2610,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2611,
+          "metric": "skipped",
+          "value": 1
+        },
+        {
+          "line": 2612,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2702,
+          "metric": "tests",
+          "value": 22
+        },
+        {
+          "line": 2704,
+          "metric": "pass",
+          "value": 22
+        },
+        {
+          "line": 2705,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2706,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2707,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2708,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 2755,
+          "metric": "tests",
+          "value": 40
+        },
+        {
+          "line": 2757,
+          "metric": "pass",
+          "value": 40
+        },
+        {
+          "line": 2758,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 2759,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2760,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2761,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3005,
+          "metric": "tests",
+          "value": 109
+        },
+        {
+          "line": 3007,
+          "metric": "pass",
+          "value": 109
+        },
+        {
+          "line": 3008,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3009,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3010,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3011,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3050,
+          "metric": "tests",
+          "value": 22
+        },
+        {
+          "line": 3052,
+          "metric": "pass",
+          "value": 22
+        },
+        {
+          "line": 3053,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3054,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3055,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3056,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3076,
+          "metric": "tests",
+          "value": 11
+        },
+        {
+          "line": 3078,
+          "metric": "pass",
+          "value": 11
+        },
+        {
+          "line": 3079,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3080,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3081,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3082,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3119,
+          "metric": "tests",
+          "value": 33
+        },
+        {
+          "line": 3121,
+          "metric": "pass",
+          "value": 33
+        },
+        {
+          "line": 3122,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3123,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3124,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3125,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3202,
+          "metric": "tests",
+          "value": 97
+        },
+        {
+          "line": 3204,
+          "metric": "pass",
+          "value": 97
+        },
+        {
+          "line": 3205,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3206,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3207,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3208,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3254,
+          "metric": "tests",
+          "value": 31
+        },
+        {
+          "line": 3256,
+          "metric": "pass",
+          "value": 31
+        },
+        {
+          "line": 3257,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3258,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3259,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3260,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3275,
+          "metric": "tests",
+          "value": 8
+        },
+        {
+          "line": 3277,
+          "metric": "pass",
+          "value": 8
+        },
+        {
+          "line": 3278,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3279,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3280,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3281,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3331,
+          "metric": "tests",
+          "value": 43
+        },
+        {
+          "line": 3333,
+          "metric": "pass",
+          "value": 43
+        },
+        {
+          "line": 3334,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3335,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3336,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3337,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3368,
+          "metric": "tests",
+          "value": 29
+        },
+        {
+          "line": 3370,
+          "metric": "pass",
+          "value": 29
+        },
+        {
+          "line": 3371,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3372,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3373,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3374,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3493,
+          "metric": "tests",
+          "value": 83
+        },
+        {
+          "line": 3495,
+          "metric": "pass",
+          "value": 83
+        },
+        {
+          "line": 3496,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3497,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3498,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3499,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3703,
+          "metric": "tests",
+          "value": 152
+        },
+        {
+          "line": 3705,
+          "metric": "pass",
+          "value": 152
+        },
+        {
+          "line": 3706,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3707,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3708,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3709,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3792,
+          "metric": "tests",
+          "value": 35
+        },
+        {
+          "line": 3794,
+          "metric": "pass",
+          "value": 35
+        },
+        {
+          "line": 3795,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3796,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3797,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3798,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3847,
+          "metric": "tests",
+          "value": 18
+        },
+        {
+          "line": 3849,
+          "metric": "pass",
+          "value": 18
+        },
+        {
+          "line": 3850,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3851,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3852,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3853,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3866,
+          "metric": "tests",
+          "value": 6
+        },
+        {
+          "line": 3868,
+          "metric": "pass",
+          "value": 6
+        },
+        {
+          "line": 3869,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3870,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3871,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3872,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3888,
+          "metric": "tests",
+          "value": 9
+        },
+        {
+          "line": 3890,
+          "metric": "pass",
+          "value": 9
+        },
+        {
+          "line": 3891,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3892,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3893,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3894,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 3931,
+          "metric": "tests",
+          "value": 23
+        },
+        {
+          "line": 3933,
+          "metric": "pass",
+          "value": 23
+        },
+        {
+          "line": 3934,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 3935,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3936,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3937,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4239,
+          "metric": "tests",
+          "value": 264
+        },
+        {
+          "line": 4241,
+          "metric": "pass",
+          "value": 264
+        },
+        {
+          "line": 4242,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4243,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4244,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4245,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4318,
+          "metric": "tests",
+          "value": 33
+        },
+        {
+          "line": 4320,
+          "metric": "pass",
+          "value": 33
+        },
+        {
+          "line": 4321,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4322,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4323,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4324,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4380,
+          "metric": "tests",
+          "value": 23
+        },
+        {
+          "line": 4382,
+          "metric": "pass",
+          "value": 23
+        },
+        {
+          "line": 4383,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4384,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4385,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4386,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4392,
+          "metric": "tests",
+          "value": 2
+        },
+        {
+          "line": 4394,
+          "metric": "pass",
+          "value": 2
+        },
+        {
+          "line": 4395,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4396,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4397,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4398,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4404,
+          "metric": "tests",
+          "value": 4
+        },
+        {
+          "line": 4406,
+          "metric": "pass",
+          "value": 4
+        },
+        {
+          "line": 4407,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4408,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4409,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4410,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4414,
+          "metric": "tests",
+          "value": 2
+        },
+        {
+          "line": 4416,
+          "metric": "pass",
+          "value": 2
+        },
+        {
+          "line": 4417,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4418,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4419,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4420,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4425,
+          "metric": "tests",
+          "value": 3
+        },
+        {
+          "line": 4427,
+          "metric": "pass",
+          "value": 3
+        },
+        {
+          "line": 4428,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4429,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4430,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4431,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4692,
+          "metric": "tests",
+          "value": 39
+        },
+        {
+          "line": 4694,
+          "metric": "pass",
+          "value": 39
+        },
+        {
+          "line": 4695,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4696,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4697,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4698,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4704,
+          "metric": "tests",
+          "value": 4
+        },
+        {
+          "line": 4706,
+          "metric": "pass",
+          "value": 4
+        },
+        {
+          "line": 4707,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4708,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4709,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4710,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4769,
+          "metric": "tests",
+          "value": 25
+        },
+        {
+          "line": 4771,
+          "metric": "pass",
+          "value": 25
+        },
+        {
+          "line": 4772,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4773,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4774,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4775,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4813,
+          "metric": "tests",
+          "value": 30
+        },
+        {
+          "line": 4815,
+          "metric": "pass",
+          "value": 30
+        },
+        {
+          "line": 4816,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4817,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4818,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4819,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4873,
+          "metric": "tests",
+          "value": 4
+        },
+        {
+          "line": 4875,
+          "metric": "pass",
+          "value": 4
+        },
+        {
+          "line": 4876,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4877,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4878,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4879,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4903,
+          "metric": "tests",
+          "value": 53
+        },
+        {
+          "line": 4905,
+          "metric": "pass",
+          "value": 53
+        },
+        {
+          "line": 4906,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4907,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4908,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4909,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4919,
+          "metric": "tests",
+          "value": 10
+        },
+        {
+          "line": 4921,
+          "metric": "pass",
+          "value": 10
+        },
+        {
+          "line": 4922,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4923,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4924,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4925,
+          "metric": "todo",
+          "value": 0
+        },
+        {
+          "line": 4959,
+          "metric": "tests",
+          "value": 9
+        },
+        {
+          "line": 4961,
+          "metric": "pass",
+          "value": 9
+        },
+        {
+          "line": 4962,
+          "metric": "fail",
+          "value": 0
+        },
+        {
+          "line": 4963,
+          "metric": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 4964,
+          "metric": "skipped",
+          "value": 0
+        },
+        {
+          "line": 4965,
+          "metric": "todo",
+          "value": 0
+        }
+      ],
+      "aggregateMessages": [
+        "##[group]Run node scripts/ci/run-units.mjs integration",
+        "node scripts/ci/run-units.mjs integration",
+        " NX   Successfully ran targets integration-2, integration-3, integration-4, integration-5, integration-6, integration-7, integration-8, integration-9, integration-10, integration-11, integration-12, integration-13, integration-14, integration-15, integration-16, integration-17, integration-18, integration-19, integration-20, integration-21, integration-22, integration-23, integration-24, integration-25, integration-26, integration-27, integration-28, integration-29, integration-factory-activity for project ci-tasks",
+        "  Cache:             Skipped (--skip-nx-cache)",
+        "    - Cache: drop --skip-nx-cache to restore unchanged tasks instantly."
+      ],
+      "skipLines": [
+        {
+          "line": 487,
+          "text": "##[end-action id=__self.__actions_cache;outcome=skipped;conclusion=skipped;duration_ms=0]"
+        },
+        {
+          "line": 547,
+          "text": "ci-tasks: ﹣ active agents on the database (0.276587ms) # SKIP"
+        },
+        {
+          "line": 553,
+          "text": "ci-tasks: ℹ skipped 1"
+        },
+        {
+          "line": 751,
+          "text": "ci-tasks: ﹣ Postgres17 migration, atomic history, pagination, unread counts, membership and privacy (0.038548ms) # SKIP"
+        },
+        {
+          "line": 761,
+          "text": "ci-tasks: ℹ skipped 1"
+        },
+        {
+          "line": 1581,
+          "text": "ci-tasks: ﹣ PG: scoped decision traces, exact event counting, human feedback, revoked memberships and privacy (0.531571ms) # SKIP"
+        },
+        {
+          "line": 1621,
+          "text": "ci-tasks: ﹣ PG: group delegation has one Task/Thread, requester scope, replay receipt, latest epoch, status/stop and one reporter (0.686295ms) # SKIP"
+        },
+        {
+          "line": 1624,
+          "text": "ci-tasks: ﹣ PG: real Factory flow 2 deliverable acceptance publishes one final report with current-epoch artifact and producer thread (0.131208ms) # SKIP"
+        },
+        {
+          "line": 1625,
+          "text": "ci-tasks: ﹣ PG: real Factory flow 2 repository acceptance publishes one final report with current-epoch artifact and producer thread (0.051909ms) # SKIP"
+        },
+        {
+          "line": 1626,
+          "text": "ci-tasks: ﹣ PG: real Factory flow 1 deliverable acceptance publishes one final report with current-epoch artifact and producer thread (0.104127ms) # SKIP"
+        },
+        {
+          "line": 1627,
+          "text": "ci-tasks: ﹣ PG: real Factory flow 1 repository acceptance publishes one final report with current-epoch artifact and producer thread (3.349891ms) # SKIP"
+        },
+        {
+          "line": 1628,
+          "text": "ci-tasks: ﹣ PG: production group Factory authorization uses typed Bot membership and rechecks both current workspace owners (8.471384ms) # SKIP"
+        },
+        {
+          "line": 1663,
+          "text": "ci-tasks: ﹣ PG17: group sessions own different backends and close releases reentrant locks even after a socket loss (0.049805ms) # SKIP"
+        },
+        {
+          "line": 1664,
+          "text": "ci-tasks: ﹣ PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, rounds, correction persistence and privacy (0.028753ms) # SKIP"
+        },
+        {
+          "line": 1718,
+          "text": "ci-tasks: ℹ skipped 9"
+        },
+        {
+          "line": 2551,
+          "text": "ci-tasks: ﹣ the demo replies use every component the bot can use (0.133882ms) # SKIP"
+        },
+        {
+          "line": 2611,
+          "text": "ci-tasks: ℹ skipped 1"
+        },
+        {
+          "line": 3232,
+          "text": "ci-tasks: ✔ parses TAP/spec and rejects missing, zero, skipped, todo, cancelled or failed executions (0.241013ms)"
+        },
+        {
+          "line": 3736,
+          "text": "ci-tasks: ✔ denied and skipped events stay out of the log (0.151478ms)"
+        }
+      ]
+    },
+    "countMeaning": "Node reporter summary totals, not a deduplicated universal suite count. Tasks are matched to the complete trusted selector by exact target; raw logs retain command/output order and any concurrent interleaving. Cache explicitly skipped."
+  },
+  "installer": {
+    "source": {
+      "jobId": 129114784847,
+      "bytes": 1016228,
+      "sha256": "8dc3a78b98c61a317909ff2561f3bcc68c5b3cb336fcc41d51f68f5b4c8fde7b",
+      "lines": 7846,
+      "downloadCount": 1,
+      "conclusion": "success"
+    },
+    "realLifecycleAssertions": [
+      {
+        "line": 3901,
+        "text": "ci-tasks: ▶ shared install defaults to no credential and overrides ambient legacy tokens in real lifecycle scripts"
+      },
+      {
+        "line": 3902,
+        "text": "ci-tasks:   ✔ no input stays empty (2072.501374ms)"
+      },
+      {
+        "line": 3903,
+        "text": "ci-tasks:   ✔ ambient token is cleared (1566.077361ms)"
+      },
+      {
+        "line": 3904,
+        "text": "ci-tasks: ✔ shared install defaults to no credential and overrides ambient legacy tokens in real lifecycle scripts (3660.254766ms)"
+      },
+      {
+        "line": 3905,
+        "text": "ci-tasks: ✔ a verified API-read-only caller explicitly delivers its token to the real install process (1518.390979ms)"
+      },
+      {
+        "line": 3906,
+        "text": "ci-tasks: ✔ the actual composite input and all workflow opt-ins preserve the process credential boundary (82.49443ms)"
+      },
+      {
+        "line": 3907,
+        "text": "ci-tasks: ▶ credential opt-ins honor job overrides and reject unknown or API-write permissions"
+      },
+      {
+        "line": 3916,
+        "text": "ci-tasks: ✔ credential opt-ins honor job overrides and reject unknown or API-write permissions (4.6345ms)"
+      }
+    ],
+    "allWorkflowScopeTestPassed": true
+  },
+  "daemon": {
+    "metadata": {
+      "jobId": 129114784961,
+      "bytes": 124549,
+      "sha256": "efb61693fb93eba1ade5eee4bfa4ad13edf77fa48683a1114524de1ccd82bd2c",
+      "lines": 1243,
+      "downloadCount": 1,
+      "sha": "323dc836c1254db2595782152aec2efd9e3cf734",
+      "privacyScanMatched": []
+    },
+    "filesPassed": 139,
+    "filesSkipped": 1,
+    "testsPassed": 1577,
+    "testsSkipped": 2
+  },
+  "desktop": {
+    "metadata": {
+      "jobId": 129115195285,
+      "bytes": 104404,
+      "sha256": "ae07446638d272bbfdf81492bd614067aee25d6d4398b1610ae8aa6361a88f1e",
+      "lines": 1102,
+      "downloadCount": 1,
+      "sha": "8fe25f5ad851f94630f2a4a3b6b5a88a985fe5bd",
+      "privacyScanMatched": []
+    },
+    "nodeSummaries": [
+      {
+        "line": 581,
+        "tests": 156,
+        "suites": 0,
+        "pass": 156,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      {
+        "line": 907,
+        "tests": 294,
+        "suites": 0,
+        "pass": 294,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      {
+        "line": 1011,
+        "tests": 46,
+        "suites": 0,
+        "pass": 46,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      {
+        "line": 1056,
+        "tests": 10,
+        "suites": 0,
+        "pass": 10,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    ],
+    "readBatchOriginalTopCases": 13,
+    "readBatchPreserves404StrictnessAndBodyPendingIsCurrent": true,
+    "fullTypeLintBuildPassed": true
+  },
+  "desktopLinuxSmoke": {
+    "metadata": {
+      "jobId": 129115195058,
+      "bytes": 312454,
+      "sha256": "8612f2b01def4632a89a1612cfd3b14e36e34cc6c65130a714aae9ec7a4c68d5",
+      "lines": 3291,
+      "downloadCount": 1,
+      "conclusion": "success"
+    },
+    "nodeSummaries": [
+      {
+        "line": 2851,
+        "tests": 1,
+        "suites": 0,
+        "pass": 1,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      {
+        "line": 2934,
+        "tests": 71,
+        "suites": 0,
+        "pass": 71,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      {
+        "line": 2945,
+        "tests": 3,
+        "suites": 0,
+        "pass": 3,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      {
+        "line": 3025,
+        "tests": 11,
+        "suites": 0,
+        "pass": 11,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      {
+        "line": 3121,
+        "tests": 44,
+        "suites": 0,
+        "pass": 44,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    ],
+    "localBuildRevision": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4",
+    "audit": {
+      "files": 4,
+      "archives": 0,
+      "archiveEntries": 0,
+      "decodedBytes": 0,
+      "result": "passed",
+      "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden"
+    },
+    "cleanupObservations": [
+      {
+        "line": 3283,
+        "text": "Stop and remove container: 8ff57149c67a407090ccdcd1ad5366ef_postgres17_2f9189"
+      },
+      {
+        "line": 3284,
+        "text": "##[command]/usr/bin/docker rm --force 7841702bb1c624a0540709849e0a6c7883521b97ea3d6b8fcbc9fef7326f1980"
+      },
+      {
+        "line": 3287,
+        "text": "##[command]/usr/bin/docker network rm github_network_e7e0be4ff8974c38989c8a3fe38ea15e"
+      },
+      {
+        "line": 3288,
+        "text": "github_network_e7e0be4ff8974c38989c8a3fe38ea15e"
+      },
+      {
+        "line": 3289,
+        "text": "Cleaning up orphan processes"
+      }
+    ],
+    "notAppleCompleteNativeWindow": true
+  },
+  "analyticsSSR": {
+    "metadata": {
+      "jobId": 129115216308,
+      "bytes": 228297,
+      "sha256": "e5639d71be146f587968d96c3e1b8f3a3a790b194c45f620d6ea4cee2bfdde6b",
+      "lines": 2532,
+      "downloadCount": 1,
+      "conclusion": "success"
+    },
+    "result": {
+      "revision": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4",
+      "runtime": "vite-nitro",
+      "analytics": "synthetic-enabled-network-blocked",
+      "assetManifestSha256": "73012facf1e9a4079a30bbc460491c45af60360bedaf9e7a741ad9e039654d4a",
+      "runtimeResources": {
+        "count": 51,
+        "required": [
+          "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+          "packages/daemon/scripts/refresh-cloud-worker.py",
+          "scripts/e2b/inspect-retained-deliverable.mjs"
+        ]
+      },
+      "paths": [
+        {
+          "path": "/mikka",
+          "locale": "zh-CN",
+          "status": "pass",
+          "loadedAssets": 60,
+          "blockedExternalRequests": 7,
+          "pageErrors": 0
+        },
+        {
+          "path": "/mikka/sign-in",
+          "locale": "zh-CN",
+          "status": "pass",
+          "loadedAssets": 60,
+          "blockedExternalRequests": 6,
+          "pageErrors": 0
+        },
+        {
+          "path": "/mikka/en/sign-in",
+          "locale": "en",
+          "status": "pass",
+          "loadedAssets": 60,
+          "blockedExternalRequests": 6,
+          "pageErrors": 0
+        }
+      ]
+    },
+    "buildAssets": 852,
+    "localAnonymousPages": 3,
+    "cleanupObservations": [
+      {
+        "line": 2524,
+        "text": "Stop and remove container: 893b438804a44f7f8b664bf832a52583_postgres17_26e261"
+      },
+      {
+        "line": 2525,
+        "text": "##[command]/usr/bin/docker rm --force 664eb6e8ea781dcf05da7c4d5d5739de86348490e10a539f0f97fe5deb968008"
+      },
+      {
+        "line": 2528,
+        "text": "##[command]/usr/bin/docker network rm github_network_a0fcdb2896da469e9de24a493dc0d810"
+      },
+      {
+        "line": 2529,
+        "text": "github_network_a0fcdb2896da469e9de24a493dc0d810"
+      },
+      {
+        "line": 2530,
+        "text": "Cleaning up orphan processes"
+      }
+    ],
+    "networkBlockedIsNotIngestion": true
+  },
+  "bounds": {
+    "imageAndApplePending": true,
+    "wholeRunPending": true,
+    "productionACMEAccepted": 0,
+    "noNewResourcesOrTestsRunByThisReview": true
+  }
+}

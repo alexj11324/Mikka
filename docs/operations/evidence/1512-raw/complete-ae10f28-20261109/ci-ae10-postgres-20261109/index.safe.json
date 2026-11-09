@@ -1,0 +1,257 @@
+{
+  "schemaVersion": 1,
+  "kind": "postgres-source-bound-archive-index",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "prefix": "ci-ae10-postgres-20261109",
+  "workflowRun": 42603781956,
+  "eventHead": "ae10f28aa471dbfc64f04d981b8934d374476259",
+  "actualCheckout": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4",
+  "actualTree": "1acbe0b8d50a7102543e24b9bd0395355bcba438",
+  "sourceBoundary": "Actual checkout is proven independently in all five raw job logs. Root's immutable commit API verification binds that checkout to the same tree as event head and parents [a219,ae10]; event head alone was not used as checkout proof.",
+  "selectionReference": {
+    "sourceJob": 129114378174,
+    "originalLogGitBlob": "0795d366db29e89ed0079d9a17c1c9df2a31fc65",
+    "selectionGitBlob": "f9a8897406fe2e318823ceed90a2810744a0b1d5",
+    "selectionBytes": 389272,
+    "selectionSha256": "e1305a79e9240dc4e1c1dca2b997fbea4bf31ef8d520d676c837e7167baed178",
+    "retrievedAndHashVerified": true,
+    "full": true,
+    "selectedSuites": 72,
+    "selectionOriginalNotDownloadedAgain": true
+  },
+  "results": {
+    "suiteCount": 72,
+    "executedExactlyOnce": 72,
+    "tests": 3904,
+    "pass": 3904,
+    "fail": 0,
+    "skipped": 0,
+    "cancelled": 0,
+    "todo": 0,
+    "shards": [
+      {
+        "jobId": 129114785119,
+        "shard": "1/4",
+        "conclusion": "success",
+        "suites": 18,
+        "tests": 759,
+        "pass": 759,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      },
+      {
+        "jobId": 129114785357,
+        "shard": "2/4",
+        "conclusion": "success",
+        "suites": 18,
+        "tests": 806,
+        "pass": 806,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      },
+      {
+        "jobId": 129114785156,
+        "shard": "3/4",
+        "conclusion": "success",
+        "suites": 18,
+        "tests": 1660,
+        "pass": 1660,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      },
+      {
+        "jobId": 129114785141,
+        "shard": "4/4",
+        "conclusion": "success",
+        "suites": 18,
+        "tests": 679,
+        "pass": 679,
+        "fail": 0,
+        "skipped": 0,
+        "todo": 0,
+        "cancelled": 0
+      }
+    ],
+    "standalonePassingTestsOutsideInventory": 10,
+    "aggregate": {
+      "jobId": 129117884767,
+      "conclusion": "success",
+      "meaning": "DB dependency-result gate and timing summary only; no production build/browser execution."
+    }
+  },
+  "keyEvidence": {
+    "deviceRevocationAndPolls": 32,
+    "deviceRevocationCommandParts": [
+      16,
+      11,
+      5
+    ],
+    "deviceEnrollmentAndCommands": 13,
+    "activityActor": 60,
+    "workspaceVisibility": 57,
+    "webAuth": 14,
+    "runResultGroups": 94,
+    "strictFence": {
+      "roundTrips": [
+        11,
+        6
+      ],
+      "explicitAuthorizationTransactions": [
+        2,
+        1
+      ],
+      "completedTransactions": [
+        3,
+        4
+      ]
+    },
+    "boundary": "These are actual source-bound isolated PG results, not a Native/production full-window pass."
+  },
+  "files": [
+    {
+      "path": "postgres-1-129114785119.original.log",
+      "bytes": 687015,
+      "sha256": "8d3c6093e40efe170f7a92ba2c266b36293ace409e25066610fa397e005fb201",
+      "gitBlob": "dee24a794d24d59549792b30568628259f53aa24",
+      "jobId": 129114785119,
+      "rawReadCount": 1,
+      "remoteConfirmed": true,
+      "containsAnsi": true,
+      "origin": "Official GitHub decoded job-log text, re-encoded as UTF-8 without editing.",
+      "kind": "original",
+      "mode": "100644",
+      "startsWithBom": true,
+      "textUnmodified": true
+    },
+    {
+      "path": "postgres-4-129114785141.original.log",
+      "bytes": 684452,
+      "sha256": "d61802f5775525cad71343c910a0bc9be3dca00e314538293ba640128fb0c00d",
+      "gitBlob": "16ef448625776bd39fc2f87f71c91cd54a86fd78",
+      "jobId": 129114785141,
+      "rawReadCount": 1,
+      "remoteConfirmed": true,
+      "containsAnsi": true,
+      "origin": "Official GitHub decoded job-log text, re-encoded as UTF-8 without editing.",
+      "kind": "original",
+      "mode": "100644",
+      "startsWithBom": true,
+      "textUnmodified": true
+    },
+    {
+      "path": "postgres-3-129114785156.original.log",
+      "bytes": 2728874,
+      "sha256": "a0a9a5f0073537f971649ccc11e4e6b1fa2370ec938cf5d64a5375775c21be73",
+      "gitBlob": "d4c1472f4ea80466c79b67a574a1e45cc3d1a119",
+      "jobId": 129114785156,
+      "rawReadCount": 1,
+      "remoteConfirmed": true,
+      "containsAnsi": true,
+      "origin": "Official GitHub decoded job-log text, re-encoded as UTF-8 without editing.",
+      "kind": "original",
+      "mode": "100644",
+      "startsWithBom": true,
+      "textUnmodified": true
+    },
+    {
+      "path": "postgres-2-129114785357.original.log",
+      "bytes": 1184275,
+      "sha256": "483f30506b4390e03f21ee0a2050c59c29c97291463bd8eab258f3ba519001f5",
+      "gitBlob": "4261afdd84ffed470dfa6afea71c2610d69808cb",
+      "jobId": 129114785357,
+      "rawReadCount": 1,
+      "remoteConfirmed": true,
+      "containsAnsi": true,
+      "origin": "Official GitHub decoded job-log text, re-encoded as UTF-8 without editing.",
+      "kind": "original",
+      "mode": "100644",
+      "startsWithBom": true,
+      "textUnmodified": true
+    },
+    {
+      "path": "postgres-aggregate-129117884767.original.log",
+      "bytes": 13312,
+      "sha256": "6bef5f196592331ffcb8a57fa43a960e75a50b97b7d801feb7ac8791f8e711bc",
+      "gitBlob": "7c454ee809c24b31397cfb3d9f2d322998d70ea2",
+      "jobId": 129117884767,
+      "rawReadCount": 1,
+      "remoteConfirmed": true,
+      "containsAnsi": true,
+      "origin": "Official GitHub decoded job-log text, re-encoded as UTF-8 without editing.",
+      "kind": "original",
+      "mode": "100644",
+      "startsWithBom": true,
+      "textUnmodified": true
+    },
+    {
+      "path": "postgres-ledger.safe.json",
+      "bytes": 879751,
+      "sha256": "d94982407a413c39b82f61df7ebb381094ce9f3b2a7110b64a1382a3a7dfac4a",
+      "gitBlob": "e4af52ed79d76dd56a6be846fa15cba55a0dbd01",
+      "kind": "safe-evidence",
+      "remoteConfirmed": true,
+      "mode": "100644"
+    },
+    {
+      "path": "postgres-terminal.safe.json",
+      "bytes": 88691,
+      "sha256": "6da323cf55cf45ca131acefc14a85d0d1194e312e73fa7ddb14ddf1e8c5875e0",
+      "gitBlob": "e948af3e096a58ff4a71c811ad499eb6da0c54aa",
+      "kind": "safe-evidence",
+      "remoteConfirmed": true,
+      "mode": "100644"
+    },
+    {
+      "path": "postgres-privacy.safe.json",
+      "bytes": 14681,
+      "sha256": "fedc325afddd7ba25c9b242eebbb065a98972b905b1eb5c05fc9148687a36769",
+      "gitBlob": "1326c8463060785652b87971468348ac84102ddd",
+      "kind": "safe-evidence",
+      "remoteConfirmed": true,
+      "mode": "100644"
+    }
+  ],
+  "payloadFileCount": 8,
+  "payloadBytes": 6281051,
+  "originalAccounting": {
+    "originalJobLogs": 5,
+    "originalBytes": 5297928,
+    "everyJobDownloadedOnce": true,
+    "originalJobIds": [
+      129114785119,
+      129114785357,
+      129114785156,
+      129114785141,
+      129117884767
+    ],
+    "encoding": "Official decoded GitHub UTF-8 text, without changing returned BOM/ANSI or masking."
+  },
+  "privacy": {
+    "safeReviewGitBlob": "1326c8463060785652b87971468348ac84102ddd",
+    "unresolvedCandidates": 0,
+    "actualCredentialsPublished": false,
+    "syntheticEmailCollisionSourceBound": true,
+    "toolEnvelopesAndDownloadUrlsExcluded": true
+  },
+  "cleanup": {
+    "removedPostgresContainers": 4,
+    "removedJobNetworks": 4,
+    "originalRemovalIdsMatchedCreateIds": true,
+    "reviewerCreatedResources": 0,
+    "testsRerun": 0,
+    "productionOrModelCalls": 0,
+    "refsChanged": false
+  },
+  "limits": [
+    "Conditional workflow skips are retained separately from the zero-skipped required tests.",
+    "Existing source/CI/Native failures from other attempts are not overwritten or retrospectively reclassified.",
+    "This package does not assert the full workflow, Native acceptance or production acceptance outcome."
+  ]
+}

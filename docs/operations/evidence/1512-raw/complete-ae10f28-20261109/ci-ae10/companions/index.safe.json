@@ -1,0 +1,606 @@
+{
+  "schemaVersion": 1,
+  "issue": 1512,
+  "title": "ae10 non-CI companion workflows: terminal original evidence",
+  "frozenAtUTC": "2026-11-09T11:03:02.978Z",
+  "source": {
+    "head": "ae10f28aa471dbfc64f04d981b8934d374476259",
+    "tree": "1acbe0b8d50a7102543e24b9bd0395355bcba438",
+    "actualSyntheticCheckout": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4",
+    "checkoutWithLogs": 17,
+    "placeholderWithoutCheckout": 1,
+    "headAndSyntheticTreeEqual": true,
+    "mainCIExcluded": 42603781956
+  },
+  "result": {
+    "workflows": 13,
+    "completedSuccess": 13,
+    "jobs": 28,
+    "executedSuccessJobs": 18,
+    "skippedJobs": 10,
+    "failedJobOrStepCount": 0,
+    "allRunAttempts": 1,
+    "allEvents": "pull_request",
+    "rawLogFetches": 18,
+    "fetchesPerExecutedJob": 1,
+    "skippedJobLogFetches": 0,
+    "actualCheckoutBoundJobs": 17,
+    "withoutCheckout": {
+      "jobId": 129114376243,
+      "reason": "echo placeholder"
+    },
+    "productionAccepted": false
+  },
+  "totals": {
+    "unit": "framework-reported case executions; overlapping suites are not deduplicated",
+    "nodeSummaries": 42,
+    "nodeTests": 1529,
+    "nodePass": 1529,
+    "nodeFail": 0,
+    "nodeSkipped": 0,
+    "vitestSummaryGroups": 7,
+    "vitestPass": 1767,
+    "vitestSkipped": 2,
+    "pythonSummaries": 6,
+    "pythonPass": 81,
+    "playwrightHTTPPass": 7,
+    "totalPass": 3384,
+    "totalSkippedTests": 2,
+    "customReceiptsNotAddedToFrameworkTotal": [
+      "macOS Node18 expected refusal",
+      "macOS Node22 install/reconnect",
+      "35 isolated read-cache HTTP reads",
+      "workspace governance Item11"
+    ],
+    "rawLogBytes": 1667874
+  },
+  "workflows": [
+    {
+      "runId": 42603781907,
+      "label": "E2B additive",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42603781907",
+      "headSha": "ae10f28aa471dbfc64f04d981b8934d374476259",
+      "event": "pull_request",
+      "attempt": 1,
+      "conclusion": "success",
+      "updatedAt": "2026-11-09T10:47:58Z",
+      "jobs": [
+        129114377094,
+        129114536792,
+        129114537609,
+        129114538635,
+        129114538796,
+        129114539631,
+        129114540473
+      ],
+      "enumeration": {
+        "perPage": 100,
+        "pagesRead": [
+          1
+        ],
+        "apiTotalCount": 7,
+        "returned": 7,
+        "complete": true
+      }
+    },
+    {
+      "runId": 42603781844,
+      "label": "read-cache-production",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42603781844",
+      "headSha": "ae10f28aa471dbfc64f04d981b8934d374476259",
+      "event": "pull_request",
+      "attempt": 1,
+      "conclusion": "success",
+      "updatedAt": "2026-11-09T10:48:54Z",
+      "jobs": [
+        129114378009,
+        129114970513,
+        129114970847
+      ],
+      "enumeration": {
+        "perPage": 100,
+        "pagesRead": [
+          1
+        ],
+        "apiTotalCount": 3,
+        "returned": 3,
+        "complete": true
+      }
+    },
+    {
+      "runId": 42603781830,
+      "label": "Node22",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42603781830",
+      "headSha": "ae10f28aa471dbfc64f04d981b8934d374476259",
+      "event": "pull_request",
+      "attempt": 1,
+      "conclusion": "success",
+      "updatedAt": "2026-11-09T10:54:43Z",
+      "jobs": [
+        129114376539,
+        129114377003,
+        129114864067,
+        129114864188
+      ],
+      "enumeration": {
+        "perPage": 100,
+        "pagesRead": [
+          1
+        ],
+        "apiTotalCount": 4,
+        "returned": 4,
+        "complete": true
+      }
+    },
+    {
+      "runId": 42603781789,
+      "label": "cloud",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42603781789",
+      "headSha": "ae10f28aa471dbfc64f04d981b8934d374476259",
+      "event": "pull_request",
+      "attempt": 1,
+      "conclusion": "success",
+      "updatedAt": "2026-11-09T10:50:30Z",
+      "jobs": [
+        129114376039,
+        129114376356,
+        129114376382
+      ],
+      "enumeration": {
+        "perPage": 100,
+        "pagesRead": [
+          1
+        ],
+        "apiTotalCount": 3,
+        "returned": 3,
+        "complete": true
+      }
+    },
+    {
+      "runId": 42603781870,
+      "label": "custody",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42603781870",
+      "headSha": "ae10f28aa471dbfc64f04d981b8934d374476259",
+      "event": "pull_request",
+      "attempt": 1,
+      "conclusion": "success",
+      "updatedAt": "2026-11-09T10:51:38Z",
+      "jobs": [
+        129114375938
+      ],
+      "enumeration": {
+        "perPage": 100,
+        "pagesRead": [
+          1
+        ],
+        "apiTotalCount": 1,
+        "returned": 1,
+        "complete": true
+      }
+    },
+    {
+      "runId": 42603781733,
+      "label": "read-cache",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42603781733",
+      "headSha": "ae10f28aa471dbfc64f04d981b8934d374476259",
+      "event": "pull_request",
+      "attempt": 1,
+      "conclusion": "success",
+      "updatedAt": "2026-11-09T10:51:27Z",
+      "jobs": [
+        129114376159
+      ],
+      "enumeration": {
+        "perPage": 100,
+        "pagesRead": [
+          1
+        ],
+        "apiTotalCount": 1,
+        "returned": 1,
+        "complete": true
+      }
+    },
+    {
+      "runId": 42603781723,
+      "label": "unattended",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42603781723",
+      "headSha": "ae10f28aa471dbfc64f04d981b8934d374476259",
+      "event": "pull_request",
+      "attempt": 1,
+      "conclusion": "success",
+      "updatedAt": "2026-11-09T10:49:48Z",
+      "jobs": [
+        129114376806
+      ],
+      "enumeration": {
+        "perPage": 100,
+        "pagesRead": [
+          1
+        ],
+        "apiTotalCount": 1,
+        "returned": 1,
+        "complete": true
+      }
+    },
+    {
+      "runId": 42603781784,
+      "label": "gateway",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42603781784",
+      "headSha": "ae10f28aa471dbfc64f04d981b8934d374476259",
+      "event": "pull_request",
+      "attempt": 1,
+      "conclusion": "success",
+      "updatedAt": "2026-11-09T10:50:08Z",
+      "jobs": [
+        129114376538,
+        129115557582
+      ],
+      "enumeration": {
+        "perPage": 100,
+        "pagesRead": [
+          1
+        ],
+        "apiTotalCount": 2,
+        "returned": 2,
+        "complete": true
+      }
+    },
+    {
+      "runId": 42603781755,
+      "label": "browsergate",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42603781755",
+      "headSha": "ae10f28aa471dbfc64f04d981b8934d374476259",
+      "event": "pull_request",
+      "attempt": 1,
+      "conclusion": "success",
+      "updatedAt": "2026-11-09T10:47:42Z",
+      "jobs": [
+        129114376243
+      ],
+      "enumeration": {
+        "perPage": 100,
+        "pagesRead": [
+          1
+        ],
+        "apiTotalCount": 1,
+        "returned": 1,
+        "complete": true
+      }
+    },
+    {
+      "runId": 42603781760,
+      "label": "site-search",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42603781760",
+      "headSha": "ae10f28aa471dbfc64f04d981b8934d374476259",
+      "event": "pull_request",
+      "attempt": 1,
+      "conclusion": "success",
+      "updatedAt": "2026-11-09T10:54:29Z",
+      "jobs": [
+        129114376489
+      ],
+      "enumeration": {
+        "perPage": 100,
+        "pagesRead": [
+          1
+        ],
+        "apiTotalCount": 1,
+        "returned": 1,
+        "complete": true
+      }
+    },
+    {
+      "runId": 42603781995,
+      "label": "SSH",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42603781995",
+      "headSha": "ae10f28aa471dbfc64f04d981b8934d374476259",
+      "event": "pull_request",
+      "attempt": 1,
+      "conclusion": "success",
+      "updatedAt": "2026-11-09T10:53:19Z",
+      "jobs": [
+        129114376689
+      ],
+      "enumeration": {
+        "perPage": 100,
+        "pagesRead": [
+          1
+        ],
+        "apiTotalCount": 1,
+        "returned": 1,
+        "complete": true
+      }
+    },
+    {
+      "runId": 42603781808,
+      "label": "Workspace governance",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42603781808",
+      "headSha": "ae10f28aa471dbfc64f04d981b8934d374476259",
+      "event": "pull_request",
+      "attempt": 1,
+      "conclusion": "success",
+      "updatedAt": "2026-11-09T10:49:45Z",
+      "jobs": [
+        129114376529
+      ],
+      "enumeration": {
+        "perPage": 100,
+        "pagesRead": [
+          1
+        ],
+        "apiTotalCount": 1,
+        "returned": 1,
+        "complete": true
+      }
+    },
+    {
+      "runId": 42603781869,
+      "label": "cloudcore",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42603781869",
+      "headSha": "ae10f28aa471dbfc64f04d981b8934d374476259",
+      "event": "pull_request",
+      "attempt": 1,
+      "conclusion": "success",
+      "updatedAt": "2026-11-09T10:48:37Z",
+      "jobs": [
+        129114377655,
+        129114840622
+      ],
+      "enumeration": {
+        "perPage": 100,
+        "pagesRead": [
+          1
+        ],
+        "apiTotalCount": 2,
+        "returned": 2,
+        "complete": true
+      }
+    }
+  ],
+  "evidenceFiles": [
+    {
+      "path": "ci-ae10/companions/logs/job-129114377094.original.log",
+      "jobId": 129114377094,
+      "bytes": 50846,
+      "sha256": "7156d6e1937f5a6fddc3f94f2c46ea43148ae766f03255cd4cd4e835addc7953",
+      "blob": "ef2759d2cd691cdf5d05c1940015253d0ed282c3",
+      "rawDecodedLogUnmodified": true,
+      "uniqueLogFetchCount": 1
+    },
+    {
+      "path": "ci-ae10/companions/logs/job-129114378009.original.log",
+      "jobId": 129114378009,
+      "bytes": 45630,
+      "sha256": "1e9ca25000cab995bc11ddbab36fb4dcfc210bd56d127bd565ae09e05019136d",
+      "blob": "fc3c147ca3ff688c471cefafba32b2f86eeea608",
+      "rawDecodedLogUnmodified": true,
+      "uniqueLogFetchCount": 1
+    },
+    {
+      "path": "ci-ae10/companions/logs/job-129114376539.original.log",
+      "jobId": 129114376539,
+      "bytes": 35649,
+      "sha256": "54d622b9093c587857125011325d4148500208c12ceec32c744ef203ce818107",
+      "blob": "4fe8f62fa9f83a1e4f3eacca2daaf023e72ccfd9",
+      "rawDecodedLogUnmodified": true,
+      "uniqueLogFetchCount": 1
+    },
+    {
+      "path": "ci-ae10/companions/logs/job-129114377003.original.log",
+      "jobId": 129114377003,
+      "bytes": 127283,
+      "sha256": "dc94025b5b17a0d6eacc1e2af149d0cb02d196db37b32775654fbeb3a0469bb9",
+      "blob": "7da7bfc708ae0c3acb1cec7079d4de95198bd3cb",
+      "rawDecodedLogUnmodified": true,
+      "uniqueLogFetchCount": 1
+    },
+    {
+      "path": "ci-ae10/companions/logs/job-129114864067.original.log",
+      "jobId": 129114864067,
+      "bytes": 45423,
+      "sha256": "3a00df643c76158db562c9905f771144f27bc5a568496fe8dc734e755e66163c",
+      "blob": "44df60a99a20d766f153044d62a9816e520dde3b",
+      "rawDecodedLogUnmodified": true,
+      "uniqueLogFetchCount": 1
+    },
+    {
+      "path": "ci-ae10/companions/logs/job-129114864188.original.log",
+      "jobId": 129114864188,
+      "bytes": 44144,
+      "sha256": "6a4476d9cd635b77cf2232b94f67ba571a0b6f2494347f2cb4c07547df26c38b",
+      "blob": "eb054b092468257a58c4aec553fc2ca2a184ce91",
+      "rawDecodedLogUnmodified": true,
+      "uniqueLogFetchCount": 1
+    },
+    {
+      "path": "ci-ae10/companions/logs/job-129114376039.original.log",
+      "jobId": 129114376039,
+      "bytes": 71308,
+      "sha256": "51df589d765631c814c16a51d32b3c3e1f96e4a11fd1bd51526b8246ce111491",
+      "blob": "b75037fd3a2783e555e68e42257dc446fc73b3cf",
+      "rawDecodedLogUnmodified": true,
+      "uniqueLogFetchCount": 1
+    },
+    {
+      "path": "ci-ae10/companions/logs/job-129114376356.original.log",
+      "jobId": 129114376356,
+      "bytes": 21958,
+      "sha256": "419a99622fa7d1ca9e1e09300a7970bdc9989b5d4ac486fe8c4f824edc77d26b",
+      "blob": "2bbc95f2e6026c5fca12f3669fc1c056a8580ca0",
+      "rawDecodedLogUnmodified": true,
+      "uniqueLogFetchCount": 1
+    },
+    {
+      "path": "ci-ae10/companions/logs/job-129114376382.original.log",
+      "jobId": 129114376382,
+      "bytes": 29554,
+      "sha256": "25d41b2925171d38bde872ff14817545da515e905e936555727209acf9d86d9a",
+      "blob": "d67cd8f7b7561bfa3521b28fd68cf10965ebc4c8",
+      "rawDecodedLogUnmodified": true,
+      "uniqueLogFetchCount": 1
+    },
+    {
+      "path": "ci-ae10/companions/logs/job-129114375938.original.log",
+      "jobId": 129114375938,
+      "bytes": 217104,
+      "sha256": "f613d7076194ae0b248ca2f99b82345f872f57f87786788a56fd5655831af0f5",
+      "blob": "638f8a19a4db1e57d4ded475a1cf911b2b7723b2",
+      "rawDecodedLogUnmodified": true,
+      "uniqueLogFetchCount": 1
+    },
+    {
+      "path": "ci-ae10/companions/logs/job-129114376159.original.log",
+      "jobId": 129114376159,
+      "bytes": 235435,
+      "sha256": "a5c9ac91544c8fcb479ffdf7a8b9a124a06d88dd5228331800df1c575e06ad6a",
+      "blob": "e1a242276fbfa5adc9a84225b88c809c1b63f7c0",
+      "rawDecodedLogUnmodified": true,
+      "uniqueLogFetchCount": 1
+    },
+    {
+      "path": "ci-ae10/companions/logs/job-129114376806.original.log",
+      "jobId": 129114376806,
+      "bytes": 71533,
+      "sha256": "b9a6a50d75467d3211ff5735364d6eec5624aa52e3cf9337251b4d66e1ad0824",
+      "blob": "56520b93d1c5e2ddca632d80c7e9f7c2d1736193",
+      "rawDecodedLogUnmodified": true,
+      "uniqueLogFetchCount": 1
+    },
+    {
+      "path": "ci-ae10/companions/logs/job-129114376538.original.log",
+      "jobId": 129114376538,
+      "bytes": 51107,
+      "sha256": "686dd56716ab201440ffb3ec0982fe1203cb041da4cfd5214caeab25df624eb6",
+      "blob": "c0547d52badcf923ae9ef83b87b48f3085bca1c2",
+      "rawDecodedLogUnmodified": true,
+      "uniqueLogFetchCount": 1
+    },
+    {
+      "path": "ci-ae10/companions/logs/job-129114376243.original.log",
+      "jobId": 129114376243,
+      "bytes": 2194,
+      "sha256": "2e6d09e0131ad7858839f9c3f968a76d1e8b6fca6b3957f97cba61e17df7be97",
+      "blob": "208a81bbcdbb5db7b2ab7bfe3239c66a500dbd13",
+      "rawDecodedLogUnmodified": true,
+      "uniqueLogFetchCount": 1
+    },
+    {
+      "path": "ci-ae10/companions/logs/job-129114376489.original.log",
+      "jobId": 129114376489,
+      "bytes": 302963,
+      "sha256": "a94cf99fc1b7ecbccd4becfa5a31496fc5ab238b2b653cd6e6a6eea2416c7f82",
+      "blob": "b5eb8e42baacd15dc1667eddc75cf0c8d604ed7f",
+      "rawDecodedLogUnmodified": true,
+      "uniqueLogFetchCount": 1
+    },
+    {
+      "path": "ci-ae10/companions/logs/job-129114376689.original.log",
+      "jobId": 129114376689,
+      "bytes": 160341,
+      "sha256": "e1043a6b41d0287c57a435cf134c9086ff4fd10cf220511c97c504ca3d350779",
+      "blob": "bb2b9c97367cc9a24bba694432fc5b3ff3b0cf69",
+      "rawDecodedLogUnmodified": true,
+      "uniqueLogFetchCount": 1
+    },
+    {
+      "path": "ci-ae10/companions/logs/job-129114376529.original.log",
+      "jobId": 129114376529,
+      "bytes": 117452,
+      "sha256": "9bf0515a506a14a4cd84b4c0782136870149d9635c47534a35599bf88f53f7d1",
+      "blob": "71b6a12fcd4c88a73874153df302484c1abb9d9a",
+      "rawDecodedLogUnmodified": true,
+      "uniqueLogFetchCount": 1
+    },
+    {
+      "path": "ci-ae10/companions/logs/job-129114377655.original.log",
+      "jobId": 129114377655,
+      "bytes": 37950,
+      "sha256": "ef71979eab5744cf2c0736aa22aee436bb6af1f3c092e592c402b19b718ba37d",
+      "blob": "0af6d3dbe1f29809bc7ee900ae389a3913610df8",
+      "rawDecodedLogUnmodified": true,
+      "uniqueLogFetchCount": 1
+    },
+    {
+      "path": "ci-ae10/companions/terminal-review.safe.json",
+      "bytes": 609729,
+      "sha256": "de4076b34894b7c5149b6a5918272d480f89e37f5371d07179d63465241fdbea",
+      "blob": "e6a50d068553e7375839146554406ff49d90a9c5"
+    },
+    {
+      "path": "ci-ae10/companions/privacy-review.safe.json",
+      "bytes": 18573,
+      "sha256": "288ebecf0b3159aee32e334253beac85fccb7d2463e0b0bda9c5f18367597616",
+      "blob": "afb6d569730810656252166dd1d3c5fd15e813aa"
+    }
+  ],
+  "fileCountExcludingThisIndex": 20,
+  "bytesExcludingThisIndex": 2296176,
+  "reviewPointers": {
+    "ledger": {
+      "path": "ci-ae10/companions/terminal-review.safe.json",
+      "bytes": 609729,
+      "sha256": "de4076b34894b7c5149b6a5918272d480f89e37f5371d07179d63465241fdbea",
+      "blob": "e6a50d068553e7375839146554406ff49d90a9c5"
+    },
+    "privacy": {
+      "path": "ci-ae10/companions/privacy-review.safe.json",
+      "bytes": 18573,
+      "sha256": "288ebecf0b3159aee32e334253beac85fccb7d2463e0b0bda9c5f18367597616",
+      "blob": "afb6d569730810656252166dd1d3c5fd15e813aa"
+    }
+  },
+  "essentialBoundaries": [
+    "All run events are pull_request; skipped release/production jobs prove no deployed production acceptance.",
+    "BrowserGate is an echo placeholder. Chromium/local-driver fixtures are not PostHog Replay playback or native APM PNG evidence.",
+    "The Node22 daemon lane preserves 2 skipped adapter tests and the 0-test real-agents skipped file.",
+    "BYOS explicitly retains CI Postgres/build containers. macOS bootout and SSH stop catch failures; no independent final absence receipts. GHA service removals and selected custom cleanup receipts are separately recorded.",
+    "No production model case, PostHog query/render, account write, workflow retry or resource was initiated by this reader.",
+    "Only decoded log bytes and allowlisted metadata are public. Full MCP/API platform envelopes remain in private functions store."
+  ],
+  "cleanup": {
+    "observedGHAServiceContainersRemoved": 6,
+    "observedGHANetworksRemoved": 5,
+    "observedServiceCleanupJobs": [
+      129114376039,
+      129114376159,
+      129114376489,
+      129114376689,
+      129114376529
+    ],
+    "isolatedReadCache": {
+      "fixtures": "succeeded",
+      "lease": "released-clean",
+      "retainedDirectChildren": 0
+    },
+    "workspaceGovernance": {
+      "runtimeExitCode": 0,
+      "sourceUnchanged": true
+    },
+    "byos": "Explicit source/log retention of disposable CI Postgres/build containers; deletion not proven.",
+    "macos": "Source closes loopback server/removes isolated HOME; launchctl bootout catch ignores failure, no independent absence receipt.",
+    "ssh": "Real uninstall acknowledged; fixture docker stop catch ignores failure, no independent SSH container absence receipt.",
+    "newResourcesCreatedByReader": 0,
+    "readerOwnedActiveResources": 0
+  },
+  "privateStore": {
+    "prefix": "ciAe10Companions20261109:",
+    "rawResponseEnvelopes": "Not published; preserve original request/response/observedAtUTC per run/job.",
+    "logs": "job:<id>:log",
+    "publishedFiles": "publishedLogs, publishedReviewFiles",
+    "noFilesystemOrVMUsed": true
+  },
+  "mutations": {
+    "gitBlobsOnly": true,
+    "refsChanged": 0,
+    "sourceChanged": 0,
+    "workflowReruns": 0,
+    "workflowCancels": 0,
+    "productionSettingsChanged": 0,
+    "accountOrModelActions": 0
+  },
+  "stopped": {
+    "allRunPolling": true,
+    "allJobLogDownloads": true,
+    "resourceCleanup": "No reader-owned process or paid resource exists to close."
+  }
+}

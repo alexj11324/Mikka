@@ -1,0 +1,2495 @@
+{
+  "schemaVersion": 1,
+  "kind": "postgres-terminal-source-cleanup-and-key-regressions",
+  "repository": "alexj11324/Mikka",
+  "workflowRun": 42603781956,
+  "sourceBinding": {
+    "eventHead": "ae10f28aa471dbfc64f04d981b8934d374476259",
+    "eventHeadTree": "1acbe0b8d50a7102543e24b9bd0395355bcba438",
+    "syntheticCheckoutReportedByRoot": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4",
+    "syntheticTreeVerifiedByRoot": "1acbe0b8d50a7102543e24b9bd0395355bcba438",
+    "syntheticParentsVerifiedByRoot": [
+      "a2198c8c2f608f7b8169329b9da853067618dba6",
+      "ae10f28aa471dbfc64f04d981b8934d374476259"
+    ],
+    "rootChangesJob": 129114378174,
+    "rootChangesLogGitBlob": "0795d366db29e89ed0079d9a17c1c9df2a31fc65",
+    "rootSelectionGitBlob": "f9a8897406fe2e318823ceed90a2810744a0b1d5",
+    "ownPgLogCheckoutStillPending": false,
+    "ownActualCheckouts": [
+      {
+        "jobId": 129114785119,
+        "observed": [
+          {
+            "commandLine": 249,
+            "shaLine": 250,
+            "sha": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4"
+          }
+        ],
+        "logGitBlob": "dee24a794d24d59549792b30568628259f53aa24"
+      },
+      {
+        "jobId": 129114785141,
+        "observed": [
+          {
+            "commandLine": 250,
+            "shaLine": 251,
+            "sha": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4"
+          }
+        ],
+        "logGitBlob": "16ef448625776bd39fc2f87f71c91cd54a86fd78"
+      },
+      {
+        "jobId": 129114785156,
+        "observed": [
+          {
+            "commandLine": 248,
+            "shaLine": 249,
+            "sha": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4"
+          }
+        ],
+        "logGitBlob": "d4c1472f4ea80466c79b67a574a1e45cc3d1a119"
+      },
+      {
+        "jobId": 129114785357,
+        "observed": [
+          {
+            "commandLine": 246,
+            "shaLine": 247,
+            "sha": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4"
+          }
+        ],
+        "logGitBlob": "4261afdd84ffed470dfa6afea71c2610d69808cb"
+      },
+      {
+        "jobId": 129117884767,
+        "observed": [
+          {
+            "commandLine": 148,
+            "shaLine": 149,
+            "sha": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4"
+          }
+        ],
+        "logGitBlob": "7c454ee809c24b31397cfb3d9f2d322998d70ea2"
+      }
+    ],
+    "treeVerificationBoundary": "Each of the five actual checkout SHAs was independently read from its original git log -1 output. The root performed the immutable Git commit API tree/parent verification; this reader reused it rather than issuing a duplicate API query."
+  },
+  "totals": {
+    "tests": 3904,
+    "pass": 3904,
+    "fail": 0,
+    "skipped": 0,
+    "todo": 0,
+    "cancelled": 0
+  },
+  "selectedSuites": 72,
+  "executedExactlyOnce": 72,
+  "allFourTerminalSuccess": true,
+  "allGroupsHaveCanonicalOK": true,
+  "missingScripts": [],
+  "unexpectedScripts": [],
+  "duplicateScripts": [],
+  "runtime": [
+    {
+      "jobId": 129114785119,
+      "node": {
+        "rawLine": 355,
+        "text": "node: v24.22.2"
+      },
+      "postgresVersions": [
+        "17.11"
+      ]
+    },
+    {
+      "jobId": 129114785141,
+      "node": {
+        "rawLine": 356,
+        "text": "node: v24.22.2"
+      },
+      "postgresVersions": [
+        "17.11"
+      ]
+    },
+    {
+      "jobId": 129114785156,
+      "node": {
+        "rawLine": 354,
+        "text": "node: v24.22.2"
+      },
+      "postgresVersions": [
+        "17.11"
+      ]
+    },
+    {
+      "jobId": 129114785357,
+      "node": {
+        "rawLine": 352,
+        "text": "node: v24.22.2"
+      },
+      "postgresVersions": [
+        "17.11"
+      ]
+    }
+  ],
+  "cleanup": [
+    {
+      "jobId": 129114785119,
+      "container": {
+        "createCommandLine": 122,
+        "createId": "b351785442b38b56e096c89e837897e20ca3b321e732136b342a5d12f65e745f",
+        "removeCommandLine": 4635,
+        "removeId": "b351785442b38b56e096c89e837897e20ca3b321e732136b342a5d12f65e745f",
+        "echoedId": "b351785442b38b56e096c89e837897e20ca3b321e732136b342a5d12f65e745f",
+        "matches": true
+      },
+      "network": {
+        "createCommandLine": 48,
+        "name": "github_network_7fa28ce368ad40a799cb4fc8e168566e",
+        "removeCommandLine": 4638,
+        "removedName": "github_network_7fa28ce368ad40a799cb4fc8e168566e",
+        "echoedName": "github_network_7fa28ce368ad40a799cb4fc8e168566e",
+        "matches": true
+      },
+      "orphanCleanupLine": 4640,
+      "completeJobSuccess": true
+    },
+    {
+      "jobId": 129114785141,
+      "container": {
+        "createCommandLine": 123,
+        "createId": "613d3d5b514b29c59aed3880794e3cc1df0b5a737a01d158507246faaee804b5",
+        "removeCommandLine": 4311,
+        "removeId": "613d3d5b514b29c59aed3880794e3cc1df0b5a737a01d158507246faaee804b5",
+        "echoedId": "613d3d5b514b29c59aed3880794e3cc1df0b5a737a01d158507246faaee804b5",
+        "matches": true
+      },
+      "network": {
+        "createCommandLine": 48,
+        "name": "github_network_558c133ef55d49e39026141f6bac90f3",
+        "removeCommandLine": 4314,
+        "removedName": "github_network_558c133ef55d49e39026141f6bac90f3",
+        "echoedName": "github_network_558c133ef55d49e39026141f6bac90f3",
+        "matches": true
+      },
+      "orphanCleanupLine": 4316,
+      "completeJobSuccess": true
+    },
+    {
+      "jobId": 129114785156,
+      "container": {
+        "createCommandLine": 121,
+        "createId": "ff93e4796e5eaf967209c2fad944ed3760b0d9a4d01802332d37a6f998a19e72",
+        "removeCommandLine": 17531,
+        "removeId": "ff93e4796e5eaf967209c2fad944ed3760b0d9a4d01802332d37a6f998a19e72",
+        "echoedId": "ff93e4796e5eaf967209c2fad944ed3760b0d9a4d01802332d37a6f998a19e72",
+        "matches": true
+      },
+      "network": {
+        "createCommandLine": 48,
+        "name": "github_network_1e269b3d8ae347bbb2f3371efb51f142",
+        "removeCommandLine": 17534,
+        "removedName": "github_network_1e269b3d8ae347bbb2f3371efb51f142",
+        "echoedName": "github_network_1e269b3d8ae347bbb2f3371efb51f142",
+        "matches": true
+      },
+      "orphanCleanupLine": 17536,
+      "completeJobSuccess": true
+    },
+    {
+      "jobId": 129114785357,
+      "container": {
+        "createCommandLine": 119,
+        "createId": "0723a589edd2cd7f9b6caeb630210af5926de3501a3e8b0617e7062879e41f43",
+        "removeCommandLine": 7378,
+        "removeId": "0723a589edd2cd7f9b6caeb630210af5926de3501a3e8b0617e7062879e41f43",
+        "echoedId": "0723a589edd2cd7f9b6caeb630210af5926de3501a3e8b0617e7062879e41f43",
+        "matches": true
+      },
+      "network": {
+        "createCommandLine": 48,
+        "name": "github_network_007686dd7a604de19d1c04744a285be0",
+        "removeCommandLine": 7381,
+        "removedName": "github_network_007686dd7a604de19d1c04744a285be0",
+        "echoedName": "github_network_007686dd7a604de19d1c04744a285be0",
+        "matches": true
+      },
+      "orphanCleanupLine": 7383,
+      "completeJobSuccess": true
+    }
+  ],
+  "keyRegressions": [
+    {
+      "script": "test:device-revocation-db",
+      "jobId": 129114785119,
+      "totals": {
+        "tests": 32,
+        "pass": 32,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "summaryRecords": [
+        {
+          "line": 2233,
+          "key": "tests",
+          "value": 16
+        },
+        {
+          "line": 2235,
+          "key": "pass",
+          "value": 16
+        },
+        {
+          "line": 2236,
+          "key": "fail",
+          "value": 0
+        },
+        {
+          "line": 2237,
+          "key": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2238,
+          "key": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2239,
+          "key": "todo",
+          "value": 0
+        },
+        {
+          "line": 2276,
+          "key": "tests",
+          "value": 11
+        },
+        {
+          "line": 2278,
+          "key": "pass",
+          "value": 11
+        },
+        {
+          "line": 2279,
+          "key": "fail",
+          "value": 0
+        },
+        {
+          "line": 2280,
+          "key": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2281,
+          "key": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2282,
+          "key": "todo",
+          "value": 0
+        },
+        {
+          "line": 2290,
+          "key": "tests",
+          "value": 5
+        },
+        {
+          "line": 2292,
+          "key": "pass",
+          "value": 5
+        },
+        {
+          "line": 2293,
+          "key": "fail",
+          "value": 0
+        },
+        {
+          "line": 2294,
+          "key": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 2295,
+          "key": "skipped",
+          "value": 0
+        },
+        {
+          "line": 2296,
+          "key": "todo",
+          "value": 0
+        }
+      ],
+      "testCases": [
+        {
+          "line": 2210,
+          "text": "✔ normal demo cleanup stops active runs, preserves history and excludes prefix/version lookalikes (13116.729445ms)"
+        },
+        {
+          "line": 2211,
+          "text": "✔ committed messages push addresses, notification receipts preserve read and ACK semantics (212.69598ms)"
+        },
+        {
+          "line": 2212,
+          "text": "✔ stopped, terminal, expired, disabled and cross-owner runs never receive notifications (47.610733ms)"
+        },
+        {
+          "line": 2213,
+          "text": "✔ real Postgres: idle gateway presence drives dispatch, device selection and post-commit uninstall (3928.092331ms)"
+        },
+        {
+          "line": 2214,
+          "text": "✔ owner revoke stops attributed work, revokes worker access, records once and preserves sibling credentials (391.337456ms)"
+        },
+        {
+          "line": 2215,
+          "text": "✔ a receipt write fault rolls token, stop, lease and worker revocation back atomically (96.634634ms)"
+        },
+        {
+          "line": 2216,
+          "text": "✔ a revocation waits for the admitted writer transaction, and later raw/ORM admissions all refuse (222.457756ms)"
+        },
+        {
+          "line": 2217,
+          "text": "✔ the actual event route accepts before revoke and rejects the old token after a fresh request scope (308.635888ms)"
+        },
+        {
+          "line": 2218,
+          "text": "✔ revocation while the real event handler waits for its body prevents the later write (1060.239214ms)"
+        },
+        {
+          "line": 2219,
+          "text": "✔ terminating an admitted write connection rolls back both the write and authority lock (82.655691ms)"
+        },
+        {
+          "line": 2222,
+          "text": "✔ a long poll loses token authority within its five-second database polling interval (2048.026304ms)"
+        },
+        {
+          "line": 2227,
+          "text": "✔ with push, revocation ends a waiting long poll on its NOTIFY, long before any timer; a lost NOTIFY still fails it at the deadline (4123.207511ms)"
+        },
+        {
+          "line": 2228,
+          "text": "✔ existing device removal still refuses live work, then records revocation without deleting history (83.324207ms)"
+        },
+        {
+          "line": 2229,
+          "text": "✔ a device request is fenced by its first statement, with no check up front, and reads no device report it does not use (80.944058ms)"
+        },
+        {
+          "line": 2231,
+          "text": "✔ one read of a device's runs finds its stops, messages and queued runs (1828.783056ms)"
+        },
+        {
+          "line": 2232,
+          "text": "✔ the idle check answers in one statement, finds the same work and pending device commands, and refuses a revoked credential (212.978264ms)"
+        },
+        {
+          "line": 2245,
+          "text": "  ✔ the same credential remains valid for its established heartbeat route (136.966589ms)"
+        },
+        {
+          "line": 2246,
+          "text": "  ✔ own run renewal passes route authentication and reaches issuance once (118.978682ms)"
+        },
+        {
+          "line": 2247,
+          "text": "  ✔ another device and another run remain refused before issuance (50.582105ms)"
+        },
+        {
+          "line": 2248,
+          "text": "  ✔ an ended machine cannot obtain a new lease (25.727343ms)"
+        },
+        {
+          "line": 2249,
+          "text": "  ✔ revoked cloud credentials remain refused (18.51881ms)"
+        },
+        {
+          "line": 2250,
+          "text": "✔ a bound cloud device can renew its own subscription lease through the actual route (5894.386742ms)"
+        },
+        {
+          "line": 2254,
+          "text": "✔ a heartbeat re-checks execution identities only when the harnesses change or the device comes back, and renews the leases of the runs it reports (14488.207578ms)"
+        },
+        {
+          "line": 2255,
+          "text": "✔ runs poll reads current authority, ownership and results in one snapshot (370.274383ms)"
+        },
+        {
+          "line": 2257,
+          "text": "✔ repos poll reads current authority, ownership and results in one snapshot (199.373033ms)"
+        },
+        {
+          "line": 2259,
+          "text": "✔ initial claim repository handoff removes a real cloud repos request without increasing SQL, rows or response bytes (364.513949ms)"
+        },
+        {
+          "line": 2274,
+          "text": "✔ every device route refuses a token revoked after authentication before it calls out or issues anything (14784.729977ms)"
+        },
+        {
+          "line": 2284,
+          "text": "✔ a revocation waits for the burst in flight; the next burst answers 401 (1832.586028ms)"
+        },
+        {
+          "line": 2285,
+          "text": "✔ between bursts (a wait, network IO) the fence is not held: a revocation goes through at once (1325.911833ms)"
+        },
+        {
+          "line": 2286,
+          "text": "✔ a hung unit loses its fence after 10 s; the revocation then completes and the unit fails closed (4014.604197ms)"
+        },
+        {
+          "line": 2287,
+          "text": "✔ when no fence connection can be had the request is refused with 503, never run unfenced (2334.255911ms)"
+        },
+        {
+          "line": 2288,
+          "text": "✔ ten concurrent multi-statement device requests complete with three fence connections; fewer authorization transactions and round trips than one fence per statement (65.801254ms)"
+        }
+      ],
+      "diagnostics": [
+        {
+          "queuedRunsRequestDbBytes": 433
+        },
+        {
+          "scenario": "runs-empty-poll",
+          "statements": 2
+        },
+        {
+          "scenario": "repos-empty-poll",
+          "statements": 2
+        },
+        {
+          "metric": "initial_repository_task_delta",
+          "scenario": "missing",
+          "unchangedTaskPrefixSuffixExcluded": true,
+          "protocol": "PostgreSQL messages, excluding TCP/TLS/connect; HTTP JSON bodies separately",
+          "original": {
+            "queries": 8,
+            "sqlBytes": 1520,
+            "resultRows": 4,
+            "sentBytes": 2562,
+            "receivedBytes": 1242
+          },
+          "candidate": {
+            "queries": 1,
+            "sqlBytes": 214,
+            "resultRows": 0,
+            "sentBytes": 366,
+            "receivedBytes": 228
+          },
+          "oldResponseBytes": 331,
+          "nextResponseBytes": 327,
+          "sqlDelta": -7,
+          "rowDelta": -4,
+          "wireDelta": -3210,
+          "responseBodyDelta": -4
+        },
+        {
+          "metric": "initial_repository_task_delta",
+          "scenario": "complete",
+          "unchangedTaskPrefixSuffixExcluded": true,
+          "protocol": "PostgreSQL messages, excluding TCP/TLS/connect; HTTP JSON bodies separately",
+          "original": {
+            "queries": 8,
+            "sqlBytes": 1520,
+            "resultRows": 6,
+            "sentBytes": 2562,
+            "receivedBytes": 1588
+          },
+          "candidate": {
+            "queries": 1,
+            "sqlBytes": 214,
+            "resultRows": 1,
+            "sentBytes": 366,
+            "receivedBytes": 469
+          },
+          "oldResponseBytes": 441,
+          "nextResponseBytes": 437,
+          "sqlDelta": -7,
+          "rowDelta": -5,
+          "wireDelta": -3315,
+          "responseBodyDelta": -4
+        },
+        {
+          "metric": "initial_repository_task_delta",
+          "scenario": "unicode",
+          "unchangedTaskPrefixSuffixExcluded": true,
+          "protocol": "PostgreSQL messages, excluding TCP/TLS/connect; HTTP JSON bodies separately",
+          "original": {
+            "queries": 8,
+            "sqlBytes": 1520,
+            "resultRows": 6,
+            "sentBytes": 2562,
+            "receivedBytes": 5186
+          },
+          "candidate": {
+            "queries": 1,
+            "sqlBytes": 214,
+            "resultRows": 1,
+            "sentBytes": 366,
+            "receivedBytes": 2268
+          },
+          "oldResponseBytes": 2240,
+          "nextResponseBytes": 2236,
+          "sqlDelta": -7,
+          "rowDelta": -5,
+          "wireDelta": -5114,
+          "responseBodyDelta": -4
+        },
+        {
+          "routes": 31
+        },
+        {
+          "perStatement": {
+            "completed": 3,
+            "roundTrips": 11,
+            "explicit": 2
+          },
+          "perUnit": {
+            "completed": 4,
+            "roundTrips": 6,
+            "explicit": 1
+          },
+          "measurement": "backend_command_tags_and_ready_for_query"
+        }
+      ],
+      "rawRange": {
+        "startLine": 2209,
+        "endLine": 2298
+      }
+    },
+    {
+      "script": "test:device-enrollment-db",
+      "jobId": 129114785141,
+      "totals": {
+        "tests": 13,
+        "pass": 13,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "summaryRecords": [
+        {
+          "line": 3187,
+          "key": "tests",
+          "value": 13
+        },
+        {
+          "line": 3189,
+          "key": "pass",
+          "value": 13
+        },
+        {
+          "line": 3190,
+          "key": "fail",
+          "value": 0
+        },
+        {
+          "line": 3191,
+          "key": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3192,
+          "key": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3193,
+          "key": "todo",
+          "value": 0
+        }
+      ],
+      "testCases": [
+        {
+          "line": 3169,
+          "text": "✔ desktop account context reads only the current browser owner's active local devices (279.442323ms)"
+        },
+        {
+          "line": 3170,
+          "text": "✔ local setup owner view retains fresh session checks without reading unused devices (3.832675ms)"
+        },
+        {
+          "line": 3171,
+          "text": "✔ owner token pagination preserves microsecond ordering and rejects foreign or malformed anchors (22.33813ms)"
+        },
+        {
+          "line": 3172,
+          "text": "✔ registration grant is user-bound, expires, and has one concurrent winner (8.103357ms)"
+        },
+        {
+          "line": 3173,
+          "text": "✔ registration grant consumption uses one PostgreSQL statement (1.599447ms)"
+        },
+        {
+          "line": 3175,
+          "text": "✔ a failed credential insertion does not consume the enrollment grant (5.293347ms)"
+        },
+        {
+          "line": 3176,
+          "text": "✔ daemon acceptance follows real local enrollment and owner routes without a cloud token binding (11.040439ms)"
+        },
+        {
+          "line": 3177,
+          "text": "✔ online removal offers only uninstall, and its own receipt revokes credentials (11417.448577ms)"
+        },
+        {
+          "line": 3178,
+          "text": "✔ unacknowledged uninstall expires after ten minutes; offline removal revokes immediately (11.769402ms)"
+        },
+        {
+          "line": 3179,
+          "text": "✔ management queue is owner-scoped, serial and acknowledges only its device (9.567176ms)"
+        },
+        {
+          "line": 3180,
+          "text": "✔ pending commands without receipts are one read and preserve current device removal state (4.286316ms)"
+        },
+        {
+          "line": 3185,
+          "text": "✔ a fresh login cannot admit an old daemon, and updating cannot revive a revoked credential (17.003977ms)"
+        },
+        {
+          "line": 3186,
+          "text": "✔ registration metadata cannot disguise an old daemon behind a current header (9.684514ms)"
+        }
+      ],
+      "diagnostics": [
+        {
+          "scenario": "enrollment-consumption",
+          "statements": 1
+        },
+        {
+          "scenario": "disabled-device",
+          "statements": 1
+        },
+        {
+          "scenario": "removed-device",
+          "statements": 1
+        },
+        {
+          "scenario": "empty-device",
+          "statements": 1
+        },
+        {
+          "scenario": "missing-device",
+          "statements": 1
+        }
+      ],
+      "rawRange": {
+        "startLine": 3165,
+        "endLine": 3195
+      }
+    },
+    {
+      "script": "test:activity-actor-db",
+      "jobId": 129114785141,
+      "totals": {
+        "tests": 60,
+        "pass": 60,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "summaryRecords": [
+        {
+          "line": 3497,
+          "key": "tests",
+          "value": 60
+        },
+        {
+          "line": 3499,
+          "key": "pass",
+          "value": 60
+        },
+        {
+          "line": 3500,
+          "key": "fail",
+          "value": 0
+        },
+        {
+          "line": 3501,
+          "key": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3502,
+          "key": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3503,
+          "key": "todo",
+          "value": 0
+        }
+      ],
+      "testCases": [
+        {
+          "line": 3319,
+          "text": "✔ task run rows keep the newest owner run and the 200-row limit without unused fields (5286.209193ms)"
+        },
+        {
+          "line": 3321,
+          "text": "✔ one bounded snapshot aggregate preserves the old fingerprint and exact expiry, including empty rows (10.576694ms)"
+        },
+        {
+          "line": 3322,
+          "text": "✔ task thread lists retain exact titles, summaries and privacy while details retain full errors (5898.103451ms)"
+        },
+        {
+          "line": 3324,
+          "text": "✔ team link reads page through all authorized pairs and retain explicit-id scope checks (52.156127ms)"
+        },
+        {
+          "line": 3328,
+          "text": "  ✔ identity projections are bounded and every read has a fixed action source (47.763477ms)"
+        },
+        {
+          "line": 3335,
+          "text": "  ✔ both actions preserve owner, peer, missing and null-issue boundaries (200.243045ms)"
+        },
+        {
+          "line": 3336,
+          "text": "  ✔ the changes result still returns valid checkpoints and rejects unreadable gzip (64.30051ms)"
+        },
+        {
+          "line": 3337,
+          "text": "  ✔ the newest checkpoint follows only the same owner and workspace chain (43.242088ms)"
+        },
+        {
+          "line": 3338,
+          "text": "  ✔ a cyclic chain fails before returning checkpoint content (15.822695ms)"
+        },
+        {
+          "line": 3339,
+          "text": "  ✔ suspension and removal are read afresh, including Bot threads without an issue (94.559484ms)"
+        },
+        {
+          "line": 3340,
+          "text": "✔ thread identity reads keep owner-only, live membership and checkpoint behavior with bounded fields (520.441981ms)"
+        },
+        {
+          "line": 3341,
+          "text": "✔ actor migration: legacy rows stay NULL, reruns preserve identity, new rows enforce type (107.650657ms)"
+        },
+        {
+          "line": 3342,
+          "text": "✔ actual action writer matrix records acting member/agent/system, ignores forged input, gates history (7516.117607ms)"
+        },
+        {
+          "line": 3344,
+          "text": "✔ actor constraint validation runs separately while a writer holds its table lock (36.289244ms)"
+        },
+        {
+          "line": 3349,
+          "text": "✔ actor validations preserve schema variants and reject invalid legacy rows without deleting data (60.446087ms)"
+        },
+        {
+          "line": 3350,
+          "text": "✔ the bot list reads each bot's preview and its citations' names only, with the same lines as before (7103.459826ms)"
+        },
+        {
+          "line": 3352,
+          "text": "✔ a chat's cited runs show the same name, summary and task without reading whole prompts, reports or bodies (1115.823124ms)"
+        },
+        {
+          "line": 3354,
+          "text": "✔ the chat's first read is one page and the bot list reads a summary, not the chat (#1414) (1731.204099ms)"
+        },
+        {
+          "line": 3356,
+          "text": "✔ a document poll with no edits on either side reads a version, not the body or state (2783.39236ms)"
+        },
+        {
+          "line": 3365,
+          "text": "✔ the task list and a task's relations read metadata and checklist counts, not every body (1476.560464ms)"
+        },
+        {
+          "line": 3371,
+          "text": "✔ workspace task polls keep permission reads bounded and recheck the next request (509.020493ms)"
+        },
+        {
+          "line": 3376,
+          "text": "✔ singleton teams with long keys retain their task-list traffic budget (87.559431ms)"
+        },
+        {
+          "line": 3378,
+          "text": "✔ one write seen by 3 tabs and 2 devices: the echo and a duplicate push read nothing again (1042.307835ms)"
+        },
+        {
+          "line": 3384,
+          "text": "✔ a revision rises once per publish across its fan-out and a reader sees the latest (10.735501ms)"
+        },
+        {
+          "line": 3385,
+          "text": "✔ prepared owner-list revisions share one PostgreSQL read without duplicate team refs or rows (12.843689ms)"
+        },
+        {
+          "line": 3388,
+          "text": "✔ the app reads a chat a page at a time: 50 first, older pages by `through`, only what is new on a push (#1408) (1172.959662ms)"
+        },
+        {
+          "line": 3407,
+          "text": "    ✔ default issueView in saveIssue reuses the verification read for owner prefix (1.440752ms)"
+        },
+        {
+          "line": 3413,
+          "text": "    ✔ linkedConnections stays within the frozen statement and total-wire budget (0.340896ms)"
+        },
+        {
+          "line": 3414,
+          "text": "    ✔ unlinkedConnections stays within the frozen statement and total-wire budget (0.095094ms)"
+        },
+        {
+          "line": 3415,
+          "text": "    ✔ linkedCitation stays within the frozen statement and total-wire budget (0.089676ms)"
+        },
+        {
+          "line": 3416,
+          "text": "    ✔ unlinkedCitation stays within the frozen statement and total-wire budget (0.074492ms)"
+        },
+        {
+          "line": 3417,
+          "text": "    ✔ linkedRunCitation stays within the frozen statement and total-wire budget (0.070567ms)"
+        },
+        {
+          "line": 3418,
+          "text": "    ✔ unlinkedRunCitation stays within the frozen statement and total-wire budget (0.103868ms)"
+        },
+        {
+          "line": 3419,
+          "text": "    ✔ connection identifiers reuse one owner input in the existing metadata query (0.307385ms)"
+        },
+        {
+          "line": 3420,
+          "text": "    ✔ direct and run-only citations keep the linked read budget and private input boundary (7.145276ms)"
+        },
+        {
+          "line": 3421,
+          "text": "    ✔ an authorized Linear import verifies its target until the link is removed (105.699653ms)"
+        },
+        {
+          "line": 3424,
+          "text": "    ✔ unlinked getIssue keeps its existing verification-read budget (0.330761ms)"
+        },
+        {
+          "line": 3427,
+          "text": "    ✔ unlinked cold poll keeps its existing verification-read budget (0.368639ms)"
+        },
+        {
+          "line": 3430,
+          "text": "    ✔ unlinked warm poll keeps its existing verification-read budget (0.268417ms)"
+        },
+        {
+          "line": 3437,
+          "text": "    ✔ revoked owners lose connections and both citation readers despite cached identifiers (0.390501ms)"
+        },
+        {
+          "line": 3438,
+          "text": "    ✔ revokedConnections stays within its frozen old-source budget (0.108775ms)"
+        },
+        {
+          "line": 3439,
+          "text": "    ✔ revokedCitation stays within its frozen old-source budget (0.043085ms)"
+        },
+        {
+          "line": 3440,
+          "text": "    ✔ revokedRunCitation stays within its frozen old-source budget (0.030576ms)"
+        },
+        {
+          "line": 3441,
+          "text": "  ✔ unlinked workspace details reuse current negative ACL reads and refresh their identifier after relinking (447.861905ms)"
+        },
+        {
+          "line": 3458,
+          "text": "    ✔ copying a subtree stays within its frozen old-source budget (0.269658ms)"
+        },
+        {
+          "line": 3459,
+          "text": "  ✔ copying a subtree preserves source tasks and allocates distinct numbered copies (76.397829ms)"
+        },
+        {
+          "line": 3462,
+          "text": "✔ detail and activity revalidate current access while returning only changed content and history summaries (2122.426306ms)"
+        },
+        {
+          "line": 3465,
+          "text": "✔ disk hydration authority follows actual membership, role, selected workspace and account deletion (611.965051ms)"
+        },
+        {
+          "line": 3471,
+          "text": "✔ settings cache restores presentation immediately but revalidates the real current preferences (494.735051ms)"
+        },
+        {
+          "line": 3473,
+          "text": "✔ one push to 3 tabs and 2 devices: tab sharing reduces five list requests to three and lowers DB traffic (1072.446216ms)"
+        },
+        {
+          "line": 3477,
+          "text": "✔ overlapping reads with identical authorization and proofs join exactly one list payload query (148.047621ms)"
+        },
+        {
+          "line": 3478,
+          "text": "✔ concurrent reads of two people, or of a removed member, are never shared (228.693032ms)"
+        },
+        {
+          "line": 3479,
+          "text": "✔ concurrent empty, partial and full snapshots of one owner each receive the rows they need (121.395609ms)"
+        },
+        {
+          "line": 3480,
+          "text": "✔ a request after membership revocation cannot join the older authorized manifest still in flight (266.496022ms)"
+        },
+        {
+          "line": 3481,
+          "text": "✔ the polled routes read with a fixed number of queries, whatever the number of bots, tasks or Profiles (1434.452592ms)"
+        },
+        {
+          "line": 3483,
+          "text": "✔ issuesForUser answers as issueForUser does for each task: personal, shared, revoked, deleted and token-pinned (124.462352ms)"
+        },
+        {
+          "line": 3484,
+          "text": "✔ readOnce shares an identical read within one operation, never a write, a lock or a read after a write (2.967233ms)"
+        },
+        {
+          "line": 3485,
+          "text": "✔ held Workspace membership remains exact and expires before detached reads can outlive its transaction (10.906154ms)"
+        },
+        {
+          "line": 3486,
+          "text": "✔ an open thread's later reads leave its prompt and report in the database and show the same thread (1476.002948ms)"
+        },
+        {
+          "line": 3495,
+          "text": "✔ quiet thread polls return only a version; visible changes and online state still invalidate (942.143366ms)"
+        }
+      ],
+      "diagnostics": [],
+      "rawRange": {
+        "startLine": 3318,
+        "endLine": 3505
+      }
+    },
+    {
+      "script": "test:visibility-db",
+      "jobId": 129114785141,
+      "totals": {
+        "tests": 57,
+        "pass": 57,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "summaryRecords": [
+        {
+          "line": 1831,
+          "key": "tests",
+          "value": 57
+        },
+        {
+          "line": 1833,
+          "key": "pass",
+          "value": 57
+        },
+        {
+          "line": 1834,
+          "key": "fail",
+          "value": 0
+        },
+        {
+          "line": 1835,
+          "key": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 1836,
+          "key": "skipped",
+          "value": 0
+        },
+        {
+          "line": 1837,
+          "key": "todo",
+          "value": 0
+        }
+      ],
+      "testCases": [
+        {
+          "line": 1716,
+          "text": "  ✔ raw reads and nested Drizzle transactions share the outer client; only committed savepoint effects survive (83.68525ms)"
+        },
+        {
+          "line": 1717,
+          "text": "  ✔ an immediate after-commit effect starts a fresh transaction instead of a savepoint on the committed client (8.583984ms)"
+        },
+        {
+          "line": 1718,
+          "text": "  ✔ a delayed callback cannot read through a released client currently borrowed by another transaction (3.113501ms)"
+        },
+        {
+          "line": 1719,
+          "text": "✔ workspace transactions reuse one checkout, roll back savepoints, and release their async lease before commit effects (359.666135ms)"
+        },
+        {
+          "line": 1724,
+          "text": "  ✔ named-Bot route and list use their real tenant and preserve source replay (46.497829ms)"
+        },
+        {
+          "line": 1725,
+          "text": "  ✔ actual background question read leaves APP free while awaiting the only Workspace connection (25.886441ms)"
+        },
+        {
+          "line": 1726,
+          "text": "  ✔ existing APP work needs its exact live lease and Profile COMMIT borrows it without another checkout (24.886221ms)"
+        },
+        {
+          "line": 1727,
+          "text": "  ✔ membership suspension waits for a background write commit and later operations have no side effects (101.743757ms)"
+        },
+        {
+          "line": 1728,
+          "text": "  ✔ botless reconciliation borrows each persisted task tenant independently (101.40197ms)"
+        },
+        {
+          "line": 1729,
+          "text": "  ✔ real local claim waits for Workspace before APP and retains the original transaction hook (14.873863ms)"
+        },
+        {
+          "line": 1730,
+          "text": "  ✔ both native device fences reject a revoked credential before any background claim mutation (20.286462ms)"
+        },
+        {
+          "line": 1731,
+          "text": "  ✔ unassigned task-free runs cannot acquire an owner-home fallback claim (4.300635ms)"
+        },
+        {
+          "line": 1732,
+          "text": "  ✔ retained Factory history of a deleted author never re-enters monitor or watchdog batches (83.376462ms)"
+        },
+        {
+          "line": 1734,
+          "text": "✔ background Factory transactions use persisted tenants before the APP pool and preserve native device authority (9991.249541ms)"
+        },
+        {
+          "line": 1741,
+          "text": "  ✔ a session without a Workspace selector uses Personal for settings, Profile catalog and creation even when Teams are older (141.878082ms)"
+        },
+        {
+          "line": 1747,
+          "text": "  ✔ actual task, flow, dispatch-status, approval and questions adapters reject another owned tenant (127.291987ms)"
+        },
+        {
+          "line": 1748,
+          "text": "  ✔ the initial cookie choice and full native principal stay fixed for the whole handler (17.180921ms)"
+        },
+        {
+          "line": 1749,
+          "text": "  ✔ Profile borrows are exact, cannot close their owner, and expire after nested rollback or return (113.823431ms)"
+        },
+        {
+          "line": 1750,
+          "text": "  ✔ a real detail request cannot reserve APP while a writer owns the only Workspace connection (17.818278ms)"
+        },
+        {
+          "line": 1751,
+          "text": "  ✔ Profile body and query cannot select another owned Workspace (21.589392ms)"
+        },
+        {
+          "line": 1752,
+          "text": "  ✔ real dispatch, frozen Profile and idempotent COMMIT share both one-connection pools (124.285081ms)"
+        },
+        {
+          "line": 1753,
+          "text": "  ✔ a committed revocation rejects reads and dispatch with no task, run or history side effects (22.441924ms)"
+        },
+        {
+          "line": 1754,
+          "text": "  ✔ a PAT cannot override its pin and concurrent same-issue reads never cross tenant buckets (41.775638ms)"
+        },
+        {
+          "line": 1755,
+          "text": "  ✔ one Alpha question survives 51 newer Beta questions before the pending cap (75.483945ms)"
+        },
+        {
+          "line": 1756,
+          "text": "✔ human Factory admission holds Workspace before APP and reuses Profile membership with both pools at one (5049.294763ms)"
+        },
+        {
+          "line": 1757,
+          "text": "✔ reading only the asked-about tasks' team links gives exactly the full read's visibility (4339.760953ms)"
+        },
+        {
+          "line": 1762,
+          "text": "  ✔ personal and both shared origins reach only the current owner tokens (92.7789ms)"
+        },
+        {
+          "line": 1763,
+          "text": "  ✔ current task targets carry their persisted Workspace and only the matching owned attempt (89.090781ms)"
+        },
+        {
+          "line": 1764,
+          "text": "  ✔ a member of both Workspaces cannot send a target from the other origin (32.725668ms)"
+        },
+        {
+          "line": 1765,
+          "text": "  ✔ pending, missing and deleted task targets are refused without falling back to the task body (74.121506ms)"
+        },
+        {
+          "line": 1766,
+          "text": "  ✔ a task target cannot name another task, tenant or owner attempt (39.907647ms)"
+        },
+        {
+          "line": 1768,
+          "text": "  ✔ a previously valid task target is refused after Workspace membership is revoked (24.229678ms)"
+        },
+        {
+          "line": 1770,
+          "text": "  ✔ removed membership, archived bots and another owner cannot deliver or edit tokens (6.255289ms)"
+        },
+        {
+          "line": 1772,
+          "text": "  ✔ a decision made while authorized does not authorize a later delivery (141.874236ms)"
+        },
+        {
+          "line": 1774,
+          "text": "  ✔ a revocation waits for an admitted bounded send and prevents every later send (126.768308ms)"
+        },
+        {
+          "line": 1777,
+          "text": "  ✔ expired, unknown and foreign sessions never deliver or mutate a destination (100.636537ms)"
+        },
+        {
+          "line": 1780,
+          "text": "  ✔ session deletion, reassignment and token replacement serialize behind delivery (503.477209ms)"
+        },
+        {
+          "line": 1795,
+          "text": "  ✔ registration accepts only the real native session and restores a legacy NULL token (93.54422ms)"
+        },
+        {
+          "line": 1806,
+          "text": "  ✔ late sign-out and failed registration cannot delete or replace a newer binding (52.49332ms)"
+        },
+        {
+          "line": 1809,
+          "text": "  ✔ partial provider failure commits accepted receipts on the same APP connection (13.438616ms)"
+        },
+        {
+          "line": 1810,
+          "text": "✔ phone delivery rechecks native sessions and the persisted Workspace with both pools at one (2580.565158ms)"
+        },
+        {
+          "line": 1815,
+          "text": "  ✔ pending resources never inherit the creator personal workspace (59.455605ms)"
+        },
+        {
+          "line": 1816,
+          "text": "  ✔ members can read a tenant task without a Team; selected/PAT tenant has no owner bypass (8.40066ms)"
+        },
+        {
+          "line": 1817,
+          "text": "  ✔ direct task-only citations preserve the reader workspace pin without a run lookup (5.451127ms)"
+        },
+        {
+          "line": 1818,
+          "text": "  ✔ lists, search and push targets use the tenant even for one account in both workspaces (13.381954ms)"
+        },
+        {
+          "line": 1819,
+          "text": "  ✔ real Factory storage honors browser selection and token pin; denied routing creates no rows or events (41.390224ms)"
+        },
+        {
+          "line": 1820,
+          "text": "  ✔ tenant cannot be changed or cleared; run and artifact provenance must agree (61.227016ms)"
+        },
+        {
+          "line": 1821,
+          "text": "  ✔ conversation envelopes use persisted mailbox tenancy; mismatched run or sender writes leave no message (44.398839ms)"
+        },
+        {
+          "line": 1822,
+          "text": "  ✔ legacy and task-free leases require current persisted tenant membership with no creator bypass (87.91266ms)"
+        },
+        {
+          "line": 1823,
+          "text": "  ✔ membership is pinned until the app commit and the next read observes suspension (8.451738ms)"
+        },
+        {
+          "line": 1824,
+          "text": "  ✔ suspending an artifact issuer closes shared links but leaves other workspace access intact (16.685956ms)"
+        },
+        {
+          "line": 1825,
+          "text": "  ✔ task-run aggregates exclude an interrupted migration's unbound run until its own tenant is proved (96.399482ms)"
+        },
+        {
+          "line": 1826,
+          "text": "  ✔ migration locks workspace before relations and APP rows; changed task evidence stays unresolved until a fresh pass (111.082087ms)"
+        },
+        {
+          "line": 1827,
+          "text": "  ✔ derived migration holds no APP row while waiting for workspace; changed computer authority is retried safely (55.395182ms)"
+        },
+        {
+          "line": 1828,
+          "text": "  ✔ derived evidence is read from a fresh statement after waiting for the APP row lock (45.130728ms)"
+        },
+        {
+          "line": 1829,
+          "text": "✔ workspace ownership: real split-database migration, ACL, immutable provenance and membership races (4335.586634ms)"
+        },
+        {
+          "line": 1830,
+          "text": "✔ real API/core visibility: immutable tenant, optional Team, provider scope and suspension (2777.001999ms)"
+        }
+      ],
+      "diagnostics": [],
+      "rawRange": {
+        "startLine": 1714,
+        "endLine": 1839
+      }
+    },
+    {
+      "script": "test:web-auth-db",
+      "jobId": 129114785119,
+      "totals": {
+        "tests": 14,
+        "pass": 14,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "summaryRecords": [
+        {
+          "line": 3160,
+          "key": "tests",
+          "value": 14
+        },
+        {
+          "line": 3162,
+          "key": "pass",
+          "value": 14
+        },
+        {
+          "line": 3163,
+          "key": "fail",
+          "value": 0
+        },
+        {
+          "line": 3164,
+          "key": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 3165,
+          "key": "skipped",
+          "value": 0
+        },
+        {
+          "line": 3166,
+          "key": "todo",
+          "value": 0
+        }
+      ],
+      "testCases": [
+        {
+          "line": 3024,
+          "text": "✔ email cookie login hands off to an independent bearer; revoke cannot log out source or another account (5464.617725ms)"
+        },
+        {
+          "line": 3025,
+          "text": "✔ wrong origin and nonexact callback fail without consuming the valid grant (44.871002ms)"
+        },
+        {
+          "line": 3026,
+          "text": "✔ wrong verifier burns the code; simultaneous correct proofs have one winner (111.15115ms)"
+        },
+        {
+          "line": 3027,
+          "text": "✔ pending and bound expiry, missing cookie and revoked source sessions reject handoff (118.273773ms)"
+        },
+        {
+          "line": 3028,
+          "text": "✔ desktop exchange cannot consume a web grant and web exchange cannot consume a desktop grant (61.70872ms)"
+        },
+        {
+          "line": 3094,
+          "text": "  ✔ Personal/A/B switches acknowledge only the validated choice; context, create, cache namespace and REST keep it (5352.055555ms)"
+        },
+        {
+          "line": 3109,
+          "text": "  ✔ a captured Coordinator workspace is checked before ensuring a Bot or writing an inbox event (355.163055ms)"
+        },
+        {
+          "line": 3132,
+          "text": "  ✔ invalid, foreign and foreign-Personal choices fail closed; a query target cannot hide an invalid selection (676.004606ms)"
+        },
+        {
+          "line": 3136,
+          "text": "  ✔ Factory list/detail and rejected control remain in the selected same-owner tenant with no write side effects (592.185668ms)"
+        },
+        {
+          "line": 3137,
+          "text": "  ✔ a pending Factory A list cannot be joined from B even when both belong to the same owner (97.166251ms)"
+        },
+        {
+          "line": 3148,
+          "text": "  ✔ PAT selection cannot escape its pin; public Web transport never promotes a PAT to a human session (166.611383ms)"
+        },
+        {
+          "line": 3157,
+          "text": "  ✔ suspending a creator/member invalidates the selected tenant on the next request without defaulting Personal (165.887535ms)"
+        },
+        {
+          "line": 3158,
+          "text": "  ✔ a revoked native session cannot switch or recover authority from another browser cookie (28.221397ms)"
+        },
+        {
+          "line": 3159,
+          "text": "✔ remote Web Workspace selection survives bearer-only HTTP and never broadens a tenant or PAT (14391.470151ms)"
+        }
+      ],
+      "diagnostics": [],
+      "rawRange": {
+        "startLine": 3020,
+        "endLine": 3168
+      }
+    },
+    {
+      "script": "test:workspace-admin-db",
+      "jobId": 129114785156,
+      "totals": {
+        "tests": 116,
+        "pass": 116,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "summaryRecords": [
+        {
+          "line": 5514,
+          "key": "tests",
+          "value": 116
+        },
+        {
+          "line": 5516,
+          "key": "pass",
+          "value": 116
+        },
+        {
+          "line": 5517,
+          "key": "fail",
+          "value": 0
+        },
+        {
+          "line": 5518,
+          "key": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 5519,
+          "key": "skipped",
+          "value": 0
+        },
+        {
+          "line": 5520,
+          "key": "todo",
+          "value": 0
+        }
+      ],
+      "testCases": [
+        {
+          "line": 5170,
+          "text": "✔ expired acquisitions are fenced and consumed atomically; unrelated states and repeated sweeps are unchanged (440.519571ms)"
+        },
+        {
+          "line": 5171,
+          "text": "✔ owner-scoped expiry changes only that owner and returns only changed owners (170.911218ms)"
+        },
+        {
+          "line": 5172,
+          "text": "✔ stale empty failures are removed; account, credential, binding and live OAuth evidence are preserved (194.304116ms)"
+        },
+        {
+          "line": 5173,
+          "text": "✔ a successful reconnect removes older empty shells in the same account and provider without waiting an hour (257.752879ms)"
+        },
+        {
+          "line": 5174,
+          "text": "✔ a concurrent credential publication keeps its epoch, staged credentials and OAuth attempt (259.886756ms)"
+        },
+        {
+          "line": 5175,
+          "text": "✔ expired enrollment reservations preserve their recovery sources before binding; a later OAuth acquisition still expires (263.630208ms)"
+        },
+        {
+          "line": 5176,
+          "text": "✔ the hourly pre-check is false when idle and true exactly when the sweep has an abandoned sign-in to expire (208.447216ms)"
+        },
+        {
+          "line": 5181,
+          "text": "  ✔ refuses share changed while membership was awaited (18.221422ms)"
+        },
+        {
+          "line": 5182,
+          "text": "  ✔ refuses policy changed while membership was awaited (22.76063ms)"
+        },
+        {
+          "line": 5183,
+          "text": "  ✔ refuses agent changed while membership was awaited (33.546647ms)"
+        },
+        {
+          "line": 5184,
+          "text": "  ✔ refuses scope changed while membership was awaited (23.312077ms)"
+        },
+        {
+          "line": 5185,
+          "text": "  ✔ refuses pause changed while membership was awaited (16.803881ms)"
+        },
+        {
+          "line": 5186,
+          "text": "  ✔ refuses epoch changed while membership was awaited (15.051596ms)"
+        },
+        {
+          "line": 5187,
+          "text": "  ✔ refuses deleted changed while membership was awaited (19.221255ms)"
+        },
+        {
+          "line": 5188,
+          "text": "✔ native execution joins current binding authority after shared membership without falling back (538.45259ms)"
+        },
+        {
+          "line": 5189,
+          "text": "✔ a frozen binding and its owner-scoped connection use one fresh query without custody fields (82.976409ms)"
+        },
+        {
+          "line": 5190,
+          "text": "✔ concurrent Connect reserves one bounded owner/workspace/provider acquisition (235.051449ms)"
+        },
+        {
+          "line": 5191,
+          "text": "✔ subscription selections are current saved chats in the authorized workspace, never binding history (133.102128ms)"
+        },
+        {
+          "line": 5193,
+          "text": "  ✔ defaults to 允许; members read without edit rights and cannot write (146.222956ms)"
+        },
+        {
+          "line": 5194,
+          "text": "  ✔ an admin blocks an app: that workspace’s bots are refused, others and the Coordinator are not; audited once (207.885882ms)"
+        },
+        {
+          "line": 5195,
+          "text": "✔ workspace app policy (8702.735389ms)"
+        },
+        {
+          "line": 5197,
+          "text": "  ✔ admins page through the window newest first without gaps; members are refused (189.730119ms)"
+        },
+        {
+          "line": 5198,
+          "text": "  ✔ 安全 filter, ip and city for admins, CSV export rows (253.647641ms)"
+        },
+        {
+          "line": 5199,
+          "text": "✔ workspace audit read API (11555.315498ms)"
+        },
+        {
+          "line": 5200,
+          "text": "✔ credit billing history and remaining balance are workspace scoped (14476.123358ms)"
+        },
+        {
+          "line": 5202,
+          "text": "  ✔ paid sessions credit once across event IDs and concurrent delivery; receipt and fee persist (284.288483ms)"
+        },
+        {
+          "line": 5203,
+          "text": "  ✔ unpaid and async pending sessions do not credit; async paid credits once (63.397471ms)"
+        },
+        {
+          "line": 5204,
+          "text": "  ✔ payment metadata cannot grant a different amount or unsupported denomination (74.017509ms)"
+        },
+        {
+          "line": 5205,
+          "text": "  ✔ partial refunds debit once per refund ID including repeated charge snapshots (106.663749ms)"
+        },
+        {
+          "line": 5206,
+          "text": "  ✔ refund delivered before its purchase stays retryable and later applies (93.196975ms)"
+        },
+        {
+          "line": 5207,
+          "text": "  ✔ all refund pages are read and pending/oversized refunds roll back (154.516498ms)"
+        },
+        {
+          "line": 5208,
+          "text": "  ✔ replayed pending refund reads current Stripe state before applying the debit (64.746888ms)"
+        },
+        {
+          "line": 5209,
+          "text": "  ✔ refund.updated settles a long-pending refund once across both event types (129.370129ms)"
+        },
+        {
+          "line": 5210,
+          "text": "  ✔ refund.updated arriving before the purchase keeps the event retryable (90.798628ms)"
+        },
+        {
+          "line": 5211,
+          "text": "✔ Stripe purchased points ledger (17612.04071ms)"
+        },
+        {
+          "line": 5213,
+          "text": "  ✔ not configured, no subscription, admin only (190.609851ms)"
+        },
+        {
+          "line": 5215,
+          "text": "  ✔ Checkout asks for one seat per active member and tags the workspace (70.146527ms)"
+        },
+        {
+          "line": 5216,
+          "text": "  ✔ webhook events record the subscription once; the portal then opens (201.862154ms)"
+        },
+        {
+          "line": 5217,
+          "text": "✔ workspace billing (19712.076162ms)"
+        },
+        {
+          "line": 5219,
+          "text": "  ✔ without a share the team's own refusal stands (68.7579ms)"
+        },
+        {
+          "line": 5220,
+          "text": "  ✔ a member opts in: the team spends their personal balance; admins see who (144.811048ms)"
+        },
+        {
+          "line": 5221,
+          "text": "  ✔ the next sharer pays when the first one runs out (21.380933ms)"
+        },
+        {
+          "line": 5222,
+          "text": "  ✔ the team's own balance pays first (20.911098ms)"
+        },
+        {
+          "line": 5223,
+          "text": "  ✔ stopping, a suspension or leaving ends a share at once (83.62838ms)"
+        },
+        {
+          "line": 5224,
+          "text": "  ✔ fallback: a team left with one person (nobody else in it or invited) spends their credits without the switch (174.349617ms)"
+        },
+        {
+          "line": 5225,
+          "text": "  ✔ a personal workspace takes no shares; an outsider sees nothing (25.424037ms)"
+        },
+        {
+          "line": 5226,
+          "text": "✔ credit shares: opt in, pay order, leave, scope (17135.607119ms)"
+        },
+        {
+          "line": 5233,
+          "text": "  ✔ detail includes contract fields, every attempt, replacement time and creation; excludes raw errors (503.68678ms)"
+        },
+        {
+          "line": 5240,
+          "text": "  ✔ list decorations share one batched read, cover no-thread schedules and preserve blocked (703.359297ms)"
+        },
+        {
+          "line": 5262,
+          "text": "  ✔ without a thread, board flags and open dependencies put both list and detail in pending (1129.357034ms)"
+        },
+        {
+          "line": 5288,
+          "text": "  ✔ without a cookie or header, the Personal list and authorized task tenants keep their own decorations (1227.583655ms)"
+        },
+        {
+          "line": 5289,
+          "text": "  ✔ task, run and Artifact origins are persisted, immutable and cannot disagree (239.069917ms)"
+        },
+        {
+          "line": 5306,
+          "text": "  ✔ an unlinked workspace task keeps its owner number without a repeated empty team read (1142.699435ms)"
+        },
+        {
+          "line": 5325,
+          "text": "  ✔ explicit workspace selections return 404 across tenants, and workspace tokens stay scoped (714.066532ms)"
+        },
+        {
+          "line": 5335,
+          "text": "  ✔ the Personal default does not grant another user Personal task (116.293695ms)"
+        },
+        {
+          "line": 5365,
+          "text": "  ✔ one account switches Personal and two Shared tenants without mixing tasks, attempts or decorations (1190.951689ms)"
+        },
+        {
+          "line": 5372,
+          "text": "  ✔ a bound Shared task needs no Team link and remains visible with provider sync disabled (279.579044ms)"
+        },
+        {
+          "line": 5379,
+          "text": "  ✔ the single decoration query excludes unresolved tasks and foreign schedule origins (324.925989ms)"
+        },
+        {
+          "line": 5405,
+          "text": "  ✔ real workspace PATs cannot borrow a browser cookie or override their pin with a selection header (592.866597ms)"
+        },
+        {
+          "line": 5411,
+          "text": "  ✔ a native detail waiting for a membership lock rechecks a committed suspension before reading projections (305.35228ms)"
+        },
+        {
+          "line": 5433,
+          "text": "  ✔ suspension and removal deny the creator while another active member retains access (456.8597ms)"
+        },
+        {
+          "line": 5447,
+          "text": "  ✔ invalid/missing IDs are 404; unauthenticated and expired native requests are 401 (175.869548ms)"
+        },
+        {
+          "line": 5448,
+          "text": "✔ mobile task endpoints with real task ACL, current workspace membership and run history (28080.398095ms)"
+        },
+        {
+          "line": 5451,
+          "text": "✔ API keys: migration replay, sealed storage, shares, picker order and run injection (6882.237883ms)"
+        },
+        {
+          "line": 5456,
+          "text": "  ✔ creating a team makes the personal workspace first (321.706341ms)"
+        },
+        {
+          "line": 5457,
+          "text": "  ✔ accepting an invitation makes the personal workspace first (181.503445ms)"
+        },
+        {
+          "line": 5458,
+          "text": "✔ personal workspace first (16484.078248ms)"
+        },
+        {
+          "line": 5460,
+          "text": "  ✔ the kind migration marks only untouched sign-up workspaces personal, and replays safely (496.878224ms)"
+        },
+        {
+          "line": 5461,
+          "text": "  ✔ a user whose first workspace came from an invite gets a personal workspace; work is charged where it happens (4019.12297ms)"
+        },
+        {
+          "line": 5462,
+          "text": "  ✔ a sign-up workspace that became a team stays a team; its owner gets a second, personal one (108.343805ms)"
+        },
+        {
+          "line": 5463,
+          "text": "  ✔ a card verified on a workspace that became a team keeps working: the fresh personal workspace is verified too (404.37818ms)"
+        },
+        {
+          "line": 5464,
+          "text": "  ✔ sharing is the member's own opt-in; the admin has one switch, audited, and none in a personal workspace (7420.999129ms)"
+        },
+        {
+          "line": 5465,
+          "text": "  ✔ leaving a team removes the subscription share and pauses the bots there until an admin takes one over (374.867375ms)"
+        },
+        {
+          "line": 5466,
+          "text": "  ✔ withdrawing a credential stops the runs using it at once; credential access then refuses them (438.282808ms)"
+        },
+        {
+          "line": 5467,
+          "text": "  ✔ every model call re-checks a shared subscription: another member's bot stops when the owner un-shares or leaves (139.03753ms)"
+        },
+        {
+          "line": 5468,
+          "text": "  ✔ a subscription connected in the personal workspace answers its owner's chats in a team; a teammate's only once shared (659.876665ms)"
+        },
+        {
+          "line": 5469,
+          "text": "  ✔ community bot chats use only their available chosen credential without a server model or Decision key (13727.003312ms)"
+        },
+        {
+          "line": 5470,
+          "text": "  ✔ 由我的卡支付这个团队: one member's card per team; leaving releases it with a 7-day grace that admins see (292.755614ms)"
+        },
+        {
+          "line": 5471,
+          "text": "✔ personal workspaces (33948.254933ms)"
+        },
+        {
+          "line": 5473,
+          "text": "  ✔ a run hands an artifact over as its Agent (22160.287004ms)"
+        },
+        {
+          "line": 5474,
+          "text": "  ✔ older versions stored under the dispatching Bot still read as the Agent; a bot author stays a bot (449.225363ms)"
+        },
+        {
+          "line": 5475,
+          "text": "  ✔ an activity row written with a run token names the Agent (71.67723ms)"
+        },
+        {
+          "line": 5476,
+          "text": "✔ run work is credited to its Agent (28337.395207ms)"
+        },
+        {
+          "line": 5478,
+          "text": "  ✔ a finished run that says it was not logged in is judged blocked, once (166.54195ms)"
+        },
+        {
+          "line": 5479,
+          "text": "  ✔ no answer: no outcome, not asked again within the hour, asked again after it (84.89709ms)"
+        },
+        {
+          "line": 5480,
+          "text": "  ✔ a run the judge never answers backs off: asked again after as long as it already waited (49.553284ms)"
+        },
+        {
+          "line": 5481,
+          "text": "  ✔ a running run is not judged (22.769987ms)"
+        },
+        {
+          "line": 5482,
+          "text": "  ✔ the sweep judges ended runs from the last 7 days and leaves older ones alone (45.983041ms)"
+        },
+        {
+          "line": 5483,
+          "text": "✔ ended runs get a judged outcome (7315.762282ms)"
+        },
+        {
+          "line": 5485,
+          "text": "  ✔ a member's run is bound to a teammate's subscription only while it is shared for members (75.315483ms)"
+        },
+        {
+          "line": 5486,
+          "text": "  ✔ the owner and, while shared for members, a member take the lease and read the credential; nobody else (184.549029ms)"
+        },
+        {
+          "line": 5487,
+          "text": "  ✔ the run harness must pass its current self-test even when an old broker flag remains (55.734467ms)"
+        },
+        {
+          "line": 5488,
+          "text": "  ✔ the admin switch, leaving the team, another workspace or a stop request refuse a member's lease (199.860182ms)"
+        },
+        {
+          "line": 5489,
+          "text": "✔ device runs on a shared subscription (8023.550805ms)"
+        },
+        {
+          "line": 5491,
+          "text": "  ✔ admins see every bot and member in the workspace for the month (285.526509ms)"
+        },
+        {
+          "line": 5492,
+          "text": "  ✔ a thread counts in the month it started; its run time counts in the months it ran (184.449047ms)"
+        },
+        {
+          "line": 5493,
+          "text": "  ✔ retries, answered questions and continuations count one thread while every run adds time (85.406342ms)"
+        },
+        {
+          "line": 5494,
+          "text": "  ✔ an October retry of a September thread adds run time without a new thread (125.910315ms)"
+        },
+        {
+          "line": 5495,
+          "text": "  ✔ cross-workspace ancestry is rejected without exposing its root or changing either run (276.971219ms)"
+        },
+        {
+          "line": 5496,
+          "text": "  ✔ usage ancestry accepts 64 parent links and refuses a 65th (563.751228ms)"
+        },
+        {
+          "line": 5497,
+          "text": "  ✔ the ancestry query seeds only the requested month instead of the entire bot history (438.545167ms)"
+        },
+        {
+          "line": 5498,
+          "text": "  ✔ invalid cyclic ancestry is refused instead of producing a thread count (79.566652ms)"
+        },
+        {
+          "line": 5499,
+          "text": "  ✔ members see their own bots only; outsiders are refused (50.047935ms)"
+        },
+        {
+          "line": 5500,
+          "text": "✔ workspace usage (13545.089534ms)"
+        },
+        {
+          "line": 5502,
+          "text": "  ✔ updateWorkspaceGeneral: name, icon, slug with redirect, uniqueness and admin-only (402.110444ms)"
+        },
+        {
+          "line": 5503,
+          "text": "  ✔ readWorkspaceGeneral and workspaceDeletionImpact: members read values, only admins see the impact (131.873932ms)"
+        },
+        {
+          "line": 5504,
+          "text": "  ✔ transferWorkspaceOwnership: owner only, target active, member promoted, fallback when the owner left (212.645533ms)"
+        },
+        {
+          "line": 5505,
+          "text": "  ✔ a personal workspace has its 常规 but is neither transferred nor deleted (decision 2026-11-02-0203) (37.312361ms)"
+        },
+        {
+          "line": 5506,
+          "text": "  ✔ deleteWorkspaceData: name check, full cleanup, other workspace untouched, personal data kept (807.480441ms)"
+        },
+        {
+          "line": 5507,
+          "text": "  ✔ workspace deletion counts persisted tenant tasks without Team links and never follows a foreign link (382.760172ms)"
+        },
+        {
+          "line": 5508,
+          "text": "  ✔ removeMember: guards, immediate access loss, bot transfer (270.087808ms)"
+        },
+        {
+          "line": 5509,
+          "text": "  ✔ removeMember: a suspended admin cannot act, and admins cannot remove themselves (50.606822ms)"
+        },
+        {
+          "line": 5510,
+          "text": "  ✔ suspend with transferTo hands bots over (83.943838ms)"
+        },
+        {
+          "line": 5511,
+          "text": "  ✔ team deletion: impact counts, name check, scoped delete (179.760157ms)"
+        },
+        {
+          "line": 5512,
+          "text": "  ✔ bot defaults: options from member installations, admin-only writes, live thread counts (112.509433ms)"
+        },
+        {
+          "line": 5513,
+          "text": "✔ workspace settings backend (15225.151262ms)"
+        }
+      ],
+      "diagnostics": [],
+      "rawRange": {
+        "startLine": 5169,
+        "endLine": 5522
+      }
+    },
+    {
+      "script": "test:groups",
+      "jobId": 129114785357,
+      "totals": {
+        "tests": 94,
+        "pass": 94,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "summaryRecords": [
+        {
+          "line": 5299,
+          "key": "tests",
+          "value": 12
+        },
+        {
+          "line": 5301,
+          "key": "pass",
+          "value": 12
+        },
+        {
+          "line": 5302,
+          "key": "fail",
+          "value": 0
+        },
+        {
+          "line": 5303,
+          "key": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 5304,
+          "key": "skipped",
+          "value": 0
+        },
+        {
+          "line": 5305,
+          "key": "todo",
+          "value": 0
+        },
+        {
+          "line": 5414,
+          "key": "tests",
+          "value": 82
+        },
+        {
+          "line": 5416,
+          "key": "pass",
+          "value": 82
+        },
+        {
+          "line": 5417,
+          "key": "fail",
+          "value": 0
+        },
+        {
+          "line": 5418,
+          "key": "cancelled",
+          "value": 0
+        },
+        {
+          "line": 5419,
+          "key": "skipped",
+          "value": 0
+        },
+        {
+          "line": 5420,
+          "key": "todo",
+          "value": 0
+        }
+      ],
+      "testCases": [
+        {
+          "line": 5285,
+          "text": "✔ directory rejects foreign/suspended users and private or malformed agents (2.310712ms)"
+        },
+        {
+          "line": 5286,
+          "text": "✔ GET conversations: authentication, write Origin/Host before DB (1.194455ms)"
+        },
+        {
+          "line": 5287,
+          "text": "✔ POST conversations: authentication, write Origin/Host before DB (0.454813ms)"
+        },
+        {
+          "line": 5288,
+          "text": "✔ GET messages: authentication, write Origin/Host before DB (0.186831ms)"
+        },
+        {
+          "line": 5289,
+          "text": "✔ POST messages: authentication, write Origin/Host before DB (18.445384ms)"
+        },
+        {
+          "line": 5290,
+          "text": "✔ POST members: authentication, write Origin/Host before DB (3.169502ms)"
+        },
+        {
+          "line": 5291,
+          "text": "✔ DELETE members: authentication, write Origin/Host before DB (0.201613ms)"
+        },
+        {
+          "line": 5294,
+          "text": "✔ Postgres17 migration, atomic history, pagination, unread counts, membership and privacy (1303.073118ms)"
+        },
+        {
+          "line": 5295,
+          "text": "✔ reaction reads ask only for stored messages, once each, a hundred per request (14.443501ms)"
+        },
+        {
+          "line": 5296,
+          "text": "✔ reactions from every page merge; a failed or malformed page reads as none (52.981596ms)"
+        },
+        {
+          "line": 5297,
+          "text": "✔ a refreshed unknown submission retains its original ID and run despite an advanced chain (8.380662ms)"
+        },
+        {
+          "line": 5298,
+          "text": "✔ edited text is a new explicit request; damaged saved state is not reused (3.121159ms)"
+        },
+        {
+          "line": 5310,
+          "text": "✔ a completed create from an unmounted workspace cannot navigate the current workspace or replay the POST (2934.053355ms)"
+        },
+        {
+          "line": 5315,
+          "text": "✔ a failed group send survives leaving for Settings and returning, with explicit retry only (20631.836254ms)"
+        },
+        {
+          "line": 5316,
+          "text": "✔ a send still in flight stays pending through a remount and receives the same late failure (140.932443ms)"
+        },
+        {
+          "line": 5317,
+          "text": "✔ a confirmed send finishing offscreen is never retried and is pruned when its stored message arrives (97.904349ms)"
+        },
+        {
+          "line": 5318,
+          "text": "✔ a background read failure keeps the mounted history, failed send, draft, selection and reading position (113.23953ms)"
+        },
+        {
+          "line": 5319,
+          "text": "✔ unauthorized still hides previously visible group messages and disables its composer (73.772342ms)"
+        },
+        {
+          "line": 5320,
+          "text": "✔ not_found still hides previously visible group messages and disables its composer (110.885764ms)"
+        },
+        {
+          "line": 5321,
+          "text": "✔ a 401 refusal cannot revive cached group history after a later transport failure (62.033579ms)"
+        },
+        {
+          "line": 5322,
+          "text": "✔ a 403 refusal cannot revive cached group history after a later transport failure (62.819761ms)"
+        },
+        {
+          "line": 5323,
+          "text": "✔ a 404 refusal cannot revive cached group history after a later transport failure (73.591199ms)"
+        },
+        {
+          "line": 5324,
+          "text": "✔ an initial unavailable read keeps the existing local error state without inventing empty history (15.067449ms)"
+        },
+        {
+          "line": 5325,
+          "text": "✔ pending group messages stay isolated by group, authenticated owner and workspace (114.753796ms)"
+        },
+        {
+          "line": 5329,
+          "text": "✔ a refused group retry completing across a quick remount unlocks the current view (21166.786178ms)"
+        },
+        {
+          "line": 5334,
+          "text": "✔ Factory task and thread references in bot and agent replies are real links; sent user text keeps its existing rendering (18658.08335ms)"
+        },
+        {
+          "line": 5335,
+          "text": "✔ group replies use the existing Markdown HTML and URL protections (164.686959ms)"
+        },
+        {
+          "line": 5336,
+          "text": "✔ the chat reads its newest page and members on the group key, never on a timer (#1212) (51.229376ms)"
+        },
+        {
+          "line": 5340,
+          "text": "✔ reactions read as chips: count past one, the person's own tinted and named (114.856312ms)"
+        },
+        {
+          "line": 5341,
+          "text": "✔ a message nobody reacted to has no reaction row (5.02455ms)"
+        },
+        {
+          "line": 5342,
+          "text": "✔ the latest run reads as its own result (1.831452ms)"
+        },
+        {
+          "line": 5343,
+          "text": "✔ an earlier run keeps its result, except one left waiting, which has ended (0.873522ms)"
+        },
+        {
+          "line": 5348,
+          "text": "✔ a committed acceptance resolves the current producer row while its stored run outcome stays needs_input (255.182354ms)"
+        },
+        {
+          "line": 5349,
+          "text": "✔ runs by one Agent are one 活动 row in the latest run's state; run data is unchanged (2026-11-09-0045) (4.071307ms)"
+        },
+        {
+          "line": 5350,
+          "text": "✔ an Agent switch starts a new row that reads 「Switched to」 the new Agent (3.979079ms)"
+        },
+        {
+          "line": 5351,
+          "text": "✔ accepted metadata preserves the row state for another issue (3.365527ms)"
+        },
+        {
+          "line": 5352,
+          "text": "✔ accepted metadata preserves the row state for an earlier candidate (2.347056ms)"
+        },
+        {
+          "line": 5353,
+          "text": "✔ accepted metadata preserves the row state for a candidate without its producer (2.240857ms)"
+        },
+        {
+          "line": 5354,
+          "text": "✔ accepted metadata preserves the row state for no current candidate (2.231704ms)"
+        },
+        {
+          "line": 5355,
+          "text": "✔ accepted metadata preserves the row state for a skill candidate (3.799348ms)"
+        },
+        {
+          "line": 5356,
+          "text": "✔ accepted metadata preserves the row state for pending approval (1.689568ms)"
+        },
+        {
+          "line": 5357,
+          "text": "✔ accepted metadata preserves the row state for a review passed before acceptance (2.483391ms)"
+        },
+        {
+          "line": 5358,
+          "text": "✔ accepted metadata preserves the row state for a failed current producer (1.727897ms)"
+        },
+        {
+          "line": 5359,
+          "text": "✔ accepted metadata preserves the row state for a newer successful continuation (1.705002ms)"
+        },
+        {
+          "line": 5360,
+          "text": "✔ accepted metadata preserves the row state for a newer failed continuation (1.252652ms)"
+        },
+        {
+          "line": 5361,
+          "text": "✔ accepted metadata preserves the row state for an active run (7.256964ms)"
+        },
+        {
+          "line": 5362,
+          "text": "✔ accepted metadata preserves the row state for an input-waiting run (1.997511ms)"
+        },
+        {
+          "line": 5363,
+          "text": "✔ accepted metadata preserves the row state for an unanswered question (7.301371ms)"
+        },
+        {
+          "line": 5364,
+          "text": "✔ accepted metadata preserves the row state for a resuming question (4.519666ms)"
+        },
+        {
+          "line": 5365,
+          "text": "✔ accepted metadata preserves the row state for a failed question wake (1.138921ms)"
+        },
+        {
+          "line": 5366,
+          "text": "✔ accepted metadata preserves the row state for a quota-paused run (6.22259ms)"
+        },
+        {
+          "line": 5367,
+          "text": "✔ accepted metadata preserves the row state for a requested stop (1.374165ms)"
+        },
+        {
+          "line": 5372,
+          "text": "✔ a background thread read failure preserves transcript, scroll, composer focus and unsent draft (4460.942606ms)"
+        },
+        {
+          "line": 5373,
+          "text": "✔ a 401 thread refusal hides private content until a new successful read (90.239329ms)"
+        },
+        {
+          "line": 5374,
+          "text": "✔ a 403 thread refusal hides private content until a new successful read (74.097906ms)"
+        },
+        {
+          "line": 5375,
+          "text": "✔ a 404 thread refusal hides private content until a new successful read (43.773672ms)"
+        },
+        {
+          "line": 5376,
+          "text": "✔ a runNotFound over browser RPC thread refusal hides private content until a new successful read (36.333709ms)"
+        },
+        {
+          "line": 5377,
+          "text": "✔ a owner scope thread refusal hides private content until a new successful read (37.341228ms)"
+        },
+        {
+          "line": 5378,
+          "text": "✔ a workspace scope thread refusal hides private content until a new successful read (41.318725ms)"
+        },
+        {
+          "line": 5379,
+          "text": "✔ a changed transport session thread refusal hides private content until a new successful read (38.526069ms)"
+        },
+        {
+          "line": 5380,
+          "text": "✔ a new thread scope cannot show the previous scope conversation or draft while its read fails (19.681803ms)"
+        },
+        {
+          "line": 5381,
+          "text": "✔ a thread refusal hides the cached changes pane and its private header (47.200683ms)"
+        },
+        {
+          "line": 5382,
+          "text": "✔ a thread refusal hides the cached acceptance pane and its private header (16.878311ms)"
+        },
+        {
+          "line": 5383,
+          "text": "✔ a retry started before the thread remounts restores the new panel from its shared successful read (27.64571ms)"
+        },
+        {
+          "line": 5384,
+          "text": "✔ an open thread ends in the composer whether it runs or has ended (84.423082ms)"
+        },
+        {
+          "line": 5385,
+          "text": "✔ the Artifact window and the thread column keep the composer (12.418931ms)"
+        },
+        {
+          "line": 5386,
+          "text": "✔ a thread the viewer cannot read in full has no composer (9.727175ms)"
+        },
+        {
+          "line": 5387,
+          "text": "✔ every conversation container draws the shared composer, directly or through the thread panel (1.096227ms)"
+        },
+        {
+          "line": 5388,
+          "text": "✔ an open thread lets the agent’s words be quoted and every message be copied (12.127092ms)"
+        },
+        {
+          "line": 5389,
+          "text": "✔ the original thread shows the latest failed continuation and its existing Retry control (13.938519ms)"
+        },
+        {
+          "line": 5390,
+          "text": "✔ a historical failure does not offer Retry while the latest continuation works or has succeeded (15.308873ms)"
+        },
+        {
+          "line": 5391,
+          "text": "✔ an ended independent check hides generic Retry and preserves an editable composer with Send disabled (7.597967ms)"
+        },
+        {
+          "line": 5392,
+          "text": "✔ a strict question recovery on a check keeps Retry while ordinary Send remains disabled (21.587747ms)"
+        },
+        {
+          "line": 5393,
+          "text": "✔ a failed queued question wake retains its explicit Retry without reopening ordinary Send (8.268183ms)"
+        },
+        {
+          "line": 5394,
+          "text": "✔ the ordinary producer and a current check question keep their composer controls (13.971534ms)"
+        },
+        {
+          "line": 5395,
+          "text": "✔ acceptance resolves the current producer badge without rewriting its outcome or disabling its ordinary composer (20.785311ms)"
+        },
+        {
+          "line": 5396,
+          "text": "✔ an acceptance display cannot grant Send when the server has withheld ordinary continuation (5.773676ms)"
+        },
+        {
+          "line": 5397,
+          "text": "✔ the root panel resolves its accepted latest continuation without changing the root acceptance pane route (4.271498ms)"
+        },
+        {
+          "line": 5398,
+          "text": "✔ accepted candidate metadata does not replace the panel state of another issue (4.91122ms)"
+        },
+        {
+          "line": 5399,
+          "text": "✔ accepted candidate metadata does not replace the panel state of an earlier candidate producer (4.119099ms)"
+        },
+        {
+          "line": 5400,
+          "text": "✔ accepted candidate metadata does not replace the panel state of a missing current candidate (8.237823ms)"
+        },
+        {
+          "line": 5401,
+          "text": "✔ accepted candidate metadata does not replace the panel state of a skill candidate (6.408329ms)"
+        },
+        {
+          "line": 5402,
+          "text": "✔ accepted candidate metadata does not replace the panel state of approval not yet accepted (7.437956ms)"
+        },
+        {
+          "line": 5403,
+          "text": "✔ accepted candidate metadata does not replace the panel state of a passed check before approval (4.670678ms)"
+        },
+        {
+          "line": 5404,
+          "text": "✔ accepted candidate metadata does not replace the panel state of a failed producer (4.740663ms)"
+        },
+        {
+          "line": 5405,
+          "text": "✔ accepted candidate metadata does not replace the panel state of a historical failed review (5.639854ms)"
+        },
+        {
+          "line": 5406,
+          "text": "✔ accepted candidate metadata does not replace the panel state of a later successful continuation (9.069758ms)"
+        },
+        {
+          "line": 5407,
+          "text": "✔ accepted candidate metadata does not replace the panel state of an active run (10.646066ms)"
+        },
+        {
+          "line": 5408,
+          "text": "✔ accepted candidate metadata does not replace the panel state of a waiting input run (7.94649ms)"
+        },
+        {
+          "line": 5409,
+          "text": "✔ accepted candidate metadata does not replace the panel state of an unanswered question (6.923363ms)"
+        },
+        {
+          "line": 5410,
+          "text": "✔ accepted candidate metadata does not replace the panel state of a resuming question (11.276734ms)"
+        },
+        {
+          "line": 5411,
+          "text": "✔ accepted candidate metadata does not replace the panel state of a failed question wake (8.449206ms)"
+        },
+        {
+          "line": 5412,
+          "text": "✔ accepted candidate metadata does not replace the panel state of a quota-paused run (8.29251ms)"
+        },
+        {
+          "line": 5413,
+          "text": "✔ accepted candidate metadata does not replace the panel state of a requested stop (7.166559ms)"
+        }
+      ],
+      "diagnostics": [],
+      "rawRange": {
+        "startLine": 5284,
+        "endLine": 5422
+      }
+    }
+  ],
+  "assertionBindings": {
+    "deviceC": {
+      "source": "lib/device-heartbeat.db.test.ts",
+      "gitBlob": "e8f4f35748707364e77c53fa594c166bafc3dae8",
+      "commandPartsObserved": [
+        16,
+        11,
+        5
+      ],
+      "emptyRunsStatements": 2,
+      "emptyReposStatements": 2,
+      "measurementMeaning": "One current authentication statement plus one authority/owner/result statement. This is a real PG fixture result, not a projected full Native budget.",
+      "raceLoop": [
+        "revoked",
+        "expired",
+        "removed",
+        "foreign-owner"
+      ],
+      "raceBarrier": "Actual wrapped handler resolves params only after initial authentication; each mutation precedes the business snapshot.",
+      "workspaceFixture": "Queued run is seeded with seedFixtureWorkspace and bound workspaceId; exact nonempty runs/repos and refusal/no-data assertions are preserved."
+    },
+    "enrollmentAndCommands": {
+      "source": "lib/device-enrollment.db.test.ts",
+      "gitBlob": "071b2243d35cd6fdd97b7be0f17f21728578c537",
+      "tests": 13,
+      "enrollmentConsumptionStatements": 1,
+      "emptyAckScenarios": {
+        "disabledDevice": 1,
+        "removedDevice": 1,
+        "emptyDevice": 1,
+        "missingDevice": 1
+      },
+      "concurrentWinnerAndInsertionRollbackActualPassed": true,
+      "ownerAndRemovalSemanticsActualPassed": true
+    },
+    "strictFence": {
+      "source": "lib/device-unit-fence.db.test.ts",
+      "gitBlob": "bc65b3faf494d2fd7c797b68f34d04227df38b7a",
+      "tenConcurrentRequestsThreeFenceConnectionsPassed": true,
+      "perStatement": {
+        "completed": 3,
+        "roundTrips": 11,
+        "explicit": 2
+      },
+      "perUnit": {
+        "completed": 4,
+        "roundTrips": 6,
+        "explicit": 1
+      },
+      "measurement": "backend_command_tags_and_ready_for_query",
+      "boundary": "Strict assertions compare explicit authorization transactions and round trips. Total completed transactions are 3→4 and are not described as a decrease."
+    },
+    "revisionPrefetch": {
+      "source": "tests/live-revision-reads.db.test.ts",
+      "gitBlob": "960eb24ff24aba996a681bc47468290cf6200398",
+      "registeredIn": "test:activity-actor-db",
+      "threeActualNamedTestsPassed": true,
+      "preparedTest": "prepared owner-list revisions share one PostgreSQL read without duplicate team refs or rows",
+      "assertedContract": "Exact values, one home read before/after, original 2 statements, personal candidate 1 and selected-team candidate 2; refs/rows preserved and JSON row bytes not increased."
+    },
+    "mainRunResultRegistration": {
+      "registeredIn": "test:groups",
+      "actualNamedTests": [
+        "the latest run reads as its own result",
+        "an earlier run keeps its result, except one left waiting, which has ended"
+      ],
+      "bothPresentAndPassed": true
+    }
+  },
+  "aggregate": {
+    "jobId": 129117884767,
+    "name": "Production build and browser interactions",
+    "status": "completed",
+    "conclusion": "success",
+    "startedAt": "2026-11-09T10:55:18Z",
+    "completedAt": "2026-11-09T10:55:29Z",
+    "log": {
+      "path": "postgres-aggregate-129117884767.original.log",
+      "bytes": 13312,
+      "sha256": "6bef5f196592331ffcb8a57fa43a960e75a50b97b7d801feb7ac8791f8e711bc",
+      "gitBlob": "7c454ee809c24b31397cfb3d9f2d322998d70ea2",
+      "jobId": 129117884767,
+      "rawReadCount": 1
+    },
+    "checkout": [
+      {
+        "commandLine": 148,
+        "shaLine": 149,
+        "sha": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4"
+      }
+    ],
+    "steps": [
+      {
+        "number": 1,
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 2,
+        "name": "Require every selected database shard",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 3,
+        "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 4,
+        "name": "Record actual completed job timings",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 8,
+        "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 9,
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ],
+    "actualCommands": [
+      "test CHANGES_RESULT = success; EXPECT_DB=true requires DB_RESULT=success",
+      "node scripts/ci/summary.mjs"
+    ],
+    "observedEnvironment": {
+      "CHANGES_RESULT": "success",
+      "EXPECT_DB": "true",
+      "DB_RESULT": "success"
+    },
+    "boundary": "Despite its historical name, this job only enforces the DB result and records timing. It is not a production build or browser/Native execution."
+  },
+  "exclusions": [
+    "No Source/Core/Integration/Daemon/desktop/image/SSR/UI/Native or companion job logs were fetched by this reviewer.",
+    "No old source's CI or Native green was used to satisfy this run.",
+    "SQL negative-fixture errors inside the retained PostgreSQL service log remain unchanged and are not mislabeled as job failures when their actual assertions and summaries passed."
+  ],
+  "resources": {
+    "reviewerCreated": 0,
+    "testsRerun": 0,
+    "workflowsTriggered": 0,
+    "productionOrModelCalls": 0,
+    "refsChanged": false,
+    "ghaPostgresContainersRemoved": 4,
+    "ghaNetworksRemoved": 4
+  }
+}

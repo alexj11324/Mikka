@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "purpose": "existing artifact byte recovery only",
+  "sessionId": "sbx_PX9yu7GOxcJDCgUoEtuWOlooF6fI",
+  "name": "issue1512-native-ae10-42603781956",
+  "createdAt": "2026-11-09T11:15:35.470Z",
+  "startedAt": "2026-11-09T11:15:35.499Z",
+  "stoppedAt": "2026-11-09T11:19:11.709Z",
+  "status": "stopped",
+  "resources": {
+    "vcpus": 1,
+    "memoryMiB": 2048,
+    "region": "iad1",
+    "architecture": "amd64",
+    "image": "vercel/sandbox/universal@sha256:bbec19cffb43ad724eee446d3bd4476e2993849dc0ff0c9f33356f8365d72219",
+    "persistent": false,
+    "ports": [],
+    "timeoutMs": 900000,
+    "extensions": 0,
+    "networkPolicy": {
+      "mode": "custom",
+      "allowedDomains": [
+        "*.blob.core.windows.net",
+        "*.amazonaws.com",
+        "*.oaiusercontent.com",
+        "chatgpt.com"
+      ]
+    }
+  },
+  "consumption": {
+    "durationMs": 216210,
+    "activeCpuDurationMs": 8702,
+    "ingressBytes": 14935862,
+    "egressBytes": 383521,
+    "cost": "not measured; no zero-cost claim"
+  },
+  "deletion": {
+    "requestedWithConfirm": true,
+    "returnedStoppedSandbox": true,
+    "exactNamedRead": {
+      "resume": false,
+      "httpStatus": 404,
+      "code": "not_found",
+      "sameProjectAndTeam": true
+    },
+    "verifiedAbsent": true
+  },
+  "currentOwnedActiveResources": 0,
+  "criticalFilesRecoveredBeforeStop": 13,
+  "criticalOriginalBlobsConfirmedBeforeStop": 5,
+  "commandCorrections": [
+    {
+      "stage": "first materialization command",
+      "error": "cwd /vercel/sandbox did not exist",
+      "processStarted": false,
+      "bytesDownloaded": 0,
+      "correction": "used actual image cwd /vercel; script creates extraction directory"
+    },
+    {
+      "stage": "first bundle command",
+      "error": "FORENSIC_ROOT environment missing",
+      "exitCode": 1,
+      "bytesDownloaded": 0,
+      "correction": "passed extraction root explicitly; same original bytes retained"
+    }
+  ]
+}

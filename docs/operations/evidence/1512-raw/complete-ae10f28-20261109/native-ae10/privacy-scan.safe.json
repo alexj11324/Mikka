@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "scope": "all 21 payload files before this receipt and index",
+  "method": "closed regular-expression scan of private key/token/JWT/email/credential-URL/authorization/SAS shapes; all original bytes retained",
+  "scannerSha256": "2dbb2cfa9c466c737a9c1900532f7ab0d244592558cb7144df2cc378c10e95ee",
+  "categories": [
+    "private-key",
+    "github-token",
+    "provider-key",
+    "jwt",
+    "email",
+    "credential-url",
+    "authorization",
+    "signed-download-query"
+  ],
+  "files": [
+    {
+      "path": "arithmetic.safe.json",
+      "bytes": 23633,
+      "sha256": "a0ec70b54c73307abe330f5360332ddfc10c874a458f18eeaf54b442cef71208",
+      "findings": []
+    },
+    {
+      "path": "cleanup-package.safe.json",
+      "bytes": 12052,
+      "sha256": "1699372edd082831ee719cecd7cd153594ac5d4c91dc0c7beb3924a600a9ed26",
+      "findings": []
+    },
+    {
+      "path": "first-read.safe.json",
+      "bytes": 1588,
+      "sha256": "8c2a9d5452398ded8f0dd507ef6aa90b72dfbfe1c25179e7c8b35f62a378467b",
+      "findings": []
+    },
+    {
+      "path": "original/lifecycle.json",
+      "bytes": 703382,
+      "sha256": "4abf78dbbd4386265f407f349d3a8497772e2f1dc8083ed82150c3688d418f04",
+      "findings": []
+    },
+    {
+      "path": "original/mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "2760ba79d43f3d082bd5db542acd1af771d73f4558066d10921ad20b379bfb94",
+      "findings": []
+    },
+    {
+      "path": "original/native-crypto.json",
+      "bytes": 2868,
+      "sha256": "8403afccd69a690d274e422f7b8bd82fc7edabb8d1c20e624ea85ea2c6ca61fd",
+      "findings": []
+    },
+    {
+      "path": "original/parity.json",
+      "bytes": 116435,
+      "sha256": "0be010455c21f409a741338de1de5b1c95bf2919d4c06220e2dbb33d5f48c6d4",
+      "findings": []
+    },
+    {
+      "path": "original/smoke.json",
+      "bytes": 3144,
+      "sha256": "89454768c8afcadde6cf198d6eb5dd8ba16e284062d8df4dbd2c92c9cfa9926c",
+      "findings": []
+    },
+    {
+      "path": "original-files-manifest.safe.json",
+      "bytes": 84763,
+      "sha256": "27cf164dee51227694e89fb5feb591eb13ad4ac3e70fba616afe6a0396a2dc1d",
+      "findings": []
+    },
+    {
+      "path": "rpc-diagnostics.safe.json",
+      "bytes": 42122,
+      "sha256": "55780483d2fab30c1d34a2941fc739dad0e20601a29913a8a49e67a493850d8a",
+      "findings": []
+    },
+    {
+      "path": "verification-run.safe.json",
+      "bytes": 887,
+      "sha256": "ef0d7a2cb0524a0c05ffd24b1f07146e7895da840a9ffce9cb7a2cbf61e15824",
+      "findings": []
+    },
+    {
+      "path": "verify-artifact-download.py",
+      "bytes": 2781,
+      "sha256": "c8b81ecd81e687c88749614aead83b013f34b5f1c820499062b4908d73d9ec6e",
+      "findings": []
+    },
+    {
+      "path": "verify-native-originals.py",
+      "bytes": 16005,
+      "sha256": "d87717fed1426985adda6692fbdf91e6ea195826e8c0c49804c1efa31ace7475",
+      "findings": []
+    },
+    {
+      "path": "job.safe.json",
+      "bytes": 7075,
+      "sha256": "e62f53e0f68a50143007f3c5178626e0ced59fd642b750a73030b23d7a4fac49",
+      "findings": []
+    },
+    {
+      "path": "source-binding.safe.json",
+      "bytes": 4172,
+      "sha256": "abb53759d46f9193ec3d17a05774c94b15871f0c91030962438992d652a475e9",
+      "findings": []
+    },
+    {
+      "path": "artifact-transfer.safe.json",
+      "bytes": 2220,
+      "sha256": "2a89c4525872882b483d9078f4af0a3ab00a522b9a2dda1585956da3f2d5253f",
+      "findings": []
+    },
+    {
+      "path": "vm-cleanup.safe.json",
+      "bytes": 1939,
+      "sha256": "0f6e45a531db961712271c248ae6ec97e1b88a3fdda6480419192925ba5865b9",
+      "findings": []
+    },
+    {
+      "path": "read-ledger.safe.json",
+      "bytes": 1176,
+      "sha256": "44b5a724994adb3e23a06b0be66eb4a9dd6b5438ed950ade7f35f90e2b091aa2",
+      "findings": []
+    },
+    {
+      "path": "terminal-review.safe.json",
+      "bytes": 15206,
+      "sha256": "900c3ffdf6586d6cca3086b2d0af4dc7279faa7c517541732e7347a43366b698",
+      "findings": []
+    },
+    {
+      "path": "README.md",
+      "bytes": 3925,
+      "sha256": "d986aea598dcec8478d368084a0222a2d9860935aa0aeba77769f6ebd0138839",
+      "findings": []
+    },
+    {
+      "path": "job-129117574595.original.log",
+      "bytes": 259836,
+      "sha256": "8d08a3f9efebf9523e1aebdd417132f9c78e631b5799e4f2ba8acfcf2338d6d6",
+      "findings": []
+    }
+  ],
+  "findings": 0,
+  "redactions": 0,
+  "withheldPublicFiles": [],
+  "excludedFromPublicPayload": [
+    "signed download references",
+    "private raw tool responses",
+    "full ZIP binary archives"
+  ],
+  "limitation": "Pattern scanning is bounded evidence and is not a universal proof that arbitrary text cannot contain private information."
+}
