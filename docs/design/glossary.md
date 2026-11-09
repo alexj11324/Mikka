@@ -58,6 +58,29 @@ Decision: [2026-11-01-2310](decisions/2026-11-01-2310-personal-and-team-workspac
 - **Attempt** is an internal data term only (`factory_attempts`, a run chain's
   runs). User-facing copy never says 「尝试」 or "attempt".
 
+## Run result (运行结果)
+
+How one run came out, in one set of words on every surface that shows it: the
+task page's 活动 rows, the right column's 活动 rows and the task conversation
+(`hooks/use-run-result.ts`), and iOS (`MobileCore.attempts`). A 活动 row shows
+the result of its Agent stretch's latest run. It is the run's own result, never
+the task's status: task status, Factory stage, run result and the derived
+受阻 / 等你处理 are four different things (#1687).
+
+| Result | 中文 | English | When |
+| --- | --- | --- | --- |
+| running | 运行中 | Running | The run is working. |
+| queued | 排队中 | Queued | The run waits for a machine. |
+| waiting | 等你回复 | Needs your reply | The run waits on the person; its reason may say more (等你确认, 待审阅). |
+| done | 完成 | Done | The run finished its work. |
+| failed | 失败 | Failed | The run failed. |
+| blocked | 受阻 | Blocked | The run stopped on something it cannot fix itself, such as 额度用完. |
+| idle | 暂不处理 | On hold | The run decided there is nothing to do now. |
+| ended | 已结束 | Ended | An earlier run left waiting while the conversation went on. |
+
+_Avoid_: 已解决 for a run (a thread group word, R-52), 已替换, 进行中 for a run
+(进行中 is the board column), 尝试.
+
 ## Other words
 
 Decided by Alex, 2026-10-28.
