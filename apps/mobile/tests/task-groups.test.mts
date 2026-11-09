@@ -88,7 +88,7 @@ test('受阻 is its own state, with the API\'s code or read from the board until
   assert.deepEqual(rowState({ group: 'pending', status: 'doing', blocked: { reason: 'run', blocker: null } }), { state: 'blocked', reason: '受阻' })
 })
 
-// Alex 2026-11-07: 「第二次尝试明显应该在第一次之后」. A task has one conversation.
+// Alex 2026-11-07: the second run comes after the first. A task has one conversation.
 test('a task\'s attempts read as one conversation, oldest first, each keeping only its own messages', () => {
   const attempt = (runId: string, n: number, harness: string, extra = {}) => ({ kind: 'attempt' as const, runId, n, group: 'resolved' as const, harness, createdAt: '', failed: false, ...extra })
   const activity = [attempt('r2', 2, 'claude_code'), attempt('r1', 1, 'codex', { failed: true }), { kind: 'created' as const, by: null, createdAt: '' }]
@@ -100,28 +100,26 @@ test('a task\'s attempts read as one conversation, oldest first, each keeping on
   assert.deepEqual(conversationSegments([{ kind: 'created', by: null, createdAt: '' }], new Map()), [])
 })
 
-// Alex 2026-11-08: a task is one conversation; 「尝试」 only where the task switched Agent.
-test('runs with the same Agent read as one; a divider only where the Agent changed, counting switches only', () => {
+// Alex 2026-11-09: a task is one conversation; no 「尝试」 and no numbering, a divider only where the Agent changed.
+test('runs with the same Agent read as one; a divider only where the Agent changed, naming the Agent that did not get through', () => {
   const run = (runId: string, n: number, harness: string, extra = {}) => ({ kind: 'attempt' as const, runId, n, group: 'resolved' as const, harness, createdAt: '', failed: false, ...extra })
   const r1 = run('r1', 1, 'codex'), r2 = run('r2', 2, 'codex'), r3 = run('r3', 3, 'codex', { failed: true, state: 'failed' }), r4 = run('r4', 4, 'claude_code'), r5 = run('r5', 5, 'cursor')
-  const activity = [r5, r4, r3, r2, r1, { kind: 'created' as const, by: null, createdAt: '' }]
   // Same Agent: nothing between them, however many runs (follow-ups, waiting for a reply).
-  assert.equal(boundary(activity, r1, r2), null)
-  // The Agent changed after a failure: counted by Agent switches, so the first stretch is 第 1 次 although it held three runs.
-  assert.deepEqual(boundary(activity, r3, r4), { kind: 'switch', text: '第 1 次尝试失败 · 换 Claude Code 再试' })
+  assert.equal(boundary(r1, r2), null)
+  // The Agent changed after a failure: the one that failed is named, nothing is numbered.
+  assert.deepEqual(boundary(r3, r4), { kind: 'switch', text: 'Codex 没跑通 · 换 Claude Code 继续' })
   // The Agent changed without a failure.
-  assert.deepEqual(boundary(activity, r4, r5), { kind: 'switch', text: '换 Cursor 继续' })
+  assert.deepEqual(boundary(r4, r5), { kind: 'switch', text: '换 Cursor 继续' })
 })
 
 // 2026-11-04-2200: verification belongs to 实现, and 审阅 is its own result card; only a fix is marked inline.
 test('a fix starting with the same Agent is a small marker; review, verify, implement and no stage are not', () => {
   const run = (runId: string, n: number, stage?: string | null) => ({ kind: 'attempt' as const, runId, n, group: 'resolved' as const, harness: 'codex', createdAt: '', failed: false, ...(stage === undefined ? {} : { stage }) }) as never
-  const activity = [run('r4', 4, 'fix'), run('r3', 3, 'verify'), run('r2', 2, 'review'), run('r1', 1, 'implement')]
-  assert.deepEqual(boundary(activity, run('r2', 2, 'review'), run('r4', 4, 'fix')), { kind: 'stage', text: '修复' })
-  assert.equal(boundary(activity, run('r1', 1, 'implement'), run('r2', 2, 'review')), null)
-  assert.equal(boundary(activity, run('r2', 2, 'review'), run('r3', 3, 'verify')), null)
-  assert.equal(boundary(activity, run('r1', 1), run('r2', 2)), null)
-  assert.equal(boundary(activity, run('r1', 1), run('r2', 2, null)), null)
+  assert.deepEqual(boundary(run('r2', 2, 'review'), run('r4', 4, 'fix')), { kind: 'stage', text: '修复' })
+  assert.equal(boundary(run('r1', 1, 'implement'), run('r2', 2, 'review')), null)
+  assert.equal(boundary(run('r2', 2, 'review'), run('r3', 3, 'verify')), null)
+  assert.equal(boundary(run('r1', 1), run('r2', 2)), null)
+  assert.equal(boundary(run('r1', 1), run('r2', 2, null)), null)
   assert.equal(reviewRun({ stage: 'review' }), true)
   assert.equal(reviewRun({ stage: 'implement' }), false)
   assert.equal(reviewRun({}), false)

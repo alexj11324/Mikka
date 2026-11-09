@@ -136,7 +136,7 @@ export interface Thread {
   finishedAt: string | null
   /** Its place in the list, as on the web (R-52). Absent from a server older than it. */
   group?: ThreadGroup
-  /** How many threads its task has had; the list shows only the newest (第 N 次尝试). */
+  /** How many threads its task has had; the list shows only the newest. */
   attempts?: number
 }
 

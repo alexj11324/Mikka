@@ -39,7 +39,7 @@ async function readConversation(id: string): Promise<Conversation> {
 
 /**
  * A task's one conversation (Alex 2026-11-07, 2026-11-08): every run's messages in order, oldest at the top. A line
- * only where the task switched Agent (「换 Claude Code 继续」, 「第 1 次尝试失败 · 换 Claude Code 再试」); a small marker
+ * only where the task switched Agent (「换 Codex 继续」, 「Claude Code 没跑通 · 换 Codex 继续」); a small marker
  * where a factory stage started (「独立审查」); same-Agent runs otherwise read as one. The bar is ← and the task's title over the current
  * Agent; the composer, 停止 and a quota pause act on the newest attempt. It updates on the task's and the newest
  * attempt's live keys.
@@ -112,11 +112,11 @@ export function TaskConversationScreen() {
         <ReadNotice error={error} hasData={Boolean(data)} label="对话" onRetry={reload} />
         {/* A factory task's one stage, and what it needs from you (2026-11-04-2200); nothing without a flow. */}
         {stageLine(data?.detail.task.flow) ? <Text style={styles.stageLine}>{stageLine(data?.detail.task.flow)}</Text> : null}
-        {data && !segments.length ? <Text style={styles.empty}>还没有尝试</Text> : null}
+        {data && !segments.length ? <Text style={styles.empty}>还没开始</Text> : null}
         {segments.map((segment, index) => (
           <View key={segment.attempt.runId} style={styles.segment}
             onLayout={event => { offsets.current.set(segment.attempt.runId, event.nativeEvent.layout.y); place() }}>
-            {index > 0 ? <Boundary at={boundary(data?.detail.activity ?? [], segments[index - 1]!.attempt, segment.attempt)} /> : null}
+            {index > 0 ? <Boundary at={boundary(segments[index - 1]!.attempt, segment.attempt)} /> : null}
             {reviewRun(segment.attempt)
               ? <ReviewCard flow={data?.detail.task.flow} running={Boolean(live?.active) && index === segments.length - 1}>
                 {segment.items.map((item, at) => <Item key={item.id} item={item} live={Boolean(live?.active) && index === segments.length - 1 && at === segment.items.length - 1} />)}

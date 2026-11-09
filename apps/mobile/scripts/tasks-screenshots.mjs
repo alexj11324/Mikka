@@ -1,5 +1,5 @@
 // Expo Web screenshots for #1671's iOS part: lists show tasks only, threads open inside their task, and a task is
-// one conversation with 「尝试」 only where it switched Agent (2026-11-08).
+// one conversation with a divider only where it switched Agent, never 「尝试」 (2026-11-09).
 // Our own labelled fixtures; no other product's source or wording.
 //
 //   MOBILE_WEB_DIST=/path/to/expo-web-export SCREENSHOT_OUT=/path/to/out node apps/mobile/scripts/tasks-screenshots.mjs
@@ -190,7 +190,7 @@ async function run() {
       await page.waitForTimeout(500)
       await page.screenshot({ path: join(outDir, `${theme}-3-task.png`) })
       await page.getByText('换 Claude Code', { exact: true }).first().click()
-      await page.getByText('第 1 次尝试失败 · 换 Claude Code 再试').waitFor({ timeout: 20_000 })
+      await page.getByText('Codex 没跑通 · 换 Claude Code 继续').waitFor({ timeout: 20_000 })
       await page.waitForTimeout(500)
       await page.screenshot({ path: join(outDir, `${theme}-4-conversation.png`) })
       // 审阅 is one result card; it opens to the reviewer's transcript.

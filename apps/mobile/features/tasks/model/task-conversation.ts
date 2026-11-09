@@ -7,7 +7,7 @@ export type Attempt = Extract<TaskActivity, { kind: 'attempt' }>
 export type Segment = { attempt: Attempt; items: ThreadItem[]; error: string | null }
 
 /**
- * A task's one conversation (Alex 2026-11-07: 「第二次尝试明显应该在第一次之后」): each attempt's thread, oldest at the
+ * A task's one conversation (Alex 2026-11-07: the second run comes after the first): each attempt's thread, oldest at the
  * top. A thread read from an earlier run also holds the runs after it (R-81), so each attempt keeps only what no
  * newer attempt already shows.
  */
@@ -29,18 +29,9 @@ const agent = (harness: string) => HARNESS[harness] ?? harness
 /**
  * A task is one conversation (Alex 2026-11-08). Runs with the same Agent in a row (follow-ups, waiting for a reply,
  * the factory's review, verify and fix) are one stretch of it; a new stretch starts only when the task switched to
- * another Agent (Claude Code ↔ Codex ↔ Cursor). Oldest first.
+ * another Agent (Claude Code ↔ Codex ↔ Cursor).
  */
 export type AgentRun = { harness: string; attempts: Attempt[] }
-export function agentRuns(activity: readonly TaskActivity[]): AgentRun[] {
-  const runs: AgentRun[] = []
-  for (const attempt of activity.filter((item): item is Attempt => item.kind === 'attempt').sort((a, b) => a.n - b.n)) {
-    const last = runs.at(-1)
-    if (last && last.harness === attempt.harness) last.attempts.push(attempt)
-    else runs.push({ harness: attempt.harness, attempts: [attempt] })
-  }
-  return runs
-}
 
 /**
  * A factory stage's start, marked inline in the conversation (2026-11-04-2200). Implementing is the conversation
@@ -52,17 +43,16 @@ const STAGE_MARK: Partial<Record<NonNullable<Attempt['stage']>, string>> = { fix
 export const reviewRun = (attempt: Pick<Attempt, 'stage'>) => attempt.stage === 'review'
 
 /**
- * What sits between two runs of the task's conversation. 「尝试」 appears only where the Agent changed: 「换 Claude Code
- * 继续」, or 「第 1 次尝试失败 · 换 Claude Code 再试」 when the run before failed, counting Agent switches only. With the
+ * What sits between two runs of the task's conversation (Alex 2026-11-09: no 「尝试」 and no numbering anywhere). Only
+ * where the Agent changed: 「换 Codex 继续」, or 「Claude Code 没跑通 · 换 Codex 继续」 when the run before failed. With the
  * same Agent nothing divides them; where the factory goes back to fix (`stage`, when the server sends it) a small
  * marker says so. No stage, no marker; the review is its own card.
  */
 export type Boundary = { kind: 'switch'; text: string } | { kind: 'stage'; text: string } | null
-export function boundary(activity: readonly TaskActivity[], previous: Attempt, next: Attempt): Boundary {
+export function boundary(previous: Attempt, next: Attempt): Boundary {
   if (next.harness !== previous.harness) {
-    const run = agentRuns(activity).findIndex(item => item.attempts.some(attempt => attempt.runId === previous.runId)) + 1
-    const failed = attemptState(previous) === 'failed'
-    return { kind: 'switch', text: failed ? `第 ${run} 次尝试失败 · 换 ${agent(next.harness)} 再试` : `换 ${agent(next.harness)} 继续` }
+    const switched = `换 ${agent(next.harness)} 继续`
+    return { kind: 'switch', text: attemptState(previous) === 'failed' ? `${agent(previous.harness)} 没跑通 · ${switched}` : switched }
   }
   const mark = next.stage ? STAGE_MARK[next.stage] : undefined
   return mark ? { kind: 'stage', text: mark } : null
