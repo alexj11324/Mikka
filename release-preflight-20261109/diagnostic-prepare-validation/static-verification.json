@@ -1,0 +1,43 @@
+{
+  "verifiedAt": "2026-11-09T16:07:32.259748+00:00",
+  "node": "v24.22.1",
+  "pythonAST": true,
+  "yamlParsed": true,
+  "disabled": true,
+  "unfilledPins": 13,
+  "exactSecretActions": 3,
+  "nodeSyntaxChecks": [
+    {
+      "file": "DIAGNOSTIC_GUARD_JS.mjs",
+      "sha256": "f836d151dea250834fa322664487e901a2b7e4df531d4487af221dd48103ad3e",
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "DIAGNOSTIC_PREFLIGHT_JS.mjs",
+      "sha256": "da50874b78b3fabcbdb953e733b8852a2b5c9336beceb9de934ca1255add1f97",
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "DIAGNOSTIC_PREPARE_JS.mjs",
+      "sha256": "593857d7c9bf158c872167a6edc6e245e08a106839b733ffcf470222913c07d4",
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "file": "helper.mjs",
+      "sha256": "53a39063ea55939b9f4f2caf916e429adc21e43a5990b8d62c2952f119032928",
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "helperFunctionsExecuted": 0,
+  "productionCalls": 0,
+  "manifestSHA256": "bb0c305d9d629c420adb74cdafc29fed44b8bef16288b1c46f77a574f53ad58b",
+  "materializerGitBlob": "618425c4f8945fedb9131a9aec6896e3d3c0ae11"
+}

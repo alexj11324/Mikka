@@ -1,0 +1,15 @@
+{
+  "EXPECTED_APP_SOURCE": null,
+  "EXPECTED_APP_TREE": null,
+  "BRANCH": null,
+  "HELPER_PARENT": null,
+  "HELPER_PARENT_TREE": null,
+  "HELPER_SHA256": null,
+  "DIAGNOSTIC_WINDOW_GO": null,
+  "UPSTREAM_RUNTIME_SOURCE": null,
+  "UPSTREAM_RUN_ID": null,
+  "UPSTREAM_ATTEMPT": null,
+  "NOT_BEFORE": null,
+  "ENTRY_DEADLINE": null,
+  "HARD_DEADLINE": null
+}

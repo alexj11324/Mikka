@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "issue": 1505,
+  "activated": false,
+  "sourceCommit": "5958dea38437de20512bbbdf60b940ccc83f00ff",
+  "originalHelperSha256": "46d8b905518cf480fecdf0a3bce1a3863f4e79c92609b1cd3ec9d4231820898c",
+  "originalReceiptSha256": "12f6f3758c382dd55c9055b3ab32f9d785c620594c66ad4d49a2030b3ccda8d5",
+  "productBusinessCalls": 0,
+  "gitRefsModified": 0,
+  "files": [
+    {
+      "path": ".github/workflows/issue1505-diagnostic-window.yml.in",
+      "bytes": 17978,
+      "sha256": "0d6120d027159051a39c9e1cf720d5429d21a91f24048753da0e20ff51835a81"
+    },
+    {
+      "path": "scripts/ops/issue1505-diagnostic-window.mjs.in",
+      "bytes": 26976,
+      "sha256": "53a39063ea55939b9f4f2caf916e429adc21e43a5990b8d62c2952f119032928"
+    },
+    {
+      "path": "scripts/ops/issue1505-diagnostic-window-original-42366750743.json",
+      "bytes": 1787,
+      "sha256": "12f6f3758c382dd55c9055b3ab32f9d785c620594c66ad4d49a2030b3ccda8d5"
+    },
+    {
+      "path": "README.md",
+      "bytes": 5855,
+      "sha256": "80efbfcba334629a61ab569124f4751eda48ac6fc0a8802e50717efdfde7a0b3"
+    },
+    {
+      "path": "pins.unfilled.json",
+      "bytes": 356,
+      "sha256": "b7b6080cb1db54e1c521014fcece66549876afa4e3e7cfdc28017397736ca5c3"
+    }
+  ]
+}

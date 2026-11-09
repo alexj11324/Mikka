@@ -1,0 +1,324 @@
+# UNACTIVATED DRAFT. Fill and independently review every pin before removing if:false.
+# Activate only after all seven jobs of the pinned upstream R7 attempt have succeeded.
+name: Issue 1505 fresh diagnostic window after R7
+on:
+  push:
+    branches: [ops/1505-diagnostic-prepare-r7-20261109]
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+concurrency:
+  group: production-smoke-owner-acceptance
+  cancel-in-progress: false
+  queue: max
+jobs:
+  prepare:
+    if: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: web-deploy-production
+      cancel-in-progress: false
+      queue: max
+    env:
+      EXPECTED_APP_SOURCE: '__SOURCE__'
+      EXPECTED_APP_TREE: '__TREE__'
+      HELPER_PARENT: '__HELPER_PARENT__'
+      HELPER_PARENT_TREE: '__HELPER_PARENT_TREE__'
+      HELPER_SHA256: '__HELPER_SHA256__'
+      DIAGNOSTIC_WINDOW_GO: '__GO__'
+      UPSTREAM_RUNTIME_SOURCE: '__UPSTREAM_RUNTIME_SOURCE__'
+      UPSTREAM_RUN_ID: '__UPSTREAM_RUN_ID__'
+      UPSTREAM_ATTEMPT: '__UPSTREAM_ATTEMPT__'
+      NOT_BEFORE: '__NOT_BEFORE__'
+      ENTRY_DEADLINE: '__ENTRY_DEADLINE__'
+      HARD_DEADLINE: '__HARD_DEADLINE__'
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out the exact reviewed source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: '__SOURCE__'
+          path: source
+          persist-credentials: false
+      - name: Check out the exact temporary helper
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          path: ops
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.22.1
+      - name: Verify source, native imports, current main and exact completed R7 before OIDC
+        id: preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          cat > "$RUNNER_TEMP/diagnostic-prepare-guard.mjs" <<'DIAGNOSTIC_GUARD_JS'
+          import { createHash } from 'node:crypto'
+          import { readFile, writeFile, rename } from 'node:fs/promises'
+          import { resolve, join } from 'node:path'
+          import { pathToFileURL } from 'node:url'
+          import { execFileSync } from 'node:child_process'
+          const e = process.env
+          export const auditPath = join(e.RUNNER_TEMP, 'diagnostic-prepare-guard.json')
+          export let audit = {version:1,issue:1505,mode:'fresh_prepare_only',status:'running',modelsDispatched:0,
+            runId:e.GITHUB_RUN_ID,attempt:e.GITHUB_RUN_ATTEMPT,head:e.GITHUB_SHA,observations:[]}
+          export class GuardError extends Error { constructor(code){super(code);this.code=code} }
+          export function check(value,code){if(!value)throw new GuardError(code)}
+          export const safeCode = error => error instanceof GuardError ? error.code : 'prepare_internal_error'
+          export async function saveJson(path,value){
+            const temporary=path+'.tmp'
+            await writeFile(temporary,JSON.stringify(value,null,2)+'\n',{mode:0o600})
+            await rename(temporary,path)
+          }
+          export async function saveAudit(){await saveJson(auditPath,audit)}
+          export async function loadAudit(){audit=JSON.parse(await readFile(auditPath,'utf8'))}
+          const sha = bytes => createHash('sha256').update(bytes).digest('hex')
+          const git = (cwd,...args) => execFileSync('git',args,{cwd,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim()
+          const originalSha='12f6f3758c382dd55c9055b3ab32f9d785c620594c66ad4d49a2030b3ccda8d5'
+          export const branch='ops/1505-diagnostic-prepare-r7-20261109'
+          export const go='root-reviewed-1505-diagnostic-prepare-r7-v1'
+          export const paths=[
+           '.github/workflows/issue1505-diagnostic-window.yml',
+           'scripts/ops/issue1505-diagnostic-window.mjs',
+           'scripts/ops/issue1505-diagnostic-window-original-42366750743.json'
+          ]
+          export const sourceDir=resolve(e.GITHUB_WORKSPACE,'source')
+          export const opsDir=resolve(e.GITHUB_WORKSPACE,'ops')
+          export const helperPath=join(opsDir,paths[1])
+          export const originalPath=join(opsDir,paths[2])
+          export function pinValidation(){
+            for(const key of ['EXPECTED_APP_SOURCE','EXPECTED_APP_TREE','HELPER_PARENT','HELPER_PARENT_TREE','UPSTREAM_RUNTIME_SOURCE'])
+              check(/^[0-9a-f]{40}$/.test(e[key]??''),'source_pin_unfilled')
+            check(/^[0-9a-f]{64}$/.test(e.HELPER_SHA256??''),'helper_hash_unfilled')
+            check(e.DIAGNOSTIC_WINDOW_GO===go,'go_unfilled')
+            check(e.HELPER_PARENT===e.EXPECTED_APP_SOURCE&&e.HELPER_PARENT_TREE===e.EXPECTED_APP_TREE,'parent_pin_mismatch')
+            for(const key of ['UPSTREAM_RUN_ID','UPSTREAM_ATTEMPT'])
+              check(/^[1-9][0-9]*$/.test(e[key]??'')&&Number.isSafeInteger(Number(e[key])),'runtime_pin_unfilled')
+            for(const key of ['NOT_BEFORE','ENTRY_DEADLINE','HARD_DEADLINE'])
+              check(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(e[key]??'')&&Number.isFinite(Date.parse(e[key])),'window_unfilled')
+            const start=Date.parse(e.NOT_BEFORE),entry=Date.parse(e.ENTRY_DEADLINE),hard=Date.parse(e.HARD_DEADLINE)
+            check(start<entry&&entry+600_000<=hard&&hard-start<=900_000,'window_budget_invalid')
+            check(e.GITHUB_REPOSITORY==='alexj11324/Mikka'&&e.GITHUB_REF==='refs/heads/'+branch
+              &&e.GITHUB_RUN_ATTEMPT==='1'&&/^[0-9a-f]{40}$/.test(e.GITHUB_SHA??''),'workflow_identity_invalid')
+          }
+          export function windowGuard(entry=false){
+            const now=Date.now(),start=Date.parse(e.NOT_BEFORE),limit=Date.parse(entry?e.ENTRY_DEADLINE:e.HARD_DEADLINE)
+            check(Number.isFinite(start)&&Number.isFinite(limit)&&now>=start&&now<limit,entry?'entry_window_closed':'hard_window_closed')
+          }
+          export async function boundedFetch(input,init={}){
+            windowGuard()
+            const remaining=Math.max(1,Date.parse(e.HARD_DEADLINE)-Date.now())
+            const timer=AbortSignal.timeout(Math.min(30_000,remaining))
+            const signal=init.signal?AbortSignal.any([init.signal,timer]):timer
+            const response=await fetch(input,{...init,signal})
+            windowGuard()
+            return response
+          }
+          export async function metadata(path){
+            windowGuard()
+            check(typeof e.GITHUB_TOKEN==='string'&&e.GITHUB_TOKEN.length>0,'github_token_missing')
+            let response,data
+            try{
+              response=await boundedFetch('https://api.github.com/repos/alexj11324/Mikka/'+path,{
+                redirect:'error',headers:{authorization:'Bearer '+e.GITHUB_TOKEN,accept:'application/vnd.github+json',
+                'x-github-api-version':'2022-11-28'}})
+              check(response.status===200,'metadata_http_failed')
+              data=await response.json()
+              windowGuard()
+              return data
+            }catch(error){if(error instanceof GuardError)throw error;throw new GuardError('metadata_request_failed')}
+          }
+          export async function currentMain(stage,entry=false){
+            windowGuard(entry)
+            const result=await metadata('git/ref/heads/main')
+            windowGuard(entry)
+            check(result?.ref==='refs/heads/main'&&result.object?.type==='commit'&&result.object.sha===e.EXPECTED_APP_SOURCE,
+              'current_main_changed')
+            audit.observations.push({stage,main:e.EXPECTED_APP_SOURCE,at:new Date().toISOString()})
+            await saveAudit()
+          }
+          export async function localGuard(){
+            pinValidation();windowGuard(true)
+            check(git(sourceDir,'rev-parse','HEAD')===e.EXPECTED_APP_SOURCE,'source_head_mismatch')
+            check(git(sourceDir,'rev-parse','HEAD^{tree}')===e.EXPECTED_APP_TREE,'source_tree_mismatch')
+            check(git(opsDir,'rev-parse','HEAD')===e.GITHUB_SHA,'helper_head_mismatch')
+            const parents=git(opsDir,'rev-list','--parents','-n','1','HEAD').split(' ').slice(1)
+            check(parents.length===1&&parents[0]===e.HELPER_PARENT,'helper_parent_mismatch')
+            check(git(opsDir,'rev-parse',e.HELPER_PARENT+'^{tree}')===e.HELPER_PARENT_TREE,'helper_parent_tree_mismatch')
+            const raw=git(opsDir,'diff','--raw','--no-renames','--abbrev=40',e.HELPER_PARENT,'HEAD').split('\n')
+            check(raw.length===paths.length,'helper_scope_mismatch')
+            const seen=new Set()
+            for(const line of raw){
+              const pair=line.split('\t'),fields=pair[0].split(' ')
+              check(pair.length===2&&paths.includes(pair[1])&&!seen.has(pair[1])&&fields.length===5
+                &&fields[0]===':000000'&&fields[1]==='100644'&&fields[4]==='A','helper_scope_mismatch')
+              seen.add(pair[1])
+            }
+            for(const directory of [sourceDir,opsDir]){
+              check(git(directory,'diff','--name-only','HEAD')==='','tracked_worktree_changed')
+              check(git(directory,'diff','--cached','--name-only')==='','tracked_index_changed')
+            }
+            check(sha(await readFile(helperPath))===e.HELPER_SHA256,'helper_bytes_changed')
+            check(sha(await readFile(originalPath))===originalSha,'original_receipt_changed')
+            const h=await import(pathToFileURL(helperPath).href)
+            check(h.SOURCE===e.EXPECTED_APP_SOURCE&&h.TREE===e.EXPECTED_APP_TREE&&h.BRANCH===branch
+              &&h.HELPER_PARENT===e.HELPER_PARENT&&h.HELPER_PARENT_TREE===e.HELPER_PARENT_TREE&&h.GO===go,'helper_constants_mismatch')
+            check(typeof h.prepareWindow==='function'&&typeof h.readOriginalBot==='function','helper_exports_invalid')
+            const driver=await import(pathToFileURL(join(sourceDir,'scripts/acceptance/cloud-startup.mjs')).href)
+            for(const name of ['createSessionClient','smokeAcceptanceAccount','selectAcceptanceTeam','restoreAcceptanceWorkspace'])
+              check(typeof driver[name]==='function','driver_import_invalid')
+            audit.sourceCommit=e.EXPECTED_APP_SOURCE;audit.sourceTree=e.EXPECTED_APP_TREE;audit.helperSha256=e.HELPER_SHA256
+            audit.originalReceiptSha256=originalSha
+            audit.window={notBefore:e.NOT_BEFORE,entryDeadline:e.ENTRY_DEADLINE,hardDeadline:e.HARD_DEADLINE}
+            await saveAudit()
+            return {helper:h,driver}
+          }
+          const jobs=['test','check','validate / build','await-web','subscriptions','publish / deploy','cleanup']
+          function checkRun(run){
+            check(run?.id===Number(e.UPSTREAM_RUN_ID)&&run.run_attempt===Number(e.UPSTREAM_ATTEMPT)
+              &&run.head_sha===e.UPSTREAM_RUNTIME_SOURCE&&run.head_branch==='main'&&run.event==='push'
+              &&run.path==='.github/workflows/e2b-official-runtime.yml'&&run.repository?.full_name==='alexj11324/Mikka'
+              &&run.status==='completed'&&run.conclusion==='success','runtime_run_not_exact_success')
+          }
+          export async function upstreamOnce(){
+            const path='actions/runs/'+e.UPSTREAM_RUN_ID
+            checkRun(await metadata(path))
+            const result=await metadata(path+'/attempts/'+e.UPSTREAM_ATTEMPT+'/jobs?per_page=100')
+            check(result?.total_count===7&&Array.isArray(result.jobs)&&result.jobs.length===7,'runtime_jobs_incomplete')
+            const names=new Set(),ids=new Set()
+            for(const job of result.jobs){
+              check(jobs.includes(job.name)&&!names.has(job.name)&&Number.isSafeInteger(job.id)&&job.id>0&&!ids.has(job.id)
+                &&job.run_id===Number(e.UPSTREAM_RUN_ID)&&job.run_attempt===Number(e.UPSTREAM_ATTEMPT)
+                &&job.head_sha===e.UPSTREAM_RUNTIME_SOURCE&&job.head_branch==='main'
+                &&job.status==='completed'&&job.conclusion==='success','runtime_job_not_exact_success')
+              names.add(job.name);ids.add(job.id)
+            }
+            checkRun(await metadata(path))
+            windowGuard(true)
+            audit.upstream={source:e.UPSTREAM_RUNTIME_SOURCE,runId:e.UPSTREAM_RUN_ID,attempt:e.UPSTREAM_ATTEMPT,
+              jobs:result.jobs.map(({id,name,status,conclusion})=>({id,name,status,conclusion})),verifiedAt:new Date().toISOString()}
+            await saveAudit()
+          }
+          export async function preflight(){
+            try{
+              await localGuard()
+              await currentMain('before_oidc',true)
+              await upstreamOnce()
+              audit.status='preflight_passed';await saveAudit()
+            }catch(error){
+              audit.status='failed';audit.code=safeCode(error);await saveAudit();process.exitCode=1
+            }
+          }
+          DIAGNOSTIC_GUARD_JS
+          node --input-type=module <<'DIAGNOSTIC_PREFLIGHT_JS'
+          import { join } from 'node:path'
+          import { pathToFileURL } from 'node:url'
+          const { preflight } = await import(pathToFileURL(join(process.env.RUNNER_TEMP,'diagnostic-prepare-guard.mjs')).href)
+          await preflight()
+          DIAGNOSTIC_PREFLIGHT_JS
+      - name: Read existing SMOKE email only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_EMAIL
+          recursive: false
+          include-imports: false
+      - name: Read existing SMOKE password only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_PASSWORD
+          recursive: false
+          include-imports: false
+      - name: Read existing project configuration token only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: VERCEL_TEAM_TOKEN
+          recursive: false
+          include-imports: false
+      - name: Verify current main, reuse original idle Bot, prepare once, verify main again
+        id: prepare
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          node --input-type=module <<'DIAGNOSTIC_PREPARE_JS'
+          import { readFile } from 'node:fs/promises'
+          import { join } from 'node:path'
+          import { pathToFileURL } from 'node:url'
+          const guard=await import(pathToFileURL(join(process.env.RUNNER_TEMP,'diagnostic-prepare-guard.mjs')).href)
+          const {localGuard,currentMain,boundedFetch,saveJson,saveAudit,loadAudit,safeCode,originalPath,windowGuard}=guard
+          const output=join(process.env.RUNNER_TEMP,'diagnostic-window.json')
+          let latest=null,called=false,postMainPassed=false,callerFailed=false
+          const save=async report=>{latest=structuredClone(report);await saveJson(output,latest)}
+          try{
+            await loadAudit()
+            const {helper,driver}=await localGuard()
+            await currentMain('before_prepare',true)
+            windowGuard(true)
+            const reuse=helper.readOriginalBot(await readFile(originalPath))
+            called=true
+            const report=await helper.prepareWindow({env:process.env,helpers:driver,reuse,fetchImpl:boundedFetch,save})
+            await save(report)
+          }catch(error){
+            callerFailed=true
+            guard.audit.callerCode=safeCode(error)
+          }finally{
+            if(called){
+              try{await currentMain('after_prepare');postMainPassed=true}
+              catch(error){
+                callerFailed=true;guard.audit.postMainCode=safeCode(error)
+                if(latest){
+                  latest.statusBeforePostMainGuard=latest.status
+                  latest.status='failed'
+                  latest.postMainGuard={status:'failed',code:safeCode(error)}
+                  latest.recovery={...latest.recovery,preserveHelperRef:true,repeatPreparationAutomatically:false,
+                    windowWriteMayExist:latest.window?.writeAttempted===true}
+                }
+              }
+            }
+            if(latest)await saveJson(output,latest)
+            guard.audit.status=!callerFailed&&postMainPassed&&latest?.status==='prepared'?'prepared':'failed'
+            guard.audit.prepareCalled=called
+            guard.audit.postMainPassed=postMainPassed
+            guard.audit.windowWriteMayExist=latest?.window?.writeAttempted===true
+            guard.audit.repeatPreparationAutomatically=false
+            guard.audit.finishedAt=new Date().toISOString()
+            await saveAudit()
+            if(guard.audit.status!=='prepared')process.exitCode=1
+          }
+          DIAGNOSTIC_PREPARE_JS
+      - name: Preserve actual created, failed or uncertain receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue-1505-diagnostic-prepare-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/diagnostic-window.json
+            ${{ runner.temp }}/diagnostic-prepare-guard.json
+            ops/scripts/ops/issue1505-diagnostic-window-original-42366750743.json
+          if-no-files-found: error
+          retention-days: 14
