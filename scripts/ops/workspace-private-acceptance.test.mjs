@@ -248,6 +248,35 @@ test('prebuilt evidence rejects foreign phases and invalid failure statuses with
   assert.deepEqual(result.build.diagnostic.buildLogs.claude.events, Array.from({ length: 64 }, () => known))
 })
 
+test('conservation rejection keeps closed provider changes without promoting a failed build', () => {
+  const value = fixtureReceipts(), secret = 'private-file-target-digest-and-path'
+  const conservation = { observedChanges: 2, redactedChanges: 1, truncated: false,
+    changes: [{ pathCode: 'provider_shared_directory', kind: 'directory', fields: ['mode'],
+      before: { mode: 493 }, after: { mode: 511 }, contentChanged: false, targetChanged: false }] }
+  const event = { phase: 'host_failure', detail: 'official_files_changed', conservation }
+  value.buildReport = { identity, status: 'failed', stage: 'build_claude', code: 'template_build_failed', diagnostic: {
+    buildLogs: { claude: { events: [{ ...event, path: secret, conservation: { ...conservation, raw: secret,
+      changes: [{ ...conservation.changes[0], path: secret, target: secret, sha256: secret }] } }] } },
+    statusLookup: { identityMatched: true, status: 'error', debugLogs: { events: [{ ...event, count: 35 }] } },
+  } }
+  const result = summarizeAcceptance(context, value)
+  assert.equal(result.passed, false)
+  assert.deepEqual(result.build.diagnostic.buildLogs.claude.events, [event])
+  assert.deepEqual(result.build.diagnostic.statusLookup.debugLogs.events, [{ ...event, count: 35 }])
+  assert.ok(!JSON.stringify(result).includes(secret))
+  for (const change of [row => { row.changes[0].pathCode = secret }, row => { row.changes[0].after.mode = true },
+    row => { row.changes[0].before.credential = secret }, row => { row.changes[0].fields = [secret] },
+    row => { row.changes[0].contentChanged = true }, row => { row.redactedChanges = 3 }, row => { row.truncated = true },
+    row => { row.changes[0].after.mode = 4096 }]) {
+    const invalid = structuredClone(conservation); change(invalid)
+    value.buildReport.diagnostic.buildLogs.claude.events = [{ ...event, conservation: invalid }]
+    const failure = summarizeAcceptance(context, value)
+    assert.equal(failure.passed, false)
+    assert.deepEqual(failure.build.diagnostic.buildLogs.claude.events, [{ phase: event.phase, detail: event.detail }])
+    assert.ok(!JSON.stringify(failure).includes(secret))
+  }
+})
+
 test('ingress command diagnostics retain only known observations without copying private process data', () => {
   const value = fixtureReceipts(), privateText = 'synthetic-private-netfilter-argument'
   const command = { family: 'ipv6', operation: 'provider_rule', failureKind: 'exit', returnCode: 2,

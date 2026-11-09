@@ -1,14 +1,15 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
-import { candidateInventory, guardContext, guardMain, MAIN, projectRows, publicFailure, selectScope, snapshot, SQL, verifyScope } from './domain-history-before-1782.mjs'
+import { createSessionClient } from '../acceptance/cloud-startup.mjs'
+import { candidateInventory, guardContext, guardMain, MAIN, projectRows, publicFailure, searchCandidates, selectScope, snapshot, SQL, verifyScope } from './domain-history-before-1782.mjs'
 
 const id = n => '00000000-0000-4000-8000-' + String(n).padStart(12, '0')
 const scope = { ownerId: 'smoke-owner', workspaceId: id(90), taskIds: [id(1), id(2)], candidateTaskIds: [id(1), id(2)] }
 const fixture = () => ({ task: scope.taskIds.map(value => ({ id: value, owner: scope.ownerId,
   workspace: scope.workspaceId, scope: 'workspace', identifier: 'MIK-' + value.slice(-1) })),
-publication: [{ id: id(3), issueId: id(1), identifier: 'MIK-1', branch: 'private-branch', baseBranch: 'main', remoteKey: 'private-repo' }],
-run: [{ id: id(3), issueId: id(1), hasProjectSnapshot: false, frozenDigest: 'a'.repeat(32) }] })
+publication: scope.taskIds.map((value, index) => ({ id: id(index + 3), issueId: value, identifier: 'MIK-' + (index + 1), branch: 'private-branch', baseBranch: 'main', remoteKey: 'private-repo' })),
+run: scope.taskIds.map((value, index) => ({ id: id(index + 3), issueId: value, hasProjectSnapshot: false, frozenDigest: 'a'.repeat(32) })) })
 const env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka',
   GITHUB_REF: 'refs/heads/ops/self-hosted-vault-closeout-20261108', GITHUB_EVENT_NAME: 'push',
   GITHUB_ACTOR: 'alexj11324', GITHUB_TRIGGERING_ACTOR: 'alexj11324', GITHUB_JOB: 'domain_history_before',
@@ -90,13 +91,17 @@ test('at most ten explicit Task UUIDs, not an arbitrary SQL or all-tenant scan',
   assert.throws(() => projectRows({ ...scope, taskIds: [] }, fixture()))
 })
 
-function database({ readonly = 'on', isolation = 'repeatable read', epic = 0, failRun = false,
+function database({ readonly = 'on', isolation = 'repeatable read', epic = 0, failRun = false, bindingOverride,
   selected = scope.taskIds.map(value => ({ id: value })) } = {}) {
   const calls = [], rows = fixture()
   return { calls, query: async (sql, args) => {
     calls.push({ sql, args })
     if (sql === SQL.settings) return { rows: [{ readonly, isolation }] }
     if (sql === SQL.ledger) return { rows: [{ epic, digest: 'c'.repeat(32) }] }
+    if (sql === SQL.binding) {
+      assert.equal(args[1], scope.ownerId); assert.equal(args[2], scope.workspaceId)
+      return { rows: [bindingOverride ?? { present: args[0].length, bound: args[0].length, published: 2, ended: 2, historical: 2 }] }
+    }
     if (sql === SQL.select) {
       assert.equal(args[1], scope.ownerId); assert.equal(args[2], scope.workspaceId)
       return { rows: selected }
@@ -115,7 +120,7 @@ test('one repeatable read, read-only transaction uses fixed SQL and always rolls
   assert.equal(db.calls[0].sql, 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY')
   assert.equal(db.calls.at(-1).sql, 'ROLLBACK')
   assert.ok(db.calls.every(({ sql }) => !/\b(?:INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|COMMIT)\b/i.test(sql)))
-  assert.equal(db.calls.filter(({ args }) => args).length, 4)
+  assert.equal(db.calls.filter(({ args }) => args).length, 5)
 })
 for (const options of [{ readonly: 'off' }, { isolation: 'read committed' }, { epic: 1 }, { failRun: true }]) {
   test('fails closed and rolls back for ' + JSON.stringify(options), async () => {
@@ -167,14 +172,14 @@ test('normal API candidates admit both owned labels and emit counts without raw 
   const result = candidateInventory(rows, scope.ownerId)
   assert.deepEqual(result.candidateTaskIds, [id(1), id(2)])
   assert.deepEqual(result.counts, { returned: 5, ownerIdFieldPresent: 4, own: 3, ownWorkspace: 1, ownPersonal: 1,
-    ownUnknownScope: 1, workspaceLabel: 1, personalLabel: 3, unknownScope: 1, listCapacityReached: false })
+    ownUnknownScope: 1, ownScopeOmitted: 0, workspaceLabel: 1, personalLabel: 3, unknownScope: 1, scopeOmitted: 0, listCapacityReached: false })
   const output = JSON.stringify(result.counts)
   for (const privateValue of [scope.ownerId, 'other-owner', 'sensitive-title', 'sensitive-body', id(1)]) assert.ok(!output.includes(privateValue))
   assert.equal(candidateInventory([], scope.ownerId).counts.returned, 0)
   assert.deepEqual(candidateInventory(rows.filter(row => row.ownerId !== scope.ownerId), scope.ownerId).candidateTaskIds, [])
 })
 
-test('normal API capacity is reported without claiming a complete scan or adding pagination', () => {
+test('each candidate collection has a hard one-hundred UUID bound', () => {
   const rows = Array.from({ length: 100 }, (_, i) => ({ id: id(i + 1), ownerId: scope.ownerId, scope: 'personal' }))
   assert.equal(candidateInventory(rows, scope.ownerId).counts.listCapacityReached, true)
   assert.equal(candidateInventory(rows, scope.ownerId).candidateTaskIds.length, 100)
@@ -185,20 +190,26 @@ test('normal API capacity is reported without claiming a complete scan or adding
 test('post-query API authorization loss invalidates evidence', async () => {
   const client = { json: async path => path.includes('get-session') ? { user: { id: scope.ownerId } } : {
     currentUserId: scope.ownerId, workspace: { id: scope.workspaceId }, role: 'member',
-  }, rpc: async () => scope.taskIds.map(value => ({ id: value, ownerId: scope.ownerId, scope: 'workspace' })) }
+  }, rpc: async (action, [value]) => {
+    assert.equal(action, 'issues.getIssue')
+    return { issue: { id: value, userId: scope.ownerId, workspaceId: scope.workspaceId, ownershipState: 'bound', scope: 'workspace' } }
+  } }
   await verifyScope(client, scope)
-  client.rpc = async () => []
+  client.rpc = async () => ({})
   await assert.rejects(verifyScope(client, scope))
 })
 
 test('post-query API verifies the same owner and Workspace for a personal-label Task', async () => {
   const client = { json: async path => path.includes('get-session') ? { user: { id: scope.ownerId } } : {
     currentUserId: scope.ownerId, workspace: { id: scope.workspaceId }, role: 'member',
-  }, rpc: async () => scope.taskIds.map(value => ({ id: value, ownerId: scope.ownerId, scope: 'personal' })) }
+  }, rpc: async (action, [value]) => {
+    assert.equal(action, 'issues.getIssue')
+    return { issue: { id: value, userId: scope.ownerId, workspaceId: scope.workspaceId, ownershipState: 'bound', scope: 'personal' } }
+  } }
   await verifyScope(client, scope)
-  client.rpc = async () => scope.taskIds.map(value => ({ id: value, ownerId: 'other', scope: 'personal' }))
+  client.rpc = async (_action, [value]) => ({ issue: { id: value, userId: 'other', workspaceId: scope.workspaceId, ownershipState: 'bound', scope: 'personal' } })
   await assert.rejects(verifyScope(client, scope))
-  client.rpc = async () => scope.taskIds.map(value => ({ id: value, ownerId: scope.ownerId, scope: 'unknown' }))
+  client.rpc = async (_action, [value]) => ({ issue: { id: value, userId: scope.ownerId, workspaceId: scope.workspaceId, ownershipState: 'bound', scope: 'unknown' } })
   await assert.rejects(verifyScope(client, scope))
 })
 
@@ -232,4 +243,121 @@ test('runner context is resolved only inside install and capture steps, never jo
     const block = source.slice(start, next < 0 ? source.length : next)
     assert.match(block, /        env:\n          DOMAIN_HISTORY_DEPENDENCIES: \$\{\{ runner.temp \}\}\/domain-history-dependencies/)
   }
+})
+
+test('real opaque search pagination reaches own historical Tasks beyond the first one hundred visible rows', async () => {
+  const paths = [], inventories = []
+  const client = { json: async path => {
+    paths.push(path); const page = paths.length
+    const rows = Array.from({ length: page < 3 ? 50 : 2 }, (_, index) => ({
+      id: id((page - 1) * 50 + index + 1), ownerId: page < 3 ? 'other-owner' : scope.ownerId,
+      title: 'private-title', content: 'private-content',
+    }))
+    return { items: rows, nextCursor: page < 3 ? 'opaque' + page : null, truncated: false }
+  } }
+  const result = await searchCandidates(client, scope, counts => inventories.push(counts))
+  assert.deepEqual(result.candidateTaskIds, [id(101), id(102)])
+  assert.equal(result.counts.pages, 3); assert.equal(result.counts.returned, 102)
+  assert.equal(result.counts.ownScopeOmitted, 2); assert.equal(result.counts.hasMore, false)
+  for (const [index, path] of paths.entries()) {
+    const url = new URL(path, 'https://synthetic.invalid')
+    assert.equal(url.pathname, '/api/issues/search'); assert.equal(url.searchParams.get('workspaceId'), scope.workspaceId)
+    assert.equal(url.searchParams.get('q'), ''); assert.equal(url.searchParams.get('limit'), '50')
+    assert.equal(url.searchParams.get('cursor'), index ? 'opaque' + index : null)
+  }
+  const evidence = JSON.stringify(inventories)
+  for (const text of ['other-owner', scope.ownerId, 'private-title', 'private-content', 'opaque1', id(101)]) assert.ok(!evidence.includes(text))
+})
+
+test('search stops at five pages or one hundred own candidates and declares the finite boundary', async () => {
+  for (const own of [false, true]) {
+    let calls = 0
+    const result = await searchCandidates({ json: async () => {
+      const page = calls++
+      return { items: Array.from({ length: 50 }, (_, i) => ({ id: id(page * 50 + i + 1), ownerId: own ? scope.ownerId : 'other' })),
+        nextCursor: 'cursor' + calls, truncated: false }
+    } }, scope)
+    assert.equal(calls, own ? 2 : 5)
+    assert.equal(result.candidateTaskIds.length, own ? 100 : 0)
+    assert.equal(result.counts.hasMore, true)
+    assert.equal(result.counts.pageLimitReached, !own)
+    assert.equal(result.counts.candidateLimitReached, own)
+  }
+})
+
+test('search refuses repeated cursors, duplicate IDs, overlarge pages and malformed cursor responses', async () => {
+  for (const scenario of ['cursor', 'duplicate', 'large', 'foreign_cursor', 'truncated']) {
+    let calls = 0
+    await assert.rejects(searchCandidates({ json: async () => {
+      calls++
+      return { items: Array.from({ length: scenario === 'large' ? 51 : 1 }, (_, index) => ({
+        id: id(scenario === 'duplicate' ? 1 : calls * 100 + index), ownerId: scope.ownerId,
+      })), nextCursor: scenario === 'foreign_cursor' ? 'https://foreign.invalid' : 'same', truncated: scenario === 'truncated' }
+    } }, scope))
+    assert.ok(calls <= 2)
+  }
+})
+
+test('APP diagnostic counts distinguish missing binding from a valid candidate with no history', async () => {
+  for (const binding of [
+    { present: 0, bound: 0, published: 0, ended: 0, historical: 0 },
+    { present: 2, bound: 1, published: 1, ended: 1, historical: 1 },
+    { present: 2, bound: 2, published: 0, ended: 2, historical: 0 },
+  ]) {
+    const db = database({ bindingOverride: { ...binding, raw: 'must-not-escape' }, selected: [] }), observations = []
+    await assert.rejects(snapshot(db, scope, value => observations.push(value)), error => error.code === (binding.bound === 2 ? 'history_missing' : 'database_binding'))
+    assert.deepEqual(observations.find(value => value.candidateCounts)?.candidateCounts, binding)
+    assert.equal(observations.at(-1).transactionRolledBack, true)
+    assert.ok(!JSON.stringify(observations).includes('must-not-escape'))
+    assert.ok(observations.some(value => value.readOnly === true && value.isolation === 'repeatable read'))
+  }
+})
+
+test('rollback evidence follows the actual ACK on success or failure, never a failed rollback', async () => {
+  for (const failRollback of [false, true]) {
+    const db = database({ failRun: true }), original = db.query, observations = []
+    db.query = async (...args) => { if (args[0] === 'ROLLBACK' && failRollback) throw Error('rollback-failed'); return original(...args) }
+    await assert.rejects(snapshot(db, scope, value => observations.push(value)))
+    assert.equal(observations.some(value => value.transactionRolledBack === true), !failRollback)
+  }
+})
+
+test('exact older Task revalidation never depends on the newest list or includes another tenant', async () => {
+  const seen = [], client = {
+    json: async path => path.includes('get-session') ? { user: { id: scope.ownerId } } : {
+      currentUserId: scope.ownerId, workspace: { id: scope.workspaceId }, role: 'member' },
+    rpc: async (action, [value], options) => { seen.push({ action, value });
+      assert.deepEqual(options, { headers: { 'x-mikka-workspace-id': scope.workspaceId } }); return { issue: {
+      id: value, userId: scope.ownerId, workspaceId: scope.workspaceId, ownershipState: 'bound', scope: 'personal', content: 'never-recorded',
+    } } },
+  }
+  await verifyScope(client, { ...scope, taskIds: [id(501)] })
+  assert.deepEqual(seen, [{ action: 'issues.getIssue', value: id(501) }])
+  client.rpc = async (_action, [value]) => ({ issue: { id: value, userId: scope.ownerId, workspaceId: id(999), ownershipState: 'bound', scope: 'personal' } })
+  await assert.rejects(verifyScope(client, { ...scope, taskIds: [id(501)] }))
+})
+
+test('the existing session transport reads fixed Tasks in an authorized request Workspace without changing the selected cookie', async () => {
+  const selectedWorkspace = id(999), paths = []
+  const client = createSessionClient('https://synthetic.invalid', async (url, init) => {
+    paths.push(url.pathname)
+    if (url.pathname.endsWith('/api/auth/get-session')) return new Response(JSON.stringify({ user: { id: scope.ownerId } }), {
+      headers: { 'set-cookie': 'mikka-workspace=' + selectedWorkspace + '; Path=/mikka' },
+    })
+    assert.equal(init.headers.cookie, 'mikka-workspace=' + selectedWorkspace)
+    if (url.pathname.endsWith('/api/workspace')) {
+      assert.equal(url.searchParams.get('workspace'), scope.workspaceId)
+      return new Response(JSON.stringify({ currentUserId: scope.ownerId, workspace: { id: scope.workspaceId }, role: 'member' }))
+    }
+    assert.equal(url.pathname, '/mikka/api/rpc')
+    const body = JSON.parse(init.body)
+    assert.equal(body.action, 'issues.getIssue')
+    // The account's saved choice is deliberately different. The existing API
+    // requires the membership-checked transport preference for this target.
+    if (init.headers['x-mikka-workspace-id'] !== scope.workspaceId) return new Response('{}', { status: 403 })
+    return new Response(JSON.stringify({ ok: true, result: { issue: { id: body.args[0], userId: scope.ownerId,
+      workspaceId: scope.workspaceId, ownershipState: 'bound', scope: 'personal' } } }))
+  })
+  await verifyScope(client, scope)
+  assert.deepEqual(paths, ['/mikka/api/auth/get-session', '/mikka/api/workspace', '/mikka/api/rpc', '/mikka/api/rpc'])
 })

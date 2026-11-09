@@ -9,20 +9,20 @@ import { pathToFileURL } from 'node:url'
 import { assertOpsContext } from './self-hosted-ingress-probe.mjs'
 
 export const P0 = Object.freeze({
-  source: '98a47306abf3f098e9186da5d0c969dc8dc01335',
-  tree: 'c2331709a9c32ec0718543a452e5553ba2186c16',
-  workerSha: '7bc7ec86ec6a9e932cd2074420f0d7ff40aadbfd',
+  source: '6497e18714e6762ca7fed3307832b125168952d1',
+  tree: 'd95743203ee33b9208d2a347f6b05971c748a6a5',
+  workerSha: '702546600fc8448e5ef7b19c3e64b0d334620bf9',
   sdks: { nodeMajor: '24', pnpm: '10.34.3', javascriptE2b: '2.61.0', pythonE2b: '2.62.0', next: '16.4.1' },
   files: {
-    'package.json': '1bf7002857836cc44937ddb5216eeb12547fc7c71f7d15d813fc324abb11d813',
+    'package.json': 'f61c704ee260347da03809685b26a135d742c0855a0a2882d63e9fdbad201312',
     'pnpm-lock.yaml': 'ddfb2c81f1e50b1b619e4a690dd38c33cc0700352434ed4424eda27c86907277',
     'pnpm-workspace.yaml': 'e8529ab36b3014adf400dfc4b82082b86f84aeadafe686f890b1b26ac2f7e117',
-    'scripts/e2b/workspace-candidates.py': '3ffa20bf4c23f6111505eedb5e1e7f439c7e7b5e006a2e602d3aa993d950b766',
-    'scripts/e2b/workspace-candidates.test.py': 'd144801b19bd8f2c337acfdaeda88cca1eee49456a26c025cac01b755ee53c55',
+    'scripts/e2b/workspace-candidates.py': '37942f1888ab7c61fb9932eeb91591dbf9fa308f9e32e6c4bfae2b0f93db331a',
+    'scripts/e2b/workspace-candidates.test.py': '907bfc8d139f783a26a7dda58a7cf3b32ddae09faaf4d8440504f5fbc5da58a0',
     'scripts/e2b/build-template.py': '13cb14ce95cb6499aae40e69f779de1790fb590e2e781834d423aed08b0438a4',
     'scripts/e2b/build-template.test.py': '62a66dc88e46be4f1548d712c20264cad97e01ef0067d4fd6733adaa17210599',
-    'scripts/e2b/official-files.py': '6191212b14205c7cb8043efcfb85eaff05670f8cb65c4c801052cf9d3a28babe',
-    'scripts/e2b/official-files.test.py': '973c9e7b699032526052f48b4326ef26b0bb7e9db621dd1910a5d00ca0a23c10',
+    'scripts/e2b/official-files.py': '66911624af52df59ef715eb105af9a3025bacf12460105fadc7f87e4d2dd63b5',
+    'scripts/e2b/official-files.test.py': 'a02db5389d866cadcbfa743bad6eaecaefb6b1effbfb0bc863a9287d59849b84',
     'scripts/e2b/cleanup-template-candidates.py': '893b0d50f30f4b21f92f155aee97965e12f84fd0e21ea0ada3dfb3a00392533d',
     'scripts/e2b/cleanup-template-candidates.test.py': '826a489c570a788ea018b6a6ce786fd3e71b41dc8d514cfd8a09e516f8bf84f1',
     'scripts/e2b/workspace-ingress-acceptance.mjs': '2d8739516b3ada59925589bb8f2da18f8b80985273d3820f1b3c11d5ba0468ea',
@@ -165,6 +165,39 @@ function ingressCommand(value) {
     extension, revision, unsupportedExtensions }
 }
 
+function conservationChanges(value) {
+  const paths = ['provider_shared_directory', 'provider_root_certificate',
+    'provider_certificate_reference', 'provider_hashed_certificate_reference']
+  const kinds = ['file', 'link', 'directory', 'special']
+  const fields = ['kind', 'sha256', 'mode', 'uid', 'gid', 'target', 'type', 'device']
+  if (!value || !Number.isInteger(value.observedChanges) || value.observedChanges < 1 || value.observedChanges > 512
+    || !Number.isInteger(value.redactedChanges) || value.redactedChanges < 0 || value.redactedChanges > value.observedChanges
+    || typeof value.truncated !== 'boolean' || !Array.isArray(value.changes) || value.changes.length > 16
+    || (value.truncated ? value.changes.length !== 16 || value.observedChanges - value.redactedChanges <= 16
+      : value.observedChanges - value.redactedChanges !== value.changes.length)) return null
+  const changes = []
+  for (const row of value.changes) {
+    if (!row || !paths.includes(row.pathCode) || !kinds.includes(row.kind) || !Array.isArray(row.fields)
+      || !row.fields.length || row.fields.some(key => !fields.includes(key))
+      || new Set(row.fields).size !== row.fields.length || typeof row.contentChanged !== 'boolean'
+      || typeof row.targetChanged !== 'boolean' || row.contentChanged !== row.fields.includes('sha256')
+      || row.targetChanged !== row.fields.includes('target')) return null
+    const projected = {}
+    for (const side of ['before', 'after']) {
+      const state = row[side]
+      if (!state || typeof state !== 'object' || Array.isArray(state)
+        || Object.keys(state).some(key => !['kind', 'mode', 'uid', 'gid'].includes(key) || !row.fields.includes(key))
+        || row.fields.filter(key => ['kind', 'mode', 'uid', 'gid'].includes(key)).some(key => !Object.hasOwn(state, key))
+        || Object.entries(state).some(([key, item]) => item !== null && (key === 'kind' ? !kinds.includes(item)
+          : !Number.isSafeInteger(item) || item < 0 || (key === 'mode' && item > 4095)))) return null
+      projected[side] = Object.fromEntries(Object.entries(state))
+    }
+    changes.push({ pathCode: row.pathCode, kind: row.kind, fields: [...row.fields].sort(), ...projected,
+      contentChanged: row.contentChanged, targetChanged: row.targetChanged })
+  }
+  return { observedChanges: value.observedChanges, redactedChanges: value.redactedChanges, truncated: value.truncated, changes }
+}
+
 function buildEvents(rows, debug = false) {
   const values = (Array.isArray(rows) ? rows.slice(0, 64) : []).flatMap(row => {
     let event
@@ -184,8 +217,12 @@ function buildEvents(rows, debug = false) {
         const command = row.detail === 'command' ? ingressCommand(row.command) : null
         event = { phase: row.phase, detail: one(row.detail, INGRESS_DETAILS), ...(command ? { command } : {}) }; break
       }
-      case 'host_failure': event = { phase: row.phase,
-        detail: one(row.detail, debug ? [...BUILD_HOST_ERRORS, 'anonymous_worker_unavailable'] : BUILD_HOST_ERRORS) }; break
+      case 'host_failure': {
+        const conservation = row.detail === 'official_files_changed' ? conservationChanges(row.conservation) : null
+        event = { phase: row.phase,
+          detail: one(row.detail, debug ? [...BUILD_HOST_ERRORS, 'anonymous_worker_unavailable'] : BUILD_HOST_ERRORS),
+          ...(conservation ? { conservation } : {}) }; break
+      }
       case 'official_capture': event = { phase: row.phase, entries: count(row.entries) }; break
       case 'ready_rejected':
         if (!debug) return []
