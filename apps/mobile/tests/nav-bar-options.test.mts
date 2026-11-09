@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { navBarOptions, needsTopFade } from '../components/nav-bar-options.ts'
+import { navBarOptions, needsTopFade, scrolledUnderBar } from '../components/nav-bar-options.ts'
 
 // Alex 2026-11-08 on TestFlight: 「Bot」 showed twice (a left-hand title plus the native one), and the chat bar was an
 // opaque grey slab with no name. These pin the iOS header options each kind of screen gets.
@@ -45,4 +45,24 @@ test('every tab root uses topTitle and nothing on the left', () => {
     assert.doesNotMatch(bar, /\bleft=/, file)
     assert.doesNotMatch(bar, /\blarge\b/, file)
   }
+})
+
+// Alex 2026-11-08: on a task's conversation the title, back button and messages overlapped under the floating bar.
+test('content counts as under the bar once it scrolls past the bar height', () => {
+  const bar = 59 + 44
+  assert.equal(scrolledUnderBar(-bar, bar), false)
+  assert.equal(scrolledUnderBar(-bar + 1, bar), false)
+  assert.equal(scrolledUnderBar(-bar + 3, bar), true)
+  assert.equal(scrolledUnderBar(0, bar), true)
+})
+
+test('every screen whose conversation scrolls under the bar gives the bar its backdrop', () => {
+  const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')
+  for (const path of ['features/tasks/screens/task-conversation-screen.tsx', 'app/thread/[id].tsx', 'features/tasks/screens/task-screen.tsx', 'app/groups/[id].tsx', 'features/chat/screens/chat-screen.tsx']) {
+    const source = read(path)
+    assert.match(source, /useScrolledUnderBar\(\)/, `${path} does not track scrolling under the bar`)
+    assert.match(source, /scrolled=\{(bar|underBar)\.scrolled\}/, `${path} does not pass it to its bar`)
+  }
+  assert.match(read('features/chat/components/chat-header.ios.tsx'), /<NavBar[^>]*scrolled=\{scrolled\}/)
+  assert.match(read('components/NavBar.tsx'), /scrolled !== undefined \? <BarBackdrop visible=\{scrolled\} \/>/)
 })

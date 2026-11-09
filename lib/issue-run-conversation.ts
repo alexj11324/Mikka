@@ -63,6 +63,17 @@ const THREAD_STAGES = new Set<ThreadStage['stage']>(['repository', 'worktree', '
 /** One tool call in a folded "N steps" line: its name, the one input that says what it did, and whether it failed. */
 export type ThreadStep = { id: string; name: string; detail: string | null; failed: boolean; output?: string; ms?: number }
 
+/** Claude Code's `Bash`, Codex's `bash`/`shell` and Cursor's `execute` run a command; every other step is a tool (as iOS
+ * apps/mobile/features/tasks/model/thread-steps.ts counts them, #1770). */
+const COMMAND_STEPS = new Set(['bash', 'shell', 'execute'])
+export const isCommandStep = (step: Pick<ThreadStep, 'name'>) => COMMAND_STEPS.has(step.name.toLowerCase())
+
+/** A folded steps row's counts: 「已运行 2 条命令 · 调用了 1 个工具」. */
+export function threadStepCounts(steps: readonly Pick<ThreadStep, 'name'>[]) {
+  const commands = steps.filter(isCommandStep).length
+  return { commands, tools: steps.length - commands }
+}
+
 const STEP_DETAIL_KEYS = ['command', 'file_path', 'path', 'pattern', 'url', 'query', 'title', 'description'] as const
 const STEP_DETAIL_MAX = 200
 const STEP_OUTPUT_END_CHARS = 4096
