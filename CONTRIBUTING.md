@@ -149,6 +149,10 @@ A change a person can see is drawn in Figma first, reviewed with the
 remains, confirmed by Alex, and only then implemented. The PR shows the built
 screen next to the confirmed frames; green CI alone does not make it
 mergeable. Details: `docs/design/decisions/2026-11-01-0330-ui-figma-and-skill-review-before-code.md`.
+A paid block or component (BoardUI Pro, affectUI, beUI Pro) is not redrawn or
+skill-reviewed for look: it is used as shipped, and its PR attaches a
+side-by-side of the library demo and our use
+(`docs/design/decisions/2026-11-09-0050-paid-blocks-as-shipped.md`).
 
 ### Test logins: never ask for a password
 

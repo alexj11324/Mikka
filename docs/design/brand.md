@@ -29,7 +29,9 @@ Then the size you set is the size people see.
 
 ## Sizes
 
-Sizes are the visible size of the dot grid, not the `<img>` box.
+Sizes are the visible size of the dot grid, not the `<img>` box. Inside a
+paid block's logo slot (for example the hosted sign-in card) the block's own
+size and placement win ([2026-11-09-0050](decisions/2026-11-09-0050-paid-blocks-as-shipped.md)).
 
 | Placement | Size | Notes |
 | --- | --- | --- |
