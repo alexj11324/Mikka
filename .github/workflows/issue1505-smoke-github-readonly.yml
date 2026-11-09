@@ -15,7 +15,7 @@ concurrency:
   queue: max
 jobs:
   cleanup:
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1505-smoke-github-readonly-20261109' && github.run_attempt == 1
+    if: false # OFFLINE_UNBOUND_DO_NOT_ACTIVATE
     runs-on: ubuntu-latest
     timeout-minutes: 10
     concurrency:
