@@ -4599,7 +4599,15 @@
     "retry": "Retry",
     "loading": "Loading artifacts",
     "empty": "No artifacts yet",
-    "threadEntry": "Artifact · {count}"
+    "threadEntry": "Artifact · {count}",
+    "folders": {
+      "sub": "Documents and pages the Bots and Agents handed over in tasks, by task.",
+      "folders": "By task",
+      "search": "Search tasks…",
+      "noMatch": "No task matches “{query}”.",
+      "noTask": "No task",
+      "count": "{count, plural, one {# item} other {# items}}"
+    }
   },
   "Artifact": {
     "kindDocument": "Document",

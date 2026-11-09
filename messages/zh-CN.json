@@ -4599,7 +4599,15 @@
     "retry": "重试",
     "loading": "正在加载 Artifact",
     "empty": "还没有 Artifact",
-    "threadEntry": "Artifact · {count}"
+    "threadEntry": "Artifact · {count}",
+    "folders": {
+      "sub": "Bot 和 Agent 在任务里交出的文档和网页，按任务分组。",
+      "folders": "按任务",
+      "search": "搜索任务…",
+      "noMatch": "没有和「{query}」匹配的任务。",
+      "noTask": "不属于任务",
+      "count": "{count} 个"
+    }
   },
   "Artifact": {
     "kindDocument": "文档",
