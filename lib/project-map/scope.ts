@@ -98,17 +98,9 @@ export async function resolveProjectReadScope(reader: IssueReader, projectId: st
   if (!Array.isArray(project.issueIds)) throw new ProjectMapError('PROJECT_SCOPE_CONFLICT', 409)
   const candidateIds = [...new Set(project.issueIds)].filter(id => z.uuid().safeParse(id).success)
   const allowedIds = issueLinks.filter(link => link.allowed).map(link => link.issueId)
-  const visibility = issueVisibilityPredicate(userId, { allowedIds })
-  // The base predicate grants only owner access or a valid workspace-team pair.
-  // Raw links are still needed to exclude an owner's task linked to another
-  // tenant, even when that team is invalid or membership there was revoked.
-  const linked = issueLinks.filter(link => link.workspaceId === workspaceId).map(link => link.issueId)
-  const elsewhere = issueLinks.filter(link => link.workspaceId !== workspaceId).map(link => link.issueId)
-  const tenant = personalWorkspace
-    ? elsewhere.length ? sql`not (${issues.scope} = 'workspace' and ${inArray(issues.id, elsewhere)})` : undefined
-    : linked.length ? inArray(issues.id, linked) : sql`false`
+  const visibility = issueVisibilityPredicate(userId, { allowedIds, workspaceIds: [workspaceId] })
   const visible = candidateIds.length ? await db.select({ id: issues.id }).from(issues)
-    .where(and(inArray(issues.id, candidateIds), visibility, tenant)) : []
+    .where(and(inArray(issues.id, candidateIds), visibility)) : []
   return { reader: scopedReader, userId, workspaceId, projectId, project: { ...project, issueIds: project.issueIds },
     issueIds: visible.map(issue => issue.id), personalWorkspace }
 }

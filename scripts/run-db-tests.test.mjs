@@ -13,7 +13,7 @@ const env = { CI: 'true', GITHUB_ACTIONS: 'true', E2E_DATABASE_URL: target, MIKK
 // These tiny inventories model one file. Pick a standalone script so a group
 // of required files sharing a package command cannot leak into the fixture.
 const sample = REQUIRED_SUITES.find(candidate => REQUIRED_SUITES.filter(entry => entry.script === candidate.script).length === 1)
-assert.ok(sample)
+assert.ok(sample, 'fixture uses one independently enrolled script')
 const files = { [sample.marker]: '', [sample.file]: "import { Pool } from 'pg'" }
 const scripts = { [sample.script]: `node --test ${sample.file}` }
 

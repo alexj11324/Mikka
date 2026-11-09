@@ -15,7 +15,7 @@ test('a bound cloud device can renew its own subscription lease through the actu
   const credential = newDeviceToken()
   await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,enabled,harnesses) VALUES($1,$2,'Lease fixture','cloud',true,'[{"harness":"claude_code","installed":true,"subscriptionBroker":true}]'),($3,$2,'Other fixture','cloud',true,'[]')`, [device, owner, otherDevice])
   await pool.query(`INSERT INTO agents(id,"userId",harness,name,"deviceId") VALUES($1,$2,'claude_code','Lease fixture',$3)`, [agent, owner, device])
-  await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","deviceId",status,"leaseExpiresAt") VALUES($1,$2,$3,$4,'running',now()+interval '1 hour'),($5,$2,$3,$6,'running',now()+interval '1 hour')`, [runId, owner, agent, device, otherRun, otherDevice])
+  await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","deviceId","workspaceId",status,"leaseExpiresAt") VALUES($1,$2,$3,$4,$7,'running',now()+interval '1 hour'),($5,$2,$3,$6,$7,'running',now()+interval '1 hour')`, [runId, owner, agent, device, otherRun, otherDevice, workspace.id])
   await pool.query(`INSERT INTO thread_machines("runId","workspaceId","ownerId","snapshotId","operationId",state,"deviceId") VALUES($1,$2,$3,'synthetic-template',$4,'running',$5)`, [runId, workspace.id, owner, randomUUID(), device])
   await pool.query(`INSERT INTO device_tokens(id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES($1,$2,$3,$4,$5,now()+interval '1 hour')`, [tokenId, owner, hashDeviceToken(credential), device, workspace.id])
   let issued = 0

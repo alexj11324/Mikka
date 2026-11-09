@@ -52,7 +52,8 @@ const render = () => renderToStaticMarkup(<IntlProvider locale="en" timeZone="UT
   <AgentRows />
 </IntlProvider>)
 function expectRowGroup(html: string, group: string) {
-  assert.match(html, new RegExp(`<span\\b(?=[^>]*role="img")(?=[^>]*data-group="${group}")[^>]*>`), 'the row icon must agree with its status badge')
+  // The row leads with its Agent's mark (R-78, decision 2026-11-09-0045 as amended); its state is the result badge.
+  assert.match(html, /data-slot="agent-mark"/, 'the row leads with its Agent\'s mark')
   assert.match(html, new RegExp(`<span\\b(?=[^>]*data-slot="badge")(?=[^>]*data-group="${group}")[^>]*>`), 'the visible status badge must use acceptance for this exact producer')
 }
 
@@ -62,7 +63,7 @@ test('a committed acceptance resolves the current producer row while its stored 
   tasks = [accepted()]
   const html = render()
   expectRowGroup(html, 'resolved')
-  assert.match(html, /Resolved<\/span>/)
+  assert.match(html, />Done<\/span>/) // the run-result word (glossary: Run result), not the R-52 group
   assert.equal(threads[0].outcome, 'needs_input')
   assert.equal(threads[0].status, 'succeeded')
 })
@@ -80,7 +81,7 @@ test('runs by one Agent are one 活动 row in the latest run\'s state; run data 
   assert.equal(threads[2].outcome, 'blocked')
 })
 
-test('an Agent switch starts a new row that reads 「Switched to」 the new Agent', () => {
+test('an Agent change starts a new row labelled with the new Agent\'s own name, no switch verb', () => {
   const codex = { name: 'Retry', agentName: 'Codex', harness: 'codex', summary: null }
   threads = [producer({ id: 'cc-2', rootRunId: 'cc-2', latestRunId: 'cc-2', status: 'failed', outcome: 'blocked', createdAt: new Date(1) }), producer({ status: 'failed', outcome: 'blocked' }),
     producer({ id: 'codex-1', rootRunId: 'codex-1', latestRunId: 'codex-1', status: 'running', outcome: null, createdAt: new Date(3), detail: codex })]
@@ -89,7 +90,8 @@ test('an Agent switch starts a new row that reads 「Switched to」 the new Agen
   assert.equal(rows.length, 2)
   assert.match(rows[0], />Claude Code</)
   expectRowGroup(rows[0], 'blocked')
-  assert.match(rows[1], />Switched to Codex</)
+  assert.match(rows[1], />Codex</)
+  assert.doesNotMatch(rows[1], /Switched|Continu|换/)
   expectRowGroup(rows[1], 'running')
 })
 

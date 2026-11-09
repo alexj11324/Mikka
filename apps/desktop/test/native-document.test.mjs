@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import test from 'node:test'
 import vm from 'node:vm'
-import { nativeLifecycleFailure, observeNativeNavigation, waitForBundledDocument } from './native-document.mjs'
+import { nativeLifecycleFailure, observeNativeNavigation, selectBundledServer, waitForBundledDocument } from './native-document.mjs'
 
 // Exercise the installed SDK's actual URL matcher and Frame.waitForURL branch,
 // without launching a browser. Only navigation/load/IPC delivery is controlled.
@@ -157,4 +157,181 @@ test('failure evidence retains a closed error class and owned source locations o
   assert.equal(JSON.stringify(result).includes('private'), false)
   assert.equal(JSON.stringify(result).includes('secret'), false)
   assert.deepEqual(nativeLifecycleFailure({ name: 'private-token', message: 'private-user' }), { kind: 'other', code: 'other', locations: [] })
+})
+
+// Use the installed SDK's actual main-frame-only DOMContentLoaded forwarding.
+const loadStateHandlers = [...sdk.matchAll(/^        this\._channel\.on\("loadstate", \(event\) => \{\n([\s\S]*?)^        \}\);/gm)]
+assert.equal(loadStateHandlers.length, 1, 'identify the installed Frame loadstate forwarding contract')
+const frameLoadState = vm.runInNewContext(`(function(event) {${loadStateHandlers[0][1]}})`, {
+  Events: { Page: { Load: 'load', DOMContentLoaded: 'domcontentloaded' }, BrowserContext: { PageLoad: 'pageload' } },
+}, { timeout: 1000 })
+const builtInServer = 'http://localhost:3000/mikka'
+const selectedServer = 'http://127.0.0.1:4123/mikka'
+const selectionContextError = () => new Error('page.evaluate: Execution context was destroyed, most likely because of a navigation.')
+
+function serverSelectionPage({ initialServer = builtInServer, deliveredServer = selectedServer,
+  documentUrl = 'mikka://app/mikka/sign-in', immediateDocument = false, oldDocumentLoading = false,
+  selectionFailure, transportFailure, readFailure } = {}) {
+  const page = new EventEmitter(), calls = [], selected = []
+  const oldReady = Promise.withResolvers()
+  if (!oldDocumentLoading) oldReady.resolve()
+  let current = initialServer, url = 'mikka://app/mikka/sign-in', reads = 0, lastBudget = 137
+  page.url = () => url
+  page._page = { context: () => ({ _options: {} }) }
+  page.waitForURL = waitForURL
+  page.waitForLoadState = async (state, options) => {
+    assert.equal(state, 'domcontentloaded'); assert.ok(options.timeout > 0 && options.timeout <= lastBudget)
+    lastBudget = options.timeout
+    calls.push('current-domcontentloaded'); await oldReady.promise
+  }
+  const on = page.on
+  page.on = function (event, listener) {
+    if (event === 'domcontentloaded') calls.push('arm-new-document')
+    return on.call(this, event, listener)
+  }
+  const main = { _page: page, _parentFrame: null, _loadStates: new Set(oldDocumentLoading ? [] : ['domcontentloaded']), _eventEmitter: new EventEmitter() }
+  const child = { ...main, _parentFrame: main, _loadStates: new Set(), _eventEmitter: new EventEmitter() }
+  const loaded = ({ childFrame = false } = {}) => {
+    if (!childFrame) { current = deliveredServer; url = documentUrl }
+    frameLoadState.call(childFrame ? child : main, { add: 'domcontentloaded' })
+  }
+  const select = async value => {
+    calls.push('select'); selected.push(value)
+    if (selectionFailure) throw selectionFailure
+    if (immediateDocument) loaded()
+    return { current: { url: deliveredServer } }
+  }
+  page.evaluate = async (read, argument) => {
+    const before = selected.length
+    const value = await vm.runInNewContext(`(${read})(argument)`, {
+      argument, window: { mikka: {
+        bundled: { server: { select } },
+        app: { get serverUrl() {
+          calls.push('read-target'); reads++
+          if (readFailure) throw readFailure
+          return current
+        } },
+      } },
+    })
+    // This is the outer Playwright reply, not a rejected renderer select Promise.
+    if (selected.length !== before && transportFailure) throw transportFailure
+    return value
+  }
+  return { page, calls, selected, loaded,
+    readyCurrent() {
+      frameLoadState.call(main, { add: 'domcontentloaded' })
+      oldReady.resolve()
+    },
+    get reads() { return reads },
+    get listeners() { return page.listenerCount('domcontentloaded') },
+  }
+}
+
+test('server selection waits for a new main document after a destroyed evaluate reply', async () => {
+  const state = serverSelectionPage({ transportFailure: selectionContextError() })
+  let settled = false
+  const pending = selectBundledServer(state.page, selectedServer, selectedServer, { timeout: 137 }).then(
+    () => { settled = true; return { passed: true } }, error => { settled = true; return { error } },
+  )
+  await new Promise(setImmediate)
+  assert.deepEqual(state.calls, ['current-domcontentloaded', 'arm-new-document', 'select'])
+  assert.deepEqual(state.selected, [selectedServer])
+  assert.equal(settled, false); assert.equal(state.reads, 0)
+  state.loaded({ childFrame: true })
+  await new Promise(setImmediate)
+  assert.equal(settled, false, 'a child frame cannot acknowledge the server document')
+  state.loaded()
+  assert.deepEqual(await pending, { passed: true })
+  assert.equal(state.reads, 1); assert.equal(state.listeners, 0)
+})
+
+test('returning to the built-in server accepts a target document arriving before the destroyed reply', async () => {
+  const state = serverSelectionPage({ initialServer: selectedServer, deliveredServer: builtInServer,
+    immediateDocument: true, transportFailure: selectionContextError() })
+  await selectBundledServer(state.page, null, builtInServer, { timeout: 137 })
+  assert.deepEqual(state.selected, [null])
+  assert.deepEqual(state.calls, ['current-domcontentloaded', 'arm-new-document', 'select', 'read-target'])
+  assert.equal(state.listeners, 0)
+})
+
+test('a successful server select reply alone does not acknowledge the old ready document', async () => {
+  const state = serverSelectionPage()
+  let settled = false
+  const pending = selectBundledServer(state.page, selectedServer, selectedServer, { timeout: 137 }).then(
+    () => { settled = true; return { passed: true } }, error => { settled = true; return { error } },
+  )
+  await new Promise(setImmediate)
+  assert.equal(settled, false); assert.equal(state.reads, 0)
+  state.loaded()
+  assert.deepEqual(await pending, { passed: true })
+  assert.deepEqual(state.selected, [selectedServer])
+  assert.equal(state.reads, 1); assert.equal(state.listeners, 0)
+})
+
+test('server selection preserves unknown failures even when a target document exists', async t => {
+  for (const kind of ['renderer-refused', 'unknown-transport']) await t.test(kind, async () => {
+    const failure = new Error(kind)
+    const state = serverSelectionPage(kind === 'renderer-refused'
+      ? { selectionFailure: failure }
+      : { transportFailure: failure, immediateDocument: true })
+    await assert.rejects(selectBundledServer(state.page, selectedServer, selectedServer, { timeout: 137 }), error => error === failure)
+    assert.deepEqual(state.selected, [selectedServer])
+    assert.equal(state.reads, 0)
+    // The candidate removes its own listeners immediately; late close is harmless.
+    state.page.emit('close')
+    await new Promise(setImmediate)
+    assert.equal(state.listeners, 0)
+  })
+})
+
+test('a destroyed server-select reply without a new document reports owned deadline and close failures', async t => {
+  for (const kind of ['TimeoutError', 'PageClosedError']) await t.test(kind, async () => {
+    const state = serverSelectionPage({ transportFailure: selectionContextError() })
+    const pending = selectBundledServer(state.page, selectedServer, selectedServer, { timeout: 137 }).then(() => null, error => error)
+    await new Promise(setImmediate)
+    if (kind === 'PageClosedError') state.page.emit('close')
+    assert.match((await pending).message, kind === 'TimeoutError' ? /NATIVE_SERVER_CHOICE_TIMEOUT/ : /NATIVE_SERVER_CHOICE_PAGE_CLOSED/)
+    assert.deepEqual(state.selected, [selectedServer])
+    assert.equal(state.reads, 0); assert.equal(state.listeners, 0)
+  })
+})
+
+test('a new document cannot hide a wrong server or foreign renderer', async t => {
+  for (const [kind, options] of [
+    ['wrong-server', { deliveredServer: builtInServer }],
+    ['foreign-document', { documentUrl: 'https://foreign.example/mikka' }],
+  ]) await t.test(kind, async () => {
+    const state = serverSelectionPage({ ...options, immediateDocument: true, transportFailure: selectionContextError() })
+    await assert.rejects(selectBundledServer(state.page, selectedServer, selectedServer, { timeout: 137 }), { code: 'ERR_ASSERTION' })
+    assert.deepEqual(state.selected, [selectedServer])
+    assert.equal(state.reads, kind === 'wrong-server' ? 1 : 0)
+    assert.equal(state.listeners, 0)
+  })
+})
+
+test('a target read failing after the server document is not retried or treated as a select reply', async () => {
+  const failure = selectionContextError()
+  const state = serverSelectionPage({ immediateDocument: true, transportFailure: selectionContextError(), readFailure: failure })
+  await assert.rejects(selectBundledServer(state.page, selectedServer, selectedServer, { timeout: 137 }), error => error === failure)
+  assert.deepEqual(state.selected, [selectedServer])
+  assert.equal(state.reads, 1); assert.equal(state.listeners, 0)
+})
+
+test('an unfinished current document cannot supply the server selection acknowledgement', async () => {
+  const state = serverSelectionPage({ oldDocumentLoading: true, transportFailure: selectionContextError() })
+  let settled = false
+  const pending = selectBundledServer(state.page, selectedServer, selectedServer, { timeout: 137 }).then(
+    () => { settled = true; return { passed: true } }, error => { settled = true; return { error } },
+  )
+  await new Promise(setImmediate)
+  assert.deepEqual(state.calls, ['current-domcontentloaded'])
+  assert.deepEqual(state.selected, []); assert.equal(state.listeners, 0)
+  state.readyCurrent()
+  await new Promise(setImmediate)
+  assert.deepEqual(state.selected, [selectedServer])
+  assert.equal(settled, false, 'the old main-document DCL must precede the armed selection waiter')
+  assert.equal(state.reads, 0); assert.equal(state.listeners, 1)
+  state.loaded()
+  assert.deepEqual(await pending, { passed: true })
+  assert.equal(state.reads, 1); assert.equal(state.listeners, 0)
 })

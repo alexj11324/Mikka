@@ -12,7 +12,7 @@ import { captureNativeResources } from './native-resources.mjs'
 import { observeAccountRelease } from './account-release-observer.mjs'
 import { captureGeneratedWorkspaceName } from './generated-workspace-name.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
-import { selectBundledServer } from './bundled-server-choice.mjs'
+import { selectBundledServer } from './native-document.mjs'
 import { continueInSystemBrowser, openAppLink } from './browser-handoff.mjs'
 import { nativeCleanupFailure, recordNativeCleanup } from './native-auth-diagnostics.mjs'
 import { acquireTestAccounts, auditEvidence } from '../../../scripts/test-accounts/session.mjs'
@@ -134,7 +134,7 @@ try {
   assert.equal(probed.status, 'ok')
   assert.equal(probed.server.url, selfHosted.url)
   assert.equal(probed.server.name, 'Acceptance self-hosted')
-  // A server change can reload before the selection's IPC reply arrives.
+  // Main may reload before evaluate replies; bind selection to its next completed document.
   await selectBundledServer(page, selfHosted.url, selfHosted.url)
   await page.waitForFunction(() => document.body.innerText.trim().length > 30)
   for (let attempt = 0; attempt < 100 && selfHosted.configReads() === 0; attempt++) await new Promise(done => setTimeout(done, 100))

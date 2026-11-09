@@ -7,6 +7,11 @@ import { submitArtifact, type ArtifactSubmitter } from '@/lib/artifacts/store'
 import { withBasePath } from '@/lib/base-path'
 import { runAgentName } from '@/lib/run-bot-name'
 import { maskForRun } from '@/lib/secrets/runtime'
+import { ActionFailureError } from '@/lib/action-error'
+import { requireTaskWorkspace, taskReaderScope } from '@/lib/task-workspace'
+import { tokenWorkspace } from '@/lib/tokens/principal'
+import { enterprisePrincipal, type EnterprisePrincipal } from '@/lib/enterprise/principal'
+import { mcpEnterprisePrincipal } from '@/lib/mcp/auth'
 
 // submit_artifact, the one way any harness hands a document or web page to
 // Mikka. From a run it is the run's artifact, by the run's agent; from an
@@ -15,16 +20,22 @@ import { maskForRun } from '@/lib/secrets/runtime'
 export interface SubmitInput { title: string; kind: ArtifactKind; content: string; artifactId?: string }
 
 /** The submitter for a run token: the run's Agent (Claude Code, Codex), never the Bot that dispatched it (R-78). */
-export async function runSubmitter(run: { id: string; userId: string; botId?: string | null; issueId: string | null }): Promise<ArtifactSubmitter> {
+export async function runSubmitter(run: { id: string; userId: string; botId?: string | null; issueId: string | null; workspaceId?: string; [enterprisePrincipal]?: EnterprisePrincipal }): Promise<ArtifactSubmitter> {
   const [row] = await db.select({ name: runAgentName }).from(agentRuns).innerJoin(agents, eq(agents.id, agentRuns.agentId)).where(eq(agentRuns.id, run.id)).limit(1)
-  return { userId: run.userId, botId: run.botId ?? null, runId: run.id, issueId: run.issueId, authorName: row?.name ?? 'Coordinator' }
+  return { userId: run.userId, botId: run.botId ?? null, runId: run.id, issueId: run.issueId, workspaceId: run.workspaceId, [enterprisePrincipal]: run[enterprisePrincipal], authorName: row?.name ?? 'Coordinator' }
 }
 
 /** The submitter for an OAuth token: the person, by the client's registered name. */
-export async function oauthSubmitter(userId: string, authInfo: AuthInfo | undefined): Promise<ArtifactSubmitter> {
+export async function oauthSubmitter(userId: string, authInfo: AuthInfo | undefined, requestedWorkspaceId?: string): Promise<ArtifactSubmitter> {
+  const pinned = typeof authInfo?.extra?.workspaceId === 'string' ? authInfo.extra.workspaceId : taskReaderScope(userId).workspaceId
+  if (pinned && requestedWorkspaceId && pinned !== requestedWorkspaceId) throw new ActionFailureError('workspaceAccessDenied')
+  const workspaceId = pinned ?? requestedWorkspaceId
+  if (!workspaceId) throw new ActionFailureError('taskWorkspaceUnresolved')
+  const principal = mcpEnterprisePrincipal(authInfo)
+  await requireTaskWorkspace({ id: userId, [tokenWorkspace]: pinned, [enterprisePrincipal]: principal }, workspaceId)
   const clientId = authInfo?.clientId
   const [row] = clientId ? await db.select({ name: oauthClients.name }).from(oauthClients).where(eq(oauthClients.clientId, clientId)).limit(1) : []
-  return { userId, runId: null, issueId: null, authorName: row?.name?.trim() || 'Mikka' }
+  return { userId, workspaceId, [enterprisePrincipal]: principal, runId: null, issueId: null, authorName: row?.name?.trim() || 'Mikka' }
 }
 
 export async function submit(submitter: ArtifactSubmitter, input: SubmitInput) {

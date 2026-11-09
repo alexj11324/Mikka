@@ -135,7 +135,7 @@ export async function backfillCoordinatorChat(pool: Pick<Pool, 'connect'>, owner
     }
     const owned = await client.query('SELECT 1 FROM coordinator_bots WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botId"=$3', [ownerId, bot.workspaceId, bot.botId])
     if (!owned.rowCount) throw new Error('coordinatorBotMissing')
-    const movedRuns = await moveExecutionRows(client, ownerId, bot.botId)
+    const movedRuns = await moveExecutionRows(client, ownerId, bot.botId, bot.workspaceId)
     await moveChat(client, ownerId, bot.botId)
     await moveKeyedRows(client, ownerId, bot)
     if (movedRuns) await ownerListChanged(client, ownerId, ['thread_list', 'task_run_list'])
@@ -181,6 +181,8 @@ async function moveChat(client: PoolClient, ownerId: string, botId: string) {
  * A source may start several tasks, so retention follows those shared links.
  * Runs owned by a different computer/group or barred by issue retirement must
  * seed that retention too; merely excluding their UPDATE would split the family.
+ * Work in another workspace or still awaiting attribution also seeds retention.
+ * Moving a personal chat never assigns a workspace or reattributes its tasks.
  *
  * Publication/completion lock issue -> run, and the run's scope trigger takes
  * an issue SHARE lock even when only botId changes. Take that lock first.
@@ -192,7 +194,7 @@ async function moveChat(client: PoolClient, ownerId: string, botId: string) {
  * retained seed, including its family, until the next pass. The final statement
  * reads the newly committed family and updates all three tables in one snapshot.
  */
-async function moveExecutionRows(client: PoolClient, ownerId: string, botId: string): Promise<number> {
+async function moveExecutionRows(client: PoolClient, ownerId: string, botId: string, workspaceId: string): Promise<number> {
   const issues = (await client.query<{ id: string }>(`SELECT i.id FROM issues i WHERE EXISTS (
     SELECT 1 FROM agent_runs r WHERE r."userId"=$1 AND r."botId" IS NULL AND r."issueId"=i.id
   ) ORDER BY i.id FOR SHARE OF i NOWAIT`, [ownerId])).rows.map(row => row.id)
@@ -202,9 +204,9 @@ async function moveExecutionRows(client: PoolClient, ownerId: string, botId: str
   // Every write below is restricted to these captured ids; late rows are excluded too.
   if (!tasks.length && !events.length && !runs.length) return 0
   const moved = await client.query(`WITH RECURSIVE
-    own_tasks AS MATERIALIZED (SELECT id,"sourceEventId" FROM factory_tasks WHERE "userId"=$1 AND "botId" IS NULL),
-    own_runs AS MATERIALIZED (SELECT id,"botId","agentDefinition","issueId",kind FROM agent_runs WHERE "userId"=$1),
-    own_events AS MATERIALIZED (SELECT id,"botId","runId",payload FROM coordinator_events WHERE "userId"=$1),
+    own_tasks AS MATERIALIZED (SELECT id,"sourceEventId","workspaceId" FROM factory_tasks WHERE "userId"=$1 AND "botId" IS NULL),
+    own_runs AS MATERIALIZED (SELECT id,"botId","agentDefinition","issueId","workspaceId",kind FROM agent_runs WHERE "userId"=$1),
+    own_events AS MATERIALIZED (SELECT id,"botId","runId","issueId",payload FROM coordinator_events WHERE "userId"=$1),
     task_sources AS (
       SELECT id AS "taskId","sourceEventId"::text AS "eventId" FROM own_tasks
       UNION ALL
@@ -230,13 +232,19 @@ async function moveExecutionRows(client: PoolClient, ownerId: string, botId: str
     seeds(kind,id) AS (
       SELECT 'run',r.id::text FROM own_runs r WHERE r."agentDefinition" ? 'executionIdentity'
         OR r.kind='group_chat'
+        OR r."workspaceId" IS DISTINCT FROM $7::uuid
+        OR (r."issueId" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM issues i WHERE i.id=r."issueId" AND i."workspaceId"=$7))
         OR EXISTS (SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id AND b."botId"<>$2)
         OR EXISTS (SELECT 1 FROM issues i WHERE i.id=r."issueId" AND i.scope='personal' AND i."userId"<>$1)
         OR (r."botId" IS NULL AND (NOT r.id=ANY($5::uuid[]) OR (r."issueId" IS NOT NULL AND NOT r."issueId"=ANY($6::uuid[]))))
       UNION ALL
-      SELECT 'event',id::text FROM own_events WHERE "botId" IS NULL AND NOT id=ANY($4::uuid[])
+      SELECT 'event',e.id::text FROM own_events e WHERE (e."botId" IS NULL AND NOT e.id=ANY($4::uuid[]))
+        OR (e."issueId" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM issues i WHERE i.id=e."issueId" AND i."workspaceId"=$7))
+        OR (e."runId" IS NOT NULL AND NOT EXISTS (SELECT 1 FROM agent_runs r WHERE r.id=e."runId" AND r."workspaceId"=$7))
+        OR EXISTS (SELECT 1 FROM factory_tasks t WHERE t."sourceEventId"=e.id AND t."workspaceId" IS DISTINCT FROM $7::uuid)
       UNION ALL
-      SELECT 'task',id::text FROM own_tasks WHERE NOT (id=ANY($3::uuid[]) AND "sourceEventId"=ANY($4::uuid[]))
+      SELECT 'task',id::text FROM own_tasks WHERE "workspaceId" IS DISTINCT FROM $7::uuid
+        OR NOT (id=ANY($3::uuid[]) AND "sourceEventId"=ANY($4::uuid[]))
     ), retained(kind,id) AS (
       SELECT kind,id FROM seeds
       UNION
@@ -251,7 +259,7 @@ async function moveExecutionRows(client: PoolClient, ownerId: string, botId: str
     UPDATE agent_runs r SET "botId"=$2 WHERE r."userId"=$1 AND r."botId" IS NULL AND r.id=ANY($5::uuid[])
       AND r.kind <> 'group_chat'
       AND NOT EXISTS (SELECT 1 FROM retained p WHERE p.kind='run' AND p.id=r.id::text)
-      AND NOT EXISTS (SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id AND b."botId"<>$2)`, [ownerId, botId, tasks, events, runs, issues])
+      AND NOT EXISTS (SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id AND b."botId"<>$2)`, [ownerId, botId, tasks, events, runs, issues, workspaceId])
   return moved.rowCount ?? 0
 }
 
@@ -277,6 +285,8 @@ async function moveKeyedRows(client: PoolClient, ownerId: string, { botId, works
       ON CONFLICT ("userId","chatKey") DO NOTHING`, [ownerId, botId])
   await client.query(`DELETE FROM chat_preferences WHERE "userId"=$1 AND "chatKey"='coordinator'`, [ownerId])
   await client.query(`UPDATE user_schedules s SET bot_id=$2, workspace_id=$3 WHERE s.owner_id=$1 AND s.bot_id IS NULL
+      AND (s.workspace_id=$3 OR (s.workspace_id IS NULL AND EXISTS (
+        SELECT 1 FROM coordinator_events e WHERE e.id=s.source_event_id AND e."userId"=$1 AND e."botId"=$2)))
       AND NOT EXISTS (SELECT 1 FROM user_schedules o WHERE o.owner_id=$1 AND o.bot_id=$2 AND o.request_id=s.request_id)`, [ownerId, botId, workspaceId])
   await client.query('UPDATE suggestions SET "botId"=$2 WHERE "userId"=$1 AND "botId" IS NULL', [ownerId, botId])
   await client.query('UPDATE pending_actions SET "botId"=$2 WHERE "userId"=$1 AND "botId" IS NULL', [ownerId, botId])

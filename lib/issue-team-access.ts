@@ -118,8 +118,11 @@ export async function issueTeamScope(userId: string, ids: string[] = [], options
   return links.filter(link => ids.includes(link.issueId) || allowed.some(team => team.id === link.teamId && team.workspaceId === link.workspaceId))
 }
 export async function issueTeamAccess(issueId: string, userId: string) {
-  const [link] = await workspaceDb.select().from(teamIssues).where(eq(teamIssues.issueId, issueId)).limit(1)
+  const [link] = await workspaceDb.select({ teamId: teamIssues.teamId, workspaceId: teamIssues.workspaceId, memberId: workspaceMembers.userId }).from(teamIssues)
+    .leftJoin(workspaceMembers, and(eq(workspaceMembers.workspaceId, teamIssues.workspaceId), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active')))
+    .where(eq(teamIssues.issueId, issueId)).limit(1)
   if (!link) return { teamId: null, workspaceId: null, allowed: false, linked: false }
-  const [member] = await workspaceDb.select({ id: workspaceMembers.userId }).from(workspaceMembers).where(and(eq(workspaceMembers.workspaceId, link.workspaceId), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active'))).limit(1)
-  return { teamId: link.teamId, workspaceId: link.workspaceId, allowed: !!member, linked: true }
+  // A revoked or foreign link remains visible to the caller's scope check;
+  // the LEFT JOIN reads its current membership in the same statement.
+  return { teamId: link.teamId, workspaceId: link.workspaceId, allowed: link.memberId !== null, linked: true }
 }

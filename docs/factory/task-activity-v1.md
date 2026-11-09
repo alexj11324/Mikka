@@ -4,9 +4,11 @@
 
 ## 请求与刷新
 
-`GET /api/factory/tasks/:taskId/activity`，路径参数 `taskId` 为 Factory task UUID，无查询参数或请求体。浏览器使用现有登录会话。通过 `withBasePath` 构造请求地址；默认前缀下实际地址为 `/mikka/api/factory/tasks/:taskId/activity`。响应里的 `url`、`downloadUrl`、`posterUrl` 已带前缀，直接使用。
+`GET /api/factory/tasks/:taskId/activity`，路径参数 `taskId` 为 Factory task UUID，无查询参数或请求体。复用现有包含工作区上下文的请求通道和登录会话，请求带任务所在工作区的 `x-mikka-workspace-id`；工作区选择沿用 [现有客户端请求层](../../lib/web-connection/client.ts)，无需在右栏另写认证逻辑。通过 `withBasePath` 构造请求地址；默认前缀下实际地址为 `/mikka/api/factory/tasks/:taskId/activity`。响应里的 `url`、`downloadUrl`、`posterUrl` 已带前缀，直接使用。
 
-响应头为 `Cache-Control: private, no-store`。权限沿用任务详情的 owner、Bot/source、issue 和工作区边界；知道 task、run 或 capture ID 不授予访问权。支持与任务详情相同的 PAT 认证。受限 PAT 只返回其工作区可见的运行、电脑区间、等待记录、产物及 flow 内嵌引用；文档同时检查版本提交者和原 Artifact 的范围。原文件及封面采用相同限制。
+响应头为 `Cache-Control: private, no-store`。权限沿用任务详情的 owner、Bot/source、issue 和工作区边界；知道 task、run 或 capture ID 不授予访问权。显式工作区选择优先于 cookie；未显式选择时沿用会话工作区选择。cookie 选到其他工作区、无效的显式选择，以及个人访问令牌（PAT）的固定工作区与请求头不一致，均不能读取此任务。工作区切换后按现有请求层退役旧响应，不去掉工作区条件重试。
+
+浏览器会话与 PAT 均只返回当前有效工作区中的运行、电脑区间、等待记录、产物及 flow 内嵌引用。文档同时核对版本提交者和 Artifact 的持久化 `workspaceId`；电脑区间要求 task、run 和租用记录的持久化租户一致，并保留原有 Bot/custody 校验。`workspaceId = NULL` 的历史数据保持隔离，不从创建者、旧 Team link 或电脑绑定推断访问权。原文件及封面采用相同限制；成员撤销后，既有对象或封面缓存不授予访问权。
 
 首次进入读取一次。沿用 `useLiveKey('factory_task', taskId, [activityKey], liveWorkspaceId)` 使现有 live 通道失效缓存；`liveWorkspaceId` 来自本响应，可以为 `null`。运行领取、首次开始输出、完成、文档提交、VM 区间与媒体就绪写入在提交后通知同一任务 key；逐个文本片段不会刷新整个右栏。无需逐个订阅 run 或猜测其工作区，不增加 `refreshInterval`、定时 fetch 或轮询。等待时长需要持续显示时，在客户端按 `observedAt` 推进时钟。
 
@@ -122,7 +124,7 @@ activity 错误响应为 `{ error: string }`：
 | `404` | `factoryNotFound` | 任务不存在、ID 无效或权限不足；使用同一不可见状态。 |
 | `409` | 对应的 Factory 错误码 | 交给现有本地化错误处理，不当作空数据成功。 |
 
-未知服务端故障走现有路由错误处理。媒体端点返回字节或无正文错误：`401` 未登录，`404` 不可见/缺失，`503` 解码或存储不可用；不要把媒体错误当作 JSON 解析。
+未知服务端故障走现有路由错误处理。媒体端点成功时返回字节；错误按状态码处理：`401` 未登录或凭证失效，`404` 工作区/权限不匹配或文件缺失，`503` 解码或存储不可用。拒绝响应可能无正文，也可能来自任务详情共用的工作区错误适配器；不要要求媒体错误一定能解析为 JSON。
 
 ## 历史方案回填
 
@@ -138,7 +140,7 @@ node --conditions=react-server --import tsx \
 
 将 `OWNER_ID` 替换为要处理的任务所有者 ID。默认 dry-run；单批最多 100 条。输出含 `scanned`、`wouldCreate`、`created`、`existing`、`skipped`、本批 `cursor` 和下一批 `nextCursor`。使用相同 owner、limit，加 `--cursor BATCH_CURSOR --apply` 应用检查过的批次；将 `BATCH_CURSOR` 替换为本批输出的 `cursor`。继续下一批使用 `nextCursor`。
 
-回填重新检查权限和 grants，跳过不再授权或来源失配的记录。重复执行不重复创建版本，历史模式不发送新的 Artifact 提交事件或启动模型 turn。执行后通过 activity 中对应 attempt 的 `plan` 和精确版本下载确认结果；权限已撤销的历史方案可以继续为 `null`。
+回填先按任务的持久化工作区取得成员租约，再开始应用数据库事务并重新检查 owner、来源和 grants；跳过不再授权、租户未归属或来源失配的记录。重复执行不重复创建版本，历史模式不发送新的 Artifact 提交事件或启动模型 turn。执行后通过 activity 中对应 attempt 的 `plan` 和精确版本下载确认结果；权限已撤销的历史方案可以继续为 `null`。
 
 ## 合同来源
 

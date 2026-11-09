@@ -16,6 +16,7 @@ import { releaseDepartingMember, restoreReturningMember, transferOnSuspend } fro
 import { auditRequestContext } from '@/lib/audit/record'
 import { enqueueWorkspaceAudit } from '@/lib/audit/delivery'
 import { ensurePersonalWorkspace } from '@/lib/personal-workspace'
+import { tokenWorkspace } from '@/lib/tokens/principal'
 import { ownerWorkspaceListsChanged, workspaceListChanged, workspaceListScopesBeforeChange, workspaceListScopeChanged } from '@/lib/live/lists'
 
 const roleSchema = z.enum(['admin', 'member'])
@@ -76,7 +77,7 @@ export async function createWorkspace(input: string | { name: string; slug: stri
   })
 }
 
-export async function switchWorkspace(input: string | { workspaceId?: string; accountId?: string }) {
+async function switchWorkspaceBody(input: string | { workspaceId?: string; accountId?: string }) {
   const i18nText = await getTranslations()
   return result(async () => {
     const user = await requireUser()
@@ -84,10 +85,15 @@ export async function switchWorkspace(input: string | { workspaceId?: string; ac
       ? { workspaceId: z.uuid().parse(input), accountId: user.id }
       : z.object({ workspaceId: z.uuid().optional(), accountId: z.string().min(1).max(200).optional() }).parse(input)
     const accountId = parsed.accountId ?? user.id
+    const pinned = user[tokenWorkspace]
+    if (pinned && (accountId !== user.id || parsed.workspaceId && parsed.workspaceId !== pinned)) throw new WorkspaceError('workspaceAccessDenied')
     const deviceSessions: DeviceSessionSummary[] = accountId === user.id ? [] : await auth.api.listDeviceSessions({ headers: await headers() })
     const deviceSession = deviceSessions.find(item => item.user.id === accountId)
     if (accountId !== user.id && !deviceSession) throw new WorkspaceError(i18nText('FeatureCopy.c_c2e795ad'))
-    if (parsed.workspaceId) await workspaceDb.transaction(tx => requireWorkspace(tx, parsed.workspaceId!, accountId))
+    if (parsed.workspaceId) await workspaceDb.transaction(async tx => {
+      const { workspace } = await requireWorkspace(tx, parsed.workspaceId!, accountId)
+      if (workspace.kind === 'personal' && workspace.userId !== accountId) throw new WorkspaceError('workspaceAccessDenied')
+    })
     if (deviceSession) await auth.api.setActiveSession({ body: { sessionToken: deviceSession.session.token }, headers: await headers() })
     if (parsed.workspaceId) await rememberWorkspace(parsed.workspaceId)
     else {
@@ -97,6 +103,10 @@ export async function switchWorkspace(input: string | { workspaceId?: string; ac
     }
     return { workspaceId: parsed.workspaceId }
   })
+}
+
+export async function switchWorkspace(...args: Parameters<typeof switchWorkspaceBody>) {
+  return withFreshSession(() => switchWorkspaceBody(...args))
 }
 
 async function createWorkspaceInvitationBody(input: { workspaceId: string; emails: string[]; role: string }) {

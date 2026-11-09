@@ -139,7 +139,14 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
   // Preserve the task-access denial before narrower policy parsing or any
   // claim preparation. Publication and the final response recheck it later.
   timings.next('admission')
-  if (!await issueForUser(caller.userId, run.issueId)) return rejectPublication(new PublicationError('issue_unavailable'))
+  const claimIssue = await issueForUser(caller.userId, run.issueId)
+  if (!claimIssue) return rejectPublication(new PublicationError('issue_unavailable'))
+  // Task and Run ownership is persisted host data. Neither a claim token nor
+  // an old frozen execution scope can assign the task to another workspace.
+  if (!run.workspaceId || claimIssue.ownershipState !== 'bound' || claimIssue.workspaceId !== run.workspaceId
+    || caller.scopeWorkspaceId && caller.scopeWorkspaceId !== run.workspaceId
+    || run.agentDefinition?.executionIdentity !== undefined && run.agentDefinition.executionIdentity?.workspaceId !== run.workspaceId)
+    return NextResponse.json({ error: 'Run ownership unavailable.' }, { status: 409 })
   // Historical generic retries cannot turn an original-session answer into
   // a fresh execution, even when their Factory attempt is no longer present.
   if (run.retryOf && await blockQuestionRetry(pool, caller.userId, run.issueId, runId) && (await afterRunEnded(caller.userId, runId), true)) return NextResponse.json({ error: 'Generic retry cannot replay an original-session question answer; explicit recovery required.' }, { status: 409 })
@@ -265,8 +272,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
   let localComputer: Awaited<ReturnType<typeof localComputerAuthority>> = null
   let taskEnv: Record<string, string> = {}
   let taskSecretNames: string[] = []
-  const taskWorkspaceId = run.agentDefinition?.executionIdentity
-    ? run.agentDefinition.executionIdentity.workspaceId : device.kind === 'cloud' ? caller.scopeWorkspaceId ?? null : null
+  const taskWorkspaceId = run.workspaceId
   const taskRepository = remoteRepositoryRef(repo.remoteUrl)
   const cloudDesktop = device.kind === 'cloud' && device.harnesses.some(info => info.harness === harness && info.computerBroker)
   if (device.kind === 'cloud' && (!cloudComputerTasksEnabled() || !caller.scopeWorkspaceId || caller.scopeDeviceId !== deviceId
@@ -521,9 +527,11 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     ...(distribution ? {policySnapshotRequired:distribution.required,policySnapshot:issuePolicySnapshot(distribution,assignmentPolicy)} : {}),
     }, { headers: { 'cache-control': 'private, no-store' } })
   }, async (current, tx) => {
-    const workspaceId = current.agentDefinition?.executionIdentity
-      ? current.agentDefinition.executionIdentity.workspaceId : device.kind === 'cloud' ? caller.scopeWorkspaceId ?? null : null
-    if (current.deviceTokenId !== caller.tokenId || current.attempt !== run.attempt || workspaceId !== taskWorkspaceId) return false
+    const workspaceId = current.workspaceId
+    if (!workspaceId || workspaceId !== taskWorkspaceId || current.deviceTokenId !== caller.tokenId || current.attempt !== run.attempt
+      || current.agentDefinition?.executionIdentity?.workspaceId !== run.agentDefinition?.executionIdentity?.workspaceId
+      || current.agentDefinition?.executionIdentity !== undefined && current.agentDefinition.executionIdentity?.workspaceId !== workspaceId
+      || caller.scopeWorkspaceId && caller.scopeWorkspaceId !== workspaceId) return false
     if (taskInjection.snapshot === undefined) return true
     if (workspaceId && !current.agentDefinition?.executionIdentity && !await executionMembersActive(workspaceId, [current.userId])) return false
     const [currentRepo] = await tx.select({ remoteUrl: deviceRepos.remoteUrl }).from(deviceRepos).where(eq(deviceRepos.id, repo.id)).limit(1)

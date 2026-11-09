@@ -1,0 +1,266 @@
+name: Workspace governance acceptance
+
+# Run the existing non-model Item 11 on GitHub's exact merge candidate.
+# acceptance.mjs intentionally refuses CI: this workflow uses its exported
+# business case and the existing isolated test-account bootstrap, with CI intact.
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workspace-governance-${{ github.event_name }}-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.run_id) || '' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  workspace-governance:
+    name: Workspace governance HTTP (Item 11)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e-local-only
+          POSTGRES_DB: mikka_e2e
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e -d mikka_e2e"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      LOCAL_LOOP_ITEMS: '11'
+      MIKKA_LOCAL_TEST_ACCOUNTS: '1'
+      MIKKA_EDITION: cloud
+      REQUIRE_DB: '1'
+      E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      MIKKA_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
+      BETTER_AUTH_URL: http://localhost:3110
+      E2E_BASE_URL: http://localhost:3110
+      MIKKA_TEST_DEPLOYMENT_SHA: ${{ github.sha }}
+      MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
+      MIKKA_DEV_PORT: '3110'
+      MIKKA_DEV_DAEMON_DIR: .cache/wg-ci/daemon
+      MIKKA_DEV_SKIP_DAEMON: '1'
+      MIKKA_DEV_SKIP_MODEL_SETUP: '1'
+      MIKKA_DEV_SKIP_ENV_FILES: '1'
+      NEXT_TELEMETRY_DISABLED: '1'
+      NODE_OPTIONS: --max-old-space-size=2048
+      SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+      MIKKA_SIGNUP_IP_HOURLY: '1000'
+      MIKKA_SIGNUP_GLOBAL_HOURLY: '10000'
+      MIKKA_VERIFICATION_IP_HOURLY: '1000'
+      MIKKA_VERIFICATION_GLOBAL_HOURLY: '10000'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/pnpm-install
+        with:
+          ffmpeg-github-token: ${{ github.token }}
+      - name: Verify the exact hosted checkout and create a test-only auth secret
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict'
+          import { execFileSync } from 'node:child_process'
+          import { appendFileSync } from 'node:fs'
+          import { randomBytes } from 'node:crypto'
+          import { assertDevLocal } from './scripts/dev-local/guard.mjs'
+          
+          assert.equal(process.platform, 'linux')
+          assert.equal(Number(process.versions.node.split('.')[0]), 24)
+          assert.equal(process.env.CI, 'true')
+          assert.equal(process.env.GITHUB_ACTIONS, 'true')
+          assert.equal(process.env.RUNNER_ENVIRONMENT, 'github-hosted')
+          assert.equal(process.env.GITHUB_REPOSITORY, 'alexj11324/Mikka')
+          assert.ok(['pull_request', 'merge_group', 'push'].includes(process.env.GITHUB_EVENT_NAME))
+          if (process.env.GITHUB_EVENT_NAME === 'pull_request') {
+            assert.match(process.env.GITHUB_REF, /^refs\/pull\/[0-9]+\/merge$/)
+          }
+          if (process.env.GITHUB_EVENT_NAME === 'push') assert.equal(process.env.GITHUB_REF, 'refs/heads/main')
+          const revision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+          assert.match(revision, /^[a-f0-9]{40}$/)
+          assert.equal(revision, process.env.GITHUB_SHA)
+          assert.equal(revision, process.env.MIKKA_TEST_DEPLOYMENT_SHA)
+          assert.equal(execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { encoding: 'utf8' }), '')
+          assert.equal(process.env.LOCAL_LOOP_ITEMS, '11')
+          assert.equal(process.env.MIKKA_EDITION, 'cloud')
+          assert.equal(process.env.MIKKA_DEV_SKIP_DAEMON, '1')
+          assert.equal(process.env.MIKKA_DEV_SKIP_MODEL_SETUP, '1')
+          assertDevLocal(process.env)
+          const target = new URL(process.env.E2E_DATABASE_URL)
+          assert.equal(target.hostname, '127.0.0.1')
+          assert.equal(target.port, '5432')
+          assert.equal(target.pathname, '/mikka_e2e')
+          assert.equal(target.username, 'e2e')
+          assert.equal(process.env.MIKKA_DATABASE_URL, process.env.E2E_DATABASE_URL)
+          assert.equal(process.env.DATABASE_URL, process.env.E2E_DATABASE_URL)
+          const secret = randomBytes(32).toString('hex')
+          console.log('::add-mask::' + secret)
+          appendFileSync(process.env.GITHUB_ENV, 'BETTER_AUTH_SECRET=' + secret + '\n')
+          JS
+      - name: Apply every tracked migration to the isolated PostgreSQL service
+        run: pnpm test:e2e:setup
+      - name: Bind the disposable database to this exact checkout
+        run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
+      - name: Run real HTTP Item 11 with its ordinary owner and peer sessions
+        timeout-minutes: 12
+        env:
+          WORKSPACE_GOVERNANCE_ARTIFACT_DIR: ${{ runner.temp }}/workspace-governance-acceptance
+        run: |
+          node --import ./tests/support/server-only.mjs --import tsx --input-type=module <<'JS'
+          import assert from 'node:assert/strict'
+          import { spawn, execFileSync } from 'node:child_process'
+          import { randomUUID } from 'node:crypto'
+          import { once } from 'node:events'
+          import { mkdir, readFile, writeFile, appendFile, copyFile } from 'node:fs/promises'
+          import { resolve, join } from 'node:path'
+          import { setTimeout as delay } from 'node:timers/promises'
+          import pg from 'pg'
+          import { loadEnvironment } from './scripts/test-accounts/environment.mjs'
+          import { acquireTestAccounts, recordAuthenticationSecrets, auditEvidence } from './scripts/test-accounts/session.mjs'
+          import { verifyWorkspaceGovernance } from './scripts/dev-local/workspace-governance-acceptance.mjs'
+          
+          assert.equal(process.env.LOCAL_LOOP_ITEMS, '11')
+          const root = process.cwd(), privateDirectory = resolve('.cache/wg-ci')
+          await mkdir(privateDirectory, { recursive: true, mode: 0o700 })
+          const environment = await loadEnvironment()
+          assert.equal(environment.kind, 'isolated-ci')
+          assert.equal(environment.deploymentSha, process.env.GITHUB_SHA)
+          assert.equal(environment.origin, 'http://localhost:3110')
+          assert.equal(environment.database.name, 'mikka_e2e')
+          const sourceTree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { encoding: 'utf8' }).trim()
+          const runId = randomUUID(), controller = new AbortController()
+          const progressFile = join(privateDirectory, 'progress.jsonl')
+          const report = { sourceSha: process.env.GITHUB_SHA, sourceTree, selectedItems: [11], passedItems: [],
+            database: { host: environment.database.host, name: environment.database.name }, origin: environment.origin,
+            runId, startedAt: new Date().toISOString(), sourceUnchanged: false, result: 'failed' }
+          let stage = 'runtime-ready', failure, stack, accounts, pool, stopping = false, output = ''
+          const progress = async (step, status, detail) => {
+            await appendFile(progressFile, JSON.stringify({ step, status, ...(detail ? { detail } : {}) }) + '\n', { mode: 0o600 })
+            console.log(step + ' ' + status)
+          }
+          const deadline = async (work, milliseconds, label) => {
+            let timer
+            try {
+              return await Promise.race([work, new Promise((_, reject) => {
+                timer = setTimeout(() => { controller.abort(); reject(new Error(label + '_timeout')) }, milliseconds)
+              })])
+            } finally { clearTimeout(timer) }
+          }
+          try {
+            await progress(stage, 'start')
+            const ready = Promise.withResolvers(), terminated = Promise.withResolvers()
+            // The existing stack announces readiness after writing runtime.json and
+            // warming the API. Listen to that event; add no polling or synthetic identity.
+            stack = spawn(process.execPath, ['scripts/dev-local.mjs'], {
+              cwd: root, env: process.env, stdio: ['ignore', 'pipe', 'pipe'], detached: true,
+            })
+            void terminated.promise.catch(() => {})
+            stack.once('error', error => terminated.reject(error))
+            stack.once('exit', (code, signal) => {
+              report.runtimeExit = { code, signal }
+              if (!stopping) {
+                controller.abort()
+                terminated.reject(new Error('owned_runtime_exited'))
+              }
+            })
+            let readinessOutput = ''
+            stack.stdout.on('data', chunk => {
+              output = (output + chunk.toString()).slice(-128_000)
+              readinessOutput = (readinessOutput + chunk.toString()).slice(-4096)
+              if (readinessOutput.includes('dev:local ready: http://localhost:3110/mikka')) ready.resolve()
+            })
+            stack.stderr.on('data', chunk => { output = (output + chunk.toString()).slice(-128_000) })
+            await deadline(Promise.race([ready.promise, terminated.promise]), 240_000, 'runtime_ready')
+            const runtime = JSON.parse(await readFile('.cache/dev-local/runtime.json', 'utf8'))
+            assert.equal(runtime.server, environment.origin + '/mikka')
+            assert.equal(runtime.daemonDataDir, resolve(process.env.MIKKA_DEV_DAEMON_DIR))
+            await progress(stage, 'ok')
+            stage = 'account-lease'
+            await progress(stage, 'start')
+            pool = new pg.Pool({ connectionString: process.env.E2E_DATABASE_URL, max: 3,
+              connectionTimeoutMillis: 5000, statement_timeout: 10000 })
+            // Real signup/sign-in and the existing exact-SHA/database HMAC attestation
+            // precede the renewable owner/peer lease. Its HTTP/DB calls are bounded.
+            accounts = await acquireTestAccounts({ environment, database: pool, runId,
+              workerId: 'workspace-governance-ci', requestId: runId })
+            await progress(stage, 'ok')
+            stage = 'item11-workspace-governance'
+            await progress(stage, 'start')
+            await deadline(Promise.race([
+              verifyWorkspaceGovernance({ accounts, pool, progress, signal: controller.signal, runId,
+                recordSecrets: values => recordAuthenticationSecrets(values, { environment }) }),
+              terminated.promise,
+            ]), 180_000, 'workspace_governance')
+            await accounts.assertActive()
+            report.passedItems = [11]
+            await progress(stage, 'ok')
+          } catch (error) {
+            failure = error
+          } finally {
+            controller.abort()
+            // Keep the API available while its real leased sessions are released.
+            try { await accounts?.release({ outcome: 'dirty' }) }
+            catch (error) { if (!failure) { failure = error; stage = 'account-release' } }
+            stopping = true
+            try {
+              if (stack?.pid && stack.exitCode === null && stack.signalCode === null) {
+                const exited = once(stack, 'exit').then(() => true)
+                process.kill(-stack.pid, 'SIGTERM')
+                if (!await Promise.race([exited, delay(10_000, false, { ref: false })])) {
+                  process.kill(-stack.pid, 'SIGKILL')
+                  assert.ok(await Promise.race([exited, delay(5000, false, { ref: false })]), 'owned_runtime_cleanup_failed')
+                }
+              }
+            } catch (error) { if (!failure) { failure = error; stage = 'runtime-cleanup' } }
+            try { await pool?.end() }
+            catch (error) { if (!failure) { failure = error; stage = 'database-close' } }
+            try {
+              assert.equal(execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), report.sourceSha)
+              assert.equal(execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { encoding: 'utf8' }), '')
+              report.sourceUnchanged = true
+            } catch (error) { if (!failure) { failure = error; stage = 'fixed-source' } }
+            // Private process output is never an artifact. Publish only scanner-approved
+            // metadata, assertion locations and the item's fixed evidence statements.
+            await writeFile(join(privateDirectory, 'runtime-private.log'), output, { mode: 0o600 })
+            report.finishedAt = new Date().toISOString()
+            if (failure) {
+              report.failure = { stage, kind: failure?.name === 'AssertionError' ? 'assertion' : 'runtime',
+                ...(failure?.name === 'AssertionError' ? {
+                  assertion: String(failure.message).split('\n')[0].slice(0, 240),
+                  ...(typeof failure.actual === 'number' || typeof failure.actual === 'boolean' ? { actual: failure.actual } : {}),
+                  ...(typeof failure.expected === 'number' || typeof failure.expected === 'boolean' ? { expected: failure.expected } : {}),
+                } : {}),
+                location: String(failure?.stack ?? '').match(/workspace-governance-acceptance\.mjs:\d+:\d+/)?.[0] }
+            } else report.result = 'passed'
+            const reportFile = join(privateDirectory, 'report.json')
+            await writeFile(reportFile, JSON.stringify(report, null, 2) + '\n', { mode: 0o600 })
+            await auditEvidence([reportFile, progressFile], { environment })
+            console.log(JSON.stringify({ event: 'workspace_governance_result', ...report }))
+            const artifacts = process.env.WORKSPACE_GOVERNANCE_ARTIFACT_DIR
+            await mkdir(artifacts, { recursive: true, mode: 0o700 })
+            await copyFile(reportFile, join(artifacts, 'report.json'))
+            await copyFile(progressFile, join(artifacts, 'progress.jsonl'))
+            await appendFile(process.env.GITHUB_STEP_SUMMARY, '## Workspace governance HTTP\n\nSource: ' + report.sourceSha +
+              '\n\nTree: ' + sourceTree + '\n\nItem 11: **' + report.result + '**. No model or daemon execution is part of this item.\n')
+            if (failure) { console.error('Workspace governance acceptance failed at ' + stage); process.exitCode = 1 }
+          }
+          JS
+      - name: Preserve only audited acceptance metadata
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: workspace-governance-${{ github.sha }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/workspace-governance-acceptance/report.json
+            ${{ runner.temp }}/workspace-governance-acceptance/progress.jsonl
+          if-no-files-found: warn
+          retention-days: 7

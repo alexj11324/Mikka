@@ -1,3 +1,4 @@
+import { withFactoryBackgroundWorkspace } from '../background-workspace'
 import 'server-only'
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
@@ -68,10 +69,12 @@ function requestMatches(request: Record<string, unknown>, task: FactoryTask, run
 async function receipt(tx: Pick<Pool, 'query'> | PoolClient, task: FactoryTask, runId: string) {
   return (await tx.query('SELECT request,result FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [task.id, eventIdFor(task, runId)])).rows[0] as { request: Record<string, unknown>; result: Receipt } | undefined
 }
-async function transaction<T>(pool: Pool, work: (tx: PoolClient) => Promise<T>) {
-  const tx = await pool.connect()
-  try { await tx.query('BEGIN'); const value = await work(tx); await tx.query('COMMIT'); return value }
-  catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
+async function transaction<T>(pool: Pool, userId: string, target: { taskId: string; botId: string | null }, work: (tx: PoolClient) => Promise<T>) {
+  return withFactoryBackgroundWorkspace(pool, userId, { kind: 'task', id: target.taskId, botId: target.botId }, async () => {
+    const tx = await pool.connect()
+    try { await tx.query('BEGIN'); const value = await work(tx); await tx.query('COMMIT'); return value }
+    catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
+  })
 }
 
 /** At most three unattended generations. A lost enqueue acknowledgement may
@@ -82,7 +85,7 @@ export async function wakeQueuedQuestionContinuation(pool: Pool, userId: string,
   if (!found) return { handled: false, launched: false, recognized: false }
   const store = await questionWakeRuntime.store(found.botId)
   let observedTask: FactoryTask
-  try { observedTask = await transaction(pool, tx => store.readTask(tx, userId, found.taskId)) }
+  try { observedTask = await transaction(pool, userId, found, tx => store.readTask(tx, userId, found.taskId)) }
   catch (error) {
     if (error instanceof FactoryError) return { handled: false, launched: false, recognized: true }
     throw error
@@ -96,7 +99,7 @@ export async function wakeQueuedQuestionContinuation(pool: Pool, userId: string,
     try { terminal = ['completed', 'failed', 'cancelled'].includes(await questionWakeRuntime.status(workflowId)) }
     catch { terminal = false }
   }
-  const launch = await transaction(pool, async tx => {
+  const launch = await transaction(pool, userId, found, async tx => {
     const task = await store.lockTask(tx, userId, found.taskId)
     const row = await scope(tx, task, runId)
     if (!row) return false
@@ -148,7 +151,7 @@ export async function claimQuestionWake(pool: Pool, actor: Actor, runId: string,
   const found = await identity(pool, actor.userId, runId)
   if (!found) return false
   const store = await questionWakeRuntime.store(found.botId)
-  return transaction(pool, async tx => {
+  return transaction(pool, actor.userId, found, async tx => {
     const task = await store.lockTask(tx, actor.userId, found.taskId)
     const row = await scope(tx, task, runId, false)
     if (!row || row.workspaceId !== actor.workspaceId || wake.eventId !== eventIdFor(task, runId)) return false
@@ -211,7 +214,7 @@ export async function questionWakeFailure(pool: Pool, userId: string, runId: str
   const found = await identity(pool, userId, runId)
   if (!found) return null
   const store = await questionWakeRuntime.store(found.botId)
-  return transaction(pool, async tx => {
+  return transaction(pool, userId, found, async tx => {
     // This projection reads committed state; mutation paths retain their row locks.
     const task = await store.readTask(tx, userId, found.taskId), row = await scope(tx, task, runId, true, false)
     if (!row || !row.idle) return null
@@ -229,7 +232,7 @@ export async function retryQueuedQuestionWake(pool: Pool, actor: { userId: strin
     const found = await identity(pool, actor.userId, runId)
     if (!found) throw new FactoryError('factoryQuestionContinuationUnavailable')
     const store = await questionWakeRuntime.store(found.botId)
-    const task = await transaction(pool, tx => store.readTask(tx, actor.userId, found.taskId)), saved = await receipt(pool, task, runId)
+    const task = await transaction(pool, actor.userId, found, tx => store.readTask(tx, actor.userId, found.taskId)), saved = await receipt(pool, task, runId)
     // Concurrent clicks observing one failed generation acknowledge its one
     // already reserved successor; they never reserve a second successor.
     if (saved?.result.previousGeneration !== expectedGeneration || saved.result.state === 'blocked') throw new FactoryError('factoryQuestionContinuationUnavailable')

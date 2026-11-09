@@ -1,8 +1,8 @@
 import type { PoolClient } from 'pg'
 import { workspaceLink } from '../../components/workspace/workspace-navigation'
-import { actingContext } from '../activity-actor'
 import { withBasePath } from '../base-path'
 import type { ArtifactKind } from '../db/schema'
+import { taskReaderScope } from '../task-workspace'
 import { maskFactoryNote } from './note-mask'
 import type { FactoryTask } from './store'
 
@@ -26,55 +26,21 @@ export interface FactoryActivityDocument {
 type Query = Pick<PoolClient, 'query'>
 type DocumentRow = Omit<FactoryActivityDocument, 'id' | 'createdAt' | 'url' | 'downloadUrl'> & {
   createdAt: Date | string
-  creatorRunId: string | null
-  scopeRunId: string | null
-  scopeIssueId: string | null
-  botWorkspace: string | null
-  bindingWorkspace: string | null
-}
-
-/** Batch equivalent of routeArtifact -> artifactOutsideToken: scope follows
- * the Artifact's original run (Bot, computer binding and issue), or its issue
- * when no run remains. Owner browser sessions do not carry a token scope. */
-async function withinArtifactTokenScope(rows: DocumentRow[], userId: string, workspaces?: Query): Promise<DocumentRow[]> {
-  const context = actingContext.getStore()
-  const workspaceId = context?.userId === userId ? context.tokenWorkspaceId : undefined
-  if (!workspaceId || !rows.length) return rows
-  const database = workspaces ?? (await import('../workspace-db')).workspacePool
-  const issueIds = [...new Set(rows.flatMap(row => row.scopeIssueId ? [row.scopeIssueId] : []))]
-  const issueWorkspaces = new Map<string,string>()
-  if (issueIds.length) {
-    const { rows: linked } = await database.query<{ issueId:string; workspaceId:string }>(
-      'SELECT "issueId","workspaceId" FROM mikka_team_issues WHERE "issueId"=ANY($1::uuid[])',[issueIds])
-    for (const link of linked) issueWorkspaces.set(link.issueId,link.workspaceId)
-  }
-  let personal: boolean | undefined
-  const visible: DocumentRow[] = []
-  for (const row of rows) {
-    // Match runsOutsideToken's existing missing-run behavior exactly. Normal
-    // FK cleanup instead sets artifacts.runId=null, taking the issue branch.
-    if (row.creatorRunId && !row.scopeRunId) { visible.push(row); continue }
-    const named = [row.botWorkspace,row.bindingWorkspace,row.scopeIssueId && issueWorkspaces.get(row.scopeIssueId)].filter(Boolean)
-    if (named.length) {
-      if (named.every(id => id===workspaceId)) visible.push(row)
-    } else {
-      if (personal===undefined) personal=Boolean((await database.query(
-        `SELECT 1 FROM mikka_workspaces WHERE id=$1 AND "userId"=$2 AND kind='personal'`,[workspaceId,userId])).rowCount)
-      if (personal) visible.push(row)
-    }
-  }
-  return visible
 }
 
 /** Called inside the task-detail authorization boundary. Like
  * runArtifactSubmissions, this attributes versions by immutable submission
  * receipts, with a version-one-only fallback for pre-receipt Artifacts. Unlike
- * its compact run summary, this keeps each attempt/version independently. */
+ * its compact run summary, this keeps each attempt/version independently.
+ * Task authorization already holds current membership in its selected tenant;
+ * owner + persisted Artifact workspace matches artifactReadAccess in that lease.
+ * NULL history is quarantined, and retiring provenance cannot change tenancy. */
 export async function readFactoryActivityDocuments(
   tx: Query,
-  task: Pick<FactoryTask, 'id' | 'userId' | 'issueId' | 'candidateId'>,
-  workspaces?: Query,
+  task: Pick<FactoryTask, 'id' | 'userId' | 'issueId' | 'candidateId' | 'workspaceId'>,
 ): Promise<FactoryActivityDocument[]> {
+  const selectedWorkspace = taskReaderScope(task.userId).workspaceId
+  if (!task.workspaceId || selectedWorkspace && selectedWorkspace !== task.workspaceId) return []
   const { rows } = await tx.query<DocumentRow>(`
     WITH owned_attempts AS (
       SELECT attempt.id AS "attemptId",attempt."candidateId",attempt.stage,attempt.output,
@@ -90,7 +56,8 @@ export async function readFactoryActivityDocuments(
       FROM owned_attempts attempt
       JOIN coordinator_events receipt ON receipt."runId"=attempt."runId" AND receipt."userId"=attempt."userId"
         AND receipt."issueId" IS NOT DISTINCT FROM attempt."issueId" AND receipt.kind='artifact_submitted'
-      JOIN artifacts document ON document."userId"=attempt."userId" AND document.id::text=receipt.payload->>'artifactId'
+      JOIN artifacts document ON document."userId"=attempt."userId" AND document."workspaceId"=$5
+        AND document.id::text=receipt.payload->>'artifactId'
       JOIN artifact_versions version ON version."artifactId"=document.id AND version.version::text=receipt.payload->>'version'
       WHERE jsonb_typeof(receipt.payload->'version')='number'
         AND receipt."dedupeKey"='artifact_submitted:' || document.id::text || ':' || version.version::text
@@ -100,7 +67,7 @@ export async function readFactoryActivityDocuments(
         version.version,version.size,version.sha256,version."createdAt"
       FROM owned_attempts attempt
       JOIN artifacts document ON document."runId"=attempt."runId" AND document."userId"=attempt."userId"
-        AND document."issueId" IS NOT DISTINCT FROM attempt."issueId"
+        AND document."issueId" IS NOT DISTINCT FROM attempt."issueId" AND document."workspaceId"=$5
       JOIN artifact_versions version ON version."artifactId"=document.id AND version.version=1
       WHERE NOT EXISTS (SELECT 1 FROM coordinator_events receipt
         WHERE receipt."dedupeKey"='artifact_submitted:' || document.id::text || ':1')
@@ -113,9 +80,6 @@ export async function readFactoryActivityDocuments(
     )
     SELECT submitted."artifactId",submitted.format,submitted.title,submitted."runId",submitted."attemptId",
       COALESCE(report."candidateId",submitted."candidateId") AS "candidateId",submitted.version,submitted.size,submitted."createdAt",
-      submitted."creatorRunId",creator.id AS "scopeRunId",
-      CASE WHEN submitted."creatorRunId" IS NOT NULL THEN creator."issueId" ELSE submitted."creatorIssueId" END AS "scopeIssueId",
-      bot."workspaceId" AS "botWorkspace",binding."workspaceId" AS "bindingWorkspace",
       CASE WHEN submitted.stage='spec' AND submitted.format='markdown'
         AND submitted."creatorRunId"=submitted."runId" AND submitted."creatorIssueId"=$3
         AND jsonb_typeof(submitted.output->'specArtifact'->'version')='number'
@@ -128,13 +92,9 @@ export async function readFactoryActivityDocuments(
       WHEN report."artifactId" IS NOT NULL THEN 'acceptance' ELSE 'document' END AS kind
     FROM submitted LEFT JOIN current_acceptance report ON report."artifactId"=submitted."artifactId"
       AND report."runId"=submitted."runId" AND report.sha256=submitted.sha256
-    LEFT JOIN agent_runs creator ON creator.id=submitted."creatorRunId"
-    LEFT JOIN bots bot ON bot.id=creator."botId"
-    LEFT JOIN computer_run_bindings binding ON binding."runId"=creator.id
     ORDER BY submitted."createdAt",submitted."artifactId",submitted.version,submitted."attemptId"`,
-  [task.id, task.userId, task.issueId, task.candidateId])
-  return (await withinArtifactTokenScope(rows,task.userId,workspaces)).map(row => {
-    const { creatorRunId: _creator,scopeRunId: _scopeRun,scopeIssueId: _scopeIssue,botWorkspace: _bot,bindingWorkspace: _binding,...document } = row
+  [task.id, task.userId, task.issueId, task.candidateId, task.workspaceId])
+  return rows.map(document => {
     return {
       ...document,
       id: `artifact:${document.artifactId}:v${document.version}:${document.attemptId}`,
