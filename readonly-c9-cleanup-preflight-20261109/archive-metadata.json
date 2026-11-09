@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "issue": 1505,
+  "purpose": "Offline preflight of exact cleanup source; cleanup was not executed",
+  "artifactId": 13677458654,
+  "sourceRun": 42622019169,
+  "sourceAttempt": 1,
+  "sourceHead": "c9b6f9531aa40dde6142291e2ce6bac476c5cea5",
+  "sourceWorkflowId": 411645081,
+  "archive": {
+    "bytes": 925,
+    "sha256": "87124f31fd4cfc332411985814650992fcdad9f21ca6f5a0709f70abb5c41a81",
+    "members": [
+      "receipt.json"
+    ]
+  },
+  "receipt": {
+    "bytes": 2132,
+    "sha256": "80031945234e34264c558f830bd64bfa651858e69dbfdfa6354b62deb2a2022d",
+    "appClientId": {
+      "redacted": true,
+      "length": 20,
+      "sha256": "1048af156b6835ad0956c4e41e34017d8392faa19f9ee57d0380264464fd78ca"
+    }
+  },
+  "recovery": {
+    "firstImageExpiredAt": "2026-11-09T13:37:10Z",
+    "firstImageBytesRead": 0,
+    "reason": "Root's first downloaded tool image expired before the worker read its bytes; root recovered an image of the same exact artifact",
+    "secondImageExpiresAt": "2026-11-09T13:44:31Z",
+    "vmActualDownloads": 1,
+    "subagentGitHubArtifactDownloadCalls": 0,
+    "vmOriginalReceiptFileExtractions": 1,
+    "cachedArchiveGuardReads": "The original positive case and bounded negative cases reread the already downloaded ZIP in memory; no second network fetch or new artifact input was used."
+  },
+  "execution": {
+    "sessionId": "sbx_dgRWQ37UPkIb91MNZmIilG1Bcf39",
+    "runtime": "node24",
+    "vcpus": 2,
+    "memoryMiB": 4096,
+    "testCommandId": "cmd_52d10120e6a54dd28ff8dc9e6ee4",
+    "testExitCode": 0,
+    "pythonBlocksCompiled": 7,
+    "archiveGuardCasesPassed": 15,
+    "productionCredentialsSupplied": false,
+    "productionApiCalls": 0,
+    "cleanupExecuted": false,
+    "stoppedAt": "2026-11-09T13:44:11.228Z",
+    "finalVmStatus": "stopped"
+  }
+}

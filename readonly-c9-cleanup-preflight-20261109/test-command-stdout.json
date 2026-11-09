@@ -1,0 +1,10 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"result\": {\n    \"logs\": [\n      {\n        \"data\": \"{\\\"workflowBytes\\\":26324,\\\"workflowSha256\\\":\\\"b73f74994833db10cac6e31e7ab109462e261398a77565d0389d32e4db6a5e9d\\\",\\\"pythonBlocksCompiled\\\":7,\\\"archiveGuardPassed\\\":15,\\\"cases\\\":[\\\"actual_original_archive\\\",\\\"outer_size\\\",\\\"outer_digest\\\",\\\"manifest\\\",\\\"path:../receipt.json\\\",\\\"path:nested/receipt.json\\\",\\\"path:nested\\\\\\\\receipt.json\\\",\\\"duplicate\\\",\\\"extra_member\\\",\\\"wrong_member\\\",\\\"symlink\\\",\\\"member_size\\\",\\\"member_digest\\\",\\\"malformed_zip\\\",\\\"encrypted\\\"],\\\"receiptBytes\\\":2132,\\\"receiptSha256\\\":\\\"80031945234e34264c558f830bd64bfa651858e69dbfdfa6354b62deb2a2022d\\\",\\\"ownerTokenResolution\\\":{\\\"minimumValidityMs\\\":660000,\\\"status\\\":\\\"committed\\\",\\\"actualRefresh\\\":\\\"not_independently_observed\\\",\\\"beforeUpdatedAt\\\":\\\"2026-11-09T10:59:38.653Z\\\",\\\"beforeExpiresAt\\\":\\\"2026-11-09T18:59:38.652Z\\\",\\\"afterUpdatedAt\\\":\\\"2026-11-09T10:59:38.653Z\\\",\\\"afterExpiresAt\\\":\\\"2026-11-09T18:59:38.652Z\\\",\\\"persistedMetadataChanged\\\":false},\\\"mintedTokenSha256\\\":\\\"1d1fee15399de66a97e389dabb2e48e8f215db9315f62e0f8a10645bf63fb93b\\\",\\\"stateTokenSha256\\\":\\\"1d1fee15399de66a97e389dabb2e48e8f215db9315f62e0f8a10645bf63fb93b\\\",\\\"minted\\\":{\\\"tokenSha256\\\":\\\"1d1fee15399de66a97e389dabb2e48e8f215db9315f62e0f8a10645bf63fb93b\\\",\\\"checkTokenScopeConfirmed\\\":false}}\\n\",\n        \"stream\": \"stdout\"\n      }\n    ],\n    \"context\": {\n      \"totalItems\": 1,\n      \"returnedItems\": 1,\n      \"truncated\": false\n    }\n  }\n}"
+    }
+  ],
+  "structuredContent": null,
+  "isError": false
+}

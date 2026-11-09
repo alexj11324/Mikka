@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "commit": "e5a50fa1d227eca754eb41dc0fc39a14ffd5d377",
+  "tree": "0535d53ff29820c36dda4385ebb5ebf9c0d3e152",
+  "soleParent": "465f1b89c52228b99c4f2424f92722901b910754",
+  "parentTree": "5053519fabc1e8ce3737f0166e61db1b29597be8",
+  "workflow": {
+    "path": ".github/workflows/issue1505-smoke-github-readonly.yml",
+    "blob": "c560af8f1dc0759d973f141421df4eb53c71171c",
+    "bytes": 26324,
+    "sha256": "b73f74994833db10cac6e31e7ab109462e261398a77565d0389d32e4db6a5e9d"
+  },
+  "relativeToC9": {
+    "status": "ahead",
+    "mergeBase": "c9b6f9531aa40dde6142291e2ce6bac476c5cea5",
+    "changedPaths": [
+      ".github/workflows/issue1505-smoke-github-readonly.yml"
+    ],
+    "fiveHelperFilesUnchanged": true
+  },
+  "time": {
+    "windowStart": "2026-11-09T13:33:00.000Z",
+    "entryDeadline": "2026-11-09T13:49:00.000Z",
+    "hardEnd": "2026-11-09T13:59:00.000Z",
+    "jobMinutes": 10
+  },
+  "currentMain": "111a8dfb8b227ac0441324339ff42e4328ea609a",
+  "freshMainGetCount": 3,
+  "mainGetsHaveBeforeAndAfterTimeGuards": true,
+  "queues": [
+    "production-smoke-owner-acceptance",
+    "web-deploy-production"
+  ],
+  "cleanupInvokesOwnerRefresh": false,
+  "review": "Runner loads the immutable receipt by its whole-file SHA, validates saved state and calls cleanupReadOnlyConnection. Cleanup matches the saved child digest, revokes the exact child and disconnects only the matching state; it does not invoke the Owner refresh path."
+}

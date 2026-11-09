@@ -1,0 +1,10 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"result\": {\n    \"sandbox\": {\n      \"name\": \"issue1505-c9-receipt-20261109\",\n      \"currentSessionId\": \"sbx_dgRWQ37UPkIb91MNZmIilG1Bcf39\",\n      \"status\": \"running\",\n      \"statusUpdatedAt\": 1794231544963,\n      \"persistent\": false,\n      \"workloadType\": \"sandbox\",\n      \"region\": \"iad1\",\n      \"failoverRegions\": [],\n      \"vcpus\": 2,\n      \"memory\": 4096,\n      \"runtime\": \"node24\",\n      \"architecture\": \"amd64\",\n      \"timeout\": 600000,\n      \"cwd\": \"/vercel/sandbox\",\n      \"createdAt\": 1794231544963,\n      \"updatedAt\": 1794231544963\n    },\n    \"session\": {\n      \"id\": \"sbx_dgRWQ37UPkIb91MNZmIilG1Bcf39\",\n      \"runtime\": \"node24\",\n      \"architecture\": \"amd64\",\n      \"requestedAt\": 1794231544896,\n      \"startedAt\": 1794231544924,\n      \"status\": \"running\",\n      \"vcpus\": 2,\n      \"memory\": 4096,\n      \"timeout\": 600000,\n      \"region\": \"iad1\",\n      \"cwd\": \"/vercel/sandbox\",\n      \"workloadType\": \"sandbox\",\n      \"createdAt\": 1794231544896,\n      \"updatedAt\": 1794231544935,\n      \"interactivePort\": 26661,\n      \"sourceSandboxName\": \"issue1505-c9-receipt-20261109\",\n      \"projectId\": \"prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH\"\n    },\n    \"routes\": []\n  }\n}"
+    }
+  ],
+  "structuredContent": null,
+  "isError": false
+}
