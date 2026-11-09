@@ -12,6 +12,12 @@ import { pathToFileURL } from 'node:url'
 import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
 
 export const REQUIRED_SUITES = [
+  { marker: 'app/api/factory/tasks/[taskId]/activity/route.ts', file: 'tests/factory-activity-http.db.test.ts', script: 'test:factory-activity-http-db' },
+  { marker: 'lib/factory/activity.ts', file: 'lib/factory/activity.db.test.ts', script: 'test:factory-activity-db' },
+  { marker: 'lib/factory/activity-artifacts.ts', file: 'lib/factory/activity-artifacts.db.test.ts', script: 'test:factory-activity-db' },
+  { marker: 'lib/factory/spec-artifact.ts', file: 'lib/factory/spec-artifact.db.test.ts', script: 'test:factory-activity-db' },
+  { marker: 'lib/factory/task-media.ts', file: 'lib/factory/task-media.db.test.ts', script: 'test:factory-activity-db' },
+  { marker: 'lib/cloud-computer/thread-machine-sessions.ts', file: 'lib/cloud-computer/thread-machine-sessions.db.test.ts', script: 'test:factory-activity-db' },
   { marker: 'lib/factory/background-workspace.ts', file: 'tests/factory-background-workspace.db.test.ts', script: 'test:visibility-db' },
   { marker: 'lib/factory/workspace-reader.ts', file: 'tests/factory-workspace-admission.db.test.ts', script: 'test:visibility-db' },
   { marker: 'lib/mobile-push.ts', file: 'tests/mobile-push-workspace.db.test.ts', script: 'test:visibility-db' },
