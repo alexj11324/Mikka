@@ -217,9 +217,12 @@ test('spec Artifact: real PG completion, immutable replay, concurrent writes and
     await t.test('historical repair pins current membership before APP locks and skips a revoked tenant', async () => {
       const historicalWorkspace = await seedFixtureWorkspace(pool, 'spec-owner', 'team');
       const pending = await fixture(historicalWorkspace);
-      await pool.query(`UPDATE factory_attempts SET status='passed',"finishedAt"=now() WHERE id=$1`, [pending.task.attemptId]);
+      // PostgreSQL retains microseconds, but the cursor is serialized to JS
+      // milliseconds. A historical fixture must sit strictly before its cutoff.
+      await pool.query(`UPDATE factory_attempts SET status='passed',"finishedAt"=clock_timestamp()-interval '1 second' WHERE id=$1`, [pending.task.attemptId]);
       const inspect = await backfillFactorySpecArtifacts(pool, store, 'spec-owner');
-      assert.ok(inspect.wouldCreate > 0);
+      assert.equal(inspect.scanned, 7, JSON.stringify(inspect));
+      assert.equal(inspect.wouldCreate, 1, JSON.stringify(inspect));
       await pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"='spec-owner'`, [historicalWorkspace]);
       try {
         const denied = await backfillFactorySpecArtifacts(pool, store, 'spec-owner', { dryRun: false, cursor: inspect.cursor });

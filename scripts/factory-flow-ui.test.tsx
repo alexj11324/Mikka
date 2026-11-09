@@ -31,7 +31,9 @@ mock.module('swr', { defaultExport: (key: string | null) => {
   if (key?.startsWith('/api/factory/tasks?issueId=')) return { data: { tasks: [task] }, isLoading: false, mutate: async () => undefined }
   return { data: undefined, mutate: async () => undefined }
 }, namedExports: { useSWRConfig: () => ({ mutate: async (key: string) => { reloaded.push(key) } }) } })
-mock.module('next-intl', { namedExports: { useTranslations: translationsFor, useFormatter: () => ({ dateTime: () => '' }) } })
+// The report's CI checks row reads the review summary (its own SWR and live keys); these tests cover the flow, not that row.
+mock.module(new URL('../hooks/code-review/use-review-summary.ts', import.meta.url).href, { namedExports: { useReviewSummary: () => ({ data: undefined }) } })
+mock.module('next-intl', { namedExports: { useTranslations: translationsFor, useFormatter: () => ({ dateTime: () => '', relativeTime: (at: Date, now: Date) => `${Math.round((now.getTime() - at.getTime()) / 3_600_000)} 小时前` }), useNow: () => new Date('2026-11-05T01:00:00.000Z') } })
 mock.module(new URL('../components/workspace/issue-thread-panel.tsx', import.meta.url).href, { namedExports: { IssueThreadPanel: () => null } })
 mock.module(new URL('../components/workspace/workspace-navigation.ts', import.meta.url).href, { namedExports: {
   navigate: (change: unknown) => { navigated.push(change) }, openArtifact: (id: string) => { navigated.push({ artifact: id }) },
@@ -214,6 +216,8 @@ test('handoff shows the report counts and opens the acceptance Artifact', async 
     acceptance: { artifactId: 'art-1', version: 2, runId: 'r', candidateId: 'c', counts: { passed: 4, unverified: 1, failed: 0 }, media: [] } })
   await render()
   assert.match(text(), /PR 待审/)
+  // How long it has waited for the person (decision 2026-11-04-2200, rule 7).
+  assert.match(text(), /1 小时前/)
   assert.match(text(), /4 项已验证/)
   assert.match(text(), /1 项未验证/)
   assert.doesNotMatch(text(), /项失败/)

@@ -58,6 +58,9 @@ before(async () => {
   process.env.GITHUB_WEBHOOK_SECRET = secret
   ;({ POST } = await import('../app/api/webhooks/github/route'))
   ;({ pool } = await import('../lib/db'))
+  // Factory's GitHub access module initializes auth during a merged-PR delivery.
+  // Finish that same instance's startup before counting per-delivery statements.
+  await (await import('../lib/auth')).auth.$context
 })
 
 /** Runs one signed delivery and its background work; returns the statements it sent. */

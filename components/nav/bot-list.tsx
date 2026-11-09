@@ -13,6 +13,7 @@ import { MikkaMark } from '@/components/brand/mikka-mark'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { NewGroupDialog } from './new-group-dialog'
+import { GroupPillAvatar } from './group-avatar'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar'
 import { WorkspaceMenu } from '@/components/workspace-menu'
@@ -191,7 +192,8 @@ function BotListBody({ bots, workspaceId, threads, issues, active, onOpen, onNew
             const { group } = row
             const title = group.title || i18nText('Nav.untitledConversation')
             return <Row key={group.id} name={title} label={title} current={active?.kind === 'group' && active.id === group.id} unread={unread(group.id)} onClick={() => choose({ kind: 'group', id: group.id, title: group.title, workspaceId: group.workspaceId })}
-              avatar={<span aria-hidden="true" className="flex size-8.5 items-center justify-center rounded-full bg-muted text-muted-foreground"><Users className="size-4" /></span>}
+              // The members' bloubs, as the group's own pill draws them (same members read, shared with the pill and 详情).
+              avatar={<span aria-hidden="true" className="flex size-8.5 items-center justify-center"><GroupPillAvatar id={group.id} title={title} /></span>}
               preview={previewOf(group.lastMessage?.body)} />
           }
           const { bot } = row
