@@ -1,0 +1,164 @@
+{
+  "schema": "issue1512.native-review-index.v1",
+  "frozenAt": "2026-11-09T01:15:16.587745+00:00",
+  "root": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/native-ae1504",
+  "workflowRunId": 42541312185,
+  "jobId": 128918612760,
+  "actualCheckout": "0041c6ab2a28b562deed9c692d8572ac4736f64e",
+  "tree": "8c5c12ea993533403d13e21dc75647bb28022767",
+  "nativeBudget": "GREEN 384<=402; pair1 168<=200",
+  "diagnostics": "incomplete, no measured query loss or overflow; explicit context/structure unknowns retained",
+  "productionAcceptedCases": 0,
+  "files": [
+    {
+      "path": "native-ae1504-source-and-artifacts.safe.json",
+      "bytes": 10618,
+      "sha256": "f2883f0f136fe82d312be622ddc397de10c610a7f174bf73cf7e038ebfb7b886",
+      "gitBlobSha": "060883e6a99ed0b484b5643b2105ca526cd189ce"
+    },
+    {
+      "path": "native-ae1504-diagnosis.safe.json",
+      "bytes": 132230,
+      "sha256": "46f21da85ef40b6a24c314c3929a9e2f59d4e52ed045581dc1120586560dcc7c",
+      "gitBlobSha": "2a0a7bae90a389db8eee095ea7cffd44276922af"
+    },
+    {
+      "path": "native-ae1504-cleanup.safe.json",
+      "bytes": 7806,
+      "sha256": "b62b54b980a28baa9c7cee0c810aa9ceae981b60d9a99952907829debc7aa235",
+      "gitBlobSha": "458bca645756517a6ef1b8732f522999856a6544"
+    },
+    {
+      "path": "native-ae1504-original-file-hashes.json",
+      "bytes": 112265,
+      "sha256": "d69a2897be9040ac07d9ee59c137b2f72a48f3eccb64205cc6771c89470b339d",
+      "gitBlobSha": "546e5805e29d946159daa79787aad9cbee004fc8"
+    },
+    {
+      "path": "original-archives-and-files.safe.json",
+      "bytes": 111193,
+      "sha256": "c4e00a8028aa0695c7d4b8f0a61634d579aa34fc408367d38b224bf675c1103b",
+      "gitBlobSha": "fcf53e2b7585f6520e10147de5512ef49eae1ccd"
+    },
+    {
+      "path": "independent-arithmetic.safe.json",
+      "bytes": 4825,
+      "sha256": "4e81356bc3029f2ec92d559a660352862c98a0b7c78bd7586a24056e293d0782",
+      "gitBlobSha": "7230cdfaf98416564a3de028ffe1461d1f30d3af"
+    },
+    {
+      "path": "diagnostics-reconciliation.safe.json",
+      "bytes": 113583,
+      "sha256": "d563eabd38a7e97f395878361c07f042b9d4aff23ebb156212355a040d5eea75",
+      "gitBlobSha": "ecb543d4a9ad820c715ce2780c370987e7b9aa31"
+    },
+    {
+      "path": "root-arithmetic.safe.json",
+      "bytes": 2817,
+      "sha256": "b8f359374a74cc9e527ef34b5ad39cd0922c72ffe8f07d696ab9771de631e746",
+      "gitBlobSha": "46bc8ad3913ed025e0dc269bdc58695ff6bacd86"
+    },
+    {
+      "path": "verify_native.py",
+      "bytes": 12194,
+      "sha256": "08946a522243eee358e802bbfd4ef3e70a99c3b0b801e25e8f8d5b3025c8e18d",
+      "gitBlobSha": "89eb17161df62fe2eb9f581ed29c5264d93cb04c"
+    },
+    {
+      "path": "verify_diagnostics.py",
+      "bytes": 11858,
+      "sha256": "8e6a3e58b596f6602083dab58bbc779739bcf12ccdd7e4d5a107efd48367ab89",
+      "gitBlobSha": "a1353262827af1687e2bd589c61ca64e4c2b94c8"
+    },
+    {
+      "path": "query-labels.json",
+      "bytes": 3178,
+      "sha256": "353e3e28d4db9ec946dae81822c7727b275e33ff406d0d81a50a8b172ad26214",
+      "gitBlobSha": "48c0aed38d68d5b77d34ffd1cb4310e01a18b165"
+    },
+    {
+      "path": "source-preparation.safe.json",
+      "bytes": 2254,
+      "sha256": "742c853bd63cab31df869445b355fa94513c089ae8ba880d6da2faf5dc1a1b7a",
+      "gitBlobSha": "f7c49cd4d3267ede89c7f7d7927ec6466372f717"
+    },
+    {
+      "path": "native-ae1504-original/lifecycle.json",
+      "bytes": 685774,
+      "sha256": "db7306abb7a789442300d2098bb211789a7424a432adce68c7637fad6ed31b05",
+      "gitBlobSha": "1c547b66b0c5bf1e32d22342109cd04fd308756a"
+    },
+    {
+      "path": "native-ae1504-original/smoke.json",
+      "bytes": 3105,
+      "sha256": "72365480ac6ecfa0156e80cb53d7e4334bc5ec1020c5d359a04367114a7795f2",
+      "gitBlobSha": "e3989539bcd2ee20d896d921e7a0af81b71f93dc"
+    },
+    {
+      "path": "native-ae1504-original/parity/parity.json",
+      "bytes": 107161,
+      "sha256": "633503b93911968f5e2064de5dd6342afd1daa5651343796c4288f0f6c5f427d",
+      "gitBlobSha": "a5e76ce5a2a2b9fc6320a7e722bbf6bebdf501de"
+    },
+    {
+      "path": "package-ae1504-original/mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "7f2f9c79d9aaecb9d0592e1baafa66ac9e4475185950ec6359fdcadfbcd94399",
+      "gitBlobSha": "8609b983f8e0a8f6cee22d809dd3ee14464748bb"
+    },
+    {
+      "path": "package-ae1504-original/native-crypto.json",
+      "bytes": 2868,
+      "sha256": "b5e35ab5acfae21024dde1db46208becfa8ad1ce05ceb313d65220b3b51fe4c8",
+      "gitBlobSha": "39321eb4b2a2304ff1b576d680a0b6dd376f8797"
+    },
+    {
+      "path": "published-commit.original-metadata.json",
+      "bytes": 1154,
+      "sha256": "9e28605315cd9635fac6054b5e06f9cfbd9ec82bb4edeabb653e32298c7b4264",
+      "gitBlobSha": "577246029f122cf0f24218561c7359bdf9ce5182"
+    },
+    {
+      "path": "native-ae1504-actual-git-object.original-metadata.json",
+      "bytes": 2608,
+      "sha256": "168c663d8f8ded404ba19e84aa7d877a9a2a88869d3e4272e16d98e72fba5b3e",
+      "gitBlobSha": "58235c2e2595bf2da975f8c3368325304a3e8e41"
+    },
+    {
+      "path": "native-ae1504-terminal-job.original-metadata.json",
+      "bytes": 7458,
+      "sha256": "858cd1bdfdcbd3e4a2230715859df90d51df33836bcc9a03f82b458579a504b6",
+      "gitBlobSha": "4ff5c43480b1611027d22d5fb88574d4d1c5383c"
+    },
+    {
+      "path": "native-ae1504-artifacts.original-metadata.json",
+      "bytes": 7755,
+      "sha256": "ff2d182bc11d81d855c18f97a40a069ac875ad73a39b27a43656d4122bc90014",
+      "gitBlobSha": "426617d9bfb1e546d3796fa5a8e8e663f65c7a36"
+    }
+  ],
+  "localOnlyOriginals": [
+    {
+      "path": "native-ae1504-original.zip",
+      "bytes": 14823922,
+      "sha256": "037efc696d2e67e2d93e25e3fe5d5e674906eb9ad6386214f9f469e96f649896",
+      "gitBlobSha": "74fe285563e56cd6e78a3e243ef78a034f59c1e8"
+    },
+    {
+      "path": "package-ae1504-original.zip",
+      "bytes": 1593,
+      "sha256": "f35f1309c8388498b9451a52df59f036578734166c80c576969e01ea38c5860f",
+      "gitBlobSha": "8f7f77ce6703a22337786ec64d01abc011b15fd7"
+    },
+    {
+      "path": "native-ae1504-job.original.log",
+      "bytes": 248378,
+      "sha256": "2a5fe7b8d0cb9d36862e3ae56a1520e45b7a86f0d42aa5d439294c0fedceb609",
+      "gitBlobSha": "a26aca626998696ec720db6896006fd18138bb73"
+    }
+  ],
+  "imageFiles": 305,
+  "originalFiles": 310,
+  "privateContentReviewOwner": "/root/current_source_review preparing checkpoint14; reviewer has not visually reviewed or authorized publication of screenshots/raw log.",
+  "resourcesActive": 0
+}

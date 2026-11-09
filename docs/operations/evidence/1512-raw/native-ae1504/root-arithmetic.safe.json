@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "verifiedAt": "2026-11-09T01:08:44.322617+00:00",
+  "method": "Direct Python recomputation from original lifecycle checkpoints; no agent summary totals used as inputs",
+  "lifecycleSha256": "db7306abb7a789442300d2098bb211789a7424a432adce68c7637fad6ed31b05",
+  "sourceCheckout": "0041c6ab2a28b562deed9c692d8572ac4736f64e",
+  "sourceTree": "8c5c12ea993533403d13e21dc75647bb28022767",
+  "windows": {
+    "webLogin": {
+      "sql": 402,
+      "segments": [
+        19,
+        0,
+        383
+      ],
+      "protocolReceiveBytes": 84812,
+      "protocolSendBytes": 255806,
+      "startedAt": "2026-11-09T01:02:03.271Z",
+      "finishedAt": "2026-11-09T01:02:06.515Z",
+      "unknownDelta": 0,
+      "otherScopedDelta": 0,
+      "noScopeDelta": 0
+    },
+    "nativeLogin": {
+      "sql": 384,
+      "segments": [
+        19,
+        13,
+        352
+      ],
+      "protocolReceiveBytes": 82767,
+      "protocolSendBytes": 261154,
+      "startedAt": "2026-11-09T01:02:07.925Z",
+      "finishedAt": "2026-11-09T01:02:15.781Z",
+      "unknownDelta": 0,
+      "otherScopedDelta": 0,
+      "noScopeDelta": 0
+    },
+    "startup-bundled": {
+      "sql": 168,
+      "segments": [
+        168
+      ],
+      "protocolReceiveBytes": 37277,
+      "protocolSendBytes": 118452,
+      "startedAt": "2026-11-09T01:02:31.530Z",
+      "finishedAt": "2026-11-09T01:02:33.655Z",
+      "unknownDelta": 0,
+      "otherScopedDelta": 0,
+      "noScopeDelta": 0
+    },
+    "startup-hosted": {
+      "sql": 200,
+      "segments": [
+        200
+      ],
+      "protocolReceiveBytes": 46238,
+      "protocolSendBytes": 163419,
+      "startedAt": "2026-11-09T01:02:34.486Z",
+      "finishedAt": "2026-11-09T01:02:36.976Z",
+      "unknownDelta": 0,
+      "otherScopedDelta": 0,
+      "noScopeDelta": 0
+    }
+  },
+  "recordCount": 24,
+  "checkpoints": 12,
+  "segments": 8,
+  "counterIdentity": [
+    28464,
+    1794185727149,
+    "nitro"
+  ],
+  "allBucketAndDifferenceChecksPassed": true,
+  "loginBudgetPassed": true,
+  "firstStartupBudgetPassed": true,
+  "originalCommonAuthAndPkcePreserved": true,
+  "backgroundRule": "all concurrent primary API background traffic is included; no guessed subtraction or per-request attribution",
+  "originalExclusions": [
+    "test-account lease/session tracking and fixture SQL in the separate harness process",
+    "PostgreSQL connection handshake and TCP/TLS overhead"
+  ],
+  "lifecycleCleanupPassed": true,
+  "accountBaselinesBefore": {
+    "owner": false,
+    "peer": false
+  },
+  "accountBaselinesAfter": {
+    "owner": true,
+    "peer": true
+  },
+  "boundary": "This verifies relative SQL budgets for this original same-source workload. Native functional/package details and new query diagnostics use their separate receipts. No production model or backend telemetry acceptance claim."
+}

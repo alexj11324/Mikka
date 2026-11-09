@@ -1,0 +1,236 @@
+{
+  "id": 128918612760,
+  "run_id": 42541312185,
+  "workflow_name": "CI",
+  "head_branch": "test/1512-native-query-sources-78-20261107",
+  "run_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42541312185",
+  "run_attempt": 1,
+  "node_id": "CR_kwDOVRYxA88AAAAeBCXrGA",
+  "head_sha": "ae1504f1bb266ae3f7b6612898f134dd979f5fdd",
+  "url": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/128918612760",
+  "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42541312185/job/128918612760",
+  "status": "completed",
+  "conclusion": "success",
+  "created_at": "2026-11-09T00:46:01Z",
+  "started_at": "2026-11-09T00:46:03Z",
+  "completed_at": "2026-11-09T01:03:27Z",
+  "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+  "steps": [
+    {
+      "name": "Set up job",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 1,
+      "started_at": "2026-11-09T00:46:04Z",
+      "completed_at": "2026-11-09T00:46:06Z"
+    },
+    {
+      "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 2,
+      "started_at": "2026-11-09T00:46:06Z",
+      "completed_at": "2026-11-09T00:46:13Z"
+    },
+    {
+      "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 3,
+      "started_at": "2026-11-09T00:46:13Z",
+      "completed_at": "2026-11-09T00:46:15Z"
+    },
+    {
+      "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 4,
+      "started_at": "2026-11-09T00:46:15Z",
+      "completed_at": "2026-11-09T00:47:13Z"
+    },
+    {
+      "name": "Run test \"$(uname -m)\" = arm64",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 5,
+      "started_at": "2026-11-09T00:47:13Z",
+      "completed_at": "2026-11-09T00:47:13Z"
+    },
+    {
+      "name": "Run pnpm install --frozen-lockfile",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 6,
+      "started_at": "2026-11-09T00:47:13Z",
+      "completed_at": "2026-11-09T00:49:24Z"
+    },
+    {
+      "name": "Keep setup-node 24 in the native installer login shell",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 7,
+      "started_at": "2026-11-09T00:49:24Z",
+      "completed_at": "2026-11-09T00:49:26Z"
+    },
+    {
+      "name": "Prepare the pinned native Electron and builder checksum cache",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 8,
+      "started_at": "2026-11-09T00:49:26Z",
+      "completed_at": "2026-11-09T00:49:30Z"
+    },
+    {
+      "name": "Run pnpm exec playwright install chromium",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 9,
+      "started_at": "2026-11-09T00:49:30Z",
+      "completed_at": "2026-11-09T00:49:42Z"
+    },
+    {
+      "name": "Start an independent local PostgreSQL",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 10,
+      "started_at": "2026-11-09T00:49:42Z",
+      "completed_at": "2026-11-09T00:50:04Z"
+    },
+    {
+      "name": "Generate ephemeral test-only auth secret",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 11,
+      "started_at": "2026-11-09T00:50:04Z",
+      "completed_at": "2026-11-09T00:50:04Z"
+    },
+    {
+      "name": "Run pnpm migrate && pnpm test:e2e:setup",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 12,
+      "started_at": "2026-11-09T00:50:04Z",
+      "completed_at": "2026-11-09T00:50:09Z"
+    },
+    {
+      "name": "Build the production API for the native ARM64 runtime",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 13,
+      "started_at": "2026-11-09T00:50:09Z",
+      "completed_at": "2026-11-09T00:54:05Z"
+    },
+    {
+      "name": "Select Xcode 26",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 14,
+      "started_at": "2026-11-09T00:54:05Z",
+      "completed_at": "2026-11-09T00:54:06Z"
+    },
+    {
+      "name": "Package an inspector-enabled harness input",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 15,
+      "started_at": "2026-11-09T00:54:06Z",
+      "completed_at": "2026-11-09T00:55:15Z"
+    },
+    {
+      "name": "Real Keychain encryption across three independent packaged processes",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 16,
+      "started_at": "2026-11-09T00:55:15Z",
+      "completed_at": "2026-11-09T00:55:24Z"
+    },
+    {
+      "name": "Real packaged Apple Silicon native acceptance",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 17,
+      "started_at": "2026-11-09T00:55:24Z",
+      "completed_at": "2026-11-09T01:03:18Z"
+    },
+    {
+      "name": "Keep final package integrity evidence",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 18,
+      "started_at": "2026-11-09T01:03:18Z",
+      "completed_at": "2026-11-09T01:03:18Z"
+    },
+    {
+      "name": "Audit closed package and crypto reports",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 19,
+      "started_at": "2026-11-09T01:03:18Z",
+      "completed_at": "2026-11-09T01:03:18Z"
+    },
+    {
+      "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 20,
+      "started_at": "2026-11-09T01:03:18Z",
+      "completed_at": "2026-11-09T01:03:19Z"
+    },
+    {
+      "name": "Audit native evidence",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 21,
+      "started_at": "2026-11-09T01:03:19Z",
+      "completed_at": "2026-11-09T01:03:20Z"
+    },
+    {
+      "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 22,
+      "started_at": "2026-11-09T01:03:20Z",
+      "completed_at": "2026-11-09T01:03:22Z"
+    },
+    {
+      "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 42,
+      "started_at": "2026-11-09T01:03:22Z",
+      "completed_at": "2026-11-09T01:03:22Z"
+    },
+    {
+      "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 43,
+      "started_at": "2026-11-09T01:03:22Z",
+      "completed_at": "2026-11-09T01:03:22Z"
+    },
+    {
+      "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 44,
+      "started_at": "2026-11-09T01:03:22Z",
+      "completed_at": "2026-11-09T01:03:22Z"
+    },
+    {
+      "name": "Complete job",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 45,
+      "started_at": "2026-11-09T01:03:22Z",
+      "completed_at": "2026-11-09T01:03:26Z"
+    }
+  ],
+  "check_run_url": "https://api.github.com/repos/alexj11324/Mikka/check-runs/128918612760",
+  "labels": [
+    "macos-26"
+  ],
+  "runner_id": 1000233166,
+  "runner_name": "GitHub Actions 1000233166",
+  "runner_group_id": 0,
+  "runner_group_name": "GitHub Actions"
+}

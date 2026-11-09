@@ -1,0 +1,50 @@
+{
+  "schema": "issue1512.native-commit-metadata-public-projection.v1",
+  "createdAt": "2026-11-09T01:22:50.219672+00:00",
+  "method": "Closed projection from the two locally retained original GitHub responses. No new query or Git operation.",
+  "omittedFields": [
+    "author",
+    "committer",
+    "message",
+    "verification.signature",
+    "verification.payload",
+    "other unneeded metadata"
+  ],
+  "omissionReason": "Author/committer email metadata and its signed-payload repetition are not republished in this checkpoint. Values are neither reproduced nor replaced inside the local originals.",
+  "boundary": "This derived projection binds the observed commit/tree/parent facts and original response hashes; it is not the complete signed Git object or an independently revalidated signature.",
+  "records": [
+    {
+      "original": {
+        "path": "native-ae1504-actual-git-object.original-metadata.json",
+        "bytes": 2608,
+        "sha256": "168c663d8f8ded404ba19e84aa7d877a9a2a88869d3e4272e16d98e72fba5b3e",
+        "gitBlobSha": "58235c2e2595bf2da975f8c3368325304a3e8e41"
+      },
+      "originalIncludedInCheckpoint": false,
+      "commit": "0041c6ab2a28b562deed9c692d8572ac4736f64e",
+      "tree": "8c5c12ea993533403d13e21dc75647bb28022767",
+      "parents": [
+        "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+        "ae1504f1bb266ae3f7b6612898f134dd979f5fdd"
+      ],
+      "githubUrl": "https://github.com/alexj11324/Mikka/commit/0041c6ab2a28b562deed9c692d8572ac4736f64e",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/git/commits/0041c6ab2a28b562deed9c692d8572ac4736f64e"
+    },
+    {
+      "original": {
+        "path": "published-commit.original-metadata.json",
+        "bytes": 1154,
+        "sha256": "9e28605315cd9635fac6054b5e06f9cfbd9ec82bb4edeabb653e32298c7b4264",
+        "gitBlobSha": "577246029f122cf0f24218561c7359bdf9ce5182"
+      },
+      "originalIncludedInCheckpoint": false,
+      "commit": "ae1504f1bb266ae3f7b6612898f134dd979f5fdd",
+      "tree": "8c5c12ea993533403d13e21dc75647bb28022767",
+      "parents": [
+        "3ffa641c6eaade5d968475795d7221c99ed393a6"
+      ],
+      "githubUrl": "https://github.com/alexj11324/Mikka/commit/ae1504f1bb266ae3f7b6612898f134dd979f5fdd",
+      "apiUrl": "https://api.github.com/repos/alexj11324/Mikka/git/commits/ae1504f1bb266ae3f7b6612898f134dd979f5fdd"
+    }
+  ]
+}

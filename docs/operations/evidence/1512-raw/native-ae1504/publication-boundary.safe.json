@@ -1,0 +1,179 @@
+{
+  "schema": "issue1512.checkpoint14-publication-boundary.v1",
+  "createdAt": "2026-11-09T01:22:50.219672+00:00",
+  "decision": "publish_closed_payload_only",
+  "sourceReviewIndex": {
+    "path": "native-ae1504-review-index.safe.json",
+    "bytes": 6473,
+    "sha256": "7a78c4cb1d97c4bcd9810d05af7e48005624eb645e272c93883b82939477afd7",
+    "gitBlobSha": "718f896e04c3513772d2a1f0eb40790bcdff44d0"
+  },
+  "screening": {
+    "filesScreened": 22,
+    "bytesScreened": 1350134,
+    "stringLeavesScreened": 10727,
+    "categories": [
+      "private_key",
+      "github_token",
+      "posthog_key",
+      "aws_access_key",
+      "jwt",
+      "bearer_material",
+      "url_userinfo",
+      "email"
+    ],
+    "credentialPatternMatches": 0,
+    "emailMatches": 6,
+    "emailContainingFiles": 2,
+    "emailDisposition": "Both original metadata files withheld; closed commit/tree/parent projections supplied. Signed-payload matches equal the corresponding original author/committer fields. No matched email values appear in this receipt.",
+    "emailLocations": [
+      {
+        "path": "published-commit.original-metadata.json",
+        "location": "$.author.email",
+        "count": 1
+      },
+      {
+        "path": "published-commit.original-metadata.json",
+        "location": "$.committer.email",
+        "count": 1
+      },
+      {
+        "path": "native-ae1504-actual-git-object.original-metadata.json",
+        "location": "$.author.email",
+        "count": 1
+      },
+      {
+        "path": "native-ae1504-actual-git-object.original-metadata.json",
+        "location": "$.committer.email",
+        "count": 1
+      },
+      {
+        "path": "native-ae1504-actual-git-object.original-metadata.json",
+        "location": "$.verification.payload",
+        "count": 2
+      }
+    ],
+    "sensitiveNamedFields": [
+      {
+        "path": "native-ae1504-original/lifecycle.json",
+        "jsonLocation": "$.nativeSetup[0].environment.files[\"daemon.secret\"]",
+        "classification": "fixed_file_type_label",
+        "containsFileContent": false
+      },
+      {
+        "path": "native-ae1504-original/lifecycle.json",
+        "jsonLocation": "$.nativeSetup[1].environment.files[\"daemon.secret\"]",
+        "classification": "fixed_file_type_label",
+        "containsFileContent": false
+      },
+      {
+        "path": "native-ae1504-original/parity/parity.json",
+        "jsonLocation": "$.nativeDeviceChecks[0].environment.files[\"daemon.secret\"]",
+        "classification": "fixed_file_type_label",
+        "containsFileContent": false
+      },
+      {
+        "path": "native-ae1504-original/parity/parity.json",
+        "jsonLocation": "$.nativeDeviceChecks[1].environment.files[\"daemon.secret\"]",
+        "classification": "fixed_file_type_label",
+        "containsFileContent": false
+      }
+    ],
+    "fieldSourceProof": {
+      "tree": "8c5c12ea993533403d13e21dc75647bb28022767",
+      "path": "apps/desktop/test/native-device-ready.mjs",
+      "bytes": 10502,
+      "sha256": "9b7c98ce34e617d324a28f99fe24eb43700b9e999c21bcfa6a88699df5e53264",
+      "method": "nativeDeviceEnvironment uses fs.lstat and a closed file/directory/socket/symlink/other/absent/unreadable label; file bytes are not read for daemon.secret."
+    },
+    "boundary": "Local structured-field review plus credential-pattern screening. This is not a proof against arbitrary unrecognized secrets. Artifact JSON is not assumed to receive GitHub log masking. Full job log and image contents were not reviewed for publication."
+  },
+  "preservation": {
+    "originalJsonFiles": 5,
+    "originalJsonBytes": 799865,
+    "exactCopiedFrozenFiles": 20,
+    "exactCopiedFrozenBytes": 1346372,
+    "originalFileIndexEntries": 310,
+    "originalJsonEntries": 5,
+    "originalPngEntries": 305,
+    "originalJsonBytesUnmodified": true,
+    "existingReceiptsUnmodified": true,
+    "rootAndAgentArithmeticRetained": true,
+    "originalWindowRecordsRetained": true,
+    "beforeBaselineFalseRetained": true,
+    "diagnosticUnknownsRetained": true
+  },
+  "excludedLocalOriginals": [
+    {
+      "path": "native-ae1504-original.zip",
+      "bytes": 14823922,
+      "sha256": "037efc696d2e67e2d93e25e3fe5d5e674906eb9ad6386214f9f469e96f649896",
+      "gitBlobSha": "74fe285563e56cd6e78a3e243ef78a034f59c1e8"
+    },
+    {
+      "path": "package-ae1504-original.zip",
+      "bytes": 1593,
+      "sha256": "f35f1309c8388498b9451a52df59f036578734166c80c576969e01ea38c5860f",
+      "gitBlobSha": "8f7f77ce6703a22337786ec64d01abc011b15fd7"
+    },
+    {
+      "path": "native-ae1504-job.original.log",
+      "bytes": 248378,
+      "sha256": "2a5fe7b8d0cb9d36862e3ae56a1520e45b7a86f0d42aa5d439294c0fedceb609",
+      "gitBlobSha": "a26aca626998696ec720db6896006fd18138bb73"
+    },
+    {
+      "path": "native-ae1504-actual-git-object.original-metadata.json",
+      "bytes": 2608,
+      "sha256": "168c663d8f8ded404ba19e84aa7d877a9a2a88869d3e4272e16d98e72fba5b3e",
+      "gitBlobSha": "58235c2e2595bf2da975f8c3368325304a3e8e41"
+    },
+    {
+      "path": "published-commit.original-metadata.json",
+      "bytes": 1154,
+      "sha256": "9e28605315cd9635fac6054b5e06f9cfbd9ec82bb4edeabb653e32298c7b4264",
+      "gitBlobSha": "577246029f122cf0f24218561c7359bdf9ce5182"
+    }
+  ],
+  "omittedImages": {
+    "count": 305,
+    "pathHashIndexIncluded": "native-ae1504-original-file-hashes.json",
+    "contentsIncluded": false,
+    "visuallyReviewedForPublication": false
+  },
+  "necessaryJobEvidence": {
+    "sourceReceipt": "native-ae1504-source-and-artifacts.safe.json",
+    "cleanupReceipt": "native-ae1504-cleanup.safe.json",
+    "method": "Already frozen closed necessary excerpts and original job-log hash. Full raw or compressed log is excluded."
+  },
+  "acceptanceBoundary": {
+    "nativeBudgetPassed": true,
+    "productionAcceptanceEstablishedByThisCheckpoint": false,
+    "allOriginalsArchived": false,
+    "queryDiagnosticStatus": "incomplete",
+    "unknownContextQueries": 239,
+    "unknownStatementQueries": 405,
+    "droppedMeasuredQueries": 0,
+    "overflow": false,
+    "unknownCounterProtocolDeltaIsDistinctFromDiagnosticUnknown": true,
+    "accountBaselinesBefore": {
+      "owner": false,
+      "peer": false
+    },
+    "accountBaselinesAfter": {
+      "owner": true,
+      "peer": true
+    },
+    "postgresServerStopIndependentlyObserved": false
+  },
+  "execution": {
+    "networkRequests": 0,
+    "newNativeRuns": 0,
+    "modelRuns": 0,
+    "workflowMutations": 0,
+    "sourceMutations": 0,
+    "gitIndexMutations": 0,
+    "newCloudResources": 0,
+    "activeOwnedProcessesAtFreeze": 0
+  }
+}

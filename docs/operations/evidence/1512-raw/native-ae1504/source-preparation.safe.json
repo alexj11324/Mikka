@@ -1,0 +1,60 @@
+{
+  "createdAt": "2026-11-09T00:42:10.331006+00:00",
+  "publishedHead": "ae1504f1bb266ae3f7b6612898f134dd979f5fdd",
+  "publishedTree": "8c5c12ea993533403d13e21dc75647bb28022767",
+  "workflowRunId": 42541312185,
+  "actualCheckout": "not yet observed; do not substitute published head for eventual PR merge checkout",
+  "sourceFiles": [
+    {
+      "path": "apps/desktop/test/db-query-operations.cjs",
+      "bytes": 529,
+      "sha256": "03632f635faceb39a1e764f5680680d0829ce98635e17d49276957a684e9d575"
+    },
+    {
+      "path": "apps/desktop/test/db-query-unattributed-sources.cjs",
+      "bytes": 2773,
+      "sha256": "2c6df289f057c4bb63acd4bc2eac33233c785ab57e152e3484bcffbf0065dc5c"
+    },
+    {
+      "path": "apps/desktop/test/db-query-diagnostics.cjs",
+      "bytes": 18406,
+      "sha256": "763d180bfc0d0a62e67a99624a4815eeca953bbcb7290193a5515bb67e24ccad"
+    },
+    {
+      "path": "apps/desktop/test/db-metrics.cjs",
+      "bytes": 8890,
+      "sha256": "814aa821cdc111c25f4632df5c2fa6abcbe2fa725f23a2ce4a397493f2a5e491"
+    },
+    {
+      "path": "apps/desktop/test/lifecycle-query-counts.mjs",
+      "bytes": 23696,
+      "sha256": "564706188c1b96bc9d9ebadb01bab5be4bc03cd0920131ecda0185b6e07fda7f"
+    },
+    {
+      "path": "apps/desktop/test/lifecycle.mjs",
+      "bytes": 33181,
+      "sha256": "45a0f56985f256f5f392ad015e0c4442a784e1b9ff1ebd8703829ecc61152a77"
+    },
+    {
+      "path": ".github/workflows/desktop.yml",
+      "bytes": 14422,
+      "sha256": "17c5837075328e66c7236cb9533602107b1317b8a21ae862e923492669f25977"
+    }
+  ],
+  "sourceReadMethod": "Read existing local final tree; published commit itself was not a local Git object. Remote commit metadata retained separately.",
+  "reusedVerificationScript": {
+    "source": "../native4a07/verify_native.py",
+    "bytes": 12194,
+    "sha256": "08946a522243eee358e802bbfd4ef3e70a99c3b0b801e25e8f8d5b3025c8e18d",
+    "byteForByteCopy": true,
+    "executed": false
+  },
+  "labels": {
+    "operations": 17,
+    "sources": 78,
+    "sameAsPreviousClosedLabels": true,
+    "sha256": "353e3e28d4db9ec946dae81822c7727b275e33ff406d0d81a50a8b172ad26214"
+  },
+  "measurementState": "No new terminal Native artifact observed; no current SQL values inferred.",
+  "resourcesStarted": 0
+}

@@ -1,0 +1,175 @@
+{
+  "artifacts": [
+    {
+      "id": 13642656100,
+      "name": "desktop-package-evidence-0041c6ab2a28b562deed9c692d8572ac4736f64e",
+      "size_in_bytes": 1593,
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13642656100",
+      "archive_download_url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13642656100/zip",
+      "expired": false,
+      "created_at": "2026-11-09T01:03:19Z",
+      "expires_at": "2026-11-16T01:03:19Z",
+      "updated_at": "2026-11-09T01:03:19Z",
+      "digest": "sha256:f35f1309c8388498b9451a52df59f036578734166c80c576969e01ea38c5860f",
+      "workflow_run": {
+        "id": 42541312185,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "test/1512-native-query-sources-78-20261107",
+        "head_sha": "ae1504f1bb266ae3f7b6612898f134dd979f5fdd"
+      }
+    },
+    {
+      "id": 13642281000,
+      "name": "self-hosted-services-0041c6ab2a28b562deed9c692d8572ac4736f64e",
+      "size_in_bytes": 71461,
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13642281000",
+      "archive_download_url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13642281000/zip",
+      "expired": false,
+      "created_at": "2026-11-09T00:54:58Z",
+      "expires_at": "2026-11-23T00:54:57Z",
+      "updated_at": "2026-11-09T00:54:58Z",
+      "digest": "sha256:83c66bc8ce63e00f6fa2d79f84fea5729612b0563fb18537179bea9e3f5179b4",
+      "workflow_run": {
+        "id": 42541312185,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "test/1512-native-query-sources-78-20261107",
+        "head_sha": "ae1504f1bb266ae3f7b6612898f134dd979f5fdd"
+      }
+    },
+    {
+      "id": 13641915845,
+      "name": "desktop-api-build-0041c6ab2a28b562deed9c692d8572ac4736f64e",
+      "size_in_bytes": 48255910,
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13641915845",
+      "archive_download_url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13641915845/zip",
+      "expired": false,
+      "created_at": "2026-11-09T00:44:58Z",
+      "expires_at": "2026-11-11T00:44:55Z",
+      "updated_at": "2026-11-09T00:44:58Z",
+      "digest": "sha256:c652693e6e5e7520b72a28e944158034c7302b7d4c570dc2d4f7cb62fee12266",
+      "workflow_run": {
+        "id": 42541312185,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "test/1512-native-query-sources-78-20261107",
+        "head_sha": "ae1504f1bb266ae3f7b6612898f134dd979f5fdd"
+      }
+    },
+    {
+      "id": 13641889747,
+      "name": "desktop-native-evidence-0041c6ab2a28b562deed9c692d8572ac4736f64e",
+      "size_in_bytes": 14823922,
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13641889747",
+      "archive_download_url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13641889747/zip",
+      "expired": false,
+      "created_at": "2026-11-09T01:03:21Z",
+      "expires_at": "2026-11-16T01:03:20Z",
+      "updated_at": "2026-11-09T01:03:21Z",
+      "digest": "sha256:037efc696d2e67e2d93e25e3fe5d5e674906eb9ad6386214f9f469e96f649896",
+      "workflow_run": {
+        "id": 42541312185,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "test/1512-native-query-sources-78-20261107",
+        "head_sha": "ae1504f1bb266ae3f7b6612898f134dd979f5fdd"
+      }
+    },
+    {
+      "id": 13641830731,
+      "name": "desktop-icon",
+      "size_in_bytes": 1753546,
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13641830731",
+      "archive_download_url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13641830731/zip",
+      "expired": false,
+      "created_at": "2026-11-09T00:40:59Z",
+      "expires_at": "2026-11-16T00:40:57Z",
+      "updated_at": "2026-11-09T00:40:59Z",
+      "digest": "sha256:2f40d1d5de79e1da4296a500da1f2b2c98586b4ab7c1f9516522172e6ce921a4",
+      "workflow_run": {
+        "id": 42541312185,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "test/1512-native-query-sources-78-20261107",
+        "head_sha": "ae1504f1bb266ae3f7b6612898f134dd979f5fdd"
+      }
+    },
+    {
+      "id": 13641497840,
+      "name": "pr13-cli-diagnostics-0041c6ab2a28b562deed9c692d8572ac4736f64e",
+      "size_in_bytes": 70510,
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13641497840",
+      "archive_download_url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13641497840/zip",
+      "expired": false,
+      "created_at": "2026-11-09T00:42:44Z",
+      "expires_at": "2027-02-07T00:38:47Z",
+      "updated_at": "2026-11-09T00:42:44Z",
+      "digest": "sha256:e0c5995ca626d0e3b1e903592b82e1bcbea6e3fb3d0e775650d68a9ce1744a28",
+      "workflow_run": {
+        "id": 42541312185,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "test/1512-native-query-sources-78-20261107",
+        "head_sha": "ae1504f1bb266ae3f7b6612898f134dd979f5fdd"
+      }
+    },
+    {
+      "id": 13641408325,
+      "name": "pr13-http-cli-approval-0041c6ab2a28b562deed9c692d8572ac4736f64e-1",
+      "size_in_bytes": 2414,
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13641408325",
+      "archive_download_url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13641408325/zip",
+      "expired": false,
+      "created_at": "2026-11-09T00:43:21Z",
+      "expires_at": "2027-02-07T00:38:47Z",
+      "updated_at": "2026-11-09T00:43:21Z",
+      "digest": "sha256:89f0dc1f62d2d26b50e10918a7d021bd2171cc937f9bcf98a750f5c21314f275",
+      "workflow_run": {
+        "id": 42541312185,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "test/1512-native-query-sources-78-20261107",
+        "head_sha": "ae1504f1bb266ae3f7b6612898f134dd979f5fdd"
+      }
+    },
+    {
+      "id": 13641124959,
+      "name": "desktop-smoke-0041c6ab2a28b562deed9c692d8572ac4736f64e",
+      "size_in_bytes": 98770,
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13641124959",
+      "archive_download_url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13641124959/zip",
+      "expired": false,
+      "created_at": "2026-11-09T00:45:56Z",
+      "expires_at": "2026-11-16T00:45:55Z",
+      "updated_at": "2026-11-09T00:45:56Z",
+      "digest": "sha256:196c1f1afdbe791824110bd3403be1dda3c03d417d2d736d736b46c6e8e71368",
+      "workflow_run": {
+        "id": 42541312185,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "test/1512-native-query-sources-78-20261107",
+        "head_sha": "ae1504f1bb266ae3f7b6612898f134dd979f5fdd"
+      }
+    },
+    {
+      "id": 13640784323,
+      "name": "ui-policy-audit",
+      "size_in_bytes": 231,
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13640784323",
+      "archive_download_url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13640784323/zip",
+      "expired": false,
+      "created_at": "2026-11-09T00:42:53Z",
+      "expires_at": "2027-02-07T00:38:47Z",
+      "updated_at": "2026-11-09T00:42:53Z",
+      "digest": "sha256:bf72a91cc8216ea786ffa592b451ec80a78aeae07c98a84069f75e3f30119c72",
+      "workflow_run": {
+        "id": 42541312185,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "test/1512-native-query-sources-78-20261107",
+        "head_sha": "ae1504f1bb266ae3f7b6612898f134dd979f5fdd"
+      }
+    }
+  ]
+}

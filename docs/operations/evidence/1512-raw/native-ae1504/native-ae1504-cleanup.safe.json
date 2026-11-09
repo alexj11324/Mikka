@@ -1,0 +1,282 @@
+{
+  "schema": "issue1512.native-cleanup-receipt.v1",
+  "createdAt": "2026-11-09T01:15:16.587745+00:00",
+  "actualCheckout": "0041c6ab2a28b562deed9c692d8572ac4736f64e",
+  "sourceLifecycle": {
+    "path": "native-ae1504-original/lifecycle.json",
+    "bytes": 685774,
+    "sha256": "db7306abb7a789442300d2098bb211789a7424a432adce68c7637fad6ed31b05",
+    "gitBlobSha": "1c547b66b0c5bf1e32d22342109cd04fd308756a"
+  },
+  "sourceSmoke": {
+    "path": "native-ae1504-original/smoke.json",
+    "bytes": 3105,
+    "sha256": "72365480ac6ecfa0156e80cb53d7e4334bc5ec1020c5d359a04367114a7795f2",
+    "gitBlobSha": "e3989539bcd2ee20d896d921e7a0af81b71f93dc"
+  },
+  "sourceParity": {
+    "path": "native-ae1504-original/parity/parity.json",
+    "bytes": 107161,
+    "sha256": "633503b93911968f5e2064de5dd6342afd1daa5651343796c4288f0f6c5f427d",
+    "gitBlobSha": "a5e76ce5a2a2b9fc6320a7e722bbf6bebdf501de"
+  },
+  "lifecycle": {
+    "cleanupStages": [
+      {
+        "stage": "browser-close",
+        "result": "passed"
+      },
+      {
+        "stage": "daemon-drain",
+        "result": "passed"
+      },
+      {
+        "stage": "native-resources",
+        "result": "passed"
+      },
+      {
+        "stage": "fixtures",
+        "result": "passed"
+      },
+      {
+        "stage": "workspace-generated-name",
+        "result": "passed"
+      },
+      {
+        "stage": "lease-release",
+        "result": "passed"
+      }
+    ],
+    "nativeCleanup": {
+      "cleaned": true,
+      "counts": {
+        "desktop_auth_requests": 2,
+        "device_token_devices": 1,
+        "device_management_commands": 0,
+        "device_repos": 0,
+        "agents": 2,
+        "device_tokens": 1,
+        "device_enrollments": 0,
+        "devices": 1
+      }
+    },
+    "accountObservation": {
+      "observed": true,
+      "state": "released",
+      "blockedReason": null,
+      "owner": {
+        "matchesSealedBaselineBefore": false,
+        "matchesSealedBaselineAfter": true,
+        "changedTableCount": 1,
+        "changes": [
+          {
+            "table": "workspace_audit_outbox",
+            "beforeRows": 1,
+            "afterRows": 0,
+            "changedFieldValueSets": [
+              "createdAt",
+              "id",
+              "workspaceId"
+            ],
+            "otherChangedFieldCount": 3
+          }
+        ]
+      },
+      "peer": {
+        "matchesSealedBaselineBefore": false,
+        "matchesSealedBaselineAfter": true,
+        "changedTableCount": 1,
+        "changes": [
+          {
+            "table": "workspace_audit_outbox",
+            "beforeRows": 1,
+            "afterRows": 0,
+            "changedFieldValueSets": [
+              "createdAt",
+              "id",
+              "workspaceId"
+            ],
+            "otherChangedFieldCount": 3
+          }
+        ]
+      }
+    },
+    "workspaceNameCleanup": {
+      "captured": true,
+      "phase": "unchanged",
+      "restored": false,
+      "initialName": {
+        "en": false,
+        "zhCN": true
+      },
+      "initialOwnerMatchesSealedBaseline": false,
+      "beforeName": {
+        "en": false,
+        "zhCN": true
+      },
+      "peerMatchesSealedBaseline": true,
+      "afterName": {
+        "en": false,
+        "zhCN": true
+      },
+      "ownerMatchesSealedBaseline": true
+    }
+  },
+  "smoke": {
+    "cleanupStages": [
+      {
+        "stage": "browser-close",
+        "result": "passed"
+      },
+      {
+        "stage": "electron-close",
+        "result": "passed"
+      },
+      {
+        "stage": "daemon-drain",
+        "result": "passed"
+      },
+      {
+        "stage": "native-resources",
+        "result": "passed"
+      },
+      {
+        "stage": "workspace-generated-name",
+        "result": "passed"
+      },
+      {
+        "stage": "lease-release",
+        "result": "passed"
+      }
+    ],
+    "nativeCleanup": {
+      "cleaned": true,
+      "counts": {
+        "desktop_auth_requests": 1,
+        "device_token_devices": 0,
+        "device_management_commands": 0,
+        "device_repos": 0,
+        "agents": 0,
+        "device_tokens": 0,
+        "device_enrollments": 0,
+        "devices": 0
+      }
+    },
+    "accountObservation": {
+      "observed": true,
+      "state": "released",
+      "blockedReason": null,
+      "owner": {
+        "matchesSealedBaselineBefore": true,
+        "matchesSealedBaselineAfter": true,
+        "changedTableCount": 0,
+        "changes": []
+      },
+      "peer": {
+        "matchesSealedBaselineBefore": true,
+        "matchesSealedBaselineAfter": true,
+        "changedTableCount": 0,
+        "changes": []
+      }
+    },
+    "workspaceNameCleanup": {
+      "captured": true,
+      "phase": "unchanged",
+      "restored": false,
+      "initialName": {
+        "en": false,
+        "zhCN": true
+      },
+      "initialOwnerMatchesSealedBaseline": true,
+      "beforeName": {
+        "en": false,
+        "zhCN": true
+      },
+      "peerMatchesSealedBaseline": true,
+      "afterName": {
+        "en": false,
+        "zhCN": true
+      },
+      "ownerMatchesSealedBaseline": true
+    }
+  },
+  "parity": {
+    "cleanup": "passed",
+    "nativeCleanup": {
+      "cleaned": true,
+      "counts": {
+        "desktop_auth_requests": 1,
+        "device_token_devices": 1,
+        "device_management_commands": 0,
+        "device_repos": 0,
+        "agents": 2,
+        "device_tokens": 1,
+        "device_enrollments": 0,
+        "devices": 1
+      }
+    },
+    "workspaceNameCleanup": {
+      "captured": true,
+      "phase": "restored",
+      "restored": true,
+      "initialName": {
+        "en": false,
+        "zhCN": true
+      },
+      "initialOwnerMatchesSealedBaseline": false,
+      "beforeName": {
+        "en": true,
+        "zhCN": false
+      },
+      "peerMatchesSealedBaseline": true,
+      "onlyGeneratedNameDifference": true,
+      "afterName": {
+        "en": false,
+        "zhCN": true
+      },
+      "ownerMatchesSealedBaseline": true
+    }
+  },
+  "packageAndCrypto": {
+    "packagePassed": true,
+    "strictDeepSignatureVerified": true,
+    "cryptoPassed": true,
+    "sameImmutablePackage": true,
+    "distinctProcesses": 3,
+    "allThreeLaunchesPassedAndExited": true,
+    "cryptoCleanup": "passed",
+    "samePackageReceipt": true,
+    "originalPackage": {
+      "path": "package-ae1504-original/mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "7f2f9c79d9aaecb9d0592e1baafa66ac9e4475185950ec6359fdcadfbcd94399",
+      "gitBlobSha": "8609b983f8e0a8f6cee22d809dd3ee14464748bb"
+    },
+    "originalCrypto": {
+      "path": "package-ae1504-original/native-crypto.json",
+      "bytes": 2868,
+      "sha256": "b5e35ab5acfae21024dde1db46208becfa8ad1ce05ceb313d65220b3b51fe4c8",
+      "gitBlobSha": "39321eb4b2a2304ff1b576d680a0b6dd376f8797"
+    }
+  },
+  "jobCleanup": {
+    "jobStatus": "completed",
+    "jobConclusion": "success",
+    "completedAt": "2026-11-09T01:03:27Z",
+    "necessaryLogExcerpt": [
+      "2026-11-09T01:03:22.1039620Z Post job cleanup.",
+      "2026-11-09T01:03:22.2682240Z Post job cleanup.",
+      "2026-11-09T01:03:22.4228100Z Post job cleanup.",
+      "2026-11-09T01:03:22.9832030Z Cleaning up orphan processes"
+    ],
+    "standalonePostgresStopReceiptSeparatelyEmitted": false,
+    "boundary": "CI runner cleanup is observed in the completed job. The artifact does not contain a separate explicit PG-server stop receipt; do not convert that absence into a fabricated process-level observation."
+  },
+  "reviewerResources": {
+    "downloadProcessSession35843ExitCode": 0,
+    "ownedActiveProcesses": 0,
+    "newCloudResources": 0,
+    "sourceOrIndexMutations": 0
+  },
+  "publicationBoundary": "Only these closed receipts and separately reviewed original JSON are candidates for evidence publication. Raw log, ZIPs and 305 screenshots are preserved locally pending the separate checkpoint privacy review."
+}

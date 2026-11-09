@@ -1,0 +1,276 @@
+{
+  "schema": "issue1512.native-source-artifact-custody.v1",
+  "createdAt": "2026-11-09T01:15:16.587745+00:00",
+  "workflowRunId": 42541312185,
+  "jobId": 128918612760,
+  "publishedHead": "ae1504f1bb266ae3f7b6612898f134dd979f5fdd",
+  "publishedTree": "8c5c12ea993533403d13e21dc75647bb28022767",
+  "actualCheckout": "0041c6ab2a28b562deed9c692d8572ac4736f64e",
+  "actualTree": "8c5c12ea993533403d13e21dc75647bb28022767",
+  "actualParents": [
+    "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+    "ae1504f1bb266ae3f7b6612898f134dd979f5fdd"
+  ],
+  "sameTreeAsPublishedHead": true,
+  "sourceAgreement": {
+    "checkoutLog": [
+      "2026-11-09T00:46:12.7565840Z [command]/opt/homebrew/bin/git checkout --progress --force refs/remotes/pull/1675/merge",
+      "2026-11-09T00:46:13.8914730Z HEAD is now at 0041c6a Merge ae1504f1bb266ae3f7b6612898f134dd979f5fdd into bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+      "2026-11-09T00:46:13.9074020Z [command]/opt/homebrew/bin/git log -1 --format=%H",
+      "2026-11-09T00:46:13.9208000Z 0041c6ab2a28b562deed9c692d8572ac4736f64e"
+    ],
+    "lifecycle": "0041c6ab2a28b562deed9c692d8572ac4736f64e",
+    "smoke": "0041c6ab2a28b562deed9c692d8572ac4736f64e",
+    "parityApp": "0041c6ab2a28b562deed9c692d8572ac4736f64e",
+    "parityHarness": "0041c6ab2a28b562deed9c692d8572ac4736f64e",
+    "crypto": "0041c6ab2a28b562deed9c692d8572ac4736f64e",
+    "queryCounter": {
+      "revision": "0041c6ab2a28b562deed9c692d8572ac4736f64e",
+      "platform": "darwin",
+      "arch": "arm64",
+      "runtime": "nitro",
+      "pid": 28464,
+      "process": "primary API shared by lifecycle bundled, hosted and Chromium"
+    },
+    "renderers": {
+      "bundled": {
+        "revision": "0041c6ab2a28b562deed9c692d8572ac4736f64e",
+        "mode": "bundled",
+        "url": "mikka://app/mikka",
+        "backend": "http://localhost:3000"
+      },
+      "hosted": {
+        "revision": "0041c6ab2a28b562deed9c692d8572ac4736f64e",
+        "mode": "hosted",
+        "url": "http://localhost:3000/mikka",
+        "backend": "http://localhost:3000"
+      }
+    }
+  },
+  "job": {
+    "id": 128918612760,
+    "status": "completed",
+    "conclusion": "success",
+    "startedAt": "2026-11-09T00:46:03Z",
+    "completedAt": "2026-11-09T01:03:27Z",
+    "requiredAndCleanupSteps": [
+      {
+        "number": 16,
+        "name": "Real Keychain encryption across three independent packaged processes",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 17,
+        "name": "Real packaged Apple Silicon native acceptance",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 18,
+        "name": "Keep final package integrity evidence",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 19,
+        "name": "Audit closed package and crypto reports",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 20,
+        "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 21,
+        "name": "Audit native evidence",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 22,
+        "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 42,
+        "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 43,
+        "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 44,
+        "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "completed",
+        "conclusion": "success"
+      },
+      {
+        "number": 45,
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success"
+      }
+    ]
+  },
+  "archives": [
+    {
+      "artifactId": 13641889747,
+      "archive": "native-ae1504-original.zip",
+      "directory": "native-ae1504-original",
+      "bytes": 14823922,
+      "sha256": "037efc696d2e67e2d93e25e3fe5d5e674906eb9ad6386214f9f469e96f649896",
+      "apiDigest": "sha256:037efc696d2e67e2d93e25e3fe5d5e674906eb9ad6386214f9f469e96f649896",
+      "metadataDigestMatches": true,
+      "members": 308,
+      "uncompressedBytes": 18434088,
+      "jsonEntries": [
+        {
+          "archiveEntry": "lifecycle.json",
+          "relativePath": "native-ae1504-original/lifecycle.json",
+          "bytes": 685774,
+          "sha256": "db7306abb7a789442300d2098bb211789a7424a432adce68c7637fad6ed31b05",
+          "gitBlobSha": "1c547b66b0c5bf1e32d22342109cd04fd308756a"
+        },
+        {
+          "archiveEntry": "parity/parity.json",
+          "relativePath": "native-ae1504-original/parity/parity.json",
+          "bytes": 107161,
+          "sha256": "633503b93911968f5e2064de5dd6342afd1daa5651343796c4288f0f6c5f427d",
+          "gitBlobSha": "a5e76ce5a2a2b9fc6320a7e722bbf6bebdf501de"
+        },
+        {
+          "archiveEntry": "smoke.json",
+          "relativePath": "native-ae1504-original/smoke.json",
+          "bytes": 3105,
+          "sha256": "72365480ac6ecfa0156e80cb53d7e4334bc5ec1020c5d359a04367114a7795f2",
+          "gitBlobSha": "e3989539bcd2ee20d896d921e7a0af81b71f93dc"
+        }
+      ],
+      "metadata": {
+        "id": 13641889747,
+        "name": "desktop-native-evidence-0041c6ab2a28b562deed9c692d8572ac4736f64e",
+        "size_in_bytes": 14823922,
+        "url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13641889747",
+        "archive_download_url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13641889747/zip",
+        "expired": false,
+        "created_at": "2026-11-09T01:03:21Z",
+        "expires_at": "2026-11-16T01:03:20Z",
+        "updated_at": "2026-11-09T01:03:21Z",
+        "digest": "sha256:037efc696d2e67e2d93e25e3fe5d5e674906eb9ad6386214f9f469e96f649896",
+        "workflow_run": {
+          "id": 42541312185,
+          "repository_id": 1427517699,
+          "head_repository_id": 1427517699,
+          "head_branch": "test/1512-native-query-sources-78-20261107",
+          "head_sha": "ae1504f1bb266ae3f7b6612898f134dd979f5fdd"
+        }
+      }
+    },
+    {
+      "artifactId": 13642656100,
+      "archive": "package-ae1504-original.zip",
+      "directory": "package-ae1504-original",
+      "bytes": 1593,
+      "sha256": "f35f1309c8388498b9451a52df59f036578734166c80c576969e01ea38c5860f",
+      "apiDigest": "sha256:f35f1309c8388498b9451a52df59f036578734166c80c576969e01ea38c5860f",
+      "metadataDigestMatches": true,
+      "members": 2,
+      "uncompressedBytes": 3825,
+      "jsonEntries": [
+        {
+          "archiveEntry": "mac-acceptance-package.json",
+          "relativePath": "package-ae1504-original/mac-acceptance-package.json",
+          "bytes": 957,
+          "sha256": "7f2f9c79d9aaecb9d0592e1baafa66ac9e4475185950ec6359fdcadfbcd94399",
+          "gitBlobSha": "8609b983f8e0a8f6cee22d809dd3ee14464748bb"
+        },
+        {
+          "archiveEntry": "native-crypto.json",
+          "relativePath": "package-ae1504-original/native-crypto.json",
+          "bytes": 2868,
+          "sha256": "b5e35ab5acfae21024dde1db46208becfa8ad1ce05ceb313d65220b3b51fe4c8",
+          "gitBlobSha": "39321eb4b2a2304ff1b576d680a0b6dd376f8797"
+        }
+      ],
+      "metadata": {
+        "id": 13642656100,
+        "name": "desktop-package-evidence-0041c6ab2a28b562deed9c692d8572ac4736f64e",
+        "size_in_bytes": 1593,
+        "url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13642656100",
+        "archive_download_url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13642656100/zip",
+        "expired": false,
+        "created_at": "2026-11-09T01:03:19Z",
+        "expires_at": "2026-11-16T01:03:19Z",
+        "updated_at": "2026-11-09T01:03:19Z",
+        "digest": "sha256:f35f1309c8388498b9451a52df59f036578734166c80c576969e01ea38c5860f",
+        "workflow_run": {
+          "id": 42541312185,
+          "repository_id": 1427517699,
+          "head_repository_id": 1427517699,
+          "head_branch": "test/1512-native-query-sources-78-20261107",
+          "head_sha": "ae1504f1bb266ae3f7b6612898f134dd979f5fdd"
+        }
+      }
+    }
+  ],
+  "originalFileIndex": {
+    "path": "native-ae1504-original-file-hashes.json",
+    "bytes": 112265,
+    "sha256": "d69a2897be9040ac07d9ee59c137b2f72a48f3eccb64205cc6771c89470b339d",
+    "gitBlobSha": "546e5805e29d946159daa79787aad9cbee004fc8"
+  },
+  "retrieval": {
+    "twoArtifactsDownloadedOnce": true,
+    "downloadTransportSession": {
+      "id": 35843,
+      "exitCode": 0
+    },
+    "zipCrcChecksPassed": true,
+    "archivePathsAndLinksCheckedBeforeExtraction": true,
+    "allOriginalFileHashesRecorded": true,
+    "signedDownloadURLsExcludedFromReceipts": true
+  },
+  "metadataFiles": [
+    {
+      "path": "published-commit.original-metadata.json",
+      "bytes": 1154,
+      "sha256": "9e28605315cd9635fac6054b5e06f9cfbd9ec82bb4edeabb653e32298c7b4264",
+      "gitBlobSha": "577246029f122cf0f24218561c7359bdf9ce5182"
+    },
+    {
+      "path": "native-ae1504-actual-git-object.original-metadata.json",
+      "bytes": 2608,
+      "sha256": "168c663d8f8ded404ba19e84aa7d877a9a2a88869d3e4272e16d98e72fba5b3e",
+      "gitBlobSha": "58235c2e2595bf2da975f8c3368325304a3e8e41"
+    },
+    {
+      "path": "native-ae1504-terminal-job.original-metadata.json",
+      "bytes": 7458,
+      "sha256": "858cd1bdfdcbd3e4a2230715859df90d51df33836bcc9a03f82b458579a504b6",
+      "gitBlobSha": "4ff5c43480b1611027d22d5fb88574d4d1c5383c"
+    },
+    {
+      "path": "native-ae1504-artifacts.original-metadata.json",
+      "bytes": 7755,
+      "sha256": "ff2d182bc11d81d855c18f97a40a069ac875ad73a39b27a43656d4122bc90014",
+      "gitBlobSha": "426617d9bfb1e546d3796fa5a8e8e663f65c7a36"
+    },
+    {
+      "path": "native-ae1504-job.original.log",
+      "bytes": 248378,
+      "sha256": "2a5fe7b8d0cb9d36862e3ae56a1520e45b7a86f0d42aa5d439294c0fedceb609",
+      "gitBlobSha": "a26aca626998696ec720db6896006fd18138bb73"
+    }
+  ],
+  "rawArtifactBoundary": "Original ZIPs, decoded job log and 305 PNGs remain local. This source receipt carries hashes and closed necessary log excerpts. It does not authorize publication of unreviewed images/logs."
+}
