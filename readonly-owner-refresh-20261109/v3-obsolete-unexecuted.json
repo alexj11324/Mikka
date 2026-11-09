@@ -1,0 +1,16 @@
+{
+  "commit": "0319b5951e2ac238392036e76c5f3eae42d557d0",
+  "reason": "main advanced to e78 before activation",
+  "obsoleteAt": "2026-11-09T11:26:40Z",
+  "refEverCreated": false,
+  "runEverCreated": false,
+  "productionReads": 0,
+  "childCreated": false,
+  "noAutomaticRebind": true,
+  "tree": "f3c23cd5453193ec2edd5def3a7ce6e81a0b2ecd",
+  "workflowBytes": 10095,
+  "workflowSha256": "421c72f76cedb64613f1e9caa896d46ce5f30e13597ee4b0a9e62e33a88333ef",
+  "entryDeadline": "2026-11-09T12:05:00Z",
+  "reviewer": "queued_source_compat",
+  "review": "Exact six-file inverse comparison confirmed only branch/GO/deadline/two source hash bindings; no tests rerun, no activation."
+}

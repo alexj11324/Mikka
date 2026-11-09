@@ -1,0 +1,29 @@
+{
+  "job": 129069965257,
+  "run": 42588519491,
+  "attempt": 1,
+  "source": "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+  "bytes": 13134,
+  "sha256": "437b98816050dec78a2c3fb2d897bfe721f8c6a33953e6ca7e3317ee2c0e3712",
+  "originalReads": 1,
+  "claimComment": 6739126692,
+  "started": "2026-11-09T09:02:20.4870685Z",
+  "errorAt": "2026-11-09T09:42:20.5328002Z",
+  "error": "webDeploy:matchingWebDeploymentTimedOut",
+  "latestSameSourceWeb": {
+    "run": 42588853466,
+    "job": 129065207403,
+    "completed": "2026-11-09T09:42:28Z",
+    "evidenceComment": 6736423357
+  },
+  "differenceFromA219": "This source exhausted its monotonic40-minute budget; a219 later rejected a canceled latest run. They are distinct failures.",
+  "fixedCodeBaseline": {
+    "ownHead": "37ffccac0e76bd32885178eef9a300dedcb9315f",
+    "source": "scripts/release/web-deploy.mjs",
+    "sha256": "e8012d49653ab635ea26d3ba881450860f8c3ead2893d799a98bc395eb65bf9a",
+    "byteIdenticalToReviewedA219": true
+  },
+  "changeStatus": "No production code changed at this archival point; bounded runtime wait design and fake-clock regression under preparation.",
+  "newModelCalls": 0,
+  "newFormalSamples": 0
+}
