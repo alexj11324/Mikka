@@ -67,7 +67,7 @@ def validate_junit(raw, phase, expected):
                 and failures[0].get('message') == item.get('failure') == 'NATIVE_DAEMON_DRAIN_TIMEOUT', 'wrong_red_failure')
         trace = failures[0].text or ''
         require('cause: Error: NATIVE_DAEMON_DRAIN_TIMEOUT' in trace
-                and re.search(r'at Timeout\._onTimeout \([^\n)]*native-cleanup\.mjs:[0-9]+:[0-9]+\)', trace), 'wrong_timeout_stage')
+                and re.search(r'at Timeout\.(?:_onTimeout|<anonymous>) \([^\n)]*native-cleanup\.mjs:16:39\)', trace), 'wrong_timeout_stage')
         require(float(item.get('time', '0')) >= 4.9, 'response_window_not_exercised')
     else:
         require(phase in ('baseline_green', 'green') and len(expected) == (8 if phase == 'baseline_green' else 12)

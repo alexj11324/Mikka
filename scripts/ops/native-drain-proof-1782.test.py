@@ -19,7 +19,7 @@ def xml(names, failed=False):
         if failed:
             case.set('failure', 'NATIVE_DAEMON_DRAIN_TIMEOUT')
             failure = ET.SubElement(case, 'failure', type='testCodeFailure', message='NATIVE_DAEMON_DRAIN_TIMEOUT')
-            failure.text = 'cause: Error: NATIVE_DAEMON_DRAIN_TIMEOUT\n    at Timeout._onTimeout (file:///checkout/apps/desktop/test/native-cleanup.mjs:16:24)'
+            failure.text = 'cause: Error: NATIVE_DAEMON_DRAIN_TIMEOUT\n    at Timeout._onTimeout (file:///checkout/apps/desktop/test/native-cleanup.mjs:16:39)'
     counts = {'tests': len(names), 'suites': 0, 'pass': 0 if failed else len(names), 'fail': len(names) if failed else 0,
               'cancelled': 0, 'skipped': 0, 'todo': 0, 'duration_ms': 5050}
     for key, value in counts.items(): root.append(ET.Comment(f' {key} {value} '))
@@ -41,9 +41,20 @@ class NativeDrainClassifier(unittest.TestCase):
         changed = copy.deepcopy(original); changed[0].set('time', '4.89')
         with self.assertRaisesRegex(RuntimeError, 'response_window_not_exercised'): validate(changed)
 
+    def test_observed_node24_anonymous_timer_frame_is_the_original_timer(self):
+        # Actual Node24.22.2 junit from run42696425897: baseline8 passed and
+        # this selected old-driver case took6.106796s at immutable line16:39.
+        observed = xml([proof.TARGET], True)
+        observed[0].set('time', '6.106796')
+        observed[0][0].text = ('cause: Error: NATIVE_DAEMON_DRAIN_TIMEOUT\n'
+            '    at Timeout.<anonymous> (file:///home/runner/work/Mikka/Mikka/apps/desktop/test/native-cleanup.mjs:16:39)\n'
+            '    at listOnTimeout (node:internal/timers:685:17)')
+        self.assertEqual(validate(observed)['failure'], 'NATIVE_DAEMON_DRAIN_TIMEOUT')
+
     def test_matching_text_from_setup_rpc_or_wrong_timer_is_rejected(self):
         for trace in ['cause: Error: NATIVE_DAEMON_DRAIN_TIMEOUT at setup',
                       'cause: Error: NATIVE_DAEMON_DRAIN_TIMEOUT\n at Timeout._onTimeout (other.mjs:1:2)',
+                      'cause: Error: NATIVE_DAEMON_DRAIN_TIMEOUT\n at Timeout.<anonymous> (native-cleanup.mjs:17:39)',
                       'cause: ResponseError: NATIVE_DAEMON_DRAIN_TIMEOUT\n at Timeout._onTimeout (native-cleanup.mjs:1:2)']:
             changed = xml([proof.TARGET], True); changed[0][0].text = trace
             with self.subTest(trace=trace), self.assertRaisesRegex(RuntimeError, 'wrong_timeout_stage'): validate(changed)
