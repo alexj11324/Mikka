@@ -25,7 +25,7 @@ import { useActionError } from '@/lib/use-action-error'
 import { IssueMembers } from './issue-members'
 import { IssueDetailProperties } from './issue-detail-properties'
 import { useAgentActivity } from './issue-threads'
-import { IssueThreadPanel } from './issue-thread-panel'
+import { TaskThreadPane } from './task-thread-pane'
 import { navigate } from './workspace-navigation'
 import { cn } from '@/lib/utils'
 import { FactoryAcceptance, FactoryAcceptancePanel, type FactoryTask } from './factory-acceptance'
@@ -340,7 +340,7 @@ function TaskForm({ initial, preview = false, thread: openThread, origin, user, 
 
   const properties = <IssueDetailProperties task={saved} onMetadataSaved={adopt} metadataDisabled={preview} onMetadataBusy={setMetadataSaving} status={status} priority={priority} pending={preview} onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }} request={propertyRequest} onDate={() => requestAction('dueDate')} onEstimate={() => requestAction('estimate')} relations={preview ? null : <IssueRelations liveWorkspaceId={syncState.workspaceId ?? null} viewerId={user.id} mode="sidebar" task={saved} onOpen={onOpen} onCreate={() => requestAction('createChild')} onPick={requestAction} getCurrent={getCurrent} onSaved={adopt} disabled={false} />} />
   const threadPanel = preview ? null : openThread
-    ? <IssueThreadPanel key={`${openThread}:${threadTab}`} issueId={saved.id} runId={openThread} initialTab={threadTab} onOpenThread={showThread} onBack={() => showThread(null)} />
+    ? <TaskThreadPane issueId={saved.id} runId={openThread} tab={threadTab} onOpenThread={showThread} onBack={() => showThread(null)} />
     : openAcceptance && <FactoryAcceptancePanel key={openAcceptance.id} task={openAcceptance} onOpenThread={showThread} onClose={() => setOpenAcceptance(null)} />
 
   // R-61: one line under the header, one before the properties or an open thread; the page scrolls, the right column stays.
