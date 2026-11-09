@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "kind": "future_readback_service_version_mapping_addendum",
+  "evidenceSource": "m1-e2b-posthog-forensics.safe.json",
+  "frozenProofsChanged": false,
+  "queriesExecutedByThisAddendum": 0,
+  "productionWeb": {
+    "source": "lib/tracing/config.ts: traceSettings",
+    "expression": "env.VERCEL_GIT_COMMIT_SHA?.slice(0,12) || undefined",
+    "actualM1ServiceVersion": "01a6bfb3a6c5",
+    "rule": "Use the verified deployment full SHA for release identity, and the source-derived plus observed short resource version for PostHog filter. Do not substitute APP_BUILD or require a full SHA that the exporter never emitted."
+  },
+  "controlledFailureRunner": {
+    "source": "scripts/ops/run-trace-benchmark.ts: controlledFailureSettings and provider construction",
+    "expression": "settings.version=env.GITHUB_SHA; createTracerProvider/createLogProvider version=settings.version",
+    "rule": "The one-shot dev runner bypasses production traceSettings and explicitly emits the full guarded GITHUB_SHA. Keep the frozen controlled-failure full-SHA filter unless the actual runner receipt/resource contradicts this source contract. Do not blindly shorten it because Web uses a prefix."
+  },
+  "futureRuntime": {
+    "rule": "Resolve each exporter resource separately from its actual source/receipt. No blanket full/short conversion across Web, daemon or the controlled-failure runner."
+  },
+  "sources": [
+    {
+      "path": "lib/tracing/config.ts",
+      "localSha256": "b26acae1c89e8a74a6aae8769ffbab32af72c72250b239711b0786f160f65856",
+      "bytes": 3376,
+      "exactM1CommitObjectAvailable": true,
+      "localBytesMatchExactM1": true
+    },
+    {
+      "path": "lib/tracing/node.ts",
+      "localSha256": "adefe4b0af2c59021f37ae77262da07cc11c2369941b7482553f4299739de670",
+      "bytes": 7106,
+      "exactM1CommitObjectAvailable": true,
+      "localBytesMatchExactM1": true
+    },
+    {
+      "path": "lib/tracing/logs.ts",
+      "localSha256": "08286b12ffb5db4010d5dbcc887726840792a79417bafa7d2ae26e72910a2e3d",
+      "bytes": 4312,
+      "exactM1CommitObjectAvailable": true,
+      "localBytesMatchExactM1": true
+    },
+    {
+      "path": "lib/tracing/ai.ts",
+      "localSha256": "202630a776f9b9d543bd6581cc4b3be70b304fcdc22431fa9a990f985f4658b4",
+      "bytes": 13617,
+      "exactM1CommitObjectAvailable": true,
+      "localBytesMatchExactM1": true
+    },
+    {
+      "path": "scripts/ops/run-trace-benchmark.ts",
+      "localSha256": "0962440794712e7f42a919d755cba69c7e2fcc15f1fad02de29ba9d2b31f9de4",
+      "bytes": 19846,
+      "exactM1CommitObjectAvailable": true,
+      "localBytesMatchExactM1": true
+    }
+  ]
+}

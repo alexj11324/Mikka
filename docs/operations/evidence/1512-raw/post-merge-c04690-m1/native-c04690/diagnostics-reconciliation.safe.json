@@ -1,0 +1,4808 @@
+{
+  "schema": "issue1512.native-query-diagnostics-independent.v1",
+  "revision": "fd053d254e377f35ff8e2529edb1ad544c23fab1",
+  "sourceFile": "native-c04690-original/lifecycle.json",
+  "sourceSha256": "19a1cfbd9225c580a2309f76016e099d4354e5fba3ee9562c59d2782db14dcdc",
+  "validation": "passed_with_explicit_unknowns",
+  "reportedStatus": "incomplete",
+  "source": {
+    "pid": 35496,
+    "runtime": "nitro",
+    "startedAt": 1794189111444
+  },
+  "capture": {
+    "fromQueryCalls": 25930,
+    "toQueryCalls": 30275,
+    "droppedQueries": 0,
+    "overflow": false,
+    "reasons": {
+      "context_missing": 1381,
+      "statement_syntax": 1504
+    }
+  },
+  "captureBoundary": "Projected artifact contains all four measured-window query rows; outside-window query rows are not exported. Global capture range/reason counters are reported values, not independently reconstructed outside-window rows.",
+  "contexts": 568,
+  "statements": 91,
+  "measuredQueries": 1245,
+  "usedKnownContexts": 166,
+  "receiptInvocations": 177,
+  "receiptStatus": "complete",
+  "unpairedReceipts": 0,
+  "conflictingReceipts": 0,
+  "unmatchedUsedKnownContexts": 0,
+  "allMeasuredOrdinalsPresentExactlyOnce": true,
+  "allFourOperationAndSourceCountersReconciled": true,
+  "windows": {
+    "nativeLogin": {
+      "capturedQueries": 473,
+      "uncapturedQueries": 0,
+      "operationAndSourceCountersReconciled": true,
+      "reportedStatus": "incomplete",
+      "reasons": [
+        "query_context_unknown",
+        "statement_structure_unknown"
+      ],
+      "knownContextQueries": 308,
+      "unknownContextQueries": 165,
+      "unknownContextByScope": {
+        "/api/desktop/return": 2,
+        "/api/devices/enrollment": 7,
+        "/api/conversations/[id]/read": 13,
+        "/api/conversations": 18,
+        "/api/pending-actions": 4,
+        "/api/approved-writes": 40,
+        "/v1/devices/enroll": 4,
+        "/v1/devices/register": 15,
+        "after:live-notify": 1,
+        "/v1/devices/[deviceId]/gateway": 5,
+        "/v1/devices/[deviceId]/heartbeat": 20,
+        "after:factory-dispatch-recovery": 12,
+        "/v1/devices/[deviceId]/repos": 12,
+        "/v1/devices/[deviceId]/runs": 12
+      },
+      "unknownStatementQueries": 150,
+      "unknownStatementByScope": {
+        "/api/workspace/switcher": 4,
+        "/api/workspace": 4,
+        "/actions/task-runs/read": 8,
+        "/actions/threads/poll": 12,
+        "/actions/coordinator/summaries": 4,
+        "/api/live/ticket": 3,
+        "/api/conversations/[id]/read": 3,
+        "/api/conversations": 4,
+        "/actions/issues/poll": 17,
+        "/api/desktop/rpc": 23,
+        "/actions/coordinator/poll": 32,
+        "/api/approved-writes": 12,
+        "/api/devices/enrollment": 1,
+        "/api/mobile/reactions": 1,
+        "/v1/devices/enroll": 1,
+        "/v1/devices/register": 5,
+        "after:live-notify": 1,
+        "/v1/devices/[deviceId]/gateway": 1,
+        "/v1/devices/[deviceId]/heartbeat": 4,
+        "/v1/devices/[deviceId]/commands": 2,
+        "after:factory-dispatch-recovery": 4,
+        "/v1/devices/[deviceId]/repos": 2,
+        "/v1/devices/[deviceId]/runs": 2
+      },
+      "capturedNullActionQueries": 78,
+      "nullActionQueriesWithLaterReceiptAction": 0,
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "fromQueryCalls": 26332,
+          "toQueryCalls": 26351,
+          "queries": 19,
+          "unknownContextQueries": 0,
+          "unknownStatementQueries": 0
+        },
+        {
+          "phase": "native-pkce-and-automatic-renderer-to-public-session",
+          "fromQueryCalls": 26351,
+          "toQueryCalls": 26366,
+          "queries": 15,
+          "unknownContextQueries": 2,
+          "unknownStatementQueries": 0
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "fromQueryCalls": 26366,
+          "toQueryCalls": 26805,
+          "queries": 439,
+          "unknownContextQueries": 163,
+          "unknownStatementQueries": 150
+        }
+      ],
+      "groups": [
+        {
+          "contextIndex": 0,
+          "statementIndex": 0,
+          "scope": "/api/conversations",
+          "queries": 4
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 0,
+          "scope": "/api/conversations/[id]/read",
+          "queries": 3
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 0,
+          "scope": "/api/approved-writes",
+          "queries": 12
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 0,
+          "scope": "/api/devices/enrollment",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 0,
+          "scope": "/v1/devices/enroll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 0,
+          "scope": "/v1/devices/register",
+          "queries": 5
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 0,
+          "scope": "/v1/devices/[deviceId]/gateway",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 0,
+          "scope": "/v1/devices/[deviceId]/heartbeat",
+          "queries": 4
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 0,
+          "scope": "/v1/devices/[deviceId]/repos",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 0,
+          "scope": "/v1/devices/[deviceId]/runs",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 0,
+          "scope": "after:factory-dispatch-recovery",
+          "queries": 4
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 0,
+          "scope": "after:live-notify",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 11,
+          "scope": "/api/approved-writes",
+          "queries": 4
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 11,
+          "scope": "/api/devices/enrollment",
+          "queries": 3
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 12,
+          "scope": "/api/approved-writes",
+          "queries": 4
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 12,
+          "scope": "/api/devices/enrollment",
+          "queries": 3
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 21,
+          "scope": "/api/conversations/[id]/read",
+          "queries": 3
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 22,
+          "scope": "/api/conversations/[id]/read",
+          "queries": 3
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 23,
+          "scope": "/api/conversations/[id]/read",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 26,
+          "scope": "/api/pending-actions",
+          "queries": 4
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 44,
+          "scope": "/api/approved-writes",
+          "queries": 8
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 45,
+          "scope": "/api/approved-writes",
+          "queries": 8
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 50,
+          "scope": "/api/conversations",
+          "queries": 4
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 50,
+          "scope": "/api/approved-writes",
+          "queries": 4
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 50,
+          "scope": "/v1/devices/enroll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 50,
+          "scope": "/v1/devices/register",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 50,
+          "scope": "/v1/devices/[deviceId]/gateway",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 50,
+          "scope": "/v1/devices/[deviceId]/heartbeat",
+          "queries": 4
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 50,
+          "scope": "/v1/devices/[deviceId]/repos",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 50,
+          "scope": "/v1/devices/[deviceId]/runs",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 50,
+          "scope": "after:factory-dispatch-recovery",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 54,
+          "scope": "/api/conversations",
+          "queries": 4
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 54,
+          "scope": "/v1/devices/enroll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 54,
+          "scope": "/v1/devices/register",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 54,
+          "scope": "/v1/devices/[deviceId]/heartbeat",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 54,
+          "scope": "after:factory-dispatch-recovery",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 56,
+          "scope": "/api/conversations",
+          "queries": 6
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 61,
+          "scope": "/api/conversations/[id]/read",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 62,
+          "scope": "/api/conversations/[id]/read",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 64,
+          "scope": "/api/desktop/return",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 65,
+          "scope": "/api/desktop/return",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 70,
+          "scope": "/v1/devices/enroll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 71,
+          "scope": "/v1/devices/register",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 71,
+          "scope": "/v1/devices/[deviceId]/gateway",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 71,
+          "scope": "/v1/devices/[deviceId]/heartbeat",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 71,
+          "scope": "/v1/devices/[deviceId]/repos",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 71,
+          "scope": "/v1/devices/[deviceId]/runs",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 72,
+          "scope": "/v1/devices/register",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 73,
+          "scope": "/v1/devices/register",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 73,
+          "scope": "/v1/devices/[deviceId]/gateway",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 73,
+          "scope": "/v1/devices/[deviceId]/heartbeat",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 73,
+          "scope": "/v1/devices/[deviceId]/repos",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 73,
+          "scope": "/v1/devices/[deviceId]/runs",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 73,
+          "scope": "after:factory-dispatch-recovery",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 74,
+          "scope": "/v1/devices/register",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 75,
+          "scope": "/v1/devices/register",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 75,
+          "scope": "/v1/devices/[deviceId]/heartbeat",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 76,
+          "scope": "/v1/devices/register",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 77,
+          "scope": "/v1/devices/[deviceId]/gateway",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 77,
+          "scope": "/v1/devices/[deviceId]/repos",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 78,
+          "scope": "/v1/devices/[deviceId]/heartbeat",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 79,
+          "scope": "/v1/devices/[deviceId]/heartbeat",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 80,
+          "scope": "after:factory-dispatch-recovery",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 81,
+          "scope": "/v1/devices/[deviceId]/repos",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 82,
+          "scope": "/v1/devices/[deviceId]/runs",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 83,
+          "scope": "/v1/devices/[deviceId]/runs",
+          "queries": 2
+        },
+        {
+          "contextIndex": 54,
+          "statementIndex": 1,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 54,
+          "statementIndex": 2,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 54,
+          "statementIndex": 3,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 54,
+          "statementIndex": 4,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 54,
+          "statementIndex": 5,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 54,
+          "statementIndex": 6,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 54,
+          "statementIndex": 7,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 54,
+          "statementIndex": 8,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 54,
+          "statementIndex": 9,
+          "scope": "/api/auth/[...all]",
+          "queries": 2
+        },
+        {
+          "contextIndex": 54,
+          "statementIndex": 10,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 54,
+          "statementIndex": 11,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 54,
+          "statementIndex": 12,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 54,
+          "statementIndex": 13,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 54,
+          "statementIndex": 14,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 54,
+          "statementIndex": 15,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 54,
+          "statementIndex": 16,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 55,
+          "statementIndex": 1,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 55,
+          "statementIndex": 2,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 56,
+          "statementIndex": 63,
+          "scope": "/api/desktop/begin",
+          "queries": 1
+        },
+        {
+          "contextIndex": 57,
+          "statementIndex": 1,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 57,
+          "statementIndex": 2,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 58,
+          "statementIndex": 7,
+          "scope": "/api/desktop/exchange",
+          "queries": 1
+        },
+        {
+          "contextIndex": 58,
+          "statementIndex": 10,
+          "scope": "/api/desktop/exchange",
+          "queries": 1
+        },
+        {
+          "contextIndex": 58,
+          "statementIndex": 11,
+          "scope": "/api/desktop/exchange",
+          "queries": 1
+        },
+        {
+          "contextIndex": 58,
+          "statementIndex": 12,
+          "scope": "/api/desktop/exchange",
+          "queries": 1
+        },
+        {
+          "contextIndex": 58,
+          "statementIndex": 66,
+          "scope": "/api/desktop/exchange",
+          "queries": 1
+        },
+        {
+          "contextIndex": 58,
+          "statementIndex": 67,
+          "scope": "/api/desktop/exchange",
+          "queries": 1
+        },
+        {
+          "contextIndex": 58,
+          "statementIndex": 68,
+          "scope": "/api/desktop/exchange",
+          "queries": 1
+        },
+        {
+          "contextIndex": 58,
+          "statementIndex": 69,
+          "scope": "/api/desktop/exchange",
+          "queries": 1
+        },
+        {
+          "contextIndex": 59,
+          "statementIndex": 18,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 59,
+          "statementIndex": 19,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 60,
+          "statementIndex": 0,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 60,
+          "statementIndex": 21,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 61,
+          "statementIndex": 0,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 61,
+          "statementIndex": 21,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 61,
+          "statementIndex": 27,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 61,
+          "statementIndex": 28,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 61,
+          "statementIndex": 31,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 62,
+          "statementIndex": 24,
+          "scope": "/api/agent/sessions",
+          "queries": 1
+        },
+        {
+          "contextIndex": 62,
+          "statementIndex": 25,
+          "scope": "/api/agent/sessions",
+          "queries": 1
+        },
+        {
+          "contextIndex": 63,
+          "statementIndex": 32,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 64,
+          "statementIndex": 21,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 64,
+          "statementIndex": 30,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 65,
+          "statementIndex": 0,
+          "scope": "/actions/task-runs/read",
+          "queries": 2
+        },
+        {
+          "contextIndex": 65,
+          "statementIndex": 33,
+          "scope": "/actions/task-runs/read",
+          "queries": 1
+        },
+        {
+          "contextIndex": 66,
+          "statementIndex": 34,
+          "scope": "/actions/projects/list",
+          "queries": 1
+        },
+        {
+          "contextIndex": 67,
+          "statementIndex": 0,
+          "scope": "/actions/threads/poll",
+          "queries": 4
+        },
+        {
+          "contextIndex": 68,
+          "statementIndex": 0,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 68,
+          "statementIndex": 36,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 68,
+          "statementIndex": 38,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 69,
+          "statementIndex": 0,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 69,
+          "statementIndex": 11,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 69,
+          "statementIndex": 12,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 70,
+          "statementIndex": 21,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 70,
+          "statementIndex": 55,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 71,
+          "statementIndex": 0,
+          "scope": "/actions/coordinator/poll",
+          "queries": 9
+        },
+        {
+          "contextIndex": 71,
+          "statementIndex": 33,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 71,
+          "statementIndex": 35,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 71,
+          "statementIndex": 37,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 71,
+          "statementIndex": 39,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 71,
+          "statementIndex": 40,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 71,
+          "statementIndex": 41,
+          "scope": "/actions/coordinator/poll",
+          "queries": 2
+        },
+        {
+          "contextIndex": 71,
+          "statementIndex": 42,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 71,
+          "statementIndex": 43,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 71,
+          "statementIndex": 47,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 71,
+          "statementIndex": 48,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 71,
+          "statementIndex": 49,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 71,
+          "statementIndex": 51,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 71,
+          "statementIndex": 52,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 71,
+          "statementIndex": 53,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 72,
+          "statementIndex": 0,
+          "scope": "/actions/issues/poll",
+          "queries": 5
+        },
+        {
+          "contextIndex": 72,
+          "statementIndex": 33,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 72,
+          "statementIndex": 57,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 73,
+          "statementIndex": 0,
+          "scope": "/api/desktop/rpc",
+          "queries": 12
+        },
+        {
+          "contextIndex": 73,
+          "statementIndex": 21,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 73,
+          "statementIndex": 35,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 73,
+          "statementIndex": 39,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 73,
+          "statementIndex": 40,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 73,
+          "statementIndex": 41,
+          "scope": "/api/desktop/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 73,
+          "statementIndex": 42,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 73,
+          "statementIndex": 43,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 73,
+          "statementIndex": 46,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 73,
+          "statementIndex": 47,
+          "scope": "/api/desktop/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 73,
+          "statementIndex": 48,
+          "scope": "/api/desktop/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 73,
+          "statementIndex": 49,
+          "scope": "/api/desktop/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 73,
+          "statementIndex": 51,
+          "scope": "/api/desktop/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 73,
+          "statementIndex": 52,
+          "scope": "/api/desktop/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 73,
+          "statementIndex": 53,
+          "scope": "/api/desktop/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 74,
+          "statementIndex": 0,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 74,
+          "statementIndex": 21,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 75,
+          "statementIndex": 0,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 75,
+          "statementIndex": 21,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 75,
+          "statementIndex": 27,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 75,
+          "statementIndex": 28,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 75,
+          "statementIndex": 31,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 76,
+          "statementIndex": 32,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 77,
+          "statementIndex": 21,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 77,
+          "statementIndex": 55,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 78,
+          "statementIndex": 30,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 79,
+          "statementIndex": 0,
+          "scope": "/actions/issues/poll",
+          "queries": 3
+        },
+        {
+          "contextIndex": 79,
+          "statementIndex": 21,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 79,
+          "statementIndex": 57,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 80,
+          "statementIndex": 0,
+          "scope": "/actions/task-runs/read",
+          "queries": 2
+        },
+        {
+          "contextIndex": 80,
+          "statementIndex": 33,
+          "scope": "/actions/task-runs/read",
+          "queries": 1
+        },
+        {
+          "contextIndex": 81,
+          "statementIndex": 0,
+          "scope": "/actions/coordinator/poll",
+          "queries": 7
+        },
+        {
+          "contextIndex": 81,
+          "statementIndex": 33,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 81,
+          "statementIndex": 35,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 81,
+          "statementIndex": 37,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 81,
+          "statementIndex": 39,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 81,
+          "statementIndex": 40,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 81,
+          "statementIndex": 41,
+          "scope": "/actions/coordinator/poll",
+          "queries": 2
+        },
+        {
+          "contextIndex": 81,
+          "statementIndex": 42,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 81,
+          "statementIndex": 43,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 81,
+          "statementIndex": 47,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 81,
+          "statementIndex": 48,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 81,
+          "statementIndex": 49,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 81,
+          "statementIndex": 51,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 81,
+          "statementIndex": 52,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 81,
+          "statementIndex": 53,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 82,
+          "statementIndex": 0,
+          "scope": "/actions/threads/poll",
+          "queries": 2
+        },
+        {
+          "contextIndex": 83,
+          "statementIndex": 0,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 83,
+          "statementIndex": 36,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 83,
+          "statementIndex": 38,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 84,
+          "statementIndex": 7,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 84,
+          "statementIndex": 10,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 84,
+          "statementIndex": 58,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 85,
+          "statementIndex": 18,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 85,
+          "statementIndex": 19,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 86,
+          "statementIndex": 0,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 86,
+          "statementIndex": 21,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 87,
+          "statementIndex": 0,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 87,
+          "statementIndex": 21,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 87,
+          "statementIndex": 27,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 87,
+          "statementIndex": 28,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 87,
+          "statementIndex": 60,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 88,
+          "statementIndex": 24,
+          "scope": "/api/agent/sessions",
+          "queries": 1
+        },
+        {
+          "contextIndex": 88,
+          "statementIndex": 25,
+          "scope": "/api/agent/sessions",
+          "queries": 1
+        },
+        {
+          "contextIndex": 89,
+          "statementIndex": 0,
+          "scope": "/api/desktop/rpc",
+          "queries": 11
+        },
+        {
+          "contextIndex": 89,
+          "statementIndex": 21,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 89,
+          "statementIndex": 35,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 89,
+          "statementIndex": 39,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 89,
+          "statementIndex": 40,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 89,
+          "statementIndex": 41,
+          "scope": "/api/desktop/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 89,
+          "statementIndex": 42,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 89,
+          "statementIndex": 43,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 89,
+          "statementIndex": 46,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 89,
+          "statementIndex": 47,
+          "scope": "/api/desktop/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 89,
+          "statementIndex": 48,
+          "scope": "/api/desktop/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 90,
+          "statementIndex": 32,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 91,
+          "statementIndex": 21,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 91,
+          "statementIndex": 30,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 92,
+          "statementIndex": 0,
+          "scope": "/actions/task-runs/read",
+          "queries": 2
+        },
+        {
+          "contextIndex": 92,
+          "statementIndex": 33,
+          "scope": "/actions/task-runs/read",
+          "queries": 1
+        },
+        {
+          "contextIndex": 93,
+          "statementIndex": 34,
+          "scope": "/actions/projects/list",
+          "queries": 1
+        },
+        {
+          "contextIndex": 94,
+          "statementIndex": 0,
+          "scope": "/actions/coordinator/poll",
+          "queries": 9
+        },
+        {
+          "contextIndex": 94,
+          "statementIndex": 33,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 94,
+          "statementIndex": 35,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 94,
+          "statementIndex": 37,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 94,
+          "statementIndex": 39,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 94,
+          "statementIndex": 40,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 94,
+          "statementIndex": 41,
+          "scope": "/actions/coordinator/poll",
+          "queries": 2
+        },
+        {
+          "contextIndex": 94,
+          "statementIndex": 42,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 94,
+          "statementIndex": 43,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 94,
+          "statementIndex": 47,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 94,
+          "statementIndex": 48,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 95,
+          "statementIndex": 0,
+          "scope": "/actions/threads/poll",
+          "queries": 4
+        },
+        {
+          "contextIndex": 96,
+          "statementIndex": 0,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 96,
+          "statementIndex": 36,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 96,
+          "statementIndex": 38,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 97,
+          "statementIndex": 0,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 97,
+          "statementIndex": 11,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 97,
+          "statementIndex": 12,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 98,
+          "statementIndex": 0,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 98,
+          "statementIndex": 11,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 98,
+          "statementIndex": 12,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 99,
+          "statementIndex": 21,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 99,
+          "statementIndex": 55,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 100,
+          "statementIndex": 0,
+          "scope": "/actions/issues/poll",
+          "queries": 6
+        },
+        {
+          "contextIndex": 100,
+          "statementIndex": 33,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 100,
+          "statementIndex": 57,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 101,
+          "statementIndex": 0,
+          "scope": "/api/mobile/reactions",
+          "queries": 1
+        },
+        {
+          "contextIndex": 102,
+          "statementIndex": 0,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 102,
+          "statementIndex": 21,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 102,
+          "statementIndex": 27,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 102,
+          "statementIndex": 28,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 102,
+          "statementIndex": 60,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 103,
+          "statementIndex": 0,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 103,
+          "statementIndex": 21,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 104,
+          "statementIndex": 32,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 105,
+          "statementIndex": 21,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 105,
+          "statementIndex": 55,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 106,
+          "statementIndex": 30,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 107,
+          "statementIndex": 0,
+          "scope": "/actions/task-runs/read",
+          "queries": 2
+        },
+        {
+          "contextIndex": 107,
+          "statementIndex": 33,
+          "scope": "/actions/task-runs/read",
+          "queries": 1
+        },
+        {
+          "contextIndex": 108,
+          "statementIndex": 0,
+          "scope": "/actions/issues/poll",
+          "queries": 3
+        },
+        {
+          "contextIndex": 108,
+          "statementIndex": 21,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 108,
+          "statementIndex": 33,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 108,
+          "statementIndex": 57,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 109,
+          "statementIndex": 0,
+          "scope": "/actions/coordinator/poll",
+          "queries": 7
+        },
+        {
+          "contextIndex": 109,
+          "statementIndex": 33,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 109,
+          "statementIndex": 35,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 109,
+          "statementIndex": 37,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 109,
+          "statementIndex": 39,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 109,
+          "statementIndex": 40,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 109,
+          "statementIndex": 41,
+          "scope": "/actions/coordinator/poll",
+          "queries": 2
+        },
+        {
+          "contextIndex": 109,
+          "statementIndex": 42,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 109,
+          "statementIndex": 43,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 109,
+          "statementIndex": 47,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 109,
+          "statementIndex": 48,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 110,
+          "statementIndex": 0,
+          "scope": "/actions/threads/poll",
+          "queries": 2
+        },
+        {
+          "contextIndex": 111,
+          "statementIndex": 0,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 111,
+          "statementIndex": 36,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 111,
+          "statementIndex": 38,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 112,
+          "statementIndex": 0,
+          "scope": "/v1/devices/[deviceId]/commands",
+          "queries": 2
+        },
+        {
+          "contextIndex": 112,
+          "statementIndex": 50,
+          "scope": "/v1/devices/[deviceId]/commands",
+          "queries": 1
+        },
+        {
+          "contextIndex": 112,
+          "statementIndex": 71,
+          "scope": "/v1/devices/[deviceId]/commands",
+          "queries": 1
+        },
+        {
+          "contextIndex": 112,
+          "statementIndex": 73,
+          "scope": "/v1/devices/[deviceId]/commands",
+          "queries": 1
+        },
+        {
+          "contextIndex": 112,
+          "statementIndex": 77,
+          "scope": "/v1/devices/[deviceId]/commands",
+          "queries": 1
+        }
+      ]
+    },
+    "webLogin": {
+      "capturedQueries": 402,
+      "uncapturedQueries": 0,
+      "operationAndSourceCountersReconciled": true,
+      "reportedStatus": "incomplete",
+      "reasons": [
+        "query_context_unknown",
+        "statement_structure_unknown"
+      ],
+      "knownContextQueries": 325,
+      "unknownContextQueries": 77,
+      "unknownContextByScope": {
+        "/api/conversations/[id]/read": 15,
+        "/api/pending-actions": 4,
+        "/api/approved-writes": 40,
+        "/api/conversations": 18
+      },
+      "unknownStatementQueries": 134,
+      "unknownStatementByScope": {
+        "/api/conversations/[id]/read": 4,
+        "/api/workspace/switcher": 4,
+        "/api/workspace": 4,
+        "/actions/coordinator/summaries": 8,
+        "/actions/threads/poll": 16,
+        "/api/rpc": 23,
+        "/api/approved-writes": 12,
+        "/actions/coordinator/poll": 36,
+        "/api/live/ticket": 3,
+        "/actions/issues/poll": 19,
+        "/api/conversations": 4,
+        "/api/mobile/reactions": 1
+      },
+      "capturedNullActionQueries": 74,
+      "nullActionQueriesWithLaterReceiptAction": 0,
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "fromQueryCalls": 25930,
+          "toQueryCalls": 25949,
+          "queries": 19,
+          "unknownContextQueries": 0,
+          "unknownStatementQueries": 0
+        },
+        {
+          "phase": "web-navigation-to-dom-content-loaded",
+          "fromQueryCalls": 25949,
+          "toQueryCalls": 25949,
+          "queries": 0,
+          "unknownContextQueries": 0,
+          "unknownStatementQueries": 0
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "fromQueryCalls": 25949,
+          "toQueryCalls": 26332,
+          "queries": 383,
+          "unknownContextQueries": 77,
+          "unknownStatementQueries": 134
+        }
+      ],
+      "groups": [
+        {
+          "contextIndex": 0,
+          "statementIndex": 0,
+          "scope": "/api/conversations",
+          "queries": 4
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 0,
+          "scope": "/api/conversations/[id]/read",
+          "queries": 4
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 0,
+          "scope": "/api/approved-writes",
+          "queries": 12
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 11,
+          "scope": "/api/approved-writes",
+          "queries": 4
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 12,
+          "scope": "/api/approved-writes",
+          "queries": 4
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 21,
+          "scope": "/api/conversations/[id]/read",
+          "queries": 3
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 22,
+          "scope": "/api/conversations/[id]/read",
+          "queries": 3
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 23,
+          "scope": "/api/conversations/[id]/read",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 26,
+          "scope": "/api/pending-actions",
+          "queries": 4
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 44,
+          "scope": "/api/approved-writes",
+          "queries": 8
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 45,
+          "scope": "/api/approved-writes",
+          "queries": 8
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 50,
+          "scope": "/api/conversations",
+          "queries": 4
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 50,
+          "scope": "/api/approved-writes",
+          "queries": 4
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 54,
+          "scope": "/api/conversations",
+          "queries": 4
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 56,
+          "scope": "/api/conversations",
+          "queries": 6
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 59,
+          "scope": "/api/conversations/[id]/read",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 61,
+          "scope": "/api/conversations/[id]/read",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 62,
+          "scope": "/api/conversations/[id]/read",
+          "queries": 1
+        },
+        {
+          "contextIndex": 1,
+          "statementIndex": 1,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 1,
+          "statementIndex": 2,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 1,
+          "statementIndex": 3,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 1,
+          "statementIndex": 4,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 1,
+          "statementIndex": 5,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 1,
+          "statementIndex": 6,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 1,
+          "statementIndex": 7,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 1,
+          "statementIndex": 8,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 1,
+          "statementIndex": 9,
+          "scope": "/api/auth/[...all]",
+          "queries": 2
+        },
+        {
+          "contextIndex": 1,
+          "statementIndex": 10,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 1,
+          "statementIndex": 11,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 1,
+          "statementIndex": 12,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 1,
+          "statementIndex": 13,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 1,
+          "statementIndex": 14,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 1,
+          "statementIndex": 15,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 1,
+          "statementIndex": 16,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 2,
+          "statementIndex": 1,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 2,
+          "statementIndex": 2,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 3,
+          "statementIndex": 1,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 3,
+          "statementIndex": 17,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 3,
+          "statementIndex": 20,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 4,
+          "statementIndex": 18,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 4,
+          "statementIndex": 19,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 5,
+          "statementIndex": 0,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 5,
+          "statementIndex": 12,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 5,
+          "statementIndex": 21,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 5,
+          "statementIndex": 29,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 6,
+          "statementIndex": 0,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 6,
+          "statementIndex": 21,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 6,
+          "statementIndex": 27,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 6,
+          "statementIndex": 28,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 6,
+          "statementIndex": 31,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 7,
+          "statementIndex": 24,
+          "scope": "/api/agent/sessions",
+          "queries": 1
+        },
+        {
+          "contextIndex": 7,
+          "statementIndex": 25,
+          "scope": "/api/agent/sessions",
+          "queries": 1
+        },
+        {
+          "contextIndex": 8,
+          "statementIndex": 21,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 8,
+          "statementIndex": 30,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 9,
+          "statementIndex": 32,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 10,
+          "statementIndex": 0,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 2
+        },
+        {
+          "contextIndex": 10,
+          "statementIndex": 33,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 10,
+          "statementIndex": 36,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 10,
+          "statementIndex": 38,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 11,
+          "statementIndex": 21,
+          "scope": "/actions/projects/list",
+          "queries": 1
+        },
+        {
+          "contextIndex": 11,
+          "statementIndex": 34,
+          "scope": "/actions/projects/list",
+          "queries": 1
+        },
+        {
+          "contextIndex": 12,
+          "statementIndex": 0,
+          "scope": "/api/rpc",
+          "queries": 12
+        },
+        {
+          "contextIndex": 12,
+          "statementIndex": 21,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 12,
+          "statementIndex": 35,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 12,
+          "statementIndex": 39,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 12,
+          "statementIndex": 40,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 12,
+          "statementIndex": 41,
+          "scope": "/api/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 12,
+          "statementIndex": 42,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 12,
+          "statementIndex": 43,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 12,
+          "statementIndex": 46,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 12,
+          "statementIndex": 47,
+          "scope": "/api/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 12,
+          "statementIndex": 48,
+          "scope": "/api/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 12,
+          "statementIndex": 49,
+          "scope": "/api/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 12,
+          "statementIndex": 51,
+          "scope": "/api/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 12,
+          "statementIndex": 52,
+          "scope": "/api/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 12,
+          "statementIndex": 53,
+          "scope": "/api/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 13,
+          "statementIndex": 0,
+          "scope": "/actions/threads/poll",
+          "queries": 5
+        },
+        {
+          "contextIndex": 13,
+          "statementIndex": 33,
+          "scope": "/actions/threads/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 14,
+          "statementIndex": 0,
+          "scope": "/actions/coordinator/poll",
+          "queries": 10
+        },
+        {
+          "contextIndex": 14,
+          "statementIndex": 21,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 14,
+          "statementIndex": 33,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 14,
+          "statementIndex": 35,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 14,
+          "statementIndex": 37,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 14,
+          "statementIndex": 39,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 14,
+          "statementIndex": 40,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 14,
+          "statementIndex": 41,
+          "scope": "/actions/coordinator/poll",
+          "queries": 2
+        },
+        {
+          "contextIndex": 14,
+          "statementIndex": 42,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 14,
+          "statementIndex": 43,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 14,
+          "statementIndex": 47,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 14,
+          "statementIndex": 48,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 14,
+          "statementIndex": 49,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 14,
+          "statementIndex": 51,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 14,
+          "statementIndex": 52,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 14,
+          "statementIndex": 53,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 15,
+          "statementIndex": 0,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 15,
+          "statementIndex": 11,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 15,
+          "statementIndex": 12,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 16,
+          "statementIndex": 21,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 16,
+          "statementIndex": 55,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 17,
+          "statementIndex": 0,
+          "scope": "/actions/issues/poll",
+          "queries": 5
+        },
+        {
+          "contextIndex": 17,
+          "statementIndex": 21,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 17,
+          "statementIndex": 33,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 17,
+          "statementIndex": 57,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 18,
+          "statementIndex": 0,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 18,
+          "statementIndex": 12,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 18,
+          "statementIndex": 21,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 18,
+          "statementIndex": 29,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 19,
+          "statementIndex": 0,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 19,
+          "statementIndex": 21,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 19,
+          "statementIndex": 27,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 19,
+          "statementIndex": 28,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 19,
+          "statementIndex": 31,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 20,
+          "statementIndex": 21,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 20,
+          "statementIndex": 55,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 21,
+          "statementIndex": 21,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 21,
+          "statementIndex": 30,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 22,
+          "statementIndex": 32,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 23,
+          "statementIndex": 0,
+          "scope": "/actions/issues/poll",
+          "queries": 4
+        },
+        {
+          "contextIndex": 23,
+          "statementIndex": 21,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 23,
+          "statementIndex": 33,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 23,
+          "statementIndex": 57,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 24,
+          "statementIndex": 0,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 2
+        },
+        {
+          "contextIndex": 24,
+          "statementIndex": 33,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 24,
+          "statementIndex": 36,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 24,
+          "statementIndex": 38,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 25,
+          "statementIndex": 0,
+          "scope": "/actions/threads/poll",
+          "queries": 3
+        },
+        {
+          "contextIndex": 25,
+          "statementIndex": 33,
+          "scope": "/actions/threads/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 26,
+          "statementIndex": 0,
+          "scope": "/actions/coordinator/poll",
+          "queries": 8
+        },
+        {
+          "contextIndex": 26,
+          "statementIndex": 21,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 26,
+          "statementIndex": 33,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 26,
+          "statementIndex": 35,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 26,
+          "statementIndex": 37,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 26,
+          "statementIndex": 39,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 26,
+          "statementIndex": 40,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 26,
+          "statementIndex": 41,
+          "scope": "/actions/coordinator/poll",
+          "queries": 2
+        },
+        {
+          "contextIndex": 26,
+          "statementIndex": 42,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 26,
+          "statementIndex": 43,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 26,
+          "statementIndex": 47,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 26,
+          "statementIndex": 48,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 26,
+          "statementIndex": 49,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 26,
+          "statementIndex": 51,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 26,
+          "statementIndex": 52,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 26,
+          "statementIndex": 53,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 27,
+          "statementIndex": 7,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 27,
+          "statementIndex": 10,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 27,
+          "statementIndex": 58,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 28,
+          "statementIndex": 1,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 28,
+          "statementIndex": 2,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 29,
+          "statementIndex": 18,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 29,
+          "statementIndex": 19,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 30,
+          "statementIndex": 21,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 30,
+          "statementIndex": 30,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 31,
+          "statementIndex": 32,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 32,
+          "statementIndex": 0,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 32,
+          "statementIndex": 21,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 32,
+          "statementIndex": 27,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 32,
+          "statementIndex": 28,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 32,
+          "statementIndex": 60,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 33,
+          "statementIndex": 0,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 33,
+          "statementIndex": 12,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 33,
+          "statementIndex": 21,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 33,
+          "statementIndex": 29,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 34,
+          "statementIndex": 0,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 2
+        },
+        {
+          "contextIndex": 34,
+          "statementIndex": 33,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 34,
+          "statementIndex": 36,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 34,
+          "statementIndex": 38,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 35,
+          "statementIndex": 21,
+          "scope": "/actions/projects/list",
+          "queries": 1
+        },
+        {
+          "contextIndex": 35,
+          "statementIndex": 34,
+          "scope": "/actions/projects/list",
+          "queries": 1
+        },
+        {
+          "contextIndex": 36,
+          "statementIndex": 0,
+          "scope": "/api/rpc",
+          "queries": 11
+        },
+        {
+          "contextIndex": 36,
+          "statementIndex": 21,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 36,
+          "statementIndex": 35,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 36,
+          "statementIndex": 39,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 36,
+          "statementIndex": 40,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 36,
+          "statementIndex": 41,
+          "scope": "/api/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 36,
+          "statementIndex": 42,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 36,
+          "statementIndex": 43,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 36,
+          "statementIndex": 46,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 36,
+          "statementIndex": 47,
+          "scope": "/api/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 36,
+          "statementIndex": 48,
+          "scope": "/api/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 37,
+          "statementIndex": 0,
+          "scope": "/actions/threads/poll",
+          "queries": 5
+        },
+        {
+          "contextIndex": 37,
+          "statementIndex": 33,
+          "scope": "/actions/threads/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 38,
+          "statementIndex": 0,
+          "scope": "/actions/coordinator/poll",
+          "queries": 10
+        },
+        {
+          "contextIndex": 38,
+          "statementIndex": 21,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 38,
+          "statementIndex": 33,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 38,
+          "statementIndex": 35,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 38,
+          "statementIndex": 37,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 38,
+          "statementIndex": 39,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 38,
+          "statementIndex": 40,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 38,
+          "statementIndex": 41,
+          "scope": "/actions/coordinator/poll",
+          "queries": 2
+        },
+        {
+          "contextIndex": 38,
+          "statementIndex": 42,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 38,
+          "statementIndex": 43,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 38,
+          "statementIndex": 47,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 38,
+          "statementIndex": 48,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 39,
+          "statementIndex": 24,
+          "scope": "/api/agent/sessions",
+          "queries": 1
+        },
+        {
+          "contextIndex": 39,
+          "statementIndex": 25,
+          "scope": "/api/agent/sessions",
+          "queries": 1
+        },
+        {
+          "contextIndex": 40,
+          "statementIndex": 21,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 40,
+          "statementIndex": 55,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 41,
+          "statementIndex": 0,
+          "scope": "/actions/issues/poll",
+          "queries": 6
+        },
+        {
+          "contextIndex": 41,
+          "statementIndex": 21,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 41,
+          "statementIndex": 33,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 41,
+          "statementIndex": 57,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 42,
+          "statementIndex": 0,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 42,
+          "statementIndex": 11,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 42,
+          "statementIndex": 12,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 43,
+          "statementIndex": 0,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 43,
+          "statementIndex": 11,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 43,
+          "statementIndex": 12,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 44,
+          "statementIndex": 0,
+          "scope": "/api/mobile/reactions",
+          "queries": 1
+        },
+        {
+          "contextIndex": 45,
+          "statementIndex": 21,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 45,
+          "statementIndex": 55,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 46,
+          "statementIndex": 0,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 46,
+          "statementIndex": 12,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 46,
+          "statementIndex": 21,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 46,
+          "statementIndex": 29,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 47,
+          "statementIndex": 21,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 47,
+          "statementIndex": 30,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 48,
+          "statementIndex": 0,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 48,
+          "statementIndex": 21,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 48,
+          "statementIndex": 27,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 48,
+          "statementIndex": 28,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 48,
+          "statementIndex": 60,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 49,
+          "statementIndex": 32,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 50,
+          "statementIndex": 0,
+          "scope": "/actions/issues/poll",
+          "queries": 4
+        },
+        {
+          "contextIndex": 50,
+          "statementIndex": 21,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 50,
+          "statementIndex": 33,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 50,
+          "statementIndex": 57,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 51,
+          "statementIndex": 0,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 2
+        },
+        {
+          "contextIndex": 51,
+          "statementIndex": 33,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 51,
+          "statementIndex": 36,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 51,
+          "statementIndex": 38,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 52,
+          "statementIndex": 0,
+          "scope": "/actions/threads/poll",
+          "queries": 3
+        },
+        {
+          "contextIndex": 52,
+          "statementIndex": 33,
+          "scope": "/actions/threads/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 53,
+          "statementIndex": 0,
+          "scope": "/actions/coordinator/poll",
+          "queries": 8
+        },
+        {
+          "contextIndex": 53,
+          "statementIndex": 21,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 53,
+          "statementIndex": 33,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 53,
+          "statementIndex": 35,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 53,
+          "statementIndex": 37,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 53,
+          "statementIndex": 39,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 53,
+          "statementIndex": 40,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 53,
+          "statementIndex": 41,
+          "scope": "/actions/coordinator/poll",
+          "queries": 2
+        },
+        {
+          "contextIndex": 53,
+          "statementIndex": 42,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 53,
+          "statementIndex": 43,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 53,
+          "statementIndex": 47,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 53,
+          "statementIndex": 48,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        }
+      ]
+    },
+    "startup-bundled": {
+      "capturedQueries": 176,
+      "uncapturedQueries": 0,
+      "operationAndSourceCountersReconciled": true,
+      "reportedStatus": "incomplete",
+      "reasons": [
+        "query_context_unknown",
+        "statement_structure_unknown"
+      ],
+      "knownContextQueries": 133,
+      "unknownContextQueries": 43,
+      "unknownContextByScope": {
+        "/api/devices/enrollment": 2,
+        "/api/conversations/[id]/read": 9,
+        "/api/conversations": 10,
+        "/api/pending-actions": 2,
+        "/api/approved-writes": 20
+      },
+      "unknownStatementQueries": 70,
+      "unknownStatementByScope": {
+        "/api/live/ticket": 2,
+        "/api/conversations/[id]/read": 2,
+        "/api/mobile/reactions": 1,
+        "/api/workspace": 2,
+        "/api/workspace/switcher": 2,
+        "/api/conversations": 2,
+        "/api/desktop/rpc": 11,
+        "/actions/task-runs/read": 2,
+        "/api/approved-writes": 6,
+        "/actions/threads/poll": 5,
+        "/actions/coordinator/summaries": 2,
+        "/actions/issues/poll": 11,
+        "/actions/coordinator/poll": 22
+      },
+      "capturedNullActionQueries": 23,
+      "nullActionQueriesWithLaterReceiptAction": 0,
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "fromQueryCalls": 27351,
+          "toQueryCalls": 27527,
+          "queries": 176,
+          "unknownContextQueries": 43,
+          "unknownStatementQueries": 70
+        }
+      ],
+      "groups": [
+        {
+          "contextIndex": 0,
+          "statementIndex": 0,
+          "scope": "/api/conversations",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 0,
+          "scope": "/api/conversations/[id]/read",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 0,
+          "scope": "/api/approved-writes",
+          "queries": 6
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 11,
+          "scope": "/api/approved-writes",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 11,
+          "scope": "/api/devices/enrollment",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 12,
+          "scope": "/api/approved-writes",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 12,
+          "scope": "/api/devices/enrollment",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 21,
+          "scope": "/api/conversations/[id]/read",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 22,
+          "scope": "/api/conversations/[id]/read",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 23,
+          "scope": "/api/conversations/[id]/read",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 26,
+          "scope": "/api/pending-actions",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 44,
+          "scope": "/api/approved-writes",
+          "queries": 4
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 45,
+          "scope": "/api/approved-writes",
+          "queries": 4
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 50,
+          "scope": "/api/conversations",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 50,
+          "scope": "/api/approved-writes",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 54,
+          "scope": "/api/conversations",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 56,
+          "scope": "/api/conversations",
+          "queries": 4
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 61,
+          "scope": "/api/conversations/[id]/read",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 62,
+          "scope": "/api/conversations/[id]/read",
+          "queries": 1
+        },
+        {
+          "contextIndex": 170,
+          "statementIndex": 18,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 170,
+          "statementIndex": 19,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 171,
+          "statementIndex": 0,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 171,
+          "statementIndex": 11,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 171,
+          "statementIndex": 12,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 172,
+          "statementIndex": 0,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 172,
+          "statementIndex": 11,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 172,
+          "statementIndex": 12,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 173,
+          "statementIndex": 0,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 173,
+          "statementIndex": 21,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 174,
+          "statementIndex": 0,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 174,
+          "statementIndex": 21,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 174,
+          "statementIndex": 27,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 174,
+          "statementIndex": 28,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 174,
+          "statementIndex": 60,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 175,
+          "statementIndex": 0,
+          "scope": "/api/mobile/reactions",
+          "queries": 1
+        },
+        {
+          "contextIndex": 176,
+          "statementIndex": 24,
+          "scope": "/api/agent/sessions",
+          "queries": 1
+        },
+        {
+          "contextIndex": 176,
+          "statementIndex": 25,
+          "scope": "/api/agent/sessions",
+          "queries": 1
+        },
+        {
+          "contextIndex": 177,
+          "statementIndex": 0,
+          "scope": "/api/desktop/rpc",
+          "queries": 11
+        },
+        {
+          "contextIndex": 177,
+          "statementIndex": 21,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 177,
+          "statementIndex": 35,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 177,
+          "statementIndex": 39,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 177,
+          "statementIndex": 40,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 177,
+          "statementIndex": 41,
+          "scope": "/api/desktop/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 177,
+          "statementIndex": 42,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 177,
+          "statementIndex": 43,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 177,
+          "statementIndex": 46,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 177,
+          "statementIndex": 47,
+          "scope": "/api/desktop/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 177,
+          "statementIndex": 48,
+          "scope": "/api/desktop/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 178,
+          "statementIndex": 32,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 179,
+          "statementIndex": 21,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 179,
+          "statementIndex": 55,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 180,
+          "statementIndex": 0,
+          "scope": "/actions/task-runs/read",
+          "queries": 2
+        },
+        {
+          "contextIndex": 180,
+          "statementIndex": 33,
+          "scope": "/actions/task-runs/read",
+          "queries": 1
+        },
+        {
+          "contextIndex": 181,
+          "statementIndex": 30,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 182,
+          "statementIndex": 34,
+          "scope": "/actions/projects/list",
+          "queries": 1
+        },
+        {
+          "contextIndex": 183,
+          "statementIndex": 0,
+          "scope": "/actions/coordinator/poll",
+          "queries": 11
+        },
+        {
+          "contextIndex": 183,
+          "statementIndex": 33,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 183,
+          "statementIndex": 35,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 183,
+          "statementIndex": 37,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 183,
+          "statementIndex": 39,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 183,
+          "statementIndex": 40,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 183,
+          "statementIndex": 41,
+          "scope": "/actions/coordinator/poll",
+          "queries": 2
+        },
+        {
+          "contextIndex": 183,
+          "statementIndex": 42,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 183,
+          "statementIndex": 43,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 183,
+          "statementIndex": 47,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 183,
+          "statementIndex": 48,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 184,
+          "statementIndex": 0,
+          "scope": "/actions/threads/poll",
+          "queries": 2
+        },
+        {
+          "contextIndex": 185,
+          "statementIndex": 0,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 185,
+          "statementIndex": 36,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 185,
+          "statementIndex": 38,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 186,
+          "statementIndex": 0,
+          "scope": "/actions/issues/poll",
+          "queries": 5
+        },
+        {
+          "contextIndex": 186,
+          "statementIndex": 57,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 187,
+          "statementIndex": 0,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 187,
+          "statementIndex": 21,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 188,
+          "statementIndex": 0,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 188,
+          "statementIndex": 21,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 188,
+          "statementIndex": 27,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 188,
+          "statementIndex": 28,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 188,
+          "statementIndex": 60,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 189,
+          "statementIndex": 32,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 190,
+          "statementIndex": 21,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 190,
+          "statementIndex": 55,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 191,
+          "statementIndex": 30,
+          "scope": "/api/desktop/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 192,
+          "statementIndex": 0,
+          "scope": "/actions/threads/poll",
+          "queries": 3
+        },
+        {
+          "contextIndex": 192,
+          "statementIndex": 33,
+          "scope": "/actions/threads/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 193,
+          "statementIndex": 0,
+          "scope": "/actions/coordinator/poll",
+          "queries": 11
+        },
+        {
+          "contextIndex": 193,
+          "statementIndex": 21,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 193,
+          "statementIndex": 33,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 193,
+          "statementIndex": 35,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 193,
+          "statementIndex": 37,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 193,
+          "statementIndex": 39,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 193,
+          "statementIndex": 40,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 193,
+          "statementIndex": 41,
+          "scope": "/actions/coordinator/poll",
+          "queries": 2
+        },
+        {
+          "contextIndex": 193,
+          "statementIndex": 42,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 193,
+          "statementIndex": 43,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 193,
+          "statementIndex": 47,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 193,
+          "statementIndex": 48,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 194,
+          "statementIndex": 0,
+          "scope": "/actions/issues/poll",
+          "queries": 6
+        },
+        {
+          "contextIndex": 194,
+          "statementIndex": 21,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 194,
+          "statementIndex": 33,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 194,
+          "statementIndex": 57,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 195,
+          "statementIndex": 0,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 195,
+          "statementIndex": 36,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 195,
+          "statementIndex": 38,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        }
+      ]
+    },
+    "startup-hosted": {
+      "capturedQueries": 194,
+      "uncapturedQueries": 0,
+      "operationAndSourceCountersReconciled": true,
+      "reportedStatus": "incomplete",
+      "reasons": [
+        "query_context_unknown",
+        "statement_structure_unknown"
+      ],
+      "knownContextQueries": 151,
+      "unknownContextQueries": 43,
+      "unknownContextByScope": {
+        "/api/devices/enrollment": 2,
+        "/api/conversations/[id]/read": 9,
+        "/api/conversations": 10,
+        "/api/pending-actions": 2,
+        "/api/approved-writes": 20
+      },
+      "unknownStatementQueries": 72,
+      "unknownStatementByScope": {
+        "/api/live/ticket": 2,
+        "/api/conversations/[id]/read": 2,
+        "/api/conversations": 2,
+        "/api/workspace/switcher": 2,
+        "/api/workspace": 2,
+        "/api/mobile/reactions": 1,
+        "/actions/task-runs/read": 4,
+        "/actions/coordinator/summaries": 4,
+        "/api/rpc": 11,
+        "/actions/issues/poll": 10,
+        "/actions/threads/poll": 6,
+        "/api/approved-writes": 6,
+        "/actions/coordinator/poll": 20
+      },
+      "capturedNullActionQueries": 29,
+      "nullActionQueriesWithLaterReceiptAction": 0,
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "fromQueryCalls": 27530,
+          "toQueryCalls": 27724,
+          "queries": 194,
+          "unknownContextQueries": 43,
+          "unknownStatementQueries": 72
+        }
+      ],
+      "groups": [
+        {
+          "contextIndex": 0,
+          "statementIndex": 0,
+          "scope": "/api/conversations",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 0,
+          "scope": "/api/conversations/[id]/read",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 0,
+          "scope": "/api/approved-writes",
+          "queries": 6
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 11,
+          "scope": "/api/approved-writes",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 11,
+          "scope": "/api/devices/enrollment",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 12,
+          "scope": "/api/approved-writes",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 12,
+          "scope": "/api/devices/enrollment",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 21,
+          "scope": "/api/conversations/[id]/read",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 22,
+          "scope": "/api/conversations/[id]/read",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 23,
+          "scope": "/api/conversations/[id]/read",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 26,
+          "scope": "/api/pending-actions",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 44,
+          "scope": "/api/approved-writes",
+          "queries": 4
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 45,
+          "scope": "/api/approved-writes",
+          "queries": 4
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 50,
+          "scope": "/api/conversations",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 50,
+          "scope": "/api/approved-writes",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 54,
+          "scope": "/api/conversations",
+          "queries": 2
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 56,
+          "scope": "/api/conversations",
+          "queries": 4
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 61,
+          "scope": "/api/conversations/[id]/read",
+          "queries": 1
+        },
+        {
+          "contextIndex": 0,
+          "statementIndex": 62,
+          "scope": "/api/conversations/[id]/read",
+          "queries": 1
+        },
+        {
+          "contextIndex": 197,
+          "statementIndex": 18,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 197,
+          "statementIndex": 19,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 198,
+          "statementIndex": 1,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 198,
+          "statementIndex": 2,
+          "scope": "/api/auth/[...all]",
+          "queries": 1
+        },
+        {
+          "contextIndex": 199,
+          "statementIndex": 0,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 199,
+          "statementIndex": 11,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 199,
+          "statementIndex": 12,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 200,
+          "statementIndex": 0,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 200,
+          "statementIndex": 11,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 200,
+          "statementIndex": 12,
+          "scope": "/api/live/ticket",
+          "queries": 1
+        },
+        {
+          "contextIndex": 201,
+          "statementIndex": 0,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 201,
+          "statementIndex": 12,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 201,
+          "statementIndex": 21,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 201,
+          "statementIndex": 29,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 202,
+          "statementIndex": 0,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 202,
+          "statementIndex": 21,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 202,
+          "statementIndex": 27,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 202,
+          "statementIndex": 28,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 202,
+          "statementIndex": 60,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 203,
+          "statementIndex": 24,
+          "scope": "/api/agent/sessions",
+          "queries": 1
+        },
+        {
+          "contextIndex": 203,
+          "statementIndex": 25,
+          "scope": "/api/agent/sessions",
+          "queries": 1
+        },
+        {
+          "contextIndex": 204,
+          "statementIndex": 21,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 204,
+          "statementIndex": 30,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 205,
+          "statementIndex": 0,
+          "scope": "/api/mobile/reactions",
+          "queries": 1
+        },
+        {
+          "contextIndex": 206,
+          "statementIndex": 32,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 207,
+          "statementIndex": 0,
+          "scope": "/actions/task-runs/read",
+          "queries": 2
+        },
+        {
+          "contextIndex": 207,
+          "statementIndex": 33,
+          "scope": "/actions/task-runs/read",
+          "queries": 1
+        },
+        {
+          "contextIndex": 208,
+          "statementIndex": 0,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 2
+        },
+        {
+          "contextIndex": 208,
+          "statementIndex": 33,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 208,
+          "statementIndex": 36,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 208,
+          "statementIndex": 38,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 209,
+          "statementIndex": 21,
+          "scope": "/actions/projects/list",
+          "queries": 1
+        },
+        {
+          "contextIndex": 209,
+          "statementIndex": 34,
+          "scope": "/actions/projects/list",
+          "queries": 1
+        },
+        {
+          "contextIndex": 210,
+          "statementIndex": 21,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 210,
+          "statementIndex": 55,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 211,
+          "statementIndex": 0,
+          "scope": "/api/rpc",
+          "queries": 11
+        },
+        {
+          "contextIndex": 211,
+          "statementIndex": 21,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 211,
+          "statementIndex": 35,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 211,
+          "statementIndex": 39,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 211,
+          "statementIndex": 40,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 211,
+          "statementIndex": 41,
+          "scope": "/api/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 211,
+          "statementIndex": 42,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 211,
+          "statementIndex": 43,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 211,
+          "statementIndex": 46,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 211,
+          "statementIndex": 47,
+          "scope": "/api/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 211,
+          "statementIndex": 48,
+          "scope": "/api/rpc",
+          "queries": 2
+        },
+        {
+          "contextIndex": 212,
+          "statementIndex": 0,
+          "scope": "/actions/coordinator/poll",
+          "queries": 12
+        },
+        {
+          "contextIndex": 212,
+          "statementIndex": 21,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 212,
+          "statementIndex": 33,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 212,
+          "statementIndex": 35,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 212,
+          "statementIndex": 37,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 212,
+          "statementIndex": 39,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 212,
+          "statementIndex": 40,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 212,
+          "statementIndex": 41,
+          "scope": "/actions/coordinator/poll",
+          "queries": 2
+        },
+        {
+          "contextIndex": 212,
+          "statementIndex": 42,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 212,
+          "statementIndex": 43,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 212,
+          "statementIndex": 47,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 212,
+          "statementIndex": 48,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 213,
+          "statementIndex": 0,
+          "scope": "/actions/issues/poll",
+          "queries": 6
+        },
+        {
+          "contextIndex": 213,
+          "statementIndex": 21,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 213,
+          "statementIndex": 33,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 213,
+          "statementIndex": 57,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 214,
+          "statementIndex": 0,
+          "scope": "/actions/threads/poll",
+          "queries": 3
+        },
+        {
+          "contextIndex": 214,
+          "statementIndex": 33,
+          "scope": "/actions/threads/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 215,
+          "statementIndex": 0,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 215,
+          "statementIndex": 12,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 215,
+          "statementIndex": 21,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 215,
+          "statementIndex": 29,
+          "scope": "/api/workspace/switcher",
+          "queries": 1
+        },
+        {
+          "contextIndex": 216,
+          "statementIndex": 0,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 216,
+          "statementIndex": 21,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 216,
+          "statementIndex": 27,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 216,
+          "statementIndex": 28,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 216,
+          "statementIndex": 60,
+          "scope": "/api/workspace",
+          "queries": 1
+        },
+        {
+          "contextIndex": 217,
+          "statementIndex": 21,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 217,
+          "statementIndex": 30,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 218,
+          "statementIndex": 32,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 219,
+          "statementIndex": 21,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 219,
+          "statementIndex": 55,
+          "scope": "/api/rpc",
+          "queries": 1
+        },
+        {
+          "contextIndex": 220,
+          "statementIndex": 0,
+          "scope": "/actions/threads/poll",
+          "queries": 3
+        },
+        {
+          "contextIndex": 220,
+          "statementIndex": 33,
+          "scope": "/actions/threads/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 221,
+          "statementIndex": 0,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 2
+        },
+        {
+          "contextIndex": 221,
+          "statementIndex": 33,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 221,
+          "statementIndex": 36,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 221,
+          "statementIndex": 38,
+          "scope": "/actions/coordinator/summaries",
+          "queries": 1
+        },
+        {
+          "contextIndex": 222,
+          "statementIndex": 0,
+          "scope": "/actions/coordinator/poll",
+          "queries": 8
+        },
+        {
+          "contextIndex": 222,
+          "statementIndex": 21,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 222,
+          "statementIndex": 33,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 222,
+          "statementIndex": 35,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 222,
+          "statementIndex": 37,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 222,
+          "statementIndex": 39,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 222,
+          "statementIndex": 40,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 222,
+          "statementIndex": 41,
+          "scope": "/actions/coordinator/poll",
+          "queries": 2
+        },
+        {
+          "contextIndex": 222,
+          "statementIndex": 42,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 222,
+          "statementIndex": 43,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 222,
+          "statementIndex": 47,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 222,
+          "statementIndex": 48,
+          "scope": "/actions/coordinator/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 223,
+          "statementIndex": 0,
+          "scope": "/actions/task-runs/read",
+          "queries": 2
+        },
+        {
+          "contextIndex": 223,
+          "statementIndex": 33,
+          "scope": "/actions/task-runs/read",
+          "queries": 1
+        },
+        {
+          "contextIndex": 224,
+          "statementIndex": 0,
+          "scope": "/actions/issues/poll",
+          "queries": 4
+        },
+        {
+          "contextIndex": 224,
+          "statementIndex": 21,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 224,
+          "statementIndex": 33,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        },
+        {
+          "contextIndex": 224,
+          "statementIndex": 57,
+          "scope": "/actions/issues/poll",
+          "queries": 1
+        }
+      ]
+    }
+  },
+  "interpretation": [
+    "Unknown context and unknown SQL structure are independent dimensions; every query remains in the SQL budget.",
+    "Captured null actions remain null; later receipt labels are never written back to query contexts.",
+    "Only original SQL ordinals define windows. Invocation completion timestamps only validate receipt pairing, not SQL membership.",
+    "Closed-source refinement includes background polling endpoints; it does not prove asynchronous execution. No scope label or unknown row is subtracted.",
+    "Normalized structure equality proves neither equal parameters nor redundant work. Groups are diagnostics, not permission to remove reads.",
+    "This result verifies recorded dimensions and their conservation; overall query diagnostics remain incomplete as reported."
+  ]
+}

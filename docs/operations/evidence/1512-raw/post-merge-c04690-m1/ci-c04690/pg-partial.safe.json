@@ -1,0 +1,1970 @@
+{
+  "schema": "issue1512.c04690-pg-readback.v1",
+  "sourceCheckout": "fd053d254e377f35ff8e2529edb1ad544c23fab1",
+  "sourceTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+  "expectedSuiteCount": 70,
+  "observedSuiteCount": 53,
+  "missing": [
+    "test:active-agents",
+    "test:approved-writes-db",
+    "test:bot-threads-db",
+    "test:cloud-services-db",
+    "test:coordinator-issue-tools-db",
+    "test:desktop-auth",
+    "test:factory",
+    "test:factory-checks-db",
+    "test:group-turns",
+    "test:local-repository-migration-db",
+    "test:ops-db",
+    "test:plugins-db",
+    "test:run-dispatch",
+    "test:scope-detachment-db",
+    "test:session-mailbox-db",
+    "test:suggestion-artifact-db",
+    "test:web-auth-db"
+  ],
+  "unexpected": [],
+  "anomalies": [],
+  "suites": {
+    "test:device-revocation-db": {
+      "log": "128930709969-pg1.original.log",
+      "summaries": {
+        "tests": [
+          16,
+          9,
+          5
+        ],
+        "pass": [
+          16,
+          9,
+          5
+        ],
+        "fail": [
+          0,
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0,
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:audit-db": {
+      "log": "128930709969-pg1.original.log",
+      "summaries": {
+        "tests": [
+          43
+        ],
+        "pass": [
+          43
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:workspace-admin-db": {
+      "log": "128930709969-pg1.original.log",
+      "summaries": {
+        "tests": [
+          109
+        ],
+        "pass": [
+          109
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:abuse-db": {
+      "log": "128930709969-pg1.original.log",
+      "summaries": {
+        "tests": [
+          24,
+          5
+        ],
+        "pass": [
+          24,
+          5
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:self-improvement-db": {
+      "log": "128930709969-pg1.original.log",
+      "summaries": {
+        "tests": [
+          28
+        ],
+        "pass": [
+          28
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:factory-approval-db": {
+      "log": "128930709969-pg1.original.log",
+      "summaries": {
+        "tests": [
+          52
+        ],
+        "pass": [
+          52
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:run-recovery-db": {
+      "log": "128930709969-pg1.original.log",
+      "summaries": {
+        "tests": [
+          20,
+          9,
+          11,
+          12,
+          9
+        ],
+        "pass": [
+          20,
+          9,
+          11,
+          12,
+          9
+        ],
+        "fail": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:conversation-reads": {
+      "log": "128930709969-pg1.original.log",
+      "summaries": {
+        "tests": [
+          22
+        ],
+        "pass": [
+          22
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:project-decisions-db": {
+      "log": "128930709969-pg1.original.log",
+      "summaries": {
+        "tests": [
+          39
+        ],
+        "pass": [
+          39
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:model-admission-db": {
+      "log": "128930709969-pg1.original.log",
+      "summaries": {
+        "tests": [
+          13,
+          1
+        ],
+        "pass": [
+          13,
+          1
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:agent-kit-db": {
+      "log": "128930709969-pg1.original.log",
+      "summaries": {
+        "tests": [
+          23
+        ],
+        "pass": [
+          23
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:chat-attachments-db": {
+      "log": "128930709969-pg1.original.log",
+      "summaries": {
+        "tests": [
+          6
+        ],
+        "pass": [
+          6
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:coordinator-task-binding-db": {
+      "log": "128930709969-pg1.original.log",
+      "summaries": {
+        "tests": [
+          1
+        ],
+        "pass": [
+          1
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:pat-db": {
+      "log": "128930709969-pg1.original.log",
+      "summaries": {
+        "tests": [
+          12
+        ],
+        "pass": [
+          12
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:issue-search-db": {
+      "log": "128930709969-pg1.original.log",
+      "summaries": {
+        "tests": [
+          8
+        ],
+        "pass": [
+          8
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:user-facts-db": {
+      "log": "128930709969-pg1.original.log",
+      "summaries": {
+        "tests": [
+          1
+        ],
+        "pass": [
+          1
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:factory-routing-db": {
+      "log": "128930709969-pg1.original.log",
+      "summaries": {
+        "tests": [
+          278,
+          5
+        ],
+        "pass": [
+          278,
+          5
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:settings-prefs-db": {
+      "log": "128930709969-pg1.original.log",
+      "summaries": {
+        "tests": [
+          11
+        ],
+        "pass": [
+          11
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:live-db": {
+      "log": "128930709984-pg2.original.log",
+      "summaries": {
+        "tests": [
+          10,
+          162
+        ],
+        "pass": [
+          10,
+          162
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:execution-settings-db": {
+      "log": "128930709984-pg2.original.log",
+      "summaries": {
+        "tests": [
+          5
+        ],
+        "pass": [
+          5
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:self-improvement-unit": {
+      "log": "128930709984-pg2.original.log",
+      "summaries": {
+        "tests": [
+          100
+        ],
+        "pass": [
+          100
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:account-db": {
+      "log": "128930709984-pg2.original.log",
+      "summaries": {
+        "tests": [
+          39
+        ],
+        "pass": [
+          39
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:personal-mailbox-default-off-db": {
+      "log": "128930709984-pg2.original.log",
+      "summaries": {
+        "tests": [
+          42
+        ],
+        "pass": [
+          42
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:cloud-backend-db": {
+      "log": "128930709984-pg2.original.log",
+      "summaries": {
+        "tests": [
+          215
+        ],
+        "pass": [
+          215
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:github-connections-db": {
+      "log": "128930709984-pg2.original.log",
+      "summaries": {
+        "tests": [
+          24
+        ],
+        "pass": [
+          24
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:agent-tool-approval-db": {
+      "log": "128930709984-pg2.original.log",
+      "summaries": {
+        "tests": [
+          16,
+          3
+        ],
+        "pass": [
+          16,
+          3
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:coordinator-issue-create-db": {
+      "log": "128930709984-pg2.original.log",
+      "summaries": {
+        "tests": [
+          10
+        ],
+        "pass": [
+          10
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:schedules-db": {
+      "log": "128930709984-pg2.original.log",
+      "summaries": {
+        "tests": [
+          16
+        ],
+        "pass": [
+          16
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:skill-semantic-db": {
+      "log": "128930709984-pg2.original.log",
+      "summaries": {
+        "tests": [
+          2
+        ],
+        "pass": [
+          2
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:visibility-db": {
+      "log": "128930709984-pg2.original.log",
+      "summaries": {
+        "tests": [
+          2
+        ],
+        "pass": [
+          2
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:credentials-db": {
+      "log": "128930709984-pg2.original.log",
+      "summaries": {
+        "tests": [
+          3
+        ],
+        "pass": [
+          3
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:factory-check-independence-db": {
+      "log": "128930709984-pg2.original.log",
+      "summaries": {
+        "tests": [
+          55
+        ],
+        "pass": [
+          55
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:bot-chats-db": {
+      "log": "128930709984-pg2.original.log",
+      "summaries": {
+        "tests": [
+          97
+        ],
+        "pass": [
+          97
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:onboarding-db": {
+      "log": "128930709984-pg2.original.log",
+      "summaries": {
+        "tests": [
+          5
+        ],
+        "pass": [
+          5
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:workspace-migration-db": {
+      "log": "128930709984-pg2.original.log",
+      "summaries": {
+        "tests": [
+          1
+        ],
+        "pass": [
+          1
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:relation-cycle": {
+      "log": "128930709984-pg2.original.log",
+      "summaries": {
+        "tests": [
+          6
+        ],
+        "pass": [
+          6
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:groups": {
+      "log": "128930709986-pg4.original.log",
+      "summaries": {
+        "tests": [
+          12,
+          79
+        ],
+        "pass": [
+          12,
+          79
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:computer-db": {
+      "log": "128930709986-pg4.original.log",
+      "summaries": {
+        "tests": [
+          8
+        ],
+        "pass": [
+          8
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:worker-authorization-db": {
+      "log": "128930709986-pg4.original.log",
+      "summaries": {
+        "tests": [
+          76
+        ],
+        "pass": [
+          76
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:coordinator-native": {
+      "log": "128930709986-pg4.original.log",
+      "summaries": {
+        "tests": [
+          36
+        ],
+        "pass": [
+          36
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:factory-monitor-db": {
+      "log": "128930709986-pg4.original.log",
+      "summaries": {
+        "tests": [
+          2,
+          10
+        ],
+        "pass": [
+          2,
+          10
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:pat-api-db": {
+      "log": "128930709986-pg4.original.log",
+      "summaries": {
+        "tests": [
+          37
+        ],
+        "pass": [
+          37
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:secrets-db": {
+      "log": "128930709986-pg4.original.log",
+      "summaries": {
+        "tests": [
+          89
+        ],
+        "pass": [
+          89
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:test-accounts-db": {
+      "log": "128930709986-pg4.original.log",
+      "summaries": {
+        "tests": [
+          17
+        ],
+        "pass": [
+          17
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:run-publication-db": {
+      "log": "128930709986-pg4.original.log",
+      "summaries": {
+        "tests": [
+          24,
+          1
+        ],
+        "pass": [
+          24,
+          1
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:artifact-migration-db": {
+      "log": "128930709986-pg4.original.log",
+      "summaries": {
+        "tests": [
+          1
+        ],
+        "pass": [
+          1
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:factory-all-dispatch-db": {
+      "log": "128930709986-pg4.original.log",
+      "summaries": {
+        "tests": [
+          2
+        ],
+        "pass": [
+          2
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:migration-steps-db": {
+      "log": "128930709986-pg4.original.log",
+      "summaries": {
+        "tests": [
+          1
+        ],
+        "pass": [
+          1
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:preview-driver": {
+      "log": "128930709986-pg4.original.log",
+      "summaries": {
+        "tests": [
+          1
+        ],
+        "pass": [
+          1
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:settings-activity-db": {
+      "log": "128930709986-pg4.original.log",
+      "summaries": {
+        "tests": [
+          6
+        ],
+        "pass": [
+          6
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:captures-db": {
+      "log": "128930709986-pg4.original.log",
+      "summaries": {
+        "tests": [
+          29
+        ],
+        "pass": [
+          29
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:device-enrollment-db": {
+      "log": "128930709986-pg4.original.log",
+      "summaries": {
+        "tests": [
+          10
+        ],
+        "pass": [
+          10
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    },
+    "test:activity-actor-db": {
+      "log": "128930709986-pg4.original.log",
+      "summaries": {
+        "tests": [
+          57
+        ],
+        "pass": [
+          57
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "lifecycle": [
+        {
+          "kind": "exit",
+          "code": "0",
+          "signal": "none"
+        },
+        {
+          "kind": "close",
+          "code": "0",
+          "signal": "none"
+        }
+      ]
+    }
+  },
+  "status": "partial_until_all_four_terminal_logs"
+}

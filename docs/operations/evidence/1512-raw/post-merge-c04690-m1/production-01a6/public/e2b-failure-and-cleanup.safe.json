@@ -1,0 +1,316 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512_e2b_subscription_failure_and_cleanup",
+  "sourceCommit": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "workerSha": "68271f9890a0926ab8bc0ada6582c1cbad992a8e",
+  "run": {
+    "id": 42544540108,
+    "run_number": 1341,
+    "run_attempt": 1,
+    "event": "push",
+    "head_branch": "main",
+    "status": "completed",
+    "conclusion": "failure",
+    "created_at": "2026-11-09T01:14:54Z",
+    "updated_at": "2026-11-09T01:51:02Z",
+    "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42544540108"
+  },
+  "jobs": [
+    {
+      "id": 128926575857,
+      "name": "test",
+      "head_sha": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:14:57Z",
+      "completed_at": "2026-11-09T01:15:18Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42544540108/job/128926575857"
+    },
+    {
+      "id": 128926688491,
+      "name": "check",
+      "head_sha": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:15:20Z",
+      "completed_at": "2026-11-09T01:15:37Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42544540108/job/128926688491"
+    },
+    {
+      "id": 128926785564,
+      "name": "validate / build",
+      "head_sha": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:15:39Z",
+      "completed_at": "2026-11-09T01:25:03Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42544540108/job/128926785564"
+    },
+    {
+      "id": 128929363411,
+      "name": "await-web",
+      "head_sha": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:25:05Z",
+      "completed_at": "2026-11-09T01:39:12Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42544540108/job/128929363411"
+    },
+    {
+      "id": 128933112530,
+      "name": "subscriptions",
+      "head_sha": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+      "status": "completed",
+      "conclusion": "failure",
+      "started_at": "2026-11-09T01:44:43Z",
+      "completed_at": "2026-11-09T01:50:38Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42544540108/job/128933112530"
+    },
+    {
+      "id": 128936104334,
+      "name": "cleanup",
+      "head_sha": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:50:40Z",
+      "completed_at": "2026-11-09T01:51:01Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42544540108/job/128936104334"
+    },
+    {
+      "id": 128936105247,
+      "name": "publish",
+      "head_sha": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+      "status": "completed",
+      "conclusion": "skipped",
+      "started_at": "2026-11-09T01:50:38Z",
+      "completed_at": "2026-11-09T01:50:38Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42544540108/job/128936105247"
+    }
+  ],
+  "subscriptionStep": {
+    "name": "Require real Claude Code and Codex subscriptions on the private candidates",
+    "status": "completed",
+    "conclusion": "failure",
+    "number": 12,
+    "started_at": "2026-11-09T01:45:10Z",
+    "completed_at": "2026-11-09T01:50:35Z"
+  },
+  "status": "failed",
+  "code": "template_gate_subscription_or_cleanup_failed",
+  "failures": [
+    {
+      "kind": "claude",
+      "stage": "receipt",
+      "code": "template_gate_bootstrap_proof_invalid",
+      "runIdHash": null,
+      "sampleStatus": "failed",
+      "sampleError": "startup_dispatch_refused",
+      "failure": {
+        "phase": "coordinator_stream",
+        "code": "startup_dispatch_refused"
+      },
+      "cleanupErrors": [],
+      "observation": {
+        "lastStatus": "unavailable",
+        "agentStart": false,
+        "providerChunk": false,
+        "agentStartStage": null,
+        "cliInit": null,
+        "replyVerified": false,
+        "replyVerifiedAfterTool": false,
+        "successfulTool": false,
+        "runtimeTimingStatus": "unavailable",
+        "expectedAgentAck": false,
+        "runtimeEvidence": {
+          "status": "unavailable",
+          "reason": "runtime_receipt_incomplete"
+        }
+      },
+      "candidateProof": {
+        "sourceCommit": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+        "workerSha": "68271f9890a0926ab8bc0ada6582c1cbad992a8e",
+        "templateId": "ek1zwnqzwbghai17b0zd",
+        "harness": "claude_code",
+        "binarySha256": "86cb722ab68348877dba7971e4d0c659919e05e6228c05e006e83da320e656ef",
+        "version": "2.1.305"
+      },
+      "configuredModelFromExactSource": "claude-haiku-5-5"
+    },
+    {
+      "kind": "codex",
+      "stage": "receipt",
+      "code": "template_gate_bootstrap_proof_invalid",
+      "runIdHash": null,
+      "sampleStatus": "failed",
+      "sampleError": "startup_timeout",
+      "failure": {
+        "phase": "coordinator_stream",
+        "code": "startup_timeout"
+      },
+      "cleanupErrors": [],
+      "observation": {
+        "lastStatus": "unavailable",
+        "agentStart": false,
+        "providerChunk": false,
+        "agentStartStage": null,
+        "cliInit": null,
+        "replyVerified": false,
+        "replyVerifiedAfterTool": false,
+        "successfulTool": false,
+        "runtimeTimingStatus": "unavailable",
+        "expectedAgentAck": false,
+        "runtimeEvidence": {
+          "status": "unavailable",
+          "reason": "runtime_receipt_incomplete"
+        }
+      },
+      "candidateProof": {
+        "sourceCommit": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+        "workerSha": "68271f9890a0926ab8bc0ada6582c1cbad992a8e",
+        "templateId": "6oo73f3frlpn3s0tqqlb",
+        "harness": "codex",
+        "binarySha256": "e14fc83739c13c1074b12bd1acce4010c893c7f6fbfc1593b4a31d74cabb57af",
+        "version": "0.166.0"
+      },
+      "configuredModelFromExactSource": "gpt-6-luna"
+    }
+  ],
+  "scope": {
+    "configuredAccount": "SMOKE owner from existing prod secrets",
+    "requiredAcceptanceScope": "verified workspace_share and confirmed team workspace",
+    "acceptedScopeProofProduced": false,
+    "note": "Workflow/source requirements are distinct from observed proof; the failing diagnostic contains no passed team-scope receipt."
+  },
+  "modelAndCostBoundary": {
+    "agentGenerationObserved": false,
+    "basis": "Both diagnostics have no runIdHash, no agentStart, no providerChunk, no cliInit and unavailable runtime evidence.",
+    "paidCallOrChargeCount": "unknown",
+    "note": "A coordinator_stream attempt is observed; absence of Agent receipts does not prove zero provider or coordinator calls/charges. Configured small models are recorded from exact source, not a completed provider receipt."
+  },
+  "acceptedReportPresent": false,
+  "publicReleaseReportPresent": false,
+  "runtimeRefreshExecuted": false,
+  "cleanup": {
+    "sourceCommit": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+    "runId": "42544540108",
+    "sandboxes": [],
+    "templates": [
+      {
+        "name": "mikka-01a6bfb3a6c5-42544540108-1-desktop",
+        "kind": "desktop",
+        "templateId": "7d1yrqc8xhbcm347q52g",
+        "status": "deleted"
+      },
+      {
+        "name": "mikka-01a6bfb3a6c5-42544540108-1-claude",
+        "kind": "claude",
+        "templateId": "ek1zwnqzwbghai17b0zd",
+        "status": "deleted"
+      },
+      {
+        "name": "mikka-01a6bfb3a6c5-42544540108-1-codex",
+        "kind": "codex",
+        "templateId": "6oo73f3frlpn3s0tqqlb",
+        "status": "deleted"
+      }
+    ],
+    "errors": []
+  },
+  "cleanupCandidateIdentityMatchesOriginalReport": true,
+  "writerRunTerminal": true,
+  "writerRunCompletedAtUTC": "2026-11-09T01:51:01Z",
+  "cleanupScope": "This attempt only; receipt reports no remaining matched sandboxes, all three exact private candidates deleted, and no cleanup errors. No global resource inventory is claimed.",
+  "artifacts": [
+    {
+      "id": 13644460263,
+      "name": "e2b-runtime-release-cleanup-42544540108-1",
+      "bytes": 415,
+      "digest": "sha256:115b631cf4dff82da642a891db389120596052b91372a7d098903e43f3ea970c",
+      "sourceCommit": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+      "runId": 42544540108
+    },
+    {
+      "id": 13644191554,
+      "name": "e2b-template-subscription-diagnostics-42544540108-1",
+      "bytes": 931,
+      "digest": "sha256:0f5920a5b869af21e4d64e35ca5c05119e1fe76b07e0263db1f9441c0f842e28",
+      "sourceCommit": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+      "runId": 42544540108
+    },
+    {
+      "id": 13643107502,
+      "name": "e2b-candidates-42544540108-1",
+      "bytes": 46283,
+      "digest": "sha256:bcf688d11ee3c0f8037366f8bf1898c4443e50ec3a12a5b86a0e2a9b85f321d3",
+      "sourceCommit": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+      "runId": 42544540108
+    },
+    {
+      "id": 13642764508,
+      "name": "e2b-candidate-build-cleanup-42544540108-1",
+      "bytes": 268,
+      "digest": "sha256:07d63812c21f3c24f9c8575bd8e5edaf1fb305a55ba02c6070b430b60eaa0cab",
+      "sourceCommit": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+      "runId": 42544540108
+    }
+  ],
+  "downloadIntegrity": [
+    {
+      "artifactId": 13644191554,
+      "name": "e2b-template-subscription-diagnostics-42544540108-1",
+      "zipBytes": 931,
+      "zipSha256": "0f5920a5b869af21e4d64e35ca5c05119e1fe76b07e0263db1f9441c0f842e28",
+      "apiSizeAndDigestMatch": true,
+      "zipTestPassed": true,
+      "safePathsVerified": true,
+      "files": [
+        {
+          "file": "subscription-diagnostics.json",
+          "bytes": 2061,
+          "sha256": "5b9ea653896fc1fe0f76e048114f215699e0049fd6f97feef6994c5f3a3d174a"
+        }
+      ],
+      "downloadedAtUTC": "2026-11-09T01:52:47.290381+00:00",
+      "downloadCount": 1,
+      "signedUrlOmitted": true
+    },
+    {
+      "artifactId": 13644460263,
+      "name": "e2b-runtime-release-cleanup-42544540108-1",
+      "zipBytes": 415,
+      "zipSha256": "115b631cf4dff82da642a891db389120596052b91372a7d098903e43f3ea970c",
+      "apiSizeAndDigestMatch": true,
+      "zipTestPassed": true,
+      "safePathsVerified": true,
+      "files": [
+        {
+          "file": "release-cleanup.json",
+          "bytes": 639,
+          "sha256": "315d71714abcb0386e505a244ff17c829578c5e08a332b49dca7f3f5a4722b01"
+        }
+      ],
+      "downloadedAtUTC": "2026-11-09T01:52:47.278866+00:00",
+      "downloadCount": 1,
+      "signedUrlOmitted": true
+    }
+  ],
+  "source": {
+    "path": "scripts/e2b/validate-template-subscriptions.mjs",
+    "sha256": "2dc30e00bdcf7e226ae7de623efaaf55f417fa2c145c91629d373a19cba9396b",
+    "bytes": 31628
+  },
+  "originalDiagnosticIntegrity": {
+    "bytes": 2061,
+    "sha256": "5b9ea653896fc1fe0f76e048114f215699e0049fd6f97feef6994c5f3a3d174a"
+  },
+  "omitted": [
+    "temporary device ID",
+    "raw CLI responses or prompts",
+    "account/profile metadata",
+    "signed artifact download URLs"
+  ],
+  "observerMutations": 0,
+  "observerModelRuns": 0,
+  "observerPaidResourcesCreated": 0,
+  "terminalLogsDownloadedOnceEach": true
+}

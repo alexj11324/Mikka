@@ -1,0 +1,193 @@
+{
+  "schema": "issue1512.c04690-main-lanes-final.v1",
+  "recordedAt": "2026-11-09T01:42:08.193806+00:00",
+  "head": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+  "actualCheckout": "fd053d254e377f35ff8e2529edb1ad544c23fab1",
+  "actualTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+  "ciRunId": 42545814990,
+  "status": "assigned_main_lanes_verified_whole_CI_not_complete",
+  "jobs": [
+    {
+      "id": 128930709878,
+      "name": "Integration unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:30:26Z",
+      "completed_at": "2026-11-09T01:34:10Z"
+    },
+    {
+      "id": 128930709925,
+      "name": "Source checks",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:31:36Z",
+      "completed_at": "2026-11-09T01:34:50Z"
+    },
+    {
+      "id": 128930709943,
+      "name": "Core unit checks",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:33:20Z",
+      "completed_at": "2026-11-09T01:40:33Z"
+    },
+    {
+      "id": 128930709957,
+      "name": "Daemon checks",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:33:40Z",
+      "completed_at": "2026-11-09T01:37:05Z"
+    },
+    {
+      "id": 128930709969,
+      "name": "Database checks (1/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:30:33Z",
+      "completed_at": "2026-11-09T01:35:09Z"
+    },
+    {
+      "id": 128930709981,
+      "name": "Database checks (3/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:33:01Z",
+      "completed_at": "2026-11-09T01:37:27Z"
+    },
+    {
+      "id": 128930709984,
+      "name": "Database checks (2/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:30:38Z",
+      "completed_at": "2026-11-09T01:34:46Z"
+    },
+    {
+      "id": 128930709986,
+      "name": "Database checks (4/4)",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:30:50Z",
+      "completed_at": "2026-11-09T01:33:52Z"
+    },
+    {
+      "id": 128932640243,
+      "name": "Production build and browser interactions",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:37:29Z",
+      "completed_at": "2026-11-09T01:37:39Z"
+    }
+  ],
+  "units": {
+    "targets": 85,
+    "core": 57,
+    "integration": 28,
+    "selectionMatches": true,
+    "cacheBypassFlagObserved": true
+  },
+  "postgres": {
+    "selectedSuites": 70,
+    "observedSuites": 70,
+    "shards": [
+      18,
+      18,
+      17,
+      17
+    ],
+    "nonzeroFailures": 0,
+    "nonzeroSkips": 0,
+    "nonzeroExitOrClose": 0,
+    "activityActorTests": 57
+  },
+  "daemon": {
+    "testFilesPassed": 138,
+    "testFilesSkipped": 1,
+    "testsPassed": 1569,
+    "testsSkipped": 2,
+    "claudeGenerationCases": 4,
+    "codexGenerationCases": 3,
+    "realModelAcceptanceEstablished": false
+  },
+  "aggregateBoundary": "Legacy job name Production build and browser interactions is the selected DB aggregate check here; its CHANGES_RESULT and DB_RESULT are success. No new browser or production-build execution is inferred from the name.",
+  "wholeCiPendingAtThisSnapshot": [
+    "desktop icon",
+    "desktop native once prerequisites complete",
+    "image checks",
+    "Local device Node22 macOS matrix"
+  ],
+  "nativeBudgetClaim": null,
+  "originalLogs": [
+    {
+      "path": "private/128930486229-selection.original.log",
+      "bytes": 389057,
+      "sha256": "c3a7cfaba136d8a59692a9677acbccfabf64d7ee28903e2cc8f6ba4265880297",
+      "gitBlobSha": "e3720b798f868d240b762d55ca429d8eb0f2df43"
+    },
+    {
+      "path": "private/128930709878-integration.original.log",
+      "bytes": 635390,
+      "sha256": "c5064477f46bc096c64070c3d5cfa31c7d5024985ba8097e0ee73a1969333e23",
+      "gitBlobSha": "f73937807c852fcd45bfbec6b8ef5d2b6794c058"
+    },
+    {
+      "path": "private/128930709925-source.original.log",
+      "bytes": 132175,
+      "sha256": "f6b40f2aaced3b4eb02609b43ff6fd96dde66b5dddd1b411ffd592a4512825f6",
+      "gitBlobSha": "f0b58420aebd7c2f7b5a9dd1af512f27ffefaa79"
+    },
+    {
+      "path": "private/128930709943-core.original.log",
+      "bytes": 984898,
+      "sha256": "4ca47f51a0dd08625d3aa5834c29865c5410d28fdf3f0766102004989885b1be",
+      "gitBlobSha": "5ffec1faf10e9c5b5f8fa894f80089f3052ec7c8"
+    },
+    {
+      "path": "private/128930709957-daemon.original.log",
+      "bytes": 124578,
+      "sha256": "3e40b2cdd92901fed62e10518a89c80fd49072b64fd1ba88a0aa85aec271cc25",
+      "gitBlobSha": "041151394a6154b3816280294b752c8f1d634399"
+    },
+    {
+      "path": "private/128930709969-pg1.original.log",
+      "bytes": 1040134,
+      "sha256": "fd80926bdba1448f86f650de8822a3085b462f0d423cc3ee6671aa6209c006dd",
+      "gitBlobSha": "8a3eaa0409ae45ba3667b94ac47bae39afbaead3"
+    },
+    {
+      "path": "private/128930709981-pg3.original.log",
+      "bytes": 1825948,
+      "sha256": "75108e2be488cbb1b03821f81e6948a5800b3adb5e8d576dac1de58e441a15f1",
+      "gitBlobSha": "297dbaa0f334c7d100d8e77c7f82559461ce4666"
+    },
+    {
+      "path": "private/128930709984-pg2.original.log",
+      "bytes": 1096073,
+      "sha256": "edabb5ebeded84beefe713a57752e48a5a94a89a8c37f29de4ae6a1e2a012551",
+      "gitBlobSha": "98ceca38f7b874aea2504d08ed45c4fe881d1921"
+    },
+    {
+      "path": "private/128930709986-pg4.original.log",
+      "bytes": 597562,
+      "sha256": "799d23bd65a2b3578c74ed9bf9e8a170c4894d7430bbc9f244ef37a2d416ea80",
+      "gitBlobSha": "3e25f2c07135633f19d6fc3f51f7d83d139c481e"
+    },
+    {
+      "path": "private/128932640243-database-aggregate.original.log",
+      "bytes": 13305,
+      "sha256": "8dbb69a11791dde402f82f6d3584feeb547c497a8045785f864fb0cddc766141",
+      "gitBlobSha": "380b4475a3d3a780b8896f1e5ed30f76065f0831"
+    }
+  ],
+  "originalLogFiles": 10,
+  "originalLogBytes": 6839120,
+  "publicationBoundary": "Original logs and complete API metadata stay private until separately screened for public packaging. This receipt contains closed counts, status/source fields and hashes only.",
+  "actions": {
+    "rerun": 0,
+    "cancel": 0,
+    "branchMutation": 0,
+    "modelsSubmitted": 0,
+    "resourcesCreated": 0
+  }
+}

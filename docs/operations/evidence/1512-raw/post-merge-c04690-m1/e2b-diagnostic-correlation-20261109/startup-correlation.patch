@@ -1,0 +1,216 @@
+diff --git a/scripts/e2b/validate-template-subscriptions.mjs b/scripts/e2b/validate-template-subscriptions.mjs
+index 7ee7564fe213ce3fba762fee8685eb9a4bb31329..f36ecf2d08f1bc2754b21be0d47d149871bb67c5 100644
+--- a/scripts/e2b/validate-template-subscriptions.mjs
++++ b/scripts/e2b/validate-template-subscriptions.mjs
+@@ -8,6 +8,7 @@ import { createHash, randomUUID } from 'node:crypto'
+ import { runCloudStartup, createSessionClient, smokeAcceptanceAccount, selectAcceptanceTeam, restoreAcceptanceWorkspace, acceptanceBot,
+   STARTUP_FAILURE_CODES, STARTUP_FAILURE_PHASES, bootstrapAdoptionEvidence, bootstrapAdoptionDiagnostics } from '../acceptance/cloud-startup.mjs'
+ import { readRuntimeTiming, runtimeEvidence } from '../acceptance/cloud-startup-evidence.mjs'
++import { ACTION_ERROR_CODES } from '../../lib/action-result.ts'
+ 
+ const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
+ const KINDS = [['claude', 'claude_code', 'claude-haiku-5-5'], ['codex', 'codex', 'gpt-6-luna']]
+@@ -35,6 +36,34 @@ const CLEANUP_STEPS = new Map([['factoryCancelled', 'factory_cancel'], ['taskDel
+ const CLEANUP_CODES = new Set(['startup_cleanup_scope_mismatch', 'startup_factory_list_invalid',
+   'startup_api_refused', 'startup_rpc_refused', 'startup_action_refused', 'startup_workspace_restore_failed'])
+ const cliVersion = value => typeof value === 'string' && value.length <= 32 && /^[0-9]+\.[0-9]+\.[0-9]+$/.test(value)
++const REQUEST_TRACE_SCOPE = 'submission_http_only_workflow_may_use_another_trace'
++// Existing public action codes plus the dispatch, repository, Profile and
++// Factory return sites. A new/unrecognized code stays unknown, never raw text.
++const DISPATCH_REFUSAL_CODES = new Set([...ACTION_ERROR_CODES,
++  'machineUnavailable', 'threadProfileMismatch', 'repositoryRequired', 'repositoryAmbiguous', 'repositoryNotFound',
++  'githubNotConnected', 'githubNotConfigured', 'githubReconnectRequired', 'githubUnavailable', 'githubRepositoryForbidden',
++  'agentProfileScopeNotFound', 'agentProfileNotFound', 'agentProfileModelUnavailable', 'agentProfileUnavailable',
++  'agentProfilePinConflict', 'agentProfileSelectionInvalid', 'agentProfileArchived', 'agentProfileDisabled',
++  'agentProfileVersionConflict', 'agentProfileDecisionUnavailable',
++  'factoryLifecycleUnavailable', 'factoryTransition', 'factoryReplayMismatch', 'factoryStopped',
++  'factoryStale', 'factoryRunStillActive', 'factorySourceMismatch',
++])
++
++/** Correlate a failed submission even before a run exists. Never promote its
++ * HTTP trace to a workflow/run trace or copy tool inputs, outputs or messages. */
++function startupCorrelation(sample, sourceCommit, harness) {
++  if (sample?.sourceCommit !== sourceCommit || sample.harness !== harness) return undefined
++  const trace = sample.requestTraceId, workflow = sample.workflowRunId, refusal = sample.dispatchRefusal
++  if (trace === undefined && workflow === undefined && refusal === undefined) return undefined
++  const requestTraceId = sample.requestTraceScope === REQUEST_TRACE_SCOPE && typeof trace === 'string'
++    && /^[a-f0-9]{32}$/.test(trace) && trace !== '0'.repeat(32) ? trace : null
++  // Keep the startup reader's alphanumeric grammar, bounded for publication;
++  // do not assume every World or future SDK uses today's 26-character ULID.
++  const workflowRunId = typeof workflow === 'string' && /^wrun_[A-Za-z0-9]{1,128}$/.test(workflow) ? workflow : null
++  const code = refusal?.code
++  return { requestTraceId, requestTraceScope: requestTraceId ? REQUEST_TRACE_SCOPE : null, workflowRunId,
++    dispatchRefusal: refusal == null ? null : { code: typeof code === 'string' && DISPATCH_REFUSAL_CODES.has(code) ? code : 'unknown' } }
++}
+ 
+ function registrationDiagnostic(report, kind, proof) {
+   const harness = kind === 'claude' ? 'claude_code' : 'codex', row = report.templates?.[kind]
+@@ -95,6 +124,7 @@ function candidateDiagnostic(kind, stage, error, acceptance, cleanupErrors, devi
+   const sampleFailure = startupFailure(sample)
+   const failure = sampleFailure ?? startupFailure(acceptance)
+   const harness = kind === 'claude' ? 'claude_code' : 'codex'
++  const correlation = error ? startupCorrelation(sample, sourceCommit, harness) : undefined
+   const runIdHash = UUID.test(sample?.runId ?? '') ? createHash('sha256').update(sample.runId).digest('hex').slice(0, 16) : null
+   const timing = runIdHash ? readRuntimeTiming(sample?.runtimeTiming, { runIdHash, harness }) : null
+   const evidence = runtimeEvidence(timing, { requireOfficial: true })
+@@ -140,6 +170,7 @@ function candidateDiagnostic(kind, stage, error, acceptance, cleanupErrors, devi
+     sampleStatus: SAMPLE_STATUSES.has(sample?.status) ? sample.status : 'unavailable',
+     sampleError: sampleFailure?.code ?? null,
+     ...(error && failure ? { failure } : {}),
++    ...(correlation ? { startupCorrelation: correlation } : {}),
+     cleanupErrors: [...cleanup], ...(observation ? { observation } : {}), ...(fixture ? { fixture } : {}),
+     ...(cleanupFailures.length ? { cleanupFailures: cleanupFailures.slice(0, 8), cleanupFailuresTruncated: cleanupFailures.length > 8 } : {}),
+     // Only the existing strict candidateReceipt can populate this proof. A
+diff --git a/scripts/e2b/validate-template-subscriptions.test.mjs b/scripts/e2b/validate-template-subscriptions.test.mjs
+index a70f45e7395309a1cf93ae295e880e06ad521ef2..628395f91d97a64655afb80117788d70207200c0 100644
+--- a/scripts/e2b/validate-template-subscriptions.test.mjs
++++ b/scripts/e2b/validate-template-subscriptions.test.mjs
+@@ -204,6 +204,140 @@ function candidateFixture(runAcceptance, cleanupFailure, { failRestore = false,
+   } }
+ }
+ 
++const startupTrace = '0123456789abcdef0123456789abcdef'
++const startupTraceScope = 'submission_http_only_workflow_may_use_another_trace'
++const startupWorkflow = 'wrun_01K4BZQ5T2J8HXFM6WD3PNAVCE'
++const preRunFailure = (harness, code, extra = {}) => ({
++  sourceCommit: COMMIT, harness, status: 'failed', error: code,
++  failure: { phase: 'coordinator_stream', code }, cleanup: { status: 'passed', errors: [] },
++  requestTraceId: startupTrace, requestTraceScope: startupTraceScope, workflowRunId: startupWorkflow,
++  ...extra,
++})
++
++/** Exercise the public failure-file seam without publishing a bootstrap for a run that never bound. */
++async function preRunFailureArtifact(sample, harness = 'claude_code') {
++  const root = await mkdtemp(join(tmpdir(), 'template-gate-correlation-'))
++  try {
++    const fixture = candidateFixture(async options => accepted(options.harness))
++    const run = fixture.options.runAcceptance, create = fixture.options.sandboxFactory
++    fixture.options.runAcceptance = async (options, dependencies) => {
++      assert.equal(options.timeoutMs, 240000)
++      if (options.harness !== harness) return run(options, dependencies)
++      return { mode: 'candidate', status: 'failed', cleanup: { errors: [] }, samples: [sample] }
++    }
++    fixture.options.sandboxFactory = async (template, options) => {
++      const sandbox = await create(template, options), read = sandbox.files.read
++      if (template.endsWith(harness === 'claude_code' ? 'claude' : 'codex')) sandbox.files.read = path => {
++        if (path.endsWith('bootstrap-proof.json')) throw Object.assign(new Error('private missing bootstrap path'), { code: 'ENOENT' })
++        return read(path)
++      }
++      return sandbox
++    }
++    const input = join(root, 'candidate.json'), output = join(root, 'accepted.json'), diagnostics = join(root, 'diagnostics.json')
++    await writeFile(input, JSON.stringify(report))
++    await assert.rejects(validateSubscriptionFiles(input, output, diagnostics, fixture.options), /template_gate_subscription_or_cleanup_failed/)
++    const raw = await readFile(diagnostics, 'utf8'), value = JSON.parse(raw)
++    const kind = harness === 'claude_code' ? 'claude' : 'codex'
++    const failed = value.candidates.find(row => row.kind === kind), passed = value.candidates.find(row => row.kind !== kind)
++    assert.equal(value.status, 'failed')
++    assert.equal(failed.code, 'template_gate_bootstrap_proof_invalid')
++    assert.equal(failed.runIdHash, null)
++    assert.equal(passed.passedReceipt.status, 'passed')
++    assert.ok(!Object.hasOwn(passed, 'startupCorrelation'))
++    assert.equal(fixture.events.filter(event => event === 'removed').length, 2)
++    assert.equal(fixture.events.filter(event => event.startsWith('killed-')).length, 2)
++    assert.ok(fixture.events.includes('restored-workspace') && fixture.events.includes('signed-out'))
++    await assert.rejects(stat(output), { code: 'ENOENT' })
++    assert.equal((await stat(diagnostics)).mode & 0o777, 0o600)
++    return { raw, failed }
++  } finally { await rm(root, { recursive: true, force: true }) }
++}
++
++for (const [harness, code, dispatchRefusal] of [
++  ['claude_code', 'startup_dispatch_refused', { code: 'githubNotConnected' }],
++  ['codex', 'startup_timeout', null],
++]) test(`startup correlation survives ${harness} failure before a run exists`, async () => {
++  const { failed } = await preRunFailureArtifact(preRunFailure(harness, code, { dispatchRefusal }), harness)
++  assert.deepEqual(failed.failure, { phase: 'coordinator_stream', code })
++  assert.deepEqual(failed.startupCorrelation, {
++    requestTraceId: startupTrace, requestTraceScope: startupTraceScope,
++    workflowRunId: startupWorkflow, dispatchRefusal,
++  })
++})
++
++test('startup correlation requires exact candidate binding and existing metadata', async () => {
++  for (const extra of [
++    { sourceCommit: 'f'.repeat(40) }, { sourceCommit: undefined }, { sourceCommit: { value: COMMIT } },
++    { harness: 'codex' }, { harness: undefined }, { harness: ['claude_code'] },
++    { requestTraceId: undefined, workflowRunId: undefined, dispatchRefusal: undefined },
++  ]) {
++    const { raw, failed } = await preRunFailureArtifact(preRunFailure('claude_code', 'startup_dispatch_refused', {
++      dispatchRefusal: { code: 'githubNotConnected' }, ...extra,
++    }))
++    assert.ok(!Object.hasOwn(failed, 'startupCorrelation'))
++    assert.ok(!raw.includes(startupTrace) && !raw.includes(startupWorkflow))
++    assert.equal(failed.sampleError, 'startup_dispatch_refused')
++  }
++})
++
++test('startup correlation rejects malformed identifiers and preserves independently valid fields', async () => {
++  let coercions = 0
++  const nonString = { toString() { coercions++; return startupTrace } }
++  for (const requestTraceId of [undefined, null, 1, true, [], nonString, '0'.repeat(32), 'f'.repeat(31),
++    'F'.repeat(32), `${startupTrace}\n`, 'private-canary@example.invalid']) {
++    const { failed } = await preRunFailureArtifact(preRunFailure('claude_code', 'startup_timeout', { requestTraceId }))
++    assert.deepEqual(failed.startupCorrelation, {
++      requestTraceId: null, requestTraceScope: null, workflowRunId: startupWorkflow, dispatchRefusal: null,
++    })
++  }
++  for (const workflowRunId of [undefined, null, 1, nonString, 'wrun_', `wrun_${'a'.repeat(129)}`,
++    `${startupWorkflow}\n`, `${startupWorkflow}/private`, 'wrun_private-canary@example.invalid']) {
++    const { failed } = await preRunFailureArtifact(preRunFailure('claude_code', 'startup_timeout', { workflowRunId }))
++    assert.equal(failed.startupCorrelation.workflowRunId, null)
++    assert.equal(failed.startupCorrelation.requestTraceId, startupTrace)
++  }
++  for (const workflowRunId of ['wrun_legacy1', `wrun_${'a'.repeat(128)}`]) {
++    const { failed } = await preRunFailureArtifact(preRunFailure('claude_code', 'startup_timeout', { workflowRunId }))
++    assert.equal(failed.startupCorrelation.workflowRunId, workflowRunId)
++  }
++  const { failed } = await preRunFailureArtifact(preRunFailure('claude_code', 'startup_timeout', {
++    requestTraceScope: 'private_scope_or_run_trace_claim',
++  }))
++  assert.equal(failed.startupCorrelation.requestTraceId, null)
++  assert.equal(failed.startupCorrelation.requestTraceScope, null)
++  assert.equal(coercions, 0)
++})
++
++test('startup correlation keeps only closed refusal codes and never emits prompts or other identities', async () => {
++  const secret = 'PRIVATE_PROMPT_RESPONSE_CREDENTIAL_CANARY', privateId = '90000000-0000-4000-8000-000000000009'
++  for (const code of ['githubNotConnected', 'deviceNotFound', 'machineUnavailable', 'agentProfilePinConflict', 'factorySourceMismatch',
++    'githubNotConnected_PRIVATE_CANARY', 'private-canary@example.invalid', '__proto__', 'constructor', 503, { private: secret }]) {
++    const expected = ['githubNotConnected', 'deviceNotFound', 'machineUnavailable', 'agentProfilePinConflict', 'factorySourceMismatch'].includes(code) ? code : 'unknown'
++    const { raw, failed } = await preRunFailureArtifact(preRunFailure('claude_code', 'startup_dispatch_refused', {
++      dispatchRefusal: { code, detail: secret, message: secret, raw: secret, userId: privateId },
++      prompt: secret, providerText: secret, issueId: privateId, botId: privateId,
++      dispatchCallId: privateId, stepId: privateId, cookie: secret,
++    }))
++    assert.deepEqual(failed.startupCorrelation, {
++      requestTraceId: startupTrace, requestTraceScope: startupTraceScope,
++      workflowRunId: startupWorkflow, dispatchRefusal: { code: expected },
++    })
++    for (const forbidden of [secret, privateId, 'private-canary@example.invalid', 'githubNotConnected_PRIVATE_CANARY']) assert.ok(!raw.includes(forbidden))
++  }
++})
++
++test('successful candidate diagnostics do not gain startup correlation metadata', async () => {
++  const diagnostics = [], fixture = candidateFixture(async options => {
++    const value = accepted(options.harness)
++    Object.assign(value.samples[0], { requestTraceId: startupTrace, requestTraceScope: startupTraceScope,
++      workflowRunId: startupWorkflow, dispatchRefusal: { code: 'githubNotConnected' } })
++    return value
++  })
++  await validateTemplateSubscriptions(report, { ...fixture.options, onDiagnostic: row => diagnostics.push(row) })
++  assert.equal(diagnostics.length, 2)
++  assert.ok(diagnostics.every(row => row.code === 'passed' && !Object.hasOwn(row, 'startupCorrelation')))
++})
++
+ test('a failed subscription still tests the other candidate and closes every created instance and device', async () => {
+   const fixture = candidateFixture(async options => {
+     if (options.harness === 'claude_code') throw Error('fixture provider blocked')
+@@ -331,6 +465,7 @@ test('a failure before a sample exists preserves the startup phase without inven
+   assert.equal(failed.sampleError, null)
+   assert.equal(failed.runIdHash, null)
+   assert.ok(!Object.hasOwn(failed, 'observation'))
++  assert.ok(!Object.hasOwn(failed, 'startupCorrelation'))
+   assert.ok(!Object.hasOwn(failed, 'passedReceipt'))
+ })
+ 

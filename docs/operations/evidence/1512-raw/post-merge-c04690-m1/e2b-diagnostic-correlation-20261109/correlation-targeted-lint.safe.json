@@ -1,0 +1,25 @@
+{
+  "command": [
+    "node_modules/.bin/oxlint",
+    "--no-ignore",
+    "scripts/e2b/validate-template-subscriptions.mjs",
+    "scripts/e2b/validate-template-subscriptions.test.mjs"
+  ],
+  "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/e2b-diagnostic-correlation-20261109/checkout",
+  "exitCode": 0,
+  "log": {
+    "path": "correlation-targeted-lint.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "source": [
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "sha256": "9cce7fe66cb9a836f0807288c2570d6ec135c505b1c101b09fbd6cd31a8f76b0"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "sha256": "6034046687d6007dde4fdbe0cbd24e538ffa75b058c2fd8b68f8cdd2a291e9a7"
+    }
+  ]
+}

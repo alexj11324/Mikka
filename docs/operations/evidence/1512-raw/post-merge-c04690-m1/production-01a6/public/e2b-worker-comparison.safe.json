@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512_e2b_actual_worker_comparison",
+  "sourceCommit": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "runId": 42544540108,
+  "runAttempt": 1,
+  "jobId": 128926688491,
+  "step": "Compare the worker hash with production",
+  "controlRefresh": false,
+  "expectedWorkerHash": "68271f9890a0926ab8bc0ada6582c1cbad992a8e",
+  "previousProductionWorkerHash": "a45382985c12c93fb0832eabd8010f60c9b7dabb",
+  "contentChanged": true,
+  "actualCandidateJobStarted": 128926785564,
+  "originalLogExcerpt": [
+    {
+      "line": 2517,
+      "text": "2026-11-09T01:15:32.9059903Z Runtime release control refresh: false"
+    },
+    {
+      "line": 2546,
+      "text": "2026-11-09T01:15:34.8875508Z worker hash 68271f9890a0926ab8bc0ada6582c1cbad992a8e; production a45382985c12c93fb0832eabd8010f60c9b7dabb"
+    }
+  ],
+  "originalLogSha256": "185aac50c34947e6cf682184ad8cc264fee34b2ac8b15839170e3a3377e52847",
+  "originalLogBytes": 345334,
+  "terminalJobLogDownloadCount": 1,
+  "subscriptionOrPublicationProven": false
+}

@@ -1,0 +1,1073 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512_release_status_observations",
+  "sourceCommit": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "observations": [
+    {
+      "observedUTC": "2026-11-09 01:18:54 UTC",
+      "runs": [
+        {
+          "runId": 42544540018,
+          "jobs": [
+            {
+              "jobId": 128926575772,
+              "name": "deploy",
+              "status": "in_progress",
+              "conclusion": null,
+              "activeOrFailedSteps": [
+                {
+                  "number": 24,
+                  "name": "Build (runs migrations last, as the Vercel build did)",
+                  "status": "in_progress",
+                  "conclusion": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "runId": 42544539939,
+          "jobs": [
+            {
+              "jobId": 128926576137,
+              "name": "publish",
+              "status": "completed",
+              "conclusion": "failure",
+              "activeOrFailedSteps": [
+                {
+                  "number": 13,
+                  "name": "Seal the exact candidate before its package acceptance test",
+                  "status": "completed",
+                  "conclusion": "failure"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "runId": 42544540108,
+          "jobs": [
+            {
+              "jobId": 128926575857,
+              "name": "test",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926688491,
+              "name": "check",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926785564,
+              "name": "validate / build",
+              "status": "in_progress",
+              "conclusion": null,
+              "activeOrFailedSteps": [
+                {
+                  "number": 7,
+                  "name": "Build private versioned candidates and require official file conservation",
+                  "status": "in_progress",
+                  "conclusion": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "observedUTC": "2026-11-09 01:21:15 UTC",
+      "runs": [
+        {
+          "runId": 42544540018,
+          "jobs": [
+            {
+              "jobId": 128926575772,
+              "name": "deploy",
+              "status": "in_progress",
+              "conclusion": null,
+              "activeOrFailedSteps": [
+                {
+                  "number": 24,
+                  "name": "Build (runs migrations last, as the Vercel build did)",
+                  "status": "in_progress",
+                  "conclusion": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "runId": 42544540108,
+          "jobs": [
+            {
+              "jobId": 128926575857,
+              "name": "test",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926688491,
+              "name": "check",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926785564,
+              "name": "validate / build",
+              "status": "in_progress",
+              "conclusion": null,
+              "activeOrFailedSteps": [
+                {
+                  "number": 7,
+                  "name": "Build private versioned candidates and require official file conservation",
+                  "status": "in_progress",
+                  "conclusion": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "observedUTC": "2026-11-09 01:22:20 UTC",
+      "runs": [
+        {
+          "runId": 42544540018,
+          "jobs": [
+            {
+              "jobId": 128926575772,
+              "name": "deploy",
+              "status": "in_progress",
+              "conclusion": null,
+              "activeOrFailedSteps": [
+                {
+                  "number": 24,
+                  "name": "Build (runs migrations last, as the Vercel build did)",
+                  "status": "in_progress",
+                  "conclusion": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "runId": 42544540108,
+          "jobs": [
+            {
+              "jobId": 128926575857,
+              "name": "test",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926688491,
+              "name": "check",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926785564,
+              "name": "validate / build",
+              "status": "in_progress",
+              "conclusion": null,
+              "activeOrFailedSteps": [
+                {
+                  "number": 7,
+                  "name": "Build private versioned candidates and require official file conservation",
+                  "status": "in_progress",
+                  "conclusion": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "observedUTC": "2026-11-09 01:23:53 UTC",
+      "runs": [
+        {
+          "runId": 42544540018,
+          "jobs": [
+            {
+              "jobId": 128926575772,
+              "name": "deploy",
+              "status": "in_progress",
+              "conclusion": null,
+              "activeOrFailedSteps": [
+                {
+                  "number": 27,
+                  "name": "Upload the prebuilt output to production",
+                  "status": "in_progress",
+                  "conclusion": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "runId": 42544540108,
+          "jobs": [
+            {
+              "jobId": 128926575857,
+              "name": "test",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926688491,
+              "name": "check",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926785564,
+              "name": "validate / build",
+              "status": "in_progress",
+              "conclusion": null,
+              "activeOrFailedSteps": [
+                {
+                  "number": 7,
+                  "name": "Build private versioned candidates and require official file conservation",
+                  "status": "in_progress",
+                  "conclusion": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "observedUTC": "2026-11-09 01:24:54 UTC",
+      "runs": [
+        {
+          "runId": 42544540018,
+          "jobs": [
+            {
+              "jobId": 128926575772,
+              "name": "deploy",
+              "status": "in_progress",
+              "conclusion": null,
+              "activeOrFailedSteps": [
+                {
+                  "number": 27,
+                  "name": "Upload the prebuilt output to production",
+                  "status": "in_progress",
+                  "conclusion": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "observedUTC": "2026-11-09 01:26:09 UTC",
+      "runs": [
+        {
+          "runId": 42544540018,
+          "jobs": [
+            {
+              "jobId": 128926575772,
+              "name": "deploy",
+              "status": "in_progress",
+              "conclusion": null,
+              "activeOrFailedSteps": [
+                {
+                  "number": 27,
+                  "name": "Upload the prebuilt output to production",
+                  "status": "in_progress",
+                  "conclusion": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "runId": 42544540108,
+          "jobs": [
+            {
+              "jobId": 128926575857,
+              "name": "test",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926688491,
+              "name": "check",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926785564,
+              "name": "validate / build",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128929363411,
+              "name": "await-web",
+              "status": "in_progress",
+              "conclusion": null,
+              "activeOrFailedSteps": [
+                {
+                  "number": 4,
+                  "name": "Await this source's actual Web build and public version",
+                  "status": "in_progress",
+                  "conclusion": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "observedUTC": "2026-11-09 01:28:19 UTC",
+      "runs": [
+        {
+          "runId": 42544540018,
+          "jobs": [
+            {
+              "jobId": 128926575772,
+              "name": "deploy",
+              "status": "in_progress",
+              "conclusion": null,
+              "activeOrFailedSteps": [
+                {
+                  "number": 27,
+                  "name": "Upload the prebuilt output to production",
+                  "status": "in_progress",
+                  "conclusion": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "runId": 42544540108,
+          "jobs": [
+            {
+              "jobId": 128926575857,
+              "name": "test",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926688491,
+              "name": "check",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926785564,
+              "name": "validate / build",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128929363411,
+              "name": "await-web",
+              "status": "in_progress",
+              "conclusion": null,
+              "activeOrFailedSteps": [
+                {
+                  "number": 4,
+                  "name": "Await this source's actual Web build and public version",
+                  "status": "in_progress",
+                  "conclusion": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "observedUTC": "2026-11-09 01:29:48 UTC",
+      "runs": [
+        {
+          "runId": 42544540018,
+          "jobs": [
+            {
+              "jobId": 128926575772,
+              "name": "deploy",
+              "status": "in_progress",
+              "conclusion": null,
+              "activeOrFailedSteps": [
+                {
+                  "number": 27,
+                  "name": "Upload the prebuilt output to production",
+                  "status": "in_progress",
+                  "conclusion": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "runId": 42544540108,
+          "jobs": [
+            {
+              "jobId": 128926575857,
+              "name": "test",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926688491,
+              "name": "check",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926785564,
+              "name": "validate / build",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128929363411,
+              "name": "await-web",
+              "status": "in_progress",
+              "conclusion": null,
+              "activeOrFailedSteps": [
+                {
+                  "number": 4,
+                  "name": "Await this source's actual Web build and public version",
+                  "status": "in_progress",
+                  "conclusion": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "observedUTC": "2026-11-09 01:31:15 UTC",
+      "runs": [
+        {
+          "runId": 42544540018,
+          "jobs": [
+            {
+              "jobId": 128926575772,
+              "name": "deploy",
+              "status": "in_progress",
+              "conclusion": null,
+              "activeOrFailedSteps": [
+                {
+                  "number": 27,
+                  "name": "Upload the prebuilt output to production",
+                  "status": "in_progress",
+                  "conclusion": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "runId": 42544540108,
+          "jobs": [
+            {
+              "jobId": 128926575857,
+              "name": "test",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926688491,
+              "name": "check",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926785564,
+              "name": "validate / build",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128929363411,
+              "name": "await-web",
+              "status": "in_progress",
+              "conclusion": null,
+              "activeOrFailedSteps": [
+                {
+                  "number": 4,
+                  "name": "Await this source's actual Web build and public version",
+                  "status": "in_progress",
+                  "conclusion": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "observedUTC": "2026-11-09 01:33:12 UTC",
+      "runs": [
+        {
+          "runId": 42544540018,
+          "jobs": [
+            {
+              "jobId": 128926575772,
+              "name": "deploy",
+              "status": "in_progress",
+              "conclusion": null,
+              "activeOrFailedSteps": [
+                {
+                  "number": 27,
+                  "name": "Upload the prebuilt output to production",
+                  "status": "in_progress",
+                  "conclusion": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "runId": 42544540108,
+          "jobs": [
+            {
+              "jobId": 128926575857,
+              "name": "test",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926688491,
+              "name": "check",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926785564,
+              "name": "validate / build",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128929363411,
+              "name": "await-web",
+              "status": "in_progress",
+              "conclusion": null,
+              "activeOrFailedSteps": [
+                {
+                  "number": 4,
+                  "name": "Await this source's actual Web build and public version",
+                  "status": "in_progress",
+                  "conclusion": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "observedUTC": "2026-11-09 01:34:40 UTC",
+      "runs": [
+        {
+          "runId": 42544540018,
+          "jobs": [
+            {
+              "jobId": 128926575772,
+              "name": "deploy",
+              "status": "in_progress",
+              "conclusion": null,
+              "activeOrFailedSteps": [
+                {
+                  "number": 27,
+                  "name": "Upload the prebuilt output to production",
+                  "status": "in_progress",
+                  "conclusion": null
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "runId": 42544540108,
+          "jobs": [
+            {
+              "jobId": 128926575857,
+              "name": "test",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926688491,
+              "name": "check",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926785564,
+              "name": "validate / build",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128929363411,
+              "name": "await-web",
+              "status": "in_progress",
+              "conclusion": null,
+              "activeOrFailedSteps": [
+                {
+                  "number": 4,
+                  "name": "Await this source's actual Web build and public version",
+                  "status": "in_progress",
+                  "conclusion": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "observedUTC": "2026-11-09 01:36:35 UTC",
+      "runs": [
+        {
+          "runId": 42544540108,
+          "jobs": [
+            {
+              "jobId": 128926575857,
+              "name": "test",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926688491,
+              "name": "check",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926785564,
+              "name": "validate / build",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128929363411,
+              "name": "await-web",
+              "status": "in_progress",
+              "conclusion": null,
+              "activeOrFailedSteps": [
+                {
+                  "number": 4,
+                  "name": "Await this source's actual Web build and public version",
+                  "status": "in_progress",
+                  "conclusion": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "observedUTC": "2026-11-09 01:39:15 UTC",
+      "runs": [
+        {
+          "runId": 42544540108,
+          "jobs": [
+            {
+              "jobId": 128926575857,
+              "name": "test",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926688491,
+              "name": "check",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926785564,
+              "name": "validate / build",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128929363411,
+              "name": "await-web",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128933112530,
+              "name": "subscriptions",
+              "status": "pending",
+              "conclusion": null,
+              "activeOrFailedSteps": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "observedUTC": "2026-11-09 01:42:08 UTC",
+      "runs": [
+        {
+          "runId": 42544540108,
+          "jobs": [
+            {
+              "jobId": 128926575857,
+              "name": "test",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926688491,
+              "name": "check",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926785564,
+              "name": "validate / build",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128929363411,
+              "name": "await-web",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128933112530,
+              "name": "subscriptions",
+              "status": "pending",
+              "conclusion": null,
+              "activeOrFailedSteps": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "observedUTC": "2026-11-09 01:44:31 UTC",
+      "runs": [
+        {
+          "runId": 42544540108,
+          "jobs": [
+            {
+              "jobId": 128926575857,
+              "name": "test",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926688491,
+              "name": "check",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926785564,
+              "name": "validate / build",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128929363411,
+              "name": "await-web",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128933112530,
+              "name": "subscriptions",
+              "status": "pending",
+              "conclusion": null,
+              "activeOrFailedSteps": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "observedUTC": "2026-11-09 01:46:30 UTC",
+      "runs": [
+        {
+          "runId": 42544540108,
+          "jobs": [
+            {
+              "jobId": 128926575857,
+              "name": "test",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926688491,
+              "name": "check",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926785564,
+              "name": "validate / build",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128929363411,
+              "name": "await-web",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128933112530,
+              "name": "subscriptions",
+              "status": "in_progress",
+              "conclusion": null,
+              "activeOrFailedSteps": [
+                {
+                  "number": 12,
+                  "name": "Require real Claude Code and Codex subscriptions on the private candidates",
+                  "status": "in_progress",
+                  "conclusion": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "observedUTC": "2026-11-09 01:48:43 UTC",
+      "runs": [
+        {
+          "runId": 42544540108,
+          "jobs": [
+            {
+              "jobId": 128926575857,
+              "name": "test",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926688491,
+              "name": "check",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926785564,
+              "name": "validate / build",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128929363411,
+              "name": "await-web",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128933112530,
+              "name": "subscriptions",
+              "status": "in_progress",
+              "conclusion": null,
+              "activeOrFailedSteps": [
+                {
+                  "number": 12,
+                  "name": "Require real Claude Code and Codex subscriptions on the private candidates",
+                  "status": "in_progress",
+                  "conclusion": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "observedUTC": "2026-11-09 01:50:29 UTC",
+      "runs": [
+        {
+          "runId": 42544540108,
+          "jobs": [
+            {
+              "jobId": 128926575857,
+              "name": "test",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926688491,
+              "name": "check",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926785564,
+              "name": "validate / build",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128929363411,
+              "name": "await-web",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128933112530,
+              "name": "subscriptions",
+              "status": "in_progress",
+              "conclusion": null,
+              "activeOrFailedSteps": [
+                {
+                  "number": 12,
+                  "name": "Require real Claude Code and Codex subscriptions on the private candidates",
+                  "status": "in_progress",
+                  "conclusion": null
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "observedUTC": "2026-11-09 01:51:58 UTC",
+      "runs": [
+        {
+          "runId": 42544540108,
+          "jobs": [
+            {
+              "jobId": 128926575857,
+              "name": "test",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926688491,
+              "name": "check",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128926785564,
+              "name": "validate / build",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128929363411,
+              "name": "await-web",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128933112530,
+              "name": "subscriptions",
+              "status": "completed",
+              "conclusion": "failure",
+              "activeOrFailedSteps": [
+                {
+                  "number": 12,
+                  "name": "Require real Claude Code and Codex subscriptions on the private candidates",
+                  "status": "completed",
+                  "conclusion": "failure"
+                }
+              ]
+            },
+            {
+              "jobId": 128936104334,
+              "name": "cleanup",
+              "status": "completed",
+              "conclusion": "success",
+              "activeOrFailedSteps": []
+            },
+            {
+              "jobId": 128936105247,
+              "name": "publish",
+              "status": "completed",
+              "conclusion": "skipped",
+              "activeOrFailedSteps": []
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "status": "all_three_tracked_runs_terminal",
+  "productionReleaseComplete": false,
+  "terminalResults": {
+    "web": "success_ready_served_exact_M",
+    "daemon": "failure_releaseCheckoutDirty_before_publish",
+    "e2b": "failure_subscription_gate_with_cleanup_complete"
+  },
+  "sourceBinding": "Initial and final full API run records bind push/main/attempt1 to exact M; final full job records bind every executed job head_sha.",
+  "observerMutations": 0
+}

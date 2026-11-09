@@ -1,0 +1,93 @@
+{
+  "status": "local_patch_ready_for_independent_review",
+  "sourceManifest": "final-source-manifest.safe.json",
+  "patch": "startup-correlation.patch",
+  "changedRuntimeLines": 31,
+  "changedTestLines": 135,
+  "publicFailureSeam": "validateSubscriptionFiles writes diagnostics.json after pre-run failure with no bootstrap-proof publication.",
+  "schema": {
+    "onlyOnFailedCandidate": true,
+    "requiresExactSourceAndHarness": true,
+    "requestTraceId": "primitive lowercase 32-hex, nonzero, only with the existing exact submission_http_only_workflow_may_use_another_trace scope; otherwise null",
+    "workflowRunId": "primitive wrun_ plus 1 to 128 alphanumeric suffix characters, preserving current driver grammar without assuming fixed SDK length; otherwise null",
+    "dispatchRefusal": "null if absent; otherwise one closed code from source-backed set or literal unknown",
+    "forbiddenFields": [
+      "prompt",
+      "tool inputs",
+      "tool outputs",
+      "provider text",
+      "cookie",
+      "credential",
+      "issueId",
+      "botId",
+      "userId",
+      "callId",
+      "stepId"
+    ],
+    "absentMetadataKeepsLegacyShape": true,
+    "unknownNeverCopiesRawValue": true
+  },
+  "verification": [
+    {
+      "receipt": "correlation-red.safe.json",
+      "result": "original runtime 0 pass / 2 fail; both correlation objects absent; exit 1"
+    },
+    {
+      "receipt": "correlation-first-green.safe.json",
+      "result": "initial implementation 2 pass / 0 fail; exit 0"
+    },
+    {
+      "receipt": "correlation-identifier-check.safe.json",
+      "result": "negative-input test 1 pass / 0 fail; exit 0; not a RED result"
+    },
+    {
+      "receipt": "correlation-final-tests.safe.json",
+      "result": "noncanonical invocation omitted tsx; 31 pass plus one file import failure; exit 1; original preserved"
+    },
+    {
+      "receipt": "correlation-canonical-tests.safe.json",
+      "result": "workflow-canonical tsx loader; 99 pass / 0 fail / 0 skip / 0 cancelled; exit 0; exact final hashes"
+    },
+    {
+      "receipt": "correlation-targeted-lint.safe.json",
+      "result": "explicit --no-ignore for both final files; exit 0"
+    }
+  ],
+  "originalMisnamedEvidence": {
+    "files": [
+      "correlation-identifier-red.log",
+      "correlation-identifier-red.safe.json"
+    ],
+    "result": "These original filenames say red but the saved execution actually passed. They are preserved unchanged; the identifier-check log is the same bytes, not a second execution or a failure claim."
+  },
+  "gitDiffCheckExitCode": 0,
+  "unchangedBehavior": [
+    "acceptance criteria",
+    "both model choices",
+    "source equality guards",
+    "SMOKE/team scope",
+    "240000ms timeout",
+    "stream parser",
+    "bootstrap ordering",
+    "run binding",
+    "cleanup",
+    "successful diagnostics schema"
+  ],
+  "resourceAccounting": {
+    "networkRequests": 0,
+    "models": 0,
+    "realCandidates": 0,
+    "VMs": 0,
+    "CI": 0,
+    "publishedRefs": 0,
+    "sharedIndexEdits": 0,
+    "activeProcesses": 0
+  },
+  "notClaimed": [
+    "new production pass",
+    "Native SQL budget improvement",
+    "GitHub connection configured",
+    "Codex cause resolved",
+    "full repository typecheck"
+  ]
+}

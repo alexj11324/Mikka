@@ -1,0 +1,444 @@
+{
+  "version": 1,
+  "createdAt": "2026-11-09T01:53:42.921843+00:00",
+  "repository": "alexj11324/Mikka",
+  "runId": 42545814990,
+  "head": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+  "actualCheckout": "fd053d254e377f35ff8e2529edb1ad544c23fab1",
+  "actualTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+  "source": {
+    "visibility": "public GitHub repository Actions logs",
+    "retrieval": "Previously downloaded and frozen original logs listed by main-lanes-final.safe.json; no network request during packaging.",
+    "maskingBoundary": "These are original bytes as GitHub served them, including GitHub masking already applied. No values were unmasked or reconstructed. Masking alone is not proof of absence of sensitive values.",
+    "rawsRetainedUnmodified": true,
+    "sourceReceipt": {
+      "path": "main-lanes-final.safe.json",
+      "bytes": 6325,
+      "sha256": "9c153ce4fdb905a2677b8b3838a58c97ea920dcf5a00e3e51e83f4e7afb5200b",
+      "gitBlobSha1": "b857707bd76fc1d00fe4f94d10f55aee62bb69db"
+    }
+  },
+  "scopeBoundary": {
+    "included": "10 terminal main-lane logs only",
+    "nativeIncluded": false,
+    "checkpointIndexCreated": false,
+    "wholeCiOrProductionPassEstablished": false,
+    "nativeWasRunningAtDelegation": true,
+    "liveStatusPolled": false
+  },
+  "compression": {
+    "format": "gzip",
+    "level": 9,
+    "mtime": 0,
+    "originalFilename": "",
+    "pythonVersion": "3.12.14",
+    "zlibVersion": "1.3.2",
+    "gitBlobAlgorithm": "sha1 over blob <byte length> NUL plus exact bytes"
+  },
+  "screening": {
+    "scope": "Ten raw logs only; existing safe JSON receipts unchanged.",
+    "initialCounts": {
+      "private_key_marker": 0,
+      "github_token": 0,
+      "posthog_token": 0,
+      "aws_access_key": 0,
+      "jwt": 0,
+      "bearer_material": 6,
+      "email": 1,
+      "signed_url_material": 0,
+      "slack_token": 0
+    },
+    "initialScreen": {
+      "path": "archive-screening-initial.safe.json",
+      "bytes": 4492,
+      "sha256": "f7bd108ac47b28d3883f72cac4d68643236aeba2e127365c9d7c0454eedb2417",
+      "gitBlobSha1": "deb40689815ca1361452431310b2ae538fee296a"
+    },
+    "resolvedSourceProof": {
+      "path": "archive-screening-fixture.safe.json",
+      "bytes": 5342,
+      "sha256": "3e64cc55721b77027aacacb1d8fd486cb0877460455f384cf4f011743e9ab8bd",
+      "gitBlobSha1": "b174e26612fc618be978f6b48b5320df7fa16677"
+    },
+    "resolvedCandidateCount": 7,
+    "syntheticNormalizedEmail": 1,
+    "ordinaryTestTitleBearerCandidates": 6,
+    "confirmedUnmaskedRealCredentialsOrPersonalData": 0,
+    "unresolvedCandidates": [],
+    "withheldLogs": [],
+    "valuesDisclosed": false,
+    "limitations": "Targeted pattern screening and exact source-context matching cannot prove absence of every possible sensitive value. If any later suspected real unmasked value is found, withhold its corresponding raw/gzip from public packaging pending review."
+  },
+  "totals": {
+    "files": 10,
+    "rawBytes": 6839120,
+    "gzipBytes": 1269036,
+    "roundtripsPassed": 10
+  },
+  "logs": [
+    {
+      "jobId": 128930486229,
+      "sourceUrl": "https://github.com/alexj11324/Mikka/actions/runs/42545814990/job/128930486229",
+      "raw": {
+        "path": "private/128930486229-selection.original.log",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-c04690/private/128930486229-selection.original.log",
+        "bytes": 389057,
+        "sha256": "c3a7cfaba136d8a59692a9677acbccfabf64d7ee28903e2cc8f6ba4265880297",
+        "gitBlobSha1": "e3720b798f868d240b762d55ca429d8eb0f2df43"
+      },
+      "gzip": {
+        "path": "archive-logs/128930486229-selection.original.log.gz",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-c04690/archive-logs/128930486229-selection.original.log.gz",
+        "bytes": 64488,
+        "sha256": "7fe516bc9012d928f8801b038e40f56ed6d5c5c813385dca0a658cbc51809386",
+        "gitBlobSha1": "9c5c7802e751971129dcd7dc867d7a29d1248305"
+      },
+      "roundtrip": {
+        "byteForByteEqual": true,
+        "decompressedBytes": 389057,
+        "sha256": "c3a7cfaba136d8a59692a9677acbccfabf64d7ee28903e2cc8f6ba4265880297",
+        "gitBlobSha1": "e3720b798f868d240b762d55ca429d8eb0f2df43",
+        "rawUnchangedAfterCompression": true
+      },
+      "gzipHeader": {
+        "mtime": 0,
+        "flags": 0,
+        "originalFilenameStored": false
+      },
+      "archiveEligible": true
+    },
+    {
+      "jobId": 128930709878,
+      "sourceUrl": "https://github.com/alexj11324/Mikka/actions/runs/42545814990/job/128930709878",
+      "raw": {
+        "path": "private/128930709878-integration.original.log",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-c04690/private/128930709878-integration.original.log",
+        "bytes": 635390,
+        "sha256": "c5064477f46bc096c64070c3d5cfa31c7d5024985ba8097e0ee73a1969333e23",
+        "gitBlobSha1": "f73937807c852fcd45bfbec6b8ef5d2b6794c058"
+      },
+      "gzip": {
+        "path": "archive-logs/128930709878-integration.original.log.gz",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-c04690/archive-logs/128930709878-integration.original.log.gz",
+        "bytes": 141610,
+        "sha256": "01ef8fc2b90dbcca2e251adba06a1d71da1bfa21dffa6f53f01965405516195e",
+        "gitBlobSha1": "2e9d64931c8853bfc640e14cc5e83905c34176bd"
+      },
+      "roundtrip": {
+        "byteForByteEqual": true,
+        "decompressedBytes": 635390,
+        "sha256": "c5064477f46bc096c64070c3d5cfa31c7d5024985ba8097e0ee73a1969333e23",
+        "gitBlobSha1": "f73937807c852fcd45bfbec6b8ef5d2b6794c058",
+        "rawUnchangedAfterCompression": true
+      },
+      "gzipHeader": {
+        "mtime": 0,
+        "flags": 0,
+        "originalFilenameStored": false
+      },
+      "archiveEligible": true
+    },
+    {
+      "jobId": 128930709925,
+      "sourceUrl": "https://github.com/alexj11324/Mikka/actions/runs/42545814990/job/128930709925",
+      "raw": {
+        "path": "private/128930709925-source.original.log",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-c04690/private/128930709925-source.original.log",
+        "bytes": 132175,
+        "sha256": "f6b40f2aaced3b4eb02609b43ff6fd96dde66b5dddd1b411ffd592a4512825f6",
+        "gitBlobSha1": "f0b58420aebd7c2f7b5a9dd1af512f27ffefaa79"
+      },
+      "gzip": {
+        "path": "archive-logs/128930709925-source.original.log.gz",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-c04690/archive-logs/128930709925-source.original.log.gz",
+        "bytes": 33718,
+        "sha256": "643c232439eb5c5086e953d8993b2e0a267b226c182ff992d5317f381c485bc3",
+        "gitBlobSha1": "b2f3e8e685c8778ddf80bc2a4e7a857d6348b312"
+      },
+      "roundtrip": {
+        "byteForByteEqual": true,
+        "decompressedBytes": 132175,
+        "sha256": "f6b40f2aaced3b4eb02609b43ff6fd96dde66b5dddd1b411ffd592a4512825f6",
+        "gitBlobSha1": "f0b58420aebd7c2f7b5a9dd1af512f27ffefaa79",
+        "rawUnchangedAfterCompression": true
+      },
+      "gzipHeader": {
+        "mtime": 0,
+        "flags": 0,
+        "originalFilenameStored": false
+      },
+      "archiveEligible": true
+    },
+    {
+      "jobId": 128930709943,
+      "sourceUrl": "https://github.com/alexj11324/Mikka/actions/runs/42545814990/job/128930709943",
+      "raw": {
+        "path": "private/128930709943-core.original.log",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-c04690/private/128930709943-core.original.log",
+        "bytes": 984898,
+        "sha256": "4ca47f51a0dd08625d3aa5834c29865c5410d28fdf3f0766102004989885b1be",
+        "gitBlobSha1": "5ffec1faf10e9c5b5f8fa894f80089f3052ec7c8"
+      },
+      "gzip": {
+        "path": "archive-logs/128930709943-core.original.log.gz",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-c04690/archive-logs/128930709943-core.original.log.gz",
+        "bytes": 241791,
+        "sha256": "5a760463c29180725f026e58e1115bc19c9a4a5f7b5d9ac6537ed5f996837988",
+        "gitBlobSha1": "3325493b0a3f8bab936c3fa98a7c5c6adeef6b88"
+      },
+      "roundtrip": {
+        "byteForByteEqual": true,
+        "decompressedBytes": 984898,
+        "sha256": "4ca47f51a0dd08625d3aa5834c29865c5410d28fdf3f0766102004989885b1be",
+        "gitBlobSha1": "5ffec1faf10e9c5b5f8fa894f80089f3052ec7c8",
+        "rawUnchangedAfterCompression": true
+      },
+      "gzipHeader": {
+        "mtime": 0,
+        "flags": 0,
+        "originalFilenameStored": false
+      },
+      "archiveEligible": true
+    },
+    {
+      "jobId": 128930709957,
+      "sourceUrl": "https://github.com/alexj11324/Mikka/actions/runs/42545814990/job/128930709957",
+      "raw": {
+        "path": "private/128930709957-daemon.original.log",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-c04690/private/128930709957-daemon.original.log",
+        "bytes": 124578,
+        "sha256": "3e40b2cdd92901fed62e10518a89c80fd49072b64fd1ba88a0aa85aec271cc25",
+        "gitBlobSha1": "041151394a6154b3816280294b752c8f1d634399"
+      },
+      "gzip": {
+        "path": "archive-logs/128930709957-daemon.original.log.gz",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-c04690/archive-logs/128930709957-daemon.original.log.gz",
+        "bytes": 26845,
+        "sha256": "9e534969bb81beed3e6be0c0112826c669e490312d9296c9eab01300b0ddbfef",
+        "gitBlobSha1": "98b31cc96aad3917264061eb84a0dbb5013057e7"
+      },
+      "roundtrip": {
+        "byteForByteEqual": true,
+        "decompressedBytes": 124578,
+        "sha256": "3e40b2cdd92901fed62e10518a89c80fd49072b64fd1ba88a0aa85aec271cc25",
+        "gitBlobSha1": "041151394a6154b3816280294b752c8f1d634399",
+        "rawUnchangedAfterCompression": true
+      },
+      "gzipHeader": {
+        "mtime": 0,
+        "flags": 0,
+        "originalFilenameStored": false
+      },
+      "archiveEligible": true
+    },
+    {
+      "jobId": 128930709969,
+      "sourceUrl": "https://github.com/alexj11324/Mikka/actions/runs/42545814990/job/128930709969",
+      "raw": {
+        "path": "private/128930709969-pg1.original.log",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-c04690/private/128930709969-pg1.original.log",
+        "bytes": 1040134,
+        "sha256": "fd80926bdba1448f86f650de8822a3085b462f0d423cc3ee6671aa6209c006dd",
+        "gitBlobSha1": "8a3eaa0409ae45ba3667b94ac47bae39afbaead3"
+      },
+      "gzip": {
+        "path": "archive-logs/128930709969-pg1.original.log.gz",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-c04690/archive-logs/128930709969-pg1.original.log.gz",
+        "bytes": 186431,
+        "sha256": "31982b3de3eb75e378149894ef3cb47bf4daa6779b285268a279f6bb89e61b9a",
+        "gitBlobSha1": "5b32971ab61867d449e114d37737c0f467fe7f78"
+      },
+      "roundtrip": {
+        "byteForByteEqual": true,
+        "decompressedBytes": 1040134,
+        "sha256": "fd80926bdba1448f86f650de8822a3085b462f0d423cc3ee6671aa6209c006dd",
+        "gitBlobSha1": "8a3eaa0409ae45ba3667b94ac47bae39afbaead3",
+        "rawUnchangedAfterCompression": true
+      },
+      "gzipHeader": {
+        "mtime": 0,
+        "flags": 0,
+        "originalFilenameStored": false
+      },
+      "archiveEligible": true
+    },
+    {
+      "jobId": 128930709981,
+      "sourceUrl": "https://github.com/alexj11324/Mikka/actions/runs/42545814990/job/128930709981",
+      "raw": {
+        "path": "private/128930709981-pg3.original.log",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-c04690/private/128930709981-pg3.original.log",
+        "bytes": 1825948,
+        "sha256": "75108e2be488cbb1b03821f81e6948a5800b3adb5e8d576dac1de58e441a15f1",
+        "gitBlobSha1": "297dbaa0f334c7d100d8e77c7f82559461ce4666"
+      },
+      "gzip": {
+        "path": "archive-logs/128930709981-pg3.original.log.gz",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-c04690/archive-logs/128930709981-pg3.original.log.gz",
+        "bytes": 299644,
+        "sha256": "e2522e440b24bccc976ca768c5c0320b4e1d3a894a1de947fc4dfcc4d7e68029",
+        "gitBlobSha1": "099322d00be1df2012e2007216432c35b83df54b"
+      },
+      "roundtrip": {
+        "byteForByteEqual": true,
+        "decompressedBytes": 1825948,
+        "sha256": "75108e2be488cbb1b03821f81e6948a5800b3adb5e8d576dac1de58e441a15f1",
+        "gitBlobSha1": "297dbaa0f334c7d100d8e77c7f82559461ce4666",
+        "rawUnchangedAfterCompression": true
+      },
+      "gzipHeader": {
+        "mtime": 0,
+        "flags": 0,
+        "originalFilenameStored": false
+      },
+      "archiveEligible": true
+    },
+    {
+      "jobId": 128930709984,
+      "sourceUrl": "https://github.com/alexj11324/Mikka/actions/runs/42545814990/job/128930709984",
+      "raw": {
+        "path": "private/128930709984-pg2.original.log",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-c04690/private/128930709984-pg2.original.log",
+        "bytes": 1096073,
+        "sha256": "edabb5ebeded84beefe713a57752e48a5a94a89a8c37f29de4ae6a1e2a012551",
+        "gitBlobSha1": "98ceca38f7b874aea2504d08ed45c4fe881d1921"
+      },
+      "gzip": {
+        "path": "archive-logs/128930709984-pg2.original.log.gz",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-c04690/archive-logs/128930709984-pg2.original.log.gz",
+        "bytes": 171040,
+        "sha256": "3a4ed81f2aafbcea1fcbd70d6cdecc6a7f273be9c3783768510a9803e88547ca",
+        "gitBlobSha1": "bb199dcadefd76e977fdc40849ce3c1b03543cf9"
+      },
+      "roundtrip": {
+        "byteForByteEqual": true,
+        "decompressedBytes": 1096073,
+        "sha256": "edabb5ebeded84beefe713a57752e48a5a94a89a8c37f29de4ae6a1e2a012551",
+        "gitBlobSha1": "98ceca38f7b874aea2504d08ed45c4fe881d1921",
+        "rawUnchangedAfterCompression": true
+      },
+      "gzipHeader": {
+        "mtime": 0,
+        "flags": 0,
+        "originalFilenameStored": false
+      },
+      "archiveEligible": true
+    },
+    {
+      "jobId": 128930709986,
+      "sourceUrl": "https://github.com/alexj11324/Mikka/actions/runs/42545814990/job/128930709986",
+      "raw": {
+        "path": "private/128930709986-pg4.original.log",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-c04690/private/128930709986-pg4.original.log",
+        "bytes": 597562,
+        "sha256": "799d23bd65a2b3578c74ed9bf9e8a170c4894d7430bbc9f244ef37a2d416ea80",
+        "gitBlobSha1": "3e25f2c07135633f19d6fc3f51f7d83d139c481e"
+      },
+      "gzip": {
+        "path": "archive-logs/128930709986-pg4.original.log.gz",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-c04690/archive-logs/128930709986-pg4.original.log.gz",
+        "bytes": 99729,
+        "sha256": "dd498f2a377ab46b103afc91de982dc888629cad402d3ae317bbef0b3c480adb",
+        "gitBlobSha1": "d4881614e78ffa98169b27b3924c3c5d4e2c877d"
+      },
+      "roundtrip": {
+        "byteForByteEqual": true,
+        "decompressedBytes": 597562,
+        "sha256": "799d23bd65a2b3578c74ed9bf9e8a170c4894d7430bbc9f244ef37a2d416ea80",
+        "gitBlobSha1": "3e25f2c07135633f19d6fc3f51f7d83d139c481e",
+        "rawUnchangedAfterCompression": true
+      },
+      "gzipHeader": {
+        "mtime": 0,
+        "flags": 0,
+        "originalFilenameStored": false
+      },
+      "archiveEligible": true
+    },
+    {
+      "jobId": 128932640243,
+      "sourceUrl": "https://github.com/alexj11324/Mikka/actions/runs/42545814990/job/128932640243",
+      "raw": {
+        "path": "private/128932640243-database-aggregate.original.log",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-c04690/private/128932640243-database-aggregate.original.log",
+        "bytes": 13305,
+        "sha256": "8dbb69a11791dde402f82f6d3584feeb547c497a8045785f864fb0cddc766141",
+        "gitBlobSha1": "380b4475a3d3a780b8896f1e5ed30f76065f0831"
+      },
+      "gzip": {
+        "path": "archive-logs/128932640243-database-aggregate.original.log.gz",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-c04690/archive-logs/128932640243-database-aggregate.original.log.gz",
+        "bytes": 3740,
+        "sha256": "7cc9815ef98d1ab5078b8dbabf957a3345044e90044a62417401d4bb6d63903f",
+        "gitBlobSha1": "8a2ca8718f20ee6296d8ce35b56610a0597b108e"
+      },
+      "roundtrip": {
+        "byteForByteEqual": true,
+        "decompressedBytes": 13305,
+        "sha256": "8dbb69a11791dde402f82f6d3584feeb547c497a8045785f864fb0cddc766141",
+        "gitBlobSha1": "380b4475a3d3a780b8896f1e5ed30f76065f0831",
+        "rawUnchangedAfterCompression": true
+      },
+      "gzipHeader": {
+        "mtime": 0,
+        "flags": 0,
+        "originalFilenameStored": false
+      },
+      "archiveEligible": true
+    }
+  ],
+  "unchangedJsonReceipts": [
+    {
+      "path": "main-lanes-final.safe.json",
+      "bytes": 6325,
+      "sha256": "9c153ce4fdb905a2677b8b3838a58c97ea920dcf5a00e3e51e83f4e7afb5200b",
+      "gitBlobSha1": "b857707bd76fc1d00fe4f94d10f55aee62bb69db",
+      "modifiedByPackaging": false
+    },
+    {
+      "path": "pg-final.safe.json",
+      "bytes": 44372,
+      "sha256": "443b8fd144973ab9b7b42502fef9616ccd9f80d38b0becb44447d75c0287ae67",
+      "gitBlobSha1": "08fb3b56d9507cb24f3386199d4bf6f0ab71f397",
+      "modifiedByPackaging": false
+    },
+    {
+      "path": "pg-partial.safe.json",
+      "bytes": 33384,
+      "sha256": "962e0e7576b68436836c4b00a31a251a95337bd7586ee39e1b22f9f6a46b6209",
+      "gitBlobSha1": "aa8620adaef1e3dc7c0d656cb6e121443b9f75d3",
+      "modifiedByPackaging": false
+    },
+    {
+      "path": "selection-plan.safe.json",
+      "bytes": 20486,
+      "sha256": "109f9936d8aa12c687b26a18e0fad5720b1cae1684985cd355459301139712ba",
+      "gitBlobSha1": "de625759cd7c91c1e665d3b8f50956b1efaec6b6",
+      "modifiedByPackaging": false
+    },
+    {
+      "path": "source-binding.safe.json",
+      "bytes": 2138,
+      "sha256": "50a0d93eb3ce960a18b5ccd77572c14cf8d1de7ae04c44142b2b85879c405ad7",
+      "gitBlobSha1": "087e82186744840766b65f401fac6a33f2d02b12",
+      "modifiedByPackaging": false
+    },
+    {
+      "path": "unit-reconciliation.safe.json",
+      "bytes": 3136,
+      "sha256": "392a636f375c10715dd66834c682349ab9d2f11ca9b333a68572b6f1d1cf9d2b",
+      "gitBlobSha1": "f7c920e7bd6fc48eff65e7fbc922d69176206319",
+      "modifiedByPackaging": false
+    }
+  ],
+  "archiveInstructions": "Prepared locally only. Root may append archive-logs/*.gz with archive-*.safe.json and selected existing safe receipts; raw logs remain unchanged and private locally. No checkpoint index is created while Native remains outside this task.",
+  "operations": {
+    "networkRequests": 0,
+    "testsRun": 0,
+    "ciActions": 0,
+    "modelCalls": 0,
+    "sourceOrIndexEdits": 0,
+    "resourcesCreated": 0,
+    "activeOwnedProcesses": 0
+  }
+}

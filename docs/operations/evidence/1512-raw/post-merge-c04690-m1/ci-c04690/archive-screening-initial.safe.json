@@ -1,0 +1,130 @@
+{
+  "version": 1,
+  "createdAt": "2026-11-09T01:51:20.195425+00:00",
+  "repository": "alexj11324/Mikka",
+  "runId": 42545814990,
+  "head": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+  "actualCheckout": "fd053d254e377f35ff8e2529edb1ad544c23fab1",
+  "actualTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+  "scope": "Ten previously downloaded terminal main-lane logs named by main-lanes-final.safe.json; no API metadata, Native logs or new downloads.",
+  "sourceReceipt": {
+    "path": "main-lanes-final.safe.json",
+    "bytes": 6325,
+    "sha256": "9c153ce4fdb905a2677b8b3838a58c97ea920dcf5a00e3e51e83f4e7afb5200b"
+  },
+  "files": 10,
+  "rawBytes": 6839120,
+  "counts": {
+    "private_key_marker": 0,
+    "github_token": 0,
+    "posthog_token": 0,
+    "aws_access_key": 0,
+    "jwt": 0,
+    "bearer_material": 6,
+    "email": 1,
+    "signed_url_material": 0,
+    "slack_token": 0
+  },
+  "potentialFindings": [
+    {
+      "path": "private/128930709969-pg1.original.log",
+      "line": 6336,
+      "category": "email"
+    },
+    {
+      "path": "private/128930709981-pg3.original.log",
+      "line": 2309,
+      "category": "bearer_material"
+    },
+    {
+      "path": "private/128930709981-pg3.original.log",
+      "line": 2634,
+      "category": "bearer_material"
+    },
+    {
+      "path": "private/128930709986-pg4.original.log",
+      "line": 2093,
+      "category": "bearer_material"
+    },
+    {
+      "path": "private/128930709986-pg4.original.log",
+      "line": 2153,
+      "category": "bearer_material"
+    },
+    {
+      "path": "private/128930709986-pg4.original.log",
+      "line": 2239,
+      "category": "bearer_material"
+    },
+    {
+      "path": "private/128930709986-pg4.original.log",
+      "line": 2299,
+      "category": "bearer_material"
+    }
+  ],
+  "potentialFindingsCount": 7,
+  "valuesDisclosed": false,
+  "originals": [
+    {
+      "path": "private/128930486229-selection.original.log",
+      "bytes": 389057,
+      "sha256": "c3a7cfaba136d8a59692a9677acbccfabf64d7ee28903e2cc8f6ba4265880297",
+      "gitBlobSha1": "e3720b798f868d240b762d55ca429d8eb0f2df43"
+    },
+    {
+      "path": "private/128930709878-integration.original.log",
+      "bytes": 635390,
+      "sha256": "c5064477f46bc096c64070c3d5cfa31c7d5024985ba8097e0ee73a1969333e23",
+      "gitBlobSha1": "f73937807c852fcd45bfbec6b8ef5d2b6794c058"
+    },
+    {
+      "path": "private/128930709925-source.original.log",
+      "bytes": 132175,
+      "sha256": "f6b40f2aaced3b4eb02609b43ff6fd96dde66b5dddd1b411ffd592a4512825f6",
+      "gitBlobSha1": "f0b58420aebd7c2f7b5a9dd1af512f27ffefaa79"
+    },
+    {
+      "path": "private/128930709943-core.original.log",
+      "bytes": 984898,
+      "sha256": "4ca47f51a0dd08625d3aa5834c29865c5410d28fdf3f0766102004989885b1be",
+      "gitBlobSha1": "5ffec1faf10e9c5b5f8fa894f80089f3052ec7c8"
+    },
+    {
+      "path": "private/128930709957-daemon.original.log",
+      "bytes": 124578,
+      "sha256": "3e40b2cdd92901fed62e10518a89c80fd49072b64fd1ba88a0aa85aec271cc25",
+      "gitBlobSha1": "041151394a6154b3816280294b752c8f1d634399"
+    },
+    {
+      "path": "private/128930709969-pg1.original.log",
+      "bytes": 1040134,
+      "sha256": "fd80926bdba1448f86f650de8822a3085b462f0d423cc3ee6671aa6209c006dd",
+      "gitBlobSha1": "8a3eaa0409ae45ba3667b94ac47bae39afbaead3"
+    },
+    {
+      "path": "private/128930709981-pg3.original.log",
+      "bytes": 1825948,
+      "sha256": "75108e2be488cbb1b03821f81e6948a5800b3adb5e8d576dac1de58e441a15f1",
+      "gitBlobSha1": "297dbaa0f334c7d100d8e77c7f82559461ce4666"
+    },
+    {
+      "path": "private/128930709984-pg2.original.log",
+      "bytes": 1096073,
+      "sha256": "edabb5ebeded84beefe713a57752e48a5a94a89a8c37f29de4ae6a1e2a012551",
+      "gitBlobSha1": "98ceca38f7b874aea2504d08ed45c4fe881d1921"
+    },
+    {
+      "path": "private/128930709986-pg4.original.log",
+      "bytes": 597562,
+      "sha256": "799d23bd65a2b3578c74ed9bf9e8a170c4894d7430bbc9f244ef37a2d416ea80",
+      "gitBlobSha1": "3e25f2c07135633f19d6fc3f51f7d83d139c481e"
+    },
+    {
+      "path": "private/128932640243-database-aggregate.original.log",
+      "bytes": 13305,
+      "sha256": "8dbb69a11791dde402f82f6d3584feeb547c497a8045785f864fb0cddc766141",
+      "gitBlobSha1": "380b4475a3d3a780b8896f1e5ed30f76065f0831"
+    }
+  ],
+  "boundary": "Targeted high-confidence credential/email pattern screen, followed by fixture source verification where needed. GitHub masking alone does not prove absence of every possible sensitive value."
+}

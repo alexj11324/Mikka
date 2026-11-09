@@ -1,0 +1,13 @@
+✔ Workflow and failure logs share OTel trace/span IDs and exclude content (13.092013ms)
+✔ tail-retained ordinary failures give native Logs the same effective rate as APM (4.815021ms)
+✔ HTTP completes while waitUntil retains an earlier in-flight Workflow trace export (94.143211ms)
+✔ exporter forceFlush reject does not fail the HTTP response or retained lifetime (5.217167ms)
+✔ exporter forceFlush throw does not fail the HTTP response or retained lifetime (1.955519ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1064.052384

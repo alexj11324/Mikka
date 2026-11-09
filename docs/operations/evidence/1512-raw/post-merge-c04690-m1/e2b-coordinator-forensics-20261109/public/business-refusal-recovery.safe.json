@@ -1,0 +1,196 @@
+{
+  "schema": 1,
+  "source": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "runId": 42544540108,
+  "subscriptionJobId": 128933112530,
+  "scope": {
+    "start": "2026-11-09T01:45:10Z",
+    "endExclusive": "2026-11-09T01:50:36Z",
+    "fixtureNamePattern": "^测试1505 [0-9a-f]{8}$",
+    "repository": "alexj11324/Mikka-handoff"
+  },
+  "queries": [
+    {
+      "queryOrdinal": 1,
+      "originalFileSha256": "723a3874643ae05b1fb006ee9b6e13e334b98738c2ccd37ebb04abb8d0446bfd",
+      "originalFileBytes": 4255,
+      "requestSha256": "454207c2abdd975aa88d21749532b59009ba323a983f3f22d3b174f0cabeb998",
+      "rows": [
+        {
+          "fixtureBotSha256": "b2bd77eaf4e01a8696ebdb037792455f6488d6805af9ac1f882f1c3aa37714bb",
+          "botCreatedAt": "2026-11-09T01:45:11.604Z",
+          "position": 2,
+          "createdAt": "2026-11-09T01:46:01.048Z",
+          "partType": "tool-call",
+          "toolName": "dispatch_run",
+          "toolCallHash": "828bebe43e1164a7da21c1a8f39dd720",
+          "outputType": null,
+          "failed": null,
+          "closedErrorCode": null
+        },
+        {
+          "fixtureBotSha256": "b2bd77eaf4e01a8696ebdb037792455f6488d6805af9ac1f882f1c3aa37714bb",
+          "botCreatedAt": "2026-11-09T01:45:11.604Z",
+          "position": 3,
+          "createdAt": "2026-11-09T01:46:01.048Z",
+          "partType": "tool-result",
+          "toolName": "dispatch_run",
+          "toolCallHash": "828bebe43e1164a7da21c1a8f39dd720",
+          "outputType": "json",
+          "failed": true,
+          "closedErrorCode": "githubNotConnected"
+        },
+        {
+          "fixtureBotSha256": "b2bd77eaf4e01a8696ebdb037792455f6488d6805af9ac1f882f1c3aa37714bb",
+          "botCreatedAt": "2026-11-09T01:45:11.604Z",
+          "position": 6,
+          "createdAt": "2026-11-09T01:46:45.452Z",
+          "partType": "tool-call",
+          "toolName": "get_factory_task",
+          "toolCallHash": "4dda8ba793ad3ceaad75d42cf54e01ed",
+          "outputType": null,
+          "failed": null,
+          "closedErrorCode": null
+        },
+        {
+          "fixtureBotSha256": "b2bd77eaf4e01a8696ebdb037792455f6488d6805af9ac1f882f1c3aa37714bb",
+          "botCreatedAt": "2026-11-09T01:45:11.604Z",
+          "position": 7,
+          "createdAt": "2026-11-09T01:46:45.452Z",
+          "partType": "tool-result",
+          "toolName": "get_factory_task",
+          "toolCallHash": "4dda8ba793ad3ceaad75d42cf54e01ed",
+          "outputType": "json",
+          "failed": true,
+          "closedErrorCode": "unclassified"
+        }
+      ]
+    },
+    {
+      "queryOrdinal": 2,
+      "originalFileSha256": "2fe1e1545793ef5354232962bed29782cbfea43d084381767ea1a88b9c2e621e",
+      "originalFileBytes": 4276,
+      "requestSha256": "e5c40e074370a49e51cd63db39d2a29590e3fa4d8e6c5894aa75120af4c051df",
+      "rows": [
+        {
+          "fixtureBotSha256": "b2bd77eaf4e01a8696ebdb037792455f6488d6805af9ac1f882f1c3aa37714bb",
+          "botCreatedAt": "2026-11-09T01:45:11.604Z",
+          "position": 2,
+          "createdAt": "2026-11-09T01:46:01.048Z",
+          "partType": "tool-call",
+          "toolName": "dispatch_run",
+          "toolCallHash": "828bebe43e1164a7da21c1a8f39dd720",
+          "outputType": null,
+          "failed": null,
+          "closedErrorCode": null
+        },
+        {
+          "fixtureBotSha256": "b2bd77eaf4e01a8696ebdb037792455f6488d6805af9ac1f882f1c3aa37714bb",
+          "botCreatedAt": "2026-11-09T01:45:11.604Z",
+          "position": 3,
+          "createdAt": "2026-11-09T01:46:01.048Z",
+          "partType": "tool-result",
+          "toolName": "dispatch_run",
+          "toolCallHash": "828bebe43e1164a7da21c1a8f39dd720",
+          "outputType": "json",
+          "failed": true,
+          "closedErrorCode": "githubNotConnected"
+        },
+        {
+          "fixtureBotSha256": "b2bd77eaf4e01a8696ebdb037792455f6488d6805af9ac1f882f1c3aa37714bb",
+          "botCreatedAt": "2026-11-09T01:45:11.604Z",
+          "position": 6,
+          "createdAt": "2026-11-09T01:46:45.452Z",
+          "partType": "tool-call",
+          "toolName": "get_factory_task",
+          "toolCallHash": "4dda8ba793ad3ceaad75d42cf54e01ed",
+          "outputType": null,
+          "failed": null,
+          "closedErrorCode": null
+        },
+        {
+          "fixtureBotSha256": "b2bd77eaf4e01a8696ebdb037792455f6488d6805af9ac1f882f1c3aa37714bb",
+          "botCreatedAt": "2026-11-09T01:45:11.604Z",
+          "position": 7,
+          "createdAt": "2026-11-09T01:46:45.452Z",
+          "partType": "tool-result",
+          "toolName": "get_factory_task",
+          "toolCallHash": "4dda8ba793ad3ceaad75d42cf54e01ed",
+          "outputType": "json",
+          "failed": true,
+          "closedErrorCode": "factoryNotFound"
+        }
+      ]
+    },
+    {
+      "queryOrdinal": 3,
+      "originalFileSha256": "3905de4eb7dcf81e8dfc5b9264288820f72f702f2a3abd749da1e3120a3cdd67",
+      "originalFileBytes": 1645,
+      "requestSha256": "231dfa690b96d867b8fd8a9bf91e6bf1b7d8f361606006d2f668dbaf9cc653ff",
+      "rows": [
+        {
+          "fixtureExists": false,
+          "exactClaudeCandidateDeviceAndRepositoryMatched": false,
+          "ownerPluginGitHubConnectionPresent": false,
+          "ownerLegacyGitHubAccountPresent": false
+        }
+      ]
+    },
+    {
+      "queryOrdinal": 4,
+      "originalFileSha256": "ccd1f715889fb21ca93f3ea13928c9401d224b0701e064ef67763eb1fb24ae64",
+      "originalFileBytes": 1763,
+      "requestSha256": "1b7345fdc1dc71515c92324fb78925c97faea9495131bc8c59afcb5f7abb6e81",
+      "rows": [
+        {
+          "fixtureExists": true,
+          "exactClaudeCandidateDeviceAndRepositoryMatched": true,
+          "ownerPluginGitHubConnectionPresent": false,
+          "ownerLegacyGitHubAccountPresent": false
+        }
+      ]
+    }
+  ],
+  "corrections": [
+    "Query1 closed set did not yet contain the source-declared factoryNotFound; query2 added that exact declared code.",
+    "Query3 timestamp equality did not match PostgreSQL microseconds; all false fields therefore do not prove absent identity. Query4 uses one-millisecond half-open bounds and confirms the fixture, exact candidate device and repository."
+  ],
+  "conclusions": {
+    "claude": "Stored dispatch_run result is githubNotConnected for the exact candidate device and repository.",
+    "codex": "Stored get_factory_task result is factoryNotFound; runtime timing lists only that tool and no dispatch_run.",
+    "connection": "Both plugin GitHub connection and legacy GitHub login-account EXISTS booleans were false for the matched fixture owner."
+  },
+  "limits": [
+    "No prompt, chat text, complete tool input/output, account email, token or credential was selected.",
+    "No database writes, migrations or resources were created.",
+    "This proves the recorded refusals, not the cause of all missing APM spans.",
+    "No identity substitution, connection restoration or successful production model acceptance is claimed."
+  ],
+  "rawVercelFiles": [
+    {
+      "file": "claude-request.original.json",
+      "bytes": 5991,
+      "sha256": "d3421a6b192980da8037b7f46e10ec16bca9576a66a210fb1b215cf14e064953"
+    },
+    {
+      "file": "codex-request.original.json",
+      "bytes": 9387,
+      "sha256": "9d497cf71c6e28cd940cd3ef863be7584599ec09c466cb51c4861f829b6fb1f0"
+    },
+    {
+      "file": "dispatch.original.json",
+      "bytes": 1586,
+      "sha256": "346aeb0519dd5b707adc95d6cf4444d07f3452a9f040fa8cfde986aef3395fe3"
+    },
+    {
+      "file": "errors.original.json",
+      "bytes": 1590,
+      "sha256": "b8407bd99fe2ba7352f0c8cb866424e4ea9557cc4e512a86ae198f200f50b07d"
+    },
+    {
+      "file": "models.original.json",
+      "bytes": 10096,
+      "sha256": "2fd26a968077b0d082abf37c7323da0e91e1c950c9af7c15b31af9789c9f89b6"
+    }
+  ]
+}

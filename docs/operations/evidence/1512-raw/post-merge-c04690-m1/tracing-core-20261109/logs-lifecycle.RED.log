@@ -1,0 +1,66 @@
+✔ Workflow and failure logs share OTel trace/span IDs and exclude content (9.046458ms)
+✔ tail-retained ordinary failures give native Logs the same effective rate as APM (4.743597ms)
+✖ HTTP completes while waitUntil retains an earlier in-flight Workflow trace export (105.588018ms)
+✖ exporter forceFlush reject does not fail the HTTP response or retained lifetime (4.061885ms)
+✖ exporter forceFlush throw does not fail the HTTP response or retained lifetime (2.268498ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 2
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 742.393971
+
+✖ failing tests:
+
+test at lib/tracing/logs.test.ts:1:3734
+✖ HTTP completes while waitUntil retains an earlier in-flight Workflow trace export (105.588018ms)
+  AssertionError [ERR_ASSERTION]: waitUntil must also retain the earlier export already removed from the batch queue
+  
+  true !== false
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/issue1512-tracing-core-copy/lib/tracing/logs.test.ts:127:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib/tracing/logs.test.ts:1:8300
+✖ exporter forceFlush reject does not fail the HTTP response or retained lifetime (4.061885ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/issue1512-tracing-core-copy/lib/tracing/logs.test.ts:171:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at lib/tracing/logs.test.ts:1:8300
+✖ exporter forceFlush throw does not fail the HTTP response or retained lifetime (2.268498ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  0 !== 1
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/issue1512-tracing-core-copy/lib/tracing/logs.test.ts:171:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 0,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

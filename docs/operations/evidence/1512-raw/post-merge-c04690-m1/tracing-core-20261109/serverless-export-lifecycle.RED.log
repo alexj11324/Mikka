@@ -1,0 +1,29 @@
+PROBE_RECEIPT {"fixtureBoundary":"Exact M1 createTracerProvider + official Workflow helper + official OTLP serializer; deferred local exporter callback, no network","sourceRevision":"01a6bfb3a6c537e2b466911f57429f109b418aa8","sentBatches":2,"completedBatches":1,"pendingBatches":1,"innerFlushCalls":0,"waitUntilSettledWhileEarlierBatchPending":true,"deliveredSpanNames":["POST /.well-known/workflow/v1/step"],"stageLogNames":["dispatch.resolveRepository","dispatch_run","step.execute"],"capturedAiEvents":1}
+✖ serverless completion retains an already-started trace export until its callback settles (52.132144ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 805.928731
+
+✖ failing tests:
+
+test at lib/tracing/serverless-export-lifecycle.probe.test.ts:1:1192
+✖ serverless completion retains an already-started trace export until its callback settles (52.132144ms)
+  AssertionError [ERR_ASSERTION]: The production waitUntil lifetime must retain an earlier in-flight trace export, not only the currently queued root
+  
+  true !== false
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/issue1512-tracing-core-copy/lib/tracing/serverless-export-lifecycle.probe.test.ts:91:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

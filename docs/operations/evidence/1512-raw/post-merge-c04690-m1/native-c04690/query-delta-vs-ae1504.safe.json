@@ -1,0 +1,5572 @@
+{
+  "schema": "issue1512.native-sql-delta-vs-ae1504.v1",
+  "createdAt": "2026-11-09T02:09:23.000295+00:00",
+  "sourceInputs": {
+    "baseline": {
+      "path": "issue1512-evidence-work/native-ae1504/native-ae1504-original/lifecycle.json",
+      "bytes": 685774,
+      "sha256": "db7306abb7a789442300d2098bb211789a7424a432adce68c7637fad6ed31b05",
+      "gitBlobSha": "1c547b66b0c5bf1e32d22342109cd04fd308756a"
+    },
+    "current": {
+      "path": "issue1512-evidence-work/native-c04690/native-c04690-original/lifecycle.json",
+      "bytes": 696142,
+      "sha256": "19a1cfbd9225c580a2309f76016e099d4354e5fba3ee9562c59d2782db14dcdc",
+      "gitBlobSha": "1cd8ce2c9528225884da22282e254311c797d07d"
+    }
+  },
+  "sourceBinding": {
+    "baselineActual": "0041c6ab2a28b562deed9c692d8572ac4736f64e",
+    "baselineTree": "8c5c12ea993533403d13e21dc75647bb28022767",
+    "currentActual": "fd053d254e377f35ff8e2529edb1ad544c23fab1",
+    "currentTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+    "repositoryBlobChanges": 0,
+    "onlyRepositoryDiff": "Two executable mode bits on existing test fakes; independently verified in daemon-fixture-mode-independent-review.safe.json."
+  },
+  "acceptance": {
+    "currentNative": 473,
+    "currentWeb": 402,
+    "nativeMinusWeb": 71,
+    "loginPassed": false,
+    "firstStartupNative": 176,
+    "firstStartupHosted": 194,
+    "startupPassed": true,
+    "baselineNative": 384,
+    "baselineWeb": 402,
+    "newNativeMinusOldNative": 89,
+    "webAll17OperationsAnd78SourcesIdentical": true
+  },
+  "originalSegmentDeltas": [
+    {
+      "phase": "common-email-authentication",
+      "baselineQueries": 19,
+      "currentQueries": 19,
+      "delta": 0,
+      "operationDelta": {},
+      "sourceDelta": {}
+    },
+    {
+      "phase": "native-pkce-and-automatic-renderer-to-public-session",
+      "baselineQueries": 13,
+      "currentQueries": 15,
+      "delta": 2,
+      "operationDelta": {
+        "/api/desktop/rpc": 2
+      },
+      "sourceDelta": {}
+    },
+    {
+      "phase": "workspace-selection-to-usable",
+      "baselineQueries": 352,
+      "currentQueries": 439,
+      "delta": 87,
+      "operationDelta": {
+        "/actions/coordinator/poll": -2,
+        "/actions/issues/poll": 1,
+        "/api/desktop/rpc": -2,
+        "unattributed": 90
+      },
+      "sourceDelta": {
+        "/api/devices/enrollment": 3,
+        "/v1/devices/[deviceId]/commands": 6,
+        "/v1/devices/[deviceId]/gateway": 5,
+        "/v1/devices/[deviceId]/heartbeat": 20,
+        "/v1/devices/[deviceId]/repos": 12,
+        "/v1/devices/[deviceId]/runs": 12,
+        "/v1/devices/enroll": 4,
+        "/v1/devices/register": 15,
+        "after:factory-dispatch-recovery": 12,
+        "after:live-notify": 1
+      }
+    }
+  ],
+  "nativeOperationDelta": {
+    "/actions/coordinator/poll": -2,
+    "/actions/issues/poll": 1,
+    "unattributed": 90
+  },
+  "nativeSourceDelta": {
+    "/api/devices/enrollment": 3,
+    "/v1/devices/[deviceId]/commands": 6,
+    "/v1/devices/[deviceId]/gateway": 5,
+    "/v1/devices/[deviceId]/heartbeat": 20,
+    "/v1/devices/[deviceId]/repos": 12,
+    "/v1/devices/[deviceId]/runs": 12,
+    "/v1/devices/enroll": 4,
+    "/v1/devices/register": 15,
+    "after:factory-dispatch-recovery": 12,
+    "after:live-notify": 1
+  },
+  "currentNativeMinusWeb": {
+    "operations": {
+      "/actions/coordinator/poll": -8,
+      "/actions/coordinator/summaries": -8,
+      "/actions/issues/poll": -5,
+      "/actions/projects/list": -2,
+      "/actions/task-runs/read": 12,
+      "/actions/threads/poll": -8,
+      "/api/auth/[...all]": -3,
+      "/api/desktop/begin": 1,
+      "/api/desktop/exchange": 8,
+      "/api/desktop/return": 2,
+      "/api/desktop/rpc": 82,
+      "/api/rpc": -84,
+      "/api/workspace/switcher": -8,
+      "unattributed": 92
+    },
+    "sources": {
+      "/api/conversations/[id]/read": -2,
+      "/api/devices/enrollment": 7,
+      "/v1/devices/[deviceId]/commands": 6,
+      "/v1/devices/[deviceId]/gateway": 5,
+      "/v1/devices/[deviceId]/heartbeat": 20,
+      "/v1/devices/[deviceId]/repos": 12,
+      "/v1/devices/[deviceId]/runs": 12,
+      "/v1/devices/enroll": 4,
+      "/v1/devices/register": 15,
+      "after:factory-dispatch-recovery": 12,
+      "after:live-notify": 1
+    }
+  },
+  "diagnosticConservation": {
+    "currentMeasuredQueries": 1245,
+    "allMeasuredOrdinalsPresentExactlyOnce": true,
+    "allFourOperationAndSourceCountersReconciled": true,
+    "status": "incomplete",
+    "droppedQueries": 0,
+    "overflow": false,
+    "nativeUnknownContexts": {
+      "baseline": 81,
+      "current": 165,
+      "delta": 84
+    },
+    "nativeUnknownStructures": {
+      "baseline": 128,
+      "current": 150,
+      "delta": 22
+    },
+    "allWindowsUnknownContexts": 328,
+    "allWindowsUnknownStructures": 426
+  },
+  "last87NativeQueries": {
+    "fromInclusive": 26719,
+    "toInclusive": 26805,
+    "count": 87,
+    "continuous": true,
+    "endsAtOriginalNativeWindowEnd": true,
+    "v1DeviceQueries": 74,
+    "afterQueries": 13,
+    "scopeCounts": {
+      "/v1/devices/enroll": 4,
+      "/v1/devices/register": 15,
+      "after:live-notify": 1,
+      "/v1/devices/[deviceId]/gateway": 5,
+      "/v1/devices/[deviceId]/heartbeat": 20,
+      "/v1/devices/[deviceId]/commands": 6,
+      "after:factory-dispatch-recovery": 12,
+      "/v1/devices/[deviceId]/repos": 12,
+      "/v1/devices/[deviceId]/runs": 12
+    },
+    "baselineNativeCountForTheseScopes": 0
+  },
+  "changedScopeDetails": [
+    {
+      "scope": "/actions/coordinator/poll",
+      "baseline": {
+        "queries": 86,
+        "unknownContextQueries": 0,
+        "unknownStructureQueries": 33,
+        "ordinals": [
+          26328,
+          26330,
+          26332,
+          26333,
+          26335,
+          26337,
+          26338,
+          26340,
+          26342,
+          26345,
+          26350,
+          26352,
+          26354,
+          26356,
+          26358,
+          26359,
+          26361,
+          26363,
+          26365,
+          26366,
+          26367,
+          26370,
+          26372,
+          26375,
+          26377,
+          26385,
+          26425,
+          26430,
+          26433,
+          26438,
+          26439,
+          26440,
+          26441,
+          26442,
+          26443,
+          26444,
+          26445,
+          26446,
+          26447,
+          26448,
+          26449,
+          26450,
+          26451,
+          26452,
+          26453,
+          26454,
+          26455,
+          26456,
+          26494,
+          26497,
+          26503,
+          26509,
+          26510,
+          26515,
+          26519,
+          26522,
+          26525,
+          26528,
+          26530,
+          26533,
+          26535,
+          26538,
+          26539,
+          26541,
+          26542,
+          26543,
+          26544,
+          26545,
+          26602,
+          26604,
+          26609,
+          26614,
+          26616,
+          26618,
+          26619,
+          26620,
+          26621,
+          26622,
+          26623,
+          26624,
+          26625,
+          26626,
+          26627,
+          26628,
+          26629,
+          26630
+        ],
+        "byPhase": {
+          "workspace-selection-to-usable": 86
+        },
+        "groups": [
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "0b9bc73fbbd2",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 1,
+            "ordinals": [
+              26328
+            ],
+            "contextIndices": [
+              73
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "6f38736a0170",
+              "parameterCount": 3,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26330,
+              26425,
+              26494,
+              26602
+            ],
+            "contextIndices": [
+              73,
+              81,
+              94,
+              109
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "66cde7eead86",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26332,
+              26430,
+              26497,
+              26604
+            ],
+            "contextIndices": [
+              73,
+              81,
+              94,
+              109
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "a130e5d92ffc",
+              "parameterCount": 4,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26333,
+              26433,
+              26503,
+              26609
+            ],
+            "contextIndices": [
+              73,
+              81,
+              94,
+              109
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "23d0664babd6",
+              "parameterCount": 3,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26335,
+              26438,
+              26509,
+              26614
+            ],
+            "contextIndices": [
+              73,
+              81,
+              94,
+              109
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "b27c6e931d1b",
+              "parameterCount": 3,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26337,
+              26439,
+              26510,
+              26616
+            ],
+            "contextIndices": [
+              73,
+              81,
+              94,
+              109
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "82919a1d33a6",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 8,
+            "ordinals": [
+              26338,
+              26350,
+              26440,
+              26444,
+              26515,
+              26528,
+              26618,
+              26622
+            ],
+            "contextIndices": [
+              73,
+              81,
+              94,
+              109
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "status": "unknown"
+            },
+            "queries": 33,
+            "ordinals": [
+              26340,
+              26342,
+              26345,
+              26354,
+              26366,
+              26367,
+              26370,
+              26375,
+              26377,
+              26385,
+              26441,
+              26442,
+              26443,
+              26446,
+              26453,
+              26454,
+              26456,
+              26519,
+              26522,
+              26525,
+              26533,
+              26539,
+              26541,
+              26543,
+              26544,
+              26545,
+              26619,
+              26620,
+              26621,
+              26624,
+              26627,
+              26628,
+              26630
+            ],
+            "contextIndices": [
+              73,
+              81,
+              94,
+              109
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "cfc5423a080d",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26352,
+              26445,
+              26530,
+              26623
+            ],
+            "contextIndices": [
+              73,
+              81,
+              94,
+              109
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "a6d8d51b1b0b",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26356,
+              26447,
+              26535,
+              26625
+            ],
+            "contextIndices": [
+              73,
+              81,
+              94,
+              109
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "1365a978dee8",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26358,
+              26448,
+              26538,
+              26626
+            ],
+            "contextIndices": [
+              73,
+              81,
+              94,
+              109
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "9f5aec55f127",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26359,
+              26449
+            ],
+            "contextIndices": [
+              73,
+              81
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "e20f5fbb8309",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26361,
+              26450
+            ],
+            "contextIndices": [
+              73,
+              81
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "0f220c251daf",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26363,
+              26451
+            ],
+            "contextIndices": [
+              73,
+              81
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "a125321ddabb",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26365,
+              26452
+            ],
+            "contextIndices": [
+              73,
+              81
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "9f0fe8477a06",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26372,
+              26455,
+              26542,
+              26629
+            ],
+            "contextIndices": [
+              73,
+              81,
+              94,
+              109
+            ]
+          }
+        ]
+      },
+      "current": {
+        "queries": 84,
+        "unknownContextQueries": 0,
+        "unknownStructureQueries": 32,
+        "ordinals": [
+          26405,
+          26408,
+          26411,
+          26416,
+          26417,
+          26420,
+          26422,
+          26424,
+          26426,
+          26428,
+          26430,
+          26432,
+          26434,
+          26436,
+          26439,
+          26440,
+          26442,
+          26445,
+          26447,
+          26450,
+          26452,
+          26454,
+          26456,
+          26469,
+          26508,
+          26510,
+          26515,
+          26519,
+          26523,
+          26524,
+          26525,
+          26526,
+          26527,
+          26528,
+          26529,
+          26530,
+          26531,
+          26532,
+          26533,
+          26534,
+          26535,
+          26536,
+          26537,
+          26538,
+          26539,
+          26540,
+          26571,
+          26576,
+          26577,
+          26584,
+          26589,
+          26596,
+          26600,
+          26605,
+          26613,
+          26616,
+          26620,
+          26624,
+          26627,
+          26631,
+          26633,
+          26634,
+          26636,
+          26638,
+          26639,
+          26642,
+          26690,
+          26695,
+          26698,
+          26702,
+          26704,
+          26706,
+          26707,
+          26708,
+          26709,
+          26710,
+          26711,
+          26712,
+          26713,
+          26714,
+          26715,
+          26716,
+          26717,
+          26718
+        ],
+        "byPhase": {
+          "workspace-selection-to-usable": 84
+        },
+        "groups": [
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "6f38736a0170",
+              "parameterCount": 3,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26405,
+              26508,
+              26571,
+              26690
+            ],
+            "contextIndices": [
+              71,
+              81,
+              94,
+              109
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "66cde7eead86",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26408,
+              26510,
+              26576,
+              26695
+            ],
+            "contextIndices": [
+              71,
+              81,
+              94,
+              109
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "a130e5d92ffc",
+              "parameterCount": 4,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26411,
+              26515,
+              26577,
+              26698
+            ],
+            "contextIndices": [
+              71,
+              81,
+              94,
+              109
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "23d0664babd6",
+              "parameterCount": 3,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26416,
+              26519,
+              26584,
+              26702
+            ],
+            "contextIndices": [
+              71,
+              81,
+              94,
+              109
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "b27c6e931d1b",
+              "parameterCount": 3,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26417,
+              26523,
+              26589,
+              26704
+            ],
+            "contextIndices": [
+              71,
+              81,
+              94,
+              109
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "82919a1d33a6",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 8,
+            "ordinals": [
+              26420,
+              26428,
+              26524,
+              26528,
+              26596,
+              26616,
+              26706,
+              26710
+            ],
+            "contextIndices": [
+              71,
+              81,
+              94,
+              109
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "status": "unknown"
+            },
+            "queries": 32,
+            "ordinals": [
+              26422,
+              26424,
+              26426,
+              26432,
+              26447,
+              26450,
+              26454,
+              26456,
+              26469,
+              26525,
+              26526,
+              26527,
+              26530,
+              26537,
+              26538,
+              26540,
+              26600,
+              26605,
+              26613,
+              26624,
+              26633,
+              26634,
+              26638,
+              26639,
+              26642,
+              26707,
+              26708,
+              26709,
+              26712,
+              26715,
+              26716,
+              26718
+            ],
+            "contextIndices": [
+              71,
+              81,
+              94,
+              109
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "cfc5423a080d",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26430,
+              26529,
+              26620,
+              26711
+            ],
+            "contextIndices": [
+              71,
+              81,
+              94,
+              109
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "a6d8d51b1b0b",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26434,
+              26531,
+              26627,
+              26713
+            ],
+            "contextIndices": [
+              71,
+              81,
+              94,
+              109
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "1365a978dee8",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26436,
+              26532,
+              26631,
+              26714
+            ],
+            "contextIndices": [
+              71,
+              81,
+              94,
+              109
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "9f5aec55f127",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26439,
+              26533
+            ],
+            "contextIndices": [
+              71,
+              81
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "e20f5fbb8309",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26440,
+              26534
+            ],
+            "contextIndices": [
+              71,
+              81
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "0f220c251daf",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26442,
+              26535
+            ],
+            "contextIndices": [
+              71,
+              81
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "a125321ddabb",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26445,
+              26536
+            ],
+            "contextIndices": [
+              71,
+              81
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "coordinator.syncCoordinatorChat",
+              "status": "known"
+            },
+            "scope": "/actions/coordinator/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "9f0fe8477a06",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26452,
+              26539,
+              26636,
+              26717
+            ],
+            "contextIndices": [
+              71,
+              81,
+              94,
+              109
+            ]
+          }
+        ]
+      },
+      "delta": -2
+    },
+    {
+      "scope": "/actions/issues/poll",
+      "baseline": {
+        "queries": 25,
+        "unknownContextQueries": 0,
+        "unknownStructureQueries": 17,
+        "ordinals": [
+          26314,
+          26316,
+          26317,
+          26318,
+          26319,
+          26320,
+          26321,
+          26422,
+          26429,
+          26432,
+          26436,
+          26437,
+          26558,
+          26560,
+          26561,
+          26562,
+          26563,
+          26564,
+          26565,
+          26566,
+          26600,
+          26608,
+          26612,
+          26615,
+          26617
+        ],
+        "byPhase": {
+          "workspace-selection-to-usable": 25
+        },
+        "groups": [
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "issues.syncIssueList",
+              "status": "known"
+            },
+            "scope": "/actions/issues/poll",
+            "statement": {
+              "status": "unknown"
+            },
+            "queries": 17,
+            "ordinals": [
+              26314,
+              26318,
+              26319,
+              26320,
+              26321,
+              26432,
+              26436,
+              26437,
+              26558,
+              26562,
+              26563,
+              26564,
+              26565,
+              26566,
+              26612,
+              26615,
+              26617
+            ],
+            "contextIndices": [
+              71,
+              79,
+              100,
+              107
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "issues.syncIssueList",
+              "status": "known"
+            },
+            "scope": "/actions/issues/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "9f0fe8477a06",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26316,
+              26560
+            ],
+            "contextIndices": [
+              71,
+              100
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "issues.syncIssueList",
+              "status": "known"
+            },
+            "scope": "/actions/issues/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "3a287aa80050",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26317,
+              26429,
+              26561,
+              26608
+            ],
+            "contextIndices": [
+              71,
+              79,
+              100,
+              107
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "issues.syncIssueList",
+              "status": "known"
+            },
+            "scope": "/actions/issues/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "0b9bc73fbbd2",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26422,
+              26600
+            ],
+            "contextIndices": [
+              79,
+              107
+            ]
+          }
+        ]
+      },
+      "current": {
+        "queries": 26,
+        "unknownContextQueries": 0,
+        "unknownStructureQueries": 17,
+        "ordinals": [
+          26406,
+          26409,
+          26413,
+          26415,
+          26418,
+          26421,
+          26427,
+          26506,
+          26514,
+          26517,
+          26521,
+          26522,
+          26644,
+          26647,
+          26648,
+          26649,
+          26650,
+          26651,
+          26652,
+          26653,
+          26688,
+          26691,
+          26696,
+          26700,
+          26703,
+          26705
+        ],
+        "byPhase": {
+          "workspace-selection-to-usable": 26
+        },
+        "groups": [
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "issues.syncIssueList",
+              "status": "known"
+            },
+            "scope": "/actions/issues/poll",
+            "statement": {
+              "status": "unknown"
+            },
+            "queries": 17,
+            "ordinals": [
+              26406,
+              26415,
+              26418,
+              26421,
+              26427,
+              26517,
+              26521,
+              26522,
+              26644,
+              26649,
+              26650,
+              26651,
+              26652,
+              26653,
+              26700,
+              26703,
+              26705
+            ],
+            "contextIndices": [
+              72,
+              79,
+              100,
+              108
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "issues.syncIssueList",
+              "status": "known"
+            },
+            "scope": "/actions/issues/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "9f0fe8477a06",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 3,
+            "ordinals": [
+              26409,
+              26647,
+              26691
+            ],
+            "contextIndices": [
+              72,
+              100,
+              108
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "issues.syncIssueList",
+              "status": "known"
+            },
+            "scope": "/actions/issues/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "3a287aa80050",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26413,
+              26514,
+              26648,
+              26696
+            ],
+            "contextIndices": [
+              72,
+              79,
+              100,
+              108
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "issues.syncIssueList",
+              "status": "known"
+            },
+            "scope": "/actions/issues/poll",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "0b9bc73fbbd2",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26506,
+              26688
+            ],
+            "contextIndices": [
+              79,
+              108
+            ]
+          }
+        ]
+      },
+      "delta": 1
+    },
+    {
+      "scope": "/api/desktop/rpc",
+      "baseline": {
+        "queries": 82,
+        "unknownContextQueries": 0,
+        "unknownStructureQueries": 23,
+        "ordinals": [
+          26279,
+          26280,
+          26292,
+          26293,
+          26295,
+          26313,
+          26315,
+          26327,
+          26329,
+          26331,
+          26334,
+          26336,
+          26339,
+          26341,
+          26343,
+          26344,
+          26346,
+          26347,
+          26348,
+          26349,
+          26351,
+          26353,
+          26355,
+          26357,
+          26360,
+          26362,
+          26364,
+          26368,
+          26369,
+          26371,
+          26373,
+          26374,
+          26376,
+          26378,
+          26379,
+          26380,
+          26381,
+          26382,
+          26383,
+          26384,
+          26411,
+          26412,
+          26415,
+          26416,
+          26457,
+          26458,
+          26459,
+          26460,
+          26461,
+          26474,
+          26475,
+          26479,
+          26481,
+          26482,
+          26483,
+          26484,
+          26486,
+          26487,
+          26488,
+          26490,
+          26492,
+          26495,
+          26498,
+          26499,
+          26506,
+          26512,
+          26517,
+          26521,
+          26523,
+          26526,
+          26529,
+          26531,
+          26534,
+          26536,
+          26537,
+          26540,
+          26557,
+          26559,
+          26596,
+          26597,
+          26598,
+          26599
+        ],
+        "byPhase": {
+          "workspace-selection-to-usable": 82
+        },
+        "groups": [
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "desktop.bootstrap",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "d47f41b71036",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26279,
+              26460
+            ],
+            "contextIndices": [
+              59,
+              85
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "desktop.bootstrap",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "8f554b451232",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26280,
+              26461
+            ],
+            "contextIndices": [
+              59,
+              85
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "team-relations.listProjectTeams",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "fcb49b74a39e",
+              "parameterCount": 4,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26292,
+              26411,
+              26487,
+              26597
+            ],
+            "contextIndices": [
+              63,
+              76,
+              90,
+              105
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "teams.listTeams",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "0b9bc73fbbd2",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26293,
+              26488
+            ],
+            "contextIndices": [
+              64,
+              91
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "teams.listTeams",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "ca5780bf570b",
+              "parameterCount": 4,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26295,
+              26415,
+              26492,
+              26598
+            ],
+            "contextIndices": [
+              64,
+              78,
+              91,
+              106
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "bots.pollBots",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "0b9bc73fbbd2",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26313,
+              26412,
+              26557,
+              26596
+            ],
+            "contextIndices": [
+              70,
+              77,
+              99,
+              104
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "bots.pollBots",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "4c80688f4aac",
+              "parameterCount": 4,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26315,
+              26416,
+              26559,
+              26599
+            ],
+            "contextIndices": [
+              70,
+              77,
+              99,
+              104
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "0b9bc73fbbd2",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26327,
+              26474
+            ],
+            "contextIndices": [
+              72,
+              89
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "66cde7eead86",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26329,
+              26475
+            ],
+            "contextIndices": [
+              72,
+              89
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "a130e5d92ffc",
+              "parameterCount": 4,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26331,
+              26479
+            ],
+            "contextIndices": [
+              72,
+              89
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "status": "unknown"
+            },
+            "queries": 23,
+            "ordinals": [
+              26334,
+              26336,
+              26344,
+              26346,
+              26348,
+              26349,
+              26364,
+              26368,
+              26369,
+              26374,
+              26383,
+              26384,
+              26481,
+              26482,
+              26490,
+              26495,
+              26499,
+              26517,
+              26521,
+              26523,
+              26531,
+              26537,
+              26540
+            ],
+            "contextIndices": [
+              72,
+              89
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "82919a1d33a6",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26339,
+              26343,
+              26483,
+              26486
+            ],
+            "contextIndices": [
+              72,
+              89
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "cfc5423a080d",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26341,
+              26484
+            ],
+            "contextIndices": [
+              72,
+              89
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "8faa2a73d8b1",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26347,
+              26498
+            ],
+            "contextIndices": [
+              72,
+              89
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "a6d8d51b1b0b",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26351,
+              26376,
+              26506,
+              26534
+            ],
+            "contextIndices": [
+              72,
+              89
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "1365a978dee8",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26353,
+              26378,
+              26512,
+              26536
+            ],
+            "contextIndices": [
+              72,
+              89
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "9f5aec55f127",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26355,
+              26379
+            ],
+            "contextIndices": [
+              72
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "e20f5fbb8309",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26357,
+              26380
+            ],
+            "contextIndices": [
+              72
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "0f220c251daf",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26360,
+              26381
+            ],
+            "contextIndices": [
+              72
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "a125321ddabb",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26362,
+              26382
+            ],
+            "contextIndices": [
+              72
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "23d0664babd6",
+              "parameterCount": 3,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26371,
+              26526
+            ],
+            "contextIndices": [
+              72,
+              89
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "b27c6e931d1b",
+              "parameterCount": 3,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26373,
+              26529
+            ],
+            "contextIndices": [
+              72,
+              89
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "workspace.switchWorkspace",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "BEGIN",
+              "normalizedStructureId": "e6f07d43b5c2",
+              "parameterCount": 0,
+              "status": "known"
+            },
+            "queries": 1,
+            "ordinals": [
+              26457
+            ],
+            "contextIndices": [
+              84
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "workspace.switchWorkspace",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "339d5b49dae6",
+              "parameterCount": 4,
+              "status": "known"
+            },
+            "queries": 1,
+            "ordinals": [
+              26458
+            ],
+            "contextIndices": [
+              84
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "workspace.switchWorkspace",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "COMMIT",
+              "normalizedStructureId": "9505cacb7c71",
+              "parameterCount": 0,
+              "status": "known"
+            },
+            "queries": 1,
+            "ordinals": [
+              26459
+            ],
+            "contextIndices": [
+              84
+            ]
+          }
+        ]
+      },
+      "current": {
+        "queries": 82,
+        "unknownContextQueries": 0,
+        "unknownStructureQueries": 23,
+        "ordinals": [
+          26365,
+          26366,
+          26378,
+          26379,
+          26381,
+          26403,
+          26407,
+          26410,
+          26412,
+          26414,
+          26419,
+          26423,
+          26425,
+          26429,
+          26431,
+          26433,
+          26435,
+          26437,
+          26438,
+          26441,
+          26443,
+          26444,
+          26446,
+          26448,
+          26449,
+          26451,
+          26453,
+          26455,
+          26457,
+          26458,
+          26459,
+          26460,
+          26461,
+          26462,
+          26463,
+          26464,
+          26465,
+          26466,
+          26467,
+          26468,
+          26502,
+          26503,
+          26504,
+          26505,
+          26541,
+          26542,
+          26543,
+          26544,
+          26545,
+          26562,
+          26564,
+          26566,
+          26567,
+          26569,
+          26572,
+          26574,
+          26578,
+          26583,
+          26588,
+          26595,
+          26599,
+          26604,
+          26607,
+          26608,
+          26614,
+          26617,
+          26621,
+          26625,
+          26628,
+          26630,
+          26632,
+          26635,
+          26637,
+          26640,
+          26641,
+          26643,
+          26645,
+          26646,
+          26681,
+          26682,
+          26684,
+          26685
+        ],
+        "byPhase": {
+          "native-pkce-and-automatic-renderer-to-public-session": 2,
+          "workspace-selection-to-usable": 80
+        },
+        "groups": [
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "desktop.bootstrap",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "d47f41b71036",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26365,
+              26544
+            ],
+            "contextIndices": [
+              59,
+              85
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "desktop.bootstrap",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "8f554b451232",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26366,
+              26545
+            ],
+            "contextIndices": [
+              59,
+              85
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "team-relations.listProjectTeams",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "fcb49b74a39e",
+              "parameterCount": 4,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26378,
+              26502,
+              26566,
+              26681
+            ],
+            "contextIndices": [
+              63,
+              76,
+              90,
+              104
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "teams.listTeams",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "0b9bc73fbbd2",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26379,
+              26567
+            ],
+            "contextIndices": [
+              64,
+              91
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "teams.listTeams",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "ca5780bf570b",
+              "parameterCount": 4,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26381,
+              26504,
+              26569,
+              26684
+            ],
+            "contextIndices": [
+              64,
+              78,
+              91,
+              106
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "bots.pollBots",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "0b9bc73fbbd2",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26403,
+              26503,
+              26643,
+              26682
+            ],
+            "contextIndices": [
+              70,
+              77,
+              99,
+              105
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "bots.pollBots",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "4c80688f4aac",
+              "parameterCount": 4,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26407,
+              26505,
+              26645,
+              26685
+            ],
+            "contextIndices": [
+              70,
+              77,
+              99,
+              105
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "0b9bc73fbbd2",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26410,
+              26562
+            ],
+            "contextIndices": [
+              73,
+              89
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "66cde7eead86",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26412,
+              26564
+            ],
+            "contextIndices": [
+              73,
+              89
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "a130e5d92ffc",
+              "parameterCount": 4,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26414,
+              26572
+            ],
+            "contextIndices": [
+              73,
+              89
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "status": "unknown"
+            },
+            "queries": 23,
+            "ordinals": [
+              26419,
+              26423,
+              26433,
+              26435,
+              26438,
+              26441,
+              26453,
+              26455,
+              26457,
+              26460,
+              26467,
+              26468,
+              26574,
+              26578,
+              26599,
+              26604,
+              26608,
+              26621,
+              26625,
+              26628,
+              26635,
+              26641,
+              26646
+            ],
+            "contextIndices": [
+              73,
+              89
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "82919a1d33a6",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26425,
+              26431,
+              26583,
+              26595
+            ],
+            "contextIndices": [
+              73,
+              89
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "cfc5423a080d",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26429,
+              26588
+            ],
+            "contextIndices": [
+              73,
+              89
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "8faa2a73d8b1",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26437,
+              26607
+            ],
+            "contextIndices": [
+              73,
+              89
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "a6d8d51b1b0b",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26443,
+              26461,
+              26614,
+              26637
+            ],
+            "contextIndices": [
+              73,
+              89
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "1365a978dee8",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26444,
+              26462,
+              26617,
+              26640
+            ],
+            "contextIndices": [
+              73,
+              89
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "9f5aec55f127",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26446,
+              26463
+            ],
+            "contextIndices": [
+              73
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "e20f5fbb8309",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26448,
+              26464
+            ],
+            "contextIndices": [
+              73
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "0f220c251daf",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26449,
+              26465
+            ],
+            "contextIndices": [
+              73
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "a125321ddabb",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26451,
+              26466
+            ],
+            "contextIndices": [
+              73
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "23d0664babd6",
+              "parameterCount": 3,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26458,
+              26630
+            ],
+            "contextIndices": [
+              73,
+              89
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "execution-settings.getBotModelMenu",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "b27c6e931d1b",
+              "parameterCount": 3,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26459,
+              26632
+            ],
+            "contextIndices": [
+              73,
+              89
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "workspace.switchWorkspace",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "BEGIN",
+              "normalizedStructureId": "e6f07d43b5c2",
+              "parameterCount": 0,
+              "status": "known"
+            },
+            "queries": 1,
+            "ordinals": [
+              26541
+            ],
+            "contextIndices": [
+              84
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "workspace.switchWorkspace",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "339d5b49dae6",
+              "parameterCount": 4,
+              "status": "known"
+            },
+            "queries": 1,
+            "ordinals": [
+              26542
+            ],
+            "contextIndices": [
+              84
+            ]
+          },
+          {
+            "context": {
+              "method": "POST",
+              "route": "/api/desktop/rpc",
+              "rpcAction": "workspace.switchWorkspace",
+              "status": "known"
+            },
+            "scope": "/api/desktop/rpc",
+            "statement": {
+              "command": "COMMIT",
+              "normalizedStructureId": "9505cacb7c71",
+              "parameterCount": 0,
+              "status": "known"
+            },
+            "queries": 1,
+            "ordinals": [
+              26543
+            ],
+            "contextIndices": [
+              84
+            ]
+          }
+        ]
+      },
+      "delta": 0
+    },
+    {
+      "scope": "/api/devices/enrollment",
+      "baseline": {
+        "queries": 4,
+        "unknownContextQueries": 4,
+        "unknownStructureQueries": 0,
+        "ordinals": [
+          26281,
+          26282,
+          26462,
+          26463
+        ],
+        "byPhase": {
+          "workspace-selection-to-usable": 4
+        },
+        "groups": [
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/api/devices/enrollment",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "8fa591ff58d0",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26281,
+              26462
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/api/devices/enrollment",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "1b6dae6d78fb",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26282,
+              26463
+            ],
+            "contextIndices": [
+              0
+            ]
+          }
+        ]
+      },
+      "current": {
+        "queries": 7,
+        "unknownContextQueries": 7,
+        "unknownStructureQueries": 1,
+        "ordinals": [
+          26367,
+          26368,
+          26546,
+          26547,
+          26548,
+          26549,
+          26550
+        ],
+        "byPhase": {
+          "workspace-selection-to-usable": 7
+        },
+        "groups": [
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/api/devices/enrollment",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "8fa591ff58d0",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 3,
+            "ordinals": [
+              26367,
+              26546,
+              26549
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/api/devices/enrollment",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "1b6dae6d78fb",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 3,
+            "ordinals": [
+              26368,
+              26547,
+              26550
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/api/devices/enrollment",
+            "statement": {
+              "status": "unknown"
+            },
+            "queries": 1,
+            "ordinals": [
+              26548
+            ],
+            "contextIndices": [
+              0
+            ]
+          }
+        ]
+      },
+      "delta": 3
+    },
+    {
+      "scope": "/v1/devices/[deviceId]/commands",
+      "baseline": {
+        "queries": 0,
+        "unknownContextQueries": 0,
+        "unknownStructureQueries": 0,
+        "ordinals": [],
+        "byPhase": {},
+        "groups": []
+      },
+      "current": {
+        "queries": 6,
+        "unknownContextQueries": 0,
+        "unknownStructureQueries": 2,
+        "ordinals": [
+          26750,
+          26753,
+          26755,
+          26757,
+          26758,
+          26760
+        ],
+        "byPhase": {
+          "workspace-selection-to-usable": 6
+        },
+        "groups": [
+          {
+            "context": {
+              "method": "GET",
+              "route": "/v1/devices/[deviceId]/commands",
+              "rpcAction": null,
+              "status": "known"
+            },
+            "scope": "/v1/devices/[deviceId]/commands",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "e7a90abd2191",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 1,
+            "ordinals": [
+              26750
+            ],
+            "contextIndices": [
+              112
+            ]
+          },
+          {
+            "context": {
+              "method": "GET",
+              "route": "/v1/devices/[deviceId]/commands",
+              "rpcAction": null,
+              "status": "known"
+            },
+            "scope": "/v1/devices/[deviceId]/commands",
+            "statement": {
+              "status": "unknown"
+            },
+            "queries": 2,
+            "ordinals": [
+              26753,
+              26758
+            ],
+            "contextIndices": [
+              112
+            ]
+          },
+          {
+            "context": {
+              "method": "GET",
+              "route": "/v1/devices/[deviceId]/commands",
+              "rpcAction": null,
+              "status": "known"
+            },
+            "scope": "/v1/devices/[deviceId]/commands",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "d43f1541a045",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 1,
+            "ordinals": [
+              26755
+            ],
+            "contextIndices": [
+              112
+            ]
+          },
+          {
+            "context": {
+              "method": "GET",
+              "route": "/v1/devices/[deviceId]/commands",
+              "rpcAction": null,
+              "status": "known"
+            },
+            "scope": "/v1/devices/[deviceId]/commands",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "c791f908d816",
+              "parameterCount": 3,
+              "status": "known"
+            },
+            "queries": 1,
+            "ordinals": [
+              26757
+            ],
+            "contextIndices": [
+              112
+            ]
+          },
+          {
+            "context": {
+              "method": "GET",
+              "route": "/v1/devices/[deviceId]/commands",
+              "rpcAction": null,
+              "status": "known"
+            },
+            "scope": "/v1/devices/[deviceId]/commands",
+            "statement": {
+              "command": "COMMIT",
+              "normalizedStructureId": "79663c1d3b43",
+              "parameterCount": 0,
+              "status": "known"
+            },
+            "queries": 1,
+            "ordinals": [
+              26760
+            ],
+            "contextIndices": [
+              112
+            ]
+          }
+        ]
+      },
+      "delta": 6
+    },
+    {
+      "scope": "/v1/devices/[deviceId]/gateway",
+      "baseline": {
+        "queries": 0,
+        "unknownContextQueries": 0,
+        "unknownStructureQueries": 0,
+        "ordinals": [],
+        "byPhase": {},
+        "groups": []
+      },
+      "current": {
+        "queries": 5,
+        "unknownContextQueries": 5,
+        "unknownStructureQueries": 1,
+        "ordinals": [
+          26739,
+          26741,
+          26742,
+          26743,
+          26744
+        ],
+        "byPhase": {
+          "workspace-selection-to-usable": 5
+        },
+        "groups": [
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/[deviceId]/gateway",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "e7a90abd2191",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 1,
+            "ordinals": [
+              26739
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/[deviceId]/gateway",
+            "statement": {
+              "status": "unknown"
+            },
+            "queries": 1,
+            "ordinals": [
+              26741
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/[deviceId]/gateway",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "d43f1541a045",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 1,
+            "ordinals": [
+              26742
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/[deviceId]/gateway",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "c791f908d816",
+              "parameterCount": 3,
+              "status": "known"
+            },
+            "queries": 1,
+            "ordinals": [
+              26743
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/[deviceId]/gateway",
+            "statement": {
+              "command": "COMMIT",
+              "normalizedStructureId": "79663c1d3b43",
+              "parameterCount": 0,
+              "status": "known"
+            },
+            "queries": 1,
+            "ordinals": [
+              26744
+            ],
+            "contextIndices": [
+              0
+            ]
+          }
+        ]
+      },
+      "delta": 5
+    },
+    {
+      "scope": "/v1/devices/[deviceId]/heartbeat",
+      "baseline": {
+        "queries": 0,
+        "unknownContextQueries": 0,
+        "unknownStructureQueries": 0,
+        "ordinals": [],
+        "byPhase": {},
+        "groups": []
+      },
+      "current": {
+        "queries": 20,
+        "unknownContextQueries": 20,
+        "unknownStructureQueries": 4,
+        "ordinals": [
+          26740,
+          26745,
+          26746,
+          26747,
+          26748,
+          26749,
+          26751,
+          26752,
+          26754,
+          26756,
+          26778,
+          26779,
+          26780,
+          26781,
+          26782,
+          26783,
+          26784,
+          26785,
+          26786,
+          26787
+        ],
+        "byPhase": {
+          "workspace-selection-to-usable": 20
+        },
+        "groups": [
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/[deviceId]/heartbeat",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "e7a90abd2191",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26740,
+              26778
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/[deviceId]/heartbeat",
+            "statement": {
+              "status": "unknown"
+            },
+            "queries": 4,
+            "ordinals": [
+              26745,
+              26752,
+              26779,
+              26785
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/[deviceId]/heartbeat",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "d43f1541a045",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26746,
+              26780
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/[deviceId]/heartbeat",
+            "statement": {
+              "command": "WITH",
+              "normalizedStructureId": "7afe414f4d9e",
+              "parameterCount": 3,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26747,
+              26781
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/[deviceId]/heartbeat",
+            "statement": {
+              "command": "WITH",
+              "normalizedStructureId": "3680b5594672",
+              "parameterCount": 8,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26748,
+              26782
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/[deviceId]/heartbeat",
+            "statement": {
+              "command": "BEGIN",
+              "normalizedStructureId": "a8402858d4f1",
+              "parameterCount": 0,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26749,
+              26783
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/[deviceId]/heartbeat",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "adea43e0f992",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26751,
+              26784
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/[deviceId]/heartbeat",
+            "statement": {
+              "command": "COMMIT",
+              "normalizedStructureId": "79663c1d3b43",
+              "parameterCount": 0,
+              "status": "known"
+            },
+            "queries": 4,
+            "ordinals": [
+              26754,
+              26756,
+              26786,
+              26787
+            ],
+            "contextIndices": [
+              0
+            ]
+          }
+        ]
+      },
+      "delta": 20
+    },
+    {
+      "scope": "/v1/devices/[deviceId]/repos",
+      "baseline": {
+        "queries": 0,
+        "unknownContextQueries": 0,
+        "unknownStructureQueries": 0,
+        "ordinals": [],
+        "byPhase": {},
+        "groups": []
+      },
+      "current": {
+        "queries": 12,
+        "unknownContextQueries": 12,
+        "unknownStructureQueries": 2,
+        "ordinals": [
+          26763,
+          26766,
+          26768,
+          26769,
+          26770,
+          26771,
+          26791,
+          26795,
+          26796,
+          26797,
+          26798,
+          26799
+        ],
+        "byPhase": {
+          "workspace-selection-to-usable": 12
+        },
+        "groups": [
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/[deviceId]/repos",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "e7a90abd2191",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26763,
+              26791
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/[deviceId]/repos",
+            "statement": {
+              "status": "unknown"
+            },
+            "queries": 2,
+            "ordinals": [
+              26766,
+              26795
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/[deviceId]/repos",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "d43f1541a045",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26768,
+              26796
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/[deviceId]/repos",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "c791f908d816",
+              "parameterCount": 3,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26769,
+              26797
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/[deviceId]/repos",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "d2f268c5073d",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26770,
+              26798
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/[deviceId]/repos",
+            "statement": {
+              "command": "COMMIT",
+              "normalizedStructureId": "79663c1d3b43",
+              "parameterCount": 0,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26771,
+              26799
+            ],
+            "contextIndices": [
+              0
+            ]
+          }
+        ]
+      },
+      "delta": 12
+    },
+    {
+      "scope": "/v1/devices/[deviceId]/runs",
+      "baseline": {
+        "queries": 0,
+        "unknownContextQueries": 0,
+        "unknownStructureQueries": 0,
+        "ordinals": [],
+        "byPhase": {},
+        "groups": []
+      },
+      "current": {
+        "queries": 12,
+        "unknownContextQueries": 12,
+        "unknownStructureQueries": 2,
+        "ordinals": [
+          26772,
+          26773,
+          26774,
+          26775,
+          26776,
+          26777,
+          26800,
+          26801,
+          26802,
+          26803,
+          26804,
+          26805
+        ],
+        "byPhase": {
+          "workspace-selection-to-usable": 12
+        },
+        "groups": [
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/[deviceId]/runs",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "e7a90abd2191",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26772,
+              26800
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/[deviceId]/runs",
+            "statement": {
+              "status": "unknown"
+            },
+            "queries": 2,
+            "ordinals": [
+              26773,
+              26801
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/[deviceId]/runs",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "d43f1541a045",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26774,
+              26802
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/[deviceId]/runs",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "ccb18ad4b67d",
+              "parameterCount": 3,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26775,
+              26803
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/[deviceId]/runs",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "5ba52cf97fff",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26776,
+              26804
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/[deviceId]/runs",
+            "statement": {
+              "command": "COMMIT",
+              "normalizedStructureId": "79663c1d3b43",
+              "parameterCount": 0,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26777,
+              26805
+            ],
+            "contextIndices": [
+              0
+            ]
+          }
+        ]
+      },
+      "delta": 12
+    },
+    {
+      "scope": "/v1/devices/enroll",
+      "baseline": {
+        "queries": 0,
+        "unknownContextQueries": 0,
+        "unknownStructureQueries": 0,
+        "ordinals": [],
+        "byPhase": {},
+        "groups": []
+      },
+      "current": {
+        "queries": 4,
+        "unknownContextQueries": 4,
+        "unknownStructureQueries": 1,
+        "ordinals": [
+          26719,
+          26720,
+          26721,
+          26722
+        ],
+        "byPhase": {
+          "workspace-selection-to-usable": 4
+        },
+        "groups": [
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/enroll",
+            "statement": {
+              "command": "BEGIN",
+              "normalizedStructureId": "a8402858d4f1",
+              "parameterCount": 0,
+              "status": "known"
+            },
+            "queries": 1,
+            "ordinals": [
+              26719
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/enroll",
+            "statement": {
+              "command": "DELETE",
+              "normalizedStructureId": "ca185fa3da9b",
+              "parameterCount": 1,
+              "status": "known"
+            },
+            "queries": 1,
+            "ordinals": [
+              26720
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/enroll",
+            "statement": {
+              "status": "unknown"
+            },
+            "queries": 1,
+            "ordinals": [
+              26721
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/enroll",
+            "statement": {
+              "command": "COMMIT",
+              "normalizedStructureId": "79663c1d3b43",
+              "parameterCount": 0,
+              "status": "known"
+            },
+            "queries": 1,
+            "ordinals": [
+              26722
+            ],
+            "contextIndices": [
+              0
+            ]
+          }
+        ]
+      },
+      "delta": 4
+    },
+    {
+      "scope": "/v1/devices/register",
+      "baseline": {
+        "queries": 0,
+        "unknownContextQueries": 0,
+        "unknownStructureQueries": 0,
+        "ordinals": [],
+        "byPhase": {},
+        "groups": []
+      },
+      "current": {
+        "queries": 15,
+        "unknownContextQueries": 15,
+        "unknownStructureQueries": 5,
+        "ordinals": [
+          26723,
+          26724,
+          26725,
+          26726,
+          26727,
+          26728,
+          26729,
+          26730,
+          26731,
+          26732,
+          26733,
+          26734,
+          26735,
+          26736,
+          26737
+        ],
+        "byPhase": {
+          "workspace-selection-to-usable": 15
+        },
+        "groups": [
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/register",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "e7a90abd2191",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 1,
+            "ordinals": [
+              26723
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/register",
+            "statement": {
+              "command": "UPDATE",
+              "normalizedStructureId": "0a5d35015c3d",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 1,
+            "ordinals": [
+              26724
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/register",
+            "statement": {
+              "status": "unknown"
+            },
+            "queries": 5,
+            "ordinals": [
+              26725,
+              26729,
+              26731,
+              26732,
+              26735
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/register",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "d43f1541a045",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 1,
+            "ordinals": [
+              26726
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/register",
+            "statement": {
+              "command": "INSERT",
+              "normalizedStructureId": "53a7d0a9b15c",
+              "parameterCount": 13,
+              "status": "known"
+            },
+            "queries": 1,
+            "ordinals": [
+              26727
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/register",
+            "statement": {
+              "command": "WITH",
+              "normalizedStructureId": "7afe414f4d9e",
+              "parameterCount": 3,
+              "status": "known"
+            },
+            "queries": 1,
+            "ordinals": [
+              26728
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/register",
+            "statement": {
+              "command": "BEGIN",
+              "normalizedStructureId": "a8402858d4f1",
+              "parameterCount": 0,
+              "status": "known"
+            },
+            "queries": 1,
+            "ordinals": [
+              26730
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/register",
+            "statement": {
+              "command": "INSERT",
+              "normalizedStructureId": "6d8018401bd8",
+              "parameterCount": 5,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26733,
+              26734
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "/v1/devices/register",
+            "statement": {
+              "command": "COMMIT",
+              "normalizedStructureId": "79663c1d3b43",
+              "parameterCount": 0,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26736,
+              26737
+            ],
+            "contextIndices": [
+              0
+            ]
+          }
+        ]
+      },
+      "delta": 15
+    },
+    {
+      "scope": "after:factory-dispatch-recovery",
+      "baseline": {
+        "queries": 0,
+        "unknownContextQueries": 0,
+        "unknownStructureQueries": 0,
+        "ordinals": [],
+        "byPhase": {},
+        "groups": []
+      },
+      "current": {
+        "queries": 12,
+        "unknownContextQueries": 12,
+        "unknownStructureQueries": 4,
+        "ordinals": [
+          26759,
+          26761,
+          26762,
+          26764,
+          26765,
+          26767,
+          26788,
+          26789,
+          26790,
+          26792,
+          26793,
+          26794
+        ],
+        "byPhase": {
+          "workspace-selection-to-usable": 12
+        },
+        "groups": [
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "after:factory-dispatch-recovery",
+            "statement": {
+              "status": "unknown"
+            },
+            "queries": 4,
+            "ordinals": [
+              26759,
+              26765,
+              26788,
+              26793
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "after:factory-dispatch-recovery",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "d43f1541a045",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26761,
+              26789
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "after:factory-dispatch-recovery",
+            "statement": {
+              "command": "BEGIN",
+              "normalizedStructureId": "a8402858d4f1",
+              "parameterCount": 0,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26762,
+              26790
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "after:factory-dispatch-recovery",
+            "statement": {
+              "command": "SELECT",
+              "normalizedStructureId": "87a68411468b",
+              "parameterCount": 2,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26764,
+              26792
+            ],
+            "contextIndices": [
+              0
+            ]
+          },
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "after:factory-dispatch-recovery",
+            "statement": {
+              "command": "COMMIT",
+              "normalizedStructureId": "79663c1d3b43",
+              "parameterCount": 0,
+              "status": "known"
+            },
+            "queries": 2,
+            "ordinals": [
+              26767,
+              26794
+            ],
+            "contextIndices": [
+              0
+            ]
+          }
+        ]
+      },
+      "delta": 12
+    },
+    {
+      "scope": "after:live-notify",
+      "baseline": {
+        "queries": 0,
+        "unknownContextQueries": 0,
+        "unknownStructureQueries": 0,
+        "ordinals": [],
+        "byPhase": {},
+        "groups": []
+      },
+      "current": {
+        "queries": 1,
+        "unknownContextQueries": 1,
+        "unknownStructureQueries": 1,
+        "ordinals": [
+          26738
+        ],
+        "byPhase": {
+          "workspace-selection-to-usable": 1
+        },
+        "groups": [
+          {
+            "context": {
+              "status": "unknown"
+            },
+            "scope": "after:live-notify",
+            "statement": {
+              "status": "unknown"
+            },
+            "queries": 1,
+            "ordinals": [
+              26738
+            ],
+            "contextIndices": [
+              0
+            ]
+          }
+        ]
+      },
+      "delta": 1
+    }
+  ],
+  "wholeWindowQueryGroupDeltas": [
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/register",
+      "statement": {
+        "status": "unknown"
+      },
+      "baseline": 0,
+      "current": 5,
+      "delta": 5
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/[deviceId]/heartbeat",
+      "statement": {
+        "command": "COMMIT",
+        "normalizedStructureId": "79663c1d3b43",
+        "parameterCount": 0,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 4,
+      "delta": 4
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/[deviceId]/heartbeat",
+      "statement": {
+        "status": "unknown"
+      },
+      "baseline": 0,
+      "current": 4,
+      "delta": 4
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "after:factory-dispatch-recovery",
+      "statement": {
+        "status": "unknown"
+      },
+      "baseline": 0,
+      "current": 4,
+      "delta": 4
+    },
+    {
+      "context": {
+        "method": "GET",
+        "route": "/v1/devices/[deviceId]/commands",
+        "rpcAction": null,
+        "status": "known"
+      },
+      "scope": "/v1/devices/[deviceId]/commands",
+      "statement": {
+        "status": "unknown"
+      },
+      "baseline": 0,
+      "current": 2,
+      "delta": 2
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/[deviceId]/heartbeat",
+      "statement": {
+        "command": "BEGIN",
+        "normalizedStructureId": "a8402858d4f1",
+        "parameterCount": 0,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 2,
+      "delta": 2
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/[deviceId]/heartbeat",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "adea43e0f992",
+        "parameterCount": 1,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 2,
+      "delta": 2
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/[deviceId]/heartbeat",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "d43f1541a045",
+        "parameterCount": 2,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 2,
+      "delta": 2
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/[deviceId]/heartbeat",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "e7a90abd2191",
+        "parameterCount": 2,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 2,
+      "delta": 2
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/[deviceId]/heartbeat",
+      "statement": {
+        "command": "WITH",
+        "normalizedStructureId": "3680b5594672",
+        "parameterCount": 8,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 2,
+      "delta": 2
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/[deviceId]/heartbeat",
+      "statement": {
+        "command": "WITH",
+        "normalizedStructureId": "7afe414f4d9e",
+        "parameterCount": 3,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 2,
+      "delta": 2
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/[deviceId]/repos",
+      "statement": {
+        "command": "COMMIT",
+        "normalizedStructureId": "79663c1d3b43",
+        "parameterCount": 0,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 2,
+      "delta": 2
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/[deviceId]/repos",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "c791f908d816",
+        "parameterCount": 3,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 2,
+      "delta": 2
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/[deviceId]/repos",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "d2f268c5073d",
+        "parameterCount": 1,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 2,
+      "delta": 2
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/[deviceId]/repos",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "d43f1541a045",
+        "parameterCount": 2,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 2,
+      "delta": 2
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/[deviceId]/repos",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "e7a90abd2191",
+        "parameterCount": 2,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 2,
+      "delta": 2
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/[deviceId]/repos",
+      "statement": {
+        "status": "unknown"
+      },
+      "baseline": 0,
+      "current": 2,
+      "delta": 2
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/[deviceId]/runs",
+      "statement": {
+        "command": "COMMIT",
+        "normalizedStructureId": "79663c1d3b43",
+        "parameterCount": 0,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 2,
+      "delta": 2
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/[deviceId]/runs",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "5ba52cf97fff",
+        "parameterCount": 2,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 2,
+      "delta": 2
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/[deviceId]/runs",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "ccb18ad4b67d",
+        "parameterCount": 3,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 2,
+      "delta": 2
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/[deviceId]/runs",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "d43f1541a045",
+        "parameterCount": 2,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 2,
+      "delta": 2
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/[deviceId]/runs",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "e7a90abd2191",
+        "parameterCount": 2,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 2,
+      "delta": 2
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/[deviceId]/runs",
+      "statement": {
+        "status": "unknown"
+      },
+      "baseline": 0,
+      "current": 2,
+      "delta": 2
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/register",
+      "statement": {
+        "command": "COMMIT",
+        "normalizedStructureId": "79663c1d3b43",
+        "parameterCount": 0,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 2,
+      "delta": 2
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/register",
+      "statement": {
+        "command": "INSERT",
+        "normalizedStructureId": "6d8018401bd8",
+        "parameterCount": 5,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 2,
+      "delta": 2
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "after:factory-dispatch-recovery",
+      "statement": {
+        "command": "BEGIN",
+        "normalizedStructureId": "a8402858d4f1",
+        "parameterCount": 0,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 2,
+      "delta": 2
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "after:factory-dispatch-recovery",
+      "statement": {
+        "command": "COMMIT",
+        "normalizedStructureId": "79663c1d3b43",
+        "parameterCount": 0,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 2,
+      "delta": 2
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "after:factory-dispatch-recovery",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "87a68411468b",
+        "parameterCount": 2,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 2,
+      "delta": 2
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "after:factory-dispatch-recovery",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "d43f1541a045",
+        "parameterCount": 2,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 2,
+      "delta": 2
+    },
+    {
+      "context": {
+        "method": "POST",
+        "route": "/api/desktop/rpc",
+        "rpcAction": "coordinator.syncCoordinatorChat",
+        "status": "known"
+      },
+      "scope": "/actions/coordinator/poll",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "0b9bc73fbbd2",
+        "parameterCount": 2,
+        "status": "known"
+      },
+      "baseline": 1,
+      "current": 0,
+      "delta": -1
+    },
+    {
+      "context": {
+        "method": "POST",
+        "route": "/api/desktop/rpc",
+        "rpcAction": "coordinator.syncCoordinatorChat",
+        "status": "known"
+      },
+      "scope": "/actions/coordinator/poll",
+      "statement": {
+        "status": "unknown"
+      },
+      "baseline": 33,
+      "current": 32,
+      "delta": -1
+    },
+    {
+      "context": {
+        "method": "POST",
+        "route": "/api/desktop/rpc",
+        "rpcAction": "issues.syncIssueList",
+        "status": "known"
+      },
+      "scope": "/actions/issues/poll",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "9f0fe8477a06",
+        "parameterCount": 2,
+        "status": "known"
+      },
+      "baseline": 2,
+      "current": 3,
+      "delta": 1
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/api/devices/enrollment",
+      "statement": {
+        "status": "unknown"
+      },
+      "baseline": 0,
+      "current": 1,
+      "delta": 1
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/api/devices/enrollment",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "1b6dae6d78fb",
+        "parameterCount": 1,
+        "status": "known"
+      },
+      "baseline": 2,
+      "current": 3,
+      "delta": 1
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/api/devices/enrollment",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "8fa591ff58d0",
+        "parameterCount": 1,
+        "status": "known"
+      },
+      "baseline": 2,
+      "current": 3,
+      "delta": 1
+    },
+    {
+      "context": {
+        "method": "GET",
+        "route": "/v1/devices/[deviceId]/commands",
+        "rpcAction": null,
+        "status": "known"
+      },
+      "scope": "/v1/devices/[deviceId]/commands",
+      "statement": {
+        "command": "COMMIT",
+        "normalizedStructureId": "79663c1d3b43",
+        "parameterCount": 0,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 1,
+      "delta": 1
+    },
+    {
+      "context": {
+        "method": "GET",
+        "route": "/v1/devices/[deviceId]/commands",
+        "rpcAction": null,
+        "status": "known"
+      },
+      "scope": "/v1/devices/[deviceId]/commands",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "c791f908d816",
+        "parameterCount": 3,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 1,
+      "delta": 1
+    },
+    {
+      "context": {
+        "method": "GET",
+        "route": "/v1/devices/[deviceId]/commands",
+        "rpcAction": null,
+        "status": "known"
+      },
+      "scope": "/v1/devices/[deviceId]/commands",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "d43f1541a045",
+        "parameterCount": 2,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 1,
+      "delta": 1
+    },
+    {
+      "context": {
+        "method": "GET",
+        "route": "/v1/devices/[deviceId]/commands",
+        "rpcAction": null,
+        "status": "known"
+      },
+      "scope": "/v1/devices/[deviceId]/commands",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "e7a90abd2191",
+        "parameterCount": 2,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 1,
+      "delta": 1
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/[deviceId]/gateway",
+      "statement": {
+        "command": "COMMIT",
+        "normalizedStructureId": "79663c1d3b43",
+        "parameterCount": 0,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 1,
+      "delta": 1
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/[deviceId]/gateway",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "c791f908d816",
+        "parameterCount": 3,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 1,
+      "delta": 1
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/[deviceId]/gateway",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "d43f1541a045",
+        "parameterCount": 2,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 1,
+      "delta": 1
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/[deviceId]/gateway",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "e7a90abd2191",
+        "parameterCount": 2,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 1,
+      "delta": 1
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/[deviceId]/gateway",
+      "statement": {
+        "status": "unknown"
+      },
+      "baseline": 0,
+      "current": 1,
+      "delta": 1
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/enroll",
+      "statement": {
+        "command": "BEGIN",
+        "normalizedStructureId": "a8402858d4f1",
+        "parameterCount": 0,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 1,
+      "delta": 1
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/enroll",
+      "statement": {
+        "command": "COMMIT",
+        "normalizedStructureId": "79663c1d3b43",
+        "parameterCount": 0,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 1,
+      "delta": 1
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/enroll",
+      "statement": {
+        "command": "DELETE",
+        "normalizedStructureId": "ca185fa3da9b",
+        "parameterCount": 1,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 1,
+      "delta": 1
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/enroll",
+      "statement": {
+        "status": "unknown"
+      },
+      "baseline": 0,
+      "current": 1,
+      "delta": 1
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/register",
+      "statement": {
+        "command": "BEGIN",
+        "normalizedStructureId": "a8402858d4f1",
+        "parameterCount": 0,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 1,
+      "delta": 1
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/register",
+      "statement": {
+        "command": "INSERT",
+        "normalizedStructureId": "53a7d0a9b15c",
+        "parameterCount": 13,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 1,
+      "delta": 1
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/register",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "d43f1541a045",
+        "parameterCount": 2,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 1,
+      "delta": 1
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/register",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "e7a90abd2191",
+        "parameterCount": 2,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 1,
+      "delta": 1
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/register",
+      "statement": {
+        "command": "UPDATE",
+        "normalizedStructureId": "0a5d35015c3d",
+        "parameterCount": 2,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 1,
+      "delta": 1
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "/v1/devices/register",
+      "statement": {
+        "command": "WITH",
+        "normalizedStructureId": "7afe414f4d9e",
+        "parameterCount": 3,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 1,
+      "delta": 1
+    },
+    {
+      "context": {
+        "status": "unknown"
+      },
+      "scope": "after:live-notify",
+      "statement": {
+        "status": "unknown"
+      },
+      "baseline": 0,
+      "current": 1,
+      "delta": 1
+    }
+  ],
+  "queryGroupDeltaSummary": {
+    "changedGroups": 55,
+    "positive": 91,
+    "negative": -2,
+    "net": 89
+  },
+  "desktopRpcPhaseGroupDeltas": [
+    {
+      "context": {
+        "method": "POST",
+        "route": "/api/desktop/rpc",
+        "rpcAction": "desktop.bootstrap",
+        "status": "known"
+      },
+      "phase": "native-pkce-and-automatic-renderer-to-public-session",
+      "scope": "/api/desktop/rpc",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "8f554b451232",
+        "parameterCount": 2,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 1,
+      "delta": 1
+    },
+    {
+      "context": {
+        "method": "POST",
+        "route": "/api/desktop/rpc",
+        "rpcAction": "desktop.bootstrap",
+        "status": "known"
+      },
+      "phase": "native-pkce-and-automatic-renderer-to-public-session",
+      "scope": "/api/desktop/rpc",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "d47f41b71036",
+        "parameterCount": 2,
+        "status": "known"
+      },
+      "baseline": 0,
+      "current": 1,
+      "delta": 1
+    },
+    {
+      "context": {
+        "method": "POST",
+        "route": "/api/desktop/rpc",
+        "rpcAction": "desktop.bootstrap",
+        "status": "known"
+      },
+      "phase": "workspace-selection-to-usable",
+      "scope": "/api/desktop/rpc",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "8f554b451232",
+        "parameterCount": 2,
+        "status": "known"
+      },
+      "baseline": 2,
+      "current": 1,
+      "delta": -1
+    },
+    {
+      "context": {
+        "method": "POST",
+        "route": "/api/desktop/rpc",
+        "rpcAction": "desktop.bootstrap",
+        "status": "known"
+      },
+      "phase": "workspace-selection-to-usable",
+      "scope": "/api/desktop/rpc",
+      "statement": {
+        "command": "SELECT",
+        "normalizedStructureId": "d47f41b71036",
+        "parameterCount": 2,
+        "status": "known"
+      },
+      "baseline": 2,
+      "current": 1,
+      "delta": -1
+    }
+  ],
+  "subsequentIntervalForLocalizationOnly": {
+    "definition": "Original nativeLogin last checkpoint to original startup-bundled first checkpoint. This is not an acceptance window and is never substituted for either original budget.",
+    "originalCounterDifferences": {
+      "baseline": {
+        "fromQueryCalls": 26630,
+        "toQueryCalls": 27266,
+        "queries": 636,
+        "operations": {
+          "/api/auth/[...all]": 5,
+          "/api/desktop/begin": 0,
+          "/api/desktop/return": 0,
+          "/api/desktop/exchange": 0,
+          "/api/desktop/rpc": 0,
+          "/api/rpc": 86,
+          "/api/workspace": 20,
+          "/api/workspace/switcher": 16,
+          "/api/live/ticket": 9,
+          "/actions/coordinator/chat": 0,
+          "/actions/coordinator/poll": 92,
+          "/actions/coordinator/summaries": 20,
+          "/actions/threads/poll": 20,
+          "/actions/task-runs/read": 12,
+          "/actions/issues/poll": 31,
+          "/actions/projects/list": 4,
+          "unattributed": 321
+        },
+        "sources": {
+          "/api/agent/sessions": 4,
+          "/api/computer/events": 0,
+          "/api/conversations": 18,
+          "/api/conversations/[id]/read": 13,
+          "/api/approved-writes": 40,
+          "/api/mobile/reactions": 1,
+          "/api/pending-actions": 4,
+          "/api/settings/preferences": 0,
+          "/api/settings/model-order": 0,
+          "/api/settings/[read]": 0,
+          "/api/devices/enrollment": 11,
+          "/api/coordinator/messages": 0,
+          "/api/coordinator/stream": 0,
+          "/api/coordinator/runtime": 0,
+          "/api/coordinator/attention": 0,
+          "/api/teams/directory": 0,
+          "/api/teams/[teamId]/members": 0,
+          "/api/integrations/composio": 0,
+          "/api/frontend/oauth-consent": 0,
+          "/pages/workspace": 0,
+          "/pages/settings": 0,
+          "/v1/devices/enroll": 4,
+          "/v1/devices/register": 22,
+          "/v1/devices/[deviceId]/commands": 12,
+          "/v1/devices/[deviceId]/commands/ack": 0,
+          "/v1/devices/[deviceId]/computer": 0,
+          "/v1/devices/[deviceId]/coordinator": 0,
+          "/v1/devices/[deviceId]/fs/requests": 0,
+          "/v1/devices/[deviceId]/fs/requests/[requestId]": 0,
+          "/v1/devices/[deviceId]/gateway": 10,
+          "/v1/devices/[deviceId]/github-token": 0,
+          "/v1/devices/[deviceId]/heartbeat": 64,
+          "/v1/devices/[deviceId]/repos": 36,
+          "/v1/devices/[deviceId]/runs": 36,
+          "/v1/devices/[deviceId]/runs/[runId]/attachments/[id]": 0,
+          "/v1/devices/[deviceId]/runs/[runId]/claim": 0,
+          "/v1/devices/[deviceId]/runs/[runId]/computer-authority": 0,
+          "/v1/devices/[deviceId]/runs/[runId]/credentials/login": 0,
+          "/v1/devices/[deviceId]/runs/[runId]/subscription-lease": 0,
+          "/v1/devices/[deviceId]/runs/[runId]/subscription": 0,
+          "/v1/runs/[runId]": 0,
+          "/v1/runs/[runId]/captures": 0,
+          "/v1/runs/[runId]/captures/[captureId]": 0,
+          "/v1/runs/[runId]/captures/[captureId]/complete": 0,
+          "/v1/runs/[runId]/checkpoint": 0,
+          "/v1/runs/[runId]/complete": 0,
+          "/v1/runs/[runId]/decision": 0,
+          "/v1/runs/[runId]/events": 0,
+          "/v1/runs/[runId]/policy-snapshot": 0,
+          "/v1/runs/[runId]/screen": 0,
+          "/v1/runs/[runId]/skill-receipt": 0,
+          "/v1/runs/[runId]/tool-approval": 0,
+          "after:agent-images.revalidate": 0,
+          "after:auth-email": 0,
+          "after:composio-triggers": 0,
+          "after:composio-webhook": 0,
+          "after:coordinator-wake": 0,
+          "after:device-wake": 0,
+          "after:due-timer": 0,
+          "after:factory-dispatch-recovery": 42,
+          "after:github-webhook": 0,
+          "after:group-turn": 0,
+          "after:issue-effects": 0,
+          "after:linear-issue-sync": 0,
+          "after:linear-sync-batch": 0,
+          "after:linear-webhook": 0,
+          "after:linear-webhook-suggestions": 0,
+          "after:live-notify": 4,
+          "after:record-time-zone": 0,
+          "after:remember-locale": 0,
+          "after:run-outcome-judge": 0,
+          "after:short-title": 0,
+          "after:stop-recordings": 0,
+          "after:subagent-start": 0,
+          "after:suggestions-bootstrap": 0,
+          "after:workflow-wake": 0,
+          "otherScoped": 0,
+          "noScope": 0
+        }
+      },
+      "current": {
+        "fromQueryCalls": 26805,
+        "toQueryCalls": 27351,
+        "queries": 546,
+        "operations": {
+          "/api/auth/[...all]": 5,
+          "/api/desktop/begin": 0,
+          "/api/desktop/return": 0,
+          "/api/desktop/exchange": 0,
+          "/api/desktop/rpc": 0,
+          "/api/rpc": 86,
+          "/api/workspace": 20,
+          "/api/workspace/switcher": 16,
+          "/api/live/ticket": 9,
+          "/actions/coordinator/chat": 0,
+          "/actions/coordinator/poll": 92,
+          "/actions/coordinator/summaries": 20,
+          "/actions/threads/poll": 20,
+          "/actions/task-runs/read": 12,
+          "/actions/issues/poll": 31,
+          "/actions/projects/list": 4,
+          "unattributed": 231
+        },
+        "sources": {
+          "/api/agent/sessions": 4,
+          "/api/computer/events": 0,
+          "/api/conversations": 18,
+          "/api/conversations/[id]/read": 13,
+          "/api/approved-writes": 40,
+          "/api/mobile/reactions": 1,
+          "/api/pending-actions": 4,
+          "/api/settings/preferences": 0,
+          "/api/settings/model-order": 0,
+          "/api/settings/[read]": 0,
+          "/api/devices/enrollment": 8,
+          "/api/coordinator/messages": 0,
+          "/api/coordinator/stream": 0,
+          "/api/coordinator/runtime": 0,
+          "/api/coordinator/attention": 0,
+          "/api/teams/directory": 0,
+          "/api/teams/[teamId]/members": 0,
+          "/api/integrations/composio": 0,
+          "/api/frontend/oauth-consent": 0,
+          "/pages/workspace": 0,
+          "/pages/settings": 0,
+          "/v1/devices/enroll": 0,
+          "/v1/devices/register": 7,
+          "/v1/devices/[deviceId]/commands": 6,
+          "/v1/devices/[deviceId]/commands/ack": 0,
+          "/v1/devices/[deviceId]/computer": 0,
+          "/v1/devices/[deviceId]/coordinator": 0,
+          "/v1/devices/[deviceId]/fs/requests": 0,
+          "/v1/devices/[deviceId]/fs/requests/[requestId]": 0,
+          "/v1/devices/[deviceId]/gateway": 5,
+          "/v1/devices/[deviceId]/github-token": 0,
+          "/v1/devices/[deviceId]/heartbeat": 44,
+          "/v1/devices/[deviceId]/repos": 24,
+          "/v1/devices/[deviceId]/runs": 24,
+          "/v1/devices/[deviceId]/runs/[runId]/attachments/[id]": 0,
+          "/v1/devices/[deviceId]/runs/[runId]/claim": 0,
+          "/v1/devices/[deviceId]/runs/[runId]/computer-authority": 0,
+          "/v1/devices/[deviceId]/runs/[runId]/credentials/login": 0,
+          "/v1/devices/[deviceId]/runs/[runId]/subscription-lease": 0,
+          "/v1/devices/[deviceId]/runs/[runId]/subscription": 0,
+          "/v1/runs/[runId]": 0,
+          "/v1/runs/[runId]/captures": 0,
+          "/v1/runs/[runId]/captures/[captureId]": 0,
+          "/v1/runs/[runId]/captures/[captureId]/complete": 0,
+          "/v1/runs/[runId]/checkpoint": 0,
+          "/v1/runs/[runId]/complete": 0,
+          "/v1/runs/[runId]/decision": 0,
+          "/v1/runs/[runId]/events": 0,
+          "/v1/runs/[runId]/policy-snapshot": 0,
+          "/v1/runs/[runId]/screen": 0,
+          "/v1/runs/[runId]/skill-receipt": 0,
+          "/v1/runs/[runId]/tool-approval": 0,
+          "after:agent-images.revalidate": 0,
+          "after:auth-email": 0,
+          "after:composio-triggers": 0,
+          "after:composio-webhook": 0,
+          "after:coordinator-wake": 0,
+          "after:device-wake": 0,
+          "after:due-timer": 0,
+          "after:factory-dispatch-recovery": 30,
+          "after:github-webhook": 0,
+          "after:group-turn": 0,
+          "after:issue-effects": 0,
+          "after:linear-issue-sync": 0,
+          "after:linear-sync-batch": 0,
+          "after:linear-webhook": 0,
+          "after:linear-webhook-suggestions": 0,
+          "after:live-notify": 3,
+          "after:record-time-zone": 0,
+          "after:remember-locale": 0,
+          "after:run-outcome-judge": 0,
+          "after:short-title": 0,
+          "after:stop-recordings": 0,
+          "after:subagent-start": 0,
+          "after:suggestions-bootstrap": 0,
+          "after:workflow-wake": 0,
+          "otherScoped": 0,
+          "noScope": 0
+        }
+      }
+    },
+    "currentMinusBaselineQueries": -90,
+    "operationDelta": {
+      "unattributed": -90
+    },
+    "sourceDelta": {
+      "/api/devices/enrollment": -3,
+      "/v1/devices/[deviceId]/commands": -6,
+      "/v1/devices/[deviceId]/gateway": -5,
+      "/v1/devices/[deviceId]/heartbeat": -20,
+      "/v1/devices/[deviceId]/repos": -12,
+      "/v1/devices/[deviceId]/runs": -12,
+      "/v1/devices/enroll": -4,
+      "/v1/devices/register": -15,
+      "after:factory-dispatch-recovery": -12,
+      "after:live-notify": -1
+    },
+    "sourceDeltasExactlyNegateMeasuredLoginUnattributedIncrease": true,
+    "combinedNativeStartToStartupBefore": {
+      "baseline": 1020,
+      "current": 1019,
+      "delta": -1,
+      "notAnAcceptanceMetric": true
+    }
+  },
+  "attributionLimits": [
+    "SQL counts are from unchanged original queryCalls ordinals and closed scope labels, including concurrent daemon/device/background activity. No query is deducted from the failed473 total.",
+    "Most additional device/after rows have unknown request context. Only the commands scope six rows have captured GET /v1/devices/[deviceId]/commands, null action, current contextIndex112; methods for unknown-context rows are not inferred from route names.",
+    "The reciprocal scope-count distribution across adjacent intervals is evidence of different placement relative to the measurement checkpoints. It does not identify the same SQL parameters, request or work across runs.",
+    "A normalizedStructureId describes the conservative normalized shape; equal IDs do not establish redundant reads or equal parameters. No SQL text, parameter, user content or raw internal UUID is exported here.",
+    "The desktop RPC +2/-2 phase changes net to zero in the full login window. They are group-count differences, not proof that two identical query identities moved between runs.",
+    "Global outside-window query rows were not exported. The subsequent-interval comparison uses only the original counter snapshots, not invented query/context rows."
+  ],
+  "execution": {
+    "networkCalls": 0,
+    "newNativeOrModelRuns": 0,
+    "sourceOrIndexMutations": 0,
+    "windowOrThresholdChanges": 0
+  }
+}

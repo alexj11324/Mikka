@@ -1,0 +1,27 @@
+{
+  "command": [
+    "node",
+    "--test",
+    "--test-reporter=tap",
+    "--test-name-pattern=startup correlation rejects malformed",
+    "scripts/e2b/validate-template-subscriptions.test.mjs"
+  ],
+  "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/e2b-diagnostic-correlation-20261109/checkout",
+  "exitCode": 0,
+  "log": {
+    "path": "correlation-identifier-check.log",
+    "bytes": 372,
+    "sha256": "e40acc682dafee47e423afb65930e78dc117e6f00908bc90b4cbd333647ddeaf"
+  },
+  "source": [
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "sha256": "e763259be259e2e96cb3b008802564be96c9d5fa8ce27c84d8234b8e5f7ab564"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "sha256": "71a1ef66dd55271556630f84c0cffac998afb9b6375c8031b3ddfddeedd15f43"
+    }
+  ],
+  "expectedOutcome": "pass; these negative input assertions already passed the initial implementation"
+}

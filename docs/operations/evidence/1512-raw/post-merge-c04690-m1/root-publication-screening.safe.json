@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "scope": "All 87 payload files, decompressing all original CI gzip logs before scanning.",
+  "credentialPatternFindings": 0,
+  "emailFindings": {
+    "e2bPatch": "Two strings are explicit .invalid canaries in the test patch.",
+    "pg1Log": "One normalized synthetic test address from the real signup concurrency test; source test and normalization implementation independently read."
+  },
+  "fixtureSources": [
+    {
+      "path": "lib/abuse/store.db.test.ts",
+      "sha256": "0076394e5cf1118e8c2c8c18969567f9da8c5cacb017f500d5ae43992e16ec9d"
+    },
+    {
+      "path": "lib/abuse/signup.ts",
+      "sha256": "c870cadb896c13500aaf25d3757cd09c95f9c9b1a7886841374262475da7f6dc"
+    }
+  ],
+  "unresolvedFindings": 0,
+  "rawLogsModified": false,
+  "rawNativeJsonModified": false
+}

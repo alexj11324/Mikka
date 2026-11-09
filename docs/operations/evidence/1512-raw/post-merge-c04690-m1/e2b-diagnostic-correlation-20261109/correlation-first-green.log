@@ -1,0 +1,22 @@
+TAP version 13
+# Subtest: startup correlation survives claude_code failure before a run exists
+ok 1 - startup correlation survives claude_code failure before a run exists
+  ---
+  duration_ms: 29.422658
+  type: 'test'
+  ...
+# Subtest: startup correlation survives codex failure before a run exists
+ok 2 - startup correlation survives codex failure before a run exists
+  ---
+  duration_ms: 9.356568
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 188.05546

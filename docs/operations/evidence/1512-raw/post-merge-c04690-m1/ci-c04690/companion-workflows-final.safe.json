@@ -1,0 +1,148 @@
+{
+  "schema": "issue1512.c04690-companion-workflows.v1",
+  "recordedAt": "2026-11-09T01:55:04.353362+00:00",
+  "head": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+  "status": "seven_non_ci_pr_workflows_terminal_success",
+  "workflows": [
+    {
+      "id": 42545814994,
+      "name": "Browser gate",
+      "path": ".github/workflows/browser-gate.yml",
+      "event": "pull_request",
+      "head_sha": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-09T01:29:16Z",
+      "updated_at": "2026-11-09T01:29:22Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42545814994",
+      "run_attempt": 1
+    },
+    {
+      "id": 42545814946,
+      "name": "E2B additive runtime release",
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "event": "pull_request",
+      "head_sha": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-09T01:29:16Z",
+      "updated_at": "2026-11-09T01:29:38Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42545814946",
+      "run_attempt": 1
+    },
+    {
+      "id": 42545814928,
+      "name": "Unattended sandbox acceptance",
+      "path": ".github/workflows/unattended-sandbox.yml",
+      "event": "pull_request",
+      "head_sha": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-09T01:29:16Z",
+      "updated_at": "2026-11-09T01:31:32Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42545814928",
+      "run_attempt": 1
+    },
+    {
+      "id": 42545814924,
+      "name": "Cloud computer backend",
+      "path": ".github/workflows/cloud-computer.yml",
+      "event": "pull_request",
+      "head_sha": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-09T01:29:16Z",
+      "updated_at": "2026-11-09T01:32:04Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42545814924",
+      "run_attempt": 1
+    },
+    {
+      "id": 42545814920,
+      "name": "E2B subscription custody",
+      "path": ".github/workflows/e2b-byos.yml",
+      "event": "pull_request",
+      "head_sha": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-09T01:29:16Z",
+      "updated_at": "2026-11-09T01:33:53Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42545814920",
+      "run_attempt": 1
+    },
+    {
+      "id": 42545814940,
+      "name": "SSH device backend",
+      "path": ".github/workflows/ssh-device-backend.yml",
+      "event": "pull_request",
+      "head_sha": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-09T01:29:16Z",
+      "updated_at": "2026-11-09T01:35:11Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42545814940",
+      "run_attempt": 1
+    },
+    {
+      "id": 42545814919,
+      "name": "Local device Node 22",
+      "path": ".github/workflows/local-device-node22.yml",
+      "event": "pull_request",
+      "head_sha": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-09T01:29:16Z",
+      "updated_at": "2026-11-09T01:44:34Z",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42545814919",
+      "run_attempt": 1
+    }
+  ],
+  "node22Jobs": [
+    {
+      "id": 128930484458,
+      "name": "package",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:29:19Z",
+      "completed_at": "2026-11-09T01:30:24Z"
+    },
+    {
+      "id": 128930484662,
+      "name": "node22-unit",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:29:19Z",
+      "completed_at": "2026-11-09T01:32:34Z"
+    },
+    {
+      "id": 128930774906,
+      "name": "macos-arm (18.20.8)",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:39:54Z",
+      "completed_at": "2026-11-09T01:42:21Z"
+    },
+    {
+      "id": 128930774938,
+      "name": "macos-arm (22.22.1)",
+      "status": "completed",
+      "conclusion": "success",
+      "started_at": "2026-11-09T01:41:55Z",
+      "completed_at": "2026-11-09T01:44:34Z"
+    }
+  ],
+  "inputs": [
+    {
+      "path": "private/phase8-runs.original.json",
+      "bytes": 102025,
+      "sha256": "d17bf5b22b9b8ed64aab9683fd041bab5c37705698c5f9d1d104eaaa10f0d32d",
+      "gitBlobSha": "be4155254fd211628720e88e36db302a72fdff67"
+    },
+    {
+      "path": "private/phase7-node22-jobs.original.json",
+      "bytes": 13604,
+      "sha256": "021985ffcaa830e66d8bc553d2f925b681f858dd6058152970f8e8273a43775d",
+      "gitBlobSha": "f79fafc8d50b5a0d9f7b205d7c1afad969c2fc96"
+    }
+  ],
+  "boundary": "Only associated pull-request workflow conclusions are established. The separate CI run42545814990 and its Native budget remain pending at this receipt; no production runtime writer, publication or issue1512 real-model acceptance is inferred from workflow names."
+}

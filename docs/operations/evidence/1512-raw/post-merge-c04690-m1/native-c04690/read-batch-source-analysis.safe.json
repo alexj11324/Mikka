@@ -1,0 +1,767 @@
+{
+  "schema": 1,
+  "kind": "read_only_source_and_existing_diagnostics_analysis",
+  "sourceMain": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "sourceMainTree": "8c5c12ea993533403d13e21dc75647bb28022767",
+  "modePrHead": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+  "modePrTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+  "actualNativeRevision": "fd053d254e377f35ff8e2529edb1ad544c23fab1",
+  "input": {
+    "path": "native-c04690-original/lifecycle.json",
+    "bytes": 696142,
+    "sha256": "19a1cfbd9225c580a2309f76016e099d4354e5fba3ee9562c59d2782db14dcdc",
+    "gitBlobSha1": "1cd8ce2c9528225884da22282e254311c797d07d"
+  },
+  "sourceFiles": [
+    {
+      "path": "lib/desktop-rpc/read-batch.ts",
+      "bytes": 3099,
+      "sha256": "8aadc849e1de11727a67f03c0d0d07d656136e455f4ef7bf32281f6b10194fdb",
+      "gitBlobSha1": "528365a2f6735a12fa514f6088bf81446c813ec7",
+      "sameBlobIn8c5AndA699": true
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "bytes": 5039,
+      "sha256": "5a4a3ec8120558c25c5c9b4db117df1acc3f4f8dfe3f5c66146c6a30d60da00f",
+      "gitBlobSha1": "9ddddf4230c9f63ca9fb5f966de87116449844fe",
+      "sameBlobIn8c5AndA699": true
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-contract.ts",
+      "bytes": 1637,
+      "sha256": "cdd915dacd21d2e9555896daeaa5e5c1f5b23a193cb48e0b959507e96e990000",
+      "gitBlobSha1": "45f73181cffbda3a48b61b90e9dc20e3a88cb18b",
+      "sameBlobIn8c5AndA699": true
+    },
+    {
+      "path": "lib/workspace-access.ts",
+      "bytes": 7976,
+      "sha256": "db5f3de381689ec358c5862c6f3d0b06823d40ade368791e85006005ea8545cd",
+      "gitBlobSha1": "a5c563dcd1e70e7c48749b76924a54da2d1a3982",
+      "sameBlobIn8c5AndA699": true
+    },
+    {
+      "path": "app/actions/coordinator.ts",
+      "bytes": 23196,
+      "sha256": "b70ceec98efa1edfc1074598b2a6cf12b58d4f2539bb351854a562fa43f9d451",
+      "gitBlobSha1": "3cde11bdaab0164d179d51f37efdf1d77ec7e938",
+      "sameBlobIn8c5AndA699": true
+    },
+    {
+      "path": "lib/coordinator/wake.ts",
+      "bytes": 8325,
+      "sha256": "010fbba7546f32261e5bf0d5256b739367b7438df2499d0edf7032c4442d82b6",
+      "gitBlobSha1": "751bdb22cfb1a3e1626c9210206740f8879463e0",
+      "sameBlobIn8c5AndA699": true
+    },
+    {
+      "path": "lib/coordinator/model-ready.ts",
+      "bytes": 1934,
+      "sha256": "a3c11f5eea106bb2c5c4ec44f8e9ccfce5b2e4782171bd64aa794fb560b566e7",
+      "gitBlobSha1": "cd6ecaaaf847ca8619e55d7d42133c9214b07392",
+      "sameBlobIn8c5AndA699": true
+    },
+    {
+      "path": "lib/execution-settings.ts",
+      "bytes": 23629,
+      "sha256": "12fc04116782566b78b17a5f2068756a6230e45930eff36912b3d2fa0045abf6",
+      "gitBlobSha1": "0c0b7accd10ea84957428a79d9e58a9924b9d841",
+      "sameBlobIn8c5AndA699": true
+    },
+    {
+      "path": "lib/bot-model-choice.ts",
+      "bytes": 8023,
+      "sha256": "941903810b3ec2b39bb8a58539b3d52ab08cde98fa9e8332a9a9777311144521",
+      "gitBlobSha1": "d2fd785e8e164ea86387bfd013d070da9ed3e3f0",
+      "sameBlobIn8c5AndA699": true
+    },
+    {
+      "path": "lib/bot-model-menu.ts",
+      "bytes": 11882,
+      "sha256": "aded81ef847d7e53e76323d94075054bec283265098e48587cb88cde0b5afcc7",
+      "gitBlobSha1": "74b14c3070d37b4c50591cf8849dc43fe5b7de96",
+      "sameBlobIn8c5AndA699": true
+    },
+    {
+      "path": "app/actions/execution-settings.ts",
+      "bytes": 3402,
+      "sha256": "f82fc11fda38f8817c260c77a42d06a768b2bbfcfb590463c32111ceffcd0329",
+      "gitBlobSha1": "3b27222dee1b8b84e4b74581e0827de07fc4de8d",
+      "sameBlobIn8c5AndA699": true
+    },
+    {
+      "path": "lib/model-api-keys.ts",
+      "bytes": 26494,
+      "sha256": "1574f8712bfe1ea8428a86e91cf137e75d2f0849bfea1cec2b0de34db0b8dffb",
+      "gitBlobSha1": "d46338c3d695ffd0fd1bc245f0db3f63d0c2ed4d",
+      "sameBlobIn8c5AndA699": true
+    },
+    {
+      "path": "lib/personal-policy.ts",
+      "bytes": 8535,
+      "sha256": "12de39231eea7fd56ae09cc4b0b601d196dcbab9748d02a0de3f3ddbbc22bb12",
+      "gitBlobSha1": "bbb9684619cbfa8faca236a78e6f8f61148d9a94",
+      "sameBlobIn8c5AndA699": true
+    },
+    {
+      "path": "lib/subscription-runtime.ts",
+      "bytes": 8794,
+      "sha256": "29a32862ced49bce348486a26a620b5588f5932c8c456dd29785fbe1b75089a1",
+      "gitBlobSha1": "a38fa4d16a8736b4e0299b5c5540fd1e7e514f2b",
+      "sameBlobIn8c5AndA699": true
+    },
+    {
+      "path": "lib/abuse/runtime.ts",
+      "bytes": 2158,
+      "sha256": "24bd6d50d380957ad33245915f525fb5512377a7ef52e6bbce939e427e1e01dd",
+      "gitBlobSha1": "38e42ade6a06960422a2076fe6cee4d95c8aca46",
+      "sameBlobIn8c5AndA699": true
+    },
+    {
+      "path": "lib/points-fallback.ts",
+      "bytes": 4438,
+      "sha256": "cbaded48ec7fe47cd5b0c5bdd0362b7200fcd1733a4f43b72dfc229ca1c34733",
+      "gitBlobSha1": "76988f3be3161b61c7acb542a79915eee65d71df",
+      "sameBlobIn8c5AndA699": true
+    },
+    {
+      "path": "lib/credit-shares.ts",
+      "bytes": 5246,
+      "sha256": "4ddf1e8a59afc81581b0a250395777694e637ae0beded60cad0c8fcbfa374358",
+      "gitBlobSha1": "9357f82e68fb7ab1b67c1922af74db9c186dadb5",
+      "sameBlobIn8c5AndA699": true
+    },
+    {
+      "path": "lib/db/request-scope.ts",
+      "bytes": 4779,
+      "sha256": "67bbb85d950948802449a1d0c2638e62bd4d1731ffe883837bc53059ac50b6f0",
+      "gitBlobSha1": "b3445c20e6be5061bcbfe0fe56903b8dd767dfd3",
+      "sameBlobIn8c5AndA699": true
+    },
+    {
+      "path": "lib/db/commit-effects.ts",
+      "bytes": 6982,
+      "sha256": "83e00e079304c5cce58d142e6af39763c0c331944d84bf5b1fc30b3f88f8bc9a",
+      "gitBlobSha1": "5f55d0c87e886422398b6767d62cd5a4cea718a6",
+      "sameBlobIn8c5AndA699": true
+    },
+    {
+      "path": "apps/desktop/test/db-query-diagnostics.cjs",
+      "bytes": 18406,
+      "sha256": "763d180bfc0d0a62e67a99624a4815eeca953bbcb7290193a5515bb67e24ccad",
+      "gitBlobSha1": "93fc0510b98e9a3812e6b4452a929ac5900fe458",
+      "sameBlobIn8c5AndA699": true
+    }
+  ],
+  "originalBudget": {
+    "nativeLogin": 473,
+    "webLogin": 402,
+    "overBudget": 71,
+    "unchanged": true
+  },
+  "method": [
+    "Read the immutable existing per-query diagnostic rows and their original completion receipts; select login SQL by original ordinal window only.",
+    "Use source AST string-literal extraction plus the unchanged statementStructure helper to bind known hashes to exact SQL call sites; no SQL text or parameters exported.",
+    "Render three source-equivalent Drizzle queries with drizzle.mock().toSQL() to bind generated structures; no database, application action or model was executed."
+  ],
+  "structureBindings": [
+    {
+      "id": "0b9bc73fbbd2",
+      "path": "lib/workspace-access.ts",
+      "function": "readWorkspaceContext.readChoices",
+      "method": "offline Drizzle toSQL"
+    },
+    {
+      "id": "6f38736a0170",
+      "path": "app/actions/coordinator.ts",
+      "function": "ownBot",
+      "method": "offline Drizzle toSQL"
+    },
+    {
+      "id": "66cde7eead86",
+      "path": "lib/execution-settings.ts",
+      "function": "executionWorkspace",
+      "method": "exact source SQL literal; RPC path binds this site, not other sites sharing its shape"
+    },
+    {
+      "id": "a130e5d92ffc",
+      "path": "lib/subscription-runtime.ts",
+      "function": "authorizeSubscriptionWorkspace",
+      "method": "offline Drizzle toSQL"
+    },
+    {
+      "id": "82919a1d33a6",
+      "path": "lib/personal-policy.ts",
+      "function": "memberSubscriptionsAllowed",
+      "method": "exact source SQL literal"
+    },
+    {
+      "id": "cfc5423a080d",
+      "path": "lib/personal-policy.ts",
+      "function": "pooledOwners",
+      "method": "exact source SQL literal"
+    },
+    {
+      "ids": [
+        "a6d8d51b1b0b",
+        "1365a978dee8",
+        "9f5aec55f127",
+        "e20f5fbb8309",
+        "0f220c251daf",
+        "a125321ddabb"
+      ],
+      "path": "lib/abuse/runtime.ts",
+      "function": "ensureLegacyVerification",
+      "method": "exact source SQL literals"
+    }
+  ],
+  "observations": {
+    "sqlBearingDesktopHttpRequests": 13,
+    "sqlBearingDesktopHttpCountIsNotFullPhysicalRpcCount": true,
+    "desktopSqlQueries": 230,
+    "readBatchRequests": 8,
+    "workspaceChoiceReadsPerBatch": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    "chat": [
+      {
+        "httpAlias": 3,
+        "sqlQueries": 24,
+        "workspacePolicyReads": 2,
+        "ownBotReads": 1,
+        "executionBotScopeReads": 1,
+        "workspaceShareLockAuthorizationReads": 1
+      },
+      {
+        "httpAlias": 6,
+        "sqlQueries": 22,
+        "workspacePolicyReads": 2,
+        "ownBotReads": 1,
+        "executionBotScopeReads": 1,
+        "workspaceShareLockAuthorizationReads": 1
+      },
+      {
+        "httpAlias": 10,
+        "sqlQueries": 20,
+        "workspacePolicyReads": 2,
+        "ownBotReads": 1,
+        "executionBotScopeReads": 1,
+        "workspaceShareLockAuthorizationReads": 1
+      },
+      {
+        "httpAlias": 13,
+        "sqlQueries": 18,
+        "workspacePolicyReads": 2,
+        "ownBotReads": 1,
+        "executionBotScopeReads": 1,
+        "workspaceShareLockAuthorizationReads": 1
+      }
+    ],
+    "menus": [
+      {
+        "httpAlias": 4,
+        "sqlQueries": 33,
+        "workspacePolicyReads": 2,
+        "legacyVerificationReads": 12
+      },
+      {
+        "httpAlias": 9,
+        "sqlQueries": 24,
+        "workspacePolicyReads": 2,
+        "legacyVerificationReads": 4
+      }
+    ],
+    "allWindows": [
+      {
+        "window": "nativeLogin",
+        "expectedQueries": 473,
+        "capturedQueries": 473,
+        "unknownContextQueries": 165,
+        "unknownStatementQueries": 150,
+        "actions": [
+          {
+            "route": "/api/desktop/rpc",
+            "action": "coordinator.syncCoordinatorChat",
+            "sqlQueries": 84,
+            "workspacePolicyReads": 8,
+            "legacyVerificationReads": 16
+          },
+          {
+            "route": "/api/desktop/rpc",
+            "action": "execution-settings.getBotModelMenu",
+            "sqlQueries": 57,
+            "workspacePolicyReads": 4,
+            "legacyVerificationReads": 16
+          }
+        ]
+      },
+      {
+        "window": "webLogin",
+        "expectedQueries": 402,
+        "capturedQueries": 402,
+        "unknownContextQueries": 77,
+        "unknownStatementQueries": 134,
+        "actions": [
+          {
+            "route": "/api/rpc",
+            "action": "execution-settings.getBotModelMenu",
+            "sqlQueries": 57,
+            "workspacePolicyReads": 4,
+            "legacyVerificationReads": 16
+          },
+          {
+            "route": "/api/rpc",
+            "action": "coordinator.syncCoordinatorChat",
+            "sqlQueries": 92,
+            "workspacePolicyReads": 8,
+            "legacyVerificationReads": 16
+          }
+        ]
+      },
+      {
+        "window": "startup-bundled",
+        "expectedQueries": 176,
+        "capturedQueries": 176,
+        "unknownContextQueries": 43,
+        "unknownStatementQueries": 70,
+        "actions": [
+          {
+            "route": "/api/desktop/rpc",
+            "action": "execution-settings.getBotModelMenu",
+            "sqlQueries": 24,
+            "workspacePolicyReads": 2,
+            "legacyVerificationReads": 4
+          },
+          {
+            "route": "/api/desktop/rpc",
+            "action": "coordinator.syncCoordinatorChat",
+            "sqlQueries": 45,
+            "workspacePolicyReads": 4,
+            "legacyVerificationReads": 4
+          }
+        ]
+      },
+      {
+        "window": "startup-hosted",
+        "expectedQueries": 194,
+        "capturedQueries": 194,
+        "unknownContextQueries": 43,
+        "unknownStatementQueries": 72,
+        "actions": [
+          {
+            "route": "/api/rpc",
+            "action": "execution-settings.getBotModelMenu",
+            "sqlQueries": 24,
+            "workspacePolicyReads": 2,
+            "legacyVerificationReads": 4
+          },
+          {
+            "route": "/api/rpc",
+            "action": "coordinator.syncCoordinatorChat",
+            "sqlQueries": 44,
+            "workspacePolicyReads": 4,
+            "legacyVerificationReads": 4
+          }
+        ]
+      }
+    ]
+  },
+  "loginDesktopQueriesByPhysicalRequest": [
+    {
+      "httpAlias": 1,
+      "rootAction": "desktop.bootstrap",
+      "firstQueryOrdinal": 26365,
+      "lastQueryOrdinal": 26366,
+      "sqlQueries": 2,
+      "actionStructureCounts": {
+        "desktop.bootstrap": {
+          "d47f41b71036": 1,
+          "8f554b451232": 1
+        }
+      }
+    },
+    {
+      "httpAlias": 2,
+      "rootAction": "desktop.readBatch",
+      "firstQueryOrdinal": 26378,
+      "lastQueryOrdinal": 26391,
+      "sqlQueries": 14,
+      "actionStructureCounts": {
+        "team-relations.listProjectTeams": {
+          "fcb49b74a39e": 1
+        },
+        "teams.listTeams": {
+          "0b9bc73fbbd2": 1,
+          "ca5780bf570b": 1
+        },
+        "task-runs.pollTaskRuns": {
+          "unknown": 2,
+          "9f0fe8477a06": 1
+        },
+        "projects.listProjects": {
+          "0dead3c976e0": 1
+        },
+        "task-runs.syncThreadList": {
+          "unknown": 4
+        },
+        "coordinator.pollBotChatSummaries": {
+          "unknown": 1,
+          "c6b2c2d19748": 1,
+          "88fee9a39995": 1
+        }
+      }
+    },
+    {
+      "httpAlias": 3,
+      "rootAction": "desktop.readBatch",
+      "firstQueryOrdinal": 26403,
+      "lastQueryOrdinal": 26469,
+      "sqlQueries": 33,
+      "actionStructureCounts": {
+        "bots.pollBots": {
+          "0b9bc73fbbd2": 1,
+          "4c80688f4aac": 1
+        },
+        "coordinator.syncCoordinatorChat": {
+          "6f38736a0170": 1,
+          "66cde7eead86": 1,
+          "a130e5d92ffc": 1,
+          "23d0664babd6": 1,
+          "b27c6e931d1b": 1,
+          "82919a1d33a6": 2,
+          "unknown": 9,
+          "cfc5423a080d": 1,
+          "a6d8d51b1b0b": 1,
+          "1365a978dee8": 1,
+          "9f5aec55f127": 1,
+          "e20f5fbb8309": 1,
+          "0f220c251daf": 1,
+          "a125321ddabb": 1,
+          "9f0fe8477a06": 1
+        },
+        "issues.syncIssueList": {
+          "unknown": 5,
+          "9f0fe8477a06": 1,
+          "3a287aa80050": 1
+        }
+      }
+    },
+    {
+      "httpAlias": 4,
+      "rootAction": "execution-settings.getBotModelMenu",
+      "firstQueryOrdinal": 26410,
+      "lastQueryOrdinal": 26468,
+      "sqlQueries": 33,
+      "actionStructureCounts": {
+        "execution-settings.getBotModelMenu": {
+          "0b9bc73fbbd2": 1,
+          "66cde7eead86": 1,
+          "a130e5d92ffc": 1,
+          "unknown": 12,
+          "82919a1d33a6": 2,
+          "cfc5423a080d": 1,
+          "8faa2a73d8b1": 1,
+          "a6d8d51b1b0b": 2,
+          "1365a978dee8": 2,
+          "9f5aec55f127": 2,
+          "e20f5fbb8309": 2,
+          "0f220c251daf": 2,
+          "a125321ddabb": 2,
+          "23d0664babd6": 1,
+          "b27c6e931d1b": 1
+        }
+      }
+    },
+    {
+      "httpAlias": 5,
+      "rootAction": "desktop.readBatch",
+      "firstQueryOrdinal": 26502,
+      "lastQueryOrdinal": 26505,
+      "sqlQueries": 4,
+      "actionStructureCounts": {
+        "team-relations.listProjectTeams": {
+          "fcb49b74a39e": 1
+        },
+        "bots.pollBots": {
+          "0b9bc73fbbd2": 1,
+          "4c80688f4aac": 1
+        },
+        "teams.listTeams": {
+          "ca5780bf570b": 1
+        }
+      }
+    },
+    {
+      "httpAlias": 6,
+      "rootAction": "desktop.readBatch",
+      "firstQueryOrdinal": 26506,
+      "lastQueryOrdinal": 26540,
+      "sqlQueries": 35,
+      "actionStructureCounts": {
+        "issues.syncIssueList": {
+          "0b9bc73fbbd2": 1,
+          "3a287aa80050": 1,
+          "unknown": 3
+        },
+        "task-runs.pollTaskRuns": {
+          "unknown": 2,
+          "9f0fe8477a06": 1
+        },
+        "coordinator.syncCoordinatorChat": {
+          "6f38736a0170": 1,
+          "66cde7eead86": 1,
+          "a130e5d92ffc": 1,
+          "23d0664babd6": 1,
+          "b27c6e931d1b": 1,
+          "82919a1d33a6": 2,
+          "unknown": 7,
+          "cfc5423a080d": 1,
+          "a6d8d51b1b0b": 1,
+          "1365a978dee8": 1,
+          "9f5aec55f127": 1,
+          "e20f5fbb8309": 1,
+          "0f220c251daf": 1,
+          "a125321ddabb": 1,
+          "9f0fe8477a06": 1
+        },
+        "task-runs.syncThreadList": {
+          "unknown": 2
+        },
+        "coordinator.pollBotChatSummaries": {
+          "unknown": 1,
+          "c6b2c2d19748": 1,
+          "88fee9a39995": 1
+        }
+      }
+    },
+    {
+      "httpAlias": 7,
+      "rootAction": "workspace.switchWorkspace",
+      "firstQueryOrdinal": 26541,
+      "lastQueryOrdinal": 26543,
+      "sqlQueries": 3,
+      "actionStructureCounts": {
+        "workspace.switchWorkspace": {
+          "e6f07d43b5c2": 1,
+          "339d5b49dae6": 1,
+          "9505cacb7c71": 1
+        }
+      }
+    },
+    {
+      "httpAlias": 8,
+      "rootAction": "desktop.bootstrap",
+      "firstQueryOrdinal": 26544,
+      "lastQueryOrdinal": 26545,
+      "sqlQueries": 2,
+      "actionStructureCounts": {
+        "desktop.bootstrap": {
+          "d47f41b71036": 1,
+          "8f554b451232": 1
+        }
+      }
+    },
+    {
+      "httpAlias": 9,
+      "rootAction": "execution-settings.getBotModelMenu",
+      "firstQueryOrdinal": 26562,
+      "lastQueryOrdinal": 26646,
+      "sqlQueries": 24,
+      "actionStructureCounts": {
+        "execution-settings.getBotModelMenu": {
+          "0b9bc73fbbd2": 1,
+          "66cde7eead86": 1,
+          "a130e5d92ffc": 1,
+          "unknown": 11,
+          "82919a1d33a6": 2,
+          "cfc5423a080d": 1,
+          "8faa2a73d8b1": 1,
+          "a6d8d51b1b0b": 2,
+          "1365a978dee8": 2,
+          "23d0664babd6": 1,
+          "b27c6e931d1b": 1
+        }
+      }
+    },
+    {
+      "httpAlias": 10,
+      "rootAction": "desktop.readBatch",
+      "firstQueryOrdinal": 26566,
+      "lastQueryOrdinal": 26642,
+      "sqlQueries": 34,
+      "actionStructureCounts": {
+        "team-relations.listProjectTeams": {
+          "fcb49b74a39e": 1
+        },
+        "teams.listTeams": {
+          "0b9bc73fbbd2": 1,
+          "ca5780bf570b": 1
+        },
+        "task-runs.pollTaskRuns": {
+          "unknown": 2,
+          "9f0fe8477a06": 1
+        },
+        "projects.listProjects": {
+          "0dead3c976e0": 1
+        },
+        "coordinator.syncCoordinatorChat": {
+          "6f38736a0170": 1,
+          "66cde7eead86": 1,
+          "a130e5d92ffc": 1,
+          "23d0664babd6": 1,
+          "b27c6e931d1b": 1,
+          "82919a1d33a6": 2,
+          "unknown": 9,
+          "cfc5423a080d": 1,
+          "a6d8d51b1b0b": 1,
+          "1365a978dee8": 1,
+          "9f0fe8477a06": 1
+        },
+        "task-runs.syncThreadList": {
+          "unknown": 4
+        },
+        "coordinator.pollBotChatSummaries": {
+          "unknown": 1,
+          "c6b2c2d19748": 1,
+          "88fee9a39995": 1
+        }
+      }
+    },
+    {
+      "httpAlias": 11,
+      "rootAction": "desktop.readBatch",
+      "firstQueryOrdinal": 26643,
+      "lastQueryOrdinal": 26653,
+      "sqlQueries": 10,
+      "actionStructureCounts": {
+        "bots.pollBots": {
+          "0b9bc73fbbd2": 1,
+          "4c80688f4aac": 1
+        },
+        "issues.syncIssueList": {
+          "unknown": 6,
+          "9f0fe8477a06": 1,
+          "3a287aa80050": 1
+        }
+      }
+    },
+    {
+      "httpAlias": 12,
+      "rootAction": "desktop.readBatch",
+      "firstQueryOrdinal": 26681,
+      "lastQueryOrdinal": 26685,
+      "sqlQueries": 4,
+      "actionStructureCounts": {
+        "team-relations.listProjectTeams": {
+          "fcb49b74a39e": 1
+        },
+        "bots.pollBots": {
+          "0b9bc73fbbd2": 1,
+          "4c80688f4aac": 1
+        },
+        "teams.listTeams": {
+          "ca5780bf570b": 1
+        }
+      }
+    },
+    {
+      "httpAlias": 13,
+      "rootAction": "desktop.readBatch",
+      "firstQueryOrdinal": 26687,
+      "lastQueryOrdinal": 26718,
+      "sqlQueries": 32,
+      "actionStructureCounts": {
+        "task-runs.pollTaskRuns": {
+          "unknown": 2,
+          "9f0fe8477a06": 1
+        },
+        "issues.syncIssueList": {
+          "0b9bc73fbbd2": 1,
+          "9f0fe8477a06": 1,
+          "3a287aa80050": 1,
+          "unknown": 3
+        },
+        "coordinator.syncCoordinatorChat": {
+          "6f38736a0170": 1,
+          "66cde7eead86": 1,
+          "a130e5d92ffc": 1,
+          "23d0664babd6": 1,
+          "b27c6e931d1b": 1,
+          "82919a1d33a6": 2,
+          "unknown": 7,
+          "cfc5423a080d": 1,
+          "a6d8d51b1b0b": 1,
+          "1365a978dee8": 1,
+          "9f0fe8477a06": 1
+        },
+        "task-runs.syncThreadList": {
+          "unknown": 2
+        },
+        "coordinator.pollBotChatSummaries": {
+          "unknown": 1,
+          "c6b2c2d19748": 1,
+          "88fee9a39995": 1
+        }
+      }
+    }
+  ],
+  "exclusions": [
+    "The workspace choices query is already shared once within each actual batch; another context memo has no observed query to remove.",
+    "Each menu is a separate non-batch HTTP invocation; never share its authentication, model or workspace snapshot with the chat HTTP request.",
+    "ownBot, executionWorkspace and authorizeSubscriptionWorkspace have different fields and guards. Removing one without preserving its semantics is invalid.",
+    "Legacy-verification repetition also occurs in the equivalent Web menu. A global optimization is not a demonstrated Native-vs-Web budget fix and may affect verification/billing.",
+    "Do not coalesce chat citations or artifacts across request boundaries; current post-flight metadata refresh guards remain required.",
+    "This analysis does not alter or remove /v1 device/background queries; the original 473 count stays intact."
+  ],
+  "minimalProposal": {
+    "status": "proposal_only_not_implemented_or_measured",
+    "policyObservation": {
+      "sameParameterProof": "Inside each botModelReady -> resolveBotModelChoice invocation, usableApiKeys and settings.pooledBindings -> pooledOwners pass the same scope.workspaceId to memberSubscriptionsAllowed. The existing diagnostic has exactly two such reads in each of the four chat invocations.",
+      "scope": "Only the existing active withReadBatchContext; exact effective database authority plus workspace. No independent lifetime, no cross-request cache, no CLI/device or mutation path cache.",
+      "guards": "Keep every consumer policy branch, membership/ownership/share-row query, returned failure and error object. Only reuse the already-observed boolean; false and rejected promises are explicit observations.",
+      "lifetime": "finally active=false and clear; bound after-work, a later request, another database/workspace, or a mutation/transaction not covered by the read-only contract must read fresh.",
+      "potentialLoginReduction": 4,
+      "counterfactualNativeTotal": 469,
+      "wouldStillFailBudget": true
+    },
+    "botObservationOptional": {
+      "sameRowProof": "ownBot resolves the owned bot ID, then coordinatorEnabled -> botModelReady -> executionWorkspace queries that same user ID and returned bot ID. Current diagnostics show one of each per chat, four chats.",
+      "scope": "Only an active readBatch and same effective database, owner and resolved bot ID. Extend the first owned-Bot projection with workspaceId and archivedAt; keep it internal.",
+      "guards": "Do not add archivedAt filtering to ownBot: historical chat can remain readable but disabled. The execution consumer still rejects archived/missing bot with its original botNotFound semantics and always performs the existing workspace FOR SHARE authorization. Ordinary requests, writes and subsequent requests remain fresh.",
+      "caution": "This is a request-local authorization observation proposal requiring explicit review of mid-request transfer/archive semantics, not authority inferred from a list row.",
+      "additionalPotentialLoginReduction": 4,
+      "combinedCounterfactualNativeTotal": 465,
+      "wouldStillFailBudget": true
+    },
+    "requiredFocusedRegression": [
+      "Exercise the real readBatch and affected reader path with counted SQL, including concurrent siblings, same parameter reuse and original return/error values.",
+      "Different owners/workspaces/effective database authorities cannot share; sequential HTTP batches and bound after-work read fresh and see revocation.",
+      "If Bot observation is selected, cover archived historical chat, transferred/missing bot, active/suspended workspace, default-model short circuit and preserved FOR SHARE membership checks.",
+      "No tests or product changes are performed by this analysis; only a subsequent approved implementation could establish actual reduction."
+    ]
+  },
+  "limits": [
+    "Normalized structure equality alone does not prove identical parameters; concrete duplicate claims above also cite the same-call source flow.",
+    "Unknown context/statement rows remain unknown and counted; nothing is inferred as zero.",
+    "No end-to-end budget improvement or production pass is claimed."
+  ],
+  "operations": {
+    "newNetworkRequests": 0,
+    "databaseQueries": 0,
+    "tests": 0,
+    "models": 0,
+    "VMs": 0,
+    "CI": 0,
+    "sourceEdits": 0,
+    "indexEdits": 0,
+    "activeProcesses": 0
+  }
+}

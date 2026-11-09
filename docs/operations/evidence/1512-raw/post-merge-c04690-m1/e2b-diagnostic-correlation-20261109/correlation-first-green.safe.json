@@ -1,0 +1,26 @@
+{
+  "command": [
+    "node",
+    "--test",
+    "--test-reporter=tap",
+    "--test-name-pattern=startup correlation survives",
+    "scripts/e2b/validate-template-subscriptions.test.mjs"
+  ],
+  "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/e2b-diagnostic-correlation-20261109/checkout",
+  "exitCode": 0,
+  "log": {
+    "path": "correlation-first-green.log",
+    "bytes": 521,
+    "sha256": "5bc0a0567af97124e610b6fef927a50fd461e3a6325b17f04c6374096df792d6"
+  },
+  "source": [
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "sha256": "e763259be259e2e96cb3b008802564be96c9d5fa8ce27c84d8234b8e5f7ab564"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "sha256": "545bf4de81ad73c16cbd74f86329b3b917249594fb7849d77a291ac608bc9607"
+    }
+  ]
+}

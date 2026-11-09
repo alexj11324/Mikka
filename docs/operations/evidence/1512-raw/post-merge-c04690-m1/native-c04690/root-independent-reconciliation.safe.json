@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "sourceSha256": "19a1cfbd9225c580a2309f76016e099d4354e5fba3ee9562c59d2782db14dcdc",
+  "sourceRevision": "fd053d254e377f35ff8e2529edb1ad544c23fab1",
+  "checkedOriginalRecords": 24,
+  "everyRecordBuckets": [
+    17,
+    78
+  ],
+  "windows": [
+    {
+      "name": "webLogin",
+      "queryCalls": 402,
+      "segmentCounts": [
+        19,
+        0,
+        383
+      ],
+      "startedAt": "2026-11-09T01:57:37.270Z",
+      "finishedAt": "2026-11-09T01:57:41.076Z",
+      "otherScoped": 0,
+      "noScope": 0
+    },
+    {
+      "name": "nativeLogin",
+      "queryCalls": 473,
+      "segmentCounts": [
+        19,
+        15,
+        439
+      ],
+      "startedAt": "2026-11-09T01:57:42.349Z",
+      "finishedAt": "2026-11-09T01:57:49.575Z",
+      "otherScoped": 0,
+      "noScope": 0
+    },
+    {
+      "name": "startup-bundled",
+      "queryCalls": 176,
+      "segmentCounts": [
+        176
+      ],
+      "startedAt": "2026-11-09T01:58:02.576Z",
+      "finishedAt": "2026-11-09T01:58:04.837Z",
+      "otherScoped": 0,
+      "noScope": 0
+    },
+    {
+      "name": "startup-hosted",
+      "queryCalls": 194,
+      "segmentCounts": [
+        194
+      ],
+      "startedAt": "2026-11-09T01:58:05.223Z",
+      "finishedAt": "2026-11-09T01:58:07.032Z",
+      "otherScoped": 0,
+      "noScope": 0
+    }
+  ],
+  "loginPass": false,
+  "startupPass": true,
+  "windowChanges": false,
+  "subtractions": 0,
+  "newTestExecutions": 0
+}

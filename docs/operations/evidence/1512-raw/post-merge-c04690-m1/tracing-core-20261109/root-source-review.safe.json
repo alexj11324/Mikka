@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "indexSha256": "f14998ff43f87ababa66fda4b7c84610634deba13d9b8e9d06ef39192a045c32",
+  "productFilesChanged": 1,
+  "productBehavior": "The same waitUntil lifetime drains queued spans then waits for exporter in-flight work; log flush remains concurrent and allSettled contains sync/async exporter failure.",
+  "reviewedRegression": [
+    "Real H3 request completes while earlier serialized batch remains pending.",
+    "Official pinned Workflow trace helper and OTLP protobuf serializer are used.",
+    "Identical final regression gives baseline2pass/3fail and candidate5pass/0fail."
+  ],
+  "rootAdditionalTestExecutions": 0,
+  "scopeLimits": [
+    "No network delivery or production readback is proved by this local test.",
+    "The reproduction is compatible with, but not proven to be the sole cause of, production span loss."
+  ],
+  "approvedForIntegration": true
+}

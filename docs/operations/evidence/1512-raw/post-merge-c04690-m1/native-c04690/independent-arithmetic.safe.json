@@ -1,0 +1,188 @@
+{
+  "version": 1,
+  "revision": "fd053d254e377f35ff8e2529edb1ad544c23fab1",
+  "independentReconciliation": "passed",
+  "counts": {
+    "snapshots": 12,
+    "segments": 8,
+    "totals": 4,
+    "bucketConservation": 24
+  },
+  "counter": {
+    "pid": 35496,
+    "startedAt": 1794189111444,
+    "runtime": "nitro"
+  },
+  "sql": {
+    "nativeLogin": {
+      "total": 473,
+      "segments": [
+        19,
+        15,
+        439
+      ],
+      "otherScopedDelta": 0,
+      "noScopeDelta": 0,
+      "startedAt": "2026-11-09T01:57:42.349Z",
+      "finishedAt": "2026-11-09T01:57:49.575Z"
+    },
+    "webLogin": {
+      "total": 402,
+      "segments": [
+        19,
+        0,
+        383
+      ],
+      "otherScopedDelta": 0,
+      "noScopeDelta": 0,
+      "startedAt": "2026-11-09T01:57:37.270Z",
+      "finishedAt": "2026-11-09T01:57:41.076Z"
+    },
+    "startup-bundled": {
+      "total": 176,
+      "segments": [
+        176
+      ],
+      "otherScopedDelta": 0,
+      "noScopeDelta": 0,
+      "startedAt": "2026-11-09T01:58:02.576Z",
+      "finishedAt": "2026-11-09T01:58:04.837Z"
+    },
+    "startup-hosted": {
+      "total": 194,
+      "segments": [
+        194
+      ],
+      "otherScopedDelta": 0,
+      "noScopeDelta": 0,
+      "startedAt": "2026-11-09T01:58:05.223Z",
+      "finishedAt": "2026-11-09T01:58:07.032Z"
+    }
+  },
+  "budget": {
+    "login": false,
+    "startup": true
+  },
+  "rpc": {
+    "physical": {
+      "nativeLogin": {
+        "startedInWindow": 14,
+        "completedInWindow": 14,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "nullActionRows": [],
+        "non200Rows": []
+      },
+      "webLogin": {
+        "startedInWindow": 35,
+        "completedInWindow": 35,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "nullActionRows": [],
+        "non200Rows": []
+      },
+      "startup-bundled": {
+        "startedInWindow": 6,
+        "completedInWindow": 6,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "nullActionRows": [],
+        "non200Rows": []
+      },
+      "startup-hosted": {
+        "startedInWindow": 19,
+        "completedInWindow": 19,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "nullActionRows": [],
+        "non200Rows": []
+      }
+    },
+    "logical": {
+      "nativeLogin": {
+        "startedInWindow": 40,
+        "completedInWindow": 40,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "nullActionRows": [],
+        "non200Rows": []
+      },
+      "webLogin": {
+        "startedInWindow": 35,
+        "completedInWindow": 35,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "nullActionRows": [],
+        "non200Rows": []
+      },
+      "startup-bundled": {
+        "startedInWindow": 18,
+        "completedInWindow": 18,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "nullActionRows": [],
+        "non200Rows": []
+      },
+      "startup-hosted": {
+        "startedInWindow": 19,
+        "completedInWindow": 19,
+        "crossesStart": 0,
+        "crossesEnd": 0,
+        "completionNotObserved": 0,
+        "completionWithoutStart": 0,
+        "nullActionRows": [],
+        "non200Rows": []
+      }
+    }
+  },
+  "coldStart": {
+    "pairs": 5,
+    "mediansMs": {
+      "bundled": 2256.16,
+      "hosted": 1806
+    }
+  },
+  "checks": {
+    "lifecycle": 8,
+    "smoke": 10,
+    "parity": 100
+  },
+  "cleanup": {
+    "lifecycleStages": 6,
+    "smokeStages": 6,
+    "parity": "passed",
+    "accountLeasesReleased": true
+  },
+  "accountBaselinesBeforeRelease": {
+    "lifecycle": {
+      "owner": false,
+      "peer": false
+    },
+    "smoke": {
+      "owner": true,
+      "peer": true
+    }
+  },
+  "sourceFileHashes": {
+    "lifecycle.json": "19a1cfbd9225c580a2309f76016e099d4354e5fba3ee9562c59d2782db14dcdc",
+    "parity/parity.json": "c3e493ee0b9de363c2f7fcec7a18b0f51f58db91fd1c11b174aa463bf2ee72dc",
+    "smoke.json": "07936d4873c30334bc4375227eb072eab1e5b8e364de15a6a31f0962a772d8c8",
+    "mac-acceptance-package.json": "f2813213e20fa25c7bca6ea28d41803350fb98ef1dded7881cd0938f7ccf30d9",
+    "native-crypto.json": "90467538c77f433bf1e95fb4d39f868283655e93e12133a1d50818a1afc1f78b"
+  },
+  "note": "A true SQL budget result is only the unmodified relative criterion for this source/workload; it is not proof of improved performance or completed production acceptance."
+}

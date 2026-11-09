@@ -1,0 +1,33 @@
+{
+  "command": [
+    "node",
+    "--import",
+    "./scripts/server-test.mjs",
+    "--import",
+    "tsx",
+    "--test",
+    "lib/tracing/logs.test.ts"
+  ],
+  "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-tracing-core-copy",
+  "redExitCode": 1,
+  "greenExitCode": 0,
+  "finalTestSha256": "6e1f3200889e5f446a0427b4c62d7db3195d58f8d72853bbd1dc6cb03118200b",
+  "baselineNodeSha256": "adefe4b0af2c59021f37ae77262da07cc11c2369941b7482553f4299739de670",
+  "fixedNodeSha256": "e1ccb4a2aaba54d8e3be4d27d9ff18b31dd9fc683f72117f6dd0ea730099f4d0",
+  "sameFinalTestUsedForRedAndGreen": true,
+  "redCount": {
+    "pass": 2,
+    "fail": 3
+  },
+  "greenCount": {
+    "pass": 5,
+    "fail": 0
+  },
+  "rootMutated": false,
+  "realModelCalls": 0,
+  "networkCalls": 0,
+  "postgresCalls": 0,
+  "listeningSockets": 0,
+  "externalResources": 0,
+  "initialH3FixtureAttempt": "The first H3 fixture inspected before asynchronous onDispose ran; retained separately as setup timing failure, not product RED. Final fixture explicitly awaits disposal notification, never exporter completion before checking HTTP result."
+}

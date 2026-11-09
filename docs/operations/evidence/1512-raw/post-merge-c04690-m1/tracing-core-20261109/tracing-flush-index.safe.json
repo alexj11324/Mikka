@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "kind": "serverless_inflight_trace_export_fix",
+  "sourceRevision": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "copy": "/workspace/scratch/812e3b7d6d45/issue1512-tracing-core-copy",
+  "rootCheckoutMutated": false,
+  "finalChangedFiles": [
+    {
+      "path": "lib/tracing/node.ts",
+      "baselineSha256": "adefe4b0af2c59021f37ae77262da07cc11c2369941b7482553f4299739de670",
+      "finalSha256": "e1ccb4a2aaba54d8e3be4d27d9ff18b31dd9fc683f72117f6dd0ea730099f4d0",
+      "finalBytes": 7287
+    },
+    {
+      "path": "lib/tracing/logs.test.ts",
+      "baselineSha256": "7aa6d8318626ac107f0ae20f314a1878888101be57ada5a2d1deee5f4854b0ae",
+      "finalSha256": "6e1f3200889e5f446a0427b4c62d7db3195d58f8d72853bbd1dc6cb03118200b",
+      "finalBytes": 11318
+    }
+  ],
+  "diagnosis": "FlushOnRootEnd awaited the batcher queue and log hooks. Official SDK batch forceFlush does not join an earlier export already removed by its timer. Actual OTLP exporter forceFlush joins the sending promise queue.",
+  "change": "After draining queued spans, call the existing exporter.forceFlush inside the same waitUntil lifetime; Promise.allSettled remains the failure boundary. No new timer, retry, database work or response-path await.",
+  "proof": {
+    "originalProbe": {
+      "red": {
+        "pass": 0,
+        "fail": 1
+      },
+      "green": {
+        "pass": 1,
+        "fail": 0
+      }
+    },
+    "existingLogsSuiteSameFinalTest": {
+      "red": {
+        "pass": 2,
+        "fail": 3
+      },
+      "green": {
+        "pass": 5,
+        "fail": 0
+      }
+    },
+    "http": "Real H3 handler plus product RequestTrace. Status200 and body are available while the earlier OTLP callback is still deliberately pending. Lifetime settles only after that callback completes.",
+    "serialization": "Actual pinned official OTLP protobuf serializer, product SafeExporter and provider. Transport completion is simulated locally; no actual remote delivery is claimed.",
+    "workflow": "Actual pinned Workflow5.2.3 trace helper. No model provider/CLI call; one injected numeric AI receipt.",
+    "errorCases": "Exporter forceFlush Promise rejection and synchronous throw are contained. HTTP and lifetime both finish normally.",
+    "notRun": [
+      "full root/API/frontend typecheck",
+      "full suite",
+      "production replay",
+      "production PostHog requery"
+    ],
+    "initialFixtureTimingFailurePreserved": true
+  },
+  "productionInference": "M1 PostHog readback shows a compatible missing-span pattern. This deterministic defect is a possible cause, not proof of the sole production cause. Endpoint rejection/circuit-breaker and backend ingestion were not independently ruled out.",
+  "resources": {
+    "models": 0,
+    "networkRequests": 0,
+    "databaseQueries": 0,
+    "listeningSockets": 0,
+    "createdCloudResources": 0,
+    "remainingProcesses": 0
+  },
+  "artifacts": [
+    {
+      "path": "copy-origin.safe.json",
+      "sha256": "fe2fb10d20e8f1569862ab82632eb2cc829ad0d9927fe165f5f2ae65f9dea169",
+      "bytes": 401
+    },
+    {
+      "path": "logs-lifecycle-verification.safe.json",
+      "sha256": "cc839d612a44172e733136bb2b6bc059c6e4260bf727d89cec1f79cf022ec6fb",
+      "bytes": 1096
+    },
+    {
+      "path": "logs-lifecycle.GREEN.log",
+      "sha256": "4e0934063d3407254be004e81f089dde197b7f635b3e427be29609ef8d9a1b26",
+      "bytes": 596
+    },
+    {
+      "path": "logs-lifecycle.H3-initial-fixture-timing.log",
+      "sha256": "c12ac9ee03149fb927f20ee309d2c47764e9296192cf8f933c723022b67568ab",
+      "bytes": 2538
+    },
+    {
+      "path": "logs-lifecycle.RED.log",
+      "sha256": "18285651d17d0b8ab63febf811da4597bb6563346c93a8c295d91b70d43fee5b",
+      "bytes": 2598
+    },
+    {
+      "path": "node.GREEN.ts",
+      "sha256": "e1ccb4a2aaba54d8e3be4d27d9ff18b31dd9fc683f72117f6dd0ea730099f4d0",
+      "bytes": 7287
+    },
+    {
+      "path": "official-export-contract.safe.json",
+      "sha256": "ac0db8e05dd9be22c58232e04f236162a187533d8fd2948fcb483a579b3eccfc",
+      "bytes": 3163
+    },
+    {
+      "path": "serverless-export-lifecycle.GREEN.log",
+      "sha256": "ad564339051f208156e883f9b46e2946c31627394d3b59f816c15ef71ae5581e",
+      "bytes": 809
+    },
+    {
+      "path": "serverless-export-lifecycle.RED.log",
+      "sha256": "370d67cd491c4957ecde413a61ef7b3e5a29082f85d164ef93b17a35f39eb9be",
+      "bytes": 1552
+    },
+    {
+      "path": "serverless-export-lifecycle.RED.probe.test.ts",
+      "sha256": "b5d206b41022809844d2d3587374ce94cb3a5c0466a12b96ce6c86e7a8af3418",
+      "bytes": 6544
+    },
+    {
+      "path": "serverless-flush.patch",
+      "sha256": "380995510903e37bebdfd536a924cf30a9b4a12e04d0071ec672c1f772c4f4e0",
+      "bytes": 10100
+    },
+    {
+      "path": "sources/logs.test.ts",
+      "sha256": "6e1f3200889e5f446a0427b4c62d7db3195d58f8d72853bbd1dc6cb03118200b",
+      "bytes": 11318
+    },
+    {
+      "path": "sources/node.baseline.ts",
+      "sha256": "adefe4b0af2c59021f37ae77262da07cc11c2369941b7482553f4299739de670",
+      "bytes": 7106
+    },
+    {
+      "path": "sources/node.fixed.ts",
+      "sha256": "e1ccb4a2aaba54d8e3be4d27d9ff18b31dd9fc683f72117f6dd0ea730099f4d0",
+      "bytes": 7287
+    },
+    {
+      "path": "sources/serverless-export-lifecycle.GREEN.probe.test.ts",
+      "sha256": "759e01475da0830005214e16c46752471b7fe61cf5080c0fe98e956478271e11",
+      "bytes": 6562
+    }
+  ]
+}

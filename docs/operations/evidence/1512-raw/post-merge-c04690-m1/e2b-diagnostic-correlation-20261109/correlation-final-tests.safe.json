@@ -1,0 +1,34 @@
+{
+  "command": [
+    "node",
+    "--test",
+    "--test-reporter=tap",
+    "scripts/e2b/validate-template-subscriptions.test.mjs",
+    "scripts/acceptance/cloud-startup.test.mjs"
+  ],
+  "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/e2b-diagnostic-correlation-20261109/checkout",
+  "exitCode": 1,
+  "log": {
+    "path": "correlation-final-tests.log",
+    "bytes": 9674,
+    "sha256": "0059d1218a8825e147d7069e65db3a5cfbfc42c8a3dab81979e22f9cdba7ced4"
+  },
+  "source": [
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "sha256": "9cce7fe66cb9a836f0807288c2570d6ec135c505b1c101b09fbd6cd31a8f76b0"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "sha256": "6034046687d6007dde4fdbe0cbd24e538ffa75b058c2fd8b68f8cdd2a291e9a7"
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.mjs",
+      "sha256": "e3ae3c84925100ac0c79a2b0d7dac70933312acd2e235fef5f2fe9d572da65b2"
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.test.mjs",
+      "sha256": "af32f9690c508b6c1a1bddaf718414c0b2eb7af4999138a0c403901d3a59545d"
+    }
+  ]
+}

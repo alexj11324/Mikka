@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "kind": "issue1512_readonly_personal_preflight",
+  "sourceCommit": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "runId": 42547018143,
+  "jobId": 128934097614,
+  "artifactId": 13643259796,
+  "transportRunId": 42547006897,
+  "transportCommit": "e1851355890539b0b6001edccbac1c1bf41771ec",
+  "requestId": "dd62eab8-c6e6-45be-a376-ba74a61123e7",
+  "mode": "preflight",
+  "startedAt": "2026-11-09T01:43:11.032Z",
+  "finishedAt": "2026-11-09T01:43:29.820Z",
+  "status": "blocked",
+  "workspaceSelection": "current_personal",
+  "caseResults": [
+    {
+      "case": "claude",
+      "model": "claude-haiku-5-5",
+      "status": "blocked",
+      "code": "paid_fallback_enabled",
+      "cleanupState": "complete",
+      "machineCount": 0
+    },
+    {
+      "case": "codex",
+      "model": "gpt-6-luna",
+      "status": "blocked",
+      "code": "paid_fallback_enabled",
+      "cleanupState": "complete",
+      "machineCount": 0
+    }
+  ],
+  "preparation": {
+    "requested": false,
+    "profilesDisabled": 0,
+    "profilesRestored": 0,
+    "fallbackChanged": false,
+    "restoration": "not_needed"
+  },
+  "sessionClosed": true,
+  "modelTaskSubmissionEnabled": false,
+  "browserSubmissionEnabled": false,
+  "posthogIngestionVerified": false,
+  "browserReplayVerified": false,
+  "reportOriginal": {
+    "bytes": 1759,
+    "sha256": "f08aa0cf1839badf9ef373a61b9ebc91917cef607309cf526da3217e699726c7",
+    "rawReportIncludedInThisProjection": false,
+    "technicalWorkspaceAndBotIdsOmitted": true
+  },
+  "artifactZip": {
+    "bytes": 824,
+    "sha256": "6d34e5388ade6fd3f64b567d223dbfa41b17664f9f952091d972a79f3cfc3ba3",
+    "apiDigestMatched": true,
+    "zipCrcPassed": true
+  },
+  "jobLog": {
+    "bytes": 37113,
+    "sha256": "375fe31631b4d1a16aff61d4354b2037f9653aa474fd99c35effbed7c8e4f7cc",
+    "included": false
+  },
+  "boundary": [
+    "The closed code requires apiKeyAfterQuota to equal false; this report does not preserve its original raw value, so does not distinguish true from an unexpected/missing field.",
+    "The existing prepare path first validates its boolean type, owner idleness and other selected-case gates before any configuration change, then records and restores acknowledged changes. That path was not run by this preflight.",
+    "Complete cleanup flags are no-op outcomes for resources never created; this does not claim that real model runs or VMs were started and stopped.",
+    "This is M1 configuration evidence only; later execution must pass its own fresh exact-source checks."
+  ]
+}

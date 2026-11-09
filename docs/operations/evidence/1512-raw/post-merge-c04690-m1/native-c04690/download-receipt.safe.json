@@ -1,0 +1,22 @@
+{
+  "method": "Saved each tool-returned file reference once; no repeated GitHub artifact download request",
+  "artifacts": [
+    {
+      "kind": "native",
+      "artifactId": 13644346196,
+      "path": "native-c04690-original.zip",
+      "bytes": 14818553,
+      "sha256": "d76e77393ba601b46a77a88c6fab9ec762bf972772479518ef680d7eaa104915",
+      "matchesApi": true
+    },
+    {
+      "kind": "package",
+      "artifactId": 13643494053,
+      "path": "package-c04690-original.zip",
+      "bytes": 1594,
+      "sha256": "0c746c4b6ca2afd0313d1950919c74f1001e36942192e9f4a97188155891761d",
+      "matchesApi": true
+    }
+  ],
+  "downloadUrlsOmitted": true
+}

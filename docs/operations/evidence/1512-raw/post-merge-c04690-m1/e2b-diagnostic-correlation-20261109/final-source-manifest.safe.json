@@ -1,0 +1,180 @@
+{
+  "sourceMain": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "sourceTree": "8c5c12ea993533403d13e21dc75647bb28022767",
+  "localSnapshotCommit": "df87eb4b8d2952ed3e1aed5ee740ff1231608594",
+  "localSnapshotIsNotProductionCommit": true,
+  "baseline": [
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "bytes": 31628,
+      "sha256": "2dc30e00bdcf7e226ae7de623efaaf55f417fa2c145c91629d373a19cba9396b",
+      "gitBlobSha1": "7ee7564fe213ce3fba762fee8685eb9a4bb31329"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "bytes": 57524,
+      "sha256": "6320ecac60bd57f07717e2cdd08bfe567471298bbb0fd67275516902b7700d9f",
+      "gitBlobSha1": "a70f45e7395309a1cf93ae295e880e06ad521ef2"
+    }
+  ],
+  "final": [
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "bytes": 34092,
+      "sha256": "9cce7fe66cb9a836f0807288c2570d6ec135c505b1c101b09fbd6cd31a8f76b0",
+      "gitBlobSha1": "f36ecf2d08f1bc2754b21be0d47d149871bb67c5"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "bytes": 65889,
+      "sha256": "6034046687d6007dde4fdbe0cbd24e538ffa75b058c2fd8b68f8cdd2a291e9a7",
+      "gitBlobSha1": "628395f91d97a64655afb80117788d70207200c0"
+    }
+  ],
+  "unchangedSourceReferences": [
+    {
+      "path": "lib/action-result.ts",
+      "bytes": 4887,
+      "sha256": "e3cdaedc994e26d5fe427cce52aa8d480e8cf38e9953985fb52fba01ecc7045d",
+      "gitBlobSha1": "85d49d3a20da1ff4609a25b58dc212f4b11e35f9",
+      "unchangedFromSourceTree": true
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.mjs",
+      "bytes": 83254,
+      "sha256": "e3ae3c84925100ac0c79a2b0d7dac70933312acd2e235fef5f2fe9d572da65b2",
+      "gitBlobSha1": "1bca723b8110625b48127a1d28ade9ecf0e153de",
+      "unchangedFromSourceTree": true
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.test.mjs",
+      "bytes": 105234,
+      "sha256": "af32f9690c508b6c1a1bddaf718414c0b2eb7af4999138a0c403901d3a59545d",
+      "gitBlobSha1": "6b57f0699db92b2c55b5add63efc23db1f403b0c",
+      "unchangedFromSourceTree": true
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup-evidence.mjs",
+      "bytes": 22658,
+      "sha256": "16010e124b5554fab29dd1b2e3fc372197c91cdd4987e0f438f43ec11460e7b9",
+      "gitBlobSha1": "b5a85b795d3026c350ced9823eaac9488a3e0cda",
+      "unchangedFromSourceTree": true
+    },
+    {
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "bytes": 18463,
+      "sha256": "9c13b3e21a58abac5240495beaa08a0fc26e1fffabeb1506d94f030689833ab3",
+      "gitBlobSha1": "be1f902f97e50628fbe26fa55b9dab0160f749be",
+      "unchangedFromSourceTree": true
+    },
+    {
+      "path": "lib/github/user-access.ts",
+      "bytes": 13263,
+      "sha256": "c6d03990df70332a4295a6a66f19914b13f12777f902f6b552dbfbc1054da2da",
+      "gitBlobSha1": "4ed8d9e13ec62d9cc15017a24245160bc5e5fbd8",
+      "unchangedFromSourceTree": true
+    },
+    {
+      "path": "lib/github/connection.ts",
+      "bytes": 10550,
+      "sha256": "c484fb8b5fed4a7a45e659ca67aa13b0493a406e2f921322e025874a165d804b",
+      "gitBlobSha1": "0f52b15c03af1199490e6852401fe2d49db06f30",
+      "unchangedFromSourceTree": true
+    },
+    {
+      "path": "lib/github/connect-callback.ts",
+      "bytes": 2995,
+      "sha256": "c7ba1fd3db7b19ffd7c8d5131796600f397d00c0d95a8131da9f095503cc2082",
+      "gitBlobSha1": "2241dce3ce8e83f9e5f1f32b62187289a5d380d0",
+      "unchangedFromSourceTree": true
+    },
+    {
+      "path": "lib/github/cloud.ts",
+      "bytes": 11039,
+      "sha256": "0857620605c95371ecbf1e47d2ac5bf4df0b56792c57058ad4ab44f3fd8a9562",
+      "gitBlobSha1": "50f9013a71b7e1a56419ac409a07e2ca6522092c",
+      "unchangedFromSourceTree": true
+    },
+    {
+      "path": "app/api/integrations/github/connect/route.ts",
+      "bytes": 2985,
+      "sha256": "6bb45e47f884b8b0b685a6428f6b5e1cfa2d8090d072da3a262ad1d3ffd5140b",
+      "gitBlobSha1": "8157d679a8159e4abefcc761cbf9ba5072ed9d5f",
+      "unchangedFromSourceTree": true
+    },
+    {
+      "path": "app/api/integrations/github/route.ts",
+      "bytes": 3037,
+      "sha256": "78a314ec72094637728d50de942797e7277ca5856a2754352b9af7d552665c2f",
+      "gitBlobSha1": "669b6f7913c03c93b8148f6d79bd86da7aa2e127",
+      "unchangedFromSourceTree": true
+    },
+    {
+      "path": "app/api/integrations/github/repositories/verification/route.ts",
+      "bytes": 3161,
+      "sha256": "bf17c03c602bb0f5e4a8084e4f2b39def81f3d2212de22d8b5c79b577b380205",
+      "gitBlobSha1": "85e87be4ed74bf591c4fa6af448842bd877af6c3",
+      "unchangedFromSourceTree": true
+    },
+    {
+      "path": "app/actions/coordinator.ts",
+      "bytes": 23196,
+      "sha256": "b70ceec98efa1edfc1074598b2a6cf12b58d4f2539bb351854a562fa43f9d451",
+      "gitBlobSha1": "3cde11bdaab0164d179d51f37efdf1d77ec7e938",
+      "unchangedFromSourceTree": true
+    },
+    {
+      "path": "lib/coordinator/stream.ts",
+      "bytes": 2517,
+      "sha256": "ff59bb88af9dbb77b53d512e03ebfeafb75444684bb8d5ac7a3b7c657d5045a8",
+      "gitBlobSha1": "8c9d131034ffe8499095298405fd131e48b54f5f",
+      "unchangedFromSourceTree": true
+    },
+    {
+      "path": "lib/coordinator/stream-response.ts",
+      "bytes": 15780,
+      "sha256": "43a4a4d93fe199163313973e6c70b93bed7c4944facebdf2a8f5648b7bcf8d88",
+      "gitBlobSha1": "e5c04efe2cd50ed782e229070345a1cf08c1e977",
+      "unchangedFromSourceTree": true
+    },
+    {
+      "path": "app/api/coordinator/stream/route.ts",
+      "bytes": 6031,
+      "sha256": "1843db486151b4f496242bd19e32b1aafb2e5ec8f6e36179689cfb51bf605f31",
+      "gitBlobSha1": "b99e9cacf1d23e9651a278855ceb31816e555428",
+      "unchangedFromSourceTree": true
+    },
+    {
+      "path": "docs/design/decisions/2026-11-01-0303-github-plugin-connection-separate-from-login.md",
+      "bytes": 1206,
+      "sha256": "6b8181d9170fe5b89f0eade178ecbd3badf65e70972b08150db94eba50428fc8",
+      "gitBlobSha1": "b51f8d8edc5ad3f44dbd40a358c40a4e5693c9dc",
+      "unchangedFromSourceTree": true
+    },
+    {
+      "path": "docs/design/decisions/2026-11-02-1600-agents-use-own-github-credential.md",
+      "bytes": 3736,
+      "sha256": "a84eb84f8644e8d64b893647f40d06424ad2cfc67ad27729b1d76c7245a7cc64",
+      "gitBlobSha1": "4750ab871e3a7a13355b1650d47a3649e2595388",
+      "unchangedFromSourceTree": true
+    }
+  ],
+  "patch": {
+    "path": "startup-correlation.patch",
+    "bytes": 14713,
+    "sha256": "c41b97546167e060acbf5e1d2f05b3d981fbcf9392f92a2832eda583c41c5bc0",
+    "gitBlobSha1": "3f5f5ae928a864ef9ddc570c15c0fd0a7916d161"
+  },
+  "trackedChangedFiles": [
+    "scripts/e2b/validate-template-subscriptions.mjs",
+    "scripts/e2b/validate-template-subscriptions.test.mjs"
+  ],
+  "untrackedDependencySymlink": {
+    "path": "checkout/node_modules",
+    "notInPatch": true,
+    "readOnlyReuse": true
+  },
+  "sharedIndexTouched": false,
+  "localCommitCreated": false,
+  "published": false
+}

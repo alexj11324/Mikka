@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512_exact_source_release_contract",
+  "sourceCommit": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "tree": "8c5c12ea993533403d13e21dc75647bb28022767",
+  "sourceFiles": [
+    {
+      "file": "sources/daemon-release.mjs",
+      "bytes": 2936,
+      "sha256": "87b7acb4ebe9619139d5ae11c917071da914bce997f4cda426c47be9eb1e2bd8"
+    },
+    {
+      "file": "sources/e2b-official-runtime.yml",
+      "bytes": 18463,
+      "sha256": "9c13b3e21a58abac5240495beaa08a0fc26e1fffabeb1506d94f030689833ab3"
+    },
+    {
+      "file": "sources/e2b-template.yml",
+      "bytes": 5492,
+      "sha256": "b7ddc06e28f0bc09ec0a01d2c7f01793bc6ccff66f63f204ac064596e0c2d676"
+    },
+    {
+      "file": "sources/publish-daemon.yml",
+      "bytes": 4881,
+      "sha256": "447c3e4c8cdb3fb55d9061b2571652a5a08bfb8748c06dde599a7bd160f3ef95"
+    },
+    {
+      "file": "sources/web-deploy.mjs",
+      "bytes": 19867,
+      "sha256": "e8012d49653ab635ea26d3ba881450860f8c3ead2893d799a98bc395eb65bf9a"
+    },
+    {
+      "file": "sources/web-deploy.yml",
+      "bytes": 11619,
+      "sha256": "2916c80cc6a764fe2167ad5dad17be68b309161119bffbcb9001ee26b015e9a1"
+    }
+  ],
+  "web": {
+    "runId": 42544540018,
+    "required": [
+      "main source fence",
+      "cloud-edition and private UI pin",
+      "production build and migrations",
+      "public source-map audit",
+      "production upload",
+      "public API version equals exact M",
+      "private UI production verification"
+    ],
+    "versionURL": "https://app.aspectlylabs.com/mikka/api/version",
+    "workflowArtifactUpload": false,
+    "initialWebIsE2bPrerequisiteOnly": true
+  },
+  "daemon": {
+    "runId": 42544539939,
+    "expectedVersionFromRunNumber": "0.0.552",
+    "required": [
+      "test/type/build",
+      "pinned runtime graph + shrinkwrap + CycloneDX SBOM + audit policy",
+      "sealed candidate",
+      "package acceptance",
+      "exact-main CI gate",
+      "unchanged sealed candidate",
+      "release evidence artifact",
+      "npm provenance publish or verified already-published exact gitHead"
+    ],
+    "artifactName": "daemon-release-evidence-01a6bfb3a6c537e2b466911f57429f109b418aa8",
+    "artifactFiles": [
+      "mikka-release-manifest.json",
+      "sbom.cdx.json",
+      "npm-shrinkwrap.json"
+    ],
+    "artifactAloneProvesPublication": false
+  },
+  "e2b": {
+    "runId": 42544540108,
+    "requiredIfChanged": [
+      "offline tests",
+      "current-main + worker comparison",
+      "private candidates + official original-file conservation",
+      "candidate build cleanup",
+      "matching actual Web build and served exact M",
+      "immutable candidate identity/digest",
+      "SMOKE team workspace official Claude and Codex subscription acceptance",
+      "accepted candidate identity preserved",
+      "public release report",
+      "runtime-refresh inside Web deploy queue",
+      "final Web build/upload/public version",
+      "release cleanup receipt"
+    ],
+    "expectedArtifacts": [
+      "e2b-candidates-42544540108-1",
+      "e2b-candidate-build-cleanup-42544540108-1",
+      "e2b-template-subscription-diagnostics-42544540108-1",
+      "e2b-release-evidence-42544540108-1",
+      "e2b-runtime-release-cleanup-42544540108-1"
+    ],
+    "skippedIsNotExecutionEvidence": true,
+    "artifactUploadSuccessIsNotReceiptSuccess": true
+  },
+  "status": "contract_only_runtime_gates_must_be_observed",
+  "noProductionAcceptanceClaimFromPrSkippedJobs": true
+}

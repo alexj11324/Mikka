@@ -1,0 +1,146 @@
+{
+  "version": 1,
+  "createdAt": "2026-11-09T01:53:42.626979+00:00",
+  "repository": "alexj11324/Mikka",
+  "runId": 42545814990,
+  "actualCheckout": "fd053d254e377f35ff8e2529edb1ad544c23fab1",
+  "actualTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+  "candidateCount": 7,
+  "resolvedCount": 7,
+  "confirmedUnmaskedRealCredentialsOrPersonalData": 0,
+  "unresolvedCandidates": [],
+  "withheldLogs": [],
+  "valuesDisclosed": false,
+  "sourceBindings": [
+    {
+      "path": "lib/abuse/store.db.test.ts",
+      "bytes": 22283,
+      "sha256": "0076394e5cf1118e8c2c8c18969567f9da8c5cacb017f500d5ae43992e16ec9d",
+      "gitBlobSha1": "04792f1c02a965cabff134f30f938d14c97d62aa",
+      "sourceRead": "git show exactTree:path",
+      "actualTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+      "sameBlobAsPriorTree": "8c5c12ea993533403d13e21dc75647bb28022767"
+    },
+    {
+      "path": "drizzle/20261030230000_hosted_usage.sql",
+      "bytes": 3583,
+      "sha256": "aaee2b4ce0f8e540262b002ffe404afb4ca9b96fe574b4f0f4c1bd016fb925a0",
+      "gitBlobSha1": "41c55d332822f397f51a75eb95bdeafc2abc685a",
+      "sourceRead": "git show exactTree:path",
+      "actualTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+      "sameBlobAsPriorTree": "8c5c12ea993533403d13e21dc75647bb28022767"
+    },
+    {
+      "path": "tests/desktop-rpc-auth.db.test.ts",
+      "bytes": 12131,
+      "sha256": "33645e4d5dc100de93b537bab709fa918041547b383567dc7ea2be524cdc549f",
+      "gitBlobSha1": "d218c4752c7b88b196e39830cb1497e2c6fe6dcc",
+      "sourceRead": "git show exactTree:path",
+      "actualTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+      "sameBlobAsPriorTree": "8c5c12ea993533403d13e21dc75647bb28022767"
+    },
+    {
+      "path": "tests/personal-access-token-api.db.test.ts",
+      "bytes": 18507,
+      "sha256": "45b220d46f48230818452e29f9c0ad75b07cdba0fad3f21631c377e6b34ecbe7",
+      "gitBlobSha1": "410c45e29a909fd8de463d72b0548f7fa0d7348c",
+      "sourceRead": "git show exactTree:path",
+      "actualTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+      "sameBlobAsPriorTree": "8c5c12ea993533403d13e21dc75647bb28022767"
+    }
+  ],
+  "resolutions": [
+    {
+      "path": "private/128930709969-pg1.original.log",
+      "line": 6336,
+      "category": "email-shaped database diagnostic",
+      "classification": "normalized synthetic test fixture",
+      "fixtureSource": "lib/abuse/store.db.test.ts",
+      "fixtureSourceLines": [
+        386,
+        390
+      ],
+      "normalizationSource": "drizzle/20261030230000_hosted_usage.sql",
+      "normalizationSourceLines": [
+        38,
+        39,
+        40,
+        41
+      ],
+      "bothFixtureValuesNormalizeExactlyToObservedDiagnostic": true,
+      "valuesDisclosed": false
+    },
+    {
+      "path": "private/128930709981-pg3.original.log",
+      "line": 2309,
+      "category": "bearer_material",
+      "classification": "ordinary words in a test title, not credential material",
+      "source": "tests/desktop-rpc-auth.db.test.ts",
+      "sourceLine": 71,
+      "entireLiteralTestTitleAppearsInLog": true,
+      "testReporterMarkerObserved": true,
+      "valuesDisclosed": false
+    },
+    {
+      "path": "private/128930709981-pg3.original.log",
+      "line": 2634,
+      "category": "bearer_material",
+      "classification": "ordinary words in a test title, not credential material",
+      "source": "tests/desktop-rpc-auth.db.test.ts",
+      "sourceLine": 71,
+      "entireLiteralTestTitleAppearsInLog": true,
+      "testReporterMarkerObserved": true,
+      "valuesDisclosed": false
+    },
+    {
+      "path": "private/128930709986-pg4.original.log",
+      "line": 2093,
+      "category": "bearer_material",
+      "classification": "ordinary words in a test title, not credential material",
+      "source": "tests/personal-access-token-api.db.test.ts",
+      "sourceLine": 11,
+      "entireLiteralTestTitleAppearsInLog": true,
+      "testReporterMarkerObserved": true,
+      "valuesDisclosed": false
+    },
+    {
+      "path": "private/128930709986-pg4.original.log",
+      "line": 2153,
+      "category": "bearer_material",
+      "classification": "ordinary words in a test title, not credential material",
+      "source": "tests/personal-access-token-api.db.test.ts",
+      "sourceLine": 11,
+      "entireLiteralTestTitleAppearsInLog": true,
+      "testReporterMarkerObserved": true,
+      "valuesDisclosed": false
+    },
+    {
+      "path": "private/128930709986-pg4.original.log",
+      "line": 2239,
+      "category": "bearer_material",
+      "classification": "ordinary words in a test title, not credential material",
+      "source": "tests/personal-access-token-api.db.test.ts",
+      "sourceLine": 11,
+      "entireLiteralTestTitleAppearsInLog": true,
+      "testReporterMarkerObserved": true,
+      "valuesDisclosed": false
+    },
+    {
+      "path": "private/128930709986-pg4.original.log",
+      "line": 2299,
+      "category": "bearer_material",
+      "classification": "ordinary words in a test title, not credential material",
+      "source": "tests/personal-access-token-api.db.test.ts",
+      "sourceLine": 11,
+      "entireLiteralTestTitleAppearsInLog": true,
+      "testReporterMarkerObserved": true,
+      "valuesDisclosed": false
+    }
+  ],
+  "operations": {
+    "network": 0,
+    "tests": 0,
+    "sourceOrIndexEdits": 0,
+    "resourcesCreated": 0
+  }
+}

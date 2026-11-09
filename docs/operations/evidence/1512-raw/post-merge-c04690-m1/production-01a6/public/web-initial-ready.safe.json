@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512_initial_web_ready_and_served_exact_source",
+  "sourceCommit": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "tree": "8c5c12ea993533403d13e21dc75647bb28022767",
+  "purpose": "Initial production Web prerequisite for same-source E2B subscription gate; not the subsequent runtime-refresh deployment.",
+  "workflow": {
+    "id": 42544540018,
+    "run_number": 259,
+    "run_attempt": 1,
+    "event": "push",
+    "head_branch": "main",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-11-09T01:14:54Z",
+    "updated_at": "2026-11-09T01:39:06Z",
+    "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42544540018"
+  },
+  "job": {
+    "id": 128926575772,
+    "name": "deploy",
+    "head_sha": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+    "status": "completed",
+    "conclusion": "success",
+    "started_at": "2026-11-09T01:14:57Z",
+    "completed_at": "2026-11-09T01:39:06Z",
+    "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42544540018/job/128926575772"
+  },
+  "requiredSteps": [
+    {
+      "name": "Build (runs migrations last, as the Vercel build did)",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 24,
+      "started_at": "2026-11-09T01:17:09Z",
+      "completed_at": "2026-11-09T01:23:17Z"
+    },
+    {
+      "name": "Audit the public output for source and source maps",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 26,
+      "started_at": "2026-11-09T01:23:18Z",
+      "completed_at": "2026-11-09T01:23:19Z"
+    },
+    {
+      "name": "Upload the prebuilt output to production",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 27,
+      "started_at": "2026-11-09T01:23:19Z",
+      "completed_at": "2026-11-09T01:39:02Z"
+    },
+    {
+      "name": "Verify the public production version before releasing the deployment queue",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 28,
+      "started_at": "2026-11-09T01:39:02Z",
+      "completed_at": "2026-11-09T01:39:03Z"
+    }
+  ],
+  "vercel": {
+    "observedUTC": "2026-11-09 01:39:15 UTC",
+    "id": "dpl_6fUKkBkmzc5sLyB98BHHpXgyMrXM",
+    "url": "mikka-5q1zxnyeb-mikka-dev.vercel.app",
+    "state": "READY",
+    "readyState": "READY",
+    "target": "production",
+    "githubCommitSha": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+    "createdAt": 1794187879830,
+    "buildingAt": 1794187880798,
+    "readyAtUnixMs": 1794188317079,
+    "readyAtUTC": "2026-11-09T01:38:37.079000+00:00"
+  },
+  "alias": {
+    "observedUTC": "2026-11-09 01:39:36 UTC",
+    "host": "app.aspectlylabs.com",
+    "deploymentId": "dpl_6fUKkBkmzc5sLyB98BHHpXgyMrXM",
+    "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH"
+  },
+  "publicHTTP": {
+    "request": {
+      "method": "GET",
+      "url": "https://app.aspectlylabs.com/mikka/api/version",
+      "headers": {
+        "Cache-Control": "no-cache",
+        "Accept": "application/json"
+      }
+    },
+    "startedAtUTC": "2026-11-09T01:39:36.636847+00:00",
+    "completedAtUTC": "2026-11-09T01:39:41.466679+00:00",
+    "status": 200,
+    "build": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+    "overlaySha": "c34b3adf07240afebae725b2af599cfbc69c4f42"
+  },
+  "rawIntegrity": [
+    {
+      "file": "web-final-run.original.json",
+      "bytes": 26468,
+      "sha256": "468148097cea3e085e07f272ded20eeba6e73abf9a84a3e7e6cd18f08714cefc",
+      "rawIncludedPublicly": false
+    },
+    {
+      "file": "web-final-jobs.original.json",
+      "bytes": 16842,
+      "sha256": "e353b790826ac79298976831dca6a833ea88a5de82df438ea514c382ef9f15ac",
+      "rawIncludedPublicly": false
+    },
+    {
+      "file": "vercel-M1-ready-deployment.original.json",
+      "bytes": 1740,
+      "sha256": "80b21ac6597e3ed7e50a8c9c7f7098b4b8f7e2445ddcf4ad2a4c95998df192ae",
+      "rawIncludedPublicly": false
+    },
+    {
+      "file": "vercel-M1-ready-alias.original.json",
+      "bytes": 1521,
+      "sha256": "335eee61faf5a0e59d356132ece271f0c46018b2ae96332671064fbc08a84590",
+      "rawIncludedPublicly": false
+    },
+    {
+      "file": "public-version-M1-ready.original.json",
+      "bytes": 1348,
+      "sha256": "7bd154a91397d118245486fbe546cb159bb74a2f20c286e02d4f66a926144c0e",
+      "rawIncludedPublicly": false
+    },
+    {
+      "file": "job-128926575772.original.log",
+      "bytes": 444062,
+      "sha256": "ab74133bd316380f8a2ebae4666ae2a946832e6df00f3d2b840709e16e747197",
+      "rawIncludedPublicly": false
+    },
+    {
+      "file": "job-128929363411.original.log",
+      "bytes": 12971,
+      "sha256": "2d58233ff1e76e39a04e4f5e7a6123d4fdc6be8f429a42bdd5659c3b77d70293",
+      "rawIncludedPublicly": false
+    }
+  ],
+  "readAccessBoundary": "Primary Vercel connection returned scoped403; an already-authorized existing612 connection completed these same scoped metadata GETs. No authorization/session/share/configuration was created or changed.",
+  "finalE2bRuntimeRefreshProvenByThisFile": false,
+  "observerModelRuns": 0,
+  "observerResourcesCreated": 0,
+  "terminalJobLogsDownloadedOnceEach": true
+}

@@ -1,0 +1,121 @@
+{
+  "sourceMain": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "sourceTree": "8c5c12ea993533403d13e21dc75647bb28022767",
+  "originalRun": {
+    "id": 42544540108,
+    "subscriptionsJobId": 128933112530,
+    "diagnosticsArtifactId": 13644191554,
+    "windowUtc": [
+      "2026-11-09T01:45:10Z",
+      "2026-11-09T01:50:35Z"
+    ],
+    "diagnostics": {
+      "relativeToEvidenceWork": "production-01a6/private/artifacts/artifact-13644191554/subscription-diagnostics.json",
+      "bytes": 2061,
+      "sha256": "5b9ea653896fc1fe0f76e048114f215699e0049fd6f97feef6994c5f3a3d174a"
+    },
+    "originalJobLog": {
+      "relativeToEvidenceWork": "production-01a6/private/job-128933112530.original.log",
+      "bytes": 37026,
+      "sha256": "e6c7442f85eb14e02181091cadc1263c754b8da14ce68635be96e52d82cfd3b5",
+      "notCopiedIntoThisPayload": true
+    }
+  },
+  "observedOriginalDiagnostics": {
+    "candidates": [
+      {
+        "harness": "claude_code",
+        "failure": {
+          "phase": "coordinator_stream",
+          "code": "startup_dispatch_refused"
+        }
+      },
+      {
+        "harness": "codex",
+        "failure": {
+          "phase": "coordinator_stream",
+          "code": "startup_timeout"
+        }
+      }
+    ],
+    "bothTopLevelCodes": "template_gate_bootstrap_proof_invalid",
+    "bothRunIdHash": null,
+    "bothAgentStart": false,
+    "bothProviderChunk": false,
+    "bothCliInit": null,
+    "bothExpectedAgentAck": false,
+    "bothRuntimeEvidence": "unavailable",
+    "cleanupErrors": []
+  },
+  "sourceCausality": [
+    "The driver records requestTraceId, its submission-only scope, workflowRunId and dispatchRefusal in memory before a run exists.",
+    "The validator continues to bootstrap-proof receipt verification after the driver returns a failed pre-run sample; missing proof is downstream of no dispatch and does not establish a CLI bootstrap regression.",
+    "The prior failure projection drops the existing correlation fields; the two-file patch preserves only bounded, source/harness-bound metadata.",
+    "dispatch_timing failed=false also covers a normal return carrying a business error; the final recorded phase does not identify the exact later return site.",
+    "The stream has start/committed events for turns and can replay prior turns; the startup driver ignores those events and waits for matching dispatch_run. This patch does not change completion or timeout behavior."
+  ],
+  "parentForensicFindings": {
+    "provenance": "Root collaboration messages; this child made no new database, PostHog, Vercel or authentication request.",
+    "claude": {
+      "persistedTool": "dispatch_run",
+      "persistedAtUtc": "2026-11-09T01:46:01.048Z",
+      "outputType": "json",
+      "failed": true,
+      "code": "githubNotConnected",
+      "sameCallHashBound": true
+    },
+    "codex": {
+      "persistedTool": "get_factory_task",
+      "persistedAtUtc": "2026-11-09T01:46:45.452Z",
+      "failed": true,
+      "exactCode": "unresolved_at_freeze",
+      "observedDispatch": false,
+      "modelTurnFinishedAccordingToParent": true,
+      "providerHangProved": false
+    },
+    "rawChatOrToolContentExported": false
+  },
+  "normalGitHubResolution": {
+    "identity": "Remain the designated SMOKE Mikka user in the existing acceptance workspace; shared model access does not supply another member's GitHub connection.",
+    "userFlow": "Plugins > GitHub > Link GitHub",
+    "connectRoute": "GET /mikka/api/integrations/github/connect",
+    "binding": "OAuth state and connect cookie bind to the signed-in Mikka user; callback checks the same user before storing a sealed github_connections row.",
+    "sameGitHubAccountForMultipleMikkaUsersAllowedByADR": true,
+    "readOnlyReadinessRoute": "GET /mikka/api/integrations/github",
+    "minimumProjection": [
+      "configured",
+      "connected",
+      "installed",
+      "exactExpectedRepositoryPresent"
+    ],
+    "exactRepositoryReadOnlyRoute": "GET /mikka/api/integrations/github/repositories/verification?repository=alexj11324%2FMikka-handoff",
+    "exactRepositoryReadOnlyProjection": [
+      "HTTP status",
+      "closed error code if any",
+      "expected repository match boolean"
+    ],
+    "doNotExport": [
+      "tokens",
+      "cookies",
+      "login",
+      "viewerId",
+      "full repository listing",
+      "verification command"
+    ],
+    "noTokenCopyOrIdentitySwitchPerformed": true,
+    "authSetupPerformed": false
+  },
+  "readOnlyCoordinatorRoute": {
+    "method": "POST",
+    "path": "/mikka/api/rpc",
+    "action": "coordinator.getCoordinatorChat",
+    "args": "Explicit already-owned botId; do not use the default bot selection path.",
+    "authorization": "Existing session and ownBot owner checks remain required. Read content only in memory and project needed metadata; no model or dispatch.",
+    "performed": false
+  },
+  "limitations": [
+    "This fixes diagnostic loss only; it does not resolve the confirmed missing GitHub connection or prove a Codex dispatch cause.",
+    "No model, real candidate, VM, CI rerun, release or production acceptance was performed.",
+    "The original real release failure and the separate current Native SQL RED remain unchanged."
+  ]
+}

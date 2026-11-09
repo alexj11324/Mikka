@@ -1,0 +1,604 @@
+TAP version 13
+# Subtest: v3 requires an exact observed claim catalogue before accepting zero physical startup sends
+ok 1 - v3 requires an exact observed claim catalogue before accepting zero physical startup sends
+  ---
+  duration_ms: 5.410429
+  type: 'test'
+  ...
+# Subtest: sampler IDs satisfy the installed 10% sampler, while invalid live configuration fails closed
+ok 2 - sampler IDs satisfy the installed 10% sampler, while invalid live configuration fails closed
+  ---
+  duration_ms: 3.811117
+  type: 'test'
+  ...
+# Subtest: startup failure projection is closed, preserves only bounded HTTP status, and unwraps native abort classes
+ok 3 - startup failure projection is closed, preserves only bounded HTTP status, and unwraps native abort classes
+  ---
+  duration_ms: 1.411248
+  type: 'test'
+  ...
+# Subtest: a native stream reader abort or timeout before run binding retains its actual phase and still cleans the owned issue
+ok 4 - a native stream reader abort or timeout before run binding retains its actual phase and still cleans the owned issue
+  ---
+  duration_ms: 52.578809
+  type: 'test'
+  ...
+# Subtest: a fetch timeout wrapped by the session client preserves the coordinator-submit phase without retrying dispatch
+ok 5 - a fetch timeout wrapped by the session client preserves the coordinator-submit phase without retrying dispatch
+  ---
+  duration_ms: 5.786727
+  type: 'test'
+  ...
+# Subtest: fixed pre-execution entry phases distinguish HTTP, API, RPC and action refusal without copying response bodies
+ok 6 - fixed pre-execution entry phases distinguish HTTP, API, RPC and action refusal without copying response bodies
+  ---
+  duration_ms: 33.005653
+  type: 'test'
+  ...
+# Subtest: stream refusal, missing workflow identity and completed stream without dispatch retain distinct closed codes
+ok 7 - stream refusal, missing workflow identity and completed stream without dispatch retain distinct closed codes
+  ---
+  duration_ms: 18.69988
+  type: 'test'
+  ...
+# Subtest: profile validation and pre-sample build pin keep their own stage instead of fabricating a run failure
+ok 8 - profile validation and pre-sample build pin keep their own stage instead of fabricating a run failure
+  ---
+  duration_ms: 3.28892
+  type: 'test'
+  ...
+# Subtest: claim/running state and daemon stages do not prove provider execution; split marker only counts after agent_start
+ok 9 - claim/running state and daemon stages do not prove provider execution; split marker only counts after agent_start
+  ---
+  duration_ms: 0.94146
+  type: 'test'
+  ...
+# Subtest: an early marker stays before the tool when full run history is replayed
+ok 10 - an early marker stays before the tool when full run history is replayed
+  ---
+  duration_ms: 0.622359
+  type: 'test'
+  ...
+# Subtest: a completed tool followed by the task marker proves reply order
+ok 11 - a completed tool followed by the task marker proves reply order
+  ---
+  duration_ms: 0.33147
+  type: 'test'
+  ...
+# Subtest: a successful same-run canonical submit report proves delivery after the completed read
+ok 12 - a successful same-run canonical submit report proves delivery after the completed read
+  ---
+  duration_ms: 0.50368
+  type: 'test'
+  ...
+# Subtest: an empty final report cannot borrow a residual error through the real summary selector
+ok 13 - an empty final report cannot borrow a residual error through the real summary selector
+  ---
+  duration_ms: 0.487465
+  type: 'test'
+  ...
+# Subtest: canonical delivery cannot borrow another run, a pending or failed result, or an unordered submit
+ok 14 - canonical delivery cannot borrow another run, a pending or failed result, or an unordered submit
+  ---
+  duration_ms: 2.407301
+  type: 'test'
+  ...
+# Subtest: the complete candidate driver accepts canonical report delivery with all runtime and cleanup gates intact
+ok 15 - the complete candidate driver accepts canonical report delivery with all runtime and cleanup gates intact
+  ---
+  duration_ms: 11.593854
+  type: 'test'
+  ...
+# Subtest: three real-shaped runs use normal cookies, pinned subscriptions, push reads and strictly owned cleanup
+ok 16 - three real-shaped runs use normal cookies, pinned subscriptions, push reads and strictly owned cleanup
+  ---
+  duration_ms: 28.018693
+  type: 'test'
+  ...
+# Subtest: SMOKE chooses the verified team without fixed IDs and accepts checking quota with a new catalogue clone ID
+ok 17 - SMOKE chooses the verified team without fixed IDs and accepts checking quota with a new catalogue clone ID
+  ---
+  duration_ms: 10.975982
+  type: 'test'
+  ...
+# Subtest: foreign payer, workspace or frozen profile cannot satisfy the shared subscription receipt
+ok 18 - foreign payer, workspace or frozen profile cannot satisfy the shared subscription receipt
+  ---
+  duration_ms: 26.004205
+  type: 'test'
+  ...
+# Subtest: wrong or ambiguous sources and sharing revoked during choice fail before dispatch without changing preferences
+ok 19 - wrong or ambiguous sources and sharing revoked during choice fail before dispatch without changing preferences
+  ---
+  duration_ms: 16.044666
+  type: 'test'
+  ...
+# Subtest: workspace restore failure is visible but never suppresses profile cleanup or sign-out
+ok 20 - workspace restore failure is visible but never suppresses profile cleanup or sign-out
+  ---
+  duration_ms: 11.645041
+  type: 'test'
+  ...
+# Subtest: startup intervals retain only closed fields and reject foreign run data or unknown phases
+ok 21 - startup intervals retain only closed fields and reject foreign run data or unknown phases
+  ---
+  duration_ms: 0.667236
+  type: 'test'
+  ...
+# Subtest: prepared_agent_start keeps its actual earlier origin and requires both real initialization boundaries
+ok 22 - prepared_agent_start keeps its actual earlier origin and requires both real initialization boundaries
+  ---
+  duration_ms: 0.903022
+  type: 'test'
+  ...
+# Subtest: bootstrap_claude_start keeps its actual earlier origin and requires both real initialization boundaries
+ok 23 - bootstrap_claude_start keeps its actual earlier origin and requires both real initialization boundaries
+  ---
+  duration_ms: 0.531291
+  type: 'test'
+  ...
+# Subtest: bootstrap_codex_initialize keeps its actual earlier origin and requires both real initialization boundaries
+ok 24 - bootstrap_codex_initialize keeps its actual earlier origin and requires both real initialization boundaries
+  ---
+  duration_ms: 0.290258
+  type: 'test'
+  ...
+# Subtest: prepared_agent_start invalid evidence cannot hide behind an otherwise valid ordinary initialization
+ok 25 - prepared_agent_start invalid evidence cannot hide behind an otherwise valid ordinary initialization
+  ---
+  duration_ms: 0.694487
+  type: 'test'
+  ...
+# Subtest: bootstrap_claude_start invalid evidence cannot hide behind an otherwise valid ordinary initialization
+ok 26 - bootstrap_claude_start invalid evidence cannot hide behind an otherwise valid ordinary initialization
+  ---
+  duration_ms: 0.554556
+  type: 'test'
+  ...
+# Subtest: bootstrap_codex_initialize invalid evidence cannot hide behind an otherwise valid ordinary initialization
+ok 27 - bootstrap_codex_initialize invalid evidence cannot hide behind an otherwise valid ordinary initialization
+  ---
+  duration_ms: 0.460164
+  type: 'test'
+  ...
+# Subtest: ordinary startup evidence stays compatible while missing or failed CLI initialization stays incomplete
+ok 28 - ordinary startup evidence stays compatible while missing or failed CLI initialization stays incomplete
+  ---
+  duration_ms: 1.151566
+  type: 'test'
+  ...
+# Subtest: the scoped runtime receipt gates direct execution, preserves only closed evidence and does not claim OTLP completeness
+ok 29 - the scoped runtime receipt gates direct execution, preserves only closed evidence and does not claim OTLP completeness
+  ---
+  duration_ms: 1.109012
+  type: 'test'
+  ...
+# Subtest: an HTTP-only legacy receipt cannot prove child-send coverage
+ok 30 - an HTTP-only legacy receipt cannot prove child-send coverage
+  ---
+  duration_ms: 0.305381
+  type: 'test'
+  ...
+# Subtest: v2 MCP body evidence keeps its own terminal time and sequence while v1 remains readable
+ok 31 - v2 MCP body evidence keeps its own terminal time and sequence while v1 remains readable
+  ---
+  duration_ms: 0.687787
+  type: 'test'
+  ...
+# Subtest: child business observations cannot become global coverage or fail solely for a missing lifecycle close
+ok 32 - child business observations cannot become global coverage or fail solely for a missing lifecycle close
+  ---
+  duration_ms: 0.725505
+  type: 'test'
+  ...
+# Subtest: child evidence rejects foreign identity, fake completeness, malformed sequences and unobserved remote MCP scope
+ok 33 - child evidence rejects foreign identity, fake completeness, malformed sequences and unobserved remote MCP scope
+  ---
+  duration_ms: 2.714964
+  type: 'test'
+  ...
+# Subtest: direct diagnostics use and delete only this test repository variable, and extra auth fails after cleanup
+ok 34 - direct diagnostics use and delete only this test repository variable, and extra auth fails after cleanup
+  ---
+  duration_ms: 37.372357
+  type: 'test'
+  ...
+# Subtest: member candidate diagnostics use the trusted host without reading or writing workspace secrets
+ok 35 - member candidate diagnostics use the trusted host without reading or writing workspace secrets
+  ---
+  duration_ms: 17.412038
+  type: 'test'
+  ...
+# Subtest: trusted candidate timing still refuses missing official CLI or MCP observations
+ok 36 - trusted candidate timing still refuses missing official CLI or MCP observations
+  ---
+  duration_ms: 9.657734
+  type: 'test'
+  ...
+# Subtest: member production acceptance observes its dedicated Bot window without reading or writing workspace secrets
+ok 37 - member production acceptance observes its dedicated Bot window without reading or writing workspace secrets
+  ---
+  duration_ms: 45.314826
+  type: 'test'
+  ...
+# Subtest: formal prepared Claude acceptance needs the independently bounded initialization receipt and preserves cleanup
+ok 38 - formal prepared Claude acceptance needs the independently bounded initialization receipt and preserves cleanup
+  ---
+  duration_ms: 19.790114
+  type: 'test'
+  ...
+# Subtest: trusted cloud timing refuses missing CLI/MCP observations and extra remote authorization
+ok 39 - trusted cloud timing refuses missing CLI/MCP observations and extra remote authorization
+  ---
+  duration_ms: 20.606895
+  type: 'test'
+  ...
+# Subtest: formal cloud diagnostics require the prepared dedicated Bot before creating task fixtures
+ok 40 - formal cloud diagnostics require the prepared dedicated Bot before creating task fixtures
+  ---
+  duration_ms: 1.024325
+  type: 'test'
+  ...
+# Subtest: optional historical baseline reads keep missing detailed diagnostics unavailable
+ok 41 - optional historical baseline reads keep missing detailed diagnostics unavailable
+  ---
+  duration_ms: 12.736777
+  type: 'test'
+  ...
+# Subtest: trusted candidate timing cannot claim a host without a pinned device and agent
+ok 42 - trusted candidate timing cannot claim a host without a pinned device and agent
+  ---
+  duration_ms: 0.893067
+  type: 'test'
+  ...
+# Subtest: lease audit uses ordinary cloud placement and waits for a terminal reply after the tool without workspace diagnostics
+ok 43 - lease audit uses ordinary cloud placement and waits for a terminal reply after the tool without workspace diagnostics
+  ---
+  duration_ms: 50.910064
+  type: 'test'
+  ...
+# Subtest: member cloud diagnostics fail before creating any variable they cannot delete
+ok 44 - member cloud diagnostics fail before creating any variable they cannot delete
+  ---
+  duration_ms: 1.906024
+  type: 'test'
+  ...
+# Subtest: admin diagnostics preserve an existing timing variable without replacing or deleting it
+ok 45 - admin diagnostics preserve an existing timing variable without replacing or deleting it
+  ---
+  duration_ms: 1.771807
+  type: 'test'
+  ...
+# Subtest: candidate gate checks frozen device and marker without representing itself as cloud latency acceptance
+ok 46 - candidate gate checks frozen device and marker without representing itself as cloud latency acceptance
+  ---
+  duration_ms: 4.456501
+  type: 'test'
+  ...
+# Subtest: candidate finish receipt waits for the same run terminal push before cleanup
+ok 47 - candidate finish receipt waits for the same run terminal push before cleanup
+  ---
+  duration_ms: 4.757244
+  type: 'test'
+  ...
+# Subtest: candidate failure cleanup waits for actual terminal after an accepted stop request
+ok 48 - candidate failure cleanup waits for actual terminal after an accepted stop request
+  ---
+  duration_ms: 4.601179
+  type: 'test'
+  ...
+# Subtest: candidate cleanup deadline retains its fixture when the daemon never confirms terminal
+ok 49 - candidate cleanup deadline retains its fixture when the daemon never confirms terminal
+  ---
+  duration_ms: 1004.265946
+  type: 'test'
+  ...
+# Subtest: candidate cleanup stops a queued continuation after its original run failed and waits for the child push
+ok 50 - candidate cleanup stops a queued continuation after its original run failed and waits for the child push
+  ---
+  duration_ms: 1.57817
+  type: 'test'
+  ...
+# Subtest: candidate cleanup retains both original and queued continuation IDs when no child terminal arrives
+ok 51 - candidate cleanup retains both original and queued continuation IDs when no child terminal arrives
+  ---
+  duration_ms: 20.811334
+  type: 'test'
+  ...
+# Subtest: cloud cleanup follows an adopted VM to its live continuation before ending every owned attempt
+ok 52 - cloud cleanup follows an adopted VM to its live continuation before ending every owned attempt
+  ---
+  duration_ms: 1.602737
+  type: 'test'
+  ...
+# Subtest: cloud cleanup retains the issue when owner end fails after the DB row was marked ended
+ok 53 - cloud cleanup retains the issue when owner end fails after the DB row was marked ended
+  ---
+  duration_ms: 0.982041
+  type: 'test'
+  ...
+# Subtest: cloud cleanup does not equate end acknowledgements with a still-retained current VM
+ok 54 - cloud cleanup does not equate end acknowledgements with a still-retained current VM
+  ---
+  duration_ms: 0.473474
+  type: 'test'
+  ...
+# Subtest: cleanup retains its fixture when Factory cancellation loses its revision fence
+ok 55 - cleanup retains its fixture when Factory cancellation loses its revision fence
+  ---
+  duration_ms: 0.481746
+  type: 'test'
+  ...
+# Subtest: wrong provenance or cleanup failure fails and still signs out; completed stop races are confirmed
+ok 56 - wrong provenance or cleanup failure fails and still signs out; completed stop races are confirmed
+  ---
+  duration_ms: 26.779353
+  type: 'test'
+  ...
+# Subtest: an existing non-test Bot is never interrupted
+ok 57 - an existing non-test Bot is never interrupted
+  ---
+  duration_ms: 1.436736
+  type: 'test'
+  ...
+# Subtest: worker configuration is pinned before and after every case and never exposes other environment values
+ok 58 - worker configuration is pinned before and after every case and never exposes other environment values
+  ---
+  duration_ms: 16.360858
+  type: 'test'
+  ...
+# Subtest: alignment rejects missing, ambiguous and reversed clocks; baseline does not silently become a passing threshold
+ok 59 - alignment rejects missing, ambiguous and reversed clocks; baseline does not silently become a passing threshold
+  ---
+  duration_ms: 0.772806
+  type: 'test'
+  ...
+# Subtest: reused Coordinator workflow aligns only through the owned run server interval
+ok 60 - reused Coordinator workflow aligns only through the owned run server interval
+  ---
+  duration_ms: 0.420164
+  type: 'test'
+  ...
+# Subtest: Claude initialization is retained as history but never proves current task acceptance
+ok 61 - Claude initialization is retained as history but never proves current task acceptance
+  ---
+  duration_ms: 0.369978
+  type: 'test'
+  ...
+# Subtest: a fast legacy dispatch body cannot pass the full dispatch-entry acceptance gate
+ok 62 - a fast legacy dispatch body cannot pass the full dispatch-entry acceptance gate
+  ---
+  duration_ms: 0.641317
+  type: 'test'
+  ...
+# Subtest: remote authorization after the actual task ACK cannot hide in the preparing phase
+ok 63 - remote authorization after the actual task ACK cannot hide in the preparing phase
+  ---
+  duration_ms: 0.595978
+  type: 'test'
+  ...
+# Subtest: failed execution keeps all six version brackets without changing the failed proof
+ok 64 - failed execution keeps all six version brackets without changing the failed proof
+  ---
+  duration_ms: 43.499768
+  type: 'test'
+  ...
+# Subtest: a version change after failed execution stops later dispatches and preserves both failures
+ok 65 - a version change after failed execution stops later dispatches and preserves both failures
+  ---
+  duration_ms: 11.12411
+  type: 'test'
+  ...
+# Subtest: candidate bootstrap callback runs once after owner provenance and before any task stream observation
+ok 66 - candidate bootstrap callback runs once after owner provenance and before any task stream observation
+  ---
+  duration_ms: 3.848965
+  type: 'test'
+  ...
+# Subtest: candidate bootstrap refuses provenance failure and retains normal cleanup after a publication failure
+ok 67 - candidate bootstrap refuses provenance failure and retains normal cleanup after a publication failure
+  ---
+  duration_ms: 5.058649
+  type: 'test'
+  ...
+# Subtest: repository Git receipt stays independent and closed
+ok 68 - repository Git receipt stays independent and closed
+  ---
+  duration_ms: 3.001922
+  type: 'test'
+  ...
+# Subtest: the production gate logs in as SMOKE without pinning an owner workspace or bot
+ok 69 - the production gate logs in as SMOKE without pinning an owner workspace or bot
+  ---
+  duration_ms: 23.875089
+  type: 'test'
+  ...
+# Subtest: a different application commit is refused before login, enrollment or candidate creation
+ok 70 - a different application commit is refused before login, enrollment or candidate creation
+  ---
+  duration_ms: 6.457408
+  type: 'test'
+  ...
+# Subtest: a release receipt names the actual candidate, revision, model and registered device
+ok 71 - a release receipt names the actual candidate, revision, model and registered device
+  ---
+  duration_ms: 5.418151
+  type: 'test'
+  ...
+# Subtest: startup correlation survives claude_code failure before a run exists
+ok 72 - startup correlation survives claude_code failure before a run exists
+  ---
+  duration_ms: 27.421382
+  type: 'test'
+  ...
+# Subtest: startup correlation survives codex failure before a run exists
+ok 73 - startup correlation survives codex failure before a run exists
+  ---
+  duration_ms: 24.797875
+  type: 'test'
+  ...
+# Subtest: startup correlation requires exact candidate binding and existing metadata
+ok 74 - startup correlation requires exact candidate binding and existing metadata
+  ---
+  duration_ms: 121.660117
+  type: 'test'
+  ...
+# Subtest: startup correlation rejects malformed identifiers and preserves independently valid fields
+ok 75 - startup correlation rejects malformed identifiers and preserves independently valid fields
+  ---
+  duration_ms: 173.820104
+  type: 'test'
+  ...
+# Subtest: startup correlation keeps only closed refusal codes and never emits prompts or other identities
+ok 76 - startup correlation keeps only closed refusal codes and never emits prompts or other identities
+  ---
+  duration_ms: 61.913186
+  type: 'test'
+  ...
+# Subtest: successful candidate diagnostics do not gain startup correlation metadata
+ok 77 - successful candidate diagnostics do not gain startup correlation metadata
+  ---
+  duration_ms: 3.990918
+  type: 'test'
+  ...
+# Subtest: a failed subscription still tests the other candidate and closes every created instance and device
+ok 78 - a failed subscription still tests the other candidate and closes every created instance and device
+  ---
+  duration_ms: 3.591706
+  type: 'test'
+  ...
+# Subtest: candidate acceptance is pinned to the outer SMOKE/team payer and always closes its normal session
+ok 79 - candidate acceptance is pinned to the outer SMOKE/team payer and always closes its normal session
+  ---
+  duration_ms: 5.741027
+  type: 'test'
+  ...
+# Subtest: a real receipt rejection persists its run hash and reason without provider text or credentials
+ok 80 - a real receipt rejection persists its run hash and reason without provider text or credentials
+  ---
+  duration_ms: 8.438625
+  type: 'test'
+  ...
+# Subtest: preflight failures preserve their phase and closed error details without producing an accepted file
+ok 81 - preflight failures preserve their phase and closed error details without producing an accepted file
+  ---
+  duration_ms: 58.698049
+  type: 'test'
+  ...
+# Subtest: a failure before a sample exists preserves the startup phase without inventing sample evidence
+ok 82 - a failure before a sample exists preserves the startup phase without inventing sample evidence
+  ---
+  duration_ms: 2.969818
+  type: 'test'
+  ...
+# Subtest: startup failure projection drops unknown content and only admits numeric HTTP error statuses
+ok 83 - startup failure projection drops unknown content and only admits numeric HTTP error statuses
+  ---
+  duration_ms: 25.404521
+  type: 'test'
+  ...
+# Subtest: failure diagnostics retain only fixed cleanup outcomes and unknown exceptions become a generic code
+ok 84 - failure diagnostics retain only fixed cleanup outcomes and unknown exceptions become a generic code
+  ---
+  duration_ms: 3.413197
+  type: 'test'
+  ...
+# Subtest: retained cleanup identities must belong to this case and contain at most four distinct UUIDs
+ok 85 - retained cleanup identities must belong to this case and contain at most four distinct UUIDs
+  ---
+  duration_ms: 8.734391
+  type: 'test'
+  ...
+# Subtest: a terminal-before-proof failure identifies only its owned case and the missing evidence
+ok 86 - a terminal-before-proof failure identifies only its owned case and the missing evidence
+  ---
+  duration_ms: 3.092984
+  type: 'test'
+  ...
+# Subtest: cleanup failures retain bounded step families and HTTP status without arbitrary causes
+ok 87 - cleanup failures retain bounded step families and HTTP status without arbitrary causes
+  ---
+  duration_ms: 3.293446
+  type: 'test'
+  ...
+# Subtest: a failed pair preserves the genuine passing receipt without creating publishable evidence
+ok 88 - a failed pair preserves the genuine passing receipt without creating publishable evidence
+  ---
+  duration_ms: 9.515009
+  type: 'test'
+  ...
+# Subtest: failure projection bounds cleanup rows and refuses foreign or malformed fixture identities
+ok 89 - failure projection bounds cleanup rows and refuses foreign or malformed fixture identities
+  ---
+  duration_ms: 14.778606
+  type: 'test'
+  ...
+# Subtest: the observed Codex adapter-start failure retains false agent_start and error cli_init
+ok 90 - the observed Codex adapter-start failure retains false agent_start and error cli_init
+  ---
+  duration_ms: 7.38056
+  type: 'test'
+  ...
+# Subtest: failed execution retains only bound registration binary metadata without a passing receipt
+ok 91 - failed execution retains only bound registration binary metadata without a passing receipt
+  ---
+  duration_ms: 3.064701
+  type: 'test'
+  ...
+# Subtest: registration diagnostics reject unbounded or non-original binary metadata without leaking it
+ok 92 - registration diagnostics reject unbounded or non-original binary metadata without leaking it
+  ---
+  duration_ms: 15.067321
+  type: 'test'
+  ...
+# Subtest: bootstrap adoption is required; ordinary FD3, wrong run, duplicate warmup or descriptor auth cannot publish
+ok 93 - bootstrap adoption is required; ordinary FD3, wrong run, duplicate warmup or descriptor auth cannot publish
+  ---
+  duration_ms: 3.204702
+  type: 'test'
+  ...
+# Subtest: bootstrap projection, repeated publication and VM proof failures still reclaim both candidate devices and VMs
+ok 94 - bootstrap projection, repeated publication and VM proof failures still reclaim both candidate devices and VMs
+  ---
+  duration_ms: 7.780042
+  type: 'test'
+  ...
+# Subtest: bootstrap failure diagnostics preserve existing strict timings and final binding checks without accepting the pair
+ok 95 - bootstrap failure diagnostics preserve existing strict timings and final binding checks without accepting the pair
+  ---
+  duration_ms: 13.762865
+  type: 'test'
+  ...
+# Subtest: bootstrap failure timing projection rejects foreign, oversized and private values without widening adoption
+ok 96 - bootstrap failure timing projection rejects foreign, oversized and private values without widening adoption
+  ---
+  duration_ms: 2.151515
+  type: 'test'
+  ...
+# Subtest: bootstrap failure binding checks name the rejected predicate without exporting bootstrap or hint values
+ok 97 - bootstrap failure binding checks name the rejected predicate without exporting bootstrap or hint values
+  ---
+  duration_ms: 13.953472
+  type: 'test'
+  ...
+# Subtest: successful candidate gate adds no failure diagnostics and keeps the original accepted receipt
+ok 98 - successful candidate gate adds no failure diagnostics and keeps the original accepted receipt
+  ---
+  duration_ms: 3.130511
+  type: 'test'
+  ...
+# Subtest: failure projection distinguishes the closed 3c production shapes using synthetic identities
+ok 99 - failure projection distinguishes the closed 3c production shapes using synthetic identities
+  ---
+  duration_ms: 3.423904
+  type: 'test'
+  ...
+1..99
+# tests 99
+# suites 0
+# pass 99
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2359.504593

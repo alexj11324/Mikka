@@ -1,0 +1,32 @@
+{
+  "sourceMain": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "sourceTree": "8c5c12ea993533403d13e21dc75647bb28022767",
+  "localSnapshotCommit": "df87eb4b8d2952ed3e1aed5ee740ff1231608594",
+  "localSnapshotIsNotProductionCommit": true,
+  "authorizedFiles": [
+    "scripts/e2b/validate-template-subscriptions.mjs",
+    "scripts/e2b/validate-template-subscriptions.test.mjs"
+  ],
+  "files": [
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "bytes": 31628,
+      "sha256": "2dc30e00bdcf7e226ae7de623efaaf55f417fa2c145c91629d373a19cba9396b",
+      "gitBlobSha1": "7ee7564fe213ce3fba762fee8685eb9a4bb31329"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "bytes": 57524,
+      "sha256": "6320ecac60bd57f07717e2cdd08bfe567471298bbb0fd67275516902b7700d9f",
+      "gitBlobSha1": "a70f45e7395309a1cf93ae295e880e06ad521ef2"
+    }
+  ],
+  "dependencies": "Read-only reuse through node_modules symlink; no install",
+  "operations": {
+    "network": 0,
+    "externalModels": 0,
+    "externalResources": 0,
+    "publishedRefs": 0,
+    "sharedIndexEdits": 0
+  }
+}

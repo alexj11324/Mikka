@@ -1,0 +1,34 @@
+{
+  "scope": "All top-level patch/receipt/log/document files; checkout and original production private logs excluded.",
+  "method": "Local credential-shape and email scan; reviewed known synthetic canary occurrences in the exact test diff.",
+  "classifiedSyntheticMatches": [
+    {
+      "path": "startup-correlation.patch",
+      "line": 152,
+      "category": "email-shaped",
+      "classification": "explicit synthetic invalid-domain canary in the reviewed negative-input test"
+    },
+    {
+      "path": "startup-correlation.patch",
+      "line": 159,
+      "category": "email-shaped",
+      "classification": "explicit synthetic invalid-domain canary in the reviewed negative-input test"
+    },
+    {
+      "path": "startup-correlation.patch",
+      "line": 179,
+      "category": "email-shaped",
+      "classification": "explicit synthetic invalid-domain canary in the reviewed negative-input test"
+    },
+    {
+      "path": "startup-correlation.patch",
+      "line": 190,
+      "category": "email-shaped",
+      "classification": "explicit synthetic invalid-domain canary in the reviewed negative-input test"
+    }
+  ],
+  "unresolved": [],
+  "secretValuesPrinted": false,
+  "preservedOriginalFailures": true,
+  "publicBoundary": "Synthetic local fixtures and closed diagnostics/source metadata only; no production chat, credentials, cookies or private raw logs."
+}

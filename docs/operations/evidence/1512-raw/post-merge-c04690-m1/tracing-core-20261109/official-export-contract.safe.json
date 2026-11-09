@@ -1,0 +1,47 @@
+{
+  "source": "Installed pinned official dependency sources, read-only; no modified dependencies or newly fetched packages. Exact M1 application source from git object.",
+  "contracts": [
+    {
+      "label": "sdkBatchProcessor",
+      "path": "/workspace/scratch/af05d9e4f31e/Mikka-observability-1512/node_modules/.pnpm/@opentelemetry+sdk-trace@2.12.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/sdk-trace/build/src/export/BatchSpanProcessorBase.js",
+      "bytes": 8254,
+      "sha256": "13b7d346bb2b96444d5109fa7038c991c628cc11d910b5e0d99392f826a6998d",
+      "contract": "forceFlush only drains _finishedSpans; _isExporting does not join an already-sending batch."
+    },
+    {
+      "label": "otlpExporterBase",
+      "path": "/workspace/scratch/af05d9e4f31e/Mikka-observability-1512/node_modules/.pnpm/@opentelemetry+otlp-exporter-base@0.223.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/otlp-exporter-base/build/src/OTLPExporterBase.js",
+      "bytes": 789,
+      "sha256": "30c30d8f2282d4401e5ae6bbb3751cdd19574cda031f4b7e64c7c6fc65a6069e",
+      "contract": "forceFlush delegates to the OTLP export delegate."
+    },
+    {
+      "label": "otlpDelegate",
+      "path": "/workspace/scratch/af05d9e4f31e/Mikka-observability-1512/node_modules/.pnpm/@opentelemetry+otlp-exporter-base@0.223.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/otlp-exporter-base/build/src/otlp-export-delegate.js",
+      "bytes": 4719,
+      "sha256": "a6ba77611b194ca43cb3e2dd48886e738a6f05acd07b604480b96d92e526cf44",
+      "contract": "Exports push actual transport completion promises; forceFlush calls the promise queue awaitAll."
+    },
+    {
+      "label": "otlpPromiseQueue",
+      "path": "/workspace/scratch/af05d9e4f31e/Mikka-observability-1512/node_modules/.pnpm/@opentelemetry+otlp-exporter-base@0.223.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/otlp-exporter-base/build/src/bounded-queue-export-promise-handler.js",
+      "bytes": 1528,
+      "sha256": "1faef62acea990cd74c886b31308da0aa6421b5c13a991b10b6dc9888e59eb7b",
+      "contract": "awaitAll uses Promise.all on the current sending promises, removed only when each settles."
+    },
+    {
+      "label": "officialWorkflowTelemetry",
+      "path": "/workspace/scratch/af05d9e4f31e/Mikka-observability-1512/node_modules/.pnpm/@workflow+core@5.2.3_@opentelemetry+api@1.10.0_ws@8.22.0/node_modules/@workflow/core/dist/telemetry.js",
+      "bytes": 57882,
+      "sha256": "cd68b1af79068a5538b53af7dadf03cb5b4b4f661c09826400bbba6d04124760",
+      "contract": "Actual official trace helper used by fixture; its successful callback sets parent step status OK then ends it."
+    },
+    {
+      "label": "officialSpanStatus",
+      "path": "/workspace/scratch/af05d9e4f31e/Mikka-observability-1512/node_modules/.pnpm/@opentelemetry+sdk-trace@2.12.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/sdk-trace/build/src/Span.js",
+      "bytes": 15656,
+      "sha256": "4730a2f1696940de6ff13891dd79aad9d144d58afd530425920ae02128de0144",
+      "contract": "An OK status overrides prior ERROR and later status changes are ignored. Relevant to refused-result proposal."
+    }
+  ]
+}
