@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "checkpoint": 23,
+  "issue": 1512,
+  "repository": "alexj11324/Mikka",
+  "prefix": "docs/operations/evidence/1512-raw/union-main89-1ffa-20261109",
+  "previousEvidenceCommit": "336968cbc1dd4f92bf373f926d62938ef29303a3",
+  "sourceHead": "1ffa581f16319381054e0636ae41e6292719a1fe",
+  "actualCheckout": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+  "tree": "bc4d584fa651385886e79dc6359b1b43324425d1",
+  "workflowRunId": 42580506632,
+  "scope": "ordinary union preservation, independent main89 source compatibility, exact actual new CI selection; remaining CI/Native/production pending",
+  "payloadCount": 5,
+  "totalPayloadBytes": 738914,
+  "files": [
+    {
+      "path": "ci/selection.original.log",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "61a482a4c9c133b35102b22c96aa287432e8cbaa",
+      "bytes": 563970,
+      "sha256": "c3a8c68e8f7cc6bb706ae826de6137a80bba56bd2fedab796958c389e2932041"
+    },
+    {
+      "path": "ci/selection.full.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "bfe9fb4de83e59aa6db0d4449172079853e07291",
+      "bytes": 123548,
+      "sha256": "cf658839d0a35ced0088f0dcc3c0b1ccb91423f041b3eb1f7ee83d1f9d46da32"
+    },
+    {
+      "path": "source/ordinary-union-and-selection.safe.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "5984eff70d86dc1ebbbed4c30c86f106047e710c",
+      "bytes": 9599,
+      "sha256": "84f4d63982a7e0583e602e0d61290eadb33a979be28bb41d3c091bf0cfbcc843"
+    },
+    {
+      "path": "source/main89-independent-compatibility.safe.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "6abccd12f44ed284bf58757d6ccab4ef344fdfff",
+      "bytes": 38342,
+      "sha256": "63d08d008a075a909d9abdfa5fe1c32e11eccc42f35119c339e5c041ad560776"
+    },
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a5eb351b69406616c1edad01521d677a12b11ab3",
+      "bytes": 3455,
+      "sha256": "8f7d0440c9e3a09a97fbf3c3d4a43cc7c11729ae43315c75ffe1e84e20e6d8a1"
+    }
+  ]
+}

@@ -1,0 +1,954 @@
+{
+  "schemaVersion": 1,
+  "kind": "main-1804-source-compatibility-review",
+  "preparedAt": "2026-11-09T07:41:32.432Z",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequest": 1799,
+  "reviewer": "/root/current_source_review",
+  "result": {
+    "codeLevelMustFix": [],
+    "directPathIntersection": [],
+    "independentRuntimeValidationPerformed": false,
+    "conclusion": "No code-level integration blocker found in this bounded source review. Preserve every main89 change and validate the combined source. This is not a runtime, production, CI or Native PASS."
+  },
+  "scope": {
+    "mainAdvance": {
+      "base": "854583566f4f55fc15490a240c3e38a2c1fd16b6",
+      "head": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+      "tree": "a850a89f11cbb467df869651ee39beca157c6351",
+      "parents": [
+        "854583566f4f55fc15490a240c3e38a2c1fd16b6"
+      ],
+      "commitTime": "2026-11-09T07:23:56Z",
+      "commits": 1,
+      "changedPaths": 83,
+      "pullRequest": 1804,
+      "pullRequestHead": "a0c55cad308813d782cd40212d70ac4ee3896d9a",
+      "pullRequestMergedAt": "2026-11-09T07:23:57Z",
+      "actualCommitTopology": "single parent squash commit",
+      "compareUrl": "https://github.com/alexj11324/Mikka/compare/854583566f4f55fc15490a240c3e38a2c1fd16b6...89eae89e9e79422e0a8b4b1346aa1c7fb6470016"
+    },
+    "ownedDelta": {
+      "base": "927260894305e066e15a4ad50114abce433e6001",
+      "head": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+      "tree": "6da320a6f476624ba2e61ca7a1f5c704a3fdae25",
+      "actualPreviouslyTestedCheckout": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+      "changedPaths": 33,
+      "compareUrl": "https://github.com/alexj11324/Mikka/compare/927260894305e066e15a4ad50114abce433e6001...025118ed953ab80803ac3ba9548c3a309c5c69b4",
+      "inventory": [
+        {
+          "path": "app/v1/devices/[deviceId]/repos/route.ts",
+          "newGitBlob": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b",
+          "status": "modified"
+        },
+        {
+          "path": "app/v1/devices/[deviceId]/runs/route.ts",
+          "newGitBlob": "5a4c4f8486239161b325b9774b3086afe666dfa9",
+          "status": "modified"
+        },
+        {
+          "path": "apps/api/generated/routes.json",
+          "newGitBlob": "06017439de4b98555310e13c35c079bca379174f",
+          "status": "modified"
+        },
+        {
+          "path": "apps/api/generated/routes.ts",
+          "newGitBlob": "16fe573dc6d192566f6bf2810b9ba94e186cba82",
+          "status": "modified"
+        },
+        {
+          "path": "docs/operations/tracing.md",
+          "newGitBlob": "a02e4a5100c066d8564902ec287c9c92fee0d20e",
+          "status": "modified"
+        },
+        {
+          "path": "instrumentation-client.ts",
+          "newGitBlob": "9109982d1c3245179b85a42d6969003aec2f5047",
+          "status": "modified"
+        },
+        {
+          "path": "lib/analytics-policy.ts",
+          "newGitBlob": "152b941ff7b05004a7c57a909f776c6268ede106",
+          "status": "modified"
+        },
+        {
+          "path": "lib/coordinator/repository-resolution.test.ts",
+          "newGitBlob": "a5157f09e8022bf9077053686d36aa02760a4e94",
+          "status": "modified"
+        },
+        {
+          "path": "lib/coordinator/repository-resolution.ts",
+          "newGitBlob": "6826efdd6895fa3f584e35ff2f1edb527cd080fa",
+          "status": "modified"
+        },
+        {
+          "path": "lib/desktop-rpc/read-batch-context.ts",
+          "newGitBlob": "e32da5e4d7294af3363eb2de4623a52aeb7e4f47",
+          "status": "modified"
+        },
+        {
+          "path": "lib/device-enrollment.db.test.ts",
+          "newGitBlob": "071b2243d35cd6fdd97b7be0f17f21728578c537",
+          "status": "modified"
+        },
+        {
+          "path": "lib/device-enrollment.ts",
+          "newGitBlob": "8fe53cb39985150e5fc05daa6370121cb5426d53",
+          "status": "modified"
+        },
+        {
+          "path": "lib/device-heartbeat.db.test.ts",
+          "newGitBlob": "27bbb720ac8f5bd3716787db62eb11833e9f3530",
+          "status": "modified"
+        },
+        {
+          "path": "lib/device-management.ts",
+          "newGitBlob": "c2243c5732d67b3ff5444196ce3b45e9aca67805",
+          "status": "modified"
+        },
+        {
+          "path": "lib/device-unit-fence.db.test.ts",
+          "newGitBlob": "bc65b3faf494d2fd7c797b68f34d04227df38b7a",
+          "status": "modified"
+        },
+        {
+          "path": "lib/dispatch-timing.ts",
+          "newGitBlob": "f82563e766f5c0477479b2d487e0f92e60a08b75",
+          "status": "modified"
+        },
+        {
+          "path": "lib/personal-policy.test.ts",
+          "newGitBlob": "fef80337b9b5244d2e8565236c6dd96f7d329acd",
+          "status": "modified"
+        },
+        {
+          "path": "lib/personal-policy.ts",
+          "newGitBlob": "dc710f0a16a5e28e5a34d5112a86fab349a2639a",
+          "status": "modified"
+        },
+        {
+          "path": "lib/replay-readiness.ts",
+          "newGitBlob": "d60598b09201228e23c5ac7a9df00938192f0e67",
+          "status": "modified"
+        },
+        {
+          "path": "lib/tracing/logs.test.ts",
+          "newGitBlob": "737fa373e4a8333a4a703bf6133f9a533d585460",
+          "status": "modified"
+        },
+        {
+          "path": "lib/tracing/node.ts",
+          "newGitBlob": "00775a5928228262a66b12b845ee0dc18f6c6047",
+          "status": "modified"
+        },
+        {
+          "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+          "newGitBlob": null,
+          "status": "modified"
+        },
+        {
+          "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+          "newGitBlob": null,
+          "status": "modified"
+        },
+        {
+          "path": "scripts/acceptance/run-observability-browser.mjs",
+          "newGitBlob": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+          "status": "modified"
+        },
+        {
+          "path": "scripts/acceptance/run-observability-browser.test.mjs",
+          "newGitBlob": "56412efdfe5bc638496b89de56281360b4cbe9b5",
+          "status": "modified"
+        },
+        {
+          "path": "scripts/acceptance/run-observability.md",
+          "newGitBlob": "4ca2cf35c1f499b338469556836ae0505649e82a",
+          "status": "modified"
+        },
+        {
+          "path": "scripts/e2b/validate-template-subscriptions.mjs",
+          "newGitBlob": "f36ecf2d08f1bc2754b21be0d47d149871bb67c5",
+          "status": "modified"
+        },
+        {
+          "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+          "newGitBlob": "628395f91d97a64655afb80117788d70207200c0",
+          "status": "modified"
+        },
+        {
+          "path": "tests/analytics-policy.test.mjs",
+          "newGitBlob": "c904b35e3405353be5a549b0d53e2858e19c3454",
+          "status": "modified"
+        },
+        {
+          "path": "tests/cloud-dispatch-startup.test.ts",
+          "newGitBlob": "609029dde521868c00ab7eb687394ad5cacd6183",
+          "status": "modified"
+        },
+        {
+          "path": "tests/replay-readiness.test.mjs",
+          "newGitBlob": "58e4706039dafe6901082676f37a3c92da613d43",
+          "status": "modified"
+        },
+        {
+          "path": "workflows/coordinator/factory-steps.ts",
+          "newGitBlob": "0e2ecce921c4b56795ad1096f2b1eae987299e95",
+          "status": "modified"
+        },
+        {
+          "path": "workflows/coordinator/steps.ts",
+          "newGitBlob": "8b7a5b06f3d1a9c0ebae03a434095a33fa552894",
+          "status": "modified"
+        }
+      ],
+      "note": "The two mode-only fake entries have null SHA in compare metadata. No blob identity or mode is inferred from that null; their exact earlier tree evidence is separate."
+    },
+    "reviewCoverage": {
+      "mainPathCount": 83,
+      "textPatchesRead": 77,
+      "textPatchChangedLineCountsMatchApi": 77,
+      "binaryPathsIndexedOnly": 6,
+      "binaryImagesDownloaded": 0,
+      "binaryVisualReview": false,
+      "fullPublicSourceReads": [
+        {
+          "path": "scripts/acceptance/run-observability-browser.mjs",
+          "revision": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+          "gitBlob": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+          "bytes": 25516,
+          "sha256": "c78a8bbe27c6f7a06279ef6ec5332026bb92ba1283f1051ed035d94b98ca7606"
+        },
+        {
+          "path": "apps/desktop/test/lifecycle.mjs",
+          "revision": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+          "gitBlob": "3f21ee7f6a4eb8948778a35db72fb5e61aeca9ab",
+          "bytes": 33181,
+          "sha256": "45a0f56985f256f5f392ad015e0c4442a784e1b9ff1ebd8703829ecc61152a77"
+        },
+        {
+          "path": "apps/desktop/test/parity.mjs",
+          "revision": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+          "gitBlob": "6f34200d4dfbffdd82c94ddbe217b0db391d9d7f",
+          "bytes": 34609,
+          "sha256": "ddb4c5951810a74a4028dfaaeb695334b8b9be5d292d482f601af8ef33d6821c"
+        },
+        {
+          "path": "apps/desktop/test/parity-page-ready.mjs",
+          "revision": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+          "gitBlob": "abcaa5ff93805b4eaca60ab09b974cfbacebf5af",
+          "bytes": 15152,
+          "sha256": "3cbc6125255d8c32983317d58f8a3bfa1b82b326f1b3df65abd95b60c5ad3b1d"
+        },
+        {
+          "path": "apps/desktop/test/parity-reads.test.mjs",
+          "revision": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+          "gitBlob": "aa6554af6e9a876132eeb09a33ae4e1e5e145320",
+          "bytes": 27039,
+          "sha256": "73c74e2637247aa588dfee1cd9a18045b2acc9abce93c94d9162a036ea3ff17d"
+        },
+        {
+          "path": "app/actions/agents.ts",
+          "revision": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+          "gitBlob": "cf3ff573b89359a5d3d559a09d9283e6ad7ef971",
+          "bytes": 42005,
+          "sha256": "c614a5abd0781d1a0e1acd37e60b9b94f38ae96a743e380c8c6e261e35ab022f"
+        },
+        {
+          "path": "components/workspace/issue-threads.tsx",
+          "revision": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+          "gitBlob": "5ae5cc571e64afb49539bfba8933e36806a507df",
+          "bytes": 5263,
+          "sha256": "39d7f9aafce71774925e2e1624bddedcd409883d75f29b7bea92f47f015f468a"
+        },
+        {
+          "path": "components/workspace/task-detail.tsx",
+          "revision": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+          "gitBlob": "9f7cfeb26e57ddf9a44e8895a2615bcd338b49ca",
+          "bytes": 30871,
+          "sha256": "a963ae1946cd514d29da27d083cc4c460a387c6be6aaa753e5b684c96530491a"
+        },
+        {
+          "path": "components/workspace/issue-activity-feed.tsx",
+          "revision": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+          "gitBlob": "ea617ebdc960e5c3b3a95af1759626f120b0f249",
+          "bytes": 3409,
+          "sha256": "f8f2f3459592fc5f39db549a24d11ce1d1048321f299b80e4f0ebba2186c048c"
+        },
+        {
+          "path": "AGENTS.md",
+          "revision": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+          "gitBlob": "fa963e4d0a342002661c58772d370484e8af740a",
+          "bytes": 22984,
+          "sha256": "7e89cb779a7da12e7d76da89c14d2d42c8ea9513da497cc6de22ff917657f98a"
+        },
+        {
+          "path": "CONTRIBUTING.md",
+          "revision": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+          "gitBlob": "768523980c14db13055f22a68c7e9c5960013508",
+          "bytes": 12955,
+          "sha256": "8f6a653453b0282814a4a88dff0d8c0cb3d34ada1c700e6461b33096679d341d"
+        }
+      ],
+      "patchMetadataProjectionSha256": "b42628125cd77015dcc72f3b5777337131d855b800651787cd359cad6e41931f"
+    },
+    "correction": {
+      "initialProvisionalClaim": "Two direct overlaps at desktop parity-page-ready.mjs and parity-reads.test.mjs.",
+      "correctedConclusion": "Zero direct path intersections. Those harness files are already in main ancestry and are not in the exact current 927-to-025 33-file delta.",
+      "method": "Compared complete fixed GitHub compare file sets: 854-to-89 (83) against 927-to-025 (33).",
+      "initialClaimRetainedAsIncorrect": true
+    }
+  },
+  "findings": [
+    {
+      "topic": "TaskDetail read mount timing",
+      "paths": [
+        "components/workspace/task-detail.tsx",
+        "components/workspace/issue-threads.tsx",
+        "components/workspace/issue-activity-feed.tsx"
+      ],
+      "facts": [
+        "TaskForm now calls useAgentActivity(saved.id, openThread ?? null, showThread, !preview) at top level. Previously IssueThreads was rendered inside the syncState.ready || readOnly || preview editor branch.",
+        "useAgentActivity uses the existing issue-threads SWR key and pollIssueThreads reader, plus existing useAcceptanceTasks; disabled previews use a null SWR key and null acceptance scope. The existing live-key minimum interval remains 2000 ms.",
+        "Agent rows combine consecutive implement/plan runs, oldest first, show the last state and open the first run. Hidden-detail rows remain non-clickable. Factory check rows are filtered from these conversation stretches, rather than deleted from persistence."
+      ],
+      "implication": "The order/coalescing of task-page reads can change before document sync becomes ready. No additional SQL amount, polling count or latency is proven by static source."
+    },
+    {
+      "topic": "Native parity vs budget windows",
+      "paths": [
+        "apps/desktop/test/parity-fixtures.mjs",
+        "apps/desktop/test/parity-page-ready.mjs",
+        "apps/desktop/test/parity-reads.test.mjs",
+        "apps/desktop/test/parity.mjs",
+        "apps/desktop/test/lifecycle.mjs"
+      ],
+      "facts": [
+        "The task-thread parity ready predicate now waits for the pressed Open thread Codex Agent row; fixture.agentLabel is Codex and the corresponding regression expectation changes to the same accessible name.",
+        "The task creation event, right-pane reply readiness and pressed-row requirement remain. The main89 helper delta does not alter shared workspace navigation or lifecycle ready conditions.",
+        "Actual lifecycle login and first startup-pair windows end at coordinator-root usable(): fixture coordinator message plus visible/enabled/editable composer and a draft. They do not navigate TaskDetail.",
+        "No begin/end/checkpoint positions, SQL counters, budgets, delays or daemon scheduling are changed by this main advance."
+      ],
+      "implication": "The combined Native acceptance must preserve the new task/task-thread parity contract. There is no source proof that the TaskDetail change increases login or first-pair SQL. Actual new-window counts remain unknown."
+    },
+    {
+      "topic": "Production browser actor selectors and submission",
+      "paths": [
+        "scripts/acceptance/run-observability-browser.mjs",
+        "messages/en.json",
+        "messages/zh-CN.json"
+      ],
+      "facts": [
+        "Read the fixed025 actor: Email, Password, Sign in to the workspace, Workspace menu, Search everything, New task, Bot to hand it to, Coordinator, Machine, Mikka Cloud, Agent profile, Task description and Create task selectors are not among main89 message changes.",
+        "The actor does not open Agent activity rows or expand steps; after the one Create task click it waits for the dialog to close and leaves the same context observing.",
+        "No main89 change touches the actor, Replay marker/readiness, source version, account/workspace/profile checks, natural snapshot requirement, cleanup or the single submission click."
+      ],
+      "implication": "No selector repair is required from the examined diff. Successful official-build production interaction is not established by this source review; task-page activity after submission can have changed timing."
+    },
+    {
+      "topic": "SQL and observability compatibility",
+      "paths": [
+        "app/actions/agents.ts",
+        "lib/issue-threads.ts",
+        "lib/issue-run-conversation.ts"
+      ],
+      "facts": [
+        "The only database query edit in the83-path delta adds agentRuns.kind to an existing threadColumns projection; threadCursorColumns and threadListColumns inherit that projection.",
+        "The full action source retains issueThreadAccess, canReadThread, workspace/member restrictions, chain limit, filters, ordering and existing query calls. The extra column can change SQL text/structure fingerprints, not the number of calls for one unchanged invocation.",
+        "New command/tool count helpers are presentation projections. The diff contains no changes to stored provider tool IDs, actual generation tracing, sampler, exporter, propagation, PostHog settings, model execution or backend authorization."
+      ],
+      "implication": "No demonstrated permission, telemetry or SQL-count regression that needs an integration patch. Runtime read inventory is still measured at the full existing window."
+    },
+    {
+      "topic": "Other main changes and rules",
+      "facts": [
+        "Mobile changes add an iOS scroll-dependent bar backdrop and expandable existing thread-step details; original API/read/stop/composer calls remain in these patches. The screenshot script is a separately invoked fixture/local-read tool, not a production or Native workflow change.",
+        "AGENTS, CONTRIBUTING, review/docs and PR template now scope paid UI blocks to their shipped appearance with side-by-side review. Preserve these upstream requirements.",
+        "ui-policy adds an explicit asShipped path allowlist, currently empty; only semantic-colour and typography rules are filtered for future listed paths. Existing interaction/security/secret/paid-source and cloud-boundary checks remain.",
+        "No package/lockfile, migration, tracing/LLM transport, generated route registry, CI workflow or production actor file changes occur in this main advance. Six new PNGs were indexed by public Git blob only."
+      ],
+      "implication": "No hidden dependency requiring unrelated code edits was identified. Preserve all83 main changes when combining the existing owned33 delta."
+    }
+  ],
+  "risks": [
+    {
+      "category": "Source and merge preservation",
+      "level": "bounded",
+      "statement": "A zero direct path intersection permits preserving main89 plus the exact owned33 delta. It does not make the old025 whole tree a valid replacement for main. This review does not independently certify the subsequently constructed union tree."
+    },
+    {
+      "category": "Behavior and UI",
+      "level": "needs combined execution",
+      "statement": "TaskDetail read mounting and Agent-row accessible names are real behavior changes. The matching main parity fixtures/predicate/tests must remain together; no code-level mismatch was found."
+    },
+    {
+      "category": "Performance and Native budget",
+      "level": "unknown until measured",
+      "statement": "The former 025/0b Native361<=Web412 and startup179<=201 are historical source-bound results only. They are not assigned to the new union. No claimed new SQL delta, blanket extra-read conclusion, budget relaxation or timing/window change."
+    },
+    {
+      "category": "Security and privacy",
+      "level": "no blocker found within scope",
+      "statement": "Existing query authorization, null-detail handling, replay sanitation/consent/automation opt-in, metadata-only tracing and single-click account gates are unchanged in the examined integration surfaces. This is a bounded compatibility review, not a fresh security audit of every upstream feature."
+    },
+    {
+      "category": "Release and account coordination",
+      "level": "separate gate",
+      "statement": "No explicit1804 owner start/end/release was found in the observed1752 announcements or the all-comments1804 response (zero). Existing publisher activity and a separate1565 SMOKE mutex were announced. Absence of a window comment does not prove a free source/account window; withdrawn1506/1512 claims must not be reused."
+    }
+  ],
+  "queueObservation": {
+    "method": "One bounded1752 comments read since2026-11-09T07:20:00Z, plus1804 comments since07:00 and all-comments requests. No subsequent polling or publisher logs.",
+    "latestReturnedCommentCreatedAt": "2026-11-09T07:29:37Z",
+    "commentsReturned": 10,
+    "owner1804AllCommentsCount": 0,
+    "owner1804ExplicitWindow": null,
+    "announcements": [
+      {
+        "id": 6734600518,
+        "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6734600518",
+        "createdAt": "2026-11-09T07:24:39Z",
+        "updatedAt": "2026-11-09T07:24:39Z",
+        "meaning": "1506 explicitly withdrew its07:24-08:24 claim because1804 had entered main first. No merge or account/model action."
+      },
+      {
+        "id": 6734618751,
+        "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6734618751",
+        "createdAt": "2026-11-09T07:25:56Z",
+        "updatedAt": "2026-11-09T07:25:56Z",
+        "meaning": "1512 explicitly withdrew its07:25:15-08:25:15 claim; no merge/main write/dispatch/account/model action."
+      },
+      {
+        "id": 6734607748,
+        "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6734607748",
+        "createdAt": "2026-11-09T07:25:09Z",
+        "updatedAt": "2026-11-09T07:25:09Z",
+        "meaning": "1565 reported an approximately20-minute SMOKE mutex business-validation run42579076817, zero VM/coding threads, explicitly not a main/source window. This is an owner announcement, not independently inspected cleanup. Its separate1506-window reference was superseded by the explicit withdrawal."
+      },
+      {
+        "id": 6734644003,
+        "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6734644003",
+        "createdAt": "2026-11-09T07:27:41Z",
+        "updatedAt": "2026-11-09T07:27:41Z",
+        "meaning": "1505 reported main89 actual publishers and a ready1805 intent, while explicitly holding no main/Web/SMOKE window; ready intent is not an active hold."
+      }
+    ],
+    "readerDidNotClaimAnyWindow": true,
+    "credentialsRead": false,
+    "peerWorkflowLogsRead": 0,
+    "writerTerminalOrCleanupEstablishedByThisReview": false
+  },
+  "mainPathInventory": [
+    {
+      "path": ".claude/skills/README.md",
+      "status": "modified",
+      "newGitBlob": "240efb923bf80b6a7496c3abed8823699087f0ee",
+      "review": "text patch"
+    },
+    {
+      "path": ".github/pull_request_template.md",
+      "status": "modified",
+      "newGitBlob": "9dd766ad46de7fba1f4ec8f93aba6d65b67e1723",
+      "review": "text patch"
+    },
+    {
+      "path": "AGENTS.md",
+      "status": "modified",
+      "newGitBlob": "fa963e4d0a342002661c58772d370484e8af740a",
+      "review": "text patch"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "status": "modified",
+      "newGitBlob": "768523980c14db13055f22a68c7e9c5960013508",
+      "review": "text patch"
+    },
+    {
+      "path": "README.md",
+      "status": "modified",
+      "newGitBlob": "3e6889be962b2ba6c7063f94297d5a30376db3ca",
+      "review": "text patch"
+    },
+    {
+      "path": "README.zh-CN.md",
+      "status": "modified",
+      "newGitBlob": "74d25464bc7e41d119cea2b1efad8fee8358bca1",
+      "review": "text patch"
+    },
+    {
+      "path": "REVIEW.md",
+      "status": "modified",
+      "newGitBlob": "6a6164fe3dd966f9f25d8b047b7a6829c69eddda",
+      "review": "text patch"
+    },
+    {
+      "path": "app/actions/agents.ts",
+      "status": "modified",
+      "newGitBlob": "cf3ff573b89359a5d3d559a09d9283e6ad7ef971",
+      "review": "text patch"
+    },
+    {
+      "path": "apps/desktop/test/parity-fixtures.mjs",
+      "status": "modified",
+      "newGitBlob": "4823fbc5bab1831e20fab3dce051b67739caaa74",
+      "review": "text patch"
+    },
+    {
+      "path": "apps/desktop/test/parity-page-ready.mjs",
+      "status": "modified",
+      "newGitBlob": "b1c5f927ca512097b6a65b366619e66d9a3ef124",
+      "review": "text patch"
+    },
+    {
+      "path": "apps/desktop/test/parity-reads.test.mjs",
+      "status": "modified",
+      "newGitBlob": "b734fdfc8b96f7995970b8a90e83ca8129aa9646",
+      "review": "text patch"
+    },
+    {
+      "path": "apps/mobile/app/groups/[id].tsx",
+      "status": "modified",
+      "newGitBlob": "0d08a5df289a24aab4e0e312aa03a4571e159e7e",
+      "review": "text patch"
+    },
+    {
+      "path": "apps/mobile/app/thread/[id].tsx",
+      "status": "modified",
+      "newGitBlob": "eddbe922f05604029a5f67c5c004a1c62d292a3a",
+      "review": "text patch"
+    },
+    {
+      "path": "apps/mobile/components/BarBackdrop.tsx",
+      "status": "added",
+      "newGitBlob": "3006dd793964052287ac98668cc73212927054fd",
+      "review": "text patch"
+    },
+    {
+      "path": "apps/mobile/components/NavBar.tsx",
+      "status": "modified",
+      "newGitBlob": "9b18564ba17e175a03170cb008f54084112a3287",
+      "review": "text patch"
+    },
+    {
+      "path": "apps/mobile/components/nav-bar-options.ts",
+      "status": "modified",
+      "newGitBlob": "d4e4786688685d8803435895694fd00856aa1d54",
+      "review": "text patch"
+    },
+    {
+      "path": "apps/mobile/features/chat/components/chat-header.ios.tsx",
+      "status": "modified",
+      "newGitBlob": "5b57392601258707283ad62f726a13ae80b0d198",
+      "review": "text patch"
+    },
+    {
+      "path": "apps/mobile/features/chat/components/chat-header.types.ts",
+      "status": "modified",
+      "newGitBlob": "0d8aadf65f916f0c507f5b11634c891709b1bd8c",
+      "review": "text patch"
+    },
+    {
+      "path": "apps/mobile/features/chat/components/chat-message-list.tsx",
+      "status": "modified",
+      "newGitBlob": "3f878eff6e451574a99ff61353168d654e3fc7f9",
+      "review": "text patch"
+    },
+    {
+      "path": "apps/mobile/features/chat/components/chat-message-list.types.ts",
+      "status": "modified",
+      "newGitBlob": "b7c5aff4f4f5b7cfb013b1a4f49b5cd8bd99ab34",
+      "review": "text patch"
+    },
+    {
+      "path": "apps/mobile/features/chat/components/chat-message-list.web.tsx",
+      "status": "modified",
+      "newGitBlob": "28abc1ce737f9b820c678df5e30176d0355f1a79",
+      "review": "text patch"
+    },
+    {
+      "path": "apps/mobile/features/chat/screens/chat-screen.tsx",
+      "status": "modified",
+      "newGitBlob": "5f5f2e95e30a2b024540511674e64c375c177f3b",
+      "review": "text patch"
+    },
+    {
+      "path": "apps/mobile/features/tasks/components/thread-steps.tsx",
+      "status": "added",
+      "newGitBlob": "4a98405ab85b6170105dbf3bb277cb095d4b7d65",
+      "review": "text patch"
+    },
+    {
+      "path": "apps/mobile/features/tasks/model/thread-steps.ts",
+      "status": "added",
+      "newGitBlob": "6e03bf4815dc5327860a5ac5acdc18adbe5d3ca4",
+      "review": "text patch"
+    },
+    {
+      "path": "apps/mobile/features/tasks/screens/task-conversation-screen.tsx",
+      "status": "modified",
+      "newGitBlob": "d37fdf541991d51daa70f5e9eaa13369a1a138eb",
+      "review": "text patch"
+    },
+    {
+      "path": "apps/mobile/features/tasks/screens/task-screen.tsx",
+      "status": "modified",
+      "newGitBlob": "e6132c81c65e4066ed25653facdb7a385e030735",
+      "review": "text patch"
+    },
+    {
+      "path": "apps/mobile/scripts/steps-screenshots.mjs",
+      "status": "added",
+      "newGitBlob": "68914ad05e694157ff87f2cf3efaf000c000adc3",
+      "review": "text patch"
+    },
+    {
+      "path": "apps/mobile/tests/messages.test.mts",
+      "status": "modified",
+      "newGitBlob": "da51e739457af8f63de7853973ca2f3fc3c96c9c",
+      "review": "text patch"
+    },
+    {
+      "path": "apps/mobile/tests/nav-bar-options.test.mts",
+      "status": "modified",
+      "newGitBlob": "39ac2a34b3098ffaa91d206abe279bac8f2d0c27",
+      "review": "text patch"
+    },
+    {
+      "path": "apps/mobile/tests/task-groups.test.mts",
+      "status": "modified",
+      "newGitBlob": "ac95d2e77d758fd13ef5e0a2909671ac583484cb",
+      "review": "text patch"
+    },
+    {
+      "path": "components/nav/thread-list.tsx",
+      "status": "modified",
+      "newGitBlob": "dab03c1c0b12006a55dc763607d4675bdd326305",
+      "review": "text patch"
+    },
+    {
+      "path": "components/workspace/issue-activity-feed.tsx",
+      "status": "modified",
+      "newGitBlob": "ea617ebdc960e5c3b3a95af1759626f120b0f249",
+      "review": "text patch"
+    },
+    {
+      "path": "components/workspace/issue-thread-panel.tsx",
+      "status": "modified",
+      "newGitBlob": "3e07eacde5cf28eac30a66e4b50df8e1e8cbc5cf",
+      "review": "text patch"
+    },
+    {
+      "path": "components/workspace/issue-threads.tsx",
+      "status": "modified",
+      "newGitBlob": "5ae5cc571e64afb49539bfba8933e36806a507df",
+      "review": "text patch"
+    },
+    {
+      "path": "components/workspace/task-detail.tsx",
+      "status": "modified",
+      "newGitBlob": "9f7cfeb26e57ddf9a44e8895a2615bcd338b49ca",
+      "review": "text patch"
+    },
+    {
+      "path": "components/workspace/thread-steps.tsx",
+      "status": "modified",
+      "newGitBlob": "29b606c7fff355885453fae8538c3fc8696fcb03",
+      "review": "text patch"
+    },
+    {
+      "path": "docs/design/README.md",
+      "status": "modified",
+      "newGitBlob": "2ed2ed9e7dce35a4b595a1480b2d6c9b39da06b4",
+      "review": "text patch"
+    },
+    {
+      "path": "docs/design/brand.md",
+      "status": "modified",
+      "newGitBlob": "a70266f4a1de5e10fc3a79096215c655e4a8af77",
+      "review": "text patch"
+    },
+    {
+      "path": "docs/design/components.md",
+      "status": "modified",
+      "newGitBlob": "29063c1f771f755e8f6246190b9a72132a92c4e9",
+      "review": "text patch"
+    },
+    {
+      "path": "docs/design/decisions.md",
+      "status": "modified",
+      "newGitBlob": "28ca8763fb2ba13c1682cd76d653ed9120c304cb",
+      "review": "text patch"
+    },
+    {
+      "path": "docs/design/decisions/2026-11-01-0015-main-is-the-design.md",
+      "status": "modified",
+      "newGitBlob": "99e0514427ed170a5994cef35830f6769b5251e2",
+      "review": "text patch"
+    },
+    {
+      "path": "docs/design/decisions/2026-11-01-0330-ui-figma-and-skill-review-before-code.md",
+      "status": "modified",
+      "newGitBlob": "dab903dcaabf39013e61553960e3a86dfa01c9b6",
+      "review": "text patch"
+    },
+    {
+      "path": "docs/design/decisions/2026-11-01-1250-five-thread-groups.md",
+      "status": "modified",
+      "newGitBlob": "244b46c87b5067e0d4a00c7f39b1d7f10cb60d21",
+      "review": "text patch"
+    },
+    {
+      "path": "docs/design/decisions/2026-11-01-2230-nothing-on-bot-avatars.md",
+      "status": "modified",
+      "newGitBlob": "62dd6a13a21e0eb9ce74d69f92bd2ba468ced947",
+      "review": "text patch"
+    },
+    {
+      "path": "docs/design/decisions/2026-11-04-2230-design-review-checks.md",
+      "status": "modified",
+      "newGitBlob": "e34daf67523a06a4049cb1a8c6358708191a96d4",
+      "review": "text patch"
+    },
+    {
+      "path": "docs/design/decisions/2026-11-04-2320-reuse-existing-components.md",
+      "status": "modified",
+      "newGitBlob": "cb87600b092b7e8f554a454299a03a41286a244d",
+      "review": "text patch"
+    },
+    {
+      "path": "docs/design/decisions/2026-11-07-2045-tasks-only-threads-inside.md",
+      "status": "modified",
+      "newGitBlob": "b6eb40b477e5f7970bfa9c0d50eb037d458f7aa7",
+      "review": "text patch"
+    },
+    {
+      "path": "docs/design/decisions/2026-11-07-2230-one-icon-per-task-state.md",
+      "status": "modified",
+      "newGitBlob": "9c1236d1d9963ef4891ad64724fbe49b5c00fe4b",
+      "review": "text patch"
+    },
+    {
+      "path": "docs/design/decisions/2026-11-07-2300-one-conversation-per-task.md",
+      "status": "modified",
+      "newGitBlob": "5da2ff044c122efc4001ed85b98a91c2eecfbc8d",
+      "review": "text patch"
+    },
+    {
+      "path": "docs/design/decisions/2026-11-08-1230-coding-workspace.md",
+      "status": "modified",
+      "newGitBlob": "db67b7323842edff9327116e97f0298ab0028828",
+      "review": "text patch"
+    },
+    {
+      "path": "docs/design/decisions/2026-11-08-2130-conversation-bar-backdrop.md",
+      "status": "added",
+      "newGitBlob": "4a69ede345b3828bff4ab3bf1fb6afe07e6c846a",
+      "review": "text patch"
+    },
+    {
+      "path": "docs/design/decisions/2026-11-09-0045-no-attempt-word.md",
+      "status": "added",
+      "newGitBlob": "c2870e670ac43641d4e8e88168da9192edf7986e",
+      "review": "text patch"
+    },
+    {
+      "path": "docs/design/decisions/2026-11-09-0050-paid-blocks-as-shipped.md",
+      "status": "added",
+      "newGitBlob": "f7c76e8751116b6f8b15c153f6f71b9c3cd55d2d",
+      "review": "text patch"
+    },
+    {
+      "path": "docs/design/glossary.md",
+      "status": "modified",
+      "newGitBlob": "e35bd2da492cc4da80e83675886c10374ea8948c",
+      "review": "text patch"
+    },
+    {
+      "path": "docs/design/information-architecture.md",
+      "status": "modified",
+      "newGitBlob": "20e4f76ffe0b460396d8cc3e3e03c2f90bdebd88",
+      "review": "text patch"
+    },
+    {
+      "path": "docs/design/mobile-comma-redesign.md",
+      "status": "modified",
+      "newGitBlob": "681a29a608715731b8c9f37e79d9fdd77f747f79",
+      "review": "text patch"
+    },
+    {
+      "path": "docs/design/rules.md",
+      "status": "modified",
+      "newGitBlob": "cc115d464b83560a4ea1739bcfaaaa3dc22cec2d",
+      "review": "text patch"
+    },
+    {
+      "path": "docs/design/spec-template.md",
+      "status": "modified",
+      "newGitBlob": "cb15211b922ce8f577c88ed544e65c34038c525e",
+      "review": "text patch"
+    },
+    {
+      "path": "docs/design/thread-steps/dark-thread-before.png",
+      "status": "added",
+      "newGitBlob": "a4af337f45e96ffe6e33157e6c4a7a9547c5a200",
+      "review": "binary metadata only"
+    },
+    {
+      "path": "docs/design/thread-steps/dark-thread-open.png",
+      "status": "added",
+      "newGitBlob": "f8cab4edb72608c6d980abb8be1072225c46a3c9",
+      "review": "binary metadata only"
+    },
+    {
+      "path": "docs/design/thread-steps/dark-thread.png",
+      "status": "added",
+      "newGitBlob": "3695d160fb705ec0b2d45daee7b163b770cad03b",
+      "review": "binary metadata only"
+    },
+    {
+      "path": "docs/design/thread-steps/light-thread-before.png",
+      "status": "added",
+      "newGitBlob": "0ed1fd62e528bdce637608c2fcb20f258fa5e10f",
+      "review": "binary metadata only"
+    },
+    {
+      "path": "docs/design/thread-steps/light-thread-open.png",
+      "status": "added",
+      "newGitBlob": "857cd512c44a0143a2550cc110348295c9d0af76",
+      "review": "binary metadata only"
+    },
+    {
+      "path": "docs/design/thread-steps/light-thread.png",
+      "status": "added",
+      "newGitBlob": "3a5f538e6df49bfabef4ce99ec835933e916c826",
+      "review": "binary metadata only"
+    },
+    {
+      "path": "docs/review-checklist.md",
+      "status": "modified",
+      "newGitBlob": "be553fa618d6a481ea5d316b6475c5e094b3eca4",
+      "review": "text patch"
+    },
+    {
+      "path": "docs/settings.md",
+      "status": "modified",
+      "newGitBlob": "7b19d69c5e13b02faf7ea38543760202424c7eb0",
+      "review": "text patch"
+    },
+    {
+      "path": "docs/ui-overlay.md",
+      "status": "modified",
+      "newGitBlob": "99fef0f2d392f99cc4865404454fe8a60b570101",
+      "review": "text patch"
+    },
+    {
+      "path": "lib/issue-run-conversation.test.ts",
+      "status": "modified",
+      "newGitBlob": "599a40fe2ff8464c111f74b7f17afcf9cbaf9502",
+      "review": "text patch"
+    },
+    {
+      "path": "lib/issue-run-conversation.ts",
+      "status": "modified",
+      "newGitBlob": "eba2f1441731684aa31c4e33d45d39aa9e9d0a16",
+      "review": "text patch"
+    },
+    {
+      "path": "lib/issue-threads.test.ts",
+      "status": "modified",
+      "newGitBlob": "fe1239c339806d354baccfa0483bf54da4e39b36",
+      "review": "text patch"
+    },
+    {
+      "path": "lib/issue-threads.ts",
+      "status": "modified",
+      "newGitBlob": "44aafbb46338a4e3bf549987135b4e9b7622d6f1",
+      "review": "text patch"
+    },
+    {
+      "path": "messages/en.json",
+      "status": "modified",
+      "newGitBlob": "c816868eb3d7a324b6d602da9cef418350f0ee5f",
+      "review": "text patch"
+    },
+    {
+      "path": "messages/zh-CN.json",
+      "status": "modified",
+      "newGitBlob": "a8ba1c134b53694239d5b13701c65dbfb2cb4ba7",
+      "review": "text patch"
+    },
+    {
+      "path": "scripts/issue-readonly-dom.test.tsx",
+      "status": "modified",
+      "newGitBlob": "058833fe9f82e8b8aa3c1dc0ff7396f7f08301c2",
+      "review": "text patch"
+    },
+    {
+      "path": "scripts/issue-thread-acceptance.test.tsx",
+      "status": "modified",
+      "newGitBlob": "80bfbb3eefa4253ba6e662dd8820f4ceaed8d40c",
+      "review": "text patch"
+    },
+    {
+      "path": "scripts/lint-ui.mjs",
+      "status": "modified",
+      "newGitBlob": "9c2f44bc94cf1fbfe4fa8097caba8afc20b93268",
+      "review": "text patch"
+    },
+    {
+      "path": "scripts/task-detail-live.test.tsx",
+      "status": "modified",
+      "newGitBlob": "98cca710ae7ef7c154c742762cac16e4d4ba9f2b",
+      "review": "text patch"
+    },
+    {
+      "path": "scripts/thread-steps.test.tsx",
+      "status": "modified",
+      "newGitBlob": "79a7342fd04f0bbd0c6c722f5aa1e07e042b55b0",
+      "review": "text patch"
+    },
+    {
+      "path": "scripts/ui-policy.mjs",
+      "status": "modified",
+      "newGitBlob": "fbd927327c726f57c59e2b9ccaf070bed24c3659",
+      "review": "text patch"
+    },
+    {
+      "path": "scripts/ui-policy.test.mjs",
+      "status": "modified",
+      "newGitBlob": "756614319462ca8d02beaed0bd0bfca68fb42a27",
+      "review": "text patch"
+    },
+    {
+      "path": "tests/e2e/issue-page-overlap.spec.ts",
+      "status": "modified",
+      "newGitBlob": "5e624e54877993ebc5f1c5964dfe103b6bd30f89",
+      "review": "text patch"
+    },
+    {
+      "path": "tests/read-retry-toasts.test.tsx",
+      "status": "modified",
+      "newGitBlob": "006d0a8234dfee2cf9c061d66fa803c72634c75e",
+      "review": "text patch"
+    },
+    {
+      "path": "ui-policy.json",
+      "status": "modified",
+      "newGitBlob": "f7aa7e6c6932e9cc82ec2af96a8a930eedd89173",
+      "review": "text patch"
+    }
+  ],
+  "execution": {
+    "tests": 0,
+    "db": 0,
+    "vm": 0,
+    "nativeRuns": 0,
+    "models": 0,
+    "workflowsTriggered": 0,
+    "refsChanged": 0,
+    "repositoryFilesChanged": 0,
+    "publicMessagesPosted": 0,
+    "onlyAuthorizedMutation": "Create this immutable safe evidence blob after freezing its content; no ref change."
+  }
+}

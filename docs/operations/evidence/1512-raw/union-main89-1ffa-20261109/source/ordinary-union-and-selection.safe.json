@@ -1,0 +1,296 @@
+{
+  "schemaVersion": 1,
+  "kind": "actual-ci-selection-and-ordinary-union-publication",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pr": 1799,
+  "workflowRunId": 42580506632,
+  "selectionJobId": 129037801896,
+  "prHead": "1ffa581f16319381054e0636ae41e6292719a1fe",
+  "actualCheckout": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+  "actualCheckoutParents": [
+    "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+    "1ffa581f16319381054e0636ae41e6292719a1fe"
+  ],
+  "tree": "bc4d584fa651385886e79dc6359b1b43324425d1",
+  "publishedAt": "2026-11-09 07:37:19 UTC",
+  "mutation": {
+    "branch": "fix/1512-daemon-fixture-executable-20261109",
+    "expectedHead": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+    "force": false,
+    "mainWritten": false,
+    "intermediateCIRuns": 0
+  },
+  "union": {
+    "sourceHead": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+    "main": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+    "tree": "bc4d584fa651385886e79dc6359b1b43324425d1",
+    "mainChangedPathsSince927": 91,
+    "ownPaths": 33,
+    "directOverlap": 0,
+    "totalLeafCount": 6744,
+    "preservedMainLeafCount": 6711,
+    "ownLeafEntries": [
+      {
+        "path": "app/v1/devices/[deviceId]/repos/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/runs/route.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5a4c4f8486239161b325b9774b3086afe666dfa9"
+      },
+      {
+        "path": "apps/api/generated/routes.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "06017439de4b98555310e13c35c079bca379174f"
+      },
+      {
+        "path": "apps/api/generated/routes.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "16fe573dc6d192566f6bf2810b9ba94e186cba82"
+      },
+      {
+        "path": "docs/operations/tracing.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a02e4a5100c066d8564902ec287c9c92fee0d20e"
+      },
+      {
+        "path": "instrumentation-client.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "9109982d1c3245179b85a42d6969003aec2f5047"
+      },
+      {
+        "path": "lib/analytics-policy.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "152b941ff7b05004a7c57a909f776c6268ede106"
+      },
+      {
+        "path": "lib/coordinator/repository-resolution.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "a5157f09e8022bf9077053686d36aa02760a4e94"
+      },
+      {
+        "path": "lib/coordinator/repository-resolution.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "6826efdd6895fa3f584e35ff2f1edb527cd080fa"
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-context.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e32da5e4d7294af3363eb2de4623a52aeb7e4f47"
+      },
+      {
+        "path": "lib/device-enrollment.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "071b2243d35cd6fdd97b7be0f17f21728578c537"
+      },
+      {
+        "path": "lib/device-enrollment.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8fe53cb39985150e5fc05daa6370121cb5426d53"
+      },
+      {
+        "path": "lib/device-heartbeat.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "27bbb720ac8f5bd3716787db62eb11833e9f3530"
+      },
+      {
+        "path": "lib/device-management.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c2243c5732d67b3ff5444196ce3b45e9aca67805"
+      },
+      {
+        "path": "lib/device-unit-fence.db.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bc65b3faf494d2fd7c797b68f34d04227df38b7a"
+      },
+      {
+        "path": "lib/dispatch-timing.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f82563e766f5c0477479b2d487e0f92e60a08b75"
+      },
+      {
+        "path": "lib/personal-policy.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "fef80337b9b5244d2e8565236c6dd96f7d329acd"
+      },
+      {
+        "path": "lib/personal-policy.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "dc710f0a16a5e28e5a34d5112a86fab349a2639a"
+      },
+      {
+        "path": "lib/replay-readiness.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "d60598b09201228e23c5ac7a9df00938192f0e67"
+      },
+      {
+        "path": "lib/tracing/logs.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "737fa373e4a8333a4a703bf6133f9a533d585460"
+      },
+      {
+        "path": "lib/tracing/node.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "00775a5928228262a66b12b845ee0dc18f6c6047"
+      },
+      {
+        "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+        "mode": "100755",
+        "type": "blob",
+        "sha": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116"
+      },
+      {
+        "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+        "mode": "100755",
+        "type": "blob",
+        "sha": "2b4fd7946c39a83eac97def4bab1cf0839802a3b"
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2f6cb3ab32695c64fa67191653c0add6e8720b39"
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "56412efdfe5bc638496b89de56281360b4cbe9b5"
+      },
+      {
+        "path": "scripts/acceptance/run-observability.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "4ca2cf35c1f499b338469556836ae0505649e82a"
+      },
+      {
+        "path": "scripts/e2b/validate-template-subscriptions.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f36ecf2d08f1bc2754b21be0d47d149871bb67c5"
+      },
+      {
+        "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "628395f91d97a64655afb80117788d70207200c0"
+      },
+      {
+        "path": "tests/analytics-policy.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c904b35e3405353be5a549b0d53e2858e19c3454"
+      },
+      {
+        "path": "tests/cloud-dispatch-startup.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "609029dde521868c00ab7eb687394ad5cacd6183"
+      },
+      {
+        "path": "tests/replay-readiness.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "58e4706039dafe6901082676f37a3c92da613d43"
+      },
+      {
+        "path": "workflows/coordinator/factory-steps.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "0e2ecce921c4b56795ad1096f2b1eae987299e95"
+      },
+      {
+        "path": "workflows/coordinator/steps.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "8b7a5b06f3d1a9c0ebae03a434095a33fa552894"
+      }
+    ],
+    "reasonForNewNative": "TaskDetail activity/read mount, task presentation, and native task-thread parity-ready predicate changed upstream; actual combined Native parity verification is needed. Lifecycle full-login and original first-startup windows end at coordinator-root usable(); no source evidence currently establishes that this TaskDetail change adds SQL inside those two windows. Preserve prior 025 results as source-bound and record the new union's original full windows."
+  },
+  "selection": {
+    "full": true,
+    "docs_only": false,
+    "reasons": [
+      "deletion, rename or non-regular/mode-changing file",
+      "global configuration, schema, policy or security input",
+      "unmapped file",
+      "changed source has unresolved/generated imports"
+    ],
+    "unitCounts": {
+      "core": 57,
+      "integration": 29
+    },
+    "dbSuites": 72,
+    "dbMatrix": {
+      "shard": [
+        "1/4",
+        "2/4",
+        "3/4",
+        "4/4"
+      ]
+    },
+    "fullSelection": {
+      "bytes": 123548,
+      "sha256": "cf658839d0a35ced0088f0dcc3c0b1ccb91423f041b3eb1f7ee83d1f9d46da32"
+    }
+  },
+  "original": {
+    "jobId": 129037801896,
+    "runId": 42580506632,
+    "bytes": 563970,
+    "sha256": "c3a8c68e8f7cc6bb706ae826de6137a80bba56bd2fedab796958c389e2932041",
+    "lines": 5572,
+    "downloadCount": 1
+  },
+  "statusAtReceipt": "New exact-source CI in progress; previous 025 complete results remain historical only.",
+  "production": {
+    "acceptedACMECases": 0,
+    "dispatchStarted": false,
+    "accountWindow": false,
+    "sourceWindow": false
+  },
+  "privacy": {
+    "publicSelectionLogReviewed": true,
+    "knownSecretValuesIncluded": false,
+    "selectionParsing": "per-line timestamps removed for JSON parsing only; original bytes retained separately",
+    "review": {
+      "patternMatchCounts": {
+        "githubToken": 0,
+        "apiKey": 0,
+        "jwt": 0,
+        "privateKey": 0,
+        "email": 0
+      },
+      "authMetadataLines": 17,
+      "authLinesOnlyMaskedConfig": false,
+      "method": "Full raw string scanned for named credential/private-key/JWT/email patterns; actual selection JSON parsed independently; auth config lines inspected without emitting raw values.",
+      "scope": "No claim of universal secret detection.",
+      "authMetadataLineClassification": "All 17 inspected lines are masked Git checkout authorization/config cleanup, branch names, or selected source/test path names containing authorization; no exposed authorization value observed."
+    }
+  }
+}
