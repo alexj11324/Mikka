@@ -1,0 +1,175 @@
+TAP version 13
+# Subtest: publication reads complete file evidence and retains independently bound models, templates and all gates
+ok 1 - publication reads complete file evidence and retains independently bound models, templates and all gates
+  ---
+  duration_ms: 41.402821
+  type: 'test'
+  ...
+# Subtest: the publisher CLI reports a closed parse error without printing the report cause
+ok 2 - the publisher CLI reports a closed parse error without printing the report cause
+  ---
+  duration_ms: 86.25399
+  type: 'test'
+  ...
+# Subtest: conservation requires both strict installation and exact provider-only finalization changes
+ok 3 - conservation requires both strict installation and exact provider-only finalization changes
+  ---
+  duration_ms: 1.344169
+  type: 'test'
+  ...
+# Subtest: desktop exact root CA rotation permits only finalization with an unchanged installation proof
+ok 4 - desktop exact root CA rotation permits only finalization with an unchanged installation proof
+  ---
+  duration_ms: 0.599801
+  type: 'test'
+  ...
+# Subtest: claude exact root CA rotation permits only finalization with an unchanged installation proof
+ok 5 - claude exact root CA rotation permits only finalization with an unchanged installation proof
+  ---
+  duration_ms: 0.497818
+  type: 'test'
+  ...
+# Subtest: exact root CA publication rules preserve metadata and reject other certificate or CLI paths
+not ok 6 - exact root CA publication rules preserve metadata and reject other certificate or CLI paths
+  ---
+  duration_ms: 9.856959
+  type: 'test'
+  location: '/workspace/scratch/263e36984c81/publication-kind-regression-1505/candidate/scripts/e2b/publish-template-env.test.mjs:144:1'
+  failureType: 'testCodeFailure'
+  error: 'Missing expected exception.'
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected:
+  operator: 'throws'
+  stack: |-
+    TestContext.<anonymous> (file:///workspace/scratch/263e36984c81/publication-kind-regression-1505/candidate/scripts/e2b/publish-template-env.test.mjs:180:10)
+    Test.runInAsyncScope (node:async_hooks:227:14)
+    Test.run (node:internal/test_runner/test:1402:25)
+    Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+    Test.postRun (node:internal/test_runner/test:1542:19)
+    Test.run (node:internal/test_runner/test:1467:12)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: certificate conversion proof fixes the original bytes and exact link target
+ok 7 - certificate conversion proof fixes the original bytes and exact link target
+  ---
+  duration_ms: 1.914727
+  type: 'test'
+  ...
+# Subtest: verified versioned templates, worker and previous release go to production in one upsert
+ok 8 - verified versioned templates, worker and previous release go to production in one upsert
+  ---
+  duration_ms: 26.215394
+  type: 'test'
+  ...
+# Subtest: runtime configuration never asks Vercel to rebuild source; the caller must use Web deploy
+ok 9 - runtime configuration never asks Vercel to rebuild source; the caller must use Web deploy
+  ---
+  duration_ms: 6.128772
+  type: 'test'
+  ...
+# Subtest: an explicit refresh still requires a Web build after an earlier env write succeeded
+ok 10 - an explicit refresh still requires a Web build after an earlier env write succeeded
+  ---
+  duration_ms: 5.123747
+  type: 'test'
+  ...
+# Subtest: a readback mismatch fails before the caller can build
+ok 11 - a readback mismatch fails before the caller can build
+  ---
+  duration_ms: 7.41482
+  type: 'test'
+  ...
+# Subtest: an uncertain mutation is never retried; an explicit rerun reads it and still requires a build
+ok 12 - an uncertain mutation is never retried; an explicit rerun reads it and still requires a build
+  ---
+  duration_ms: 6.789841
+  type: 'test'
+  ...
+# Subtest: an HTTP mutation error has one attempt and never exposes the response body
+ok 13 - an HTTP mutation error has one attempt and never exposes the response body
+  ---
+  duration_ms: 2.293626
+  type: 'test'
+  ...
+# Subtest: main advancing during configuration reads prevents the single env mutation
+ok 14 - main advancing during configuration reads prevents the single env mutation
+  ---
+  duration_ms: 1.382808
+  type: 'test'
+  ...
+# Subtest: obsolete refreshes fail even when their old runtime env already matches
+ok 15 - obsolete refreshes fail even when their old runtime env already matches
+  ---
+  duration_ms: 0.468514
+  type: 'test'
+  ...
+# Subtest: a different serving alias or public version prevents every configuration write
+ok 16 - a different serving alias or public version prevents every configuration write
+  ---
+  duration_ms: 1.820685
+  type: 'test'
+  ...
+# Subtest: does not search past a newer application for an older matching READY deployment
+ok 17 - does not search past a newer application for an older matching READY deployment
+  ---
+  duration_ms: 0.563838
+  type: 'test'
+  ...
+# Subtest: refuses missing or short source identities and candidate mismatches before requests
+ok 18 - refuses missing or short source identities and candidate mismatches before requests
+  ---
+  duration_ms: 0.638259
+  type: 'test'
+  ...
+# Subtest: pair validation still rejects short worker SHA, odd or missing template IDs and unmeasured harnesses
+ok 19 - pair validation still rejects short worker SHA, odd or missing template IDs and unmeasured harnesses
+  ---
+  duration_ms: 0.249926
+  type: 'test'
+  ...
+# Subtest: only a complete matching runtime tuple returns the current worker hash
+ok 20 - only a complete matching runtime tuple returns the current worker hash
+  ---
+  duration_ms: 4.135222
+  type: 'test'
+  ...
+# Subtest: repairing a partial upsert keeps the last valid rollback snapshot
+ok 21 - repairing a partial upsert keeps the last valid rollback snapshot
+  ---
+  duration_ms: 2.18292
+  type: 'test'
+  ...
+# Subtest: a valid legacy official catalogue can be backed up while requiring fresh validation
+ok 22 - a valid legacy official catalogue can be backed up while requiring fresh validation
+  ---
+  duration_ms: 2.051813
+  type: 'test'
+  ...
+# Subtest: GitHub-only build timeline waits for source upload before the single runtime env publication
+ok 23 - GitHub-only build timeline waits for source upload before the single runtime env publication
+  ---
+  duration_ms: 5.716563
+  type: 'test'
+  ...
+# Subtest: publication requires both real subscriptions on these exact candidates before any network request
+ok 24 - publication requires both real subscriptions on these exact candidates before any network request
+  ---
+  duration_ms: 16.402291
+  type: 'test'
+  ...
+# Subtest: publication requires the same bounded bootstrap adoption proof after the native subscription passed
+ok 25 - publication requires the same bounded bootstrap adoption proof after the native subscription passed
+  ---
+  duration_ms: 3.32802
+  type: 'test'
+  ...
+1..25
+# tests 25
+# suites 0
+# pass 24
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 474.511521

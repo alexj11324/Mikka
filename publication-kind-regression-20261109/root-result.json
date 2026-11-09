@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "pr": 1835,
+  "head": "a83b2a0fbd0b8f45f2e59ce7ceda2f1e06d21055",
+  "parent": "cb2f771eeac0c8793e9f94b485dd87c7d5866b4c",
+  "tree": "99833a63d69f6b88c64b7c44b44df06d1a0506c5",
+  "files": [
+    {
+      "path": "scripts/e2b/publish-template-env.mjs",
+      "bytes": 17955,
+      "sha256": "15ed43dd07a4fe1a0ad81e04aa984bc468aa65f1b1d756cff293fd43dcd7b2ea",
+      "gitBlob": "676e0cf7af622b19ad3a1f530d91b4e6b4cc3095"
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.test.mjs",
+      "bytes": 35635,
+      "sha256": "c87eedc8823434026cecca793b5bea924ce510d570dfbce23f73f89aabd898d8",
+      "gitBlob": "52fac123eb4f1e6ba8513b38148295f2c2648458"
+    },
+    {
+      "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+      "bytes": 95749,
+      "sha256": "f8f139bace1d139f0872beacce19ade048acc5ebc4e7965172d77043eed7d05f",
+      "gitBlob": "f241e0ab27cc6443de15fb8bde794f376d5ef9ee"
+    }
+  ],
+  "rootPatchReviewed": true,
+  "rootIntegratedBytesMatchGreen": true,
+  "rootAdditionalTestRuns": 0,
+  "pythonMatcherAndPolicyUnchanged": true,
+  "newFormalSamples": 0,
+  "initialE2BPrRun": 42678667376,
+  "initialE2BPrConclusion": "success",
+  "completeCurrentHeadCiClaimed": false
+}

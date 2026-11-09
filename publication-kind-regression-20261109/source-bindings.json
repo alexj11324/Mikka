@@ -1,0 +1,106 @@
+{
+  "sourceDirectory": "/workspace/scratch/263e36984c81/Mikka-1505-ca-relinks",
+  "sourceBasis": "current on-disk dirty working tree; not HEAD",
+  "copiedDependencyClosure": [
+    {
+      "path": "package.json",
+      "bytes": 80877,
+      "sha256": "ed9893d62d9d90299de21eb0325e73ab3c97202dec5eafe3d9983c04b64a6add",
+      "gitBlobOid": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d"
+    },
+    {
+      "path": "tsconfig.json",
+      "bytes": 873,
+      "sha256": "9aa2e6ca4d1c06eaa646e5e2faa1146772545758cf751314f83a8c78618a4fa6",
+      "gitBlobOid": "48293d8237e1804840ec535a18bd5d1c7630eea6"
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.test.mjs",
+      "bytes": 33829,
+      "sha256": "ddd4d584ea03f2ceb6efa50623a419d7fcfa8be54cfaba99b06b890a842bf0a3",
+      "gitBlobOid": "86843115336fa4021df9ac33e387caab5cc04e64"
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.mjs",
+      "bytes": 17883,
+      "sha256": "2c15611a5304d3b5c4cf6b12e7969426dbc14c65404e1de197eab3aebd26819a",
+      "gitBlobOid": "56ca3993bf11e33ca02a28ccf0678a45ee509215"
+    },
+    {
+      "path": "scripts/e2b/runtime-report.mjs",
+      "bytes": 6202,
+      "sha256": "46e652c57a99658b66aa5079ed1d5ddbe226ee68a413dba3bb853c8cdefe0af3",
+      "gitBlobOid": "9f5a61c221f8e05d6b23252d86af528dc26bba3c"
+    },
+    {
+      "path": "scripts/e2b/e2b-finalization-files.json",
+      "bytes": 6238,
+      "sha256": "7d3abc6a73cfd56ee2bed51572db5b7d0e842db91df838f5dc40563b8c0ceb9c",
+      "gitBlobOid": "e6d19b5ed954d71c53a3ef32eed9c96a30943116"
+    },
+    {
+      "path": "scripts/e2b/e2b-certificate-relinks.json",
+      "bytes": 106533,
+      "sha256": "16f3341cf64a4c7fd739a50439e558db4643f23fdd1ec16a51b062c30f037b52",
+      "gitBlobOid": "ba210a72dff95a34120bcd6fb581fb54aa47b863"
+    },
+    {
+      "path": "scripts/release/web-deploy.mjs",
+      "bytes": 20124,
+      "sha256": "2428b9ddfc6d3b90a9a14e59d1e730813d18a9e56ad7c23252622d7e9bc1d5ab",
+      "gitBlobOid": "f1a2e150c3bb73fb15c6d1e5e325d5cc5187bd4b"
+    },
+    {
+      "path": "scripts/vercel-ignore-build.mjs",
+      "bytes": 2621,
+      "sha256": "bd16434eb54cbf56a83755a1c381cae6af7435a452bf4ada9b0e2bafaa877e0f",
+      "gitBlobOid": "48163515db21e0906cef15ead6f3401120bae165"
+    },
+    {
+      "path": "scripts/ci-docs-only.mjs",
+      "bytes": 6993,
+      "sha256": "c42b6617863ff137635a86fe5bddfdaeeb31cbdec8f9ace7e49e48ff6becf01a",
+      "gitBlobOid": "061fc3c63ba89fba911bd83247bedc79118927f7"
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.mjs",
+      "bytes": 85323,
+      "sha256": "4cdff20223c3e684512d7b6c95d573eb50d864eafcb680006be0aaf7c2b4a436",
+      "gitBlobOid": "6753c8aa8adf4354b60be3d62dcc5d5458f36cd9"
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup-evidence.mjs",
+      "bytes": 22658,
+      "sha256": "16010e124b5554fab29dd1b2e3fc372197c91cdd4987e0f438f43ec11460e7b9",
+      "gitBlobOid": "b5a85b795d3026c350ced9823eaac9488a3e0cda"
+    },
+    {
+      "path": "scripts/acceptance/team-workspace.mjs",
+      "bytes": 6653,
+      "sha256": "1a9139c9fa11076b0cf9c0786c286ef34c8b5f2b6951bc1664cb30d3a57873a5",
+      "gitBlobOid": "c8bcb85cdbda9d2b80217660c06a4e49d265c44f"
+    },
+    {
+      "path": "lib/smoke-account.ts",
+      "bytes": 417,
+      "sha256": "3e35f8082d618d412dc07d99815a6d2e37766824a9cbe188d20fce58fe7c7997",
+      "gitBlobOid": "7c669d4bee8636ba063ee92ace07dbaf75023033"
+    },
+    {
+      "path": "lib/desktop-rpc/wire.ts",
+      "bytes": 5364,
+      "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3",
+      "gitBlobOid": "2c72b5aafa3e6b8f4df8212072e6663e306d9318"
+    },
+    {
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "bytes": 18539,
+      "sha256": "4773724c6ccbeadd2b7cf6b1833028971d50e4774590d7a0f14e502c9c20c88e",
+      "gitBlobOid": "97cdc7dfefb5dfbe00e733ccb5559fae8de2dfa9"
+    }
+  ],
+  "dependencyReuse": "read-only resolution of existing Mikka-1505/node_modules; no install",
+  "node": "v24.22.1",
+  "nodeExecutable": "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+  "capturedAt": "2026-11-09T18:54:06.147676+00:00"
+}

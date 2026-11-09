@@ -1,0 +1,184 @@
+TAP version 13
+# Subtest: publication reads complete file evidence and retains independently bound models, templates and all gates
+ok 1 - publication reads complete file evidence and retains independently bound models, templates and all gates
+  ---
+  duration_ms: 35.07846
+  type: 'test'
+  ...
+# Subtest: the publisher CLI reports a closed parse error without printing the report cause
+ok 2 - the publisher CLI reports a closed parse error without printing the report cause
+  ---
+  duration_ms: 87.352683
+  type: 'test'
+  ...
+# Subtest: conservation requires both strict installation and exact provider-only finalization changes
+ok 3 - conservation requires both strict installation and exact provider-only finalization changes
+  ---
+  duration_ms: 1.856308
+  type: 'test'
+  ...
+# Subtest: desktop exact root CA rotation permits only finalization with an unchanged installation proof
+ok 4 - desktop exact root CA rotation permits only finalization with an unchanged installation proof
+  ---
+  duration_ms: 0.738039
+  type: 'test'
+  ...
+# Subtest: claude exact root CA rotation permits only finalization with an unchanged installation proof
+ok 5 - claude exact root CA rotation permits only finalization with an unchanged installation proof
+  ---
+  duration_ms: 0.496476
+  type: 'test'
+  ...
+# Subtest: codex exact root CA rotation permits only finalization with an unchanged installation proof
+ok 6 - codex exact root CA rotation permits only finalization with an unchanged installation proof
+  ---
+  duration_ms: 0.685309
+  type: 'test'
+  ...
+# Subtest: exact root CA publication rules preserve metadata and reject other certificate or CLI paths
+ok 7 - exact root CA publication rules preserve metadata and reject other certificate or CLI paths
+  ---
+  duration_ms: 10.334282
+  type: 'test'
+  ...
+# Subtest: Codex observed root CA mode-only finalization does not require a simultaneous digest change
+ok 8 - Codex observed root CA mode-only finalization does not require a simultaneous digest change
+  ---
+  duration_ms: 0.398979
+  type: 'test'
+  ...
+# Subtest: claude finalization requires the policy's original directory kind
+ok 9 - claude finalization requires the policy's original directory kind
+  ---
+  duration_ms: 1.376077
+  type: 'test'
+  ...
+# Subtest: codex finalization requires the policy's original file kind
+ok 10 - codex finalization requires the policy's original file kind
+  ---
+  duration_ms: 1.271019
+  type: 'test'
+  ...
+# Subtest: certificate conversion proof fixes the original bytes and exact link target
+ok 11 - certificate conversion proof fixes the original bytes and exact link target
+  ---
+  duration_ms: 2.586075
+  type: 'test'
+  ...
+# Subtest: verified versioned templates, worker and previous release go to production in one upsert
+ok 12 - verified versioned templates, worker and previous release go to production in one upsert
+  ---
+  duration_ms: 31.759454
+  type: 'test'
+  ...
+# Subtest: runtime configuration never asks Vercel to rebuild source; the caller must use Web deploy
+ok 13 - runtime configuration never asks Vercel to rebuild source; the caller must use Web deploy
+  ---
+  duration_ms: 4.51328
+  type: 'test'
+  ...
+# Subtest: an explicit refresh still requires a Web build after an earlier env write succeeded
+ok 14 - an explicit refresh still requires a Web build after an earlier env write succeeded
+  ---
+  duration_ms: 2.886015
+  type: 'test'
+  ...
+# Subtest: a readback mismatch fails before the caller can build
+ok 15 - a readback mismatch fails before the caller can build
+  ---
+  duration_ms: 3.758525
+  type: 'test'
+  ...
+# Subtest: an uncertain mutation is never retried; an explicit rerun reads it and still requires a build
+ok 16 - an uncertain mutation is never retried; an explicit rerun reads it and still requires a build
+  ---
+  duration_ms: 4.349563
+  type: 'test'
+  ...
+# Subtest: an HTTP mutation error has one attempt and never exposes the response body
+ok 17 - an HTTP mutation error has one attempt and never exposes the response body
+  ---
+  duration_ms: 2.059643
+  type: 'test'
+  ...
+# Subtest: main advancing during configuration reads prevents the single env mutation
+ok 18 - main advancing during configuration reads prevents the single env mutation
+  ---
+  duration_ms: 1.660944
+  type: 'test'
+  ...
+# Subtest: obsolete refreshes fail even when their old runtime env already matches
+ok 19 - obsolete refreshes fail even when their old runtime env already matches
+  ---
+  duration_ms: 0.576336
+  type: 'test'
+  ...
+# Subtest: a different serving alias or public version prevents every configuration write
+ok 20 - a different serving alias or public version prevents every configuration write
+  ---
+  duration_ms: 1.536438
+  type: 'test'
+  ...
+# Subtest: does not search past a newer application for an older matching READY deployment
+ok 21 - does not search past a newer application for an older matching READY deployment
+  ---
+  duration_ms: 0.871238
+  type: 'test'
+  ...
+# Subtest: refuses missing or short source identities and candidate mismatches before requests
+ok 22 - refuses missing or short source identities and candidate mismatches before requests
+  ---
+  duration_ms: 0.474763
+  type: 'test'
+  ...
+# Subtest: pair validation still rejects short worker SHA, odd or missing template IDs and unmeasured harnesses
+ok 23 - pair validation still rejects short worker SHA, odd or missing template IDs and unmeasured harnesses
+  ---
+  duration_ms: 0.248724
+  type: 'test'
+  ...
+# Subtest: only a complete matching runtime tuple returns the current worker hash
+ok 24 - only a complete matching runtime tuple returns the current worker hash
+  ---
+  duration_ms: 3.036441
+  type: 'test'
+  ...
+# Subtest: repairing a partial upsert keeps the last valid rollback snapshot
+ok 25 - repairing a partial upsert keeps the last valid rollback snapshot
+  ---
+  duration_ms: 2.25663
+  type: 'test'
+  ...
+# Subtest: a valid legacy official catalogue can be backed up while requiring fresh validation
+ok 26 - a valid legacy official catalogue can be backed up while requiring fresh validation
+  ---
+  duration_ms: 3.057062
+  type: 'test'
+  ...
+# Subtest: GitHub-only build timeline waits for source upload before the single runtime env publication
+ok 27 - GitHub-only build timeline waits for source upload before the single runtime env publication
+  ---
+  duration_ms: 4.492778
+  type: 'test'
+  ...
+# Subtest: publication requires both real subscriptions on these exact candidates before any network request
+ok 28 - publication requires both real subscriptions on these exact candidates before any network request
+  ---
+  duration_ms: 14.359188
+  type: 'test'
+  ...
+# Subtest: publication requires the same bounded bootstrap adoption proof after the native subscription passed
+ok 29 - publication requires the same bounded bootstrap adoption proof after the native subscription passed
+  ---
+  duration_ms: 3.011995
+  type: 'test'
+  ...
+1..29
+# tests 29
+# suites 0
+# pass 29
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 442.148474

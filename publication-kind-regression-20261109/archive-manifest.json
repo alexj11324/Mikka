@@ -1,0 +1,569 @@
+{
+  "version": 1,
+  "archivePrefix": "publication-kind-regression-20261109",
+  "evidenceParent": "22593cfe401975e09af36374fa958c51b9a2fd9a",
+  "originalManifestListedCount": 47,
+  "originalAgentPackageCountIncludingManifest": 48,
+  "rootReceiptPaths": [
+    "e2b-ci-steps.json",
+    "root-binding.json",
+    "root-result.json"
+  ],
+  "rootBindingAlreadyInOriginalManifest": true,
+  "additionalRootFilesCount": 2,
+  "originalDistinctFileCount": 50,
+  "originalBytes": 1096723,
+  "sourceFiles": [
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/README.md",
+      "path": "README.md",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 4132,
+      "sha256": "3b3b64c44710db8741766a077daa521727a81069f8701f5187aa799e173e509c",
+      "gitBlob": "b8280549f21ec8a6e14b7505454439003da68adb",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/candidate.patch",
+      "path": "candidate.patch",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 4147,
+      "sha256": "10a7ac44cee9ca79a137a37fa51b9a079a3c55dbf3886d6f8b5c81db3e75acd7",
+      "gitBlob": "f6d67b2b1f9c0d3dd35dadba655173f4a1cb4646",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/candidate/.github/workflows/e2b-official-runtime.yml",
+      "path": "candidate/.github/workflows/e2b-official-runtime.yml",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 18539,
+      "sha256": "4773724c6ccbeadd2b7cf6b1833028971d50e4774590d7a0f14e502c9c20c88e",
+      "gitBlob": "97cdc7dfefb5dfbe00e733ccb5559fae8de2dfa9",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/candidate/lib/desktop-rpc/wire.ts",
+      "path": "candidate/lib/desktop-rpc/wire.ts",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 5364,
+      "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3",
+      "gitBlob": "2c72b5aafa3e6b8f4df8212072e6663e306d9318",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/candidate/lib/smoke-account.ts",
+      "path": "candidate/lib/smoke-account.ts",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 417,
+      "sha256": "3e35f8082d618d412dc07d99815a6d2e37766824a9cbe188d20fce58fe7c7997",
+      "gitBlob": "7c669d4bee8636ba063ee92ace07dbaf75023033",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/candidate/package.json",
+      "path": "candidate/package.json",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 80877,
+      "sha256": "ed9893d62d9d90299de21eb0325e73ab3c97202dec5eafe3d9983c04b64a6add",
+      "gitBlob": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/candidate/scripts/acceptance/cloud-startup-evidence.mjs",
+      "path": "candidate/scripts/acceptance/cloud-startup-evidence.mjs",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 22658,
+      "sha256": "16010e124b5554fab29dd1b2e3fc372197c91cdd4987e0f438f43ec11460e7b9",
+      "gitBlob": "b5a85b795d3026c350ced9823eaac9488a3e0cda",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/candidate/scripts/acceptance/cloud-startup.mjs",
+      "path": "candidate/scripts/acceptance/cloud-startup.mjs",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 85323,
+      "sha256": "4cdff20223c3e684512d7b6c95d573eb50d864eafcb680006be0aaf7c2b4a436",
+      "gitBlob": "6753c8aa8adf4354b60be3d62dcc5d5458f36cd9",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/candidate/scripts/acceptance/team-workspace.mjs",
+      "path": "candidate/scripts/acceptance/team-workspace.mjs",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 6653,
+      "sha256": "1a9139c9fa11076b0cf9c0786c286ef34c8b5f2b6951bc1664cb30d3a57873a5",
+      "gitBlob": "c8bcb85cdbda9d2b80217660c06a4e49d265c44f",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/candidate/scripts/ci-docs-only.mjs",
+      "path": "candidate/scripts/ci-docs-only.mjs",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 6993,
+      "sha256": "c42b6617863ff137635a86fe5bddfdaeeb31cbdec8f9ace7e49e48ff6becf01a",
+      "gitBlob": "061fc3c63ba89fba911bd83247bedc79118927f7",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/candidate/scripts/e2b/e2b-certificate-relinks.json",
+      "path": "candidate/scripts/e2b/e2b-certificate-relinks.json",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 106533,
+      "sha256": "16f3341cf64a4c7fd739a50439e558db4643f23fdd1ec16a51b062c30f037b52",
+      "gitBlob": "ba210a72dff95a34120bcd6fb581fb54aa47b863",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/candidate/scripts/e2b/e2b-finalization-files.json",
+      "path": "candidate/scripts/e2b/e2b-finalization-files.json",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 6238,
+      "sha256": "7d3abc6a73cfd56ee2bed51572db5b7d0e842db91df838f5dc40563b8c0ceb9c",
+      "gitBlob": "e6d19b5ed954d71c53a3ef32eed9c96a30943116",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/candidate/scripts/e2b/publish-template-env.mjs",
+      "path": "candidate/scripts/e2b/publish-template-env.mjs",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 17955,
+      "sha256": "15ed43dd07a4fe1a0ad81e04aa984bc468aa65f1b1d756cff293fd43dcd7b2ea",
+      "gitBlob": "676e0cf7af622b19ad3a1f530d91b4e6b4cc3095",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/candidate/scripts/e2b/publish-template-env.test.mjs",
+      "path": "candidate/scripts/e2b/publish-template-env.test.mjs",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 35635,
+      "sha256": "c87eedc8823434026cecca793b5bea924ce510d570dfbce23f73f89aabd898d8",
+      "gitBlob": "52fac123eb4f1e6ba8513b38148295f2c2648458",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/candidate/scripts/e2b/runtime-report.mjs",
+      "path": "candidate/scripts/e2b/runtime-report.mjs",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 6202,
+      "sha256": "46e652c57a99658b66aa5079ed1d5ddbe226ee68a413dba3bb853c8cdefe0af3",
+      "gitBlob": "9f5a61c221f8e05d6b23252d86af528dc26bba3c",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/candidate/scripts/release/web-deploy.mjs",
+      "path": "candidate/scripts/release/web-deploy.mjs",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 20124,
+      "sha256": "2428b9ddfc6d3b90a9a14e59d1e730813d18a9e56ad7c23252622d7e9bc1d5ab",
+      "gitBlob": "f1a2e150c3bb73fb15c6d1e5e325d5cc5187bd4b",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/candidate/scripts/vercel-ignore-build.mjs",
+      "path": "candidate/scripts/vercel-ignore-build.mjs",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 2621,
+      "sha256": "bd16434eb54cbf56a83755a1c381cae6af7435a452bf4ada9b0e2bafaa877e0f",
+      "gitBlob": "48163515db21e0906cef15ead6f3401120bae165",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/candidate/tsconfig.json",
+      "path": "candidate/tsconfig.json",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 873,
+      "sha256": "9aa2e6ca4d1c06eaa646e5e2faa1146772545758cf751314f83a8c78618a4fa6",
+      "gitBlob": "48293d8237e1804840ec535a18bd5d1c7630eea6",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/e2b-ci-steps.json",
+      "path": "e2b-ci-steps.json",
+      "listedInOriginalManifest": false,
+      "rootEvidence": true,
+      "bytes": 12001,
+      "sha256": "74ed5b66e3eb165b30e97525410ea36fcdd0eb98f1b1ce99384668a6e6547d2a",
+      "gitBlob": "1ef05e40747cb925a210be32df299634f28e3d37",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/manifest.json",
+      "path": "manifest.json",
+      "listedInOriginalManifest": false,
+      "rootEvidence": false,
+      "bytes": 11302,
+      "sha256": "7eba8fd216abfdd0c2383b521488079844c450497e6f5e5163fda9dfffe373ef",
+      "gitBlob": "693d39b57fa48dfbf3bdf5cf2a6c8a4b3b6fa8ec",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/original/.github/workflows/e2b-official-runtime.yml",
+      "path": "original/.github/workflows/e2b-official-runtime.yml",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 18539,
+      "sha256": "4773724c6ccbeadd2b7cf6b1833028971d50e4774590d7a0f14e502c9c20c88e",
+      "gitBlob": "97cdc7dfefb5dfbe00e733ccb5559fae8de2dfa9",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/original/lib/desktop-rpc/wire.ts",
+      "path": "original/lib/desktop-rpc/wire.ts",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 5364,
+      "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3",
+      "gitBlob": "2c72b5aafa3e6b8f4df8212072e6663e306d9318",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/original/lib/smoke-account.ts",
+      "path": "original/lib/smoke-account.ts",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 417,
+      "sha256": "3e35f8082d618d412dc07d99815a6d2e37766824a9cbe188d20fce58fe7c7997",
+      "gitBlob": "7c669d4bee8636ba063ee92ace07dbaf75023033",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/original/package.json",
+      "path": "original/package.json",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 80877,
+      "sha256": "ed9893d62d9d90299de21eb0325e73ab3c97202dec5eafe3d9983c04b64a6add",
+      "gitBlob": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/original/scripts/acceptance/cloud-startup-evidence.mjs",
+      "path": "original/scripts/acceptance/cloud-startup-evidence.mjs",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 22658,
+      "sha256": "16010e124b5554fab29dd1b2e3fc372197c91cdd4987e0f438f43ec11460e7b9",
+      "gitBlob": "b5a85b795d3026c350ced9823eaac9488a3e0cda",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/original/scripts/acceptance/cloud-startup.mjs",
+      "path": "original/scripts/acceptance/cloud-startup.mjs",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 85323,
+      "sha256": "4cdff20223c3e684512d7b6c95d573eb50d864eafcb680006be0aaf7c2b4a436",
+      "gitBlob": "6753c8aa8adf4354b60be3d62dcc5d5458f36cd9",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/original/scripts/acceptance/team-workspace.mjs",
+      "path": "original/scripts/acceptance/team-workspace.mjs",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 6653,
+      "sha256": "1a9139c9fa11076b0cf9c0786c286ef34c8b5f2b6951bc1664cb30d3a57873a5",
+      "gitBlob": "c8bcb85cdbda9d2b80217660c06a4e49d265c44f",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/original/scripts/ci-docs-only.mjs",
+      "path": "original/scripts/ci-docs-only.mjs",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 6993,
+      "sha256": "c42b6617863ff137635a86fe5bddfdaeeb31cbdec8f9ace7e49e48ff6becf01a",
+      "gitBlob": "061fc3c63ba89fba911bd83247bedc79118927f7",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/original/scripts/e2b/e2b-certificate-relinks.json",
+      "path": "original/scripts/e2b/e2b-certificate-relinks.json",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 106533,
+      "sha256": "16f3341cf64a4c7fd739a50439e558db4643f23fdd1ec16a51b062c30f037b52",
+      "gitBlob": "ba210a72dff95a34120bcd6fb581fb54aa47b863",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/original/scripts/e2b/e2b-finalization-files.json",
+      "path": "original/scripts/e2b/e2b-finalization-files.json",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 6238,
+      "sha256": "7d3abc6a73cfd56ee2bed51572db5b7d0e842db91df838f5dc40563b8c0ceb9c",
+      "gitBlob": "e6d19b5ed954d71c53a3ef32eed9c96a30943116",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/original/scripts/e2b/publish-template-env.mjs",
+      "path": "original/scripts/e2b/publish-template-env.mjs",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 17883,
+      "sha256": "2c15611a5304d3b5c4cf6b12e7969426dbc14c65404e1de197eab3aebd26819a",
+      "gitBlob": "56ca3993bf11e33ca02a28ccf0678a45ee509215",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/original/scripts/e2b/publish-template-env.test.mjs",
+      "path": "original/scripts/e2b/publish-template-env.test.mjs",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 33829,
+      "sha256": "ddd4d584ea03f2ceb6efa50623a419d7fcfa8be54cfaba99b06b890a842bf0a3",
+      "gitBlob": "86843115336fa4021df9ac33e387caab5cc04e64",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/original/scripts/e2b/runtime-report.mjs",
+      "path": "original/scripts/e2b/runtime-report.mjs",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 6202,
+      "sha256": "46e652c57a99658b66aa5079ed1d5ddbe226ee68a413dba3bb853c8cdefe0af3",
+      "gitBlob": "9f5a61c221f8e05d6b23252d86af528dc26bba3c",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/original/scripts/release/web-deploy.mjs",
+      "path": "original/scripts/release/web-deploy.mjs",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 20124,
+      "sha256": "2428b9ddfc6d3b90a9a14e59d1e730813d18a9e56ad7c23252622d7e9bc1d5ab",
+      "gitBlob": "f1a2e150c3bb73fb15c6d1e5e325d5cc5187bd4b",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/original/scripts/vercel-ignore-build.mjs",
+      "path": "original/scripts/vercel-ignore-build.mjs",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 2621,
+      "sha256": "bd16434eb54cbf56a83755a1c381cae6af7435a452bf4ada9b0e2bafaa877e0f",
+      "gitBlob": "48163515db21e0906cef15ead6f3401120bae165",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/original/tsconfig.json",
+      "path": "original/tsconfig.json",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 873,
+      "sha256": "9aa2e6ca4d1c06eaa646e5e2faa1146772545758cf751314f83a8c78618a4fa6",
+      "gitBlob": "48293d8237e1804840ec535a18bd5d1c7630eea6",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/review-receipt.json",
+      "path": "review-receipt.json",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 25093,
+      "sha256": "79e91f9d7382bd8295b53811bb9ea2b7b7d230acd8317cdaa5e3b2442c67cf79",
+      "gitBlob": "1ffb490073e8540a66f86d73fc517275554c65e0",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/root-binding.json",
+      "path": "root-binding.json",
+      "listedInOriginalManifest": true,
+      "rootEvidence": true,
+      "bytes": 152299,
+      "sha256": "35ab78be843208f9c4505b40f0192fbdb3dda75e303f836099caf29a605133bb",
+      "gitBlob": "0ceb940e9c462625d81bdc8a773dbeca00909096",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/root-result.json",
+      "path": "root-result.json",
+      "listedInOriginalManifest": false,
+      "rootEvidence": true,
+      "bytes": 1237,
+      "sha256": "fd37dcef88705729287e96b7c36dde76bac75c91db2ceef7b4b2564faed907bc",
+      "gitBlob": "23ff8ca9bdb528d3f1ffc4bdd0d83bf3a2c70d7f",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/run-validation.py",
+      "path": "run-validation.py",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 2377,
+      "sha256": "dd5b812e6cb1fcf8ffeaf3f923f3f01c5e1e90a758d6ca7b765a13763a448b0b",
+      "gitBlob": "88d02fc7c01ea7d25356da0c89809a66e4340c7e",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/source-bindings.json",
+      "path": "source-bindings.json",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 4130,
+      "sha256": "60c704dc02495bcb709b59cd3f08fb0662e51b5f72cf6e7c43cd72d49722209e",
+      "gitBlob": "46dc57a6061f1d53969e9ca9356645a467cef30d",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/validation/baseline-red.result.json",
+      "path": "validation/baseline-red.result.json",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 4379,
+      "sha256": "93ef056fb2832d234214a8953534d279f357e8a481b24db7f84ee60598359436",
+      "gitBlob": "ed9598593f2421bf0193adcf532aa0de92c33e2c",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/validation/baseline-red.stderr.txt",
+      "path": "validation/baseline-red.stderr.txt",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/validation/baseline-red.stdout.txt",
+      "path": "validation/baseline-red.stdout.txt",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 6941,
+      "sha256": "385162918cd6941ed27e6f9c82ef2447491ef16d20086d8d40ac200d8d15b83c",
+      "gitBlob": "175c7c329f2f03c38aaff35e70ce062ef82e75dc",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/validation/green.result.json",
+      "path": "validation/green.result.json",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 4401,
+      "sha256": "fa214474f515cf5d89b10412182e7e2f2a987961c374888a3c18a4db817c72a5",
+      "gitBlob": "86de7d2d6d0163dd161b2fbcf6319abc624b6a01",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/validation/green.stderr.txt",
+      "path": "validation/green.stderr.txt",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/validation/green.stdout.txt",
+      "path": "validation/green.stdout.txt",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 7009,
+      "sha256": "f1303978cc19fd2db946fe6bd52e40006c3fced7b62f5b9610c6a245659a9ced",
+      "gitBlob": "377523dfe8f92f06c11ab52afcff4ec690ee9556",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/validation/guard-red.result.json",
+      "path": "validation/guard-red.result.json",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 4405,
+      "sha256": "370104ad773d33e83a96796a9b1a222e1bec32924b6c46563fb58db1dc6779aa",
+      "gitBlob": "bf33610abc01114966c96b48e0665ee8eed8fd58",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/validation/guard-red.stderr.txt",
+      "path": "validation/guard-red.stderr.txt",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/validation/guard-red.stdout.txt",
+      "path": "validation/guard-red.stdout.txt",
+      "listedInOriginalManifest": true,
+      "rootEvidence": false,
+      "bytes": 8738,
+      "sha256": "9cdd18e475584866e92cf46f34b4665674ed913aaaa14eaa656be9dd2b1813a9",
+      "gitBlob": "8e6380d4d03e6e7b2a7c01736d505a8e78636650",
+      "mode": "100644"
+    }
+  ],
+  "sourceFilesUnchanged": true,
+  "excluded": [
+    {
+      "path": "candidate/node_modules",
+      "kind": "symlink",
+      "targetTraversed": false,
+      "copied": false
+    }
+  ],
+  "generatedFiles": [
+    {
+      "path": "ARCHIVE-README.md",
+      "bytes": 2256,
+      "sha256": "39ae98a4c30640ef31085edd9a4efc6f2e2ad7c0cebd479fe896f968dc1c8886",
+      "gitBlob": "78e26732908b3a1a5b3632453ae60e8e5001cc75",
+      "mode": "100644"
+    }
+  ],
+  "scope": {
+    "localBaseline": {
+      "pass": 24,
+      "fail": 1
+    },
+    "localGuardRed": {
+      "pass": 27,
+      "fail": 2
+    },
+    "localGreen": {
+      "pass": 29,
+      "fail": 0
+    },
+    "rootEvidenceKeptSeparate": true,
+    "head": "a83b2a0fbd0b8f45f2e59ce7ceda2f1e06d21055",
+    "parent": "cb2f771eeac0c8793e9f94b485dd87c7d5866b4c",
+    "tree": "99833a63d69f6b88c64b7c44b44df06d1a0506c5",
+    "pythonMatcherAndPolicyUnchanged": true,
+    "e2bPrRun": 42678667376,
+    "e2bPrAttempt": 1,
+    "e2bPrTest": "success",
+    "otherSixJobs": "skipped",
+    "productionR7PassAsserted": false,
+    "completeCurrentHeadCiClaimed": false,
+    "newFormalSamples": 0
+  },
+  "archiveOnly": {
+    "newTests": 0,
+    "originalLogDownloads": 0,
+    "artifactDownloads": 0,
+    "productionActions": 0,
+    "refMutations": 0
+  }
+}

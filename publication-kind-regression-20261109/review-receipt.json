@@ -1,0 +1,639 @@
+{
+  "scope": "local offline publication-consumer contract repair; no release/production claim",
+  "policyAndPythonMatcherChanged": false,
+  "candidatePaths": [
+    "scripts/e2b/publish-template-env.mjs",
+    "scripts/e2b/publish-template-env.test.mjs"
+  ],
+  "sourceConservation": [
+    {
+      "path": "package.json",
+      "original": {
+        "bytes": 80877,
+        "sha256": "ed9893d62d9d90299de21eb0325e73ab3c97202dec5eafe3d9983c04b64a6add",
+        "gitBlobOid": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d"
+      },
+      "candidate": {
+        "bytes": 80877,
+        "sha256": "ed9893d62d9d90299de21eb0325e73ab3c97202dec5eafe3d9983c04b64a6add",
+        "gitBlobOid": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d"
+      },
+      "candidateChanged": false,
+      "rootSourceStillMatchesSnapshot": true
+    },
+    {
+      "path": "tsconfig.json",
+      "original": {
+        "bytes": 873,
+        "sha256": "9aa2e6ca4d1c06eaa646e5e2faa1146772545758cf751314f83a8c78618a4fa6",
+        "gitBlobOid": "48293d8237e1804840ec535a18bd5d1c7630eea6"
+      },
+      "candidate": {
+        "bytes": 873,
+        "sha256": "9aa2e6ca4d1c06eaa646e5e2faa1146772545758cf751314f83a8c78618a4fa6",
+        "gitBlobOid": "48293d8237e1804840ec535a18bd5d1c7630eea6"
+      },
+      "candidateChanged": false,
+      "rootSourceStillMatchesSnapshot": true
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.test.mjs",
+      "original": {
+        "bytes": 33829,
+        "sha256": "ddd4d584ea03f2ceb6efa50623a419d7fcfa8be54cfaba99b06b890a842bf0a3",
+        "gitBlobOid": "86843115336fa4021df9ac33e387caab5cc04e64"
+      },
+      "candidate": {
+        "bytes": 35635,
+        "sha256": "c87eedc8823434026cecca793b5bea924ce510d570dfbce23f73f89aabd898d8",
+        "gitBlobOid": "52fac123eb4f1e6ba8513b38148295f2c2648458"
+      },
+      "candidateChanged": true,
+      "rootSourceStillMatchesSnapshot": true
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.mjs",
+      "original": {
+        "bytes": 17883,
+        "sha256": "2c15611a5304d3b5c4cf6b12e7969426dbc14c65404e1de197eab3aebd26819a",
+        "gitBlobOid": "56ca3993bf11e33ca02a28ccf0678a45ee509215"
+      },
+      "candidate": {
+        "bytes": 17955,
+        "sha256": "15ed43dd07a4fe1a0ad81e04aa984bc468aa65f1b1d756cff293fd43dcd7b2ea",
+        "gitBlobOid": "676e0cf7af622b19ad3a1f530d91b4e6b4cc3095"
+      },
+      "candidateChanged": true,
+      "rootSourceStillMatchesSnapshot": true
+    },
+    {
+      "path": "scripts/e2b/runtime-report.mjs",
+      "original": {
+        "bytes": 6202,
+        "sha256": "46e652c57a99658b66aa5079ed1d5ddbe226ee68a413dba3bb853c8cdefe0af3",
+        "gitBlobOid": "9f5a61c221f8e05d6b23252d86af528dc26bba3c"
+      },
+      "candidate": {
+        "bytes": 6202,
+        "sha256": "46e652c57a99658b66aa5079ed1d5ddbe226ee68a413dba3bb853c8cdefe0af3",
+        "gitBlobOid": "9f5a61c221f8e05d6b23252d86af528dc26bba3c"
+      },
+      "candidateChanged": false,
+      "rootSourceStillMatchesSnapshot": true
+    },
+    {
+      "path": "scripts/e2b/e2b-finalization-files.json",
+      "original": {
+        "bytes": 6238,
+        "sha256": "7d3abc6a73cfd56ee2bed51572db5b7d0e842db91df838f5dc40563b8c0ceb9c",
+        "gitBlobOid": "e6d19b5ed954d71c53a3ef32eed9c96a30943116"
+      },
+      "candidate": {
+        "bytes": 6238,
+        "sha256": "7d3abc6a73cfd56ee2bed51572db5b7d0e842db91df838f5dc40563b8c0ceb9c",
+        "gitBlobOid": "e6d19b5ed954d71c53a3ef32eed9c96a30943116"
+      },
+      "candidateChanged": false,
+      "rootSourceStillMatchesSnapshot": true
+    },
+    {
+      "path": "scripts/e2b/e2b-certificate-relinks.json",
+      "original": {
+        "bytes": 106533,
+        "sha256": "16f3341cf64a4c7fd739a50439e558db4643f23fdd1ec16a51b062c30f037b52",
+        "gitBlobOid": "ba210a72dff95a34120bcd6fb581fb54aa47b863"
+      },
+      "candidate": {
+        "bytes": 106533,
+        "sha256": "16f3341cf64a4c7fd739a50439e558db4643f23fdd1ec16a51b062c30f037b52",
+        "gitBlobOid": "ba210a72dff95a34120bcd6fb581fb54aa47b863"
+      },
+      "candidateChanged": false,
+      "rootSourceStillMatchesSnapshot": true
+    },
+    {
+      "path": "scripts/release/web-deploy.mjs",
+      "original": {
+        "bytes": 20124,
+        "sha256": "2428b9ddfc6d3b90a9a14e59d1e730813d18a9e56ad7c23252622d7e9bc1d5ab",
+        "gitBlobOid": "f1a2e150c3bb73fb15c6d1e5e325d5cc5187bd4b"
+      },
+      "candidate": {
+        "bytes": 20124,
+        "sha256": "2428b9ddfc6d3b90a9a14e59d1e730813d18a9e56ad7c23252622d7e9bc1d5ab",
+        "gitBlobOid": "f1a2e150c3bb73fb15c6d1e5e325d5cc5187bd4b"
+      },
+      "candidateChanged": false,
+      "rootSourceStillMatchesSnapshot": true
+    },
+    {
+      "path": "scripts/vercel-ignore-build.mjs",
+      "original": {
+        "bytes": 2621,
+        "sha256": "bd16434eb54cbf56a83755a1c381cae6af7435a452bf4ada9b0e2bafaa877e0f",
+        "gitBlobOid": "48163515db21e0906cef15ead6f3401120bae165"
+      },
+      "candidate": {
+        "bytes": 2621,
+        "sha256": "bd16434eb54cbf56a83755a1c381cae6af7435a452bf4ada9b0e2bafaa877e0f",
+        "gitBlobOid": "48163515db21e0906cef15ead6f3401120bae165"
+      },
+      "candidateChanged": false,
+      "rootSourceStillMatchesSnapshot": true
+    },
+    {
+      "path": "scripts/ci-docs-only.mjs",
+      "original": {
+        "bytes": 6993,
+        "sha256": "c42b6617863ff137635a86fe5bddfdaeeb31cbdec8f9ace7e49e48ff6becf01a",
+        "gitBlobOid": "061fc3c63ba89fba911bd83247bedc79118927f7"
+      },
+      "candidate": {
+        "bytes": 6993,
+        "sha256": "c42b6617863ff137635a86fe5bddfdaeeb31cbdec8f9ace7e49e48ff6becf01a",
+        "gitBlobOid": "061fc3c63ba89fba911bd83247bedc79118927f7"
+      },
+      "candidateChanged": false,
+      "rootSourceStillMatchesSnapshot": true
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.mjs",
+      "original": {
+        "bytes": 85323,
+        "sha256": "4cdff20223c3e684512d7b6c95d573eb50d864eafcb680006be0aaf7c2b4a436",
+        "gitBlobOid": "6753c8aa8adf4354b60be3d62dcc5d5458f36cd9"
+      },
+      "candidate": {
+        "bytes": 85323,
+        "sha256": "4cdff20223c3e684512d7b6c95d573eb50d864eafcb680006be0aaf7c2b4a436",
+        "gitBlobOid": "6753c8aa8adf4354b60be3d62dcc5d5458f36cd9"
+      },
+      "candidateChanged": false,
+      "rootSourceStillMatchesSnapshot": true
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup-evidence.mjs",
+      "original": {
+        "bytes": 22658,
+        "sha256": "16010e124b5554fab29dd1b2e3fc372197c91cdd4987e0f438f43ec11460e7b9",
+        "gitBlobOid": "b5a85b795d3026c350ced9823eaac9488a3e0cda"
+      },
+      "candidate": {
+        "bytes": 22658,
+        "sha256": "16010e124b5554fab29dd1b2e3fc372197c91cdd4987e0f438f43ec11460e7b9",
+        "gitBlobOid": "b5a85b795d3026c350ced9823eaac9488a3e0cda"
+      },
+      "candidateChanged": false,
+      "rootSourceStillMatchesSnapshot": true
+    },
+    {
+      "path": "scripts/acceptance/team-workspace.mjs",
+      "original": {
+        "bytes": 6653,
+        "sha256": "1a9139c9fa11076b0cf9c0786c286ef34c8b5f2b6951bc1664cb30d3a57873a5",
+        "gitBlobOid": "c8bcb85cdbda9d2b80217660c06a4e49d265c44f"
+      },
+      "candidate": {
+        "bytes": 6653,
+        "sha256": "1a9139c9fa11076b0cf9c0786c286ef34c8b5f2b6951bc1664cb30d3a57873a5",
+        "gitBlobOid": "c8bcb85cdbda9d2b80217660c06a4e49d265c44f"
+      },
+      "candidateChanged": false,
+      "rootSourceStillMatchesSnapshot": true
+    },
+    {
+      "path": "lib/smoke-account.ts",
+      "original": {
+        "bytes": 417,
+        "sha256": "3e35f8082d618d412dc07d99815a6d2e37766824a9cbe188d20fce58fe7c7997",
+        "gitBlobOid": "7c669d4bee8636ba063ee92ace07dbaf75023033"
+      },
+      "candidate": {
+        "bytes": 417,
+        "sha256": "3e35f8082d618d412dc07d99815a6d2e37766824a9cbe188d20fce58fe7c7997",
+        "gitBlobOid": "7c669d4bee8636ba063ee92ace07dbaf75023033"
+      },
+      "candidateChanged": false,
+      "rootSourceStillMatchesSnapshot": true
+    },
+    {
+      "path": "lib/desktop-rpc/wire.ts",
+      "original": {
+        "bytes": 5364,
+        "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3",
+        "gitBlobOid": "2c72b5aafa3e6b8f4df8212072e6663e306d9318"
+      },
+      "candidate": {
+        "bytes": 5364,
+        "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3",
+        "gitBlobOid": "2c72b5aafa3e6b8f4df8212072e6663e306d9318"
+      },
+      "candidateChanged": false,
+      "rootSourceStillMatchesSnapshot": true
+    },
+    {
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "original": {
+        "bytes": 18539,
+        "sha256": "4773724c6ccbeadd2b7cf6b1833028971d50e4774590d7a0f14e502c9c20c88e",
+        "gitBlobOid": "97cdc7dfefb5dfbe00e733ccb5559fae8de2dfa9"
+      },
+      "candidate": {
+        "bytes": 18539,
+        "sha256": "4773724c6ccbeadd2b7cf6b1833028971d50e4774590d7a0f14e502c9c20c88e",
+        "gitBlobOid": "97cdc7dfefb5dfbe00e733ccb5559fae8de2dfa9"
+      },
+      "candidateChanged": false,
+      "rootSourceStillMatchesSnapshot": true
+    }
+  ],
+  "patch": {
+    "bytes": 4147,
+    "sha256": "10a7ac44cee9ca79a137a37fa51b9a079a3c55dbf3886d6f8b5c81db3e75acd7",
+    "gitBlobOid": "f6d67b2b1f9c0d3dd35dadba655173f4a1cb4646"
+  },
+  "validation": [
+    {
+      "phase": "baseline-red",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "--import",
+        "tsx",
+        "--test",
+        "--test-reporter=tap",
+        "scripts/e2b/publish-template-env.test.mjs"
+      ],
+      "cwd": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/candidate",
+      "environmentKeys": [
+        "PATH",
+        "LANG",
+        "TZ",
+        "TSX_DISABLE_CACHE"
+      ],
+      "startedAt": "2026-11-09T18:54:06.147895+00:00",
+      "completedAt": "2026-11-09T18:54:06.661275+00:00",
+      "exitCode": 1,
+      "stdout": {
+        "bytes": 6941,
+        "sha256": "385162918cd6941ed27e6f9c82ef2447491ef16d20086d8d40ac200d8d15b83c",
+        "gitBlobOid": "175c7c329f2f03c38aaff35e70ce062ef82e75dc"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobOid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      },
+      "source": {
+        "package.json": {
+          "bytes": 80877,
+          "sha256": "ed9893d62d9d90299de21eb0325e73ab3c97202dec5eafe3d9983c04b64a6add",
+          "gitBlobOid": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d"
+        },
+        "tsconfig.json": {
+          "bytes": 873,
+          "sha256": "9aa2e6ca4d1c06eaa646e5e2faa1146772545758cf751314f83a8c78618a4fa6",
+          "gitBlobOid": "48293d8237e1804840ec535a18bd5d1c7630eea6"
+        },
+        "scripts/e2b/publish-template-env.test.mjs": {
+          "bytes": 33829,
+          "sha256": "ddd4d584ea03f2ceb6efa50623a419d7fcfa8be54cfaba99b06b890a842bf0a3",
+          "gitBlobOid": "86843115336fa4021df9ac33e387caab5cc04e64"
+        },
+        "scripts/e2b/publish-template-env.mjs": {
+          "bytes": 17883,
+          "sha256": "2c15611a5304d3b5c4cf6b12e7969426dbc14c65404e1de197eab3aebd26819a",
+          "gitBlobOid": "56ca3993bf11e33ca02a28ccf0678a45ee509215"
+        },
+        "scripts/e2b/runtime-report.mjs": {
+          "bytes": 6202,
+          "sha256": "46e652c57a99658b66aa5079ed1d5ddbe226ee68a413dba3bb853c8cdefe0af3",
+          "gitBlobOid": "9f5a61c221f8e05d6b23252d86af528dc26bba3c"
+        },
+        "scripts/e2b/e2b-finalization-files.json": {
+          "bytes": 6238,
+          "sha256": "7d3abc6a73cfd56ee2bed51572db5b7d0e842db91df838f5dc40563b8c0ceb9c",
+          "gitBlobOid": "e6d19b5ed954d71c53a3ef32eed9c96a30943116"
+        },
+        "scripts/e2b/e2b-certificate-relinks.json": {
+          "bytes": 106533,
+          "sha256": "16f3341cf64a4c7fd739a50439e558db4643f23fdd1ec16a51b062c30f037b52",
+          "gitBlobOid": "ba210a72dff95a34120bcd6fb581fb54aa47b863"
+        },
+        "scripts/release/web-deploy.mjs": {
+          "bytes": 20124,
+          "sha256": "2428b9ddfc6d3b90a9a14e59d1e730813d18a9e56ad7c23252622d7e9bc1d5ab",
+          "gitBlobOid": "f1a2e150c3bb73fb15c6d1e5e325d5cc5187bd4b"
+        },
+        "scripts/vercel-ignore-build.mjs": {
+          "bytes": 2621,
+          "sha256": "bd16434eb54cbf56a83755a1c381cae6af7435a452bf4ada9b0e2bafaa877e0f",
+          "gitBlobOid": "48163515db21e0906cef15ead6f3401120bae165"
+        },
+        "scripts/ci-docs-only.mjs": {
+          "bytes": 6993,
+          "sha256": "c42b6617863ff137635a86fe5bddfdaeeb31cbdec8f9ace7e49e48ff6becf01a",
+          "gitBlobOid": "061fc3c63ba89fba911bd83247bedc79118927f7"
+        },
+        "scripts/acceptance/cloud-startup.mjs": {
+          "bytes": 85323,
+          "sha256": "4cdff20223c3e684512d7b6c95d573eb50d864eafcb680006be0aaf7c2b4a436",
+          "gitBlobOid": "6753c8aa8adf4354b60be3d62dcc5d5458f36cd9"
+        },
+        "scripts/acceptance/cloud-startup-evidence.mjs": {
+          "bytes": 22658,
+          "sha256": "16010e124b5554fab29dd1b2e3fc372197c91cdd4987e0f438f43ec11460e7b9",
+          "gitBlobOid": "b5a85b795d3026c350ced9823eaac9488a3e0cda"
+        },
+        "scripts/acceptance/team-workspace.mjs": {
+          "bytes": 6653,
+          "sha256": "1a9139c9fa11076b0cf9c0786c286ef34c8b5f2b6951bc1664cb30d3a57873a5",
+          "gitBlobOid": "c8bcb85cdbda9d2b80217660c06a4e49d265c44f"
+        },
+        "lib/smoke-account.ts": {
+          "bytes": 417,
+          "sha256": "3e35f8082d618d412dc07d99815a6d2e37766824a9cbe188d20fce58fe7c7997",
+          "gitBlobOid": "7c669d4bee8636ba063ee92ace07dbaf75023033"
+        },
+        "lib/desktop-rpc/wire.ts": {
+          "bytes": 5364,
+          "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3",
+          "gitBlobOid": "2c72b5aafa3e6b8f4df8212072e6663e306d9318"
+        },
+        ".github/workflows/e2b-official-runtime.yml": {
+          "bytes": 18539,
+          "sha256": "4773724c6ccbeadd2b7cf6b1833028971d50e4774590d7a0f14e502c9c20c88e",
+          "gitBlobOid": "97cdc7dfefb5dfbe00e733ccb5559fae8de2dfa9"
+        }
+      }
+    },
+    {
+      "phase": "guard-red",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "--import",
+        "tsx",
+        "--test",
+        "--test-reporter=tap",
+        "scripts/e2b/publish-template-env.test.mjs"
+      ],
+      "cwd": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/candidate",
+      "environmentKeys": [
+        "PATH",
+        "LANG",
+        "TZ",
+        "TSX_DISABLE_CACHE"
+      ],
+      "nodeVersion": "v24.22.1",
+      "startedAt": "2026-11-09T18:54:56.971139+00:00",
+      "completedAt": "2026-11-09T18:54:57.511673+00:00",
+      "exitCode": 1,
+      "stdout": {
+        "bytes": 8738,
+        "sha256": "9cdd18e475584866e92cf46f34b4665674ed913aaaa14eaa656be9dd2b1813a9",
+        "gitBlobOid": "8e6380d4d03e6e7b2a7c01736d505a8e78636650"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobOid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      },
+      "source": {
+        "package.json": {
+          "bytes": 80877,
+          "sha256": "ed9893d62d9d90299de21eb0325e73ab3c97202dec5eafe3d9983c04b64a6add",
+          "gitBlobOid": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d"
+        },
+        "tsconfig.json": {
+          "bytes": 873,
+          "sha256": "9aa2e6ca4d1c06eaa646e5e2faa1146772545758cf751314f83a8c78618a4fa6",
+          "gitBlobOid": "48293d8237e1804840ec535a18bd5d1c7630eea6"
+        },
+        "scripts/e2b/publish-template-env.test.mjs": {
+          "bytes": 35635,
+          "sha256": "c87eedc8823434026cecca793b5bea924ce510d570dfbce23f73f89aabd898d8",
+          "gitBlobOid": "52fac123eb4f1e6ba8513b38148295f2c2648458"
+        },
+        "scripts/e2b/publish-template-env.mjs": {
+          "bytes": 17883,
+          "sha256": "2c15611a5304d3b5c4cf6b12e7969426dbc14c65404e1de197eab3aebd26819a",
+          "gitBlobOid": "56ca3993bf11e33ca02a28ccf0678a45ee509215"
+        },
+        "scripts/e2b/runtime-report.mjs": {
+          "bytes": 6202,
+          "sha256": "46e652c57a99658b66aa5079ed1d5ddbe226ee68a413dba3bb853c8cdefe0af3",
+          "gitBlobOid": "9f5a61c221f8e05d6b23252d86af528dc26bba3c"
+        },
+        "scripts/e2b/e2b-finalization-files.json": {
+          "bytes": 6238,
+          "sha256": "7d3abc6a73cfd56ee2bed51572db5b7d0e842db91df838f5dc40563b8c0ceb9c",
+          "gitBlobOid": "e6d19b5ed954d71c53a3ef32eed9c96a30943116"
+        },
+        "scripts/e2b/e2b-certificate-relinks.json": {
+          "bytes": 106533,
+          "sha256": "16f3341cf64a4c7fd739a50439e558db4643f23fdd1ec16a51b062c30f037b52",
+          "gitBlobOid": "ba210a72dff95a34120bcd6fb581fb54aa47b863"
+        },
+        "scripts/release/web-deploy.mjs": {
+          "bytes": 20124,
+          "sha256": "2428b9ddfc6d3b90a9a14e59d1e730813d18a9e56ad7c23252622d7e9bc1d5ab",
+          "gitBlobOid": "f1a2e150c3bb73fb15c6d1e5e325d5cc5187bd4b"
+        },
+        "scripts/vercel-ignore-build.mjs": {
+          "bytes": 2621,
+          "sha256": "bd16434eb54cbf56a83755a1c381cae6af7435a452bf4ada9b0e2bafaa877e0f",
+          "gitBlobOid": "48163515db21e0906cef15ead6f3401120bae165"
+        },
+        "scripts/ci-docs-only.mjs": {
+          "bytes": 6993,
+          "sha256": "c42b6617863ff137635a86fe5bddfdaeeb31cbdec8f9ace7e49e48ff6becf01a",
+          "gitBlobOid": "061fc3c63ba89fba911bd83247bedc79118927f7"
+        },
+        "scripts/acceptance/cloud-startup.mjs": {
+          "bytes": 85323,
+          "sha256": "4cdff20223c3e684512d7b6c95d573eb50d864eafcb680006be0aaf7c2b4a436",
+          "gitBlobOid": "6753c8aa8adf4354b60be3d62dcc5d5458f36cd9"
+        },
+        "scripts/acceptance/cloud-startup-evidence.mjs": {
+          "bytes": 22658,
+          "sha256": "16010e124b5554fab29dd1b2e3fc372197c91cdd4987e0f438f43ec11460e7b9",
+          "gitBlobOid": "b5a85b795d3026c350ced9823eaac9488a3e0cda"
+        },
+        "scripts/acceptance/team-workspace.mjs": {
+          "bytes": 6653,
+          "sha256": "1a9139c9fa11076b0cf9c0786c286ef34c8b5f2b6951bc1664cb30d3a57873a5",
+          "gitBlobOid": "c8bcb85cdbda9d2b80217660c06a4e49d265c44f"
+        },
+        "lib/smoke-account.ts": {
+          "bytes": 417,
+          "sha256": "3e35f8082d618d412dc07d99815a6d2e37766824a9cbe188d20fce58fe7c7997",
+          "gitBlobOid": "7c669d4bee8636ba063ee92ace07dbaf75023033"
+        },
+        "lib/desktop-rpc/wire.ts": {
+          "bytes": 5364,
+          "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3",
+          "gitBlobOid": "2c72b5aafa3e6b8f4df8212072e6663e306d9318"
+        },
+        ".github/workflows/e2b-official-runtime.yml": {
+          "bytes": 18539,
+          "sha256": "4773724c6ccbeadd2b7cf6b1833028971d50e4774590d7a0f14e502c9c20c88e",
+          "gitBlobOid": "97cdc7dfefb5dfbe00e733ccb5559fae8de2dfa9"
+        }
+      }
+    },
+    {
+      "phase": "green",
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/node/bin/node",
+        "--import",
+        "tsx",
+        "--test",
+        "--test-reporter=tap",
+        "scripts/e2b/publish-template-env.test.mjs"
+      ],
+      "cwd": "/workspace/scratch/263e36984c81/publication-kind-regression-1505/candidate",
+      "environmentKeys": [
+        "PATH",
+        "LANG",
+        "TZ",
+        "TSX_DISABLE_CACHE"
+      ],
+      "nodeVersion": "v24.22.1",
+      "startedAt": "2026-11-09T18:55:07.324168+00:00",
+      "completedAt": "2026-11-09T18:55:07.806736+00:00",
+      "exitCode": 0,
+      "stdout": {
+        "bytes": 7009,
+        "sha256": "f1303978cc19fd2db946fe6bd52e40006c3fced7b62f5b9610c6a245659a9ced",
+        "gitBlobOid": "377523dfe8f92f06c11ab52afcff4ec690ee9556"
+      },
+      "stderr": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlobOid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      },
+      "source": {
+        "package.json": {
+          "bytes": 80877,
+          "sha256": "ed9893d62d9d90299de21eb0325e73ab3c97202dec5eafe3d9983c04b64a6add",
+          "gitBlobOid": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d"
+        },
+        "tsconfig.json": {
+          "bytes": 873,
+          "sha256": "9aa2e6ca4d1c06eaa646e5e2faa1146772545758cf751314f83a8c78618a4fa6",
+          "gitBlobOid": "48293d8237e1804840ec535a18bd5d1c7630eea6"
+        },
+        "scripts/e2b/publish-template-env.test.mjs": {
+          "bytes": 35635,
+          "sha256": "c87eedc8823434026cecca793b5bea924ce510d570dfbce23f73f89aabd898d8",
+          "gitBlobOid": "52fac123eb4f1e6ba8513b38148295f2c2648458"
+        },
+        "scripts/e2b/publish-template-env.mjs": {
+          "bytes": 17955,
+          "sha256": "15ed43dd07a4fe1a0ad81e04aa984bc468aa65f1b1d756cff293fd43dcd7b2ea",
+          "gitBlobOid": "676e0cf7af622b19ad3a1f530d91b4e6b4cc3095"
+        },
+        "scripts/e2b/runtime-report.mjs": {
+          "bytes": 6202,
+          "sha256": "46e652c57a99658b66aa5079ed1d5ddbe226ee68a413dba3bb853c8cdefe0af3",
+          "gitBlobOid": "9f5a61c221f8e05d6b23252d86af528dc26bba3c"
+        },
+        "scripts/e2b/e2b-finalization-files.json": {
+          "bytes": 6238,
+          "sha256": "7d3abc6a73cfd56ee2bed51572db5b7d0e842db91df838f5dc40563b8c0ceb9c",
+          "gitBlobOid": "e6d19b5ed954d71c53a3ef32eed9c96a30943116"
+        },
+        "scripts/e2b/e2b-certificate-relinks.json": {
+          "bytes": 106533,
+          "sha256": "16f3341cf64a4c7fd739a50439e558db4643f23fdd1ec16a51b062c30f037b52",
+          "gitBlobOid": "ba210a72dff95a34120bcd6fb581fb54aa47b863"
+        },
+        "scripts/release/web-deploy.mjs": {
+          "bytes": 20124,
+          "sha256": "2428b9ddfc6d3b90a9a14e59d1e730813d18a9e56ad7c23252622d7e9bc1d5ab",
+          "gitBlobOid": "f1a2e150c3bb73fb15c6d1e5e325d5cc5187bd4b"
+        },
+        "scripts/vercel-ignore-build.mjs": {
+          "bytes": 2621,
+          "sha256": "bd16434eb54cbf56a83755a1c381cae6af7435a452bf4ada9b0e2bafaa877e0f",
+          "gitBlobOid": "48163515db21e0906cef15ead6f3401120bae165"
+        },
+        "scripts/ci-docs-only.mjs": {
+          "bytes": 6993,
+          "sha256": "c42b6617863ff137635a86fe5bddfdaeeb31cbdec8f9ace7e49e48ff6becf01a",
+          "gitBlobOid": "061fc3c63ba89fba911bd83247bedc79118927f7"
+        },
+        "scripts/acceptance/cloud-startup.mjs": {
+          "bytes": 85323,
+          "sha256": "4cdff20223c3e684512d7b6c95d573eb50d864eafcb680006be0aaf7c2b4a436",
+          "gitBlobOid": "6753c8aa8adf4354b60be3d62dcc5d5458f36cd9"
+        },
+        "scripts/acceptance/cloud-startup-evidence.mjs": {
+          "bytes": 22658,
+          "sha256": "16010e124b5554fab29dd1b2e3fc372197c91cdd4987e0f438f43ec11460e7b9",
+          "gitBlobOid": "b5a85b795d3026c350ced9823eaac9488a3e0cda"
+        },
+        "scripts/acceptance/team-workspace.mjs": {
+          "bytes": 6653,
+          "sha256": "1a9139c9fa11076b0cf9c0786c286ef34c8b5f2b6951bc1664cb30d3a57873a5",
+          "gitBlobOid": "c8bcb85cdbda9d2b80217660c06a4e49d265c44f"
+        },
+        "lib/smoke-account.ts": {
+          "bytes": 417,
+          "sha256": "3e35f8082d618d412dc07d99815a6d2e37766824a9cbe188d20fce58fe7c7997",
+          "gitBlobOid": "7c669d4bee8636ba063ee92ace07dbaf75023033"
+        },
+        "lib/desktop-rpc/wire.ts": {
+          "bytes": 5364,
+          "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3",
+          "gitBlobOid": "2c72b5aafa3e6b8f4df8212072e6663e306d9318"
+        },
+        ".github/workflows/e2b-official-runtime.yml": {
+          "bytes": 18539,
+          "sha256": "4773724c6ccbeadd2b7cf6b1833028971d50e4774590d7a0f14e502c9c20c88e",
+          "gitBlobOid": "97cdc7dfefb5dfbe00e733ccb5559fae8de2dfa9"
+        }
+      }
+    }
+  ],
+  "baselineSummary": {
+    "tests": 25,
+    "pass": 24,
+    "fail": 1,
+    "skip": 0,
+    "failure": "obsolete Codex 420->511 negative fixture"
+  },
+  "guardRedSummary": {
+    "tests": 29,
+    "pass": 27,
+    "fail": 2,
+    "skip": 0,
+    "failures": [
+      "Claude directory original kind omitted",
+      "Codex file original kind omitted"
+    ],
+    "note": "Each test stops at its first missing-kind assertion in RED; all five variants per rule execute and pass in GREEN."
+  },
+  "greenSummary": {
+    "tests": 29,
+    "pass": 29,
+    "fail": 0,
+    "skip": 0
+  },
+  "nonExecution": [
+    "no network request",
+    "no credentials",
+    "no cloud resources",
+    "no real models or subscriptions",
+    "no git object/ref/write",
+    "no root working-tree edits"
+  ],
+  "actualControlValuesUsed": {
+    "controlRun": "42670291715",
+    "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+    "preReadySha256": "713ed37b92f312cf89345677c1d7f413c55b38ca0c1c636ce0fecc672d08ed9a",
+    "freshSha256": "545244c4bc7f902ed9a6d843dd6ccaed08d0a59bbfc1b60064bd0278e026da5a",
+    "beforeMode": 420,
+    "afterMode": 511,
+    "limitation": "Synthetic publication receipts use already-reviewed actual digest/mode values; this is not a new official control or full conservation replay."
+  }
+}
