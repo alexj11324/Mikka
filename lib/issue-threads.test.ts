@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { canReadThread, projectIssueThreads, taskFreeThreadMembers, threadName, threadQuestionRunId, threadQuestionView, threadTime, withRunChain } from './issue-threads'
+import { agentStretches, canReadThread, projectIssueThreads, taskFreeThreadMembers, threadName, threadQuestionRunId, threadQuestionView, threadTime, withRunChain } from './issue-threads'
 import type { RunChain } from './run-chain'
 import type { RunFailure } from '@mikka/protocol/run-failure'
 
@@ -206,4 +206,16 @@ test('thread lists expose only compact diagnostics, including the latest continu
   assert.doesNotMatch(JSON.stringify(resumed), /private provider response|APIError/)
   const succeeding = withRunChain(own, { ...chain, attempts: [chain.attempts[0], { ...chain.attempts[1], status: 'succeeded', failureDetails: null }] })
   assert.equal(succeeding.failureDetails, null, 'a successful continuation does not retain the root failure')
+})
+
+test('agentStretches joins consecutive threads by one Agent, oldest first (2026-11-09-0045)', () => {
+  const t = (id: string, at: number, harness: string | null) => ({ id, createdAt: new Date(at), detail: harness ? { harness } : null })
+  const out = agentStretches([t('c', 3, 'codex'), t('a', 1, 'claude_code'), t('b', 2, 'claude_code'), t('d', 4, 'claude_code'), t('h1', 5, null), t('h2', 6, null)])
+  assert.deepEqual(out.map(s => [s.agent, s.first.id, s.last.id, s.ids]), [
+    ['claude_code', 'a', 'b', ['a', 'b']], ['codex', 'c', 'c', ['c']], ['claude_code', 'd', 'd', ['d']], [null, 'h1', 'h2', ['h1', 'h2']],
+  ])
+  assert.deepEqual(agentStretches([]), [])
+  // A Factory check by another Agent is its result card, not a switch.
+  const checks = agentStretches([{ ...t('i', 1, 'claude_code'), kind: 'implement' }, { ...t('r', 2, 'codex'), kind: 'acceptance' }, { ...t('v', 3, 'claude_code'), kind: 'review' }])
+  assert.deepEqual(checks.map(s => [s.agent, s.ids]), [['claude_code', ['i']]])
 })

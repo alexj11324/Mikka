@@ -148,6 +148,11 @@ the production update.
   app's names). A few of BoardUI's theme variables share a name with this
   app's (`--font-sans`, `--color-blue-400`); this app's utilities inline their
   own values, so pages outside the slots look the same in both builds.
+  Paid blocks in the layer keep their shipped look and only data and text
+  change ([2026-11-09-0050](design/decisions/2026-11-09-0050-paid-blocks-as-shipped.md)). Because the
+  shadcn token block is left out, affectUI blocks currently resolve shadcn
+  token names to this app's values; that is recorded drift, not a rule to
+  follow.
 - **Dependencies.** Packages BoardUI needs that this repository lacks are
   installed in the layer. `react` and `react-dom` come from this repository
   only.

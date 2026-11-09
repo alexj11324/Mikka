@@ -53,9 +53,9 @@ source paths. Release and external-service results are recorded through
 [runtime acceptance](docs/acceptance.md).
 
 The accepted interface lists tasks and opens their work inside each task, with
-one conversation joining its attempts. The native mobile source implements
+one conversation joining a task's runs. The native mobile source implements
 this model. The default slots in this repository still show thread lists and separate
-attempt views; what ships is the official build, which needs its own version-bound release evidence.
+run views; what ships is the official build, which needs its own version-bound release evidence.
 See the [task navigation decision](docs/design/decisions/2026-11-07-2045-tasks-only-threads-inside.md)
 and [task conversation decision](docs/design/decisions/2026-11-07-2300-one-conversation-per-task.md).
 
@@ -123,7 +123,7 @@ account. Publication depends on the configured target and deployment switches.
   you create. Each bot has its own chat, with unread markers and an animated
   avatar.
 - **Makes progress visible.** Dispatch cards link to the work and its status.
-  The accepted task interface opens the task and joins its attempts in one
+  The accepted task interface opens the task and joins its runs in one
   conversation. Workers report progress, ask questions and flag blocks through
   Mikka's MCP tools. You can reply to or stop your own work.
 - **Answers with charts and cards.** Bots reply with OpenUI components: bar,

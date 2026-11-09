@@ -3,7 +3,7 @@ import { mobileMessages } from '../lib/messages.ts'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { attemptState, groupOf, groupOfThread, rowState, taskListRows } from '../features/tasks/model/task-groups.ts'
-import { conversationSegments, dividerText } from '../features/tasks/model/task-conversation.ts'
+import { activityEntries, agentRunTitle, boundary, conversationSegments, reviewRun } from '../features/tasks/model/task-conversation.ts'
 
 test('a task\'s current thread decides its group, by R-52\'s judgement', () => {
   assert.equal(groupOfThread('waiting'), 'pending')
@@ -89,7 +89,7 @@ test('受阻 is its own state, with the API\'s code or read from the board until
   assert.deepEqual(rowState({ group: 'pending', status: 'doing', blocked: { reason: 'run', blocker: null } }), { state: 'blocked', reason: mobileMessages.MobileCore.reasons.blocked })
 })
 
-// Alex 2026-11-07: 「第二次尝试明显应该在第一次之后」. A task has one conversation.
+// Alex 2026-11-07: the second run comes after the first. A task has one conversation.
 test('a task\'s attempts read as one conversation, oldest first, each keeping only its own messages', () => {
   const attempt = (runId: string, n: number, harness: string, extra = {}) => ({ kind: 'attempt' as const, runId, n, group: 'resolved' as const, harness, createdAt: '', failed: false, ...extra })
   const activity = [attempt('r2', 2, 'claude_code'), attempt('r1', 1, 'codex', { failed: true }), { kind: 'created' as const, by: null, createdAt: '' }]
@@ -98,7 +98,71 @@ test('a task\'s attempts read as one conversation, oldest first, each keeping on
   const threads = new Map([['r1', { items: [item('a'), item('b'), item('c')], error: 'E_TOOL_FAILED' }], ['r2', { items: [item('c')], error: null }]])
   const segments = conversationSegments(activity, threads)
   assert.deepEqual(segments.map(segment => [segment.attempt.runId, segment.items.map(entry => entry.id), segment.error]), [['r1', ['a', 'b'], 'E_TOOL_FAILED'], ['r2', ['c'], null]])
-  assert.equal(dividerText(segments[0]!.attempt, segments[1]!.attempt), '第 1 次尝试失败 · 换 Claude Code 再试')
-  assert.equal(dividerText(attempt('r1', 1, 'codex', { group: 'blocked' }), attempt('r2', 2, 'codex')), '第 1 次尝试受阻 · 再试')
   assert.deepEqual(conversationSegments([{ kind: 'created', by: null, createdAt: '' }], new Map()), [])
+})
+
+// Alex 2026-11-09: a task is one conversation; no 「尝试」 and no numbering, a divider only where the Agent changed.
+test('runs with the same Agent read as one; a divider only where the Agent changed, naming the Agent that did not get through', () => {
+  const run = (runId: string, n: number, harness: string, extra = {}) => ({ kind: 'attempt' as const, runId, n, group: 'resolved' as const, harness, createdAt: '', failed: false, ...extra })
+  const r1 = run('r1', 1, 'codex'), r2 = run('r2', 2, 'codex'), r3 = run('r3', 3, 'codex', { failed: true, state: 'failed' }), r4 = run('r4', 4, 'claude_code'), r5 = run('r5', 5, 'cursor')
+  // Same Agent: nothing between them, however many runs (follow-ups, waiting for a reply).
+  assert.equal(boundary(r1, r2), null)
+  // The Agent changed after a failure: the one that failed is named, nothing is numbered.
+  assert.deepEqual(boundary(r3, r4), { kind: 'switch', text: mobileMessages.MobileCore.conversation.switchedAfterFailure.replace('{previous}', 'Codex').replace('{agent}', 'Claude Code') })
+  // The Agent changed without a failure.
+  assert.deepEqual(boundary(r4, r5), { kind: 'switch', text: mobileMessages.MobileCore.conversation.switched.replace('{agent}', 'Cursor') })
+})
+
+// 2026-11-04-2200: verification belongs to 实现, and 审阅 is its own result card; only a fix is marked inline.
+test('a fix starting with the same Agent is a small marker; review, verify, implement and no stage are not', () => {
+  const run = (runId: string, n: number, stage?: string | null) => ({ kind: 'attempt' as const, runId, n, group: 'resolved' as const, harness: 'codex', createdAt: '', failed: false, ...(stage === undefined ? {} : { stage }) }) as never
+  assert.deepEqual(boundary(run('r2', 2, 'review'), run('r4', 4, 'fix')), { kind: 'stage', text: mobileMessages.MobileCore.conversation.fix })
+  assert.equal(boundary(run('r1', 1, 'implement'), run('r2', 2, 'review')), null)
+  assert.equal(boundary(run('r2', 2, 'review'), run('r3', 3, 'verify')), null)
+  assert.equal(boundary(run('r1', 1), run('r2', 2)), null)
+  assert.equal(boundary(run('r1', 1), run('r2', 2, null)), null)
+  assert.equal(reviewRun({ stage: 'review' }), true)
+  assert.equal(reviewRun({ stage: 'implement' }), false)
+  assert.equal(reviewRun({}), false)
+})
+
+test('a factory task shows one stage and what it needs from you; 审阅 has one verdict; nothing without a flow', async () => {
+  const { stageLine, verdictWord } = await import('../features/tasks/model/task-flow.ts')
+  const flow = mobileMessages.FactoryFlow, needs = (what: string) => mobileMessages.MobileCore.conversation.needsYou.replace('{what}', what)
+  assert.equal(stageLine({ stage: 'review' }), flow.stages.review)
+  assert.equal(stageLine({ stage: 'handoff', needsYou: { kind: 'pr_review', since: '' } }), `${flow.stages.handoff} · ${needs(flow.card.needsYou.pr_review)}`)
+  assert.equal(stageLine({ stage: 'spec', needsYou: { kind: 'spec_review', since: '' } }), `${flow.stages.spec} · ${needs(flow.card.needsYou.spec_review)}`)
+  assert.equal(stageLine(null), null)
+  assert.equal(stageLine(undefined), null)
+  assert.deepEqual(['passed', 'changes_requested', 'needs_judgment'].map(verdict => verdictWord({ stage: 'review', review: { verdict: verdict as never } })), [mobileMessages.MobileCore.conversation.verdicts.passed, mobileMessages.MobileCore.conversation.verdicts.changes_requested, mobileMessages.MobileCore.conversation.verdicts.needs_judgment])
+  assert.equal(verdictWord({ stage: 'review', review: { verdict: null } }), null)
+  assert.equal(verdictWord(undefined), null)
+})
+
+test('活动 merges an Agent\'s runs in a row into one row; a switch starts 「换 X」', () => {
+  const run = (runId: string, n: number, harness: string, extra = {}) => ({ kind: 'attempt' as const, runId, n, group: 'waiting' as const, harness, createdAt: '2026-11-05T10:00:00.000Z', failed: false, ...extra })
+  // The server sends 活动 newest first.
+  const activity = [run('r4', 4, 'claude_code'), run('r3', 3, 'codex'), run('r2', 2, 'codex'), run('r1', 1, 'codex'), { kind: 'created' as const, by: 'Coordinator', createdAt: '2026-11-05T09:00:00.000Z' }]
+  const entries = activityEntries(activity)
+  assert.deepEqual(entries.map(entry => entry.kind === 'agent' ? [agentRunTitle(entry), entry.run.attempts.map(item => item.runId)] : entry.kind), ['created', ['Codex', ['r1', 'r2', 'r3']], [mobileMessages.MobileCore.conversation.switchedTo.replace('{agent}', 'Claude Code'), ['r4']]])
+})
+
+// Alex 2026-11-08: the folded steps row opens to each command and tool call, labelled as Codex does.
+test('a steps row says what ran: commands and tools, or the plain count without the steps', async () => {
+  const { stepsLabel, stepLine, commandText, stepDuration } = await import('../features/tasks/model/thread-steps.ts')
+  const steps = [
+    { name: 'bash', detail: '/bin/bash -lc "pnpm test"' },
+    { name: 'Bash', detail: 'git status' },
+    { name: 'mcp__mikka__record_decision', detail: 'Choose provider receipts' },
+  ]
+  const words = mobileMessages.MobileCore
+  assert.equal(stepsLabel(steps, 3), `${words.threadSteps.commands.replace('{count}', '2')} · ${words.threadSteps.tool}`)
+  assert.equal(stepsLabel([steps[2]!], 1), words.threadSteps.tool)
+  assert.equal(stepsLabel(undefined, 3), words.steps.replace('{count}', '3'))
+  assert.equal(commandText('/bin/bash -lc "pnpm test"'), 'pnpm test')
+  assert.equal(commandText(`/bin/bash -lc "python3 - <<'PY' import json…`), `python3 - <<'PY' import json…`)
+  assert.deepEqual(stepLine(steps[2]!), { title: 'record_decision', detail: 'Choose provider receipts', code: false })
+  assert.deepEqual(stepLine({ name: 'apply_patch', detail: '/home/user/.mikka/worker/worktrees/abc/apps/mobile/lib/a.ts' }), { title: 'apply_patch', detail: 'lib/a.ts', code: false })
+  assert.deepEqual(stepLine(steps[0]!), { title: 'pnpm test', detail: null, code: true })
+  assert.deepEqual([stepDuration(850), stepDuration(1240), stepDuration(125_000), stepDuration(undefined)], [words.threadSteps.milliseconds.replace('{count}', '850'), words.threadSteps.seconds.replace('{count}', '1.2'), words.threadSteps.minutes.replace('{minutes}', '2').replace('{seconds}', '5'), null])
 })

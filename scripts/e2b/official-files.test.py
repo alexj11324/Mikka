@@ -549,5 +549,81 @@ class OfficialFiles(unittest.TestCase):
                 files.verify(baseline)
 
 
+
+class ProviderDirectoryFinalization(unittest.TestCase):
+    @staticmethod
+    def original_directory():
+        return {'path': '/usr/local/share/e2b', 'kind': 'directory',
+                'mode': 0o755, 'uid': 0, 'gid': 0}
+
+    def directory_proof(self):
+        original = self.original_directory()
+        baseline = {'version': 1, 'entries': [original]}
+        with patch.object(files, 'entry', return_value=original):
+            installation = files.verify(baseline)
+        with patch.object(files, 'entry', return_value={**original, 'mode': 0o777}):
+            # The candidate exception applies only after the strict install receipt.
+            with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                files.verify(baseline)
+            final = files.verify(baseline, 'claude')
+        return original, {**installation, 'finalization': final}
+
+    def test_exact_claude_directory_mode_requires_finalization_and_preserves_kind(self):
+        original, proof = self.directory_proof()
+        final = proof['finalization']
+        self.assertEqual(final['providerChanges'], [{
+            'path': original['path'], 'kind': 'directory',
+            'before': {'mode': 0o755}, 'after': {'mode': 0o777},
+        }])
+        self.assertEqual(final['originalBefore'], proof['before'])
+        self.assertNotEqual(final['originalBefore'], final['originalAfter'])
+        # Entry type stays in the normalized digest; _kind is rule metadata.
+        protected = {'path': original['path'], 'kind': 'directory', 'uid': 0, 'gid': 0}
+        self.assertEqual(final['before'], files.receipt([protected]))
+        self.assertEqual(final['before'], final['after'])
+        self.assertIs(files.validate_receipt(proof, 'claude'), proof)
+
+    def test_directory_rule_rejects_other_identity_fields_modes_paths_and_templates(self):
+        directory = self.original_directory()
+        file = {**directory, 'kind': 'file', 'sha256': 'a' * 64}
+        link = {**directory, 'kind': 'link', 'target': '/official/directory'}
+        sibling = {**directory, 'path': '/usr/local/share/e2b-other'}
+        child = {**file, 'path': '/usr/local/share/e2b/existing-file'}
+        cases = [
+            ('stable file', 'claude', file, {**file, 'mode': 0o777}),
+            ('stable link', 'claude', link, {**link, 'mode': 0o777}),
+            ('directory becomes file', 'claude', directory, {**file, 'mode': 0o777}),
+            ('directory becomes link', 'claude', directory, {**link, 'mode': 0o777}),
+            ('owner changes', 'claude', directory, {**directory, 'mode': 0o777, 'uid': 1000}),
+            ('group changes', 'claude', directory, {**directory, 'mode': 0o777, 'gid': 1000}),
+            ('different old mode', 'claude', {**directory, 'mode': 0o700}, {**directory, 'mode': 0o777}),
+            ('different new mode', 'claude', directory, {**directory, 'mode': 0o775}),
+            ('sibling directory', 'claude', sibling, {**sibling, 'mode': 0o777}),
+            ('existing child bytes', 'claude', child, {**child, 'sha256': 'b' * 64}),
+            ('desktop scope', 'desktop', directory, {**directory, 'mode': 0o777}),
+            ('codex scope', 'codex', directory, {**directory, 'mode': 0o777}),
+        ]
+        for label, kind, original, updated in cases:
+            with self.subTest(case=label), patch.object(files, 'entry', return_value=updated):
+                with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                    files.verify({'version': 1, 'entries': [original]}, kind)
+
+    def test_directory_receipt_rejects_missing_wrong_kind_and_replaced_installation(self):
+        _, proof = self.directory_proof()
+        for kind in (None, 'file', 'link', 'special'):
+            invalid = deepcopy(proof)
+            change = invalid['finalization']['providerChanges'][0]
+            if kind is None:
+                change.pop('kind')
+            else:
+                change['kind'] = kind
+            with self.subTest(kind=kind):
+                with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
+                    files.validate_receipt(invalid, 'claude')
+        invalid = deepcopy(proof)
+        invalid['after'] = invalid['finalization']['originalAfter']
+        with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
+            files.validate_receipt(invalid, 'claude')
+
 if __name__ == '__main__':
     unittest.main()

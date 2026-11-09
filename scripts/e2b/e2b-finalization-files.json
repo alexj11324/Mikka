@@ -13,6 +13,27 @@
       "controlOpsCommit": "0cc4ccaf65f5b2eb20b06d4dbcc272d793cfbb39",
       "sourceContextCommit": "d63b5e1b2e70baa368cf42ec6f9b13691571b6e0",
       "evidence": "docs/operations/evidence/1512-official-claude-ca.json"
+    },
+    {
+      "template": "claude",
+      "path": "/usr/local/share/e2b",
+      "fields": [
+        "mode"
+      ],
+      "entryKind": "directory",
+      "mode": {
+        "before": 493,
+        "after": 511
+      },
+      "controlRun": "https://github.com/alexj11324/Mikka/actions/runs/42619272499",
+      "controlOpsCommit": "1e351dcfe9a4c93430f8e67fabef5b3dc97385e0",
+      "sourceContextCommit": "e78fccffd9dd878edd490b113ea80efcff1525e7",
+      "artifactId": 13676555208,
+      "artifactZipBytes": 3810,
+      "artifactZipSha256": "5639a4565249a7e169bd156d71d8c2fd4663c464ebe824cdd4813fbdf4942fd6",
+      "targetedOnly": true,
+      "releaseAccepted": false,
+      "evidence": "docs/operations/evidence/1506-official-base-conservation-control-20261109.json"
     }
   ],
   "additionalControls": [
@@ -47,6 +68,13 @@
   },
   "templates": {
     "claude": {
+      "/usr/local/share/e2b": {
+        "_kind": "directory",
+        "mode": {
+          "before": 493,
+          "after": 511
+        }
+      },
       "/usr/local/share/ca-certificates/e2b-ca.crt": {
         "sha256": "per-boot",
         "mode": {

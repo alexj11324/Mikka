@@ -52,10 +52,36 @@ Decision: [2026-11-01-2310](decisions/2026-11-01-2310-personal-and-team-workspac
   bot header (Alex, 2026-10-28; `rules.md` R-02, R-50).
 - Choosing another bot on the left changes the center chat and the right
   column's dispatched tasks and computer together.
-- A task (issue, `MIK-xx`) can have several attempts over time. It has one
-  conversation joining those attempts oldest first. Opening an attempt scrolls
-  to its part of that conversation, and the composer addresses the newest
-  attempt ([decision](decisions/2026-11-07-2300-one-conversation-per-task.md)).
+- A task (issue, `MIK-xx`) is one conversation: its runs read oldest first,
+  and where the Agent changes, a label with the next Agent's mark and name,
+  never a 「换」 verb (as Warp labels runs). The composer addresses the
+  newest run ([decision](decisions/2026-11-09-0045-no-attempt-word.md)).
+- **Attempt** is an internal data term only (`factory_attempts`, a run chain's
+  runs). User-facing copy never says 「尝试」 or "attempt".
+
+## Run result (运行结果)
+
+How one run came out, in one set of words on every surface that shows it: the
+task page's 活动 rows, the right column's 活动 rows and the task conversation
+(`hooks/use-run-result.ts`), and iOS (`MobileCore.attempts`). A 活动 row shows
+the result of its Agent stretch's latest run. It is the run's own result, never
+the task's status: task status, Factory stage, run result and the derived
+受阻 / 等你处理 are four different things (#1687).
+
+| Result | 中文 | English | When |
+| --- | --- | --- | --- |
+| running | 运行中 | Running | The run is working. |
+| queued | 排队中 | Queued | The run waits for a machine. |
+| waiting | 等你回复 | Needs your reply | The run waits on the person; its reason may say more (等你确认, 待审阅). |
+| done | 完成 | Done | The run finished its work. |
+| failed | 失败 | Failed | The run failed. |
+| blocked | 受阻 | Blocked | The run stopped on something it cannot fix itself, such as 额度用完. |
+| idle | 暂不处理 | On hold | The run decided there is nothing to do now. |
+| ended | 已结束 | Ended | An earlier run left waiting while the conversation went on. |
+
+_Avoid_: 「换 Codex」 or 「换 Codex 继续」 (a row or a change of Agent is labelled by the
+Agent's own mark and name), 已解决 for a run (a thread group word, R-52), 已替换, 进行中 for a run
+(进行中 is the board column), 尝试.
 
 ## Other words
 
@@ -67,7 +93,7 @@ Decided by Alex, 2026-10-28.
 | **Agent** | Agent | The coding agent that runs a thread: Claude Code, Codex, Cursor (`agents` table, a harness). It does the coding work; a bot never does. Shown by its own brand mark wherever a thread or run has an icon (R-78). Never called harness or 执行器 in the UI (R-43). |
 | **Agent Profile** | Agent 配置 | A reusable logical coding role owned by a person in a workspace: responsibilities, capabilities, Agent/model policy, effort, private instructions and controlled Skills. Several Profiles may use the same physical Agent/model. Managed in Settings › Models and subscriptions; frozen into each selected run. It never becomes a Bot or a left-column row. [Spec](factory-agent-profiles.md). |
 | **Library** | 资料库 | A bot's files, listed under 概览 › 详情; the person can delete their own (R-51). Files are added with the composer's 「+」. |
-| **Thread** | 线程 | As above. Since 2026-11-07 it is shown only inside its task (an attempt in the task's 活动); no list or tab is named 线程. |
+| **Thread** | 线程 | As above. Since 2026-11-07 it is shown only inside its task (an Agent stretch in the task's 活动); no list or tab is named 线程. |
 | **Browser** | 浏览器 | The person's own local browser, one for the whole app, opened from the globe in the top bar (R-57). |
 | **Computer** | 电脑 | A bot's cloud computer: its own desktop (X display) on its owner's bot machine, which is one per person per workspace (`cloud_machines` keyed by `workspaceId`, `ownerId`; `bot_desktops` keyed by `botId`). Used by that bot only; a thread that needs a desktop gets its own machine ([0251](decisions/2026-11-02-0251-desktop-runs-get-their-own-machine.md)). Shown in the 电脑 tab of 概览 (R-50). Never called 浏览器. |
 
