@@ -6,7 +6,7 @@ import { pool, withDatabaseClient } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
 import { artifactStorage, deleteArtifactObject } from '@/lib/artifacts/storage'
 import { auditDigest } from '@/lib/audit/integrity'
-import { accountStorageKeys, deleteMainAccountData, deleteWorkspaceData, planWorkspaces, type Plan } from './delete'
+import { accountStorageKeys, deleteMainAccountData, deleteWorkspaceData, freezeTaskRetention, planWorkspaces, type Plan } from './delete'
 import type { AccountCleanupReport } from './cleanup-result'
 import { cleanupAccountConnections } from './external-cleanup'
 import { AccountDeletionBusy, AccountDeletionLockLost, acquireAccountDeletionLock } from './deletion-lock'
@@ -171,19 +171,21 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
         if (!options.replayPlan && ('soleAdminOf' in checked || auditDigest(checked) !== auditDigest(frozen))) throw new Error('accountDeletionWorkspaceChanged')
         // Include objects written before the request's write barrier, and durable old-avatar references.
         assertHeld()
-        await transaction(main, async client => {
+        const retained = await transaction(main, async client => {
           assertHeld()
-          const objects = await accountStorageKeys(client, job.subjectUserId, frozen)
+          const retained = await freezeTaskRetention(client, job.subjectUserId, frozen)
+          const objects = await accountStorageKeys(client, job.subjectUserId, retained)
           const notBefore = !options.deleteObject && artifactStorage() === 'inline' ? (options.now?.() ?? new Date()) : objects.notBefore
           assertHeld()
-          await deleteMainAccountData(client, job.subjectUserId, frozen)
+          await deleteMainAccountData(client, job.subjectUserId, retained)
           await client.query('UPDATE account_deletion_jobs SET stage=\'main_deleted\',plan=$4,"pendingObjects"=$2,"storageNotBefore"=$3,"blockedReasons"=\'[]\',"updatedAt"=now() WHERE id=$1',
-            [id, JSON.stringify(objects.keys), notBefore, JSON.stringify(frozen)])
+            [id, JSON.stringify(objects.keys), notBefore, JSON.stringify(retained)])
           assertHeld()
+          return retained
         })
         assertHeld()
         // Workspace row locks remain held across the main commit; this is explicitly two commits.
-        await deleteWorkspaceData(drizzle(workspaceClient), job.subjectUserId, job.subjectEmailHash, frozen)
+        await deleteWorkspaceData(drizzle(workspaceClient), job.subjectUserId, job.subjectEmailHash, retained)
         assertHeld()
       })
       await lease.query('UPDATE account_deletion_jobs SET stage=\'workspace_deleted\',"updatedAt"=now() WHERE id=$1', [id])
@@ -269,22 +271,28 @@ export async function applyAccountDeletionManifest(manifest: AccountDeletionMani
     ids.add(job.id); subjects.add(job.subjectUserId)
   }
   for (const source of manifest.jobs) {
-    await transaction(options.mainPool, async client => {
+    const replayPlan = await transaction(options.mainPool, async client => {
       const existing = (await client.query<AccountDeletionJob>('SELECT * FROM account_deletion_jobs WHERE id=$1 FOR UPDATE', [source.id])).rows[0]
       if (existing && (existing.subjectUserId !== source.subjectUserId || existing.subjectEmailHash !== source.subjectEmailHash)) throw new Error('accountDeletionManifestInvalid')
+      // A previous replay may have retained tasks present only in the old backup.
+      // Preserve that frozen decision without expanding the source solo deletion set.
+      const retained: Plan = { ...source.plan!, keptIssueIds: [...new Set([
+        ...source.plan!.keptIssueIds, ...(existing?.plan?.keptIssueIds ?? []),
+      ])].sort() }
       await guard(client, source.subjectUserId, source.id, new Date(source.requestedAt))
       // A retry must preserve the pending object list after its DB pointers have already gone.
       // A completed row from the old dump is harmless to replay and captures old file references.
       if (existing && !['completed', 'cancelled'].includes(existing.stage)) {
-        await client.query('UPDATE account_deletion_jobs SET plan=$2,stage=CASE WHEN stage=\'preparing\' THEN \'requested\' ELSE stage END WHERE id=$1', [source.id, JSON.stringify(source.plan)])
-        return
+        await client.query('UPDATE account_deletion_jobs SET plan=$2,stage=CASE WHEN stage=\'preparing\' THEN \'requested\' ELSE stage END WHERE id=$1', [source.id, JSON.stringify(retained)])
+        return retained
       }
       await client.query(`INSERT INTO account_deletion_jobs(id,"subjectUserId","subjectEmailHash","requestedAt",stage,plan,"retentionUntil",warnings) VALUES($1,$2,$3,$4,'requested',$5,$6,$7)
         ON CONFLICT(id) DO UPDATE SET stage='requested',plan=excluded.plan,"pendingObjects"='[]',"completedAt"=NULL,"blockedReasons"='[]'`,
-      [source.id, source.subjectUserId, source.subjectEmailHash, source.requestedAt, JSON.stringify(source.plan), source.retentionUntil, JSON.stringify(source.warnings ?? [])])
+      [source.id, source.subjectUserId, source.subjectEmailHash, source.requestedAt, JSON.stringify(retained), source.retentionUntil, JSON.stringify(source.warnings ?? [])])
+      return retained
     })
     // Managed custody cleanup completed in the current journal; its warnings preserve upstream exceptions. Restore replays only local deletion against explicit isolated targets.
-    await resumeAccountDeletion(source.id, { ...options, externalCleanup: async () => ({ blockedReasons: [], warnings: source.warnings ?? [] }), replayPlan: source.plan! })
+    await resumeAccountDeletion(source.id, { ...options, externalCleanup: async () => ({ blockedReasons: [], warnings: source.warnings ?? [] }), replayPlan })
   }
   const remaining = (await options.mainPool.query('SELECT id FROM account_deletion_jobs WHERE id=ANY($1::uuid[]) AND stage<>\'completed\'', [[...ids]])).rows
   if (remaining.length) throw new Error('accountDeletionRestoreCleanupPending')

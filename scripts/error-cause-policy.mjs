@@ -127,7 +127,6 @@ export const droppedCauseAllowlist = {
   'lib/credentials/page-binding.ts': 1,
   'lib/credentials/runtime.ts': 2,
   'lib/execution-settings.ts': 1,
-  'lib/factory/agent-profile-store.ts': 1,
   'lib/factory/local-publication.ts': 2,
   'lib/factory/merge.ts': 1,
   'lib/factory/monitor-issue-links.ts': 1,

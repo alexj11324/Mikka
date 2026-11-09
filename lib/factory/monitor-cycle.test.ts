@@ -1,4 +1,5 @@
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { factoryTestLifecycle } from "../../tests/helpers/factory-test-authority";
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
@@ -102,8 +103,8 @@ test(
           runId = randomUUID(),
           candidateId = randomUUID();
         await pool.query(
-          `INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,'owner','Monitor cycle fixture','{}','todo','normal')`,
-          [issueId],
+          `INSERT INTO issues (id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,'owner','Monitor cycle fixture','{}','todo','normal',$2,'bound')`,
+          [issueId, await seedFixtureWorkspace(pool, 'owner')],
         );
         await pool.query(
           `INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,'owner','user_message',$2,'{"text":"fixture"}')`,

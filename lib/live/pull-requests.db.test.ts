@@ -70,7 +70,7 @@ test('the PR status key reaches each delivered task\'s audience, after the real 
     const agent = randomUUID()
     await database.query(`INSERT INTO agents (id,"userId",name,harness) VALUES ($1,'owner','Coder','codex')`, [agent])
     // A personal task and a team task the PR was delivered on; a third task names the PR but has no delivery.
-    await database.query(`INSERT INTO issues (id,"userId",title,content,status,priority,scope) VALUES ($1,'owner','Personal',$4,'review','normal','personal'),($2,'owner','Team',$4,'review','normal','workspace'),($3,'owner','Unrelated',$4,'todo','normal','personal')`, [personalTask, teamTask, unrelated, content])
+    await database.query(`INSERT INTO issues (id,"userId",title,content,status,priority,scope,"workspaceId") VALUES ($1,'owner','Personal',$4,'review','normal','personal',$5),($2,'owner','Team',$4,'review','normal','workspace',$6),($3,'owner','Unrelated',$4,'todo','normal','personal',$5)`, [personalTask, teamTask, unrelated, content, home, team])
     await database.query(`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,'owner')`, [teamTask, randomUUID(), team])
     for (const issueId of [personalTask, teamTask]) {
       const run = randomUUID()

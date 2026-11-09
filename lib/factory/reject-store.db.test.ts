@@ -1,5 +1,6 @@
 // #444: human reject through the REAL createFactoryStore (finish failed → repair
 // from approval → fresh execute attempt) on a disposable *_e2e database.
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
@@ -43,7 +44,7 @@ test("reject through the real Factory store", { skip: !url, timeout: 180000 }, a
     /** A routed task parked at approval/pending on an exact candidate. */
     const atApproval = async (priorExecuteAttempts = 1) => {
       const issueId = randomUUID(), sourceEventId = randomUUID();
-      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal')`, [issueId]);
+      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal',$2,'bound')`, [issueId, await seedFixtureWorkspace(pool, 'owner')]);
       await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,'owner','user_message',$2,'{"text":"synthetic"}')`, [sourceEventId, sourceEventId]);
       const routed = await store.route("owner", { issueId, sourceEventId, eventId: randomUUID(), rationale: "Task requested", missingInformation: [], missingPermissions: [], needsSpec: false });
       const taskId = routed.task.id, candidateId = randomUUID(), attemptId = randomUUID();

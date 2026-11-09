@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../tests/helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
@@ -94,12 +95,13 @@ async function database() {
 }
 
 dbTest('active agents on the database', async t => {
-  const { db, schema, heartbeat, close } = await database()
+  const { db, pool, schema, heartbeat, close } = await database()
   const { listActiveAgents } = await import('./active-agents')
   const { agents, agentRuns, devices, coordinatorSessions } = schema
   const { eq, inArray } = await import('drizzle-orm')
   const me = `test-mik7-${randomUUID()}`
   const other = `test-mik7-${randomUUID()}`
+  const workspaceId = await seedFixtureWorkspace(pool, me), otherWorkspace = await seedFixtureWorkspace(pool, other)
   const now = new Date()
   const ago = (ms: number) => new Date(now.getTime() - ms)
   const ahead = new Date(now.getTime() + 5 * 60_000)
@@ -112,7 +114,7 @@ dbTest('active agents on the database', async t => {
   const [a, b, c, d, e, f, mine] = [agent('A'), agent('B'), agent('C'), agent('D'), agent('E'), agent('F'), agent('Other', other)]
   await db.insert(agents).values([a, b, c, d, e, f, mine])
   const run = (agentId: string, status: string, extra: Partial<typeof agentRuns.$inferInsert> = {}, userId = me) =>
-    ({ id: randomUUID(), userId, agentId, status: status as never, leaseExpiresAt: ahead, startedAt: ago(60_000), ...extra })
+    ({ id: randomUUID(), userId, workspaceId: userId === me ? workspaceId : otherWorkspace, agentId, status: status as never, leaseExpiresAt: ahead, startedAt: ago(60_000), ...extra })
   const runs = [
     run(a.id, 'running', { startedAt: ago(30_000) }),
     run(a.id, 'waiting_input', { startedAt: ago(90_000) }),          // merge: earlier start, but A still working

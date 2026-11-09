@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import test from 'node:test'
-import { dbUrl, seedAgent, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedAgent, seedPersonalWorkspace, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
 test('personal secrets', { skip: !dbUrl }, async t => {
   const previousKey = process.env.WORKSPACE_SECRETS_KEY
@@ -142,8 +142,9 @@ test('personal secrets', { skip: !dbUrl }, async t => {
     const owner = await seedUser(pool, 'secret-owner'), teammate = await seedUser(pool, 'secret-teammate')
     const consumer = async (userId: string, status = 'running') => {
       const runId = randomUUID(), deviceId = randomUUID(), agentId = await seedAgent(pool, userId)
+      const workspaceId = await seedPersonalWorkspace(pool, userId)
       await pool.query('insert into devices (id,"ownerId",name,kind) values ($1,$2,$3,\'local\')', [deviceId, userId, 'personal-secret-consumer'])
-      await pool.query('insert into agent_runs (id,"userId","agentId","deviceId",status,"leaseExpiresAt") values ($1,$2,$3,$4,$5,now()+interval \'10 minutes\')', [runId, userId, agentId, deviceId, status])
+      await pool.query('insert into agent_runs (id,"userId","agentId","deviceId",status,"leaseExpiresAt","workspaceId") values ($1,$2,$3,$4,$5,now()+interval \'10 minutes\',$6)', [runId, userId, agentId, deviceId, status, workspaceId])
       return runId
     }
     const stopped = async (id: string) => (await pool.query('select "stopRequestedAt" is not null as stopped,"leaseExpiresAt"<=now() as expired from agent_runs where id=$1', [id])).rows[0]

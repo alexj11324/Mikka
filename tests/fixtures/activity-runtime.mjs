@@ -11,7 +11,14 @@ export const activityFixtureSession = () => sessions.getStore() ?? null
  * @param {string} [workspaceId]
  * @returns {T}
  */
-export const withActivitySession = (userId, callback, workspaceId) => sessions.run({user:{id:userId,name:'Synthetic',email:`${userId}@example.invalid`},workspaceId}, callback)
+export const withActivitySession = (userId, callback, workspaceId) => {
+  const createdAt = new Date()
+  return sessions.run({
+    user: { id: userId, name: 'Synthetic', email: `${userId}@example.invalid` },
+    session: { id: `activity-fixture:${userId}`, userId, createdAt, updatedAt: createdAt, expiresAt: new Date(createdAt.getTime() + 60 * 60 * 1000) },
+    workspaceId,
+  }, callback)
+}
 const sources = new Map([
   ['server-only', 'export {}'],
   ['next/headers', `import { activityFixtureSession } from ${JSON.stringify(import.meta.url)}; export async function headers(){return new Headers()} export async function cookies(){return {get(key){const id=activityFixtureSession()?.workspaceId;return key==='mikka-workspace' && id ? {value:id} : undefined},set(){}}}`],

@@ -1,10 +1,14 @@
+import { seedFixtureWorkspace } from '../tests/helpers/task-workspace'
 // Server-side cycle guard for updateIssueRelation, against a real database.
 // Runs the action through actAs (the same path MCP tools use).
 // Only GitHub Actions' disposable mikka_e2e service may run this fixture.
 // REQUIRE_DB=1 makes missing or foreign targets a failure before any connection.
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import test from 'node:test'
+import { mock, test } from 'node:test'
+
+mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined, getAll: () => [], has: () => false }) } })
+mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
 import { isE2eTarget } from '../tests/helpers/e2e-target.mjs'
 
 let hasDb = false
@@ -19,7 +23,7 @@ if (!hasDb && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=1 but 
 
 test('updateIssueRelation rejects a parent cycle on the server', { skip: !hasDb && 'no MIKKA_DATABASE_URL / DATABASE_URL' }, async () => {
   const { eq, inArray, sql } = await import('drizzle-orm')
-  const { db } = await import('./db')
+  const { db, pool } = await import('./db')
   const { issues, issueVersions, users } = await import('./db/schema')
   const { actAs } = await import('./acting-user')
   const { updateIssueRelation } = await import('../app/actions/issue-operations')
@@ -29,12 +33,13 @@ test('updateIssueRelation rejects a parent cycle on the server', { skip: !hasDb 
   // Raw SQL with every not-null column spelled out (as issue-search.db.test does), so the insert
   // does not depend on schema defaults that differ between databases.
   await db.execute(sql`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values (${owner}, 'Cycle Test', ${owner + '@example.test'}, false, now(), now())`)
+  const workspaceId = await seedFixtureWorkspace(pool, owner)
   try {
     // a <- b <- c  (b's parent is a, c's parent is b)
     await db.insert(issues).values([
-      { id: a, userId: owner, title: 'cycle a', status: 'todo', priority: 'normal', content: doc(null) },
-      { id: b, userId: owner, title: 'cycle b', status: 'todo', priority: 'normal', content: doc(a) },
-      { id: c, userId: owner, title: 'cycle c', status: 'todo', priority: 'normal', content: doc(b) },
+      { id: a, userId: owner, workspaceId, title: 'cycle a', status: 'todo', priority: 'normal', content: doc(null) },
+      { id: b, userId: owner, workspaceId, title: 'cycle b', status: 'todo', priority: 'normal', content: doc(a) },
+      { id: c, userId: owner, workspaceId, title: 'cycle c', status: 'todo', priority: 'normal', content: doc(b) },
     ])
     const before = await db.select().from(issues).where(inArray(issues.id, [a, b, c]))
     const revisionOf = (id: string) => before.find(row => row.id === id)!.revision
@@ -83,8 +88,9 @@ test('relation edits lock only their pair while preserving concurrent graph cycl
   const ids = [a, b, c, d, unrelated]
   const doc = (metadata: object = {}) => ({ type: 'doc', content: [], attrs: { mikka: metadata } })
   await db.execute(sql`insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values (${owner},'Relation Locks',${owner + '@example.test'},false,now(),now())`)
+  const workspaceId = await seedFixtureWorkspace(pool, owner)
   try {
-    await db.insert(issues).values(ids.map(id => ({ id, userId: owner, title: 'relation lock fixture', status: 'todo', priority: 'normal', content: doc() })))
+    await db.insert(issues).values(ids.map(id => ({ id, userId: owner, workspaceId, title: 'relation lock fixture', status: 'todo', priority: 'normal', content: doc() })))
 
     await t.test('an unrelated write lock does not block an edge edit or its full graph read', async () => {
       const blocker = await pool.connect()

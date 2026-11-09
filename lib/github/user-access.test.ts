@@ -13,7 +13,7 @@ const getAccessToken = mock.fn(async (_input: { headers?: Headers; body: { accou
 // The server-side account lookup with no request: Better Auth's adapter, by user id.
 const findAccounts = mock.fn(async (userId: string) => accounts.filter(row => row.userId === userId))
 mock.module(new URL('../auth.ts', import.meta.url).href, { namedExports: { auth: { api: {
-  getSession: async ({ headers }: { headers: Headers }) => { assert.equal(headers, requestHeaders); const id = sessionUsers.length ? sessionUsers.shift() : user; return id ? { user: { id } } : null },
+  getSession: async ({ headers }: { headers: Headers }) => { assert.equal(headers, requestHeaders); const id = sessionUsers.length ? sessionUsers.shift() : user; return id ? { user: { id }, session: { id: 'github-fixture-session' } } : null },
   listUserAccounts: async () => accounts,
   getAccessToken,
 }, $context: Promise.resolve({ internalAdapter: { findAccounts } }) } } })

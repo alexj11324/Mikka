@@ -1,4 +1,5 @@
 // BE-10b: POST /api/factory/tasks/route handler over the real store on a disposable *_e2e PG.
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
@@ -33,7 +34,7 @@ test("POST /api/factory/tasks/route routes once, replays, masks and is owner-onl
     const store = createFactoryStore(pool, authorize, null, { independent: factoryCheckIndependent });
     const route = async () => (userId: string, input: unknown) => store.route(userId, input);
     const issueId = randomUUID(), sourceEventId = randomUUID(), intruderEvent = randomUUID();
-    await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal')`, [issueId]);
+    await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal',$2,'bound')`, [issueId, await seedFixtureWorkspace(pool, 'owner')]);
     for (const [id, user] of [[sourceEventId, "owner"], [intruderEvent, "intruder"]])
       await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,$2,'user_message',$3,'{"text":"synthetic"}')`, [id, user, `fixture-${id}`]);
     const req = (userId: string, body: unknown) => ({ userId, origin: "https://app.example", url: "https://app.example/api/factory/tasks/route", body, enabled: true });
@@ -84,7 +85,7 @@ test("POST /api/factory/tasks/route under concurrency creates one task per sourc
     const req = (body: unknown) => ({ userId: "owner", origin: "https://app.example", url: "https://app.example/api/factory/tasks/route", body, enabled: true });
     const fixture = async () => {
       const issueId = randomUUID(), sourceEventId = randomUUID();
-      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal')`, [issueId]);
+      await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal',$2,'bound')`, [issueId, await seedFixtureWorkspace(pool, 'owner')]);
       await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,'owner','user_message',$2,'{"text":"synthetic"}')`, [sourceEventId, `fixture-${sourceEventId}`]);
       return { issueId, eventId: randomUUID(), sourceEventId, rationale: "Task requested", missingInformation: [], missingPermissions: [], needsSpec: false };
     };
