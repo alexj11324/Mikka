@@ -1,0 +1,35 @@
+{
+  "base": "869c71d7aa062c76fc7a75c1f8775d1ed8538168",
+  "baseTree": "61207b65e30026c0cde5cd4eb9b794cb4faf308e",
+  "baseDriverBlob": "5b5dd2d6b06f5b26f2c04db31cbc99a1b265ce63",
+  "commit": "a7092db9a0328c6eeb467101c01f4836be0d1809",
+  "tree": "27321a39cd8e1cb6e1ee4a2d5eb96bd696479b8b",
+  "files": [
+    {
+      "path": "scripts/acceptance/cloud-startup.mjs",
+      "blob": "6753c8aa8adf4354b60be3d62dcc5d5458f36cd9",
+      "additions": 21,
+      "deletions": 3
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.test.mjs",
+      "blob": "6ae54051916032d788864a725711975ad1ea007f",
+      "additions": 130,
+      "deletions": 0
+    }
+  ],
+  "officialProtocol": {
+    "tag": "rust-v0.166.0",
+    "tagObject": "593389380740f7b4762771573c447ccfdc59742f",
+    "commit": "6ff1e1ca3b30fc8b914720681fcf5fe62e95f856",
+    "files": [
+      "codex-rs/app-server-protocol/schema/typescript/v2/PatchApplyStatus.ts",
+      "codex-rs/app-server-protocol/schema/typescript/v2/CommandExecutionStatus.ts",
+      "codex-rs/app-server-protocol/schema/typescript/v2/McpToolCallResult.ts",
+      "codex-rs/app-server-protocol/schema/typescript/v2/ThreadItem.ts"
+    ]
+  },
+  "testScope": "8 focused regression tests; complete original test file retained, full existing suite not executed here due missing unrelated packages; no stubs",
+  "refsMoved": false
+}
+

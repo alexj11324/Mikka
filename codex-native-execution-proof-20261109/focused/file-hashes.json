@@ -1,0 +1,20 @@
+{
+  "baseline": {
+    "bytes": 84226,
+    "gitBlob": "5b5dd2d6b06f5b26f2c04db31cbc99a1b265ce63",
+    "sha256": "5738324428183c1844cab595f5ef9680d0ef7ad7b7f3effad4b9117587e7b8f6"
+  },
+  "files": {
+    "scripts/acceptance/cloud-startup.mjs": {
+      "bytes": 85323,
+      "gitBlob": "6753c8aa8adf4354b60be3d62dcc5d5458f36cd9",
+      "sha256": "4cdff20223c3e684512d7b6c95d573eb50d864eafcb680006be0aaf7c2b4a436"
+    },
+    "scripts/acceptance/cloud-startup.test.mjs": {
+      "bytes": 118044,
+      "gitBlob": "6ae54051916032d788864a725711975ad1ea007f",
+      "sha256": "fa492f535b8d2b2abdb2056a0a5d4f656a8b194a9437a6a165f1a0f9317f72bf"
+    }
+  },
+  "environmentSha256": "0a5cfae5bc9aea793e011f73c8b875e99a42fb220c4694d42773a024deaffd2b"
+}

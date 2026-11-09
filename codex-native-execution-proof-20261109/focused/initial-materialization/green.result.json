@@ -1,0 +1,14 @@
+{
+  "command": [
+    "node",
+    "--test",
+    "focused-native-tool-proof.test.mjs"
+  ],
+  "cwd": "/workspace/scratch/263e36984c81/native-tool-proof-1505",
+  "exitCode": 0,
+  "stdoutSha256": "4a60e9d7ee4015187a92c6ca86f9e07a96bef68ed4e5603f3b93b299ecc72d9b",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "sourceSha256": "7297e39421ea54ec24bdfce7aef1bfa2d36616dd208a176c235c5af861694660",
+  "testsSha256": "8bea2beed041ab3bc17ac153e1e0183fa28d7bbff586a0160200f4945b75ce24",
+  "focusedSha256": "61ca11e36ec2ac8e3ca253ad60aaf698e442549bbab7b434156140f0d141b1a1"
+}

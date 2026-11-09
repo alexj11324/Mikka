@@ -1,0 +1,16 @@
+✔ Codex native shell proof requires an exact successful exit code (7.509231ms)
+✔ Codex patch proof requires the actual completed protocol status (0.540242ms)
+✔ Codex native names arriving after the result still qualify an admitted call at the 64-call boundary (15.935549ms)
+✔ a later unknown name cannot downgrade a recognized Codex native tool (0.323176ms)
+✔ a later failed Codex available result removes that call from successful execution proof (0.249846ms)
+✔ canonical Codex submitted reports need a successful native execution outcome (6.043609ms)
+✔ other harnesses and ordinary MCP tools retain their availability semantics (0.434322ms)
+✔ Codex native outcome checks retain handoff exclusion and explicit error rejection (0.253521ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 166.041881

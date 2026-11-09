@@ -1,0 +1,14 @@
+{
+  "recordedAt": "2026-11-09T14:17:09.412637+00:00",
+  "checkoutHeadAtCollection": "a7092db9a0328c6eeb467101c01f4836be0d1809",
+  "workingTreeStatusAtCollection": "",
+  "nodeVersionAtCollection": "v24.22.1",
+  "defaultPathPnpmAtCollection": "11.25.0",
+  "actualInstallPnpmVersion": "10.34.3",
+  "actualInstallVersionEvidence": "full-related/install-frozen-869.log and root verification metadata",
+  "platform": "Linux-6.18.57-x86_64-with-glibc2.39",
+  "archivePreparationDoesNotRunTests": true,
+  "productionLogsRead": false,
+  "newVmCreated": false,
+  "refsMoved": false
+}

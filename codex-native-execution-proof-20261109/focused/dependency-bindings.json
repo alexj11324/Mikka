@@ -1,0 +1,72 @@
+{
+  "files": [
+    {
+      "path": "scripts/acceptance/cloud-startup-evidence.mjs",
+      "commit": "869c71d7aa062c76fc7a75c1f8775d1ed8538168",
+      "fixture": {
+        "bytes": 22659,
+        "sha256": "27b5e34ac43e87a5b78a00fce0e82ddefedc4d7aa45fa95bec27fe1f59e80071",
+        "gitBlob": "11a8266cb951a5752820e0b6ce26d34aea6d9e44"
+      },
+      "originalSource": {
+        "bytes": 22658,
+        "sha256": "16010e124b5554fab29dd1b2e3fc372197c91cdd4987e0f438f43ec11460e7b9",
+        "gitBlob": "b5a85b795d3026c350ced9823eaac9488a3e0cda"
+      },
+      "difference": "fixture has exactly one extra EOF newline; no other byte differs"
+    },
+    {
+      "path": "scripts/acceptance/team-workspace.mjs",
+      "commit": "869c71d7aa062c76fc7a75c1f8775d1ed8538168",
+      "fixture": {
+        "bytes": 6654,
+        "sha256": "034b39bf47ac8a3609c42ca2de5172cbc3528155c5c273c7b825d1c36c0b3eed",
+        "gitBlob": "b871cc48e16414e88d9999d3d29a064d6c9cc7d7"
+      },
+      "originalSource": {
+        "bytes": 6653,
+        "sha256": "1a9139c9fa11076b0cf9c0786c286ef34c8b5f2b6951bc1664cb30d3a57873a5",
+        "gitBlob": "c8bcb85cdbda9d2b80217660c06a4e49d265c44f"
+      },
+      "difference": "fixture has exactly one extra EOF newline; no other byte differs"
+    },
+    {
+      "path": "lib/smoke-account.ts",
+      "commit": "869c71d7aa062c76fc7a75c1f8775d1ed8538168",
+      "fixture": {
+        "bytes": 418,
+        "sha256": "8fda059c371657bf64604d6e72a896e357a5a96ea32bb0cbc7f821f785a81923",
+        "gitBlob": "1d17f29e81520cef2f83ba5a6cb22b56250e12a1"
+      },
+      "originalSource": {
+        "bytes": 417,
+        "sha256": "3e35f8082d618d412dc07d99815a6d2e37766824a9cbe188d20fce58fe7c7997",
+        "gitBlob": "7c669d4bee8636ba063ee92ace07dbaf75023033"
+      },
+      "difference": "fixture has exactly one extra EOF newline; no other byte differs"
+    },
+    {
+      "path": "lib/desktop-rpc/wire.ts",
+      "commit": "869c71d7aa062c76fc7a75c1f8775d1ed8538168",
+      "fixture": {
+        "bytes": 5365,
+        "sha256": "4a9e105d74841c2a076fb37f903e1d04351c028612851bc9a358653e4c109967",
+        "gitBlob": "c95af90e66e085deddc0280890f690ac1b054daf"
+      },
+      "originalSource": {
+        "bytes": 5364,
+        "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3",
+        "gitBlob": "2c72b5aafa3e6b8f4df8212072e6663e306d9318"
+      },
+      "difference": "fixture has exactly one extra EOF newline; no other byte differs"
+    }
+  ],
+  "fixturePackageJson": "{\"private\":true,\"type\":\"module\"}\n\n",
+  "fixturePackageJsonDigest": {
+    "bytes": 34,
+    "sha256": "55c40fada2c832d834f915351168d4a46598bde8070f076b72ab6b45d53b3da5",
+    "gitBlob": "5b9a03d3534279364293acab2862a9292d83d8c4"
+  },
+  "productImplementationsStubbed": false,
+  "dependencyEofNormalization": "not applied; hashes document actual bytes used by both canonical focused runs"
+}

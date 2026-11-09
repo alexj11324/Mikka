@@ -1,0 +1,51 @@
+{
+  "recordedAt": "2026-11-09T14:11:51.005186+00:00",
+  "sourceCommit": "a7092db9a0328c6eeb467101c01f4836be0d1809",
+  "sourceTree": "27321a39cd8e1cb6e1ee4a2d5eb96bd696479b8b",
+  "nodeVersion": "v24.22.1",
+  "pnpmVersion": "10.34.3",
+  "workingTreeClean": true,
+  "testCommand": "node --import ./tests/support/server-only.mjs --import tsx --test scripts/e2b/runtime-report.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/release/web-deploy.test.mjs",
+  "exitCode": 0,
+  "tests": 194,
+  "passed": 194,
+  "failed": 0,
+  "skipped": 0,
+  "coverage": "Full related Node suites on a709; does not include PostgreSQL/full-repository checks or real subscription/production execution",
+  "sources": [
+    {
+      "path": "scripts/acceptance/cloud-startup.mjs",
+      "bytes": 85323,
+      "sha256": "4cdff20223c3e684512d7b6c95d573eb50d864eafcb680006be0aaf7c2b4a436",
+      "gitBlob": "6753c8aa8adf4354b60be3d62dcc5d5458f36cd9"
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.test.mjs",
+      "bytes": 118044,
+      "sha256": "fa492f535b8d2b2abdb2056a0a5d4f656a8b194a9437a6a165f1a0f9317f72bf",
+      "gitBlob": "6ae54051916032d788864a725711975ad1ea007f"
+    }
+  ],
+  "logs": [
+    {
+      "path": "a709-related-suite.stdout.txt",
+      "bytes": 21031,
+      "sha256": "fbedccda49ea6f870c6c60fc24d4c3ce1ce85eee839b2e6776ff115f064226ac"
+    },
+    {
+      "path": "a709-related-suite.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "a709-related-suite.exit.txt",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "install-frozen-869.log",
+      "bytes": 8028,
+      "sha256": "2932ffcafe10a3a8cb95269960d748a089f25ac31ab1fbb9df5d579a5fe38161"
+    }
+  ]
+}

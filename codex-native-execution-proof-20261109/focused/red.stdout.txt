@@ -1,0 +1,142 @@
+✖ Codex native shell proof requires an exact successful exit code (5.003516ms)
+✖ Codex patch proof requires the actual completed protocol status (0.854524ms)
+✖ Codex native names arriving after the result still qualify an admitted call at the 64-call boundary (6.36052ms)
+✖ a later unknown name cannot downgrade a recognized Codex native tool (0.45286ms)
+✖ a later failed Codex available result removes that call from successful execution proof (0.501323ms)
+✖ canonical Codex submitted reports need a successful native execution outcome (2.333205ms)
+✔ other harnesses and ordinary MCP tools retain their availability semantics (0.628824ms)
+✔ Codex native outcome checks retain handoff exclusion and explicit error rejection (0.333591ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 2
+ℹ fail 6
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 231.113587
+
+✖ failing tests:
+
+test at focused-native-tool-proof.test.mjs:23:1
+✖ Codex native shell proof requires an exact successful exit code (5.003516ms)
+  AssertionError [ERR_ASSERTION]: nonzero
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/263e36984c81/native-tool-proof-1505/focused-native-tool-proof.test.mjs:38:55)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.start (node:internal/test_runner/test:1262:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:387:17) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at focused-native-tool-proof.test.mjs:43:1
+✖ Codex patch proof requires the actual completed protocol status (0.854524ms)
+  AssertionError [ERR_ASSERTION]: failed
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/263e36984c81/native-tool-proof-1505/focused-native-tool-proof.test.mjs:50:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at focused-native-tool-proof.test.mjs:55:1
+✖ Codex native names arriving after the result still qualify an admitted call at the 64-call boundary (6.36052ms)
+  AssertionError [ERR_ASSERTION]: bash:false
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/263e36984c81/native-tool-proof-1505/focused-native-tool-proof.test.mjs:68:55)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at focused-native-tool-proof.test.mjs:73:1
+✖ a later unknown name cannot downgrade a recognized Codex native tool (0.45286ms)
+  AssertionError [ERR_ASSERTION]: bash
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/263e36984c81/native-tool-proof-1505/focused-native-tool-proof.test.mjs:81:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at focused-native-tool-proof.test.mjs:85:1
+✖ a later failed Codex available result removes that call from successful execution proof (0.501323ms)
+  AssertionError [ERR_ASSERTION]: bash
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/263e36984c81/native-tool-proof-1505/focused-native-tool-proof.test.mjs:97:12)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at focused-native-tool-proof.test.mjs:102:1
+✖ canonical Codex submitted reports need a successful native execution outcome (2.333205ms)
+  AssertionError [ERR_ASSERTION]: bash:false
+  
+  true !== false
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/263e36984c81/native-tool-proof-1505/focused-native-tool-proof.test.mjs:110:55)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: true,
+    expected: false,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
