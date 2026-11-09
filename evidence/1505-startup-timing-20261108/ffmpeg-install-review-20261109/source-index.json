@@ -1,0 +1,103 @@
+{
+  "pnpmVersion": "10.34.3",
+  "pnpmTagObject": "df3eee4f4a7710da2fce6efd5588ef30b642211b",
+  "pnpmCommit": "c7c97c30dfa0640063e79362dbd5663ae9cc1b66",
+  "githubTagVerification": true,
+  "pnpmFiles": [
+    {
+      "repository": "pnpm/pnpm",
+      "commit": "c7c97c30dfa0640063e79362dbd5663ae9cc1b66",
+      "path": "exec/build-modules/src/index.ts",
+      "bytes": 9895,
+      "sha256": "6e04d89f7fb5b2352e565b931a1382d0b4684202dd4b099bffe2f21a33e4a798",
+      "gitBlob": "8bea2ba15f4b7cf6d1bb55e7a0c1536deced74b4",
+      "url": "https://github.com/pnpm/pnpm/blob/c7c97c30dfa0640063e79362dbd5663ae9cc1b66/exec/build-modules/src/index.ts"
+    },
+    {
+      "repository": "pnpm/pnpm",
+      "commit": "c7c97c30dfa0640063e79362dbd5663ae9cc1b66",
+      "path": "pkg-manager/headless/src/index.ts",
+      "bytes": 34525,
+      "sha256": "fa8fb560bbdfee0bb62dbd0bc3c72dc273d1f0611d3d1ecdbca9b979fc8c0fa0",
+      "gitBlob": "fe5fe5e2a0ffc3400fa8bfb8d1a6f45359ada5da",
+      "url": "https://github.com/pnpm/pnpm/blob/c7c97c30dfa0640063e79362dbd5663ae9cc1b66/pkg-manager/headless/src/index.ts"
+    },
+    {
+      "repository": "pnpm/pnpm",
+      "commit": "c7c97c30dfa0640063e79362dbd5663ae9cc1b66",
+      "path": "fs/indexed-pkg-importer/src/index.ts",
+      "bytes": 8087,
+      "sha256": "ea6674706b61fa81e3f93b7e60de2cf79e6f1c00f15bad4e783804c1c635eaaa",
+      "gitBlob": "1c3c8fffa4dd4c18c1547d6b1451d3edf54fb92a",
+      "url": "https://github.com/pnpm/pnpm/blob/c7c97c30dfa0640063e79362dbd5663ae9cc1b66/fs/indexed-pkg-importer/src/index.ts"
+    },
+    {
+      "repository": "pnpm/pnpm",
+      "commit": "c7c97c30dfa0640063e79362dbd5663ae9cc1b66",
+      "path": "store/create-cafs-store/src/index.ts",
+      "bytes": 4904,
+      "sha256": "089131dbef4e335c2c1435a52a5d5d0a9fe9d3cf98533573c816286a4f51aef1",
+      "gitBlob": "27dfc1461d47c06a6b85f394e2270c034751b29a",
+      "url": "https://github.com/pnpm/pnpm/blob/c7c97c30dfa0640063e79362dbd5663ae9cc1b66/store/create-cafs-store/src/index.ts"
+    },
+    {
+      "repository": "pnpm/pnpm",
+      "commit": "c7c97c30dfa0640063e79362dbd5663ae9cc1b66",
+      "path": "exec/lifecycle/src/index.ts",
+      "bytes": 1266,
+      "sha256": "5f9d303f4b64ac4ad142328fffb0c252c3d1ebebeaf19d8c2c372c9c2e8dfa72",
+      "gitBlob": "09de261bc99073b0d9037979ef4f50c28a34fcd0",
+      "url": "https://github.com/pnpm/pnpm/blob/c7c97c30dfa0640063e79362dbd5663ae9cc1b66/exec/lifecycle/src/index.ts"
+    },
+    {
+      "repository": "pnpm/pnpm",
+      "commit": "c7c97c30dfa0640063e79362dbd5663ae9cc1b66",
+      "path": "exec/plugin-commands-rebuild/src/implementation/index.ts",
+      "bytes": 19479,
+      "sha256": "9a286030f2326dc88e1e3c93c9da0cfa9f3f247180355d462755c071f60b55d6",
+      "gitBlob": "1d30b0a853b7da68fe31d585f7889b79446b1fca",
+      "url": "https://github.com/pnpm/pnpm/blob/c7c97c30dfa0640063e79362dbd5663ae9cc1b66/exec/plugin-commands-rebuild/src/implementation/index.ts"
+    },
+    {
+      "repository": "pnpm/pnpm",
+      "commit": "c7c97c30dfa0640063e79362dbd5663ae9cc1b66",
+      "path": "fs/indexed-pkg-importer/src/importIndexedDir.ts",
+      "bytes": 7613,
+      "sha256": "a0e779bad802b411d4bbde1b3286cb07ba7779478a228ccebd51a3c5db223461",
+      "gitBlob": "35f03c0f2400434227889c301348b8192920a362",
+      "url": "https://github.com/pnpm/pnpm/blob/c7c97c30dfa0640063e79362dbd5663ae9cc1b66/fs/indexed-pkg-importer/src/importIndexedDir.ts"
+    }
+  ],
+  "ffmpegGitHead": "24504b7d549c0400e099720b3d5854577693a63a",
+  "upstreamInstallEqualsNpmTarball": true,
+  "npmTarballIntegrityMatchesProjectLock": true,
+  "repoSource": "02401458a7fe26e00ce4caa653084c7f9680696d",
+  "repoTree": "0013159d8dd0e1155b84d81907f19f4e1283cff7",
+  "repoInputs": [
+    {
+      "path": "package.json",
+      "gitBlob": "4d4d856e9f90ea102c4e42cf42114e9d5daad731",
+      "bytes": 80325,
+      "sha256": "e677d9ca43c64d5050c38e880a7d4745c838086e0ed16f83990106f4b1f5e39a"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "gitBlob": "a7a956ac98dfcf7de9ebfe508853b8475fd10106",
+      "bytes": 978174,
+      "sha256": "ddfb2c81f1e50b1b619e4a690dd38c33cc0700352434ed4424eda27c86907277"
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "gitBlob": "cc47ee1a48b9585e06c87e0f5ed6f14211601c0c",
+      "bytes": 661,
+      "sha256": "e8529ab36b3014adf400dfc4b82082b86f84aeadafe686f890b1b26ac2f7e117"
+    },
+    {
+      "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+      "gitBlob": "27c2146b45054c3eb5510afc94ea7ee9696dcb87",
+      "bytes": 11661,
+      "sha256": "6740900ce8fe7367a8e2f980b13556b2ddb3a7d9fbadb49d5eff1482fcbf25f0"
+    }
+  ],
+  "checksAreStaticSourceChecks": true
+}

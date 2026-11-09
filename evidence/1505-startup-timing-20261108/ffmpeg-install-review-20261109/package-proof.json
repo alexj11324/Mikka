@@ -1,0 +1,30 @@
+{
+  "registry": "https://registry.npmjs.org/ffmpeg-static/5.3.0",
+  "tarball": "https://registry.npmjs.org/ffmpeg-static/-/ffmpeg-static-5.3.0.tgz",
+  "tarballBytes": 17329,
+  "tarballSha256": "0525c908c27618582a6fb5d4cc70452a2f2d4f50cb3d88b19b16a3c1cc8df25d",
+  "integrityVerified": true,
+  "sha1Verified": true,
+  "gitHead": "24504b7d549c0400e099720b3d5854577693a63a",
+  "repository": {
+    "url": "git+https://github.com/eugeneware/ffmpeg-static.git",
+    "type": "git"
+  },
+  "files": [
+    {
+      "path": "install.js",
+      "bytes": 6186,
+      "sha256": "9801ce3aa35e45f72f7d13339ff04c916011b529040d1a1301c74102ed335fb9"
+    },
+    {
+      "path": "index.js",
+      "bytes": 1152,
+      "sha256": "ca4ca945d60557d20f99c11fdcd338f85a55ff38b19868b1e8755b7a5c350a9d"
+    },
+    {
+      "path": "package.json",
+      "bytes": 1295,
+      "sha256": "646ba194bac40bdb76856effc9629463477c0e1e7ccded3888971328ff7761c5"
+    }
+  ]
+}

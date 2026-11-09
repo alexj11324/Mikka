@@ -1,0 +1,106 @@
+{
+  "title": "ffmpeg-static 5.3.0 partial postinstall and bounded retry review",
+  "observedAt": "2026-11-09T06:00:12.907024+00:00",
+  "repositorySource": "02401458a7fe26e00ce4caa653084c7f9680696d",
+  "trigger": {
+    "source": "parent-provided unique release log finding; not independently re-downloaded",
+    "runId": 42566225093,
+    "attempt": 2,
+    "kind": "desktop",
+    "time": "2026-11-09T05:41:25Z",
+    "package": "ffmpeg-static@5.3.0",
+    "failureHTTP": 504,
+    "asset": "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/linux-x64.LICENSE"
+  },
+  "conclusion": {
+    "plainInPlaceInstallRetryIsCompleteInstallProof": false,
+    "plainRebuildIsCompleteInstallProof": false,
+    "canReturnSuccessWithMissingLicense": true,
+    "scope": "If package directory and binary remain in place; not a claim that every pnpm reimport must preserve them",
+    "preferredAlternative": "Use only the necessary daemon dependency closure if the independent dependency investigation proves it complete; no ignore-scripts or substitute mirror"
+  },
+  "evidence": [
+    {
+      "source": "install.js",
+      "lines": "38–45",
+      "finding": "An existing regular binary causes process.exit(0), before any README/LICENSE check."
+    },
+    {
+      "source": "install.js",
+      "lines": "101–131",
+      "finding": "Downloads use original upstream URLs, redirects<=3, request timeout30s and retry:true; file write begins after HTTP200. Streaming failures can leave output; no unlink recovery is present."
+    },
+    {
+      "source": "install.js",
+      "lines": "25–32,178–188",
+      "finding": "binary→chmod→README→LICENSE are sequential. A LICENSE504 is fatal. Binary remains. README/LICENSE404 only warns, so successful exit alone does not prove their presence."
+    },
+    {
+      "source": "pnpm exec/build-modules/src/index.ts",
+      "lines": "164–229",
+      "finding": "runPostinstallHooks is awaited; success side-effects upload occurs only afterward. Required dependency failure is rethrown. No package-generated-file rollback or license validation."
+    },
+    {
+      "source": "pnpm store/create-cafs-store/src/index.ts",
+      "lines": "64–80",
+      "finding": "Unbuilt required-build package uses clone-or-copy and passes caller force flag."
+    },
+    {
+      "source": "pnpm fs/indexed-pkg-importer/src/index.ts",
+      "lines": "117–145,229–237",
+      "finding": "Store-derived, nonforced clone/copy can skip reimport if the package.json target exists; this does not inspect generated binary/LICENSE."
+    },
+    {
+      "source": "pnpm pkg-manager/headless/src/index.ts",
+      "lines": "531–574,629–666,887–913",
+      "finding": "Lifecycle before final modules/current-lock manifest writes; package importer can preserve existing files. isBuilt comes from cache/import metadata, not license completeness."
+    },
+    {
+      "source": "pnpm exec/plugin-commands-rebuild/src/implementation/index.ts",
+      "lines": "383–416",
+      "finding": "Rebuild invokes the same package lifecycle, which still has the binary-only early return."
+    }
+  ],
+  "minimumRobustRetryRequirements": [
+    "Finite attempt count plus a hard total command deadline, no blanket suppression of install exit codes.",
+    "Use unchanged upstream package/version/lock/SRI and original download endpoints; keep lifecycle scripts enabled.",
+    "Before retry, guarantee clean package content in this build's own install area, or deliberately remove only that exact package's generated binary/README/LICENSE and force that package's install hook. Do not clean a shared pnpm store or another release.",
+    "Do not allow an unverified side-effects cache to restore an earlier partial installation as complete. Any recovered package must pass the same explicit postcondition.",
+    "After an apparently successful attempt, require nonempty regular binary, README and platform binary LICENSE at the exact package output paths; preserve package license too. A missing file remains failure, including upstream's warn-on404 path.",
+    "A targeted rebuild approach also needs all remaining original installation work to complete successfully. Rebuilding ffmpeg alone cannot stand in for the original full install.",
+    "These conditions are a source-grounded design boundary, not an implemented or experimentally verified retry patch."
+  ],
+  "comparison": [
+    {
+      "option": "Blind original pnpm install retry",
+      "verdict": "insufficient",
+      "reason": "Can reuse binary and skip README/LICENSE while returning0."
+    },
+    {
+      "option": "pnpm rebuild ffmpeg-static alone",
+      "verdict": "insufficient",
+      "reason": "Same early-return script; generated artifacts not reset or checked."
+    },
+    {
+      "option": "Fresh private attempt + original lifecycle + explicit artifact completion guard",
+      "verdict": "valid candidate boundary, not tested",
+      "reason": "Can preserve complete install but incurs repeat installs/downloads and needs precise private cleanup/cache treatment."
+    },
+    {
+      "option": "Necessary daemon closure only",
+      "verdict": "preferred if independently proved",
+      "reason": "Removes an unrelated root dependency's download from template construction rather than asserting a partial ffmpeg installation succeeded. Closure/peer-resolution evidence belongs to the other reviewer."
+    }
+  ],
+  "limitations": [
+    "No install, postinstall, rebuild, package/binary execution, model, SQL, production read, release rerun, or repository mutation performed.",
+    "No FFmpeg binary/README/LICENSE download. Only17,329B public npm source tarball and public primary source reads.",
+    "The actual release failure is reported by parent's one log read; no new claim about attempt1's different CLI failures.",
+    "No measured success rate, elapsed-time saving, final template readiness, or formal acceptance result."
+  ],
+  "paths": {
+    "root": "/vercel/ops-1505/ffmpeg-install-review",
+    "sourceIndex": "source-index.json",
+    "packageProof": "package-proof.json"
+  }
+}
