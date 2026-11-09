@@ -1,0 +1,209 @@
+{
+  "sourceCommit": "7848e79df9c5af67e526aeed1c828858db392066",
+  "workerSha": "aa7efbbe2969d8b1578bdba093e6400a26749e07",
+  "published": false,
+  "templates": {
+    "desktop": {
+      "templateId": "v1xqsfwvj54bqtzhydjm",
+      "buildId": "77225165-0309-408c-8cef-0ddcc5db3774",
+      "name": "mikka-7848e79df9c5-42690423873-1-desktop",
+      "strict": {
+        "entries": 103616,
+        "sha256": "817e2d62d159cd9bb8ce8ff4b0fd0ae2e66739395eada80c7d608e0826129454"
+      },
+      "strictUnchanged": true,
+      "stages": {
+        "finalization": {
+          "normalizedUnchanged": true,
+          "normalized": {
+            "entries": 103616,
+            "sha256": "9b77bdbae55956b078838cfd8af451a9aaa92817e4f87267b5f375898bc6a699"
+          },
+          "providerChanges": 248,
+          "allHaveKind": true,
+          "specificCaRows": [
+            {
+              "path": "/etc/ssl/certs/1560546e.0",
+              "kind": "file",
+              "before": {
+                "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+                "kind": "file",
+                "target": null
+              },
+              "after": {
+                "sha256": null,
+                "kind": "link",
+                "target": "e2b-ca.pem"
+              },
+              "resolvedSha256": "15162c70aa287f9671ffdcf5bb82d6e1c87f3af443ccd66804625ef28bb63c4b"
+            },
+            {
+              "path": "/etc/ssl/certs/e2b-ca.pem",
+              "kind": "file",
+              "before": {
+                "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+                "kind": "file",
+                "target": null
+              },
+              "after": {
+                "sha256": null,
+                "kind": "link",
+                "target": "/usr/local/share/ca-certificates/e2b-ca.crt"
+              },
+              "resolvedSha256": "15162c70aa287f9671ffdcf5bb82d6e1c87f3af443ccd66804625ef28bb63c4b"
+            },
+            {
+              "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+              "kind": "file",
+              "before": {
+                "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1"
+              },
+              "after": {
+                "sha256": "15162c70aa287f9671ffdcf5bb82d6e1c87f3af443ccd66804625ef28bb63c4b"
+              }
+            }
+          ]
+        },
+        "preloadFinalization": {
+          "normalizedUnchanged": true,
+          "normalized": {
+            "entries": 103616,
+            "sha256": "9b77bdbae55956b078838cfd8af451a9aaa92817e4f87267b5f375898bc6a699"
+          },
+          "providerChanges": 3,
+          "allHaveKind": true,
+          "specificCaRows": []
+        }
+      }
+    },
+    "claude": {
+      "templateId": "0bezoohwbmqnvmrq5tbs",
+      "buildId": "4994c9d2-2276-4cd6-84a3-16810fbcdd1b",
+      "name": "mikka-7848e79df9c5-42690423873-1-claude",
+      "strict": {
+        "entries": 44198,
+        "sha256": "c9dc5e6a0c7f41ce0a678e51794a7bbcead41a8fb8c65aa6ed57b677f8b73010"
+      },
+      "strictUnchanged": true,
+      "stages": {
+        "finalization": {
+          "normalizedUnchanged": true,
+          "normalized": {
+            "entries": 44198,
+            "sha256": "cddcd144ba59595faacf6b37cab1cc34c27c4753c7901c4b87577c0eb378e072"
+          },
+          "providerChanges": 253,
+          "allHaveKind": true,
+          "specificCaRows": [
+            {
+              "path": "/etc/ssl/certs/1560546e.0",
+              "kind": "file",
+              "before": {
+                "kind": "file",
+                "target": null,
+                "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1"
+              },
+              "after": {
+                "kind": "link",
+                "target": "e2b-ca.pem",
+                "sha256": null
+              },
+              "resolvedSha256": "997e37c6578ddf22ba820251ab162dee0f7622d9766debfe38df42c3ddc577bb"
+            },
+            {
+              "path": "/etc/ssl/certs/e2b-ca.pem",
+              "kind": "file",
+              "before": {
+                "kind": "file",
+                "target": null,
+                "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1"
+              },
+              "after": {
+                "kind": "link",
+                "target": "/usr/local/share/ca-certificates/e2b-ca.crt",
+                "sha256": null
+              },
+              "resolvedSha256": "997e37c6578ddf22ba820251ab162dee0f7622d9766debfe38df42c3ddc577bb"
+            },
+            {
+              "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+              "kind": "file",
+              "before": {
+                "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1"
+              },
+              "after": {
+                "sha256": "997e37c6578ddf22ba820251ab162dee0f7622d9766debfe38df42c3ddc577bb"
+              }
+            }
+          ]
+        },
+        "preloadFinalization": {
+          "normalizedUnchanged": true,
+          "normalized": {
+            "entries": 44198,
+            "sha256": "cddcd144ba59595faacf6b37cab1cc34c27c4753c7901c4b87577c0eb378e072"
+          },
+          "providerChanges": 9,
+          "allHaveKind": true,
+          "specificCaRows": []
+        }
+      }
+    },
+    "codex": {
+      "templateId": "qsw2vcrplrgskul36ok3",
+      "buildId": "ef0b2568-eb7b-4390-bceb-a484ae518b0b",
+      "name": "mikka-7848e79df9c5-42690423873-1-codex",
+      "strict": {
+        "entries": 39644,
+        "sha256": "c360e98bee57f262e90e40ffbdef3b93a17398ea12afc8455a55f1e53bcd7422"
+      },
+      "strictUnchanged": true,
+      "stages": {
+        "finalization": {
+          "normalizedUnchanged": true,
+          "normalized": {
+            "entries": 39644,
+            "sha256": "1438552b16bffdf47fe4b790ab6b8ff57c14045f720587bf7f0d206141a3c531"
+          },
+          "providerChanges": 301,
+          "allHaveKind": true,
+          "specificCaRows": [
+            {
+              "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+              "kind": "file",
+              "before": {
+                "sha256": "3d3bf4eda47ee4754c04202fe5ac919ae609f21aa750de1f6bdc91e83c16a686",
+                "mode": 420
+              },
+              "after": {
+                "sha256": "ababf4b10eab2b9fd636e2b6c4d3c57e8cae83a1fd7ad56d06f0ce8de5998288",
+                "mode": 511
+              }
+            }
+          ]
+        },
+        "preloadFinalization": {
+          "normalizedUnchanged": true,
+          "normalized": {
+            "entries": 39644,
+            "sha256": "1438552b16bffdf47fe4b790ab6b8ff57c14045f720587bf7f0d206141a3c531"
+          },
+          "providerChanges": 5,
+          "allHaveKind": true,
+          "specificCaRows": [
+            {
+              "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+              "kind": "file",
+              "before": {
+                "mode": 420
+              },
+              "after": {
+                "mode": 511
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

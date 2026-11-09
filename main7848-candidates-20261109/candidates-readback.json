@@ -1,0 +1,49 @@
+{
+  "artifactId": 13707142521,
+  "zipBytes": 47005,
+  "zipSHA256": "31db147f227a9a1162db8bc1b4cf21158da6ba8e2c6c594db54020a8771e8efe",
+  "receiptBytes": 331851,
+  "receiptSHA256": "3e28fadb49d56dc3abe509d357304b740b6f6b7a237f36b298d1a1186387fe95",
+  "keys": [
+    "sourceCommit",
+    "workerSha",
+    "templates"
+  ],
+  "identity": {
+    "sourceCommit": "7848e79df9c5af67e526aeed1c828858db392066",
+    "workerSha": "aa7efbbe2969d8b1578bdba093e6400a26749e07",
+    "runId": null,
+    "runAttempt": null,
+    "published": null,
+    "status": null
+  },
+  "templateKeys": {
+    "desktop": [
+      "templateId",
+      "buildId",
+      "name",
+      "baseTemplate",
+      "preinstalled",
+      "models",
+      "conservation"
+    ],
+    "claude": [
+      "templateId",
+      "buildId",
+      "name",
+      "baseTemplate",
+      "preinstalled",
+      "models",
+      "conservation"
+    ],
+    "codex": [
+      "templateId",
+      "buildId",
+      "name",
+      "baseTemplate",
+      "preinstalled",
+      "models",
+      "conservation"
+    ]
+  }
+}
