@@ -57,6 +57,7 @@ export type StoredCoordinatorStartupInbox = z.infer<typeof storedInboxSchema>
 export interface StoredCoordinatorStartupReceipt { settings: StoredCoordinatorStartupSettings; inbox: StoredCoordinatorStartupInbox }
 export type CoordinatorStartupTake =
   | ({ kind: 'ready'; replayed: boolean } & CoordinatorStartupReceipt)
+  | ({ kind: 'inbox-only' } & CoordinatorStartupReceipt)
   | { kind: 'not-held'; inbox: InboxTake }
   | ({ kind: 'lost'; replayed: true } & CoordinatorStartupReceipt)
 

@@ -2,9 +2,10 @@ import type { CoordinatorWorkflowStreamPart } from '@/lib/coordinator/stream'
 import * as steps from './steps'
 import { prepareHostedAgentRound } from './round-preparation'
 
-/** The receipt commits before either execution preparation or stream start.
- * Only this first round combines inbox and preparation; neither a credential
- * nor a live model object is retained between attempts. */
+/** A bounded ordinary inbox commits its receipt before preparation/start.
+ * Inbox-only returns immediately after its take, retaining the original
+ * durable boundary before either operation. Neither a credential nor a live
+ * model object is retained between attempts. */
 export async function prepareCoordinatorStartup(userId: string, botId: string, holder: string, writable: WritableStream<CoordinatorWorkflowStreamPart>) {
   'use step'
   const candidate = await steps.hostedStartupSettings(userId)

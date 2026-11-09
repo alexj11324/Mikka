@@ -126,8 +126,9 @@ export async function takeInbox(userId: string, holder: string, botId: string): 
   return (await takeInboxTransaction(userId, holder, botId)).inbox
 }
 
-/** Round zero consumes and records one immutable inbox in the same COMMIT.
- * Every retry still locks the current lease; the receipt grants no authority. */
+/** A bounded ordinary round zero commits a receipt before combined preparation.
+ * Other new takes retain the inbox-only durable boundary. Existing receipts
+ * always replay first; every attempt checks the lease and gains no authority. */
 export async function takeStartupInbox(userId: string, holder: string, botId: string, candidate: CoordinatorStartupSettingsCandidate): Promise<CoordinatorStartupTake> {
   const codec = await import('./startup-receipt')
   // Reject a missing or malformed candidate before any session/lease write;
@@ -220,7 +221,16 @@ async function takeInboxTransaction(userId: string, holder: string, botId: strin
       if (!codec || !settings) return { inbox }
       const receipt = codec.readStartupReceipt(1, settings, inbox)
       const stored = codec.encodeStoredStartupReceipt(receipt)
-      const inserted = await tx.execute(sql`INSERT INTO coordinator_startup_receipts("userId","botId",holder,round,version,settings,inbox) VALUES(${userId},${botId}::uuid,${holder},0,1,${JSON.stringify(stored.settings)}::jsonb,${JSON.stringify(stored.inbox)}::jsonb) ON CONFLICT("userId","botId",holder,round) DO NOTHING`)
+      const storedSettings = JSON.stringify(stored.settings), storedInbox = JSON.stringify(stored.inbox)
+      // Only a small ordinary inbox needs a receipt for preparation inside
+      // this step. Larger/new non-combined takes return their complete inbox
+      // directly at the original durable boundary, with no fallible work
+      // after COMMIT. Existing receipts were replayed above before this choice.
+      if (inbox.added > 0 && (inbox.scheduledRead || !settings.agentKitEnabled ||
+        Buffer.byteLength(storedSettings, 'utf8') + Buffer.byteLength(storedInbox, 'utf8') > 256)) {
+        return { inbox: receipt.inbox, startup: { kind: 'inbox-only', ...receipt } }
+      }
+      const inserted = await tx.execute(sql`INSERT INTO coordinator_startup_receipts("userId","botId",holder,round,version,settings,inbox) VALUES(${userId},${botId}::uuid,${holder},0,1,${storedSettings}::jsonb,${storedInbox}::jsonb) ON CONFLICT("userId","botId",holder,round) DO NOTHING`)
       if (inserted.rowCount !== 1) throw codec.startupReceiptConflict(new Error('coordinatorStartupReceiptConflict'))
       return { inbox: receipt.inbox, startup: { kind: 'ready', ...receipt, replayed: false } }
     }

@@ -9,9 +9,16 @@ export async function readLocalDeviceAccount(fetcher: (url: string, init: Reques
   return localDeviceAccount.parse(await response.json())
 }
 
+/** Setup admission consumes only the fresh owner, never a device-list snapshot. */
+export async function readLocalDeviceOwner(fetcher: (url: string, init: RequestInit) => Promise<Response>, appUrl: string): Promise<Pick<LocalDeviceAccount, 'ownerId'>> {
+  const response = await fetcher(`${appUrl.replace(/\/$/, '')}/api/devices/enrollment?view=owner`, { cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(10_000) })
+  if (!response.ok) throw new Error('Sign in to register a device')
+  return localDeviceAccount.pick({ ownerId: true }).parse(await response.json())
+}
+
 /** Main owns the account key. A workspace change is the same account; A→B→A
  * is three setup contexts, even while the Electron process stays alive. */
-export function localSetupController(installer: Pick<SshInstaller, 'state' | 'cancel' | 'beginLocal' | 'repairLocal' | 'restartLocal'>, account: () => Promise<LocalDeviceAccount>) {
+export function localSetupController(installer: Pick<SshInstaller, 'state' | 'cancel' | 'beginLocal' | 'repairLocal' | 'restartLocal'>, account: () => Promise<Pick<LocalDeviceAccount, 'ownerId'>>) {
   let autoOwner: string | null = null
   let pending = Promise.resolve()
   const run = <T>(action: () => Promise<T>): Promise<T> => {

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import test, { after, type TestContext } from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
 import type { Pool, PoolClient, QueryResult } from 'pg'
@@ -94,9 +94,16 @@ const emptyInbox: InboxTake = {
 }
 type Fixture = { owner: string; botId: string; workspaceId: string; holder: string; pool: Pool }
 type Ready = Extract<CoordinatorStartupTake, { kind: 'ready' }>
+type InboxOnly = Extract<CoordinatorStartupTake, { kind: 'inbox-only' }>
 const ready = (value: CoordinatorStartupTake): Ready => {
   assert.equal(value.kind, 'ready')
   if (value.kind !== 'ready') throw new Error('Expected a ready startup')
+  return value
+}
+const inboxOnly = (value: CoordinatorStartupTake): InboxOnly => {
+  assert.equal(value.kind, 'inbox-only')
+  if (value.kind !== 'inbox-only') throw new Error('Expected an inbox-only startup')
+  assert.equal(Object.hasOwn(value, 'replayed'), false)
   return value
 }
 
@@ -146,6 +153,21 @@ async function receiptRows(f: Fixture) {
 async function decodeReceiptRow(row: { version: unknown; settings: unknown; inbox: unknown }) {
   const { decodeStoredStartupReceipt } = await import('./startup-receipt')
   return { ...row, ...decodeStoredStartupReceipt(row.version, row.settings, row.inbox) }
+}
+async function seedHistoricalReceipt(f: Fixture, checkpoint: InboxOnly) {
+  assert.deepEqual(await receiptRows(f), [], 'a new inbox-only checkpoint must not write a receipt')
+  // The previous implementation stored these complete, schema-valid results.
+  // Seed that committed historical row explicitly; a new take must not be
+  // expected to write it merely to exercise backward-compatible replay.
+  const { encodeStoredStartupReceipt } = await import('./startup-receipt')
+  const encoded = encodeStoredStartupReceipt(checkpoint)
+  const inserted = await f.pool.query('INSERT INTO coordinator_startup_receipts ("userId","botId",holder,round,version,settings,inbox) VALUES ($1,$2,$3,0,1,$4::jsonb,$5::jsonb)',
+    [f.owner, f.botId, f.holder, JSON.stringify(encoded.settings), JSON.stringify(encoded.inbox)])
+  assert.equal(inserted.rowCount, 1)
+  const rows = await receiptRows(f)
+  assert.equal(rows.length, 1)
+  assert.deepEqual(await decodeReceiptRow(rows[0]), { holder: f.holder, round: 0, version: 1, settings: checkpoint.settings, inbox: checkpoint.inbox })
+  return rows
 }
 async function lease(f: Fixture) {
   return (await f.pool.query('SELECT "leaseHolder","leaseUntil","updatedAt" FROM coordinator_sessions WHERE "userId"=$1 AND "botId"=$2', [f.owner, f.botId])).rows[0]
@@ -279,7 +301,9 @@ dbTest('startup retry after a committed take keeps E1 and leaves E2 pending', { 
   await fixture(t, async f => {
     // Only this test accepts the explicit test-only negative control.
     const operation = process.env.MIKKA_TEST_STARTUP_LEGACY_COMPOSITE === '1' ? unsafeComposite : take
-    const e1 = await event(f, 'E1: the original request', true, { taskDestination: { kind: 'task' } })
+    // Keep the task/source receipt eligible for combined preparation. The
+    // separate INSERT rollback regression still exercises Telegram delivery.
+    const e1 = await event(f, 'E1: the original request', false, { taskDestination: { kind: 'task' } })
     const preparationError = new Error('synthetic prepare failure after the DB commit')
     const captured: { first?: Ready } = {}
     const composite = async (candidate: CoordinatorStartupSettingsCandidate, prepare: (result: Ready) => Promise<void>) => {
@@ -299,7 +323,7 @@ dbTest('startup retry after a committed take keeps E1 and leaves E2 pending', { 
     assert.equal(first.inbox.sourceEventId, e1)
     assert.equal(first.inbox.taskEventId, e1)
     assert.equal(first.settings.coordinator, true)
-    assert.equal(first.inbox.telegramTargets.length, 1)
+    assert.equal(first.inbox.telegramTargets.length, 0)
     const committedMessages = await messages(f), committedEvents = await events(f)
     const e2 = await event(f, 'E2: a later request', true)
     // Fresh call, changed deployment flags, no in-memory receipt reuse.
@@ -318,7 +342,7 @@ dbTest('startup retry after a committed take keeps E1 and leaves E2 pending', { 
     assert.ok(receipts[0].settings && typeof receipts[0].settings === 'object' && !Array.isArray(receipts[0].settings))
     assert.ok(receipts[0].inbox && typeof receipts[0].inbox === 'object' && !Array.isArray(receipts[0].inbox))
     assert.deepEqual(Object.keys(receipts[0].settings).sort(), ['f', 'r'])
-    assert.deepEqual(Object.keys(receipts[0].inbox).sort(), ['a', 'f', 'k', 'p', 's', 't'])
+    assert.deepEqual(Object.keys(receipts[0].inbox).sort(), ['a', 'f', 'k', 'p', 's'])
     assert.deepEqual(await decodeReceiptRow(receipts[0]), { holder: f.holder, round: 0, version: 1, settings: first.settings, inbox: first.inbox })
   })
 })
@@ -372,7 +396,7 @@ dbTest('multi-event startup preserves chronological order and source timestamp b
 dbTest('same-key waiters read a fresh receipt snapshot after the session lock', { timeout: 35_000 }, async t => {
   await fixture(t, async f => {
     const [{ withDatabaseClient }] = runtime!
-    const e1 = await event(f, 'E1 before concurrent startup', true)
+    const e1 = await event(f, 'E1 before concurrent startup')
     const a = await clientFor(f), b = await clientFor(f), observer = await clientFor(f)
     const aPid = Number((await a.query('SELECT pg_backend_pid() AS pid')).rows[0].pid)
     const bPid = Number((await b.query('SELECT pg_backend_pid() AS pid')).rows[0].pid)
@@ -498,13 +522,13 @@ dbTest('an empty receipt stays empty and later input remains available to the or
   })
 })
 
-async function scheduledEvent(f: Fixture, valid: boolean) {
+async function scheduledEvent(f: Fixture, valid: boolean, prompt = 'Read the synthetic issue status') {
   const sourceEvent = await event(f, 'Human source for a stored scheduled read')
   await f.pool.query('UPDATE coordinator_events SET "deliveredAt"=now() WHERE id=$1', [sourceEvent])
   const scheduleId = randomUUID(), occurrenceId = randomUUID(), eventId = randomUUID(), token = randomUUID()
   const definition = { title: 'Synthetic startup read', timezone: 'UTC',
     timing: { kind: 'once', at: new Date(Date.now() + 60_000).toISOString() },
-    task: { kind: 'agent_read', prompt: 'Read the synthetic issue status', allowedActions: ['get_issue'] },
+    task: { kind: 'agent_read', prompt, allowedActions: ['get_issue'] },
     misfire: 'catch_up_once', maxLatenessMinutes: 5 }
   await f.pool.query('INSERT INTO user_schedules (id,owner_id,workspace_id,bot_id,source_event_id,request_id,definition,request_definition,status,next_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$7,$8,$9)',
     [scheduleId, f.owner, f.workspaceId, f.botId, sourceEvent, randomUUID(), definition, 'active', new Date()])
@@ -515,11 +539,12 @@ async function scheduledEvent(f: Fixture, valid: boolean) {
   return { eventId, scope: { occurrenceId, leaseToken: token, allowedActions: definition.task.allowedActions, prompt: definition.task.prompt } }
 }
 
-dbTest('scheduled reads and expired schedule empty returns both persist replayable receipts', { timeout: 40_000 }, async t => {
+dbTest('new scheduled reads keep their checkpoint while historical scopes and expired empty receipts replay', { timeout: 40_000 }, async t => {
   for (const valid of [true, false]) await t.test(valid ? 'valid scope' : 'expired scope', async child => {
     await fixture(child, async f => {
       const scheduled = await scheduledEvent(f, valid)
-      const first = ready(await take(f))
+      const taken = await take(f)
+      const first = valid ? inboxOnly(taken) : ready(taken)
       if (valid) {
         assert.equal(first.inbox.added, 1)
         assert.deepEqual(first.inbox.scheduledRead, scheduled.scope)
@@ -532,6 +557,7 @@ dbTest('scheduled reads and expired schedule empty returns both persist replayab
         assert.equal(retired.tier, 'background')
         assert.equal((await messages(f)).length, 0)
       }
+      const historical = valid ? await seedHistoricalReceipt(f, inboxOnly(first)) : undefined
       const e2 = await event(f, 'Input after scheduled startup')
       const replay = ready(await take(f, changedSettings))
       assert.equal(replay.replayed, true)
@@ -539,6 +565,7 @@ dbTest('scheduled reads and expired schedule empty returns both persist replayab
       assert.deepEqual(replay.settings, first.settings)
       await pending(f, e2)
       assert.equal((await receiptRows(f)).length, 1)
+      if (historical) assert.deepEqual(await receiptRows(f), historical, 'the full historical scheduled authority is never rewritten on replay')
     })
   })
 })
@@ -575,7 +602,8 @@ dbTest('handoff privacy and human-question metadata survive a fresh receipt repl
       }
       await f.pool.query('INSERT INTO coordinator_events (id,"userId","botId",kind,"dedupeKey",payload,tier,"issueId","runId","triageDecision") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
         [id, f.owner, f.botId, kind, 'startup-metadata:' + id, payload, 'attention', issueId, runId, decision])
-      const first = ready(await take(f))
+      const taken = await take(f)
+      const first = kind === 'run_question' ? inboxOnly(taken) : ready(taken)
       assert.equal(first.inbox.added, 1)
       assert.equal(first.inbox.sourceEventId, undefined)
       assert.deepEqual(first.inbox.pushEvents, [{ kind, tier: 'attention', issueId, runId }])
@@ -589,12 +617,14 @@ dbTest('handoff privacy and human-question metadata survive a fresh receipt repl
         assert.equal(first.inbox.handoffOnly, false)
         assert.equal(first.inbox.pushHidesText, false)
       }
+      const historical = kind === 'run_question' ? await seedHistoricalReceipt(f, inboxOnly(first)) : undefined
       const e2 = await event(f, 'Later input after metadata-rich startup')
       const replay = ready(await take(f, changedSettings))
       assert.equal(replay.replayed, true)
       assert.deepEqual(replay.inbox, first.inbox)
       assert.deepEqual(replay.settings, first.settings)
       await pending(f, e2)
+      if (historical) assert.deepEqual(await receiptRows(f), historical, 'the complete historical question receipt is never rewritten on replay')
     })
   })
 })
@@ -625,7 +655,10 @@ dbTest('invalid candidate settings fail before acquiring the lease or consuming 
 dbTest('failure after the real receipt INSERT rolls back delivery, lease, Telegram markers and notifications', { timeout: 30_000 }, async t => {
   await fixture(t, async f => {
     const [{ withDatabaseClient }, , , , , { COORDINATOR_LEASE_CHANNEL }, { afterCommit }] = runtime!
-    const e1 = await event(f, 'E1 for transaction rollback', true)
+    // Short nonempty IDs satisfy the real Telegram source contract and keep
+    // this receipt within the combined-startup bound. Do not bypass marking.
+    const telegram = { threadId: '1', telegramUserId: '2', messageId: 1 }
+    const e1 = await event(f, 'E1 for transaction rollback', true, { telegram })
     const originalLease = await lease(f), originalEvents = await events(f)
     const worker = await clientFor(f), listener = await clientFor(f)
     const notifications: string[] = []
@@ -672,6 +705,8 @@ dbTest('failure after the real receipt INSERT rolls back delivery, lease, Telegr
       try { retried = ready(await withDatabaseClient(worker, () => take(f))) } finally { restoreEffect() }
       assert.equal(retried.replayed, false)
       assert.equal(retried.inbox.sourceEventId, e1)
+      assert.deepEqual(retried.inbox.telegramTargets, [{ threadId: telegram.threadId, telegramUserId: telegram.telegramUserId, sourceEventIds: [e1] }])
+      assert.deepEqual((await events(f)).find(row => row.id === e1)?.payload.mikkaTelegramReply, { version: 1, state: 'pending' })
       assert.equal((await messages(f)).length, 1)
       assert.equal((await receiptRows(f)).length, 1)
       assert.equal(committedEffects, 1, 'the same observed commit-effect mechanism runs after a successful COMMIT')
@@ -827,7 +862,7 @@ dbTest('receipt keys keep owner, bot and holder isolated and follow session dele
     // under a different owner, so omitting userId cannot pass by accident.
     for (const other of [{ ...f, botId: peerBot }, { ...f, owner: peerOwner }]) {
       const id = await event(other, 'Separate scope input')
-      const result = ready(await take(other, changedSettings))
+      const result = ready(await take(other, { ...changedSettings, agentKitEnabled: true }))
       assert.equal(result.replayed, false)
       assert.equal(result.settings.coordinator, false)
       assert.equal(result.inbox.sourceEventId, id)
@@ -850,20 +885,52 @@ dbTest('receipt keys keep owner, bot and holder isolated and follow session dele
 dbTest('startup normal paths use no more statements than old settings plus inbox', { timeout: 60_000 }, async t => {
   const personal = await import('./personal-instructions')
   const { modelMessage } = await import('./message-safety')
+  type PromptInput = { summary: string | null; memory: string; messages: { position: number; message: ReturnType<typeof modelMessage> }[]; system: string }
   const system = 'You are a helpful coordinator.', personalText = 'Keep answers concise.', memory = 'The person prefers practical examples.'
   // Both normal definitions already carry this same authorized empty snapshot.
   // Supplying it uses the real formatter without another plugin discovery phase.
   const plugins = { servers: [], skills: [] }
-  for (const scenario of ['user', 'empty', 'not-held', 'telegram', 'expired-schedule'] as const) await t.test(scenario, async child => {
+  for (const scenario of ['user', 'empty', 'not-held', 'telegram', 'expired-schedule', 'user-batch-50', 'scheduled-read-8000-bmp', 'disabled-kit'] as const) await t.test(scenario, async child => {
     const measurements: Partial<Record<'old' | 'startup', QueryMetrics>> = {}
     const promptMeasurements: Partial<Record<'old' | 'startup', QueryMetrics>> = {}
     const completeMeasurements: Partial<Record<'old' | 'startup', QueryMetrics>> = {}
-    const promptInputs: Partial<Record<'old' | 'startup', unknown>> = {}
-    const expectsPrompt = scenario === 'user' || scenario === 'telegram'
+    const promptInputs: Partial<Record<'old' | 'startup', PromptInput>> = {}
+    const bounded = scenario === 'user-batch-50' || scenario === 'scheduled-read-8000-bmp' || scenario === 'disabled-kit'
+    const expectsPrompt = scenario === 'user' || scenario === 'telegram' || bounded
+    const expectedAdded = scenario === 'user-batch-50' ? 50 : 1
+    // Both entries receive the same settings snapshot. Disabling the kit or
+    // deferring a schedule to its original checkpoint does not skip its prompt.
+    const candidate = scenario === 'disabled-kit' ? { ...firstSettings, agentKitEnabled: false } : firstSettings
+    const entrySettings: Partial<Record<'old' | 'startup', CoordinatorStartupSettingsCandidate & { coordinator: boolean }>> = {}
+    const scheduledPrompt = '中'.repeat(8000)
+    const scheduledCreatedAt = '2026-01-01T00:00:00.000Z'
     for (const mode of ['old', 'startup'] as const) await fixture(child, async f => {
       let sourceEventId: string | undefined
+      let scheduled: Awaited<ReturnType<typeof scheduledEvent>> | undefined
+      const batchIds: string[] = [], batchStamps: string[] = []
       if (expectsPrompt) {
-        sourceEventId = await event(f, 'Query budget input', scenario === 'telegram')
+        if (scenario === 'user-batch-50') {
+          for (let index = 0; index < 50; index++) {
+            batchIds.push(await event(f, 'Short ordinary message ' + String(index).padStart(2, '0')))
+            batchStamps.push(new Date(Date.UTC(2026, 0, 1) + index).toISOString())
+          }
+          await f.pool.query('UPDATE coordinator_events e SET "createdAt"=v.created_at FROM unnest($1::uuid[],$2::timestamptz[]) AS v(id,created_at) WHERE e.id=v.id', [batchIds, batchStamps])
+          const seeded = await events(f)
+          assert.equal(seeded.length, 50)
+          assert.ok(seeded.every(row => row.payload.taskDestination === undefined), 'all 50 inputs are ordinary messages, not isolated task requests')
+          sourceEventId = batchIds.at(-1)
+        } else if (scenario === 'scheduled-read-8000-bmp') {
+          const { taskSchema } = await import('../schedules/contract')
+          assert.equal(scheduledPrompt.length, 8000)
+          assert.equal([...scheduledPrompt].length, 8000)
+          assert.equal(Buffer.byteLength(scheduledPrompt), 24_000)
+          assert.deepEqual(taskSchema.parse({ kind: 'agent_read', prompt: scheduledPrompt, allowedActions: ['get_issue'] }),
+            { kind: 'agent_read', prompt: scheduledPrompt, allowedActions: ['get_issue'] }, 'the original schedule contract accepts this BMP payload unchanged')
+          scheduled = await scheduledEvent(f, true, scheduledPrompt)
+          const fixed = await f.pool.query('UPDATE coordinator_events SET "createdAt"=$2 WHERE id=$1 AND "userId"=$3 AND "botId"=$4',
+            [scheduled.eventId, scheduledCreatedAt, f.owner, f.botId])
+          assert.equal(fixed.rowCount, 1, 'both fixtures use the same real scheduled source timestamp before A')
+        } else sourceEventId = await event(f, 'Query budget input', scenario === 'telegram')
         // Identical short real rows, created before any measurement window.
         await runtime![0].db.insert(runtime![1].userPreferences).values({ userId: f.owner, memoryEnabled: true, personalInstructions: personalText })
         await runtime![0].db.insert(runtime![1].attentionSettings).values({ userId: f.owner, enabled: true })
@@ -880,14 +947,21 @@ dbTest('startup normal paths use no more statements than old settings plus inbox
         await runtime![0].withDatabaseClient(client, async () => {
           let inbox: InboxTake
           if (mode === 'old') {
-            await runtime![4].isCoordinatorBot(client, f.owner, f.botId)
+            const coordinator = await runtime![4].isCoordinatorBot(client, f.owner, f.botId)
+            entrySettings.old = { ...candidate, coordinator }
             inbox = await runtime![2].takeInbox(f.owner, f.holder, f.botId)
-          } else inbox = (await take(f)).inbox
+          } else {
+            const value = await take(f, candidate)
+            inbox = value.inbox
+            if ('settings' in value) entrySettings.startup = value.settings
+          }
           // Adjacent A->B and B->C windows on this one held client. The whole
           // segment below is measured directly A->C, never across fixtures.
           middle = querySnapshot(client, metrics)
           startupStatementCount = statements.length
-          if (inbox.held && inbox.added > 0 && !inbox.scheduledRead) {
+          // Schedules and disabled-kit turns still reach these real readers
+          // through prepareTurn; only their durable preparation is separate.
+          if (inbox.held && inbox.added > 0 && (!inbox.scheduledRead || scenario === 'scheduled-read-8000-bmp')) {
             promptExecuted = true
             const conversation = mode === 'old'
               ? await runtime![2].loadConversation(f.owner, f.botId)
@@ -898,11 +972,23 @@ dbTest('startup normal paths use no more statements than old settings plus inbox
               assert.ok('personalInstructions' in conversation && typeof conversation.personalInstructions === 'string')
               instructions = await personal.withPersonalInstructionText(f.owner, system, conversation.personalInstructions, plugins)
             }
-            assert.equal(inbox.added, 1)
+            assert.equal(inbox.added, expectedAdded)
             assert.equal(inbox.sourceEventId, sourceEventId)
             assert.equal(conversation.memory, memory)
-            assert.equal(conversation.messages.length, 1)
+            assert.equal(conversation.messages.length, expectedAdded)
             assert.ok(instructions.includes(personalText))
+            if (scenario === 'user-batch-50') {
+              assert.equal(inbox.taskEventId, undefined)
+              assert.equal(inbox.scheduledRead, undefined)
+              assert.deepEqual(conversation.messages.map(row => row.position), batchIds.map((_, index) => index + 1))
+              assert.deepEqual(conversation.messages.map(row => 'mikkaUserEvent' in row.message ? row.message.mikkaUserEvent : undefined),
+                batchIds.map((id, index) => ({ id, sentAt: batchStamps[index] })), 'all 50 original message IDs and dates remain in order')
+            }
+            if (scheduled) {
+              assert.deepEqual(inbox.scheduledRead, scheduled.scope, 'the full authorized schedule survives without truncating its prompt')
+              assert.equal(inbox.taskEventId, undefined)
+              assert.ok(JSON.stringify(modelMessage(conversation.messages[0].message)).includes(scheduledPrompt), 'the model input retains all 8000 BMP characters')
+            }
             // Real model projection removes only each fixture's source receipt
             // metadata; SQL/result byte measurements above remain untouched.
             promptInputs[mode] = { summary: conversation.summary, memory: conversation.memory,
@@ -916,14 +1002,66 @@ dbTest('startup normal paths use no more statements than old settings plus inbox
         completeMeasurements[mode] = queryRange(before, after)
         restore(); client.release()
       }
-      assert.equal(promptExecuted, expectsPrompt, 'only an actually delivered non-schedule batch enters prompt preparation')
+      if (scheduled) {
+        // Fixtures deliberately retain rows, so their global event UUIDs
+        // cannot be reused. Read back only after C and observer restoration:
+        // this provenance check must not enter the measured wire window.
+        const sourceRows = await f.pool.query<{
+          id: string; kind: string; runId: string | null; issueId: string | null;
+          createdAt: Date | string; deliveredAt: Date | string | null;
+          payload: { source?: unknown; occurrenceId?: unknown };
+        }>('SELECT id,kind,"runId","issueId","createdAt","deliveredAt",payload FROM coordinator_events WHERE id=$1 AND "userId"=$2 AND "botId"=$3',
+          [scheduled.eventId, f.owner, f.botId])
+        assert.equal(sourceRows.rows.length, 1)
+        const source = sourceRows.rows[0]
+        const iso = (value: Date | string) => value instanceof Date ? value.toISOString() : new Date(value).toISOString()
+        assert.equal(source.id, scheduled.eventId)
+        assert.equal(source.kind, 'run_report')
+        assert.equal(source.payload.source, 'schedule_due')
+        assert.equal(source.payload.occurrenceId, scheduled.scope.occurrenceId)
+        assert.equal(iso(source.createdAt), scheduledCreatedAt)
+        assert.notEqual(source.deliveredAt, null)
+        const input = promptInputs[mode]
+        assert.ok(input)
+        assert.equal(input.messages.length, 1)
+        const row = input.messages[0], message = row.message
+        assert.ok(message.role === 'user' && typeof message.content === 'string')
+        const raw = message.content, packet = JSON.parse(raw)
+        assert.equal(packet.version, 1)
+        assert.equal(packet.kind, 'personal_agent_message')
+        assert.equal(packet.authority, 'coordination_data_only')
+        assert.deepEqual(packet.source, {
+          messageId: source.id, senderId: null, origin: 'runtime_notification', taskId: source.issueId, runId: source.runId,
+          deliveryState: 'delivered', sourceSessionId: null, replyToSessionId: null,
+          sentAt: scheduledCreatedAt, receivedAt: iso(source.deliveredAt!), pendingCount: null,
+        }, 'every original source field must match this fixture before comparing generated identities')
+        const idField = '"messageId":' + JSON.stringify(source.id)
+        const deliveryField = '"receivedAt":' + JSON.stringify(iso(source.deliveredAt!))
+        assert.equal(raw.split(idField).length, 2, 'exactly one verified source messageId can be projected')
+        assert.equal(raw.split(deliveryField).length, 2, 'exactly one verified delivery timestamp can be projected')
+        child.diagnostic(JSON.stringify({ event: 'startup_schedule_prompt_source', mode, source: packet.source,
+          rawPacketUtf8Bytes: Buffer.byteLength(raw), rawPacketSha256: createHash('sha256').update(raw).digest('hex'),
+          comparisonOnlyFields: ['source.messageId', 'source.receivedAt'] }))
+        // Replace only those two exact field values, keeping every other byte
+        // of the full packet (including unknown fields and body) unchanged.
+        const compared = raw.replace(idField, '"messageId":"fixture-scheduled-event"')
+          .replace(deliveryField, '"receivedAt":"2026-01-01T00:00:01.000Z"')
+        promptInputs[mode] = { ...input, messages: [{ ...row, message: { ...message, content: compared } }] }
+      }
+      assert.equal(promptExecuted, expectsPrompt, 'the measured prompt follows the actual delivered turn, including schedule and disabled-kit fallback')
       assert.equal(measurements[mode]!.statements, startupStatementCount)
       assert.equal(completeMeasurements[mode]!.statements, statements.length)
       const startupStatements = statements.slice(0, startupStatementCount)
       assert.ok(startupStatements.some(text => /^\s*begin\b/i.test(text)), 'count includes the actual transaction BEGIN')
       assert.ok(startupStatements.some(text => /^\s*commit\b/i.test(text)), 'count includes the actual transaction COMMIT')
     })
-    assert.deepEqual(promptInputs.startup, promptInputs.old, 'real prompt inputs and complete system bytes are unchanged')
+    assert.deepEqual(promptInputs.startup, promptInputs.old, scenario === 'scheduled-read-8000-bmp'
+      ? 'complete model packet and system bytes match after verifying and projecting only fixture event ID and delivery timestamp'
+      : 'real prompt inputs and complete system bytes are unchanged')
+    if (bounded) {
+      assert.deepEqual(entrySettings.startup, entrySettings.old, 'both actual entries use the same settings snapshot')
+      assert.equal(entrySettings.old!.agentKitEnabled, scenario !== 'disabled-kit')
+    }
     const old = measurements.old!, startup = measurements.startup!
     const completeOld = completeMeasurements.old!, completeStartup = completeMeasurements.startup!
     child.diagnostic(JSON.stringify({ event: 'startup_receipt_statement_budget', scenario,
@@ -936,5 +1074,11 @@ dbTest('startup normal paths use no more statements than old settings plus inbox
         pgProtocolTotalByteDelta: completeStartup.pgProtocolTotalBytes !== null && completeOld.pgProtocolTotalBytes !== null
           ? completeStartup.pgProtocolTotalBytes - completeOld.pgProtocolTotalBytes : null } }))
     assert.ok(startup.statements <= old.statements, scenario + ' must not add normal-path SQL round trips')
+    if (bounded) {
+      const oldBytes = completeOld.pgProtocolTotalBytes, startupBytes = completeStartup.pgProtocolTotalBytes
+      assert.ok(typeof oldBytes === 'number' && typeof startupBytes === 'number', scenario + ' requires real complete-window PG receive and send counters')
+      assert.ok(startupBytes <= oldBytes,
+        `${scenario} complete PG traffic must not increase: startup=${startupBytes} B, old=${oldBytes} B, delta=${startupBytes - oldBytes} B`)
+    }
   })
 })

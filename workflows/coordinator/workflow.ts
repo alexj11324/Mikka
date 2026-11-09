@@ -82,9 +82,10 @@ export async function coordinatorTurn(userId: string, botId: string, startupRece
       return
     }
   }
-  // Ordinary new hosted startup returns both from the same committed receipt.
-  // Native and historical runs retain these independent original steps.
-  const [settings, firstInbox] = startup?.kind === 'ready' ? [startup.settings,startup.inbox] as const : await Promise.all([
+  // Both new hosted paths have already taken this inbox. Inbox-only returns
+  // at the original durable boundary; it must never fall through to a new take.
+  // Native and historical runs retain their independent original steps.
+  const [settings, firstInbox] = startup?.kind === 'ready' || startup?.kind === 'inbox-only' ? [startup.settings,startup.inbox] as const : await Promise.all([
     timedPreparation(initialMs, 'settings', () => steps.turnSettings(userId,botId)),
     timedPreparation(initialMs, 'inbox', () => steps.takeInbox(userId,holder,botId)),
   ])
@@ -96,8 +97,8 @@ export async function coordinatorTurn(userId: string, botId: string, startupRece
     const signal = controller.signal
     const phaseMs: PreparationTimings = round === 0 ? { ...initialMs } : {}
     const inbox = round === 0 ? firstInbox : await timedPreparation(phaseMs, 'inbox', () => steps.takeInbox(userId,holder,botId))
-    // Workflow event time at the returned checkpoint. New round zero includes
-    // preparation in that checkpoint; log its origin rather than compare it
+    // Workflow event time at the returned checkpoint. A ready startup includes
+    // preparation there; inbox-only does not. Log the origin rather than compare it
     // with a Node clock or label it as the old inbox-only boundary.
     const takenAt = Date.now()
     const storeTimingOrigin = round === 0 && startup?.kind === 'ready' ? 'startup_checkpoint' as const : 'inbox_checkpoint' as const

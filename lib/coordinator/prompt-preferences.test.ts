@@ -2,8 +2,8 @@
 import assert from 'node:assert/strict'
 import { after, before, beforeEach, mock, test } from 'node:test'
 import { PgDialect } from 'drizzle-orm/pg-core'
-import type { SQL } from 'drizzle-orm'
-import { coordinatorMessages, coordinatorSessions, userPreferences } from '../db/schema'
+import { SQL } from 'drizzle-orm'
+import { attentionSettings, coordinatorMessages, coordinatorSessions, userPreferences } from '../db/schema'
 import { overrideDeploymentSwitch } from '../deployment-switches'
 import { makeSnapshot } from '../agent-kit/definition'
 import { DEFAULT_AGENT_DEFINITION } from '../agent-kit/builtin'
@@ -31,15 +31,36 @@ let errors: Partial<Record<ReadKind, Error>> = {}
 const forbidden = () => { throw new Error('External, write and model effects are forbidden in prompt preference fixture') }
 const database = {
   select(selection?: Record<string, unknown>) {
-    let table: unknown, condition: SQL
+    let table: unknown, condition: SQL | undefined
+    const joins: { table: unknown; condition: SQL }[] = []
     let result: Promise<unknown[]> | undefined
     const read = () => result ??= (async () => {
-      const query = dialect.sqlToQuery(condition)
+      const source = table instanceof SQL ? table : condition
+      assert.ok(source instanceof SQL, 'every read has an explicit SQL owner boundary')
+      const query = dialect.sqlToQuery(source)
       const who = query.params[0] as string
       assert.ok([owner, peer].includes(who), 'every read retains its requested owner')
-      const kind = table === coordinatorSessions ? 'session' : table === coordinatorMessages ? 'messages' : table === userPreferences ? 'preferences' : undefined
-      assert.ok(kind, 'only the three prompt input tables are read')
-      assert.match(query.sql, /"userId" = \$1/)
+      const joined = table instanceof SQL
+      const kind = joined || table === userPreferences ? 'preferences' : table === coordinatorSessions ? 'session' : table === coordinatorMessages ? 'messages' : undefined
+      assert.ok(kind, 'only the prompt input tables and the exact legacy preference join are read')
+      if (joined) {
+        assert.equal(condition, undefined)
+        assert.equal(query.sql, '(values ($1::text)) as preference_owner("userId")')
+        assert.deepEqual(selection, { preferences: userPreferences, proactive: attentionSettings.enabled })
+        assert.equal(joins.length, 2)
+        for (const [index, expected] of [
+          { table: userPreferences, sql: '"user_preferences"."userId" = preference_owner."userId"' },
+          { table: attentionSettings, sql: '"attention_settings"."userId" = preference_owner."userId"' },
+        ].entries()) {
+          assert.equal(joins[index].table, expected.table)
+          const join = dialect.sqlToQuery(joins[index].condition)
+          assert.equal(join.sql, expected.sql)
+          assert.deepEqual(join.params, [])
+        }
+      } else {
+        assert.equal(joins.length, 0)
+        assert.match(query.sql, /"userId" = \$1/)
+      }
       if (kind === 'preferences') assert.deepEqual(query.params, [who])
       else { assert.equal(query.params[1], bot); assert.match(query.sql, /"botId" = \$2/) }
       reads.push({ kind, owner: who, params: query.params, selection: selection && Object.keys(selection) })
@@ -52,12 +73,16 @@ const database = {
         return messages[who].filter(row => row.position > Number(query.params[2])).sort((a, b) => a.position - b.position)
       }
       const row = preferences[who]
+      // VALUES retains one owner row even when either optional table is empty.
+      // This fixture has no attention row, matching the original true default.
+      if (joined) return [{ preferences: row ? { ...row } : null, proactive: null }]
       if (!row) return []
       if (selection && 'text' in selection) return [{ text: row.personalInstructions }]
       return [{ ...row }]
     })()
     const q = {
       from(value: unknown) { table = value; return q },
+      leftJoin(value: unknown, on: SQL) { joins.push({ table: value, condition: on }); return q },
       where(value: SQL) { condition = value; return q },
       orderBy() { return q },
       limit() { return read() },
