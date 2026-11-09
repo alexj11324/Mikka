@@ -422,6 +422,62 @@ test('a completed tool followed by the task marker proves reply order', () => {
   assert.doesNotMatch(JSON.stringify(record), /PRIVATE_|STARTUP_OK_ordered/)
 })
 
+test('terminal handoff tools do not prove execution before a text reply', () => {
+  for (const name of ['submit', 'request_help', 'ask_human', 'report_blocked']) {
+    const record = { sampleId: 'handoff-only', requireReply: true, minToolCalls: 1, requireReplyAfterTool: true }
+    const detail = { chunks: [stage('agent_start', 20),
+      { chunk: { type: 'tool-input-start', toolCallId: 'handoff' } },
+      { chunk: { type: 'tool-input-available', toolCallId: 'handoff', toolName: `mcp__mikka__${name}`, input: { summary: 'No read occurred.' } } },
+      { chunk: { type: 'tool-output-available', toolCallId: 'handoff', output: [] } },
+      delta('STARTUP_OK_handoff-only')] }
+    for (let replay = 0; replay < 2; replay++) {
+      assert.equal(observeChunks(record, detail, epoch + replay), false, name)
+      assert.equal(record.replyVerified, true)
+      assert.equal(record.replyVerifiedAfterTool, false)
+      assert.equal(record.toolCalls.length, 1)
+      assert.equal(record.toolCalls[0].outcome, 'ok', 'the actual successful handoff stays in the audit')
+    }
+    assert.doesNotMatch(JSON.stringify(record), /No read occurred|mcp__mikka__|STARTUP_OK_handoff-only/)
+  }
+})
+
+test('a previous submit cannot provide the independent tool for a submitted report', () => {
+  const { record, detail } = submittedReply()
+  detail.chunks = [detail.chunks[0],
+    { chunk: { type: 'tool-input-available', toolCallId: 'earlier-submit', toolName: 'mcp__mikka__submit', input: { summary: 'No read occurred.' } } },
+    { chunk: { type: 'tool-output-available', toolCallId: 'earlier-submit', output: [] } },
+    ...detail.chunks.slice(4)]
+  for (let replay = 0; replay < 2; replay++) {
+    assert.equal(observeChunks(record, detail, epoch + 7000 + replay), false)
+    assert.notEqual(record.replyVerified, true)
+    assert.equal(record.replyVerifiedAfterTool, false)
+    assert.equal(record.toolCalls.filter(tool => tool.outcome === 'ok').length, 2)
+  }
+})
+
+test('the minimum tool count excludes delivery while keeping the successful read and report', () => {
+  const { record, detail } = submittedReply()
+  record.minToolCalls = 2
+  assert.equal(observeChunks(record, detail, epoch + 7000), false)
+  assert.equal(record.replyVerifiedAfterTool, true, 'the independent read still precedes the report')
+  assert.equal(record.toolCalls.filter(tool => tool.outcome === 'ok').length, 2, 'audit retains the read and submit')
+  record.minToolCalls = 1
+  assert.equal(observeChunks(record, detail, epoch + 8000), true)
+})
+
+test('a tool error replaces its earlier success in the replay execution count', () => {
+  const record = { sampleId: 'error-replay', requireReply: true, minToolCalls: 1, requireReplyAfterTool: true }
+  const detail = { chunks: [stage('agent_start', 20),
+    { chunk: { type: 'tool-input-start', toolCallId: 'read-file' } },
+    { chunk: { type: 'tool-output-available', toolCallId: 'read-file', output: 'PRIVATE_README' } },
+    { chunk: { type: 'tool-output-error', toolCallId: 'read-file', errorText: 'PRIVATE_ERROR' } },
+    delta('STARTUP_OK_error-replay')] }
+  assert.equal(observeChunks(record, detail, epoch + 7000), false)
+  assert.equal(record.replyVerifiedAfterTool, false)
+  assert.equal(record.toolCalls[0].outcome, 'error')
+  assert.doesNotMatch(JSON.stringify(record), /PRIVATE_|STARTUP_OK_error-replay/)
+})
+
 function submittedReply() {
   const record = { sampleId: 'submitted', runId: id(901), harness: 'codex', requireReply: true, minToolCalls: 1, requireReplyAfterTool: true, requireTerminal: true }
   const detail = { thread: { id: record.runId, rootRunId: record.runId, latestRunId: record.runId, ownedByCurrentUser: true,
@@ -489,6 +545,25 @@ test('canonical delivery cannot borrow another run, a pending or failed result, 
     assert.equal(record.replyVerifiedAfterTool, false, String(mutate))
     assert.doesNotMatch(JSON.stringify(record), /PRIVATE_|STARTUP_OK_submitted/)
   }
+})
+
+test('the complete candidate driver rejects submit-only output with valid runtime evidence and cleans up', async () => {
+  const io = fixture({ candidate: true, runtime: true })
+  io.onDetail = (_sample, detail) => {
+    for (const { chunk } of detail.chunks) {
+      if (chunk.type === 'tool-input-start') chunk.toolName = 'mcp__mikka__submit'
+    }
+  }
+  const report = await runCloudStartup({ ...oneCodexCandidate(), minToolCalls: 1 }, { env, ...io })
+  assert.equal(report.status, 'failed')
+  const sample = report.samples[0]
+  assert.deepEqual(sample.failure, { phase: 'execution_watch', code: 'startup_ended_before_execution_proof' })
+  assert.equal(sample.replyVerified, true)
+  assert.equal(sample.replyVerifiedAfterTool, false)
+  assert.equal(sample.runtimeEvidence.status, 'passed', 'valid native/runtime evidence does not replace the missing independent tool')
+  assert.equal(sample.cleanup.status, 'passed')
+  assert.ok(io.samples.every(row => row.cancelled && row.deleted))
+  assert.ok(io.sockets.every(socket => socket.closed))
 })
 
 test('the complete candidate driver accepts canonical report delivery with all runtime and cleanup gates intact', async () => {
