@@ -1,0 +1,82 @@
+{
+  "activation": {
+    "BOUND_CONTEXT": null,
+    "bindingTemplateActive": false,
+    "cloudExecution": false,
+    "gitObjectsOrRefsChanged": false,
+    "workflowCreated": false
+  },
+  "aptReference": {
+    "isProofOfCurrentGuestSource": false,
+    "mechanism": "cp -p active to unsuffixed apt.extended_states, then savelog; a publishing actor is not necessarily the initial data writer",
+    "sourceReceipt": {
+      "downloads": [
+        {
+          "bytes": 2801,
+          "name": "apt_2.4.14.dsc",
+          "sha256": "317040c4ab15f20cc77460126fd78745814a81d73a6c37d0559876977a7dfe35",
+          "url": "https://launchpad.net/ubuntu/+archive/primary/+sourcefiles/apt/2.4.14/apt_2.4.14.dsc"
+        },
+        {
+          "bytes": 2323176,
+          "name": "apt_2.4.14.tar.xz",
+          "sha256": "8d1b2748a6b5c99c9fd56dfadde280b85616dd67d22f7ca44f86225fa688a98c",
+          "url": "https://launchpad.net/ubuntu/+archive/primary/+sourcefiles/apt/2.4.14/apt_2.4.14.tar.xz"
+        }
+      ],
+      "members": [
+        {
+          "archivePath": "apt-2.4.14/debian/apt-daily-upgrade.service",
+          "bytes": 389,
+          "path": "/workspace/scratch/263e36984c81/apt-2.4.14-source-1505/apt-daily-upgrade.service",
+          "sha256": "da0651537cad0ed384291bd50c0bbc3268e6c625626ec9344150de4e8db3925e"
+        },
+        {
+          "archivePath": "apt-2.4.14/debian/apt-daily.service",
+          "bytes": 326,
+          "path": "/workspace/scratch/263e36984c81/apt-2.4.14-source-1505/apt-daily.service",
+          "sha256": "90f87047f4ea2f261f9117d02870de8719f808b911bb1808bf039ff3c162e5e9"
+        },
+        {
+          "archivePath": "apt-2.4.14/debian/apt.apt-compat.cron.daily",
+          "bytes": 1478,
+          "path": "/workspace/scratch/263e36984c81/apt-2.4.14-source-1505/apt.apt-compat.cron.daily",
+          "sha256": "1983c659b042b1ec26127e7874954d83cd97eb8dcfd03238a7d2031ea0182fbe"
+        },
+        {
+          "archivePath": "apt-2.4.14/debian/apt.systemd.daily",
+          "bytes": 16325,
+          "path": "/workspace/scratch/263e36984c81/apt-2.4.14-source-1505/apt.systemd.daily",
+          "sha256": "4949c220a844071ee4709115aadfc00684578d5c7dda9c1b5a5c65a75de9d50f"
+        }
+      ]
+    },
+    "url": "https://launchpad.net/ubuntu/+source/apt/2.4.14"
+  },
+  "limitations": [
+    "Only offline parser/process/ACK/output-bound branches have been executed.",
+    "No actual fanotify, PIDFD, procfs, systemctl, guest socket, E2B or normal-build integration test.",
+    "Optional preparation; does not block the next R7."
+  ],
+  "linuxUapi": {
+    "commit": "ffc253263a1375a65fa6c9f62a893e9767fbebfa",
+    "headerBlob": "cd14c94e9a1e093ca2bec3f8f36d6eba0f27acc1",
+    "headerUrl": "https://github.com/torvalds/linux/blob/ffc253263a1375a65fa6c9f62a893e9767fbebfa/include/uapi/linux/fanotify.h",
+    "pidfdImplementationUrl": "https://github.com/torvalds/linux/blob/ffc253263a1375a65fa6c9f62a893e9767fbebfa/fs/notify/fanotify/fanotify_user.c#L702",
+    "purpose": "Reference ABI, not a claim about the future guest kernel"
+  },
+  "manuals": [
+    "https://man7.org/linux/man-pages/man2/fanotify_init.2.html",
+    "https://man7.org/linux/man-pages/man2/fanotify_mark.2.html",
+    "https://man7.org/linux/man-pages/man7/fanotify.7.html",
+    "https://manpages.ubuntu.com/manpages/jammy/man8/savelog.8.html"
+  ],
+  "normalBuilder": {
+    "bytes": 55730,
+    "gitBlobOid": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+    "modified": false,
+    "sha256": "0adb53fbdd6cbcd61f1d1804aee3e2df1538997c0724556062f2741c5ac1cdb1",
+    "url": "https://github.com/alexj11324/Mikka/blob/5ba1f9e2359ce714d83cd16fc040f2567c40a6d0/scripts/e2b/build-template.py"
+  },
+  "normalSource": "5ba1f9e2359ce714d83cd16fc040f2567c40a6d0"
+}

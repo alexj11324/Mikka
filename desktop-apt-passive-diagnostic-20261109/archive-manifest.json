@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "archivePrefix": "desktop-apt-passive-diagnostic-20261109",
+  "evidenceParent": "f4edc25ff754e9546aff19013cb78c593e2da40e",
+  "sourceFiles": [
+    {
+      "source": "/workspace/scratch/263e36984c81/desktop-apt-passive-diagnostic-1505/DESIGN.md",
+      "path": "DESIGN.md",
+      "bytes": 8634,
+      "sha256": "e98f00830259c01f2c56bc06d02336b5a7dcb943e446cb4612fdb2ce9d85f1f5",
+      "gitBlob": "a89a25390d4e09aeabb7d7b8814b5cf9278b38e0",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/desktop-apt-passive-diagnostic-1505/binding.json.in",
+      "path": "binding.json.in",
+      "bytes": 221,
+      "sha256": "41059211cd34a42522b86b273341ee4b224774f00d680d922dcf27bf0544faa9",
+      "gitBlob": "8d700c96eb49fe676f33e16ccbce8e38d3bb9701",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/desktop-apt-passive-diagnostic-1505/guest_observer.py",
+      "path": "guest_observer.py",
+      "bytes": 30605,
+      "sha256": "970da61123e7e1f1a259103bdccfdc7dcdc874598aac08935503dd83eaa2880b",
+      "gitBlob": "c4f7dc813c7a6455bca54f51fc03c7c06e7f341c",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/desktop-apt-passive-diagnostic-1505/guest_observer_test.py",
+      "path": "guest_observer_test.py",
+      "bytes": 13637,
+      "sha256": "2c430bc8ffa288b62d26eaf685c7251086463c6b3f0470f621c1c5f20cef310f",
+      "gitBlob": "a3d6718055de102c1e936818ea6d6f937b7cf17d",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/desktop-apt-passive-diagnostic-1505/manifest.json",
+      "path": "manifest.json",
+      "bytes": 1992,
+      "sha256": "8d5c4d7857c013cafe60defaa841dc975811309a3f0883f35b128992e831637a",
+      "gitBlob": "92ea949b29ca0f8fc73f8b341187e14dd695218b",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/desktop-apt-passive-diagnostic-1505/source-bindings.json",
+      "path": "source-bindings.json",
+      "bytes": 3741,
+      "sha256": "ceaaff4c72263ec20e29b013f5702277324a5f24348eb3c49696204c2c27f2db",
+      "gitBlob": "a068b33d80729539d2483bcfd153b66d57f6ed8b",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/desktop-apt-passive-diagnostic-1505/validation/parser-01.result.json",
+      "path": "validation/parser-01.result.json",
+      "bytes": 1216,
+      "sha256": "fb2cbfe775db2a22d6bf609733d8f62c8d792e897bafb1c3e986e5fa8d97acaa",
+      "gitBlob": "fe32db5917ca5c5ddfaa814b5ad924db74f61c81",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/desktop-apt-passive-diagnostic-1505/validation/parser-01.stderr.txt",
+      "path": "validation/parser-01.stderr.txt",
+      "bytes": 2889,
+      "sha256": "f44ee40045be4ba1b6812033d454ad26adb972659a46f4028917738a17c84ce1",
+      "gitBlob": "2868ef11d3def6820afd1031ec7d443effe97ca7",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/desktop-apt-passive-diagnostic-1505/validation/parser-01.stdout.txt",
+      "path": "validation/parser-01.stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "mode": "100644"
+    }
+  ],
+  "sourceFileCount": 9,
+  "sourceBytes": 62935,
+  "sourceFilesUnchanged": true,
+  "generatedFiles": [
+    {
+      "path": "README.md",
+      "bytes": 944,
+      "sha256": "d2d2b432bd15e6384fb7bebac0e60642fd3878723168a81bfb01817c3164576d",
+      "gitBlob": "56305af72b534c3ff8cadf9f56e37ab6ef383719",
+      "mode": "100644"
+    }
+  ],
+  "excludedPathRules": [
+    "**/readback-transfer.json"
+  ],
+  "boundaries": {
+    "optionalDraft": true,
+    "disabled": true,
+    "runtimeValidated": false,
+    "workflowCreated": false,
+    "recordedOfflineTestsPassed": 21,
+    "guestExecutionProved": false,
+    "newR7Gate": false,
+    "newFormalSamples": 0
+  },
+  "archiveOnly": {
+    "newTests": 0,
+    "originalLogDownloads": 0,
+    "artifactDownloads": 0,
+    "productionActions": 0,
+    "refMutations": 0
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "complete": false,
+  "error": "run 42673936949 is no longer zero-job",
+  "errorType": "RuntimeError",
+  "operatorAttempt": "1",
+  "operatorRun": "42677288279",
+  "operatorSha": "e313d24c9f0e9ad4362c23abceeeedc6eca19ae5",
+  "pr": 1835,
+  "prHead": "cb2f771eeac0c8793e9f94b485dd87c7d5866b4c",
+  "repository": "alexj11324/Mikka",
+  "schema": 1,
+  "targets": [],
+  "updatedAt": "2026-11-09T18:48:35.596014+00:00"
+}

@@ -1,0 +1,26 @@
+test_ack_requires_fresh_challenge_and_same_boot_and_instance (__main__.IdentityAndBounds.test_ack_requires_fresh_challenge_and_same_boot_and_instance) ... ok
+test_context_must_be_bound_fresh_and_closed (__main__.IdentityAndBounds.test_context_must_be_bound_fresh_and_closed) ... ok
+test_default_entry_is_disabled_before_any_runtime_operation (__main__.IdentityAndBounds.test_default_entry_is_disabled_before_any_runtime_operation) ... ok
+test_exited_or_recycled_pid_cannot_supply_an_executable (__main__.IdentityAndBounds.test_exited_or_recycled_pid_cannot_supply_an_executable) ... ok
+test_journal_limit_reserves_terminal_space_and_refuses_overwrite (__main__.IdentityAndBounds.test_journal_limit_reserves_terminal_space_and_refuses_overwrite) ... ok
+test_missing_or_negative_identity_never_reads_proc (__main__.IdentityAndBounds.test_missing_or_negative_identity_never_reads_proc) ... ok
+test_valid_pidfd_identifies_only_executable_at_read (__main__.IdentityAndBounds.test_valid_pidfd_identifies_only_executable_at_read) ... ok
+test_bad_event_lengths_version_reserved_and_metadata_length (__main__.Parser.test_bad_event_lengths_version_reserved_and_metadata_length) ... ok
+test_every_short_metadata_header_is_rejected (__main__.Parser.test_every_short_metadata_header_is_rejected) ... ok
+test_handles_names_and_padding_are_bounded (__main__.Parser.test_handles_names_and_padding_are_bounded) ... ok
+test_independent_24_byte_header_and_arbitrary_info_order (__main__.Parser.test_independent_24_byte_header_and_arbitrary_info_order) ... ok
+test_moved_to_and_close_write_have_distinct_roles (__main__.Parser.test_moved_to_and_close_write_have_distinct_roles) ... ok
+test_multiple_records_and_event_count_cap (__main__.Parser.test_multiple_records_and_event_count_cap) ... ok
+test_negative_pidfd_is_never_closed (__main__.Parser.test_negative_pidfd_is_never_closed) ... ok
+test_nontarget_fds_are_still_owned_and_closed (__main__.Parser.test_nontarget_fds_are_still_owned_and_closed) ... ok
+test_overflow_without_name_is_not_filtered_out (__main__.Parser.test_overflow_without_name_is_not_filtered_out) ... ok
+test_same_basename_in_other_directory_is_not_target (__main__.Parser.test_same_basename_in_other_directory_is_not_target) ... ok
+test_short_or_overrunning_info_and_duplicate_pidfd (__main__.Parser.test_short_or_overrunning_info_and_duplicate_pidfd) ... ok
+test_staging_to_dot_zero_records_only_directory_entry_actor (__main__.Parser.test_staging_to_dot_zero_records_only_directory_entry_actor) ... ok
+test_unknown_mask_is_incomplete_not_positive_evidence (__main__.Parser.test_unknown_mask_is_incomplete_not_positive_evidence) ... ok
+test_unknown_record_and_parse_error_retain_known_fd_ownership (__main__.Parser.test_unknown_record_and_parse_error_retain_known_fd_ownership) ... ok
+
+----------------------------------------------------------------------
+Ran 21 tests in 0.003s
+
+OK

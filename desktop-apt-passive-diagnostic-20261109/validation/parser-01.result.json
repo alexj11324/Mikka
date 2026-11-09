@@ -1,0 +1,35 @@
+{
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+    "-B",
+    "guest_observer_test.py"
+  ],
+  "cwd": "/workspace/scratch/263e36984c81/desktop-apt-passive-diagnostic-1505",
+  "elapsedSeconds": 0.08684353200078476,
+  "exitCode": 0,
+  "files": [
+    {
+      "bytes": 30605,
+      "gitBlobOid": "c4f7dc813c7a6455bca54f51fc03c7c06e7f341c",
+      "path": "guest_observer.py",
+      "sha256": "970da61123e7e1f1a259103bdccfdc7dcdc874598aac08935503dd83eaa2880b"
+    },
+    {
+      "bytes": 13637,
+      "gitBlobOid": "a3d6718055de102c1e936818ea6d6f937b7cf17d",
+      "path": "guest_observer_test.py",
+      "sha256": "2c430bc8ffa288b62d26eaf685c7251086463c6b3f0470f621c1c5f20cef310f"
+    }
+  ],
+  "pythonVersion": "3.12.14",
+  "scope": "Offline synthetic fanotify bytes and fake process/ACK guards; temporary scratch journal cap only; no fanotify/proc/systemctl/cloud runtime invocation",
+  "startedAt": "2026-11-09T18:45:45.450092+00:00",
+  "stderr": {
+    "bytes": 2889,
+    "sha256": "f44ee40045be4ba1b6812033d454ad26adb972659a46f4028917738a17c84ce1"
+  },
+  "stdout": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

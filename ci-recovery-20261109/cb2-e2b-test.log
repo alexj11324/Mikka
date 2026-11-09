@@ -1,0 +1,413 @@
+﻿2026-11-09T18:26:11.9241325Z Current runner version: '2.338.2'
+2026-11-09T18:26:11.9277718Z ##[group]Runner Image Provisioner
+2026-11-09T18:26:11.9279202Z Hosted Compute Agent
+2026-11-09T18:26:11.9280235Z Version: 20261028.624
+2026-11-09T18:26:11.9281501Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+2026-11-09T18:26:11.9283115Z Build Date: 2026-10-28T21:51:42Z
+2026-11-09T18:26:11.9284343Z Worker ID: {5a8c6a24-cc13-47cd-8b10-b22936f9a35e}
+2026-11-09T18:26:11.9285987Z Region: canadaeast
+2026-11-09T18:26:11.9286944Z Cloud: Azure
+2026-11-09T18:26:11.9288018Z ##[endgroup]
+2026-11-09T18:26:11.9290315Z ##[group]Operating System
+2026-11-09T18:26:11.9291405Z Ubuntu
+2026-11-09T18:26:11.9292916Z 24.04.5
+2026-11-09T18:26:11.9293854Z LTS
+2026-11-09T18:26:11.9294755Z ##[endgroup]
+2026-11-09T18:26:11.9295449Z ##[group]Runner Image
+2026-11-09T18:26:11.9296089Z Image: ubuntu-24.04
+2026-11-09T18:26:11.9296821Z Version: 20261101.360.1
+2026-11-09T18:26:11.9298083Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261101.360/images/ubuntu/Ubuntu2404-Readme.md
+2026-11-09T18:26:11.9299717Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261101.360
+2026-11-09T18:26:11.9300751Z ##[endgroup]
+2026-11-09T18:26:11.9302340Z ##[group]GITHUB_TOKEN Permissions
+2026-11-09T18:26:11.9304914Z Contents: read
+2026-11-09T18:26:11.9305964Z Metadata: read
+2026-11-09T18:26:11.9306823Z ##[endgroup]
+2026-11-09T18:26:11.9309281Z Secret source: Actions
+2026-11-09T18:26:11.9310256Z Cache mode: write
+2026-11-09T18:26:11.9311125Z Prepare workflow directory
+2026-11-09T18:26:11.9725741Z Prepare all required actions
+2026-11-09T18:26:11.9797350Z Getting action download info
+2026-11-09T18:26:12.2674501Z Download action repository 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-11-09T18:26:12.3695814Z Download action repository 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-11-09T18:26:12.5683204Z Complete job name: test
+2026-11-09T18:26:12.6720785Z ##[group]Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+2026-11-09T18:26:12.6722082Z with:
+2026-11-09T18:26:12.6722544Z   persist-credentials: false
+2026-11-09T18:26:12.6723074Z   repository: alexj11324/Mikka
+2026-11-09T18:26:12.6727158Z   token: ***
+2026-11-09T18:26:12.6727804Z   ssh-strict: true
+2026-11-09T18:26:12.6728406Z   ssh-user: git
+2026-11-09T18:26:12.6728848Z   clean: true
+2026-11-09T18:26:12.6729364Z   sparse-checkout-cone-mode: true
+2026-11-09T18:26:12.6729898Z   fetch-depth: 1
+2026-11-09T18:26:12.6730331Z   fetch-tags: false
+2026-11-09T18:26:12.6730782Z   show-progress: true
+2026-11-09T18:26:12.6731260Z   lfs: false
+2026-11-09T18:26:12.6731673Z   submodules: false
+2026-11-09T18:26:12.6732451Z   set-safe-directory: true
+2026-11-09T18:26:12.6732981Z   allow-unsafe-pr-checkout: false
+2026-11-09T18:26:12.6733881Z ##[endgroup]
+2026-11-09T18:26:13.0105008Z Syncing repository: alexj11324/Mikka
+2026-11-09T18:26:13.0107172Z ##[group]Getting Git version info
+2026-11-09T18:26:13.0108057Z Working directory is '/home/runner/work/Mikka/Mikka'
+2026-11-09T18:26:13.0109158Z [command]/usr/bin/git version
+2026-11-09T18:26:13.0225781Z git version 2.56.0
+2026-11-09T18:26:13.0249852Z ##[endgroup]
+2026-11-09T18:26:13.0275396Z Temporarily overriding HOME='/home/runner/work/_temp/f4a52fe2-bd81-4406-a728-48f6a14291cc' before making global git config changes
+2026-11-09T18:26:13.0278136Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T18:26:13.0284834Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T18:26:13.0357071Z Deleting the contents of '/home/runner/work/Mikka/Mikka'
+2026-11-09T18:26:13.0372845Z ##[group]Initializing the repository
+2026-11-09T18:26:13.0374759Z [command]/usr/bin/git init /home/runner/work/Mikka/Mikka
+2026-11-09T18:26:13.0516741Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-09T18:26:13.0519126Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-09T18:26:13.0521654Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-09T18:26:13.0523453Z hint: call:
+2026-11-09T18:26:13.0524361Z hint:
+2026-11-09T18:26:13.0525545Z hint: 	git config --global init.defaultBranch <name>
+2026-11-09T18:26:13.0526953Z hint:
+2026-11-09T18:26:13.0528169Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-09T18:26:13.0530118Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-09T18:26:13.0532048Z hint:
+2026-11-09T18:26:13.0532928Z hint: 	git branch -m <name>
+2026-11-09T18:26:13.0533791Z hint:
+2026-11-09T18:26:13.0535901Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-09T18:26:13.0538010Z Initialized empty Git repository in /home/runner/work/Mikka/Mikka/.git/
+2026-11-09T18:26:13.0553370Z [command]/usr/bin/git remote add origin https://github.com/alexj11324/Mikka
+2026-11-09T18:26:13.0618808Z ##[endgroup]
+2026-11-09T18:26:13.0620645Z ##[group]Disabling automatic garbage collection
+2026-11-09T18:26:13.0623076Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-09T18:26:13.0664762Z ##[endgroup]
+2026-11-09T18:26:13.0667170Z ##[group]Setting up auth
+2026-11-09T18:26:13.0676691Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T18:26:13.0736622Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T18:26:13.1224401Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T18:26:13.1270668Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T18:26:13.1553696Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T18:26:13.1604852Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T18:26:13.1860097Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-09T18:26:13.1915034Z ##[endgroup]
+2026-11-09T18:26:13.1916311Z ##[group]Fetching the repository
+2026-11-09T18:26:13.1929467Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +e1fc5a9dd5015e486308facd6f09cec83487637e:refs/remotes/pull/1835/merge
+2026-11-09T18:26:15.9752379Z From https://github.com/alexj11324/Mikka
+2026-11-09T18:26:15.9757995Z  * [new ref]         e1fc5a9dd5015e486308facd6f09cec83487637e -> pull/1835/merge
+2026-11-09T18:26:15.9762447Z ##[endgroup]
+2026-11-09T18:26:15.9763808Z ##[group]Determining the checkout info
+2026-11-09T18:26:15.9765422Z ##[endgroup]
+2026-11-09T18:26:15.9774890Z [command]/usr/bin/git sparse-checkout disable
+2026-11-09T18:26:15.9839941Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-09T18:26:15.9881973Z ##[group]Checking out the ref
+2026-11-09T18:26:15.9885660Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/1835/merge
+2026-11-09T18:26:16.6898530Z Note: switching to 'refs/remotes/pull/1835/merge'.
+2026-11-09T18:26:16.6899215Z 
+2026-11-09T18:26:16.6923113Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-11-09T18:26:16.6933465Z changes and commit them, and you can discard any commits you make in this
+2026-11-09T18:26:16.6934477Z state without impacting any branches by switching back to a branch.
+2026-11-09T18:26:16.6935105Z 
+2026-11-09T18:26:16.6935537Z If you want to create a new branch to retain commits you create, you may
+2026-11-09T18:26:16.6936507Z do so (now or later) by using -c with the switch command. Example:
+2026-11-09T18:26:16.6937043Z 
+2026-11-09T18:26:16.6937951Z   git switch -c <new-branch-name>
+2026-11-09T18:26:16.6938422Z 
+2026-11-09T18:26:16.6938633Z Or undo this operation with:
+2026-11-09T18:26:16.6938945Z 
+2026-11-09T18:26:16.6939103Z   git switch -
+2026-11-09T18:26:16.6939367Z 
+2026-11-09T18:26:16.6939751Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-11-09T18:26:16.6940309Z 
+2026-11-09T18:26:16.6940887Z HEAD is now at e1fc5a9 Merge cb2f771eeac0c8793e9f94b485dd87c7d5866b4c into ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d
+2026-11-09T18:26:16.6942985Z ##[endgroup]
+2026-11-09T18:26:16.6994239Z [command]/usr/bin/git log -1 --format=%H
+2026-11-09T18:26:16.7030986Z e1fc5a9dd5015e486308facd6f09cec83487637e
+2026-11-09T18:26:16.7042243Z ##[group]Removing auth
+2026-11-09T18:26:16.7046330Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T18:26:16.7122107Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T18:26:16.7383728Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T18:26:16.7423652Z http.https://github.com/.extraheader
+2026-11-09T18:26:16.7431500Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-09T18:26:16.7474864Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T18:26:16.7733992Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T18:26:16.7778646Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T18:26:16.8032818Z ##[endgroup]
+2026-11-09T18:26:16.8402141Z ##[group]Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+2026-11-09T18:26:16.8402620Z with:
+2026-11-09T18:26:16.8402831Z   node-version: 24
+2026-11-09T18:26:16.8403047Z   always-auth: false
+2026-11-09T18:26:16.8403270Z   check-latest: false
+2026-11-09T18:26:16.8405821Z   token: ***
+2026-11-09T18:26:16.8406027Z ##[endgroup]
+2026-11-09T18:26:17.0004761Z Found in cache @ /opt/hostedtoolcache/node/24.22.2/x64
+2026-11-09T18:26:17.0010580Z (node:2437) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T18:26:17.0012317Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T18:26:17.0014331Z ##[group]Environment details
+2026-11-09T18:26:17.4737639Z node: v24.22.2
+2026-11-09T18:26:17.4738124Z npm: 11.19.1
+2026-11-09T18:26:17.4738472Z yarn: 1.22.22
+2026-11-09T18:26:17.4739625Z ##[endgroup]
+2026-11-09T18:26:17.4906033Z ##[group]Run npm install --prefix "$RUNNER_TEMP/runtime-gate-tests" --ignore-scripts --no-audit --no-fund 'tsx@4.23.15' '@opentelemetry/sdk-trace-base@2.12.0' 'zod@4.6.7'
+2026-11-09T18:26:17.4907344Z [36;1mnpm install --prefix "$RUNNER_TEMP/runtime-gate-tests" --ignore-scripts --no-audit --no-fund 'tsx@4.23.15' '@opentelemetry/sdk-trace-base@2.12.0' 'zod@4.6.7'[0m
+2026-11-09T18:26:17.4908192Z [36;1mln -s "$RUNNER_TEMP/runtime-gate-tests/node_modules" node_modules[0m
+2026-11-09T18:26:17.4908603Z [36;1mmkdir -p node_modules/@mikka[0m
+2026-11-09T18:26:17.4909012Z [36;1mln -s "$GITHUB_WORKSPACE/packages/protocol" node_modules/@mikka/protocol[0m
+2026-11-09T18:26:17.4941642Z shell: /usr/bin/bash -e {0}
+2026-11-09T18:26:17.4942283Z ##[endgroup]
+2026-11-09T18:26:19.9925377Z npm warn deprecated @opentelemetry/sdk-trace-base@2.12.0: Use @opentelemetry/sdk-trace package
+2026-11-09T18:26:20.6744682Z 
+2026-11-09T18:26:20.6745305Z added 10 packages in 3s
+2026-11-09T18:26:20.7268153Z ##[group]Run node --import tsx --test scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/acceptance/cloud-startup-report.test.mjs
+2026-11-09T18:26:20.7270930Z [36;1mnode --import tsx --test scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/acceptance/cloud-startup-report.test.mjs[0m
+2026-11-09T18:26:20.7293587Z shell: /usr/bin/bash -e {0}
+2026-11-09T18:26:20.7293862Z ##[endgroup]
+2026-11-09T18:26:21.1398810Z ✔ keeps fixed numeric phases, rejects foreign identities, and drops private log attributes (6.323397ms)
+2026-11-09T18:26:21.1432745Z ✔ aligns exact dispatch evidence and reports raw median/max with honest proxy lower-bound semantics (1.337996ms)
+2026-11-09T18:26:21.1455725Z ✔ uses bounded read-only provider queries and never retains raw envelopes or missing logs as zero calls (1.773599ms)
+2026-11-09T18:26:21.1457753Z ✔ keeps drifted raw evidence but excludes it from fixed-version statistics (0.676321ms)
+2026-11-09T18:26:21.1463156Z ✔ retains closed worker-claim phases and marks unavailable runtime proof honestly (1.142802ms)
+2026-11-09T18:26:21.1465058Z ✔ reports prepared and late initialization on separate interval origins without adding their overlap (0.634671ms)
+2026-11-09T18:26:21.1469819Z ✔ business request output preserves actual ACK ordering and unknown child generations without claiming all HTTP coverage (0.610409ms)
+2026-11-09T18:26:22.1180660Z ✔ v3 requires an exact observed claim catalogue before accepting zero physical startup sends (5.92289ms)
+2026-11-09T18:26:22.1198727Z ✔ sampler IDs satisfy the installed 10% sampler, while invalid live configuration fails closed (3.505542ms)
+2026-11-09T18:26:22.1254255Z ✔ startup failure projection is closed, preserves only bounded HTTP status, and unwraps native abort classes (1.219439ms)
+2026-11-09T18:26:22.1278941Z ✔ a native stream reader abort or timeout before run binding retains its actual phase and still cleans the owned issue (78.979622ms)
+2026-11-09T18:26:22.1315811Z ✔ a fetch timeout wrapped by the session client preserves the coordinator-submit phase without retrying dispatch (8.236333ms)
+2026-11-09T18:26:22.1322882Z ✔ fixed pre-execution entry phases distinguish HTTP, API, RPC and action refusal without copying response bodies (51.410338ms)
+2026-11-09T18:26:22.1346417Z ✔ stream refusal, missing workflow identity and completed stream without dispatch retain distinct closed codes (41.974579ms)
+2026-11-09T18:26:22.1365257Z ✔ profile validation and pre-sample build pin keep their own stage instead of fabricating a run failure (3.878489ms)
+2026-11-09T18:26:22.1367422Z ✔ claim/running state and daemon stages do not prove provider execution; split marker only counts after agent_start (1.869023ms)
+2026-11-09T18:26:22.1369186Z ✔ an early marker stays before the tool when full run history is replayed (0.910952ms)
+2026-11-09T18:26:22.1370595Z ✔ a completed tool followed by the task marker proves reply order (0.384218ms)
+2026-11-09T18:26:22.1372361Z ✔ terminal handoff tools do not prove execution before a text reply (0.907927ms)
+2026-11-09T18:26:22.1373929Z ✔ a previous submit cannot provide the independent tool for a submitted report (0.602285ms)
+2026-11-09T18:26:22.1375575Z ✔ the minimum tool count excludes delivery while keeping the successful read and report (0.450692ms)
+2026-11-09T18:26:22.1377090Z ✔ a tool error replaces its earlier success in the replay execution count (0.373909ms)
+2026-11-09T18:26:22.1378673Z ✔ a successful same-run canonical submit report proves delivery after the completed read (0.367206ms)
+2026-11-09T18:26:22.1380988Z ✔ an empty final report cannot borrow a residual error through the real summary selector (0.500375ms)
+2026-11-09T18:26:22.1383332Z ✔ canonical delivery cannot borrow another run, a pending or failed result, or an unordered submit (4.453914ms)
+2026-11-09T18:26:22.1385533Z ✔ the complete candidate driver rejects submit-only output with valid runtime evidence and cleans up (15.412786ms)
+2026-11-09T18:26:22.1388083Z ✔ the complete candidate driver accepts canonical report delivery with all runtime and cleanup gates intact (8.885948ms)
+2026-11-09T18:26:22.1390202Z ✔ three real-shaped runs use normal cookies, pinned subscriptions, push reads and strictly owned cleanup (18.37906ms)
+2026-11-09T18:26:22.1393186Z ✔ SMOKE chooses the verified team without fixed IDs and accepts checking quota with a new catalogue clone ID (19.095687ms)
+2026-11-09T18:26:22.1419093Z ✔ foreign payer, workspace or frozen profile cannot satisfy the shared subscription receipt (43.96046ms)
+2026-11-09T18:26:22.1421226Z ✔ wrong or ambiguous sources and sharing revoked during choice fail before dispatch without changing preferences (22.905611ms)
+2026-11-09T18:26:22.1423790Z ✔ workspace restore failure is visible but never suppresses profile cleanup or sign-out (15.861694ms)
+2026-11-09T18:26:22.1425657Z ✔ startup intervals retain only closed fields and reject foreign run data or unknown phases (0.663149ms)
+2026-11-09T18:26:22.1427720Z ✔ prepared_agent_start keeps its actual earlier origin and requires both real initialization boundaries (1.024174ms)
+2026-11-09T18:26:22.1429859Z ✔ bootstrap_claude_start keeps its actual earlier origin and requires both real initialization boundaries (0.557101ms)
+2026-11-09T18:26:22.1432287Z ✔ bootstrap_codex_initialize keeps its actual earlier origin and requires both real initialization boundaries (0.258773ms)
+2026-11-09T18:26:22.1434374Z ✔ prepared_agent_start invalid evidence cannot hide behind an otherwise valid ordinary initialization (0.881136ms)
+2026-11-09T18:26:22.1436528Z ✔ bootstrap_claude_start invalid evidence cannot hide behind an otherwise valid ordinary initialization (0.764218ms)
+2026-11-09T18:26:22.1438721Z ✔ bootstrap_codex_initialize invalid evidence cannot hide behind an otherwise valid ordinary initialization (0.522446ms)
+2026-11-09T18:26:22.1441058Z ✔ ordinary startup evidence stays compatible while missing or failed CLI initialization stays incomplete (0.310861ms)
+2026-11-09T18:26:22.1443645Z ✔ the scoped runtime receipt gates direct execution, preserves only closed evidence and does not claim OTLP completeness (1.020617ms)
+2026-11-09T18:26:22.1445463Z ✔ an HTTP-only legacy receipt cannot prove child-send coverage (0.297606ms)
+2026-11-09T18:26:22.1447118Z ✔ v2 MCP body evidence keeps its own terminal time and sequence while v1 remains readable (0.883561ms)
+2026-11-09T18:26:22.1449042Z ✔ child business observations cannot become global coverage or fail solely for a missing lifecycle close (1.171559ms)
+2026-11-09T18:26:22.1451226Z ✔ child evidence rejects foreign identity, fake completeness, malformed sequences and unobserved remote MCP scope (3.10819ms)
+2026-11-09T18:26:22.1453666Z ✔ direct diagnostics use and delete only this test repository variable, and extra auth fails after cleanup (32.957176ms)
+2026-11-09T18:26:22.1455794Z ✔ member candidate diagnostics use the trusted host without reading or writing workspace secrets (34.394542ms)
+2026-11-09T18:26:22.1457718Z ✔ trusted candidate timing still refuses missing official CLI or MCP observations (11.969311ms)
+2026-11-09T18:26:22.1459815Z ✔ member production acceptance observes its dedicated Bot window without reading or writing workspace secrets (50.912092ms)
+2026-11-09T18:26:22.1462370Z ✔ formal prepared Claude acceptance needs the independently bounded initialization receipt and preserves cleanup (42.822824ms)
+2026-11-09T18:26:22.1464646Z ✔ trusted cloud timing refuses missing CLI/MCP observations and extra remote authorization (40.701529ms)
+2026-11-09T18:26:22.1466642Z ✔ formal cloud diagnostics require the prepared dedicated Bot before creating task fixtures (1.809611ms)
+2026-11-09T18:26:22.1468993Z ✔ optional historical baseline reads keep missing detailed diagnostics unavailable (11.676453ms)
+2026-11-09T18:26:22.1470808Z ✔ trusted candidate timing cannot claim a host without a pinned device and agent (1.620178ms)
+2026-11-09T18:26:22.2514835Z ✔ lease audit uses ordinary cloud placement and waits for a terminal reply after the tool without workspace diagnostics (146.292667ms)
+2026-11-09T18:26:22.2523717Z ✔ member cloud diagnostics fail before creating any variable they cannot delete (2.422518ms)
+2026-11-09T18:26:22.2555027Z ✔ admin diagnostics preserve an existing timing variable without replacing or deleting it (1.587006ms)
+2026-11-09T18:26:22.2583498Z ✔ candidate gate checks frozen device and marker without representing itself as cloud latency acceptance (6.906889ms)
+2026-11-09T18:26:22.2585324Z ✔ candidate finish receipt waits for the same run terminal push before cleanup (8.099598ms)
+2026-11-09T18:26:22.2643729Z ✔ candidate failure cleanup waits for actual terminal after an accepted stop request (6.502222ms)
+2026-11-09T18:26:23.2685072Z ✔ candidate cleanup deadline retains its fixture when the daemon never confirms terminal (1005.680747ms)
+2026-11-09T18:26:23.2702575Z ✔ candidate cleanup stops a queued continuation after its original run failed and waits for the child push (4.398651ms)
+2026-11-09T18:26:23.2923659Z ✔ candidate cleanup retains both original and queued continuation IDs when no child terminal arrives (21.443217ms)
+2026-11-09T18:26:23.4464357Z ✔ cloud cleanup follows an adopted VM to its live continuation before ending every owned attempt (1.743298ms)
+2026-11-09T18:26:23.4516549Z ✔ cloud cleanup retains the issue when owner end fails after the DB row was marked ended (1.354351ms)
+2026-11-09T18:26:23.4518232Z ✔ cloud cleanup does not equate end acknowledgements with a still-retained current VM (0.596895ms)
+2026-11-09T18:26:23.4519704Z ✔ cleanup retains its fixture when Factory cancellation loses its revision fence (0.579734ms)
+2026-11-09T18:26:23.4521379Z ✔ wrong provenance or cleanup failure fails and still signs out; completed stop races are confirmed (30.987269ms)
+2026-11-09T18:26:23.4523110Z ✔ an existing non-test Bot is never interrupted (1.314587ms)
+2026-11-09T18:26:23.4524736Z ✔ worker configuration is pinned before and after every case and never exposes other environment values (15.209736ms)
+2026-11-09T18:26:23.4526851Z ✔ alignment rejects missing, ambiguous and reversed clocks; baseline does not silently become a passing threshold (0.8454ms)
+2026-11-09T18:26:23.4528649Z ✔ reused Coordinator workflow aligns only through the owned run server interval (0.519482ms)
+2026-11-09T18:26:23.4530210Z ✔ Claude initialization is retained as history but never proves current task acceptance (0.381413ms)
+2026-11-09T18:26:23.4531663Z ✔ a fast legacy dispatch body cannot pass the full dispatch-entry acceptance gate (0.740564ms)
+2026-11-09T18:26:23.4533366Z ✔ remote authorization after the actual task ACK cannot hide in the preparing phase (0.447546ms)
+2026-11-09T18:26:23.4534874Z ✔ failed execution keeps all six version brackets without changing the failed proof (47.58264ms)
+2026-11-09T18:26:23.4536404Z ✔ a version change after failed execution stops later dispatches and preserves both failures (16.854791ms)
+2026-11-09T18:26:23.4538096Z ✔ candidate bootstrap callback runs once after owner provenance and before any task stream observation (7.100461ms)
+2026-11-09T18:26:23.4539425Z ✔ candidate bootstrap refuses provenance failure and retains normal cleanup after a publication failure (9.153568ms)
+2026-11-09T18:26:23.4540201Z ✔ repository Git receipt stays independent and closed (1.869845ms)
+2026-11-09T18:26:23.4540836Z ✔ Codex native shell proof requires an exact successful exit code (1.014185ms)
+2026-11-09T18:26:23.4541502Z ✔ Codex patch proof requires the actual completed protocol status (0.667217ms)
+2026-11-09T18:26:23.4543308Z ✔ Codex native names arriving after the result still qualify an admitted call at the 64-call boundary (9.061906ms)
+2026-11-09T18:26:23.4570180Z ✔ a later unknown name cannot downgrade a recognized Codex native tool (0.479697ms)
+2026-11-09T18:26:23.4572061Z ✔ a later failed Codex available result removes that call from successful execution proof (0.501507ms)
+2026-11-09T18:26:23.4573604Z ✔ canonical Codex submitted reports need a successful native execution outcome (1.566378ms)
+2026-11-09T18:26:23.4575372Z ✔ other harnesses and ordinary MCP tools retain their availability semantics (0.934707ms)
+2026-11-09T18:26:23.4576869Z ✔ Codex native outcome checks retain handoff exclusion and explicit error rejection (0.542604ms)
+2026-11-09T18:26:23.4962683Z ✔ official instance release derives its worker digest from the exact acceptance revision (2.70679ms)
+2026-11-09T18:26:23.4964030Z ✔ private template configuration and a different source stop before worker preparation (2.940276ms)
+2026-11-09T18:26:23.4964907Z ✔ an old or malformed worker receipt cannot identify the official instance release (1.594625ms)
+2026-11-09T18:26:23.4966672Z ✔ real Git rejects changed or untracked runtime source before hashing but ignores generated caches (107.229037ms)
+2026-11-09T18:26:23.4968751Z ✔ publication reads complete file evidence and retains independently bound models, templates and all gates (52.272561ms)
+2026-11-09T18:26:23.4970530Z ✔ the publisher CLI reports a closed parse error without printing the report cause (183.180408ms)
+2026-11-09T18:26:23.4972392Z ✔ conservation requires both strict installation and exact provider-only finalization changes (2.741484ms)
+2026-11-09T18:26:23.4973892Z ✔ desktop exact root CA rotation permits only finalization with an unchanged installation proof (1.515252ms)
+2026-11-09T18:26:23.4975646Z ✔ claude exact root CA rotation permits only finalization with an unchanged installation proof (1.28969ms)
+2026-11-09T18:26:23.4977343Z ✖ exact root CA publication rules preserve metadata and reject other certificate or CLI paths (24.907931ms)
+2026-11-09T18:26:23.4978988Z ✔ certificate conversion proof fixes the original bytes and exact link target (3.175264ms)
+2026-11-09T18:26:23.4980644Z ✔ verified versioned templates, worker and previous release go to production in one upsert (38.563023ms)
+2026-11-09T18:26:23.4982703Z ✔ runtime configuration never asks Vercel to rebuild source; the caller must use Web deploy (5.676509ms)
+2026-11-09T18:26:23.4984536Z ✔ an explicit refresh still requires a Web build after an earlier env write succeeded (5.602751ms)
+2026-11-09T18:26:23.4985235Z ✔ a readback mismatch fails before the caller can build (4.997279ms)
+2026-11-09T18:26:23.4985999Z ✔ an uncertain mutation is never retried; an explicit rerun reads it and still requires a build (10.956517ms)
+2026-11-09T18:26:23.4986810Z ✔ an HTTP mutation error has one attempt and never exposes the response body (3.166688ms)
+2026-11-09T18:26:23.4987556Z ✔ main advancing during configuration reads prevents the single env mutation (2.493408ms)
+2026-11-09T18:26:23.4988577Z ✔ obsolete refreshes fail even when their old runtime env already matches (0.625549ms)
+2026-11-09T18:26:23.4989662Z ✔ a different serving alias or public version prevents every configuration write (2.011559ms)
+2026-11-09T18:26:23.4990452Z ✔ does not search past a newer application for an older matching READY deployment (0.946509ms)
+2026-11-09T18:26:23.4991252Z ✔ refuses missing or short source identities and candidate mismatches before requests (0.647259ms)
+2026-11-09T18:26:23.4992437Z ✔ pair validation still rejects short worker SHA, odd or missing template IDs and unmeasured harnesses (0.385921ms)
+2026-11-09T18:26:23.4993276Z ✔ only a complete matching runtime tuple returns the current worker hash (4.724119ms)
+2026-11-09T18:26:23.4993970Z ✔ repairing a partial upsert keeps the last valid rollback snapshot (3.128778ms)
+2026-11-09T18:26:23.4994733Z ✔ a valid legacy official catalogue can be backed up while requiring fresh validation (3.094794ms)
+2026-11-09T18:26:23.4995600Z ✔ GitHub-only build timeline waits for source upload before the single runtime env publication (7.900205ms)
+2026-11-09T18:26:23.4997212Z ✔ publication requires both real subscriptions on these exact candidates before any network request (26.053233ms)
+2026-11-09T18:26:23.4998699Z ✔ publication requires the same bounded bootstrap adoption proof after the native subscription passed (5.625554ms)
+2026-11-09T18:26:23.5000166Z ✔ a report larger than the failing 310446-byte payload remains byte-identical through the real file CLI (107.465085ms)
+2026-11-09T18:26:23.5002194Z ✔ an immutable reference accepts one numeric ID and a byte digest, never a list or an empty download selector (1.355584ms)
+2026-11-09T18:26:23.5003165Z ✔ changed bytes and foreign source or worker are refused before the report can reach a gate (14.722005ms)
+2026-11-09T18:26:23.5004072Z ✔ a partial rerun cannot reuse a previous attempt or another run as subscription/publication proof (26.199686ms)
+2026-11-09T18:26:23.5004869Z ✔ report identities require the concrete build and preinstalled runtime (53.72404ms)
+2026-11-09T18:26:23.5005587Z ✔ accepted and published reports preserve every original candidate field (128.102704ms)
+2026-11-09T18:26:23.5006476Z ✔ only short cleanup identities cross the failure boundary, independent of every preservation proof byte (6.711383ms)
+2026-11-09T18:26:23.5007377Z ✔ model catalogue digest binds the original build while the full report remains in a file (0.91342ms)
+2026-11-09T18:26:23.5008725Z ✔ model digests ignore JSON object key order but preserve array order and model values (8.127029ms)
+2026-11-09T18:26:23.5010486Z ✔ the actual workflow producer and pre-publication scripts keep large proofs out of every job output (628.417986ms)
+2026-11-09T18:26:23.5013091Z ✔ actual producer, accepted and release scripts never print malformed report content (192.114028ms)
+2026-11-09T18:26:23.5014683Z ✔ malformed report text keeps its error cause but never reaches CLI diagnostics (53.856635ms)
+2026-11-09T18:26:23.5016152Z ✔ the production gate logs in as SMOKE without pinning an owner workspace or bot (30.962397ms)
+2026-11-09T18:26:23.5017728Z ✔ a different application commit is refused before login, enrollment or candidate creation (46.851804ms)
+2026-11-09T18:26:23.5019193Z ✔ a release receipt names the actual candidate, revision, model and registered device (15.494318ms)
+2026-11-09T18:26:23.5020133Z ✔ a failed subscription still tests the other candidate and closes every created instance and device (16.00363ms)
+2026-11-09T18:26:23.5021222Z ✔ candidate acceptance is pinned to the outer SMOKE/team payer and always closes its normal session (13.646156ms)
+2026-11-09T18:26:23.5022561Z ✔ a real receipt rejection persists its run hash and reason without provider text or credentials (18.565694ms)
+2026-11-09T18:26:23.5023611Z ✔ preflight failures preserve their phase and closed error details without producing an accepted file (65.244426ms)
+2026-11-09T18:26:23.5024653Z ✔ a failure before a sample exists preserves the startup phase without inventing sample evidence (4.572065ms)
+2026-11-09T18:26:23.5025665Z ✔ startup failure projection drops unknown content and only admits numeric HTTP error statuses (56.357937ms)
+2026-11-09T18:26:23.5026694Z ✔ failure diagnostics retain only fixed cleanup outcomes and unknown exceptions become a generic code (5.344258ms)
+2026-11-09T18:26:23.5027702Z ✔ retained cleanup identities must belong to this case and contain at most four distinct UUIDs (9.58839ms)
+2026-11-09T18:26:23.5028647Z ✔ a terminal-before-proof failure identifies only its owned case and the missing evidence (3.489772ms)
+2026-11-09T18:26:23.5029593Z ✔ cleanup failures retain bounded step families and HTTP status without arbitrary causes (4.395285ms)
+2026-11-09T18:26:23.5030519Z ✔ a failed pair preserves the genuine passing receipt without creating publishable evidence (9.183499ms)
+2026-11-09T18:26:23.5031471Z ✔ failure projection bounds cleanup rows and refuses foreign or malformed fixture identities (16.205608ms)
+2026-11-09T18:26:23.5032852Z ✔ the observed Codex adapter-start failure retains false agent_start and error cli_init (7.343796ms)
+2026-11-09T18:26:23.5034046Z ✔ failed execution retains only bound registration binary metadata without a passing receipt (3.32821ms)
+2026-11-09T18:26:23.5035043Z ✔ registration diagnostics reject unbounded or non-original binary metadata without leaking it (16.812602ms)
+2026-11-09T18:26:23.5036198Z ✔ bootstrap adoption is required; ordinary FD3, wrong run, duplicate warmup or descriptor auth cannot publish (3.513106ms)
+2026-11-09T18:26:23.5038110Z ✔ bootstrap projection, repeated publication and VM proof failures still reclaim both candidate devices and VMs (6.665237ms)
+2026-11-09T18:26:23.5039435Z ✔ bootstrap failure diagnostics preserve existing strict timings and final binding checks without accepting the pair (10.235119ms)
+2026-11-09T18:26:23.5040511Z ✔ bootstrap failure timing projection rejects foreign, oversized and private values without widening adoption (2.222103ms)
+2026-11-09T18:26:23.5041513Z ✔ bootstrap failure binding checks name the rejected predicate without exporting bootstrap or hint values (14.916048ms)
+2026-11-09T18:26:23.5042742Z ✔ successful candidate gate adds no failure diagnostics and keeps the original accepted receipt (4.177748ms)
+2026-11-09T18:26:23.5043677Z ✔ failure projection distinguishes the closed 3c production shapes using synthetic identities (4.344951ms)
+2026-11-09T18:26:23.5044583Z ✔ fills sensitive build values from the job and pins the main Git identity (3.201954ms)
+2026-11-09T18:26:23.5045271Z ✔ refuses a build with a missing value and names only the variable (0.782482ms)
+2026-11-09T18:26:23.5045867Z ✔ reads the commit production serves through the alias (3.508969ms)
+2026-11-09T18:26:23.5046343Z /etc/bash.bashrc: line 7: PS1: unbound variable
+2026-11-09T18:26:23.5046743Z /etc/bash.bashrc: line 7: PS1: unbound variable
+2026-11-09T18:26:23.5047118Z /etc/bash.bashrc: line 7: PS1: unbound variable
+2026-11-09T18:26:23.5047486Z /etc/bash.bashrc: line 7: PS1: unbound variable
+2026-11-09T18:26:23.5048238Z ✔ public verification waits through an HTTP error and the previous build before recording the exact build (54.36688ms)
+2026-11-09T18:26:23.5049083Z ✔ a different public build cannot pass just because its deployment is READY (1.550518ms)
+2026-11-09T18:26:23.5049937Z ✔ invalid responses and network failures stay bounded and never copy response bodies into errors (1.985551ms)
+2026-11-09T18:26:23.5050746Z ✔ a moving branch name or invalid budget fails before sending a public request (0.42799ms)
+2026-11-09T18:26:23.5051528Z ✔ an exact response arriving after the monotonic verification deadline cannot pass (0.647189ms)
+2026-11-09T18:26:23.5052547Z ✔ waits for a GitHub build while Vercel still only serves the older READY source (4.657144ms)
+2026-11-09T18:26:23.5053331Z ✔ waits for completed Web step metadata to converge before accepting the public build (4.884318ms)
+2026-11-09T18:26:23.5054220Z ✔ pending Web step metadata shares the original deadline without reading the public build (2.341436ms)
+2026-11-09T18:26:23.5055055Z ✔ main advancing during step metadata convergence stops before another evidence read (1.230299ms)
+2026-11-09T18:26:23.5055866Z ✔ step metadata that completes after the original deadline cannot admit a release (1.441795ms)
+2026-11-09T18:26:23.5056639Z ✔ pending step metadata never hides a failed, cancelled or skipped required step (2.439039ms)
+2026-11-09T18:26:23.5057522Z ✔ duplicate, missing or contradictory step evidence fails instead of waiting or accepting public READY (8.728022ms)
+2026-11-09T18:26:23.5058479Z ✔ main advancing while waiting rejects the obsolete source before another workflow or public read (0.745013ms)
+2026-11-09T18:26:23.5059418Z ✔ the latest exact Web attempt must succeed; an older success cannot hide its failure or cancellation (1.472342ms)
+2026-11-09T18:26:23.5060364Z ✔ a docs-only skipped build or incomplete upload never passes even if public already has that SHA (1.43407ms)
+2026-11-09T18:26:23.5061255Z ✔ a successful Web job waits for its required step results to catch up before reading public (1.735383ms)
+2026-11-09T18:26:23.5062392Z ✔ required Web step results that remain pending cannot pass and retain the finite wait (1.154007ms)
+2026-11-09T18:26:23.5063362Z ✔ pending Web step results retain the exact-main fence on every wait (0.748549ms)
+2026-11-09T18:26:23.5064128Z ✔ pending step metadata does not hide a required step that already failed or skipped (1.81918ms)
+2026-11-09T18:26:23.5065104Z ✔ another repository, branch or workflow cannot stand in for the matching main Web run (5.194218ms)
+2026-11-09T18:26:23.5065898Z ✔ a successful Web run with an old public build has a finite monotonic wait (2.946707ms)
+2026-11-09T18:26:23.5066690Z ✔ a matching public response after the deadline cannot admit the runtime mutation (1.317092ms)
+2026-11-09T18:26:23.5067628Z ✔ the final read-only fence also rejects a main change during public verification (1.069128ms)
+2026-11-09T18:26:23.5068413Z ✔ invalid source, missing identity or invalid wait fails without any network request (0.43321ms)
+2026-11-09T18:26:23.5069123Z ✔ GitHub errors do not expose response bodies or transport messages (0.873993ms)
+2026-11-09T18:26:23.5070087Z ✔ explicit runtime refresh always builds while ordinary docs-only classification is preserved (0.827396ms)
+2026-11-09T18:26:23.5071592Z ✔ both release paths use one non-cancelling pending queue, and the Web wait remains outside it (0.967709ms)
+2026-11-09T18:26:23.5073308Z ✔ runtime env, build and upload are ordered under the same job with fixed identity and source fences (0.670042ms)
+2026-11-09T18:26:23.5074284Z ✔ the actual dispatch comparison only bypasses unchanged-hash optimization when explicitly requested (18.425611ms)
+2026-11-09T18:26:23.5075317Z ✔ release-control refresh validates both immutable push endpoints and never assumes missing history is unchanged (1.103964ms)
+2026-11-09T18:26:23.5076209Z ✔ manual runtime refresh defaults off and does not make pull requests eligible (0.236393ms)
+2026-11-09T18:26:23.5077147Z ✔ real Git and the production CLI compare the entire push, preserve docs-only skip and reject unavailable before (207.44994ms)
+2026-11-09T18:26:23.5078074Z ✔ desktop release accepts a deployed descendant while preserving its own source identity (2.994737ms)
+2026-11-09T18:26:23.5079074Z ✔ desktop replaces obsolete preflights while preserving active signing and documentation does not trigger a release (6.473359ms)
+2026-11-09T18:26:23.5080052Z ✔ real Git ancestry admits the same source or descendants and never an older or divergent Web (141.243352ms)
+2026-11-09T18:26:23.5080853Z ✔ an unbound or malformed GitHub comparison cannot admit a desktop release (2.341516ms)
+2026-11-09T18:26:23.5081657Z ✔ desktop waits for a newer compatible Web instead of stopping at its obsolete failed build (1.314687ms)
+2026-11-09T18:26:23.5082750Z ✔ a changed public candidate is reverified before the desktop can be released (2.159325ms)
+2026-11-09T18:26:23.5083627Z ✔ descendant mode retains successful same-source Web build, upload and public verification gates (3.518596ms)
+2026-11-09T18:26:23.5084547Z ✔ desktop verification cannot succeed after its deadline or start without a GitHub identity (0.340337ms)
+2026-11-09T18:26:23.5085450Z ✔ private-push dispatch waits through an older overlay on an otherwise valid desktop descendant (0.997003ms)
+2026-11-09T18:26:23.5086224Z ✔ private-push exact-source wait keeps matching overlay behavior (1.445371ms)
+2026-11-09T18:26:23.5086963Z ✔ every fromJSON of a workflow input has a fallback, since a push run has no inputs (0.333843ms)
+2026-11-09T18:26:23.5087691Z ✔ large runtime reports cross jobs only as immutable artifact files (0.841092ms)
+2026-11-09T18:26:23.5088443Z ✔ duplicate required step cannot hide a failure or pending record behind one success (1.290803ms)
+2026-11-09T18:26:23.5089373Z ✔ runtime CLI waits beyond forty minutes for the latest Web run instead of accepting an older successful push (41.002251ms)
+2026-11-09T18:26:23.5090253Z ✔ desktop CLI still times out at forty minutes while the latest Web run is pending (51.635284ms)
+2026-11-09T18:26:23.5091182Z ✔ runtime CLI stops at ninety minutes while required Web step evidence remains pending without reading public (100.279107ms)
+2026-11-09T18:26:23.5092045Z ℹ tests 205
+2026-11-09T18:26:23.5092510Z ℹ suites 0
+2026-11-09T18:26:23.5092738Z ℹ pass 204
+2026-11-09T18:26:23.5092947Z ℹ fail 1
+2026-11-09T18:26:23.5093154Z ℹ cancelled 0
+2026-11-09T18:26:23.5093372Z ℹ skipped 0
+2026-11-09T18:26:23.5093576Z ℹ todo 0
+2026-11-09T18:26:23.5093993Z ℹ duration_ms 2728.606687
+2026-11-09T18:26:23.5094155Z 
+2026-11-09T18:26:23.5094269Z ✖ failing tests:
+2026-11-09T18:26:23.5094391Z 
+2026-11-09T18:26:23.5094628Z test at scripts/e2b/publish-template-env.test.mjs:144:1
+2026-11-09T18:26:23.5095391Z ✖ exact root CA publication rules preserve metadata and reject other certificate or CLI paths (24.907931ms)
+2026-11-09T18:26:23.5096026Z   AssertionError [ERR_ASSERTION]: Missing expected exception.
+2026-11-09T18:26:23.5096769Z       at TestContext.<anonymous> (file:///home/runner/work/Mikka/Mikka/scripts/e2b/publish-template-env.test.mjs:180:10)
+2026-11-09T18:26:23.5097415Z       at Test.runInAsyncScope (node:async_hooks:227:14)
+2026-11-09T18:26:23.5097817Z       at Test.run (node:internal/test_runner/test:1402:25)
+2026-11-09T18:26:23.5098311Z       at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+2026-11-09T18:26:23.5098802Z       at Test.postRun (node:internal/test_runner/test:1542:19)
+2026-11-09T18:26:23.5099208Z       at Test.run (node:internal/test_runner/test:1467:12)
+2026-11-09T18:26:23.5099722Z       at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+2026-11-09T18:26:23.5100153Z     generatedMessage: false,
+2026-11-09T18:26:23.5100405Z     code: 'ERR_ASSERTION',
+2026-11-09T18:26:23.5100638Z     actual: undefined,
+2026-11-09T18:26:23.5100939Z     expected: /runtime_release_conservation_invalid/,
+2026-11-09T18:26:23.5101260Z     operator: 'throws',
+2026-11-09T18:26:23.5101480Z     diff: 'simple'
+2026-11-09T18:26:23.5101676Z   }
+2026-11-09T18:26:23.5113980Z ##[error]Process completed with exit code 1.
+2026-11-09T18:26:23.5310720Z Post job cleanup.
+2026-11-09T18:26:23.6230525Z [command]/usr/bin/git version
+2026-11-09T18:26:23.6278455Z git version 2.56.0
+2026-11-09T18:26:23.6320439Z Temporarily overriding HOME='/home/runner/work/_temp/b30012b9-a6ca-46ee-9560-6ece00d27067' before making global git config changes
+2026-11-09T18:26:23.6322234Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T18:26:23.6327136Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T18:26:23.6373522Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T18:26:23.6416435Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T18:26:23.6776959Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T18:26:23.6803878Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T18:26:23.7192487Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T18:26:23.7260659Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T18:26:23.7764043Z Cleaning up orphan processes
+2026-11-09T18:26:23.8204122Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

@@ -1,0 +1,131 @@
+{
+  "version": 1,
+  "archivePrefix": "ci-recovery-20261109",
+  "evidenceParent": "f4edc25ff754e9546aff19013cb78c593e2da40e",
+  "sourceFiles": [
+    {
+      "source": "/workspace/scratch/263e36984c81/ci-recovery-1505/active.yml",
+      "path": "active.yml",
+      "bytes": 10893,
+      "sha256": "ff9a1f00dc7747b6802e4cfefd277d34f71840cd49a1ae905c6a68091ee9cfc3",
+      "gitBlob": "e1f84e6b5d5e052f16c9b63c33b4691c17fc83bc",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/ci-recovery-1505/binding.json",
+      "path": "binding.json",
+      "bytes": 441,
+      "sha256": "b7a12c144f651643961c3914fe3ac1c3363686eb4dd5a7b3953c6c9d2854b0e7",
+      "gitBlob": "6a3d034432fc5f9f9bdd3e70464d8a747fd5efc9",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/ci-recovery-1505/cb2-e2b-test.log",
+      "path": "cb2-e2b-test.log",
+      "bytes": 45037,
+      "sha256": "b93b4543c80dc56115e78d97312d22946f1b4d53d506ff864c5cd6805e1018f3",
+      "gitBlob": "d02a4a085e227c9bd89650a14c7fc1a4ceb06d9e",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/ci-recovery-1505/closed.yml",
+      "path": "closed.yml",
+      "bytes": 10725,
+      "sha256": "0a024c2e7ad151b53be98aafd42c7ae50c94f286c8a15ad206fd342ecb7760cd",
+      "gitBlob": "fa506b9b9ba37150330452949ca37ee9dce043fe",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/ci-recovery-1505/issue1505-ci-recovery-42677288279-1.zip",
+      "path": "issue1505-ci-recovery-42677288279-1.zip",
+      "bytes": 413,
+      "sha256": "2dbb5dfdd317f111b1efdb4452d0e1f7a4ecb34a142726e30538611193b4e883",
+      "gitBlob": "4639e9a08d4070d5a030010584604a772137e103",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/ci-recovery-1505/operator.log",
+      "path": "operator.log",
+      "bytes": 372938,
+      "sha256": "8042477919ef5389d6e46a4e65f64cd4302233e368a47a8c4ddc60c426790460",
+      "gitBlob": "40443d59f2a48ec04d3d415b8e5ce638e50cec4a",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/ci-recovery-1505/outcome.json",
+      "path": "outcome.json",
+      "bytes": 87271,
+      "sha256": "317741f15ba3443f1304b31b17f44a509052bc7c63fd468e9f0aa7a32fd12e6f",
+      "gitBlob": "2608ab625d3d29c49fd919ad79ae98c16c951505",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/ci-recovery-1505/receipt.json",
+      "path": "receipt.json",
+      "bytes": 415,
+      "sha256": "e7ca74849a53a34df0ff907b3e6312284791c01ddfde4f939d303eea90843e3b",
+      "gitBlob": "737990002374e8c4b28d65f10c58549cc0a88bea",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/ci-recovery-1505/recovery_source.py",
+      "path": "recovery_source.py",
+      "bytes": 7668,
+      "sha256": "47972fb1ad3c5e6baf2a354ec7e4fcf0a057c090b300800b89442cdeb26e769e",
+      "gitBlob": "254bb072c6145e9aa9843a417bf4271948e65a21",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/ci-recovery-1505/render.py",
+      "path": "render.py",
+      "bytes": 1858,
+      "sha256": "1c476e0c00f87af49b3e5052e18aebb905eaffb54f8220d4ac02ec255fda74fd",
+      "gitBlob": "78dd59a86adf99a93140dcaa4f3744381176382f",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/ci-recovery-1505/workflow.yml.in",
+      "path": "workflow.yml.in",
+      "bytes": 10685,
+      "sha256": "d61e0f0531466363f89a13ee8d381b75ee081c16abe4c90578ef83d1bb98d271",
+      "gitBlob": "6975fcaa91249ac867138b2e74cd9e19d7f3baeb",
+      "mode": "100644"
+    }
+  ],
+  "sourceFileCount": 11,
+  "sourceBytes": 548344,
+  "sourceFilesUnchanged": true,
+  "generatedFiles": [
+    {
+      "path": "README.md",
+      "bytes": 1987,
+      "sha256": "03d3e947bc2973530b638a126dcc75f77367a696e7ebed2a7b675b9e0fd84a89",
+      "gitBlob": "46be5e7c5a240f53e3c88fe54a4b2609622a8852",
+      "mode": "100644"
+    }
+  ],
+  "excludedPathRules": [
+    "**/readback-transfer.json"
+  ],
+  "boundaries": {
+    "operatorRun": 42677288279,
+    "attempt": 1,
+    "operatorConclusion": "failure",
+    "preflightFoundRealE2bTestJob": true,
+    "targets": [],
+    "postCount": 0,
+    "allTargetsZeroJobsClaimed": false,
+    "ciPassClaimed": false,
+    "newFormalSamples": 0,
+    "closureCommit": "195c681d414e958ad43fbd7222872aa13ca0ef05",
+    "closureRun": 42677399617,
+    "closureConclusionFromRootHandoff": "skipped"
+  },
+  "archiveOnly": {
+    "newTests": 0,
+    "originalLogDownloads": 0,
+    "artifactDownloads": 0,
+    "productionActions": 0,
+    "refMutations": 0
+  }
+}

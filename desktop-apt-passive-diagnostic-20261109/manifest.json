@@ -1,0 +1,59 @@
+{
+  "files": [
+    {
+      "bytes": 8634,
+      "gitBlobOid": "a89a25390d4e09aeabb7d7b8814b5cf9278b38e0",
+      "path": "DESIGN.md",
+      "sha256": "e98f00830259c01f2c56bc06d02336b5a7dcb943e446cb4612fdb2ce9d85f1f5"
+    },
+    {
+      "bytes": 221,
+      "gitBlobOid": "8d700c96eb49fe676f33e16ccbce8e38d3bb9701",
+      "path": "binding.json.in",
+      "sha256": "41059211cd34a42522b86b273341ee4b224774f00d680d922dcf27bf0544faa9"
+    },
+    {
+      "bytes": 30605,
+      "gitBlobOid": "c4f7dc813c7a6455bca54f51fc03c7c06e7f341c",
+      "path": "guest_observer.py",
+      "sha256": "970da61123e7e1f1a259103bdccfdc7dcdc874598aac08935503dd83eaa2880b"
+    },
+    {
+      "bytes": 13637,
+      "gitBlobOid": "a3d6718055de102c1e936818ea6d6f937b7cf17d",
+      "path": "guest_observer_test.py",
+      "sha256": "2c430bc8ffa288b62d26eaf685c7251086463c6b3f0470f621c1c5f20cef310f"
+    },
+    {
+      "bytes": 3741,
+      "gitBlobOid": "a068b33d80729539d2483bcfd153b66d57f6ed8b",
+      "path": "source-bindings.json",
+      "sha256": "ceaaff4c72263ec20e29b013f5702277324a5f24348eb3c49696204c2c27f2db"
+    },
+    {
+      "bytes": 1216,
+      "gitBlobOid": "fe32db5917ca5c5ddfaa814b5ad924db74f61c81",
+      "path": "validation/parser-01.result.json",
+      "sha256": "fb2cbfe775db2a22d6bf609733d8f62c8d792e897bafb1c3e986e5fa8d97acaa"
+    },
+    {
+      "bytes": 2889,
+      "gitBlobOid": "2868ef11d3def6820afd1031ec7d443effe97ca7",
+      "path": "validation/parser-01.stderr.txt",
+      "sha256": "f44ee40045be4ba1b6812033d454ad26adb972659a46f4028917738a17c84ce1"
+    },
+    {
+      "bytes": 0,
+      "gitBlobOid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "path": "validation/parser-01.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "gitObjectsOrRefsChanged": false,
+  "payloadBytes": 60943,
+  "payloadCount": 8,
+  "runtimeValidated": false,
+  "stage": "optional offline draft; unactivated",
+  "version": 1,
+  "workflowCreated": false
+}
