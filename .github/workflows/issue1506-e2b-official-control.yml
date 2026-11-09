@@ -1,0 +1,83 @@
+name: Issue 1506 Desktop-only 480-second official control
+
+on:
+  push:
+    branches: [ops/issue1506-e2b-conservation-control-3]
+    paths:
+      - .github/workflows/issue1506-e2b-official-control.yml
+      - scripts/ops/issue1506-e2b-official-control.py
+      - scripts/ops/issue1506-e2b-official-control.test.py
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: issue1506-official-conservation-control
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  observe:
+    # Disabled preparation. Bind one absolute <=15-minute window only after review.
+    if: github.ref == 'refs/heads/ops/issue1506-e2b-conservation-control-3' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      CONTROL_GO: 'true'
+      CONTROL_NOT_BEFORE: 2026-11-09T13:00:42Z
+      CONTROL_DEADLINE: 2026-11-09T13:15:42Z
+    steps:
+      - name: Check out the fixed product source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: e78fccffd9dd878edd490b113ea80efcff1525e7
+          path: source
+          persist-credentials: false
+      - name: Check out this diagnostic revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          path: ops
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify offline source and ownership guards
+        run: |
+          python3 -B ops/scripts/ops/issue1506-e2b-official-control.test.py
+          python3 -B ops/scripts/ops/issue1506-e2b-official-control.py verify --source source --output "$RUNNER_TEMP/issue1506-official-control"
+      - name: Install only the pinned control SDK
+        run: |
+          python3 -m venv "$RUNNER_TEMP/issue1506-official-sdk"
+          "$RUNNER_TEMP/issue1506-official-sdk/bin/pip" install --disable-pip-version-check 'e2b==2.62.0'
+      - name: Recheck absolute budget before requesting the key
+        run: python3 -B ops/scripts/ops/issue1506-e2b-official-control.py verify --source source --output "$RUNNER_TEMP/issue1506-official-control"
+      - name: Read only the existing E2B key
+        id: key
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: E2B_API_KEY
+          include-imports: false
+      - name: Observe only the official Desktop base
+        run: >-
+          "$RUNNER_TEMP/issue1506-official-sdk/bin/python" -B ops/scripts/ops/issue1506-e2b-official-control.py diagnose
+          --source source --output "$RUNNER_TEMP/issue1506-official-control"
+      - name: Recheck exact owned instances and private templates
+        if: always() && steps.key.outcome == 'success'
+        run: >-
+          "$RUNNER_TEMP/issue1506-official-sdk/bin/python" -B ops/scripts/ops/issue1506-e2b-official-control.py cleanup
+          --source source --output "$RUNNER_TEMP/issue1506-official-control"
+      - name: Preserve closed observations and cleanup receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1506-official-control-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/issue1506-official-control/
+          if-no-files-found: warn
+          retention-days: 7
