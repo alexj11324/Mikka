@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "checkpoint": 32,
+  "issue": 1512,
+  "repository": "alexj11324/Mikka",
+  "prefix": "docs/operations/evidence/1512-raw/production-readiness-contracts-20261109",
+  "recordedAtUTC": "2026-11-09 12:50:55 UTC",
+  "scope": "Prepared conditional source compatibility and actual-evidence execution contracts; not production acceptance.",
+  "currentTestedSource": {
+    "head": "f3466ba479ef51918790f521a288feaef5160e44",
+    "tree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+    "ciRun": 42610943512
+  },
+  "files": [
+    {
+      "path": "p0-conditional-source-proof.safe.json",
+      "sha": "5fe43d79bea38f8c55b3edb618ca68e800b13550",
+      "bytes": 38432,
+      "sha256": "78d2055d337d9c19c646011c28624ec0b78a376f1ddbe96af7950f32f13420e3",
+      "mode": "100644",
+      "kind": "conditional-independent-source-proof"
+    },
+    {
+      "path": "posthog-visual-execution-contract.safe.json",
+      "sha": "a2823a1d8d189548bebfd719d3e34d56d0f3653f",
+      "bytes": 22108,
+      "sha256": "454c37ca2586228df4593988439080fe937afb6125e2f2a91ebfd19cac21aca9",
+      "mode": "100644",
+      "kind": "prepared-not-executed-visual-contract"
+    },
+    {
+      "path": "root-conditional-tree-proof.safe.json",
+      "sha": "1a1ac2ee711c8b847ad3667992739b20341eced7",
+      "bytes": 803,
+      "sha256": "57e577d75a0c1026fbfaa06f369c4c9cc079d890d52036572c0991eca755dbc9",
+      "mode": "100644",
+      "kind": "root-independent-tree-arithmetic"
+    },
+    {
+      "path": "claude-generation-source-boundary.safe.json",
+      "sha": "300c055821e99dc83b93ee795983501090fd186d",
+      "bytes": 3791,
+      "sha256": "e823375b472117911ca02fe91ada9a1f4744c5f24bcc6573b4116cd3dfd7f3eb",
+      "mode": "100644",
+      "kind": "source-boundary-review"
+    },
+    {
+      "path": "execution-notes.prepared.safe.json",
+      "sha": "d6d338b467af0d9cfcade9105c7e0fdc2396e607",
+      "bytes": 1361,
+      "sha256": "2762ce8d50c4b62ece50fc7d84580b759d2dcff567c458cbec93fd173c57f18d",
+      "mode": "100644",
+      "kind": "prepared-execution-notes"
+    },
+    {
+      "path": "README.md",
+      "sha": "3a86f652f96ac07ff2ec42e7f147e027c7b0b984",
+      "bytes": 4001,
+      "sha256": "55e83a6729ef635e1c20fee48c6e39074e317acb5c4f806dbbc7f88cef08f6e3",
+      "mode": "100644",
+      "kind": "checkpoint-readme"
+    }
+  ],
+  "payloadFileCount": 6,
+  "payloadBytes": 70496,
+  "indexExcluded": true,
+  "priorCheckpoint": {
+    "number": 31,
+    "commit": "5f6872c8b708a5176e99086321606e28930db401"
+  },
+  "productionAcceptedCases": 0,
+  "newSourceCommits": 0,
+  "newCI": 0,
+  "newModels": 0,
+  "newPosthogQueries": 0,
+  "newVMs": 0
+}

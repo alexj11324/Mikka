@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "method": "Root independently reconstructed Git binary tree hashes from all existing remote-verified candidate leaves and the 57 exact inverse overlay entries; pure V8, no source object/ref/CI writes.",
+  "actualTestedTree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+  "actualTestedLeaves": 6792,
+  "conditionExpectedP0Tree": "6a06f3742fb0dfc35bed19780fe09da2747c1ddc",
+  "conditionExpectedP0Leaves": 6790,
+  "inverseOverlayEntries": 57,
+  "overlayInputErrors": [],
+  "rootIndependentMatches": true,
+  "p0ActuallyMergedOrDeployed": false,
+  "receiptBlob": "5fe43d79bea38f8c55b3edb618ca68e800b13550",
+  "limitations": "Apply only if actual fresh main tree equals 6a06; this does not authorize overlapping another owner's actual window or count a future merge as completed."
+}

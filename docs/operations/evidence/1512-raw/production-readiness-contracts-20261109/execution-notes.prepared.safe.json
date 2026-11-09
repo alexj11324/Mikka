@@ -1,0 +1,32 @@
+{
+  "preparedAtUTC": "2026-11-09 12:42:04 UTC",
+  "source": "f3466ba479ef51918790f521a288feaef5160e44",
+  "posthogProject": 670821,
+  "execution": {
+    "queryTemplatesBlob": "07f2013526784be3bff29fd23073f5320a980cf3",
+    "normalizerBlob": "8bd8d631b24cb134e1581e48eca86e8f16d3f557",
+    "reconcilerBlob": "521ef985cd815b19b5220025adbd053879ccb41e",
+    "queryCount": 14,
+    "pagedQueries": 6,
+    "pageSize": 500,
+    "stableSnapshots": 2,
+    "queriesCurrentlyExecutedForActualCases": 0,
+    "offlineProcessing": "Run the original Node modules without modifying their behavior when the actual metadata snapshots and native PNG artifacts are ready; use the same bounded evidence-recovery VM and stop/delete after recovery."
+  },
+  "visualContractBlob": "a2823a1d8d189548bebfd719d3e34d56d0f3653f",
+  "currentActiveOwnerWindow": {
+    "issue": 1608,
+    "start": "2026-11-09T12:29:00Z",
+    "hardEnd": "2026-11-09T13:59:00Z",
+    "earlyReleaseRequiredOnCompletionOrFailure": true
+  },
+  "sourceConditionalProof": {
+    "peerBlob": "5fe43d79bea38f8c55b3edb618ca68e800b13550",
+    "rootIndependent": true,
+    "expectedP0Tree": "6a06f3742fb0dfc35bed19780fe09da2747c1ddc",
+    "testedTreeUnchanged": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+    "onlyPreviouslyDeclaredPaths": 57,
+    "notAnActualMerge": true
+  },
+  "noActualProductionAcceptanceClaim": true
+}

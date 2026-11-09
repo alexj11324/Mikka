@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "issue": 1512,
+  "head": "f3466ba479ef51918790f521a288feaef5160e44",
+  "reviewRecordedAtUTC": "2026-11-09 12:47:18 UTC",
+  "reviewType": "Delegated fixed-source review; no current production case exists yet",
+  "inputs": {
+    "codingAdapter": "b5659ce0a1d56aeccd29f964d1aed30dd750282f",
+    "generationMetrics": "4827af84d7b53cff43cea29e73b19a5a780e8572",
+    "daemonAi": "6f7d7414fb07809880603dc4c20f6525616219ab",
+    "daemonTracing": "0eed0277c933b0d2457909851bab458a482c184d",
+    "deprecatedNativeCoordinator": "ea50f87f580610afba4d425d69436ae74348ff2c",
+    "frozenModel": "20cab1661d40684acbee135808145f38994802fc",
+    "subscriptionWorkflowModel": "c47738974f8692ebd30a1736e8d39ea7a35ff7f4",
+    "hostedWorkflowTurn": "fa3c7dd9d05c2e5593addfe515e26b8b78d8431b",
+    "modelCallTiming": "f5d5a9cae9f792e2b1b4a5573abcbc7579264f12",
+    "webAi": "a017de1850bf4cc80e1ad31a6b7fb1b8f46ca72f"
+  },
+  "conclusion": {
+    "confirmedNormalPathMaterialOmission": false,
+    "newSourceChangeRequiredByThisReview": false,
+    "independentClaudeUpstreamCountAvailable": false,
+    "nativeFlushConfirmed": false,
+    "productionAcceptance": false
+  },
+  "coding": {
+    "observation": "generations.observe(message) before business branches; tracing enables includePartialMessages",
+    "identity": "message ID deduplication; parent_tool_use_id separates active streams",
+    "start": "message_start",
+    "update": "message_delta known usage",
+    "finish": "message_stop or terminal complete assistant fallback",
+    "abort": "explicit aborted assistant error; unconfirmed output usage unknown",
+    "exception": "active generations fail on SDK iterator exception",
+    "emission": "one daemon.ai.generation span and corresponding AI event share trace/span identity; metadata-only",
+    "terminalResult": "aggregate data-usage, not another generation; no modelUsage/num_turns or independent per-message ledger exported",
+    "notValidCounts": [
+      "text/reasoning chunk count",
+      "tool-call count",
+      "runtime initialization model label"
+    ],
+    "aggregateUsageBoundary": "terminal and per-generation cache semantics differ; do not assert naive sums or distribute terminal cost across generations"
+  },
+  "coordinator": {
+    "normalPath": "runHostedWorkflowTurn -> SubscriptionWorkflowModel -> resolveFrozenHostedModel -> observedModel doStream/doGenerate",
+    "deprecatedNativeEnabled": false,
+    "independentExistingMetadata": [
+      "model_call_timing keyed by workflowRunId/stepId/attempt and outcome",
+      "turn_timing.modelCalls equals result.steps.length for successful turns"
+    ],
+    "limits": "resolution/auth failures need not be provider generations; successful turn count is not coding subprocess count or all failed attempts"
+  },
+  "evidence": {
+    "reconcileBothDirections": true,
+    "stableSnapshots": 2,
+    "allObservedOperationModelHarnessBuckets": true,
+    "claudeUpstreamCountUnavailableIsLimitation": true,
+    "nativeFlushUnconfirmedIsLimitation": true,
+    "overallAcceptance": null,
+    "forbiddenClaim": "AI/APM equality, CLI exit or local queue flush proves every hidden upstream CLI call/retry was captured"
+  },
+  "conditionalUnobservedBoundary": {
+    "condition": "SDK returns normal EOF while collector still holds started generation without terminal frame",
+    "behavior": "adapter normal EOF goes through diedEarly; generations.fail is in exception catch",
+    "actualOccurrenceProven": false,
+    "newGateAdded": false,
+    "action": "Revisit only if actual safe case evidence establishes this sequence; do not expand speculative SDK scans"
+  },
+  "operations": {
+    "models": 0,
+    "tests": 0,
+    "vms": 0,
+    "productionQueries": 0,
+    "jobLogReads": 0,
+    "sourceWrites": 0,
+    "refWrites": 0
+  }
+}

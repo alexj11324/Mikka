@@ -1,0 +1,1130 @@
+{
+  "schemaVersion": 1,
+  "name": "p0-6a06-to-tested-102bc-conditional-source-proof.safe.json",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequest": 1799,
+  "dateUtc": "2026-11-09",
+  "conclusion": "If the original P0 owner actually merges a main commit whose entire tree is exactly6a06f3742fb0dfc35bed19780fe09da2747c1ddc, the already-tested own tree102bc671b4c5e3cf49fcce54025c71b26f817cf2 can be retained byte-for-byte with the exact57-path declared overlay below. No new product/source conflict was found. This is a conditional source-tree proof, not evidence of a P0 merge, deployment or production acceptance.",
+  "inputs": {
+    "p0Commit": "521db4799a4a85e1955f7dd86a1ad5ccef143cc8",
+    "p0Tree": "d82a34d59bf072348869ef086e24ae0ad5a852ec",
+    "mainCommit": "e78fccffd9dd878edd490b113ea80efcff1525e7",
+    "mainTree": "48b0d459ca1c9087e8abab29e7c3ccf9428fbbcc",
+    "actualCommonAncestor": "76df3935c8be5af480485c52e445d389e85d8a35",
+    "commonAncestorTree": "bd554b5317dbee81f543ae024db2b9510a28947e",
+    "ownCommit": "f3466ba479ef51918790f521a288feaef5160e44",
+    "ownActualCICheckout": "855245dba9accc3212dab9fd28af398af1a7e65a",
+    "ownTree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+    "ownPredecessorDeclaredDelta": {
+      "commit": "f0956eb1481cee710efb714ec3635ac66b4b44ec",
+      "relativeTo": "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+      "paths": 59
+    },
+    "ownerTreeAnnouncement": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6737782574",
+    "ownTreePreparationReceipt": "1e21ba2a1e247d61d8ad03f9a3a5b1e721748de8",
+    "ownNewSourceAndPG2Index": "209da97de40fa637abf5d9a46e2b9d022fdc3641"
+  },
+  "retrievalBoundary": {
+    "exactOwnerTreeRequest": {
+      "tree": "6a06f3742fb0dfc35bed19780fe09da2747c1ddc",
+      "httpStatus": 422,
+      "message": "Invalid object requested. SHA must identify a commit or a tree.",
+      "meaning": "The announced local tree was not publicly resolvable through this repository API at the observation. It is not evidence that the owner's local merge failed."
+    },
+    "mergeBaseMetadata": "GET compare e78...521; status diverged, actual merge base76df. Its300-path compare payload was used only for merge-base metadata, never as a complete path inventory.",
+    "completeRecursiveTreesRead": {
+      "p0": {
+        "sha": "d82a34d59bf072348869ef086e24ae0ad5a852ec",
+        "entries": 7660,
+        "blobs": 6788,
+        "truncated": false
+      },
+      "base": {
+        "sha": "bd554b5317dbee81f543ae024db2b9510a28947e",
+        "entries": 7631,
+        "blobs": 6760,
+        "truncated": false
+      }
+    },
+    "reusedMainAndOwnTree": "Previously retained full e78 tree and independently reconstructed own102bc leaf inventory. Root had already verified remote f346 all6792 leaves against that inventory.",
+    "sourceBlobsNewlyRead": [
+      "3158b34c16d1734861e1f487f3142a98908e5d78"
+    ],
+    "jobLogsRead": 0,
+    "artifactZipsRead": 0,
+    "productionDataRead": 0
+  },
+  "reconstruction": {
+    "method": "Pure V8 exact three-way leaf resolution and raw Git tree SHA-1; no Git CLI or repository mutation.",
+    "expectedOwnerReportedTree": "6a06f3742fb0dfc35bed19780fe09da2747c1ddc",
+    "computedTree": "6a06f3742fb0dfc35bed19780fe09da2747c1ddc",
+    "matchesOwnerReported": true,
+    "blobs": 6790,
+    "gitlinks": 0,
+    "originalP0AndBaseAllSubtreesReconstructed": true,
+    "threeWayClassification": {
+      "unchanged": 6353,
+      "p0Only": 425,
+      "mainOnly": 9,
+      "sameBoth": 0,
+      "conflict": 3
+    },
+    "resolvedSharedFileProofs": [
+      {
+        "path": "messages/en.json",
+        "baseBlob": "b27501a8d69d766df76709418c8811e5aa94e815",
+        "p0Blob": "95dc94444fe0149348acfec5598fb8cab743ba32",
+        "mainBlob": "c1f88dac78f116cfa010ff9deb88c890c5b6d464",
+        "unionBlob": "7c56dc09490258db5f15a772b3ff176efaf3450c",
+        "bytes": 252821,
+        "sha256": "b3bda8ced94b1c0ba9cbbb39de18d06ce9e85dbc1b50ec3099837c6a9ab36efa",
+        "method": "Removing exactly three P0 Errors lines yields exact base/P0 and exact e78/union Git blobs; all other bytes unchanged.",
+        "retainedKeys": [
+          "Errors.taskWorkspaceUnresolved",
+          "Errors.taskWorkspaceMismatch",
+          "Errors.taskWorkspaceTransferDenied"
+        ]
+      },
+      {
+        "path": "messages/zh-CN.json",
+        "baseBlob": "32cb3ded65d4d6b572b8d647354164ab08f4ee96",
+        "p0Blob": "35ca6cb153df026c66881b0d4083c79ae9119df1",
+        "mainBlob": "c34c7f5639bba44642c91d2a107abb21f451740f",
+        "unionBlob": "e61e3a62e6879189fb4f469c870abbffbfe7bb73",
+        "bytes": 243494,
+        "sha256": "f81068a50e63fe02f08b46805f635818ca3a29e72a24b98c6d368ad9f3e152e9",
+        "method": "Removing exactly three P0 Errors lines yields exact base/P0 and exact e78/union Git blobs; all other bytes unchanged.",
+        "retainedKeys": [
+          "Errors.taskWorkspaceUnresolved",
+          "Errors.taskWorkspaceMismatch",
+          "Errors.taskWorkspaceTransferDenied"
+        ]
+      },
+      {
+        "path": "package.json",
+        "baseBlob": "ec9951453307dd586dfe058648d9fc762a6665ad",
+        "p0Blob": "3158b34c16d1734861e1f487f3142a98908e5d78",
+        "mainBlob": "2464da06d4a809c500aff11195f60a9c6b66c70b",
+        "unionBlob": "b4c7addbf7d0d147409d2f95fe41c14183edf2a0",
+        "bytes": 80792,
+        "sha256": "6fe98887dad71fe87de43540513c2ff519783a2a3db305d6d8bbf6012dacb288",
+        "method": "One exact full-line main test:groups replacement at a unique unchanged P0 preimage; all other P0 bytes retained.",
+        "changedKey": "scripts.test:groups",
+        "retainedMainAddition": "hooks/use-run-result.test.ts"
+      }
+    ],
+    "allOtherThreeWayLeaves": "Exact Git mode/type/blob selection from the unchanged/common, P0-only or main-only side. No other synthesized source.",
+    "algorithms": {
+      "treeSerialization": "Raw Git tree mode/name/NUL/20-byte object ID encoding with Git byte ordering; SHA-1 reconstructed original P0/base roots and all subtrees before computing the union.",
+      "treeCodeSha256": "e77a19fb29653d6275beaadb899fcd9b90dce1f86204b551912e643afc731cc8",
+      "hashUtilitySha256": "ea4485ff0117484dbee5f85504bad6bc645f085cf0fbfdce068513f4eb5c74bc"
+    },
+    "futureTreeLeafManifestSha256": "abb2a989d1857d83abfcbe7a1a34a026169dec3af4c8b7cc6cc63003a83cde98",
+    "testedTreeLeafManifestSha256": "d32cd7b01aae56f30b595a30055c11d044e3e163863e35ff5a5e4eeb6edf13d1"
+  },
+  "comparison": {
+    "baselineTree": "6a06f3742fb0dfc35bed19780fe09da2747c1ddc",
+    "baselineBlobs": 6790,
+    "testedTree": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+    "testedBlobs": 6792,
+    "differentPaths": 57,
+    "unchangedPaths": 6735,
+    "statusCounts": {
+      "modified": 55,
+      "added": 2,
+      "deleted": 0,
+      "modeOnly": 0
+    },
+    "categories": {
+      "ci-and-release-workflows": 10,
+      "dependency-and-installation": 5,
+      "runtime-source": 19,
+      "generated-route-contracts": 2,
+      "documentation": 2,
+      "regression-tests": 15,
+      "acceptance-and-operations-drivers": 4
+    },
+    "priorF095BlobsUnchanged": 51,
+    "previouslyReviewedJointBlobs": 6,
+    "undeclaredPaths": [],
+    "noLongerDifferentFrom59": [
+      "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "packages/daemon/test/fakes/fake-codex-generation-completion.mjs"
+    ],
+    "identicalExecutableFixtures": [
+      {
+        "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+        "p0": {
+          "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+          "mode": "100755",
+          "type": "blob",
+          "sha": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116"
+        },
+        "ours": {
+          "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+          "mode": "100755",
+          "type": "blob",
+          "sha": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116"
+        }
+      },
+      {
+        "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+        "p0": {
+          "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+          "mode": "100755",
+          "type": "blob",
+          "sha": "2b4fd7946c39a83eac97def4bab1cf0839802a3b"
+        },
+        "ours": {
+          "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+          "mode": "100755",
+          "type": "blob",
+          "sha": "2b4fd7946c39a83eac97def4bab1cf0839802a3b"
+        }
+      }
+    ],
+    "overlayReconstructsTestedTree": {
+      "computed": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+      "expected": "102bc671b4c5e3cf49fcce54025c71b26f817cf2",
+      "allOtherLeavesPreserved": 6735
+    },
+    "overlay": [
+      {
+        "path": ".github/actions/pnpm-install/action.yml",
+        "status": "modified",
+        "category": "ci-and-release-workflows",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "6563e46bec7c1a02cdbdcd90be0742fb9ecb47d9"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "553d718ad413f0db4b12833e06ffb8f29d98e555"
+        }
+      },
+      {
+        "path": ".github/workflows/issue1415-deployed-production.yml",
+        "status": "modified",
+        "category": "ci-and-release-workflows",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "8ef902848aba3a2e59ce01608782697ec7f4d14c"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "6d0b50becc99ce6d5f6cfb69cceea1037f2ee1be"
+        }
+      },
+      {
+        "path": ".github/workflows/issue1415-managed-inspection.yml",
+        "status": "modified",
+        "category": "ci-and-release-workflows",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "0d8cc322ddddb2bada48abff741cf7887b6631b0"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "9ece51fc2a39c2d362446e68df1f9bbf2076f641"
+        }
+      },
+      {
+        "path": ".github/workflows/issues-1516-welcome-acceptance.yml",
+        "status": "modified",
+        "category": "ci-and-release-workflows",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "74c7dd24872ef8e02ef27d559822fb6440d01c0a"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "4757d62065017957f6e1e4300ab4695507ce40d8"
+        }
+      },
+      {
+        "path": ".github/workflows/read-cache-production.yml",
+        "status": "modified",
+        "category": "ci-and-release-workflows",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "82b0a711738730df3dcdc5f6e2f07beda4b7c8c1"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "7ffa772dc65e85ae6665d7fb70f5d5a3b604da22"
+        }
+      },
+      {
+        "path": ".github/workflows/read-cache.yml",
+        "status": "modified",
+        "category": "ci-and-release-workflows",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "54464667276af18611ba083e968ce9f1672fb301"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "86ee0112413eae241189bb2d748a6d6901201c4f"
+        }
+      },
+      {
+        "path": ".github/workflows/self-hosted-production.yml",
+        "status": "modified",
+        "category": "ci-and-release-workflows",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "77788506cdb928f64b6975483c73c6523c76d483"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "862a9f7cdea8df0373207e389f3cbf3afaca46df"
+        }
+      },
+      {
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "status": "modified",
+        "category": "ci-and-release-workflows",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "e90d6530e978d638d3040c0daa4ac6dc84b39767"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "42ae23945f798020ec068635e7621869fb427af2"
+        }
+      },
+      {
+        "path": ".github/workflows/ui-policy.yml",
+        "status": "modified",
+        "category": "ci-and-release-workflows",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "18e7c54ec507d02b12fd1131b5a8b6112ece2212"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "e3938ad5c343fb14d60709e014cb3d9a3189b104"
+        }
+      },
+      {
+        "path": ".github/workflows/web-deploy.yml",
+        "status": "modified",
+        "category": "ci-and-release-workflows",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "e15741a3ae51a294593eeb2151311378babd8ce4"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "bab7ed46eefd7bd4b6db712e8e141484be9f73ba"
+        }
+      },
+      {
+        "path": "Dockerfile",
+        "status": "modified",
+        "category": "dependency-and-installation",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "0de463a5b008837322a28a0edf665fa3c0ba6d53"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "19054afe4768b3391515c7a3e0f97a0021f123ee"
+        }
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/repos/route.ts",
+        "status": "modified",
+        "category": "runtime-source",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "9fe33b05a9570ab59e4bb041f9a1344c44ab31ad"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b"
+        }
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/runs/route.ts",
+        "status": "modified",
+        "category": "runtime-source",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "3bbb71a8a7d249eb517d75a95986cf75d1994168"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "5a4c4f8486239161b325b9774b3086afe666dfa9"
+        }
+      },
+      {
+        "path": "apps/api/generated/routes.json",
+        "status": "modified",
+        "category": "generated-route-contracts",
+        "preservation": "previously-reviewed-joint-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "016af99a766db7d863704225d451d9eb3a950bbb"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "6fbced33e672f3fa0d5e35bed40b63fa103809d5"
+        }
+      },
+      {
+        "path": "apps/api/generated/routes.ts",
+        "status": "modified",
+        "category": "generated-route-contracts",
+        "preservation": "previously-reviewed-joint-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "f218fd0698bfae6296be7a06c732c26cac412eb7"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "a0cc13783eb567c256c34e08eaf3f6e9aca157e2"
+        }
+      },
+      {
+        "path": "apps/desktop/src/renderer/read-batch.ts",
+        "status": "modified",
+        "category": "runtime-source",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "b72659facb8a5a710fb0c0121e2543add0ad8f33"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "67503a9abe7131de3e9bf86629532e015085d4ee"
+        }
+      },
+      {
+        "path": "apps/desktop/src/renderer/rpc.ts",
+        "status": "modified",
+        "category": "runtime-source",
+        "preservation": "previously-reviewed-joint-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "c69dcfe5f459de0e603651fd510f06cf8d32e75b"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "dae8798653457afad334c2d909b10b63e9b3956f"
+        }
+      },
+      {
+        "path": "components/swr-defaults.tsx",
+        "status": "modified",
+        "category": "runtime-source",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "f6be8710182ad68ce0a87f6cac910184bf1d52f3"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "9b7a4385896b9aacc69ea898be23636b5a8c62fb"
+        }
+      },
+      {
+        "path": "docs/operations/tracing.md",
+        "status": "modified",
+        "category": "documentation",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "e75e8377fbcb6f92d3446f5325d6d55cc4b294af"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "a02e4a5100c066d8564902ec287c9c92fee0d20e"
+        }
+      },
+      {
+        "path": "hooks/use-live-lists.ts",
+        "status": "modified",
+        "category": "runtime-source",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "ac60a59be511ec45cc372b8c91c0535861a30931"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "afd0cae59d1b871cbc5175a6de8f2b44f2d036ca"
+        }
+      },
+      {
+        "path": "instrumentation-client.ts",
+        "status": "modified",
+        "category": "runtime-source",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "649ac94ae8f45203782a2a99aad0cc3e4c42f27a"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "9109982d1c3245179b85a42d6969003aec2f5047"
+        }
+      },
+      {
+        "path": "lib/analytics-policy.ts",
+        "status": "modified",
+        "category": "runtime-source",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "9529e8f563ef43d3e7c1eedd992165626eb86085"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "152b941ff7b05004a7c57a909f776c6268ede106"
+        }
+      },
+      {
+        "path": "lib/coordinator/repository-resolution.test.ts",
+        "status": "modified",
+        "category": "regression-tests",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "1d76b2da5d6b70fce05221cb10f8a7a35a72ae1c"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "a5157f09e8022bf9077053686d36aa02760a4e94"
+        }
+      },
+      {
+        "path": "lib/coordinator/repository-resolution.ts",
+        "status": "modified",
+        "category": "runtime-source",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "faa8276d73120a257034b2a31d4c89d24856b46c"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "6826efdd6895fa3f584e35ff2f1edb527cd080fa"
+        }
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-context.ts",
+        "status": "modified",
+        "category": "runtime-source",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "9ddddf4230c9f63ca9fb5f966de87116449844fe"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "e32da5e4d7294af3363eb2de4623a52aeb7e4f47"
+        }
+      },
+      {
+        "path": "lib/device-enrollment.db.test.ts",
+        "status": "modified",
+        "category": "regression-tests",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "431897540dc97e29fbc514ecb1ccd1dbf5d0c9ed"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "071b2243d35cd6fdd97b7be0f17f21728578c537"
+        }
+      },
+      {
+        "path": "lib/device-enrollment.ts",
+        "status": "modified",
+        "category": "runtime-source",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "f9490f18359d2d3a9b61b068bfb14ef4b965144d"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "8fe53cb39985150e5fc05daa6370121cb5426d53"
+        }
+      },
+      {
+        "path": "lib/device-heartbeat.db.test.ts",
+        "status": "modified",
+        "category": "regression-tests",
+        "preservation": "previously-reviewed-joint-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "46c43f5c8bd9d33818f67d1e899f924ac9d267ae"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "e8f4f35748707364e77c53fa594c166bafc3dae8"
+        }
+      },
+      {
+        "path": "lib/device-management.ts",
+        "status": "modified",
+        "category": "runtime-source",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "c2e44913f843391095232bdda81d774a58ff9d24"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "c2243c5732d67b3ff5444196ce3b45e9aca67805"
+        }
+      },
+      {
+        "path": "lib/device-unit-fence.db.test.ts",
+        "status": "modified",
+        "category": "regression-tests",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "a5237da052e304897cd48afdebc42ee6f7571d96"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "bc65b3faf494d2fd7c797b68f34d04227df38b7a"
+        }
+      },
+      {
+        "path": "lib/dispatch-timing.ts",
+        "status": "modified",
+        "category": "runtime-source",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "7f5ca1b72b28823f00936a820edac001766f5e71"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "f82563e766f5c0477479b2d487e0f92e60a08b75"
+        }
+      },
+      {
+        "path": "lib/personal-policy.test.ts",
+        "status": "modified",
+        "category": "regression-tests",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "bb2de016988758cbf34c00a8284a084c19b9e809"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "fef80337b9b5244d2e8565236c6dd96f7d329acd"
+        }
+      },
+      {
+        "path": "lib/personal-policy.ts",
+        "status": "modified",
+        "category": "runtime-source",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "bbb9684619cbfa8faca236a78e6f8f61148d9a94"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "dc710f0a16a5e28e5a34d5112a86fab349a2639a"
+        }
+      },
+      {
+        "path": "lib/replay-readiness.ts",
+        "status": "modified",
+        "category": "runtime-source",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "899a9dcf33af282913c3e25c99b0826566b2c56b"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "d60598b09201228e23c5ac7a9df00938192f0e67"
+        }
+      },
+      {
+        "path": "lib/swr/read-observer.ts",
+        "status": "modified",
+        "category": "runtime-source",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "2dc3ab5a9934fed5146189fd236b450f0d223920"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "69a827369bd71838ba8ac9ffbee928ca70219e76"
+        }
+      },
+      {
+        "path": "lib/tracing/logs.test.ts",
+        "status": "modified",
+        "category": "regression-tests",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "8e6dc9b951d1126376ab29d4d0a80f276391a58a"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "737fa373e4a8333a4a703bf6133f9a533d585460"
+        }
+      },
+      {
+        "path": "lib/tracing/node.ts",
+        "status": "modified",
+        "category": "runtime-source",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "3037a3b0cc2538451917cdd8e454a376553fc47c"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "00775a5928228262a66b12b845ee0dc18f6c6047"
+        }
+      },
+      {
+        "path": "package.json",
+        "status": "modified",
+        "category": "dependency-and-installation",
+        "preservation": "previously-reviewed-joint-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "b4c7addbf7d0d147409d2f95fe41c14183edf2a0"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "568cfeee161309202699acefd0a57a8edc52bf6e"
+        }
+      },
+      {
+        "path": "patches/ffmpeg-static@5.3.0.patch",
+        "status": "added",
+        "category": "dependency-and-installation",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": null,
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "5e27d8d12fbed2d0c2e62083976de11c86d9e1fa"
+        }
+      },
+      {
+        "path": "pnpm-lock.yaml",
+        "status": "modified",
+        "category": "dependency-and-installation",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "a7a956ac98dfcf7de9ebfe508853b8475fd10106"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "4b67909739360248e279efa0c3bb7344379e04fe"
+        }
+      },
+      {
+        "path": "pnpm-workspace.yaml",
+        "status": "modified",
+        "category": "dependency-and-installation",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "cc47ee1a48b9585e06c87e0f5ed6f14211601c0c"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d"
+        }
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.mjs",
+        "status": "modified",
+        "category": "acceptance-and-operations-drivers",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "0ed07cf1751a0fc2885109201caf89cda71f704b"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "2f6cb3ab32695c64fa67191653c0add6e8720b39"
+        }
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.test.mjs",
+        "status": "modified",
+        "category": "regression-tests",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "58170f27b9586752ca966e377c9255ac6e6174a9"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "56412efdfe5bc638496b89de56281360b4cbe9b5"
+        }
+      },
+      {
+        "path": "scripts/acceptance/run-observability.md",
+        "status": "modified",
+        "category": "documentation",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "176e3aead0068d801f829dcadaafcd02a61e67a3"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "4ca2cf35c1f499b338469556836ae0505649e82a"
+        }
+      },
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "status": "modified",
+        "category": "acceptance-and-operations-drivers",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "002b8501cd4f4df023148515add7c55e2863dbd3"
+        }
+      },
+      {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "status": "modified",
+        "category": "regression-tests",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "e73f32f4b93a1bffc70d9d9ba96f581e47746a9d"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "aab0a21c4c8fadb9df81ff87ada4fa23198fa575"
+        }
+      },
+      {
+        "path": "scripts/check-analytics-ssr.mjs",
+        "status": "modified",
+        "category": "acceptance-and-operations-drivers",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "78a3df1f4c6117087289996f72ddbd398780f526"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "0fad928edefbb3b2677450f9f04778ec088a6195"
+        }
+      },
+      {
+        "path": "scripts/e2b/validate-template-subscriptions.mjs",
+        "status": "modified",
+        "category": "acceptance-and-operations-drivers",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "7ee7564fe213ce3fba762fee8685eb9a4bb31329"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "f36ecf2d08f1bc2754b21be0d47d149871bb67c5"
+        }
+      },
+      {
+        "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+        "status": "modified",
+        "category": "regression-tests",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "a70f45e7395309a1cf93ae295e880e06ad521ef2"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "628395f91d97a64655afb80117788d70207200c0"
+        }
+      },
+      {
+        "path": "scripts/ffmpeg-install.test.mjs",
+        "status": "added",
+        "category": "regression-tests",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": null,
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "9ce1e3333fd3ddb10ea206f5144cc466611842a1"
+        }
+      },
+      {
+        "path": "scripts/use-live-lists.live.test.tsx",
+        "status": "modified",
+        "category": "regression-tests",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "f981a61d72fb9c0e153e490f89d7328fb014558e"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "a4aec5fe968100f283a8d93b963934430a97fcda"
+        }
+      },
+      {
+        "path": "tests/analytics-policy.test.mjs",
+        "status": "modified",
+        "category": "regression-tests",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "74c4933788dda4e33caca2675738bc223442adda"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "f162a894cbada7fada30c63a3a49f4b665574f0f"
+        }
+      },
+      {
+        "path": "tests/cloud-dispatch-startup.test.ts",
+        "status": "modified",
+        "category": "regression-tests",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "c006685c7862c1fd41197f3a786ecb399076aa8b"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "609029dde521868c00ab7eb687394ad5cacd6183"
+        }
+      },
+      {
+        "path": "tests/mvp/pinned-pnpm.test.mjs",
+        "status": "modified",
+        "category": "regression-tests",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "b22b319424ada32e3592f7a6ea464aa49121aad0"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "0306d340b38cf455facba376c2eb6dda58362c96"
+        }
+      },
+      {
+        "path": "tests/replay-readiness.test.mjs",
+        "status": "modified",
+        "category": "regression-tests",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "2c67bead9d3d211e58dd6a7a684d60139d7df16c"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "58e4706039dafe6901082676f37a3c92da613d43"
+        }
+      },
+      {
+        "path": "workflows/coordinator/factory-steps.ts",
+        "status": "modified",
+        "category": "runtime-source",
+        "preservation": "unchanged-prior-f095-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "665573940610341eea039de5fb2c02406c6ef3b7"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "0e2ecce921c4b56795ad1096f2b1eae987299e95"
+        }
+      },
+      {
+        "path": "workflows/coordinator/steps.ts",
+        "status": "modified",
+        "category": "runtime-source",
+        "preservation": "previously-reviewed-joint-blob",
+        "before": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "5002aebd9ed3df6047ccb3f7a083401c3cad34c3"
+        },
+        "after": {
+          "mode": "100644",
+          "type": "blob",
+          "gitBlob": "d500795e9a62631b6c7619c4ffd1df67f137ee54"
+        }
+      }
+    ]
+  },
+  "preservation": {
+    "locales": "Both future P0+e78 locale blobs are already identical to tested102bc: en7c56dc09490258db5f15a772b3ff176efaf3450c and zh-CNe61e3a62e6879189fb4f469c870abbffbfe7bb73. All three P0 Errors.taskWorkspace* values and e78's original Shell removals remain.",
+    "package": "Future P0+e78 package is b4c7addbf7d0d147409d2f95fe41c14183edf2a0; tested own package568cfeee161309202699acefd0a57a8edc52bf6e retains that normal main/P0 contract plus the previously reviewed own installer/test changes.",
+    "sixJointFiles": [
+      "apps/api/generated/routes.json",
+      "apps/api/generated/routes.ts",
+      "apps/desktop/src/renderer/rpc.ts",
+      "lib/device-heartbeat.db.test.ts",
+      "package.json",
+      "workflows/coordinator/steps.ts"
+    ],
+    "noTeamOrEnterpriseCompositionPerformed": true,
+    "noUndeclaredUpstreamPathAdded": true
+  },
+  "limits": [
+    "Do not treat the announced6a06 tree or this reconstruction as an actual main merge or deployed version.",
+    "At handoff, verify the actual main commit's full tree is6a06. Any different tree requires analysis of its real delta rather than application of this condition.",
+    "The57-path overlay yields exactly the already-tested102bc source tree; commit ancestry, HEAD-derived identifiers, CI event metadata and production served versions can still differ.",
+    "Existing mandatory branch/release gates remain applicable. This review neither triggers nor waives them.",
+    "No new CI, database, Native, production model or account verification is claimed. Existing evidence keeps its exact original source and environment boundaries."
+  ],
+  "actions": {
+    "sourceBlobCreates": 0,
+    "treeCreates": 0,
+    "commitCreates": 0,
+    "refWrites": 0,
+    "tests": 0,
+    "workflows": 0,
+    "computeResources": 0,
+    "safeReceiptBlobCreates": 1
+  }
+}

@@ -1,0 +1,27 @@
+# #1512 CP32 — 发布交接与真实证据执行合同
+
+本检查点记录准备工作，不增加生产验收计数。已测候选仍f3466ba479ef51918790f521a288feaef5160e44/tree102bc671b4c5e3cf49fcce54025c71b26f817cf2，完整CI与原Native见CP31。ACME accepted cases=0。
+
+## P0合流条件
+
+原owner公布的P0+e78预期tree6a06f3742fb0dfc35bed19780fe09da2747c1ddc尚未作为GitHub可取对象公开；初次Git tree API422不等于合流失败。独立review按真实共同祖先76df与固定521/e78重建恰6a06，Root再从远端已核的6792个当前叶及57条反向overlay独立计算Git二进制tree SHA，得到当前102bc与预期6a06，零差异。
+
+若实际main的tree恰6a06，则6735共同叶逐mode/blob不变；本方仅55修改+2新增，57个路径全部已声明、没有Team/Enterprise或未声明增量。51份精确旧f095字节与6份既有联合版本保留。两个fake在P0里已同blob及100755，不再构成本方差异。只有实际fresh main满足该条件后才能引用为实际合流依据，不能用本证明代替P0真实合并、部署或当前owner的有限窗口交接。
+
+## PostHog 原生PNG与Replay
+
+现有Notebook C9vQAc1L的timeline UUID是SQL cell，不是numeric saved-insight ID。真实IDs、稳定14查询结果到手后，创建DataVisualizationNode/ActionsTable/HogQLQuery保存视图，读回定义并实际query，再将返回numeric id交现有GHA export。保留真实APM表、trace、UTC、父子关联和排序；展示页与完整timeline逐行对应。Root必须看官方PNG原字节的实际像素，检查阶段/耗时与截断；不能把PNG receipt、尺寸或hash当可见性验收。
+
+Replay现有GHA helper只读一个blob_v2 segment，明确playback_verified=false。实际渲染使用已冻结172ad5的官方vision inline流程，两真实session、一次原classifier/prompt/config/model，读取匹配的最终observation及完整scanner_result。必须有真实画面变化和可用时间位置，才能声明有限区间播放；mask/navigation分别需要相应证据。started/HTTP200/泛化摘要不够。该接口不保证返回可独立查看的媒体文件，不把它说成人工浏览器播放器。本阶段没有创建insight、scan、模型、查询、录屏读取或恢复VM。
+
+## Claude逐次生成的准确口径
+
+固定正常coding adapter在业务分支前观察SDK消息，按活动stream和message ID去重；message_start/delta/stop及终态assistant fallback都进入同一APM/AI关联。当前WebCoordinator走observedModel包装；deprecated nativeCoordinator恒false，不能据其未接collector报正常路径缺陷。现有model_call_timing与成功turn的modelCalls提供有边界的交叉核对材料。
+
+未证实新的正常路径material漏记。Claude没有独立官方CLI内部调用总数，内部去重ID未导出为上游消息账本，终态聚合usage与逐次cache语义不同，不能用chunk/tool-call数、朴素token求和或AI/APM相等宣称隐藏上游调用绝对完整。native flush仍未确认。若真实case出现具体缺失再定位产品原因；不会凭未观察到的正常EOF条件另加阻断或投机补丁。
+
+## 实际推进边界
+
+Factory前段已于12:26:12明确提前释放；其completed_with_retained_credentials包含保留另一台非本轮sandbox及对应key，不能改写全账号资源为0。P0原owner当前实际窗口12:29–13:59，不自动延长；本方尚未进入生产窗口。P0 normal API已读到GitHub configured但connected=false，原owner接续正常受信只读连接准备；这些前置不是#1512案例。未来各PR就绪计划不作为已激活的新锁。
+
+后续仍是实际main/source/version/seal绑定，两条官方订阅真实案例，14查询全页与两个稳定快照、所有观测generation集合/parent/usage核对，原生PNG像素、Replay、Notebook三ID入口，最终源受控失败/开销和全部本方资源收尾。所有原件/费用unknown/能力限制保持，生产通过后才关闭issue。
