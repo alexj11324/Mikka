@@ -6,6 +6,7 @@ import { runInNewContext } from 'node:vm'
 import { runObservabilityWorkflow } from './run-observability-workflow.mjs'
 import { startObservabilityBrowser, ObservabilityBrowserError } from './run-observability-browser.mjs'
 import { CASES, fixtureTask, ORIGIN } from './run-observability.mjs'
+import { ACCEPTANCE_REPLAY_MARKER, acceptanceReplayOptIn } from '../../lib/replay-readiness.ts'
 
 const revision = 'a'.repeat(40), owner = 'synthetic-browser-owner'
 const workspaceId = '77777777-7777-4777-8777-777777777777'
@@ -182,6 +183,10 @@ function browserFixture(input, options = {}) {
   }
   const context = {
     request: api,
+    async addInitScript(script, arg) {
+      calls.push({ type: 'addInitScript', script, arg })
+      if (options.initScriptFails) throw new Error(CANARY)
+    },
     async newPage() { calls.push({ type: 'newPage' }); return page },
     async close() { calls.push({ type: 'close', resource: 'context' }); state.contextClosed = true },
   }
@@ -471,3 +476,52 @@ for (const kind of ['abort', 'timeout']) {
     assert.equal(f.calls.find(call => call.type === 'api' && call.path.endsWith('/sign-out')).pageClosed, true)
   })
 }
+
+test('acceptance marker is installed before the first document and stays on the official top-level app', async () => {
+  const input = inputs(), f = browserFixture(input)
+  const session = await startObservabilityBrowser(f.args)
+  const entry = f.calls.find(call => call.type === 'addInitScript')
+  assert.ok(entry)
+  assert.equal(f.calls.filter(call => call.type === 'addInitScript').length, 1)
+  assert.equal(f.calls.indexOf(entry) < f.calls.findIndex(call => call.type === 'newPage'), true)
+  assert.deepEqual(entry.arg, { marker: ACCEPTANCE_REPLAY_MARKER, origin: ORIGIN, deadline: Date.parse(input.ready.expiresAt) })
+  const execute = ({ url = HOME, child = false, now = input.now() } = {}) => {
+    const location = new URL(url), navigator = { webdriver: true, userAgent: 'HeadlessChrome', userAgentData: { brands: [{ brand: 'HeadlessChrome' }] } }
+    const window = { location, navigator }
+    window.top = child ? {} : window
+    Object.defineProperty(window, 'localStorage', { get() { throw new Error(CANARY) } })
+    Object.defineProperty(window, 'sessionStorage', { get() { throw new Error(CANARY) } })
+    runInNewContext('(' + entry.script.toString() + ')(arg)', { window, arg: entry.arg, Date: { now: () => now } })
+    assert.equal(navigator.webdriver, true)
+    assert.equal(navigator.userAgent, 'HeadlessChrome')
+    assert.equal(navigator.userAgentData.brands[0].brand, 'HeadlessChrome')
+    assert.equal(Object.hasOwn(window, '__mikkaReplayReadiness'), false)
+    assert.equal(Object.hasOwn(window, 'posthog'), false)
+    return window
+  }
+  for (const url of [ORIGIN + '/mikka', HOME + '/sign-in', HOME]) {
+    const target = execute({ url })
+    assert.equal(acceptanceReplayOptIn(target, input.now()), true)
+    const descriptor = Object.getOwnPropertyDescriptor(target, ACCEPTANCE_REPLAY_MARKER)
+    assert.equal(descriptor.enumerable, false)
+    assert.equal(descriptor.writable, false)
+    assert.equal(descriptor.configurable, false)
+  }
+  for (const options of [{ url: 'https://unrelated.example/mikka/en' }, { url: ORIGIN + '/' },
+    { url: ORIGIN + '/mikka-other' }, { child: true }, { now: entry.arg.deadline }, { now: entry.arg.deadline + 1 }]) {
+    const target = execute(options)
+    assert.equal(Object.hasOwn(target, ACCEPTANCE_REPLAY_MARKER), false)
+    assert.equal(acceptanceReplayOptIn(target, options.now ?? input.now()), false)
+  }
+  assert.equal(f.state.submitAttempts, 1)
+  await session.close()
+})
+
+test('an acceptance marker installation failure submits nothing and closes the allocated context', async () => {
+  const f = browserFixture(inputs(), { initScriptFails: true })
+  await assert.rejects(startObservabilityBrowser(f.args), error => { safeFailure(error, f.reports); return true })
+  assert.equal(f.calls.some(call => call.type === 'newPage' || call.type === 'goto'), false)
+  assert.equal(f.state.submitAttempts, 0)
+  assert.equal(f.state.contextClosed, true)
+  assert.equal(f.state.browserClosed, true)
+})

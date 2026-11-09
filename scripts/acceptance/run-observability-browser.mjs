@@ -5,6 +5,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { isDeepStrictEqual } from 'node:util'
 import { CASES, fixtureTask, ORIGIN } from './run-observability.mjs'
+import { ACCEPTANCE_REPLAY_MARKER } from '../../lib/replay-readiness.ts'
 
 const REPORT = 'production-run-observability-report/browser-actor.receipt.json'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -243,6 +244,12 @@ export async function startObservabilityBrowser({ ready, env = process.env, sign
     await allocate('browser', () => chromium.launch({ headless: true, timeout: Math.min(30_000, config.deadline - now()), env: launchEnv }))
     await allocate('context', () => owned.browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 900 } }))
     report.freshContext = true
+    // Only this owned context opts real automation into the official SDK filter.
+    await run(() => owned.context.addInitScript(({ marker, origin, deadline }) => {
+      if (window.top !== window || window.location.origin !== origin
+        || !/^\/mikka(?:\/|$)/.test(window.location.pathname) || Date.now() >= deadline) return
+      Object.defineProperty(window, marker, { value: deadline })
+    }, { marker: ACCEPTANCE_REPLAY_MARKER, origin: ORIGIN, deadline: config.deadline }))
     await allocate('page', () => owned.context.newPage())
     owned.page.on('pageerror', () => { report.pageErrorCount = Math.min(1_000_000, report.pageErrorCount + 1) })
     owned.page.on('request', request => {

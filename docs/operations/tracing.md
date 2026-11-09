@@ -726,6 +726,23 @@ fragments and identifier segments. Live-channel `status` / `message` handling
 records only event kind, allowed key names and receive/skip state, never payload
 content. See [Replay privacy](https://posthog.com/docs/session-replay/privacy).
 
+Ordinary browser sessions keep the SDK's bot filter. The production acceptance
+runner explicitly opts in only its fresh automated browser context: before page
+scripts run, it installs a non-enumerable, in-memory deadline marker in the
+official Mikka main document. A valid marker enables the SDK's public
+`opt_out_useragent_filter` option for that instance. It does not alter the user
+agent, WebDriver signals, consent, project settings or recording privacy. The
+official `$browser_type` value survives the privacy filter only when it is exactly
+`bot` or `browser`, for both ordinary events and snapshots. The marker deadline
+limits eligibility at initialization; it is not an automatic timer that resets
+an already initialized SDK. The runner closes its owned context during cleanup.
+
+This opt-in never fabricates a snapshot or bypasses readiness: the same session
+must still produce a natural `$snapshot` before the single UI submission. Browser
+readiness alone does not prove ingestion or playback. See the
+[SDK configuration contract](https://posthog.com/docs/references/posthog-js/types/PostHogConfig)
+and the [acceptance driver contract](../../scripts/acceptance/run-observability.md).
+
 On 2026-11-06 the project received only these explicit settings changes:
 `session_recording_opt_in=true`, `capture_console_log_opt_in=false`,
 `capture_performance_opt_in=false`. The existing masking/network configuration

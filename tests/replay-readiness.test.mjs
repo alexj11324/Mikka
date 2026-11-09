@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
-import { installReplayReadiness } from '../lib/replay-readiness.ts'
+import { ACCEPTANCE_REPLAY_MARKER, acceptanceReplayOptIn, installReplayReadiness } from '../lib/replay-readiness.ts'
 import { sanitizeAnalyticsEvent, redactReplayRequest } from '../lib/analytics-policy.ts'
 
 const A = '77777777-7777-4777-8777-777777777777'
@@ -93,17 +93,19 @@ test('duplicate entry replaces subscriptions; unavailable or failing SDK remains
   assert.doesNotThrow(() => installReplayReadiness(Object.freeze({})))
 })
 
-test('real bootstrap preserves sanitizer return/drop behavior and masking while publishing only a reader', () => {
+for (const optedIn of [false, true]) test(`real bootstrap keeps masking and natural readiness with acceptance opt-in ${optedIn}`, () => {
   const source = readFileSync(new URL('../instrumentation-client.ts', import.meta.url), 'utf8')
     .replace(/^import .*\n/gm, '')
   const f = fixture()
   let config
   const client = { ...f.client, register() {}, capture() {} }
   const target = { location: { hostname: 'example.invalid' } }
+  if (optedIn) Object.defineProperty(target, ACCEPTANCE_REPLAY_MARKER, { value: Date.now() + 60_000 })
   runInNewContext(source, { window: target, process: { env: { NODE_ENV: 'test' } },
     posthogConfig: { token: 'SYNTHETIC_PUBLIC_PROJECT_TOKEN', apiHost: 'https://example.invalid', uiHost: 'https://example.invalid' },
     posthog: { init(_token, value) { config = value } }, watchRemovedActions() {},
-    setLiveTelemetrySink() {}, installReplayReadiness, sanitizeAnalyticsEvent, redactReplayRequest })
+    setLiveTelemetrySink() {}, acceptanceReplayOptIn, installReplayReadiness, sanitizeAnalyticsEvent, redactReplayRequest })
+  assert.equal(config.opt_out_useragent_filter, optedIn)
   assert.equal(typeof target.__mikkaReplayReadiness, 'function')
   assert.equal(config.before_send({ event: 'unknown', properties: { message: CANARY } }), null)
   const input = { event: '$snapshot', properties: { $session_id: A, $snapshot_data: [{ type: 2 }], prompt: CANARY } }
@@ -117,4 +119,20 @@ test('real bootstrap preserves sanitizer return/drop behavior and masking while 
   assert.equal(config.session_recording.maskTextSelector, '*')
   assert.equal(config.session_recording.recordBody, false)
   assert.equal(config.session_recording.recordHeaders, false)
+})
+
+test('acceptance opt-in requires an unexpired bounded own data marker without reading accessors', () => {
+  const now = 1_800_000_000_000
+  const marked = value => Object.defineProperty({}, ACCEPTANCE_REPLAY_MARKER, { value })
+  assert.equal(acceptanceReplayOptIn({}, now), false)
+  for (const value of [now + 1, now + 600_000]) assert.equal(acceptanceReplayOptIn(marked(value), now), true)
+  for (const value of [undefined, null, true, 'true', String(now + 1), CANARY, NaN, Infinity, now - 1, now, now + 0.5, now + 600_001])
+    assert.equal(acceptanceReplayOptIn(marked(value), now), false)
+  let reads = 0
+  const accessor = Object.defineProperty({}, ACCEPTANCE_REPLAY_MARKER, { get() { reads++; throw new Error(CANARY) } })
+  assert.equal(acceptanceReplayOptIn(accessor, now), false)
+  assert.equal(reads, 0)
+  assert.equal(acceptanceReplayOptIn(Object.create(marked(now + 1)), now), false)
+  assert.equal(acceptanceReplayOptIn(marked(now + 1), now + 1), false)
+  assert.equal(acceptanceReplayOptIn(new Proxy({}, { getOwnPropertyDescriptor() { throw new Error(CANARY) } }), now), false)
 })
