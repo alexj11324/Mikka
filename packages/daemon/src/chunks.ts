@@ -56,7 +56,10 @@ export type MikkaDataTypes = {
   }
 }
 
-export type RunChunk = UIMessageChunk<unknown, MikkaDataTypes>
+export type RunChunk = UIMessageChunk<unknown, MikkaDataTypes> & {
+  /** Tool input-available to result, measured by the daemon's monotonic clock before batching. */
+  toolDurationMs?: number
+}
 
 /** A start-up stage's outcome (stored, unlike `run-state`). */
 export function runStageChunk(stage: RunStage, ms: number, ok: boolean, startupTiming?: DaemonStartupTiming,

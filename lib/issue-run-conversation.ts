@@ -1,3 +1,5 @@
+import { credentialMasker, maskDeep } from './secrets/mask'
+
 /** View helpers for the existing durable run chunk stream; no new session model. */
 export function runIsActive(status: string) {
   return ['queued', 'preparing', 'running', 'waiting_input', 'finishing'].includes(status)
@@ -59,10 +61,32 @@ export type ThreadStage = { stage: 'repository' | 'worktree' | 'agent_start'; ms
 const THREAD_STAGES = new Set<ThreadStage['stage']>(['repository', 'worktree', 'agent_start'])
 
 /** One tool call in a folded "N steps" line: its name, the one input that says what it did, and whether it failed. */
-export type ThreadStep = { id: string; name: string; detail: string | null; failed: boolean }
+export type ThreadStep = { id: string; name: string; detail: string | null; failed: boolean; output?: string; ms?: number }
+
+/** Claude Code's `Bash`, Codex's `bash`/`shell` and Cursor's `execute` run a command; every other step is a tool (as iOS
+ * apps/mobile/features/tasks/model/thread-steps.ts counts them, #1770). */
+const COMMAND_STEPS = new Set(['bash', 'shell', 'execute'])
+export const isCommandStep = (step: Pick<ThreadStep, 'name'>) => COMMAND_STEPS.has(step.name.toLowerCase())
+
+/** A folded steps row's counts: 「已运行 2 条命令 · 调用了 1 个工具」. */
+export function threadStepCounts(steps: readonly Pick<ThreadStep, 'name'>[]) {
+  const commands = steps.filter(isCommandStep).length
+  return { commands, tools: steps.length - commands }
+}
 
 const STEP_DETAIL_KEYS = ['command', 'file_path', 'path', 'pattern', 'url', 'query', 'title', 'description'] as const
 const STEP_DETAIL_MAX = 200
+const STEP_OUTPUT_END_CHARS = 4096
+
+/** Stored chunks already mask workspace/owner secrets; reapply credential patterns before cutting. */
+function stepOutput(output: unknown): string | undefined {
+  if (output === undefined || output === null) return undefined
+  const masked = maskDeep(output, credentialMasker)
+  const text = typeof masked === 'string' ? masked : JSON.stringify(masked, null, 2)
+  if (text === undefined) return undefined
+  return text.length <= STEP_OUTPUT_END_CHARS * 2 ? text
+    : `${text.slice(0, STEP_OUTPUT_END_CHARS)}\n[output truncated]\n${text.slice(-STEP_OUTPUT_END_CHARS)}`
+}
 
 function stepDetail(input: unknown): string | null {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return null
@@ -129,9 +153,17 @@ export function threadItems(
       calls.set(step.id, step)
       if (last?.kind === 'steps') { last.count += 1; last.steps.push(step) }
       else items.push({ kind: 'steps', id: `steps:${index}`, count: 1, steps: [step], at: time })
-    } else if (chunk.type === 'tool-output-error' && typeof chunk.toolCallId === 'string') {
+    } else if ((chunk.type === 'tool-output-available' || chunk.type === 'tool-output-error') && typeof chunk.toolCallId === 'string') {
       const step = calls.get(chunk.toolCallId)
-      if (step) step.failed = true
+      if (step) {
+        if (chunk.type === 'tool-output-error') step.failed = true
+        else {
+          const output = stepOutput(chunk.output)
+          if (output !== undefined) step.output = output
+        }
+        // `at` is the batch's insert time, not tool execution time. Historical chunks stay unknown.
+        if (typeof chunk.toolDurationMs === 'number' && Number.isFinite(chunk.toolDurationMs) && chunk.toolDurationMs >= 0) step.ms = chunk.toolDurationMs
+      }
     } else if (chunk.type === 'data-computer' && expectedRunId && chunk.data && typeof chunk.data === 'object') {
       const data = chunk.data as Record<string, unknown>
       if (data.runId === expectedRunId && typeof data.botId === 'string' && typeof data.task === 'string' && data.task.length <= 200 && !items.some(item => item.kind === 'computer' && item.runId === expectedRunId))

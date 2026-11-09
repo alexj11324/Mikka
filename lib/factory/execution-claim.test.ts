@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import test, { describe } from 'node:test'
+import { withFactoryQuestionDeliveryContext } from './questions/continuation-delivery-context'
 import type { Pool, PoolClient } from 'pg'
 import { createExecutionClaim } from './execution-claim'
 import { createFactoryClaim } from './claim'
@@ -82,3 +83,85 @@ test('non-execute Factory claims retain the original authorization projection', 
     assert.equal(checks, stage === 'spec' ? 0 : 1)
   }
 })
+
+
+describe('Factory native question publication context', () => {
+  const issueId = '11111111-1111-4111-8111-111111111111';
+  const claim = {
+    questionId: '22222222-2222-4222-8222-222222222222',
+    requireSessionResume: true,
+    continuesRunId: '33333333-3333-4333-8333-333333333333',
+    resumeSessionId: 'retained-native-session',
+    followUp: 'Accepted human answer. Continue the same task; do not repeat this permission question.',
+    preserveQuestionWorktree: true,
+  };
+  const context = {
+    issueId,
+    kind: 'implement',
+    readOnly: false,
+    gitPush: 'allow',
+    repository: 'example/project',
+    branch: 'mikka/f1503-13',
+    baseBranch: 'main',
+  };
+
+  test('same-session answer receives the admitted branch, remote and canonical PR marker', () => {
+    const result = withFactoryQuestionDeliveryContext(claim, context);
+    const followUp = String(result.followUp);
+    assert.ok(followUp.startsWith(claim.followUp + '\n\n'));
+    assert.match(followUp, /https:\/\/github\.com\/example\/project/);
+    assert.match(followUp, /"taskBranch":"mikka\/f1503-13"/);
+    assert.ok(followUp.includes(`<!-- mikka-issue:${issueId} -->`));
+    assert.match(followUp, /"baseBranch":"main"/);
+    assert.equal(result.questionId, claim.questionId);
+    assert.equal(result.resumeSessionId, claim.resumeSessionId);
+    assert.equal(result.continuesRunId, claim.continuesRunId);
+    assert.equal(result.requireSessionResume, true);
+    assert.equal(result.preserveQuestionWorktree, true);
+    assert.equal(claim.followUp.includes('mikka/f1503-13'), false);
+  });
+
+  test('fix continuation receives the same publication destination without replaying a task prompt', () => {
+    const supplied = { ...context, kind: 'fix', prompt: 'ORIGINAL_TASK_MUST_NOT_BE_REPLAYED',
+      token: 'TOKEN_MUST_NOT_BE_COPIED', nativeSessionId: 'SID_MUST_NOT_BE_COPIED' };
+    const followUp = String(withFactoryQuestionDeliveryContext(claim, supplied).followUp);
+    for (const forbidden of ['ORIGINAL_TASK_MUST_NOT_BE_REPLAYED', 'TOKEN_MUST_NOT_BE_COPIED',
+      'SID_MUST_NOT_BE_COPIED', claim.resumeSessionId]) assert.equal(followUp.includes(forbidden), false);
+    assert.equal(followUp.split(claim.followUp).length - 1, 1);
+  });
+
+  test('the final read-only and git-push policy each withhold the publication context', () => {
+    assert.equal(withFactoryQuestionDeliveryContext(claim, { ...context, readOnly: true }), claim);
+    for (const gitPush of ['deny', 'ask', undefined])
+      assert.equal(withFactoryQuestionDeliveryContext(claim, { ...context, gitPush }), claim);
+  });
+
+  test('planning, review and other non-execution stages are unchanged', () => {
+    for (const kind of ['plan', 'review', 'verify', 'report'])
+      assert.equal(withFactoryQuestionDeliveryContext(claim, { ...context, kind }), claim);
+  });
+
+  test('ordinary continuation and missing Factory question identities are unchanged', () => {
+    const generic = { ...claim, requireSessionResume: false };
+    assert.equal(withFactoryQuestionDeliveryContext(generic, context), generic);
+    const withoutQuestion = { ...claim, questionId: undefined };
+    assert.equal(withFactoryQuestionDeliveryContext(withoutQuestion, context), withoutQuestion);
+    const withoutAnswer = { ...claim, followUp: undefined };
+    assert.equal(withFactoryQuestionDeliveryContext(withoutAnswer, context), withoutAnswer);
+  });
+
+  test('a missing publication never invents a branch or repository', () => {
+    for (const branch of [undefined, ''])
+      assert.equal(withFactoryQuestionDeliveryContext(claim, { ...context, branch }), claim);
+    for (const repository of [undefined, '', 'https://user:token@github.com/example/project'])
+      assert.equal(withFactoryQuestionDeliveryContext(claim, { ...context, repository }), claim);
+  });
+
+  test('re-applying the response decoration does not duplicate delivery context', () => {
+    const once = withFactoryQuestionDeliveryContext(claim, context);
+    assert.equal(withFactoryQuestionDeliveryContext(once, context), once);
+    const admitted = withFactoryQuestionDeliveryContext(claim, { ...context, branch: 'already-admitted/task-branch' });
+    assert.ok(String(admitted.followUp).includes('already-admitted/task-branch'));
+  });
+
+});
