@@ -29,6 +29,22 @@ const briefOrder = view => ({ location: view.location, preferredHarness: view.pr
 const binding = task => ({ taskId: task.id, issueId: task.issueId, attemptId: task.attemptId, candidateId: task.candidateId, revision: task.revision })
 const nonempty = value => typeof value === 'string' && value.trim().length > 0
 const verificationPath = '/api/integrations/github/repositories/verification'
+
+/** Approval can precede the publisher's committed receipt. Wait on this
+ * candidate's delivery; the full proof below still verifies the exact head. */
+export function approvalPublicationReady(state, expectedBranch, previous) {
+  if (state?.task?.stage !== 'approval' || !['pending', 'waiting'].includes(state.task.status)) return false
+  const candidate = Array.isArray(state.candidates) ? state.candidates.find(item => item.id === state.task.candidateId) : null
+  const delivery = state.delivery
+  const pr = delivery?.pullRequest
+  return Boolean(candidate && sha(candidate.sha) && uuid(candidate.runId)
+    && (!previous || (candidate.id !== previous.candidateId && candidate.sha !== previous.candidateSha))
+    && delivery?.candidateSha === candidate.sha && delivery.branch?.head === expectedBranch
+    && pr?.state === 'open' && typeof pr.url === 'string'
+    && new RegExp('^https://github\\.com/' + REPOSITORY + '/pull/\\d+$', 'i').test(pr.url)
+    && (!previous || pr.url === previous.pullRequestUrl))
+}
+
 const rpcErrorCodes = new Set([...ACTION_ERROR_CODES, 'desktop_rpc_request_invalid', 'desktop_rpc_action_unknown',
   'desktop_client_update_required', 'desktop_session_expired', 'desktop_rpc_failed'])
 
@@ -411,7 +427,7 @@ export async function runDeliveryAcceptance(env = process.env) {
     check(!(profiles.profiles ?? []).some(item => item.enabled && !item.archivedAt), 'fixture_has_enabled_profiles')
     originalOrder = currentOrder = await order(); report.originalOrder = briefOrder(originalOrder)
     check(originalOrder.cloudReady, 'cloud_unavailable')
-    live = new LiveChanges(json, workspaceId); await live.start()
+    live = new LiveChanges(json, workspaceId, { kinds: ['factory_task', 'factory_issue', 'issue_threads'] }); await live.start()
     // Existing tasks join the project before dispatch. Explicit new tasks are
     // already dispatched by their creation turn; changing scope then stops them.
     if (submissionMode === 'existing_issue') {
@@ -560,7 +576,7 @@ export async function runDeliveryAcceptance(env = process.env) {
       }
       check(found.tasks.length === 1, 'multiple_factory_tasks'); activeCase.taskId = found.tasks[0].id
       closeChatLive()
-      const keys = [`factory_task:${activeCase.taskId}`, ...issueKeys, `pull_request_status:${issue.id}`]
+      const keys = [`factory_task:${activeCase.taskId}`, ...issueKeys, `issue_threads:${issue.id}`, `pull_request_status:${issue.id}`]
       let lastState = ''
       const read = async () => {
         const state = await json(`/api/factory/tasks/${activeCase.taskId}`)
@@ -622,8 +638,8 @@ export async function runDeliveryAcceptance(env = process.env) {
         }
         return state
       }
-      const approval = previous => live.until(keys, read, state => state.task.stage === 'approval' && ['pending', 'waiting'].includes(state.task.status)
-        && (!previous || state.task.candidateId !== previous), timeoutMs)
+      const approval = previous => live.until(keys, read,
+        state => approvalPublicationReady(state, activeCase.expectedBranch, previous), timeoutMs)
       const proof = async (state, expectedText, label) => {
         const candidate = state.candidates.find(item => item.id === state.task.candidateId)
         check(candidate && sha(candidate.sha) && uuid(candidate.runId), 'candidate_missing')
@@ -745,7 +761,7 @@ export async function runDeliveryAcceptance(env = process.env) {
       activeCase.rejectionId = rejectionId
       // Exactly the existing sendBack UI behavior: no recovery endpoint or redispatch.
       await stage('wait_automatic_repair')
-      const repaired = await approval(first.candidateId)
+      const repaired = await approval(first)
       check(repaired.task.sourceEventId === activeCase.sourceEventId, 'repair_replaced_acceptance_target')
       const second = await proof(repaired, revisedText, 'repaired')
       check(second.pullRequestUrl === first.pullRequestUrl && second.candidateSha !== first.candidateSha, 'repair_not_same_pr')

@@ -177,3 +177,121 @@ test('failure cleanup discovers the exact admitted task once and rejects another
   state.task.botId = botId; state.attempts[0].runId = attemptId
   await assert.rejects(delivery.discoverExplicitCleanupTask(json, workspaceId, item), /^Error: issue1503_cleanup_task_scope_mismatch$/)
 })
+
+
+const publicationIssueId = '00000000-0000-4000-8000-000000000018'
+const publicationTaskId = '00000000-0000-4000-8000-000000000019'
+const publicationWorkspaceId = '00000000-0000-4000-8000-000000000020'
+const publicationBranch = 'mikka/test-18'
+const priorPublication = {
+  candidateId: '00000000-0000-4000-8000-000000000021',
+  candidateSha: '1'.repeat(40),
+  pullRequestUrl: 'https://github.com/alexj11324/Mikka-handoff/pull/999999',
+}
+const publishedCandidate = () => ({
+  task: { id: publicationTaskId, stage: 'approval', status: 'pending', candidateId: '00000000-0000-4000-8000-000000000022' },
+  candidates: [{ id: '00000000-0000-4000-8000-000000000022', sha: '2'.repeat(40), runId: '00000000-0000-4000-8000-000000000023' }],
+  delivery: { candidateSha: '2'.repeat(40), branch: { head: publicationBranch, base: 'main' },
+    pullRequest: { state: 'open', url: priorPublication.pullRequestUrl } },
+})
+const publicationKeys = ['factory_task:' + publicationTaskId, 'factory_issue:' + publicationIssueId, 'issue_threads:' + publicationIssueId, 'pull_request_status:' + publicationIssueId]
+const publicationKinds = ['factory_task', 'factory_issue', 'issue_threads']
+const nextPublicationTurn = () => new Promise(resolve => setImmediate(resolve))
+
+class PublicationTestSocket {
+  static current
+  constructor() {
+    PublicationTestSocket.current = this
+    queueMicrotask(() => this.onmessage?.({ data: JSON.stringify({ type: 'live_ready', version: 2, kinds: publicationKinds }) }))
+  }
+  send() {}
+  close() {}
+  event(kind, id) { this.onmessage?.({ data: JSON.stringify({ kind, id }) }) }
+}
+
+test('publication readiness: pending waits for the same-issue post-commit event without polling', async () => {
+  let ticketReads = 0, taskReads = 0, settled = false
+  let current = publishedCandidate()
+  current.delivery.pullRequest = null
+  const live = new delivery.LiveChanges(async path => {
+    assert.equal(path, '/api/live/ticket?workspace=' + publicationWorkspaceId)
+    ticketReads++
+    return { url: 'wss://offline.invalid/live', protocol: 'offline', expiresAt: Date.now() + 60_000 }
+  }, publicationWorkspaceId, { Socket: PublicationTestSocket, kinds: publicationKinds })
+  try {
+    await live.start()
+    const waiting = live.until(publicationKeys, async () => { taskReads++; return current },
+      state => delivery.approvalPublicationReady(state, publicationBranch, priorPublication), 1_000)
+    waiting.then(() => { settled = true }, () => { settled = true })
+    await nextPublicationTurn()
+    assert.equal(taskReads, 1)
+    assert.equal(settled, false)
+    assert.equal(live.waiters.size, 1, 'pending publication waits instead of failing proof')
+    current = publishedCandidate()
+    PublicationTestSocket.current.event('issue_threads', '00000000-0000-4000-8000-000000000099')
+    await nextPublicationTurn()
+    assert.equal(taskReads, 1, 'another issue cannot cause a business read')
+    assert.equal(settled, false)
+    PublicationTestSocket.current.event('issue_threads', publicationIssueId)
+    assert.equal(await waiting, current)
+    assert.equal(taskReads, 2, 'only initial read plus the matching live invalidation')
+    assert.equal(ticketReads, 1)
+  } finally { live.close() }
+})
+
+test('publication readiness: current candidate SHA branch and same PR must all match', () => {
+  const cases = [
+    state => { state.task.candidateId = priorPublication.candidateId },
+    state => { state.candidates[0].sha = priorPublication.candidateSha; state.delivery.candidateSha = priorPublication.candidateSha },
+    state => { state.candidates[0].runId = 'not-a-run' },
+    state => { state.candidates[0].sha = 'not-a-sha' },
+    state => { state.delivery.candidateSha = '3'.repeat(40) },
+    state => { state.delivery.branch.head = 'mikka/another-18' },
+    state => { state.delivery.branch = null },
+    state => { state.delivery.pullRequest.url = priorPublication.pullRequestUrl + '0' },
+    state => { state.delivery.pullRequest.url = 'https://github.com/another/repo/pull/999999' },
+    state => { state.delivery.pullRequest.state = 'closed' },
+    state => { state.delivery.pullRequest.state = 'draft' },
+    state => { state.delivery.pullRequest = null },
+    state => { state.delivery = null },
+    state => { state.task.stage = 'execute' },
+    state => { state.task.status = 'cancelled' },
+    state => { state.task.status = 'failed' },
+    state => { state.task.status = 'blocked' },
+    state => { state.task.status = 'revoked' },
+    state => {
+      state.candidates.push({ id: '00000000-0000-4000-8000-000000000024', sha: '3'.repeat(40), runId: '00000000-0000-4000-8000-000000000025' })
+      state.delivery.candidateSha = '3'.repeat(40)
+    },
+  ]
+  for (const mutate of cases) {
+    const state = publishedCandidate()
+    mutate(state)
+    assert.equal(delivery.approvalPublicationReady(state, publicationBranch, priorPublication), false)
+  }
+})
+
+test('publication readiness: initial and repaired candidates need their own published delivery', () => {
+  const state = publishedCandidate()
+  assert.equal(delivery.approvalPublicationReady(state, publicationBranch), true)
+  assert.equal(delivery.approvalPublicationReady(state, publicationBranch, priorPublication), true)
+  state.task.status = 'waiting'
+  assert.equal(delivery.approvalPublicationReady(state, publicationBranch, priorPublication), true)
+  state.delivery.pullRequest = null
+  assert.equal(delivery.approvalPublicationReady(state, publicationBranch), false)
+})
+
+test('publication readiness: existing live read failures and deadline remain failures', async () => {
+  const live = new delivery.LiveChanges(() => assert.fail('no API is needed for this pure case'), publicationWorkspaceId, { Socket: PublicationTestSocket, kinds: publicationKinds })
+  try {
+    const terminal = new Error('issue1503_factory_terminal_failure')
+    await assert.rejects(live.until(publicationKeys, async () => { throw terminal },
+      state => delivery.approvalPublicationReady(state, publicationBranch, priorPublication), 1_000), error => error === terminal)
+    let reads = 0
+    const pending = publishedCandidate()
+    pending.delivery.pullRequest = null
+    await assert.rejects(live.until(publicationKeys, async () => { reads++; return pending },
+      state => delivery.approvalPublicationReady(state, publicationBranch, priorPublication), 20), /issue1503_task_timeout/)
+    assert.equal(reads, 1, 'a deadline timer never polls task data')
+  } finally { live.close() }
+})

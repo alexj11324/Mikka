@@ -12,8 +12,8 @@ export const REENTRY = Object.freeze({
   smokeUserId: 'cL1NXe1mr7WuIS8xWhU37v0p7kNoUMY3',
   repository: 'alexj11324/Mikka-handoff', githubLogin: 'alexj11324', githubAccountId: '183887963',
   retainedE2bUpdatedAt: '2026-11-06T18:21:51.895Z',
-  historicalFixtureSha256: '8b418a5fba122f3716988405888adbd25467d6333fef29da2810bd9019c1f9af',
-  releaseProjectionSha256: '2468382a8316abc0293be74f8e4025030d8d5cbe3144591a2240d554997f727e',
+  historicalFixtureSha256: '0da23cbb104014a36e130c82c3ae583f01a16825686da1393fb572bc8b199791',
+  releaseProjectionSha256: '2f307f3bff45e80efb55a10952a7a743720b664882e8bfef6d97843abd70702d',
 })
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value)
 const hex = (value, size) => typeof value === 'string' && new RegExp('^[a-f0-9]{' + size + '}$').test(value)
