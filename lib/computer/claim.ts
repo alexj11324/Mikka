@@ -7,6 +7,7 @@ import { computerPermission, type ComputerPermission } from './permission'
 import { runMayUseCredentialSql } from '@/lib/personal-policy'
 import { runListChanged } from '@/lib/live/lists'
 import { armDueTimerAfterCommit } from '@/lib/due-timer'
+import { taskActivityChanged } from '@/lib/factory/activity-live'
 
 /** The existing local daemon cannot operate a Bot's cloud desktop. Keep its
  * claim serialized with Bot binding and fail closed until a cloud worker with
@@ -31,6 +32,7 @@ export async function claimLocalRun(pool: Pool, runId: string, deviceId: string,
     armDueTimerAfterCommit(client, 'run-recovery')
     await runListChanged(client, runId)
     await runChanged(client, runId)
+    taskActivityChanged(client, runId)
     if (afterClaim) await afterClaim(client)
     await client.query('COMMIT')
     return 'claimed'
@@ -87,6 +89,7 @@ export async function claimCloudRun(pool: Pool, actor: { userId: string; workspa
     armDueTimerAfterCommit(client, 'run-recovery')
     await runListChanged(client, runId)
     await runChanged(client, runId)
+    taskActivityChanged(client, runId)
     if (afterClaim) await afterClaim(client)
     await client.query('COMMIT')
     return { botId: binding.botId, ownerId: actor.userId, display: `:${binding.display}`, policyVersion: policy?.version ?? 0, permission }
