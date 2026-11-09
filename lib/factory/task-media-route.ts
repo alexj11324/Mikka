@@ -1,0 +1,38 @@
+import { actAs } from '../acting-user'
+import { auth } from '../api-auth'
+import { pool } from '../db'
+import { humanSessionHeaders } from '../desktop-rpc/handler'
+import { readCapturePoster } from '../captures/poster-store'
+import { privateCaptureDownload } from '../captures/private-download'
+import { captureFileResponse } from '../captures/serve'
+import { factoryHumanStore } from './server'
+import { authorizeFactoryTaskCapture } from './task-media'
+import { FactoryError } from './contract'
+import { causeFields } from '@mikka/protocol/coded-error'
+
+/** Browser/native session adapter, shared by originals and their derived covers.
+ * actAs preserves the same workspace principal as the task-detail route. */
+export async function serveFactoryTaskMedia(request: Request, taskId: string, captureId: string, poster = false) {
+  const headers = humanSessionHeaders(request)
+  const session = headers ? await auth.api.getSession({ headers, query: { disableCookieCache: true } }) : null
+  const privateHeaders = { 'cache-control': 'private, no-store' }
+  if (!session) return new Response(null,{ status: 401, headers: privateHeaders })
+  return actAs(session.user,async () => {
+    try {
+      await authorizeFactoryTaskCapture(pool,factoryHumanStore,session.user.id,taskId,captureId)
+      const cover = poster ? await readCapturePoster(session.user.id,captureId,request.signal) : null
+      const response = poster ? (cover ? captureFileResponse(request,cover,privateHeaders) : null)
+        : await privateCaptureDownload(request,session.user.id,captureId)
+      // Rendering/object reads can take time. Recheck current task visibility
+      // before returning bytes if its workspace/source changed meanwhile.
+      if (response) await authorizeFactoryTaskCapture(pool,factoryHumanStore,session.user.id,taskId,captureId)
+      return response ?? new Response(null,{ status:404,headers:privateHeaders })
+    } catch (error) {
+      if (error instanceof FactoryError && error.code === 'factoryNotFound') return new Response(null,{ status: 404, headers: privateHeaders })
+      // Failed decoding/storage never invents a cover or discloses the input,
+      // binary stderr, storage key or account data in a response.
+      console.warn('[capture media] read unavailable', { causes: causeFields(error) })
+      return new Response(null,{ status: 503, headers: privateHeaders })
+    }
+  })
+}

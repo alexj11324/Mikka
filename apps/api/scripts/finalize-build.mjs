@@ -22,7 +22,9 @@ export async function compileTracing(root) {
 }
 
 async function runtimeFiles(root) {
-  const files = ['lib/abuse/data/disposable-email-domains.txt', 'packages/subscription-worker/CPA_COMMIT',
+  const files = ['node_modules/ffmpeg-static/ffmpeg', 'node_modules/ffmpeg-static/ffmpeg.README',
+    'node_modules/ffmpeg-static/ffmpeg.LICENSE', 'node_modules/ffmpeg-static/LICENSE', 'node_modules/ffmpeg-static/README.md',
+    'lib/abuse/data/disposable-email-domains.txt', 'packages/subscription-worker/CPA_COMMIT',
     'packages/daemon/scripts/official-e2b-instance-bootstrap.sh', 'packages/daemon/scripts/refresh-cloud-worker.py']
   for (const item of await readdir(join(root, 'scripts/e2b'), { withFileTypes: true })) {
     if (item.isFile() && /\.(?:py|mjs|sh)$/.test(item.name)) files.push(`scripts/e2b/${item.name}`)

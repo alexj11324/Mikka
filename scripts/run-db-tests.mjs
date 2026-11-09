@@ -12,6 +12,10 @@ import { pathToFileURL } from 'node:url'
 import { isE2eTarget, E2E_DB_RULE } from '../tests/helpers/e2e-target.mjs'
 
 export const REQUIRED_SUITES = [
+  { marker: 'lib/factory/activity.ts', file: 'lib/factory/activity.db.test.ts', script: 'test:factory-activity-db' },
+  { marker: 'lib/factory/spec-artifact.ts', file: 'lib/factory/spec-artifact.db.test.ts', script: 'test:factory-activity-db' },
+  { marker: 'lib/factory/task-media.ts', file: 'lib/factory/task-media.db.test.ts', script: 'test:factory-activity-db' },
+  { marker: 'lib/cloud-computer/thread-machine-sessions.ts', file: 'lib/cloud-computer/thread-machine-sessions.db.test.ts', script: 'test:factory-activity-db' },
   { marker: 'lib/cloud-services/store.ts', file: 'lib/cloud-services/client.db.test.ts', script: 'test:cloud-services-db' },
   { marker: 'app/api/web/exchange/route.ts', file: 'tests/web-auth-handoff.db.test.ts', script: 'test:web-auth-db' },
   { marker: 'lib/project-map/decisions.ts', file: 'lib/project-map/decisions.db.test.ts', script: 'test:project-decisions-db' },
