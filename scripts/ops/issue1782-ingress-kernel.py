@@ -45,7 +45,7 @@ class HarnessError(RuntimeError):
 def run(argv, input_text=None):
     result = subprocess.run(argv, input=input_text, text=True, capture_output=True, timeout=10)
     if result.returncode:
-        raise HarnessError(f'{argv[0]} failed ({result.returncode}): {result.stderr[-8000:]}')
+        raise HarnessError(f'{argv[0]} failed ({result.returncode}): {result.stderr[-1200:]}')
     return result.stdout
 
 
@@ -213,12 +213,32 @@ class Fixture:
                 run(args)
                 run(['ip', '-n', namespace, 'link', 'set', interface, 'up'])
             self.provider = self.server(PROVIDER_PORT, marked=self.marked)
-            if not self.defer_policy:
+            if self.defer_policy:
+                self.install_initial_conntrack_observer()
+            else:
                 self.install_policy(verify_live_provider=True)
             return self
         except BaseException:
             self.close()
             raise
+
+    def install_initial_conntrack_observer(self):
+        # A new network namespace has no conntrack hooks until a consumer asks
+        # for them. Seed tracking BEFORE the synthetic connection's SYN; adding
+        # the first ct expression after connect() would otherwise let the first
+        # later server packet establish the conntrack ORIGINAL direction.
+        # Both chains only count and retain policy accept. They never set marks,
+        # directions or verdicts, and stay installed for the fixture lifetime.
+        lines = [
+            'add table inet mikka_test_track',
+            'add chain inet mikka_test_track incoming { type filter hook prerouting priority -199; policy accept; }',
+            'add chain inet mikka_test_track outgoing { type filter hook output priority -199; policy accept; }',
+            f'add rule inet mikka_test_track incoming iifname != "lo" meta l4proto tcp tcp dport {PROVIDER_PORT} '
+            'tcp flags & 0x12 == 0x02 ct direction original counter comment "client_syn_original"',
+            f'add rule inet mikka_test_track outgoing oifname != "lo" meta l4proto tcp tcp sport {PROVIDER_PORT} '
+            'tcp flags & 0x12 == 0x12 ct direction reply counter comment "server_synack_reply"',
+        ]
+        run(['ip', 'netns', 'exec', self.server_ns, 'nft', '-f', '-'], '\n'.join(lines) + '\n')
 
     def install_policy(self, verify_live_provider):
         guard = load_guard(self.guard_path)
@@ -244,13 +264,17 @@ class Fixture:
             for kind, condition in [('root', ' meta skuid 0'),
                                     ('nonroot', ' meta skuid != 0'), ('all', ''),
                                     ('nonroot_long', ' meta skuid != 0 meta length > 120'),
-                                    ('nonroot_ack_long', ' meta skuid != 0 tcp flags == ack meta length > 120')]:
+                                    ('nonroot_ack_long', ' meta skuid != 0 tcp flags == ack meta length > 120'),
+                                    ('nonroot_long_original', ' meta skuid != 0 meta length > 120 ct direction original'),
+                                    ('nonroot_long_reply', ' meta skuid != 0 meta length > 120 ct direction reply'),
+                                    ('nonroot_ack_long_original', ' meta skuid != 0 tcp flags == ack meta length > 120 ct direction original'),
+                                    ('nonroot_ack_long_reply', ' meta skuid != 0 tcp flags == ack meta length > 120 ct direction reply')]:
                 lines.append(prefix + condition + f' counter comment "{chain}_{kind}"')
         run(['ip', 'netns', 'exec', self.server_ns, 'nft', '-f', '-'], '\n'.join(lines) + '\n')
 
-    def observe(self):
+    def counter_table(self, table):
         raw = run(['ip', 'netns', 'exec', self.server_ns, 'nft', '-j', '-n',
-                   'list', 'table', 'inet', 'mikka_test_observe'])
+                   'list', 'table', 'inet', table])
         counts = {}
         for row in json.loads(raw)['nftables']:
             rule = row.get('rule', {})
@@ -259,6 +283,10 @@ class Fixture:
                 for expr in rule['expr']:
                     if 'counter' in expr:
                         counts[comment] = expr['counter']['packets']
+        return counts
+
+    def observe(self):
+        counts = self.counter_table('mikka_test_observe')
         for stage in ('before', 'after'):
             counts[stage + '_without_uid'] = (counts[stage + '_all'] - counts[stage + '_root']
                                               - counts[stage + '_nonroot'])
@@ -347,6 +375,10 @@ def established_nonroot_payload(fixture, evidence, ack_only):
     seed = client.rpc('recv', size=1)
     assert seed.get('received') == 1, 'fixture connection was not usable before policy'
     evidence['pre_policy_application_data_received'] = True
+    seed_tracking = fixture.counter_table('mikka_test_track')
+    evidence['tracking_before_policy'] = seed_tracking
+    assert seed_tracking['client_syn_original'] > 0, 'fixture_did_not_track_client_SYN_as_original'
+    assert seed_tracking['server_synack_reply'] > 0, 'fixture_did_not_track_server_SYN_ACK_as_reply'
     fixture.install_policy(verify_live_provider=False)
     attempted = server.rpc('send_more_segment') if ack_only else server.rpc('send', size=256)
     evidence['send_result'] = attempted
@@ -356,8 +388,12 @@ def established_nonroot_payload(fixture, evidence, ack_only):
     observed = fixture.observe()
     evidence['observed'] = observed
     assert observed['before_nonroot_long'] > 0, 'fixture_did_not_emit_nonroot_data_packet'
+    assert observed['before_nonroot_long_original'] == 0, 'fixture_server_data_was_original_not_reply'
+    assert observed['before_nonroot_long_reply'] == observed['before_nonroot_long'], 'fixture_server_data_was_not_all_tracked_reply'
     if ack_only:
         assert observed['before_nonroot_ack_long'] > 0, 'fixture_did_not_emit_ACK_only_with_payload'
+        assert observed['before_nonroot_ack_long_original'] == 0, 'fixture_ACK_payload_was_original_not_reply'
+        assert observed['before_nonroot_ack_long_reply'] == observed['before_nonroot_ack_long'], 'fixture_ACK_payload_was_not_all_tracked_reply'
         assert observed['after_nonroot_ack_long'] == 0, 'ACK_only_payload_passed_guard'
     assert observed['after_nonroot_long'] == 0, 'nonroot_payload_passed_guard'
     assert received.get('received') == 0, 'nonroot_application_data_was_received'
@@ -395,7 +431,7 @@ def main(args):
                 row.update(passed=False, kind='assertion', error=str(exc))
             except Exception as exc:
                 infrastructure_error = True
-                row.update(passed=False, kind='harness_or_policy', error=str(exc)[:8000])
+                row.update(passed=False, kind='harness_or_policy', error=str(exc)[:1600])
             rows.append(row)
     passed = all(row['passed'] for row in rows)
     emit({'ok': passed, 'guard': str(Path(args.guard).resolve()),
@@ -423,23 +459,7 @@ if __name__ == '__main__':
         ports = [PROVIDER_PORT] if args.behavior_fixture_known_ports else guard.provider_ports()
         if ports != [PROVIDER_PORT]:
             raise RuntimeError('fixture provider discovery mismatch')
-        try:
-            guard.check_rules(shutil.which('nft'), ports)
-        except Exception:
-            rows = json.loads(run(['nft', '-j', '-n', 'list', 'table', 'inet', guard.TABLE]))['nftables']
-            short = [row for row in rows if 'rule' not in row]
-            rules = [row for row in rows if 'rule' in row]
-            for offset, family in ((1, 'ipv4'), (12, 'ipv6')):
-                for index, doff in enumerate(range(5, 16)):
-                    actual = dict(rules[offset + index]['rule'])
-                    actual.pop('handle', None)
-                    try:
-                        guard.check_ack_rule(actual, family, ports, doff)
-                    except Exception:
-                        short.append({'failedAck': {'family': family, 'doff': doff, 'rule': actual}})
-                        break
-            print(json.dumps({'ruleCount': len(rules), 'syntheticPolicyReadback': short}), file=sys.stderr)
-            raise
+        guard.check_rules(shutil.which('nft'), ports)
     else:
         if not args.guard:
             parser.error('--guard is required')
