@@ -11,8 +11,6 @@
 
 Every agent, from laptop to cloud, working as one team.
 
-Mikka organizes work for Claude Code, Codex and supported Cursor runners, with bots that coordinate tasks and agents that execute them.
-
 [Open Mikka](https://app.aspectlylabs.com/mikka) · [Documentation](https://aspectlylabs.com/mikka/docs) · [Quickstart](https://aspectlylabs.com/mikka/docs/quickstart)
 
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
@@ -20,6 +18,8 @@ Mikka organizes work for Claude Code, Codex and supported Cursor runners, with b
 **English** · [简体中文](README.zh-CN.md)
 
 </div>
+
+Mikka organizes work for Claude Code, Codex and supported Cursor runners, with bots that coordinate tasks and agents that execute them.
 
 Describe a task to a bot. Mikka dispatches coding work to agents on your Mac, Linux machine, SSH server or an eligible cloud sandbox, then brings their progress, questions and results back into one place. Use it in the web, macOS or iOS app.
 
