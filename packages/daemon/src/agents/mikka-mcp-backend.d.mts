@@ -26,6 +26,8 @@ export interface MikkaMcpContext {
   decisionUrl?: string
   decisionToken?: string
   decisionCatalogue?: string
+  /** Host-bound telemetry only; never task authority or tool input. */
+  decisionTraceparent?: string
   observationUrl?: string
   env?: Record<string, string | undefined>
 }

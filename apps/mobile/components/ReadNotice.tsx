@@ -1,3 +1,4 @@
+import { mobileMessages } from '@/lib/messages'
 import { useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { Text } from '@/components/Text'
@@ -5,7 +6,7 @@ import { GlassButton } from '@/components/GlassButton'
 import { colors } from '@/lib/theme'
 
 /** A failed read keeps useful data visible and offers an explicit retry. */
-export function ReadNotice({ error, hasData = false, label = '内容', onRetry }: {
+export function ReadNotice({ error, hasData = false, label = mobileMessages.MobileCore.content, onRetry }: {
   error: unknown; hasData?: boolean; label?: string; onRetry: () => void | Promise<unknown>
 }) {
   const pending = useRef(false)
@@ -18,8 +19,8 @@ export function ReadNotice({ error, hasData = false, label = '内容', onRetry }
     finally { pending.current = false; setBusy(false) }
   }
   return <View accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.notice}>
-    <Text style={styles.text}>{hasData ? `${label}更新失败，仍显示上次内容。` : `${label}加载失败。`}</Text>
-    <GlassButton label="重试" busy={busy} onPress={() => void retry()} />
+    <Text style={styles.text}>{(hasData ? mobileMessages.MobileCore.refreshFailed : mobileMessages.MobileCore.readFailed).replace('{label}', label)}</Text>
+    <GlassButton label={mobileMessages.Common.retry} busy={busy} onPress={() => void retry()} />
   </View>
 }
 const styles = StyleSheet.create({

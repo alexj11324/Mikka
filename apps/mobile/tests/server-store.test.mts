@@ -4,7 +4,7 @@ import { MobileServerStore, accountStorageKey, SERVER_STORE_KEY, type MobileServ
 import { pushBelongsToAccount } from '../lib/push-route.ts'
 
 const cloud: MobileServer = { url: 'https://app.aspectlylabs.com/mikka', name: 'Mikka Cloud', version: null, edition: 'cloud',
-  signIn: { google: true, github: true, email: true }, mobileReady: true }
+  signIn: { google: true, github: true, apple: true, email: true }, mobileReady: true }
 const self: MobileServer = { ...cloud, url: 'https://self.example.test/mikka', name: 'Acme Mikka', edition: 'community', version: 'revision' }
 const user = { id: 'same-id-on-both-servers', name: 'Alex', email: 'alex@example.test' }
 function fixture() {
@@ -85,4 +85,21 @@ test('push taps and foreground banners match both server and account', () => {
   assert.equal(pushBelongsToAccount({}, { ...account, id: 'legacy', server: cloud }), true)
   assert.equal(pushBelongsToAccount({}, { ...account, id: '2', server: cloud }), false)
   assert.equal(pushBelongsToAccount({ serverUrl: self.url, userId: user.id }, { ...account, user: null }), false)
+})
+
+
+test('saved servers predating Apple discovery enable only the official cloud fallback', async () => {
+  const f = fixture(); await f.store.initialize(); await f.store.add(self)
+  const stored = JSON.parse(f.values.get(SERVER_STORE_KEY)!)
+  for (const account of stored.accounts) delete account.server.signIn.apple
+  f.values.set(SERVER_STORE_KEY, JSON.stringify(stored))
+  const restored = new MobileServerStore(f.storage, cloud)
+  await restored.initialize()
+  assert.equal(restored.snapshot().accounts[0].server.signIn.apple, true)
+  assert.equal(restored.snapshot().accounts[1].server.signIn.apple, false)
+  stored.accounts[0].server.signIn.apple = false
+  f.values.set(SERVER_STORE_KEY, JSON.stringify(stored))
+  const disabled = new MobileServerStore(f.storage, cloud)
+  await disabled.initialize()
+  assert.equal(disabled.snapshot().accounts[0].server.signIn.apple, false)
 })
