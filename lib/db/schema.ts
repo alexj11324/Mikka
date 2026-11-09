@@ -1,7 +1,7 @@
 import type { ExecutionIdentity } from '../execution-identity'
 import type { WorkerDefinitionSnapshot } from '../agent-kit/worker'
 import type { SendKey } from '../send-key'
-import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, timestamp, primaryKey, index, unique, uniqueIndex, check, boolean, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
+import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, check, foreignKey, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
@@ -586,6 +586,22 @@ export const coordinatorSessions = pgTable('coordinator_sessions', {
   lastErrorAt: timestamp('lastErrorAt', { withTimezone: true }),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('coordinator_sessions_chat_key').on(table.userId, table.botId).nullsNotDistinct()])
+
+/** First inbox and run settings are committed together, before preparation.
+ * Replays still check the current chat lease and fresh execution authority. */
+export const coordinatorStartupReceipts = pgTable('coordinator_startup_receipts', {
+  userId: text('userId').notNull(), botId: uuid('botId').notNull(), holder: text('holder').notNull(),
+  round: integer('round').notNull(), version: integer('version').notNull().default(1),
+  settings: jsonb('settings').$type<import('@/lib/coordinator/startup-receipt').StoredCoordinatorStartupSettings>().notNull(),
+  inbox: jsonb('inbox').$type<import('@/lib/coordinator/startup-receipt').StoredCoordinatorStartupInbox>().notNull(),
+}, table => [
+  primaryKey({ columns: [table.userId, table.botId, table.holder, table.round] }),
+  foreignKey({ columns: [table.userId, table.botId], foreignColumns: [coordinatorSessions.userId, coordinatorSessions.botId] }).onDelete('cascade'),
+  check('coordinator_startup_receipts_round_check', sql`${table.round} = 0`),
+  check('coordinator_startup_receipts_version_check', sql`${table.version} = 1`),
+  check('coordinator_startup_receipts_settings_check', sql`jsonb_typeof(${table.settings}) = 'object'`),
+  check('coordinator_startup_receipts_inbox_check', sql`jsonb_typeof(${table.inbox}) = 'object'`),
+])
 
 // --- Suggestions (MIK-41) ---------------------------------------------------
 //

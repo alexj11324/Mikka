@@ -60,14 +60,15 @@ function ViewerPullRequestLink({ issueId, pr, compact = false, userId, isPending
   // A refresh rechecks permission; the previous response is not proof of current access.
   const state = userId && !isValidating && data && 'state' in data && data.checkedAt >= mountedAt ? data.state : undefined
   const error = data && 'error' in data ? data.error : undefined
-  const statusLabel = state ? tSync('synced', { state: tState(state) })
-    : isPending || isValidating || (userId && (!data || ('state' in data && data.checkedAt < mountedAt))) ? tSync('loading')
-      : !userId || error === 'githubNotConnected' || error === 'githubReconnectRequired' ? tSync('disconnected') : tSync('unavailable')
+  const loading = !state && (isPending || isValidating || (userId && (!data || ('state' in data && data.checkedAt < mountedAt))))
+  // No GitHub connection here (none set up, or not this person's): the link stays, with no status words beside it.
+  const disconnected = !state && !loading && (!userId || error === 'githubNotConnected' || error === 'githubReconnectRequired' || error === 'githubNotConfigured')
+  const statusLabel = state ? tSync('synced', { state: tState(state) }) : loading ? tSync('loading') : disconnected ? tSync('disconnected') : tSync('unavailable')
   const title = `${statusLabel} · ${tSync('manual', { state: tState(pr.state) })} · ${pr.url}`
   // The icon's shape is the PR state (Figma icon/14/pr-*): GitHub's when it answered, else the state saved on the task.
   // Only a state GitHub just confirmed for this viewer gets its colour; a saved or stale one stays grey.
   const Icon = PR_ICONS[state ?? pr.state]
-  const content = <><Icon data-icon="inline-start" className={cn(!state && 'text-muted-foreground', state === 'open' && 'text-success-foreground', state === 'merged' && 'text-info-foreground', state === 'closed' && 'text-destructive-foreground')} />#{pr.url.split('/').filter(Boolean).at(-1)}{!compact && <span className="text-muted-foreground">{state ? tState(state) : statusLabel}</span>}</>
+  const content = <><Icon data-icon="inline-start" className={cn(!state && 'text-muted-foreground', state === 'open' && 'text-success-foreground', state === 'merged' && 'text-info-foreground', state === 'closed' && 'text-destructive-foreground')} />#{pr.url.split('/').filter(Boolean).at(-1)}{!compact && !disconnected && <span className="text-muted-foreground">{state ? tState(state) : statusLabel}</span>}</>
   const link = <a href={pr.url} draggable={false} target="_blank" rel="noopener noreferrer" title={title} aria-label={title} />
   return compact
     ? <BoardBadge variant="outline" size="lg" className="h-5 gap-1 border-transparent px-0 text-xs font-normal text-muted-foreground tabular-nums [&_svg]:size-3.5" render={link}>{content}</BoardBadge>
