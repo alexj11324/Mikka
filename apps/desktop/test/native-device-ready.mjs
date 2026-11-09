@@ -138,7 +138,15 @@ export async function waitForNativeDevice(target, { scope, profile, record, time
       await scope.assertActive()
       const remaining = timeout - (now() - started)
       if (remaining <= 0) break
-      const state = await bounded(snapshot(), Math.min(5000, remaining))
+      let state
+      try { state = await bounded(snapshot(), Math.min(5000, remaining)) }
+      catch (error) {
+        // Authentication can replace the document while its read-only IPC is
+        // pending. Use the existing bounded wait to read the new document;
+        // every other renderer/IPC error still fails with its original cause.
+        if (!(error instanceof Error) || !error.message.startsWith('page.evaluate: Execution context was destroyed,')) throw error
+        state = { document: 'navigating' }
+      }
       evidence.reads++
       const key = JSON.stringify(state)
       if (key !== previous) {

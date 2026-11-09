@@ -86,6 +86,41 @@ test('metadata failures cannot replace a lease failure or turn it into readiness
   assert.equal(JSON.stringify(evidence).includes('private'), false)
 })
 
+test('a document replaced during native IPC remains pending until a fresh authenticated snapshot is ready', async () => {
+  let at = 0, reads = 0, evidence
+  const ready = await snapshot()
+  await waitForNativeDevice({ mode: 'bundled' }, { profile: '/owned/profile', timeout: 1000,
+    scope: { assertActive: async () => {} }, now: () => at, delay: async ms => { at += ms },
+    metadata: async () => ({ status: 'unavailable' }), environment: async () => ({ available: false }),
+    record: value => { evidence = value }, snapshot: async () => {
+      if (++reads === 1) throw new Error('page.evaluate: Execution context was destroyed, most likely because of a navigation /private/token')
+      return ready
+    } })
+  assert.equal(evidence.ready, true)
+  assert.equal(evidence.reads, 2)
+  assert.equal(evidence.elapsedMs, 250)
+  assert.deepEqual(evidence.transitions[0], { elapsedMs: 0, document: 'navigating' })
+  assert.equal(JSON.stringify(evidence).includes('/private'), false)
+})
+
+test('document navigation cannot extend the readiness deadline or hide other renderer failures', async () => {
+  let at = 0, evidence
+  const options = { profile: '/owned/profile', timeout: 1000, scope: { assertActive: async () => {} },
+    now: () => at, delay: async ms => { at += ms }, record: value => { evidence = value },
+    metadata: async () => ({ status: 'unavailable' }), environment: async () => ({ available: false }) }
+  await assert.rejects(waitForNativeDevice({ mode: 'hosted' }, { ...options, snapshot: async () => {
+    throw new Error('page.evaluate: Execution context was destroyed, most likely because of a navigation')
+  } }), { message: 'PARITY_NATIVE_DEVICE_NOT_READY' })
+  assert.equal(evidence.ready, false)
+  assert.equal(evidence.failure, 'deadline')
+  assert.equal(evidence.elapsedMs, 1000)
+  const failure = new Error('page.evaluate: an unrelated private failure')
+  at = 0
+  await assert.rejects(waitForNativeDevice({ mode: 'hosted' }, { ...options, snapshot: async () => { throw failure } }), error => error === failure)
+  assert.equal(evidence.ready, false)
+  assert.equal(evidence.elapsedMs, 0)
+})
+
 test('main profile inspection rejects other profiles and reports only fixed service argument comparisons', async () => {
   let reads = 0
   const profile = '/owned/Mikka & Dev'
