@@ -48,6 +48,12 @@ test(
       repoId = randomUUID(),
       approvalId = randomUUID(),
       publicationId = randomUUID();
+    // Completion receipts reference the authenticated owner, as production
+    // approvals do. Keep the real inbox FK/trigger active in this fixture.
+    await pool.query(
+      `INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,'Synthetic activation owner',$2,true,now(),now())`,
+      [userId, `${userId}@example.invalid`],
+    );
     await pool.query(
       `INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Synthetic activation transaction fixture','{}','todo','normal')`,
       [issueId, userId],
