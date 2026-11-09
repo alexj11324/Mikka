@@ -26,7 +26,7 @@ const effectiveOrder = (value: OrderSnapshot) => serialized({ ...value, customiz
 
 /** Evidence for this fixture only. Project its pinned old defaults with the
  * product resolver; never write either list back as a replacement default. */
-export function modelOrderCleanupPlan(initial: any, latest: any, now = Date.now()) {
+function receiptModelOrderCleanupPlan(initial: any, latest: any, now: number, expectedStatus: 'passed' | 'failed') {
   const original = briefOrder(initial?.originalOrder)
   const started = briefOrder(latest?.originalOrder), materialized = briefOrder(latest?.restoredOrder)
   const validReceipt = (value: any) => value?.issue === 1503 && value.workspaceId === WORKSPACE_ID
@@ -36,7 +36,7 @@ export function modelOrderCleanupPlan(initial: any, latest: any, now = Date.now(
   const refuse = (): never => { throw new Error('issue1503_cleanup_model_order_receipt_mismatch') }
   if (!validReceipt(initial) || initial.marker !== '42278720813-1' || !original || original.customized !== false
     || createHash('sha256').update(serialized(initial.originalOrder)).digest('hex') !== '528cdc4ffd615042e48ab112b9132779f328637e0469364e71f9cbc22a590792'
-    || !validReceipt(latest) || latest.status !== 'passed' || Date.parse(latest.startedAt) < Date.parse(initial.completedAt)
+    || !validReceipt(latest) || latest.status !== expectedStatus || Date.parse(latest.startedAt) < Date.parse(initial.completedAt)
     || Date.parse(latest.completedAt) > now + 30_000
     || !Array.isArray(latest.cleanup) || !latest.cleanup.some((entry: any) => entry?.kind === 'effective_model_order_restored')
     || !started || !materialized) return refuse()
@@ -47,4 +47,32 @@ export function modelOrderCleanupPlan(initial: any, latest: any, now = Date.now(
   if (effectiveOrder(started) !== effectiveOrder(materialized)
     || (effectiveOrder(materialized) !== effectiveOrder(original) && effectiveOrder(materialized) !== effectiveOrder(currentDefault))) return refuse()
   return { original, materialized, currentDefault }
+}
+
+/** The original final-C behavior remains PASS-only. */
+export function modelOrderCleanupPlan(initial: any, latest: any, now = Date.now()) {
+  return receiptModelOrderCleanupPlan(initial, latest, now, 'passed')
+}
+
+/** The failed-release caller supplies the two SHA-bound original F186 reports.
+ * Preserve their real failure status and use the actual latest writer window. */
+export function failedReleaseModelOrderCleanupPlan(initial: any, failures: any[], now = Date.now()) {
+  const refuse = (): never => { throw new Error('issue1503_cleanup_failed_model_order_receipt_mismatch') }
+  if (!Array.isArray(failures) || failures.length !== 2) return refuse()
+  const plans = failures.map((latest, index) => {
+    const started = briefOrder(latest?.originalOrder), restored = briefOrder(latest?.restoredOrder)
+    if (latest?.status !== 'failed' || latest.marker !== '42535538611-1'
+      || latest.expectedSha !== 'bb5d1f9e224aea395b9c45823960e8ad10f1a099'
+      || serialized(latest.selectedHarnesses) !== serialized([index === 0 ? 'claude_code' : 'codex'])
+      || !started || !restored || started.entries.length !== 22 || restored.entries.length !== 22
+      || started.location !== 'cloud' || started.preferredHarness !== 'claude_code'
+      || started.autoModelRouting !== true || started.customized !== true
+      || !sameModelOrder(started, restored)
+      || !Array.isArray(latest.cleanup) || !latest.cleanup.some((entry: any) =>
+        entry?.kind === 'effective_model_order_restored' && entry.customizedFlagPreserved === true)) return refuse()
+    return receiptModelOrderCleanupPlan(initial, latest, now, 'failed')
+  })
+  if (Date.parse(failures[0].completedAt) >= Date.parse(failures[1].startedAt)
+    || !sameModelOrder(failures[0].restoredOrder, failures[1].originalOrder)) return refuse()
+  return { ...plans[1], latest: failures[1] }
 }

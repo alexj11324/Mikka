@@ -10,13 +10,22 @@ import { ownerSettingsChanged } from '../../../lib/live/lists'
 import { computerGone, computerState, killComputer } from '../../../lib/computer/e2b-provider'
 import { cleanupIssue1503SmokeGitHub, SmokeGitHubSetupError } from '../issue1503-smoke-github.mjs'
 import { smokeSession, SMOKE_ID, OWNER_ID, fail } from './http'
-import { modelOrderCleanupPlan, sameModelOrder } from './model-order-cleanup'
+import { modelOrderCleanupPlan, failedReleaseModelOrderCleanupPlan, sameModelOrder } from './model-order-cleanup'
+import { Sandbox } from 'e2b'
+import { e2bApiKey } from '../../../lib/secrets/e2b-runtime'
+import { threadLifecycleProvider } from '../../../lib/cloud-computer/thread-lifecycle-provider'
+import { threadMachineProvider } from '../../../lib/cloud-computer/thread-machines'
+import { loadAllocationScope, loadFailedAllocationScope, allocationTargets, allocationIdentity, findLegacyCreated,
+  confirmAllocationAbsence, assertAllocationPostcondition } from './cleanup-allocations.mjs'
 
 const WORKSPACE_ID = '93f38d33-9447-4eaf-8a46-0d8889165bcd'
 const E2B_UPDATED_AT = '2026-11-06T18:21:51.895Z'
 const ACTIVE_RUNS = ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing']
 const HANDOFF_KEY = 'v2/github.com/alexj11324/mikka-handoff'
-const report: Record<string, any> = { issue: 1503, phase: 'cleanup', workspaceId: WORKSPACE_ID,
+const cleanupMode = process.env.MIKKA_1503_CLEANUP_MODE ?? 'final_delivery'
+const failedRelease = cleanupMode === 'failed_release'
+const report: Record<string, any> = { issue: 1503, phase: failedRelease ? 'failed_release' : 'cleanup',
+  ...(failedRelease ? { acceptancePassed: false, failedWorkflowRunId: 42535538611 } : {}), workspaceId: WORKSPACE_ID,
   startedAt: new Date().toISOString(), status: 'running', actions: [], retained: [] }
 let session: Awaited<ReturnType<typeof smokeSession>> | undefined
 let stage = 'fixture_state'
@@ -60,7 +69,7 @@ async function restoreCreditShare(fixture: Record<string, any>) {
 /** Metadata only. Old blocked/passed tasks and retained sandbox IDs are not proof of live work. */
 async function inventory() {
   const { rows: [row] } = await pool.query(`SELECT
-    COALESCE((SELECT jsonb_agg(jsonb_build_object('id',t.id,'userId',t."userId",'stage',t.stage,'status',t.status))
+    COALESCE((SELECT jsonb_agg(jsonb_build_object('id',t.id,'userId',t."userId",'issueId',t."issueId",'stage',t.stage,'status',t.status))
       FROM factory_tasks t JOIN bots b ON b.id=t."botId" WHERE b."workspaceId"=$1), '[]') AS tasks,
     COALESCE((SELECT jsonb_agg(jsonb_build_object('id',r.id,'userId',r."userId",'status',r.status))
       FROM agent_runs r WHERE r.status=ANY($3::text[]) AND (
@@ -69,9 +78,15 @@ async function inventory() {
         OR EXISTS(SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id AND b."workspaceId"=$1)
         OR EXISTS(SELECT 1 FROM factory_attempts a JOIN factory_tasks t ON t.id=a."taskId"
           JOIN bots b ON b.id=t."botId" WHERE a."runId"=r.id AND b."workspaceId"=$1))), '[]') AS runs,
-    COALESCE((SELECT jsonb_agg(jsonb_build_object('runId',"runId",'ownerId',"ownerId",'sandboxId',"sandboxId",
-      'state',state,'pending',("workerLeaseId" IS NOT NULL OR "workerLeaseUntil" IS NOT NULL)))
-      FROM thread_machines WHERE "workspaceId"=$1), '[]') AS threads,
+    COALESCE((SELECT jsonb_agg(jsonb_build_object(
+      'runId',m."runId",'ownerId',m."ownerId",'workspaceId',m."workspaceId",'issueId',m."issueId",
+      'operationId',m."operationId",'phase',m.lifecycle->>'phase','sandboxId',m."sandboxId",
+      'state',m.state,'pending',(m."workerLeaseId" IS NOT NULL OR m."workerLeaseUntil" IS NOT NULL),
+      'runOwnerId',r."userId",'runIssueId',r."issueId",'runStatus',r.status,'runFinishedAt',r."finishedAt",
+      'runLeaseLive',COALESCE(r."leaseExpiresAt">now(),false),
+      'legacyTerminalAtMatches',COALESCE(r."finishedAt"='2026-11-06T19:56:45.867Z'::timestamptz,false)))
+      FROM thread_machines m LEFT JOIN agent_runs r ON r.id=m."runId"
+      WHERE m."workspaceId"=$1), '[]') AS threads,
     COALESCE((SELECT jsonb_agg(jsonb_build_object('ownerId',"ownerId",'sandboxId',"sandboxId",'state',state,
       'pending',("provisionLeaseId" IS NOT NULL OR "provisionLeaseUntil" IS NOT NULL
         OR "workerLeaseId" IS NOT NULL OR "workerLeaseUntil" IS NOT NULL)))
@@ -146,12 +161,13 @@ async function scopedJson(path: string, init?: RequestInit) {
 const unwrap = (value: any) => value?.ok === true ? value.data : value
 
 /** Operator-only repair of this fixture's first driver's materialized default. The normal API has no reset action. */
-async function restoreModelOrderDefault() {
+async function restoreModelOrderDefault(failureReports?: any[]) {
   const initial = JSON.parse(await readFile(process.env.MIKKA_1503_INITIAL_ORDER_FILE
     ?? 'scripts/ops/issue1503/initial-model-order.json', 'utf8'))
-  const latest = JSON.parse(await readFile(process.env.MIKKA_1503_SUCCESSFUL_DELIVERY_FILE
+  const latest = failureReports ? failureReports[1] : JSON.parse(await readFile(process.env.MIKKA_1503_SUCCESSFUL_DELIVERY_FILE
     ?? 'scripts/ops/issue1503/last-successful-delivery.json', 'utf8'))
-  const { original, materialized, currentDefault } = modelOrderCleanupPlan(initial, latest)
+  const { original, materialized, currentDefault } = failureReports
+    ? failedReleaseModelOrderCleanupPlan(initial, failureReports) : modelOrderCleanupPlan(initial, latest)
   const currentView = unwrap(await session!.rpc('model-order.getModelOrder', [WORKSPACE_ID]))
   if (currentView.customized === false) {
     if (!sameModelOrder(currentView, currentDefault)) fail('cleanup_model_order_default_changed')
@@ -203,6 +219,7 @@ async function restoreModelOrderDefault() {
 }
 
 try {
+  if (!['final_delivery', 'failed_release'].includes(cleanupMode)) fail('cleanup_mode_invalid')
   const state = JSON.parse(await readFile(process.env.MIKKA_1503_FIXTURE_STATE_FILE ?? 'scripts/ops/issue1503/fixture-state.json', 'utf8'))
   if (state.issue !== 1503 || state.workspaceId !== WORKSPACE_ID || state.ownerUserId !== OWNER_ID || state.smokeUserId !== SMOKE_ID
     || state.shareBefore?.shared !== false || state.shareBefore?.allowOthers !== false
@@ -210,6 +227,18 @@ try {
     || state.githubSetup?.userId !== SMOKE_ID || state.githubSetup?.ownerUserId !== OWNER_ID
     || state.githubSetup?.repository !== 'alexj11324/Mikka-handoff') fail('cleanup_fixture_state_mismatch')
 
+  stage = 'allocation_inputs'
+  const allocationConfig = JSON.parse(await readFile(process.env.MIKKA_1503_ALLOCATION_SCOPE_FILE
+    ?? 'scripts/ops/issue1503/cleanup-allocation-scope.json', 'utf8'))
+  const allocationScope = failedRelease
+    ? await loadFailedAllocationScope(allocationConfig, process.env.MIKKA_1503_FAILED_DELIVERY_FILE
+      ?? 'scripts/ops/issue1503/last-failed-delivery.json')
+    : await loadAllocationScope(allocationConfig, process.env.MIKKA_1503_SUCCESSFUL_DELIVERY_FILE
+      ?? 'scripts/ops/issue1503/last-successful-delivery.json')
+  report.allocationScope = { receipts: allocationScope.receipts,
+    ...(failedRelease ? { mode: 'failed_release', acceptancePassed: false,
+      latestFailedRawSha256: allocationScope.latestFailedRawSha256 }
+      : { latestSuccessfulRawSha256: allocationScope.latestSuccessfulRawSha256 }) }
   stage = 'fixture_scope'
   const { rows: [workspace] } = await workspacePool.query(`SELECT w.id,w."userId",w.kind,w.slug,
     (SELECT count(*) FROM mikka_workspace_members m WHERE m."workspaceId"=w.id
@@ -224,6 +253,8 @@ try {
   report.productionBuild = (await session.json('/api/version')).build
   let current = await inventory()
   report.before = counts(current)
+  // Freeze new-case operation IDs from this existing inventory. Historical IDs are already pinned.
+  allocationScope.allocations = allocationIdentity(allocationTargets(allocationScope, current))
 
   stage = 'stop_fixture_work'
   for (const task of current.tasks.filter(item => item.userId === SMOKE_ID && !completed(item))) {
@@ -232,7 +263,7 @@ try {
       if (value.task?.id !== task.id) fail('cleanup_factory_binding_changed')
       if (completed(value.task)) return
       await scopedJson(`/api/factory/tasks/${task.id}`, session!.post({ binding: { taskId: task.id, revision: value.task.revision },
-        eventId: randomUUID(), action: 'cancel', reason: 'Issue #1503 production verification finished; release only this fixture’s unfinished resources.' }))
+        eventId: randomUUID(), action: 'cancel', reason: failedRelease ? 'Issue #1503 production window ended after failed acceptance; release only this fixture’s unfinished resources.' : 'Issue #1503 production verification finished; release only this fixture’s unfinished resources.' }))
     })
   }
   for (const subagent of current.subagents.filter(item => item.ownerId === SMOKE_ID)) {
@@ -251,6 +282,7 @@ try {
   stage = 'end_fixture_machines'
   // Re-read once after cancellation: a stage that was provisioning may now have a machine row.
   current = await inventory()
+  allocationTargets(allocationScope, current)
   const endedSandboxes = new Set<string>()
   for (const machine of current.threads.filter(item => item.ownerId === SMOKE_ID)) {
     if (machine.state === 'ended' && !machine.sandboxId && !machine.pending) continue
@@ -268,6 +300,7 @@ try {
     })
   }
   current = await inventory()
+  allocationTargets(allocationScope, current)
   const unfinished = current.runs.length || current.subagents.length || current.tasks.some(task => !completed(task))
   for (const machine of current.clouds.filter(item => item.ownerId === SMOKE_ID && item.sandboxId)) {
     await attempt('cloud_machine_ended', SMOKE_ID, async () => {
@@ -280,8 +313,23 @@ try {
     })
   }
 
+  stage = 'verify_exact_allocation_absence'
+  report.providerAllocations = { status: 'pending', receipts: [] }
+  const allocationBefore = await confirmAllocationAbsence(allocationScope, current, {
+    modern: threadLifecycleProvider.findCreated,
+    legacy: (target: any) => findLegacyCreated(target, {
+      list: (options: any) => Sandbox.list(options),
+      options: async (ownerId: string) => ({ apiKey: await e2bApiKey(ownerId, 'Cloud runtime unavailable'),
+        proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy, requestTimeoutMs: 15_000 }),
+    }),
+    kill: threadMachineProvider.kill,
+    info: threadLifecycleProvider.info,
+  }, endedSandboxes, (receipt: any) => report.providerAllocations.receipts.push(receipt))
+
   stage = 'verify_resource_boundary'
   current = await inventory()
+  assertAllocationPostcondition(allocationScope, current, allocationBefore, endedSandboxes)
+  report.providerAllocations.status = 'confirmed'
   report.after = counts(current)
   const pendingThreads = current.threads.filter(machine => machine.state !== 'ended' || machine.pending
     || (machine.sandboxId && !endedSandboxes.has(machine.sandboxId)))
@@ -301,7 +349,7 @@ try {
   } else {
     stage = 'restore_fixture_model_order_default'
     try {
-      await restoreModelOrderDefault()
+      await restoreModelOrderDefault(failedRelease ? allocationScope.sourceReports : undefined)
     } catch (error) {
       report.modelOrder = { status: 'retained', code: safeCode(error) }
       report.retained.push({ kind: 'model_order', reason: 'conditional_restore_not_confirmed' })
@@ -364,6 +412,7 @@ try {
       } else {
         // Re-check operations and the exact sandbox set after provider reads; the normal delete API has no timestamp CAS parameter.
         const latest = await inventory()
+        assertAllocationPostcondition(allocationScope, latest, allocationBefore, endedSandboxes)
         const observed = new Set(current.other_sandboxes.map(machine => `${machine.workspaceId}:${machine.sandboxId}`))
         const newSandbox = latest.other_sandboxes.some(machine => !observed.has(`${machine.workspaceId}:${machine.sandboxId}`))
           || [...latest.threads, ...latest.clouds].some(machine => machine.sandboxId && !endedSandboxes.has(machine.sandboxId))
