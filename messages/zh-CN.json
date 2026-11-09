@@ -5683,6 +5683,20 @@
       "pending": "读取中"
     }
   },
+  "HostedTasks": {
+    "open": "打开任务",
+    "status": "状态",
+    "tasks": "任务",
+    "steps": "步骤",
+    "happened": "最近的进展",
+    "emptyActive": "没有进行中的任务",
+    "emptyActiveText": "新建任务，交给 Bot 去做。",
+    "emptyDone": "还没有完成的任务",
+    "emptyDoneText": "完成的任务会出现在这里。",
+    "noTask": "没有打开的任务",
+    "noTaskText": "在左侧选一个任务，查看它到哪一步了。",
+    "noTasks": "没有任务"
+  },
   "HostedInbox": {
     "open": "待处理",
     "send": "发送",

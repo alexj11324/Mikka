@@ -5683,6 +5683,20 @@
       "pending": "Loading"
     }
   },
+  "HostedTasks": {
+    "open": "Open task",
+    "status": "Status",
+    "tasks": "Tasks",
+    "steps": "Steps",
+    "happened": "Latest",
+    "emptyActive": "No active tasks",
+    "emptyActiveText": "New task hands one to a Bot.",
+    "emptyDone": "Nothing done yet",
+    "emptyDoneText": "Finished tasks land here.",
+    "noTask": "No task open",
+    "noTaskText": "Pick a task on the left to see where it is.",
+    "noTasks": "No tasks"
+  },
   "HostedInbox": {
     "open": "Open",
     "send": "Send",
