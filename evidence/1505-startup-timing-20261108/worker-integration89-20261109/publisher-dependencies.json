@@ -1,0 +1,16 @@
+{
+  "source": "854583566f4f55fc15490a240c3e38a2c1fd16b6",
+  "reviewer": "/root/production_traces",
+  "npmPath": ".github/workflows/publish-daemon.yml",
+  "e2bPath": ".github/workflows/e2b-official-runtime.yml",
+  "finding": "npm daemon seal failure is not an E2B or formal upstream dependency. E2B builds pinned Git source directly; its seven jobs and formal upstream guard do not depend on npm publish. Actual window/writer coordination still applies.",
+  "futureActualMain": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+  "newMainReviewOwnedBy": "/root/template_prebuild",
+  "formalSamples": 0,
+  "rootFollowup": {
+    "source": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+    "e2bWorkflowRead": "complete",
+    "daemonWorkflowRead": "lines60-120",
+    "conclusion": "Same direct Git-source E2B chain; no npm publisher dependency."
+  }
+}

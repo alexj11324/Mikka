@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "files": [
+    {
+      "path": "independent-integration.json",
+      "bytes": 6854,
+      "sha256": "c463109e7a27ff3306be6e96226a61bd2a3414f645ee53054033ab29964c3cd3"
+    },
+    {
+      "path": "publisher-dependencies.json",
+      "bytes": 839,
+      "sha256": "67d0d371f576954abe06026af85743e96d890dbfe2284ce80b5b31d8287f6216"
+    },
+    {
+      "path": "root-readback.json",
+      "bytes": 943,
+      "sha256": "89bdb5dd05e2d15304c8e670a54609dc867aab55caa19f35c7349f6dab1c99dd"
+    }
+  ]
+}

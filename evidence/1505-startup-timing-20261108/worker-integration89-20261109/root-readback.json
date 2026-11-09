@@ -1,0 +1,28 @@
+{
+  "source": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+  "sourceTree": "a850a89f11cbb467df869651ee39beca157c6351",
+  "ownHead": "5fde6ffae3c01769b69aa9c14abec26f2ceddfda",
+  "rootCreateTree": "b242578595fc01ff23c37d61e933c45ca28d692d",
+  "independentTree": "b242578595fc01ff23c37d61e933c45ca28d692d",
+  "rootCreateTreeRefWritten": false,
+  "headReadbackAt": "2026-11-09T07:34:04Z",
+  "mergeable": true,
+  "mergeableState": "clean",
+  "apiAdvertisedBase": "88b144d52d091d7ff566c63fce6e902e33edc59e",
+  "apiAdvertisedSynthetic": "aaaa97fc745eed66f56e8c3543fa50f61815cc38",
+  "freshMetadataObserverAt": "2026-11-09T07:32:41Z",
+  "checks": {
+    "success": 34,
+    "skipped": 7,
+    "active": 0,
+    "failure": 0
+  },
+  "workflows": {
+    "success": 8
+  },
+  "reviews": [],
+  "newCombinationCIExecuted": false,
+  "formalSamples": 0,
+  "comment": "https://github.com/alexj11324/Mikka/pull/1805#issuecomment-6734804336",
+  "ownedVmsRunning": 0
+}
