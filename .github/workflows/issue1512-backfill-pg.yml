@@ -31,7 +31,8 @@ jobs:
 
   red:
     name: Old source, genuine regression assertion RED
-    if: ${{ github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1512-backfill-pg-20261109' && github.event_name == 'push' && github.run_attempt == '1' && github.event.head_commit.message == 'issue1512: backfill-pg admit 20261109' }}
+    if: >-
+      ${{ github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1512-backfill-pg-20261109' && github.event_name == 'push' && github.run_attempt == '1' && github.event.head_commit.message == 'issue1512: backfill-pg admit 20261109' }}
     runs-on: ubuntu-22.04
     timeout-minutes: 8
     services:
@@ -117,7 +118,8 @@ jobs:
   green:
     name: Candidate, complete Coordinator family GREEN
     needs: red
-    if: ${{ github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1512-backfill-pg-20261109' && github.event_name == 'push' && github.run_attempt == '1' && github.event.head_commit.message == 'issue1512: backfill-pg admit 20261109' && needs.red.result == 'success' }}
+    if: >-
+      ${{ github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1512-backfill-pg-20261109' && github.event_name == 'push' && github.run_attempt == '1' && github.event.head_commit.message == 'issue1512: backfill-pg admit 20261109' && needs.red.result == 'success' }}
     runs-on: ubuntu-22.04
     timeout-minutes: 12
     services:
