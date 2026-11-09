@@ -140,7 +140,7 @@ jobs:
 
   final-acceptance:
     if: >-
-      ${{ false && github.repository == 'alexj11324/Mikka' && github.event_name == 'push' &&
+      ${{ github.repository == 'alexj11324/Mikka' && github.event_name == 'push' &&
       github.ref == 'refs/heads/acceptance/issues-1504-1506' &&
       startsWith(github.event.head_commit.message, 'test: run root final issue acceptance') }}
     permissions:
@@ -204,7 +204,7 @@ jobs:
           const live=await fetch('https://app.aspectlylabs.com/mikka/api/version',{
             headers:{'cache-control':'no-store'},redirect:'error',signal:AbortSignal.timeout(20000)})
           if(!live.ok || (await live.json()).build!==sha) throw Error('PUBLIC_SOURCE_CHANGED')
-          const required = process.env.MIKKA_GROUP_MODE === 'mcp' ? ['CI','Web deploy']
+          const required = process.env.MIKKA_GROUP_MODE === 'mcp' ? ['Web deploy']
             : ['CI','Web deploy','E2B additive runtime release','Self-hosted image']
           const workflows=required.map(name=>{
             const candidates=runs.workflow_runs.filter(r=>r.name===name&&r.head_sha===sha&&r.head_branch==='main')
@@ -214,7 +214,13 @@ jobs:
             return {name,runId:run.id,attempt:run.run_attempt}
           })
           mkdirSync('issue-1212-mcp-report',{recursive:true})
-          writeFileSync('issue-1212-mcp-report/release-gate.json',JSON.stringify({sourceSha:sha,workflows,runtimeUsed:process.env.MIKKA_GROUP_MODE!=='mcp',credentialsDelivered:false})+'\n')
+          // MCP only observes the already deployed application; it does not publish or merge.
+          // Keep its CI observations honest without adding a new deployment gate to reads.
+          const latestCi = runs.workflow_runs.filter(r=>r.name==='CI'&&r.head_sha===sha&&r.head_branch==='main')
+            .sort((a,b)=>b.id-a.id || b.run_attempt-a.run_attempt)[0]
+          const ciObserved = latestCi ? {runId:latestCi.id,attempt:latestCi.run_attempt,status:latestCi.status,conclusion:latestCi.conclusion} : null
+          writeFileSync('issue-1212-mcp-report/release-gate.json',JSON.stringify({sourceSha:sha,workflows,ciObserved,
+            acceptanceOnly:process.env.MIKKA_GROUP_MODE==='mcp',runtimeUsed:process.env.MIKKA_GROUP_MODE!=='mcp',credentialsDelivered:false})+'\n')
           JS
       - name: Read only the exact released source for normal shared-account helpers
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
