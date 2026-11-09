@@ -676,6 +676,71 @@ test('the diagnostic reads only the frozen build with debug-level finite pages a
   assert.equal(JSON.stringify(result).includes(privateText), false)
 })
 
+test('fixed early provider failures retain only exact public categories in the one bounded GET', async () => {
+  const known = [
+    ['An internal error occurred. Please try again or contact support with the build ID.', 'provider_internal_error'],
+    ['build was cancelled', 'build_cancelled'], ['build timed out', 'build_timed_out'],
+  ]
+  const secret = 'synthetic-private-unclassified-provider-message'
+  for (const [message, category] of known) {
+    const entries = [logEntry(secret, 'info'), logEntry(secret, 'info'), logEntry(secret, 'info'),
+      logEntry('Build failed: ' + message, 'error'), logEntry('[start] [stderr]: Build failed: ' + message, 'error'),
+      logEntry('Build failed: ' + message, 'info'), logEntry('Build failed: ' + message + secret, 'error')]
+    let requests = 0
+    const result = await diagnoseExistingBuild('synthetic-key', { fetchImpl: async (_url, init) => {
+      requests++; assert.equal(init.method, 'GET')
+      return jsonResponse(diagnosticPage(entries, { step: null, message, logEntries: [] }))
+    } })
+    assert.equal(requests, 1); assert.equal(result.complete, true); assert.equal(result.status, 'error')
+    assert.deepEqual(result.reason, { phase: null, categories: [category], exitCode: null })
+    assert.deepEqual(result.events, [{ kind: 'provider_failure', detail: category, count: 1 }])
+    assert.equal(result.ignoredLines, 6); assert.equal(result.runtimeAcceptance, false)
+    assert.equal(result.resourcesCreated, false); assert.equal(result.mutationsPerformed, false)
+    assert.equal(result.signals.startAnnounced, false); assert.equal(result.signals.readyAnnounced, false)
+    assert.equal(JSON.stringify(result).includes(secret), false)
+    for (const level of ['info', 'error']) {
+      const ready = await diagnoseExistingBuild('synthetic-key', { fetchImpl: async () =>
+        jsonResponse(diagnosticPage([logEntry('Template is not ready: ' + message, level)])) })
+      assert.deepEqual(ready.events, [{ kind: 'ready_rejected', phase: 'finalize', categories: [], exitCode: null, count: 1 }])
+      assert.equal(ready.signals.readyRejected, 1)
+    }
+    for (const invalidEntry of ['[start] [stderr]: guest continuation\nBuild failed: ' + message,
+      'Build failed: ' + message + '\n' + secret, ' Build failed: ' + message]) {
+      const unknown = await diagnoseExistingBuild('synthetic-key', { fetchImpl: async () =>
+        jsonResponse(diagnosticPage([logEntry(invalidEntry, 'error')])) })
+      assert.deepEqual(unknown.events, [])
+      assert.equal(JSON.stringify(unknown).includes(secret), false)
+    }
+    for (const invalid of [secret + message, message + secret, message + '\n' + secret,
+      '[start] [stderr]: Build failed: ' + message, 'Build failed: ' + message + 'x'.repeat(65536)]) {
+      const unknown = await diagnoseExistingBuild('synthetic-key', { fetchImpl: async () =>
+        jsonResponse(diagnosticPage([], { message: invalid, logEntries: [] })) })
+      assert.deepEqual(unknown.reason.categories, [])
+      assert.equal(JSON.stringify(unknown).includes(secret), false)
+    }
+  }
+})
+
+test('provider failure projection cannot promote failed acceptance or retain unknown fields', () => {
+  const value = fixtureReceipts(), secret = 'synthetic-private-provider-category'
+  const categories = ['provider_internal_error', 'build_cancelled', 'build_timed_out']
+  const events = categories.map(detail => ({ phase: 'provider_failure', detail, count: 1, message: secret }))
+  value.buildReport = { identity, status: 'failed', stage: 'build_codex', code: 'template_build_failed', diagnostic: {
+    buildLogs: { codex: { events: [...events, { phase: 'provider_failure', detail: secret }] } },
+    statusLookup: { identityMatched: true, status: 'error', categories: [...categories, secret],
+      debugLogs: { events: [...events, { phase: 'provider_failure', detail: secret }] } },
+  } }
+  const result = summarizeAcceptance(context, value)
+  assert.equal(result.passed, false); assert.equal(result.build.code, 'template_build_failed')
+  assert.equal(result.build.stage, 'build_codex')
+  assert.deepEqual(result.build.diagnostic.statusLookup.categories, [...categories].sort())
+  assert.deepEqual(result.build.diagnostic.buildLogs.codex.events,
+    categories.map(detail => ({ phase: 'provider_failure', detail })))
+  assert.deepEqual(result.build.diagnostic.statusLookup.debugLogs.events,
+    categories.map(detail => ({ phase: 'provider_failure', detail, count: 1 })))
+  assert.equal(JSON.stringify(result).includes(secret), false)
+})
+
 test('deleted or unauthorized exact builds stop immediately and remain unavailable', async () => {
   for (const [httpStatus, body, expected] of [[400, { message: `Build '${FINALIZE_DIAGNOSTIC.buildId}' not found` }, 'not_found'],
     [400, { message: 'another failure' }, 'http_error'], [401, {}, 'unauthorized'], [403, {}, 'forbidden'], [404, {}, 'not_found'], [429, {}, 'http_error']]) {

@@ -1,0 +1,62 @@
+name: Issue 1782 fixed deleted Codex build diagnosis
+on:
+  push:
+    branches: [ops/self-hosted-vault-closeout-20261108]
+permissions:
+  contents: read
+jobs:
+  codex_deleted_build_readonly:
+    name: GET only the one verified cleaned Codex build
+    if: github.repository == 'alexj11324/Mikka' && github.actor == 'alexj11324' && github.ref == 'refs/heads/ops/self-hosted-vault-closeout-20261108' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: alexj11324/Mikka
+          ref: b315f01116d64bc8a7cc1ef4312e4d14e7790dbb
+          path: workspace-codex-diagnostic-source
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Preserve all existing bounded diagnostic tests and the exact new source guard
+        timeout-minutes: 1
+        run: node --test scripts/ops/workspace-private-acceptance.test.mjs scripts/ops/codex-build-diagnostic-1782.test.mjs
+      - name: Verify actual Ops parent and immutable b315 source before credentials
+        timeout-minutes: 1
+        run: node scripts/ops/codex-build-diagnostic-1782.mjs check
+      - name: Read only the existing E2B credential through the unchanged OIDC identity
+        timeout-minutes: 1
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: E2B_API_KEY
+          recursive: false
+          include-imports: false
+      - name: Read at most six pages from the one terminal deleted build
+        timeout-minutes: 2
+        run: node scripts/ops/codex-build-diagnostic-1782.mjs diagnose
+      - name: Retain only closed source, category and count evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fixed-codex-build-diagnostic-1782-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/codex-build-diagnostic-1782/*.json
+          retention-days: 14
+          if-no-files-found: warn

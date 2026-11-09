@@ -9,16 +9,16 @@ import { pathToFileURL } from 'node:url'
 import { assertOpsContext } from './self-hosted-ingress-probe.mjs'
 
 export const P0 = Object.freeze({
-  source: 'b315f01116d64bc8a7cc1ef4312e4d14e7790dbb',
-  tree: '95f69cec928307e837e3e19fd401100ed7a90117',
+  source: 'eb387d91cee9845e00026cc1f83387e42caf7993',
+  tree: '52ffc56e7dbcf94362519101a8410aee3893bfe8',
   workerSha: '300c7be89fb2bbb701e29d4c74ec7962694613e1',
   sdks: { nodeMajor: '24', pnpm: '10.34.3', javascriptE2b: '2.61.0', pythonE2b: '2.62.0', next: '16.4.1' },
   files: {
     'package.json': '42e0321a095d434bb22437cfd2a3685cbbfb0d0d66576e334aeab2d05e50eb47',
     'pnpm-lock.yaml': 'e18697f2dd891b9159e43e40d1f8af4018d087cf2a0e668b9e358a766b020c28',
     'pnpm-workspace.yaml': '5a24e67ade7fae19b2d160b4ca61b58170eb3c04a18f8b06efb9a5a0fae36b9f',
-    'scripts/e2b/workspace-candidates.py': '2440d02b368288e4a6e8a618f65e2ecca88f5a0251a0a005f9c71b6c0c977237',
-    'scripts/e2b/workspace-candidates.test.py': 'ce408974f1841de2ba164cd108b69c7dfc1d3bcab8c4cc84c9d1cc7db5622b37',
+    'scripts/e2b/workspace-candidates.py': '00757ff10c91206035a051e0625bd2b6adda4e07ef27806628ec6c916e2df0ef',
+    'scripts/e2b/workspace-candidates.test.py': '34f3633b94b05b5c6db49cdcb3e61cdac436ccd52c2312087dbcbc7bacede4c4',
     'scripts/e2b/build-template.py': '33ff017fa85e6e05fbdf7d0e8a5c59db4da98825e2aff73ac3314956e479b42c',
     'scripts/e2b/build-template.test.py': '0481716b0fd2accfd66d08975ceee67ac5fdf6ae82c3918c20164632c79a3ed2',
     'scripts/e2b/official-files.py': '66911624af52df59ef715eb105af9a3025bacf12460105fadc7f87e4d2dd63b5',
@@ -38,13 +38,13 @@ export const P0 = Object.freeze({
 // Copied only from the verified, closed creation journal in this exact artifact.
 // This target is already deleted; the diagnostic must never create a replacement.
 export const FINALIZE_DIAGNOSTIC = Object.freeze({
-  runId: '42539385597', runAttempt: '1',
-  opsSource: '4b330dff25a74c66a92530e9d12e6e91485e3797',
-  sourceCommit: '37b0e55ddfca6646bc3beea7531048e6e63331c1',
-  sourceTree: '2167f94b74c1ede4b8d37054fb407a462c0b470d',
-  workerSha: '0537b0c49fe197240632ec7c74875c3af0c53260',
-  templateId: '9k8a4ls6uimaeyvbipz4', buildId: 'dff39bb4-ce38-412f-8451-7dd75967a4fa',
-  artifactId: 13641406353, artifactSha256: '6fc38ac8f6ba22cbdbb3dc39cc510ac4898b83d1256910e0ada27b74966e24b5',
+  runId: '42694495556', runAttempt: '1',
+  opsSource: '9cd289ebe5b67cec4ea243cc11ce5fd24de9501a',
+  sourceCommit: 'b315f01116d64bc8a7cc1ef4312e4d14e7790dbb',
+  sourceTree: '95f69cec928307e837e3e19fd401100ed7a90117',
+  workerSha: '300c7be89fb2bbb701e29d4c74ec7962694613e1',
+  templateId: 'gyx8q8k5izwymqtv36rj', buildId: '5e5fef90-c723-406a-9839-8868485fdbe8',
+  artifactId: 13708184048, artifactSha256: '151e05c0ba67c292672277bd6ecdb2c5b89e67251cbf47482575e05b241e18af',
 })
 const SOURCE_DIRECTORY = 'workspace-acceptance-source'
 const SHA = /^[a-f0-9]{40}$/, DIGEST = /^[a-f0-9]{64}$/
@@ -119,8 +119,9 @@ const FRAMEWORK_VERSIONS = { next: '16.4.1', vite: '8.3.6', react: '19.3.1', 're
 const exitCode = number => Number.isInteger(number) && number >= -255 && number <= 255 ? number : null
 const DEBUG_FAILURE_CODES = ['journal_refused', 'request_failed', 'request_timeout', 'worker_failed', 'body_limit',
   'response_refused', 'http_error', 'unauthorized', 'forbidden', 'not_found', 'not_terminal', 'status_changed', 'time_limit', 'page_limit']
+const PROVIDER_FAILURE_CATEGORIES = ['provider_internal_error', 'build_cancelled', 'build_timed_out']
 const DEBUG_REASON_CATEGORIES = ['configuration_failed', 'ready_failed', 'ready_timeout', 'start_confirmation_failed',
-  'start_failed', 'process_start_failed', 'sync_failed', 'deadline_exceeded']
+  'start_failed', 'process_start_failed', 'sync_failed', 'deadline_exceeded', ...PROVIDER_FAILURE_CATEGORIES]
 const debugCategories = value => [...new Set((Array.isArray(value) ? value.slice(0, 8) : [])
   .filter(code => DEBUG_REASON_CATEGORIES.includes(code)))].sort()
 const debugCount = (value, maximum) => count(value) !== null && value <= maximum ? value : null
@@ -215,6 +216,9 @@ function buildEvents(rows, debug = false) {
     let event
     switch (row?.phase) {
       case 'template_created': event = { phase: row.phase }; break
+      case 'provider_failure':
+        if (!PROVIDER_FAILURE_CATEGORIES.includes(row.detail)) return []
+        event = { phase: row.phase, detail: row.detail }; break
       case 'bootstrap': event = { phase: row.phase, detail: one(row.detail, BOOTSTRAP_PHASES), elapsedMs: count(row.elapsedMs) }; break
       case 'prebuilt_start':
         if (!PREBUILT_START_PHASES.includes(row.detail)) return []
@@ -276,7 +280,19 @@ function buildDiagnostic(value) {
   }
 }
 
-function providerReason(message, step) {
+function fixedProviderFailure(message) {
+  // Exact runtime@438a79cf builderrors/errors.go literals and builder.go envelope.
+  // A matching observed message does not identify the deployed provider revision.
+  if (typeof message !== 'string' || message.length > 65_536) return null
+  const text = message.startsWith('Build failed: ') ? message.slice(14) : message
+  const known = new Map([
+    ['An internal error occurred. Please try again or contact support with the build ID.', 'provider_internal_error'],
+    ['build was cancelled', 'build_cancelled'], ['build timed out', 'build_timed_out'],
+  ])
+  return known.get(text) ?? null
+}
+
+function providerReason(message, step, includeFixed = true) {
   const text = typeof message === 'string' && message.length <= 65_536 ? message : ''
   // Fixed error prefixes from runtime@438a79cf finalize/builder.go and ready.go.
   // Their presence is an observation, not proof the deployed provider uses that revision.
@@ -293,8 +309,10 @@ function providerReason(message, step) {
   const codes = [...text.matchAll(/\bexit (?:status|code):?\s+(-?[0-9]{1,3})(?=$|[\s,;)])/gi)]
     .map(match => Number(match[1])).filter(number => exitCode(number) !== null)
   const unique = [...new Set(codes)]
+  const fixed = includeFixed ? fixedProviderFailure(text) : null
   return { phase: one(step, ['base', 'finalize'], null),
-    categories: Object.entries(patterns).filter(([, pattern]) => pattern.test(text)).map(([code]) => code).sort(),
+    categories: [...Object.entries(patterns).filter(([, pattern]) => pattern.test(text)).map(([code]) => code),
+      ...(fixed === null ? [] : [fixed])].sort(),
     exitCode: unique.length === 1 ? unique[0] : null }
 }
 
@@ -336,13 +354,17 @@ export async function diagnoseExistingBuild(apiKey, { fetchImpl = fetch, now = (
     if (!entry || !Object.hasOwn(result.levels, entry.level)) { result.ignoredLines++; return }
     result.levels[entry.level]++
     if (typeof entry.message !== 'string' || entry.message.length > 65_536) { result.oversizedEntries++; return }
+    const providerFailure = entry.message.startsWith('Build failed: ') ? fixedProviderFailure(entry.message) : null
+    if (entry.level === 'error' && providerFailure !== null) {
+      event({ kind: 'provider_failure', detail: providerFailure }); return
+    }
     for (const raw of entry.message.split('\n')) {
       let line = raw.trim()
       if (line.startsWith('Running start command: ')) { result.signals.startAnnounced = true; continue }
       if (line.startsWith('Waiting for template to be ready: ')) { result.signals.readyAnnounced = true; continue }
       if (line === 'Template is ready') { result.signals.templateReady = true; continue }
       if (line.startsWith('Template is not ready: ')) {
-        result.signals.readyRejected++; event({ kind: 'ready_rejected', ...providerReason(line.slice(23), 'finalize') }); continue
+        result.signals.readyRejected++; event({ kind: 'ready_rejected', ...providerReason(line.slice(23), 'finalize', false) }); continue
       }
       const wrapped = /^\[(?:builder ([1-9][0-9]?)\/([1-9][0-9]?)|start|ready)\] \[(?:stdout|stderr)\]: (.*)$/.exec(line)
       if (wrapped && (wrapped[1] === undefined || Number(wrapped[1]) <= Number(wrapped[2]))) line = wrapped[3]
