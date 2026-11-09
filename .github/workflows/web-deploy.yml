@@ -191,7 +191,7 @@ jobs:
           echo "MIKKA_DEPLOYMENT_ID=$id" >> "$GITHUB_ENV"
       - name: Install the pinned workspace dependencies
         if: steps.skip.outputs.skip != 'true'
-        run: pnpm install --frozen-lockfile
+        run: node scripts/install-workspace.mjs
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       - name: Install private UI runtime dependencies without license scripts
