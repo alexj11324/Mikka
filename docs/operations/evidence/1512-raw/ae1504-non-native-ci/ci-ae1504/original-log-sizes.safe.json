@@ -1,0 +1,72 @@
+[
+  {
+    "jobId": 128916883912,
+    "name": "Daemon checks",
+    "originalUtf16Length": 122379,
+    "originalUtf8Bytes": 123597,
+    "originalEndsWithNewline": true
+  },
+  {
+    "jobId": 128916883926,
+    "name": "Core unit checks",
+    "originalUtf16Length": 973531,
+    "originalUtf8Bytes": 985602,
+    "originalEndsWithNewline": true
+  },
+  {
+    "jobId": 128916883970,
+    "name": "Database checks (4/4)",
+    "originalUtf16Length": 593879,
+    "originalUtf8Bytes": 597469,
+    "originalEndsWithNewline": true
+  },
+  {
+    "jobId": 128916883972,
+    "name": "Database checks (2/4)",
+    "originalUtf16Length": 1090681,
+    "originalUtf8Bytes": 1095483,
+    "originalEndsWithNewline": true
+  },
+  {
+    "jobId": 128916883978,
+    "name": "Database checks (1/4)",
+    "originalUtf16Length": 1035746,
+    "originalUtf8Bytes": 1040920,
+    "originalEndsWithNewline": true
+  },
+  {
+    "jobId": 128916884008,
+    "name": "Integration unit checks",
+    "originalUtf16Length": 626778,
+    "originalUtf8Bytes": 635439,
+    "originalEndsWithNewline": true
+  },
+  {
+    "jobId": 128916884051,
+    "name": "Source checks",
+    "originalUtf16Length": 131887,
+    "originalUtf8Bytes": 133055,
+    "originalEndsWithNewline": true
+  },
+  {
+    "jobId": 128916884058,
+    "name": "Database checks (3/4)",
+    "originalUtf16Length": 1815978,
+    "originalUtf8Bytes": 1824096,
+    "originalEndsWithNewline": true
+  },
+  {
+    "jobId": 128918150874,
+    "name": "Production build and browser interactions",
+    "originalUtf16Length": 13303,
+    "originalUtf8Bytes": 13305,
+    "originalEndsWithNewline": true
+  },
+  {
+    "jobId": 128916638034,
+    "name": "changes / Changed files",
+    "originalUtf16Length": 586905,
+    "originalUtf8Bytes": 586907,
+    "originalEndsWithNewline": true
+  }
+]

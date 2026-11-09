@@ -1,0 +1,16 @@
+{
+  "file": "128916883978-database-checks-1-4.log",
+  "line": 6361,
+  "category": "email-shaped database diagnostic",
+  "classification": "normalized synthetic test fixture",
+  "fixtureSource": "lib/abuse/store.db.test.ts",
+  "fixtureSourceLines": [
+    386,
+    390
+  ],
+  "fixtureSourceSha256": "0076394e5cf1118e8c2c8c18969567f9da8c5cacb017f500d5ae43992e16ec9d",
+  "actualTree": "8c5c12ea993533403d13e21dc75647bb28022767",
+  "actualTreeSourceByteMatch": true,
+  "gitObjectReadExitCode": 0,
+  "valuesDisclosed": false
+}

@@ -1,0 +1,189 @@
+{
+  "version": 1,
+  "status": "partial_waiting_core_terminal",
+  "observedAt": "2026-11-09 00:47:18 UTC",
+  "runId": 42541312185,
+  "attempt": 1,
+  "head": "ae1504f1bb266ae3f7b6612898f134dd979f5fdd",
+  "actualCheckout": "0041c6ab2a28b562deed9c692d8572ac4736f64e",
+  "actualTree": "8c5c12ea993533403d13e21dc75647bb28022767",
+  "base": "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+  "selection": {
+    "full": true,
+    "reason": [
+      "global configuration, schema, policy or security input",
+      "unmapped file"
+    ],
+    "unitTasks": 85,
+    "dbSuites": 70,
+    "dbShards": 4
+  },
+  "completedJobs": [
+    {
+      "id": 128916883912,
+      "name": "Daemon checks",
+      "conclusion": "success",
+      "completedAt": "2026-11-09T00:43:07Z"
+    },
+    {
+      "id": 128916883970,
+      "name": "Database checks (4/4)",
+      "conclusion": "success",
+      "completedAt": "2026-11-09T00:43:30Z"
+    },
+    {
+      "id": 128916883972,
+      "name": "Database checks (2/4)",
+      "conclusion": "success",
+      "completedAt": "2026-11-09T00:43:24Z"
+    },
+    {
+      "id": 128916883978,
+      "name": "Database checks (1/4)",
+      "conclusion": "success",
+      "completedAt": "2026-11-09T00:43:11Z"
+    },
+    {
+      "id": 128916884008,
+      "name": "Integration unit checks",
+      "conclusion": "success",
+      "completedAt": "2026-11-09T00:43:36Z"
+    },
+    {
+      "id": 128916884051,
+      "name": "Source checks",
+      "conclusion": "success",
+      "completedAt": "2026-11-09T00:42:56Z"
+    },
+    {
+      "id": 128916884058,
+      "name": "Database checks (3/4)",
+      "conclusion": "success",
+      "completedAt": "2026-11-09T00:44:23Z"
+    },
+    {
+      "id": 128918150874,
+      "name": "Production build and browser interactions",
+      "conclusion": "success",
+      "completedAt": "2026-11-09T00:44:35Z"
+    }
+  ],
+  "pendingJobs": [
+    {
+      "id": 128916883926,
+      "name": "Core unit checks",
+      "status": "in_progress"
+    }
+  ],
+  "database": {
+    "expectedAndObservedSuites": 70,
+    "uniquePerShard": [
+      18,
+      18,
+      17,
+      17
+    ],
+    "everySuiteOneExitAndCloseZero": true,
+    "everySuiteHasNodeSummary": true,
+    "nonzeroFailOrSkip": false,
+    "reconciliation": "db-suite-reconciliation.safe.json",
+    "activityActor": {
+      "jobId": 128916883970,
+      "tests": 57,
+      "pass": 57,
+      "fail": 0,
+      "skipped": 0,
+      "newPrefetchCase": "prepared owner-list revisions share one PostgreSQL read without duplicate team refs or rows",
+      "newPrefetchResult": "pass",
+      "durationMs": 44.58092,
+      "timestamp": "2026-11-09T00:42:36.5851258Z",
+      "sourceSha256": "49c00de7613ef0f88a78906456d94f90b2438646ead72acdf1afda0a0bd07c3f"
+    }
+  },
+  "integration": {
+    "targets": 28,
+    "cache": "Skipped (--skip-nx-cache)",
+    "conclusion": "success"
+  },
+  "daemon": {
+    "vitestFilesPassed": 138,
+    "vitestFilesSkipped": 1,
+    "vitestTestsPassed": 1569,
+    "vitestTestsSkipped": 2,
+    "generationTests": {
+      "src/codex-generation-telemetry.test.ts": 13,
+      "src/adapters/generation-metrics.test.ts": 6,
+      "test/claude-generation-abort.test.ts": 4,
+      "test/codex-generation-completion.test.ts": 3
+    },
+    "skippedFile": "test/real-agents.test.ts; not live model acceptance"
+  },
+  "preservedWarnings": [
+    "Source log emits an env-runner worker-init error (W3CTraceContextPropagator is not a constructor) during passing real development worker regression; the test asserts successful HTTP, provider/pg instrumentation and exported child spans for both worker versions. This observed warning is retained; no CI failure or production failure inferred.",
+    "Daemon Vitest explicitly contains one skipped file/two skipped tests. DB no-skip conclusion is not generalized to daemon live-provider coverage."
+  ],
+  "boundaries": [
+    "No Native logs read; native review belongs to the designated other agent.",
+    "No rerun, cancel, workflow dispatch, product edits, or index changes.",
+    "Core still running; this partial receipt is not a full CI success claim.",
+    "Production build and browser interactions is the database aggregate gate name, not proof of new browser execution."
+  ],
+  "rawLogs": [
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/128916638034-selection.log",
+      "sha256": "d1fa417ac61b11153d4d5773cdc381c1377e96ca9e86a6cc2ae27cb145e5bf66",
+      "bytes": 586907,
+      "lines": 5889,
+      "actualCheckoutMatches": true
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/128916883912-daemon-checks.log",
+      "sha256": "b877a3a48412c661d59b2949df1679a42c4ad4c521aba0899b3971a1c35ef666",
+      "bytes": 123597,
+      "lines": 1232,
+      "actualCheckoutMatches": true
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/128916883970-database-checks-4-4.log",
+      "sha256": "d26f5b7bf3adc5db3882f8fea280a2227a876f490dbece9837b9f393c152dc3c",
+      "bytes": 597469,
+      "lines": 3794,
+      "actualCheckoutMatches": true
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/128916883972-database-checks-2-4.log",
+      "sha256": "0d408eccb274ffb6ce81ea037b348a9f6c122fcf69504ef6e00f4984bad364d5",
+      "bytes": 1095483,
+      "lines": 7003,
+      "actualCheckoutMatches": true
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/128916883978-database-checks-1-4.log",
+      "sha256": "041e2ee87c42cd7b155887d054eef6e4257d686bf63f05cee0162d438e0f7e8c",
+      "bytes": 1040920,
+      "lines": 6506,
+      "actualCheckoutMatches": true
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/128916884008-integration-unit-checks.log",
+      "sha256": "c1de65d0c6443d055f4ee5a728b302df74b9f81ad93e045177a58a69a77d781b",
+      "bytes": 635439,
+      "lines": 4807,
+      "actualCheckoutMatches": true
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/128916884051-source-checks.log",
+      "sha256": "65c205bd24f13633e9c539dba8aa02212155170217b7c036a53f75cc4472a6f2",
+      "bytes": 133055,
+      "lines": 1721,
+      "actualCheckoutMatches": true
+    },
+    {
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/128916884058-database-checks-3-4.log",
+      "sha256": "de0426ae428750e634dddca6667575bd12aae8da24307949412476911a93ff90",
+      "bytes": 1824096,
+      "lines": 11063,
+      "actualCheckoutMatches": true
+    }
+  ]
+}

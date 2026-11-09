@@ -1,0 +1,123 @@
+{
+  "version": 1,
+  "runId": 42541312185,
+  "head": "ae1504f1bb266ae3f7b6612898f134dd979f5fdd",
+  "actualCheckout": "0041c6ab2a28b562deed9c692d8572ac4736f64e",
+  "tree": "8c5c12ea993533403d13e21dc75647bb28022767",
+  "report": {
+    "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/non-native-final.safe.json",
+    "sha256": "1aebc72678b9c308b5b20cffc5ee0effb1e03e271a3c4b1813580da63031b7bf"
+  },
+  "files": [
+    {
+      "path": "128916638034-selection.log",
+      "sha256": "d1fa417ac61b11153d4d5773cdc381c1377e96ca9e86a6cc2ae27cb145e5bf66",
+      "bytes": 586907
+    },
+    {
+      "path": "128916883912-daemon-checks.log",
+      "sha256": "b877a3a48412c661d59b2949df1679a42c4ad4c521aba0899b3971a1c35ef666",
+      "bytes": 123597
+    },
+    {
+      "path": "128916883926-core-unit-checks.log",
+      "sha256": "9e26594ad1be16748f394b97fe69c0c2d91ef12dd0d10f905ef930086b04b877",
+      "bytes": 985602
+    },
+    {
+      "path": "128916883970-database-checks-4-4.log",
+      "sha256": "d26f5b7bf3adc5db3882f8fea280a2227a876f490dbece9837b9f393c152dc3c",
+      "bytes": 597469
+    },
+    {
+      "path": "128916883972-database-checks-2-4.log",
+      "sha256": "0d408eccb274ffb6ce81ea037b348a9f6c122fcf69504ef6e00f4984bad364d5",
+      "bytes": 1095483
+    },
+    {
+      "path": "128916883978-database-checks-1-4.log",
+      "sha256": "041e2ee87c42cd7b155887d054eef6e4257d686bf63f05cee0162d438e0f7e8c",
+      "bytes": 1040920
+    },
+    {
+      "path": "128916884008-integration-unit-checks.log",
+      "sha256": "c1de65d0c6443d055f4ee5a728b302df74b9f81ad93e045177a58a69a77d781b",
+      "bytes": 635439
+    },
+    {
+      "path": "128916884051-source-checks.log",
+      "sha256": "65c205bd24f13633e9c539dba8aa02212155170217b7c036a53f75cc4472a6f2",
+      "bytes": 133055
+    },
+    {
+      "path": "128916884058-database-checks-3-4.log",
+      "sha256": "de0426ae428750e634dddca6667575bd12aae8da24307949412476911a93ff90",
+      "bytes": 1824096
+    },
+    {
+      "path": "128918150874-production-build-and-browser-interactions.log",
+      "sha256": "dc5ff92bd21f3e0f30e40c41c4b578c8702908f88916a601023f17f247b22d63",
+      "bytes": 13305
+    },
+    {
+      "path": "actual-merge-commit.json",
+      "sha256": "7240dcf017da9daddb86fc36c13aafbdd346ec6b1c5fba534c1e34fb4cd5e6f6",
+      "bytes": 2810
+    },
+    {
+      "path": "db-suite-reconciliation.safe.json",
+      "sha256": "cac7795a941bf4386e55ec5f8826fa6d0856ccc0b589e03bf569a3a32d3d9c61",
+      "bytes": 38514
+    },
+    {
+      "path": "jobs-final-own-scope.json",
+      "sha256": "d90c7e1d016ead46d9aef7cfe168cfe975abe359eefae0e08533ac44b0853578",
+      "bytes": 47047
+    },
+    {
+      "path": "jobs-initial.json",
+      "sha256": "d70202372aa9d45261f0a69c50fd4d7da1e91dd9de644680c2625c03170c6a21",
+      "bytes": 79805
+    },
+    {
+      "path": "jobs-stage-0045.json",
+      "sha256": "3deb18b94f2d4abda4d2d7a05c11538fa2a9f3e70a3e3e0f5cb73b2d4e6748ff",
+      "bytes": 46676
+    },
+    {
+      "path": "non-native-final.safe.json",
+      "sha256": "1aebc72678b9c308b5b20cffc5ee0effb1e03e271a3c4b1813580da63031b7bf",
+      "bytes": 49187
+    },
+    {
+      "path": "non-native-partial.safe.json",
+      "sha256": "6857f93d5052937c29a67aaaf94738188c5121b67a60b2be9526be912eed236c",
+      "bytes": 6580
+    },
+    {
+      "path": "original-log-sizes.safe.json",
+      "sha256": "5141ffd57f0cdb536e53c281b5f3640451ddbcb1d0253cd01e08620561296059",
+      "bytes": 1780
+    },
+    {
+      "path": "run-initial.json",
+      "sha256": "c1efa6505860d4ae305b0d4b0fdf813376ddd678fc2f8ec871913a88aba2329e",
+      "bytes": 14745
+    },
+    {
+      "path": "selection-plan.safe.json",
+      "sha256": "fe4936d0c85dff44eb79f9f02fb3a2ba7b9d5b5dc17a225353f7f4ccd0ca9f8a",
+      "bytes": 143624
+    },
+    {
+      "path": "source/package.json",
+      "sha256": "67ae032661666e1eb97e683147c2fc0ce9ce02d2989232549416470e1a6787f6",
+      "bytes": 79302
+    },
+    {
+      "path": "source/tests/live-revision-reads.db.test.ts",
+      "sha256": "49c00de7613ef0f88a78906456d94f90b2438646ead72acdf1afda0a0bd07c3f",
+      "bytes": 16071
+    }
+  ]
+}

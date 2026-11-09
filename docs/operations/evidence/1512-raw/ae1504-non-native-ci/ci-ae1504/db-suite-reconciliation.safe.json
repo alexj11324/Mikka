@@ -1,0 +1,2260 @@
+{
+  "expectedSuiteCount": 70,
+  "observedSuiteCount": 70,
+  "missing": [],
+  "unexpected": [],
+  "duplicateJobAssignment": {},
+  "unexpectedCloseCounts": {},
+  "unexpectedExitCounts": {},
+  "nonzeroLifecycle": [],
+  "nonzeroFailures": {},
+  "nonzeroSkips": {},
+  "suites": {
+    "test:activity-actor-db": {
+      "jobs": [
+        "128916883970-database-checks-4-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1184,
+          "text": "start"
+        },
+        {
+          "line": 3309,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 3310,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        57
+      ],
+      "pass": [
+        57
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:groups": {
+      "jobs": [
+        "128916883970-database-checks-4-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1185,
+          "text": "start"
+        },
+        {
+          "line": 1698,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 1699,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        12,
+        79
+      ],
+      "pass": [
+        12,
+        79
+      ],
+      "fail": [
+        0,
+        0
+      ],
+      "skipped": [
+        0,
+        0
+      ]
+    },
+    "test:computer-db": {
+      "jobs": [
+        "128916883970-database-checks-4-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1186,
+          "text": "start"
+        },
+        {
+          "line": 1364,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 1365,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        8
+      ],
+      "pass": [
+        8
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:worker-authorization-db": {
+      "jobs": [
+        "128916883970-database-checks-4-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1187,
+          "text": "start"
+        },
+        {
+          "line": 1543,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 1544,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        76
+      ],
+      "pass": [
+        76
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:coordinator-native": {
+      "jobs": [
+        "128916883970-database-checks-4-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1394,
+          "text": "start"
+        },
+        {
+          "line": 1888,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 1889,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        36
+      ],
+      "pass": [
+        36
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:secrets-db": {
+      "jobs": [
+        "128916883970-database-checks-4-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1689,
+          "text": "start"
+        },
+        {
+          "line": 2232,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 2233,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        89
+      ],
+      "pass": [
+        89
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:factory-monitor-db": {
+      "jobs": [
+        "128916883970-database-checks-4-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1837,
+          "text": "start"
+        },
+        {
+          "line": 2050,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 2051,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        2,
+        10
+      ],
+      "pass": [
+        2,
+        10
+      ],
+      "fail": [
+        0,
+        0
+      ],
+      "skipped": [
+        0,
+        0
+      ]
+    },
+    "test:pat-api-db": {
+      "jobs": [
+        "128916883970-database-checks-4-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1943,
+          "text": "start"
+        },
+        {
+          "line": 2401,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 2402,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        37
+      ],
+      "pass": [
+        37
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:run-publication-db": {
+      "jobs": [
+        "128916883970-database-checks-4-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 2100,
+          "text": "start"
+        },
+        {
+          "line": 2762,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 2763,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        24,
+        1
+      ],
+      "pass": [
+        24,
+        1
+      ],
+      "fail": [
+        0,
+        0
+      ],
+      "skipped": [
+        0,
+        0
+      ]
+    },
+    "test:test-accounts-db": {
+      "jobs": [
+        "128916883970-database-checks-4-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 2341,
+          "text": "start"
+        },
+        {
+          "line": 2615,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 2616,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        17
+      ],
+      "pass": [
+        17
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:captures-db": {
+      "jobs": [
+        "128916883970-database-checks-4-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 2547,
+          "text": "start"
+        },
+        {
+          "line": 3103,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 3104,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        29
+      ],
+      "pass": [
+        29
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:artifact-migration-db": {
+      "jobs": [
+        "128916883970-database-checks-4-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 2646,
+          "text": "start"
+        },
+        {
+          "line": 2665,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 2666,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        1
+      ],
+      "pass": [
+        1
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:device-enrollment-db": {
+      "jobs": [
+        "128916883970-database-checks-4-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 2679,
+          "text": "start"
+        },
+        {
+          "line": 3260,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 3261,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        10
+      ],
+      "pass": [
+        10
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:factory-all-dispatch-db": {
+      "jobs": [
+        "128916883970-database-checks-4-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 2846,
+          "text": "start"
+        },
+        {
+          "line": 2930,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 2931,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        2
+      ],
+      "pass": [
+        2
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:migration-steps-db": {
+      "jobs": [
+        "128916883970-database-checks-4-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 2988,
+          "text": "start"
+        },
+        {
+          "line": 3001,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 3002,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        1
+      ],
+      "pass": [
+        1
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:preview-driver": {
+      "jobs": [
+        "128916883970-database-checks-4-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 3018,
+          "text": "start"
+        },
+        {
+          "line": 3028,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 3029,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        1
+      ],
+      "pass": [
+        1
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:settings-activity-db": {
+      "jobs": [
+        "128916883970-database-checks-4-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 3042,
+          "text": "start"
+        },
+        {
+          "line": 3070,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 3071,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        6
+      ],
+      "pass": [
+        6
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:live-db": {
+      "jobs": [
+        "128916883972-database-checks-2-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1178,
+          "text": "start"
+        },
+        {
+          "line": 6030,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 6031,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        10,
+        162
+      ],
+      "pass": [
+        10,
+        162
+      ],
+      "fail": [
+        0,
+        0
+      ],
+      "skipped": [
+        0,
+        0
+      ]
+    },
+    "test:self-improvement-unit": {
+      "jobs": [
+        "128916883972-database-checks-2-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1179,
+          "text": "start"
+        },
+        {
+          "line": 1398,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 1399,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        100
+      ],
+      "pass": [
+        100
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:account-db": {
+      "jobs": [
+        "128916883972-database-checks-2-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1180,
+          "text": "start"
+        },
+        {
+          "line": 1665,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 1666,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        39
+      ],
+      "pass": [
+        39
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:execution-settings-db": {
+      "jobs": [
+        "128916883972-database-checks-2-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1210,
+          "text": "start"
+        },
+        {
+          "line": 1559,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 1560,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        5
+      ],
+      "pass": [
+        5
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:bot-chats-db": {
+      "jobs": [
+        "128916883972-database-checks-2-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1541,
+          "text": "start"
+        },
+        {
+          "line": 5565,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 5566,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        97
+      ],
+      "pass": [
+        97
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:personal-mailbox-default-off-db": {
+      "jobs": [
+        "128916883972-database-checks-2-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1584,
+          "text": "start"
+        },
+        {
+          "line": 1809,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 1810,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        42
+      ],
+      "pass": [
+        42
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:cloud-backend-db": {
+      "jobs": [
+        "128916883972-database-checks-2-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1725,
+          "text": "start"
+        },
+        {
+          "line": 3379,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 3380,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        215
+      ],
+      "pass": [
+        215
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:github-connections-db": {
+      "jobs": [
+        "128916883972-database-checks-2-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1872,
+          "text": "start"
+        },
+        {
+          "line": 5006,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 5007,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        24
+      ],
+      "pass": [
+        24
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:agent-tool-approval-db": {
+      "jobs": [
+        "128916883972-database-checks-2-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 4872,
+          "text": "start"
+        },
+        {
+          "line": 5793,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 5794,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        16,
+        3
+      ],
+      "pass": [
+        16,
+        3
+      ],
+      "fail": [
+        0,
+        0
+      ],
+      "skipped": [
+        0,
+        0
+      ]
+    },
+    "test:coordinator-issue-create-db": {
+      "jobs": [
+        "128916883972-database-checks-2-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 5100,
+          "text": "start"
+        },
+        {
+          "line": 5158,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 5159,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        10
+      ],
+      "pass": [
+        10
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:schedules-db": {
+      "jobs": [
+        "128916883972-database-checks-2-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 5182,
+          "text": "start"
+        },
+        {
+          "line": 5248,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 5249,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        16
+      ],
+      "pass": [
+        16
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:skill-semantic-db": {
+      "jobs": [
+        "128916883972-database-checks-2-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 5279,
+          "text": "start"
+        },
+        {
+          "line": 5322,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 5323,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        2
+      ],
+      "pass": [
+        2
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:visibility-db": {
+      "jobs": [
+        "128916883972-database-checks-2-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 5340,
+          "text": "start"
+        },
+        {
+          "line": 5351,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 5352,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        2
+      ],
+      "pass": [
+        2
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:credentials-db": {
+      "jobs": [
+        "128916883972-database-checks-2-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 5366,
+          "text": "start"
+        },
+        {
+          "line": 5378,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 5379,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        3
+      ],
+      "pass": [
+        3
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:factory-check-independence-db": {
+      "jobs": [
+        "128916883972-database-checks-2-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 5394,
+          "text": "start"
+        },
+        {
+          "line": 5460,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 5461,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        55
+      ],
+      "pass": [
+        55
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:onboarding-db": {
+      "jobs": [
+        "128916883972-database-checks-2-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 5530,
+          "text": "start"
+        },
+        {
+          "line": 5725,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 5726,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        5
+      ],
+      "pass": [
+        5
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:relation-cycle": {
+      "jobs": [
+        "128916883972-database-checks-2-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 5706,
+          "text": "start"
+        },
+        {
+          "line": 5919,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 5920,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        6
+      ],
+      "pass": [
+        6
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:workspace-migration-db": {
+      "jobs": [
+        "128916883972-database-checks-2-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 5748,
+          "text": "start"
+        },
+        {
+          "line": 5758,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 5759,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        1
+      ],
+      "pass": [
+        1
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:factory-routing-db": {
+      "jobs": [
+        "128916883978-database-checks-1-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1250,
+          "text": "start"
+        },
+        {
+          "line": 5450,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 5451,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        278,
+        5
+      ],
+      "pass": [
+        278,
+        5
+      ],
+      "fail": [
+        0,
+        0
+      ],
+      "skipped": [
+        0,
+        0
+      ]
+    },
+    "test:workspace-admin-db": {
+      "jobs": [
+        "128916883978-database-checks-1-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1251,
+          "text": "start"
+        },
+        {
+          "line": 1723,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 1724,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        109
+      ],
+      "pass": [
+        109
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:device-revocation-db": {
+      "jobs": [
+        "128916883978-database-checks-1-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1252,
+          "text": "start"
+        },
+        {
+          "line": 2035,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 2036,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        16,
+        9,
+        5
+      ],
+      "pass": [
+        16,
+        9,
+        5
+      ],
+      "fail": [
+        0,
+        0,
+        0
+      ],
+      "skipped": [
+        0,
+        0,
+        0
+      ]
+    },
+    "test:audit-db": {
+      "jobs": [
+        "128916883978-database-checks-1-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1253,
+          "text": "start"
+        },
+        {
+          "line": 1486,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 1487,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        43
+      ],
+      "pass": [
+        43
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:self-improvement-db": {
+      "jobs": [
+        "128916883978-database-checks-1-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1581,
+          "text": "start"
+        },
+        {
+          "line": 2158,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 2159,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        28
+      ],
+      "pass": [
+        28
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:abuse-db": {
+      "jobs": [
+        "128916883978-database-checks-1-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1875,
+          "text": "start"
+        },
+        {
+          "line": 2638,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 2639,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        24,
+        5
+      ],
+      "pass": [
+        24,
+        5
+      ],
+      "fail": [
+        0,
+        0
+      ],
+      "skipped": [
+        0,
+        0
+      ]
+    },
+    "test:factory-approval-db": {
+      "jobs": [
+        "128916883978-database-checks-1-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 2125,
+          "text": "start"
+        },
+        {
+          "line": 4119,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 4120,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        52
+      ],
+      "pass": [
+        52
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:project-decisions-db": {
+      "jobs": [
+        "128916883978-database-checks-1-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 2207,
+          "text": "start"
+        },
+        {
+          "line": 3178,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 3179,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        39
+      ],
+      "pass": [
+        39
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:run-recovery-db": {
+      "jobs": [
+        "128916883978-database-checks-1-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 2725,
+          "text": "start"
+        },
+        {
+          "line": 4549,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 4550,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        20,
+        9,
+        11,
+        12,
+        9
+      ],
+      "pass": [
+        20,
+        9,
+        11,
+        12,
+        9
+      ],
+      "fail": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "skipped": [
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "test:conversation-reads": {
+      "jobs": [
+        "128916883978-database-checks-1-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 3664,
+          "text": "start"
+        },
+        {
+          "line": 3812,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 3813,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        22
+      ],
+      "pass": [
+        22
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:model-admission-db": {
+      "jobs": [
+        "128916883978-database-checks-1-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 3862,
+          "text": "start"
+        },
+        {
+          "line": 4269,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 4270,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        13,
+        1
+      ],
+      "pass": [
+        13,
+        1
+      ],
+      "fail": [
+        0,
+        0
+      ],
+      "skipped": [
+        0,
+        0
+      ]
+    },
+    "test:agent-kit-db": {
+      "jobs": [
+        "128916883978-database-checks-1-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 4241,
+          "text": "start"
+        },
+        {
+          "line": 4376,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 4377,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        23
+      ],
+      "pass": [
+        23
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:chat-attachments-db": {
+      "jobs": [
+        "128916883978-database-checks-1-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 4335,
+          "text": "start"
+        },
+        {
+          "line": 4455,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 4456,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        6
+      ],
+      "pass": [
+        6
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:coordinator-task-binding-db": {
+      "jobs": [
+        "128916883978-database-checks-1-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 4439,
+          "text": "start"
+        },
+        {
+          "line": 4515,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 4516,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        1
+      ],
+      "pass": [
+        1
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:issue-search-db": {
+      "jobs": [
+        "128916883978-database-checks-1-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 4475,
+          "text": "start"
+        },
+        {
+          "line": 5064,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 5065,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        8
+      ],
+      "pass": [
+        8
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:pat-db": {
+      "jobs": [
+        "128916883978-database-checks-1-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 4530,
+          "text": "start"
+        },
+        {
+          "line": 5216,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 5217,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        12
+      ],
+      "pass": [
+        12
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:settings-prefs-db": {
+      "jobs": [
+        "128916883978-database-checks-1-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 4984,
+          "text": "start"
+        },
+        {
+          "line": 5414,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 5415,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        11
+      ],
+      "pass": [
+        11
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:user-facts-db": {
+      "jobs": [
+        "128916883978-database-checks-1-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 5096,
+          "text": "start"
+        },
+        {
+          "line": 5252,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 5253,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        1
+      ],
+      "pass": [
+        1
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:bot-threads-db": {
+      "jobs": [
+        "128916884058-database-checks-3-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1184,
+          "text": "start"
+        },
+        {
+          "line": 7663,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 7664,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        338
+      ],
+      "pass": [
+        338
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:factory": {
+      "jobs": [
+        "128916884058-database-checks-3-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1185,
+          "text": "start"
+        },
+        {
+          "line": 5999,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 6000,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        504
+      ],
+      "pass": [
+        504
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:desktop-auth": {
+      "jobs": [
+        "128916884058-database-checks-3-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1186,
+          "text": "start"
+        },
+        {
+          "line": 2069,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 2070,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        70,
+        3,
+        11,
+        44
+      ],
+      "pass": [
+        70,
+        3,
+        11,
+        44
+      ],
+      "fail": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "skipped": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "test:approved-writes-db": {
+      "jobs": [
+        "128916884058-database-checks-3-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1215,
+          "text": "start"
+        },
+        {
+          "line": 1412,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 1413,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        10
+      ],
+      "pass": [
+        10
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:factory-checks-db": {
+      "jobs": [
+        "128916884058-database-checks-3-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 1443,
+          "text": "start"
+        },
+        {
+          "line": 7046,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 7047,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        320
+      ],
+      "pass": [
+        320
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:group-turns": {
+      "jobs": [
+        "128916884058-database-checks-3-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 2335,
+          "text": "start"
+        },
+        {
+          "line": 3543,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 3544,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        123,
+        5
+      ],
+      "pass": [
+        123,
+        5
+      ],
+      "fail": [
+        0,
+        0
+      ],
+      "skipped": [
+        0,
+        0
+      ]
+    },
+    "test:plugins-db": {
+      "jobs": [
+        "128916884058-database-checks-3-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 3722,
+          "text": "start"
+        },
+        {
+          "line": 4222,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 4223,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        18
+      ],
+      "pass": [
+        18
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:scope-detachment-db": {
+      "jobs": [
+        "128916884058-database-checks-3-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 4277,
+          "text": "start"
+        },
+        {
+          "line": 5355,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 5356,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        69
+      ],
+      "pass": [
+        69
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:cloud-services-db": {
+      "jobs": [
+        "128916884058-database-checks-3-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 5459,
+          "text": "start"
+        },
+        {
+          "line": 5488,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 5489,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        10
+      ],
+      "pass": [
+        10
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:coordinator-issue-tools-db": {
+      "jobs": [
+        "128916884058-database-checks-3-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 5517,
+          "text": "start"
+        },
+        {
+          "line": 6690,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 6691,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        2
+      ],
+      "pass": [
+        2
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:active-agents": {
+      "jobs": [
+        "128916884058-database-checks-3-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 6552,
+          "text": "start"
+        },
+        {
+          "line": 10615,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 10616,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        14
+      ],
+      "pass": [
+        14
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:local-repository-migration-db": {
+      "jobs": [
+        "128916884058-database-checks-3-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 6707,
+          "text": "start"
+        },
+        {
+          "line": 6849,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 6850,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        1
+      ],
+      "pass": [
+        1
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:session-mailbox-db": {
+      "jobs": [
+        "128916884058-database-checks-3-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 6864,
+          "text": "start"
+        },
+        {
+          "line": 6883,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 6884,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        5
+      ],
+      "pass": [
+        5
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:suggestion-artifact-db": {
+      "jobs": [
+        "128916884058-database-checks-3-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 6902,
+          "text": "start"
+        },
+        {
+          "line": 6932,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 6933,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        4
+      ],
+      "pass": [
+        4
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:web-auth-db": {
+      "jobs": [
+        "128916884058-database-checks-3-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 6953,
+          "text": "start"
+        },
+        {
+          "line": 6970,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 6971,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        5
+      ],
+      "pass": [
+        5
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    },
+    "test:ops-db": {
+      "jobs": [
+        "128916884058-database-checks-3-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 7488,
+          "text": "start"
+        },
+        {
+          "line": 7573,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 7574,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        11,
+        6
+      ],
+      "pass": [
+        11,
+        6
+      ],
+      "fail": [
+        0,
+        0
+      ],
+      "skipped": [
+        0,
+        0
+      ]
+    },
+    "test:run-dispatch": {
+      "jobs": [
+        "128916884058-database-checks-3-4.log"
+      ],
+      "lifecycle": [
+        {
+          "line": 7631,
+          "text": "start"
+        },
+        {
+          "line": 10583,
+          "text": "exit code=0 signal=none"
+        },
+        {
+          "line": 10584,
+          "text": "close code=0 signal=none"
+        }
+      ],
+      "tests": [
+        10
+      ],
+      "pass": [
+        10
+      ],
+      "fail": [
+        0
+      ],
+      "skipped": [
+        0
+      ]
+    }
+  }
+}

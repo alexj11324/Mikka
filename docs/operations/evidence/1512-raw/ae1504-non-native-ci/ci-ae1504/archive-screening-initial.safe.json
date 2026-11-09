@@ -1,0 +1,21 @@
+{
+  "files": 10,
+  "counts": {
+    "private_key_marker": 0,
+    "github_token": 0,
+    "posthog_token": 0,
+    "aws_access_key": 0,
+    "jwt": 0,
+    "bearer_material": 0,
+    "email": 1
+  },
+  "potentialFindings": [
+    {
+      "path": "128916883978-database-checks-1-4.log",
+      "line": 6361,
+      "category": "email"
+    }
+  ],
+  "potentialFindingsCount": 1,
+  "fixtureEmailDomainsCount": 0
+}

@@ -1,0 +1,458 @@
+{
+  "version": 1,
+  "createdAt": "2026-11-09T00:55:14.360016+00:00",
+  "repository": "alexj11324/Mikka",
+  "runId": 42541312185,
+  "runAttempt": 1,
+  "head": "ae1504f1bb266ae3f7b6612898f134dd979f5fdd",
+  "actualCheckout": "0041c6ab2a28b562deed9c692d8572ac4736f64e",
+  "actualTree": "8c5c12ea993533403d13e21dc75647bb28022767",
+  "source": {
+    "visibility": "public GitHub repository Actions logs",
+    "retrieval": "Previously frozen decoded GitHub workflow-job log responses; no new network requests during packaging.",
+    "maskingBoundary": "The saved original bytes are the logs as GitHub served them, including GitHub masking already applied. GitHub masking is not a proof that every possible secret or personal datum is absent. No values were unmasked or reconstructed.",
+    "rawsRetainedUnmodified": true
+  },
+  "compression": {
+    "format": "gzip",
+    "level": 9,
+    "mtime": 0,
+    "originalFilename": "",
+    "pythonVersion": "3.12.14",
+    "zlibVersion": "1.3.2",
+    "gitBlobAlgorithm": "sha1 over blob <byte length> NUL plus exact bytes"
+  },
+  "screening": {
+    "scope": "Ten raw logs only; existing JSON receipts kept byte-for-byte.",
+    "confirmedUnmaskedRealCredentialsOrPersonalData": 0,
+    "withheldLogs": [],
+    "candidateCategoriesWithZeroMatches": [
+      "private key marker",
+      "GitHub token",
+      "PostHog token",
+      "AWS access key",
+      "JWT",
+      "unmasked Bearer material"
+    ],
+    "resolvedCandidate": {
+      "log": "128916883978-database-checks-1-4.log",
+      "line": 6361,
+      "category": "email-shaped database diagnostic",
+      "resolution": "Normalized synthetic fixture matched to actual tree source bytes; values omitted.",
+      "proof": "archive-screening-fixture.safe.json"
+    },
+    "limitations": "Targeted pattern screening and contextual fixture matching cannot prove absence of every possible sensitive value. Any later suspected real unmasked value must withhold its corresponding raw/gzip from the public package pending review."
+  },
+  "totals": {
+    "files": 10,
+    "rawBytes": 7035873,
+    "gzipBytes": 1290703,
+    "roundtripsPassed": 10
+  },
+  "logs": [
+    {
+      "jobId": 128916638034,
+      "sourceUrl": "https://github.com/alexj11324/Mikka/actions/runs/42541312185/job/128916638034",
+      "raw": {
+        "path": "128916638034-selection.log",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/128916638034-selection.log",
+        "bytes": 586907,
+        "sha256": "d1fa417ac61b11153d4d5773cdc381c1377e96ca9e86a6cc2ae27cb145e5bf66",
+        "gitBlobSha1": "9a44b80e94808bc014c14dfe64fb6d9ea8c44fbf"
+      },
+      "gzip": {
+        "path": "archive-logs/128916638034-selection.log.gz",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/archive-logs/128916638034-selection.log.gz",
+        "bytes": 93546,
+        "sha256": "9828dc33531a0486a5481b078ddc3dd3a02d53d49fce178f64282b7771de51a7",
+        "gitBlobSha1": "dc7fd80fc624d691dd92a79f9a2b01767d1ba547"
+      },
+      "roundtrip": {
+        "byteForByteEqual": true,
+        "decompressedBytes": 586907,
+        "sha256": "d1fa417ac61b11153d4d5773cdc381c1377e96ca9e86a6cc2ae27cb145e5bf66",
+        "gitBlobSha1": "9a44b80e94808bc014c14dfe64fb6d9ea8c44fbf",
+        "rawUnchangedAfterCompression": true
+      },
+      "gzipHeader": {
+        "mtime": 0,
+        "flags": 0,
+        "originalFilenameStored": false
+      },
+      "archiveEligible": true
+    },
+    {
+      "jobId": 128916883912,
+      "sourceUrl": "https://github.com/alexj11324/Mikka/actions/runs/42541312185/job/128916883912",
+      "raw": {
+        "path": "128916883912-daemon-checks.log",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/128916883912-daemon-checks.log",
+        "bytes": 123597,
+        "sha256": "b877a3a48412c661d59b2949df1679a42c4ad4c521aba0899b3971a1c35ef666",
+        "gitBlobSha1": "0e81be9c857c5401aa01d95947c15536ff23f702"
+      },
+      "gzip": {
+        "path": "archive-logs/128916883912-daemon-checks.log.gz",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/archive-logs/128916883912-daemon-checks.log.gz",
+        "bytes": 26791,
+        "sha256": "9e27f10fada68cec967de9cb85e02dbfaa90ff79139cee38259705d29712432f",
+        "gitBlobSha1": "2734009ed2117ea6df59a12ecd3781b1dabab216"
+      },
+      "roundtrip": {
+        "byteForByteEqual": true,
+        "decompressedBytes": 123597,
+        "sha256": "b877a3a48412c661d59b2949df1679a42c4ad4c521aba0899b3971a1c35ef666",
+        "gitBlobSha1": "0e81be9c857c5401aa01d95947c15536ff23f702",
+        "rawUnchangedAfterCompression": true
+      },
+      "gzipHeader": {
+        "mtime": 0,
+        "flags": 0,
+        "originalFilenameStored": false
+      },
+      "archiveEligible": true
+    },
+    {
+      "jobId": 128916883926,
+      "sourceUrl": "https://github.com/alexj11324/Mikka/actions/runs/42541312185/job/128916883926",
+      "raw": {
+        "path": "128916883926-core-unit-checks.log",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/128916883926-core-unit-checks.log",
+        "bytes": 985602,
+        "sha256": "9e26594ad1be16748f394b97fe69c0c2d91ef12dd0d10f905ef930086b04b877",
+        "gitBlobSha1": "3fe7867f85149436b0487e259367a4ebef6c3f9a"
+      },
+      "gzip": {
+        "path": "archive-logs/128916883926-core-unit-checks.log.gz",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/archive-logs/128916883926-core-unit-checks.log.gz",
+        "bytes": 240338,
+        "sha256": "a9a7c6ab5e268db03a70c7d0bddc605bbd315c15b5779e0be57c0df42724ec7a",
+        "gitBlobSha1": "1d5706622d88a13898286b10c7d9b554acbac6b9"
+      },
+      "roundtrip": {
+        "byteForByteEqual": true,
+        "decompressedBytes": 985602,
+        "sha256": "9e26594ad1be16748f394b97fe69c0c2d91ef12dd0d10f905ef930086b04b877",
+        "gitBlobSha1": "3fe7867f85149436b0487e259367a4ebef6c3f9a",
+        "rawUnchangedAfterCompression": true
+      },
+      "gzipHeader": {
+        "mtime": 0,
+        "flags": 0,
+        "originalFilenameStored": false
+      },
+      "archiveEligible": true
+    },
+    {
+      "jobId": 128916883970,
+      "sourceUrl": "https://github.com/alexj11324/Mikka/actions/runs/42541312185/job/128916883970",
+      "raw": {
+        "path": "128916883970-database-checks-4-4.log",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/128916883970-database-checks-4-4.log",
+        "bytes": 597469,
+        "sha256": "d26f5b7bf3adc5db3882f8fea280a2227a876f490dbece9837b9f393c152dc3c",
+        "gitBlobSha1": "fb8273c9789fd0165de1ef5209d7c6a77936ea4f"
+      },
+      "gzip": {
+        "path": "archive-logs/128916883970-database-checks-4-4.log.gz",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/archive-logs/128916883970-database-checks-4-4.log.gz",
+        "bytes": 101088,
+        "sha256": "8e6fe109d9d2970f8c6fcfa2ee2783c94f60bab3122df96a541c27c32aa63d03",
+        "gitBlobSha1": "e1b37f0b1d7a4915277f23567f8c6ad65c17b50f"
+      },
+      "roundtrip": {
+        "byteForByteEqual": true,
+        "decompressedBytes": 597469,
+        "sha256": "d26f5b7bf3adc5db3882f8fea280a2227a876f490dbece9837b9f393c152dc3c",
+        "gitBlobSha1": "fb8273c9789fd0165de1ef5209d7c6a77936ea4f",
+        "rawUnchangedAfterCompression": true
+      },
+      "gzipHeader": {
+        "mtime": 0,
+        "flags": 0,
+        "originalFilenameStored": false
+      },
+      "archiveEligible": true
+    },
+    {
+      "jobId": 128916883972,
+      "sourceUrl": "https://github.com/alexj11324/Mikka/actions/runs/42541312185/job/128916883972",
+      "raw": {
+        "path": "128916883972-database-checks-2-4.log",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/128916883972-database-checks-2-4.log",
+        "bytes": 1095483,
+        "sha256": "0d408eccb274ffb6ce81ea037b348a9f6c122fcf69504ef6e00f4984bad364d5",
+        "gitBlobSha1": "1060aa30eeb789f382b3f6f8d28756b03ca2ea12"
+      },
+      "gzip": {
+        "path": "archive-logs/128916883972-database-checks-2-4.log.gz",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/archive-logs/128916883972-database-checks-2-4.log.gz",
+        "bytes": 168738,
+        "sha256": "a8908bb61c8ba6842e263d0a8b68e35e697d505101afbd6937599b315b940000",
+        "gitBlobSha1": "548b2027cb5cd9e2dcb6806779e18ec05759fb8c"
+      },
+      "roundtrip": {
+        "byteForByteEqual": true,
+        "decompressedBytes": 1095483,
+        "sha256": "0d408eccb274ffb6ce81ea037b348a9f6c122fcf69504ef6e00f4984bad364d5",
+        "gitBlobSha1": "1060aa30eeb789f382b3f6f8d28756b03ca2ea12",
+        "rawUnchangedAfterCompression": true
+      },
+      "gzipHeader": {
+        "mtime": 0,
+        "flags": 0,
+        "originalFilenameStored": false
+      },
+      "archiveEligible": true
+    },
+    {
+      "jobId": 128916883978,
+      "sourceUrl": "https://github.com/alexj11324/Mikka/actions/runs/42541312185/job/128916883978",
+      "raw": {
+        "path": "128916883978-database-checks-1-4.log",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/128916883978-database-checks-1-4.log",
+        "bytes": 1040920,
+        "sha256": "041e2ee87c42cd7b155887d054eef6e4257d686bf63f05cee0162d438e0f7e8c",
+        "gitBlobSha1": "eb2f094ebc811cb1cbe8c7de21169821757db052"
+      },
+      "gzip": {
+        "path": "archive-logs/128916883978-database-checks-1-4.log.gz",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/archive-logs/128916883978-database-checks-1-4.log.gz",
+        "bytes": 181543,
+        "sha256": "55fcbced94406497c9f5e1c0e7ef097f2bd3e1866718d3b7c633e61d0bce61b6",
+        "gitBlobSha1": "1f1e63c365fe26ad8300c1167fcfe1bc0206ab2f"
+      },
+      "roundtrip": {
+        "byteForByteEqual": true,
+        "decompressedBytes": 1040920,
+        "sha256": "041e2ee87c42cd7b155887d054eef6e4257d686bf63f05cee0162d438e0f7e8c",
+        "gitBlobSha1": "eb2f094ebc811cb1cbe8c7de21169821757db052",
+        "rawUnchangedAfterCompression": true
+      },
+      "gzipHeader": {
+        "mtime": 0,
+        "flags": 0,
+        "originalFilenameStored": false
+      },
+      "archiveEligible": true
+    },
+    {
+      "jobId": 128916884008,
+      "sourceUrl": "https://github.com/alexj11324/Mikka/actions/runs/42541312185/job/128916884008",
+      "raw": {
+        "path": "128916884008-integration-unit-checks.log",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/128916884008-integration-unit-checks.log",
+        "bytes": 635439,
+        "sha256": "c1de65d0c6443d055f4ee5a728b302df74b9f81ad93e045177a58a69a77d781b",
+        "gitBlobSha1": "4b8f439d4d70aa231255e7079c8d7c2e90c39523"
+      },
+      "gzip": {
+        "path": "archive-logs/128916884008-integration-unit-checks.log.gz",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/archive-logs/128916884008-integration-unit-checks.log.gz",
+        "bytes": 142059,
+        "sha256": "4dd987659baf930272140e66058735fd57ed49f6c612baf7637b3a8767cc1dbe",
+        "gitBlobSha1": "c38597b52a97f149d0213ef76ad164a3166a87d9"
+      },
+      "roundtrip": {
+        "byteForByteEqual": true,
+        "decompressedBytes": 635439,
+        "sha256": "c1de65d0c6443d055f4ee5a728b302df74b9f81ad93e045177a58a69a77d781b",
+        "gitBlobSha1": "4b8f439d4d70aa231255e7079c8d7c2e90c39523",
+        "rawUnchangedAfterCompression": true
+      },
+      "gzipHeader": {
+        "mtime": 0,
+        "flags": 0,
+        "originalFilenameStored": false
+      },
+      "archiveEligible": true
+    },
+    {
+      "jobId": 128916884051,
+      "sourceUrl": "https://github.com/alexj11324/Mikka/actions/runs/42541312185/job/128916884051",
+      "raw": {
+        "path": "128916884051-source-checks.log",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/128916884051-source-checks.log",
+        "bytes": 133055,
+        "sha256": "65c205bd24f13633e9c539dba8aa02212155170217b7c036a53f75cc4472a6f2",
+        "gitBlobSha1": "30cb7f4f707cc3692390be21f56e5f5fb8a8c828"
+      },
+      "gzip": {
+        "path": "archive-logs/128916884051-source-checks.log.gz",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/archive-logs/128916884051-source-checks.log.gz",
+        "bytes": 33725,
+        "sha256": "6b6a50171b20dee73ea68b0f3b89eadd95ec5589f549530835b993c0aebf8c78",
+        "gitBlobSha1": "af4424c0adac3be82bf61a13b6948f7eaa266c78"
+      },
+      "roundtrip": {
+        "byteForByteEqual": true,
+        "decompressedBytes": 133055,
+        "sha256": "65c205bd24f13633e9c539dba8aa02212155170217b7c036a53f75cc4472a6f2",
+        "gitBlobSha1": "30cb7f4f707cc3692390be21f56e5f5fb8a8c828",
+        "rawUnchangedAfterCompression": true
+      },
+      "gzipHeader": {
+        "mtime": 0,
+        "flags": 0,
+        "originalFilenameStored": false
+      },
+      "archiveEligible": true
+    },
+    {
+      "jobId": 128916884058,
+      "sourceUrl": "https://github.com/alexj11324/Mikka/actions/runs/42541312185/job/128916884058",
+      "raw": {
+        "path": "128916884058-database-checks-3-4.log",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/128916884058-database-checks-3-4.log",
+        "bytes": 1824096,
+        "sha256": "de0426ae428750e634dddca6667575bd12aae8da24307949412476911a93ff90",
+        "gitBlobSha1": "0cb5c9f8a3fe08511088bc106f7ba3d66b41e30b"
+      },
+      "gzip": {
+        "path": "archive-logs/128916884058-database-checks-3-4.log.gz",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/archive-logs/128916884058-database-checks-3-4.log.gz",
+        "bytes": 299127,
+        "sha256": "9b41c5fce9775785d04e25fbabcbc32595ac0e89c30abf44c02196436de1cf4e",
+        "gitBlobSha1": "58ae5d8ff3ffaf05d8ac116d54231c032c49d92f"
+      },
+      "roundtrip": {
+        "byteForByteEqual": true,
+        "decompressedBytes": 1824096,
+        "sha256": "de0426ae428750e634dddca6667575bd12aae8da24307949412476911a93ff90",
+        "gitBlobSha1": "0cb5c9f8a3fe08511088bc106f7ba3d66b41e30b",
+        "rawUnchangedAfterCompression": true
+      },
+      "gzipHeader": {
+        "mtime": 0,
+        "flags": 0,
+        "originalFilenameStored": false
+      },
+      "archiveEligible": true
+    },
+    {
+      "jobId": 128918150874,
+      "sourceUrl": "https://github.com/alexj11324/Mikka/actions/runs/42541312185/job/128918150874",
+      "raw": {
+        "path": "128918150874-production-build-and-browser-interactions.log",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/128918150874-production-build-and-browser-interactions.log",
+        "bytes": 13305,
+        "sha256": "dc5ff92bd21f3e0f30e40c41c4b578c8702908f88916a601023f17f247b22d63",
+        "gitBlobSha1": "4d239e2009607f737b54cab1b63b08a23236dd9a"
+      },
+      "gzip": {
+        "path": "archive-logs/128918150874-production-build-and-browser-interactions.log.gz",
+        "absolutePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-ae1504/archive-logs/128918150874-production-build-and-browser-interactions.log.gz",
+        "bytes": 3748,
+        "sha256": "5b2b4cbddf86a0f8820ba1e14ba5245465714303eef426daef5fab10534d4a2b",
+        "gitBlobSha1": "775e9572c65a32c3f2034a79f5c8d4d66765f64e"
+      },
+      "roundtrip": {
+        "byteForByteEqual": true,
+        "decompressedBytes": 13305,
+        "sha256": "dc5ff92bd21f3e0f30e40c41c4b578c8702908f88916a601023f17f247b22d63",
+        "gitBlobSha1": "4d239e2009607f737b54cab1b63b08a23236dd9a",
+        "rawUnchangedAfterCompression": true
+      },
+      "gzipHeader": {
+        "mtime": 0,
+        "flags": 0,
+        "originalFilenameStored": false
+      },
+      "archiveEligible": true
+    }
+  ],
+  "unchangedJsonReceipts": [
+    {
+      "path": "actual-merge-commit.json",
+      "bytes": 2810,
+      "sha256": "7240dcf017da9daddb86fc36c13aafbdd346ec6b1c5fba534c1e34fb4cd5e6f6",
+      "gitBlobSha1": "eb5c7c4be933e90bf5785f189f70baedbfaead42",
+      "modifiedByCompression": false
+    },
+    {
+      "path": "archive-screening-fixture.safe.json",
+      "bytes": 521,
+      "sha256": "46886acae1d54d035a59292ffd296c172c44144e4ef03ec2bf50f65eaf775ae7",
+      "gitBlobSha1": "f6bb75dc9c5bc0a96dff04ed128f7ff5bbb3d53b",
+      "modifiedByCompression": false
+    },
+    {
+      "path": "archive-screening-initial.safe.json",
+      "bytes": 399,
+      "sha256": "674dbc9aceb1131c42a424306201a2ab740371d17b0ff9b34400cec12ae836bf",
+      "gitBlobSha1": "745e6e623ec286d2c199548d7b8d93c01ed9a9d9",
+      "modifiedByCompression": false
+    },
+    {
+      "path": "db-suite-reconciliation.safe.json",
+      "bytes": 38514,
+      "sha256": "cac7795a941bf4386e55ec5f8826fa6d0856ccc0b589e03bf569a3a32d3d9c61",
+      "gitBlobSha1": "47a795c691d2782f7f394404e47f8431d8ce6022",
+      "modifiedByCompression": false
+    },
+    {
+      "path": "evidence-index.safe.json",
+      "bytes": 4106,
+      "sha256": "329f83174c1a115c4abebf53a1e79bf9360b1163e5ee1ace57ea617d3197acd1",
+      "gitBlobSha1": "4686df31e159b9a55e2d30fbaa3d69cae8d64a69",
+      "modifiedByCompression": false
+    },
+    {
+      "path": "jobs-final-own-scope.json",
+      "bytes": 47047,
+      "sha256": "d90c7e1d016ead46d9aef7cfe168cfe975abe359eefae0e08533ac44b0853578",
+      "gitBlobSha1": "b5134e2b7ea5b89a3bd7be6d410ac8021ca6366e",
+      "modifiedByCompression": false
+    },
+    {
+      "path": "jobs-initial.json",
+      "bytes": 79805,
+      "sha256": "d70202372aa9d45261f0a69c50fd4d7da1e91dd9de644680c2625c03170c6a21",
+      "gitBlobSha1": "4432359583affeb27c5b82b643af783fc46c8e71",
+      "modifiedByCompression": false
+    },
+    {
+      "path": "jobs-stage-0045.json",
+      "bytes": 46676,
+      "sha256": "3deb18b94f2d4abda4d2d7a05c11538fa2a9f3e70a3e3e0f5cb73b2d4e6748ff",
+      "gitBlobSha1": "f331291302f56ff5bcb190a5acd0a4a175635619",
+      "modifiedByCompression": false
+    },
+    {
+      "path": "non-native-final.safe.json",
+      "bytes": 49187,
+      "sha256": "1aebc72678b9c308b5b20cffc5ee0effb1e03e271a3c4b1813580da63031b7bf",
+      "gitBlobSha1": "098b9e51c3c1ecb8a8b87d5211305ad906f10bc3",
+      "modifiedByCompression": false
+    },
+    {
+      "path": "non-native-partial.safe.json",
+      "bytes": 6580,
+      "sha256": "6857f93d5052937c29a67aaaf94738188c5121b67a60b2be9526be912eed236c",
+      "gitBlobSha1": "4d95ea463f98c1597bb33889440d92a6906f46ab",
+      "modifiedByCompression": false
+    },
+    {
+      "path": "original-log-sizes.safe.json",
+      "bytes": 1780,
+      "sha256": "5141ffd57f0cdb536e53c281b5f3640451ddbcb1d0253cd01e08620561296059",
+      "gitBlobSha1": "60e9f4dfbeb8212fc048dc601b358e1bcd64bb14",
+      "modifiedByCompression": false
+    },
+    {
+      "path": "run-initial.json",
+      "bytes": 14745,
+      "sha256": "c1efa6505860d4ae305b0d4b0fdf813376ddd678fc2f8ec871913a88aba2329e",
+      "gitBlobSha1": "ed08bb83121881e7c6694fea94b87d224fc8cb49",
+      "modifiedByCompression": false
+    },
+    {
+      "path": "selection-plan.safe.json",
+      "bytes": 143624,
+      "sha256": "fe4936d0c85dff44eb79f9f02fb3a2ba7b9d5b5dc17a225353f7f4ccd0ca9f8a",
+      "gitBlobSha1": "7f1acd66089205dc4f4e63c0e4481d6321b12fb3",
+      "modifiedByCompression": false
+    }
+  ],
+  "archiveInstructions": "Root may append archive-logs/*.gz and existing safe JSON receipts with this manifest to the evidence branch. Raw .log files remain retained locally; each gzip reconstructs the exact original bytes and Git blob. No repository source, refs or target index changed."
+}
