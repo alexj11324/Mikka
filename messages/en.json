@@ -4359,6 +4359,8 @@
         },
         "result": {
           "running": "Running",
+          "queued": "Queued",
+          "waiting": "Needs your reply",
           "needsReply": "Needs your reply",
           "paused": "Paused",
           "failed": "Failed",
