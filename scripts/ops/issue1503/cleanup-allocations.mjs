@@ -258,7 +258,8 @@ function requireScope(scope) {
   const mode = scope?.mode === undefined ? 'final_delivery' : scope.mode
   const historyLength = mode === 'final_delivery' ? PINNED_HISTORY.length
     : mode === 'failed_release' ? FAILED_RELEASE_HISTORY.length
-      : mode === F42606137512_RELEASE_MODE ? F42606137512_HISTORY.length : null
+      : mode === F42606137512_RELEASE_MODE ? F42606137512_HISTORY.length
+        : mode === F42636835234_RELEASE_MODE ? F42636835234_HISTORY.length : null
   check(historyLength !== null && scope?.ownerId === OWNER && scope.workspaceId === WORKSPACE
     && Array.isArray(scope.allocations) && scope.allocations.length > historyLength, 'allocation_scope_invalid')
 }
@@ -815,4 +816,277 @@ export async function loadF42606137512AllocationScope(config, latestPath, read =
   return { version: 1, ownerId: OWNER, workspaceId: WORKSPACE, mode: F42606137512_RELEASE_MODE,
     acceptancePassed: false, allocations, receipts, sourceReports,
     latestFailedRawSha256: F42606137512_INPUTS[1].sha256 }
+}
+
+/** Exact failure-only scope for F42636835234; prior histories and success contracts remain unchanged. */
+export const F42636835234_RELEASE_MODE = 'failed_release_42636835234'
+export const F42636835234_HISTORY = Object.freeze([
+  {
+    "issueId": "bf272b85-2430-4546-9038-8f3bc6998a5e",
+    "taskId": "caaaed63-8648-49b0-b17b-ff45c005876b",
+    "runId": "9f49787a-a5e4-437f-8432-c594c713a18e",
+    "operationId": "c328c238-dede-421f-9ec7-deb217f12a38",
+    "lookup": "legacy_run_metadata"
+  },
+  {
+    "issueId": "bf272b85-2430-4546-9038-8f3bc6998a5e",
+    "taskId": "caaaed63-8648-49b0-b17b-ff45c005876b",
+    "runId": "e295faed-273c-479f-8c03-9ab9dc2533ee",
+    "operationId": "16ab7e20-71f0-48a8-a143-a526142a68cb",
+    "lookup": "legacy_run_metadata"
+  },
+  {
+    "issueId": "e0582e5d-17cd-44e1-b0af-28fc0aace596",
+    "taskId": "5138410f-0b33-42fb-a55f-60017242a8e2",
+    "runId": "d1f7e459-4576-4994-846f-8afb1ca6492f",
+    "operationId": "68812218-6272-4022-98a1-a91eba5f3822",
+    "lookup": "legacy_run_metadata"
+  },
+  {
+    "issueId": "80f34b1c-4e3a-4d20-b0bd-786d40840bef",
+    "taskId": "8c02fbe0-ce49-4223-8888-10eff99d1a8f",
+    "runId": "d9a4ebfc-b8c6-48ca-8776-a8935863a488",
+    "operationId": "1bb43ed8-277c-46a7-bd2e-001571181ab0",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "f4298bea-9cb0-4fa2-bbff-0e16c33954af",
+    "taskId": "994ceba4-dc1a-42a6-9c33-29b954fd3ac2",
+    "runId": "6547cb9f-455d-4fe1-8cef-75cdc08e7df0",
+    "operationId": "6b130b2e-f94b-432e-8021-7659502b308e",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "97c51483-dea3-4ac3-8088-c4a182fb77ed",
+    "taskId": "1f4ee63f-035c-49e1-b2da-0b30ccf414dd",
+    "runId": "8af222c0-8143-439d-8fd1-d1a4d3b43a7c",
+    "operationId": "21638b1c-47b3-489c-8e0d-c19b27bb7aa7",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "719523d1-b0e5-4b28-823c-485c1e141c5f",
+    "taskId": "a3908404-57c9-453b-8539-7069195fac70",
+    "runId": "ed6723b7-f39f-4cf4-8243-9e5e9a94225f",
+    "operationId": "c6524fbd-4a9e-44d0-9b0d-d24b97b038f7",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "6fa2a3e8-1f4c-4ef4-9057-1d00fff5d4bf",
+    "taskId": "e1a83dea-fe74-4a90-bf17-6c7ab5260e89",
+    "runId": "4d6b0daf-346b-4e9f-8e71-a767bc6100de",
+    "operationId": "86f9926b-0a15-49a8-9f0d-e279977aa0fa",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "6fa2a3e8-1f4c-4ef4-9057-1d00fff5d4bf",
+    "taskId": "e1a83dea-fe74-4a90-bf17-6c7ab5260e89",
+    "runId": "4491cf36-8828-4096-8a13-578b7ca3d807",
+    "operationId": "1d773195-07ff-4a75-b6cd-7bda75745f0e",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "11ba8fa4-9919-4387-8b72-a0e279d41d5f",
+    "taskId": "e722dc29-d451-4e4f-a96c-949c6647f460",
+    "runId": "5ea7dad6-d3bc-4e9c-83fd-967fb58fa85a",
+    "operationId": "999a6cba-584e-443b-888f-54fbb4240e59",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "4fb0b4ec-3a0f-47b4-a3db-4a37fc7f281c",
+    "taskId": "7fe4108d-8722-411a-9f7f-ebd1391ab54e",
+    "runId": "338b908a-1ada-4791-8cc0-868db7f47afa",
+    "operationId": "f7dd8c0c-0fd7-4ae6-9672-fe4d97090bb2",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "45b22130-bc9c-4d62-9553-3b7d847e4120",
+    "taskId": "a4f5844c-7c4f-46d9-a304-2cf84598742f",
+    "runId": "032f5180-1a44-42bb-82cd-70b0637b16d4",
+    "operationId": "a101d3c7-31af-49d4-9bdd-3c655db4e389",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "45b22130-bc9c-4d62-9553-3b7d847e4120",
+    "taskId": "a4f5844c-7c4f-46d9-a304-2cf84598742f",
+    "runId": "4ad9064f-af19-4e1d-bd2c-e835d6c7b159",
+    "operationId": "69684576-232b-4e43-b49e-4375edfc3a13",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "626ffdfd-f24b-4b35-8682-84167a45ffe5",
+    "taskId": "77927ba7-096d-4ee2-8b20-9ffc7ae9f539",
+    "runId": "5a2fefa4-c7d0-4920-8718-bf8d79cc2e91",
+    "operationId": "6538d7b1-fa88-4429-8773-d0e2035776ba",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "626ffdfd-f24b-4b35-8682-84167a45ffe5",
+    "taskId": "77927ba7-096d-4ee2-8b20-9ffc7ae9f539",
+    "runId": "e33db713-68e5-4e18-8fe3-ee3e1a210c50",
+    "operationId": "476f458e-c234-433f-9502-4b61af57dd1e",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "fc33fd19-3482-415c-8e41-2b64b261b27e",
+    "taskId": "337bbcf4-d127-4772-9332-e7ced061c621",
+    "runId": "8d0667f4-02ac-4205-8014-bfec1a920a9d",
+    "operationId": "f391dacd-2b86-4eba-ac15-b408f6bfa8b6",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "fc33fd19-3482-415c-8e41-2b64b261b27e",
+    "taskId": "337bbcf4-d127-4772-9332-e7ced061c621",
+    "runId": "eee445ca-1eeb-429d-bf8e-8635362ff241",
+    "operationId": "ef484e80-2089-4817-92a3-4d8fdada5e89",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "9b4f90bf-9268-4e68-8037-0d12950529cb",
+    "taskId": "c687460b-e6a4-44ac-8696-f60d66bf64d3",
+    "runId": "0c66bb7d-f166-4deb-81c2-7197c042c6ab",
+    "operationId": "acde36fc-c52b-453a-88c4-5a2c95b3cf61",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "9b4f90bf-9268-4e68-8037-0d12950529cb",
+    "taskId": "c687460b-e6a4-44ac-8696-f60d66bf64d3",
+    "runId": "51f9f9b1-cabd-4530-8147-93c58f9d5ecf",
+    "operationId": "8a0295bd-daf8-4b9c-9572-8ee1324b4f69",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "facee344-3cc3-4919-8708-1462f815fb21",
+    "taskId": "5919985f-c531-4915-b51e-fea3b1702211",
+    "runId": "58a0260d-f0fd-4f38-8c29-3acca904bbdd",
+    "operationId": "f32ae3d7-0857-46e5-98fa-1be54b067c64",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "facee344-3cc3-4919-8708-1462f815fb21",
+    "taskId": "5919985f-c531-4915-b51e-fea3b1702211",
+    "runId": "6fb2b7dd-ca53-4ba7-8d6c-4526a1de227a",
+    "operationId": "232ffa5f-831c-47ac-9731-e2b4e18efe8d",
+    "lookup": "operation_metadata"
+  },
+  {
+    "issueId": "facee344-3cc3-4919-8708-1462f815fb21",
+    "taskId": "5919985f-c531-4915-b51e-fea3b1702211",
+    "runId": "7970d2af-b75b-4450-89e3-47f0a8a1154a",
+    "operationId": "a2f200cf-28ad-43a4-be76-118ade1660ef",
+    "lookup": "operation_metadata"
+  }
+])
+export const F42636835234_BINDING = Object.freeze({
+  "workflowRunId": 42636835234,
+  "workflowAttempt": 1,
+  "operatorSha": "7017d5f14871cbf1aeea771824d72e1d2bd90255",
+  "appSha": "76537e4c2996f717cbd19589e1efae328028aa4a",
+  "marker": "42636835234-1",
+  "fixtureSha256": "9e0836aa5e5d290dac5c282e82f56907b99207820ded44396159b935c53f9de7"
+})
+export const F42636835234_INPUTS = Object.freeze([
+  {
+    "harness": "claude_code",
+    "path": "issue1503-inputs/factory/claude-code-delivery.json",
+    "sha256": "c95f7c78568b89c2409b7753af00886f53f7c955823cfd60d03b1d4268d2b8fb",
+    "bytes": 6985,
+    "issueId": "fa86659d-a5f2-48ab-992a-ee75f716d562",
+    "taskId": "f695503c-c7fb-40e1-9659-df918f8b1b6e",
+    "runIds": [
+      "e269de7c-525d-4a1d-88fb-ec5670014b01",
+      "532e9734-5b02-4aae-89b5-7a744a6a614d"
+    ],
+    "startedAt": "2026-11-09T14:40:29.288Z",
+    "completedAt": "2026-11-09T15:00:48.484Z"
+  },
+  {
+    "harness": "codex",
+    "path": "issue1503-inputs/factory/codex-delivery.json",
+    "sha256": "6ecd5fc689cfa792d798f9b66ab4fab605dd996315e7efbbf07a5859a23ab7c8",
+    "bytes": 10938,
+    "issueId": "c38abb4c-2f8a-48ea-b70b-9f2badda85ee",
+    "taskId": "4ad3fce3-a6e8-40b3-9248-df1ea6bc9faf",
+    "runIds": [
+      "eb28a228-a575-4bc6-8732-ca505a3b2636",
+      "0450e5aa-7891-47b9-90db-3a1f6b4b9ca3"
+    ],
+    "startedAt": "2026-11-09T15:00:52.869Z",
+    "completedAt": "2026-11-09T15:06:51.838Z"
+  }
+].map(item => Object.freeze({ ...item, runIds: Object.freeze(item.runIds) })))
+
+function f42636835234Case(raw, expected) {
+  check(raw?.issue === 1503 && raw.phase === 'delivery' && raw.status === 'failed'
+    && raw.workspaceId === WORKSPACE && raw.teamId === TEAM && raw.repository === REPOSITORY
+    && raw.expectedSha === F42636835234_BINDING.appSha
+    && raw.marker === F42636835234_BINDING.marker
+    && isDeepStrictEqual(raw.selectedHarnesses, [expected.harness])
+    && raw.startedAt === expected.startedAt && raw.completedAt === expected.completedAt
+    && validTime(raw.startedAt) && validTime(raw.completedAt)
+    && Date.parse(raw.completedAt) >= Date.parse(raw.startedAt)
+    && Array.isArray(raw.cases) && raw.cases.length === 1, 'f42636835234_report_scope')
+  const item = raw.cases[0]
+  check(item?.harness === expected.harness && item.status === 'failed'
+    && item.issueId === expected.issueId && item.taskId === expected.taskId
+    && Array.isArray(item.runIdsSeen) && item.runIdsSeen.length > 0
+    && Array.isArray(item.runs), 'f42636835234_case_scope')
+  const runs = new Set()
+  const add = id => { check(uuid(id), 'f42636835234_run_id'); runs.add(id) }
+  const optional = id => { if (id != null) add(id) }
+  for (const id of item.runIdsSeen) add(id)
+  for (const run of item.runs) add(run.runId)
+  optional(item.threadRunId); optional(item.creation?.runId)
+  for (const id of item.dispatchReceipts?.runIds ?? []) add(id)
+  for (const candidate of [item.initial, item.repaired]) {
+    if (!candidate) continue
+    add(candidate.runId)
+    for (const key of ['reviewArtifacts', 'verification', 'checks'])
+      for (const evidence of candidate[key] ?? []) add(evidence.runId)
+  }
+  const question = item.questionConfirmation
+  check(expected.harness !== 'codex' || question != null, 'f42636835234_question_required')
+  if (question) {
+    for (const id of [question.origin?.runId, question.continuation?.runId,
+      question.receipt?.originRunId, question.receipt?.continuationRunId]) optional(id)
+    check(question.required === true && question.answerAttempted === true
+      && expected.harness === 'codex'
+      && question.receipt?.answerSource === 'human' && question.receipt?.replayed === false
+      && question.receipt?.sourceEventId === '2b45eea5-46ca-4bb1-a64f-112ac5650ca7'
+      && question.receipt?.source === 'normal_factory_question_api'
+      && question.origin?.runId === question.receipt.originRunId
+      && question.continuation?.runId === question.receipt.continuationRunId,
+    'f42636835234_question_binding')
+  }
+  check(isDeepStrictEqual([...runs].sort(), [...expected.runIds].sort()), 'f42636835234_run_set_changed')
+  return { issueId: item.issueId, taskId: item.taskId, runIds: [...runs] }
+}
+
+export async function loadF42636835234AllocationScope(config, latestPath, read = readFile) {
+  check(config?.version === 1 && config.issue === 1503 && config.mode === F42636835234_RELEASE_MODE
+    && config.workspaceId === WORKSPACE && config.smokeUserId === OWNER
+    && isDeepStrictEqual(config.source, F42636835234_BINDING)
+    && isDeepStrictEqual(config.historicalAllocations, F42636835234_HISTORY)
+    && isDeepStrictEqual(config.failedReports, F42636835234_INPUTS), 'f42636835234_allocation_scope_invalid')
+  const receipts = [], sourceReports = [], cases = []
+  for (const entry of F42636835234_INPUTS) {
+    const bytes = await read(entry.path)
+    check(bytes.length === entry.bytes && hash(bytes) === entry.sha256, 'f42636835234_raw_sha_mismatch')
+    const raw = JSON.parse(Buffer.from(bytes).toString('utf8'))
+    cases.push(f42636835234Case(raw, entry)); sourceReports.push(raw)
+    receipts.push({ harness: entry.harness, sha256: entry.sha256, status: raw.status,
+      startedAt: raw.startedAt, completedAt: raw.completedAt })
+  }
+  check(Date.parse(sourceReports[0].completedAt) < Date.parse(sourceReports[1].startedAt),
+    'f42636835234_chronology_changed')
+  check(typeof latestPath === 'string' && latestPath.length > 0
+    && hash(await read(latestPath)) === F42636835234_INPUTS[1].sha256, 'f42636835234_latest_mismatch')
+  const allocations = F42636835234_HISTORY.map(item => ({ ...item }))
+  for (const item of cases) for (const runId of item.runIds)
+    allocations.push({ issueId: item.issueId, taskId: item.taskId, runId,
+      operationId: null, lookup: 'operation_metadata' })
+  check(allocations.length === 26 && new Set(allocations.map(item => item.runId)).size === 26,
+    'f42636835234_allocation_run_overlap')
+  return { version: 1, ownerId: OWNER, workspaceId: WORKSPACE, mode: F42636835234_RELEASE_MODE,
+    acceptancePassed: false, allocations, receipts, sourceReports,
+    latestFailedRawSha256: F42636835234_INPUTS[1].sha256 }
 }

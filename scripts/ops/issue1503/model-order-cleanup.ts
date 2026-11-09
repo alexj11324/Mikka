@@ -114,3 +114,41 @@ export function f42606137512ModelOrderCleanupPlan(initial: any, failures: any[],
     || !sameModelOrder(failures[0].restoredOrder, failures[1].originalOrder)) return refuse()
   return { ...plans[1], latest: failures[1] }
 }
+
+/** This run restored the actual eight-entry default; its first leg changed
+ * only the materialized flag. Preserve that false receipt, never reinterpret it
+ * as F186's true flag or a successful delivery. The caller verifies raw bytes. */
+export function f42636835234ModelOrderCleanupPlan(initial: any, failures: any[], now = Date.now()) {
+  const refuse = (): never => { throw new Error('issue1503_cleanup_f42636835234_model_order_receipt_mismatch') }
+  if (!Array.isArray(failures) || failures.length !== 2) return refuse()
+  const pins = [
+    { harness: 'claude_code', startedAt: '2026-11-09T14:40:29.288Z', completedAt: '2026-11-09T15:00:48.484Z',
+      originalCustomized: false, flagPreserved: false,
+      originalHash: '9b8296bd6449841656e279bb6287feea84899c47aaea468ffe1a44f3d76400fb' },
+    { harness: 'codex', startedAt: '2026-11-09T15:00:52.869Z', completedAt: '2026-11-09T15:06:51.838Z',
+      originalCustomized: true, flagPreserved: true,
+      originalHash: '483e54d0f2281589293466e1be05347baf93e30b008f05454fe61bd1a19233a2' },
+  ]
+  const restoredHash = '483e54d0f2281589293466e1be05347baf93e30b008f05454fe61bd1a19233a2'
+  const plans = failures.map((latest, index) => {
+    const pin = pins[index]
+    const started = briefOrder(latest?.originalOrder), restored = briefOrder(latest?.restoredOrder)
+    if (latest?.status !== 'failed' || latest.marker !== '42636835234-1'
+      || latest.expectedSha !== '76537e4c2996f717cbd19589e1efae328028aa4a'
+      || serialized(latest.selectedHarnesses) !== serialized([pin.harness])
+      || latest.startedAt !== pin.startedAt || latest.completedAt !== pin.completedAt
+      || !started || !restored || started.entries.length !== 8 || restored.entries.length !== 8
+      || started.location !== 'cloud' || started.preferredHarness !== 'claude_code' || started.autoModelRouting !== true
+      || started.customized !== pin.originalCustomized || restored.customized !== true
+      || createHash('sha256').update(serialized(latest.originalOrder)).digest('hex') !== pin.originalHash
+      || createHash('sha256').update(serialized(latest.restoredOrder)).digest('hex') !== restoredHash
+      || !Array.isArray(latest.cleanup) || !latest.cleanup.some((entry: any) =>
+        entry?.kind === 'effective_model_order_restored' && entry.customizedFlagPreserved === pin.flagPreserved)) return refuse()
+    const plan = receiptModelOrderCleanupPlan(initial, latest, now, 'failed')
+    if (effectiveOrder(plan.materialized) !== effectiveOrder(plan.currentDefault)) return refuse()
+    return plan
+  })
+  if (Date.parse(failures[0].completedAt) >= Date.parse(failures[1].startedAt)
+    || !sameModelOrder(failures[0].restoredOrder, failures[1].originalOrder)) return refuse()
+  return { ...plans[1], latest: failures[1] }
+}

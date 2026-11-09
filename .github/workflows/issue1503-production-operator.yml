@@ -1,4 +1,4 @@
-name: Issue 1503 bounded read-only diagnosis
+name: Issue 1503 production acceptance operator
 on:
   push:
     branches: [ops/issue-1503-production-smoke]
@@ -13,21 +13,25 @@ concurrency:
   cancel-in-progress: false
   queue: max
 jobs:
-  diagnose:
-    if: false
+  cleanup:
+    if: github.repository == 'alexj11324/Mikka'
     runs-on: ubuntu-latest
     concurrency:
       group: web-deploy-production
       cancel-in-progress: false
       queue: max
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      id-token: write
+    timeout-minutes: 15
     env:
       MIKKA_EDITION: cloud
-      MIKKA_EXPECTED_DEPLOYMENT_SHA: 76537e4c2996f717cbd19589e1efae328028aa4a
+      MIKKA_1503_CLEANUP_MODE: failed_release_42636835234
+      MIKKA_1503_ALLOCATION_SCOPE_FILE: scripts/ops/issue1503/failed-release-42636835234.json
+      MIKKA_1503_F_RUN_ID: '42636835234'
       MIKKA_1503_START_FIXTURE_SHA256: 9e0836aa5e5d290dac5c282e82f56907b99207820ded44396159b935c53f9de7
+      MIKKA_1503_F_ARTIFACT_ID: '13686430249'
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -35,6 +39,70 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: 24
+      - name: Require the pinned failed Factory artifact and exact fixture
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises'
+          import { createHash } from 'node:crypto'
+          try {
+            const fixture = await readFile('scripts/ops/issue1503/fixture-state.json')
+            if (createHash('sha256').update(fixture).digest('hex') !== process.env.MIKKA_1503_START_FIXTURE_SHA256) throw new Error('invalid')
+            for (const name of ['MIKKA_1503_F_RUN_ID', 'MIKKA_1503_F_ARTIFACT_ID']) {
+              const value = process.env[name] ?? ''
+              if (!/^[1-9][0-9]*$/.test(value) || !Number.isSafeInteger(Number(value))) throw new Error('invalid')
+            }
+            const scope = JSON.parse(await readFile('scripts/ops/issue1503/failed-release-42636835234.json', 'utf8'))
+            const expected = [
+              ['claude_code', 'issue1503-inputs/factory/claude-code-delivery.json'],
+              ['codex', 'issue1503-inputs/factory/codex-delivery.json'],
+            ]
+            if (scope.mode !== 'failed_release_42636835234' || !Array.isArray(scope.failedReports) || scope.failedReports.length !== 2 ||
+              !expected.every(([harness, path], i) => scope.failedReports[i]?.harness === harness &&
+                scope.failedReports[i]?.path === path && /^[a-f0-9]{64}$/.test(scope.failedReports[i]?.sha256 ?? ''))) throw new Error('invalid')
+          } catch {
+            console.error('issue1503_cleanup_transport_inputs_missing')
+            process.exitCode = 1
+          }
+          NODE
+      - name: Download the exact failed F42636835234 aggregate artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4, same pin as web-deploy
+        with:
+          github-token: ${{ github.token }}
+          repository: alexj11324/Mikka
+          run-id: ${{ env.MIKKA_1503_F_RUN_ID }}
+          artifact-ids: ${{ env.MIKKA_1503_F_ARTIFACT_ID }}
+          path: issue1503-inputs/factory
+          merge-multiple: true
+      - name: Bind both real FAIL originals and byte-copy the chronological latest
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile, writeFile } from 'node:fs/promises'
+          import { createHash } from 'node:crypto'
+          import { loadF42636835234AllocationScope } from './scripts/ops/issue1503/cleanup-allocations.mjs'
+          const hash = bytes => createHash('sha256').update(bytes).digest('hex')
+          try {
+            const scope = JSON.parse(await readFile('scripts/ops/issue1503/failed-release-42636835234.json', 'utf8'))
+            const inputs = []
+            for (const entry of scope.failedReports) {
+              const bytes = await readFile(entry.path)
+              if (hash(bytes) !== entry.sha256) throw new Error('invalid')
+              const raw = JSON.parse(bytes.toString('utf8'))
+              const completedAt = Date.parse(raw.completedAt)
+              if (raw.status !== 'failed' || raw.marker !== '42636835234-1' || raw.expectedSha !== '76537e4c2996f717cbd19589e1efae328028aa4a' ||
+                !Number.isFinite(completedAt)) throw new Error('invalid')
+              inputs.push({ bytes, completedAt })
+            }
+            inputs.sort((a, b) => a.completedAt - b.completedAt)
+            if (inputs.length !== 2 || inputs[0].completedAt >= inputs[1].completedAt) throw new Error('invalid')
+            const latest = 'scripts/ops/issue1503/last-failed-delivery.json'
+            await writeFile(latest, inputs[1].bytes, { flag: 'wx' })
+            await loadF42636835234AllocationScope(scope, latest)
+            console.log('issue1503_cleanup_transport_bound')
+          } catch {
+            console.error('issue1503_cleanup_transport_binding_failed')
+            process.exitCode = 1
+          }
+          NODE
       - run: corepack enable && corepack prepare pnpm@10.34.3 --activate && pnpm install --frozen-lockfile
       - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
@@ -46,8 +114,74 @@ jobs:
           secret-path: /
           recursive: false
           include-imports: false
-      - name: Read six exact business resources once after failed driver cleanup
-        run: node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1503/diagnose-f42636835234.ts
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /neon
+          secret-name: DATABASE_URL
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: MIKKA_DATABASE_URL
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: BETTER_AUTH_SECRET
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: GITHUB_CLIENT_ID
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: GITHUB_CLIENT_SECRET
+          recursive: false
+          include-imports: false
+      - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: WORKSPACE_SECRETS_KEY
+          recursive: false
+          include-imports: false
+      - name: Release the failed-window fixture resources without claiming acceptance
+        run: node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1503/cleanup.ts
         env:
           NODE_ENV: production
           VERCEL_ENV: production
@@ -56,7 +190,6 @@ jobs:
       - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: issue1503-diagnostic-42636835234
-          path: issue1503-report/diagnostic-42636835234.json
-          if-no-files-found: error
+          name: issue1503-failed-release
+          path: issue1503-report
           retention-days: 3
