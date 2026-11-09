@@ -74,9 +74,14 @@ export function persistentReadData(key: unknown, data: unknown): unknown {
     // The existing continuation proves the server's latest 200-message window.
     // Older pages and optimistic/inbox messages have no such proof after reload.
     const cursor = 'cursor' in data && typeof data.cursor === 'number' ? data.cursor : 0
-    const items = data.items.filter(item => item && typeof item === 'object' && !item.pending && Number.isInteger(item.position) && item.position >= Math.max(0, cursor - 199)).slice(-200)
+    const eligible = data.items.filter(item => item && typeof item === 'object' && !item.pending && Number.isInteger(item.position) && item.position >= 0)
+    const items = eligible.filter(item => item.position >= Math.max(0, cursor - 199)).slice(-200)
+    const first = items[0]?.position
+    const retained = new Set(items)
+    // Preserve the server's edge unless persistence actually drops older rows.
+    const discardedEarlier = first !== undefined && eligible.some(item => !retained.has(item) && item.position < first)
     const { streamRunId: _stream, ...rest } = data as Record<string, unknown>
-    projected = { ...rest, items, working: false, historyBefore: items[0]?.position }
+    projected = { ...rest, items, working: false, ...(discardedEarlier ? { historyBefore: first } : {}) }
   }
   const value = clean(projected, context)
   // Required text fields must retain their shape. If a value itself looks like

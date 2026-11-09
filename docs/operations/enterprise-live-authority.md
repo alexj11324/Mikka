@@ -10,7 +10,7 @@ This change uses the existing live transport. It adds no polling and changes no 
 
 ## Persisted boundary and locks
 
-`20261108120223_enterprise_live_session_authority.sql` explicitly targets `MIKKA_DATABASE_URL`, beside Auth. It adds capability rows and durable revocation receipts. There is deliberately no session/user foreign key: deleting a session must leave an undelivered revocation available for retry.
+`20261109035023_enterprise_live_session_authority.sql` explicitly targets `MIKKA_DATABASE_URL`, beside Auth. It adds capability rows and durable revocation receipts. There is deliberately no session/user foreign key: deleting a session must leave an undelivered revocation available for retry.
 
 | Operation | Order and commit boundary |
 | --- | --- |

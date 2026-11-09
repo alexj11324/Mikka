@@ -21,7 +21,7 @@ test('shared credential policy preserves scope and current revocation in one Pos
     await pool.query(`CREATE TABLE workspace_subscription_shares ("ownerId" text,"workspaceId" uuid,"allowOthers" boolean NOT NULL,PRIMARY KEY ("ownerId","workspaceId"));
       CREATE TABLE workspace_personal_policies ("workspaceId" uuid PRIMARY KEY,subscriptions boolean NOT NULL);
       CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY,kind text NOT NULL CHECK (kind IN ('personal','team')))`)
-    await pool.query(await readFile(new URL('../drizzle/20261108120220_organization_governance.sql', import.meta.url), 'utf8'))
+    await pool.query(await readFile(new URL('../drizzle/20261109035020_organization_governance.sql', import.meta.url), 'utf8'))
     await pool.query('INSERT INTO mikka_workspaces VALUES ($1,\'team\'),($2,\'team\')', [workspace, otherWorkspace])
     closeWorkspace = await bindFixtureWorkspaceDatabase(pool)
     const { othersMayUse } = await import('./personal-policy')

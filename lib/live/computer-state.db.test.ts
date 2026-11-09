@@ -117,7 +117,7 @@ test('real PG: computer changes publish committed owner state without heartbeat 
         "approvedForRun" boolean NOT NULL DEFAULT false,FOREIGN KEY ("botId","workspaceId","ownerId") REFERENCES bots(id,"workspaceId","ownerId"));
       CREATE TABLE thread_machines ("runId" uuid PRIMARY KEY,"botId" uuid,"ownerId" text,"workspaceId" uuid,"deviceId" uuid,state text,"sandboxId" text,epoch integer);`)
     await database.query(await readFile(new URL('../../drizzle/20261027164510_local_computer_reviews.sql', import.meta.url), 'utf8'))
-    for (const name of ['20261108120220_organization_governance.sql', '20261108120223_enterprise_live_session_authority.sql']) {
+    for (const name of ['20261109035020_organization_governance.sql', '20261109035023_enterprise_live_session_authority.sql']) {
       await database.query(await readFile(new URL('../../drizzle/' + name, import.meta.url), 'utf8'))
     }
     await database.query('INSERT INTO mikka_workspaces(id,"userId",kind) VALUES ($1,$2,\'team\'),($3,$2,\'team\')', [actor.workspaceId, actor.userId, other.workspaceId])
