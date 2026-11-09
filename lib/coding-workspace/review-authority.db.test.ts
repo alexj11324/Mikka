@@ -67,11 +67,12 @@ test('task review: current owner, session, tenant and immutable physical checkou
   const read = (f: Fixture, session = f.session, expected = {}) => resolve(pool, pool, session, f.taskId, expected)
   const refused = (operation: Promise<unknown>, status: number, code?: string) => assert.rejects(operation, error => error instanceof ReviewAuthorityError && error.status === status && (!code || error.code === code))
   // Model inconsistent historical rows that predate immutable stored tenancy.
-  // Only that write-time trigger is suspended in this owned throwaway DB;
+  // Only the corresponding write-time trigger is suspended in this owned throwaway DB;
   // review source fences, SQL reads/locks and every authorization check remain
   // real. Ordinary production writes are separately asserted to reject drift.
-  const legacyWrite = async (table: 'issues' | 'agent_runs', query: string, values: unknown[]) => {
-    const trigger = table === 'issues' ? 'preserve_task_workspace' : 'require_run_task_workspace'
+  const legacyWrite = async (table: 'issues' | 'agent_runs' | 'mikka_team_issues', query: string, values: unknown[]) => {
+    const trigger = { issues: 'preserve_task_workspace', agent_runs: 'require_run_task_workspace',
+      mikka_team_issues: 'check_active_team_relation' }[table]
     const client = await pool.connect()
     try {
       await client.query('BEGIN')
@@ -156,7 +157,10 @@ test('task review: current owner, session, tenant and immutable physical checkou
     await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [f.workspaceId, f.userId])
     await refused(read(f), 404, 'review_not_found')
     await pool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [f.workspaceId, f.userId])
-    await pool.query('UPDATE mikka_team_issues SET "workspaceId"=$2 WHERE "issueId"=$1', [f.taskId, f.otherWorkspaceId])
+    await assert.rejects(pool.query('UPDATE mikka_team_issues SET "workspaceId"=$2 WHERE "issueId"=$1', [f.taskId, f.otherWorkspaceId]),
+      (error: unknown) => error instanceof Error && 'code' in error && error.code === '23514')
+    assert.equal((await read(f)).workspaceId, f.workspaceId, 'a rejected relation write preserves the current tenant')
+    await legacyWrite('mikka_team_issues', 'UPDATE mikka_team_issues SET "workspaceId"=$2 WHERE "issueId"=$1', [f.taskId, f.otherWorkspaceId])
     await refused(read(f), 403)
   })
   const mutations: Array<[string, (f: Fixture) => Promise<unknown>, number]> = [
@@ -438,7 +442,7 @@ test('task review: current owner, session, tenant and immutable physical checkou
     try {
       await client.query('BEGIN')
       await client.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload)
-        VALUES($1,$2,$3,$4,'user_message',$1,'{"text":"Review binding fixture"}')`, [eventId, f.userId, f.botId, f.taskId])
+        VALUES($1::uuid,$2,$3,$4,'user_message',$1::text,'{"text":"Review binding fixture"}')`, [eventId, f.userId, f.botId, f.taskId])
       await client.query(`INSERT INTO factory_tasks(id,"userId","botId","issueId","sourceEventId",route,stage,status,"attemptId",reason,"scopeVersion")
         SELECT $1,$2,$3,id,$4,'{}',$5,'pending',$6,'Review binding fixture',"scopeVersion" FROM issues WHERE id=$7`,
       [taskId, f.userId, f.botId, eventId, stage, attemptId, f.taskId])

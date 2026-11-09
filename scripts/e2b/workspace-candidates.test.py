@@ -7,8 +7,11 @@ import io
 import json
 import os
 from pathlib import Path
+import subprocess
+import sys
 from types import SimpleNamespace
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError
@@ -28,6 +31,7 @@ class Fixture:
         self.calls, self.builds, self.probes, self.created = [], [], [], []
         self.override, self.foreign = {}, []
         self.fail_build = self.collision = self.fail_create = False
+        self.build_failure = None
         self.emit_creation = True
         self.returned_id = None
         self.status_calls, self.status_error = [], None
@@ -82,7 +86,7 @@ class Fixture:
         kwargs['on_build_logs'](SimpleNamespace(level='info', message='mikka-bootstrap-phase source 12'))
         if self.fail_build:
             print(PRIVATE)
-            failure = RuntimeError(PRIVATE)
+            failure = self.build_failure or RuntimeError(PRIVATE)
             failure.__cause__ = HTTPError('https://provider.invalid/' + PRIVATE, 503, PRIVATE, {'Authorization': PRIVATE}, None)
             raise failure
         return source, SimpleNamespace(template_id=self.returned_id or template_id, build_id=build_id)
@@ -130,13 +134,21 @@ class Fixture:
         sandbox.kill()
         return {'validated': True}
 
-    def read_status(self, row, api_key):
+    def read_status(self, row, api_key, _offset=0, _timeout=15):
         self.status_calls.append((row['templateId'], row['buildId']))
         assert api_key == PRIVATE and row['templateId'] in self.templates, 'lookup must precede exact cleanup'
         if self.status_error:
             raise self.status_error
-        return SimpleNamespace(**{'template_id': row['templateId'], 'build_id': row['buildId'],
-            'status': SimpleNamespace(value='error'), 'reason': None, **self.status_override})
+        return SimpleNamespace(status_code=200, parsed=SimpleNamespace(**{
+            'template_id': row['templateId'], 'build_id': row['buildId'], 'log_entries': [],
+            'status': SimpleNamespace(value='error'), 'reason': None, **self.status_override}))
+
+    def debug_page(self, payload, timeout):
+        row = candidates.debug_target(payload['scope'], Path(payload['output']), payload['kind'], payload['row'])
+        try:
+            return candidates.project_debug_page(self.read_status(row, payload['key'], payload['offset'], timeout), row)
+        except BaseException as error:
+            return candidates.debug_failure('request_failed', error, request_started=True)
 
     def patches(self):
         stack = ExitStack()
@@ -146,6 +158,7 @@ class Fixture:
         stack.enter_context(patch.object(candidates.builder, 'probe_models', self.models))
         stack.enter_context(patch.object(candidates.builder, 'probe_conservation', self.conservation))
         stack.enter_context(patch.object(candidates, 'read_build_status', self.read_status, create=True))
+        stack.enter_context(patch.object(candidates, 'request_debug_page', self.debug_page))
         stack.enter_context(patch.object(candidates.builder, 'publish', side_effect=AssertionError('must not publish')))
         return stack
 
@@ -421,16 +434,208 @@ class Candidates(unittest.TestCase):
             self.build()
         report = json.loads((self.output / 'build-report.json').read_text())
         self.assertEqual(self.fixture.status_calls, [('private-claude', 'build-claude')])
-        self.assertEqual(report['diagnostic']['statusLookup'], {'attempted': True, 'identityMatched': True,
+        lookup = report['diagnostic']['statusLookup']
+        self.assertEqual({key: lookup[key] for key in ('attempted', 'identityMatched', 'status', 'step', 'exitCode',
+                         'exitCodeSource', 'reasonLogEntries', 'reasonLogEntriesTruncated')}, {'attempted': True, 'identityMatched': True,
             'status': 'error', 'step': {'phase': 'bootstrap', 'index': 9}, 'exitCode': 2,
             'exitCodeSource': 'provider_reason', 'reasonLogEntries': 2, 'reasonLogEntriesTruncated': False})
-        self.assertIn({'phase': 'ingress', 'detail': 'provider'}, report['diagnostic']['buildLogs']['claude']['events'])
+        self.assertTrue(lookup['complete'])
+        self.assertIn({'phase': 'ingress', 'detail': 'provider', 'count': 1}, lookup['debugLogs']['events'])
+        self.assertNotIn({'phase': 'ingress', 'detail': 'provider'}, report['diagnostic']['buildLogs']['claude']['events'])
         self.assertNotIn(PRIVATE, ''.join(path.read_text() for path in self.output.iterdir()))
         self.assertFalse(self.fixture.templates)
 
+    def test_debug_collection_reads_top_level_pages_before_cleanup_and_preserves_callback_evidence(self):
+        self.build()
+        row = candidates.read_journal(self.output, SCOPE)['templates']['claude']
+        calls = []
+        def page(payload, timeout):
+            calls.append((payload['offset'], timeout))
+            message = '[ready] [stderr]: ' + json.dumps({'ok': False, 'detail': 'worker_order'})
+            entries = [SimpleNamespace(level='debug', message=PRIVATE)] * 100 if payload['offset'] == 0 else [
+                SimpleNamespace(level='debug', message=message),
+                SimpleNamespace(level='info', message='Running start command: ' + PRIVATE),
+                SimpleNamespace(level='debug', message='[start] [stderr]: Cloud worker unavailable')]
+            response = SimpleNamespace(status_code=200, parsed=SimpleNamespace(template_id=row['templateId'],
+                build_id=row['buildId'], status='error', log_entries=entries, reason=None))
+            return candidates.project_debug_page(response, row)
+        before = (self.output / candidates.JOURNAL).read_bytes()
+        with patch.object(candidates, 'request_debug_page', side_effect=page):
+            result = candidates.failed_build_status(SCOPE, self.output, 'claude', row, PRIVATE)
+        self.assertEqual([offset for offset, _ in calls], [0, 100])
+        self.assertTrue(all(0 < timeout <= 15 for _, timeout in calls))
+        self.assertEqual((result['complete'], result['outcome'], result['requests'], result['pages'], result['entries']),
+                         (True, 'available', 2, 2, 103))
+        self.assertTrue(result['debugLogs']['signals']['startAnnounced'])
+        self.assertIn({'phase': 'ingress', 'detail': 'worker_order', 'count': 1}, result['debugLogs']['events'])
+        self.assertIn({'phase': 'host_failure', 'detail': 'anonymous_worker_unavailable', 'count': 1}, result['debugLogs']['events'])
+        self.assertEqual((self.output / candidates.JOURNAL).read_bytes(), before)
+        self.assertNotIn(PRIVATE, json.dumps(result))
+
+    def test_debug_requires_current_complete_journal_and_never_queries_foreign_or_partial_identity(self):
+        self.build()
+        original = candidates.read_journal(self.output, SCOPE)
+        row = original['templates']['claude']
+        mutations = [lambda value: value['identity'].update(runAttempt='3'),
+                     lambda value: value['identity'].update(sourceCommit='d' * 40),
+                     lambda value: value['identity'].update(workflowCommit='d' * 40),
+                     lambda value: value['identity'].update(runId='456'),
+                     lambda value: value.update(unknown=PRIVATE),
+                     lambda value: value['templates']['claude'].pop('buildId'),
+                     lambda value: value['templates']['claude'].update(name='foreign'),
+                     lambda value: value['templates']['claude'].update(templateId='foreign')]
+        for change in mutations:
+            value = deepcopy(original)
+            change(value)
+            candidates.write_private(self.output / candidates.JOURNAL, value)
+            with patch.object(candidates, 'request_debug_page') as request:
+                result = candidates.failed_build_status(SCOPE, self.output, 'claude', row, PRIVATE)
+            request.assert_not_called()
+            self.assertFalse(result['complete'])
+            self.assertEqual(result['requests'], 0)
+            self.assertEqual(result['failure']['code'], 'journal_refused')
+        (self.output / candidates.JOURNAL).write_text('{"identity":')
+        with patch.object(candidates, 'request_debug_page') as request:
+            result = candidates.failed_build_status(SCOPE, self.output, 'claude', row, PRIVATE)
+        request.assert_not_called()
+        self.assertEqual(result['failure']['code'], 'journal_refused')
+        self.assertNotIn(PRIVATE, json.dumps(result))
+
+    def test_debug_request_hard_deadline_kills_and_reaps_a_blocked_process(self):
+        real_run = subprocess.run
+        pidfile = self.output / 'blocked.pid'
+        command = [sys.executable, '-c',
+                   'import os,time;from pathlib import Path;'
+                   'Path(' + repr(str(pidfile)) + ').write_text(str(os.getpid()));'
+                   'print(\'{"requestStarted":true}\',flush=True);time.sleep(30)']
+        def blocked(_command, **options):
+            self.assertNotIn(PRIVATE, ' '.join(_command))
+            return real_run(command, **options)
+        started = time.monotonic()
+        actual = self.actual_module()
+        with patch.object(actual.subprocess, 'run', side_effect=blocked):
+            result = actual.request_debug_page({'key': PRIVATE}, 0.2)
+        self.assertLess(time.monotonic() - started, 1.5)
+        self.assertTrue(result['requestStarted'])
+        self.assertEqual(result['failure']['code'], 'request_timeout')
+        with self.assertRaises(ProcessLookupError):
+            os.kill(int(pidfile.read_text()), 0)
+        self.assertNotIn(PRIVATE, json.dumps(result))
+
+    def test_debug_collection_has_a_real_total_deadline_across_request_processes(self):
+        self.build()
+        row = candidates.read_journal(self.output, SCOPE)['templates']['claude']
+        actual, real_run, calls = self.actual_module(), subprocess.run, []
+        report = actual.project_debug_page(SimpleNamespace(status_code=200, parsed=SimpleNamespace(
+            template_id=row['templateId'], build_id=row['buildId'], status='error', reason=None,
+            log_entries=[SimpleNamespace(level='debug', message=PRIVATE)] * 100)), row)
+        pidfile = self.output / 'total-blocked.pid'
+        def child(_command, **options):
+            calls.append(options['timeout'])
+            if len(calls) == 1:
+                script = 'import time;print(\'{"requestStarted":true}\',flush=True);time.sleep(0.06);print(' + repr(json.dumps(report)) + ')'
+            else:
+                script = ('import os,time;from pathlib import Path;Path(' + repr(str(pidfile)) + ').write_text(str(os.getpid()));'
+                          'print(\'{"requestStarted":true}\',flush=True);time.sleep(30)')
+            return real_run([sys.executable, '-c', script], **options)
+        started = time.monotonic()
+        with patch.object(actual, 'DEBUG_TOTAL_SECONDS', 0.5), patch.object(actual.subprocess, 'run', side_effect=child):
+            result = actual.failed_build_status(SCOPE, self.output, 'claude', row, PRIVATE)
+        elapsed = time.monotonic() - started
+        self.assertEqual((result['requests'], result['pages'], result['outcome']), (2, 1, 'partial'))
+        self.assertEqual(result['failure']['code'], 'request_timeout')
+        self.assertTrue(0 < calls[1] < calls[0] <= 0.5)
+        self.assertTrue(0.4 <= elapsed < 1.5)
+        with self.assertRaises(ProcessLookupError):
+            os.kill(int(pidfile.read_text()), 0)
+
+    def test_debug_pages_stop_on_http_nonterminal_foreign_identity_status_changes_and_page_limit(self):
+        self.build()
+        row = candidates.read_journal(self.output, SCOPE)['templates']['claude']
+        def projected(state='error', entries=None, **changes):
+            return candidates.project_debug_page(SimpleNamespace(status_code=200, parsed=SimpleNamespace(**{
+                'template_id': row['templateId'], 'build_id': row['buildId'], 'status': state,
+                'log_entries': entries or [], 'reason': None, **changes})), row)
+        for code, expected in ((400, 'not_found'), (401, 'unauthorized'), (403, 'forbidden'), (404, 'not_found'), (503, 'http_error')):
+            page = candidates.project_debug_page(SimpleNamespace(status_code=code,
+                parsed=SimpleNamespace(message=f"Build '{row['buildId']}' not found")), row)
+            with patch.object(candidates, 'request_debug_page', return_value=page) as request:
+                result = candidates.failed_build_status(SCOPE, self.output, 'claude', row, PRIVATE)
+            self.assertEqual(request.call_count, 1)
+            self.assertEqual((result['failure']['code'], result['failure']['httpStatus']), (expected, code))
+            self.assertFalse(result['complete'])
+        for state in ('waiting', 'building'):
+            with patch.object(candidates, 'request_debug_page', return_value=projected(state)) as request:
+                result = candidates.failed_build_status(SCOPE, self.output, 'claude', row, PRIVATE)
+            self.assertEqual(request.call_count, 1)
+            self.assertEqual((result['failure']['code'], result['status'], result['complete']), ('not_terminal', state, False))
+        full = [SimpleNamespace(level='debug', message=PRIVATE)] * 100
+        for state in ('ready', 'building'):
+            with patch.object(candidates, 'request_debug_page', side_effect=[projected(entries=full), projected(state)]) as request:
+                result = candidates.failed_build_status(SCOPE, self.output, 'claude', row, PRIVATE)
+            self.assertEqual(request.call_count, 2)
+            self.assertEqual((result['failure']['code'], result['status'], result['complete']), ('status_changed', 'error', False))
+        with patch.object(candidates, 'request_debug_page', side_effect=lambda *_args: projected(entries=full)) as request:
+            result = candidates.failed_build_status(SCOPE, self.output, 'claude', row, PRIVATE)
+        self.assertEqual(request.call_count, 6)
+        self.assertEqual((result['entries'], result['failure']['code'], result['complete']), (600, 'page_limit', False))
+        for page in (projected(template_id='foreign'), projected(entries=full + full)):
+            self.assertFalse(page.get('identityMatched', False))
+            self.assertEqual(page['failure']['code'], 'response_refused')
+        self.assertNotIn(PRIVATE, json.dumps(result))
+
+    def test_debug_internal_worker_revalidates_scope_and_suppresses_sdk_text_before_its_one_get(self):
+        self.build()
+        row = candidates.read_journal(self.output, SCOPE)['templates']['claude']
+        payload = {'scope': SCOPE, 'output': str(self.output), 'kind': 'claude', 'row': row,
+                   'key': PRIVATE, 'offset': 0, 'timeout': 1}
+        def run(value, identity=SCOPE):
+            output = io.BytesIO()
+            with patch.object(candidates.sys, 'stdin', SimpleNamespace(buffer=io.BytesIO(json.dumps(value).encode()))), \
+                 patch.object(candidates.sys, 'stdout', io.TextIOWrapper(output, encoding='utf-8', write_through=True)), \
+                 patch.object(candidates, 'identity', return_value=identity), \
+                 patch.object(candidates, 'read_build_status', side_effect=read) as request:
+                self.assertEqual(candidates.debug_page_main(), 0)
+                raw = output.getvalue()
+            self.assertNotIn(PRIVATE.encode(), raw)
+            return raw, request.call_count
+        def read(*args):
+            print(PRIVATE)
+            print(PRIVATE, file=sys.stderr)
+            return self.fixture.read_status(*args)
+        raw, calls = run(payload)
+        self.assertEqual(calls, 1)
+        self.assertTrue(raw.startswith(candidates.DEBUG_REQUEST_MARKER))
+        for value, identity in (({**payload, 'offset': 1}, SCOPE),
+                                (payload, {**SCOPE, 'runAttempt': '3'}),
+                                ({**payload, 'row': {**row, 'buildId': 'foreign'}}, SCOPE),
+                                ({**payload, 'extra': PRIVATE}, SCOPE)):
+            raw, calls = run(value, identity)
+            self.assertEqual(calls, 0)
+            self.assertFalse(json.loads(raw)['requestStarted'])
+            self.assertEqual(json.loads(raw)['failure']['code'], 'journal_refused')
+
+    def test_unexpected_diagnostic_exceptions_preserve_original_build_exception_and_exact_cleanup(self):
+        for diagnostic_error in (RuntimeError(PRIVATE), KeyboardInterrupt(PRIVATE), SystemExit(PRIVATE)):
+            with tempfile.TemporaryDirectory() as temp:
+                output = candidates.output_directory(Path(temp) / 'output')
+                fixture = Fixture(output)
+                fixture.fail_build = True
+                fixture.build_failure = type('BuildException', (Exception,), {})(PRIVATE)
+                with fixture.patches(), patch.object(candidates, 'failed_build_status', side_effect=diagnostic_error), \
+                     self.assertRaises(candidates.CandidateError) as raised:
+                    candidates.build_candidates(SCOPE, output, PRIVATE, fixture.sdk)
+                self.assertIs(raised.exception.__cause__, fixture.build_failure)
+                report = json.loads((output / 'build-report.json').read_text())
+                self.assertEqual(report['code'], 'template_build_failed')
+                self.assertEqual(report['diagnostic']['exceptionChain'][0]['type'], 'BuildException')
+                self.assertFalse(fixture.templates)
+                self.assertTrue(any(method == 'DELETE' for method, _ in fixture.calls))
+                self.assertNotIn(PRIVATE, ''.join(path.read_text() for path in output.iterdir()))
+
     def test_status_read_error_or_foreign_response_never_replaces_build_failure_or_skips_cleanup(self):
-        for status_error, override, code in ((HTTPError('https://provider.invalid/' + PRIVATE, 503, PRIVATE, {}, None), {}, 'provider_http_error'),
-                                             (None, {'template_id': 'foreign'}, 'candidate_identity_mismatch')):
+        for status_error, override, code in ((HTTPError('https://provider.invalid/' + PRIVATE, 503, PRIVATE, {}, None), {}, 'request_failed'),
+                                             (None, {'template_id': 'foreign'}, 'response_refused')):
             with self.subTest(code=code), tempfile.TemporaryDirectory() as temp:
                 output = candidates.output_directory(Path(temp) / 'output')
                 fixture = Fixture(output)
@@ -440,26 +645,52 @@ class Candidates(unittest.TestCase):
                 report = json.loads((output / 'build-report.json').read_text())
                 self.assertEqual(report['code'], 'operation_failed')
                 self.assertEqual(report['diagnostic']['exceptionChain'][0]['type'], 'RuntimeError')
-                self.assertEqual(report['diagnostic']['statusLookup']['failure']['exceptionChain'][0]['code'], code)
+                self.assertEqual(report['diagnostic']['statusLookup']['failure']['code'], code)
                 self.assertEqual(len(fixture.status_calls), 1)
                 self.assertFalse(fixture.templates)
 
-    def test_public_status_read_has_one_fifteen_second_request_and_closed_step_exit_projection(self):
+    @staticmethod
+    def actual_module():
+        actual_spec = importlib.util.spec_from_file_location('status_adapter', Path(__file__).with_name('workspace-candidates.py'))
+        actual = importlib.util.module_from_spec(actual_spec)
+        actual_spec.loader.exec_module(actual)
+        return actual
+
+    def test_generated_status_read_explicitly_disables_retries_redirects_and_selects_debug(self):
         row = {'templateId': 'owned-template', 'buildId': 'owned-build', 'name': 'owned-name'}
-        calls = []
+        calls, configs, transports, clients = [], [], [], []
         response = SimpleNamespace()
-        def get_status(build, **options):
-            calls.append((vars(build), options))
+        class Client:
+            def __init__(self, config, **options):
+                clients.append((config, options))
+            def __enter__(self):
+                return self
+            def __exit__(self, *_args):
+                return False
+        def config(**options):
+            configs.append(options)
+            return options
+        def transport(value, **options):
+            transports.append((value, options))
+            return 'non-retrying-transport'
+        def get_status(template, build, **options):
+            calls.append((template, build, options))
             return response
-        with patch.dict('sys.modules', {'e2b': SimpleNamespace(Template=SimpleNamespace(get_build_status=get_status)),
-                                       'e2b.template.types': SimpleNamespace(BuildInfo=SimpleNamespace)}):
-            # Bypass the fixture's read-status replacement to exercise the SDK adapter.
-            actual_spec = importlib.util.spec_from_file_location('status_adapter', Path(__file__).with_name('workspace-candidates.py'))
-            actual = importlib.util.module_from_spec(actual_spec)
-            actual_spec.loader.exec_module(actual)
-            self.assertIs(actual.read_build_status(row, PRIVATE), response)
-        self.assertEqual(calls, [({'template_id': 'owned-template', 'build_id': 'owned-build',
-                                  'name': 'owned-name', 'alias': 'owned-name'}, {'api_key': PRIVATE, 'request_timeout': 15})])
+        with patch.dict('sys.modules', {
+                'e2b.api': SimpleNamespace(ApiClient=Client),
+                'e2b.api.client_sync': SimpleNamespace(get_transport=transport),
+                'e2b.api.client.api.templates': SimpleNamespace(get_templates_template_id_builds_build_id_status=SimpleNamespace(sync_detailed=get_status)),
+                'e2b.api.client.models.log_level': SimpleNamespace(LogLevel=SimpleNamespace(DEBUG='debug')),
+                'e2b.connection_config': SimpleNamespace(ConnectionConfig=config)}):
+            self.assertIs(self.actual_module().read_build_status(row, PRIVATE, 100, 7), response)
+        self.assertEqual(configs, [{'api_key': PRIVATE, 'api_url': 'https://api.e2b.dev', 'debug': False,
+                                  'request_timeout': 7, 'retries': 0, 'logger': None}])
+        self.assertEqual(transports, [(configs[0], {'retry_connect': False})])
+        self.assertEqual(clients[0][1], {'transport': 'non-retrying-transport', 'follow_redirects': False,
+                                        'raise_on_unexpected_status': False})
+        self.assertEqual(calls[0][:2], ('owned-template', 'owned-build'))
+        self.assertEqual({key: value for key, value in calls[0][2].items() if key != 'client'},
+                         {'logs_offset': 100, 'limit': 100, 'level': 'debug'})
         self.assertEqual(candidates.source_step('base'), {'phase': 'base', 'index': None})
         self.assertEqual(candidates.source_step('finalize'), {'phase': 'finalize', 'index': None})
         self.assertEqual(candidates.source_step('9'), {'phase': 'bootstrap', 'index': 9})

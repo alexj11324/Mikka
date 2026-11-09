@@ -832,7 +832,7 @@
         "GET",
         "POST"
       ],
-      "sourceHash": "38fe0c41d60482f1314b414e1f3177add2f667ffa8ad3546794d15f5e9fce6aa"
+      "sourceHash": "08c91a56354263fcce77afc73ec9b44b2889ea07f0ae56007e07879fa07d36a4"
     },
     {
       "path": "/mikka/api/devices/ssh",
@@ -1330,7 +1330,7 @@
         "POST",
         "PUT"
       ],
-      "sourceHash": "9deeaa949f66beb9006576b3ebb0a29c81aabbdd4831f62ab8be63be59d7aa09"
+      "sourceHash": "40afa67a3d516a46b49ec19fe2f1a844f2be44398532387802ff262d34de6f17"
     },
     {
       "path": "/mikka/api/mobile/open",
@@ -1733,6 +1733,45 @@
         "POST"
       ],
       "sourceHash": "4bbd05f3ec67d39a691094ce7e2bc2b8558d37d1fa5c9ecb80237c33f728814a"
+    },
+    {
+      "path": "/mikka/api/tasks/[id]/review/preview",
+      "template": "/api/tasks/[id]/review/preview",
+      "source": "app/api/tasks/[id]/review/preview/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 60,
+      "sourceHash": "aaaa0e686e510c357df1b3eb0cebd32285a4a5ecf38d2e38319d55c279d36a38"
+    },
+    {
+      "path": "/mikka/api/tasks/[id]/review/terminal",
+      "template": "/api/tasks/[id]/review/terminal",
+      "source": "app/api/tasks/[id]/review/terminal/route.ts",
+      "methods": [
+        "DELETE",
+        "GET"
+      ],
+      "maxDuration": 300,
+      "sourceHash": "b53e06f662f648dbdcc0ae5704a7cb8325de48bc2f2054bf89496b078812af8b"
+    },
+    {
+      "path": "/mikka/api/tasks/[id]/review/terminal/input",
+      "template": "/api/tasks/[id]/review/terminal/input",
+      "source": "app/api/tasks/[id]/review/terminal/input/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "9bc4ab80a786609a3f2f6c7ec237b91ff96e4aa2f24bf8a830fd9a24cbc1eed8"
+    },
+    {
+      "path": "/mikka/api/tasks/[id]/review/terminal/resize",
+      "template": "/api/tasks/[id]/review/terminal/resize",
+      "source": "app/api/tasks/[id]/review/terminal/resize/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "56bf42f57efcc10898e2965288731e13babecfc4162afbb7d7e2ffd2b5aede90"
     },
     {
       "path": "/mikka/api/teams/directory",

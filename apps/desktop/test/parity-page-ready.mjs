@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { expect } from '@playwright/test'
 import { observedAction, publishedActions, rpcReadResult } from '../../../scripts/acceptance/read-action-transport.mjs'
 import { selectWorkspaceMenuItem } from './native-document.mjs'
+export { selectWorkspaceMenuItem } from './native-document.mjs'
 
 export async function selectParityWorkspace(page, { menuName, workspaceName, basePath }) {
   await page.getByRole('button', { name: menuName, exact: true }).first().click()

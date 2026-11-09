@@ -172,7 +172,9 @@ test('review capabilities follow real team relation changes and their transactio
     const f = await fixture(), current = await grant(f)
     await pool.query('INSERT INTO review_scope_faults("taskId","rejectLink") VALUES($1,true)', [f.taskId])
     expectedLinks.set(f.taskId, null)
-    assert.equal((await change(f, teamA, null)).ok, false)
+    await assert.rejects(change(f, teamA, null), (error: unknown) => error instanceof Error
+      && error.cause instanceof Error && error.cause.message === 'synthetic relation failure'
+      && 'code' in error.cause && error.cause.code === 'P0001')
     assert.ok(closeIds.includes(current.lease.id)); assert.equal(await leaseRow(current.lease.id), undefined)
     const later = await grant(f)
     await closeReviewSession(later.authority, { kind: 'terminal', id: later.lease.id }, pool)

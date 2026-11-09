@@ -6,7 +6,6 @@ import { useSearchParams } from 'next/navigation'
 import { useRouter } from '@/i18n/navigation'
 import { APP_BUILD } from '@/lib/app-build'
 import { selectedWebServer } from '@/lib/web-connection/selection'
-import { WorkspaceLoading } from '@/components/workspace/workspace-loading'
 import type { AuthorizedCacheWorkspace } from '@/lib/swr/cache-scope'
 import { clearPersistentReadCaches, PersistentReadCache, readCacheNamespace, type ReadCacheScope, type ReadCacheState } from '@/lib/swr/persistent-cache'
 
@@ -26,7 +25,7 @@ export function AuthenticatedReadCache({ ownerId, workspace, build = APP_BUILD, 
 
 function ReadCacheBoundary({ scope, unauthorized, initialReads, children }: { scope: ReadCacheScope | null; unauthorized: boolean; initialReads?: readonly InitialRead[]; children: ReactNode }) {
   const router = useRouter()
-  const [state, setState] = useState<{ cache: Cache; generation: number; retiring?: boolean }>(() => {
+  const [state, setState] = useState<{ cache: Cache; generation: number; retired?: boolean }>(() => {
     const cache: Cache = scope ? new PersistentReadCache(scope) : new Map()
     // SWR fallback is not necessarily stored in the provider. Put authorized
     // server reads there before the asynchronous disk snapshot can arrive.
@@ -39,13 +38,12 @@ function ReadCacheBoundary({ scope, unauthorized, initialReads, children }: { sc
   const config = useMemo(() => ({ provider: () => state.cache }), [state.cache])
   useEffect(() => { if (unauthorized) void clearPersistentReadCaches() }, [unauthorized])
   useEffect(() => {
-    if (!(state.cache instanceof PersistentReadCache)) return
-    return state.cache.connect(reason => {
-      // The workspace selector is already replacing this entire document.
-      // Retire its readers immediately while disk clears; a fresh Map here
-      // would remount them before the replacement document authorizes scope.
-      if (reason === 'document-navigation') {
-        setState(current => ({ ...current, retiring: true }))
+    if (state.retired || !(state.cache instanceof PersistentReadCache)) return
+    return state.cache.connect(documentNavigation => {
+      if (documentNavigation) {
+        // Clear the old view without mounting another reader before assign().
+        // The next Document creates its ordinary fresh authorized boundary.
+        setState(current => ({ ...current, retired: true }))
         return
       }
       // Retire the whole provider, including in-flight requests and component
@@ -54,8 +52,8 @@ function ReadCacheBoundary({ scope, unauthorized, initialReads, children }: { sc
       setState(current => ({ cache: new Map(), generation: current.generation + 1 }))
       router.refresh()
     })
-  }, [state.cache, router])
-  if (state.retiring) return <WorkspaceLoading />
+  }, [state.cache, state.retired, router])
+  if (state.retired) return null
   return <SWRConfig key={state.generation} value={config}><HydrateReadCache />{children}</SWRConfig>
 }
 

@@ -396,8 +396,12 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
     await t.test('a pending PR parks its terminal producer; merged delivery completes and refreshes it without waking compute', async () => {
       // Real PG, lifecycle/park and merge writers; only provider I/O and live
       // transport are fixtures. Signature admission has its own route tests.
+      // Each prepared() has a fresh Task and one execute Run; its review and
+      // verify Runs are classified before use. A shared creation timestamp
+      // cannot introduce a second eligible producer into the Task ordering.
       await pool.query(`
-        ALTER TABLE agent_runs ADD COLUMN "pauseReason" text, ADD COLUMN "deviceTokenId" uuid,
+        ALTER TABLE agent_runs ADD COLUMN "createdAt" timestamptz NOT NULL DEFAULT now(),
+          ADD COLUMN "pauseReason" text, ADD COLUMN "deviceTokenId" uuid,
           ADD COLUMN "deviceRepoId" uuid, ADD COLUMN "worktreePath" text, ADD COLUMN attempt integer NOT NULL DEFAULT 1;
         ALTER TABLE devices ADD COLUMN "removedAt" timestamptz;
         ALTER TABLE run_publications ADD COLUMN "issueId" uuid, ADD COLUMN "updatedAt" timestamptz DEFAULT now();
