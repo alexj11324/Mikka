@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "scope": "Verbatim root-recorded exact-head CI proof; archival verification only.",
+  "sourceFile": "/workspace/scratch/263e36984c81/publication-kind-final-gates-1505/proof.json",
+  "files": [
+    {
+      "path": "proof.json",
+      "mode": "100644",
+      "bytes": 8947,
+      "sha256": "c97ca18fb1c8e01a303ef97d3b8f03255930d694c41d655a22c1937e7724f950",
+      "gitBlobOid": "62ac7bfae3958ed2fa27f200b47a719ffa022e2c"
+    }
+  ],
+  "originalSupportFiles": [],
+  "newCiQueries": 0,
+  "newLogOrArtifactReads": 0,
+  "newTests": 0,
+  "productionCalls": 0,
+  "refUpdates": 0
+}
