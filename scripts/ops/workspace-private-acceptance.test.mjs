@@ -183,6 +183,75 @@ test('source/input/projection failures emit only closed codes and source refusal
   assert(main.indexOf('const source = await verifySources(directory)') < main.indexOf('await readAcceptanceInputs('))
 })
 
+test('identity diagnostics retain only the three source operations and closed fixed SDK evidence', () => {
+  for (const operation of ['get_info', 'source_command', 'source_compare']) {
+    const input = fixtureReceipts()
+    Object.assign(input.runtime.claude, { stage: 'identity', passed: false, failure: 'internal', identityDiagnostic: {
+      operation, truncated: false,
+      exceptionChain: [{ type: 'CommandExitError', exitCode: 128, httpStatus: null, connectCode: null },
+        { type: 'ConnectError', exitCode: null, httpStatus: 503, connectCode: 14 },
+        { type: 'Error', reason: 'process_start_event_missing' },
+        { type: 'SandboxError', reason: 'process_result_missing' }],
+      stderr: { gitDubiousOwnership: true, gitNotRepository: false, oversized: false },
+    } })
+    const result = summarizeAcceptance(context, input), diagnostic = result.cases[0].identityDiagnostic
+    assert.equal(result.passed, false); assert.equal(result.cases[0].runtimePassed, false)
+    assert.equal(result.cases[0].identityMatched, true)
+    assert.equal(diagnostic.operation, operation)
+    assert.deepEqual(diagnostic.exceptionChain, [
+      { type: 'CommandExitError', reason: null, exitCode: 128, httpStatus: null, connectCode: null },
+      { type: 'ConnectError', reason: null, exitCode: null, httpStatus: 503, connectCode: 14 },
+      { type: 'Error', reason: 'process_start_event_missing', exitCode: null, httpStatus: null, connectCode: null },
+      { type: 'SandboxError', reason: 'process_result_missing', exitCode: null, httpStatus: null, connectCode: null },
+    ])
+    assert.deepEqual(diagnostic.stderr, { gitDubiousOwnership: true, gitNotRepository: false, oversized: false })
+  }
+})
+
+test('identity diagnostic projection rejects foreign stages, types, numeric fields and arbitrary SDK data', () => {
+  const privateText = 'synthetic-private-exception-path-url-header'
+  const input = fixtureReceipts()
+  Object.assign(input.runtime.claude, { stage: 'identity', passed: false, failure: 'internal', identityDiagnostic: {
+    operation: 'source_command', truncated: false, privateText,
+    exceptionChain: [{ type: privateText, message: privateText, stderr: privateText, exitCode: 128, connectCode: 14, httpStatus: true },
+      { type: 'CommandExitError', exitCode: 256, httpStatus: 600, connectCode: 14, reason: 'process_start_event_missing' },
+      { type: 'ConnectError', exitCode: -1, connectCode: 17, httpStatus: 99, message: privateText },
+      { type: 'SandboxError', reason: privateText, code: privateText },
+      { type: 'TimeoutError', message: privateText }],
+    stderr: { gitDubiousOwnership: privateText, gitNotRepository: true, oversized: false, text: privateText },
+  } })
+  const result = summarizeAcceptance(context, input), diagnostic = result.cases[0].identityDiagnostic
+  assert.equal(result.passed, false)
+  assert.equal(diagnostic.truncated, true); assert.equal(diagnostic.exceptionChain.length, 4)
+  assert.equal(diagnostic.exceptionChain[0].type, 'other')
+  for (const row of diagnostic.exceptionChain)
+    assert.deepEqual([row.reason, row.exitCode, row.httpStatus, row.connectCode], [null, null, null, null])
+  assert.deepEqual(diagnostic.stderr, { gitDubiousOwnership: null, gitNotRepository: true, oversized: false })
+  assert.equal(JSON.stringify(result).includes(privateText), false)
+  input.runtime.claude.identityDiagnostic.operation = privateText
+  assert.equal(summarizeAcceptance(context, input).cases[0].identityDiagnostic, null)
+  input.runtime.claude.identityDiagnostic.operation = 'get_info'; input.runtime.claude.stage = 'next'
+  assert.equal(summarizeAcceptance(context, input).cases[0].identityDiagnostic, null)
+})
+
+test('identity code bounds reject booleans, fractions and strings while keeping actual SDK boundaries', () => {
+  for (const [type, field, valid, invalid] of [
+    ['CommandExitError', 'exitCode', [-255, 0, 255], [-256, 256, true, '128', 1.5]],
+    ['ConnectError', 'connectCode', [1, 16], [0, 17, true, '14', 1.5]],
+    ['SandboxError', 'httpStatus', [100, 599], [99, 600, true, '503', 1.5]],
+  ]) {
+    for (const value of [...valid, ...invalid]) {
+      const input = fixtureReceipts()
+      Object.assign(input.runtime.claude, { stage: 'identity', passed: false, failure: 'internal', identityDiagnostic: {
+        operation: 'source_command', exceptionChain: [{ type, [field]: value }],
+      } })
+      const result = summarizeAcceptance(context, input)
+      assert.equal(result.cases[0].identityDiagnostic.exceptionChain[0][field], valid.includes(value) ? value : null)
+      assert.equal(result.passed, false)
+    }
+  }
+})
+
 test('the real original Ops push is required; source checks never impersonate main or another run', () => {
   const branch = 'ops/self-hosted-vault-closeout-20261108'
   const env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REF: `refs/heads/${branch}`,

@@ -9,13 +9,13 @@ import { pathToFileURL } from 'node:url'
 import { assertOpsContext } from './self-hosted-ingress-probe.mjs'
 
 export const P0 = Object.freeze({
-  source: 'f845bd90fee2b34a53677d868c45b906a46375ef',
-  tree: 'c6eacfac0fef543c48f68a8a8a9f395cd0f6b263',
+  source: '3d004c18ddfd55698cd7ba10e6714d793594ec90',
+  tree: '02e38ad1a421eac6ed183d02d6c2d27da9666cb8',
   workerSha: '42b1cbd54279363f0492ac4300570e3a0e62890f',
   sdks: { nodeMajor: '24', pnpm: '10.34.3', javascriptE2b: '2.61.0', pythonE2b: '2.62.0', next: '16.4.1' },
   files: {
     'package.json': '306d928ed8f02dad3cbd9fa3b8cf7a6f18ed1c342394a8013a0bfc35ec0dc5e4',
-    'pnpm-lock.yaml': '313a7452044b0d4b780bd2400e70a84aa2bc6a23415e547c5d177f9b7843a52f',
+    'pnpm-lock.yaml': 'e18697f2dd891b9159e43e40d1f8af4018d087cf2a0e668b9e358a766b020c28',
     'pnpm-workspace.yaml': '5a24e67ade7fae19b2d160b4ca61b58170eb3c04a18f8b06efb9a5a0fae36b9f',
     'scripts/e2b/workspace-candidates.py': '2440d02b368288e4a6e8a618f65e2ecca88f5a0251a0a005f9c71b6c0c977237',
     'scripts/e2b/workspace-candidates.test.py': 'ce408974f1841de2ba164cd108b69c7dfc1d3bcab8c4cc84c9d1cc7db5622b37',
@@ -25,8 +25,8 @@ export const P0 = Object.freeze({
     'scripts/e2b/official-files.test.py': '01c31d24a17ed3d0745ed5f0ba24327d11c2e4222a466ca26584c5f7674827b4',
     'scripts/e2b/cleanup-template-candidates.py': '893b0d50f30f4b21f92f155aee97965e12f84fd0e21ea0ada3dfb3a00392533d',
     'scripts/e2b/cleanup-template-candidates.test.py': '826a489c570a788ea018b6a6ce786fd3e71b41dc8d514cfd8a09e516f8bf84f1',
-    'scripts/e2b/workspace-ingress-acceptance.mjs': '2d8739516b3ada59925589bb8f2da18f8b80985273d3820f1b3c11d5ba0468ea',
-    'scripts/e2b/workspace-ingress-acceptance.test.mjs': '8dd31240764e905e6aa002fe8ca3ab81436f3771a5cb22aad6f75059ed387b1e',
+    'scripts/e2b/workspace-ingress-acceptance.mjs': 'eefa6e240eb3cc236747a7b7537ef2309e8bc75dc54a2516a28a25c008db9e74',
+    'scripts/e2b/workspace-ingress-acceptance.test.mjs': '899641f96cb548158b733f043d509640eb6aaf6366bebe4e8199d2fb5aec9b0d',
     'scripts/e2b/workspace-ingress-servers.py': '5c0c12ff3f5573f7a6032a359a372b2a4697b17e44501c7d175bd10c809c74b8',
     'scripts/e2b/workspace-terminal-acceptance.mjs': 'd6d9d535c393e179eca800a44e5dfed508b06135d8891a793af05d539fa8252c',
     'scripts/e2b/workspace-terminal-acceptance.test.mjs': '971003d90739338112ae83838abc218811818600dcebe7fdbdd46b5e2214dce3',
@@ -107,6 +107,11 @@ const BUILD_STAGES = ['identity', 'credential', 'preflight', 'build', 'complete'
   ...KINDS.flatMap(kind => ['build', 'private', 'models', 'conservation'].map(prefix => `${prefix}_${kind}`))]
 const RUNTIME_STAGES = ['create', 'identity', 'prelistener_guard', 'initial_ingress', 'gateway_listener_wiring',
   'framework_dependencies', 'next', 'vite', 'terminal', 'pause_resume', 'completed']
+const IDENTITY_OPERATIONS = ['get_info', 'source_command', 'source_compare']
+const IDENTITY_ERROR_TYPES = ['Error', 'TypeError', 'SyntaxError', 'CommandExitError', 'ConnectError',
+  'SandboxError', 'SandboxNotFoundError', 'SandboxNotRunningError', 'SandboxUnreachableError', 'FileNotFoundError',
+  'NotFoundError', 'ServiceBusyError', 'RateLimitError', 'AuthenticationError', 'InvalidArgumentError',
+  'NotEnoughSpaceError', 'TimeoutError', 'AbortError']
 const CLEANUP_OUTCOMES = ['creation_not_requested', 'no_creation_journal', 'creation_unconfirmed',
   'provider_already_absent', 'provider_kill_acknowledged_and_absent', 'provider_absence_not_confirmed', 'cleanup_failed']
 const FRAMEWORK_FLAGS = ['rawDenied', 'authenticatedHttp', 'assets', 'hotReload', 'crossSiteBootstrap', 'revoked', 'takeoverDenied']
@@ -457,11 +462,27 @@ function ingressEvidence(value) {
   const raw = ['userLoopback4', 'userPublic4', 'userLoopback6']
   return { local: flags(value?.local, raw), external: Object.fromEntries([...raw, 'rootMarked'].map(name => [name, marker(value?.external?.[name])])) }
 }
+function identityFailureEvidence(value) {
+  if (!value || !IDENTITY_OPERATIONS.includes(value.operation)) return null
+  const rows = Array.isArray(value.exceptionChain) ? value.exceptionChain : []
+  return { operation: value.operation, truncated: value.truncated === true || rows.length > 4,
+    exceptionChain: rows.slice(0, 4).map(row => {
+      const type = one(row?.type, IDENTITY_ERROR_TYPES, 'other')
+      return { type,
+        reason: type === 'Error' && row?.reason === 'process_start_event_missing' ? row.reason
+          : type === 'SandboxError' && row?.reason === 'process_result_missing' ? row.reason : null,
+        exitCode: type === 'CommandExitError' ? exitCode(row?.exitCode) : null,
+        httpStatus: status(row?.httpStatus),
+        connectCode: type === 'ConnectError' && Number.isInteger(row?.connectCode)
+          && row.connectCode >= 1 && row.connectCode <= 16 ? row.connectCode : null }
+    }), stderr: flags(value.stderr, ['gitDubiousOwnership', 'gitNotRepository', 'oversized']) }
+}
 function runtimeEvidence(row, kind) {
   return { kind, present: !!row, sourceCommit: SHA.test(row?.sourceCommit ?? '') ? row.sourceCommit : null,
     workerSha: SHA.test(row?.workerSha ?? '') ? row.workerSha : null, templateId: boundedId(row?.templateId), sandboxId: boundedId(row?.sandboxId),
     fixtureId: UUID.test(row?.fixtureId ?? '') ? row.fixtureId : null, stage: one(row?.stage, RUNTIME_STAGES),
     failure: row?.failure === undefined ? null : one(row.failure, RUNTIME_CODES, 'internal'), passed: row?.passed === true,
+    identityDiagnostic: row?.stage === 'identity' ? identityFailureEvidence(row.identityDiagnostic) : null,
     ...flags(row, ['productionTaskAuthorityTested', 'subscriptionsTested', 'agentRootIsolationProven']),
     frameworkVersions: Object.fromEntries(Object.entries(FRAMEWORK_VERSIONS).map(([key, version]) => [key, row?.frameworkVersions?.[key] === version ? version : null])),
     frameworkLockSha256: DIGEST.test(row?.frameworkLockSha256 ?? '') ? row.frameworkLockSha256 : null,
