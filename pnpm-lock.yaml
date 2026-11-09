@@ -12,7 +12,7 @@ patchedDependencies:
     hash: 4c366142582a7e49bf37b4e30502f6cc47d708fe1d91b0627c029c3872963573
     path: patches/@novnc__novnc@1.6.0.patch
   ffmpeg-static@5.3.0:
-    hash: e67d78d6b10fbf3ba5bd4fc34b13983b4047f91898a43030b5305067ef835641
+    hash: 7c49ecd9c22f1a10a87314ce3d1ab332d9c099736c6b8bd5bb86d4d50238776b
     path: patches/ffmpeg-static@5.3.0.patch
 
 importers:
@@ -270,7 +270,7 @@ importers:
         version: 0.8.3
       ffmpeg-static:
         specifier: 5.3.0
-        version: 5.3.0(patch_hash=e67d78d6b10fbf3ba5bd4fc34b13983b4047f91898a43030b5305067ef835641)
+        version: 5.3.0(patch_hash=7c49ecd9c22f1a10a87314ce3d1ab332d9c099736c6b8bd5bb86d4d50238776b)
       file-type:
         specifier: ^22.3.0
         version: 22.3.0
@@ -20198,7 +20198,7 @@ snapshots:
 
   fflate@0.8.3: {}
 
-  ffmpeg-static@5.3.0(patch_hash=e67d78d6b10fbf3ba5bd4fc34b13983b4047f91898a43030b5305067ef835641):
+  ffmpeg-static@5.3.0(patch_hash=7c49ecd9c22f1a10a87314ce3d1ab332d9c099736c6b8bd5bb86d4d50238776b):
     dependencies:
       '@derhuerst/http-basic': 8.2.4
       env-paths: 2.2.1
