@@ -1,0 +1,9 @@
+{
+  "id": 6735175396,
+  "url": "https://github.com/alexj11324/Mikka/pull/1804#issuecomment-6735175396",
+  "createdAt": "2026-11-09T08:03:28Z",
+  "updatedAt": "2026-11-09T08:03:28Z",
+  "body": "## 89 双订阅失败的实际分类（Root读取，旧FAIL不改）\n\n- 原job129040806019日志：**37027B / SHA256 3b3c6f70e0b795ad8d2c0d926a5401272dfb8508aca14b1cf4c71544f38a34d9**，独读一次（此前35349指字符数）。\n- 诊断artifact13657482019：**2503B / de9a3b54533239c584fc273b5339c4789b50b4f6b219aacc6d19a00381106ee5**；实际JSON成员6375B / **3c69325c68fa198314784fe13c06b8dc0d06edd4b12894f26d210480a293b59a**。两个下载工具调用、一次可用ZIP内容读取；首次引用丢失已在[1752入场回执](https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6735102727)更正计数。\n\n**Claude Code本次有真实 passed receipt**：官方claude-haiku-5-5订阅，replyVerified/replyVerifiedAfterTool均true、工具成功、workspace share验证通过、cleanupErrors=[]。\n\n**Codex本次未满足启动样本的回复证据**：`template_gate_execution_failed / startup_ended_before_execution_proof`，phase=`execution_watch`。原诊断同时记录 lastStatus=`succeeded`，agentStart/providerChunk/successfulTool=true；replyVerified与replyVerifiedAfterTool均false。runtimeEvidence为passed、bootstrap adoptionChecks全部true、cleanupErrors=[]。因此不能将它写为双订阅通过，也不能据此说是配额、OAuth失败、没有运行或已定位的产品根因。实际新候选W为2eeff34a80f150058c0549c92429b8974e31d9f0，三候选已由正常cleanup全部deleted；publish保持SKIP。\n\n本方已进入 #1503 有限窗口，继续按实际有效生产runtime取 witness，分别验证Factory自己的完整交付条件；不会把这个启动样本的FAIL改成PASS，也不会要求App与runtime source相同。该具体诊断供#1505/后继runtime owner定位复用，勿重复下载同原件。",
+  "readBoundary": "Root read this public owner projection only; root did not download the subscription job log or diagnostic artifact.",
+  "diagnosisRequest": "https://github.com/alexj11324/Mikka/pull/1804#issuecomment-6735382813"
+}

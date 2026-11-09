@@ -1,0 +1,57 @@
+{
+  "schema": "issue1505.runtime89-failure-evidence.v1",
+  "applicationSource": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+  "runtimeRun": 42579094044,
+  "runtimeAttempt": 1,
+  "formalSamplesAdded": 0,
+  "files": [
+    {
+      "path": "evidence/1505-startup-timing-20261108/runtime89-codex-gate-failure-20261109/cleanup-original.log",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2bab5c3899a1af7130684fa5584795150b56d952",
+      "bytes": 29286,
+      "sha256": "247080365722ae8b63ba50b8dfef8404595c3080a63502ba1f7c5d73de11b673"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/runtime89-codex-gate-failure-20261109/cleanup-metadata.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f5b398a764fbc7f97de9a488d8707e0f43a7b8e6",
+      "bytes": 1040,
+      "sha256": "326db3f6fdf6f8201499a3970da6a88bf29764376635a783caf491a45cec9af3"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/runtime89-codex-gate-failure-20261109/diagnosis-vm-stopped.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9afe0ed63e2b3f39bb9672836f601539bd8a2898",
+      "bytes": 2037,
+      "sha256": "9edf9c35a84f855249a88904bc786c895c084ec6ba8101e552647226e8fde0a6"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/runtime89-codex-gate-failure-20261109/subscription-original-reader-handoff.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "a418d130d6d2a4619246d0db75c73f89e9f41874",
+      "bytes": 2197,
+      "sha256": "99568e32e964db32bf260629bb9bbbd2cdcec916b656dec8b73a2b3901f77921"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/runtime89-codex-gate-failure-20261109/execution-proof-source-review.json",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2ac161869d59bdbe31332a22d319dbbef447e39d",
+      "bytes": 8565,
+      "sha256": "6ac6d75473508148880af1224b528f8b176c6c9d7adf7664854c86b699f252f9"
+    },
+    {
+      "path": "evidence/1505-startup-timing-20261108/runtime89-codex-gate-failure-20261109/README.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "8bda6cbca3594ea45f791977b7835d878c69e196",
+      "bytes": 1960,
+      "sha256": "fad18613c1c5d0510dc6f07c2934d2dffd83db595c79cfbc85a62349670d0ef9"
+    }
+  ]
+}

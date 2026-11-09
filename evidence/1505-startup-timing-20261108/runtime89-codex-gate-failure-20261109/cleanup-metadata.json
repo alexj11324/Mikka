@@ -1,0 +1,15 @@
+{
+  "run": 42579094044,
+  "attempt": 1,
+  "job": 129043491976,
+  "source": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+  "bytes": 29286,
+  "sha256": "247080365722ae8b63ba50b8dfef8404595c3080a63502ba1f7c5d73de11b673",
+  "rootReadCount": 1,
+  "claim": "https://github.com/alexj11324/Mikka/pull/1804#issuecomment-6735084100",
+  "receiptLines": [
+    "2026-11-09T07:54:34.1286861Z mikka-release-cleanup {\"sourceCommit\":\"89eae89e9e79422e0a8b4b1346aa1c7fb6470016\",\"runId\":\"42579094044\",\"sandboxes\":[],\"templates\":[{\"name\":\"mikka-89eae89e9e79-42579094044-1-desktop\",\"kind\":\"desktop\",\"templateId\":\"qlje4i4o83xmeds4rzfu\",\"status\":\"deleted\"},{\"name\":\"mikka-89eae89e9e79-42579094044-1-claude\",\"kind\":\"claude\",\"templateId\":\"471usd5l1lvwdaak2zp4\",\"status\":\"deleted\"},{\"name\":\"mikka-89eae89e9e79-42579094044-1-codex\",\"kind\":\"codex\",\"templateId\":\"dyi7q2lx25ydw4k9r3ho\",\"status\":\"deleted\"}],\"errors\":[]}"
+  ],
+  "rootSubscriptionLogReadCount": 0,
+  "rootSubscriptionArtifactDownloadCount": 0
+}

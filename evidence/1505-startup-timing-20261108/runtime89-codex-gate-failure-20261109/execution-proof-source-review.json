@@ -1,0 +1,170 @@
+{
+  "schema": "issue1505.runtime89.execution-proof-source-review.v1",
+  "source": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+  "tree": "a850a89f11cbb467df869651ee39beca157c6351",
+  "scope": "Source-only; no log/artifact download, production read, model, VM, test, source/ref modification.",
+  "actualEvidence": {
+    "publicComment": "https://github.com/alexj11324/Mikka/pull/1804#issuecomment-6735175396",
+    "diagnosticBytes": 6375,
+    "diagnosticSha256": "3c69325c68fa198314784fe13c06b8dc0d06edd4b12894f26d210480a293b59a",
+    "originalArtifactRead": false,
+    "testCaseIdsAvailable": false,
+    "claude": "passedReceipt exists (owner/root report)",
+    "codex": {
+      "phase": "execution_watch",
+      "status": "succeeded",
+      "error": "startup_ended_before_execution_proof",
+      "agentStart": true,
+      "providerChunk": true,
+      "successfulTool": true,
+      "replyVerified": false,
+      "replyVerifiedAfterTool": false,
+      "runtimeEvidence": "passed",
+      "adoptionChecks": "all true in owner projection; not a passed candidate receipt",
+      "cleanupErrors": []
+    }
+  },
+  "conclusion": "现有数据只能定位为指定回复证明未成立；未找到可据以增加延迟/重读或放宽gate的终态抢先证据。原driver已支持严格submitted_report路径，不能用新增submit fallback作为修复。",
+  "findings": [
+    {
+      "where": "cloud-startup.mjs:478-580,660-674",
+      "fact": "每次无cursor全量回放；先判断完整proof再判断terminal。text路线须工具完成后的指定marker；submit路线须同run的submit输入含marker、已成功的前一工具、对应submit输出、owner/report来源/单attempt/无continuation/finishedAt等严格条件。失败后不再额外读取。"
+    },
+    {
+      "where": "app/actions/agents.ts:224-234,412-437,490; issue-threads.ts:66-84,169-186; thread-chunks.ts:31-54",
+      "fact": "status/report/finishedAt来自同一初始SELECT。withRunChain不替换其status或summary。driver无cursor读取的chunks无LIMIT且按seq排序；89新增kind没有剔除这些字段。不能用后读chain的terminal覆盖旧report解释本例。"
+    },
+    {
+      "where": "codex.ts:306-330; mikka-mcp-backend.mjs:641-718; run-context.ts:486-526; supervisor.ts:1188-1214,2058-2059",
+      "fact": "原生mcpToolCall(server=mikka,tool=submit)映射mcp__mikka__submit。backend原子写handoff中summary，RunContext把同summary变submitted report；supervisor最多取前10000字符。submit本来可以终止且没有随后text，所以只要严格submitted_report成立即可，不要求另发模型文本。"
+    },
+    {
+      "where": "child.ts:21-62; supervisor.ts:1915,1028-1067; outbox.ts:202-253; runs/[runId]/route.ts:37-49; events/route.ts:46; run-events.ts:34-64; run-publications.ts:209-212",
+      "fact": "正常链FIFO chunks→runtime finish/mask flush→state→complete。outbox逐项await；events先提交。terminal PATCH不改状态（失败时只保存error），真正complete在一条UPDATE中写status+report，finishedAt用DB clock_timestamp；run_chunks.createdAt是DB defaultNow。旁路run-completion.ts的JS new Date不是这条入口，不能据其推测跨时钟误判。"
+    },
+    {
+      "where": "protocol/daemon.ts:76-85; codex.ts:806-807,848; supervisor.ts:2138-2145",
+      "fact": "正常completion路径只有submitted成为succeeded；自然turn_ended/blocked是stopped。旧ff2 blocked案例不能替代这次succeeded。"
+    },
+    {
+      "where": "cloud-startup.test.mjs:425-517",
+      "fact": "现有测试源码已覆盖只有canonical report而无text仍可通过，以及报告标记缺失、错误source、时间、run/attempt/continuation、submit顺序等拒绝；本轮仅读，未重跑。"
+    },
+    {
+      "where": "lib/run-completion-effects.ts:52-68",
+      "fact": "普通completion报告原样传回；只有skillMount/execution/runtime证据分支可调用其既有证据验证，Factory submitted probe本身不以其它文本替换summary。未从本次closed JSON推定这些动态绑定。"
+    }
+  ],
+  "conditionalBoundaries": [
+    {
+      "where": "codex.ts:235-245,703-711",
+      "condition": "某item先收到非空delta，随后completed.agentMessage.text包含此前没有交付的尾部",
+      "effect": "streamed set使completed仅发text-end，不补末text；这是源码条件，尚无官方协议/本例原事件证明，不作为已证race或修复依据。"
+    },
+    {
+      "where": "outbox.ts:241-253",
+      "condition": "chunks批被明确非重试HTTP拒绝",
+      "effect": "批次可丢弃后继续complete；需要原reader的seq/提交链闭式证据，不能由succeeded自动排除，也不能据当前聚合diagnostic宣称发生。"
+    },
+    {
+      "where": "cloud-startup.mjs:528-569",
+      "condition": "成功工具仅为submit本身，或submit摘要未含指定marker，或其它任一严格report谓词不成立",
+      "effect": "succeeded仍会被当前gate正确拒绝；这是目前最先需要区分的业务证明边界。"
+    }
+  ],
+  "minimalClosedObservation": [
+    "原唯一reader从其已持fixture提供确切run/issue/sample身份（现公开comment没有UUID）。",
+    "只对该自产run：expectedMarkerInRunPrompt、expectedMarkerInAllText、expectedMarkerInTextAfterTool。",
+    "priorCompletedToolBeforeSubmit、canonicalSubmitInputSeen、submitInputHasExpectedMarker、matchingSubmitOutputSeen，以及必要input/output seq。",
+    "reportSummaryHasExpectedMarker、summarySource为report、exactOneOwnedRun/noContinuation/harnessMatch、finishedAtGteSubmitOutputTime及必要时间。",
+    "matching chunks总数/seq是否连续/投影是否截断。无需prompt、模型全文、工具正文或凭据。",
+    "若marker与顺序齐全但现driver仍拒绝，先以同形状脱敏detail做纯observeChunks回归；若缺marker则不能用延迟/取消marker门槛当修复。均需parent另行授权执行。"
+  ],
+  "sourceIndex": [
+    {
+      "path": "scripts/acceptance/cloud-startup.mjs",
+      "blob": "1bca723b8110625b48127a1d28ade9ecf0e153de"
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "blob": "7ee7564fe213ce3fba762fee8685eb9a4bb31329"
+    },
+    {
+      "path": "app/actions/agents.ts",
+      "blob": "cf3ff573b89359a5d3d559a09d9283e6ad7ef971"
+    },
+    {
+      "path": "lib/issue-threads.ts",
+      "blob": "44aafbb46338a4e3bf549987135b4e9b7622d6f1"
+    },
+    {
+      "path": "lib/thread-chunks.ts",
+      "blob": "d9d464f151d09ab0803068d6fd213ffec32b5071"
+    },
+    {
+      "path": "lib/run-chain.ts",
+      "blob": "704b01d13fc9e774bb50014efdd7daa862031454"
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "blob": "953af7b99b542aafd9cc724fde76d27f6a6bb2f7"
+    },
+    {
+      "path": "packages/daemon/src/agents/run-context.ts",
+      "blob": "61fec2db18195fd8d77a4686b7ab8c4aeedcbe6f"
+    },
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp-backend.mjs",
+      "blob": "308c9ed7ab78b636876fd661b55d36dd61b478d2"
+    },
+    {
+      "path": "packages/daemon/src/agents/child.ts",
+      "blob": "1381a9787e4ac14b759c9e16022dd652afc39025"
+    },
+    {
+      "path": "packages/daemon/src/runs/supervisor.ts",
+      "blob": "3367adf7b454b4b044d09858fa2e55ef24ae1195"
+    },
+    {
+      "path": "packages/daemon/src/outbox.ts",
+      "blob": "764b3cfae981dd2ba3f19616ce5782bbb9fcc67a"
+    },
+    {
+      "path": "app/v1/runs/[runId]/events/route.ts",
+      "blob": "931ce04d1ddf51a3fccc940d9e9fabc2ac8ec1d4"
+    },
+    {
+      "path": "app/v1/runs/[runId]/complete/route.ts",
+      "blob": "9f42a40b8087f88d6d68c4657fa4751ffa1b2a1c"
+    },
+    {
+      "path": "lib/secrets/run-events.ts",
+      "blob": "c409d22e38802c5fe59ef1989b88127213fbb942"
+    },
+    {
+      "path": "lib/run-publications.ts",
+      "blob": "5cf697fe417d558039db584571670f315a71e851"
+    },
+    {
+      "path": "lib/db/schema.ts",
+      "blob": "accc7c40833c66b1ba8c18709ba22a70d5b3c2c8"
+    },
+    {
+      "path": "packages/protocol/src/daemon.ts",
+      "blob": "d22e9b6fc77ffe302f53530fd5798ae9e900f650"
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.test.mjs",
+      "blob": "6b57f0699db92b2c55b5add63efc23db1f403b0c"
+    },
+    {
+      "path": "app/v1/runs/[runId]/route.ts",
+      "blob": "aaa34f13004b1fd33435c8b81256cc769b3ce8a1"
+    },
+    {
+      "path": "lib/run-completion-effects.ts",
+      "blob": "26ce33aa8613723457fdbb2e4a6f3033eb6bee95"
+    }
+  ],
+  "stopped": "Source read complete; no ongoing processes or writes."
+}

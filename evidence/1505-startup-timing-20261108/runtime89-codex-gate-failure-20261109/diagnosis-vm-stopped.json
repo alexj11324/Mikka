@@ -1,0 +1,73 @@
+{
+  "scope": "Source-only exact89 diagnosis, no dependency install, edits, production credentials or model calls",
+  "source": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+  "cleanStatus": {
+    "items": [
+      {
+        "command": {
+          "id": "cmd_ab31be8f279649ffa68656d690f3",
+          "name": "git",
+          "args": [
+            "status",
+            "--porcelain=v1"
+          ],
+          "cwd": "/vercel/Mikka-1505-codex-reply",
+          "sessionId": "sbx_YVuvZulZ2vaZVXzYoQIW8uMcwU3V",
+          "startedAt": 1794212193016,
+          "exitCode": null
+        }
+      },
+      {
+        "command": {
+          "id": "cmd_ab31be8f279649ffa68656d690f3",
+          "name": "git",
+          "args": [
+            "status",
+            "--porcelain=v1"
+          ],
+          "cwd": "/vercel/Mikka-1505-codex-reply",
+          "sessionId": "sbx_YVuvZulZ2vaZVXzYoQIW8uMcwU3V",
+          "startedAt": 1794212193016,
+          "exitCode": 0,
+          "durationMs": 419
+        }
+      }
+    ],
+    "context": {
+      "totalItems": 2,
+      "returnedItems": 2,
+      "truncated": false
+    }
+  },
+  "stopReadback": {
+    "session": {
+      "id": "sbx_YVuvZulZ2vaZVXzYoQIW8uMcwU3V",
+      "runtime": "node22",
+      "architecture": "amd64",
+      "requestedAt": 1794211618302,
+      "startedAt": 1794211618327,
+      "requestedStopAt": 1794212195476,
+      "stoppedAt": 1794212195756,
+      "status": "stopped",
+      "duration": 577429,
+      "vcpus": 2,
+      "memory": 4096,
+      "timeout": 3600000,
+      "region": "iad1",
+      "cwd": "/vercel",
+      "sourceSnapshotId": "snap_gicyje477KwXfcooRs5pVDxyxcH9",
+      "workloadType": "sandbox",
+      "createdAt": 1794211618302,
+      "updatedAt": 1794211618337,
+      "interactivePort": 26661,
+      "activeCpuDurationMs": 55159,
+      "networkTransfer": {
+        "ingress": 19816808,
+        "egress": 51545
+      },
+      "sourceSandboxName": "issue1505-codex-reply-diagnosis-20261109",
+      "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH"
+    },
+    "routes": []
+  }
+}
