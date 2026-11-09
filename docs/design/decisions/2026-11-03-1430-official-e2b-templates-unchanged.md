@@ -129,17 +129,34 @@ fresh 的精确链接依次为 `e2b-ca.pem` 和 `/usr/local/share/ca-certificate
 三项本 run 候选均已删除，最终清理确认精确名字 absent、sandbox 和 errors 列表为空；
 真实双订阅和公开发布均未执行。这个失败不等于新运行时或五秒验收通过。
 
-本后继先准备仅适用于 `claude` 的两条精确规则，等待
-[#1724 的无 Mikka 官方 Claude 对照](https://github.com/alexj11324/Mikka/issues/1724#issuecomment-6745956055)
-补齐 before/ready/fresh 的完整 stat、链接终点和根证书证据后再确认可发布性。
-不把 Desktop 对照或本次差异行直接推广成 Claude 的 provider 证明。
-候选只追加规则数据并同步其摘要，不改变匹配算法：原摘要、原 file 类型、
-精确链接、mode/uid/gid 不变及精确 provider root 普通文件终点均继续校验，
-provider 每次启动的实际 root 摘要可轮换；不要求它等于旧 `4e04ce…`。
-strict 安装阶段、官方 CLI、普通证书、其他路径和模板的拒绝条件保持。
+后续独立官方 Claude 对照
+[42661569263/1](https://github.com/alexj11324/Mikka/actions/runs/42661569263)
+在没有安装 Mikka 产品、worker 或执行 CLI/模型的情况下复现了同一变化。
+固定观察源码为 `7fd8a2681cd71bb6603a485854c8beda2044911b`；
+`623a1afd8715433a58c3e88ce88f8fbcc29d1761` 仅是该控制所用 cleanup helper 的产品上下文，
+不是失败 R7 的源码，也不是官方 base 身份。观察程序只新增 `/opt/mikka` 下的诊断文件。
+四阶段 `before / pre_finalization / ready / fresh` 中，前三阶段两条 CA 引用都是
+上述 `4e04ce…` 普通文件，仅 fresh 变为上述精确链接；三节点全程 mode `0777`、
+uid/gid `0/0`。根证书保持普通文件，本轮 fresh 摘要是
+`0459a4cfe2cc288afae322259a84a08910e65282d89dc06e94f5e1b80d3c6cb4`，
+两条实际解析链的终点路径和摘要都与它一致。
+[控制来源、完整结构化观测、原件摘要和清理回执](../../operations/evidence/1782-official-claude-certificate-relinks-20261109.json)
+保留四阶段观测及本轮一个私有模板、一个 fresh sandbox 的精确清理回执。
+原 schema 没有采集官方 base 的 immutable ID、base build ID 或 envd version，
+这些字段保持 unknown，不能用诊断衍生 build ID 替代。
+
+因此仅为 `claude` 追加两条精确规则并同步摘要和控制来源，原 320 条规则保持。
+匹配算法不变：原摘要、原 file 类型、精确链接、mode/uid/gid 不变及精确
+provider root 普通文件终点均继续校验；provider 每次启动的实际 root 摘要
+可轮换，不要求它等于旧 `4e04ce…`。不增加 mode 例外；strict 安装阶段、
+官方 CLI、普通证书、其他路径和模板的拒绝条件保持。
 测试保留原用例和原失败证据，仅将已被新行为取代的 Claude 正确形状旧负例
 更新为 Claude 错误旧摘要负例，并增加针对该规则的正例和拒绝回归。
-此处仍是未发布候选；完整保全、真实双订阅及同一生产元组六次 ≤5000ms 仍待完成。
+本 PR 的本地回归为 34/34、0 skip；完整红绿原件固定于
+[800eff40 的候选证据](https://github.com/alexj11324/Mikka/tree/800eff40eeead9c78fb83cd2260adc0cf40fbd4f/claude-ca-relink-candidate-20261109)。
+导入的控制发布者范围说明保留其独立的 33 项回归结果，不混作本 PR 的测试计数。
+这个三路径定点控制不代表全量文件保全或发布通过；完整保全、真实双订阅及
+同一生产元组六次 ≤5000ms 仍须由后续实际发布和正常 Task 验收完成。
 
 构建记录轻量 CLI manifest，包含构建前官方 CLI 的真实路径和摘要；官方原本缺少
 某个 harness 时，才记录 `/opt/mikka` 内补装的位置。每个 worker release 保存
@@ -955,3 +972,46 @@ main759五条publisher及主CI均已终态；Desktop42470724706最后因匹配We
 本次只追加真实主线整合与门槛状态；官方文件只增不删、原校验和、真实双订阅/sidecar采用、39 stages/14次实际版本检查/原完整公式与5000ms阈值均不变。公开进度见 [PR1689完整f94回执](https://github.com/alexj11324/Mikka/pull/1689#issuecomment-6721326928) 和 [同child维护回执](https://github.com/alexj11324/Mikka/issues/1503#issuecomment-6721380079)。
 
 独立整合复核已闭合（manifest43401fffb3f3cee5eb25be202846cdeba9d0e67a2721283031b8926c8b18f612；固定27f验证9638eb77e5c7f735d30a0584dc5606e49f68a59259b1ba366933e9a3e977a018）：470个原始输入对象中469个逐字相同，唯一变动是package.json的test:mobile脚本；正式worker投影排除此脚本，因此指纹9da相同。这里不把原始blob相同与投影相同混为一谈，也不把静态整合证明称为新CI或运行时通过。
+
+### 2026-11-09：Codex 根证书权限的官方定点对照
+
+在同一个 #1505 修复 PR 中继续保留“只许加、不许删或覆盖官方文件”的决定。
+主线 `5ba1f9e2359ce714d83cd16fc040f2567c40a6d0` 的 R7
+`42661874195/A1` 报告 Codex 根证书权限与 Desktop APT 备份摘要变化；
+两者分别归因，不能将已证的 Claude 重链接行为扩展到其他路径。
+
+新的 [官方定点对照 42670291715/A1](https://github.com/alexj11324/Mikka/actions/runs/42670291715)
+仅从官方 codex/desktop 模板在 `/opt/mikka` 添加观察器，不安装 Mikka、
+执行 CLI/模型、修改官方文件或 APT/timer，也不追加全盘扫描或等待。
+Ops `b75871ea1753f75769daa33b095704475cf9a4a2` 的有序父为固定产品源
+`5ba1f9e2359ce714d83cd16fc040f2567c40a6d0` 与已关闭载体
+`b52445d24978dc46235b0744783eb7ebb3c3e397`，产品树仅增加三个普通文件。
+完整原件、安全投影及边界见
+[对照说明](../../operations/evidence/1505-official-path-control-20261109.md)
+和[可重建 JSON](../../operations/evidence/1505-official-path-control-20261109.json)。
+
+Codex `/usr/local/share/ca-certificates/e2b-ca.crt` 在 before/pre_finalization
+均为普通文件、uid/gid=0、0644；ready 时变为0777而摘要仍相同，fresh
+时保持0777、证书摘要随后变化。这提供了不含 Mikka 安装的正向证据，
+仅支持 Codex 该普通文件的精确 `0644→0777` finalization 转换。
+策略继续使用现有 matcher，保留原每次启动 CA 摘要语义、同一路径、
+同一类型、未变所有者及 SHA256 格式校验，原有证书重链接目标校验不变；其他权限对、路径和类型
+仍须拒绝。安装之后的 strict 检查与官方 CLI 原始摘要门槛不变。
+
+Desktop 的 active/backup APT 节点在四阶段的摘要、大小、权限、所有者、
+inode、device、mtime/ctime 全部相同，四个 APT unit 的已采属性也未变。
+本次没有复现 Desktop 问题，因此不增加该路径例外。未采 cron 或写者
+PID，不能从四个 unit 的静止状态证明所有后台写入均已排除。此前失败
+仍保留，后续须定位实际构建首次变化阶段与写入者。
+
+本对照未采 immutable 官方 base/build ID 或 envd 版本，私有输出 build
+不能代替它们；控制的四个阶段名也不等于其他 R7 的失败阶段。两个私有
+模板和两个实例均有 exact-ID 不存在的清理收据、errors=[]。入口正常
+FF 关闭至 `376298951e4eee5970e2f0d00e21acb3ffba4e18`，关闭运行
+`42670790551` SKIPPED。首轮 `42668993157` 的离线 guard 断言失败
+及其 SDK/OIDC/观察全跳过事实一并保留；后来的成功不覆盖历史失败。
+
+这些定点证据不替代三个官方模板的完整文件与 CLI 保全、两个真实订阅
+CI 发布门槛，也不替代同一 APP/DPL/runtime/worker/template 元组下
+Claude×3、Codex×3 的生产普通任务、工具与后续回复验收。#1505 仍须
+六次完整 dispatch→agent 时间各不超过5000ms，目标2000–3000ms。
