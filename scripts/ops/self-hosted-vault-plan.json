@@ -1,0 +1,12 @@
+{
+  "repository": "alexj11324/Mikka",
+  "branch": "ops/infisical-cloud-capabilities",
+  "source": "88b144d52d091d7ff566c63fce6e902e33edc59e",
+  "ciRun": 42569765699,
+  "imageRun": 42569765628,
+  "imageDigest": "sha256:96de4972ea7820dca9d7f03d116f8a4589c662ee6a6db9cb33cf8ad0f89ec98e",
+  "configDigest": "sha256:1fb3725678739bf9d448be52ca5ba576ed3e7902b4c9e1240bd5c174f13754b4",
+  "workerHash": "6ada1d4f809eace6ca84ad0329562f4aacb78452",
+  "template": "desktop",
+  "driverSource": "c60dd823b39ba51c064e12ecd270c2590c41dbc4"
+}
