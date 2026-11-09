@@ -1,0 +1,94 @@
+✔ fills sensitive build values from the job and pins the main Git identity (3.664832ms)
+✔ refuses a build with a missing value and names only the variable (0.752051ms)
+✔ reads the commit production serves through the alias (9.440937ms)
+/etc/bashrc: line 12: BASHRCSOURCED: unbound variable
+/etc/bashrc: line 12: BASHRCSOURCED: unbound variable
+/etc/bashrc: line 12: BASHRCSOURCED: unbound variable
+/etc/bashrc: line 12: BASHRCSOURCED: unbound variable
+✔ public verification waits through an HTTP error and the previous build before recording the exact build (67.633983ms)
+✔ a different public build cannot pass just because its deployment is READY (6.783213ms)
+✔ invalid responses and network failures stay bounded and never copy response bodies into errors (2.879106ms)
+✔ a moving branch name or invalid budget fails before sending a public request (3.307165ms)
+✔ an exact response arriving after the monotonic verification deadline cannot pass (0.465442ms)
+✔ waits for a GitHub build while Vercel still only serves the older READY source (2.814508ms)
+✔ waits for completed Web step metadata to converge before accepting the public build (9.731753ms)
+✔ pending Web step metadata shares the original deadline without reading the public build (1.194023ms)
+✔ main advancing during step metadata convergence stops before another evidence read (1.965658ms)
+✔ step metadata that completes after the original deadline cannot admit a release (0.796003ms)
+✔ pending step metadata never hides a failed, cancelled or skipped required step (7.793665ms)
+✔ duplicate, missing or contradictory step evidence fails instead of waiting or accepting public READY (9.09645ms)
+✔ main advancing while waiting rejects the obsolete source before another workflow or public read (0.66186ms)
+✔ the latest exact Web attempt must succeed; an older success cannot hide its failure or cancellation (5.280707ms)
+✔ a docs-only skipped build or incomplete upload never passes even if public already has that SHA (1.103929ms)
+✔ a successful Web job waits for its required step results to catch up before reading public (1.276722ms)
+✔ required Web step results that remain pending cannot pass and retain the finite wait (0.927858ms)
+✔ pending Web step results retain the exact-main fence on every wait (4.885161ms)
+✔ pending step metadata does not hide a required step that already failed or skipped (1.793471ms)
+✔ another repository, branch or workflow cannot stand in for the matching main Web run (6.815903ms)
+✔ a successful Web run with an old public build has a finite monotonic wait (1.338889ms)
+✔ a matching public response after the deadline cannot admit the runtime mutation (2.053739ms)
+✔ the final read-only fence also rejects a main change during public verification (0.716336ms)
+✔ invalid source, missing identity or invalid wait fails without any network request (0.271474ms)
+✔ GitHub errors do not expose response bodies or transport messages (3.051016ms)
+✔ explicit runtime refresh always builds while ordinary docs-only classification is preserved (2.878545ms)
+✔ both release paths use one non-cancelling pending queue, and the Web wait remains outside it (0.805367ms)
+✔ runtime env, build and upload are ordered under the same job with fixed identity and source fences (0.447541ms)
+✔ the actual dispatch comparison only bypasses unchanged-hash optimization when explicitly requested (9.830084ms)
+✔ release-control refresh validates both immutable push endpoints and never assumes missing history is unchanged (0.901243ms)
+✔ manual runtime refresh defaults off and does not make pull requests eligible (0.125523ms)
+✔ real Git and the production CLI compare the entire push, preserve docs-only skip and reject unavailable before (135.978342ms)
+✔ desktop release accepts a deployed descendant while preserving its own source identity (1.627601ms)
+✔ desktop replaces obsolete preflights while preserving active signing and documentation does not trigger a release (6.840923ms)
+✔ real Git ancestry admits the same source or descendants and never an older or divergent Web (58.38727ms)
+✔ an unbound or malformed GitHub comparison cannot admit a desktop release (2.691552ms)
+✔ desktop waits for a newer compatible Web instead of stopping at its obsolete failed build (2.830675ms)
+✔ a changed public candidate is reverified before the desktop can be released (1.267557ms)
+✔ descendant mode retains successful same-source Web build, upload and public verification gates (4.045923ms)
+✔ desktop verification cannot succeed after its deadline or start without a GitHub identity (0.343185ms)
+✔ private-push dispatch waits through an older overlay on an otherwise valid desktop descendant (1.007565ms)
+✔ private-push exact-source wait keeps matching overlay behavior (3.808538ms)
+✔ every fromJSON of a workflow input has a fallback, since a push run has no inputs (0.307329ms)
+✔ large runtime reports cross jobs only as immutable artifact files (0.532484ms)
+✔ duplicate required step cannot hide a failure or pending record behind one success (0.867798ms)
+✖ runtime CLI waits beyond forty minutes for the latest Web run instead of accepting an older successful push (59.284999ms)
+✔ desktop CLI still times out at forty minutes while the latest Web run is pending (41.321456ms)
+✖ runtime CLI stops at ninety minutes while required Web step evidence remains pending without reading public (41.011789ms)
+ℹ tests 51
+ℹ suites 0
+ℹ pass 49
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 731.360558
+
+✖ failing tests:
+
+test at scripts/release/web-deploy.test.mjs:767:1
+✖ runtime CLI waits beyond forty minutes for the latest Web run instead of accepting an older successful push (59.284999ms)
+  Error: webDeploy:matchingWebDeploymentTimedOut
+      at waitForWebDeployment (file:///vercel/sandbox/scripts/release/web-deploy.mjs:219:9)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async TestContext.<anonymous> (file:///vercel/sandbox/scripts/release/web-deploy.test.mjs:778:18)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at scripts/release/web-deploy.test.mjs:804:1
+✖ runtime CLI stops at ninety minutes while required Web step evidence remains pending without reading public (41.011789ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + 2400000
+  - 5400000
+  
+      at TestContext.<anonymous> (file:///vercel/sandbox/scripts/release/web-deploy.test.mjs:810:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2400000,
+    expected: 5400000,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

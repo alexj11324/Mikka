@@ -1,0 +1,22 @@
+[
+  {
+    "path": "scripts/release/web-deploy.mjs",
+    "bytes": 20124,
+    "sha256": "2428b9ddfc6d3b90a9a14e59d1e730813d18a9e56ad7c23252622d7e9bc1d5ab"
+  },
+  {
+    "path": "scripts/release/web-deploy.test.mjs",
+    "bytes": 49505,
+    "sha256": "9d7c2ce03648a3630dfca0fa22639a9567ad16ca8c8adb7169526b0470670e50"
+  },
+  {
+    "path": ".github/workflows/e2b-official-runtime.yml",
+    "bytes": 18539,
+    "sha256": "4773724c6ccbeadd2b7cf6b1833028971d50e4774590d7a0f14e502c9c20c88e"
+  },
+  {
+    "path": "docs/operations/web-deploy.md",
+    "bytes": 17556,
+    "sha256": "3a8166aeee5dc28661bde504d46622f43ac4be5b4219098385c3368265101052"
+  }
+]

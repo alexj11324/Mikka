@@ -1,0 +1,130 @@
+diff --git a/.github/workflows/e2b-official-runtime.yml b/.github/workflows/e2b-official-runtime.yml
+index 40fec29..97cdc7d 100644
+--- a/.github/workflows/e2b-official-runtime.yml
++++ b/.github/workflows/e2b-official-runtime.yml
+@@ -146,7 +146,7 @@ jobs:
+   await-web:
+     needs: validate
+     runs-on: ubuntu-latest
+-    timeout-minutes: 45
++    timeout-minutes: 95
+     permissions:
+       contents: read
+       actions: read
+diff --git a/docs/operations/web-deploy.md b/docs/operations/web-deploy.md
+index 5f1ad85..811eb76 100644
+--- a/docs/operations/web-deploy.md
++++ b/docs/operations/web-deploy.md
+@@ -107,11 +107,15 @@ requires it.
+ 
+ The official runtime workflow keeps its existing disposable-instance validation,
+ worker hash, measured model catalogue and unchanged-file proofs. After validation,
+-a read-only job waits up to 40 minutes for the same source's latest Web run to
++a read-only job waits up to 90 minutes for the same source's latest Web run to
+ succeed, including its actual build/upload/version steps, and for the public
+-version to match. A docs-only skipped build cannot satisfy this gate. If `main`
+-advances, the old release stops. This wait is outside the shared deployment queue
+-so it cannot block the Web job it is waiting for.
++version to match. The job has a 95-minute limit. This budget allows for an active
++Web build followed by a queued build; each Web deploy job has a 45-minute limit.
++The latest matching run must succeed even when an older run already succeeded.
++A failed, cancelled or skipped run cannot satisfy this gate. If `main` advances,
++the old release stops. This wait is outside the shared deployment queue so it
++cannot block the Web job it is waiting for. Desktop's Web wait and direct callers
++keep their existing 40-minute default.
+ 
+ Changes to the two release workflows, `scripts/release/web-deploy.mjs` or
+ `scripts/e2b/publish-template-env.mjs` also require the full runtime validation
+diff --git a/scripts/release/web-deploy.mjs b/scripts/release/web-deploy.mjs
+index 948caac..f1a2e15 100644
+--- a/scripts/release/web-deploy.mjs
++++ b/scripts/release/web-deploy.mjs
+@@ -140,6 +140,14 @@ async function containsDesktopSource({ expectedBuild, publicCommit, token, fetch
+     && comparison.merge_base_commit.sha === expectedBuild
+ }
+ 
++/** Keep the runtime's queued Web wait separate from Desktop and direct callers. */
++export function webDeploymentWaitOptions(command) {
++  return {
++    allowDescendant: command === 'await-desktop-web',
++    maxWaitMs: (command === 'await-web' ? 90 : 40) * 60_000,
++  }
++}
++
+ /** This read-only wait runs OUTSIDE web-deploy-production: GitHub can still be
+  * building while Vercel only knows the previous READY deployment. A successful
+  * docs-only workflow is not a successful application build. */
+@@ -298,7 +306,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)
+     if (process.env.GITHUB_OUTPUT) writeFileSync(process.env.GITHUB_OUTPUT, `refresh=${refresh}\n`, { flag: 'a' })
+   } else if (command === 'await-web' || command === 'await-desktop-web') {
+     const result = await waitForWebDeployment({ expectedBuild: process.env.GITHUB_SHA,
+-      allowDescendant: command === 'await-desktop-web',
++      ...webDeploymentWaitOptions(command),
+       expectedOverlay: process.env.EXPECTED_UI_OVERLAY_SHA || (command === 'await-desktop-web' ? process.env.MIKKA_UI_OVERLAY_SHA : undefined), token: process.env.GITHUB_TOKEN })
+     console.log(JSON.stringify({ event: 'matching_web_deployment_verified', ...result }))
+   } else if (command === 'verify') {
+diff --git a/scripts/release/web-deploy.test.mjs b/scripts/release/web-deploy.test.mjs
+index bb6f99c..7d3b377 100644
+--- a/scripts/release/web-deploy.test.mjs
++++ b/scripts/release/web-deploy.test.mjs
+@@ -8,7 +8,7 @@ import { join, matchesGlob } from 'node:path'
+ import { tmpdir } from 'node:os'
+ import { fileURLToPath } from 'node:url'
+ import { buildEnvironment, productionSha, verifyProductionBuild, PRODUCTION_VERSION_URL, REQUIRED,
+-  assertCurrentMain, waitForWebDeployment, deploymentPlan, runtimeRefreshRequired, RUNTIME_RELEASE_PATHS } from './web-deploy.mjs'
++  assertCurrentMain, waitForWebDeployment, webDeploymentWaitOptions, deploymentPlan, runtimeRefreshRequired, RUNTIME_RELEASE_PATHS } from './web-deploy.mjs'
+ 
+ const SHA = 'a'.repeat(40)
+ const pulled = [
+@@ -763,3 +763,51 @@ test('duplicate required step cannot hide a failure or pending record behind one
+     { status: 'pending', result: 'webDeploy:matchingWebBuildSkippedOrIncomplete', elapsed: 0, publicReads: 0 },
+   ])
+ })
++
++test('runtime CLI waits beyond forty minutes for the latest Web run instead of accepting an older successful push', async () => {
++  const latestSucceedsAt = 40 * 60_000 + 9_000
++  const fixture = webFixture({
++    // An older successful push and matching public version cannot admit the latest pending dispatch.
++    runs: elapsed => [
++      webRun({ id: 69, run_attempt: 1, event: 'push' }),
++      webRun({ event: 'workflow_dispatch',
++        ...(elapsed < latestSucceedsAt ? { status: 'in_progress', conclusion: null } : {}) }),
++    ],
++    version: () => SHA,
++  })
++  const result = await fixture.run({ ...webDeploymentWaitOptions('await-web'), intervalMs: 10_000 })
++  assert.equal(result.webRunId, 70)
++  assert.equal(result.webAttempt, 2)
++  assert.equal(result.sourceCommit, SHA)
++  assert.equal(result.publicBuild, SHA)
++  assert.equal(fixture.elapsed(), 40 * 60_000 + 10_000)
++  assert.deepEqual(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').map(call => call.at),
++    [40 * 60_000 + 10_000], 'an older successful push cannot bypass the latest pending dispatch')
++})
++
++test('desktop CLI still times out at forty minutes while the latest Web run is pending', async () => {
++  const latestSucceedsAt = 40 * 60_000 + 9_000
++  const fixture = desktopWebFixture({
++    runs: (build, elapsed) => [
++      webRun({ head_sha: build, id: 69, run_attempt: 1, event: 'push' }),
++      webRun({ head_sha: build, event: 'workflow_dispatch',
++        ...(elapsed < latestSucceedsAt ? { status: 'in_progress', conclusion: null } : {}) }),
++    ],
++  })
++  await assert.rejects(fixture.run({ ...webDeploymentWaitOptions('await-desktop-web'), intervalMs: 10_000 }),
++    /matchingWebDeploymentTimedOut/)
++  assert.equal(fixture.elapsed(), 40 * 60_000)
++  assert.equal(fixture.calls.some(call => /\/actions\/runs\/\d+\/attempts\/\d+\/jobs/.test(call.url)), false,
++    'the older successful push cannot provide build evidence while the latest dispatch is pending')
++})
++
++test('runtime CLI stops at ninety minutes while required Web step evidence remains pending without reading public', async () => {
++  const job = buildJob()
++  Object.assign(job.steps[2], { status: 'pending', conclusion: null })
++  const fixture = webFixture({ job })
++  await assert.rejects(fixture.run({ ...webDeploymentWaitOptions('await-web'), intervalMs: 10_000 }),
++    /matchingWebDeploymentTimedOut/)
++  assert.equal(fixture.elapsed(), 90 * 60_000)
++  assert.equal(fixture.calls.filter(call => call.origin === 'https://app.aspectlylabs.com').length, 0,
++    'matching public output cannot replace unfinished required Web step evidence')
++})

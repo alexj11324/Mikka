@@ -1,0 +1,47 @@
+[
+  {
+    "path": "scripts/release/web-deploy.mjs",
+    "bytes": 19867,
+    "sha256": "e8012d49653ab635ea26d3ba881450860f8c3ead2893d799a98bc395eb65bf9a"
+  },
+  {
+    "path": "scripts/release/web-deploy.test.mjs",
+    "bytes": 46875,
+    "sha256": "9a2e724afc95feb9c5b7056600316cb6911d409e5b614f1b19ec4b54643862b4"
+  },
+  {
+    "path": "scripts/vercel-ignore-build.mjs",
+    "bytes": 2621,
+    "sha256": "bd16434eb54cbf56a83755a1c381cae6af7435a452bf4ada9b0e2bafaa877e0f"
+  },
+  {
+    "path": "scripts/ci-docs-only.mjs",
+    "bytes": 6993,
+    "sha256": "c42b6617863ff137635a86fe5bddfdaeeb31cbdec8f9ace7e49e48ff6becf01a"
+  },
+  {
+    "path": "scripts/e2b/publish-template-env.mjs",
+    "bytes": 17883,
+    "sha256": "2c15611a5304d3b5c4cf6b12e7969426dbc14c65404e1de197eab3aebd26819a"
+  },
+  {
+    "path": ".github/workflows/e2b-official-runtime.yml",
+    "bytes": 18539,
+    "sha256": "000ac0db12662e23d78d8becc51d36ac6aeebb94e23e7d459c382fa83476e5af"
+  },
+  {
+    "path": ".github/workflows/web-deploy.yml",
+    "bytes": 11619,
+    "sha256": "2916c80cc6a764fe2167ad5dad17be68b309161119bffbcb9001ee26b015e9a1"
+  },
+  {
+    "path": ".github/workflows/e2b-template.yml",
+    "bytes": 5492,
+    "sha256": "b7ddc06e28f0bc09ec0a01d2c7f01793bc6ccff66f63f204ac064596e0c2d676"
+  },
+  {
+    "path": ".github/workflows/desktop-release.yml",
+    "bytes": 16666,
+    "sha256": "b8a4fe38bf341ad5e5cd9677f787488da94369ca3e7f189873fe58cf440a4872"
+  }
+]

@@ -1,0 +1,60 @@
+✔ fills sensitive build values from the job and pins the main Git identity (10.414798ms)
+✔ refuses a build with a missing value and names only the variable (1.672922ms)
+✔ reads the commit production serves through the alias (7.825433ms)
+/etc/bashrc: line 12: BASHRCSOURCED: unbound variable
+/etc/bashrc: line 12: BASHRCSOURCED: unbound variable
+/etc/bashrc: line 12: BASHRCSOURCED: unbound variable
+/etc/bashrc: line 12: BASHRCSOURCED: unbound variable
+✔ public verification waits through an HTTP error and the previous build before recording the exact build (88.701863ms)
+✔ a different public build cannot pass just because its deployment is READY (7.34771ms)
+✔ invalid responses and network failures stay bounded and never copy response bodies into errors (5.906386ms)
+✔ a moving branch name or invalid budget fails before sending a public request (0.296333ms)
+✔ an exact response arriving after the monotonic verification deadline cannot pass (0.5699ms)
+✔ waits for a GitHub build while Vercel still only serves the older READY source (7.256633ms)
+✔ waits for completed Web step metadata to converge before accepting the public build (9.276591ms)
+✔ pending Web step metadata shares the original deadline without reading the public build (1.825759ms)
+✔ main advancing during step metadata convergence stops before another evidence read (2.822672ms)
+✔ step metadata that completes after the original deadline cannot admit a release (0.917942ms)
+✔ pending step metadata never hides a failed, cancelled or skipped required step (8.982956ms)
+✔ duplicate, missing or contradictory step evidence fails instead of waiting or accepting public READY (13.918177ms)
+✔ main advancing while waiting rejects the obsolete source before another workflow or public read (0.676282ms)
+✔ the latest exact Web attempt must succeed; an older success cannot hide its failure or cancellation (1.064208ms)
+✔ a docs-only skipped build or incomplete upload never passes even if public already has that SHA (1.064408ms)
+✔ a successful Web job waits for its required step results to catch up before reading public (6.161744ms)
+✔ required Web step results that remain pending cannot pass and retain the finite wait (6.459473ms)
+✔ pending Web step results retain the exact-main fence on every wait (0.766786ms)
+✔ pending step metadata does not hide a required step that already failed or skipped (1.520983ms)
+✔ another repository, branch or workflow cannot stand in for the matching main Web run (6.778831ms)
+✔ a successful Web run with an old public build has a finite monotonic wait (1.514648ms)
+✔ a matching public response after the deadline cannot admit the runtime mutation (5.431337ms)
+✔ the final read-only fence also rejects a main change during public verification (1.08462ms)
+✔ invalid source, missing identity or invalid wait fails without any network request (0.318146ms)
+✔ GitHub errors do not expose response bodies or transport messages (1.096244ms)
+✔ explicit runtime refresh always builds while ordinary docs-only classification is preserved (0.851626ms)
+✔ both release paths use one non-cancelling pending queue, and the Web wait remains outside it (0.931541ms)
+✔ runtime env, build and upload are ordered under the same job with fixed identity and source fences (0.467004ms)
+✔ the actual dispatch comparison only bypasses unchanged-hash optimization when explicitly requested (13.300473ms)
+✔ release-control refresh validates both immutable push endpoints and never assumes missing history is unchanged (1.100031ms)
+✔ manual runtime refresh defaults off and does not make pull requests eligible (0.136509ms)
+✔ real Git and the production CLI compare the entire push, preserve docs-only skip and reject unavailable before (161.851875ms)
+✔ desktop release accepts a deployed descendant while preserving its own source identity (1.956327ms)
+✔ desktop replaces obsolete preflights while preserving active signing and documentation does not trigger a release (7.051532ms)
+✔ real Git ancestry admits the same source or descendants and never an older or divergent Web (71.717335ms)
+✔ an unbound or malformed GitHub comparison cannot admit a desktop release (3.046558ms)
+✔ desktop waits for a newer compatible Web instead of stopping at its obsolete failed build (3.260597ms)
+✔ a changed public candidate is reverified before the desktop can be released (1.325684ms)
+✔ descendant mode retains successful same-source Web build, upload and public verification gates (4.232799ms)
+✔ desktop verification cannot succeed after its deadline or start without a GitHub identity (0.432798ms)
+✔ private-push dispatch waits through an older overlay on an otherwise valid desktop descendant (1.492223ms)
+✔ private-push exact-source wait keeps matching overlay behavior (1.343741ms)
+✔ every fromJSON of a workflow input has a fallback, since a push run has no inputs (0.440917ms)
+✔ large runtime reports cross jobs only as immutable artifact files (0.941226ms)
+✔ duplicate required step cannot hide a failure or pending record behind one success (2.854799ms)
+ℹ tests 48
+ℹ suites 0
+ℹ pass 48
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 683.898171
