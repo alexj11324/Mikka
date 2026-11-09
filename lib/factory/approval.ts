@@ -137,10 +137,10 @@ export async function reservePublication(
   return id;
 }
 
-/** Browser transport authentication, not a human-approval requirement. */
+/** Fresh browser/native transport session, not a human-approval decision. */
 async function browserSession(tx: PoolClient, actor: FactoryActor) {
   if (!actor?.userId) fail("factoryActorRequired");
-  if (!actor.sessionId) return; // Approval itself requires a linked human session.
+  if (!actor.sessionId) return; // Approval itself requires a live human session.
   const { rows } = await tx.query(
     `SELECT id FROM "session" WHERE id=$1 AND "userId"=$2 AND "expiresAt">clock_timestamp() FOR SHARE`,
     [actor.sessionId, actor.userId],
@@ -148,17 +148,16 @@ async function browserSession(tx: PoolClient, actor: FactoryActor) {
   if (!rows.length) fail("factoryHumanRequired");
 }
 
-/** Warp-aligned approval: a person approving in the browser is the decision.
- * The session must be live and linked to GitHub or Google; no external policy
- * issuer or decision credential is involved on this path. */
+/** The human-only route supplies a verified browser/native session. Recheck
+ * its owner and expiry under the transaction lock, independently of sign-in
+ * method. Linked OAuth accounts and delegated credentials are not this proof. */
 async function humanApproval(
   tx: PoolClient,
   actor: { userId: string; sessionId?: string | null },
 ) {
   if (!actor.userId || !actor.sessionId) fail("factoryHumanRequired");
   const { rows } = await tx.query(
-    `SELECT s.id FROM "session" s WHERE s.id=$1 AND s."userId"=$2 AND s."expiresAt">clock_timestamp()
-     AND EXISTS (SELECT 1 FROM account a WHERE a."userId"=s."userId" AND a."providerId" IN ('github','google')) FOR SHARE`,
+    `SELECT s.id FROM "session" s WHERE s.id=$1 AND s."userId"=$2 AND s."expiresAt">clock_timestamp() FOR SHARE`,
     [actor.sessionId, actor.userId],
   );
   if (!rows.length) fail("factoryHumanRequired");
