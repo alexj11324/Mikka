@@ -9,6 +9,7 @@ import { liveKeyConnection } from '../lib/swr/live-focus'
 import { PersistentReadCache } from '../lib/swr/persistent-cache'
 import { CacheReadError } from '../lib/cache-read-error'
 import type { PresenceProof } from '../lib/live/presence'
+import type { ReadStorage, StoredRead } from '../lib/swr/indexed-db'
 
 const home = '10000000-0000-4000-8000-000000000001'
 const team = '20000000-0000-4000-8000-000000000001'
@@ -29,6 +30,9 @@ mock.module(new URL('../app/actions/issues.ts', import.meta.url).href, { namedEx
 mock.module(new URL('../app/actions/task-runs.ts', import.meta.url).href, { namedExports: { syncThreadList: (known?: string, positions?: unknown) => sync('threads', known, positions), pollTaskRuns: () => read('tasks') } })
 mock.module(new URL('../app/actions/coordinator.ts', import.meta.url).href, { namedExports: { pollBotChatSummaries: () => read('bots') } })
 mock.module(new URL('../app/actions/bots.ts', import.meta.url).href, { namedExports: { pollBots: () => read('roster') } })
+
+mock.module('next/navigation', { namedExports: { useSearchParams: () => ({ get: () => null }) } })
+mock.module(new URL('../i18n/navigation.ts', import.meta.url).href, { namedExports: { useRouter: () => ({ refresh() {} }) } })
 
 const browser = new Window({ url: 'https://mikka.example/mikka/en' })
 const originalFetch = globalThis.fetch, originalSocket = globalThis.WebSocket
@@ -955,3 +959,318 @@ for (const { kind, action, liveKind } of [
     }
   })
 }
+
+
+/** Startup composes the production persistent provider, hydration middleware,
+ * owner list hooks and Native MessageChannel queue. Only storage/HTTP/socket
+ * boundaries are controlled; no timer or live scheduling code is replaced. */
+for (const scenario of [
+  'provider-unresolved', 'provider-hint', 'warm-committed',
+  'warm-pending-after-ready', 'warm-pending-before-ready', 'warm-new-home',
+] as const) test('native hydration order: ' + scenario, { timeout: 8_000 }, async t => {
+  const { HydrateReadCache } = await import('../components/authenticated-read-cache')
+  const { callAction } = await import('../apps/desktop/src/renderer/rpc')
+  const { resetReadBatchScope } = await import('../apps/desktop/src/renderer/read-batch')
+  const { encode, decode } = await import('../lib/desktop-rpc/wire')
+  const { setLiveTelemetrySink } = await import('../lib/live/telemetry')
+  const phases: { event: string; at: number; kind?: string; call?: number }[] = []
+  const record = (event: string, kind?: string, call?: number) => phases.push({ event, at: performance.now(), ...(kind ? { kind } : {}), ...(call ? { call } : {}) })
+  const warm = scenario.startsWith('warm-')
+  const pending = scenario.includes('pending')
+  const beforeReady = scenario === 'warm-pending-before-ready'
+  const changedHome = scenario === 'warm-new-home'
+  const activation = deferred<StoredRead[]>(), response = deferred<void>(), dispatched = deferred<void>()
+  const rawKey = ['bot-chats', 'owner'], key = unstableSerialize(rawKey)
+  const warmRead = snapshot('bots', 'owner', home)
+  warmRead.live.revisions = { ['bot_chat_list:' + home]: 4 }
+  const storage: ReadStorage = {
+    async activate() { record('storage_activate'); return activation.promise },
+    async write() {},
+    async remove() {},
+    async clear() {},
+  }
+  class ObservedCache extends PersistentReadCache {
+    override set(id: string, state: State & { _k?: unknown }) {
+      const oldData = this.get(id)?.data
+      const result = super.set(id, state)
+      if (state.data !== undefined && state.data !== oldData) {
+        record(this.isHydrated ? 'commit' : 'restore', id === key ? 'bots' : 'other')
+      }
+      return result
+    }
+    override resumeHydrationReads() { record('hydration_resume'); return super.resumeHydrationReads() }
+  }
+  const persistent = new ObservedCache({ userId: 'owner', workspaceId: team, role: 'admin', build: 'fixture-native-startup' }, storage)
+  cache = persistent
+  let listCalls = 0, rosterCalls = 0, physicalCalls = 0
+  const originalOpen = FakeSocket.prototype.open, originalMessage = FakeSocket.prototype.message
+  FakeSocket.prototype.open = function () { if (!this.readyState) record('socket_open', this.url.endsWith(home) ? 'home' : 'other'); return originalOpen.call(this) }
+  FakeSocket.prototype.message = function (value: unknown) {
+    originalMessage.call(this, value)
+    if ((value as { type?: unknown })?.type === 'live_ready') record('ready', this.url.endsWith(home) ? 'home' : 'other')
+  }
+  setLiveTelemetrySink((event, properties) => { if (event === 'mikka_live_read') record('flush', String(properties.read_key)) })
+  automaticOpen = !warm
+  resetReadBatchScope()
+  const openHome = () => sockets.find(socket => socket.url.endsWith(home))?.open()
+  replies.set('bots', () => {
+    record('fetcher', 'bots')
+    const result = callAction<Read>('coordinator.pollBotChatSummaries', [])
+    record('enqueue', 'bots')
+    if (warm && !beforeReady) queueMicrotask(openHome)
+    return result
+  })
+  replies.set('roster', () => {
+    record('fetcher', 'roster')
+    const result = callAction<Read>('bots.pollBots', [])
+    record('enqueue', 'roster')
+    if (warm && !beforeReady) queueMicrotask(openHome)
+    return result
+  })
+  const ticketFetch = globalThis.fetch
+  globalThis.fetch = async (input, options) => {
+    const url = new URL(String(input), 'https://mikka.example')
+    if (url.pathname.endsWith('/api/live/ticket')) return ticketFetch(input, options)
+    assert.ok(url.pathname.endsWith('/api/desktop/rpc'))
+    assert.equal(options?.method, 'POST')
+    assert.equal(options?.cache, 'no-store')
+    const envelope = JSON.parse(String(options?.body))
+    assert.equal(envelope.version, 1)
+    const args = decode(envelope.args) as unknown[]
+    const batch = envelope.action === 'desktop.readBatch'
+    const calls = batch ? args[0] as { action: string; args: unknown[] }[] : [{ action: envelope.action, args }]
+    const physicalCall = ++physicalCalls
+    record('dispatch', undefined, physicalCall)
+    const first = physicalCall === 1
+    const results = calls.map(call => {
+      assert.deepEqual(call.args, [])
+      if (call.action === 'coordinator.pollBotChatSummaries') {
+        listCalls++
+        const nextHome = changedHome ? otherHome : home
+        const result = snapshot('bots', 'owner', nextHome)
+        result.live.revisions = { ['bot_chat_list:' + nextHome]: listCalls + 4 }
+        return { ok: true, result }
+      }
+      assert.equal(call.action, 'bots.pollBots')
+      rosterCalls++
+      return { ok: true, result: snapshot('roster', 'owner', home) }
+    })
+    if (first) {
+      dispatched.resolve()
+      if (beforeReady) queueMicrotask(openHome)
+      if (pending) await response.promise
+    }
+    record('response', undefined, physicalCall)
+    return Response.json({ version: 1, ok: true, result: encode(batch ? results : results[0].result) })
+  }
+  try {
+    await act(async () => root.render(<SWRConfig value={{ provider: () => persistent, use: [staleOnFocus], dedupingInterval: 0, shouldRetryOnError: false }}>
+      <HydrateReadCache />
+      <LiveProvider ownerId="owner" workspaceId={scenario === 'provider-unresolved' ? undefined : home}>
+        <Bots owner="owner" />
+        {warm && <Roster owner="owner" workspace={home} />}
+      </LiveProvider>
+    </SWRConfig>))
+    assert.equal(listCalls, 0, 'paused reads cannot dispatch before hydration')
+    await act(async () => activation.resolve(warm ? [{ key, rawKey, data: warmRead, savedAt: 1 }] : []))
+    await dispatched.promise
+    if (pending) {
+      await wait()
+      if (beforeReady) assert.equal(listCalls, 2, 'the pending older read cannot block the required catch-up')
+      record('response_release')
+      await act(async () => response.resolve())
+    }
+    if (changedHome) {
+      await wait(10)
+      await act(async () => sockets.find(socket => socket.url.endsWith(otherHome))?.open())
+    }
+    await settled()
+    const first = (event: string, kind?: string) => phases.findIndex(phase => phase.event === event && (!kind || phase.kind === kind))
+    assert.ok(first('hydration_resume') >= 0)
+    assert.ok(first('fetcher', 'bots') >= 0)
+    assert.ok(first('enqueue', 'bots') < first('dispatch'))
+    if (!warm) {
+      assert.ok(first('commit', 'bots') < first('socket_open'))
+      assert.equal(listCalls, 2, 'Provider scope alone never guesses the unresolved owner home; its later watch gap still needs a read')
+    } else {
+      assert.ok(first('restore', 'bots') >= 0)
+      assert.ok(first('fetcher') < first('ready'), 'the fetcher enters before the controlled acknowledgement')
+      assert.equal(first('dispatch') < first('ready'), beforeReady, 'the real MessageChannel dispatch establishes the controlled order')
+      if (pending) assert.ok(first('flush') < first('response_release'), 'the actual live timer flushes while the first response is held')
+      if (changedHome) {
+        assert.ok(tickets.includes(otherHome), 'the returned authenticated home replaces the disk hint')
+        assert.equal(listCalls, 2, 'a genuinely different home starts a new coverage generation')
+      } else {
+        assert.equal(listCalls, beforeReady ? 2 : 1, 'only an actual dispatch after readiness may satisfy the flush')
+        assert.equal(rosterCalls, beforeReady ? 2 : 1)
+      }
+    }
+    assert.equal(persistent.isHydrated, true)
+    assert.equal(persistent.isEnabled, true)
+  } finally {
+    response.resolve()
+    activation.resolve([])
+    t.diagnostic(JSON.stringify({ kind: 'native_hydration_order', scenario, listCalls, rosterCalls, physicalCalls, phases }))
+    FakeSocket.prototype.open = originalOpen
+    FakeSocket.prototype.message = originalMessage
+    setLiveTelemetrySink(undefined)
+    resetReadBatchScope()
+    await persistent.flushed()
+  }
+})
+
+
+for (const scenario of ['unproven-result', 'repeated-dispatch', 'multiple-captures', 'superseded-read', 'failed-read'] as const) {
+  test('pending dispatch observation: ' + scenario, { timeout: 2_000 }, async () => {
+    const { observeSWRRead, acceptSWRRead, capturePendingReadDispatch, readBoundary, readFresh } = await import('../lib/swr/read-observer')
+    const observationCache = new Map<string, { data?: unknown; error?: unknown }>()
+    const held = deferred<object>()
+    let notify: (() => void) | undefined
+    const original = observeSWRRead(observationCache, 'pending', withDispatch => withDispatch(() => {
+      notify = capturePendingReadDispatch()
+      if (scenario === 'multiple-captures') assert.equal(capturePendingReadDispatch(), undefined)
+      return held.promise
+    }))
+    void original.then(value => {
+      acceptSWRRead(observationCache, 'pending', value)
+      observationCache.set('pending', { data: value })
+    }, () => undefined)
+    assert.equal(capturePendingReadDispatch(), undefined, 'the synchronous token cannot escape into unrelated work')
+    const after = readBoundary()
+    assert.ok(notify)
+    notify()
+    let revalidations = 0
+    const expected = { fresh: true }
+    const catchup = readFresh(observationCache, 'pending', after, async () => { revalidations++; return expected }, () => true, () => true)
+    const failure = new CacheReadError('workspaceAccessDenied')
+    try {
+      await Promise.resolve()
+      if (scenario === 'multiple-captures') {
+        assert.equal(await catchup, expected)
+        assert.equal(revalidations, 1, 'an ambiguous capture never lets the hung original hold up catch-up')
+      } else if (scenario === 'repeated-dispatch') {
+        assert.equal(revalidations, 0)
+        notify()
+        assert.equal(await catchup, expected)
+        assert.equal(revalidations, 1, 'revoking an already-used pending hint wakes the catch-up without the old response')
+      } else if (scenario === 'superseded-read') {
+        assert.equal(revalidations, 0)
+        const nextValue = { replacement: true }
+        const next = observeSWRRead(observationCache, 'pending', () => nextValue)
+        void next.then(value => {
+          acceptSWRRead(observationCache, 'pending', value)
+          observationCache.set('pending', { data: value })
+        })
+        assert.equal(await catchup, nextValue, 'a newer actual read supersedes the hung pending hint')
+        assert.equal(revalidations, 0)
+      } else if (scenario === 'failed-read') {
+        held.reject(failure)
+        await assert.rejects(catchup, error => error === failure)
+        assert.equal(revalidations, 0, 'the original failure is not silently retried')
+      } else {
+        assert.equal(revalidations, 0)
+        held.resolve({ unproven: true })
+        assert.equal(await catchup, expected)
+        assert.equal(revalidations, 1, 'a pending hint alone never becomes completed dispatch proof')
+      }
+    } finally {
+      held.resolve({ released: true })
+      await original.catch(() => undefined)
+    }
+  })
+}
+
+
+/** Keep this last: a 404 capability response disables batching for this real
+ * document, and resetReadBatchScope deliberately does not restore capability. */
+test('native pending dispatch: real 404 capability fallback revokes an already awaited hint', { timeout: 8_000 }, async t => {
+  const { HydrateReadCache } = await import('../components/authenticated-read-cache')
+  const { callAction } = await import('../apps/desktop/src/renderer/rpc')
+  const { resetReadBatchScope } = await import('../apps/desktop/src/renderer/read-batch')
+  const { encode, decode } = await import('../lib/desktop-rpc/wire')
+  const { setLiveTelemetrySink } = await import('../lib/live/telemetry')
+  const activation = deferred<StoredRead[]>(), batchRefusal = deferred<void>(), fallback = deferred<void>(), batchDispatched = deferred<void>()
+  const phases: string[] = []
+  const rawKey = ['bot-chats', 'owner'], key = unstableSerialize(rawKey)
+  const storage: ReadStorage = { async activate() { return activation.promise }, async write() {}, async remove() {}, async clear() {} }
+  const persistent = new PersistentReadCache({ userId: 'owner', workspaceId: team, role: 'admin', build: 'fixture-capability-fallback' }, storage)
+  cache = persistent
+  let physical = 0
+  const logical = { bots: 0, roster: 0 }
+  const originalMessage = FakeSocket.prototype.message
+  FakeSocket.prototype.message = function (value: unknown) {
+    originalMessage.call(this, value)
+    if ((value as { type?: unknown })?.type === 'live_ready') phases.push('ready')
+  }
+  setLiveTelemetrySink((event, properties) => { if (event === 'mikka_live_read') phases.push('flush:' + properties.read_key) })
+  automaticOpen = false
+  resetReadBatchScope()
+  for (const kind of ['bots', 'roster'] as const) replies.set(kind, () => {
+    const action = kind === 'bots' ? 'coordinator.pollBotChatSummaries' : 'bots.pollBots'
+    phases.push('enqueue:' + kind)
+    const promise = callAction<Read>(action, [])
+    queueMicrotask(() => sockets.find(socket => socket.url.endsWith(home))?.open())
+    return promise
+  })
+  const ticketFetch = globalThis.fetch
+  globalThis.fetch = async (input, options) => {
+    const url = new URL(String(input), 'https://mikka.example')
+    if (url.pathname.endsWith('/api/live/ticket')) return ticketFetch(input, options)
+    assert.ok(url.pathname.endsWith('/api/desktop/rpc'))
+    const envelope = JSON.parse(String(options?.body))
+    const id = ++physical
+    phases.push('dispatch:' + id + ':' + envelope.action)
+    if (id === 1) {
+      assert.equal(envelope.action, 'desktop.readBatch')
+      const args = decode(envelope.args) as { action: string }[][]
+      assert.deepEqual(args[0].map(call => call.action).sort(), ['bots.pollBots', 'coordinator.pollBotChatSummaries'])
+      batchDispatched.resolve()
+      await batchRefusal.promise
+      phases.push('batch_404')
+      return Response.json({ version: 1, ok: false, error: { code: 'desktop_rpc_action_unknown' } }, { status: 404 })
+    }
+    assert.notEqual(envelope.action, 'desktop.readBatch', 'only the explicit capability refusal permits single fallback')
+    const kind = envelope.action === 'coordinator.pollBotChatSummaries' ? 'bots' : 'roster'
+    assert.ok(['coordinator.pollBotChatSummaries', 'bots.pollBots'].includes(envelope.action))
+    const count = ++logical[kind]
+    if (count === 1) {
+      phases.push('fallback_held:' + kind)
+      await fallback.promise
+    } else phases.push('catchup:' + kind)
+    const value = snapshot(kind, 'owner', home)
+    value.items[0].title = count === 1 ? 'late-fallback' : 'fresh-catchup'
+    phases.push('response:' + id)
+    return Response.json({ version: 1, ok: true, result: encode(value) })
+  }
+  try {
+    await act(async () => root.render(<SWRConfig value={{ provider: () => persistent, use: [staleOnFocus], dedupingInterval: 0, shouldRetryOnError: false }}>
+      <HydrateReadCache />
+      <LiveProvider ownerId="owner" workspaceId={home}><Bots owner="owner" /><Roster owner="owner" workspace={home} /></LiveProvider>
+    </SWRConfig>))
+    await act(async () => activation.resolve([{ key, rawKey, data: snapshot('bots'), savedAt: 1 }]))
+    await batchDispatched.promise
+    await wait()
+    assert.ok(phases.indexOf('ready') < phases.findIndex(value => value.startsWith('dispatch:1:')))
+    assert.ok(phases.includes('flush:bot-chats') && phases.includes('flush:bots'))
+    assert.equal(physical, 1, 'both catch-ups are already waiting on the post-ready pending batch')
+    await act(async () => batchRefusal.resolve())
+    await settled()
+    assert.deepEqual(logical, { bots: 2, roster: 2 }, 'duplicate dispatch notification wakes both catch-ups while fallback responses remain held')
+    assert.equal(physical, 5)
+    assert.ok(view('bots')?.includes('fresh-catchup'))
+    assert.ok(view('roster')?.includes('fresh-catchup'))
+    phases.push('release_fallback')
+    await act(async () => fallback.resolve())
+    await settled()
+    assert.equal(physical, 5, 'releasing obsolete fallback responses creates no further request')
+    assert.ok(view('bots')?.includes('fresh-catchup'))
+    assert.ok(view('roster')?.includes('fresh-catchup'))
+  } finally {
+    batchRefusal.resolve(); fallback.resolve(); activation.resolve([])
+    t.diagnostic(JSON.stringify({ kind: 'native_real_capability_fallback', physical, logical, phases }))
+    FakeSocket.prototype.message = originalMessage
+    setLiveTelemetrySink(undefined)
+    resetReadBatchScope()
+    await persistent.flushed()
+  }
+})
