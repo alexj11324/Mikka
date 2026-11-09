@@ -1,0 +1,48 @@
+test_observed_mode_then_digest_changes_require_finalization_and_strict_proof (__main__.CodexRootCaFinalization.test_observed_mode_then_digest_changes_require_finalization_and_strict_proof) ... 
+  test_observed_mode_then_digest_changes_require_finalization_and_strict_proof (__main__.CodexRootCaFinalization.test_observed_mode_then_digest_changes_require_finalization_and_strict_proof) (phase='ready') ... ERROR
+  test_observed_mode_then_digest_changes_require_finalization_and_strict_proof (__main__.CodexRootCaFinalization.test_observed_mode_then_digest_changes_require_finalization_and_strict_proof) (phase='fresh') ... ERROR
+test_other_paths_cli_and_desktop_backup_keep_their_existing_protection (__main__.CodexRootCaFinalization.test_other_paths_cli_and_desktop_backup_keep_their_existing_protection) ... ok
+test_receipts_cannot_widen_the_measured_codex_transition (__main__.CodexRootCaFinalization.test_receipts_cannot_widen_the_measured_codex_transition) ... ERROR
+test_unobserved_modes_and_owner_or_file_kind_changes_are_rejected (__main__.CodexRootCaFinalization.test_unobserved_modes_and_owner_or_file_kind_changes_are_rejected) ... ok
+test_exact_root_ca_exception_keeps_type_owner_target_mode_and_other_paths_protected (__main__.OfficialFiles.test_exact_root_ca_exception_keeps_type_owner_target_mode_and_other_paths_protected) ... ok
+test_provider_ca_finalization_keeps_exact_path_type_owner_and_mode_guards (__main__.OfficialFiles.test_provider_ca_finalization_keeps_exact_path_type_owner_and_mode_guards) ... ok
+test_rotating_provider_ca_bytes_are_accepted_only_at_fresh_finalization (__main__.OfficialFiles.test_rotating_provider_ca_bytes_are_accepted_only_at_fresh_finalization) ... ok
+test_exact_root_ca_rotation_receipts_reject_invalid_hashes (__main__.OfficialFiles.test_exact_root_ca_rotation_receipts_reject_invalid_hashes) ... ok
+
+======================================================================
+ERROR: test_observed_mode_then_digest_changes_require_finalization_and_strict_proof (__main__.CodexRootCaFinalization.test_observed_mode_then_digest_changes_require_finalization_and_strict_proof) (phase='ready')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/263e36984c81/codex-root-mode-candidate-1505/candidate/scripts/e2b/official-files.test.py", line 892, in test_observed_mode_then_digest_changes_require_finalization_and_strict_proof
+    final = files.verify(baseline, 'codex')
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/263e36984c81/codex-root-mode-candidate-1505/candidate/scripts/e2b/official-files.py", line 319, in verify
+    raise RuntimeError('official_files_changed ' + json.dumps(refused, sort_keys=True, separators=(',', ':')))
+RuntimeError: official_files_changed [{"after":{"mode":511},"before":{"mode":420},"kind":"file","path":"/usr/local/share/ca-certificates/e2b-ca.crt"}]
+
+======================================================================
+ERROR: test_observed_mode_then_digest_changes_require_finalization_and_strict_proof (__main__.CodexRootCaFinalization.test_observed_mode_then_digest_changes_require_finalization_and_strict_proof) (phase='fresh')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/263e36984c81/codex-root-mode-candidate-1505/candidate/scripts/e2b/official-files.test.py", line 892, in test_observed_mode_then_digest_changes_require_finalization_and_strict_proof
+    final = files.verify(baseline, 'codex')
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/263e36984c81/codex-root-mode-candidate-1505/candidate/scripts/e2b/official-files.py", line 319, in verify
+    raise RuntimeError('official_files_changed ' + json.dumps(refused, sort_keys=True, separators=(',', ':')))
+RuntimeError: official_files_changed [{"after":{"mode":511,"sha256":"545244c4bc7f902ed9a6d843dd6ccaed08d0a59bbfc1b60064bd0278e026da5a"},"before":{"mode":420,"sha256":"713ed37b92f312cf89345677c1d7f413c55b38ca0c1c636ce0fecc672d08ed9a"},"kind":"file","path":"/usr/local/share/ca-certificates/e2b-ca.crt"}]
+
+======================================================================
+ERROR: test_receipts_cannot_widen_the_measured_codex_transition (__main__.CodexRootCaFinalization.test_receipts_cannot_widen_the_measured_codex_transition)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/263e36984c81/codex-root-mode-candidate-1505/candidate/scripts/e2b/official-files.test.py", line 957, in test_receipts_cannot_widen_the_measured_codex_transition
+    proof['finalization'] = files.verify(baseline, 'codex')
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/263e36984c81/codex-root-mode-candidate-1505/candidate/scripts/e2b/official-files.py", line 319, in verify
+    raise RuntimeError('official_files_changed ' + json.dumps(refused, sort_keys=True, separators=(',', ':')))
+RuntimeError: official_files_changed [{"after":{"mode":511},"before":{"mode":420},"kind":"file","path":"/usr/local/share/ca-certificates/e2b-ca.crt"}]
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.177s
+
+FAILED (errors=3)

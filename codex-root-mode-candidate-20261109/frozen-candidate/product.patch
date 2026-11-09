@@ -1,0 +1,46 @@
+--- a/scripts/e2b/e2b-finalization-files.json
++++ b/scripts/e2b/e2b-finalization-files.json
+@@ -80,6 +80,29 @@
+       "evidence": "docs/operations/evidence/1782-official-claude-certificate-relinks-20261109.json",
+       "evidenceBytes": 18164,
+       "evidenceSha256": "dc69062c8376cb2a10cf47b7455ff478f7872c709c31c128c1384ecfc7696632"
++    },
++    {
++      "template": "codex",
++      "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
++      "fields": [
++        "mode"
++      ],
++      "entryKind": "file",
++      "mode": {
++        "before": 420,
++        "after": 511
++      },
++      "controlRun": "https://github.com/alexj11324/Mikka/actions/runs/42670291715",
++      "controlOpsCommit": "b75871ea1753f75769daa33b095704475cf9a4a2",
++      "sourceContextCommit": "5ba1f9e2359ce714d83cd16fc040f2567c40a6d0",
++      "artifactId": 13697989038,
++      "artifactZipBytes": 3353,
++      "artifactZipSha256": "2aa02beb720a3e3922bafa5ba81344529a22e76ea14588717de0f9e11255b268",
++      "targetedOnly": true,
++      "releaseAccepted": false,
++      "evidence": "docs/operations/evidence/1505-official-path-control-20261109.json",
++      "evidenceBytes": 31180,
++      "evidenceSha256": "ba526b6e177f786d4dcb62f17c6f84c08c93a1b963fe8a06af49d849f1f2bad0"
+     }
+   ],
+   "additionalControls": [
+@@ -146,7 +169,12 @@
+     },
+     "codex": {
+       "/usr/local/share/ca-certificates/e2b-ca.crt": {
+-        "sha256": "per-boot"
++        "_kind": "file",
++        "sha256": "per-boot",
++        "mode": {
++          "before": 420,
++          "after": 511
++        }
+       }
+     },
+     "desktop": {

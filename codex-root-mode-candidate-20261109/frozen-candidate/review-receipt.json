@@ -1,0 +1,220 @@
+{
+  "baseCommit": "8197a48843f9733a775003898ab00eaceb533c66",
+  "candidateFiles": [
+    {
+      "bytes": 21445,
+      "gitBlobOid": "ea0819bf3e2d4ff83e64482b6336567050376591",
+      "path": "scripts/e2b/official-files.py",
+      "sha256": "66911624af52df59ef715eb105af9a3025bacf12460105fadc7f87e4d2dd63b5"
+    },
+    {
+      "bytes": 61113,
+      "gitBlobOid": "f980c7258243a77a123207ccfe03911d4483064d",
+      "path": "scripts/e2b/official-files.test.py",
+      "sha256": "2e6cf363425489783afda7a53e627d4eb2645a2bba27869378bcd3aed4423dff"
+    },
+    {
+      "bytes": 6238,
+      "gitBlobOid": "e6d19b5ed954d71c53a3ef32eed9c96a30943116",
+      "path": "scripts/e2b/e2b-finalization-files.json",
+      "sha256": "7d3abc6a73cfd56ee2bed51572db5b7d0e842db91df838f5dc40563b8c0ceb9c"
+    },
+    {
+      "bytes": 106533,
+      "gitBlobOid": "ba210a72dff95a34120bcd6fb581fb54aa47b863",
+      "path": "scripts/e2b/e2b-certificate-relinks.json",
+      "sha256": "16f3341cf64a4c7fd739a50439e558db4643f23fdd1ec16a51b062c30f037b52"
+    }
+  ],
+  "changedPaths": [
+    "scripts/e2b/official-files.test.py",
+    "scripts/e2b/e2b-finalization-files.json"
+  ],
+  "controlInputVerification": {
+    "artifact": {
+      "artifactId": 13697989038,
+      "attempt": 1,
+      "members": [
+        {
+          "bytes": 3405,
+          "name": "codex.json",
+          "sha256": "c0ce123a741c24d69d5dc686a4d429d3e72b6e5b46380f2ff37696c1bf761357"
+        },
+        {
+          "bytes": 10487,
+          "name": "desktop.json",
+          "sha256": "57c5c0311f8870840491e87c7b7babc5922015c87f3b266614cf25fca4f217d9"
+        },
+        {
+          "bytes": 1640,
+          "name": "summary.json",
+          "sha256": "c00574e265b2935a3b598714b978eb11732309b24471717b6a3bb64e6ab93ffe"
+        }
+      ],
+      "runId": 42670291715,
+      "zip": {
+        "bytes": 3353,
+        "crcChecked": true,
+        "sha256": "2aa02beb720a3e3922bafa5ba81344529a22e76ea14588717de0f9e11255b268"
+      }
+    },
+    "bothCleanupReportsExactAndComplete": true,
+    "codexPhases": [
+      {
+        "bootId": "bfcc8656-5af0-4f30-970e-462ccc9c9cfd",
+        "monotonicNs": 8486921649,
+        "node": {
+          "gid": 0,
+          "kind": "file",
+          "mode": 420,
+          "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+          "sha256": "713ed37b92f312cf89345677c1d7f413c55b38ca0c1c636ce0fecc672d08ed9a",
+          "status": "present",
+          "uid": 0
+        },
+        "phase": "before",
+        "utcNs": 1794247349350326626
+      },
+      {
+        "bootId": "bfcc8656-5af0-4f30-970e-462ccc9c9cfd",
+        "monotonicNs": 8741068548,
+        "node": {
+          "gid": 0,
+          "kind": "file",
+          "mode": 420,
+          "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+          "sha256": "713ed37b92f312cf89345677c1d7f413c55b38ca0c1c636ce0fecc672d08ed9a",
+          "status": "present",
+          "uid": 0
+        },
+        "phase": "pre_finalization",
+        "utcNs": 1794247349713781941
+      },
+      {
+        "bootId": "e15e0619-7d9b-45e5-95e2-eb1798713281",
+        "monotonicNs": 2015132241,
+        "node": {
+          "gid": 0,
+          "kind": "file",
+          "mode": 511,
+          "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+          "sha256": "713ed37b92f312cf89345677c1d7f413c55b38ca0c1c636ce0fecc672d08ed9a",
+          "status": "present",
+          "uid": 0
+        },
+        "phase": "ready",
+        "utcNs": 1794247354016092312
+      },
+      {
+        "bootId": "e15e0619-7d9b-45e5-95e2-eb1798713281",
+        "monotonicNs": 7272307103,
+        "node": {
+          "gid": 0,
+          "kind": "file",
+          "mode": 511,
+          "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+          "sha256": "545244c4bc7f902ed9a6d843dd6ccaed08d0a59bbfc1b60064bd0278e026da5a",
+          "status": "present",
+          "uid": 0
+        },
+        "phase": "fresh",
+        "utcNs": 1794247361582618182
+      }
+    ],
+    "desktopFourObservationsEqual": true,
+    "identity": {
+      "application": "mikka-1505-official-path-control",
+      "opsCommit": "b75871ea1753f75769daa33b095704475cf9a4a2",
+      "ref": "refs/heads/ops/1505-smoke-github-readonly-20261109",
+      "repository": "alexj11324/Mikka",
+      "runAttempt": "1",
+      "runId": "42670291715",
+      "sourceCommit": "5ba1f9e2359ce714d83cd16fc040f2567c40a6d0"
+    },
+    "inputDirectory": "/workspace/scratch/263e36984c81/official-path-control-receipts-1505",
+    "localMembersOnly": true,
+    "remoteLogsOrZipRead": false,
+    "upstreamImmutableBaseAndEnvd": "not collected; unknown"
+  },
+  "createdAt": "2026-11-09T18:16:55.775783+00:00",
+  "patches": {
+    "candidate.patch": {
+      "bytes": 11150,
+      "gitBlobOid": "a002f9f4303af8cbe92313a0cad911f116d50c19",
+      "sha256": "6091788b6b9402e4bad7caeb10a33d8c4e2c64a56be68da62b60ebe37649cc0b"
+    },
+    "product.patch": {
+      "bytes": 1596,
+      "gitBlobOid": "174f626ae30d0248330da625d7f578f3e777d8ee",
+      "sha256": "67c6854f1da76cb233ecdb845df6965182ecb96c760158b676f2d9e73a443e83"
+    }
+  },
+  "policyConservation": {
+    "all322CertificateRowsAndBytesUnchanged": true,
+    "checksDigestFormatAndExactCertificateTargetsNotX509Contents": true,
+    "commonRulesUnchanged": true,
+    "inverseRestoresWholeOriginalBytes": true,
+    "matcherBytesUnchanged": true,
+    "onlyNewRule": "codex exact root CA regular file mode 0644 to 0777",
+    "otherTemplatesUnchanged": true,
+    "perBootShaRuleUnchanged": true
+  },
+  "productEvidence": {
+    "bytes": 31180,
+    "gitBlobOid": "1dbd1907aca7c820be90ed6779fc2962717e5fec",
+    "localPath": "/workspace/scratch/263e36984c81/official-path-control-product-evidence-1505/1505-official-path-control-20261109.json",
+    "repoPath": "docs/operations/evidence/1505-official-path-control-20261109.json",
+    "sha256": "ba526b6e177f786d4dcb62f17c6f84c08c93a1b963fe8a06af49d849f1f2bad0"
+  },
+  "scopeLimits": [
+    "Targeted metadata replay through real matcher, not a full filesystem conservation scan.",
+    "No Git objects, refs, CI, VMs, credentials, models or provider mutation.",
+    "No Desktop policy expansion and no X509 content validation claim.",
+    "The four control phase names do not prove the first failure stage of a separate R7."
+  ],
+  "testConservation": {
+    "changedOriginalBehavior": "Only two old negative mode expectations changed from 0644->0777 to unobserved 0644->0755; comment clarifications have no AST changes.",
+    "changedOriginalMethods": [
+      "OfficialFiles.test_exact_root_ca_exception_keeps_type_owner_target_mode_and_other_paths_protected",
+      "OfficialFiles.test_provider_ca_finalization_keeps_exact_path_type_owner_and_mode_guards"
+    ],
+    "finalMethods": 38,
+    "newMethods": [
+      "CodexRootCaFinalization.test_observed_mode_then_digest_changes_require_finalization_and_strict_proof",
+      "CodexRootCaFinalization.test_other_paths_cli_and_desktop_backup_keep_their_existing_protection",
+      "CodexRootCaFinalization.test_receipts_cannot_widen_the_measured_codex_transition",
+      "CodexRootCaFinalization.test_unobserved_modes_and_owner_or_file_kind_changes_are_rejected"
+    ],
+    "originalMethods": 34,
+    "originalMethodsRemoved": []
+  },
+  "validation": {
+    "commentClarification": "After first green, Codex-only control was clarified to official Codex observation; the same eight focused tests passed on the exact final source.",
+    "finalGreen": {
+      "exitCode": 0,
+      "failed": 0,
+      "passedMethods": 8,
+      "result": "evidence/green.result.json",
+      "skipped": 0
+    },
+    "fullOriginal34SuiteRerun": false,
+    "initialGreen": {
+      "exitCode": 0,
+      "passedMethods": 8,
+      "result": "evidence/green-before-comment-clarification.result.json"
+    },
+    "pythonVersion": "3.12.14",
+    "red": {
+      "errorRecords": 3,
+      "erroredMethods": 2,
+      "exitCode": 1,
+      "methods": 8,
+      "passedMethods": 6,
+      "reason": "Original policy rejects observed mode 420->511 in ready, fresh and receipt construction.",
+      "result": "evidence/red.result.json"
+    },
+    "redSourceSnapshot": "evidence/red-official-files.test.py restored by inverse comment-only change and matched to the source hash recorded during RED.",
+    "testsDoNotAccessProviderOrEtc": true
+  },
+  "version": 1
+}

@@ -1,0 +1,13 @@
+test_observed_mode_then_digest_changes_require_finalization_and_strict_proof (__main__.CodexRootCaFinalization.test_observed_mode_then_digest_changes_require_finalization_and_strict_proof) ... ok
+test_other_paths_cli_and_desktop_backup_keep_their_existing_protection (__main__.CodexRootCaFinalization.test_other_paths_cli_and_desktop_backup_keep_their_existing_protection) ... ok
+test_receipts_cannot_widen_the_measured_codex_transition (__main__.CodexRootCaFinalization.test_receipts_cannot_widen_the_measured_codex_transition) ... ok
+test_unobserved_modes_and_owner_or_file_kind_changes_are_rejected (__main__.CodexRootCaFinalization.test_unobserved_modes_and_owner_or_file_kind_changes_are_rejected) ... ok
+test_exact_root_ca_exception_keeps_type_owner_target_mode_and_other_paths_protected (__main__.OfficialFiles.test_exact_root_ca_exception_keeps_type_owner_target_mode_and_other_paths_protected) ... ok
+test_provider_ca_finalization_keeps_exact_path_type_owner_and_mode_guards (__main__.OfficialFiles.test_provider_ca_finalization_keeps_exact_path_type_owner_and_mode_guards) ... ok
+test_rotating_provider_ca_bytes_are_accepted_only_at_fresh_finalization (__main__.OfficialFiles.test_rotating_provider_ca_bytes_are_accepted_only_at_fresh_finalization) ... ok
+test_exact_root_ca_rotation_receipts_reject_invalid_hashes (__main__.OfficialFiles.test_exact_root_ca_rotation_receipts_reject_invalid_hashes) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.153s
+
+OK

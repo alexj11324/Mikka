@@ -1,0 +1,163 @@
+{
+  "baseCommit": "8197a48843f9733a775003898ab00eaceb533c66",
+  "candidateFrozen": true,
+  "excludedTransientPaths": [
+    "**/__pycache__/**"
+  ],
+  "files": [
+    {
+      "bytes": 5136,
+      "gitBlobOid": "b93c3f5a5fcfcccc081db40720863934a5ec1dff",
+      "path": "README.md",
+      "sha256": "dc74c8055d3f2ceb64becd99b3da0589841281a768ec994ea2c6028afde8a5e4"
+    },
+    {
+      "bytes": 106533,
+      "gitBlobOid": "ba210a72dff95a34120bcd6fb581fb54aa47b863",
+      "path": "candidate/scripts/e2b/e2b-certificate-relinks.json",
+      "sha256": "16f3341cf64a4c7fd739a50439e558db4643f23fdd1ec16a51b062c30f037b52"
+    },
+    {
+      "bytes": 6238,
+      "gitBlobOid": "e6d19b5ed954d71c53a3ef32eed9c96a30943116",
+      "path": "candidate/scripts/e2b/e2b-finalization-files.json",
+      "sha256": "7d3abc6a73cfd56ee2bed51572db5b7d0e842db91df838f5dc40563b8c0ceb9c"
+    },
+    {
+      "bytes": 21445,
+      "gitBlobOid": "ea0819bf3e2d4ff83e64482b6336567050376591",
+      "path": "candidate/scripts/e2b/official-files.py",
+      "sha256": "66911624af52df59ef715eb105af9a3025bacf12460105fadc7f87e4d2dd63b5"
+    },
+    {
+      "bytes": 61113,
+      "gitBlobOid": "f980c7258243a77a123207ccfe03911d4483064d",
+      "path": "candidate/scripts/e2b/official-files.test.py",
+      "sha256": "2e6cf363425489783afda7a53e627d4eb2645a2bba27869378bcd3aed4423dff"
+    },
+    {
+      "bytes": 11150,
+      "gitBlobOid": "a002f9f4303af8cbe92313a0cad911f116d50c19",
+      "path": "candidate.patch",
+      "sha256": "6091788b6b9402e4bad7caeb10a33d8c4e2c64a56be68da62b60ebe37649cc0b"
+    },
+    {
+      "bytes": 2206,
+      "gitBlobOid": "9ad6411acfd09c3791713cbd1f0e7214a5352917",
+      "path": "evidence/green-before-comment-clarification.result.json",
+      "sha256": "70aa2727ea80754898c6548c6d060fe564c48c93627845151ad01e1cbc1861cd"
+    },
+    {
+      "bytes": 1514,
+      "gitBlobOid": "15526d07ce0fc81377268a4c91753149170c2303",
+      "path": "evidence/green-before-comment-clarification.stderr.txt",
+      "sha256": "2c18c7af3804e083f680489be8c81e1e5e8c7b15effc53a2320e3fa4fa19f083"
+    },
+    {
+      "bytes": 0,
+      "gitBlobOid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "path": "evidence/green-before-comment-clarification.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 2206,
+      "gitBlobOid": "5b9363321b3ba7bdf2cc02d98d3fea8bc5240ef6",
+      "path": "evidence/green.result.json",
+      "sha256": "bfc3f5fb6408e46d637d46bdb49064641bfc39ba207fce6672baa0a20d9e04b8"
+    },
+    {
+      "bytes": 1514,
+      "gitBlobOid": "58465adcd5e678eeb87d5369eabc6a809544b2ba",
+      "path": "evidence/green.stderr.txt",
+      "sha256": "d1511bf0baaa3fe76adad53345bf90de124ff02fbe2c8954a200c989dbb569ec"
+    },
+    {
+      "bytes": 0,
+      "gitBlobOid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "path": "evidence/green.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 61105,
+      "gitBlobOid": "9b2cdff9e13e4c95d03c49d39ea63b73d2157161",
+      "path": "evidence/red-official-files.test.py",
+      "sha256": "5c1a7d1b2534b0078ab698e241e3e3cdc7b8c887e68eecc8ae5fe8913f90df3f"
+    },
+    {
+      "bytes": 2203,
+      "gitBlobOid": "cc6a9952684aa801691f7239d05f311916b1190b",
+      "path": "evidence/red.result.json",
+      "sha256": "2f725cdffd476cb8489e35acd7597419bc1deab876c77eab98436da873e99787"
+    },
+    {
+      "bytes": 5315,
+      "gitBlobOid": "5dfa2a41aa11b1ea95dbc7a7c771fda5a855e05c",
+      "path": "evidence/red.stderr.txt",
+      "sha256": "fe2688bf1239b423ce75c1364f51438cc8113e051b125f3043bbe90f592b8d42"
+    },
+    {
+      "bytes": 0,
+      "gitBlobOid": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391",
+      "path": "evidence/red.stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 106533,
+      "gitBlobOid": "ba210a72dff95a34120bcd6fb581fb54aa47b863",
+      "path": "original/scripts/e2b/e2b-certificate-relinks.json",
+      "sha256": "16f3341cf64a4c7fd739a50439e558db4643f23fdd1ec16a51b062c30f037b52"
+    },
+    {
+      "bytes": 5242,
+      "gitBlobOid": "ebfb109586df90054ebf216435d1fc7db9afebb5",
+      "path": "original/scripts/e2b/e2b-finalization-files.json",
+      "sha256": "fd2a8f1a08af17f54e8579db09430d744497b17130314317de8611cfede87098"
+    },
+    {
+      "bytes": 21445,
+      "gitBlobOid": "ea0819bf3e2d4ff83e64482b6336567050376591",
+      "path": "original/scripts/e2b/official-files.py",
+      "sha256": "66911624af52df59ef715eb105af9a3025bacf12460105fadc7f87e4d2dd63b5"
+    },
+    {
+      "bytes": 54158,
+      "gitBlobOid": "ce4fbffa210c3e3670cc9c8fbe51c6c11da7a7f4",
+      "path": "original/scripts/e2b/official-files.test.py",
+      "sha256": "f494a8253ea8ef380ab0000664d9f8f4859cdb4f5f0a275b159e09bc7f5e1486"
+    },
+    {
+      "bytes": 4288,
+      "gitBlobOid": "21c0589d7e70bc554fd7acaa685e673b49dfa84f",
+      "path": "phase-analysis.md",
+      "sha256": "69918ad6c212fba7a4a8b5c589a29e0330b41b7da151cea6128a0f92a200c353"
+    },
+    {
+      "bytes": 1596,
+      "gitBlobOid": "174f626ae30d0248330da625d7f578f3e777d8ee",
+      "path": "product.patch",
+      "sha256": "67c6854f1da76cb233ecdb845df6965182ecb96c760158b676f2d9e73a443e83"
+    },
+    {
+      "bytes": 8285,
+      "gitBlobOid": "ee992880d01584be5895568ae81f68af77e736a9",
+      "path": "review-receipt.json",
+      "sha256": "168913f136d7d3620692622763d0a12869a62df62b7ce363bcfca150b436d923"
+    },
+    {
+      "bytes": 2595,
+      "gitBlobOid": "c2c4f90e8dd1d1da504af47b3de9910c69c7bfc1",
+      "path": "run-selected.py",
+      "sha256": "4711daeafeec0bf7cc26ce63712ddbb55652ec029a6f1c41fb17581f29cead05"
+    },
+    {
+      "bytes": 1068,
+      "gitBlobOid": "df18860f07579a910b7af3ffb8eb6bf47fae9d2d",
+      "path": "source-bindings.json",
+      "sha256": "d7a3728cc51cc6728dbec432decef4db70c23b2ede1f0b8e66fbd693cfb01c3e"
+    }
+  ],
+  "noGitObjectsOrRefsCreated": true,
+  "payloadBytes": 492888,
+  "payloadCount": 25,
+  "version": 1
+}

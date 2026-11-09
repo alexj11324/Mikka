@@ -1,0 +1,39 @@
+{
+  "parent": "8197a48843f9733a775003898ab00eaceb533c66",
+  "baseTree": "1dd00087ce703a22971472df9a6c81a9bb337050",
+  "expectedTree": "9e62d407fbe4abe4d73015ec95e31bbc4e96fb3f",
+  "files": [
+    {
+      "path": "scripts/e2b/e2b-finalization-files.json",
+      "bytes": 6238,
+      "sha256": "7d3abc6a73cfd56ee2bed51572db5b7d0e842db91df838f5dc40563b8c0ceb9c",
+      "sha": "e6d19b5ed954d71c53a3ef32eed9c96a30943116"
+    },
+    {
+      "path": "scripts/e2b/official-files.test.py",
+      "bytes": 61113,
+      "sha256": "2e6cf363425489783afda7a53e627d4eb2645a2bba27869378bcd3aed4423dff",
+      "sha": "f980c7258243a77a123207ccfe03911d4483064d"
+    },
+    {
+      "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+      "bytes": 94478,
+      "sha256": "12fb0369f325166462de8f2130f034a47084eb49adb1c5be98e9eba2c9f21bb5",
+      "sha": "ed5767a9fe2a96d38c9423fa79fa05d8a1124e1d"
+    },
+    {
+      "path": "docs/operations/evidence/1505-official-path-control-20261109.json",
+      "bytes": 31180,
+      "sha256": "ba526b6e177f786d4dcb62f17c6f84c08c93a1b963fe8a06af49d849f1f2bad0",
+      "sha": "1dbd1907aca7c820be90ed6779fc2962717e5fec"
+    },
+    {
+      "path": "docs/operations/evidence/1505-official-path-control-20261109.md",
+      "bytes": 5717,
+      "sha256": "51f0aa4403439e9730e8f48827c34d118948ff869cf987d018e399e95045edf2",
+      "sha": "bcf0cbc0d59d7360d3179485402821516846ef34"
+    }
+  ],
+  "localValidation": "selected 8 tests RED to GREEN, final comment-only clarification also checked by delegated source owner; root reviewed diff and exact input hashes; no duplicate root execution",
+  "firstIntegrationAttempt": "Stopped after copying policy, before copying tests/docs: agent clarified one test comment, so exact input hash guard rejected the prior test hash. New final bytes independently re-read before continuing."
+}

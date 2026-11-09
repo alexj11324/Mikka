@@ -1,0 +1,30 @@
+{
+  "files": [
+    {
+      "bytes": 21445,
+      "gitBlobOid": "ea0819bf3e2d4ff83e64482b6336567050376591",
+      "path": "scripts/e2b/official-files.py",
+      "sha256": "66911624af52df59ef715eb105af9a3025bacf12460105fadc7f87e4d2dd63b5"
+    },
+    {
+      "bytes": 54158,
+      "gitBlobOid": "ce4fbffa210c3e3670cc9c8fbe51c6c11da7a7f4",
+      "path": "scripts/e2b/official-files.test.py",
+      "sha256": "f494a8253ea8ef380ab0000664d9f8f4859cdb4f5f0a275b159e09bc7f5e1486"
+    },
+    {
+      "bytes": 5242,
+      "gitBlobOid": "ebfb109586df90054ebf216435d1fc7db9afebb5",
+      "path": "scripts/e2b/e2b-finalization-files.json",
+      "sha256": "fd2a8f1a08af17f54e8579db09430d744497b17130314317de8611cfede87098"
+    },
+    {
+      "bytes": 106533,
+      "gitBlobOid": "ba210a72dff95a34120bcd6fb581fb54aa47b863",
+      "path": "scripts/e2b/e2b-certificate-relinks.json",
+      "sha256": "16f3341cf64a4c7fd739a50439e558db4643f23fdd1ec16a51b062c30f037b52"
+    }
+  ],
+  "localReadMatchesExactSourceBlobs": true,
+  "sourceCommit": "8197a48843f9733a775003898ab00eaceb533c66"
+}

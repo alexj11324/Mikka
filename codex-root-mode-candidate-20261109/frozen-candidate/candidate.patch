@@ -1,0 +1,196 @@
+--- a/scripts/e2b/official-files.test.py
++++ b/scripts/e2b/official-files.test.py
+@@ -231,7 +231,7 @@
+                         files.verify({'version': 1, 'entries': [before]}, kind)
+         with patch.object(files, 'entry', return_value={**original, 'sha256': after_sha}):
+             files.verify({'version': 1, 'entries': [original]}, 'codex')
+-        with patch.object(files, 'entry', return_value={**original, 'mode': 0o777}):
++        with patch.object(files, 'entry', return_value={**original, 'mode': 0o755}):
+             with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                 files.verify({'version': 1, 'entries': [original]}, 'codex')
+ 
+@@ -434,8 +434,8 @@
+ 
+     def test_rotating_provider_ca_bytes_are_accepted_only_at_fresh_finalization(self):
+         # The d63 Claude fresh scan observed both the existing control-proven
+-        # 0644 -> 0777 transition and a new provider CA. Codex already permits
+-        # this exact path's per-boot bytes; its mode rule must not be widened.
++        # 0644 -> 0777 transition and a new provider CA. The Codex case retains
++        # its pre-existing permission while checking the per-boot digest rule.
+         path = '/usr/local/share/ca-certificates/e2b-ca.crt'
+         for kind, mode in [('claude', 0o644), ('desktop', 0o644), ('codex', 0o777)]:
+             with self.subTest(kind=kind):
+@@ -480,9 +480,8 @@
+                 with self.subTest(kind=kind, path=other), patch.object(files, 'entry', return_value={**before, 'sha256': 'b' * 64}):
+                     with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                         files.verify({'version': 1, 'entries': [before]}, kind)
+-        # Codex's measured policy still allows only byte rotation, not a new
+-        # permission transition inferred from the other official templates.
+-        with patch.object(files, 'entry', return_value={**original, 'mode': 0o777}):
++        # The official Codex observation proves 0644 -> 0777, not arbitrary modes.
++        with patch.object(files, 'entry', return_value={**original, 'mode': 0o755}):
+             with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                 files.verify({'version': 1, 'entries': [original]}, 'codex')
+ 
+@@ -865,5 +864,115 @@
+                     files.validate_receipt(invalid, 'claude')
+ 
+ 
++class CodexRootCaFinalization(unittest.TestCase):
++    # Actual metadata from official-only control 42670291715 / attempt 1,
++    # ops b75871ea1753f75769daa33b095704475cf9a4a2. This replays the
++    # observed path through the real verifier; it is not a filesystem scan.
++    BEFORE_SHA = '713ed37b92f312cf89345677c1d7f413c55b38ca0c1c636ce0fecc672d08ed9a'
++    FRESH_SHA = '545244c4bc7f902ed9a6d843dd6ccaed08d0a59bbfc1b60064bd0278e026da5a'
++
++    def setUp(self):
++        self.original = {'path': ROOT_CA, 'kind': 'file', 'mode': 0o644,
++                         'uid': 0, 'gid': 0, 'sha256': self.BEFORE_SHA}
++
++    def test_observed_mode_then_digest_changes_require_finalization_and_strict_proof(self):
++        baseline = {'version': 1, 'entries': [self.original]}
++        with patch.object(files, 'entry', return_value=self.original):
++            installation = files.verify(baseline)
++        for phase, mode, sha in [('pre_finalization', 0o644, self.BEFORE_SHA),
++                                 ('ready', 0o777, self.BEFORE_SHA),
++                                 ('fresh', 0o777, self.FRESH_SHA)]:
++            updated = {**self.original, 'mode': mode, 'sha256': sha}
++            with self.subTest(phase=phase), patch.object(files, 'entry', return_value=updated):
++                if phase == 'pre_finalization':
++                    self.assertEqual(files.verify(baseline), installation)
++                else:
++                    with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
++                        files.verify(baseline)
++                final = files.verify(baseline, 'codex')
++                proof = {**installation, 'finalization': final}
++                self.assertIs(files.validate_receipt(proof, 'codex'), proof)
++                expected_before, expected_after = {}, {}
++                if mode != 0o644:
++                    expected_before['mode'], expected_after['mode'] = 0o644, mode
++                if sha != self.BEFORE_SHA:
++                    expected_before['sha256'], expected_after['sha256'] = self.BEFORE_SHA, sha
++                expected = ([{'path': ROOT_CA, 'kind': 'file', 'before': expected_before,
++                              'after': expected_after}] if expected_before else [])
++                self.assertEqual(final['providerChanges'], expected)
++                if phase != 'pre_finalization':
++                    proof['after'] = final['originalAfter']
++                    with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
++                        files.validate_receipt(proof, 'codex')
++
++    def test_unobserved_modes_and_owner_or_file_kind_changes_are_rejected(self):
++        cases = []
++        for before_mode, after_mode in [(0o600, 0o777), (0o640, 0o777),
++                                        (0o644, 0o666), (0o644, 0o755),
++                                        (0o777, 0o644), (0o777, 0o755)]:
++            original = {**self.original, 'mode': before_mode}
++            cases.append((f'mode {before_mode:o}->{after_mode:o}', original,
++                          {**original, 'mode': after_mode, 'sha256': self.FRESH_SHA}))
++        for field, value in [('uid', 1000), ('gid', 1000), ('sha256', 'not-a-digest')]:
++            cases.append((field, self.original,
++                          {**self.original, 'mode': 0o777, 'sha256': self.FRESH_SHA, field: value}))
++        for kind in ('directory', 'link'):
++            nonfile = {'path': ROOT_CA, 'kind': kind, 'mode': 0o644, 'uid': 0, 'gid': 0}
++            if kind == 'link':
++                nonfile['target'] = '/opt/mikka/replaced.crt'
++            cases.append((f'unchanged {kind}', nonfile, {**nonfile, 'mode': 0o777}))
++            cases.append((f'file to {kind}', self.original, {**nonfile, 'mode': 0o777}))
++        for name, original, updated in cases:
++            with self.subTest(case=name), patch.object(files, 'entry', return_value=updated):
++                with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
++                    files.verify({'version': 1, 'entries': [original]}, 'codex')
++
++    def test_other_paths_cli_and_desktop_backup_keep_their_existing_protection(self):
++        for path in ('/usr/local/share/ca-certificates/unobserved.crt', ROOT_CA + '.backup',
++                     '/usr/local/bin/codex', '/var/backups/apt.extended_states.0'):
++            original = {**self.original, 'path': path}
++            with self.subTest(path=path), patch.object(files, 'entry', return_value={
++                    **original, 'mode': 0o777, 'sha256': self.FRESH_SHA}):
++                with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
++                    files.verify({'version': 1, 'entries': [original]}, 'codex')
++        cli = {**self.original, 'path': '/usr/local/bin/codex', 'mode': 0o755}
++        after = {ROOT_CA: {**self.original, 'mode': 0o777},
++                 cli['path']: {**cli, 'sha256': self.FRESH_SHA}}
++        with patch.object(files, 'entry', side_effect=lambda path: after[str(path)]):
++            with self.assertRaisesRegex(RuntimeError, '/usr/local/bin/codex'):
++                files.verify({'version': 1, 'entries': [self.original, cli]}, 'codex')
++        # Desktop's observed backup stayed unchanged; a synthetic digest change
++        # remains forbidden, even though Codex now has one additional mode rule.
++        backup = {**self.original, 'path': '/var/backups/apt.extended_states.0',
++                  'sha256': '52f87bdad074b319ed8b601e4c5e97ab0d5ce235bafac3213d32f1873f7413ac'}
++        with patch.object(files, 'entry', return_value={**backup, 'sha256': 'b' * 64}):
++            with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
++                files.verify({'version': 1, 'entries': [backup]}, 'desktop')
++
++    def test_receipts_cannot_widen_the_measured_codex_transition(self):
++        baseline = {'version': 1, 'entries': [self.original]}
++        with patch.object(files, 'entry', return_value=self.original):
++            proof = files.verify(baseline)
++        with patch.object(files, 'entry', return_value={**self.original, 'mode': 0o777}):
++            proof['finalization'] = files.verify(baseline, 'codex')
++        self.assertIs(files.validate_receipt(proof, 'codex'), proof)
++        for defect in ('before mode', 'after mode', 'kind', 'path', 'owner'):
++            invalid = deepcopy(proof)
++            change = invalid['finalization']['providerChanges'][0]
++            if defect == 'before mode':
++                change['before']['mode'] = 0o600
++            elif defect == 'after mode':
++                change['after']['mode'] = 0o755
++            elif defect == 'kind':
++                change['kind'] = 'directory'
++            elif defect == 'path':
++                change['path'] = ROOT_CA + '.backup'
++            else:
++                change['before']['uid'], change['after']['uid'] = 0, 1000
++            with self.subTest(defect=defect):
++                with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
++                    files.validate_receipt(invalid, 'codex')
++
++
+ if __name__ == '__main__':
+     unittest.main()
+--- a/scripts/e2b/e2b-finalization-files.json
++++ b/scripts/e2b/e2b-finalization-files.json
+@@ -80,6 +80,29 @@
+       "evidence": "docs/operations/evidence/1782-official-claude-certificate-relinks-20261109.json",
+       "evidenceBytes": 18164,
+       "evidenceSha256": "dc69062c8376cb2a10cf47b7455ff478f7872c709c31c128c1384ecfc7696632"
++    },
++    {
++      "template": "codex",
++      "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
++      "fields": [
++        "mode"
++      ],
++      "entryKind": "file",
++      "mode": {
++        "before": 420,
++        "after": 511
++      },
++      "controlRun": "https://github.com/alexj11324/Mikka/actions/runs/42670291715",
++      "controlOpsCommit": "b75871ea1753f75769daa33b095704475cf9a4a2",
++      "sourceContextCommit": "5ba1f9e2359ce714d83cd16fc040f2567c40a6d0",
++      "artifactId": 13697989038,
++      "artifactZipBytes": 3353,
++      "artifactZipSha256": "2aa02beb720a3e3922bafa5ba81344529a22e76ea14588717de0f9e11255b268",
++      "targetedOnly": true,
++      "releaseAccepted": false,
++      "evidence": "docs/operations/evidence/1505-official-path-control-20261109.json",
++      "evidenceBytes": 31180,
++      "evidenceSha256": "ba526b6e177f786d4dcb62f17c6f84c08c93a1b963fe8a06af49d849f1f2bad0"
+     }
+   ],
+   "additionalControls": [
+@@ -146,7 +169,12 @@
+     },
+     "codex": {
+       "/usr/local/share/ca-certificates/e2b-ca.crt": {
+-        "sha256": "per-boot"
++        "_kind": "file",
++        "sha256": "per-boot",
++        "mode": {
++          "before": 420,
++          "after": 511
++        }
+       }
+     },
+     "desktop": {

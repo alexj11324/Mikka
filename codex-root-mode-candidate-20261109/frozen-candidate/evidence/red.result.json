@@ -1,0 +1,54 @@
+{
+  "command": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+    "scripts/e2b/official-files.test.py",
+    "-v",
+    "CodexRootCaFinalization",
+    "OfficialFiles.test_exact_root_ca_exception_keeps_type_owner_target_mode_and_other_paths_protected",
+    "OfficialFiles.test_provider_ca_finalization_keeps_exact_path_type_owner_and_mode_guards",
+    "OfficialFiles.test_rotating_provider_ca_bytes_are_accepted_only_at_fresh_finalization",
+    "OfficialFiles.test_exact_root_ca_rotation_receipts_reject_invalid_hashes"
+  ],
+  "cwd": "/workspace/scratch/263e36984c81/codex-root-mode-candidate-1505/candidate",
+  "elapsedSeconds": 0.2725443899998936,
+  "executable": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+  "exitCode": 1,
+  "phase": "red",
+  "pythonVersion": "3.12.14",
+  "scope": "Four new Codex methods and four directly related existing methods; no provider or filesystem scan",
+  "sourceFiles": [
+    {
+      "bytes": 21445,
+      "gitBlobOid": "ea0819bf3e2d4ff83e64482b6336567050376591",
+      "path": "scripts/e2b/official-files.py",
+      "sha256": "66911624af52df59ef715eb105af9a3025bacf12460105fadc7f87e4d2dd63b5"
+    },
+    {
+      "bytes": 61105,
+      "gitBlobOid": "9b2cdff9e13e4c95d03c49d39ea63b73d2157161",
+      "path": "scripts/e2b/official-files.test.py",
+      "sha256": "5c1a7d1b2534b0078ab698e241e3e3cdc7b8c887e68eecc8ae5fe8913f90df3f"
+    },
+    {
+      "bytes": 5242,
+      "gitBlobOid": "ebfb109586df90054ebf216435d1fc7db9afebb5",
+      "path": "scripts/e2b/e2b-finalization-files.json",
+      "sha256": "fd2a8f1a08af17f54e8579db09430d744497b17130314317de8611cfede87098"
+    },
+    {
+      "bytes": 106533,
+      "gitBlobOid": "ba210a72dff95a34120bcd6fb581fb54aa47b863",
+      "path": "scripts/e2b/e2b-certificate-relinks.json",
+      "sha256": "16f3341cf64a4c7fd739a50439e558db4643f23fdd1ec16a51b062c30f037b52"
+    }
+  ],
+  "startedAt": "2026-11-09T18:13:48.579751+00:00",
+  "stderr": {
+    "bytes": 5315,
+    "sha256": "fe2688bf1239b423ce75c1364f51438cc8113e051b125f3043bbe90f592b8d42"
+  },
+  "stdout": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}
