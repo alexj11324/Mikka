@@ -71,6 +71,7 @@ test('community staging source guard accepts the five reviewed operations files 
  assert.doesNotThrow(()=>assertExecution(env,event,head,TARGET.base,paths))
  assert.throws(()=>assertExecution(env,event,head,TARGET.base,[...paths.slice(0,4),'lib/auth.ts']),/EXECUTION_SCOPE/)
  assert.throws(()=>assertExecution(env,event,head,'b'.repeat(40),paths),/EXECUTION_SCOPE/)
+ assert.throws(()=>assertExecution(env,event,head,'19d22245c13f753fcf7d3e925eebfc5aaadc922b',paths),/EXECUTION_SCOPE/)
 })
 
 // The isolated image contract validates real signup, signed consent and MCP without model requests.

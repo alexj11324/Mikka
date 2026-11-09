@@ -92,6 +92,27 @@ export function communityPublishedAncestry(publicRevision, mainRevision, compari
 
 // Discovery is not authority: the normal Cloud setup still verifies the real
 // GitHub manager, then the self-hosted installation must expose the target.
+// The formal candidate publisher now has a specialized bootstrap protocol.
+// This self-hosted personal device uses the already released normal daemon
+// enrollment/start path instead; it is not a candidate publication gate.
+export function communityDaemonHelper(raw, origin) {
+  const bytes = Buffer.from(raw)
+  check(createHash('sha1').update(Buffer.concat([Buffer.from('blob ' + bytes.length + '\0'),bytes])).digest('hex')
+    === 'bf546a0ef670b41f273d9f4c2e391220cfb6837c', 'HELPER_SOURCE')
+  const url = new URL(origin)
+  check(url.protocol === 'https:' && /^[a-z0-9-]+\.trycloudflare\.com$/.test(url.hostname)
+    && url.origin === origin && !url.port && !url.username && !url.password, 'HELPER_ORIGIN')
+  let prefix = raw.slice(0,raw.indexOf('  const link = new HttpServerLink'))
+  prefix = prefix.replace("import { hostname, platform, arch } from 'node:os'\n", '')
+  prefix = prefix.replace("import { DAEMON_PROTOCOL_VERSION } from '../../packages/protocol/src/index.ts'\n", '')
+  prefix = prefix.replace("import { holdCandidateRegistration, publishCandidateBootstrap, waitForCandidateStart } from './acceptance-bootstrap.mts'\n", '')
+  prefix = prefix.replace("  const workspaceId = process.env.MIKKA_ACCEPTANCE_WORKSPACE_ID\n", '')
+  prefix = prefix.replace("  if (origin !== 'https://app.aspectlylabs.com' || (harness !== 'claude_code' && harness !== 'codex') || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(workspaceId ?? '')) throw Error('candidate_configuration_invalid')","  if (origin !== 'https://app.aspectlylabs.com' || (harness !== 'claude_code' && harness !== 'codex')) throw Error('candidate_configuration_invalid')")
+  prefix = prefix.replace("import { registrationLogin }","import { startDaemon } from '../../packages/daemon/src/main.ts'\nimport { registrationLogin }")
+  prefix = prefix.replace("origin !== 'https://app.aspectlylabs.com'", 'origin !== ' + JSON.stringify(origin))
+  return prefix + "  const link = new HttpServerLink(`${origin}/mikka`, fetch, DAEMON_VERSION)\n  const heartbeatProof: unknown[] = []\n  const originalHeartbeat = link.heartbeat.bind(link)\n  link.heartbeat = async (...args) => {\n    const result = await originalHeartbeat(...args)\n    heartbeatProof.push({ reported: args[1].runs.length, renewed: Object.keys(result.leases).length,\n      revoked: result.revoked?.length ?? 0, reportedRevoked: args[1].runs.filter(run => result.revoked?.includes(run.runId)).length })\n    await writeFile(dataDir + '/heartbeat-proof.json', JSON.stringify(heartbeatProof.slice(-12)), { mode: 0o600 })\n    return result\n  }\n  const register = link.registerDevice.bind(link)\n  let announced = false\n  link.registerDevice = async (...args) => {\n    const registered = await register(...args)\n    if (!announced) {\n      announced = true\n      const proof = { deviceId: registered.deviceId, harness, binary, binarySha256, version }\n      await writeFile(`${dataDir}/device-proof.json`, `${JSON.stringify(proof)}\\n`, { mode: 0o600, flag: 'wx' })\n      process.stdout.write(`mikka-template-device ${JSON.stringify(proof)}\\n`)\n    }\n    return registered\n  }\n  const daemon = await startDaemon({ dataDir, flavor: 'prod', link, credential, hostedSubscriptions: true,\n    // A personal candidate does not receive cloud-only repository task secrets.\n    // Opt in locally; enrollment, claim authority and the assignment stay normal.\n    collectCliTiming: true, harnesses: probe.reports, preloadedModels: probe, modelProbe: true })\n  const stop = () => { void daemon.stop().then(() => process.exit(0)) }\n  process.once('SIGTERM', stop)\n  process.once('SIGINT', stop)\n}\n\nvoid main().catch(error => {\n  const code = /^candidate_[a-z0-9_]+$/.test(error?.message ?? '') ? error.message : 'candidate_daemon_failed'\n  process.stderr.write(`${code}\\n`)\n  process.exitCode = 1\n})\n"
+}
+
 export function assertCommunityAdmission(env, now = Date.now()) {
   if (env.MIKKA_COMMUNITY_MODE !== 'native-delivery') return
   const value = env.MIKKA_COMMUNITY_ADMISSION_DEADLINE
@@ -1045,6 +1066,10 @@ export async function runCommunity(env = process.env) {
         const authorization = await cloud.rpc('model-order.getModelOrder', [s.selectedWorkspace])
         check(authorization.candidates?.some(c => c.harness === s.harness && c.model === s.model
           && c.source?.kind === 'subscription' && c.source.connectionId === s.row.id), 'SOURCE_STILL_AUTHORIZED')
+        row.stage = 'helper-preflight'
+        const helper = communityDaemonHelper(await readFile(source + '/scripts/e2b/acceptance-daemon.mts', 'utf8'), origin)
+        row.daemonLaunch = { mode: 'normal_personal_startDaemon', helperSourceBlob: 'bf546a0ef670b41f273d9f4c2e391220cfb6837c',
+          officialBinaryGuardPreserved: true, candidatePublicationClaimed: false }
         row.stage = 'machine'
         assertCommunityAdmission(env)
         const kind = s.provider === 'claude' ? 'claude' : 'codex'
@@ -1054,23 +1079,7 @@ export async function runCommunity(env = process.env) {
         sandbox = await Sandbox.create(sourceConfig.templates[kind], { apiKey: e2bKey, timeoutMs: 900000, metadata: { application: 'mikka-selfhost-release', runId: env.GITHUB_RUN_ID, kind } })
         journal.vms.push(sandbox.sandboxId); await saveJournal()
         check((await sandbox.files.read('/opt/mikka/worker-source-sha', { user: 'root' })).trim() === sourceConfig.workerSha, 'VM_WORKER')
-        // The existing strict helper conserves the official binary and uses
-        // normal enrollment. Only its fixed acceptance origin is adapted to
-        // this run's attested community server; no runtime source is changed.
-        let helper = (await readFile(source + '/scripts/e2b/acceptance-daemon.mts', 'utf8')).replace("origin !== 'https://app.aspectlylabs.com'", 'origin !== ' + JSON.stringify(origin))
-        check(helper.includes('origin !== ' + JSON.stringify(origin)), 'HELPER_ORIGIN')
-        const heartbeatObserver = `const heartbeatProof: unknown[] = []
-  const originalHeartbeat = link.heartbeat.bind(link)
-  link.heartbeat = async (...args) => {
-    const result = await originalHeartbeat(...args)
-    heartbeatProof.push({ reported: args[1].runs.length, renewed: Object.keys(result.leases).length,
-      revoked: result.revoked?.length ?? 0, reportedRevoked: args[1].runs.filter(run => result.revoked?.includes(run.runId)).length })
-    await writeFile(dataDir + '/heartbeat-proof.json', JSON.stringify(heartbeatProof.slice(-12)), { mode: 0o600 })
-    return result
-  }
-  const register = link.registerDevice.bind(link)`
-        check(helper.includes('const register = link.registerDevice.bind(link)'), 'HELPER_HEARTBEAT_OBSERVER')
-        helper = helper.replace('const register = link.registerDevice.bind(link)', heartbeatObserver)
+        row.vmWorkerVerified = true
         await sandbox.files.write('/opt/mikka/worker/scripts/e2b/community-acceptance-daemon.mts', helper, { user: 'root' })
         row.stage = 'enrollment'
         const grant = await community.json('/api/devices/enrollment', post({}))
@@ -1383,9 +1392,18 @@ export async function runCommunity(env = process.env) {
     }
     }
     report.publicFinalBuild = (await cloud.json('/api/version')).build
-    check(sharedBuilds.includes(report.publicFinalBuild), 'PUBLIC_CHANGED')
+    check(/^[a-f0-9]{40}$/.test(report.publicFinalBuild), 'PUBLIC_VERSION')
+    // The tested self-hosted container and each VM's verified worker files
+    // stay fixed. A separately deployed shared management page or new default
+    // does not replace those machines. Preserve both observations honestly.
+    if (!nativeOnly) check(sharedBuilds.includes(report.publicFinalBuild), 'PUBLIC_CHANGED')
     report.sharedWorkerAtEnd = (await readProductionWorkerRelease({ token: env.VERCEL_TEAM_TOKEN })).workerSha
-    check(report.sharedWorkerAtEnd === report.sharedWorkerAtStart, 'WORKER_CHANGED')
+    if (!nativeOnly) check(report.sharedWorkerAtEnd === report.sharedWorkerAtStart, 'WORKER_CHANGED')
+    report.sharedServiceObservations = { publicBuildChanged: report.publicFinalBuild !== report.publicBuild,
+      defaultWorkerChanged: report.sharedWorkerAtEnd !== report.sharedWorkerAtStart,
+      selfHostedImageFixed: Boolean(report.imageRuntime),
+      eachNativeVmWorkerVerified: report.cases.length === 2 && report.cases.every(row => row.vmWorkerVerified === true),
+      sharedApplicationSourceEquivalenceClaimed: false }
     report.privateCloudAtEnd = await privateRelease()
     check(report.privateCloudAtEnd.id === report.privateCloudAtStart.id, 'PRIVATE_DEPLOYMENT_CHANGED')
     report.status = threadsPassed && report.communityMonitoring?.status === 'passed'
