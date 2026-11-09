@@ -29,7 +29,8 @@ const ERROR_CODES = new Set(['ERR_ASSERTION', 'ERR_INVALID_ARG_TYPE', 'ERR_OUT_O
 const CHECKS = new Set(['backendVersionHTTPFailed', 'backendVersionSHARequired', 'backendOverlaySHARequired',
   'backendDeploymentChangedDuringCapture', 'demoReadbackHTTPFailed', 'reviewSessionRequired',
   'existingReviewCredentialRequired', 'screenshotSimulatorCleanupFailed', 'screenshotModeRequired',
-  'iPhone17ProAndIOS26Required', 'preflightCredentialBoundaryRequired'])
+  'iPhone17ProAndIOS26Required', 'preflightCredentialBoundaryRequired', 'driverPreflightCIRequired',
+  'driverPreflightIdentityRequired'])
 const NATIVE_FLOWS = new Set(['driver-preflight', 'login', 'workspace', ...SHOTS])
 const COMMAND_TYPES = ['applyConfigurationCommand', 'launchAppCommand', 'assertConditionCommand',
   'tapOnElement', 'inputTextCommand', 'hideKeyboardCommand']
@@ -162,6 +163,18 @@ export function screenshotIdentity(env) {
   assert.equal(env.GITHUB_REPOSITORY_OWNER_ID, '183887963')
   assert.match(env.OVERLAY_SHA ?? '', /^[a-f0-9]{40}$/)
   return identity
+}
+
+export function driverPreflightIdentity(env) {
+  assert.equal(env.GITHUB_ACTIONS, 'true', 'driverPreflightCIRequired')
+  assert.equal(env.GITHUB_EVENT_NAME, 'workflow_dispatch', 'driverPreflightIdentityRequired')
+  assert.equal(env.GITHUB_REPOSITORY, 'alexj11324/Mikka', 'driverPreflightIdentityRequired')
+  assert.equal(env.GITHUB_REPOSITORY_ID, '1427517699', 'driverPreflightIdentityRequired')
+  assert.equal(env.GITHUB_REPOSITORY_OWNER_ID, '183887963', 'driverPreflightIdentityRequired')
+  assert.match(env.GITHUB_REF ?? '', /^refs\/heads\/[^\s]+$/, 'driverPreflightIdentityRequired')
+  assert.match(env.GITHUB_SHA ?? '', /^[a-f0-9]{40}$/, 'driverPreflightIdentityRequired')
+  assert.match(env.GITHUB_RUN_ID ?? '', /^\d+$/, 'driverPreflightIdentityRequired')
+  return { sha: env.GITHUB_SHA, runId: env.GITHUB_RUN_ID, ref: env.GITHUB_REF }
 }
 
 export async function backendVersion(expected, fetchImpl = fetch) {
@@ -379,7 +392,7 @@ async function main(mode) {
   } else if (mode === 'capture') {
     await capture(env)
   } else if (mode === 'driver-preflight') {
-    screenshotIdentity(env)
+    driverPreflightIdentity(env)
     assert.ok(!env.APP_STORE_REVIEW_EMAIL && !env.APP_STORE_REVIEW_PASSWORD && !env.HOSTED_UI_READ_KEY,
       'preflightCredentialBoundaryRequired')
     const privateDir = join(env.RUNNER_TEMP, 'mikka-screenshots-private')

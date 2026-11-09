@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { screenshotIdentity, pngDimensions, loginFlow, workspaceFlow, readFlow, backendVersion,
-  screenshotFailure, screenshotPhase, nativeDriverFlow, nativeFlowDiagnostics, SHOTS } from './mobile-screenshots.mjs'
+  screenshotFailure, screenshotPhase, nativeDriverFlow, nativeFlowDiagnostics, driverPreflightIdentity, SHOTS } from './mobile-screenshots.mjs'
 
 const env = { GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REF: 'refs/heads/main',
   GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_SHA: 'a'.repeat(40), GITHUB_RUN_ID: '123',
@@ -157,6 +157,8 @@ test('stock native driver preflight runs before compilation and reviewer credent
   assert.ok(preflight > build.indexOf("screenshotPhase('simulator-boot-localized'"))
   assert.ok(preflight < build.indexOf('cd apps/mobile'))
   assert.ok(preflight < build.indexOf('run_build_phase expo-prebuild'))
+  assert.ok(build.indexOf('if [ "${1:-}" = --preflight-only ]; then exit 0; fi') > preflight)
+  assert.ok(build.indexOf('if [ "${1:-}" = --preflight-only ]; then exit 0; fi') < build.indexOf('cd apps/mobile'))
   const workflow = readFileSync(new URL('../../.github/workflows/mobile-screenshots.yml', import.meta.url), 'utf8')
   assert.ok(workflow.indexOf('Build unsigned Release') < workflow.indexOf('Read existing review email'))
 })
@@ -176,7 +178,7 @@ fs.writeFileSync(process.env.PROBE_CAPTURE, JSON.stringify({ args: process.argv.
 console.log('FAKE_PRIVATE_DRIVER_OUTPUT')
 `, { mode: 0o700 })
   const module = fileURLToPath(new URL('./mobile-screenshots.mjs', import.meta.url))
-  const childEnv = { ...process.env, ...env, RUNNER_TEMP: directory, PATH: `${binaryDir}:${process.env.PATH}`,
+  const childEnv = { ...process.env, ...env, GITHUB_ACTIONS: 'true', RUNNER_TEMP: directory, PATH: `${binaryDir}:${process.env.PATH}`,
     APP_STORE_REVIEW_EMAIL: '', APP_STORE_REVIEW_PASSWORD: '', HOSTED_UI_READ_KEY: '', PROBE_CAPTURE: join(directory, 'probe.json') }
   try {
     for (const credential of ['APP_STORE_REVIEW_EMAIL', 'APP_STORE_REVIEW_PASSWORD', 'HOSTED_UI_READ_KEY']) {
@@ -198,6 +200,30 @@ console.log('FAKE_PRIVATE_DRIVER_OUTPUT')
     assert.equal(invocation.credentialsPresent, false)
     assert.equal(invocation.args.at(-1), join(privateDir, 'driver-preflight.yaml'))
   } finally { rmSync(directory, { recursive: true, force: true }) }
+})
+
+test('read-only branch preflight validates CI identity while screenshot identity still requires main', () => {
+  const branch = { ...env, GITHUB_ACTIONS: 'true', GITHUB_REF: 'refs/heads/fix/native-driver-preflight' }
+  assert.equal(driverPreflightIdentity(branch).ref, branch.GITHUB_REF)
+  assert.equal(driverPreflightIdentity({ ...branch, GITHUB_REF: 'refs/heads/main' }).sha, branch.GITHUB_SHA)
+  assert.throws(() => screenshotIdentity(branch))
+  for (const patch of [{ GITHUB_ACTIONS: 'false' }, { GITHUB_EVENT_NAME: 'push' },
+    { GITHUB_REPOSITORY: 'fork/Mikka' }, { GITHUB_REPOSITORY_ID: 'other' },
+    { GITHUB_REPOSITORY_OWNER_ID: 'other' }, { GITHUB_REF: 'refs/pull/1/merge' },
+    { GITHUB_REF: 'refs/heads/' }, { GITHUB_SHA: 'main' }, { GITHUB_RUN_ID: 'invalid' }]) {
+    assert.throws(() => driverPreflightIdentity({ ...branch, ...patch }))
+  }
+  const workflow = readFileSync(new URL('../../.github/workflows/mobile-screenshots.yml', import.meta.url), 'utf8')
+  const probe = workflow.slice(workflow.indexOf('\n  driver-preflight:\n'))
+  assert.match(probe, /github\.ref != 'refs\/heads\/main'/)
+  assert.match(probe, /startsWith\(github\.ref, 'refs\/heads\/'\)/)
+  assert.match(probe, /permissions:\n      contents: read\n/)
+  assert.match(probe, /ref: \$\{\{ github\.sha \}\}/)
+  assert.match(probe, /cli-2\.12\.1\/maestro\.zip/)
+  assert.match(probe, /shasum -a 256 -c checksums_sha256\.txt/)
+  assert.match(probe, /mobile-screenshots-build\.sh --preflight-only/)
+  assert.match(probe, /if: always\(\)\n        run: node scripts\/release\/mobile-screenshots\.mjs cleanup/)
+  assert.doesNotMatch(probe, /id-token|Infisical|secrets\.|environment:|APP_STORE|HOSTED_UI|OVERLAY|upload-artifact|pnpm|GITHUB_REF:/)
 })
 
 test('pinned Maestro command reports project only closed command metadata and fixed failure reasons', () => {
