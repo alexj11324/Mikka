@@ -165,3 +165,19 @@ test('a steps row says what ran: commands and tools, or the plain count without 
   assert.deepEqual(stepLine(steps[0]!), { title: 'pnpm test', detail: null, code: true })
   assert.deepEqual([stepDuration(850), stepDuration(1240), stepDuration(125_000), stepDuration(undefined)], [words.threadSteps.milliseconds.replace('{count}', '850'), words.threadSteps.seconds.replace('{count}', '1.2'), words.threadSteps.minutes.replace('{minutes}', '2').replace('{seconds}', '5'), null])
 })
+
+// Alex 2026-11-09: the Agents' real brand marks, from @lobehub/icons-static-svg (MIT) as files.
+test('an Agent brand mark is the package\'s own markup, sized by its caller, without Codex\'s white backdrop', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { createRequire } = await import('node:module')
+  const { agentMark } = await import('../features/tasks/model/agent-marks.ts')
+  const file = (name: string) => readFileSync(createRequire(import.meta.url).resolve(`@lobehub/icons-static-svg/icons/${name}`), 'utf8')
+  for (const name of ['claudecode-color.svg', 'codex-color.svg', 'cursor.svg']) {
+    const mark = agentMark(file(name))
+    assert.match(mark, /^<svg[^>]*viewBox="0 0 24 24"/)
+    assert.doesNotMatch(mark, /1em|style=/)
+  }
+  assert.match(file('codex-color.svg'), /fill="#fff"/)
+  assert.doesNotMatch(agentMark(file('codex-color.svg')), /fill="#fff"/)
+  assert.match(agentMark(file('cursor.svg')), /currentColor/)
+})
