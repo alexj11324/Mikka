@@ -1,5 +1,9 @@
 # 给 Codex：为 Mikka 密码箱搭建 AWS KMS，并把配置写进 Infisical
 
+本文保留 2026-10-27 的一次性搭建任务和当日回报。账号、角色、同步和实测状态均以
+该日期为界。后续维护先核对现有资源和授权，再按 [Infisical 运维约定](../infisical-cloud.md)
+复用现有身份。此历史任务本身不授权重新创建资源或改动生产配置。
+
 你在 Alex 的 Mac 上操作。目标是为「已保存的登录」（#180）搭好 AWS KMS 信封加密的底座。
 
 完整设计见 https://github.com/alexj11324/Mikka/issues/180#issuecomment-6450064407 第 3 节。

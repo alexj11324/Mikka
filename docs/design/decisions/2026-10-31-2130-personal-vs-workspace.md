@@ -6,6 +6,7 @@
   「可以按你的建议来」. Research and audit:
   personal vs workspace
 - Rule: —
+- Superseded in part by: [2026-11-02-1500](2026-11-02-1500-personal-first-team-needs-two.md) (personal-workspace creation precedes team creation or joining; creating a team requires an invitation to another person).
 - Superseded in part by: [2026-11-01-2310-personal-and-team-workspaces-apart](2026-11-01-2310-personal-and-team-workspaces-apart.md) (the three levels: profile memory and 「API 与订阅」 belong to the account, while bot and team memory stay in their workspace; a personal workspace hides every team setting, keeps personal billing and handles only personal events; nothing moves between personal and team)
 - Superseded in part by: [2026-11-01-2240-own-credentials-always-usable](2026-11-01-2240-own-credentials-always-usable.md) (an admin can no longer switch off personal subscriptions or API keys)
 - Superseded by: [bindings belong to the person](2026-10-31-2225-bindings-belong-to-the-person.md), for the admin switches, where subscriptions run and who pays for work with no workspace of its own

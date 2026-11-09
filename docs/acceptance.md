@@ -1,5 +1,9 @@
 # Runtime acceptance
 
+Use this guide to verify an issue through the affected runtime and record
+version-bound evidence. `AGENTS.md` and accepted decisions govern account,
+model and release authorization.
+
 ## Ordinary functional acceptance
 
 Run ordinary functional acceptance locally, in the session's cloud Linux
@@ -10,24 +14,29 @@ deployed site and provider OAuth are not prerequisites for ordinary business
 checks. Keep the existing rule against starting those services or builds on
 the developer's Mac.
 
-Use the existing automatic test-account allocation, reuse and lease mechanism
-by default: `acquireTestAccounts` in `scripts/test-accounts/session.mjs` uses
-`pool.mjs` and returns separate owner/peer identities and browser storage state.
-It obtains a real application session through `/api/auth/sign-up/email` or
-`/api/auth/sign-in/email` and verifies `/api/auth/get-session`. Routine tests do
-not require the user to sign in manually, supply a password or complete OAuth.
-Use the helper's lease renewal/release and existing evidence auditing; retain
-resources and logs as required by the current task.
+Use the existing shared SMOKE account in **Acme Inc.** for acceptance against
+the shared application, following [the workspace contract](#shared-production-acceptance-workspace).
+Do not sign in as Alex. Isolated regression harnesses that bootstrap their own
+disposable database use `acquireTestAccounts` in
+`scripts/test-accounts/session.mjs` and `pool.mjs`. Those harnesses provision
+owner/peer fixtures through normal email sign-up/sign-in and verify the real
+session. Follow their lease renewal, release and evidence auditing. Their
+results establish the isolated fixture path, while shared-team subscriptions
+require the shared-account check.
 
-The shared adapter currently implements `isolated-ci` and loopback application
-and database targets. Its environment descriptor binds the application version,
-origin and actual database identity. These checks remain in force. This is an
-implementation boundary, not a user policy prohibiting deployed or other test
+The shared adapter implements `isolated-ci` for loopback application targets
+and `isolated-docker` for the separately bound Docker environment. Both keep
+the database on a loopback `*_e2e` target. Its environment descriptor binds the
+application version, origin and actual database identity. These checks remain
+in force. This is an implementation boundary, not a user policy prohibiting deployed or other test
 environments. Where that adapter is not implemented, use an existing supported
 automatic test-identity fixture or authorized session for that environment and
-record the actual capability gap. Acceptance runs through the API and the CLI
-(`pnpm test:local-loop`); no browser tests run, locally or in CI
-([decision](design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md)).
+record the actual capability gap. Ordinary acceptance runs through the API
+and CLI (`pnpm test:local-loop`) under the
+[accepted policy](design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md).
+The general browser suite is retired. Retained targeted Desktop, Analytics and
+self-hosted checks keep the source-bound scopes in the
+[workflow reference](../.github/workflows/README.md).
 
 ## Record the version and environment
 
@@ -92,10 +101,9 @@ never request passwords or verification codes in chat.
 
 There is no separate Infisical vault for an OAuth test account; the Aspectly Labs
 organization has no such project. Use the existing authorized provider/browser
-sessions above. Live model-path acceptance (API key, Claude Code subscription,
-Codex subscription) runs through the normal Owner UI of the existing Owner
-account, which already has those sources bound. Preserve provider verification
-checks.
+sessions above. Live model-path acceptance uses the shared test account and the
+subscription paths described in [Live model acceptance](#live-model-acceptance).
+Preserve provider verification checks.
 
 For `account_not_linked`, diagnose the provider identity, existing account and
 verification state without weakening ownership checks. Record the affected
@@ -107,13 +115,33 @@ sign-out on the origin being tested; unrelated origins must remain rejected.
 Record the provider-specific result and remaining evidence separately from
 ordinary functional acceptance.
 
+## Live model acceptance
+
+For a change that runs model work, cover the official Claude Code subscription
+with `claude-haiku-5-5` and the official Codex subscription with `gpt-6-luna`.
+Keep each existing case on its originally bound subscription. Record a blocked
+path's real quota, rate-limit or provider error and continue the independent
+path. Both passing paths complete the model coverage. One passing path does
+not prove the other.
+
+The DeepSeek/API-key leg never gates a merge or acceptance. Do not send paid
+API-key prompts to retry a blocked leg or substitute Pro, another provider or
+another model. The existing `test:local-loop` driver still requires a real
+DeepSeek key and asserts Flash selection, so its local-flow results do not
+establish either subscription path. Record that implementation gap without
+making it an additional gate. The built-in Decision judge is separate from
+these user-selectable coding models and keeps its configured model.
+
 ## Shared production acceptance workspace
 
 验收工作区：**Acme Inc.**。**验收在这个工作区里做**。
 
 Use the existing shared smoke test account for subsequent production acceptance
-in this workspace. Alex's account was authorized only for the one-time invitation
-and subscription-sharing setup in
+in this workspace. Its credentials are the Mikka Infisical project's `prod:/`
+`SMOKE_OWNER_EMAIL` and `SMOKE_OWNER_PASSWORD`. Sign in directly through the
+existing authorized cloud configuration and keep the values out of output.
+Alex's account was authorized only for the one-time invitation and
+subscription-sharing setup in
 [issue #1515](https://github.com/alexj11324/Mikka/issues/1515#issuecomment-6694934529).
 Ordinary acceptance must not sign in as Alex. For production checks described
 below, use this shared-account team scope rather than an isolated account-pool
@@ -130,9 +158,10 @@ After the owning agent merges its PR ([dev workflow](dev-workflow.md) § 5):
 
 1. Watch the Vercel production deployment of the merge commit until it is
    READY, and confirm the production domain serves that commit.
-2. Pending migrations run through the existing flow (`pnpm build` runs
-   `scripts/migrate.mjs` in Vercel production; [migration bootstrap](migration-bootstrap.md)).
-   Do not apply SQL by hand.
+2. Pending migrations run through the existing flow. `pnpm build` runs
+   `scripts/migrate.mjs` in the production-mode GitHub Actions build before
+   deploying the prebuilt output to Vercel. See
+   [migration bootstrap](migration-bootstrap.md). Do not apply SQL by hand.
 3. Decide whether the change needs production acceptance (Alex, 2026-11-07):
    - **No**, when a local production build can show it: UI, interaction,
      navigation, page refresh, layout and copy. CI plus the PR's screenshots
@@ -148,10 +177,16 @@ After the owning agent merges its PR ([dev workflow](dev-workflow.md) § 5):
 4. Write the evidence on the issue: time, run id and a log summary, with no
    secrets or personal data. Then close the issue.
 
-Every production Web deploy also runs an automatic smoke test with the shared
-test account: sign in, send a Coordinator message, dispatch a task. It reports
-only when it fails. It does not replace step 3's external-service checks, and
-a failing run is fixed forward first.
+The [2026-11-07 production acceptance decision](design/decisions/2026-11-07-1400-production-acceptance-scope.md)
+calls for automatic sign-in, a Coordinator message and task dispatch after each
+Web deploy. The implemented `production-smoke.yml` job runs
+`scripts/ops/production-smoke.mjs`, which signs in and reads the shell,
+capabilities and shared-team Coordinator runtime. `AGENTS.md` records that
+implementation and keeps messaging and dispatch in separate live acceptance
+until the automatic-smoke gap is implemented. The workflow writes its result
+and artifact on every run. Inspect a failure and fix the responsible path
+through the normal release flow. See [production smoke](production-smoke.md)
+for the exact coverage.
 
 If production breaks, fix forward with a new PR or revert through a revert
 PR. Never delete deployments, revoke shared tokens, change production Neon

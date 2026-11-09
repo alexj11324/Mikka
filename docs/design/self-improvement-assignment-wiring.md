@@ -1,6 +1,16 @@
 # Controlled improvement assignment and Factory wiring
 
-- Status: implementation candidate; actual CLI/production acceptance pending.
+This is the historical assignment candidate and its validation scope. The
+implemented contract has since expanded to registered candidates, authenticated
+mount records, frozen evaluations and Factory activation. Read
+[self-improvement.md](self-improvement.md) for the source map and current
+interfaces. The 25-failure fixtures below describe that candidate's tests. Proposal
+eligibility follows the [Decision API decision](decisions/2026-11-01-1500-self-improvement-and-profile-decided-by-decision-api.md).
+Application acceptance follows [the acceptance guide](../acceptance.md) and the
+two subscription paths in `AGENTS.md`. The browser-CI paragraph records an older
+check and is not an instruction to run application browser tests.
+
+- Recorded status at candidate handoff: implementation candidate; actual CLI/production acceptance pending.
 - Tracking: #237 / MIK-103; minimal prerequisite of #232, not its enterprise registry.
 - Frozen baseline: #238 `62a6f710f454aa0860e09a5a941f2720657c96ef`.
 - Follow-up branch: `codex/skill-assignment-factory-237-20261025`.

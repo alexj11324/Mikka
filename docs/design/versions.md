@@ -1,8 +1,8 @@
-# Design versions: v11
+# Design versions: v11 Figma snapshot
 
-The single current version of the Mikka interface, as of 2026-10-29. Read this
-before opening Figma: it says which page is authoritative for each area, which
-older pages were archived, and which frames are still waiting on Alex.
+This records the Figma interface inventory on 2026-10-29, including the pages
+then accepted or awaiting review and the archive moves. Use the
+[design entry point](README.md) and later decisions to choose a design source.
 
 Status (2026-11-03): this is the Figma state of 2026-10-29. Since 2026-11-01
 the running app on `main` is the design
@@ -11,12 +11,12 @@ Where a page below and `main` disagree, `main` wins. Pages named here may
 since have moved to 归档.
 
 Figma file `zPe5LKycb2XuT1ivCLRw07`. An area's row names the one page (and the
-frames) that count. Anything not listed here is either in `归档` or is a
-component library with no demo frames.
+frames) that count. The inventory below describes that date. Later accepted pages are recorded
+in `decisions/` and the relevant feature specs.
 
-## v11 by area
+## v11 by area on 2026-10-29
 
-| # | Area | Authoritative page / frames | Status |
+| # | Area | Recorded page / frames | Status on 2026-10-29 |
 | --- | --- | --- | --- |
 | 1 | Shell and the global AI sidebar | `237:4483`, frames `237:4484`, `237:4725`, `237:5014` | Current |
 | 2 | Onboarding | `241:4483`, frames `241:4484`, `241:4889`, `241:5265`, `241:5641`, `247:5342` | Current |
@@ -58,6 +58,15 @@ Not published as part of the whole. Fix in place; do not redraw.
   stray copy block sits outside the frame at the top right.
 - `476:4860`: 「请管理员增加」 uses an imperative 请 (C-04).
 - `241:4483`: 「都连好了。先交给我一件事吧。」 is colloquial (C-02).
+
+### C-04 correction on 2026-11-08
+
+The findings above retain the audit's original wording. The current C-04 in
+[UI copy rules](copy.md#总原则) classifies 「请」 by the surrounding controls.
+「连接失败，请重试」 requires checking whether the component has a retry
+action. An instruction to contact an administrator keeps 「请」 under C-04's
+outside-interface category. These rules guide a later correction of the
+frames; this note records no fresh inspection of those frames.
 
 ## What v11 is not
 
