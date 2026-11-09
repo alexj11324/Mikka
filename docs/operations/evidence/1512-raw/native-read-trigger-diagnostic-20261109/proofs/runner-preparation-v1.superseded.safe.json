@@ -1,0 +1,731 @@
+{
+  "version": 1,
+  "preparedAt": "2026-11-09 23:05:28 UTC",
+  "issue": 1512,
+  "purpose": "Isolated observation-only native read-trigger diagnosis, not budget acceptance",
+  "baseCommit": "d2c3f63448130443e3e10bb5304417162f585776",
+  "baseTree": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+  "originalWorkflow": {
+    "path": ".github/workflows/desktop.yml",
+    "sha": "1cfd9d8be85015b639809faedc8a68fb83609399"
+  },
+  "workflow": {
+    "path": ".github/workflows/issue1512-native-read-diagnostic.yml",
+    "sha": "2c0d004a3ebbf074f5d08bb0d4a3c0d149966463",
+    "bytes": 25856,
+    "sha256": "152f7ad89b4c9bd0503aa8e1309c412b2247a1733d102efee5f726af4e0c5af6"
+  },
+  "sourceOverlayPreimages": [
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "beforeBlob": "e7f6972a23519ae45e059038cd0c404789d44a98"
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "beforeBlob": "dae8798653457afad334c2d909b10b63e9b3956f"
+    },
+    {
+      "path": "apps/desktop/test/lifecycle.mjs",
+      "beforeBlob": "3f21ee7f6a4eb8948778a35db72fb5e61aeca9ab"
+    },
+    {
+      "path": "apps/desktop/test/read-diagnostics.mjs",
+      "beforeBlob": null
+    },
+    {
+      "path": "hooks/use-live-key.tsx",
+      "beforeBlob": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f"
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "beforeBlob": "38df2110ac19c41e413dbbdfae8fac34361b2480"
+    },
+    {
+      "path": "lib/swr/read-diagnostics.ts",
+      "beforeBlob": null
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "beforeBlob": "69a827369bd71838ba8ac9ffbee928ca70219e76"
+    }
+  ],
+  "sourceOverlayFinalized": false,
+  "verification": {
+    "workflowParsed": true,
+    "parser": "js-yaml 4.1.0 official GitHub distribution; repository 4.3.2 validation is scheduled before native build",
+    "commonJsScriptsParse": [
+      {
+        "step": "Verify the one-shot diagnostic source and request",
+        "lines": 67
+      },
+      {
+        "step": "Start an independent local PostgreSQL",
+        "lines": 4
+      },
+      {
+        "step": "Start an independent local PostgreSQL",
+        "lines": 5
+      },
+      {
+        "step": "Generate ephemeral test-only auth secret",
+        "lines": 4
+      },
+      {
+        "step": "Stop only this diagnostic run's PostgreSQL",
+        "lines": 36
+      },
+      {
+        "step": "Audit closed diagnostic control receipts",
+        "lines": 33
+      }
+    ],
+    "criticalCommands": [
+      {
+        "name": "Keep setup-node 24 in the native installer login shell",
+        "runSame": true,
+        "envSame": true
+      },
+      {
+        "name": "Prepare the pinned native Electron and builder checksum cache",
+        "runSame": true,
+        "envSame": true
+      },
+      {
+        "name": "Build the production API for the native ARM64 runtime",
+        "runSame": true,
+        "envSame": true
+      },
+      {
+        "name": "Select Xcode 26",
+        "runSame": true,
+        "envSame": true
+      },
+      {
+        "name": "Package an inspector-enabled harness input",
+        "runSame": true,
+        "envSame": true
+      },
+      {
+        "name": "Real Keychain encryption across three independent packaged processes",
+        "runSame": true,
+        "envSame": true
+      },
+      {
+        "name": "Real packaged Apple Silicon native acceptance",
+        "runSame": true,
+        "envSame": true
+      },
+      {
+        "name": "Audit closed package and crypto reports",
+        "runSame": true,
+        "envSame": true
+      }
+    ],
+    "unchangedHarness": [
+      {
+        "path": "apps/desktop/scripts/package-dev.mjs",
+        "sha": "9ddbffbad566e5416206baa827bf4a737c61b493"
+      },
+      {
+        "path": "apps/desktop/test/bundled-smoke.mjs",
+        "sha": "2df81511184d89d773b86f7d34ae0c069a49e295"
+      },
+      {
+        "path": "apps/desktop/test/environment.mjs",
+        "sha": "cf1dcee34ea2edeb9e0ed32110966726049246e5"
+      },
+      {
+        "path": "apps/desktop/test/lifecycle-query-counts.mjs",
+        "sha": "39e1facecdf28a661511f72e14580fdb4b1ae967"
+      },
+      {
+        "path": "apps/desktop/test/native-crypto.mjs",
+        "sha": "86926e6807f0b693680dfc1b363e7d104699a260"
+      },
+      {
+        "path": "apps/desktop/test/parity.mjs",
+        "sha": "71157e93057ca19159a054fd4d41c9c0e0650fca"
+      },
+      {
+        "path": "apps/desktop/test/run-acceptance.mjs",
+        "sha": "c28c6348d1efcd359ca1440267189d40341aae30"
+      }
+    ],
+    "sourceCheckDeferred": true,
+    "runtimeExecuted": false,
+    "refsChanged": false
+  },
+  "triggerReview": {
+    "count": 42,
+    "pushCount": 14,
+    "nonPushCount": 28,
+    "matchingPushWorkflows": [],
+    "matchingWorkflowRunSubscribers": [],
+    "externalGitHubApps": "not controlled by workflow source; observe actual checks",
+    "headers": [
+      {
+        "path": ".github/workflows/analytics-ssr.yml",
+        "sha": "2a263858b477569d92f1694ed6bfddcd03469c56",
+        "header": "name: Analytics SSR\n# Runs on pull requests only. After a merge, Vercel's production build of main\n# is the build check; repeating this one on main added nothing.\non:\n  workflow_call:\n  workflow_dispatch:\npermissions:\n  contents: read\nconcurrency:\n  group: analytics-ssr-${{ github.ref }}\n  cancel-in-progress: true\nenv:\n  # A cache restore that fails (e.g. the account's cache egress limit) would\n  # otherwise hang for actions/cache's 10-minute default before falling back\n  # to a normal install, which outlasts the short jobs' own timeouts.\n  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'\n"
+      },
+      {
+        "path": ".github/workflows/app-icon.yml",
+        "sha": "2ad5b5fa99d72c4440c435bdd8f5bad44411bd36",
+        "header": "name: App icon\n\n# The iOS app and the desktop app share one Icon Composer bundle\n# (apps/mobile/assets/icon.icon, copied to apps/desktop/build/icon.icon).\n# EAS compiles the iOS copy with Xcode's actool; electron-builder compiles the\n# desktop copy. This job compiles both the same way on a pull request, so a\n# broken bundle fails here, and renders each appearance with Icon Composer's\n# ictool for review (artifact `app-icon-previews`). macos-26: on macos-15,\n# Xcode 26.3's asset agent crashes when it renders a glass layer for macOS.\non:\n  pull_request:\n    paths:\n      - 'apps/mobile/assets/icon.icon/**'\n      - 'apps/desktop/build/icon.icon/**'\n      - '.github/workflows/app-icon.yml'\n  workflow_dispatch:\n\npermissions:\n  contents: read\n"
+      },
+      {
+        "path": ".github/workflows/browser-gate.yml",
+        "sha": "0717180c70f54f9af06ebe39d0f5b5ec207235c4",
+        "header": "name: Browser gate\n\n# Browser tests are removed from CI (decision 2026-11-01-1520). This job only\n# keeps the protected check name \"Browser tests (before merge)\"; delete this\n# file once Alex removes that name from the required checks in the repository\n# settings.\non:\n  pull_request:\n    types: [opened, synchronize, reopened, ready_for_review]\n\npermissions:\n  contents: read\n"
+      },
+      {
+        "path": ".github/workflows/ci-selection.yml",
+        "sha": "5d541b4ff7be9cb365b18b804bbbe7c3db235580",
+        "header": "name: Trusted CI selection\non:\n  workflow_call:\n    outputs:\n      docs_only:\n        value: ${{ jobs.select.outputs.docs_only }}\n      core:\n        value: ${{ jobs.select.outputs.core }}\n      integration:\n        value: ${{ jobs.select.outputs.integration }}\n      source:\n        value: ${{ jobs.select.outputs.source }}\n      daemon:\n        value: ${{ jobs.select.outputs.daemon }}\n      desktop:\n        value: ${{ jobs.select.outputs.desktop }}\n      image:\n        value: ${{ jobs.select.outputs.image }}\n      analytics:\n        value: ${{ jobs.select.outputs.analytics }}\n      db:\n        value: ${{ jobs.select.outputs.db }}\n      units:\n        value: ${{ jobs.select.outputs.units }}\n      db_suites:\n        value: ${{ jobs.select.outputs.db_suites }}\n      db_matrix:\n        value: ${{ jobs.select.outputs.db_matrix }}\npermissions:\n  contents: read"
+      },
+      {
+        "path": ".github/workflows/cloud-computer.yml",
+        "sha": "1d91a07140966e8220e24153be6fdaff2b0aaf6c",
+        "header": "name: Cloud computer backend\n# Pull requests only: the same suite already passed on the PR, and main's\n# CI workflow (ui-policy.yml) still verifies every merged commit.\non:\n  pull_request:\n    paths:\n      - 'packages/daemon/**'\n      - 'packages/protocol/**'\n      - 'lib/computer/**'\n      - 'lib/cua/**'\n      - 'lib/cloud-computer/**'\n      - 'app/api/bots/**'\n      - 'scripts/e2b/**'\n      - '.github/workflows/cloud-computer.yml'\n  workflow_dispatch:\npermissions:\n  contents: read\nenv:\n  # A cache restore that fails (e.g. the account's cache egress limit) would\n  # otherwise hang for actions/cache's 10-minute default before falling back\n  # to a normal install, which outlasts the short jobs' own timeouts.\n  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'\n"
+      },
+      {
+        "path": ".github/workflows/credential-vault.yml",
+        "sha": "440712e2ca9e474e64970e8e03392b91e12acdca",
+        "header": "name: Credential vault backend\non:\n  push:\n    branches: ['codex/180-account-credential-vault']\n  pull_request:\n    paths: ['lib/credentials/**', 'services/credential-broker/**', 'drizzle/*credential*', '.github/workflows/credential-vault.yml']\npermissions:\n  contents: read\nenv:\n  # A cache restore that fails (e.g. the account's cache egress limit) would\n  # otherwise hang for actions/cache's 10-minute default before falling back\n  # to a normal install, which outlasts the short jobs' own timeouts.\n  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'\n"
+      },
+      {
+        "path": ".github/workflows/desktop-release.yml",
+        "sha": "d254ed3ac47c943d57fc3dc79448b1752753078f",
+        "header": "name: Desktop release\n\n# Publishes signed, notarized Apple Silicon installers for each main push that\n# changes the app or something it bundles (the daemon client, protocol, lockfile).\n# Versions use a fixed epoch above earlier calendar versions and the workflow\n# run number: 2026.10000.<run_number>. Retries keep the version and built commit.\n# Manual builds that skip notarization remain drafts.\n#\n# Existing signing and notarization credentials come from Infisical prod:/platform.\n# ASC_* names are mapped to the release tools' APPLE_* inputs inside the runner.\n\non:\n  push:\n    branches: [main]\n    paths:\n      - 'apps/desktop/**'\n      # Shared renderer source and build inputs are part of the shipped app.\n      - 'apps/frontend/**'\n      - 'app/\\[locale\\]/**'\n      - 'app/actions/**'\n      - 'app/fonts/**'\n      - 'app/globals.css'\n      - 'components/**'\n      - 'hooks/**'\n      - 'lib/**'\n      - 'messages/**'\n      - 'i18n/**'\n      - 'public/**'\n      - 'packages/config/**'\n      - 'instrumentation-client.ts'\n      - 'next.config.mjs'\n      - 'postcss.config.mjs'\n      - 'tsconfig.json'\n      - 'packages/daemon/**'\n      - 'packages/protocol/**'\n      - 'lib/daemon-commands.ts'\n      - 'lib/local-device-setup.ts'\n      - 'package.json'\n      - 'pnpm-lock.yaml'\n      - 'pnpm-workspace.yaml'\n      - 'patches/**'\n      - 'scripts/release/**'\n      - 'config/release-security.json'\n      - '.github/workflows/desktop-release.yml'\n  workflow_dispatch:\n    inputs:\n      overlay-sha:\n        description: Private main revision expected from the dispatching push\n        type: string\n        default: ''\n      skip_notarization:\n        description: Build macOS without notarization (internal testing only)\n        required: false\n        default: false\n        type: boolean\n\npermissions:\n  contents: read\n\nenv:\n  # A cache restore that fails (e.g. the account's cache egress limit) would\n  # otherwise hang for actions/cache's 10-minute default before falling back\n  # to a normal install, which outlasts the short jobs' own timeouts.\n  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'\n  NODE_VERSION: '24'\n  PNPM_VERSION: '10.34.3'\n"
+      },
+      {
+        "path": ".github/workflows/desktop.yml",
+        "sha": "1cfd9d8be85015b639809faedc8a68fb83609399",
+        "header": "name: Desktop shell\n\n# Checks the bundled/shared UI and native boundary. Mikka Dev uses complete\n# ad-hoc integrity signatures; Developer ID and releases stay on release runners.\n\n# Pull requests only: the same suite already passed on the PR, and main's\n# CI workflow (ui-policy.yml) still verifies every merged commit.\non:\n  workflow_call:\n  workflow_dispatch:\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: desktop-${{ github.event.pull_request.number || github.ref }}\n  cancel-in-progress: true\n\nenv:\n  MIKKA_EDITION: cloud\n  # A cache restore that fails (e.g. the account's cache egress limit) would\n  # otherwise hang for actions/cache's 10-minute default before falling back\n  # to a normal install, which outlasts the short jobs' own timeouts.\n  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'\n"
+      },
+      {
+        "path": ".github/workflows/device-gateway.yml",
+        "sha": "a0c0db030a9343caeffd371889bf40c13d06d2cc",
+        "header": "name: Device gateway\non:\n  push:\n    branches: [main]\n    paths: &gateway_paths\n      - 'cloudflare/device-gateway/**'\n      - 'lib/device-gateway*.ts'\n      - 'lib/device-presence*.ts'\n      - 'lib/live/**'\n      - 'lib/db/commit-effects*.ts'\n      - 'hooks/use-live-key.tsx'\n      - 'app/api/live/**'\n      - 'scripts/device-gateway/**'\n      - '.github/workflows/device-gateway.yml'\n  pull_request:\n    paths: *gateway_paths\n  workflow_dispatch:\npermissions:\n  contents: read\nconcurrency:\n  group: ${{ github.event_name == 'pull_request' && format('device-gateway-{0}', github.ref) || 'device-gateway-production' }}\n  # A newer main release must never finish before an older release writes.\n  cancel-in-progress: ${{ github.event_name == 'pull_request' }}"
+      },
+      {
+        "path": ".github/workflows/e2b-byos.yml",
+        "sha": "333e0674355baa72ce7bd00e7e57964fff8c7d6a",
+        "header": "name: E2B subscription custody\n# Pull requests only: the same suite already passed on the PR, and main's\n# CI workflow (ui-policy.yml) still verifies every merged commit.\non:\n  pull_request:\n    paths:\n      - 'lib/subscription*'\n      - 'lib/infisical-workload*'\n      - 'packages/subscription-worker/**'\n      - 'packages/daemon/**'\n      - 'packages/protocol/**'\n      - 'scripts/test-subscription*'\n      - 'tests/byos-*'\n      - '.github/workflows/e2b-byos.yml'\n      - 'package.json'\n      - 'pnpm-lock.yaml'\n  workflow_dispatch:\npermissions:\n  contents: read\nenv:\n  # A cache restore that fails (e.g. the account's cache egress limit) would\n  # otherwise hang for actions/cache's 10-minute default before falling back\n  # to a normal install, which outlasts the short jobs' own timeouts.\n  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'\n"
+      },
+      {
+        "path": ".github/workflows/e2b-official-runtime.yml",
+        "sha": "97cdc7dfefb5dfbe00e733ccb5559fae8de2dfa9",
+        "header": "name: E2B additive runtime release\n# Build private candidates, preserve official files, prove both subscriptions,\n# then publish through the same version-bound Web deployment queue.\non:\n  push:\n    branches: [main]\n    # An unrelated merge can obsolete an in-flight publication. Recheck the\n    # live worker on every main push; the check job still gates validation.\n  pull_request:\n    paths: &runtime_paths\n      - 'package.json'\n      - 'pnpm-lock.yaml'\n      - 'pnpm-workspace.yaml'\n      - 'packages/daemon/**'\n      - 'packages/protocol/**'\n      - 'packages/config/**'\n      - 'patches/**'\n      - 'scripts/e2b/**'\n      - 'scripts/e2b/publish-template-env.mjs'\n      - 'lib/computer/official-runtime.ts'\n      - '.github/workflows/e2b-official-runtime.yml'\n      - '.github/workflows/e2b-template.yml'\n      - 'scripts/e2b/validate-template-subscriptions.mjs'\n      - 'scripts/e2b/cleanup-template-candidates.py'\n      - 'scripts/e2b/runtime-report.mjs'\n      - 'scripts/e2b/acceptance-daemon.mts'\n      - 'scripts/e2b/acceptance-bootstrap.mts'\n      - 'lib/captures/bootstrap-evidence.ts'\n      - 'app/api/runs/[runId]/evidence/route.ts'\n      # The wildcard also matches Next route brackets as literal directory names.\n      - 'app/api/runs/**/evidence/route.ts'\n      - 'lib/computer/claude-startup-hint.ts'\n      - 'lib/computer/codex-startup-hint.ts'\n      - 'scripts/acceptance/cloud-startup.mjs'\n      - 'scripts/acceptance/cloud-startup.test.mjs'\n      - 'scripts/acceptance/cloud-startup-evidence.mjs'\n      - 'scripts/acceptance/team-workspace.mjs'\n      - 'scripts/acceptance/team-workspace.test.mjs'\n      - 'lib/smoke-account.ts'\n      - '.github/workflows/web-deploy.yml'\n      - 'scripts/release/web-deploy.mjs'\n      - 'scripts/release/build-vercel.mjs'\n      - 'scripts/release/web-deploy.test.mjs'\n      # This issue's acceptance requires a same-application-SHA runtime proof.\n      - '.github/workflows/model-provider-fallback-acceptance.yml'\n      - 'scripts/acceptance/model-provider-fallback.mjs'\n      - 'scripts/acceptance/model-provider-fallback.test.mjs'\n      - '.github/workflows/project-decisions-acceptance.yml'\n      - 'scripts/acceptance/project-decisions.mjs'\n      - 'scripts/acceptance/project-decisions.test.mjs'\n  workflow_dispatch:\n    inputs:\n      runtime-refresh:\n        description: Validate and publish even when the configured worker hash matches\n        type: boolean\n        default: false\npermissions:\n  contents: read\nconcurrency:\n  group: ${{ github.event_name == 'pull_request' && format('e2b-official-runtime-{0}', github.ref) || 'e2b-official-runtime-release' }}\n  # An old rerun must not replace the latest main's pending runtime validation.\n  # PRs have their own group and only run the offline test job; retain those too.\n  cancel-in-progress: false\n  queue: max"
+      },
+      {
+        "path": ".github/workflows/e2b-template.yml",
+        "sha": "bb948480beac3370335dd4b8ce59a01e6becf1f0",
+        "header": "name: E2B additive template candidates\n# Reusable builder only. It cannot make a candidate public or change production.\non:\n  workflow_call:\n    outputs:\n      source-sha:\n        value: ${{ jobs.build.outputs.source-sha }}\n      template-models-sha256:\n        value: ${{ jobs.build.outputs.template-models-sha256 }}\n      candidate-artifact-id:\n        value: ${{ jobs.build.outputs.candidate-artifact-id }}\n      candidate-sha256:\n        value: ${{ jobs.build.outputs.candidate-sha256 }}\n      candidate-identities:\n        value: ${{ jobs.build.outputs.candidate-identities }}\npermissions:\n  contents: read"
+      },
+      {
+        "path": ".github/workflows/issue1415-deployed-production.yml",
+        "sha": "6d0b50becc99ce6d5f6cfb69cceea1037f2ee1be",
+        "header": "name: Issue 1415 deployed production acceptance\n\non:\n  workflow_dispatch:\n    inputs:\n      application_sha:\n        description: Exact immutable application commit already serving the production alias\n        required: true\n        type: string\n      web_run_id:\n        description: Successful real Web deploy run for this application commit\n        required: true\n        type: string\n      deployment_id:\n        description: Exact READY production deployment currently attached to the fixed alias\n        required: true\n        type: string\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: production-smoke-owner-acceptance\n  cancel-in-progress: false\n  queue: max\n"
+      },
+      {
+        "path": ".github/workflows/issue1415-managed-inspection.yml",
+        "sha": "9ece51fc2a39c2d362446e68df1f9bbf2076f641",
+        "header": "name: Issue 1415 managed history inspection\n\non:\n  workflow_dispatch:\n    inputs:\n      source_run_id:\n        description: Existing failed managed proof run (only 42285115630 is authorized)\n        required: true\n        type: string\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: issue1415-managed-history-inspection\n  cancel-in-progress: false\n"
+      },
+      {
+        "path": ".github/workflows/issues-1515-1517-cleanup.yml",
+        "sha": "402b01de60f16f041ab9d0bd3b2036ad820e760e",
+        "header": "name: Issues 1515-1517 production cleanup\non:\n  workflow_dispatch:\n    inputs:\n      application_sha:\n        description: Exact deployed application SHA\n        required: true\n        type: string\n      mode:\n        description: Apply only after the preceding dry-run succeeds\n        required: true\n        default: dry-run\n        type: choice\n        options: [dry-run, apply]\npermissions:\n  contents: read"
+      },
+      {
+        "path": ".github/workflows/issues-1515-1517-diagnostics.yml",
+        "sha": "bb67205200d6777a626cecc3494762e49d491a5c",
+        "header": "name: Issues 1515-1517 read-only diagnostics\non:\n  workflow_dispatch:\n    inputs:\n      application_sha:\n        description: Exact deployed application SHA\n        required: true\n        type: string\npermissions:\n  contents: read"
+      },
+      {
+        "path": ".github/workflows/issues-1516-welcome-acceptance.yml",
+        "sha": "4757d62065017957f6e1e4300ab4695507ce40d8",
+        "header": "name: Issue 1516 real welcome acceptance\non:\n  workflow_dispatch:\n    inputs:\n      application_sha:\n        description: Exact deployed application SHA\n        required: true\n        type: string\n      acceptance_cases:\n        description: Real welcome cases or read-only structure diagnosis of the retained failed B fixture\n        required: true\n        default: all\n        type: choice\n        options: [all, claude-b, diagnose-b]\npermissions:\n  contents: read"
+      },
+      {
+        "path": ".github/workflows/local-device-node22.yml",
+        "sha": "d195f389292e1a84967fd9864063ac536b91bbaf",
+        "header": "name: Local device Node 22\non:\n  pull_request:\n    paths:\n      - 'apps/desktop/src/main/*install*'\n      - 'packages/daemon/**'\n      - 'packages/protocol/**'\n      - 'scripts/acceptance/local-installer-macos.ts'\n      - '.github/workflows/local-device-node22.yml'\n  workflow_dispatch:\npermissions:\n  contents: read\nconcurrency:\n  group: local-device-node22-${{ github.ref }}\n  cancel-in-progress: true"
+      },
+      {
+        "path": ".github/workflows/mobile-native.yml",
+        "sha": "a14280622e2e0cd44d79b809ef36bb6b1895cd38",
+        "header": "name: Mobile native release\n\n# Native configuration changes need a new fingerprint-compatible iOS binary.\n# Reuse the existing Expo signing and App Store Connect credentials; never\n# create or repair credentials in CI. OTA publication remains a separate job.\non:\n  push:\n    branches: [main]\n    paths:\n      - 'apps/mobile/app.json'\n      - 'apps/mobile/app.config.ts'\n      - 'apps/mobile/eas.json'\n      - '.easignore'\n  workflow_dispatch:\n    inputs:\n      overlay_sha:\n        description: Exact reviewed hosted UI commit for a new official build\n        type: string\n        default: c34b3adf07240afebae725b2af599cfbc69c4f42\n      submit:\n        description: Submit this exact completed build to TestFlight\n        type: boolean\n        default: true\n      existing_build_id:\n        description: Completed production-profile EAS build to submit without rebuilding (requires expected_commit)\n        type: string\n        default: ''\n      expected_commit:\n        description: Exact 40-character main commit of the existing build\n        type: string\n        default: ''\n\npermissions:\n  contents: read\n  actions: read\n\nconcurrency:\n  group: mobile-native-production\n  cancel-in-progress: false\n"
+      },
+      {
+        "path": ".github/workflows/mobile-screenshots.yml",
+        "sha": "17cedf93280ec9955608c34c7b605f9df6704f4d",
+        "header": "name: Mobile App Store screenshots\n\non:\n  workflow_dispatch:\n    inputs:\n      overlay_sha:\n        description: Exact reviewed hosted UI commit (40 lowercase hex characters)\n        type: string\n        required: true\n        default: c34b3adf07240afebae725b2af599cfbc69c4f42\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: mobile-app-store-screenshots\n  cancel-in-progress: false\n"
+      },
+      {
+        "path": ".github/workflows/mobile-update.yml",
+        "sha": "0708d8d90ac94c96bd35f2cec0407d8b25d362f3",
+        "header": "name: Mobile OTA update\n\n# Publishes the iOS app's JavaScript as an EAS Update (decision\n# 2026-10-31-2010-ota-updates): main goes to the `production` channel that\n# TestFlight builds read; a pull request gets its own `pr-<n>` branch, which\n# can be opened in a preview build. Production reads the existing Expo token\n# from Infisical using the trusted main workload's OIDC identity. PR previews\n# retain their existing repository-secret delivery; forks cannot publish.\n# Production bundles the private UI layer's mobile/ folder when the existing\n# read key can check it out (docs/ui-overlay.md, 「iOS app」); without it, the\n# app's default slots ship.\non:\n  push:\n    branches: [main]\n    paths: ['apps/mobile/**', 'packages/protocol/**']\n  pull_request:\n    paths: ['apps/mobile/**', 'packages/protocol/**']\n  # A push to the private UI layer's mobile/ folder ships through this (docs/ui-overlay.md).\n  workflow_dispatch:\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: mobile-update-${{ github.ref }}\n  cancel-in-progress: true\n"
+      },
+      {
+        "path": ".github/workflows/model-provider-fallback-acceptance.yml",
+        "sha": "316476e5015a5bc04c27a62d198f847784233201",
+        "header": "name: Issue 1225 model provider acceptance\n# Paid acceptance is authorized by these two merged issue PRs only.\non:\n  workflow_run:\n    workflows: [Web deploy]\n    types: [completed]\n  workflow_dispatch:\n    inputs:\n      mode:\n        description: Read-only preflight, or the three independent real model paths\n        type: choice\n        options: [preflight, active]\n        default: preflight\n      guard_pr:\n        description: Merged issue 1225 PR authorizing this acceptance\n        type: choice\n        options: ['1249', '1232']\n        default: '1249'\npermissions:\n  contents: read\nconcurrency:\n  group: production-smoke-owner-acceptance\n  cancel-in-progress: false\n  queue: max"
+      },
+      {
+        "path": ".github/workflows/production-readiness.yml",
+        "sha": "0cd039a6c28eeccf2a417ff4f3e09255b371be29",
+        "header": "name: Production owner readiness\n# This workflow cannot dispatch a task. The historical paid comparison file\n# must not be present when publishing the acceptance branch from reviewed main.\non:\n  pull_request:\n    paths:\n      - '.github/workflows/production-readiness.yml'\n      - '.github/workflows/model-provider-fallback-acceptance.yml'\n      - '.github/workflows/project-decisions-acceptance.yml'\n      - 'scripts/acceptance/production-readiness*'\n  push:\n    branches: [acceptance/proactive-1157-1163]\n    paths:\n      - '.github/workflows/production-readiness.yml'\n      - 'scripts/acceptance/production-readiness*'\n  workflow_dispatch:\n    inputs:\n      application_sha:\n        description: Exact already-deployed main application SHA; runtime publication is checked separately\n        required: true\n        type: string\npermissions:\n  contents: read\nconcurrency:\n  group: ${{ github.event_name == 'pull_request' && format('production-readiness-guards-{0}', github.event.pull_request.number) || 'production-smoke-owner-acceptance' }}\n  cancel-in-progress: false\n  queue: max"
+      },
+      {
+        "path": ".github/workflows/production-smoke.yml",
+        "sha": "67751d4d3a38989a635e5ee07ac0c8f0775a333e",
+        "header": "name: Production smoke\n# Signs in the tagged smoke account on production and reads (docs/production-smoke.md).\non:\n  schedule:\n    - cron: '17 14 * * *'\n    - cron: '*/15 * * * *'\n  deployment_status:\n  workflow_dispatch:\n    inputs:\n      audit_auth_sha:\n        description: Optional exact deployed main SHA for issue 1597/1600 safe authorization acceptance\n        required: false\n        type: string\n      audit_lease:\n        description: Also verify both real subscription paths and natural expiry in owned test tasks\n        required: false\n        type: boolean\n        default: false\n      audit_recover_lease_run:\n        description: Recover only the own pre-dispatch CLI interruption in run 42418118236 before the lease audit\n        type: choice\n        options:\n          - none\n          - '42418118236'\n        default: none\npermissions:\n  contents: read\nconcurrency:\n  group: production-smoke\n  cancel-in-progress: false\n  queue: max\nenv:\n  # A cache restore that fails (e.g. the account's cache egress limit) would\n  # otherwise hang for actions/cache's 10-minute default before falling back\n  # to a normal install, which outlasts the short jobs' own timeouts.\n  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'\n"
+      },
+      {
+        "path": ".github/workflows/project-decisions-acceptance.yml",
+        "sha": "7be1af6692ab21d971bd091994c56a7a3ac159fe",
+        "header": "name: Project decisions production acceptance\n# Normal smoke session; secrets stay in the hosted workload and reports contain only fixed metadata.\non:\n  workflow_run:\n    workflows: [Web deploy]\n    types: [completed]\n  workflow_dispatch:\n    inputs:\n      mode:\n        description: Read-only preflight, or three independent real model cases\n        type: choice\n        options: [preflight, active]\n        default: preflight\npermissions:\n  contents: read\nconcurrency:\n  group: production-smoke-owner-acceptance\n  cancel-in-progress: false\n  queue: max"
+      },
+      {
+        "path": ".github/workflows/publish-daemon.yml",
+        "sha": "c6f861a5ec36468ee9a65bc226613fbbabc797c2",
+        "header": "name: Publish daemon\n\n# Keep this filename: npm trusted publishing authorizes this workflow identity.\non:\n  push:\n    branches: [main]\n    # Publish only when something that goes into the npm package changed.\n    # Every published version makes installed daemons upgrade and restart.\n    paths:\n      - 'packages/daemon/**'\n      - 'packages/protocol/**'\n      - 'packages/config/**'\n      - 'package.json'\n      - 'pnpm-lock.yaml'\n      - 'pnpm-workspace.yaml'\n      - 'patches/**'\n      - 'LICENSE'\n      - 'scripts/release/**'\n      - 'config/release-security.json'\n      - '.github/workflows/publish-daemon.yml'\n  workflow_dispatch:\n\nconcurrency:\n  group: publish-daemon\n  queue: max\n  cancel-in-progress: false\n\npermissions:\n  contents: read\n\nenv:\n  # A cache restore that fails (e.g. the account's cache egress limit) would\n  # otherwise hang for actions/cache's 10-minute default before falling back\n  # to a normal install, which outlasts the short jobs' own timeouts.\n  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'\n"
+      },
+      {
+        "path": ".github/workflows/read-cache-production.yml",
+        "sha": "7ffa772dc65e85ae6665d7fb70f5d5a3b604da22",
+        "header": "name: Read cache production acceptance\n\non:\n  pull_request:\n    paths:\n      - '.github/workflows/read-cache-production.yml'\n      - 'scripts/acceptance/read-cache*.mjs'\n      - 'scripts/acceptance/production-readiness.mjs'\n      - 'scripts/acceptance/workflow-migration-production*.mjs'\n  workflow_dispatch:\n    inputs:\n      application_sha:\n        description: Exact already-deployed main commit to accept with read-only requests\n        required: true\n        type: string\n  workflow_run:\n    workflows: ['Web deploy']\n    types: [completed]\n    branches: [main]\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: ${{ github.event_name == 'pull_request' && format('read-cache-production-guards-{0}', github.event.pull_request.number) || 'production-smoke-owner-acceptance' }}\n  cancel-in-progress: false\n  queue: max\n"
+      },
+      {
+        "path": ".github/workflows/read-cache.yml",
+        "sha": "86ee0112413eae241189bb2d748a6d6901201c4f",
+        "header": "name: Read cache API acceptance\n\non:\n  pull_request:\n    paths:\n      - 'apps/api/**'\n      - 'apps/frontend/**'\n      - 'lib/browser-rpc/**'\n      - 'scripts/start-app*'\n      - 'scripts/acceptance/read-action-transport.mjs'\n      - '.github/workflows/read-cache.yml'\n      - 'scripts/acceptance/read-cache*.mjs'\n      - 'scripts/acceptance/run-read-cache*.mjs'\n      - 'scripts/test-accounts/**'\n      - 'lib/swr/**'\n      - 'lib/coordinator/chat-read-client*'\n      - 'lib/settings-read.ts'\n      - 'app/actions/coordinator.ts'\n      - 'app/actions/issues.ts'\n      - 'app/actions/task-runs.ts'\n      - 'app/api/settings/**'\n      - 'components/authenticated-read-cache.tsx'\n      - 'components/swr-defaults.tsx'\n      - 'components/workspace/task-detail.tsx'\n      - 'hooks/use-live-lists.ts'\n      - 'package.json'\n      - 'pnpm-lock.yaml'\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: read-cache-api-${{ github.ref }}\n  cancel-in-progress: true\n"
+      },
+      {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "sha": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+        "header": "name: Run trace production acceptance\n# Explicit operator runs only. Preflight reads configuration; execute uses the\n# existing tagged account and fixed small subscription models for issue #1512.\n# controlled-failure uses only an owned loopback database and 20 test failures.\non:\n  workflow_dispatch:\n    inputs:\n      mode:\n        description: Preflight, bounded real tasks, native PNG export, or 20 isolated failures\n        type: choice\n        options: [preflight, execute, export, controlled-failure]\n        default: preflight\n      expected-deployment-sha:\n        description: Exact main commit; already served for production acceptance and export\n        type: string\n        required: true\n      model-case:\n        description: Subscription model case\n        type: choice\n        options: [all, claude, codex]\n        default: all\n      prepare:\n        description: Temporarily prepare and restore idle account settings through normal APIs\n        type: boolean\n        default: false\n      browser-submit:\n        description: Submit one model case once through the runner's real browser New task UI\n        type: boolean\n        default: false\n      export-target:\n        description: Native saved PostHog object to export after verifying production evidence\n        type: choice\n        options: [dashboard, insight]\n        default: dashboard\n      export-id:\n        description: Positive numeric PostHog object ID; required only for export\n        type: string\n        required: false\n      session-id:\n        description: Optional real browser Replay UUID; requires trace-id and export mode\n        type: string\n        required: false\n      trace-id:\n        description: Matching actual APM trace hex ID; requires session-id and export mode\n        type: string\n        required: false\npermissions:\n  contents: read\nconcurrency:\n  group: run-trace-production-acceptance\n  cancel-in-progress: false\n  queue: max"
+      },
+      {
+        "path": ".github/workflows/self-hosted-image.yml",
+        "sha": "3dc64ed2c8d58efdf981036e7bb6362e1bd92077",
+        "header": "name: Self-hosted image\non:\n  workflow_call:\n  push:\n    branches: [main]\n    tags: ['v*']\n  workflow_dispatch:\npermissions:\n  contents: read\nconcurrency:\n  group: self-hosted-image-${{ github.event_name }}-${{ github.ref }}\n  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}"
+      },
+      {
+        "path": ".github/workflows/self-hosted-production.yml",
+        "sha": "862a9f7cdea8df0373207e389f3cbf3afaca46df",
+        "header": "name: Mikka cloud core compatibility\n\non:\n  pull_request:\n    paths:\n      - '.github/workflows/self-hosted-production.yml'\n      - 'scripts/acceptance/self-hosted-production*.mjs'\n      - 'scripts/ops/production-mobile-daemon*.mjs'\n  workflow_run:\n    workflows: ['Web deploy']\n    types: [completed]\n    branches: [main]\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: ${{ github.event_name == 'pull_request' && format('self-hosted-production-guards-{0}', github.event.pull_request.number) || 'production-smoke-owner-acceptance' }}\n  cancel-in-progress: false\n  queue: max\n"
+      },
+      {
+        "path": ".github/workflows/self-hosting-ui.yml",
+        "sha": "5aa39770c0a4d6166e0088d5e1d84af746b57d58",
+        "header": "name: Self-hosting UI evidence\non:\n  pull_request:\n    paths:\n      - '.github/workflows/self-hosting-ui.yml'\n      - 'scripts/self-hosting-ui/**'\n      - 'components/settings/cloud-settings.tsx'\n      - 'components/plugins/github-app-settings.tsx'\n      - 'apps/mobile/features/accounts/**'\n      - 'apps/mobile/components/SignIn.tsx'\n      - 'apps/mobile/components/ServerGate.tsx'\n      - 'apps/mobile/lib/server-*.ts'\npermissions:\n  contents: read\nconcurrency:\n  group: self-hosting-ui-${{ github.event.pull_request.number || github.ref }}\n  cancel-in-progress: true"
+      },
+      {
+        "path": ".github/workflows/site-search.yml",
+        "sha": "299e09591558bced0eafcc05c7d5a6d295078438",
+        "header": "name: Site search read contract\n# An HTTP API test, not a browser test (decisions 2026-11-01-1520 and 2225 run\n# none): tests/e2e/site-search.spec.ts uses Playwright's request client only,\n# against the compiled API, Better Auth and two PostgreSQL services. No\n# browser is installed or launched.\n# Runs only when search changes: on every pull request (this repository's and\n# forks') and on pushes to main that touch these paths.\n# Pull requests only: the same suite already passed on the PR, and main's\n# CI workflow (ui-policy.yml) still verifies every merged commit.\non:\n  pull_request:\n    paths: ['apps/api/**', 'apps/frontend/**', 'lib/browser-rpc/**', 'scripts/start-app*', 'lib/search/**', 'lib/federated-search/**', 'app/api/search/**', 'tests/e2e/site-search.spec.ts', '.github/workflows/site-search.yml']\n  workflow_dispatch:\npermissions:\n  contents: read\nconcurrency:\n  group: site-search-${{ github.ref }}\n  cancel-in-progress: true\nenv:\n  # A cache restore that fails (e.g. the account's cache egress limit) would\n  # otherwise hang for actions/cache's 10-minute default before falling back\n  # to a normal install, which outlasts the short jobs' own timeouts.\n  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'\n"
+      },
+      {
+        "path": ".github/workflows/ssh-device-backend.yml",
+        "sha": "e980cb3cdf2bc1206972ca66c87f9bc990e2ac48",
+        "header": "name: SSH device backend\non:\n  pull_request:\n    paths:\n      - 'apps/desktop/**'\n      - 'packages/daemon/**'\n      - 'packages/protocol/**'\n      - 'lib/device-*.ts'\n      - 'app/api/devices/**'\n      - 'app/v1/devices/**'\n      - 'drizzle/**'\n      - 'tests/ssh-install/**'\n      - '.github/workflows/ssh-device-backend.yml'\n  workflow_dispatch:\npermissions:\n  contents: read"
+      },
+      {
+        "path": ".github/workflows/subagents.yml",
+        "sha": "116080d9d31bf85774dedac96f79a92235575706",
+        "header": "name: Subagents and thread backend\non:\n  push:\n    branches: ['codex/342-runtime', 'codex/180-account-credential-vault', 'integration/**', 'integrate/**']\n  workflow_dispatch:\npermissions:\n  contents: read\nenv:\n  # A cache restore that fails (e.g. the account's cache egress limit) would\n  # otherwise hang for actions/cache's 10-minute default before falling back\n  # to a normal install, which outlasts the short jobs' own timeouts.\n  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'\n"
+      },
+      {
+        "path": ".github/workflows/suggestions-cron.yml",
+        "sha": "587693cbff72150a1212d0997aabee0aff1269ce",
+        "header": "name: Minute Worker\non:\n  push:\n    branches: [main]\n    paths: &minute_paths\n      - 'cloudflare/suggestions-cron/**'\n      - 'scripts/suggestions-cron/**'\n      - 'scripts/device-gateway/deploy.mjs'\n      - 'scripts/release/ci-gate.mjs'\n      - '.github/workflows/suggestions-cron.yml'\n  pull_request:\n    paths: *minute_paths\n  workflow_dispatch:\npermissions:\n  contents: read\nconcurrency:\n  group: ${{ github.event_name == 'pull_request' && format('minute-worker-{0}', github.ref) || 'minute-worker-production' }}\n  # A newer main release must never finish before an older release writes.\n  cancel-in-progress: ${{ github.event_name == 'pull_request' }}"
+      },
+      {
+        "path": ".github/workflows/task-secret-acceptance.yml",
+        "sha": "938ffc405cee597005d4503ab022ab1c3b0f934e",
+        "header": "name: Task Secret scoped external acceptance\n# The upstream webhook is a pointer; authenticate it before checkout or OIDC.\non:\n  workflow_run:\n    workflows: [E2B additive runtime release]\n    types: [completed]\n  workflow_dispatch:\n    inputs:\n      mode:\n        description: Read-only preflight or one native task per selected official subscription\n        type: choice\n        options: [preflight, execute]\n        default: preflight\n      application_sha:\n        description: Exact main SHA already served by production\n        type: string\n        required: true\n      worker_sha:\n        description: Exact released worker content SHA; required for execute\n        type: string\n      worker_source_sha:\n        description: Exact released worker source commit; required for execute\n        type: string\n      claude_template:\n        description: Released Claude template ID; required for execute\n        type: string\n      codex_template:\n        description: Released Codex template ID; required for execute\n        type: string\n      model_case:\n        description: Keep each case on its own fixed official subscription\n        type: choice\n        options: [all, claude, codex]\n        default: all\n      factory_acceptance:\n        description: Also run the existing ACME Factory artifact acceptance; only execute with all models\n        type: boolean\n        default: false\npermissions:\n  contents: read"
+      },
+      {
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "sha": "42ae23945f798020ec068635e7621869fb427af2",
+        "header": "name: Task VM question-resume evidence\n# #1593: main-only provider integration, then the ordinary Owner HTTP flow.\n# The webhook is a pointer, never an artifact/source authorization by itself.\non:\n  workflow_run:\n    workflows: [E2B additive runtime release]\n    types: [completed]\npermissions:\n  contents: read"
+      },
+      {
+        "path": ".github/workflows/ui-policy.yml",
+        "sha": "e3938ad5c343fb14d60709e014cb3d9a3189b104",
+        "header": "name: CI\n\n# Merge-blocking source and database checks run on GitHub's PR merge candidate,\n# not a same-repository branch push. This avoids duplicating the same expensive\n# jobs and detects integration failures against the target branch at PR time.\n# - pull_request: premerge checks (same-repo and fork PRs);\n# - merge_group: synthetic queue candidate, if a queue is enabled later;\n# - push main: postmerge verification of each distinct main commit.\n# CI runs no browser tests (decision 2026-11-01-1520). Preserve the existing\n# protected status-check names.\non:\n  push:\n    branches: [main]\n  pull_request:\n  merge_group:\n  workflow_dispatch:\n  schedule:\n    - cron: '23 3 * * 1'\n\npermissions:\n  contents: read\n\nconcurrency:\n  # Main commits need unique groups: a new pending run must not evict an older\n  # pending run (cancel-in-progress: false alone does not guarantee that).\n  group: ui-policy-${{ github.event_name }}-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.run_id) || '' }}\n  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}\n\nenv:\n  # Existing accounting/admission suites exercise the hosted deployment.\n  # The self-hosted image workflow separately runs the default community mode.\n  MIKKA_EDITION: cloud\n  # A cache restore that fails (e.g. the account's cache egress limit) would\n  # otherwise hang for actions/cache's 10-minute default before falling back\n  # to a normal install, which outlasts the short jobs' own timeouts.\n  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'\n  # Ephemeral CI registration fixtures share one loopback IP. Keep finite\n  # limits while leaving the production defaults at 5 signups/IP/hour.\n  MIKKA_SIGNUP_IP_HOURLY: '1000'\n  MIKKA_SIGNUP_GLOBAL_HOURLY: '10000'\n  MIKKA_VERIFICATION_IP_HOURLY: '1000'\n  MIKKA_VERIFICATION_GLOBAL_HOURLY: '10000'\n"
+      },
+      {
+        "path": ".github/workflows/unattended-sandbox.yml",
+        "sha": "91ebe7a22509c3e900eedf2d6f160c454da91b4e",
+        "header": "name: Unattended sandbox acceptance\n# Pull requests only: the same suite already passed on the PR, and main's\n# CI workflow (ui-policy.yml) still verifies every merged commit.\non:\n  pull_request:\n    paths:\n      - '.github/workflows/unattended-sandbox.yml'\n      - 'packages/daemon/**'\n      - 'packages/protocol/**'\n      - 'scripts/e2b/**'\n      - 'lib/agent-tool-approval/**'\n      - 'lib/cloud-computer/**'\n      - 'lib/computer/**'\n      - 'lib/credentials/**'\n      - 'components/settings/computer-policy-settings.tsx'\n      - 'tests/e2e/computer-policy-settings.spec.ts'\n      - 'workflows/subagent/**'\n      - 'pnpm-lock.yaml'\n  workflow_dispatch:\npermissions:\n  contents: read\nconcurrency:\n  group: unattended-${{ github.workflow }}-${{ github.ref }}\n  cancel-in-progress: true\nenv:\n  # A cache restore that fails (e.g. the account's cache egress limit) would\n  # otherwise hang for actions/cache's 10-minute default before falling back\n  # to a normal install, which outlasts the short jobs' own timeouts.\n  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'\n"
+      },
+      {
+        "path": ".github/workflows/web-deploy.yml",
+        "sha": "710f70c3528e1b8eb5c37f1be52c6442445bf9be",
+        "header": "name: Web deploy\n# Builds the production web app on GitHub's free runners (this repository is\n# public) and uploads the prebuilt output to Vercel, instead of paying for\n# Vercel build minutes. Vercel's own Git deployment of main is off in\n# vercel.json. See docs/operations/web-deploy.md.\non:\n  push:\n    branches: [main]\n  workflow_dispatch:\n    inputs:\n      overlay-refresh:\n        description: Rebuild current main after a private UI push\n        type: boolean\n        default: false\n  workflow_call:\n    inputs:\n      runtime-refresh:\n        type: boolean\n        default: false\n      runtime-worker-sha:\n        type: string\n        default: ''\n      runtime-template-models-sha256:\n        type: string\n        default: ''\n      runtime-template-ids:\n        type: string\n        default: '{}'\n      runtime-release-artifact-id:\n        type: string\n        default: ''\n      runtime-release-sha256:\n        type: string\n        default: ''\npermissions:\n  contents: read"
+      },
+      {
+        "path": ".github/workflows/workspace-governance-acceptance.yml",
+        "sha": "c107a7699cc0bb91ac8d9eaf258361d2f04e51a4",
+        "header": "name: Workspace governance acceptance\n\n# Run the existing non-model Item 11 on GitHub's exact merge candidate.\n# acceptance.mjs intentionally refuses CI: this workflow uses its exported\n# business case and the existing isolated test-account bootstrap, with CI intact.\non:\n  pull_request:\n  merge_group:\n  push:\n    branches: [main]\n\npermissions:\n  contents: read\n\nconcurrency:\n  group: workspace-governance-${{ github.event_name }}-${{ github.ref }}${{ github.ref == 'refs/heads/main' && format('-{0}', github.run_id) || '' }}\n  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}\n"
+      }
+    ],
+    "summary": [
+      {
+        "path": ".github/workflows/analytics-ssr.yml",
+        "sha": "2a263858b477569d92f1694ed6bfddcd03469c56",
+        "push": false,
+        "sections": []
+      },
+      {
+        "path": ".github/workflows/app-icon.yml",
+        "sha": "2ad5b5fa99d72c4440c435bdd8f5bad44411bd36",
+        "push": false,
+        "sections": []
+      },
+      {
+        "path": ".github/workflows/browser-gate.yml",
+        "sha": "0717180c70f54f9af06ebe39d0f5b5ec207235c4",
+        "push": false,
+        "sections": []
+      },
+      {
+        "path": ".github/workflows/ci-selection.yml",
+        "sha": "5d541b4ff7be9cb365b18b804bbbe7c3db235580",
+        "push": false,
+        "sections": []
+      },
+      {
+        "path": ".github/workflows/cloud-computer.yml",
+        "sha": "1d91a07140966e8220e24153be6fdaff2b0aaf6c",
+        "push": false,
+        "sections": []
+      },
+      {
+        "path": ".github/workflows/credential-vault.yml",
+        "sha": "440712e2ca9e474e64970e8e03392b91e12acdca",
+        "push": true,
+        "sections": [
+          "  push:\n    branches: ['codex/180-account-credential-vault']"
+        ]
+      },
+      {
+        "path": ".github/workflows/desktop-release.yml",
+        "sha": "d254ed3ac47c943d57fc3dc79448b1752753078f",
+        "push": true,
+        "sections": [
+          "  push:\n    branches: [main]\n    paths:\n      - 'apps/desktop/**'\n      # Shared renderer source and build inputs are part of the shipped app.\n      - 'apps/frontend/**'\n      - 'app/\\[locale\\]/**'\n      - 'app/actions/**'\n      - 'app/fonts/**'\n      - 'app/globals.css'\n      - 'components/**'\n      - 'hooks/**'\n      - 'lib/**'\n      - 'messages/**'\n      - 'i18n/**'\n      - 'public/**'\n      - 'packages/config/**'\n      - 'instrumentation-client.ts'\n      - 'next.config.mjs'\n      - 'postcss.config.mjs'\n      - 'tsconfig.json'\n      - 'packages/daemon/**'\n      - 'packages/protocol/**'\n      - 'lib/daemon-commands.ts'\n      - 'lib/local-device-setup.ts'\n      - 'package.json'\n      - 'pnpm-lock.yaml'\n      - 'pnpm-workspace.yaml'\n      - 'patches/**'\n      - 'scripts/release/**'\n      - 'config/release-security.json'\n      - '.github/workflows/desktop-release.yml'"
+        ]
+      },
+      {
+        "path": ".github/workflows/desktop.yml",
+        "sha": "1cfd9d8be85015b639809faedc8a68fb83609399",
+        "push": false,
+        "sections": []
+      },
+      {
+        "path": ".github/workflows/device-gateway.yml",
+        "sha": "a0c0db030a9343caeffd371889bf40c13d06d2cc",
+        "push": true,
+        "sections": [
+          "  push:\n    branches: [main]\n    paths: &gateway_paths\n      - 'cloudflare/device-gateway/**'\n      - 'lib/device-gateway*.ts'\n      - 'lib/device-presence*.ts'\n      - 'lib/live/**'\n      - 'lib/db/commit-effects*.ts'\n      - 'hooks/use-live-key.tsx'\n      - 'app/api/live/**'\n      - 'scripts/device-gateway/**'\n      - '.github/workflows/device-gateway.yml'"
+        ]
+      },
+      {
+        "path": ".github/workflows/e2b-byos.yml",
+        "sha": "333e0674355baa72ce7bd00e7e57964fff8c7d6a",
+        "push": false,
+        "sections": []
+      },
+      {
+        "path": ".github/workflows/e2b-official-runtime.yml",
+        "sha": "97cdc7dfefb5dfbe00e733ccb5559fae8de2dfa9",
+        "push": true,
+        "sections": [
+          "  push:\n    branches: [main]\n    # An unrelated merge can obsolete an in-flight publication. Recheck the\n    # live worker on every main push; the check job still gates validation."
+        ]
+      },
+      {
+        "path": ".github/workflows/e2b-template.yml",
+        "sha": "bb948480beac3370335dd4b8ce59a01e6becf1f0",
+        "push": false,
+        "sections": []
+      },
+      {
+        "path": ".github/workflows/issue1415-deployed-production.yml",
+        "sha": "6d0b50becc99ce6d5f6cfb69cceea1037f2ee1be",
+        "push": false,
+        "sections": []
+      },
+      {
+        "path": ".github/workflows/issue1415-managed-inspection.yml",
+        "sha": "9ece51fc2a39c2d362446e68df1f9bbf2076f641",
+        "push": false,
+        "sections": []
+      },
+      {
+        "path": ".github/workflows/issues-1515-1517-cleanup.yml",
+        "sha": "402b01de60f16f041ab9d0bd3b2036ad820e760e",
+        "push": false,
+        "sections": []
+      },
+      {
+        "path": ".github/workflows/issues-1515-1517-diagnostics.yml",
+        "sha": "bb67205200d6777a626cecc3494762e49d491a5c",
+        "push": false,
+        "sections": []
+      },
+      {
+        "path": ".github/workflows/issues-1516-welcome-acceptance.yml",
+        "sha": "4757d62065017957f6e1e4300ab4695507ce40d8",
+        "push": false,
+        "sections": []
+      },
+      {
+        "path": ".github/workflows/local-device-node22.yml",
+        "sha": "d195f389292e1a84967fd9864063ac536b91bbaf",
+        "push": false,
+        "sections": []
+      },
+      {
+        "path": ".github/workflows/mobile-native.yml",
+        "sha": "a14280622e2e0cd44d79b809ef36bb6b1895cd38",
+        "push": true,
+        "sections": [
+          "  push:\n    branches: [main]\n    paths:\n      - 'apps/mobile/app.json'\n      - 'apps/mobile/app.config.ts'\n      - 'apps/mobile/eas.json'\n      - '.easignore'"
+        ]
+      },
+      {
+        "path": ".github/workflows/mobile-screenshots.yml",
+        "sha": "17cedf93280ec9955608c34c7b605f9df6704f4d",
+        "push": false,
+        "sections": []
+      },
+      {
+        "path": ".github/workflows/mobile-update.yml",
+        "sha": "0708d8d90ac94c96bd35f2cec0407d8b25d362f3",
+        "push": true,
+        "sections": [
+          "  push:\n    branches: [main]\n    paths: ['apps/mobile/**', 'packages/protocol/**']"
+        ]
+      },
+      {
+        "path": ".github/workflows/model-provider-fallback-acceptance.yml",
+        "sha": "316476e5015a5bc04c27a62d198f847784233201",
+        "push": false,
+        "sections": [
+          "  workflow_run:\n    workflows: [Web deploy]\n    types: [completed]"
+        ]
+      },
+      {
+        "path": ".github/workflows/production-readiness.yml",
+        "sha": "0cd039a6c28eeccf2a417ff4f3e09255b371be29",
+        "push": true,
+        "sections": [
+          "  push:\n    branches: [acceptance/proactive-1157-1163]\n    paths:\n      - '.github/workflows/production-readiness.yml'\n      - 'scripts/acceptance/production-readiness*'"
+        ]
+      },
+      {
+        "path": ".github/workflows/production-smoke.yml",
+        "sha": "67751d4d3a38989a635e5ee07ac0c8f0775a333e",
+        "push": false,
+        "sections": [
+          "  deployment_status:"
+        ]
+      },
+      {
+        "path": ".github/workflows/project-decisions-acceptance.yml",
+        "sha": "7be1af6692ab21d971bd091994c56a7a3ac159fe",
+        "push": false,
+        "sections": [
+          "  workflow_run:\n    workflows: [Web deploy]\n    types: [completed]"
+        ]
+      },
+      {
+        "path": ".github/workflows/publish-daemon.yml",
+        "sha": "c6f861a5ec36468ee9a65bc226613fbbabc797c2",
+        "push": true,
+        "sections": [
+          "  push:\n    branches: [main]\n    # Publish only when something that goes into the npm package changed.\n    # Every published version makes installed daemons upgrade and restart.\n    paths:\n      - 'packages/daemon/**'\n      - 'packages/protocol/**'\n      - 'packages/config/**'\n      - 'package.json'\n      - 'pnpm-lock.yaml'\n      - 'pnpm-workspace.yaml'\n      - 'patches/**'\n      - 'LICENSE'\n      - 'scripts/release/**'\n      - 'config/release-security.json'\n      - '.github/workflows/publish-daemon.yml'"
+        ]
+      },
+      {
+        "path": ".github/workflows/read-cache-production.yml",
+        "sha": "7ffa772dc65e85ae6665d7fb70f5d5a3b604da22",
+        "push": false,
+        "sections": [
+          "  workflow_run:\n    workflows: ['Web deploy']\n    types: [completed]\n    branches: [main]\n"
+        ]
+      },
+      {
+        "path": ".github/workflows/read-cache.yml",
+        "sha": "86ee0112413eae241189bb2d748a6d6901201c4f",
+        "push": false,
+        "sections": []
+      },
+      {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "sha": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+        "push": false,
+        "sections": []
+      },
+      {
+        "path": ".github/workflows/self-hosted-image.yml",
+        "sha": "3dc64ed2c8d58efdf981036e7bb6362e1bd92077",
+        "push": true,
+        "sections": [
+          "  push:\n    branches: [main]\n    tags: ['v*']"
+        ]
+      },
+      {
+        "path": ".github/workflows/self-hosted-production.yml",
+        "sha": "862a9f7cdea8df0373207e389f3cbf3afaca46df",
+        "push": false,
+        "sections": [
+          "  workflow_run:\n    workflows: ['Web deploy']\n    types: [completed]\n    branches: [main]\n"
+        ]
+      },
+      {
+        "path": ".github/workflows/self-hosting-ui.yml",
+        "sha": "5aa39770c0a4d6166e0088d5e1d84af746b57d58",
+        "push": false,
+        "sections": []
+      },
+      {
+        "path": ".github/workflows/site-search.yml",
+        "sha": "299e09591558bced0eafcc05c7d5a6d295078438",
+        "push": false,
+        "sections": []
+      },
+      {
+        "path": ".github/workflows/ssh-device-backend.yml",
+        "sha": "e980cb3cdf2bc1206972ca66c87f9bc990e2ac48",
+        "push": false,
+        "sections": []
+      },
+      {
+        "path": ".github/workflows/subagents.yml",
+        "sha": "116080d9d31bf85774dedac96f79a92235575706",
+        "push": true,
+        "sections": [
+          "  push:\n    branches: ['codex/342-runtime', 'codex/180-account-credential-vault', 'integration/**', 'integrate/**']"
+        ]
+      },
+      {
+        "path": ".github/workflows/suggestions-cron.yml",
+        "sha": "587693cbff72150a1212d0997aabee0aff1269ce",
+        "push": true,
+        "sections": [
+          "  push:\n    branches: [main]\n    paths: &minute_paths\n      - 'cloudflare/suggestions-cron/**'\n      - 'scripts/suggestions-cron/**'\n      - 'scripts/device-gateway/deploy.mjs'\n      - 'scripts/release/ci-gate.mjs'\n      - '.github/workflows/suggestions-cron.yml'"
+        ]
+      },
+      {
+        "path": ".github/workflows/task-secret-acceptance.yml",
+        "sha": "938ffc405cee597005d4503ab022ab1c3b0f934e",
+        "push": false,
+        "sections": [
+          "  workflow_run:\n    workflows: [E2B additive runtime release]\n    types: [completed]"
+        ]
+      },
+      {
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "sha": "42ae23945f798020ec068635e7621869fb427af2",
+        "push": false,
+        "sections": [
+          "  workflow_run:\n    workflows: [E2B additive runtime release]\n    types: [completed]"
+        ]
+      },
+      {
+        "path": ".github/workflows/ui-policy.yml",
+        "sha": "e3938ad5c343fb14d60709e014cb3d9a3189b104",
+        "push": true,
+        "sections": [
+          "  push:\n    branches: [main]"
+        ]
+      },
+      {
+        "path": ".github/workflows/unattended-sandbox.yml",
+        "sha": "91ebe7a22509c3e900eedf2d6f160c454da91b4e",
+        "push": false,
+        "sections": []
+      },
+      {
+        "path": ".github/workflows/web-deploy.yml",
+        "sha": "710f70c3528e1b8eb5c37f1be52c6442445bf9be",
+        "push": true,
+        "sections": [
+          "  push:\n    branches: [main]"
+        ]
+      },
+      {
+        "path": ".github/workflows/workspace-governance-acceptance.yml",
+        "sha": "c107a7699cc0bb91ac8d9eaf258361d2f04e51a4",
+        "push": true,
+        "sections": [
+          "  push:\n    branches: [main]\n"
+        ]
+      }
+    ]
+  },
+  "manifest": {
+    "path": ".github/issue1512-native-read-diagnostic.json",
+    "requiredKeys": [
+      "version",
+      "enabled",
+      "requestId",
+      "createdAt",
+      "expiresAt",
+      "baseCommit",
+      "baseTree",
+      "sourceCommit",
+      "sourceTree",
+      "overlay"
+    ],
+    "sourceShape": "S is a single-parent child of d2c containing exactly the reviewed observation paths; R is a single-parent child of S adding only this workflow and manifest; actual application revision is R",
+    "requestShape": "canonical JSON; fresh UUIDv4; <=90-minute creation-to-expiry duration; enabled true; exact first execution commit line includes UUID; initial GitHub push only and run_attempt 1",
+    "closing": "normal child commit on R, manifest enabled=false; first line ci: close native read diagnosis <requestId>; job-level if excludes closure before allocating a runner"
+  },
+  "resources": {
+    "currentlyActive": 0,
+    "created": 0,
+    "owner": "issue1512/native_diag_runner",
+    "provider": "github-actions",
+    "runner": "macos-26",
+    "jobTimeoutMinutes": 60,
+    "acceptanceStepTimeoutMinutes": 30,
+    "precondition": "postgresql@17 pg_isready returns 2 before owned start intent; an existing/rejecting server blocks without takeover",
+    "cleanup": "always owned-only brew services stop postgresql@17, then pg_isready exit2 and pg_ctl status exit3; closed receipt under original audited evidence directory",
+    "artifactExtraction": "none yet; original job log and each final ZIP assigned to native_diag_runner exactly once, only after terminal; any extraction VM must then be stopped/deleted/read back 404"
+  },
+  "privacy": {
+    "scope": "local GHA fixture database and local application, no production account/model/OAuth/Infisical delivery",
+    "diagnosticPath": ".cache/desktop-evidence/read-diagnostics.json",
+    "controlPath": ".cache/desktop-evidence/diagnostic-control",
+    "audits": [
+      "strict diagnostic schema CLI",
+      "strict control metadata schema",
+      "original scripts/test-accounts/cli.mjs audit-evidence --evidence .cache/desktop-evidence"
+    ],
+    "packageAudit": "original native-evidence.mjs unchanged; no new package report field",
+    "noRaw": [
+      "environment dumps",
+      "HTTP payloads",
+      "query parameters",
+      "credentials",
+      "messages",
+      "HAR"
+    ]
+  },
+  "limitations": [
+    "workflow and inline-script parsing are preparation evidence, not executed Node/macOS verification",
+    "timing changes caused by observation remain a diagnostic limitation; outcomes cannot retroactively prove unrecorded old events",
+    "original daemon installer may resolve a changed npm runtime; report its actual identity, do not silently pin it",
+    "a 60-minute hard job timeout may preempt always steps; hosted runner reclamation is distinct from an observed explicit PG cleanup receipt",
+    "source overlay and its diagnosis completeness are reviewed and supplied by current_source_review; this runner does not assert completeness",
+    "no branch ref, workflow run, production operation, original Actions log or ZIP was created/read by this preparation"
+  ]
+}

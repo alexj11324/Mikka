@@ -1,0 +1,667 @@
+{
+  "version": 1,
+  "purpose": "issue1512 native diagnostic terminal failure evidence",
+  "recordedAt": "2026-11-09 23:29:44 UTC",
+  "checkpointObservedAt": {
+    "current_time": "2026-11-09 23:27:41 UTC"
+  },
+  "head": "dc32133ba6d2db3303365bfa9e360fbc487ea0b5",
+  "source": "668f1a3543f8d007d0b1cae655a2595c1cfa657f",
+  "runId": 42719996457,
+  "runAttempt": 1,
+  "jobId": 129511219631,
+  "status": "completed",
+  "conclusion": "failure",
+  "runResponse": {
+    "id": 42719996457,
+    "name": "Issue 1512 native read-trigger diagnosis",
+    "node_id": "WFR_kwLOVRYxA88AAAAJ8k9qKQ",
+    "head_branch": "ops/1512-native-read-diagnostic-20261109",
+    "head_sha": "dc32133ba6d2db3303365bfa9e360fbc487ea0b5",
+    "path": ".github/workflows/issue1512-native-read-diagnostic.yml",
+    "display_title": "ci: diagnose native reads 1be17350-761f-4df3-bce8-1055a95a5437",
+    "run_number": 1,
+    "event": "push",
+    "status": "completed",
+    "conclusion": "failure",
+    "workflow_id": 412683104,
+    "check_suite_id": 115703997255,
+    "check_suite_node_id": "CS_kwDOVRYxA88AAAAa8H7jRw",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42719996457",
+    "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42719996457",
+    "pull_requests": [],
+    "created_at": "2026-11-09T23:23:00Z",
+    "updated_at": "2026-11-09T23:26:58Z",
+    "actor": {
+      "login": "alexj11324",
+      "id": 183887963,
+      "node_id": "U_kgDOCvXoWw",
+      "avatar_url": "https://avatars.githubusercontent.com/u/183887963?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/alexj11324",
+      "html_url": "https://github.com/alexj11324",
+      "followers_url": "https://api.github.com/users/alexj11324/followers",
+      "following_url": "https://api.github.com/users/alexj11324/following{/other_user}",
+      "gists_url": "https://api.github.com/users/alexj11324/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/alexj11324/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/alexj11324/subscriptions",
+      "organizations_url": "https://api.github.com/users/alexj11324/orgs",
+      "repos_url": "https://api.github.com/users/alexj11324/repos",
+      "events_url": "https://api.github.com/users/alexj11324/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/alexj11324/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "run_attempt": 1,
+    "referenced_workflows": [],
+    "run_started_at": "2026-11-09T23:23:00Z",
+    "triggering_actor": {
+      "login": "alexj11324",
+      "id": 183887963,
+      "node_id": "U_kgDOCvXoWw",
+      "avatar_url": "https://avatars.githubusercontent.com/u/183887963?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/alexj11324",
+      "html_url": "https://github.com/alexj11324",
+      "followers_url": "https://api.github.com/users/alexj11324/followers",
+      "following_url": "https://api.github.com/users/alexj11324/following{/other_user}",
+      "gists_url": "https://api.github.com/users/alexj11324/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/alexj11324/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/alexj11324/subscriptions",
+      "organizations_url": "https://api.github.com/users/alexj11324/orgs",
+      "repos_url": "https://api.github.com/users/alexj11324/repos",
+      "events_url": "https://api.github.com/users/alexj11324/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/alexj11324/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "jobs_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42719996457/jobs",
+    "logs_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42719996457/logs",
+    "check_suite_url": "https://api.github.com/repos/alexj11324/Mikka/check-suites/115703997255",
+    "artifacts_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42719996457/artifacts",
+    "cancel_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42719996457/cancel",
+    "rerun_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42719996457/rerun",
+    "previous_attempt_url": null,
+    "workflow_url": "https://api.github.com/repos/alexj11324/Mikka/actions/workflows/412683104",
+    "head_commit": {
+      "id": "dc32133ba6d2db3303365bfa9e360fbc487ea0b5",
+      "tree_id": "10b9ce122ca7e390bcc525b255174dde7c17ffd5",
+      "message": "ci: diagnose native reads 1be17350-761f-4df3-bce8-1055a95a5437\n\nRun the isolated observation-only issue #1512 candidate once on macOS ARM64. Preserve the original smoke, parity, lifecycle, query windows, FIRST pair, fixtures and application behavior. This diagnostic is not a budget acceptance or production result.",
+      "timestamp": "2026-11-09T23:21:10Z",
+      "author": {
+        "name": "Zhixuan Jiang",
+        "email": "zhixuanj@andrew.cmu.edu"
+      },
+      "committer": {
+        "name": "Zhixuan Jiang",
+        "email": "zhixuanj@andrew.cmu.edu"
+      }
+    },
+    "repository": {
+      "id": 1427517699,
+      "node_id": "R_kgDOVRYxAw",
+      "name": "Mikka",
+      "full_name": "alexj11324/Mikka",
+      "private": false,
+      "owner": {
+        "login": "alexj11324",
+        "id": 183887963,
+        "node_id": "U_kgDOCvXoWw",
+        "avatar_url": "https://avatars.githubusercontent.com/u/183887963?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/alexj11324",
+        "html_url": "https://github.com/alexj11324",
+        "followers_url": "https://api.github.com/users/alexj11324/followers",
+        "following_url": "https://api.github.com/users/alexj11324/following{/other_user}",
+        "gists_url": "https://api.github.com/users/alexj11324/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/alexj11324/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/alexj11324/subscriptions",
+        "organizations_url": "https://api.github.com/users/alexj11324/orgs",
+        "repos_url": "https://api.github.com/users/alexj11324/repos",
+        "events_url": "https://api.github.com/users/alexj11324/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/alexj11324/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "html_url": "https://github.com/alexj11324/Mikka",
+      "description": null,
+      "fork": false,
+      "url": "https://api.github.com/repos/alexj11324/Mikka",
+      "forks_url": "https://api.github.com/repos/alexj11324/Mikka/forks",
+      "keys_url": "https://api.github.com/repos/alexj11324/Mikka/keys{/key_id}",
+      "collaborators_url": "https://api.github.com/repos/alexj11324/Mikka/collaborators{/collaborator}",
+      "teams_url": "https://api.github.com/repos/alexj11324/Mikka/teams",
+      "hooks_url": "https://api.github.com/repos/alexj11324/Mikka/hooks",
+      "issue_events_url": "https://api.github.com/repos/alexj11324/Mikka/issues/events{/number}",
+      "events_url": "https://api.github.com/repos/alexj11324/Mikka/events",
+      "assignees_url": "https://api.github.com/repos/alexj11324/Mikka/assignees{/user}",
+      "branches_url": "https://api.github.com/repos/alexj11324/Mikka/branches{/branch}",
+      "tags_url": "https://api.github.com/repos/alexj11324/Mikka/tags",
+      "blobs_url": "https://api.github.com/repos/alexj11324/Mikka/git/blobs{/sha}",
+      "git_tags_url": "https://api.github.com/repos/alexj11324/Mikka/git/tags{/sha}",
+      "git_refs_url": "https://api.github.com/repos/alexj11324/Mikka/git/refs{/sha}",
+      "trees_url": "https://api.github.com/repos/alexj11324/Mikka/git/trees{/sha}",
+      "statuses_url": "https://api.github.com/repos/alexj11324/Mikka/statuses/{sha}",
+      "languages_url": "https://api.github.com/repos/alexj11324/Mikka/languages",
+      "stargazers_url": "https://api.github.com/repos/alexj11324/Mikka/stargazers",
+      "contributors_url": "https://api.github.com/repos/alexj11324/Mikka/contributors",
+      "subscribers_url": "https://api.github.com/repos/alexj11324/Mikka/subscribers",
+      "subscription_url": "https://api.github.com/repos/alexj11324/Mikka/subscription",
+      "commits_url": "https://api.github.com/repos/alexj11324/Mikka/commits{/sha}",
+      "git_commits_url": "https://api.github.com/repos/alexj11324/Mikka/git/commits{/sha}",
+      "comments_url": "https://api.github.com/repos/alexj11324/Mikka/comments{/number}",
+      "issue_comment_url": "https://api.github.com/repos/alexj11324/Mikka/issues/comments{/number}",
+      "contents_url": "https://api.github.com/repos/alexj11324/Mikka/contents/{+path}",
+      "compare_url": "https://api.github.com/repos/alexj11324/Mikka/compare/{base}...{head}",
+      "merges_url": "https://api.github.com/repos/alexj11324/Mikka/merges",
+      "archive_url": "https://api.github.com/repos/alexj11324/Mikka/{archive_format}{/ref}",
+      "downloads_url": "https://api.github.com/repos/alexj11324/Mikka/downloads",
+      "issues_url": "https://api.github.com/repos/alexj11324/Mikka/issues{/number}",
+      "pulls_url": "https://api.github.com/repos/alexj11324/Mikka/pulls{/number}",
+      "milestones_url": "https://api.github.com/repos/alexj11324/Mikka/milestones{/number}",
+      "notifications_url": "https://api.github.com/repos/alexj11324/Mikka/notifications{?since,all,participating}",
+      "labels_url": "https://api.github.com/repos/alexj11324/Mikka/labels{/name}",
+      "releases_url": "https://api.github.com/repos/alexj11324/Mikka/releases{/id}",
+      "deployments_url": "https://api.github.com/repos/alexj11324/Mikka/deployments"
+    },
+    "head_repository": {
+      "id": 1427517699,
+      "node_id": "R_kgDOVRYxAw",
+      "name": "Mikka",
+      "full_name": "alexj11324/Mikka",
+      "private": false,
+      "owner": {
+        "login": "alexj11324",
+        "id": 183887963,
+        "node_id": "U_kgDOCvXoWw",
+        "avatar_url": "https://avatars.githubusercontent.com/u/183887963?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/alexj11324",
+        "html_url": "https://github.com/alexj11324",
+        "followers_url": "https://api.github.com/users/alexj11324/followers",
+        "following_url": "https://api.github.com/users/alexj11324/following{/other_user}",
+        "gists_url": "https://api.github.com/users/alexj11324/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/alexj11324/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/alexj11324/subscriptions",
+        "organizations_url": "https://api.github.com/users/alexj11324/orgs",
+        "repos_url": "https://api.github.com/users/alexj11324/repos",
+        "events_url": "https://api.github.com/users/alexj11324/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/alexj11324/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "html_url": "https://github.com/alexj11324/Mikka",
+      "description": null,
+      "fork": false,
+      "url": "https://api.github.com/repos/alexj11324/Mikka",
+      "forks_url": "https://api.github.com/repos/alexj11324/Mikka/forks",
+      "keys_url": "https://api.github.com/repos/alexj11324/Mikka/keys{/key_id}",
+      "collaborators_url": "https://api.github.com/repos/alexj11324/Mikka/collaborators{/collaborator}",
+      "teams_url": "https://api.github.com/repos/alexj11324/Mikka/teams",
+      "hooks_url": "https://api.github.com/repos/alexj11324/Mikka/hooks",
+      "issue_events_url": "https://api.github.com/repos/alexj11324/Mikka/issues/events{/number}",
+      "events_url": "https://api.github.com/repos/alexj11324/Mikka/events",
+      "assignees_url": "https://api.github.com/repos/alexj11324/Mikka/assignees{/user}",
+      "branches_url": "https://api.github.com/repos/alexj11324/Mikka/branches{/branch}",
+      "tags_url": "https://api.github.com/repos/alexj11324/Mikka/tags",
+      "blobs_url": "https://api.github.com/repos/alexj11324/Mikka/git/blobs{/sha}",
+      "git_tags_url": "https://api.github.com/repos/alexj11324/Mikka/git/tags{/sha}",
+      "git_refs_url": "https://api.github.com/repos/alexj11324/Mikka/git/refs{/sha}",
+      "trees_url": "https://api.github.com/repos/alexj11324/Mikka/git/trees{/sha}",
+      "statuses_url": "https://api.github.com/repos/alexj11324/Mikka/statuses/{sha}",
+      "languages_url": "https://api.github.com/repos/alexj11324/Mikka/languages",
+      "stargazers_url": "https://api.github.com/repos/alexj11324/Mikka/stargazers",
+      "contributors_url": "https://api.github.com/repos/alexj11324/Mikka/contributors",
+      "subscribers_url": "https://api.github.com/repos/alexj11324/Mikka/subscribers",
+      "subscription_url": "https://api.github.com/repos/alexj11324/Mikka/subscription",
+      "commits_url": "https://api.github.com/repos/alexj11324/Mikka/commits{/sha}",
+      "git_commits_url": "https://api.github.com/repos/alexj11324/Mikka/git/commits{/sha}",
+      "comments_url": "https://api.github.com/repos/alexj11324/Mikka/comments{/number}",
+      "issue_comment_url": "https://api.github.com/repos/alexj11324/Mikka/issues/comments{/number}",
+      "contents_url": "https://api.github.com/repos/alexj11324/Mikka/contents/{+path}",
+      "compare_url": "https://api.github.com/repos/alexj11324/Mikka/compare/{base}...{head}",
+      "merges_url": "https://api.github.com/repos/alexj11324/Mikka/merges",
+      "archive_url": "https://api.github.com/repos/alexj11324/Mikka/{archive_format}{/ref}",
+      "downloads_url": "https://api.github.com/repos/alexj11324/Mikka/downloads",
+      "issues_url": "https://api.github.com/repos/alexj11324/Mikka/issues{/number}",
+      "pulls_url": "https://api.github.com/repos/alexj11324/Mikka/pulls{/number}",
+      "milestones_url": "https://api.github.com/repos/alexj11324/Mikka/milestones{/number}",
+      "notifications_url": "https://api.github.com/repos/alexj11324/Mikka/notifications{?since,all,participating}",
+      "labels_url": "https://api.github.com/repos/alexj11324/Mikka/labels{/name}",
+      "releases_url": "https://api.github.com/repos/alexj11324/Mikka/releases{/id}",
+      "deployments_url": "https://api.github.com/repos/alexj11324/Mikka/deployments"
+    }
+  },
+  "jobsResponse": {
+    "total_count": 1,
+    "jobs": [
+      {
+        "id": 129511219631,
+        "run_id": 42719996457,
+        "workflow_name": "Issue 1512 native read-trigger diagnosis",
+        "head_branch": "ops/1512-native-read-diagnostic-20261109",
+        "run_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42719996457",
+        "run_attempt": 1,
+        "node_id": "CR_kwDOVRYxA88AAAAeJ3hhrw",
+        "head_sha": "dc32133ba6d2db3303365bfa9e360fbc487ea0b5",
+        "url": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129511219631",
+        "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42719996457/job/129511219631",
+        "status": "completed",
+        "conclusion": "failure",
+        "created_at": "2026-11-09T23:23:00Z",
+        "started_at": "2026-11-09T23:23:15Z",
+        "completed_at": "2026-11-09T23:26:58Z",
+        "name": "Isolated native read-trigger diagnosis",
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1,
+            "started_at": "2026-11-09T23:23:16Z",
+            "completed_at": "2026-11-09T23:23:17Z"
+          },
+          {
+            "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2,
+            "started_at": "2026-11-09T23:23:17Z",
+            "completed_at": "2026-11-09T23:23:23Z"
+          },
+          {
+            "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3,
+            "started_at": "2026-11-09T23:23:23Z",
+            "completed_at": "2026-11-09T23:23:25Z"
+          },
+          {
+            "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4,
+            "started_at": "2026-11-09T23:23:25Z",
+            "completed_at": "2026-11-09T23:24:23Z"
+          },
+          {
+            "name": "Verify the one-shot diagnostic source and request",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 5,
+            "started_at": "2026-11-09T23:24:23Z",
+            "completed_at": "2026-11-09T23:24:25Z"
+          },
+          {
+            "name": "Run test \"$(uname -m)\" = arm64",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 6,
+            "started_at": "2026-11-09T23:24:25Z",
+            "completed_at": "2026-11-09T23:24:25Z"
+          },
+          {
+            "name": "Run pnpm install --frozen-lockfile",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 7,
+            "started_at": "2026-11-09T23:24:25Z",
+            "completed_at": "2026-11-09T23:25:42Z"
+          },
+          {
+            "name": "Check diagnostic syntax and renderer types before building",
+            "status": "completed",
+            "conclusion": "failure",
+            "number": 8,
+            "started_at": "2026-11-09T23:25:42Z",
+            "completed_at": "2026-11-09T23:26:51Z"
+          },
+          {
+            "name": "Keep setup-node 24 in the native installer login shell",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 9,
+            "started_at": "2026-11-09T23:26:51Z",
+            "completed_at": "2026-11-09T23:26:51Z"
+          },
+          {
+            "name": "Prepare the pinned native Electron and builder checksum cache",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 10,
+            "started_at": "2026-11-09T23:26:51Z",
+            "completed_at": "2026-11-09T23:26:51Z"
+          },
+          {
+            "name": "Run pnpm exec playwright install chromium",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 11,
+            "started_at": "2026-11-09T23:26:51Z",
+            "completed_at": "2026-11-09T23:26:51Z"
+          },
+          {
+            "name": "Start an independent local PostgreSQL",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 12,
+            "started_at": "2026-11-09T23:26:51Z",
+            "completed_at": "2026-11-09T23:26:51Z"
+          },
+          {
+            "name": "Generate ephemeral test-only auth secret",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 13,
+            "started_at": "2026-11-09T23:26:51Z",
+            "completed_at": "2026-11-09T23:26:51Z"
+          },
+          {
+            "name": "Run pnpm migrate && pnpm test:e2e:setup",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 14,
+            "started_at": "2026-11-09T23:26:51Z",
+            "completed_at": "2026-11-09T23:26:51Z"
+          },
+          {
+            "name": "Build the production API for the native ARM64 runtime",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 15,
+            "started_at": "2026-11-09T23:26:51Z",
+            "completed_at": "2026-11-09T23:26:51Z"
+          },
+          {
+            "name": "Select Xcode 26",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 16,
+            "started_at": "2026-11-09T23:26:51Z",
+            "completed_at": "2026-11-09T23:26:51Z"
+          },
+          {
+            "name": "Package an inspector-enabled harness input",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 17,
+            "started_at": "2026-11-09T23:26:51Z",
+            "completed_at": "2026-11-09T23:26:51Z"
+          },
+          {
+            "name": "Real Keychain encryption across three independent packaged processes",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 18,
+            "started_at": "2026-11-09T23:26:51Z",
+            "completed_at": "2026-11-09T23:26:51Z"
+          },
+          {
+            "name": "Real packaged Apple Silicon native acceptance",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 19,
+            "started_at": "2026-11-09T23:26:51Z",
+            "completed_at": "2026-11-09T23:26:51Z"
+          },
+          {
+            "name": "Stop only this diagnostic run's PostgreSQL",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 20,
+            "started_at": "2026-11-09T23:26:51Z",
+            "completed_at": "2026-11-09T23:26:51Z"
+          },
+          {
+            "name": "Audit closed diagnostic control receipts",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 21,
+            "started_at": "2026-11-09T23:26:51Z",
+            "completed_at": "2026-11-09T23:26:51Z"
+          },
+          {
+            "name": "Keep final package integrity evidence",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 22,
+            "started_at": "2026-11-09T23:26:51Z",
+            "completed_at": "2026-11-09T23:26:52Z"
+          },
+          {
+            "name": "Audit closed package and crypto reports",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 23,
+            "started_at": "2026-11-09T23:26:52Z",
+            "completed_at": "2026-11-09T23:26:52Z"
+          },
+          {
+            "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 24,
+            "started_at": "2026-11-09T23:26:52Z",
+            "completed_at": "2026-11-09T23:26:53Z"
+          },
+          {
+            "name": "Audit the closed read-trigger diagnostic",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 25,
+            "started_at": "2026-11-09T23:26:53Z",
+            "completed_at": "2026-11-09T23:26:53Z"
+          },
+          {
+            "name": "Audit native evidence",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 26,
+            "started_at": "2026-11-09T23:26:53Z",
+            "completed_at": "2026-11-09T23:26:53Z"
+          },
+          {
+            "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 27,
+            "started_at": "2026-11-09T23:26:53Z",
+            "completed_at": "2026-11-09T23:26:53Z"
+          },
+          {
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "completed",
+            "conclusion": "skipped",
+            "number": 52,
+            "started_at": "2026-11-09T23:26:53Z",
+            "completed_at": "2026-11-09T23:26:53Z"
+          },
+          {
+            "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 53,
+            "started_at": "2026-11-09T23:26:53Z",
+            "completed_at": "2026-11-09T23:26:53Z"
+          },
+          {
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 54,
+            "started_at": "2026-11-09T23:26:53Z",
+            "completed_at": "2026-11-09T23:26:55Z"
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 55,
+            "started_at": "2026-11-09T23:26:55Z",
+            "completed_at": "2026-11-09T23:26:56Z"
+          }
+        ],
+        "check_run_url": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129511219631",
+        "labels": [
+          "macos-26"
+        ],
+        "runner_id": 1000240747,
+        "runner_name": "GitHub Actions 1000240747",
+        "runner_group_id": 0,
+        "runner_group_name": "GitHub Actions"
+      }
+    ]
+  },
+  "artifactResponse": {
+    "total_count": 0,
+    "artifacts": []
+  },
+  "logs": [
+    {
+      "name": "native-diagnostic-42719996457-job129511219631.log",
+      "sha": "0f7d072ea0ea4ff7bed2c61730231a9048b0a592",
+      "bytes": 90132,
+      "sha256": "4a78d737cd3628c88f538e13f91ac8d73e2945b9833ef0339b8047f11c12b3a5"
+    },
+    {
+      "name": "native-diagnostic-42719996457-job129511219631-wrapper.json",
+      "sha": "bba548983c1bdab3dfa8e2e4b351ff47eb6c2d14",
+      "bytes": 93415,
+      "sha256": "cf3c6d3ba958c60329f81640fb57d02eddf4a9af43155e6565fd503509a6c699"
+    }
+  ],
+  "hardCredentialPatternScan": {
+    "findings": 0,
+    "scope": "specific token/private-key literals only, not comprehensive privacy assurance"
+  },
+  "failure": {
+    "stage": "renderer typecheck before any PG/build/acceptance",
+    "command": "tsc --noEmit -p tsconfig.renderer.json",
+    "reportedCause": "FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory",
+    "exitStatus": 134,
+    "heapObservedMiB": {
+      "scavengeUsed": 2038.9,
+      "scavengeTotal": 2050.8,
+      "markCompactUsed": 2041.3,
+      "markCompactTotal": 2055.1
+    },
+    "typescriptDiagnosticObserved": false,
+    "excerpt": {
+      "line": 647,
+      "text": "2026-11-09T23:25:42.6886590Z   BETTER_AUTH_URL: http://localhost:3000\n2026-11-09T23:25:42.6886880Z   AUTH_TRUSTED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000\n2026-11-09T23:25:42.6887160Z   NEXT_TELEMETRY_DISABLED: 1\n2026-11-09T23:25:42.6887420Z   MIKKA_TEST_DEPLOYMENT_SHA: dc32133ba6d2db3303365bfa9e360fbc487ea0b5\n2026-11-09T23:25:42.6887750Z   MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json\n2026-11-09T23:25:42.6888010Z   MIKKA_DESKTOP_FLAVOR: dev\n2026-11-09T23:25:42.6888220Z   PNPM_HOME: /Users/runner/setup-pnpm/node_modules/.bin\n2026-11-09T23:25:42.6888450Z ##[endgroup]\n2026-11-09T23:25:43.0741240Z \n2026-11-09T23:25:43.0765910Z > @mikka/desktop@0.1.2 typecheck /Users/runner/work/Mikka/Mikka/apps/desktop\n2026-11-09T23:25:43.0772560Z > tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.renderer.json\n2026-11-09T23:25:43.0773510Z \n2026-11-09T23:26:50.8778790Z \n2026-11-09T23:26:50.8879130Z <--- Last few GCs --->\n2026-11-09T23:26:50.8980370Z \n2026-11-09T23:26:50.9083120Z [7135:0x9bf40c000]    64901 ms: Scavenge 2038.9 (2050.8) -> 2037.4 (2055.1) MB, pooled: 0 MB, 2.50 / 0.00 ms  (average mu = 0.340, current mu = 0.394) allocation failure; \n2026-11-09T23:26:50.9182740Z [7135:0x9bf40c000]    65415 ms: Mark-Compact 2041.3 (2055.1) -> 2033.6 (2055.3) MB, pooled: 0 MB, 504.62 / 0.00 ms  (average mu = 0.318, current mu = 0.294) allocation failure; scavenge might not succeed\n2026-11-09T23:26:50.9284080Z \n2026-11-09T23:26:50.9385360Z FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory\n2026-11-09T23:26:50.9485860Z ----- Native stack trace -----\n2026-11-09T23:26:50.9587180Z \n2026-11-09T23:26:50.9689260Z  1: 0x10288f60c node::(anonymous namespace)::DefaultAbortHandler(char const*, char const*) [/Users/runner/hostedtoolcache/node/24.22.2/arm64/bin/node]\n2026-11-09T23:26:50.9795150Z  2: 0x10288f870 node::OOMErrorHandler(char const*, v8::OOMDetails const&) [/Users/runner/hostedtoolcache/node/24.22.2/arm64/bin/node]\n2026-11-09T23:26:50.9898940Z  3: 0x102b22d94 v8::internal::V8::FatalProcessOutOfMemory(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [/Users/runner/hostedtoolcache/node/24.22.2/arm64/bin/node]\n2026-11-09T23:26:51.0001560Z  4: 0x102d82c88 v8::internal::Heap::stack() [/Users/runner/hostedtoolcache/node/24.22.2/arm64/bin/node]"
+    },
+    "abortLog": "sh: line 1: 7135 Abort trap: 6 tsc --noEmit -p tsconfig.renderer.json",
+    "mjsSyntaxChecks": "both commands precede successful entry into typecheck under bash -e; no direct per-command report, only sequential exit control",
+    "runtimeWorkflowYamlParse": "not reached because it follows failing typecheck"
+  },
+  "actualReceipts": {
+    "source": {
+      "line": 326,
+      "time": "2026-11-09T23:24:25.2853230Z",
+      "value": {
+        "status": "source_verified",
+        "requestId": "1be17350-761f-4df3-bce8-1055a95a5437",
+        "executionCommit": "dc32133ba6d2db3303365bfa9e360fbc487ea0b5",
+        "sourceCommit": "668f1a3543f8d007d0b1cae655a2595c1cfa657f",
+        "overlayFiles": 8
+      },
+      "rawLine": "2026-11-09T23:24:25.2853230Z {\"status\":\"source_verified\",\"requestId\":\"1be17350-761f-4df3-bce8-1055a95a5437\",\"executionCommit\":\"dc32133ba6d2db3303365bfa9e360fbc487ea0b5\",\"sourceCommit\":\"668f1a3543f8d007d0b1cae655a2595c1cfa657f\",\"overlayFiles\":8}"
+    },
+    "audit": {
+      "line": 917,
+      "time": "2026-11-09T23:26:51.9682690Z",
+      "value": {
+        "status": "diagnostic_control_audited",
+        "files": [
+          {
+            "name": "cleanup.json",
+            "bytes": 476,
+            "sha256": "b169c0e20d47b7c2de6547ea2e943fbbf816e575b6984845100efdb9cfa20e8e"
+          },
+          {
+            "name": "source-manifest.json",
+            "bytes": 1850,
+            "sha256": "e563c42d3bb4340eceb72e5ca98a5e56496599486617bc0d19cba67d03a656a2"
+          },
+          {
+            "name": "source.json",
+            "bytes": 2554,
+            "sha256": "e6e50cd60b8063a65ad54b67f1c1cc20ccadbc032f6265a53e2efdee2a6273bb"
+          }
+        ]
+      },
+      "rawLine": "2026-11-09T23:26:51.9682690Z {\"status\":\"diagnostic_control_audited\",\"files\":[{\"name\":\"cleanup.json\",\"bytes\":476,\"sha256\":\"b169c0e20d47b7c2de6547ea2e943fbbf816e575b6984845100efdb9cfa20e8e\"},{\"name\":\"source-manifest.json\",\"bytes\":1850,\"sha256\":\"e563c42d3bb4340eceb72e5ca98a5e56496599486617bc0d19cba67d03a656a2\"},{\"name\":\"source.json\",\"bytes\":2554,\"sha256\":\"e6e50cd60b8063a65ad54b67f1c1cc20ccadbc032f6265a53e2efdee2a6273bb\"}]}"
+    },
+    "cleanup": {
+      "line": 863,
+      "time": "2026-11-09T23:26:51.8069390Z",
+      "value": {
+        "version": 1,
+        "owner": "issue1512/native_diag_runner",
+        "service": "postgresql@17",
+        "startedAt": "2026-11-09T23:26:51.782Z",
+        "postgresStepOutcome": "skipped",
+        "observation": "no_owned_start_intent_observed",
+        "ownedStartRequested": false,
+        "stopRequested": false,
+        "stopExitCode": null,
+        "readyExitCode": null,
+        "controlStatusExitCode": null,
+        "passed": true,
+        "failure": null,
+        "controlEvidenceCopied": true,
+        "finishedAt": "2026-11-09T23:26:51.804Z"
+      },
+      "rawLine": "2026-11-09T23:26:51.8069390Z {\"version\":1,\"owner\":\"issue1512/native_diag_runner\",\"service\":\"postgresql@17\",\"startedAt\":\"2026-11-09T23:26:51.782Z\",\"postgresStepOutcome\":\"skipped\",\"observation\":\"no_owned_start_intent_observed\",\"ownedStartRequested\":false,\"stopRequested\":false,\"stopExitCode\":null,\"readyExitCode\":null,\"controlStatusExitCode\":null,\"passed\":true,\"failure\":null,\"controlEvidenceCopied\":true,\"finishedAt\":\"2026-11-09T23:26:51.804Z\"}"
+    }
+  },
+  "cleanup": {
+    "sha": "0ef8f1c11b9839e455113f0d9e592c9e8abc7d3a",
+    "bytes": 476,
+    "sha256": "b169c0e20d47b7c2de6547ea2e943fbbf816e575b6984845100efdb9cfa20e8e",
+    "provenance": "canonical file bytes reconstructed from actual unmodified stdout JSON; matches actual closed audit file bytes and SHA256",
+    "sourceLogLine": 863,
+    "auditLogLine": 917,
+    "value": {
+      "version": 1,
+      "owner": "issue1512/native_diag_runner",
+      "service": "postgresql@17",
+      "startedAt": "2026-11-09T23:26:51.782Z",
+      "postgresStepOutcome": "skipped",
+      "observation": "no_owned_start_intent_observed",
+      "ownedStartRequested": false,
+      "stopRequested": false,
+      "stopExitCode": null,
+      "readyExitCode": null,
+      "controlStatusExitCode": null,
+      "passed": true,
+      "failure": null,
+      "controlEvidenceCopied": true,
+      "finishedAt": "2026-11-09T23:26:51.804Z"
+    }
+  },
+  "boundaries": {
+    "postgresStep": "skipped",
+    "authSecretStep": "skipped",
+    "applicationBuild": "skipped",
+    "packaging": "skipped",
+    "crypto": "skipped",
+    "acceptance": "skipped",
+    "newDiagnosticObservations": "none; application not started",
+    "artifacts": 0,
+    "packageAuditEmpty": "audit step success over no reports; upload explicitly states no files, not a package pass",
+    "originalJobLogReadCount": 1,
+    "originalArtifactZipReadCount": 0,
+    "extractionVMCreated": 0,
+    "sourceOrOpsRefChangesAfterPublication": 0,
+    "reruns": 0,
+    "productionCases": 0,
+    "formalNativeBudget": "unchanged FAIL 424 > 358"
+  },
+  "nextCandidateReason": "change only demonstrated runner typecheck heap allowance, scoped to this prebuild step; original build already uses --max-old-space-size=6144; no old R rerun or budget assertion"
+}

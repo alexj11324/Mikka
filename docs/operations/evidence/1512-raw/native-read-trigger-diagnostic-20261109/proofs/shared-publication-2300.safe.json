@@ -1,0 +1,671 @@
+{
+  "schema": "mikka.issue1512.shared-publication-one-shot-checkpoint.v1",
+  "observationStartUtc": "2026-11-09T22:59:10.024Z",
+  "observationEndUtc": "2026-11-09T23:00:14.051Z",
+  "recordedAtUtc": "2026-11-09T23:02:04.457Z",
+  "scope": "One bounded read-only checkpoint; stop after freezing this blob. No continuous watch.",
+  "repository": "alexj11324/Mikka",
+  "priorCheckpoint": {
+    "commit": "bcb93bb106055dd0ecb71ff6baed6b6913fe54ca",
+    "prefix": "docs/operations/evidence/1512-raw/gate-completion-d2c3-budget-red-20261109",
+    "equivalenceProof": "99d990af44faedb40c86c8ebe98a866cc0a7011a",
+    "sharedProofs": [
+      "e474fd95c5e1b23996474ecca35249244ba4f133",
+      "aefa070a7be5a64f4ecf03231b74d98f1f6ff710"
+    ],
+    "notRecomputed": true
+  },
+  "actualMain": {
+    "ref": "refs/heads/main",
+    "head": "fabe4271eb1b739e7f6598ae404b3a655bb177c8",
+    "tree": "2154f40b94179f8db3be5a20fd3b4f265c6bf262",
+    "parents": [
+      "1c7698655405b289d7fdbd814713d15e542cc2bb",
+      "91472edf593840e97f4cfb18f5bf6edce30f677a"
+    ],
+    "committedAtUtc": "2026-11-09T22:26:33Z",
+    "mergePullRequest": 1841,
+    "subject": "Merge pull request #1841 from alexj11324/fix/core-cleanup-1826",
+    "evidenceClass": "fresh-Git-API"
+  },
+  "batch1844": {
+    "number": 1844,
+    "url": "https://github.com/alexj11324/Mikka/pull/1844",
+    "state": "open",
+    "merged": false,
+    "head": "62b5783a61a199f886a2d71d2914f85b3bf6cfc7",
+    "baseSnapshot": "1c7698655405b289d7fdbd814713d15e542cc2bb",
+    "updatedAtUtc": "2026-11-09T22:54:18Z",
+    "mergeable": true,
+    "mergeableState": "clean",
+    "syntheticHint": "ec908bc419ead3e8a281fec7d91ffcc0e76f2199",
+    "baseSnapshotIsNotActualMainRef": true,
+    "ci": {
+      "id": 42710712714,
+      "name": "CI",
+      "path": ".github/workflows/ui-policy.yml",
+      "head": "62b5783a61a199f886a2d71d2914f85b3bf6cfc7",
+      "event": "pull_request",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAtUtc": "2026-11-09T22:18:39Z",
+      "updatedAtUtc": "2026-11-09T22:47:57Z",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42710712714"
+    },
+    "independentlyVerified": "This checkpoint independently verifies only this main CI run metadata and exact PR head, not all 9 owner-reported workflows or original test logs.",
+    "ownerClaims": {
+      "comment": 6753599595,
+      "workflowsSuccess": 9,
+      "checksSuccess": 35,
+      "checksSkipped": 7,
+      "mainCiJobsSuccess": 21,
+      "mainCiJobsSkipped": 1,
+      "independentOriginalReadHere": false
+    },
+    "futureCombination": {
+      "treeOwnerReported": "1348e6ed748cd02badfaf6bdbdfc8de9040777ab",
+      "tested": false,
+      "interpretation": "Owner conditional combination; no new union tree or ref created here."
+    }
+  },
+  "oldUiMain1c": {
+    "head": "1c7698655405b289d7fdbd814713d15e542cc2bb",
+    "web": {
+      "runId": 42705513711,
+      "conclusion": "success"
+    },
+    "r7": {
+      "runId": 42705513501,
+      "conclusion": "failure",
+      "publish": "skipped",
+      "cleanup": "success",
+      "exactFailureStep": null,
+      "exactFailureCause": null
+    },
+    "source": "Reused CP50 immutable shared publication observations and Root-provided terminal facts; no original logs or artifacts fetched.",
+    "newFailureExplanationInReviewedComments": false,
+    "scope": "Do not import the old failure cause, cleanup or runtime conclusion into the new fabe run."
+  },
+  "currentMainRuns": {
+    "apiTotal": 18,
+    "pages": 1,
+    "perPage": 100,
+    "complete": true,
+    "runs": [
+      {
+        "id": 42716179327,
+        "name": "Task Secret scoped external acceptance",
+        "path": ".github/workflows/task-secret-acceptance.yml",
+        "head": "fabe4271eb1b739e7f6598ae404b3a655bb177c8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAtUtc": "2026-11-09T22:55:50Z",
+        "updatedAtUtc": "2026-11-09T22:55:52Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42716179327"
+      },
+      {
+        "id": 42716179320,
+        "name": "Task VM question-resume evidence",
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "head": "fabe4271eb1b739e7f6598ae404b3a655bb177c8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAtUtc": "2026-11-09T22:55:50Z",
+        "updatedAtUtc": "2026-11-09T22:56:00Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42716179320"
+      },
+      {
+        "id": 42716101499,
+        "name": "Issue 1225 model provider acceptance",
+        "path": ".github/workflows/model-provider-fallback-acceptance.yml",
+        "head": "fabe4271eb1b739e7f6598ae404b3a655bb177c8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAtUtc": "2026-11-09T22:55:18Z",
+        "updatedAtUtc": "2026-11-09T22:55:28Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42716101499"
+      },
+      {
+        "id": 42716101487,
+        "name": "Project decisions production acceptance",
+        "path": ".github/workflows/project-decisions-acceptance.yml",
+        "head": "fabe4271eb1b739e7f6598ae404b3a655bb177c8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAtUtc": "2026-11-09T22:55:18Z",
+        "updatedAtUtc": "2026-11-09T22:55:19Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42716101487"
+      },
+      {
+        "id": 42716101600,
+        "name": "Mikka cloud core compatibility",
+        "path": ".github/workflows/self-hosted-production.yml",
+        "head": "fabe4271eb1b739e7f6598ae404b3a655bb177c8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "createdAtUtc": "2026-11-09T22:55:18Z",
+        "updatedAtUtc": "2026-11-09T22:58:28Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42716101600"
+      },
+      {
+        "id": 42716101573,
+        "name": "Read cache production acceptance",
+        "path": ".github/workflows/read-cache-production.yml",
+        "head": "fabe4271eb1b739e7f6598ae404b3a655bb177c8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "in_progress",
+        "conclusion": null,
+        "createdAtUtc": "2026-11-09T22:55:18Z",
+        "updatedAtUtc": "2026-11-09T22:59:39Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42716101573"
+      },
+      {
+        "id": 42713706852,
+        "name": "Task VM question-resume evidence",
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "head": "fabe4271eb1b739e7f6598ae404b3a655bb177c8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAtUtc": "2026-11-09T22:38:39Z",
+        "updatedAtUtc": "2026-11-09T22:38:40Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42713706852"
+      },
+      {
+        "id": 42713706939,
+        "name": "Task Secret scoped external acceptance",
+        "path": ".github/workflows/task-secret-acceptance.yml",
+        "head": "fabe4271eb1b739e7f6598ae404b3a655bb177c8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAtUtc": "2026-11-09T22:38:39Z",
+        "updatedAtUtc": "2026-11-09T22:38:40Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42713706939"
+      },
+      {
+        "id": 42712762250,
+        "name": "Task Secret scoped external acceptance",
+        "path": ".github/workflows/task-secret-acceptance.yml",
+        "head": "fabe4271eb1b739e7f6598ae404b3a655bb177c8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAtUtc": "2026-11-09T22:32:19Z",
+        "updatedAtUtc": "2026-11-09T22:32:29Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42712762250"
+      },
+      {
+        "id": 42712762521,
+        "name": "Task VM question-resume evidence",
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "head": "fabe4271eb1b739e7f6598ae404b3a655bb177c8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAtUtc": "2026-11-09T22:32:19Z",
+        "updatedAtUtc": "2026-11-09T22:32:20Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42712762521"
+      },
+      {
+        "id": 42712346556,
+        "name": "Task VM question-resume evidence",
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "head": "fabe4271eb1b739e7f6598ae404b3a655bb177c8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAtUtc": "2026-11-09T22:29:35Z",
+        "updatedAtUtc": "2026-11-09T22:29:41Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42712346556"
+      },
+      {
+        "id": 42712346518,
+        "name": "Task Secret scoped external acceptance",
+        "path": ".github/workflows/task-secret-acceptance.yml",
+        "head": "fabe4271eb1b739e7f6598ae404b3a655bb177c8",
+        "event": "workflow_run",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAtUtc": "2026-11-09T22:29:35Z",
+        "updatedAtUtc": "2026-11-09T22:29:36Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42712346518"
+      },
+      {
+        "id": 42711918642,
+        "name": "CI",
+        "path": ".github/workflows/ui-policy.yml",
+        "head": "fabe4271eb1b739e7f6598ae404b3a655bb177c8",
+        "event": "push",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "createdAtUtc": "2026-11-09T22:26:37Z",
+        "updatedAtUtc": "2026-11-09T22:34:47Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42711918642"
+      },
+      {
+        "id": 42711918331,
+        "name": "Workspace governance acceptance",
+        "path": ".github/workflows/workspace-governance-acceptance.yml",
+        "head": "fabe4271eb1b739e7f6598ae404b3a655bb177c8",
+        "event": "push",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "createdAtUtc": "2026-11-09T22:26:36Z",
+        "updatedAtUtc": "2026-11-09T22:28:34Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42711918331"
+      },
+      {
+        "id": 42711918190,
+        "name": "Self-hosted image",
+        "path": ".github/workflows/self-hosted-image.yml",
+        "head": "fabe4271eb1b739e7f6598ae404b3a655bb177c8",
+        "event": "push",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "createdAtUtc": "2026-11-09T22:26:36Z",
+        "updatedAtUtc": "2026-11-09T22:44:26Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42711918190"
+      },
+      {
+        "id": 42711918408,
+        "name": "E2B additive runtime release",
+        "path": ".github/workflows/e2b-official-runtime.yml",
+        "head": "fabe4271eb1b739e7f6598ae404b3a655bb177c8",
+        "event": "push",
+        "attempt": 1,
+        "status": "pending",
+        "conclusion": null,
+        "createdAtUtc": "2026-11-09T22:26:36Z",
+        "updatedAtUtc": "2026-11-09T22:55:29Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42711918408"
+      },
+      {
+        "id": 42711918078,
+        "name": "Desktop release",
+        "path": ".github/workflows/desktop-release.yml",
+        "head": "fabe4271eb1b739e7f6598ae404b3a655bb177c8",
+        "event": "push",
+        "attempt": 1,
+        "status": "in_progress",
+        "conclusion": null,
+        "createdAtUtc": "2026-11-09T22:26:36Z",
+        "updatedAtUtc": "2026-11-09T22:55:30Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42711918078"
+      },
+      {
+        "id": 42711918175,
+        "name": "Web deploy",
+        "path": ".github/workflows/web-deploy.yml",
+        "head": "fabe4271eb1b739e7f6598ae404b3a655bb177c8",
+        "event": "push",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "createdAtUtc": "2026-11-09T22:26:36Z",
+        "updatedAtUtc": "2026-11-09T22:55:16Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42711918175"
+      }
+    ]
+  },
+  "currentR7": {
+    "runId": 42711918408,
+    "attempt": 1,
+    "head": "fabe4271eb1b739e7f6598ae404b3a655bb177c8",
+    "runStatus": "pending",
+    "runConclusion": null,
+    "jobsObservedAtUtc": "2026-11-09T23:00:14.051Z",
+    "jobs": [
+      {
+        "id": 129483393069,
+        "name": "test",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAtUtc": "2026-11-09T22:26:40Z",
+        "completedAtUtc": "2026-11-09T22:26:59Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42711918408/job/129483393069",
+        "steps": []
+      },
+      {
+        "id": 129483578614,
+        "name": "check",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAtUtc": "2026-11-09T22:27:02Z",
+        "completedAtUtc": "2026-11-09T22:27:23Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42711918408/job/129483578614",
+        "steps": []
+      },
+      {
+        "id": 129483793337,
+        "name": "validate / build",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAtUtc": "2026-11-09T22:27:26Z",
+        "completedAtUtc": "2026-11-09T22:36:01Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42711918408/job/129483793337",
+        "steps": [
+          {
+            "number": 7,
+            "name": "Build private versioned candidates and require official file conservation",
+            "status": "completed",
+            "conclusion": "success",
+            "completedAtUtc": "2026-11-09T22:35:56Z"
+          },
+          {
+            "number": 8,
+            "name": "Preserve the complete private candidate report",
+            "status": "completed",
+            "conclusion": "success",
+            "completedAtUtc": "2026-11-09T22:35:57Z"
+          },
+          {
+            "number": 9,
+            "name": "Close leftover probes and failed private builds",
+            "status": "completed",
+            "conclusion": "success",
+            "completedAtUtc": "2026-11-09T22:35:57Z"
+          },
+          {
+            "number": 10,
+            "name": "Preserve candidate build cleanup receipt",
+            "status": "completed",
+            "conclusion": "success",
+            "completedAtUtc": "2026-11-09T22:35:58Z"
+          }
+        ]
+      },
+      {
+        "id": 129488270570,
+        "name": "await-web",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAtUtc": "2026-11-09T22:36:04Z",
+        "completedAtUtc": "2026-11-09T22:55:28Z",
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42711918408/job/129488270570",
+        "steps": [
+          {
+            "number": 4,
+            "name": "Await this source's actual Web build and public version",
+            "status": "completed",
+            "conclusion": "success",
+            "completedAtUtc": "2026-11-09T22:55:25Z"
+          }
+        ]
+      },
+      {
+        "id": 129497985965,
+        "name": "subscriptions",
+        "status": "pending",
+        "conclusion": null,
+        "startedAtUtc": "2026-11-09T22:55:28Z",
+        "completedAtUtc": null,
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42711918408/job/129497985965",
+        "steps": []
+      }
+    ],
+    "observedJobCount": 5,
+    "subscriptionJob": {
+      "id": 129497985965,
+      "status": "pending",
+      "conclusion": null,
+      "stepsObserved": 0,
+      "startedAtApiValue": "2026-11-09T22:55:28Z",
+      "actualProviderExecutionProven": false
+    },
+    "buildCompleted": true,
+    "candidateIdentitiesUnknown": true,
+    "finalPublishJobObserved": false,
+    "finalCleanupJobObserved": false,
+    "runtimePublishedProven": false,
+    "scope": "Build probe-cleanup step success is not final runtime cleanup. Pending/started_at with no steps is not proof of model execution."
+  },
+  "sourceAndAccountWindows": [
+    {
+      "owner": "#1782",
+      "evidenceComments": [
+        6753115982,
+        6753186614
+      ],
+      "evidenceClass": "owner-public-comment",
+      "declaredStart": "2026-11-09T22:25:34.000Z",
+      "declaredUpperBound": "2026-11-09T22:37:34.000Z",
+      "releasedAtOwnerReported": "2026-11-09T22:28:00Z",
+      "minutePrecision": true,
+      "state": "explicitly-released",
+      "credentialsBeforeFenceFailureOwnerReported": true
+    },
+    {
+      "owner": "#1826/#1841",
+      "evidenceComments": [
+        6753121990,
+        6753369374
+      ],
+      "evidenceClass": "owner-public-comment plus fresh in-flight metadata",
+      "declaredStart": "2026-11-09T22:26:10.000Z",
+      "declaredUpperBound": "2026-11-10T00:26:10.000Z",
+      "state": "actual-claimed-interval-no-release-observed",
+      "stillHoldsSourceAndSmokePerOwner": true,
+      "releaseObservedInThisRead": false,
+      "backendLockStateIndependentlyRead": false,
+      "scopeExpansion": false
+    },
+    {
+      "owner": "#1506/#1844",
+      "evidenceComments": [
+        6753604646,
+        6753599595
+      ],
+      "state": "waiting-not-future-hold",
+      "freshReadonlyChild": {
+        "preparedOrActivatedProofObserved": false,
+        "exactIdentityReceipt": null,
+        "plan": "Prepare own fresh readonly child after current owner's release; close preparation entry and release locks before merge; exact child cleanup after actual R7/Core terminal and 8 idle checks."
+      }
+    },
+    {
+      "owner": "#1843/#1845",
+      "evidenceComments": [
+        6753606693
+      ],
+      "state": "source-and-ci-ready-no-actual-window-claimed"
+    },
+    {
+      "owner": "#1512",
+      "evidenceComments": [
+        6753604715
+      ],
+      "state": "no-source-or-account-window-held",
+      "productionComplete": 0,
+      "productionRequired": 2,
+      "nativeFullBudgetPassed": false
+    }
+  ],
+  "commentWindow": {
+    "sinceUtc": "2026-11-09T22:25:00Z",
+    "coord1752": {
+      "pages": 1,
+      "perPage": 100,
+      "returned": 7,
+      "comments": [
+        {
+          "id": 6753115982,
+          "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6753115982",
+          "createdAtUtc": "2026-11-09T22:25:54Z",
+          "updatedAtUtc": "2026-11-09T22:29:09Z",
+          "author": "alexj11324",
+          "evidenceClass": "owner-public-comment",
+          "summary": "Owner #1782 declared read-only source/SMOKE preflight 22:25:34–22:37:34, later edited to record early release at 22:28 after credentials-before-source fence failed."
+        },
+        {
+          "id": 6753121990,
+          "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6753121990",
+          "createdAtUtc": "2026-11-09T22:26:10Z",
+          "updatedAtUtc": "2026-11-09T22:26:10Z",
+          "author": "alexj11324",
+          "evidenceClass": "owner-public-comment",
+          "summary": "Owner #1826/#1841 declared an actual security source/SMOKE publication interval from 22:26:10 to no later than 2026-11-10T00:26:10Z, covering its merge, historical credential/device cleanup, Core and automatic R7."
+        },
+        {
+          "id": 6753186614,
+          "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6753186614",
+          "createdAtUtc": "2026-11-09T22:29:08Z",
+          "updatedAtUtc": "2026-11-09T22:29:08Z",
+          "author": "alexj11324",
+          "evidenceClass": "owner-public-comment",
+          "summary": "Owner #1782 explicitly released its interval at 22:28. Owner reports main_changed before Infisical/sign-in; no account/model/task execution. This agent did not inspect its original log."
+        },
+        {
+          "id": 6753369374,
+          "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6753369374",
+          "createdAtUtc": "2026-11-09T22:38:39Z",
+          "updatedAtUtc": "2026-11-09T22:38:39Z",
+          "author": "alexj11324",
+          "evidenceClass": "owner-public-comment",
+          "summary": "Owner #1826 acknowledges overlapping claims, confirms #1782 release, and explicitly continues its bounded security interval without release or scope expansion."
+        },
+        {
+          "id": 6753604646,
+          "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6753604646",
+          "createdAtUtc": "2026-11-09T22:51:15Z",
+          "updatedAtUtc": "2026-11-09T22:51:15Z",
+          "author": "alexj11324",
+          "evidenceClass": "owner-public-comment",
+          "summary": "Owner #1506/#1844 reports final 62b CI complete and waits for current source/SMOKE owner. Fresh readonly child is a future preparation step after actual availability, not a new hold."
+        },
+        {
+          "id": 6753604715,
+          "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6753604715",
+          "createdAtUtc": "2026-11-09T22:51:16Z",
+          "updatedAtUtc": "2026-11-09T22:51:43Z",
+          "author": "alexj11324",
+          "evidenceClass": "owner-public-comment",
+          "summary": "Root #1512 declares Native full budget RED 424>358, FIRST211<=221, production0/2, no source/account window or active recovery resources held by #1512."
+        },
+        {
+          "id": 6753606693,
+          "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6753606693",
+          "createdAtUtc": "2026-11-09T22:51:22Z",
+          "updatedAtUtc": "2026-11-09T22:51:22Z",
+          "author": "alexj11324",
+          "evidenceClass": "owner-public-comment",
+          "summary": "Owner #1843/#1845 reports code/CI ready only, explicitly no publication window; waits for #1826 release before a future bounded merge and proof."
+        }
+      ]
+    },
+    "owner1844": {
+      "pages": 1,
+      "perPage": 100,
+      "returned": 2,
+      "comments": [
+        {
+          "id": 6753265357,
+          "url": "https://github.com/alexj11324/Mikka/pull/1844#issuecomment-6753265357",
+          "createdAtUtc": "2026-11-09T22:33:13Z",
+          "updatedAtUtc": "2026-11-09T22:33:13Z",
+          "author": "alexj11324",
+          "evidenceClass": "owner-public-comment",
+          "summary": "Owner #1503 reports limited fabe compatibility review with batch62, not a new source/SMOKE claim or completed production validation."
+        },
+        {
+          "id": 6753599595,
+          "url": "https://github.com/alexj11324/Mikka/pull/1844#issuecomment-6753599595",
+          "createdAtUtc": "2026-11-09T22:50:59Z",
+          "updatedAtUtc": "2026-11-09T22:50:59Z",
+          "author": "alexj11324",
+          "evidenceClass": "owner-public-comment",
+          "summary": "Owner #1503 confirms batch62 CI and reports no new OPS activation; #1844 owner must later prepare own readonly child, merge, complete R7/Web/Core and exact child cleanup."
+        }
+      ]
+    },
+    "paginationComplete": true
+  },
+  "findings": [
+    "main advanced from 1c769 to actual fabe via #1841; batch1844 head remains62b and is open/unmerged.",
+    "CI42710712714/A1 is terminal success, updated22:47:57; no original job logs were read.",
+    "fabe Web42711918175 is success at22:55:16 metadata update; Core42716101600 success at22:58:28. This is metadata, not independent raw cleanup/account proof.",
+    "fabe R7 build and await-web succeeded; subscriptions is pending/no steps. There is no observed final publish/cleanup job yet, so new runtime readiness remains unproven.",
+    "Self-hosted image42711918190 is success metadata; image digest/provenance was not read, and this does not equal R7 publication.",
+    "fabe Desktop42711918078 and read-cache production42716101573 are still in_progress in the one-shot snapshot.",
+    "No new reviewed comment explains exact failure cause of old1c R742705513501; preserve unknown.",
+    "#1782 explicitly released; #1826/#1841 has not released in reviewed increments. #1844 fresh readonly child remains a plan without a receipt or new actual claim.",
+    "#1512 remains Native-budget blocked and production0/2; neither owner CI success nor future plans authorize merging #1512."
+  ],
+  "requests": [
+    {
+      "key": "main",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/main",
+      "observedAtUtc": "2026-11-09T22:59:10.024Z"
+    },
+    {
+      "key": "pr1844",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/pulls/1844",
+      "observedAtUtc": "2026-11-09T22:59:10.240Z"
+    },
+    {
+      "key": "ci42710712714",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42710712714",
+      "observedAtUtc": "2026-11-09T22:59:10.100Z"
+    },
+    {
+      "key": "coord1752:1",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/issues/1752/comments?since=2026-11-09T22%3A25%3A00Z&per_page=100&page=1",
+      "observedAtUtc": "2026-11-09T22:59:10.092Z"
+    },
+    {
+      "key": "owner1844:1",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/issues/1844/comments?since=2026-11-09T22%3A25%3A00Z&per_page=100&page=1",
+      "observedAtUtc": "2026-11-09T22:59:45.845Z"
+    },
+    {
+      "key": "main-fabe-runs:1",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs?head_sha=fabe4271eb1b739e7f6598ae404b3a655bb177c8&per_page=100&page=1",
+      "observedAtUtc": "2026-11-09T22:59:46.129Z"
+    },
+    {
+      "key": "main-fabe-commit",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/fabe4271eb1b739e7f6598ae404b3a655bb177c8",
+      "observedAtUtc": "2026-11-09T22:59:45.781Z"
+    },
+    {
+      "key": "r7-fabe-jobs",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42711918408/attempts/1/jobs?per_page=100&page=1",
+      "observedAtUtc": "2026-11-09T23:00:14.051Z"
+    }
+  ],
+  "actions": {
+    "actionsOriginalJobLogReads": 0,
+    "artifactZipReads": 0,
+    "sourceReadsOrTreeRebuilds": 0,
+    "resourceCreations": 0,
+    "tests": 0,
+    "models": 0,
+    "accountCalls": 0,
+    "commentsWritten": 0,
+    "refsWritten": 0,
+    "onlyUnreferencedEvidenceBlob": true,
+    "continuousPolling": false
+  },
+  "ingestionNote": "The first metadata response batch hit a missing in-memory decoding helper before storage; the same four metadata endpoints were immediately re-read to preserve the snapshot. This was decoder recovery, not polling or an original-log/artifact read."
+}

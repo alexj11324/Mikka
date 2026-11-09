@@ -1,0 +1,444 @@
+{
+  "schema": "issue1512-native-diagnostic-root-review/v1",
+  "reviewedAtUtc": "2026-11-09T23:22:17Z",
+  "purpose": "approve one isolated causal diagnostic; not product or budget acceptance",
+  "baseCommit": "d2c3f63448130443e3e10bb5304417162f585776",
+  "baseTree": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+  "sourceCommit": "668f1a3543f8d007d0b1cae655a2595c1cfa657f",
+  "sourceTree": "5a72ec243b49bf7c0547f97d2b636938afe1ee3a",
+  "executionCommit": "dc32133ba6d2db3303365bfa9e360fbc487ea0b5",
+  "executionTree": "10b9ce122ca7e390bcc525b255174dde7c17ffd5",
+  "sourceTreeVerification": {
+    "sha": "5a72ec243b49bf7c0547f97d2b636938afe1ee3a",
+    "oldLeaves": 6840,
+    "newLeaves": 6842,
+    "diffs": [
+      {
+        "path": "apps/desktop/src/renderer/read-batch.ts",
+        "beforeBlob": "e7f6972a23519ae45e059038cd0c404789d44a98",
+        "afterBlob": "c4f97ced534634c66a1d840618756464d020be4a"
+      },
+      {
+        "path": "apps/desktop/src/renderer/rpc.ts",
+        "beforeBlob": "dae8798653457afad334c2d909b10b63e9b3956f",
+        "afterBlob": "cbbd2acc7611c441b4b9dd885920b8babebc0e0e"
+      },
+      {
+        "path": "apps/desktop/test/lifecycle.mjs",
+        "beforeBlob": "3f21ee7f6a4eb8948778a35db72fb5e61aeca9ab",
+        "afterBlob": "fc876e7c863724e2048499dbccece9065b6766ff"
+      },
+      {
+        "path": "apps/desktop/test/read-diagnostics.mjs",
+        "beforeBlob": null,
+        "afterBlob": "c41bfc24156ef2b99c10ac08c393f4594b037048"
+      },
+      {
+        "path": "hooks/use-live-key.tsx",
+        "beforeBlob": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f",
+        "afterBlob": "4bf39ecfee54659a75e42456888ca4ee828b00e6"
+      },
+      {
+        "path": "lib/live/channel.ts",
+        "beforeBlob": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+        "afterBlob": "e9b4f3b66589f5350e3bfdda8cb22f7a982d4b95"
+      },
+      {
+        "path": "lib/swr/read-diagnostics.ts",
+        "beforeBlob": null,
+        "afterBlob": "7dd27cabdd495839bd578613fe36390b81cef69d"
+      },
+      {
+        "path": "lib/swr/read-observer.ts",
+        "beforeBlob": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+        "afterBlob": "bd366c93b338fcfc5b9b03353c2a4e29dea1db21"
+      }
+    ],
+    "unrelatedUnchanged": 6834
+  },
+  "gitTreeHashVerification": {
+    "directories": 874,
+    "recomputedRoot": "5a72ec243b49bf7c0547f97d2b636938afe1ee3a",
+    "errors": []
+  },
+  "executionManifest": {
+    "blob": "24d12e18a4d8a0b9d0c0ff818afa7e009c29c595",
+    "bytes": 1850,
+    "sha256": "e563c42d3bb4340eceb72e5ca98a5e56496599486617bc0d19cba67d03a656a2",
+    "content": {
+      "version": 1,
+      "enabled": true,
+      "requestId": "1be17350-761f-4df3-bce8-1055a95a5437",
+      "createdAt": "2026-11-09T23:20:53.000Z",
+      "expiresAt": "2026-11-10T00:50:53.000Z",
+      "baseCommit": "d2c3f63448130443e3e10bb5304417162f585776",
+      "baseTree": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+      "sourceCommit": "668f1a3543f8d007d0b1cae655a2595c1cfa657f",
+      "sourceTree": "5a72ec243b49bf7c0547f97d2b636938afe1ee3a",
+      "overlay": [
+        {
+          "path": "apps/desktop/src/renderer/read-batch.ts",
+          "beforeBlob": "e7f6972a23519ae45e059038cd0c404789d44a98",
+          "afterBlob": "c4f97ced534634c66a1d840618756464d020be4a"
+        },
+        {
+          "path": "apps/desktop/src/renderer/rpc.ts",
+          "beforeBlob": "dae8798653457afad334c2d909b10b63e9b3956f",
+          "afterBlob": "cbbd2acc7611c441b4b9dd885920b8babebc0e0e"
+        },
+        {
+          "path": "apps/desktop/test/lifecycle.mjs",
+          "beforeBlob": "3f21ee7f6a4eb8948778a35db72fb5e61aeca9ab",
+          "afterBlob": "fc876e7c863724e2048499dbccece9065b6766ff"
+        },
+        {
+          "path": "apps/desktop/test/read-diagnostics.mjs",
+          "beforeBlob": null,
+          "afterBlob": "c41bfc24156ef2b99c10ac08c393f4594b037048"
+        },
+        {
+          "path": "hooks/use-live-key.tsx",
+          "beforeBlob": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f",
+          "afterBlob": "4bf39ecfee54659a75e42456888ca4ee828b00e6"
+        },
+        {
+          "path": "lib/live/channel.ts",
+          "beforeBlob": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+          "afterBlob": "e9b4f3b66589f5350e3bfdda8cb22f7a982d4b95"
+        },
+        {
+          "path": "lib/swr/read-diagnostics.ts",
+          "beforeBlob": null,
+          "afterBlob": "7dd27cabdd495839bd578613fe36390b81cef69d"
+        },
+        {
+          "path": "lib/swr/read-observer.ts",
+          "beforeBlob": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+          "afterBlob": "bd366c93b338fcfc5b9b03353c2a4e29dea1db21"
+        }
+      ]
+    }
+  },
+  "runner": {
+    "blob": "97ff3aacdea495d930e015c0616403d66db55cb6",
+    "bytes": 29002,
+    "sha256": "30168c05c743f77f543d2e78579ceb074c4e78559a5d2556148cae0de1b4ed8f",
+    "rootReview": "full v1 text and complete v1-v2 diff read; only source/R execution lineage, one-shot manifest, existing commands, private owned resource intent and original privacy-audited artifacts",
+    "sourceReadbackProofBlob": "02b668bc533416f546d804005fb7ee453aebed54"
+  },
+  "independentSourceReview": {
+    "blob": "b237832355c6ffc70e1151fd8c20d984eb87b401",
+    "bytes": 89636,
+    "sha256": "3aad591ab5dd574889f9d7f092034bf0cfdc8bf4a3e062dd1304427708cc40cc",
+    "decision": "PASS for this single temporary diagnostic; no remaining mustfix"
+  },
+  "rootSourceReview": {
+    "helper": "read current closed metadata, local IDs, try-wrapped sink and explicit omissions; corrected RPC names confirmed by independent reviewer",
+    "observerDiff": [
+      {
+        "op": "+",
+        "line": 1,
+        "text": "import { observeReadDiagnostic } from './read-diagnostics'"
+      },
+      {
+        "op": "+",
+        "line": 2,
+        "text": ""
+      },
+      {
+        "op": "+",
+        "line": 42,
+        "text": "  observeReadDiagnostic('pending_capture', { read, began: read.began })"
+      },
+      {
+        "op": "+",
+        "line": 47,
+        "text": "    observeReadDiagnostic('pending_revoke', { read, reason: 'revoked', began: read.began })"
+      },
+      {
+        "op": "+",
+        "line": 58,
+        "text": "      observeReadDiagnostic('pending_revoke', { read, reason: 'revoked', began: read.began })"
+      },
+      {
+        "op": "+",
+        "line": 63,
+        "text": "    observeReadDiagnostic('pending_dispatch', { read, began: read.began, pending: read.pendingDispatchAt })"
+      },
+      {
+        "op": "+",
+        "line": 119,
+        "text": "  observeReadDiagnostic('read_entry', { cache, key, read, began: read.began })"
+      },
+      {
+        "op": "+",
+        "line": 129,
+        "text": "    observeReadDiagnostic('read_complete', { cache, key, read, began: read.began, outcome: outcome.status, accepted: read.accepted, received: read.received, superseded: read.superseded })"
+      },
+      {
+        "op": "+",
+        "line": 140,
+        "text": "    observeReadDiagnostic('read_received', { cache, key, read, began: read.began, sent, proof: sent !== undefined })"
+      },
+      {
+        "op": "+",
+        "line": 169,
+        "text": "    if (!read || read.began <= after && (read.pendingDispatchAt ?? 0) <= after) {"
+      },
+      {
+        "op": "+",
+        "line": 170,
+        "text": "      observeReadDiagnostic('read_fresh', { cache, key, read, after, began: read?.began, pending: read?.pendingDispatchAt, reason: read ? 'before_boundary' : 'no_read', outcome: 'revalidate' })"
+      },
+      {
+        "op": "+",
+        "line": 171,
+        "text": "      return revalidate()"
+      },
+      {
+        "op": "+",
+        "line": 172,
+        "text": "    }"
+      },
+      {
+        "op": "+",
+        "line": 173,
+        "text": "    observeReadDiagnostic('read_fresh', { cache, key, read, after, began: read.began, pending: read.pendingDispatchAt, reason: read.began > after ? 'wait_settled' : 'wait_pending' })"
+      },
+      {
+        "op": "-",
+        "line": 160,
+        "text": "    if (!read || read.began <= after && (read.pendingDispatchAt ?? 0) <= after) return revalidate()"
+      },
+      {
+        "op": "+",
+        "line": 178,
+        "text": "    if (!current()) { observeReadDiagnostic('read_fresh', { cache, key, read, after, reason: 'retired' }); return }"
+      },
+      {
+        "op": "-",
+        "line": 165,
+        "text": "    if (!current()) return"
+      },
+      {
+        "op": "+",
+        "line": 181,
+        "text": "      if (next && next !== read) { observeReadDiagnostic('read_fresh', { cache, key, read, after, reason: 'newer_read' }); continue }"
+      },
+      {
+        "op": "+",
+        "line": 182,
+        "text": "      observeReadDiagnostic('read_fresh', { cache, key, read, after, reason: 'revoked', outcome: 'revalidate' })"
+      },
+      {
+        "op": "-",
+        "line": 168,
+        "text": "      if (next && next !== read) continue"
+      },
+      {
+        "op": "+",
+        "line": 185,
+        "text": "    if (outcome.status === 'failed') { observeReadDiagnostic('read_fresh', { cache, key, read, after, reason: 'failed' }); throw outcome.error }"
+      },
+      {
+        "op": "-",
+        "line": 171,
+        "text": "    if (outcome.status === 'failed') throw outcome.error"
+      },
+      {
+        "op": "+",
+        "line": 188,
+        "text": "      if (accepts(data)) { observeReadDiagnostic('read_fresh', { cache, key, read, after, reason: 'covers' }); return data }"
+      },
+      {
+        "op": "+",
+        "line": 189,
+        "text": "      observeReadDiagnostic('read_fresh', { cache, key, read, after, reason: 'revision_uncovered' })"
+      },
+      {
+        "op": "-",
+        "line": 174,
+        "text": "      if (accepts(data)) return data"
+      },
+      {
+        "op": "+",
+        "line": 194,
+        "text": "    if (!next || next === read) {"
+      },
+      {
+        "op": "+",
+        "line": 195,
+        "text": "      observeReadDiagnostic('read_fresh', { cache, key, read, after, began: read.began, outcome: outcome.status, reason: 'not_returned' })"
+      },
+      {
+        "op": "+",
+        "line": 196,
+        "text": "      return revalidate()"
+      },
+      {
+        "op": "+",
+        "line": 197,
+        "text": "    }"
+      },
+      {
+        "op": "+",
+        "line": 198,
+        "text": "    observeReadDiagnostic('read_fresh', { cache, key, read, after, reason: 'newer_read' })"
+      },
+      {
+        "op": "-",
+        "line": 179,
+        "text": "    if (!next || next === read) return revalidate()"
+      }
+    ],
+    "lifecycleInsertions": [
+      {
+        "line": 31,
+        "text": "import { createReadDiagnostics } from './read-diagnostics.mjs'"
+      },
+      {
+        "line": 38,
+        "text": "const readDiagnostics = createReadDiagnostics({ revision })"
+      },
+      {
+        "line": 71,
+        "text": "let diagnosticNativeAttached = false"
+      },
+      {
+        "line": 113,
+        "text": "  if (mode === 'bundled' && !diagnosticNativeAttached) {"
+      },
+      {
+        "line": 114,
+        "text": "    diagnosticNativeAttached = true"
+      },
+      {
+        "line": 115,
+        "text": "    await readDiagnostics.attach(page, 'nativeLogin', { late: true })"
+      },
+      {
+        "line": 116,
+        "text": "  }"
+      },
+      {
+        "line": 347,
+        "text": "    await readDiagnostics.attach(webPage, 'webLogin')"
+      },
+      {
+        "line": 352,
+        "text": "    await readDiagnostics.snapshot(webPage)"
+      },
+      {
+        "line": 366,
+        "text": "  await readDiagnostics.snapshot(run.page)"
+      },
+      {
+        "line": 527,
+        "text": "  try { evidence.readDiagnostics = await readDiagnostics.write(join(output, 'read-diagnostics.json'), evidence.queryCounts?.windows) }"
+      },
+      {
+        "line": 528,
+        "text": "  catch { evidence.readDiagnostics = { status: 'unavailable', code: 'READ_DIAGNOSTIC_WRITE_FAILED' } }"
+      }
+    ],
+    "collectorFinalDiff": [
+      {
+        "op": "+",
+        "line": 10,
+        "text": "        coverage: 'webLogin/nativeLogin pages only; capture spans attachment through ordinary context close and can include tail; budgets use only the unchanged two windows; no cold FIRST capture; initial Native document may precede attachment',"
+      },
+      {
+        "op": "-",
+        "line": 10,
+        "text": "        coverage: 'webLogin/nativeLogin only; no cold FIRST capture; initial Native document may precede attachment',"
+      },
+      {
+        "op": "+",
+        "line": 12,
+        "text": "        delivery: 'asynchronous test binding; missing delivery, other schema values and overflow remain incomplete; failure/pending counters sum observations and can repeat at snapshot/seal',"
+      },
+      {
+        "op": "-",
+        "line": 12,
+        "text": "        delivery: 'asynchronous test binding; missing delivery, other schema values and overflow remain incomplete',"
+      },
+      {
+        "op": "+",
+        "line": 14,
+        "text": "        cost: 'retained rows/bytes are bounded; per-event CPU/IPC delivery is not capped and occurs inside original windows; no production performance claim',"
+      },
+      {
+        "op": "-",
+        "line": 14,
+        "text": "        cost: 'bounded CPU, memory and diagnostic IPC occur inside original windows; no production performance claim',"
+      },
+      {
+        "op": "+",
+        "line": 133,
+        "text": "      if (packet.sequence > document.lastSequence) document.sealed = false"
+      },
+      {
+        "op": "+",
+        "line": 233,
+        "text": "      status: Object.values(counts).some(value => value > 0) || pages.length !== 2 || pages.some(page => page.attachmentLate || !page.setup.cdp || !page.snapshot)"
+      },
+      {
+        "op": "-",
+        "line": 232,
+        "text": "      status: Object.values(counts).some(value => value > 0) || pages.length !== 2 || pages.some(page => !page.setup.cdp || !page.snapshot)"
+      },
+      {
+        "op": "+",
+        "line": 255,
+        "text": "    for (const value of Object.values(window)) assert.ok(value === null || typeof value === 'string' && /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/.test(value))"
+      },
+      {
+        "op": "-",
+        "line": 254,
+        "text": "    for (const value of Object.values(window)) assert.ok(value === null || typeof value === 'string' && /^\\\\d{4}-\\\\d{2}-\\\\d{2}T\\\\d{2}:\\\\d{2}:\\\\d{2}\\\\.\\\\d{3}Z$/.test(value))"
+      },
+      {
+        "op": "+",
+        "line": 274,
+        "text": "  const incomplete = Object.values(report.counts).some(value => value > 0) || report.pages.length !== 2 || report.pages.some(page => page.attachmentLate || !page.setup.cdp || !page.snapshot)"
+      },
+      {
+        "op": "-",
+        "line": 273,
+        "text": "  const incomplete = Object.values(report.counts).some(value => value > 0) || report.pages.length !== 2 || report.pages.some(page => !page.setup.cdp || !page.snapshot)"
+      }
+    ],
+    "runtimeSemantics": "independent reviewer verified all original control predicates and critical read/coverage/dispatch expression sequences; root separately reviewed observer and lifecycle diffs",
+    "compilerAndActualRuntime": "not executed at this review; job runs mjs syntax and desktop typecheck before its builds"
+  },
+  "canonicalBudget": {
+    "source": "d2c3f63448130443e3e10bb5304417162f585776",
+    "nativeFull": 424,
+    "webFull": 358,
+    "delta": 66,
+    "fullVerdict": "FAIL",
+    "firstNative": 211,
+    "firstHosted": 221,
+    "firstVerdict": "PASS",
+    "sameRunArithmeticProof": "1c5e38ce2696088d98a87b156ccdb3438027ff71",
+    "productionCases": "0/2"
+  },
+  "limits": [
+    "Observation causes per-event CPU/IPC overhead; retained rows/bytes are bounded, total delivery work is not capped.",
+    "Native initial document may precede attachment; attachmentLate and all omission/failure counters retain incomplete status.",
+    "Capture includes setup and ordinary tail; only original login windows define the database budget. FIRST/cold collects no sink.",
+    "No raw messages, request body/headers, URL query, raw SWR key, owner/workspace/entity ID leave the diagnostic projection.",
+    "Document UUID/timeOrigin and CDP loader ID are distinct; unknown or ambiguous cross-layer joins stay unknown.",
+    "A green diagnostic sample does not resolve the existing failed budget and cannot justify merging or issue closure.",
+    "No product fix chosen yet. The purpose is to obtain missing causal observations."
+  ],
+  "publication": {
+    "status": "GO issued after exact source/manifest/review validation; actual ref/run identity recorded separately by the runner",
+    "branch": "ops/1512-native-read-diagnostic-20261109",
+    "originalLogAndArtifactReader": "/root/native_diag_runner",
+    "resourceOwner": "/root/native_diag_runner",
+    "maxMacMinutes": 60,
+    "maxAcceptanceMinutes": 30,
+    "productionAccountUse": false
+  }
+}

@@ -1,0 +1,885 @@
+{
+  "schemaVersion": 1,
+  "kind": "temporary-native-read-diagnostics-source-overlay",
+  "repository": "alexj11324/Mikka",
+  "purpose": "One bounded diagnostic run to distinguish document navigation, Live invalidation, readFresh branches and real transport dispatch; not a product repair or budget acceptance.",
+  "source": {
+    "baselineCommit": "d2c3f63448130443e3e10bb5304417162f585776",
+    "baselineTree": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+    "historicalActualCheckout": "3bc095c100537563296186fc3d4cc4d60b59b698",
+    "preparedSourceCommit": "668f1a3543f8d007d0b1cae655a2595c1cfa657f",
+    "preparedSourceTree": "5a72ec243b49bf7c0547f97d2b636938afe1ee3a",
+    "preparedSourceParents": [
+      "d2c3f63448130443e3e10bb5304417162f585776"
+    ],
+    "preparedObjectBinding": "Parent agent reports complete remote 6842-leaf verification: exactly six changed and two added paths. This implementer independently hashes the eight exact source objects listed below; did not duplicate the full-tree API read.",
+    "noNewMainInputs": true
+  },
+  "files": [
+    {
+      "path": "lib/swr/read-diagnostics.ts",
+      "mode": "100644",
+      "before": null,
+      "after": {
+        "gitBlob": "7dd27cabdd495839bd578613fe36390b81cef69d",
+        "bytes": 6794,
+        "sha256": "8beb5f68dd0e4c75cd23f12b70cd96850862c16efed06f488c0d0585c95d138e"
+      },
+      "hunks": 1,
+      "addedLines": 100,
+      "deletedLines": 0,
+      "strictUnifiedForward": true,
+      "strictUnifiedReverse": true,
+      "reverseOperation": "delete new file"
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "mode": "100644",
+      "before": {
+        "path": "lib/swr/read-observer.ts",
+        "gitBlob": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+        "bytes": 8237,
+        "sha256": "c520e2c86ca83fe382e6131eb48b36b813b6b9f8750dc9d3c09e6e0044412cc9"
+      },
+      "after": {
+        "gitBlob": "bd366c93b338fcfc5b9b03353c2a4e29dea1db21",
+        "bytes": 10253,
+        "sha256": "a46dcba51ad51e2db0452a2f8e4e4c0db38441a88bf8953c5471029dc84920c0"
+      },
+      "hunks": 7,
+      "addedLines": 25,
+      "deletedLines": 6,
+      "strictUnifiedForward": true,
+      "strictUnifiedReverse": true,
+      "reverseOperation": "restore exact original bytes"
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "mode": "100644",
+      "before": {
+        "path": "lib/live/channel.ts",
+        "gitBlob": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+        "bytes": 24031,
+        "sha256": "7d1d16e02ea9ca8256812312eafc96c0591cc1df1c6a463e0216e420d37b8ede"
+      },
+      "after": {
+        "gitBlob": "e9b4f3b66589f5350e3bfdda8cb22f7a982d4b95",
+        "bytes": 25695,
+        "sha256": "f5e3cdc28967eeed8a182894720d99e5eebae3d9766dd2b7b6a546e0b6d54c7e"
+      },
+      "hunks": 11,
+      "addedLines": 15,
+      "deletedLines": 6,
+      "strictUnifiedForward": true,
+      "strictUnifiedReverse": true,
+      "reverseOperation": "restore exact original bytes"
+    },
+    {
+      "path": "hooks/use-live-key.tsx",
+      "mode": "100644",
+      "before": {
+        "path": "hooks/use-live-key.tsx",
+        "gitBlob": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f",
+        "bytes": 8050,
+        "sha256": "5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857"
+      },
+      "after": {
+        "gitBlob": "4bf39ecfee54659a75e42456888ca4ee828b00e6",
+        "bytes": 8236,
+        "sha256": "29576ddb1ec483c21a9826529a112d21b1f7483380e619a93398cff9ee39ade1"
+      },
+      "hunks": 2,
+      "addedLines": 2,
+      "deletedLines": 0,
+      "strictUnifiedForward": true,
+      "strictUnifiedReverse": true,
+      "reverseOperation": "restore exact original bytes"
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "mode": "100644",
+      "before": {
+        "path": "apps/desktop/src/renderer/rpc.ts",
+        "gitBlob": "dae8798653457afad334c2d909b10b63e9b3956f",
+        "bytes": 4726,
+        "sha256": "6119f76aa46cf1fcd93dc9b389859221c206fecba7cedf265af061fd6862270e"
+      },
+      "after": {
+        "gitBlob": "cbbd2acc7611c441b4b9dd885920b8babebc0e0e",
+        "bytes": 5550,
+        "sha256": "2bf0191188c608d4909b77149bd14ad0523e7c76bf5380ebf122951036186dc2"
+      },
+      "hunks": 5,
+      "addedLines": 8,
+      "deletedLines": 1,
+      "strictUnifiedForward": true,
+      "strictUnifiedReverse": true,
+      "reverseOperation": "restore exact original bytes"
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "mode": "100644",
+      "before": {
+        "path": "apps/desktop/src/renderer/read-batch.ts",
+        "gitBlob": "e7f6972a23519ae45e059038cd0c404789d44a98",
+        "bytes": 6301,
+        "sha256": "f98ecf6e986da17aa66d8c54039f5d683dc7cfb7d2e563eec5efffeff9527bac"
+      },
+      "after": {
+        "gitBlob": "c4f97ced534634c66a1d840618756464d020be4a",
+        "bytes": 6899,
+        "sha256": "aba0168ad5a649f291d4cc35bf6e4edb91972cb28696135cd171c7cdded7e8ad"
+      },
+      "hunks": 6,
+      "addedLines": 7,
+      "deletedLines": 3,
+      "strictUnifiedForward": true,
+      "strictUnifiedReverse": true,
+      "reverseOperation": "restore exact original bytes"
+    },
+    {
+      "path": "apps/desktop/test/read-diagnostics.mjs",
+      "mode": "100644",
+      "before": null,
+      "after": {
+        "gitBlob": "c41bfc24156ef2b99c10ac08c393f4594b037048",
+        "bytes": 22806,
+        "sha256": "91a854f2610cf17951bdec836fcd9eae9f6ec38eac0dc0003c049a4070652f2c"
+      },
+      "hunks": 1,
+      "addedLines": 311,
+      "deletedLines": 0,
+      "strictUnifiedForward": true,
+      "strictUnifiedReverse": true,
+      "reverseOperation": "delete new file"
+    },
+    {
+      "path": "apps/desktop/test/lifecycle.mjs",
+      "mode": "100644",
+      "before": {
+        "path": "apps/desktop/test/lifecycle.mjs",
+        "gitBlob": "3f21ee7f6a4eb8948778a35db72fb5e61aeca9ab",
+        "bytes": 33181,
+        "sha256": "45a0f56985f256f5f392ad015e0c4442a784e1b9ff1ebd8703829ecc61152a77"
+      },
+      "after": {
+        "gitBlob": "fc876e7c863724e2048499dbccece9065b6766ff",
+        "bytes": 33887,
+        "sha256": "1d23ef59d65cc620febb8ec7dcd19523fabc40e6426fe3711ddb546e4bb466dc"
+      },
+      "hunks": 6,
+      "addedLines": 12,
+      "deletedLines": 0,
+      "strictUnifiedForward": true,
+      "strictUnifiedReverse": true,
+      "reverseOperation": "restore exact original bytes"
+    }
+  ],
+  "patch": {
+    "path": "native-read-diagnostic-overlay.patch",
+    "gitBlob": "531734e48ff50f4b95646acb86374294e16ec9bf",
+    "bytes": 56313,
+    "sha256": "2caf956d7831dacb076430570b8273d02ba1aec91de41116e0777e3059ce812d"
+  },
+  "strictSerializedPatchValidation": {
+    "method": "Parse serialized unified headers/content; enforce exact hunk offsets, consumed/produced line counts and every context/deleted line; no fuzz; rehash complete outputs",
+    "files": [
+      {
+        "path": "lib/swr/read-diagnostics.ts",
+        "serializedUnifiedForwardExact": true,
+        "serializedUnifiedReverseExact": true
+      },
+      {
+        "path": "lib/swr/read-observer.ts",
+        "serializedUnifiedForwardExact": true,
+        "serializedUnifiedReverseExact": true
+      },
+      {
+        "path": "lib/live/channel.ts",
+        "serializedUnifiedForwardExact": true,
+        "serializedUnifiedReverseExact": true
+      },
+      {
+        "path": "hooks/use-live-key.tsx",
+        "serializedUnifiedForwardExact": true,
+        "serializedUnifiedReverseExact": true
+      },
+      {
+        "path": "apps/desktop/src/renderer/rpc.ts",
+        "serializedUnifiedForwardExact": true,
+        "serializedUnifiedReverseExact": true
+      },
+      {
+        "path": "apps/desktop/src/renderer/read-batch.ts",
+        "serializedUnifiedForwardExact": true,
+        "serializedUnifiedReverseExact": true
+      },
+      {
+        "path": "apps/desktop/test/read-diagnostics.mjs",
+        "serializedUnifiedForwardExact": true,
+        "serializedUnifiedReverseExact": true
+      },
+      {
+        "path": "apps/desktop/test/lifecycle.mjs",
+        "serializedUnifiedForwardExact": true,
+        "serializedUnifiedReverseExact": true
+      }
+    ],
+    "allPassed": true
+  },
+  "positionalEditValidation": [
+    {
+      "path": "lib/swr/read-observer.ts",
+      "forwardExact": true,
+      "reverseExact": true,
+      "edits": 14,
+      "callCounts": [
+        {
+          "pattern": "readBoundary\\(\\)",
+          "old": 3,
+          "new": 3
+        },
+        {
+          "pattern": "current\\(\\)",
+          "old": 5,
+          "new": 5
+        },
+        {
+          "pattern": "accepts\\(data\\)",
+          "old": 1,
+          "new": 1
+        },
+        {
+          "pattern": "read\\.applied\\(\\)",
+          "old": 2,
+          "new": 2
+        },
+        {
+          "pattern": "cache\\.get\\(key\\)",
+          "old": 2,
+          "new": 2
+        },
+        {
+          "pattern": "checkpointQueryWindow\\(",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "beginQueryWindow\\(",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "selectFixture\\(",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "usable\\(",
+          "old": 0,
+          "new": 0
+        }
+      ]
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "forwardExact": true,
+      "reverseExact": true,
+      "edits": 19,
+      "callCounts": [
+        {
+          "pattern": "readBoundary\\(\\)",
+          "old": 4,
+          "new": 4
+        },
+        {
+          "pattern": "current\\(\\)",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "accepts\\(data\\)",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "read\\.applied\\(\\)",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "cache\\.get\\(key\\)",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "checkpointQueryWindow\\(",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "beginQueryWindow\\(",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "selectFixture\\(",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "usable\\(",
+          "old": 0,
+          "new": 0
+        }
+      ]
+    },
+    {
+      "path": "hooks/use-live-key.tsx",
+      "forwardExact": true,
+      "reverseExact": true,
+      "edits": 2,
+      "callCounts": [
+        {
+          "pattern": "readBoundary\\(\\)",
+          "old": 1,
+          "new": 1
+        },
+        {
+          "pattern": "current\\(\\)",
+          "old": 2,
+          "new": 2
+        },
+        {
+          "pattern": "accepts\\(data\\)",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "read\\.applied\\(\\)",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "cache\\.get\\(key\\)",
+          "old": 4,
+          "new": 4
+        },
+        {
+          "pattern": "checkpointQueryWindow\\(",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "beginQueryWindow\\(",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "selectFixture\\(",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "usable\\(",
+          "old": 0,
+          "new": 0
+        }
+      ]
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "forwardExact": true,
+      "reverseExact": true,
+      "edits": 8,
+      "callCounts": [
+        {
+          "pattern": "readBoundary\\(\\)",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "current\\(\\)",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "accepts\\(data\\)",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "read\\.applied\\(\\)",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "cache\\.get\\(key\\)",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "checkpointQueryWindow\\(",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "beginQueryWindow\\(",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "selectFixture\\(",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "usable\\(",
+          "old": 0,
+          "new": 0
+        }
+      ]
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "forwardExact": true,
+      "reverseExact": true,
+      "edits": 7,
+      "callCounts": [
+        {
+          "pattern": "readBoundary\\(\\)",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "current\\(\\)",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "accepts\\(data\\)",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "read\\.applied\\(\\)",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "cache\\.get\\(key\\)",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "checkpointQueryWindow\\(",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "beginQueryWindow\\(",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "selectFixture\\(",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "usable\\(",
+          "old": 0,
+          "new": 0
+        }
+      ]
+    },
+    {
+      "path": "apps/desktop/test/lifecycle.mjs",
+      "forwardExact": true,
+      "reverseExact": true,
+      "edits": 8,
+      "callCounts": [
+        {
+          "pattern": "readBoundary\\(\\)",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "current\\(\\)",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "accepts\\(data\\)",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "read\\.applied\\(\\)",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "cache\\.get\\(key\\)",
+          "old": 0,
+          "new": 0
+        },
+        {
+          "pattern": "checkpointQueryWindow\\(",
+          "old": 8,
+          "new": 8
+        },
+        {
+          "pattern": "beginQueryWindow\\(",
+          "old": 4,
+          "new": 4
+        },
+        {
+          "pattern": "selectFixture\\(",
+          "old": 4,
+          "new": 4
+        },
+        {
+          "pattern": "usable\\(",
+          "old": 7,
+          "new": 7
+        }
+      ]
+    }
+  ],
+  "schema": {
+    "version": 1,
+    "events": [
+      "live_observe",
+      "live_invalidate",
+      "live_flush",
+      "live_refresh",
+      "live_subscribe",
+      "live_unsubscribe",
+      "read_entry",
+      "read_received",
+      "read_complete",
+      "read_fresh",
+      "pending_capture",
+      "pending_dispatch",
+      "pending_revoke",
+      "rpc_dispatch",
+      "rpc_headers",
+      "rpc_decoded",
+      "rpc_failed",
+      "batch_enqueue",
+      "batch_send",
+      "batch_fallback",
+      "socket",
+      "received",
+      "skipped",
+      "read",
+      "connecting",
+      "open",
+      "ready",
+      "closed",
+      "hidden",
+      "revision_held",
+      "unsubscribed",
+      "covered",
+      "invalid",
+      "late_subscribe",
+      "visibility",
+      "deadline",
+      "fallback",
+      "socket_open",
+      "push",
+      "capabilities",
+      "presence",
+      "other",
+      "no_read",
+      "before_boundary",
+      "wait_settled",
+      "wait_pending",
+      "retired",
+      "revoked",
+      "failed",
+      "committed",
+      "discarded",
+      "covers",
+      "revision_uncovered",
+      "not_returned",
+      "newer_read",
+      "revalidate"
+    ],
+    "actions": [
+      "desktop.readBatch",
+      "desktop.bootstrap",
+      "desktop.session",
+      "workspace.switchWorkspace",
+      "coordinator.syncCoordinatorChat",
+      "coordinator.pollBotChatSummaries",
+      "execution-settings.getBotModelMenu",
+      "issues.syncIssueList",
+      "task-runs.syncThreadList",
+      "task-runs.pollTaskRuns",
+      "bots.pollBots",
+      "teams.listTeams",
+      "team-relations.listProjectTeams",
+      "projects.listProjects"
+    ],
+    "families": [
+      "coordinator-chat",
+      "coordinator-chat-metadata",
+      "bot-chats",
+      "threads",
+      "task-runs",
+      "issues",
+      "bots",
+      "teams",
+      "project-teams",
+      "bot-list-groups",
+      "approved-writes",
+      "pending-actions"
+    ],
+    "kinds": [
+      "thread_list",
+      "task_run_list",
+      "bot_chat_list",
+      "device_list",
+      "bot_chat",
+      "issue_list",
+      "bot_list",
+      "group_list",
+      "workspace_settings",
+      "computer_state",
+      "approved_writes",
+      "approved_write",
+      "pending_actions",
+      "factory_task",
+      "factory_issue",
+      "issue_document",
+      "artifact",
+      "issue_members",
+      "issue_relations",
+      "issue_threads",
+      "thread",
+      "run",
+      "coordinator_session",
+      "model_settings",
+      "group_chat",
+      "hosted_billing",
+      "pull_request_status",
+      "subagent_events",
+      "project_map"
+    ]
+  },
+  "observations": [
+    {
+      "path": "lib/swr/read-diagnostics.ts",
+      "role": "Opt-in sink and closed projection; per-producer local IDs; no raw cache/scope/entity values."
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "role": "Existing read entry/receive/commit and readFresh branch decisions; existing numeric boundary values and pending-dispatch hints."
+    },
+    {
+      "path": "lib/live/channel.ts",
+      "role": "Existing socket/open/ready/push observations, invalidation reason, subscriptions and flush events; kind/revision closed metadata."
+    },
+    {
+      "path": "hooks/use-live-key.tsx",
+      "role": "Refresh callback entry with local key/scope identity and existing after boundary."
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "role": "Existing Native RPC dispatch/headers/decode/failure, closed action and local member IDs."
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "role": "Existing enqueue, actual batch membership and fallback, without wire contract changes."
+    },
+    {
+      "path": "apps/desktop/test/read-diagnostics.mjs",
+      "role": "Test-process collector, per-document identity/clocks, closed HTTP method/path-family CDP projection and strict report validator."
+    },
+    {
+      "path": "apps/desktop/test/lifecycle.mjs",
+      "role": "Attach to two original full-login pages and collect only after original checkpoints; preserve existing functional result/cleanup on export failure."
+    }
+  ],
+  "behavioralBoundaries": {
+    "lifecycleAddedLines": 12,
+    "lifecycleDeletedLines": 0,
+    "unchanged": [
+      "All original window start/end and query checkpoints",
+      "Original thresholds, whole-login budget and FIRST pair",
+      "Original selectors, fixtures, readiness and cleanup order",
+      "Existing Live invalidation conditions and readBoundary calls",
+      "Existing current/accepts/applied/cache reads",
+      "Snapshot-proof whitelist and transformed response semantics",
+      "RPC authentication, 401, body and response semantics"
+    ],
+    "extraProductDbQueries": 0,
+    "extraApplicationApiRequests": 0,
+    "extraReadBoundaryCalls": 0,
+    "diagnosticOnly": true,
+    "budgetPass": false,
+    "noColdFirstCapture": true,
+    "nativeAttachment": "Initial Native document can precede firstWindow return and attachment. page.attachmentLate is preserved independently of document.late and forces incomplete.",
+    "captureTail": "Capture spans attachment through ordinary context closure and may contain tail events outside the two original windows; those events do not alter budget membership.",
+    "identity": "Actual document UUID and performance.timeOrigin; wall and monotonic fields retained separately. CDP loader/request IDs use separate local identities, not a fabricated join.",
+    "cost": "Only retained rows/bytes and intern tables are capped. Per-event CPU/IPC delivery occurs inside original windows and is not capped; timing perturbation remains possible.",
+    "joinLimits": "No user/workspace/raw SWR key/URL query/header/body/server invocation ID is retained. Ambiguous time/action associations remain unknown; shape or local ID equality does not prove parameter equality or redundant SQL.",
+    "missingResultReason": "readFresh not_returned records the existing entered branch but not the particular cache object change; no extra cache/current/accepts evaluation is introduced.",
+    "sinkIsolation": "Lookup, synchronous sink errors and asynchronous rejection are caught for diagnostic failure accounting; no sink means return; no timer, polling, new analytics or network exporter."
+  },
+  "completeness": {
+    "retainedLimits": {
+      "rows": 2048,
+      "bytes": 524288,
+      "documents": 16,
+      "networkIds": 1024
+    },
+    "productLimits": {
+      "referenceIds": 4096,
+      "keys": 256,
+      "scopes": 256,
+      "entities": 256,
+      "actionsPerEvent": 16
+    },
+    "explicitUnknowns": [
+      "key/scope/entity/reference/action omission",
+      "other schema values",
+      "invalid packets",
+      "document/network-ID omissions",
+      "sequence gaps/duplicates",
+      "sink failures",
+      "pending delivery",
+      "unsealed/late documents",
+      "late page attachment",
+      "missing setup or final snapshot"
+    ],
+    "snapshotThenTail": "A later product sequence clears document.sealed, preventing an old snapshot from falsely sealing subsequent tail.",
+    "reportCanBeIncompleteAndValid": true
+  },
+  "verification": {
+    "execution": "pure V8 actual exported functions; Node assert/UTF8 byte-length adapters; no Node/Playwright execution",
+    "oldBlob": "4524861de528624714aa6eea7107293fd16ee718",
+    "actualKnownD2cWindowStart": "2026-11-09T22:26:08.143Z",
+    "otherFixtureBoundariesSynthetic": true,
+    "tests": [
+      {
+        "name": "old validator rejects actual ISO window start",
+        "passed": true,
+        "expected": "RED"
+      },
+      {
+        "name": "candidate complete minimal report JSON roundtrip accepts actual ISO start",
+        "passed": true,
+        "expected": "GREEN"
+      },
+      {
+        "name": "reject unknown nested page field",
+        "passed": true
+      },
+      {
+        "name": "reject unknown nested count field",
+        "passed": true
+      },
+      {
+        "name": "reject unknown nested boundary field",
+        "passed": true
+      },
+      {
+        "name": "reject unknown top field",
+        "passed": true
+      },
+      {
+        "name": "reject incorrect complete while pages absent",
+        "passed": true
+      },
+      {
+        "name": "retain workspace.switchWorkspace",
+        "passed": true
+      },
+      {
+        "name": "retain execution-settings.getBotModelMenu",
+        "passed": true
+      },
+      {
+        "name": "reject nonprimitive coerced UUID",
+        "passed": true
+      },
+      {
+        "name": "actual collector new product after snapshot clears sealed",
+        "passed": true
+      },
+      {
+        "name": "late attachment retained despite document late=false",
+        "passed": true
+      },
+      {
+        "name": "actual collector full JSON roundtrip with real ISO shape",
+        "passed": true
+      }
+    ],
+    "passed": 13,
+    "failed": 0,
+    "priorHarnessCheckAttempts": [
+      {
+        "result": "wrapper environment failure",
+        "reason": "TextEncoder unavailable; replaced by already verified UTF8 helper"
+      },
+      {
+        "result": "not a product result",
+        "reason": "URL unavailable in pure V8; no Node URL/CDP path projection test claimed"
+      }
+    ],
+    "collectorExecution": "pure V8 actual collector/validator with fake Playwright transport and in-memory writeFile; no browser or Node claimed"
+  },
+  "verificationNotPerformed": [
+    "Node execution/typecheck",
+    "Playwright/Chromium/CDP execution",
+    "Actual Mac lifecycle or SQL measurement",
+    "Production or model calls"
+  ],
+  "reviewHistory": [
+    {
+      "blob": "4f62224ad94ca64f39e3bf35cb53758283888e7d",
+      "status": "Superseded helper; lookup isolation and omission accounting findings retained."
+    },
+    {
+      "blob": "f59a97bee3477ae6d95995839dc8c2413b807219",
+      "status": "Superseded helper; action allowlist spelling corrected in 7dd final."
+    },
+    {
+      "blob": "4524861de528624714aa6eea7107293fd16ee718",
+      "status": "Superseded harness; ISO regex, stale sealed state, late attachment race and cost wording corrected in c41 final."
+    }
+  ],
+  "independentReview": {
+    "reviewer": "/root/e093_budget_diff",
+    "gitBlob": "b237832355c6ffc70e1151fd8c20d984eb87b401",
+    "bytes": 89636,
+    "sha256": "3aad591ab5dd574889f9d7f092034bf0cfdc8bf4a3e062dd1304427708cc40cc",
+    "conclusion": "Source-only PASS with no remaining must-fix; reviewer independently verified eight source objects, 480 additions/16 deletions, exact forward/reverse, original branch/control expressions and lifecycle 12 additions/0 deletions.",
+    "executionClaim": false
+  },
+  "runnerContract": {
+    "owner": "/root/native_diag_runner",
+    "workflowBlob": "97ff3aacdea495d930e015c0616403d66db55cb6",
+    "artifactPath": ".cache/desktop-evidence/read-diagnostics.json",
+    "auditCommand": "node apps/desktop/test/read-diagnostics.mjs audit .cache/desktop-evidence/read-diagnostics.json",
+    "originalPrivacyAuditUnchanged": true,
+    "sourceCommit": "S directly parents fixed d2c with these eight files",
+    "runnerCommit": "R directly parents S and adds only owned workflow/manifest; actual R revision must be recorded",
+    "executionOwner": "Parent controls authorization/publication; this receipt does not claim a workflow was started or completed."
+  },
+  "actionsPerformedByThisTask": {
+    "sourceBlobsCreated": true,
+    "patchBlobCreated": true,
+    "refMutations": 0,
+    "workflowDispatches": 0,
+    "workflowLogDownloads": 0,
+    "zipDownloads": 0,
+    "virtualMachines": 0,
+    "dbOrModelCalls": 0
+  },
+  "restoration": "Reverse the serialized patch exactly: restore six original blobs and remove the two new files. No unrelated source or configuration is part of this overlay."
+}

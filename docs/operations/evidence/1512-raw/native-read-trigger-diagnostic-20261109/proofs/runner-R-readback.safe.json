@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "checkedAt": "2026-11-09 23:21:56 UTC",
+  "sourceCommit": "668f1a3543f8d007d0b1cae655a2595c1cfa657f",
+  "sourceTree": "5a72ec243b49bf7c0547f97d2b636938afe1ee3a",
+  "executionCommit": "dc32133ba6d2db3303365bfa9e360fbc487ea0b5",
+  "executionTree": "10b9ce122ca7e390bcc525b255174dde7c17ffd5",
+  "parents": [
+    "668f1a3543f8d007d0b1cae655a2595c1cfa657f"
+  ],
+  "manifestBlob": "24d12e18a4d8a0b9d0c0ff818afa7e009c29c595",
+  "requestId": "1be17350-761f-4df3-bce8-1055a95a5437",
+  "createdAt": "2026-11-09T23:20:53.000Z",
+  "expiresAt": "2026-11-10T00:50:53.000Z",
+  "sourceLeaves": 6842,
+  "executionLeaves": 6844,
+  "oldLeavesUnchanged": 6842,
+  "exactNewEntries": [
+    {
+      "path": ".github/issue1512-native-read-diagnostic.json",
+      "before": null,
+      "after": {
+        "sha": "24d12e18a4d8a0b9d0c0ff818afa7e009c29c595",
+        "mode": "100644",
+        "type": "blob"
+      }
+    },
+    {
+      "path": ".github/workflows/issue1512-native-read-diagnostic.yml",
+      "before": null,
+      "after": {
+        "sha": "97ff3aacdea495d930e015c0616403d66db55cb6",
+        "mode": "100644",
+        "type": "blob"
+      }
+    }
+  ],
+  "gitDirectoriesRecomputed": 874,
+  "helperAuditCliCompatible": true,
+  "helperAuditScope": "parsed JSON closed schema; not a canonical-byte or causal verdict",
+  "branchRefWritten": false,
+  "jobTriggered": false,
+  "workflow": {
+    "path": ".github/workflows/issue1512-native-read-diagnostic.yml",
+    "sha": "97ff3aacdea495d930e015c0616403d66db55cb6",
+    "bytes": 29002,
+    "sha256": "30168c05c743f77f543d2e78579ceb074c4e78559a5d2556148cae0de1b4ed8f"
+  },
+  "manifest": {
+    "manifest": {
+      "version": 1,
+      "enabled": true,
+      "requestId": "1be17350-761f-4df3-bce8-1055a95a5437",
+      "createdAt": "2026-11-09T23:20:53.000Z",
+      "expiresAt": "2026-11-10T00:50:53.000Z",
+      "baseCommit": "d2c3f63448130443e3e10bb5304417162f585776",
+      "baseTree": "a311b73945e9846a33a2bbd3ffa54b9e23888b1d",
+      "sourceCommit": "668f1a3543f8d007d0b1cae655a2595c1cfa657f",
+      "sourceTree": "5a72ec243b49bf7c0547f97d2b636938afe1ee3a",
+      "overlay": [
+        {
+          "path": "apps/desktop/src/renderer/read-batch.ts",
+          "beforeBlob": "e7f6972a23519ae45e059038cd0c404789d44a98",
+          "afterBlob": "c4f97ced534634c66a1d840618756464d020be4a"
+        },
+        {
+          "path": "apps/desktop/src/renderer/rpc.ts",
+          "beforeBlob": "dae8798653457afad334c2d909b10b63e9b3956f",
+          "afterBlob": "cbbd2acc7611c441b4b9dd885920b8babebc0e0e"
+        },
+        {
+          "path": "apps/desktop/test/lifecycle.mjs",
+          "beforeBlob": "3f21ee7f6a4eb8948778a35db72fb5e61aeca9ab",
+          "afterBlob": "fc876e7c863724e2048499dbccece9065b6766ff"
+        },
+        {
+          "path": "apps/desktop/test/read-diagnostics.mjs",
+          "beforeBlob": null,
+          "afterBlob": "c41bfc24156ef2b99c10ac08c393f4594b037048"
+        },
+        {
+          "path": "hooks/use-live-key.tsx",
+          "beforeBlob": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f",
+          "afterBlob": "4bf39ecfee54659a75e42456888ca4ee828b00e6"
+        },
+        {
+          "path": "lib/live/channel.ts",
+          "beforeBlob": "38df2110ac19c41e413dbbdfae8fac34361b2480",
+          "afterBlob": "e9b4f3b66589f5350e3bfdda8cb22f7a982d4b95"
+        },
+        {
+          "path": "lib/swr/read-diagnostics.ts",
+          "beforeBlob": null,
+          "afterBlob": "7dd27cabdd495839bd578613fe36390b81cef69d"
+        },
+        {
+          "path": "lib/swr/read-observer.ts",
+          "beforeBlob": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+          "afterBlob": "bd366c93b338fcfc5b9b03353c2a4e29dea1db21"
+        }
+      ]
+    },
+    "sha": "24d12e18a4d8a0b9d0c0ff818afa7e009c29c595",
+    "bytes": 1850,
+    "sha256": "e563c42d3bb4340eceb72e5ca98a5e56496599486617bc0d19cba67d03a656a2"
+  },
+  "preparationProof": {
+    "sha": "9b8d64944a9a817dd79be2c20753fcd2b54efb06",
+    "bytes": 8551,
+    "sha256": "d4a90dbe545602fc6ffc916c0b9d1d4feba75942d192a9d4fc35350c335e610b"
+  },
+  "executionStatus": "prepared-unpublished",
+  "originalActionsOrZipReads": 0,
+  "resourcesCreated": 0,
+  "resourcesRunning": 0
+}

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "owner": "issue1512/native_diag_runner",
+  "service": "postgresql@17",
+  "startedAt": "2026-11-09T23:26:51.782Z",
+  "postgresStepOutcome": "skipped",
+  "observation": "no_owned_start_intent_observed",
+  "ownedStartRequested": false,
+  "stopRequested": false,
+  "stopExitCode": null,
+  "readyExitCode": null,
+  "controlStatusExitCode": null,
+  "passed": true,
+  "failure": null,
+  "controlEvidenceCopied": true,
+  "finishedAt": "2026-11-09T23:26:51.804Z"
+}

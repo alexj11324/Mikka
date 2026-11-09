@@ -1,0 +1,242 @@
+{
+  "version": 2,
+  "preparedAt": "2026-11-09 23:08:16 UTC",
+  "issue": 1512,
+  "workflow": {
+    "path": ".github/workflows/issue1512-native-read-diagnostic.yml",
+    "sha": "97ff3aacdea495d930e015c0616403d66db55cb6",
+    "bytes": 29002,
+    "sha256": "30168c05c743f77f543d2e78579ceb074c4e78559a5d2556148cae0de1b4ed8f"
+  },
+  "supersedesWorkflow": {
+    "path": ".github/workflows/issue1512-native-read-diagnostic.yml",
+    "sha": "2c0d004a3ebbf074f5d08bb0d4a3c0d149966463",
+    "bytes": 25856,
+    "sha256": "152f7ad89b4c9bd0503aa8e1309c412b2247a1733d102efee5f726af4e0c5af6"
+  },
+  "priorFullPreparationProof": {
+    "sha": "1ebbe72b92cf1ec22f6695669c58b7e219abcc38",
+    "bytes": 62815,
+    "sha256": "87ed4c79523bbd1232116b6e103cf9969b7ea70410599ebc6f47c87312ebef0a"
+  },
+  "sourceOverlayFinalized": false,
+  "approvedPathCountCurrently": 8,
+  "privateControl": {
+    "directory": "RUNNER_TEMP/mikka-1512-native-read-diagnostic-GITHUB_RUN_ID",
+    "mode": "0700, exclusive mkdir after source guard",
+    "earlyFiles": [
+      "source.json",
+      "source-manifest.json"
+    ],
+    "ownedIntentFile": "postgres-intent.json",
+    "finalCopy": "only these fixed regular non-symlink files <=64KiB are copied in cleanup to .cache/desktop-evidence/diagnostic-control; original audit-evidence scans them before upload",
+    "resultBoundary": "no_owned_start_intent_observed is not proof that PostgreSQL is absent; it permits no-op cleanup only when the actual PostgreSQL step outcome is skipped; missing/invalid intent after an attempted start fails closed without stopping any service"
+  },
+  "directHarnessSourceReview": {
+    "sources": [
+      {
+        "path": "apps/desktop/test/environment.mjs",
+        "sha": "cf1dcee34ea2edeb9e0ed32110966726049246e5",
+        "removesEvidenceRoot": false
+      },
+      {
+        "path": "apps/desktop/test/bundled-smoke.mjs",
+        "sha": "2df81511184d89d773b86f7d34ae0c069a49e295",
+        "removes": "owned profile only"
+      },
+      {
+        "path": "apps/desktop/test/parity.mjs",
+        "sha": "71157e93057ca19159a054fd4d41c9c0e0650fca",
+        "removes": "owned profiles only"
+      },
+      {
+        "path": "apps/desktop/test/lifecycle.mjs",
+        "sha": "3f21ee7f6a4eb8948778a35db72fb5e61aeca9ab",
+        "removes": "its mkdtemp directory only"
+      }
+    ],
+    "limitation": "does not claim an exhaustive transitive review of every build script; private RUNNER_TEMP storage removes the evidence-root deletion dependency"
+  },
+  "verification": {
+    "yamlParsed": true,
+    "singleJob": true,
+    "steps": 26,
+    "timeoutMinutes": 60,
+    "commonJsBodiesParsed": [
+      {
+        "name": "Verify the one-shot diagnostic source and request",
+        "lines": 69
+      },
+      {
+        "name": "Start an independent local PostgreSQL",
+        "lines": 6
+      },
+      {
+        "name": "Start an independent local PostgreSQL",
+        "lines": 6
+      },
+      {
+        "name": "Generate ephemeral test-only auth secret",
+        "lines": 4
+      },
+      {
+        "name": "Stop only this diagnostic run's PostgreSQL",
+        "lines": 64
+      },
+      {
+        "name": "Audit closed diagnostic control receipts",
+        "lines": 33
+      }
+    ],
+    "syntheticCleanupCases": [
+      {
+        "name": "skipped before owned start",
+        "exitCode": 0,
+        "report": {
+          "version": 1,
+          "owner": "issue1512/native_diag_runner",
+          "service": "postgresql@17",
+          "startedAt": "2026-11-09T23:07:58.619Z",
+          "postgresStepOutcome": "skipped",
+          "observation": "no_owned_start_intent_observed",
+          "ownedStartRequested": false,
+          "stopRequested": false,
+          "stopExitCode": null,
+          "readyExitCode": null,
+          "controlStatusExitCode": null,
+          "passed": true,
+          "failure": null,
+          "controlEvidenceCopied": true,
+          "finishedAt": "2026-11-09T23:07:58.619Z"
+        },
+        "stopCalls": 0,
+        "totalCommands": 0
+      },
+      {
+        "name": "missing intent after successful PG step",
+        "exitCode": 1,
+        "report": {
+          "version": 1,
+          "owner": "issue1512/native_diag_runner",
+          "service": "postgresql@17",
+          "startedAt": "2026-11-09T23:07:58.619Z",
+          "postgresStepOutcome": "success",
+          "observation": "no_owned_start_intent_observed",
+          "ownedStartRequested": false,
+          "stopRequested": false,
+          "stopExitCode": null,
+          "readyExitCode": null,
+          "controlStatusExitCode": null,
+          "passed": false,
+          "failure": "owned_start_intent_missing",
+          "controlEvidenceCopied": true,
+          "finishedAt": "2026-11-09T23:07:58.619Z"
+        },
+        "stopCalls": 0,
+        "totalCommands": 0
+      },
+      {
+        "name": "failure before ownership or missing receipt",
+        "exitCode": 1,
+        "report": {
+          "version": 1,
+          "owner": "issue1512/native_diag_runner",
+          "service": "postgresql@17",
+          "startedAt": "2026-11-09T23:07:58.619Z",
+          "postgresStepOutcome": "failure",
+          "observation": "no_owned_start_intent_observed",
+          "ownedStartRequested": false,
+          "stopRequested": false,
+          "stopExitCode": null,
+          "readyExitCode": null,
+          "controlStatusExitCode": null,
+          "passed": false,
+          "failure": "owned_start_intent_missing",
+          "controlEvidenceCopied": true,
+          "finishedAt": "2026-11-09T23:07:58.619Z"
+        },
+        "stopCalls": 0,
+        "totalCommands": 0
+      },
+      {
+        "name": "invalid ownership intent",
+        "exitCode": 1,
+        "report": {
+          "version": 1,
+          "owner": "issue1512/native_diag_runner",
+          "service": "postgresql@17",
+          "startedAt": "2026-11-09T23:07:58.620Z",
+          "postgresStepOutcome": "failure",
+          "observation": "owned_intent_invalid",
+          "ownedStartRequested": false,
+          "stopRequested": false,
+          "stopExitCode": null,
+          "readyExitCode": null,
+          "controlStatusExitCode": null,
+          "passed": false,
+          "failure": "owned_intent_invalid",
+          "controlEvidenceCopied": true,
+          "finishedAt": "2026-11-09T23:07:58.620Z"
+        },
+        "stopCalls": 0,
+        "totalCommands": 0
+      },
+      {
+        "name": "owned stop confirmed",
+        "exitCode": 0,
+        "report": {
+          "version": 1,
+          "owner": "issue1512/native_diag_runner",
+          "service": "postgresql@17",
+          "startedAt": "2026-11-09T23:07:58.620Z",
+          "postgresStepOutcome": "success",
+          "observation": "owned_postgres_stopped",
+          "ownedStartRequested": true,
+          "stopRequested": true,
+          "stopExitCode": 0,
+          "readyExitCode": 2,
+          "controlStatusExitCode": 3,
+          "passed": true,
+          "failure": null,
+          "controlEvidenceCopied": true,
+          "finishedAt": "2026-11-09T23:07:58.620Z"
+        },
+        "stopCalls": 1,
+        "totalCommands": 5
+      },
+      {
+        "name": "owned stop failed",
+        "exitCode": 1,
+        "report": {
+          "version": 1,
+          "owner": "issue1512/native_diag_runner",
+          "service": "postgresql@17",
+          "startedAt": "2026-11-09T23:07:58.620Z",
+          "postgresStepOutcome": "success",
+          "observation": "owned_postgres_stop_unverified",
+          "ownedStartRequested": true,
+          "stopRequested": true,
+          "stopExitCode": 1,
+          "readyExitCode": 0,
+          "controlStatusExitCode": 0,
+          "passed": false,
+          "failure": "postgres_stop_unverified",
+          "controlEvidenceCopied": true,
+          "finishedAt": "2026-11-09T23:07:58.620Z"
+        },
+        "stopCalls": 1,
+        "totalCommands": 5
+      }
+    ],
+    "syntheticOnly": true,
+    "actualMacExecution": false,
+    "jobTriggered": false,
+    "sourceRefModified": false,
+    "evidenceRefModified": false,
+    "resourcesCreated": 0,
+    "resourcesRunning": 0,
+    "originalActionsLogOrZipReads": 0
+  },
+  "originalCommands": "The prior proof's original critical build/package/crypto/smoke-parity-lifecycle run and env conservation remains unchanged; only source/PG/control snippets and one closed POSTGRES_STEP_OUTCOME environment value differ from runner v1",
+  "artifacts": "Only original audited native evidence + original closed package/crypto evidence upload paths remain. No unaudited control fallback artifact."
+}

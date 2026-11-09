@@ -1,0 +1,61 @@
+{
+  "schema": "mikka.issue1512.cp51.public-readback.v1",
+  "recordedAtUtc": "2026-11-09T23:27:36.691Z",
+  "comments": [
+    {
+      "id": 6753689565,
+      "url": "https://github.com/alexj11324/Mikka/pull/1799#issuecomment-6753689565",
+      "createdAtUtc": "2026-11-09T22:55:41Z",
+      "updatedAtUtc": "2026-11-09T22:55:41Z",
+      "bodyPath": "public/pr1799-comment-6753689565.md",
+      "bodyBytes": 1958,
+      "bodySha256": "e4408f88a7ed5652de5ac9ac8acbda70c33fd875d9d564242306116fae069f5c",
+      "bodyGitBlob": "c1f81556706d2ba50300aec64f02ffab3807a72f",
+      "observedAtUtc": "2026-11-09T23:26:07.383Z"
+    },
+    {
+      "id": 6753484456,
+      "url": "https://github.com/alexj11324/Mikka/issues/1512#issuecomment-6753484456",
+      "createdAtUtc": "2026-11-09T22:44:51Z",
+      "updatedAtUtc": "2026-11-09T22:44:51Z",
+      "bodyPath": "public/issue1512-comment-6753484456.md",
+      "bodyBytes": 1892,
+      "bodySha256": "9ab83f0c033ef082d76c01b1110bb19e4167f6952e69e157f03ec7c9ce388908",
+      "bodyGitBlob": "978ac6b6fd7e9f303f1e62e1c8324ef152e0a86d",
+      "observedAtUtc": "2026-11-09T23:26:07.383Z"
+    },
+    {
+      "id": 6753604715,
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6753604715",
+      "createdAtUtc": "2026-11-09T22:51:16Z",
+      "updatedAtUtc": "2026-11-09T22:51:43Z",
+      "bodyPath": "public/coord1752-comment-6753604715.md",
+      "bodyBytes": 991,
+      "bodySha256": "48545ea11de73e70b03fb5907518fd728ba8a29e65e5499ee000e1ceb27bf566",
+      "bodyGitBlob": "a811a0cf18fbfbd5297749a6efa04cb8c3ee9320",
+      "observedAtUtc": "2026-11-09T23:26:07.354Z"
+    },
+    {
+      "id": 6754220229,
+      "url": "https://github.com/alexj11324/Mikka/issues/1512#issuecomment-6754220229",
+      "createdAtUtc": "2026-11-09T23:25:04Z",
+      "updatedAtUtc": "2026-11-09T23:25:04Z",
+      "bodyPath": "public/issue1512-comment-6754220229.md",
+      "bodyBytes": 2141,
+      "bodySha256": "b585c1b365fb0cf73d04420a91eb210ada5c2af597b4b21e7a910b58d819d52f",
+      "bodyGitBlob": "43b1f01b798a8a6b8317ca0ca6c83a57776e8f04",
+      "observedAtUtc": "2026-11-09T23:26:07.477Z"
+    }
+  ],
+  "formalPr": {
+    "number": 1799,
+    "head": "d2c3f63448130443e3e10bb5304417162f585776",
+    "state": "open",
+    "merged": false,
+    "updatedAtUtc": "2026-11-09T22:55:41Z",
+    "url": "https://github.com/alexj11324/Mikka/pull/1799",
+    "observedAtUtc": "2026-11-09T23:26:07.373Z"
+  },
+  "commentOrPrWrites": 0,
+  "historicalClaimsKeptAsSnapshots": true
+}

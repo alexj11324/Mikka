@@ -1,0 +1,832 @@
+diff --git a/lib/swr/read-diagnostics.ts b/lib/swr/read-diagnostics.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..7dd27cabdd495839bd578613fe36390b81cef69d
+--- /dev/null
++++ b/lib/swr/read-diagnostics.ts
+@@ -0,0 +1,100 @@
++// Temporary, opt-in acceptance diagnostics. No authorization, network, timers or proof mutation.
++type Ref = object | undefined
++export type ReadDiagnosticFields = {
++  cache?: Ref; read?: Ref; channel?: Ref; request?: Ref; item?: Ref; key?: string; scope?: string | null; entity?: string
++  after?: number; began?: number; pending?: number; sent?: number; generation?: number; count?: number; status?: number; revision?: number
++  accepted?: boolean; received?: boolean; superseded?: boolean; unconditional?: boolean; reuse?: boolean; proof?: boolean
++  event?: string; reason?: string; state?: string; outcome?: string; kind?: string; action?: string; actions?: readonly string[]
++}
++const actions = new Set(['desktop.readBatch', 'desktop.bootstrap', 'desktop.session', 'workspace.switchWorkspace',
++  'coordinator.syncCoordinatorChat', 'coordinator.pollBotChatSummaries', 'execution-settings.getBotModelMenu',
++  'issues.syncIssueList', 'task-runs.syncThreadList', 'task-runs.pollTaskRuns', 'bots.pollBots',
++  'teams.listTeams', 'team-relations.listProjectTeams', 'projects.listProjects'])
++const labels = new Set(['live_observe', 'live_invalidate', 'live_flush', 'live_refresh', 'live_subscribe', 'live_unsubscribe',
++  'read_entry', 'read_received', 'read_complete', 'read_fresh', 'pending_capture', 'pending_dispatch', 'pending_revoke',
++  'rpc_dispatch', 'rpc_headers', 'rpc_decoded', 'rpc_failed', 'batch_enqueue', 'batch_send', 'batch_fallback',
++  'socket', 'received', 'skipped', 'read', 'connecting', 'open', 'ready', 'closed',
++  'hidden', 'revision_held', 'unsubscribed', 'covered', 'invalid', 'late_subscribe', 'visibility', 'deadline',
++  'fallback', 'socket_open', 'push', 'capabilities', 'presence', 'other',
++  'no_read', 'before_boundary', 'wait_settled', 'wait_pending', 'retired', 'revoked', 'failed',
++  'committed', 'discarded', 'covers', 'revision_uncovered', 'not_returned', 'newer_read', 'revalidate'])
++const kinds = new Set(["thread_list","task_run_list","bot_chat_list","device_list","bot_chat","issue_list","bot_list","group_list","workspace_settings","computer_state","approved_writes","approved_write","pending_actions","factory_task","factory_issue","issue_document","artifact","issue_members","issue_relations","issue_threads","thread","run","coordinator_session","model_settings","group_chat","hosted_billing","pull_request_status","subagent_events","project_map"])
++const families = new Set(['coordinator-chat', 'coordinator-chat-metadata', 'bot-chats', 'threads', 'task-runs',
++  'issues', 'bots', 'teams', 'project-teams', 'bot-list-groups', 'approved-writes', 'pending-actions'])
++const refs = new WeakMap<object, number>()
++const keys = new Map<string, number>()
++const scopes = new Map<string, number>()
++const entities = new Map<string, number>()
++let nextRef = 0, nextKey = 0, nextScope = 0, nextEntity = 0, producer: string | undefined
++const reference = (value: object) => {
++  let id = refs.get(value)
++  if (id === undefined) { if (nextRef >= 4096) return 0; id = ++nextRef; refs.set(value, id) }
++  return id
++}
++const intern = (values: Map<string, number>, value: string, next: () => number) => {
++  let id = values.get(value)
++  if (id === undefined) {
++    if (values.size >= 256) return 0
++    id = next(); values.set(value, id)
++  }
++  return id
++}
++const noteFailure = () => {
++  try {
++    const state = Object.getOwnPropertyDescriptor(globalThis, '__mikkaReadDiagnosticState')?.value
++    if (state && Number.isSafeInteger(state.failures)) state.failures++
++  } catch { /* only diagnostic completeness is affected */ }
++}
++/** Objects and raw cache keys stay inside this module. Only bounded scalar metadata reaches the test sink. */
++export function observeReadDiagnostic(event: string, fields: ReadDiagnosticFields = {}): void {
++  try {
++    const sink = Object.getOwnPropertyDescriptor(globalThis, '__mikkaReadDiagnostic')?.value
++    if (typeof sink !== 'function') return
++    producer ??= crypto.randomUUID()
++    const row: Record<string, string | number | boolean | string[]> = {
++      version: 1, producer, event: labels.has(event) ? event : 'other', monotonicMs: performance.now(), wallMs: Date.now(),
++    }
++    let omittedReferences = 0
++    for (const name of ['cache', 'read', 'channel', 'request', 'item'] as const) {
++      const value = fields[name]
++      if (value !== undefined && value !== null && (typeof value === 'object' || typeof value === 'function')) {
++        const id = reference(value); row[name + 'Id'] = id; if (id === 0) omittedReferences++
++      }
++    }
++    if (typeof fields.key === 'string') {
++      row.keyId = intern(keys, fields.key, () => ++nextKey)
++      row.keyOmitted = row.keyId === 0
++      const family = /^@?"?([a-z][a-z0-9:_-]{0,63})(?:"|,|$)/.exec(fields.key)?.[1]
++      row.keyFamily = family && families.has(family) ? family : 'other'
++    }
++    if (typeof fields.scope === 'string') {
++      row.scopeId = intern(scopes, fields.scope, () => ++nextScope); row.scopeOmitted = row.scopeId === 0; row.scopeKnown = true
++    } else if (fields.scope === null) row.scopeKnown = false
++    if (typeof fields.entity === 'string') {
++      row.entityId = intern(entities, fields.entity, () => ++nextEntity); row.entityOmitted = row.entityId === 0
++    }
++    row.omittedReferences = omittedReferences
++    for (const name of ['after', 'began', 'pending', 'sent', 'generation', 'count', 'status', 'revision'] as const) {
++      const value = fields[name]
++      if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0) row[name] = value
++    }
++    for (const name of ['accepted', 'received', 'superseded', 'unconditional', 'reuse', 'proof'] as const) {
++      if (typeof fields[name] === 'boolean') row[name] = fields[name]
++    }
++    for (const name of ['event', 'reason', 'state', 'outcome'] as const) {
++      const value = fields[name]
++      if (typeof value === 'string') row[name === 'event' ? 'observedEvent' : name] = labels.has(value) ? value : 'other'
++    }
++    if (typeof fields.kind === 'string') row.kind = kinds.has(fields.kind) ? fields.kind : 'other'
++    if (typeof fields.action === 'string') row.action = actions.has(fields.action) ? fields.action : 'other'
++    if (fields.actions) {
++      row.actions = fields.actions.slice(0, 16).map(action => actions.has(action) ? action : 'other')
++      row.omittedActions = Math.max(0, fields.actions.length - 16)
++    }
++    // The sink handles its own asynchronous delivery failures; the product never waits for it.
++    const delivered: unknown = sink(row)
++    if (delivered !== undefined) void Promise.resolve(delivered).catch(noteFailure)
++  } catch { noteFailure() }
++}
++
++export const READ_DIAGNOSTIC_SCHEMA = Object.freeze({ version: 1, events: Object.freeze([...labels]), actions: Object.freeze([...actions]), families: Object.freeze([...families]), kinds: Object.freeze([...kinds]) })
+diff --git a/lib/swr/read-observer.ts b/lib/swr/read-observer.ts
+index 69a827369bd71838ba8ac9ffbee928ca70219e76..bd366c93b338fcfc5b9b03353c2a4e29dea1db21 100644
+--- a/lib/swr/read-observer.ts
++++ b/lib/swr/read-observer.ts
+@@ -1,3 +1,5 @@
++import { observeReadDiagnostic } from './read-diagnostics'
++
+ type Cache = { get(key: string): { data?: unknown; error?: unknown } | undefined }
+ type Outcome = { status: 'committed' | 'discarded' } | { status: 'failed'; error: unknown }
+ type Read = {
+@@ -37,10 +39,12 @@
+   const observation = synchronousRead
+   if (!observation || !observation.current()) return
+   const { read } = observation
++  observeReadDiagnostic('pending_capture', { read, began: read.began })
+   if (read.dispatchCaptured) {
+     read.dispatchAmbiguous = true
+     read.pendingDispatchAt = undefined
+     read.revokePending?.()
++    observeReadDiagnostic('pending_revoke', { read, reason: 'revoked', began: read.began })
+     return
+   }
+   read.dispatchCaptured = true
+@@ -51,10 +55,12 @@
+       read.dispatchAmbiguous = true
+       read.pendingDispatchAt = undefined
+       read.revokePending?.()
++      observeReadDiagnostic('pending_revoke', { read, reason: 'revoked', began: read.began })
+       return
+     }
+     read.dispatchNotified = true
+     read.pendingDispatchAt = readBoundary()
++    observeReadDiagnostic('pending_dispatch', { read, began: read.began, pending: read.pendingDispatchAt })
+   }
+ }
+ 
+@@ -110,6 +116,7 @@
+     },
+   }
+   reads.set(key, read)
++  observeReadDiagnostic('read_entry', { cache, key, read, began: read.began })
+   // Return this exact promise to SWR. Its continuation runs onSuccess and then
+   // commits the cache synchronously; the following microtask checks both.
+   const withDispatch = <Result>(run: () => Result): Result => {
+@@ -119,6 +126,7 @@
+   }
+   const promise = (async () => fetcher(withDispatch))()
+   const complete = (outcome: Outcome) => {
++    observeReadDiagnostic('read_complete', { cache, key, read, began: read.began, outcome: outcome.status, accepted: read.accepted, received: read.received, superseded: read.superseded })
+     if (outcome.status === 'committed' && read.value !== null && typeof read.value === 'object') {
+       read.committedValue = new WeakRef(read.value)
+       read.value = undefined
+@@ -129,6 +137,7 @@
+     read.received = true; read.value = value
+     const sent = value !== null && typeof value === 'object' ? dispatched.get(value) : undefined
+     if (sent !== undefined && sent > read.began) read.began = sent
++    observeReadDiagnostic('read_received', { cache, key, read, began: read.began, sent, proof: sent !== undefined })
+     queueMicrotask(() => {
+       // Only this read's original callback failure belongs to it. A retained
+       // cache.error can instead be from an older, unrelated request.
+@@ -157,25 +166,35 @@
+ export async function readFresh(cache: Cache, key: string, after: number, revalidate: () => Promise<unknown>, accepts: (data: unknown) => boolean, current: () => boolean): Promise<unknown> {
+   while (current()) {
+     const read = latest.get(cache)?.get(key)
+-    if (!read || read.began <= after && (read.pendingDispatchAt ?? 0) <= after) return revalidate()
++    if (!read || read.began <= after && (read.pendingDispatchAt ?? 0) <= after) {
++      observeReadDiagnostic('read_fresh', { cache, key, read, after, began: read?.began, pending: read?.pendingDispatchAt, reason: read ? 'before_boundary' : 'no_read', outcome: 'revalidate' })
++      return revalidate()
++    }
++    observeReadDiagnostic('read_fresh', { cache, key, read, after, began: read.began, pending: read.pendingDispatchAt, reason: read.began > after ? 'wait_settled' : 'wait_pending' })
+     const outcome = await (read.began > after ? read.settled : Promise.race([
+       read.settled,
+       read.pendingRevoked!.then(() => ({ status: 'revoked' as const })),
+     ]))
+-    if (!current()) return
++    if (!current()) { observeReadDiagnostic('read_fresh', { cache, key, read, after, reason: 'retired' }); return }
+     if (outcome.status === 'revoked') {
+       const next = latest.get(cache)?.get(key)
+-      if (next && next !== read) continue
++      if (next && next !== read) { observeReadDiagnostic('read_fresh', { cache, key, read, after, reason: 'newer_read' }); continue }
++      observeReadDiagnostic('read_fresh', { cache, key, read, after, reason: 'revoked', outcome: 'revalidate' })
+       return revalidate()
+     }
+-    if (outcome.status === 'failed') throw outcome.error
++    if (outcome.status === 'failed') { observeReadDiagnostic('read_fresh', { cache, key, read, after, reason: 'failed' }); throw outcome.error }
+     if (outcome.status === 'committed' && read.began > after && read.applied()) {
+       const data = cache.get(key)?.data
+-      if (accepts(data)) return data
++      if (accepts(data)) { observeReadDiagnostic('read_fresh', { cache, key, read, after, reason: 'covers' }); return data }
++      observeReadDiagnostic('read_fresh', { cache, key, read, after, reason: 'revision_uncovered' })
+     }
+     // A later read can itself cover this obligation; never return the old
+     // result or let its completion erase the newer read's observation.
+     const next = latest.get(cache)?.get(key)
+-    if (!next || next === read) return revalidate()
++    if (!next || next === read) {
++      observeReadDiagnostic('read_fresh', { cache, key, read, after, began: read.began, outcome: outcome.status, reason: 'not_returned' })
++      return revalidate()
++    }
++    observeReadDiagnostic('read_fresh', { cache, key, read, after, reason: 'newer_read' })
+   }
+ }
+diff --git a/lib/live/channel.ts b/lib/live/channel.ts
+index 38df2110ac19c41e413dbbdfae8fac34361b2480..e9b4f3b66589f5350e3bfdda8cb22f7a982d4b95 100644
+--- a/lib/live/channel.ts
++++ b/lib/live/channel.ts
+@@ -2,6 +2,7 @@
+ import { liveRevisionKey, type LiveRevisions } from './revisions'
+ import { LIVE_PRESENCE_PARAM, PRESENCE_MAX_TOKEN_BYTES, PRESENCE_MAX_WATCHES_PER_SOCKET, presenceReply, type PresenceCommand, type PresenceProof } from './presence'
+ import { readBoundary } from '../swr/read-observer'
++import { observeReadDiagnostic } from '../swr/read-diagnostics'
+ 
+ export const LIVE_FALLBACK_MS = 60_000
+ const HEARTBEAT_MS = 30_000
+@@ -73,6 +74,7 @@
+   constructor(private runtime: LiveRuntime) {}
+ 
+   private observe(observation: LiveObservation) {
++    observeReadDiagnostic('live_observe', { channel: this, generation: this.generation, event: observation.event, state: observation.state, reason: observation.reason, kind: observation.kind, entity: observation.id, revision: observation.rev, key: observation.key })
+     try { this.runtime.observe?.(observation) } catch { /* analytics never changes a read */ }
+   }
+ 
+@@ -90,18 +92,20 @@
+       deadlineObservation: Number.isFinite(options.deadline?.observation) ? options.deadline!.observation! : null,
+       timer: `deadline:${++this.nextDeadline}`, revisions: heldRevisions(options.revisions), presence: options.presence }
+     this.subscriptions.add(subscription)
++    observeReadDiagnostic('live_subscribe', { channel: this, item: subscription, kind, entity: id, count: keys.length, generation: this.generation })
+     if (this.subscriptions.size === 1) {
+       this.unwatch = this.runtime.watchVisibility(() => this.visibilityChanged())
+       if (this.runtime.visible()) { this.fallback(); void this.connect() }
+     }
+     if (this.connected && this.runtime.visible()) this.invalidate(kind, id, true, false, undefined,
+       this.supported(subscription) && this.coverageAfter !== null
+-        ? Math.max(this.coverageAfter, this.invalidationAfter.get(kind) ?? 0) : undefined)
++        ? Math.max(this.coverageAfter, this.invalidationAfter.get(kind) ?? 0) : undefined, 'late_subscribe')
+     this.syncPresence()
+     this.fallback()
+     this.scheduleDeadline(subscription)
+     const stop = () => {
+       this.subscriptions.delete(subscription)
++      observeReadDiagnostic('live_unsubscribe', { channel: this, item: subscription, kind, entity: id, generation: this.generation })
+       this.clear(subscription.timer)
+       this.syncPresence()
+       if (this.allSupported()) this.clear('fallback')
+@@ -188,7 +192,7 @@
+       // A real hidden/offline interval has closed the socket and always reads.
+       // Duplicate visible/online events on a healthy channel leave supported
+       // keys to SWR's age-based focus check; unsupported kinds still catch up.
+-      this.invalidate(undefined, undefined, false, true)
++      this.invalidate(undefined, undefined, false, true, undefined, undefined, 'visibility')
+       for (const subscription of this.subscriptions) {
+         if (subscription.deadlineAt !== null && subscription.deadlineAt <= this.localNow()) subscription.deadlineAt = null
+         this.scheduleDeadline(subscription)
+@@ -205,11 +209,12 @@
+       if (!this.subscriptions.has(subscription) || subscription.deadlineAt === null) return
+       if (subscription.deadlineAt > this.localNow()) { this.scheduleDeadline(subscription); return }
+       subscription.deadlineAt = null
+-      this.invalidate(subscription.kind, subscription.id, true)
++      this.invalidate(subscription.kind, subscription.id, true, false, undefined, undefined, 'deadline')
+     })
+   }
+ 
+-  private invalidate(kind?: LiveKind, id?: string, immediate = false, unsupportedOnly = false, rev?: number, after = readBoundary()) {
++  private invalidate(kind?: LiveKind, id?: string, immediate = false, unsupportedOnly = false, rev?: number, after = readBoundary(), diagnosticReason = 'push') {
++    observeReadDiagnostic('live_invalidate', { channel: this, generation: this.generation, kind, entity: id, revision: rev, after, reason: diagnosticReason })
+     if (!this.runtime.visible()) { this.observe({ event: 'skipped', reason: 'hidden', kind, id, rev }); return }
+     for (const subscription of this.subscriptions) {
+       if (kind && (subscription.kind !== kind || subscription.id !== id)) continue
+@@ -220,6 +225,7 @@
+         const at = kind && !immediate ? Math.max(this.localNow(), (this.lastRead.get(key) ?? -Infinity) + subscription.minIntervalMs) : this.localNow()
+         const previous = this.pending.get(key)
+         const waits = [...previous?.waits ?? [], ...rev === undefined ? [] : [{ subscription, key, rev }]]
++        observeReadDiagnostic('live_invalidate', { channel: this, item: subscription, key, kind: subscription.kind, entity: subscription.id, revision: rev, after, reason: diagnosticReason })
+         this.pending.set(key, { at: Math.min(at, previous?.at ?? Infinity), after: Math.max(after, previous?.after ?? after),
+           unconditional: rev === undefined || previous?.unconditional === true, waits })
+       }
+@@ -256,6 +262,7 @@
+       this.lastRead.set(key, this.localNow())
+       const request = Symbol()
+       this.inFlight.set(key, request)
++      observeReadDiagnostic('live_flush', { channel: this, item: entity, key, after: read.after, unconditional: read.unconditional, kind: entity.kind, generation: this.generation })
+       this.observe({ event: 'read', key, kind: entity.kind, id: entity.id })
+       const settled = () => {
+         if (this.inFlight.get(key) !== request) return
+@@ -348,6 +355,7 @@
+       } else if (!watch.unavailable && reply.expiresAt > this.runtime.now() && reply.expiresAt <= watch.proof.expiresAt) {
+         watch.coveredUntil = this.localNow() + reply.expiresAt - this.runtime.now()
+         this.coverageAfter = readBoundary()
++        observeReadDiagnostic('live_observe', { channel: this, after: this.coverageAfter, reason: 'presence', generation: this.generation })
+         this.expirePresence(watch, reply.expiresAt)
+       }
+     }
+@@ -357,7 +365,7 @@
+ 
+   private fallback() {
+     if (this.allSupported() || !this.runtime.visible() || !this.subscriptions.size || this.timers.has('fallback')) return
+-    this.later('fallback', LIVE_FALLBACK_MS, () => { this.invalidate(undefined, undefined, false, true); this.fallback() })
++    this.later('fallback', LIVE_FALLBACK_MS, () => { this.invalidate(undefined, undefined, false, true, undefined, undefined, 'fallback'); this.fallback() })
+   }
+ 
+   private disconnected(generation: number, delay = this.retryMs) {
+@@ -401,7 +409,7 @@
+         this.observe({ event: 'socket', state: 'open' })
+         // An open socket/pong is not evidence that this Worker supports a new kind.
+         this.fallback()
+-        this.invalidate() // Covers changes committed while the connection was opening.
++        this.invalidate(undefined, undefined, false, false, undefined, undefined, 'socket_open') // Covers changes committed while the connection was opening.
+         this.heartbeat(generation)
+         this.later('renew', Math.max(1, ticket.expiresAt - this.runtime.now()), () => this.disconnected(generation, 0))
+       }
+@@ -416,6 +424,7 @@
+           if (readiness) {
+             this.observe({ event: 'socket', state: 'ready' })
+             this.coverageAfter = readBoundary()
++            observeReadDiagnostic('live_observe', { channel: this, after: this.coverageAfter, reason: 'capabilities', generation: this.generation })
+             this.capabilities = new Set(readiness.kinds)
+             this.revisionKinds = new Set(readiness.revisions)
+             if (this.allSupported()) this.clear('fallback'); else this.fallback()
+diff --git a/hooks/use-live-key.tsx b/hooks/use-live-key.tsx
+index 00cbfb3541c8403a4a3b4d43199281acee9bdb9f..4bf39ecfee54659a75e42456888ca4ee828b00e6 100644
+--- a/hooks/use-live-key.tsx
++++ b/hooks/use-live-key.tsx
+@@ -11,6 +11,7 @@
+ import { registerLiveKeyConnection } from '@/lib/swr/live-focus'
+ import { PersistentReadCache, readCacheShareNamespace } from '@/lib/swr/persistent-cache'
+ import { readBoundary, readFresh } from '@/lib/swr/read-observer'
++import { observeReadDiagnostic } from '@/lib/swr/read-diagnostics'
+ 
+ const LiveContext = createContext<{ channels: LiveChannels; ownerId: string; workspaceId?: string; namespace: string | null; share?: (scope: string | null) => TabShare | null } | null>(null)
+ 
+@@ -93,6 +94,7 @@
+     const subscriptions = (JSON.parse(references) as LiveEntity[]).map(({ kind, id, workspaceId: entityScope }, index) => {
+       const channelScope = entityScope === undefined ? scope : entityScope
+       const refresh: LiveRefresh = (key, requiredRevisions, reuseCompleted, after = readBoundary()) => {
++        observeReadDiagnostic('live_refresh', { cache, key, scope: channelScope, after, reuse: reuseCompleted, kind })
+         if (!current()) return
+         const authorized = () => ownerId && namespace && readCacheShareNamespace(cache, ownerId) === namespace
+         const heldAtStart = { ...cache.get(key)?.data?.live?.revisions }
+diff --git a/apps/desktop/src/renderer/rpc.ts b/apps/desktop/src/renderer/rpc.ts
+index dae8798653457afad334c2d909b10b63e9b3956f..cbbd2acc7611c441b4b9dd885920b8babebc0e0e 100644
+--- a/apps/desktop/src/renderer/rpc.ts
++++ b/apps/desktop/src/renderer/rpc.ts
+@@ -1,4 +1,5 @@
+ import { capturePendingReadDispatch, captureReadDispatch } from '@/lib/swr/read-observer'
++import { observeReadDiagnostic } from '@/lib/swr/read-diagnostics'
+ import { withBasePath } from '@/lib/base-path'
+ import { decode, encodeArgs, DESKTOP_RPC_VERSION } from '@/lib/desktop-rpc/wire'
+ import { isBatchReadAction } from '@/lib/desktop-rpc/read-batch-contract'
+@@ -22,7 +23,7 @@
+   }, (action, args, context) => callRemoteAction(action, args, { ...nativeTransport, ...context }))
+ }
+ 
+-export async function callRemoteAction<T = unknown>(action: string, args: unknown[], transport: { endpoint: '/api/desktop/rpc' | '/api/rpc'; credentials: 'omit' | 'same-origin'; header: 'x-mikka-desktop-protocol' | 'x-mikka-rpc'; isCurrent?: (response?: Response) => boolean; locale?: Locale; onDispatch?: () => void }): Promise<T> {
++export async function callRemoteAction<T = unknown>(action: string, args: unknown[], transport: { endpoint: '/api/desktop/rpc' | '/api/rpc'; credentials: 'omit' | 'same-origin'; header: 'x-mikka-desktop-protocol' | 'x-mikka-rpc'; isCurrent?: (response?: Response) => boolean; locale?: Locale; onDispatch?: () => void; diagnosticItems?: readonly object[]; diagnosticActions?: readonly string[] }): Promise<T> {
+   // Web supplies its existing SDK owner generation; bootstrap also fences
+   // retired page phases. Native identity authorization remains in main.
+   const assertCurrent = (cause?: unknown, response?: Response) => {
+@@ -37,6 +38,9 @@
+   // A pending snapshot may cover the live gap before its response arrives.
+   // Completion still requires that response's existing dispatch proof.
+   if (prove) transport.onDispatch?.()
++  const diagnosticRequest = {}
++  observeReadDiagnostic('rpc_dispatch', { request: diagnosticRequest, action, actions: transport.diagnosticActions, proof: prove !== undefined })
++  for (let index = 0; index < (transport.diagnosticItems?.length ?? 0); index++) observeReadDiagnostic('rpc_dispatch', { request: diagnosticRequest, item: transport.diagnosticItems![index], action: transport.diagnosticActions?.[index] })
+   try {
+     response = await fetch(withBasePath(transport.endpoint), {
+       method: 'POST',
+@@ -46,10 +50,12 @@
+       body: JSON.stringify({ version: DESKTOP_RPC_VERSION, action, args: encoded }),
+     })
+   } catch (cause) {
++    observeReadDiagnostic('rpc_failed', { request: diagnosticRequest, action })
+     assertCurrent(cause)
+     setTransportState('offline')
+     throw new DesktopTransportError('desktop_backend_unreachable', { cause })
+   }
++  observeReadDiagnostic('rpc_headers', { request: diagnosticRequest, action })
+   assertCurrent(undefined, response)
+   if (response.status === 401) {
+     setTransportState('unauthenticated')
+@@ -70,5 +76,6 @@
+   if (!response.ok) throw new DesktopTransportError('desktop_rpc_request_rejected', { status: response.status })
+   setTransportState('ready')
+   const result = decode(value.result) as T
++  observeReadDiagnostic('rpc_decoded', { request: diagnosticRequest, action, proof: prove !== undefined })
+   return prove ? prove(result) : result
+ }
+diff --git a/apps/desktop/src/renderer/read-batch.ts b/apps/desktop/src/renderer/read-batch.ts
+index e7f6972a23519ae45e059038cd0c404789d44a98..c4f97ced534634c66a1d840618756464d020be4a 100644
+--- a/apps/desktop/src/renderer/read-batch.ts
++++ b/apps/desktop/src/renderer/read-batch.ts
+@@ -1,4 +1,5 @@
+ import { carryReadDispatch } from '@/lib/swr/read-observer'
++import { observeReadDiagnostic } from '@/lib/swr/read-diagnostics'
+ import { MAX_READ_BATCH, READ_BATCH_ACTION, type BatchReadAction, type ReadBatchItem } from '@/lib/desktop-rpc/read-batch-contract'
+ import type { Locale } from './location'
+ 
+@@ -20,7 +21,7 @@
+ }
+ 
+ type ReadContext = { locale: Locale; workspace: string | null; currentWorkspace: () => string | null; isCurrent?: () => boolean; onDispatch?: () => void }
+-type Send = (action: string, args: unknown[], context: { locale: Locale; isCurrent: () => boolean; onDispatch?: () => void }) => Promise<unknown>
++type Send = (action: string, args: unknown[], context: { locale: Locale; isCurrent: () => boolean; onDispatch?: () => void; diagnosticItems?: readonly object[]; diagnosticActions?: readonly string[] }) => Promise<unknown>
+ type Pending = ReadContext & {
+   action: BatchReadAction; args: unknown[]; generation: number; send: Send
+   resolve: (result: unknown) => void; reject: (error: unknown) => void
+@@ -45,7 +46,8 @@
+ 
+ async function single(item: Pending) {
+   try {
+-    const result = await item.send(item.action, item.args, { locale: item.locale, isCurrent: () => current(item),
++    observeReadDiagnostic('batch_send', { item, action: item.action, generation: item.generation, count: 1 })
++    const result = await item.send(item.action, item.args, { locale: item.locale, isCurrent: () => current(item), diagnosticItems: [item], diagnosticActions: [item.action],
+       ...(item.onDispatch ? { onDispatch: item.onDispatch } : {}),
+     })
+     if (!current(item)) throw changed()
+@@ -67,7 +69,7 @@
+     // Keep arguments raw: callRemoteAction encodes the entire envelope once,
+     // and its decoded item results must not pass through the codec again.
+     const result = await items[0].send(READ_BATCH_ACTION, [items.map(({ action, args }) => ({ action, args }))], {
+-      locale: items[0].locale, isCurrent: () => items.every(current),
++      locale: items[0].locale, isCurrent: () => items.every(current), diagnosticItems: items, diagnosticActions: items.map(item => item.action),
+       ...(items.some(item => item.onDispatch) ? { onDispatch: () => { for (const item of items) item.onDispatch?.() } } : {}),
+     })
+     if (!validItems(result, items.length)) throw new DesktopTransportError('desktop_rpc_response_invalid', { status: 200 })
+@@ -81,6 +83,7 @@
+     // Only this explicit capability response proves none of the reads ran.
+     // Network/server failures must never silently duplicate work.
+     if (items.every(current) && cause instanceof DesktopTransportError && cause.status === 404 && cause.code === 'desktop_rpc_action_unknown') {
++      observeReadDiagnostic('batch_fallback', { count: items.length, actions: items.map(item => item.action) })
+       unavailable = true
+       await Promise.all(items.map(single))
+     } else for (const item of items) reject(item, cause)
+@@ -125,6 +128,7 @@
+ export function enqueueRead<T>(action: BatchReadAction, args: unknown[], context: ReadContext, send: Send): Promise<T> {
+   return new Promise<T>((resolve, reject) => {
+     const item: Pending = { ...context, action, args, generation, send, resolve: result => resolve(result as T), reject }
++    observeReadDiagnostic('batch_enqueue', { item, action, generation, scope: context.workspace })
+     if (unavailable) { void single(item); return }
+     pending.push(item)
+     if (!scheduled) scheduleFlush()
+diff --git a/apps/desktop/test/read-diagnostics.mjs b/apps/desktop/test/read-diagnostics.mjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..c41bfc24156ef2b99c10ac08c393f4594b037048
+--- /dev/null
++++ b/apps/desktop/test/read-diagnostics.mjs
+@@ -0,0 +1,311 @@
++// Temporary two-login diagnostic collector. Never controls readiness, reads, budgets or retries.
++import assert from 'node:assert/strict'
++import { readFile, writeFile } from 'node:fs/promises'
++import { resolve } from 'node:path'
++import { fileURLToPath } from 'node:url'
++import { READ_DIAGNOSTIC_SCHEMA } from '../../../lib/swr/read-diagnostics.ts'
++
++const BOUNDARIES = {
++        budgetPass: false, extraReadBoundaryCalls: 0, extraApplicationRequests: 0, originalCheckpointsChanged: false,
++        coverage: 'webLogin/nativeLogin pages only; capture spans attachment through ordinary context close and can include tail; budgets use only the unchanged two windows; no cold FIRST capture; initial Native document may precede attachment',
++        identity: 'per-document UUID and timeOrigin; CDP loader IDs are separate local identities, not a guessed cross-layer join',
++        delivery: 'asynchronous test binding; missing delivery, other schema values and overflow remain incomplete; failure/pending counters sum observations and can repeat at snapshot/seal',
++        clocks: 'product monotonicMs is relative to its actual document timeOrigin; wallMs and CDP monotonic clocks are separate',
++        cost: 'retained rows/bytes are bounded; per-event CPU/IPC delivery is not capped and occurs inside original windows; no production performance claim',
++        unknownAssociation: 'no user, workspace, raw SWR key, URL query, headers, body or server invocation ID; ambiguous action/time joins remain unknown',
++      }
++const LIMITS = { rows: 2048, bytes: 524288, documents: 16, networkIds: 1024 }
++const COUNT_KEYS = ['droppedRows', 'droppedBytes', 'invalidPackets', 'missingDocuments', 'duplicateSequences', 'sequenceGaps', 'sinkFailures', 'pendingAtSnapshot', 'keyOmissions', 'scopeOmissions', 'entityOmissions', 'referenceOmissions', 'actionOmissions', 'schemaOther', 'networkIdOmissions', 'documentOmissions', 'unsealedDocuments', 'lateDocuments']
++const BINDING = '__mikkaAcceptanceReadDiagnostic'
++const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
++const METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'])
++const FAMILIES = new Set(['/api/rpc', '/api/desktop/rpc', '/api/workspace', '/api/workspace/switcher',
++  '/api/conversations', '/api/conversations/:id', '/api/conversations/:id/read',
++  '/api/approved-writes', '/api/pending-actions', '/api/live/ticket', 'other-api', 'document', 'other'])
++const EVENTS = new Set(READ_DIAGNOSTIC_SCHEMA.events)
++const ACTIONS = new Set([...READ_DIAGNOSTIC_SCHEMA.actions, 'other'])
++const KINDS = new Set([...READ_DIAGNOSTIC_SCHEMA.kinds, 'other'])
++const KEYS = new Set([...READ_DIAGNOSTIC_SCHEMA.families, 'other'])
++const NUMERIC = new Set(['cacheId', 'readId', 'channelId', 'requestId', 'itemId', 'keyId', 'scopeId', 'entityId',
++  'after', 'began', 'pending', 'sent', 'generation', 'count', 'status', 'revision', 'omittedReferences', 'omittedActions'])
++const FLAGS = new Set(['accepted', 'received', 'superseded', 'unconditional', 'reuse', 'proof',
++  'keyOmitted', 'scopeOmitted', 'scopeKnown', 'entityOmitted'])
++const DETAIL_KEYS = new Set(['version', 'producer', 'event', 'monotonicMs', 'wallMs', ...NUMERIC, ...FLAGS,
++  'keyFamily', 'observedEvent', 'reason', 'state', 'outcome', 'kind', 'action', 'actions'])
++const finite = value => typeof value === 'number' && Number.isFinite(value) && value >= 0
++const integer = value => Number.isSafeInteger(value) && value >= 0
++const exactKeys = (value, allowed) => value && typeof value === 'object' && !Array.isArray(value)
++  && Object.keys(value).every(key => allowed.has(key))
++
++export function diagnosticPathFamily(value, type) {
++  let path
++  try { path = new URL(value).pathname.replace(/^\/mikka(?=\/)/, '') } catch { return 'other' }
++  if (FAMILIES.has(path)) return path
++  if (/^\/api\/conversations\/[^/]+\/read$/.test(path)) return '/api/conversations/:id/read'
++  if (/^\/api\/conversations\/[^/]+$/.test(path)) return '/api/conversations/:id'
++  if (path.startsWith('/api/') || path.startsWith('/v1/')) return 'other-api'
++  return type === 'Document' ? 'document' : 'other'
++}
++export function validDiagnosticDetail(value) {
++  if (!exactKeys(value, DETAIL_KEYS) || value.version !== 1 || typeof value.producer !== 'string' || !UUID.test(value.producer)
++    || !EVENTS.has(value.event) || !finite(value.monotonicMs) || !finite(value.wallMs)) return false
++  for (const [key, item] of Object.entries(value)) {
++    if (NUMERIC.has(key) && !integer(item)) return false
++    if (FLAGS.has(key) && typeof item !== 'boolean') return false
++    if (['observedEvent', 'reason', 'state', 'outcome'].includes(key) && !EVENTS.has(item)) return false
++  }
++  if (value.keyFamily !== undefined && !KEYS.has(value.keyFamily)) return false
++  if (value.kind !== undefined && !KINDS.has(value.kind)) return false
++  if (value.action !== undefined && !ACTIONS.has(value.action)) return false
++  return value.actions === undefined || Array.isArray(value.actions) && value.actions.length <= 16 && value.actions.every(action => ACTIONS.has(action))
++}
++
++// This function is serialized by Playwright into each actual document.
++function installDocumentSink({ binding, late }) {
++  if (globalThis !== globalThis.top || Object.hasOwn(globalThis, '__mikkaReadDiagnosticState')) return
++  const state = { documentId: crypto.randomUUID(), timeOrigin: performance.timeOrigin,
++    initializedWallMs: Date.now(), initializedMonotonicMs: performance.now(), late,
++    sequence: 0, failures: 0, pending: 0, attempted: 0 }
++  const deliver = packet => {
++    state.attempted++; state.pending++
++    try {
++      const result = globalThis[binding](packet)
++      Promise.resolve(result).then(() => { state.pending-- }, () => { state.pending--; state.failures++ })
++    } catch { state.pending--; state.failures++ }
++  }
++  Object.defineProperty(globalThis, '__mikkaReadDiagnosticState', { value: state, configurable: false })
++  Object.defineProperty(globalThis, '__mikkaReadDiagnostic', { configurable: false, value: detail => {
++    deliver({ kind: 'product', documentId: state.documentId, sequence: ++state.sequence, detail })
++  } })
++  deliver({ kind: 'document', documentId: state.documentId, sequence: 0,
++    timeOrigin: state.timeOrigin, initializedWallMs: state.initializedWallMs,
++    initializedMonotonicMs: state.initializedMonotonicMs, late })
++  addEventListener('pagehide', () => deliver({ kind: 'seal', documentId: state.documentId, sequence: state.sequence,
++    failures: state.failures, pending: state.pending, attempted: state.attempted, timeOrigin: state.timeOrigin }), { once: true })
++}
++
++export function createReadDiagnostics({ revision }) {
++  const rows = [], pages = [], documents = new Map(), contexts = new WeakSet(), attached = new WeakMap()
++  const counts = { droppedRows: 0, droppedBytes: 0, invalidPackets: 0, missingDocuments: 0, duplicateSequences: 0,
++    sequenceGaps: 0, sinkFailures: 0, pendingAtSnapshot: 0, keyOmissions: 0, scopeOmissions: 0, entityOmissions: 0,
++    referenceOmissions: 0, actionOmissions: 0, schemaOther: 0, networkIdOmissions: 0, documentOmissions: 0, unsealedDocuments: 0, lateDocuments: 0 }
++  let usedBytes = 0
++  const append = row => {
++    const size = Buffer.byteLength(JSON.stringify(row))
++    if (rows.length >= LIMITS.rows || usedBytes + size > LIMITS.bytes) { counts.droppedRows++; counts.droppedBytes += size; return }
++    usedBytes += size; rows.push(row)
++  }
++  const collect = (source, packet) => {
++    const page = attached.get(source.page)
++    if (!page || source.frame !== source.page.mainFrame()) { counts.invalidPackets++; return }
++    if (!packet || typeof packet.documentId !== 'string' || !UUID.test(packet.documentId) || !integer(packet.sequence)) { counts.invalidPackets++; return }
++    const key = page.id + ':' + packet.documentId
++    if (packet.kind === 'document') {
++      if (!exactKeys(packet, new Set(['kind', 'documentId', 'sequence', 'timeOrigin', 'initializedWallMs', 'initializedMonotonicMs', 'late']))
++        || packet.sequence !== 0 || !finite(packet.timeOrigin) || !finite(packet.initializedWallMs)
++        || !finite(packet.initializedMonotonicMs) || typeof packet.late !== 'boolean') { counts.invalidPackets++; return }
++      if (documents.has(key)) { counts.duplicateSequences++; return }
++      if (documents.size >= LIMITS.documents) { counts.documentOmissions++; return }
++      const document = { pageId: page.id, client: page.client, ...packet, lastSequence: 0, sealed: false }
++      documents.set(key, document)
++      counts.lateDocuments += Number(packet.late)
++      append({ ...packet, pageId: page.id, receivedWallMs: Date.now() })
++      return
++    }
++    if (packet.kind === 'seal') {
++      if (!exactKeys(packet, new Set(['kind', 'documentId', 'sequence', 'failures', 'pending', 'attempted', 'timeOrigin']))
++        || ![packet.failures, packet.pending, packet.attempted].every(integer) || !finite(packet.timeOrigin)) { counts.invalidPackets++; return }
++      const document = documents.get(key)
++      if (!document || document.timeOrigin !== packet.timeOrigin) counts.missingDocuments++
++      else {
++        document.sealed = packet.sequence === document.lastSequence && packet.failures === 0 && packet.pending === 0
++        if (packet.sequence > document.lastSequence) counts.sequenceGaps += packet.sequence - document.lastSequence
++      }
++      counts.sinkFailures += packet.failures; counts.pendingAtSnapshot += packet.pending
++      append({ ...packet, pageId: page.id, receivedWallMs: Date.now() })
++      return
++    }
++    if (packet.kind !== 'product' || !exactKeys(packet, new Set(['kind', 'documentId', 'sequence', 'detail']))
++      || !validDiagnosticDetail(packet.detail)) { counts.invalidPackets++; return }
++    const document = documents.get(key)
++    if (!document) counts.missingDocuments++
++    else {
++      if (packet.sequence > document.lastSequence) document.sealed = false
++      if (packet.sequence <= document.lastSequence) counts.duplicateSequences++
++      else if (packet.sequence !== document.lastSequence + 1) counts.sequenceGaps += packet.sequence - document.lastSequence - 1
++      document.lastSequence = Math.max(document.lastSequence, packet.sequence)
++    }
++    const d = packet.detail
++    counts.keyOmissions += Number(d.keyOmitted === true)
++    counts.scopeOmissions += Number(d.scopeOmitted === true)
++    counts.entityOmissions += Number(d.entityOmitted === true)
++    counts.referenceOmissions += d.omittedReferences ?? 0
++    counts.actionOmissions += d.omittedActions ?? 0
++    counts.schemaOther += Object.values(d).filter(value => value === 'other').length
++      + (d.actions?.filter(value => value === 'other').length ?? 0)
++    append({ ...packet, pageId: page.id, receivedWallMs: Date.now() })
++  }
++  async function attach(page, client, { late = false } = {}) {
++    const record = { id: pages.length + 1, client, attachmentLate: late, setup: { binding: false, initScript: false, cdp: false },
++      closed: false, snapshot: null }
++    pages.push(record); attached.set(page, record)
++    page.on('close', () => { record.closed = true })
++    const context = page.context()
++    try {
++      if (!contexts.has(context)) {
++        await context.exposeBinding(BINDING, collect)
++        await context.addInitScript(installDocumentSink, { binding: BINDING, late: false })
++        contexts.add(context)
++      }
++      record.setup.binding = true; record.setup.initScript = true
++      await page.evaluate(installDocumentSink, { binding: BINDING, late })
++    } catch { counts.invalidPackets++ }
++    try {
++      const cdp = await context.newCDPSession(page)
++      const requests = new Map(), loaders = new Map()
++      let nextRequest = 0, nextLoader = 0
++      const id = (map, value, next) => {
++        if (typeof value !== 'string' || !value) return 0
++        if (!map.has(value)) {
++          if (map.size >= LIMITS.networkIds) { counts.networkIdOmissions++; return 0 }
++          map.set(value, next())
++        }
++        return map.get(value)
++      }
++      cdp.on('Network.requestWillBeSent', value => {
++        const method = METHODS.has(value.request?.method) ? value.request.method : 'OTHER'
++        const family = diagnosticPathFamily(value.request?.url, value.type)
++        if (family === 'other') return // static assets are outside this diagnostic's declared scope.
++        if (family === 'other-api' || method === 'OTHER') counts.schemaOther++
++        append({ kind: 'network', phase: 'dispatch', pageId: record.id,
++          requestId: id(requests, value.requestId, () => ++nextRequest), loaderId: id(loaders, value.loaderId, () => ++nextLoader),
++          method, family, cdpMonotonicMs: finite(value.timestamp) ? value.timestamp * 1000 : null,
++          wallMs: finite(value.wallTime) ? value.wallTime * 1000 : null, receivedWallMs: Date.now(), redirected: Boolean(value.redirectResponse) })
++      })
++      cdp.on('Network.responseReceived', value => {
++        const requestId = requests.get(value.requestId)
++        if (!requestId) return
++        append({ kind: 'network', phase: 'headers', pageId: record.id, requestId,
++          status: integer(value.response?.status) ? value.response.status : null,
++          cdpMonotonicMs: finite(value.timestamp) ? value.timestamp * 1000 : null, receivedWallMs: Date.now() })
++      })
++      for (const [event, phase] of [['Network.loadingFinished', 'complete'], ['Network.loadingFailed', 'failed']]) cdp.on(event, value => {
++        const requestId = requests.get(value.requestId)
++        if (requestId) append({ kind: 'network', phase, pageId: record.id, requestId,
++          cdpMonotonicMs: finite(value.timestamp) ? value.timestamp * 1000 : null, receivedWallMs: Date.now() })
++      })
++      cdp.on('Page.frameNavigated', value => {
++        if (value.frame?.parentId) return
++        append({ kind: 'navigation', phase: 'committed', pageId: record.id,
++          loaderId: id(loaders, value.frame?.loaderId, () => ++nextLoader), receivedWallMs: Date.now() })
++      })
++      cdp.on('Page.domContentEventFired', value => append({ kind: 'navigation', phase: 'domcontentloaded', pageId: record.id,
++        cdpMonotonicMs: finite(value.timestamp) ? value.timestamp * 1000 : null, receivedWallMs: Date.now() }))
++      await cdp.send('Network.enable')
++      await cdp.send('Page.enable')
++      record.setup.cdp = true
++    } catch { counts.invalidPackets++ }
++  }
++  async function snapshot(page) {
++    const record = attached.get(page)
++    if (!record) return
++    try {
++      const value = await page.evaluate(() => {
++        const state = Object.getOwnPropertyDescriptor(globalThis, '__mikkaReadDiagnosticState')?.value
++        return state ? { documentId: state.documentId, sequence: state.sequence, failures: state.failures,
++          pending: state.pending, attempted: state.attempted, timeOrigin: state.timeOrigin } : null
++      })
++      if (!value || typeof value.documentId !== 'string' || !UUID.test(value.documentId) || ![value.sequence, value.failures, value.pending, value.attempted].every(integer)
++        || !finite(value.timeOrigin)) { counts.missingDocuments++; return }
++      record.snapshot = value
++      const document = documents.get(record.id + ':' + value.documentId)
++      if (document && document.timeOrigin === value.timeOrigin) document.sealed = value.sequence === document.lastSequence && value.failures === 0 && value.pending === 0
++      counts.sinkFailures += value.failures
++      counts.pendingAtSnapshot += value.pending
++    } catch { counts.missingDocuments++ }
++  }
++  async function write(path, windows) {
++    counts.unsealedDocuments = [...documents.values()].filter(document => !document.sealed).length
++    const report = { version: 1, revision, purpose: 'causal-diagnostic-only', limits: LIMITS,
++      windows: Object.fromEntries(['webLogin', 'nativeLogin'].map(name => [name, {
++        startedAt: windows?.[name]?.total?.startedAt ?? null, finishedAt: windows?.[name]?.total?.finishedAt ?? null,
++      }])), counts, pages, documents: [...documents.values()], rows,
++      status: Object.values(counts).some(value => value > 0) || pages.length !== 2 || pages.some(page => page.attachmentLate || !page.setup.cdp || !page.snapshot)
++        || !windows?.webLogin?.total?.finishedAt || !windows?.nativeLogin?.total?.finishedAt ? 'incomplete' : 'complete',
++      boundaries: BOUNDARIES }
++    assertReadDiagnosticsReport(report)
++    await writeFile(path, JSON.stringify(report, null, 2) + '\n', { mode: 0o600 })
++    return { status: report.status, rows: rows.length, counts: { ...counts } }
++  }
++  return { attach, snapshot, write }
++}
++export function assertReadDiagnosticsReport(report) {
++  assert.ok(exactKeys(report, new Set(['version', 'revision', 'purpose', 'limits', 'windows', 'counts', 'pages', 'documents', 'rows', 'status', 'boundaries'])))
++  assert.equal(report.version, 1)
++  assert.match(report.revision, /^[0-9a-f]{40}$/)
++  assert.equal(report.purpose, 'causal-diagnostic-only')
++  assert.deepEqual(report.limits, LIMITS)
++  assert.ok(['complete', 'incomplete'].includes(report.status))
++  assert.deepEqual(report.boundaries, BOUNDARIES)
++  assert.ok(exactKeys(report.counts, new Set(COUNT_KEYS)) && Object.keys(report.counts).length === COUNT_KEYS.length)
++  assert.ok(Object.values(report.counts).every(integer))
++  assert.ok(exactKeys(report.windows, new Set(['webLogin', 'nativeLogin'])) && Object.keys(report.windows).length === 2)
++  for (const window of Object.values(report.windows)) {
++    assert.ok(exactKeys(window, new Set(['startedAt', 'finishedAt'])) && Object.keys(window).length === 2)
++    for (const value of Object.values(window)) assert.ok(value === null || typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value))
++  }
++  assert.ok(Array.isArray(report.pages) && report.pages.length <= 2)
++  const validSnapshot = value => exactKeys(value, new Set(['documentId', 'sequence', 'failures', 'pending', 'attempted', 'timeOrigin']))
++    && typeof value.documentId === 'string' && UUID.test(value.documentId) && [value.sequence, value.failures, value.pending, value.attempted].every(integer) && finite(value.timeOrigin)
++  for (const page of report.pages) {
++    assert.ok(exactKeys(page, new Set(['id', 'client', 'attachmentLate', 'setup', 'closed', 'snapshot'])))
++    assert.ok(integer(page.id) && ['webLogin', 'nativeLogin'].includes(page.client) && typeof page.attachmentLate === 'boolean' && typeof page.closed === 'boolean')
++    assert.ok(exactKeys(page.setup, new Set(['binding', 'initScript', 'cdp'])) && Object.keys(page.setup).length === 3 && Object.values(page.setup).every(value => typeof value === 'boolean'))
++    assert.ok(page.snapshot === null || validSnapshot(page.snapshot))
++  }
++  assert.ok(Array.isArray(report.documents) && report.documents.length <= LIMITS.documents)
++  for (const document of report.documents) {
++    assert.ok(exactKeys(document, new Set(['pageId', 'client', 'kind', 'documentId', 'sequence', 'timeOrigin', 'initializedWallMs', 'initializedMonotonicMs', 'late', 'lastSequence', 'sealed'])))
++    assert.ok(integer(document.pageId) && ['webLogin', 'nativeLogin'].includes(document.client) && document.kind === 'document'
++      && typeof document.documentId === 'string' && UUID.test(document.documentId) && document.sequence === 0
++      && [document.timeOrigin, document.initializedWallMs, document.initializedMonotonicMs].every(finite)
++      && typeof document.late === 'boolean' && integer(document.lastSequence) && typeof document.sealed === 'boolean')
++  }
++  const incomplete = Object.values(report.counts).some(value => value > 0) || report.pages.length !== 2 || report.pages.some(page => page.attachmentLate || !page.setup.cdp || !page.snapshot)
++    || Object.values(report.windows).some(window => !window.startedAt || !window.finishedAt)
++  assert.equal(report.status, incomplete ? 'incomplete' : 'complete')
++  assert.ok(Array.isArray(report.rows) && report.rows.length <= LIMITS.rows)
++  assert.ok(Buffer.byteLength(report.rows.map(row => JSON.stringify(row)).join('')) <= LIMITS.bytes)
++  for (const row of report.rows) {
++    assert.ok(integer(row.pageId) && finite(row.receivedWallMs))
++    if (row.kind === 'product') {
++      assert.ok(exactKeys(row, new Set(['kind', 'pageId', 'receivedWallMs', 'documentId', 'sequence', 'detail'])))
++      assert.ok(typeof row.documentId === 'string' && UUID.test(row.documentId) && integer(row.sequence) && validDiagnosticDetail(row.detail))
++    } else if (row.kind === 'document') {
++      assert.ok(exactKeys(row, new Set(['kind', 'pageId', 'receivedWallMs', 'documentId', 'sequence', 'timeOrigin', 'initializedWallMs', 'initializedMonotonicMs', 'late'])))
++      assert.ok(typeof row.documentId === 'string' && UUID.test(row.documentId) && row.sequence === 0 && finite(row.timeOrigin) && finite(row.initializedWallMs) && finite(row.initializedMonotonicMs) && typeof row.late === 'boolean')
++    } else if (row.kind === 'seal') {
++      assert.ok(exactKeys(row, new Set(['kind', 'pageId', 'receivedWallMs', 'documentId', 'sequence', 'failures', 'pending', 'attempted', 'timeOrigin'])))
++      assert.ok(typeof row.documentId === 'string' && UUID.test(row.documentId) && [row.sequence, row.failures, row.pending, row.attempted].every(integer) && finite(row.timeOrigin))
++    } else if (row.kind === 'network') {
++      assert.ok(exactKeys(row, new Set(['kind', 'phase', 'pageId', 'receivedWallMs', 'requestId', 'loaderId', 'method', 'family', 'cdpMonotonicMs', 'wallMs', 'redirected', 'status'])))
++      assert.ok(['dispatch', 'headers', 'complete', 'failed'].includes(row.phase) && integer(row.requestId))
++      if (row.phase === 'dispatch') assert.ok(integer(row.loaderId) && (METHODS.has(row.method) || row.method === 'OTHER') && FAMILIES.has(row.family) && typeof row.redirected === 'boolean')
++      if (row.status !== undefined) assert.ok(row.status === null || integer(row.status))
++      assert.ok(row.cdpMonotonicMs === null || finite(row.cdpMonotonicMs))
++      if (row.wallMs !== undefined) assert.ok(row.wallMs === null || finite(row.wallMs))
++    } else if (row.kind === 'navigation') {
++      assert.ok(exactKeys(row, new Set(['kind', 'phase', 'pageId', 'receivedWallMs', 'loaderId', 'cdpMonotonicMs'])))
++      assert.ok(['committed', 'domcontentloaded'].includes(row.phase))
++      if (row.loaderId !== undefined) assert.ok(integer(row.loaderId))
++      if (row.cdpMonotonicMs !== undefined) assert.ok(row.cdpMonotonicMs === null || finite(row.cdpMonotonicMs))
++    } else assert.fail('DIAGNOSTIC_ROW_KIND')
++  }
++  return true
++}
++
++if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
++  if (process.argv[2] !== 'audit' || process.argv.length !== 4) throw new Error('READ_DIAGNOSTIC_AUDIT_ARGUMENTS')
++  assertReadDiagnosticsReport(JSON.parse(await readFile(resolve(process.argv[3]), 'utf8')))
++  console.log('read-diagnostics closed schema: passed (not a budget or causal verdict)')
++}
+diff --git a/apps/desktop/test/lifecycle.mjs b/apps/desktop/test/lifecycle.mjs
+index 3f21ee7f6a4eb8948778a35db72fb5e61aeca9ab..fc876e7c863724e2048499dbccece9065b6766ff 100644
+--- a/apps/desktop/test/lifecycle.mjs
++++ b/apps/desktop/test/lifecycle.mjs
+@@ -28,12 +28,14 @@
+ import { nativeLifecycleFailure, observeNativeNavigation, waitForBundledDocument } from './native-document.mjs'
+ import { createLifecycleQueryCounter, queryCountDelta } from './lifecycle-query-counts.mjs'
+ import { selectWorkspaceMenuItem } from './parity-page-ready.mjs'
++import { createReadDiagnostics } from './read-diagnostics.mjs'
+ 
+ const root = fileURLToPath(new URL('../../..', import.meta.url))
+ const environment = await loadEnvironment()
+ const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
+ assert.equal(environment.deploymentSha, revision, 'Lifecycle acceptance must test the attested application revision')
+ const output = resolve(process.env.MIKKA_DESKTOP_EVIDENCE ?? '.cache/desktop-evidence')
++const readDiagnostics = createReadDiagnostics({ revision })
+ const pairs = Number(process.env.MIKKA_DESKTOP_COLD_PAIRS ?? 5)
+ if (!Number.isInteger(pairs) || pairs < 5 || pairs > 20) throw new Error('LIFECYCLE_REQUIRES_5_TO_20_COLD_PAIRS')
+ await mkdir(output, { recursive: true })
+@@ -66,6 +68,7 @@
+ const check = name => { evidence.checks.push({ name, result: 'passed' }); console.log(`PASS ${name}`) }
+ let scope, browser, fixtures, nativeResources, application, ownerEmail, releaseObserver, generatedWorkspaceName, queryCounter
+ let passed = false
++let diagnosticNativeAttached = false
+ let cleanupFailure
+ const active = new Set()
+ const appProfiles = new WeakMap()
+@@ -107,6 +110,10 @@
+   appProfiles.set(app, profiles[mode])
+   const page = await app.firstWindow({ timeout: 90_000 })
+   const firstWindowMs = performance.now() - started
++  if (mode === 'bundled' && !diagnosticNativeAttached) {
++    diagnosticNativeAttached = true
++    await readDiagnostics.attach(page, 'nativeLogin', { late: true })
++  }
+   page.setDefaultTimeout(60_000)
+   const navigation = { mode, launch: evidence.nativeViewports.length + 1, events: [], overflow: false }
+   evidence.navigation.push(navigation)
+@@ -337,10 +344,12 @@
+   try {
+     const webPage = await webContext.newPage()
+     webPage.setDefaultTimeout(60_000)
++    await readDiagnostics.attach(webPage, 'webLogin')
+     await webPage.goto(`${environment.origin}/mikka`, { waitUntil: 'domcontentloaded' })
+     await checkpointQueryWindow(webLogin, 'web-navigation-to-dom-content-loaded')
+     assert.equal(await selectFixture(webPage), 'zh-CN')
+     await checkpointQueryWindow(webLogin, 'workspace-selection-to-usable', true)
++    await readDiagnostics.snapshot(webPage)
+   } finally { await webContext.close() }
+ 
+   let run = await launch('bundled')
+@@ -354,6 +363,7 @@
+   mark('prepare-bundled-workspace')
+   assert.equal(await selectFixture(run.page), 'zh-CN')
+   await checkpointQueryWindow(nativeLogin, 'workspace-selection-to-usable', true)
++  await readDiagnostics.snapshot(run.page)
+   evidence.queryCounts.login.comparable = true
+   await prepareNativeDevice(run, 'bundled')
+   await recordNativeState(run.page, 'authenticated-profile', 'bundled')
+@@ -514,6 +524,8 @@
+   evidence.accountObservation = releaseObserver?.read() ?? { observed: false }
+   releaseObserver?.restore()
+   if (queryCounter && evidence.queryCounts) evidence.queryCounts.rpcActions = await queryCounter.rpcActions(evidence.queryCounts.windows)
++  try { evidence.readDiagnostics = await readDiagnostics.write(join(output, 'read-diagnostics.json'), evidence.queryCounts?.windows) }
++  catch { evidence.readDiagnostics = { status: 'unavailable', code: 'READ_DIAGNOSTIC_WRITE_FAILED' } }
+   evidence.finishedAt = new Date().toISOString()
+   evidence.result = passed ? 'passed' : 'failed'
+   await writeFile(join(output, 'lifecycle.json'), `${JSON.stringify(evidence, null, 2)}\n`)
