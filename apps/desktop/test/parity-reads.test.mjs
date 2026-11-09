@@ -10,6 +10,39 @@ import { observeReads, pageReady, selectParityWorkspace, selectWorkspaceMenuItem
 import { compareImages } from './parity-images.mjs'
 
 const ids = { coordinator: 'coordinator-bot', bot: 'bot', coordinatorUser: 'c1', coordinatorReply: 'c2', botUser: 'b1', botReply: 'b2' }
+
+for (const restored of [false, true]) test(`workspace capture completes the ${restored ? 'restored' : 'cold'} two-message history through its real button`, async () => {
+  const history = Promise.withResolvers()
+  const events = []
+  const earlier = {
+    isVisible: async () => restored,
+    click: async () => { events.push('history-click') },
+    waitFor: async options => {
+      assert.equal(options.state, 'hidden')
+      if (restored) await history.promise
+      events.push('history-complete')
+    },
+  }
+  const ready = { getByRole: () => ready, getByText: () => ready, waitFor: async () => {} }
+  const conversation = {
+    getByRole: (_role, options) => { assert.equal(options.name, 'Earlier messages'); return earlier },
+    getByText: value => ({ waitFor: async () => { events.push(value) } }),
+  }
+  const page = { getByRole: role => role === 'region' ? conversation : ready }
+  const messages = { Nav: {}, Shell: { panel: {} }, Coordinator: { conversation: 'Conversation' }, Common: { loadMore: 'Earlier messages' } }
+  let completed = false
+  const pending = pageReady(page, 'workspace-link', {}, messages).then(() => { completed = true })
+  await new Promise(setImmediate)
+  assert.equal(completed, !restored)
+  if (restored) {
+    assert.deepEqual(events, ['history-click'])
+    history.resolve()
+  }
+  await pending
+  assert.deepEqual(events, [...(restored ? ['history-click'] : []), 'history-complete',
+    'What should we review today?', 'Review the desktop workspace, including conversations, tasks, artifacts and settings.'])
+})
+
 const coordinator = { conversationId: 'coordinator', lastReadMessageId: 'c2', lastReadPosition: 2 }
 function fixture(initial = []) {
   const state = { reads: initial, messages: [{ id: 'c2', position: 2, botId: ids.coordinator }, { id: 'b2', position: 2, botId: ids.bot }], deletes: [] }

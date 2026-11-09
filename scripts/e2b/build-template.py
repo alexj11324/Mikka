@@ -48,10 +48,41 @@ KINDS = {
     'claude': {'base': 'claude', 'harnesses': ()},
     'codex': {'base': 'codex', 'harnesses': ()},
 }
-ANONYMOUS_WORKER_READY = ("test -s /home/user/.mikka/preloaded.pid && "
-                          "read -r mikka_preloaded_pid < /home/user/.mikka/preloaded.pid && "
-                          "kill -0 \"$mikka_preloaded_pid\" && "
-                          "tr '\\0' '\\n' < \"/proc/$mikka_preloaded_pid/cmdline\" | grep -Fxq -- '--wait-bootstrap'")
+ANONYMOUS_WORKER_CHECKS = (
+    ('pid_file', 'test -s /home/user/.mikka/preloaded.pid'),
+    ('pid_read', 'read -r mikka_preloaded_pid < /home/user/.mikka/preloaded.pid'),
+    ('pid_alive', 'kill -0 "$mikka_preloaded_pid"'),
+    ('worker_waiting', "tr '\\0' '\\n' < \"/proc/$mikka_preloaded_pid/cmdline\" | grep -Fxq -- '--wait-bootstrap'"),
+)
+ANONYMOUS_WORKER_READY = ' && '.join(command for _phase, command in ANONYMOUS_WORKER_CHECKS)
+PREBUILT_START_PHASES = frozenset(('entry', 'preconditions_verified', 'guard_prepare', 'guard_prepared',
+                                 'control_install', 'control_installed', 'worker_exec'))
+PREBUILT_READY_PHASES = frozenset((*[phase for phase, _command in ANONYMOUS_WORKER_CHECKS],
+                                 'ingress_ready', 'bootstrap_absent', 'device_absent',
+                                 'viewer_key_absent', 'viewer_unauthorized', 'official_files'))
+
+
+def prebuilt_ready_command(kind):
+    """Preserve every original predicate/order/status and the provider deadline.
+
+    No probe or retry is added. One closed failure line distinguishes a normal
+    first PID-file race from a failing guest check after envd starts the shell.
+    """
+    checks = [*ANONYMOUS_WORKER_CHECKS,
+              ('ingress_ready', 'python3 /opt/mikka/runtime/ingress-v1/guard.py ready "$mikka_preloaded_pid" > /opt/mikka/ingress-ready.json'),
+              ('bootstrap_absent', 'test ! -e /home/user/.mikka/bootstrap.json'),
+              ('device_absent', 'test ! -e /home/user/.mikka/worker/device.json')]
+    if kind == 'desktop':
+        checks.extend((('viewer_key_absent', 'test ! -e /run/mikka-viewer/key'),
+                       ('viewer_unauthorized', 'test "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6080/vnc)" = 401')))
+    checks.append(('official_files', f'python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization {kind}'
+                   ' > /opt/mikka/official-files-ready.json'))
+    command = ' && '.join(f'mikka_ready_phase={phase} && {predicate}' for phase, predicate in checks)
+    return (command + '; mikka_ready_status=$?; '
+            'if [ "$mikka_ready_status" -ne 0 ]; then '
+            'printf "mikka-prebuilt-ready-failed %s %s\\n" "$mikka_ready_phase" "$mikka_ready_status" >&2; fi; '
+            'exit "$mikka_ready_status"')
+
 # One deadline includes reading/verifying selected native CLI bytes and the
 # real anonymous catalogue exchange. Never warm files in a separate command.
 # The standalone official-instance installer has no snapshot receipt. Its
@@ -308,15 +339,7 @@ def build(name, ref='HEAD', api_key=None, on_build_logs=None, kind='desktop', cp
                     .run_cmd(f'bash /opt/mikka/instance-bootstrap.sh {sha} {worker_sha} {kind} prebuild', user='root')
                     .run_cmd(NPM_RUNTIME_CHECK, user='user')
                     .run_cmd('python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --receipt /opt/mikka/official-files-conservation.json', user='root'))
-        ready = (ANONYMOUS_WORKER_READY + ' && '
-                 'python3 /opt/mikka/runtime/ingress-v1/guard.py ready "$mikka_preloaded_pid" > /opt/mikka/ingress-ready.json && '
-                 'test ! -e /home/user/.mikka/bootstrap.json && '
-                 'test ! -e /home/user/.mikka/worker/device.json')
-        if kind == 'desktop':
-            ready += (' && test ! -e /run/mikka-viewer/key && '
-                      'test "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6080/vnc)" = 401')
-        ready += (f' && python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization {kind}'
-                  ' > /opt/mikka/official-files-ready.json')
+        ready = prebuilt_ready_command(kind)
         # E2B's template builder freezes the initialized process. New instances
         # resume the already imported worker and receive a fresh normal handoff.
         template = template.set_user('root').set_start_cmd('bash /opt/mikka/start-prebuilt.sh', ready)

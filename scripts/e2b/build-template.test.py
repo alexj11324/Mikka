@@ -5,6 +5,7 @@ import copy
 from contextlib import redirect_stderr
 import hashlib
 import json
+import os
 import shlex
 import subprocess
 import sys
@@ -584,6 +585,79 @@ with fixture.root_file_metadata():
         self.assertNotIn('rm ', text)
         self.assertNotIn('sleep ', text)
         self.assertNotIn('systemctl', text)
+
+    def test_startup_reports_the_reached_phase_and_preserves_real_shell_exit(self):
+        startup = (bt.ROOT / 'scripts/e2b/start-prebuilt.sh').read_text()
+        for failure, code in ((None, 0), ('entry', 1), ('guard_prepare', 17), ('control_install', 23)):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory(prefix='mikka-start-stage-') as temp:
+                root = Path(temp)
+                runtime, home = root / 'opt', root / 'home/.mikka'
+                guard = runtime / 'runtime/ingress-v1/guard.py'
+                control = runtime / 'worker/packages/daemon/scripts/workspace-control-install.py'
+                node = runtime / 'runtime/node/bin/node'
+                for path in (guard, control, node):
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                home.mkdir(parents=True)
+                if failure == 'entry':
+                    (home / 'bootstrap.json').write_text('{}')
+                guard.write_text('import sys\nsys.exit(' + str(code if failure == 'guard_prepare' else 0) + ')\n')
+                control.write_text('import sys\nsys.exit(' + str(code if failure == 'control_install' else 0) + ')\n')
+                node.write_text('#!/bin/sh\nexit 0\n'); node.chmod(0o700)
+                command = startup.replace('/opt/mikka', str(runtime)).replace('/home/user/.mikka', str(home))
+                command = command.replace('/run/mikka-viewer', str(root / 'viewer')).replace('exec runuser -u user -- env', 'exec env')
+                result = subprocess.run(['bash', '-c', command], capture_output=True, text=True, timeout=5,
+                                        env={**os.environ, 'MIKKA_TEST_PRIVATE': 'synthetic-private-stage-value'})
+                self.assertEqual(result.returncode, code, result.stderr)
+                reached = [line.removeprefix('mikka-prebuilt-start ') for line in result.stdout.splitlines()]
+                self.assertTrue(reached and reached[0] == 'entry')
+                self.assertTrue(all(phase in bt.PREBUILT_START_PHASES for phase in reached))
+                self.assertEqual(reached[-1], failure or 'worker_exec')
+                if failure:
+                    self.assertEqual(result.stderr, f'mikka-prebuilt-start-failed {failure} {code}\n')
+                    self.assertNotIn('worker_exec', reached)
+                else:
+                    self.assertEqual(result.stderr, '')
+                    self.assertLess(reached.index('guard_prepare'), reached.index('guard_prepared'))
+                    self.assertLess(reached.index('guard_prepared'), reached.index('control_install'))
+                    self.assertLess(reached.index('control_installed'), reached.index('worker_exec'))
+                self.assertNotIn('synthetic-private-stage-value', result.stdout + result.stderr)
+
+    def test_ready_diagnostics_preserve_each_failed_predicate_and_short_circuit(self):
+        cases = [(kind, None, 0) for kind in bt.KINDS]
+        cases += [('claude', phase, code) for phase, code in (
+            ('pid_file', 1), ('pid_read', 1), ('pid_alive', 1), ('worker_waiting', 1),
+            ('ingress_ready', 17), ('bootstrap_absent', 1), ('device_absent', 1), ('official_files', 31))]
+        cases += [('desktop', 'viewer_key_absent', 1), ('desktop', 'viewer_unauthorized', 1)]
+        for kind, failure, code in cases:
+            with self.subTest(kind=kind, failure=failure), tempfile.TemporaryDirectory(prefix='mikka-ready-stage-') as temp:
+                root = Path(temp)
+                runtime, home, viewer = root / 'opt', root / 'home/.mikka', root / 'viewer'
+                guard, official = runtime / 'runtime/ingress-v1/guard.py', runtime / 'official-files.py'
+                guard.parent.mkdir(parents=True); (home / 'worker').mkdir(parents=True); viewer.mkdir()
+                if failure != 'pid_file':
+                    pid = '2147483647' if failure == 'pid_alive' else str(os.getpid())
+                    (home / 'preloaded.pid').write_text(pid + ('' if failure == 'pid_read' else '\n'))
+                cmdline = root / 'cmdline'
+                cmdline.write_bytes(b'worker\0' + (b'other' if failure == 'worker_waiting' else b'--wait-bootstrap') + b'\0')
+                guard.write_text('import sys\nassert sys.argv[1] == "ready"\nsys.exit(' + str(code if failure == 'ingress_ready' else 0) + ')\n')
+                official.write_text('import sys\nassert sys.argv[-1] == ' + repr(kind) + '\nsys.exit(' + str(code if failure == 'official_files' else 0) + ')\n')
+                if failure == 'bootstrap_absent': (home / 'bootstrap.json').write_text('{}')
+                if failure == 'device_absent': (home / 'worker/device.json').write_text('{}')
+                if failure == 'viewer_key_absent': (viewer / 'key').write_text('synthetic-viewer-key')
+                binary = root / 'bin'; binary.mkdir()
+                curl = binary / 'curl'
+                curl.write_text('#!/bin/sh\nprintf ' + ('403' if failure == 'viewer_unauthorized' else '401') + '\n')
+                curl.chmod(0o700)
+                command = bt.prebuilt_ready_command(kind).replace('/opt/mikka', str(runtime))
+                command = command.replace('/home/user/.mikka', str(home)).replace('/run/mikka-viewer', str(viewer))
+                command = command.replace('"/proc/$mikka_preloaded_pid/cmdline"', shlex.quote(str(cmdline)))
+                result = subprocess.run(['bash', '-c', command], capture_output=True, text=True, timeout=5,
+                                        env={**os.environ, 'PATH': str(binary) + os.pathsep + os.environ['PATH']})
+                self.assertEqual(result.returncode, code, result.stderr)
+                diagnostic = [line for line in result.stderr.splitlines() if line.startswith('mikka-prebuilt-')]
+                self.assertEqual(diagnostic, [] if failure is None else [f'mikka-prebuilt-ready-failed {failure} {code}'])
+                self.assertEqual((runtime / 'official-files-ready.json').exists(), failure in (None, 'official_files'))
+                self.assertNotIn('synthetic-viewer-key', result.stdout + result.stderr)
 
     def test_release_gate_rejects_missing_stale_and_non_subscription_receipts(self):
         proof = {'entries': 4, 'sha256': 'f' * 64}

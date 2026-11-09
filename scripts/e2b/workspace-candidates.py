@@ -191,6 +191,15 @@ class BuildDiagnostics:
             if phase and phase[1] in BOOTSTRAP_PHASES:
                 self.event({'phase': 'bootstrap', 'detail': phase[1], 'elapsedMs': int(phase[2])})
                 continue
+            startup = re.fullmatch(r'mikka-prebuilt-start ([a-z_]+)', line)
+            if startup and startup[1] in builder.PREBUILT_START_PHASES:
+                self.event({'phase': 'prebuilt_start', 'detail': startup[1]})
+                continue
+            stopped = re.fullmatch(r'mikka-prebuilt-(start|ready)-failed ([a-z_]+) ([0-9]{1,3})', line)
+            if (stopped and 1 <= int(stopped[3]) <= 255
+                    and stopped[2] in (builder.PREBUILT_START_PHASES if stopped[1] == 'start' else builder.PREBUILT_READY_PHASES)):
+                self.event({'phase': 'prebuilt_' + stopped[1] + '_failed', 'detail': stopped[2], 'exitCode': int(stopped[3])})
+                continue
             failure = re.match(r'(?:ValueError|RuntimeError): ([a-z_]+)(?: |$)', line)
             host_error = failure[1] if failure else line
             if host_error in HOST_ERRORS:

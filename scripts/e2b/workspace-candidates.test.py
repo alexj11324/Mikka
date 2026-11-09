@@ -363,6 +363,31 @@ class Candidates(unittest.TestCase):
         self.assertEqual(len(log.value['events']), before, 'success output cannot manufacture a failed command')
         self.assertNotIn(PRIVATE, json.dumps(log.value))
 
+    def test_start_and_ready_markers_keep_only_fixed_phases_and_actual_failed_exit_codes(self):
+        for cls in (candidates.BuildDiagnostics, candidates.DebugDiagnostics):
+            with self.subTest(collector=cls.__name__):
+                journal = {'templates': {'claude': {}}}
+                log = cls() if cls is candidates.DebugDiagnostics else cls(journal, self.output, 'claude')
+                for message in ('[start] [stdout]: mikka-prebuilt-start guard_prepare',
+                                '[start] [stderr]: mikka-prebuilt-start-failed control_install 23',
+                                '[ready] [stderr]: mikka-prebuilt-ready-failed pid_file 1'):
+                    log(SimpleNamespace(level='debug', message=message))
+                expected = [{'phase': 'prebuilt_start', 'detail': 'guard_prepare'},
+                            {'phase': 'prebuilt_start_failed', 'detail': 'control_install', 'exitCode': 23},
+                            {'phase': 'prebuilt_ready_failed', 'detail': 'pid_file', 'exitCode': 1}]
+                if cls is candidates.DebugDiagnostics:
+                    expected = [{**event, 'count': 1} for event in expected]
+                self.assertEqual(log.value['events'], expected)
+                for message in ('mikka-prebuilt-start ' + PRIVATE, 'mikka-prebuilt-ready-failed pid_file 0',
+                                'mikka-prebuilt-ready-failed pid_file 256', 'mikka-prebuilt-ready-failed pid_file -1',
+                                'mikka-prebuilt-start-failed pid_file 1', 'mikka-prebuilt-ready-failed guard_prepare 1',
+                                'mikka-prebuilt-start-failed control_install 23 ' + PRIVATE,
+                                'prefix mikka-prebuilt-start guard_prepared', 'mikka-prebuilt-ready-failed ' + PRIVATE + ' 1'):
+                    log(SimpleNamespace(level='error', message=message))
+                self.assertEqual(log.value['events'], expected)
+                self.assertEqual(journal['templates']['claude'], {})
+                self.assertNotIn(PRIVATE, json.dumps(log.value))
+
     def test_exception_projection_is_bounded_and_preserves_numeric_causes_only(self):
         failure = type('BuildException', (Exception,), {})(PRIVATE)
         failure.__cause__ = HTTPError('https://provider.invalid/' + PRIVATE, HTTPStatus.TOO_MANY_REQUESTS, PRIVATE, {'X-API-Key': PRIVATE}, None)

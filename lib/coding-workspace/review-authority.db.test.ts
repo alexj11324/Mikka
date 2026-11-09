@@ -421,6 +421,7 @@ test('task review: current owner, session, tenant and immutable physical checkou
   const { observePoolCommits } = await import('../db/commit-effects')
   observePoolCommits(pool)
   const { createFactoryStore } = await import('../factory/store')
+  const { factoryCheckIndependent } = await import('../factory/check-independence')
   const { factoryAuthorize } = await import('../factory/authorize')
   const { actAs } = await import('../acting-user')
   const { withTaskWorkspace } = await import('../task-workspace')
@@ -450,7 +451,9 @@ test('task review: current owner, session, tenant and immutable physical checkou
         VALUES($1,$2,$3,1,1,'pending','Review binding fixture')`, [attemptId, taskId, stage])
       await client.query('COMMIT')
     } finally { await client.query('ROLLBACK'); client.release() }
-    const store = createFactoryStore(pool, factoryAuthorize, f.botId)
+    // Like the normal dispatch Store, opt into lifecycle transitions. Omitting
+    // this host configuration intentionally leaves bind_run unavailable.
+    const store = createFactoryStore(pool, factoryAuthorize, f.botId, { independent: factoryCheckIndependent })
     return { taskId, attemptId, bind: (tx: PoolClient) => actAs({ id: f.userId, [tokenWorkspace]: f.workspaceId }, () =>
       store.apply(f.userId, { taskId, revision: 1 }, randomUUID(), { action: 'bind_run', runId: f.runId }, tx)) }
   }

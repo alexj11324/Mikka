@@ -24,6 +24,8 @@ const run = { id: 123, run_attempt: 2, workflow_id: workflow.id, name: RELEASE_N
   repository: { id: 789, full_name: REPOSITORY }, head_repository: { id: 789, full_name: REPOSITORY } }
 const expected = { sourceCommit: SHA, runId: run.id, runAttempt: run.run_attempt, workflowId: workflow.id, event: run.event }
 const env = () => ({ GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: 'workflow_run', GITHUB_REPOSITORY: REPOSITORY,
+  TASK_SECRETS_JOB_STARTED_AT: new Date().toISOString(),
+  TASK_SECRETS_JOB_ID: '991', TASK_SECRETS_JOB_START_SOURCE: 'github_actions_job.started_at',
   GITHUB_REF: 'refs/heads/main', GITHUB_SHA: SHA, GITHUB_RUN_ID: '990', GITHUB_RUN_ATTEMPT: '1', GITHUB_TOKEN: TOKEN,
   APPLICATION_SHA: SHA, EXPECTED_SOURCE_SHA: SHA, EXPECTED_UPSTREAM_RUN_ID: '123', EXPECTED_UPSTREAM_RUN_ATTEMPT: '2',
   EXPECTED_WORKER_SHA: WORKER, EXPECTED_WORKER_SOURCE_SHA: SHA, EXPECTED_CLAUDE_TEMPLATE: 'candidate-claude', EXPECTED_CODEX_TEMPLATE: 'candidate-codex' })

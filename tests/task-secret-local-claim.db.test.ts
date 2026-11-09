@@ -2,12 +2,13 @@
 // HttpServerLink, loopback HTTP/TLS, the production bridge and Node children.
 // No model/official CLI, vendor credential, shared account or external VM.
 // Next.after and the existing synthetic GitHub provider are fixture boundaries;
+// request headers/locale use the API's own compatibility scope for downloads.
 // DNS-to-loopback exists only in the injected TLS transport below, after
 // production public-address validation. Claim authorization is not mocked.
 import assert from 'node:assert/strict'
 import { execFile, execFileSync } from 'node:child_process'
 import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createServer, type IncomingMessage } from 'node:http'
 import { createServer as createTlsServer, request as tlsRequest } from 'node:https'
 import type { AddressInfo } from 'node:net'
@@ -26,7 +27,7 @@ import { taskExecutionEnv } from '../packages/daemon/src/task-env'
 import { startTaskSecretBridge, type TaskSecretBridge } from '../packages/daemon/src/task-secret-bridge'
 import { executeEgressRequest, pinnedEgressRequestOptions, type EgressHttpTarget, type EgressUpstreamResponse } from '../lib/secrets/egress-http'
 import { taskSecretEgressResponse } from '../lib/secrets/egress-route'
-import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedBot, seedIssue, seedPersonalWorkspace, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { connectGitHub, githubAppStub, recordPushGrant } from './support/github-app-stub'
 
 // The daemon has its own TypeScript build. Import its current implementation at
@@ -77,6 +78,13 @@ test('local task Secret claim, child egress, recovery and withdrawal use the rea
   process.env.BETTER_AUTH_SECRET = randomBytes(32).toString('hex')
   const next = await import('next/server')
   mock.module('next/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse, after: () => {} } })
+  // Use the same request adapters as the standalone API. Neither session nor
+  // workspace/object authorization readers are replaced with fixture values.
+  const requestHeaders = await import('../apps/api/compat/headers')
+  const requestIntl = await import('../apps/api/compat/intl')
+  mock.module('next/headers', { namedExports: { ...requestHeaders } })
+  mock.module('next-intl/server', { namedExports: { ...requestIntl } })
+  const { createRequestScope, runRequestScope } = await import('../apps/api/src/context')
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const { pool: appPool } = await import('../lib/db')
@@ -97,6 +105,8 @@ test('local task Secret claim, child egress, recovery and withdrawal use the rea
     checkpoint: await import('../app/v1/runs/[runId]/checkpoint/route'),
     complete: await import('../app/v1/runs/[runId]/complete/route'),
     delivery: await import('../app/api/secrets/delivery/route'),
+    artifact: await import('../app/api/artifacts/[artifactId]/versions/[version]/download/route'),
+    capture: await import('../app/api/captures/[captureId]/route'),
   }
   const directory = await mkdtemp(join(tmpdir(), 'mikka-secret-local-'))
   const github = githubAppStub()
@@ -118,7 +128,7 @@ test('local task Secret claim, child egress, recovery and withdrawal use the rea
       for (const owner of owners) {
         await pool.query('DELETE FROM coordinator_events WHERE "userId"=$1', [owner])
         await pool.query('DELETE FROM run_tokens t USING agent_runs r WHERE r.id=t."runId" AND r."userId"=$1', [owner])
-        for (const table of ['agent_runs', 'agents', 'device_repos', 'device_tokens', 'user_secrets', 'repository_settings', 'issues'])
+        for (const table of ['artifacts', 'run_captures', 'agent_runs', 'agents', 'device_repos', 'device_tokens', 'user_secrets', 'repository_settings', 'issues'])
           await pool.query(`DELETE FROM ${table} WHERE "userId"=$1`, [owner])
         await pool.query('DELETE FROM devices WHERE "ownerId"=$1', [owner])
         await pool.query('DELETE FROM bots WHERE "ownerId"=$1', [owner])
@@ -175,7 +185,7 @@ test('local task Secret claim, child egress, recovery and withdrawal use the rea
       request.end(target.body)
     })
   }
-  const routeErrors: string[] = []
+  const routeErrors: string[] = [], objectRequests: string[] = []
   let base = ''
   const application = createServer((incoming, outgoing) => {
     void (async () => {
@@ -192,6 +202,15 @@ test('local task Secret claim, child egress, recovery and withdrawal use the rea
       else if ((found = match(/^\/v1\/devices\/([^/]+)\/runs\/([^/]+)\/claim$/))) result = await routes.claim.POST(request, { params: Promise.resolve({ deviceId: found[0], runId: found[1] }) })
       else if ((found = match(/^\/v1\/runs\/([^/]+)\/checkpoint$/))) result = await routes.checkpoint.POST(request, { params: Promise.resolve({ runId: found[0] }) })
       else if ((found = match(/^\/v1\/runs\/([^/]+)\/complete$/))) result = await routes.complete.POST(request, { params: Promise.resolve({ runId: found[0] }) })
+      else if (request.method === 'GET' && (found = match(/^\/api\/artifacts\/([^/]+)\/versions\/([^/]+)\/download$/))) {
+        objectRequests.push(path)
+        const [artifactId, version] = found
+        result = await runRequestScope(createRequestScope(request), () => routes.artifact.GET(request, { params: Promise.resolve({ artifactId, version }) }))
+      } else if (request.method === 'GET' && (found = match(/^\/api\/captures\/([^/]+)$/))) {
+        objectRequests.push(path)
+        const [captureId] = found
+        result = await runRequestScope(createRequestScope(request), () => routes.capture.GET(request, { params: Promise.resolve({ captureId }) }))
+      }
       else if ((found = match(/^\/v1\/task-secrets\/([^/]+)$/))) result = await taskSecretEgressResponse(request, found[0], (input, binding, options) =>
         executeEgressRequest(input, binding, { ...options, resolve: async () => [{ address: '93.184.216.34', family: 4 }], transport }))
       else result = new Response(null, { status: 404 })
@@ -411,6 +430,7 @@ test('local task Secret claim, child egress, recovery and withdrawal use the rea
     assert.equal(scopeDenied, 0, 'the TLS provider accepted the effective value in every actual claim')
   })
 
+  let ownerCookie: string | undefined
   await t.test('only a fresh human approval enables direct delivery and real non-HTTP child signing', async () => {
     const directName = 'LOCAL_DIRECT_SIGNING_KEY', directValue = 'synthetic-direct-' + randomBytes(24).toString('hex')
     const secret = await personal.createUserSecret(owner, { name: directName, kind: 'secret', value: directValue }, {})
@@ -455,6 +475,7 @@ test('local task Secret claim, child egress, recovery and withdrawal use the rea
       headers: new Headers({ origin: new URL(context.baseURL).origin }), returnHeaders: true })
     const cookie = login.headers.getSetCookie().map(value => value.split(';')[0]).join('; ')
     assert.equal(Boolean(cookie && login.response.token), true, 'actual owner sign-in produced a session')
+    ownerCookie = cookie
     const approve = async (authorization?: string) => fetch(`${base}/api/secrets/delivery`, { method: 'PATCH',
       headers: { cookie, origin: base, 'content-type': 'application/json', ...(authorization ? { authorization: `Bearer ${authorization}` } : {}) },
       body: JSON.stringify({ id: secret.id, delivery: { mode: 'direct', exposeToAgent: true } }) })
@@ -479,6 +500,171 @@ test('local task Secret claim, child egress, recovery and withdrawal use the rea
     assert.equal(signed.signature === createHmac('sha256', directValue).update(challenge).digest('hex'), true)
     await assertJournalWithheld(after, [directValue])
     await complete(after)
+  })
+
+  await t.test('the exact claimed Run collector executes every formal SQL category and normal owner download without holding a transaction', async () => {
+    assert.ok(ownerCookie, 'reuse the real owner login; do not replace the authorization reader')
+    const personalWorkspace = await seedPersonalWorkspace(pool, owner)
+    if (!ownedWorkspaces.includes(personalWorkspace)) ownedWorkspaces.push(personalWorkspace)
+    const claimed = await freshClaim()
+    const claimedTask = (await pool.query<{ issueId: string }>('SELECT "issueId" FROM agent_runs WHERE id=$1 AND "userId"=$2', [claimed.runId, owner])).rows[0].issueId
+    const scope: { ownerId: string; workspaceId: string; botId: string; issueId: string; runId: string } =
+      { ownerId: owner, workspaceId: workspace.id, botId, issueId: claimedTask, runId: claimed.runId }
+    const synthetic = Array.from({ length: 3 }, () => 'mikka1712s_' + randomBytes(32).toString('hex'))
+    const digest = (value: string | Uint8Array) => createHash('sha256').update(value).digest('hex')
+    const canaries = { descriptor: { format: 'synthetic_task_secret_v1', byteLength: 75, encodings: ['utf8'] },
+      generations: synthetic.map((value, index) => ({ generation: index + 1, sha256: digest(value), state: 'acknowledged' })) }
+
+    // These are deliberately seeded evidence bodies, not model output. A real
+    // claim/owner scope and the production persistence/download code stay in use.
+    const chunks = [{ type: 'text-start', id: 'evidence-stream' },
+      { type: 'text-delta', id: 'evidence-stream', delta: synthetic[0].slice(0, 31) },
+      { type: 'text-delta', id: 'evidence-stream', delta: synthetic[0].slice(31) },
+      { type: 'text-end', id: 'evidence-stream' }]
+    const sequence = Number((await pool.query<{ next: number }>('SELECT COALESCE(max(seq),-1)+1 AS next FROM run_chunks WHERE "runId"=$1', [claimed.runId])).rows[0].next)
+    for (const [index, chunk] of chunks.entries()) await pool.query('INSERT INTO run_chunks (id,"runId",seq,chunk) VALUES ($1,$2,$3,$4)',
+      [randomUUID(), claimed.runId, sequence + index, JSON.stringify(chunk)])
+    await pool.query('INSERT INTO run_messages (id,"runId","userId",text) VALUES ($1,$2,$3,$4)', [randomUUID(), claimed.runId, owner, synthetic[1]])
+    const patch = gzipSync(`diff --git a/evidence.txt b/evidence.txt\n--- a/evidence.txt\n+++ b/evidence.txt\n@@ -0,0 +1 @@\n+${synthetic[2]}\n`)
+    assert.equal((await b.link.checkpointRun(claimed.runId, { baseCommit: 'a'.repeat(40), patch: patch.toString('base64'), files: 1,
+      takenAt: new Date().toISOString() }))?.runId, claimed.runId)
+
+    const { artifactStorage } = await import('../lib/artifacts/storage')
+    const { submitArtifact } = await import('../lib/artifacts/store')
+    const captures = await import('../lib/captures/store')
+    assert.equal(artifactStorage(), 'inline', 'this fixture cannot contact a bucket')
+    const first = await submitArtifact({ userId: owner, workspaceId: workspace.id, botId, runId, issueId, authorName: 'Fixture Agent' },
+      { title: 'Evidence versions', kind: 'markdown', content: '# Original\nNot submitted by the collected Run.\n' })
+    assert.ok(!('error' in first))
+    for (const [index, content] of ['# Version two\nClean controlled body.\n', '# Version three\n' + synthetic[0]].entries()) {
+      const version = await submitArtifact({ userId: owner, workspaceId: workspace.id, botId, runId: claimed.runId, issueId: claimedTask, authorName: 'Fixture Agent' },
+        { artifactId: first.artifactId, title: 'Evidence versions', kind: 'markdown', content })
+      assert.ok(!('error' in version)); assert.equal(version.version, index + 2)
+    }
+    assert.deepEqual((await pool.query<{ runId: string; latestVersion: number }>('SELECT "runId","latestVersion" FROM artifacts WHERE id=$1', [first.artifactId])).rows[0],
+      { runId, latestVersion: 3 }, 'creator and latest pointer cannot replace per-version submission provenance')
+    const captureOwner = { userId: owner, runId: claimed.runId, issueId: claimedTask, botId }
+    const recording = await captures.openRecording(captureOwner, { title: 'Controlled evidence bytes', display: 0, stopsAt: new Date(Date.now() + 60_000) })
+    assert.ok(recording)
+    await captures.markRecordingStarted(recording.id)
+    assert.equal(await captures.recordStep(captureOwner, { label: synthetic[1], source: 'mark' }), true)
+    const recordingRow = await captures.currentRecording(claimed.runId)
+    assert.ok(recordingRow)
+    // A protocol-recognized byte fixture exercises storage and HTTP transport;
+    // it is not a rendered screen recording and cannot prove visual absence.
+    const media = new Uint8Array([0, 0, 0, 0x18, ...Buffer.from('ftypisom-evidence-fixture')])
+    const ready = await captures.finishRecording(recordingRow, { bytes: media, durationMs: 1 })
+    assert.ok(!('error' in ready))
+    await complete(claimed)
+
+    type ObjectReceipt = { category: string; id: string; inventoryStable: boolean; inventoryStatus: string;
+      attributes: { version?: number }; content: null | { verified: boolean; bytes: number; sha256: string };
+      scan: { status: string; matchedGenerations: number[]; reasons: string[] }; inflated?: { bytes: number; sha256: string } }
+    type EvidenceReceipt = { status: string; inventoryStable: boolean; objects: ObjectReceipt[]; reasons: string[];
+      categories: Record<string, { status: string; observed: number; scan: string }>;
+      serverEvidence: { status: string }; vmTranscript: { status: string } }
+    type QueryOptions = { signal: AbortSignal; timeoutMs: number }
+    const evidenceModule = new URL('../scripts/acceptance/task-secrets-evidence.mjs', import.meta.url).href
+    const { collectTaskSecretEvidence } = await import(evidenceModule) as { collectTaskSecretEvidence(input: {
+      query(sql: string, values: unknown[], options: QueryOptions): Promise<{ rows: unknown[] }>;
+      client: { request(path: string, init: RequestInit, timeoutMs: number): Promise<Response> };
+      scope: typeof scope; canaries: typeof canaries; budget: { remaining(phase: string, maximum: number): number; signal(): AbortSignal };
+      saveObject(object: ObjectReceipt): Promise<void>; limits: { pageSize: number; pagesPerCategory: number };
+    }): Promise<EvidenceReceipt> }
+    const statements = new Set<string>(), persisted = new Map<string, ObjectReceipt>()
+    const writes: Array<{ key: string; status: string }> = []
+    const objectKey = (object: ObjectReceipt) => `${object.category}:${object.id}`
+    let openTransactions = 0
+    const query = async (sql: string, values: unknown[], { signal, timeoutMs }: QueryOptions) => {
+      const label = /^\/\* task-secret-evidence:([a-z_]+) \*\//.exec(sql)?.[1]
+      assert.ok(label); statements.add(label)
+      assert.ok(timeoutMs > 0 && timeoutMs <= 5000); signal.throwIfAborted()
+      const connection = await pool.connect()
+      let begun = false, released = false
+      const abort = () => { if (!released) { released = true; connection.release(true) } }
+      signal.addEventListener('abort', abort, { once: true })
+      openTransactions++
+      try {
+        signal.throwIfAborted()
+        await connection.query('BEGIN READ ONLY'); begun = true
+        await connection.query('SELECT set_config(\'statement_timeout\',$1,true)', [String(Math.floor(timeoutMs))])
+        const result = await connection.query(sql, values)
+        signal.throwIfAborted(); await connection.query('COMMIT'); begun = false
+        return { rows: result.rows as unknown[] }
+      } finally {
+        signal.removeEventListener('abort', abort)
+        try { if (begun && !released) await connection.query('ROLLBACK') }
+        finally { if (!released) connection.release(); openTransactions-- }
+      }
+    }
+    const evidenceSignal = AbortSignal.timeout(20_000)
+    const deadline = Date.now() + 20_000
+    const budget = { remaining: (phase: string, maximum: number) => {
+      assert.equal(phase, 'evidence'); evidenceSignal.throwIfAborted()
+      const remaining = Math.min(maximum, deadline - Date.now()); assert.ok(remaining > 0); return remaining
+    }, signal: () => evidenceSignal }
+    const client = { request: async (path: string, init: RequestInit, timeoutMs: number) => {
+      assert.equal(openTransactions, 0, 'all database leases are released before normal HTTP I/O')
+      const headers = new Headers(init.headers); headers.set('cookie', ownerCookie!)
+      assert.equal(headers.get('x-mikka-workspace-id'), workspace.id)
+      return fetch(new URL(path, base), { ...init, headers, redirect: 'error',
+        signal: AbortSignal.any([evidenceSignal, AbortSignal.timeout(timeoutMs), ...(init.signal ? [init.signal] : [])]) })
+    } }
+    const collect = (selected = scope) => collectTaskSecretEvidence({ query, client, scope: selected, canaries, budget,
+      saveObject: async object => {
+        const key = objectKey(object), previous = persisted.get(key)
+        if (object.inventoryStatus === 'pending_verification') {
+          assert.equal(previous, undefined)
+          assert.equal(object.inventoryStable, false)
+        } else assert.equal(previous?.inventoryStatus, 'pending_verification')
+        const path = join(directory, `evidence-${object.category}-${object.id}.json`)
+        await writeFile(path, JSON.stringify(object), { mode: 0o600 })
+        const stored = JSON.parse(await readFile(path, 'utf8')) as ObjectReceipt
+        assert.deepEqual(stored, object, 'each pending and final receipt reaches private storage before the next read')
+        persisted.set(key, stored)
+        writes.push({ key, status: stored.inventoryStatus })
+      }, limits: { pageSize: 1, pagesPerCategory: 32 } })
+    const receipt = await collect()
+    assert.equal(receipt.inventoryStable, true)
+    assert.deepEqual([...statements].sort(), ['scope', 'chunks', 'messages', 'checkpoint', 'artifact_versions', 'captures', 'capture_steps', 'run_definition'].sort())
+    assert.ok(Object.values(receipt.categories).every(category => category.observed > 0 && category.status === 'collected'))
+    assert.equal(receipt.status, 'leak_detected', 'known positive controls cannot be reported as an empty negative')
+    const matches = (category: string, generation: number) => receipt.objects.some(object => object.category === category && object.scan.matchedGenerations.includes(generation))
+    assert.equal(matches('chunks', 1), true, 'the marker is split across two real SQL pages')
+    assert.equal(matches('messages', 2), true)
+    assert.equal(matches('checkpoint', 3), true)
+    assert.equal(matches('artifact_versions', 1), true, 'downloaded v3 content is scanned through the actual owner route')
+    assert.equal(matches('capture_steps', 2), true)
+    assert.ok(receipt.objects.find(object => object.category === 'checkpoint')?.inflated?.bytes)
+    const versions = receipt.objects.filter(object => object.category === 'artifact_versions')
+    assert.deepEqual(versions.map(object => object.attributes.version).sort(), [2, 3])
+    assert.ok(versions.every(object => object.content?.verified))
+    const capture = receipt.objects.find(object => object.category === 'captures')
+    assert.equal(capture?.content?.verified, true)
+    assert.ok(capture?.scan.reasons.includes('visual_content_unscanned'))
+    assert.equal(receipt.serverEvidence.status, 'incomplete'); assert.equal(receipt.vmTranscript.status, 'needs_collection')
+    assert.equal(persisted.size, receipt.objects.length)
+    assert.ok(writes.some(write => write.status === 'pending_verification'))
+    for (const object of receipt.objects) {
+      assert.deepEqual(writes.filter(write => write.key === objectKey(object)).map(write => write.status), ['pending_verification', 'verified'])
+      assert.deepEqual(persisted.get(objectKey(object)), object, 'the final receipt replaces the pending receipt under the same key')
+    }
+    assert.equal(synthetic.some(value => JSON.stringify({ receipt, persisted: [...persisted.values()] }).includes(value)), false)
+    assert.deepEqual([...objectRequests].sort(), [`/api/artifacts/${first.artifactId}/versions/2/download`,
+      `/api/artifacts/${first.artifactId}/versions/3/download`, `/api/captures/${recording.id}`].sort())
+
+    for (const selected of [{ ...scope, ownerId: outsider }, { ...scope, workspaceId: personalWorkspace }]) {
+      const reads = objectRequests.length, savedObjects = persisted.size, savedWrites = writes.length
+      const denied = await collect(selected)
+      assert.equal(denied.inventoryStable, false); assert.ok(denied.reasons.includes('scope_unverified'))
+      assert.equal(denied.objects.length, 0); assert.equal(objectRequests.length, reads); assert.equal(persisted.size, savedObjects)
+      assert.equal(writes.length, savedWrites)
+    }
+    await assert.rejects(pool.query('UPDATE run_checkpoints SET patch=NULL WHERE "runId"=$1', [claimed.runId]),
+      error => (error as { code?: string }).code === '23502')
+    assert.equal((await pool.query<{ digest: string }>('SELECT encode(sha256(patch),\'hex\') AS digest FROM run_checkpoints WHERE "runId"=$1', [claimed.runId])).rows[0].digest, digest(patch),
+      'formal NOT NULL rejection retains the actual gzip bytes; no test-only schema relaxation')
+    assert.equal(openTransactions, 0)
   })
   assert.deepEqual(routeErrors, [])
   assert.equal(upstreamRequests, 2, 'direct HMAC uses no HTTP endpoint and scope tests use their separate TLS path')

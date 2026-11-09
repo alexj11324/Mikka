@@ -6,7 +6,6 @@
  * mode uses one new private synthetic entry in an operator-reserved window.
  */
 import { createHash, randomUUID } from 'node:crypto'
-import { mkdir, rename, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { execFile } from 'node:child_process'
@@ -18,6 +17,8 @@ import { isExactNativeCommand } from './thread-lifecycle.mjs'
 import { buildFixtureBundles, createIsolatedFixture } from './task-secrets-fixture.mjs'
 import { assertDriverAttestation, attestAcceptance } from './task-secrets-ci.mjs'
 import { canaryWindow, createProductionCanary } from './task-secrets-production-canary.mjs'
+import { createSecretBudget, createSecretEvidenceStore, secretJournal, secretMutation, writeSecretCheckpoint } from './task-secrets-journal.mjs'
+import { cleanupTaskSecrets } from './task-secrets-cleanup.mjs'
 
 export const ORIGIN = 'https://app.aspectlylabs.com'
 export const REPOSITORY = 'alexj11324/Mikka-handoff'
@@ -32,7 +33,8 @@ const FAILURE_CODES = new Set(['configuration', 'main_workflow_required', 'build
   'profile', 'bot', 'issue', 'dispatch', 'multiple_dispatches', 'thread', 'receipt', 'canary_visible', 'runtime',
   'fixture', 'cleanup', 'production_canary_requires_review', 'failed',
   'canary_window', 'canary_database_unavailable', 'canary_scope', 'canary_idle_unverified',
-  'canary_metadata', 'canary_fixture', 'canary_create', 'canary_cleanup', 'canary_revocation'])
+  'canary_metadata', 'canary_fixture', 'canary_create', 'canary_cleanup', 'canary_revocation',
+  'canary_run_evidence', 'canary_object_evidence', 'journal', 'budget'])
 export const safeFailure = error => {
   const own = /^task_secrets_([a-z_]+)$/.exec(error?.message ?? '')?.[1]
   return own && FAILURE_CODES.has(own) ? `task_secrets_${own}` : startupFailure(error).code
@@ -50,10 +52,12 @@ export function productionCanaryPlan() {
 }
 
 export function readOptions(args = [], env = process.env, releaseAttestation) {
-  check(args.every(item => ['--execute', '--production-canary'].includes(item)) && new Set(args).size === args.length, 'configuration')
-  check(env.GITHUB_ACTIONS === 'true' && ['workflow_dispatch', 'workflow_run'].includes(env.GITHUB_EVENT_NAME)
+  check(args.every(item => ['--execute', '--production-canary', '--cleanup'].includes(item)) && new Set(args).size === args.length, 'configuration')
+  const cleanupOnly = args.includes('--cleanup')
+  check(!cleanupOnly || args.length === 1, 'configuration')
+  check(env.GITHUB_ACTIONS === 'true' && env.GITHUB_REPOSITORY === 'alexj11324/Mikka' && ['workflow_dispatch', 'workflow_run'].includes(env.GITHUB_EVENT_NAME)
     && env.GITHUB_REF === 'refs/heads/main', 'main_workflow_required')
-  if (env.GITHUB_EVENT_NAME === 'workflow_run') assertDriverAttestation(env, releaseAttestation)
+  if (env.GITHUB_EVENT_NAME === 'workflow_run' && !cleanupOnly) assertDriverAttestation(env, releaseAttestation)
   const sourceCommit = env.APPLICATION_SHA
   check(SHA.test(sourceCommit ?? '') && sourceCommit === env.GITHUB_SHA, 'source_mismatch')
   const modelCase = env.TASK_SECRETS_MODEL_CASE ?? 'all'
@@ -61,12 +65,18 @@ export function readOptions(args = [], env = process.env, releaseAttestation) {
   const execute = args.includes('--execute')
   const productionCanary = args.includes('--production-canary')
   if (productionCanary) check(execute && env.GITHUB_EVENT_NAME === 'workflow_dispatch', 'configuration')
-  if (env.GITHUB_EVENT_NAME === 'workflow_run') check(execute && modelCase === 'all' && !args.includes('--production-canary'), 'configuration')
+  if (env.GITHUB_EVENT_NAME === 'workflow_run' && !cleanupOnly) check(execute && modelCase === 'all' && !args.includes('--production-canary'), 'configuration')
+  const driver = { runId: Number(env.GITHUB_RUN_ID), runAttempt: Number(env.GITHUB_RUN_ATTEMPT), jobId: Number(env.TASK_SECRETS_JOB_ID) }
+  check(Object.values(driver).every(value => Number.isSafeInteger(value) && value > 0), 'configuration')
+  const jobStart = Date.parse(env.TASK_SECRETS_JOB_STARTED_AT ?? '')
+  check(Number.isFinite(jobStart) && jobStart <= Date.now()
+    && env.TASK_SECRETS_JOB_START_SOURCE === 'github_actions_job.started_at', 'budget')
   const workerSha = env.EXPECTED_WORKER_SHA, workerSourceCommit = env.EXPECTED_WORKER_SOURCE_SHA
   const templates = { claude_code: env.EXPECTED_CLAUDE_TEMPLATE, codex: env.EXPECTED_CODEX_TEMPLATE }
   if (execute) check(SHA.test(workerSha ?? '') && SHA.test(workerSourceCommit ?? '')
     && Object.values(templates).every(value => /^[A-Za-z0-9_-]{1,128}$/.test(value ?? '')), 'worker_pin')
-  return { execute, sourceCommit, workerSha, workerSourceCommit, templates, modelCase,
+  return { execute, cleanupOnly, sourceCommit, workerSha, workerSourceCommit, templates, modelCase, driver,
+    jobStartedAt: new Date(jobStart).toISOString(), jobStartSource: env.TASK_SECRETS_JOB_START_SOURCE,
     ...(env.GITHUB_EVENT_NAME === 'workflow_run' ? { releaseAttestation } : {}),
     productionCanary, ...(productionCanary ? { canaryWindow: canaryWindow(env) } : {}), timeoutMs: 480_000,
     reportPath: resolve('production-task-secrets-report/report.json') }
@@ -167,7 +177,7 @@ export function nativeReceipt(detail, expected, command) {
   return receipts[0] ?? null
 }
 
-async function dispatch(client, record, profileId, botId, now) {
+async function dispatch(client, record, profileId, botId, now, checkpoint, budget) {
   const scope = record.phase === 'revocation'
     ? 'This revocation phase makes no Git or PR writes and waits for the owner to stop it by rotating its synthetic Secret.'
     : "The task describes the only authorized disposable Git branch and draft PR."
@@ -175,11 +185,11 @@ async function dispatch(client, record, profileId, botId, now) {
     note: `Execute this test's exact native verification command once, then reply STARTUP_OK_${record.sampleId} if it completes. ${scope} Do not submit to Factory, merge, change main, spawn agents, or retry.` }
   const trace = sampledRequestTrace(); record.requestTraceId = trace.traceId
   record.messageSubmittedAt = new Date(now()).toISOString()
-  await client.rpc('coordinator.sendCoordinatorMessage', [
+  await secretMutation(record, 'dispatch', () => client.rpc('coordinator.sendCoordinatorMessage', [
     `执行已有测试任务 ${record.issueId}，只调用一次 dispatch_run，参数：${JSON.stringify(tool)}。使用指定 Profile，不变更模型、订阅或电脑，不创建另一任务。派发后只汇报 runId。`,
     null, botId, randomUUID(), { $mikka: 'undefined' }, null, [], { $mikka: 'undefined' }, profileId,
-  ], { headers: { traceparent: trace.traceparent } })
-  const response = await client.request(`/api/coordinator/stream?botId=${botId}&wait=1`, {}, 120_000)
+  ], { headers: { traceparent: trace.traceparent } }), () => {}, checkpoint, now)
+  const response = await client.request(`/api/coordinator/stream?botId=${botId}&wait=1`, {}, budget.remaining('execution', 120_000))
   check(response.ok && response.body && response.headers.get('content-type')?.includes('application/x-ndjson'), 'dispatch')
   const reader = response.body.getReader(), decoder = new TextDecoder()
   let buffer = '', call
@@ -194,12 +204,14 @@ async function dispatch(client, record, profileId, botId, now) {
         if (event.state === 'running' && (event.input?.includes(record.issueId) || event.quote?.includes(`STARTUP_OK_${record.sampleId}`))) {
           check(!call || call === event.call, 'multiple_dispatches'); call = event.call
           record.dispatchObservedAt ??= new Date(now()).toISOString()
+          await checkpoint()
         } else if (call && call === event.call) {
           check(event.state === 'done', 'dispatch')
           const { threads } = await client.rpc('agents.pollIssueThreads', [record.issueId])
           check(threads?.length === 1 && UUID.test(threads[0].id ?? '') && threads[0].ownedByCurrentUser === true, 'thread')
           record.runId = threads[0].id; record.runIdHash = hash(record.runId).slice(0, 16); record.placement = { kind: 'cloud' }
           record.dispatchReturnedAt = new Date(now()).toISOString()
+          await checkpoint()
           return
         }
       }
@@ -210,8 +222,10 @@ async function dispatch(client, record, profileId, botId, now) {
 
 export async function runTaskSecretsAcceptance(options, { env = process.env, fetchImpl = fetch, now = Date.now,
   WebSocketImpl = globalThis.WebSocket, buildBundles = buildFixtureBundles, createFixture = createIsolatedFixture,
-  sessionClient = createSessionClient, watch = watchRun, createCanary = createProductionCanary } = {}) {
+  sessionClient = createSessionClient, watch = watchRun, createCanary = createProductionCanary,
+  writeCheckpoint = writeSecretCheckpoint, signal } = {}) {
   const report = { version: 1, issue: 1712, sourceCommit: options.sourceCommit, origin: ORIGIN,
+    driver: options.driver, jobStartSource: options.jobStartSource, fixtureId: randomUUID(), resources: { intents: [] },
     startedAt: new Date(now()).toISOString(), mode: options.productionCanary ? 'production_canary' : options.execute ? 'execute' : 'preflight', status: 'running',
     productionCanary: productionCanaryPlan(), productionStoreMutated: false,
     externalEvidenceStillRequired: ['production_claim_store_canary', 'PostHog_canary_absence', 'screenshots_checkpoints_templates', 'Factory_full_acceptance'],
@@ -227,13 +241,29 @@ export async function runTaskSecretsAcceptance(options, { env = process.env, fet
   if (options.productionCanary && (!options.execute || !options.canaryWindow || !env.MIKKA_DATABASE_URL)) {
     report.status = 'blocked'; report.failure = options.canaryWindow ? 'task_secrets_canary_database_unavailable' : 'task_secrets_canary_window'; return report
   }
-  const account = smokeAcceptanceAccount(env), client = sessionClient(ORIGIN, fetchImpl), fixtureId = randomUUID()
+  const budget = createSecretBudget({ jobStartedAt: options.jobStartedAt, startedAt: report.startedAt, window: options.canaryWindow }, { now, signal })
+  const account = smokeAcceptanceAccount(env), boundedFetch = budget.fetch(fetchImpl), client = sessionClient(ORIGIN, boundedFetch), fixtureId = report.fixtureId
+  let writes = Promise.resolve()
+  const checkpoint = () => {
+    report.budget = budget.snapshot(); report.checkpointAt = new Date(now()).toISOString()
+    const journal = structuredClone(secretJournal(report)), snapshot = structuredClone(report)
+    writes = writes.catch(() => {}).then(async () => {
+      await writeCheckpoint(resolve(dirname(options.reportPath), 'canary-journal.json'), journal)
+      await writeCheckpoint(options.reportPath, snapshot)
+    })
+    return writes
+  }
+  const cleanupCheckpoint = async () => {
+    try { await checkpoint() }
+    catch { report.cleanup.errors.push({ step: 'journal', code: 'task_secrets_journal' }) }
+  }
   const cases = CASES.filter(item => options.modelCase === 'all' || item.id === options.modelCase)
   const executions = options.productionCanary ? cases.flatMap(item => ['revocation', 'fresh_claim'].map(phase => ({ ...item, phase }))) : cases
   const rotations = new Map()
   let ownerId, scope, originalWorkspaceId, loggedIn = false, fixture, botId, canary
   const profiles = [], pin = async () => check((await client.json('/api/version')).build === options.sourceCommit, 'build_mismatch')
   try {
+    check(!options.cleanupOnly, 'configuration'); budget.remaining(); await checkpoint()
     await pin()
     const login = await client.request('/api/auth/sign-in/email', post({ ...account, rememberMe: false }))
     check(login.ok, 'sign_in'); loggedIn = true; await login.body?.cancel()
@@ -241,7 +271,8 @@ export async function runTaskSecretsAcceptance(options, { env = process.env, fet
     check(identity.user?.email?.toLowerCase() === account.email.toLowerCase() && typeof identity.user.id === 'string', 'identity')
     ownerId = identity.user.id; report.ownerHash = hash(ownerId).slice(0, 16)
     scope = await selectAcceptanceTeam(client, { ownerId }, value => { originalWorkspaceId = value })
-    report.team = scope.evidence
+    report.team = scope.evidence; report.workspaceId = scope.workspaceId; report.originalWorkspaceId = originalWorkspaceId
+    await checkpoint()
     const [threads, tasks, keys, github, order] = await Promise.all([
       client.rpc('task-runs.pollThreads', []), client.rpc('task-runs.pollTaskRuns', []),
       client.json(`/api/settings/api-keys?workspace=${scope.workspaceId}`), client.json('/api/integrations/github'),
@@ -266,21 +297,23 @@ export async function runTaskSecretsAcceptance(options, { env = process.env, fet
     if (!chosen.size) { report.status = 'blocked'; return report }
     if (options.productionCanary) {
       canary = await createCanary({ client, ownerId, email: account.email, workspaceId: scope.workspaceId,
-        sourceCommit: options.sourceCommit, fixtureId, window: options.canaryWindow, connectionString: env.MIKKA_DATABASE_URL, pin,
+        sourceCommit: options.sourceCommit, fixtureId, window: options.canaryWindow, connectionString: env.MIKKA_DATABASE_URL, pin, budget,
         persist: async evidence => {
           report.productionCanary.journal = evidence
           report.productionStoreMutated = evidence.productionStoreMutated
           if (evidence.productionStoreMutated) report.productionCanary.executed = true
-          const path = resolve(dirname(options.reportPath), 'canary-journal.json'), temporary = `${path}.tmp`
-          await mkdir(dirname(path), { recursive: true, mode: 0o700 })
-          await writeFile(temporary, JSON.stringify(evidence, null, 2) + '\n', { mode: 0o600 })
-          await rename(temporary, path)
+          await checkpoint()
         } }, { now })
       report.preflight.ownerWideIdle = await canary.preflight()
     }
     const bundles = await buildBundles()
-    fixture = await createFixture({ fixtureId, sourceCommit: options.sourceCommit, apiKey: env.E2B_API_KEY, bundles },
-      { fetchImpl, now, onEvidence: value => { report.fixture = value } })
+    report.resources.fixture = { metadata: { application: 'mikka-1712-secret-fixture', acceptance: fixtureId,
+      sourceCommit: options.sourceCommit, driverRunId: String(options.driver.runId), driverRunAttempt: String(options.driver.runAttempt) } }
+    fixture = await secretMutation(report.resources, 'fixture_create', () => createFixture({ fixtureId,
+      sourceCommit: options.sourceCommit, apiKey: env.E2B_API_KEY, bundles, driver: options.driver },
+    { fetchImpl: boundedFetch, now, signal: budget.signal(), cleanupSignal: () => budget.signal('cleanup'), onCreated: async value => {
+      report.resources.fixture = value; budget.bindFixture(value.startedAt); await checkpoint()
+    }, onEvidence: async value => { report.fixture = value; await checkpoint() } }), () => {}, checkpoint, now)
     report.fixture = fixture.evidence
     if (canary) {
       // Keep the independent upstream alive before creating the single private
@@ -290,22 +323,29 @@ export async function runTaskSecretsAcceptance(options, { env = process.env, fet
       report.productionCanary.requiresSeparateReview = false
       report.fixture.signingKeySource = 'none_production_claim_uses_existing_application_key'
     }
-    const bot = await client.rpc('bots.createBot', [{ name: `测试1712 ${fixtureId.slice(0, 8)}`, color: 'gris', shape: 'cercle', model: null, repository: null }])
+    report.resources.botName = `测试1712 ${fixtureId.slice(0, 8)}`
+    const bot = await secretMutation(report.resources, 'bot_create', () => client.rpc('bots.createBot', [{ name: report.resources.botName,
+      color: 'gris', shape: 'cercle', model: null, repository: null }]), value => {
+      check(UUID.test(value?.id ?? ''), 'bot'); report.resources.botId = value.id
+    }, checkpoint, now)
     check(UUID.test(bot?.id ?? ''), 'bot'); botId = bot.id
     const observedBot = await client.json(`/api/bots/${botId}`)
     check(observedBot.id === botId && observedBot.name === `测试1712 ${fixtureId.slice(0, 8)}`, 'bot')
     report.bot = { id: botId, retention: 'dedicated_test_bot_no_delete_api' }; scope.botId = botId
+    await checkpoint()
     for (const item of executions) {
+      check(!report.cleanup.errors.length, 'journal')
+      budget.phase('execution'); check(budget.remaining('execution', 120_000) === 120_000, 'budget')
       const candidate = chosen.get(item.harness)
       if (!candidate) continue
-      const caseId = randomUUID(), record = { caseId, sampleId: caseId, harness: item.harness, requestedModel: item.model,
+      const caseId = randomUUID(), record = { caseId, sampleId: caseId, botId, harness: item.harness, requestedModel: item.model,
         title: `测试 1712 ${caseId} ${item.harness}`, sourceCommit: options.sourceCommit, workerSha: options.workerSha,
         workerSourceCommit: options.workerSourceCommit, requireReply: true, minToolCalls: 1, requireReplyAfterTool: true,
         // Normal write-capable cloud tasks have no diagnostic opt-in. The
         // native command, reply, terminal state and external proofs stay required.
         requireRuntimeReceipt: false, requireTerminal: true,
         runtimeDiagnostics: { enabledByDriver: false, required: false, executionGateUsed: false, authorizationCensusUsed: false, status: 'not_observed' },
-        stages: [], status: 'running', cleanup: { status: 'running', errors: [] },
+        createdAt: new Date(now()).toISOString(), intents: [], stages: [], status: 'running', cleanup: { status: 'running', errors: [] },
         remoteCleanupTarget: { repository: REPOSITORY, branch: `acceptance/1712/${caseId}/${item.harness}`, mergeAuthorized: false } }
       const revocation = Boolean(canary && item.phase === 'revocation')
       if (canary) { record.deliveryMode = 'production_claim'; record.phase = item.phase }
@@ -314,6 +354,7 @@ export async function runTaskSecretsAcceptance(options, { env = process.env, fet
         record.remoteCleanupTarget = { repository: REPOSITORY, status: 'no_git_write_in_revocation_phase', mergeAuthorized: false }
       }
       report.cases.push(record)
+      await checkpoint()
       let fixtureCaseCreated = false
       try {
         await pin()
@@ -323,20 +364,28 @@ export async function runTaskSecretsAcceptance(options, { env = process.env, fet
         if (canary && !revocation) check(rotations.has(item.harness), 'canary_revocation')
         const state = canary ? await canary.prepareCase(fixture, caseId, item.phase) : await fixture.createCase(caseId)
         fixtureCaseCreated = true
-        if (canary) record.sdkResponseSha256 = state.sdkResponseSha256
+        if (canary) {
+          record.sdkResponseSha256 = state.sdkResponseSha256
+          record.syntheticGenerations = [state.canarySha256, ...(!revocation ? [rotations.get(item.harness).previousCanarySha256] : [])]
+        }
+        await checkpoint()
         const config = { ...state, harness: item.harness, repository: REPOSITORY, sourceCommit: options.sourceCommit,
           workerSha: options.workerSha, workerSourceCommit: options.workerSourceCommit,
           fixtureOrigin: fixture.fixtureOrigin, upstreamOrigin: fixture.upstreamOrigin,
           ...(canary && !revocation ? { previousCanarySha256: rotations.get(item.harness).previousCanarySha256 } : {}) }
         const command = nativeCommand(config, bundles.client.sha256)
         record.commandSha256 = hash(command)
-        const created = await client.json('/api/factory/agent-profiles', post({ workspaceId: scope.workspaceId, requestId: randomUUID(), profile: {
-          name: `测试1712 ${caseId.slice(0, 8)} ${item.harness}`, description: 'Disposable Secret/Git acceptance', enabled: true,
+        record.profileName = `测试1712 ${caseId} ${item.harness}`
+        const created = await secretMutation(record, 'profile_create', () => client.json('/api/factory/agent-profiles', post({ workspaceId: scope.workspaceId, requestId: randomUUID(), profile: {
+          name: record.profileName, description: 'Disposable Secret/Git acceptance', enabled: true,
           harness: item.harness, model: { mode: 'fixed', harness: item.harness, model: item.model, source: candidate.source }, effort: 'low', roles: [], skills: [],
           instructions: revocation
             ? 'Run only the exact #1712 revocation verification command, once. Make no Git or PR write. Wait for the owner to rotate its synthetic Secret and stop the task; do not retry or replace the stopped command. Do not inspect unrelated credentials, change settings, use paid fallback, submit to Factory, or spawn agents.'
             : 'Run only the exact #1712 verification command from this task, once. It owns one disposable branch and draft PR, closes/deletes those in finally, and never merges or pushes a default branch. Do not inspect unrelated credentials, change settings, use paid fallback, submit to Factory, or spawn agents.',
-        } }))
+        } })), value => {
+          check(UUID.test(value?.profile?.id ?? '') && Number.isSafeInteger(value.profile.version) && value.profile.version > 0, 'profile')
+          record.profileId = value.profile.id; record.profileVersion = value.profile.version
+        }, checkpoint, now)
         const profile = created.profile
         check(UUID.test(profile?.id ?? '') && DIGEST.test(profile.digest ?? '') && profile.harness === item.harness
           && profile.model?.mode === 'fixed' && profile.model.model === item.model && profile.model.source?.kind === 'subscription'
@@ -347,12 +396,13 @@ export async function runTaskSecretsAcceptance(options, { env = process.env, fet
           ? '此阶段不操作 Git。脚本只使用任务实际领取的 MIKKA_SECRET_ENDPOINTS 访问本轮合成服务，然后等待 owner 轮换新建测试 Secret 产生的停止事件。停止属于预期验收，绝不重试。'
           : `只允许仓库 ${REPOSITORY} 的分支 ${record.remoteCleanupTarget.branch} 和唯一测试文件；必须创建 draft PR 后关闭、删分支，绝不 merge 或写默认分支。脚本只使用实际领取的 MIKKA_SECRET_ENDPOINTS 验证已轮换的本轮合成 Secret，不修改生产配置。`
           : `只允许仓库 ${REPOSITORY} 的分支 ${record.remoteCleanupTarget.branch} 和唯一测试文件；必须创建 draft PR 后关闭、删分支，绝不 merge 或写默认分支。脚本连接独立合成 key/canary fixture，不修改生产 Secret Store。`
-        const issue = await client.rpc('issues.saveIssue', [{ title: record.title, status: 'todo', priority: 'low', content: { type: 'doc', content: [
+        const issue = await secretMutation(record, 'issue_create', () => client.rpc('issues.saveIssue', [{ title: record.title, status: 'todo', priority: 'low', content: { type: 'doc', content: [
           { type: 'paragraph', content: [{ type: 'text', text: `为 #1712 执行一次真正的原生凭证/Secret隔离验收。${taskScope}\n以下命令必须原样独占一次 bash/shell 工具调用，timeout 360000ms；不重试、不拼接其他命令。脚本验证下载代码摘要，使用正常原生身份；失败就报告失败。完成后仅回复 STARTUP_OK_${caseId}。\n\n${command}` }] },
-        ] } }])
+        ] } }]), value => { check(UUID.test(value?.issue?.id ?? ''), 'issue'); record.issueId = value.issue.id }, checkpoint, now)
         check(UUID.test(issue.issue?.id ?? ''), 'issue'); record.issueId = issue.issue.id
-        await dispatch(client, record, profile.id, botId, now)
+        await dispatch(client, record, profile.id, botId, now, checkpoint, budget)
         check(!report.cases.some(other => other !== record && other.runId === record.runId), 'thread')
+        if (canary) { record.persistedRun = await canary.observeRun(record, { budget, phase: 'execution' }); await checkpoint() }
         await fixture.bind(caseId, record.runId)
         await client.rpc('coordinator.stopCoordinatorTurn', [botId]); record.coordinatorStopped = true
         await subscriptionProof(client, record, scope, profile)
@@ -365,7 +415,7 @@ export async function runTaskSecretsAcceptance(options, { env = process.env, fet
           const rotation = await canary.rotate(record.runId)
           rotations.set(item.harness, rotation)
           const deadline = Date.parse(rotation.requestedAt) + 90_000
-          await watch(client, record, Math.max(1, deadline - now()), WebSocketImpl, now, undefined, { allowTerminal: true, observe: async detail => {
+          await watch(client, record, budget.remaining('execution', Math.max(1, deadline - now())), WebSocketImpl, now, undefined, { signal: budget.signal(), allowTerminal: true, observe: async detail => {
             const chunks = detail.chunks ?? [], text = JSON.stringify(chunks)
             check(![...text.matchAll(/mikka1712s_[a-f0-9]{64}/g)].some(match => hash(match[0]) === state.canarySha256), 'canary_visible')
             observeChunks(record, detail, now()); delete record.runtimeEvidence
@@ -380,6 +430,7 @@ export async function runTaskSecretsAcceptance(options, { env = process.env, fet
               elapsedMs: now() - Date.parse(rotation.requestedAt), maximumMs: 90_000,
               proof: 'actual_protected_upstream_then_store_rotation_expired_lease_and_native_run_stop',
               rawCapabilityReplayTested: false }
+            record.terminalObservedAt = new Date(now()).toISOString(); await checkpoint()
             return true
           } })
           await subscriptionProof(client, record, scope, profile)
@@ -389,7 +440,7 @@ export async function runTaskSecretsAcceptance(options, { env = process.env, fet
           await pin(); record.status = 'passed'
           continue
         }
-        await watch(client, record, options.timeoutMs, WebSocketImpl, now, undefined, { observe: async detail => {
+        await watch(client, record, budget.remaining('execution', options.timeoutMs), WebSocketImpl, now, undefined, { signal: budget.signal(), observe: async detail => {
           const text = JSON.stringify(detail.chunks ?? [])
           check(![...text.matchAll(/mikka1712s_[a-f0-9]{64}/g)].some(match =>
             [state.canarySha256, config.previousCanarySha256].includes(hash(match[0]))), 'canary_visible')
@@ -410,7 +461,9 @@ export async function runTaskSecretsAcceptance(options, { env = process.env, fet
           }
           // A normal no-submit CLI turn ends as stopped. The owner projection
           // does not expose its stop reason; the native proofs remain required.
-          return complete && Boolean(record.native) && record.lastStatus === 'stopped'
+          const done = complete && Boolean(record.native) && record.lastStatus === 'stopped'
+          if (done) { record.terminalObservedAt = new Date(now()).toISOString(); await checkpoint() }
+          return done
         } })
         await subscriptionProof(client, record, scope, profile)
         record.fixtureReceipt = await fixture.receipt(caseId)
@@ -422,6 +475,8 @@ export async function runTaskSecretsAcceptance(options, { env = process.env, fet
         await pin(); record.status = 'passed'
       } catch (error) { record.status = 'blocked'; record.failure = safeFailure(error) }
       finally {
+        budget.phase('evidence')
+        await cleanupCheckpoint()
         if (record.issueId) {
           if (!record.runId) {
             // A dispatch response may be lost after its write. One owner read
@@ -429,15 +484,53 @@ export async function runTaskSecretsAcceptance(options, { env = process.env, fet
             try { const value = await client.rpc('agents.pollIssueThreads', [record.issueId]); if (value.threads?.length === 1 && value.threads[0].ownedByCurrentUser === true) record.runId = value.threads[0].id }
             catch { record.cleanup.errors.push({ step: 'resolve_run', code: 'task_secrets_cleanup' }) }
           }
-          try { await cleanupCase(client, record, 'cloud', { timeoutMs: 60_000, WebSocketImpl, now, preserveIssue: !revocation && !record.native?.github.cleanup }) }
+          if (canary && record.runId) try {
+            budget.remaining('evidence'); record.persistedRun = await canary.observeRun(record, { budget, phase: 'evidence' })
+          } catch { record.cleanup.errors.push({ step: 'persisted_run_evidence', code: 'task_secrets_canary_run_evidence' }) }
+          if (canary && record.runId) {
+            record.objectEvidence = { status: 'needs_collection', serverStatus: 'incomplete',
+              fullNegativeEvidence: false, reasons: ['run_not_ended'] }
+            try {
+              check(TERMINAL.has(record.persistedRun?.status), 'canary_object_evidence')
+              budget.remaining('evidence')
+              const store = createSecretEvidenceStore({ reportPath: options.reportPath, sourceCommit: options.sourceCommit,
+                fixtureId, caseId: record.caseId, ownerId, workspaceId: scope.workspaceId,
+                botId: record.botId, issueId: record.issueId, runId: record.runId, generations: canary.evidence.generations }, { writeCheckpoint })
+              const collected = await canary.collectObjects(record, { budget, saveObject: store.saveObject })
+              record.objectEvidence = await store.finish(collected)
+              if (record.objectEvidence.serverStatus !== 'complete_text_scan' || collected.matchedObjects) {
+                record.status = 'blocked'; record.failure ??= 'task_secrets_canary_object_evidence'
+              }
+            } catch {
+              record.status = 'blocked'; record.failure ??= 'task_secrets_canary_object_evidence'
+              if (TERMINAL.has(record.persistedRun?.status)) record.objectEvidence.reasons = ['enumeration_failed']
+            }
+          }
+          await cleanupCheckpoint()
+          budget.phase('cleanup'); record.cleanupStartedAt = new Date(now()).toISOString(); await cleanupCheckpoint()
+          try { await cleanupCase(client, record, 'cloud', { timeoutMs: budget.remaining('cleanup', 60_000), WebSocketImpl, now,
+            // Server text receipts do not cover all Coordinator/VM/media
+            // objects. Keep the Task for those gaps, without retaining a VM.
+            preserveIssue: options.productionCanary || !revocation && !record.native?.github.cleanup }) }
           catch { record.cleanup.errors.push({ step: 'owned_run_cleanup', code: 'task_secrets_cleanup' }) }
+          if (canary && record.runId) try {
+            budget.remaining('cleanup'); record.persistedRun = await canary.observeRun(record, { budget, phase: 'cleanup' })
+          } catch { record.cleanup.errors.push({ step: 'final_run_evidence', code: 'task_secrets_canary_run_evidence' }) }
         } else record.cleanup.status = 'passed'
+        budget.phase('cleanup')
         if (fixtureCaseCreated) try { await fixture.deleteCase(caseId) } catch { record.cleanup.errors.push({ step: 'fixture_case_delete', code: 'task_secrets_cleanup' }) }
         if (!revocation) {
           if (!record.native?.github.cleanup) record.remoteCleanupTarget.status = 'unconfirmed_verify_exact_head_before_any_cleanup'
           else record.remoteCleanupTarget.status = 'verified_closed_and_branch_absent'
         }
+        if (record.intents.some(intent => intent.state !== 'responded'
+          && !(intent.kind === 'profile_create' && record.profileId)
+          && !(intent.kind === 'issue_create' && record.issueId)
+          && !(intent.kind === 'dispatch' && record.runId)))
+          record.cleanup.errors.push({ step: 'unresolved_creation_identity', code: 'task_secrets_cleanup' })
         if (record.cleanup.errors.length || record.cleanup.status !== 'passed') record.status = 'blocked'
+        record.cleanupFinishedAt = new Date(now()).toISOString(); await cleanupCheckpoint()
+        check(record.cleanup.status === 'passed' && !record.cleanup.errors.length, 'cleanup')
       }
     }
     report.status = report.cases.length === executions.length && report.cases.every(item => item.status === 'passed') ? 'scoped_external_acceptance_passed' : 'blocked'
@@ -448,12 +541,17 @@ export async function runTaskSecretsAcceptance(options, { env = process.env, fet
     }
   } catch (error) { report.status = 'blocked'; report.failure = safeFailure(error) }
   finally {
+    budget.phase('cleanup')
+    await cleanupCheckpoint()
     if (canary) try { report.productionCanary.cleanup = await canary.close() }
     catch { report.productionCanary.cleanup = canary.evidence.cleanup; report.cleanup.errors.push({ step: 'production_canary', code: 'task_secrets_canary_cleanup' }) }
     if (fixture) try { report.fixture.cleanup = await fixture.close() } catch { report.cleanup.errors.push({ step: 'fixture_vm', code: 'task_secrets_cleanup' }) }
     if (loggedIn) {
       for (const profile of profiles) try {
         await client.json(`/api/factory/agent-profiles/${profile.id}`, { ...post({ workspaceId: scope.workspaceId, version: profile.version }), method: 'DELETE' })
+        const record = report.cases.find(item => item.profileId === profile.id)
+        if (record) record.profileArchived = true
+        await cleanupCheckpoint()
       } catch { report.cleanup.errors.push({ step: 'profile_archive', id: profile.id, code: 'task_secrets_cleanup' }) }
       if (botId) try { await client.rpc('coordinator.stopCoordinatorTurn', [botId]) } catch { report.cleanup.errors.push({ step: 'coordinator_stop', code: 'task_secrets_cleanup' }) }
       if (originalWorkspaceId) try { await restoreAcceptanceWorkspace(client, ownerId, originalWorkspaceId); report.cleanup.workspaceRestored = true }
@@ -461,24 +559,35 @@ export async function runTaskSecretsAcceptance(options, { env = process.env, fet
       try { check((await client.request('/api/auth/sign-out', post({}))).ok, 'cleanup'); report.cleanup.sessionClosed = true }
       catch { report.cleanup.errors.push({ step: 'sign_out', code: 'task_secrets_cleanup' }) }
     }
-    client.clear(); report.finishedAt = new Date(now()).toISOString()
+    client.clear(); budget.close(); report.finishedAt = new Date(now()).toISOString()
     if (report.cleanup.errors.length) report.status = 'blocked'
+    await cleanupCheckpoint()
   }
   return report
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const abort = new AbortController(), stop = () => abort.abort(Error('task_secrets_budget'))
+  process.once('SIGINT', stop); process.once('SIGTERM', stop)
+  const cleanupRequested = process.argv.slice(2).includes('--cleanup')
   let report, options
   try {
-    const proof = await attestAcceptance(process.env)
+    // Recovery is bound to this invocation's journal and checkout. It must not
+    // rerun an acceptance or require main to remain unchanged merely to retire
+    // an exact owned resource; Secret writes retain their separate build gate.
+    const proof = cleanupRequested ? undefined : await attestAcceptance(process.env)
     options = readOptions(process.argv.slice(2), process.env, proof)
     const { stdout } = await promisify(execFile)('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', timeout: 5000, maxBuffer: 200 })
     check(stdout.trim() === options.sourceCommit, 'source_mismatch')
-    report = await runTaskSecretsAcceptance(options)
+    report = options.cleanupOnly ? await cleanupTaskSecrets(options) : await runTaskSecretsAcceptance(options, { signal: abort.signal })
   } catch (error) { report = { version: 1, issue: 1712, status: 'blocked', failure: safeFailure(error), productionStoreMutated: false } }
+  finally { process.removeListener('SIGINT', stop); process.removeListener('SIGTERM', stop) }
   const reportPath = options?.reportPath ?? resolve('production-task-secrets-report/report.json')
-  await mkdir(dirname(reportPath), { recursive: true, mode: 0o700 })
-  await writeFile(reportPath, JSON.stringify(report, null, 2) + '\n', { mode: 0o600 })
+  // Recovery appends its receipt to the journal, preserving the original red
+  // execution report instead of overwriting it with a cleanup-only success.
+  if (!cleanupRequested) {
+    await writeSecretCheckpoint(reportPath, report)
+  }
   process.stdout.write(JSON.stringify({ issue: 1712, status: report.status, report: 'production-task-secrets-report/report.json' }) + '\n')
-  if (!['preflight_passed', 'scoped_external_acceptance_passed'].includes(report.status)) process.exitCode = 1
+  if (!(options?.cleanupOnly ? ['not_started', 'passed'] : ['preflight_passed', 'scoped_external_acceptance_passed']).includes(report.status)) process.exitCode = 1
 }
