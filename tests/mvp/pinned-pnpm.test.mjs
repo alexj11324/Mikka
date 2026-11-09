@@ -142,6 +142,10 @@ function lifecyclePresence(t, caller, inherited = '') {
   assert.equal(install[0].shell, 'bash')
   const value = caller.with?.['ffmpeg-github-token'] ?? action.inputs?.['ffmpeg-github-token']?.default ?? ''
   const inputs = { 'ffmpeg-github-token': resolveInstallValue(value, {}) }
+  return installLifecyclePresence(t, install[0], inputs, inherited)
+}
+function installLifecyclePresence(t, install, inputs = {}, inherited = '') {
+  assert.equal(install.run, 'pnpm install --frozen-lockfile')
   const directory = mkdtempSync(join(tmpdir(), 'mikka-install-scope-'))
   t.after(() => rmSync(directory, { recursive: true, force: true }))
   writeFileSync(join(directory, 'package.json'), JSON.stringify({
@@ -158,12 +162,12 @@ function lifecyclePresence(t, caller, inherited = '') {
     npm_config_manage_package_manager_versions: 'false', npm_config_offline: 'true',
     npm_config_store_dir: join(directory, 'store'), FFMPEG_GITHUB_TOKEN: inherited,
   }
-  for (const [key, value] of Object.entries(install[0].env || {})) {
+  for (const [key, value] of Object.entries(install.env || {})) {
     assert.equal(key, 'FFMPEG_GITHUB_TOKEN')
     environment[key] = resolveInstallValue(value, inputs)
   }
   const manager = resolvePinnedPnpm({ packageManager: pin })
-  execFileSync(manager.file, [...manager.args, ...install[0].run.split(' ').slice(1)], {
+  execFileSync(manager.file, [...manager.args, ...install.run.split(' ').slice(1)], {
     cwd: directory, env: environment, timeout: 30_000, maxBuffer: 64 * 1024, stdio: ['ignore', 'pipe', 'pipe'],
   })
   const receipt = JSON.parse(readFileSync(join(directory, 'presence.json'), 'utf8'))
@@ -226,5 +230,27 @@ test('credential opt-ins honor job overrides and reject unknown or API-write per
       delete job.steps[0].with
       assert.doesNotThrow(() => assertCredentialScopes(workflow), 'anonymous/default-none remains allowed')
     })
+  }
+})
+
+test('the actual Apple direct install passes its read-only token to real lifecycle scripts', t => {
+  const workflow = readYaml('.github/workflows/desktop.yml')
+  const native = workflow.jobs['native-arm64']
+  assert.ok(apiReadOnly(native.permissions ?? workflow.permissions))
+  const installs = native.steps.filter(step => step.run === 'pnpm install --frozen-lockfile')
+  assert.equal(installs.length, 1)
+  assert.equal(installLifecyclePresence(t, installs[0]), true)
+})
+
+test('all three desktop direct installs explicitly opt in under API-read-only permissions', () => {
+  const workflow = readYaml('.github/workflows/desktop.yml')
+  assertCredentialScopes(workflow)
+  for (const name of ['checks', 'smoke', 'native-arm64']) {
+    const job = workflow.jobs[name]
+    assert.ok(apiReadOnly(job.permissions ?? workflow.permissions), name)
+    const installs = job.steps.filter(step => step.run === 'pnpm install --frozen-lockfile')
+    assert.equal(installs.length, 1, name)
+    assert.equal(installs[0].env.FFMPEG_GITHUB_TOKEN, githubTokenExpression, name)
+    if (name === 'checks') assert.equal(installs[0].env.ELECTRON_SKIP_BINARY_DOWNLOAD, '1')
   }
 })
