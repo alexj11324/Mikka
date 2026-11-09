@@ -30,7 +30,7 @@ async function fixture(diagnostics = false, hostOnly = false) {
   const binary = join(root, 'codex')
   let fake = readFileSync(resolve(import.meta.dirname, 'fakes/fake-codex-subscription.mjs'), 'utf8')
   fake = fake.replace('existsSync, mkdirSync,', 'appendFileSync, existsSync, mkdirSync,')
-    .replace('  if (!method) {', "  appendFileSync(process.env.FIXTURE_WIRE, JSON.stringify({ method, pid: process.pid, cwd: params?.cwd, config: params?.config }) + '\\n')\n  if (!method) {")
+    .replace('  if (!method) {', "  appendFileSync(process.env.FIXTURE_WIRE, JSON.stringify({ method, pid: process.pid, cwd: params?.cwd, config: params?.config, argv: process.argv }) + '\\n')\n  if (!method) {")
   writeFileSync(binary, fake); chmodSync(binary, 0o700)
   const env = Object.fromEntries(Object.entries({ ...process.env, HOME: home,
     FAKE_CODEX_USER_AGENT: 'mikka/0.166.0 (offline fixture)', FIXTURE_WIRE: trace }).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
@@ -81,6 +81,7 @@ it.each([false, true, 'host'] as const)('adopts one initialized child, retains o
     expect(threads).toHaveLength(1); expect(threads[0].cwd).toBe(f.cwd)
     expect(JSON.stringify(threads[0].config)).not.toContain('synthetic-mcp-token')
     const mcp = threads[0].config.mcp_servers.mikka
+    expect(mcp.required).toBe(true)
     expect(mcp.args[0]).toContain('mikka-mcp-context.mjs'); expect(existsSync(mcp.args[1])).toBe(false)
     const ledger = JSON.parse(readFileSync(join(f.stateDir, 'native-ledgers', f.assignment.runId + '.json'), 'utf8'))
     expect(ledger.scope.accountId).toBe('fixture-account'); expect(ledger.sessionId).toBe(session.sessionId)
@@ -139,6 +140,7 @@ it('drains an incompatible project before the original cold child receives any l
   const wire = f.wire(), starts = wire.filter(frame => frame.method === 'initialize'), login = wire.find(frame => frame.method === 'account/login/start')
   expect(starts).toHaveLength(2); expect(starts[0].pid).not.toBe(starts[1].pid)
   expect(login.pid).toBe(starts[1].pid); expect(f.candidate.nativeExitObserved).toBe(true)
+  expect(login.argv).toContain('mcp_servers.mikka.required=true')
   expect(f.candidate.preparationTiming).toBeUndefined()
 })
 it('keeps a real login refusal on the adopted child as failure with no cold retry or task input', async () => {

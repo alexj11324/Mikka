@@ -186,7 +186,7 @@ export function startAnonymousCodex(input: {
         state = 'adopted'; adopted = true; clearTimeout(timer)
         measurement?.finish('ok')
         return { child, rpc, initialized, nativeGenerations,
-          threadConfig: { mcp_servers: { mikka: context.server } } }
+          threadConfig: { mcp_servers: { mikka: { ...context.server, required: true } } } }
       } catch (cause) { await close(); throw cause }
     },
   }
