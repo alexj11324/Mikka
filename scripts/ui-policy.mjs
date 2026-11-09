@@ -6,6 +6,14 @@ export function isComponentLibrarySource(file, policy) {
   return policy.componentRoots.some(root => file.startsWith(root))
 }
 
+// Paid blocks keep their native colours and type (docs/design/decisions/2026-11-09-0050-paid-blocks-as-shipped.md):
+// files under ui-policy.json asShipped.public drop only these two rules.
+const AS_SHIPPED_RULES = new Set(['style/semantic-colors', 'typography/preset-only'])
+export function exemptAsShipped(file, diagnostics, policy) {
+  const roots = policy.asShipped?.public ?? []
+  return roots.some(root => file === root || (root.endsWith('/') && file.startsWith(root))) ? diagnostics.filter(d => !AS_SHIPPED_RULES.has(d.rule)) : diagnostics
+}
+
 export function splitUtilities(value) {
   const tokens = []
   let token = '', depth = 0, quote = ''

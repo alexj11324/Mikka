@@ -52,10 +52,11 @@ Decision: [2026-11-01-2310](decisions/2026-11-01-2310-personal-and-team-workspac
   bot header (Alex, 2026-10-28; `rules.md` R-02, R-50).
 - Choosing another bot on the left changes the center chat and the right
   column's dispatched tasks and computer together.
-- A task (issue, `MIK-xx`) can have several attempts over time. It has one
-  conversation joining those attempts oldest first. Opening an attempt scrolls
-  to its part of that conversation, and the composer addresses the newest
-  attempt ([decision](decisions/2026-11-07-2300-one-conversation-per-task.md)).
+- A task (issue, `MIK-xx`) is one conversation: its runs read oldest first,
+  with a divider only where the Agent changes. The composer addresses the
+  newest run ([decision](decisions/2026-11-09-0045-no-attempt-word.md)).
+- **Attempt** is an internal data term only (`factory_attempts`, a run chain's
+  runs). User-facing copy never says 「尝试」 or "attempt".
 
 ## Other words
 
@@ -67,7 +68,7 @@ Decided by Alex, 2026-10-28.
 | **Agent** | Agent | The coding agent that runs a thread: Claude Code, Codex, Cursor (`agents` table, a harness). It does the coding work; a bot never does. Shown by its own brand mark wherever a thread or run has an icon (R-78). Never called harness or 执行器 in the UI (R-43). |
 | **Agent Profile** | Agent 配置 | A reusable logical coding role owned by a person in a workspace: responsibilities, capabilities, Agent/model policy, effort, private instructions and controlled Skills. Several Profiles may use the same physical Agent/model. Managed in Settings › Models and subscriptions; frozen into each selected run. It never becomes a Bot or a left-column row. [Spec](factory-agent-profiles.md). |
 | **Library** | 资料库 | A bot's files, listed under 概览 › 详情; the person can delete their own (R-51). Files are added with the composer's 「+」. |
-| **Thread** | 线程 | As above. Since 2026-11-07 it is shown only inside its task (an attempt in the task's 活动); no list or tab is named 线程. |
+| **Thread** | 线程 | As above. Since 2026-11-07 it is shown only inside its task (an Agent stretch in the task's 活动); no list or tab is named 线程. |
 | **Browser** | 浏览器 | The person's own local browser, one for the whole app, opened from the globe in the top bar (R-57). |
 | **Computer** | 电脑 | A bot's cloud computer: its own desktop (X display) on its owner's bot machine, which is one per person per workspace (`cloud_machines` keyed by `workspaceId`, `ownerId`; `bot_desktops` keyed by `botId`). Used by that bot only; a thread that needs a desktop gets its own machine ([0251](decisions/2026-11-02-0251-desktop-runs-get-their-own-machine.md)). Shown in the 电脑 tab of 概览 (R-50). Never called 浏览器. |
 

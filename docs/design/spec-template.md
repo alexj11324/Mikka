@@ -31,6 +31,8 @@ new rule it needs. A new rule needs Alex's decision and a file in `decisions/`.
 
 ## Components
 
+A paid block or component is listed as used as shipped (data and text only), with its library demo for the side-by-side ([2026-11-09-0050](decisions/2026-11-09-0050-paid-blocks-as-shipped.md)).
+
 What it is built from, one line per part: the existing component
 (`components.md`, the live screen for the same job, or `components/reui/`,
 `components/ui/`, `components/motion/`, the OpenUI catalog) it reuses, as its

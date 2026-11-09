@@ -6,7 +6,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { auditSource, auditCss, isComponentLibrarySource, splitUtilities, utilityBase } from './ui-policy.mjs'
+import { auditSource, auditCss, isComponentLibrarySource, exemptAsShipped, splitUtilities, utilityBase } from './ui-policy.mjs'
 
 const policy = JSON.parse(readFileSync(new URL('../ui-policy.json', import.meta.url), 'utf8'))
 const prefix = `import { cn } from '@/lib/utils'; import { Button } from '@/components/ui/button';`
@@ -380,4 +380,16 @@ test('the type scale is Comma\'s: size tokens in globals.css match the pinned va
     assert.equal(token(`--text-${step}--letter-spacing`), tracking, `text-${step} letter spacing`)
   }
   assert.equal(token('--font-weight-normal'), '450')
+})
+
+test('paid blocks used as shipped skip only the colour and type rules (2026-11-09-0050)', () => {
+  const policy = { ...JSON.parse(readFileSync('ui-policy.json', 'utf8')), asShipped: { public: ['components/paid-demo/', 'app/one-use.tsx'] } }
+  const diagnostics = [{ rule: 'style/semantic-colors' }, { rule: 'typography/preset-only' }, { rule: 'style/gap' }]
+  assert.deepEqual(exemptAsShipped('components/paid-demo/card.tsx', diagnostics, policy).map(d => d.rule), ['style/gap'])
+  assert.deepEqual(exemptAsShipped('app/one-use.tsx', diagnostics, policy).map(d => d.rule), ['style/gap'])
+  assert.equal(exemptAsShipped('app/one-use.tsx.bak', diagnostics, policy).length, 3)
+  assert.equal(exemptAsShipped('components/workspace/x.tsx', diagnostics, policy).length, 3)
+  const real = JSON.parse(readFileSync('ui-policy.json', 'utf8'))
+  assert.match(real.asShipped.$comment, /2026-11-09-0050-paid-blocks-as-shipped\.md/)
+  assert.ok(readFileSync('docs/design/decisions/2026-11-09-0050-paid-blocks-as-shipped.md', 'utf8').length > 0)
 })
