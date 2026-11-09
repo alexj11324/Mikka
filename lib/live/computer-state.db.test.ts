@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { after, before, mock, test } from 'node:test'
+import { after, mock, test } from 'node:test'
 import { createHash, randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import { once } from 'node:events'
@@ -17,10 +17,6 @@ if (process.env.REQUIRE_DB === '1') assert.ok(url, 'actual isolated PostgreSQL r
 if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 const scheduled: (() => Promise<void>)[] = []
 mock.module('next/server', { namedExports: { after: (work: () => Promise<void>) => { scheduled.push(work) } } })
-let workspaceDatabase: Pool
-mock.module(new URL('../workspace-db.ts', import.meta.url).href, {
-  namedExports: { workspacePool: { query: (text: string, parameters?: unknown[]) => workspaceDatabase.query(text, parameters) } },
-})
 let ComputerStore: typeof import('../computer/store')['ComputerStore']
 let syncComputerReviews: typeof import('../computer/reviews')['syncComputerReviews']
 let decideComputerReview: typeof import('../computer/reviews')['decideComputerReview']
@@ -28,12 +24,12 @@ let reconcileCloudMachines: typeof import('../computer/reconcile')['reconcileClo
 let computerChanged: typeof import('./computer-state')['computerChanged']
 let computerLiveTargets: typeof import('./computer-state')['computerLiveTargets']
 
-before(async () => {
+async function loadRuntime() {
   ;({ ComputerStore } = await import('../computer/store'))
   ;({ syncComputerReviews, decideComputerReview } = await import('../computer/reviews'))
   ;({ reconcileCloudMachines } = await import('../computer/reconcile'))
   ;({ computerChanged, computerLiveTargets } = await import('./computer-state'))
-})
+}
 
 after(() => mock.restoreAll())
 
@@ -44,7 +40,14 @@ test('real PG: computer changes publish committed owner state without heartbeat 
   await admin.query(`CREATE SCHEMA "${schema}"`)
   const database = new Pool({ connectionString, options: `-c search_path=${schema}`, max: 6 })
   const reader = new Pool({ connectionString, options: `-c search_path=${schema}`, max: 2 })
-  workspaceDatabase = database
+  // P2 notification authority uses the canonical APP and Workspace modules.
+  // Both real pools must target this isolated schema before any runtime opens them.
+  const [{ pool: applicationPool }, { workspacePool }] = await Promise.all([import('../db'), import('../workspace-db')])
+  assert.equal(applicationPool.totalCount, 0)
+  assert.equal(workspacePool.totalCount, 0)
+  const previousPools = [applicationPool, workspacePool].map(pool => ({ connectionString: pool.options.connectionString, options: pool.options.options, max: pool.options.max }))
+  for (const pool of [applicationPool, workspacePool]) Object.assign(pool.options, { connectionString, options: `-c search_path=${schema}`, max: 1 })
+  await loadRuntime()
   observePoolCommits(database)
   const received: { channel: string; events: { kind: string; id: string }[] }[] = []
   const errors: unknown[] = []
@@ -101,7 +104,10 @@ test('real PG: computer changes publish committed owner state without heartbeat 
     for (const name of ['20261027164501_cloud_computers.sql', '20261029080001_owner_cloud_machines.sql']) {
       await database.query(await readFile(new URL('../../drizzle/' + name, import.meta.url), 'utf8'))
     }
-    await database.query(`CREATE TABLE mikka_workspace_members ("workspaceId" uuid,"userId" text,status text,PRIMARY KEY("workspaceId","userId"));
+    await database.query(`CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY,"userId" text NOT NULL REFERENCES "user"(id),kind text NOT NULL CHECK (kind IN ('personal','team')));
+      CREATE TABLE mikka_workspace_members ("workspaceId" uuid,"userId" text,status text,PRIMARY KEY("workspaceId","userId"));
+      CREATE TABLE session (id text PRIMARY KEY,"userId" text NOT NULL REFERENCES "user"(id),"expiresAt" timestamptz NOT NULL,
+        "enterpriseOrganizationId" uuid,"enterpriseProviderId" text,"enterpriseDirectoryUserId" text,"enterpriseIdentityId" text);
       CREATE TABLE workspace_computer_policies ("workspaceId" uuid PRIMARY KEY,permission text,version integer NOT NULL DEFAULT 0,"updatedAt" timestamptz);
       CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,enabled boolean NOT NULL DEFAULT true);
       CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text,"deviceId" uuid,status text,"leaseExpiresAt" timestamptz,
@@ -111,12 +117,16 @@ test('real PG: computer changes publish committed owner state without heartbeat 
         "approvedForRun" boolean NOT NULL DEFAULT false,FOREIGN KEY ("botId","workspaceId","ownerId") REFERENCES bots(id,"workspaceId","ownerId"));
       CREATE TABLE thread_machines ("runId" uuid PRIMARY KEY,"botId" uuid,"ownerId" text,"workspaceId" uuid,"deviceId" uuid,state text,"sandboxId" text,epoch integer);`)
     await database.query(await readFile(new URL('../../drizzle/20261027164510_local_computer_reviews.sql', import.meta.url), 'utf8'))
+    for (const name of ['20261109035020_organization_governance.sql', '20261109035023_enterprise_live_session_authority.sql']) {
+      await database.query(await readFile(new URL('../../drizzle/' + name, import.meta.url), 'utf8'))
+    }
+    await database.query('INSERT INTO mikka_workspaces(id,"userId",kind) VALUES ($1,$2,\'team\'),($3,$2,\'team\')', [actor.workspaceId, actor.userId, other.workspaceId])
     await database.query('INSERT INTO mikka_workspace_members VALUES ($1,$2,\'active\'),($1,$3,\'active\'),($4,$2,\'active\')',
       [actor.workspaceId, actor.userId, peer.userId, other.workspaceId])
     await database.query('INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,$3,\'Owner\'),($4,$2,$5,\'Peer\'),($6,$7,$3,\'Other\')',
       [botId, actor.workspaceId, actor.userId, peerBot, peer.userId, otherBot, other.workspaceId])
     await database.query('INSERT INTO devices(id,"ownerId") VALUES ($1,$2)', [deviceId, actor.userId])
-    await database.query('INSERT INTO agent_runs(id,"userId","deviceId",status,"leaseExpiresAt") VALUES($1,$2,$3,\'running\',now()+interval \'1 hour\')', [runId, actor.userId, deviceId])
+    await database.query('INSERT INTO agent_runs(id,"userId","deviceId",status,"leaseExpiresAt","workspaceId") VALUES($1,$2,$3,\'running\',now()+interval \'1 hour\',$4)', [runId, actor.userId, deviceId, actor.workspaceId])
     await database.query('INSERT INTO computer_run_bindings("runId","botId","ownerId","workspaceId") VALUES($1,$2,$3,$4)', [runId, botId, actor.userId, actor.workspaceId])
 
     await t.test('cold wake and takeover notify only the owned machine after real commits', async () => {
@@ -276,6 +286,8 @@ test('real PG: computer changes publish committed owner state without heartbeat 
     if (previous.url === undefined) delete process.env.DEVICE_GATEWAY_URL; else process.env.DEVICE_GATEWAY_URL = previous.url
     if (previous.secret === undefined) delete process.env.DEVICE_GATEWAY_PUSH_SECRET; else process.env.DEVICE_GATEWAY_PUSH_SECRET = previous.secret
     await new Promise<void>(resolve => server.close(() => resolve()))
+    await Promise.all([applicationPool.end(), workspacePool.end()])
+    for (const [index, pool] of [applicationPool, workspacePool].entries()) Object.assign(pool.options, previousPools[index])
     await database.end(); await reader.end()
     await admin.query(`DROP SCHEMA "${schema}" CASCADE`); await admin.end()
   }

@@ -145,22 +145,44 @@ test('one write seen by 3 tabs and 2 devices: the echo and a duplicate push read
 
 test('a revision rises once per publish across its fan-out and a reader sees the latest', { skip: !enabled }, async t => {
   const { pool } = await import('../lib/db')
+  const { workspacePool } = await import('../lib/workspace-db')
   const { readLiveRevisions } = await import('../lib/live/revisions')
   const { sendLiveTargets } = await import('../lib/live/publish')
   const { resetLiveRevisionFallback } = await import('../lib/live/notify')
+  const { liveChannelId } = await import('../lib/live/scope')
   const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
   process.env.DEVICE_GATEWAY_URL = 'https://gateway.example.invalid'
   process.env.DEVICE_GATEWAY_PUSH_SECRET = 'fixture-only-live-revision'
+  const group = randomUUID(), workspaceId = randomUUID()
+  const ownerA = `live-revision-fanout-a-${randomUUID()}`, ownerB = `live-revision-fanout-b-${randomUUID()}`
+  const scopeA = { ownerId: ownerA, workspaceId }, scopeB = { ownerId: ownerB, workspaceId }
+  const channels = [liveChannelId(scopeA), liveChannelId(scopeB)]
   const bodies: LiveInvalidation[][] = []
+  const destinations = new WeakMap<LiveInvalidation[], number>()
   let refuse = false
-  t.mock.method(globalThis, 'fetch', async (_input: string | URL, init?: RequestInit) => {
+  t.mock.method(globalThis, 'fetch', async (input: string | URL, init?: RequestInit) => {
+    const url = new URL(String(input))
+    assert.equal(url.hostname, 'gateway.example.invalid')
+    const destination = channels.findIndex(channel => url.pathname === `/v1/live/${channel}/push`)
+    assert.ok(destination >= 0, 'the push targets one of the two real workspace members')
     const body: LiveInvalidation[] = JSON.parse(String(init?.body))
+    destinations.set(body, destination)
     bodies.push(body)
+    // Separate membership reads may finish in either order. Compare recipients
+    // in target order while retaining the exact send/retry order per recipient.
+    bodies.sort((a, b) => destinations.get(a)! - destinations.get(b)!)
     // An older Worker refuses a third field.
     return new Response(null, { status: refuse && body.some(event => 'rev' in event) ? 400 : 204 })
   })
-  const group = randomUUID(), scopeA = { ownerId: 'a', workspaceId: randomUUID() }, scopeB = { ownerId: 'b', workspaceId: randomUUID() }
   try {
+    // A real Shared workspace gives both recipients current authority. The
+    // production source barrier must not deliver to fabricated owner/W pairs.
+    await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,false,now(),now()),($3,$3,$4,false,now(),now())',
+      [ownerA, `${ownerA}@example.invalid`, ownerB, `${ownerB}@example.invalid`])
+    await workspacePool.query(`insert into mikka_workspaces(id,"userId",name,kind) values($1,$2,'Live revision fan-out','team')`, [workspaceId, ownerA])
+    await workspacePool.query(`insert into mikka_workspace_members("workspaceId","userId",name,email,role,status)
+      values($1,$2,$2,$3,'admin','active'),($1,$4,$4,$5,'member','active')`,
+      [workspaceId, ownerA, `${ownerA}@example.invalid`, ownerB, `${ownerB}@example.invalid`])
     const key = { kind: 'group_chat' as const, id: group }
     await sendLiveTargets(pool, [{ scope: scopeA, events: [key] }, { scope: scopeB, events: [key, { kind: 'factory_task', id: group }] }])
     assert.deepEqual(bodies, [[{ ...key, rev: 1 }], [{ ...key, rev: 1 }, { kind: 'factory_task', id: group }]], 'one raise for every member; a kind without revisions stays plain')
@@ -175,6 +197,9 @@ test('a revision rises once per publish across its fan-out and a reader sees the
   } finally {
     resetLiveRevisionFallback()
     await pool.query('delete from live_revisions where id=$1', [group])
+    await workspacePool.query('delete from mikka_workspace_members where "workspaceId"=$1', [workspaceId])
+    await workspacePool.query('delete from mikka_workspaces where id=$1', [workspaceId])
+    await pool.query('delete from "user" where id=any($1::text[])', [[ownerA, ownerB]])
     if (previous.url === undefined) delete process.env.DEVICE_GATEWAY_URL; else process.env.DEVICE_GATEWAY_URL = previous.url
     if (previous.secret === undefined) delete process.env.DEVICE_GATEWAY_PUSH_SECRET; else process.env.DEVICE_GATEWAY_PUSH_SECRET = previous.secret
   }

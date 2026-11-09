@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/lib/api-auth'
-import { workspacePool } from '@/lib/workspace-db'
+import { activeTaskWorkspaces } from '@/lib/task-workspace'
 import { withRequestLog } from '@/lib/request-log'
 import { LIVE_ID } from '@/lib/live/events'
-import { liveGatewayConfig, liveTicket } from '@/lib/live/scope'
+import { liveGatewayConfig } from '@/lib/live/scope'
+import { workspaceLiveTicket } from '@/lib/enterprise/live-authority'
 import { desktopBearerHeaders } from '@/lib/desktop-rpc/handler'
 import { homeScopeProof } from '@/lib/live/home-scope-proof'
 
@@ -20,16 +21,16 @@ async function ticket(request: Request) {
   if (!session?.user) return NextResponse.json({ error: 'authRequired' }, { status: 401, headers })
   const workspaceId = (new URL(request.url).searchParams.get('workspace') ?? '').toLowerCase()
   if (!LIVE_ID.test(workspaceId)) return NextResponse.json({ error: 'workspaceAccessDenied' }, { status: 403, headers })
-  const member = await workspacePool.query<{ personalHome: boolean }>(
-    `SELECT EXISTS (SELECT 1 FROM mikka_workspaces w WHERE w.id=m."workspaceId" AND w."userId"=$2 AND w.kind='personal') AS "personalHome"
-       FROM mikka_workspace_members m WHERE m."workspaceId"=$1 AND m."userId"=$2 AND m.status='active'`,
-    [workspaceId, session.user.id],
-  )
-  if (!member.rowCount) return NextResponse.json({ error: 'workspaceAccessDenied' }, { status: 403, headers })
+  const [workspace] = await activeTaskWorkspaces(session.user, workspaceId)
+  if (!workspace) return NextResponse.json({ error: 'workspaceAccessDenied' }, { status: 403, headers })
   const config = liveGatewayConfig(process.env)
   if (!config) return NextResponse.json({ url: null, protocol: null, expiresAt: null }, { headers })
-  const scope = { ownerId: session.user.id, workspaceId }, issued = liveTicket(scope, config, Date.now(), session.session?.id)
-  const homeScope = member.rows[0]?.personalHome ? homeScopeProof(scope, issued.expiresAt, config.secret) : null
+  const scope = { ownerId: session.user.id, workspaceId }
+  const result = await workspaceLiveTicket(scope, session.session?.id ?? '', config)
+  if (result.status === 'denied') return NextResponse.json({ error: 'workspaceAccessDenied' }, { status: 403, headers })
+  if (result.status === 'pending') return NextResponse.json({ url: null, protocol: null, expiresAt: null }, { headers })
+  const issued = result.ticket
+  const homeScope = workspace.kind === 'personal' ? homeScopeProof(scope, issued.expiresAt, config.secret) : null
   return NextResponse.json({ ...issued, ...(homeScope ? { homeScope } : {}) }, { headers })
 }
 

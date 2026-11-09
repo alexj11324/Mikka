@@ -42,7 +42,7 @@ export async function listIssueConnections(id: string) {
  * owner, for copying a whole subtask tree.
  */
 async function issueConnections(id: string, reach: 'linked' | 'all') {
-  const { issue, user, teamId } = await requireIssueAccessWithoutBody(id)
+  const { issue, user, teamId } = await requireIssueAccessWithoutBody(id, { projection: 'lock' })
   return db.transaction(async tx => {
   const [locked] = await tx.select({ workspaceId: issues.workspaceId, scopeVersion: issues.scopeVersion, content: issueAttrsContent }).from(issues).where(eq(issues.id, id)).for('share')
   requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
@@ -159,7 +159,7 @@ export async function createLinkedIssue(input: { id: string; revision: number; k
     const parsed = z.object({ id: z.uuid(), revision: z.number().int().positive(), kind: z.enum(['child', 'duplicate']), title: z.string().trim().min(1).max(200).optional(), includeSubissues: z.boolean().optional() }).safeParse(input)
     if (!parsed.success) return { error: 'issueTitleInvalid' }
     const t = await getTranslations('IssueDetail')
-    const { issue, user } = await requireIssueAccess(input.id)
+    const { issue, user } = await requireIssueAccessWithoutBody(input.id, { projection: 'lock' })
     if (!issue.workspaceId || issue.ownershipState !== 'bound') throw new ActionFailureError('workspaceAccessDenied')
     const accessible = input.includeSubissues ? await issueConnections(issue.id, 'all') : []
     try {
