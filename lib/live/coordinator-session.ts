@@ -12,7 +12,9 @@ export async function coordinatorSessionScope(database: Database, workspaceDatab
   )
   if (!bot) return null
   const member = await workspaceDatabase.query(
-    'SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status=\'active\'', [bot.workspaceId, ownerId],
+    `SELECT 1 FROM mikka_workspace_members m JOIN mikka_workspaces w ON w.id=m."workspaceId"
+     WHERE w.id=$1 AND m."userId"=$2 AND m.status='active'
+       AND (w.kind='team' OR (w.kind='personal' AND w."userId"=$2))`, [bot.workspaceId, ownerId],
   )
   return member.rowCount ? { ownerId, workspaceId: bot.workspaceId } : null
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { factoryBrowserHuman } from "./browser-human";
+import { factoryBrowserHuman, factoryBrowserSession } from "./browser-human";
 import { approvalRequest, publicationRequest } from "./approval-contract";
 test("strict human-session boundary rejects worker bearer/JSON identity and client receipts", async () => {
   assert.equal(
@@ -57,3 +57,14 @@ test("native human headers never use an ambient cookie to rescue delegated crede
   }), { userId: "person", sessionId: "live-session" });
   assert.equal(await factoryBrowserHuman(native, async () => null), null);
 });
+
+test("the workspace adapter receives the original verified session and hidden principal", async () => {
+  const provenance = Symbol("verified-session-principal")
+  const user = Object.defineProperty({ id: "fixture-owner" }, provenance, { value: { kind: "session", sessionId: "fixture-session" } })
+  const session = { user, session: { id: "fixture-session" } }
+  const result = await factoryBrowserSession(new Request("https://fixture.invalid", { headers: { cookie: "fixture-session=verified" } }), async () => session)
+  assert.equal(result, session)
+  assert.equal(result?.user, user)
+  assert.equal(Object.getOwnPropertyDescriptor(result!.user, provenance)?.enumerable, false)
+  assert.deepEqual(Object.getOwnPropertyDescriptor(result!.user, provenance)?.value, { kind: "session", sessionId: "fixture-session" })
+})

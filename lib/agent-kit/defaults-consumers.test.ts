@@ -23,7 +23,7 @@ stub('./service.ts', {
     propose: async (...args: unknown[]) => { record('propose', ...args) },
   },
 })
-stub('../auth.ts', {auth: {api: {getSession: async () => ({user: {id: owner}})}}})
+stub('../auth.ts', {auth: {api: {getSession: async () => ({user: {id: owner}, session: {id: 'defaults-fixture-session'}})}}})
 stub('./live-eval.ts', {evaluateProposal: forbidden})
 stub('../subscription-runtime.ts', {authorizeSubscriptionWorkspace: forbidden, subscriptionRuntime: forbidden})
 stub('../coordinator/bot-instructions.ts', {botInstructions: async () => 'synthetic host',formatBotInstructions: () => 'synthetic host'})

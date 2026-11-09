@@ -8,8 +8,11 @@ export { DesktopTransportError } from '../../../desktop/src/renderer/rpc'
 export function callAction<T = unknown>(action: string, args: unknown[], isCurrent?: () => boolean): Promise<T> {
   const version = getSessionOwnerVersion()
   const servers = currentWebServers(), serverVersion = servers?.getVersion()
+  const workspaceVersion = servers?.getWorkspaceVersion()
   return callRemoteAction(action, args, {
     endpoint: '/api/rpc', credentials: 'same-origin', header: 'x-mikka-rpc',
-    isCurrent: () => getSessionOwnerVersion() === version && servers?.getVersion() === serverVersion && isCurrent?.() !== false,
+    isCurrent: response => getSessionOwnerVersion() === version && servers?.getVersion() === serverVersion
+      && isCurrent?.() !== false
+      && (response ? !servers || servers.isCurrentResponse(response) : servers?.getWorkspaceVersion() === workspaceVersion),
   })
 }

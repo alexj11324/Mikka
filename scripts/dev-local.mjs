@@ -85,10 +85,11 @@ const cronSecret = process.env.CRON_SECRET || LOCAL_CRON_SECRET
 const secretsKey = process.env.WORKSPACE_SECRETS_KEY || localSecretsKey(join(root, '.cache/dev-local'))
 // The workspace model key (DeepSeek preset): from the environment, else by name from Infisical
 // (MIKKA_DEV_INFISICAL_PROJECT). Held in memory for the seeder only; never written or printed.
-const deepseekKey = process.env.DEEPSEEK_API_KEY || await infisicalSecret('DEEPSEEK_API_KEY')
+const skipModelSetup = process.env.MIKKA_DEV_SKIP_MODEL_SETUP === '1'
+const deepseekKey = skipModelSetup ? undefined : process.env.DEEPSEEK_API_KEY || await infisicalSecret('DEEPSEEK_API_KEY')
 delete process.env.DEEPSEEK_API_KEY
 delete childEnv.DEEPSEEK_API_KEY
-log(deepseekKey ? 'model key DEEPSEEK_API_KEY: found' : 'model key: 缺少 DEEPSEEK_API_KEY，跳过模型 key 注入')
+log(skipModelSetup ? 'model setup: not required by selected acceptance items' : deepseekKey ? 'model key DEEPSEEK_API_KEY: found' : 'model key: 缺少 DEEPSEEK_API_KEY，跳过模型 key 注入')
 async function infisicalSecret(name) {
   const project = process.env.MIKKA_DEV_INFISICAL_PROJECT || process.env.INFISICAL_PROJECT_ID
   if (!project) return undefined
