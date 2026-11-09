@@ -37,6 +37,7 @@ size and placement win ([2026-11-09-0050](decisions/2026-11-09-0050-paid-blocks-
 | --- | --- | --- |
 | Bot list header (top left) | 28px | Mark only, no "Mikka" wordmark. Same height as the header's `+` button (`h-7`). |
 | Sign-in / sign-up (`auth-logo.tsx`) | 24px | Mark plus "Mikka" in `text-lg font-semibold`, gap 10px (`gap-2.5`). |
+| Native sign-in (`SignIn.tsx`) | 56pt | Dot-grid mark above the existing 30pt "Mikka" wordmark, gap 12pt. |
 | Onboarding welcome | 56px | Mark only, centered above the "欢迎来到 Mikka" title. |
 | Browser tab | 16 / 32px | `app/icon.svg`. |
 
@@ -46,7 +47,10 @@ the solid dots.
 ## Implementation status
 
 `components/brand/mikka-mark.tsx` implements the cropped, inherited-colour
-mark at 28px and drops ghost dots in its 12px variant. The public
+mark at 28px and drops ghost dots in its 12px variant.
+`apps/mobile/components/MikkaMark.tsx` renders the same 13 solid and 12 ghost
+dots for native sign-in, using the dynamic text colour and its existing 56pt frame.
+The public
 `components/blocks/auth-19/components/auth-logo.tsx` still renders the two
 padded image assets at 28px, so its visible mark differs from the 24px
 placement above. The implemented onboarding in

@@ -468,3 +468,86 @@ test('detail and activity revalidate current access while returning only changed
     await pool.query('delete from "user" where id=any($1::text[])', [[owner, stranger]])
   }
 })
+
+test('chat readers advertise the authorized bot tenant for live delivery', { skip: !enabled }, async t => {
+  const { pool } = await import('../lib/db')
+  const { workspacePool } = await import('../lib/workspace-db')
+  const { getCoordinatorChat, syncCoordinatorChat } = await import('../app/actions/coordinator')
+  const { botChatTargets } = await import('../lib/live/chats')
+  const owner = `chat-scope-owner-${randomUUID()}`, peer = `chat-scope-peer-${randomUUID()}`
+  const home = randomUUID(), team = randomUUID(), peerHome = randomUUID()
+  const teamBot = randomUUID(), personalBot = randomUUID(), peerBot = randomUUID()
+  const users = [owner, peer], workspaces = [home, team, peerHome], botIds = [teamBot, personalBot, peerBot]
+  const read = <T>(userId: string, workspaceId: string, work: () => Promise<T>) =>
+    withActivitySession(userId, work, workspaceId)
+  try {
+    for (const id of users) await pool.query(
+      'insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,false,now(),now())',
+      [id, `${id}@example.invalid`],
+    )
+    await seedFixtureWorkspace(workspacePool, owner, 'personal', home)
+    await seedFixtureWorkspace(workspacePool, owner, 'team', team)
+    await seedFixtureWorkspace(workspacePool, peer, 'personal', peerHome)
+    await workspacePool.query(
+      'insert into mikka_workspace_members("workspaceId","userId",name,email,role,status) values($1,$2,$2,$3,\'member\',\'active\')',
+      [team, peer, `${peer}@example.invalid`],
+    )
+    for (const [id, userId, workspaceId] of [[teamBot, owner, team], [personalBot, owner, home], [peerBot, peer, team]]) {
+      await pool.query('insert into bots(id,"ownerId","workspaceId",name) values($1,$2,$3,\'Chat scope fixture\')', [id, userId, workspaceId])
+      await pool.query('insert into coordinator_messages(id,"userId","botId",position,message) values($1,$2,$3,1,$4)',
+        [randomUUID(), userId, id, JSON.stringify({ role: 'assistant', content: 'Committed fixture reply' })])
+    }
+
+    await t.test('team full, cold and unchanged reads match the writer and never the personal home', async () => {
+      const [writer] = await botChatTargets(pool, workspacePool, owner, teamBot)
+      assert.deepEqual(writer.scope, { ownerId: owner, workspaceId: team })
+      const full = await read(owner, team, () => getCoordinatorChat(teamBot))
+      const cold = successful(await read(owner, team, () => syncCoordinatorChat(teamBot))).chat
+      assert.ok(!('unchanged' in cold))
+      assert.ok(cold.version)
+      const unchanged = successful(await read(owner, team, () => syncCoordinatorChat(teamBot, cold.version))).chat
+      assert.equal('unchanged' in unchanged && unchanged.unchanged, true)
+      for (const chat of [full, cold, unchanged]) {
+        assert.deepEqual({ ownerId: chat.live?.ownerId, workspaceId: chat.live?.workspaceId }, writer.scope)
+        assert.notEqual(chat.live?.workspaceId, home)
+      }
+    })
+
+    await t.test('a personal bot retains its own authorized personal channel', async () => {
+      const [writer] = await botChatTargets(pool, workspacePool, owner, personalBot)
+      assert.deepEqual(writer.scope, { ownerId: owner, workspaceId: home })
+      const full = await read(owner, home, () => getCoordinatorChat(personalBot))
+      const incremental = successful(await read(owner, home, () => syncCoordinatorChat(personalBot))).chat
+      for (const chat of [full, incremental]) {
+        assert.deepEqual({ ownerId: chat.live?.ownerId, workspaceId: chat.live?.workspaceId }, writer.scope)
+      }
+    })
+
+    await t.test('wrong workspace and another owner cannot obtain chat or live metadata', async () => {
+      for (const [userId, workspaceId, botId] of [[owner, home, teamBot], [peer, team, teamBot], [owner, team, peerBot]]) {
+        const denied = await read(userId, workspaceId, () => syncCoordinatorChat(botId))
+        assert.ok(denied.error)
+        assert.equal('chat' in denied, false)
+        await assert.rejects(() => read(userId, workspaceId, () => getCoordinatorChat(botId)))
+      }
+      assert.deepEqual(await botChatTargets(pool, workspacePool, peer, teamBot), [])
+    })
+
+    await t.test('membership revocation also rejects a previously valid chat version', async () => {
+      const before = successful(await read(owner, team, () => syncCoordinatorChat(teamBot))).chat
+      assert.ok(before.version)
+      await workspacePool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2', [team, owner])
+      const denied = await read(owner, team, () => syncCoordinatorChat(teamBot, before.version))
+      assert.ok(denied.error)
+      assert.equal('chat' in denied, false)
+      await assert.rejects(() => read(owner, team, () => getCoordinatorChat(teamBot)))
+      assert.deepEqual(await botChatTargets(pool, workspacePool, owner, teamBot), [])
+    })
+  } finally {
+    await pool.query('delete from coordinator_messages where "botId"=any($1::uuid[])', [botIds])
+    await pool.query('delete from bots where id=any($1::uuid[])', [botIds])
+    await workspacePool.query('delete from mikka_workspace_members where "workspaceId"=any($1::uuid[])', [workspaces])
+    await workspacePool.query('delete from mikka_workspaces where id=any($1::uuid[])', [workspaces])
+    await pool.query('delete from "user" where id=any($1::text[])', [users])
+  }
+})

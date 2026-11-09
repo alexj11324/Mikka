@@ -97,6 +97,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
+        with:
+          ffmpeg-github-token: ${{ github.token }}
       - name: Ensure FFmpeg for Factory evidence acceptance regressions
         timeout-minutes: 5
         run: |
@@ -124,6 +126,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
+        with:
+          ffmpeg-github-token: ${{ github.token }}
       - name: Ensure FFmpeg for real recording regressions
         run: |
           if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
@@ -150,6 +154,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
+        with:
+          ffmpeg-github-token: ${{ github.token }}
       - name: Shadow selection against full baseline scenarios
         run: node scripts/ci/shadow.mjs
       - run: pnpm check:cloud-boundary
@@ -213,6 +219,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
+        with:
+          ffmpeg-github-token: ${{ github.token }}
       - name: Ensure FFmpeg for daemon recording regressions
         run: |
           if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
@@ -358,6 +366,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
+        with:
+          ffmpeg-github-token: ${{ github.token }}
       # The .deb files apt downloads for the packages below, keyed on the package
       # list and the runner image (a new image can carry newer dependencies).
       # Read-only except on pushes to main, like the pnpm store.

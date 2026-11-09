@@ -91,7 +91,9 @@ async function runRows(userId: string, filter: SQL | undefined, limit: number) {
   const issueIds = [...new Set(Object.values(sources).flatMap(source => source?.kind === 'run' && source.issue ? [source.issue.id] : []))]
   const tasks = new Map<string, GroupIssue>((issueIds.length ? await db.select({ id: issues.id, status: issues.status, content: issueAttrsContent }).from(issues).where(inArray(issues.id, issueIds)) : [])
     .map(issue => [issue.id, { status: issue.status, metadata: { pullRequests: readIssueMetadata(issue.content).pullRequests } }]))
-  return rows.map(row => {
+  // citationSources already applies readRun's visibility gate. A missing run
+  // must stay out of the list instead of reappearing under its raw prompt.
+  return rows.filter(row => sources[row.id]?.kind === 'run').map(row => {
     const found = sources[row.id]
     const source = found?.kind === 'run' ? found : undefined
     const thread: MobileThread = {

@@ -21,7 +21,8 @@ import { shortWhen } from '@/lib/clock'
 import { colors, LIST_INSET, SPACE } from '@/lib/theme'
 import { AttemptIcon, BOARD_LABEL, PriorityIcon, priorityLabel, STATE_LABEL, TaskStateIcon } from '../components/task-icons'
 import { ATTEMPT_WORD, attemptState, rowState } from '../model/task-groups'
-import { activityEntries, agentRunTitle, type ActivityEntry } from '../model/task-conversation'
+import { activityEntries, type ActivityEntry } from '../model/task-conversation'
+import { AgentName } from '../components/agent-name'
 import { ReviewSummaryRow } from '@/features/review/components/review-summary-row'
 import { reviewHref } from '@/features/review/model/routes'
 
@@ -107,8 +108,8 @@ function Chip({ icon, label }: { icon: ReactNode; label: string }) {
 
 /**
  * One entry of 活动 on the timeline (Alex 2026-11-08: a task is one conversation). An Agent's runs in a row are one
- * row, 「Codex」 with its latest run's result (2026-11-07-2230) and date; a switch to another Agent starts a row
- * 「换 Claude Code」. A row opens the task's conversation at its first run; a replaced thread and the creation are lines.
+ * row: the Agent's glyph and name, 「Codex」, with its latest run's result (2026-11-07-2230) and date; another Agent starts
+ * its own row, with no 「换」 (2026-11-09, as Warp). A row opens the task's conversation at its first run; a replaced thread and the creation are lines.
  */
 function ActivityRow({ item, first, last, onOpen }: { item: ActivityEntry; first: boolean; last: boolean; onOpen?: () => void }) {
   const latest = item.kind === 'agent' ? item.run.attempts.at(-1)! : null
@@ -126,9 +127,9 @@ function ActivityRow({ item, first, last, onOpen }: { item: ActivityEntry; first
         {result ? <View style={styles.node}><AttemptIcon result={result} size={20} /></View> : <View style={styles.dot} />}
       </View>
       <View style={styles.activityText}>
-        <Text style={styles.activityTitle} numberOfLines={1}>
-          {item.kind === 'agent' ? agentRunTitle(item) : item.kind === 'replaced' ? mobileMessages.MobileCore.threadReplaced : item.by ? mobileMessages.MobileCore.taskCreatedBy.replace('{name}', item.by) : mobileMessages.MobileCore.taskCreated}
-        </Text>
+        {item.kind === 'agent' ? <AgentName harness={item.run.harness} style={styles.activityTitle} /> : <Text style={styles.activityTitle} numberOfLines={1}>
+          {item.kind === 'replaced' ? mobileMessages.MobileCore.threadReplaced : item.by ? mobileMessages.MobileCore.taskCreatedBy.replace('{name}', item.by) : mobileMessages.MobileCore.taskCreated}
+        </Text>}
         <Text style={styles.activityMeta} numberOfLines={2}>
           {result && latest ? [ATTEMPT_WORD[result], result === 'done' && pullRequest ? mobileMessages.MobileCore.openedPullRequest.replace('{number}', String(pullRequest.number)) : null, shortWhen(latest.createdAt)].filter(Boolean).join(' · ') : item.kind === 'agent' ? null : shortWhen(item.createdAt)}
         </Text>

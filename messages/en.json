@@ -5806,9 +5806,6 @@
     "activity": "Activity",
     "comment": "+ Comment",
     "conversation": {
-      "switched": "Continued with {agent}",
-      "switchedAfterFailure": "{previous} didn't get through · continued with {agent}",
-      "switchedTo": "Switched to {agent}",
       "fix": "Fix",
       "needsYou": "Needs you: {what}",
       "verdicts": {

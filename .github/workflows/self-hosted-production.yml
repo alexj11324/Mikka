@@ -30,6 +30,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/pnpm-install
+        with:
+          ffmpeg-github-token: ${{ github.token }}
       - run: node --import tsx --test scripts/acceptance/self-hosted-production.test.mjs scripts/ops/production-mobile-daemon.test.mjs
 
   acceptance:
@@ -55,6 +57,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/pnpm-install
+        with:
+          ffmpeg-github-token: ${{ github.token }}
       - name: Verify an open core issue, current main and its actual cloud Web publication before credentials
         id: attest
         run: node --import tsx scripts/acceptance/self-hosted-production.mjs --attest

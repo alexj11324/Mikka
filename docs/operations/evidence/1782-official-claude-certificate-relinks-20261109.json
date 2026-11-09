@@ -1,0 +1,558 @@
+{
+  "version": 1,
+  "template": "claude",
+  "targetedOnly": true,
+  "releaseAccepted": false,
+  "policyChanged": false,
+  "controlRun": "https://github.com/alexj11324/Mikka/actions/runs/42661569263",
+  "runAttempt": 1,
+  "jobId": 129314204150,
+  "jobConclusion": "success",
+  "window": {
+    "notBefore": "2026-11-09T17:07:29Z",
+    "deadline": "2026-11-09T17:22:29Z"
+  },
+  "source": {
+    "runId": 42661569263,
+    "attempt": 1,
+    "event": "push",
+    "actor": "alexj11324",
+    "opsCommit": "7fd8a2681cd71bb6603a485854c8beda2044911b",
+    "opsTree": "e7152cf5bd7b348f92904d9aa7ea87ec5e532a83",
+    "soleParent": "32d3afecbeb1f8d433f9a91c51f3980995207d30",
+    "exactPaths": [
+      ".github/workflows/issue1782-domain-history-before.yml",
+      ".github/workflows/issue1782-official-claude-control.yml",
+      ".github/workflows/self-hosted-vault-closeout.yml",
+      "scripts/ops/domain-history-before-1782.db.test.mjs",
+      "scripts/ops/domain-history-before-1782.mjs",
+      "scripts/ops/domain-history-before-1782.test.mjs",
+      "scripts/ops/issue1782-official-claude-control.py",
+      "scripts/ops/issue1782-official-claude-control.test.py",
+      "scripts/ops/workspace-private-acceptance.mjs"
+    ],
+    "source": "623a1afd8715433a58c3e88ce88f8fbcc29d1761",
+    "sourceTree": "193c7c1a101a56a889f7b22eb615e903981942af",
+    "kinds": [
+      "claude"
+    ],
+    "runnerSha256": "5f6cb521afa4c908e780131682dfd3c7f4803884e482e8f3a7d425d6ff909ccf",
+    "workflowSha256": "d2c005963af46687d6eb7175d69b21be732edc7bbf13118379a632f6f056932e",
+    "statusAtInitialRead": "in_progress"
+  },
+  "artifact": {
+    "artifactId": 13694766815,
+    "bytes": 2310,
+    "sha256": "4e16df73b5ed7acfe366449d278b20e1fa20d0033ba2998f9741e7755cf0eb09",
+    "crcPassed": true,
+    "files": {
+      "claude.json": {
+        "bytes": 10322,
+        "sha256": "1e53cae8e0b3feaec3d0454429cc7d89e2ad89f2694b77f72e323a7bb076fff6",
+        "topKeys": [
+          "buildId",
+          "buildStarted",
+          "cleanup",
+          "createStarted",
+          "identity",
+          "kind",
+          "name",
+          "observations",
+          "policyChanged",
+          "probe",
+          "releaseAccepted",
+          "sandboxId",
+          "targetedOnly",
+          "templateId",
+          "version"
+        ]
+      },
+      "summary.json": {
+        "bytes": 1273,
+        "sha256": "adbc2d857de6efd7eb47fa74cd7c41a964954faee6f0439877e0a02fd5eb1cc5",
+        "topKeys": [
+          "budget",
+          "cleanup",
+          "failure",
+          "identity",
+          "policyChanged",
+          "releaseAccepted",
+          "targetedOnly",
+          "version"
+        ]
+      }
+    }
+  },
+  "job": {
+    "id": 129314204150,
+    "name": "official_claude_control",
+    "status": "completed",
+    "conclusion": "success",
+    "run_id": 42661569263,
+    "logs_url": null,
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1
+      },
+      {
+        "name": "Check out the exact product source for cleanup only",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2
+      },
+      {
+        "name": "Check out this owned diagnostic append",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3
+      },
+      {
+        "name": "Verify offline guards and the exact sources before credentials",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4
+      },
+      {
+        "name": "Install only the pinned host control SDK",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5
+      },
+      {
+        "name": "Recheck the absolute observation budget before requesting the key",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6
+      },
+      {
+        "name": "Read only the existing E2B key through the existing owned subject",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7
+      },
+      {
+        "name": "Observe one official-only Claude derivative and one fresh instance",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8
+      },
+      {
+        "name": "Recheck only the exact owned private template and instance",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9
+      },
+      {
+        "name": "Preserve only closed public-certificate metadata and cleanup receipts",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10
+      },
+      {
+        "name": "Post Check out this owned diagnostic append",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 19
+      },
+      {
+        "name": "Post Check out the exact product source for cleanup only",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 20
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 21
+      }
+    ]
+  },
+  "controls": {
+    "claude": {
+      "buildId": "4161f161-aadb-4bf0-a82f-e6970f981e87",
+      "buildStarted": true,
+      "cleanup": {
+        "errors": [],
+        "sandbox": {
+          "absenceConfirmedById": true,
+          "id": "iui98zldpl4fxszi3c2nv"
+        },
+        "status": "complete",
+        "templates": [
+          {
+            "kind": "claude",
+            "name": "mikka-1782-official-claude-control-42661569263-1-claude",
+            "status": "absent",
+            "templateId": "ivedr9vpyweketvct677"
+          }
+        ]
+      },
+      "createStarted": true,
+      "identity": {
+        "application": "mikka-1782-official-claude-control",
+        "opsCommit": "7fd8a2681cd71bb6603a485854c8beda2044911b",
+        "ref": "refs/heads/ops/self-hosted-vault-closeout-20261108",
+        "repository": "alexj11324/Mikka",
+        "runAttempt": "1",
+        "runId": "42661569263",
+        "sourceCommit": "623a1afd8715433a58c3e88ce88f8fbcc29d1761",
+        "sourceTree": "193c7c1a101a56a889f7b22eb615e903981942af"
+      },
+      "kind": "claude",
+      "name": "mikka-1782-official-claude-control-42661569263-1-claude",
+      "observations": {
+        "before": {
+          "bootId": "7b9a053b-b8c9-4695-a917-6f9e44b41f2d",
+          "certificates": [
+            {
+              "chain": [
+                "/etc/ssl/certs/1560546e.0"
+              ],
+              "path": "/etc/ssl/certs/1560546e.0",
+              "status": "observed",
+              "terminalPath": "/etc/ssl/certs/1560546e.0",
+              "terminalSha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1"
+            },
+            {
+              "chain": [
+                "/etc/ssl/certs/e2b-ca.pem"
+              ],
+              "path": "/etc/ssl/certs/e2b-ca.pem",
+              "status": "observed",
+              "terminalPath": "/etc/ssl/certs/e2b-ca.pem",
+              "terminalSha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1"
+            }
+          ],
+          "kind": "claude",
+          "monotonicNs": 21702092077,
+          "nodes": [
+            {
+              "ctimeNs": 1794244105246838102,
+              "device": 23,
+              "gid": 0,
+              "inode": 149,
+              "kind": "file",
+              "mode": 511,
+              "mtimeNs": 1794212008000000000,
+              "path": "/etc/ssl/certs/1560546e.0",
+              "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+              "size": 595,
+              "status": "present",
+              "uid": 0
+            },
+            {
+              "ctimeNs": 1794244105246838102,
+              "device": 23,
+              "gid": 0,
+              "inode": 149,
+              "kind": "file",
+              "mode": 511,
+              "mtimeNs": 1794212008000000000,
+              "path": "/etc/ssl/certs/e2b-ca.pem",
+              "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+              "size": 595,
+              "status": "present",
+              "uid": 0
+            },
+            {
+              "ctimeNs": 1794244107598238268,
+              "device": 65024,
+              "gid": 0,
+              "inode": 3550,
+              "kind": "file",
+              "mode": 511,
+              "mtimeNs": 1794244107598238268,
+              "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+              "sha256": "ee836ee305e23a18319640cafe0c7ebe628d7fbf985c23cfc5bf453d2ea7224d",
+              "size": 595,
+              "status": "present",
+              "uid": 0
+            }
+          ],
+          "phase": "before",
+          "utcNs": 1794244122919622490,
+          "version": 1
+        },
+        "fresh": {
+          "bootId": "48a38586-20df-42ad-8b89-aa4a7b0af701",
+          "certificates": [
+            {
+              "chain": [
+                "/etc/ssl/certs/1560546e.0",
+                "/etc/ssl/certs/e2b-ca.pem",
+                "/usr/local/share/ca-certificates/e2b-ca.crt"
+              ],
+              "path": "/etc/ssl/certs/1560546e.0",
+              "status": "observed",
+              "terminalPath": "/usr/local/share/ca-certificates/e2b-ca.crt",
+              "terminalSha256": "0459a4cfe2cc288afae322259a84a08910e65282d89dc06e94f5e1b80d3c6cb4"
+            },
+            {
+              "chain": [
+                "/etc/ssl/certs/e2b-ca.pem",
+                "/usr/local/share/ca-certificates/e2b-ca.crt"
+              ],
+              "path": "/etc/ssl/certs/e2b-ca.pem",
+              "status": "observed",
+              "terminalPath": "/usr/local/share/ca-certificates/e2b-ca.crt",
+              "terminalSha256": "0459a4cfe2cc288afae322259a84a08910e65282d89dc06e94f5e1b80d3c6cb4"
+            }
+          ],
+          "kind": "claude",
+          "monotonicNs": 11391744020,
+          "nodes": [
+            {
+              "ctimeNs": 1794244135966537016,
+              "device": 23,
+              "gid": 0,
+              "inode": 508,
+              "kind": "link",
+              "mode": 511,
+              "mtimeNs": 1794244135966537016,
+              "path": "/etc/ssl/certs/1560546e.0",
+              "size": 10,
+              "status": "present",
+              "target": "e2b-ca.pem",
+              "uid": 0
+            },
+            {
+              "ctimeNs": 1794244135757266861,
+              "device": 23,
+              "gid": 0,
+              "inode": 451,
+              "kind": "link",
+              "mode": 511,
+              "mtimeNs": 1794244135757266861,
+              "path": "/etc/ssl/certs/e2b-ca.pem",
+              "size": 43,
+              "status": "present",
+              "target": "/usr/local/share/ca-certificates/e2b-ca.crt",
+              "uid": 0
+            },
+            {
+              "ctimeNs": 1794244139540079301,
+              "device": 65024,
+              "gid": 0,
+              "inode": 3550,
+              "kind": "file",
+              "mode": 511,
+              "mtimeNs": 1794244139540079301,
+              "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+              "sha256": "0459a4cfe2cc288afae322259a84a08910e65282d89dc06e94f5e1b80d3c6cb4",
+              "size": 595,
+              "status": "present",
+              "uid": 0
+            }
+          ],
+          "phase": "fresh",
+          "utcNs": 1794244141280188819,
+          "version": 1
+        },
+        "pre_finalization": {
+          "bootId": "7b9a053b-b8c9-4695-a917-6f9e44b41f2d",
+          "certificates": [
+            {
+              "chain": [
+                "/etc/ssl/certs/1560546e.0"
+              ],
+              "path": "/etc/ssl/certs/1560546e.0",
+              "status": "observed",
+              "terminalPath": "/etc/ssl/certs/1560546e.0",
+              "terminalSha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1"
+            },
+            {
+              "chain": [
+                "/etc/ssl/certs/e2b-ca.pem"
+              ],
+              "path": "/etc/ssl/certs/e2b-ca.pem",
+              "status": "observed",
+              "terminalPath": "/etc/ssl/certs/e2b-ca.pem",
+              "terminalSha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1"
+            }
+          ],
+          "kind": "claude",
+          "monotonicNs": 22037024361,
+          "nodes": [
+            {
+              "ctimeNs": 1794244105246838102,
+              "device": 23,
+              "gid": 0,
+              "inode": 149,
+              "kind": "file",
+              "mode": 511,
+              "mtimeNs": 1794212008000000000,
+              "path": "/etc/ssl/certs/1560546e.0",
+              "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+              "size": 595,
+              "status": "present",
+              "uid": 0
+            },
+            {
+              "ctimeNs": 1794244105246838102,
+              "device": 23,
+              "gid": 0,
+              "inode": 149,
+              "kind": "file",
+              "mode": 511,
+              "mtimeNs": 1794212008000000000,
+              "path": "/etc/ssl/certs/e2b-ca.pem",
+              "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+              "size": 595,
+              "status": "present",
+              "uid": 0
+            },
+            {
+              "ctimeNs": 1794244107598238268,
+              "device": 65024,
+              "gid": 0,
+              "inode": 3550,
+              "kind": "file",
+              "mode": 511,
+              "mtimeNs": 1794244107598238268,
+              "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+              "sha256": "ee836ee305e23a18319640cafe0c7ebe628d7fbf985c23cfc5bf453d2ea7224d",
+              "size": 595,
+              "status": "present",
+              "uid": 0
+            }
+          ],
+          "phase": "pre_finalization",
+          "utcNs": 1794244123373407703,
+          "version": 1
+        },
+        "ready": {
+          "bootId": "48a38586-20df-42ad-8b89-aa4a7b0af701",
+          "certificates": [
+            {
+              "chain": [
+                "/etc/ssl/certs/1560546e.0"
+              ],
+              "path": "/etc/ssl/certs/1560546e.0",
+              "status": "observed",
+              "terminalPath": "/etc/ssl/certs/1560546e.0",
+              "terminalSha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1"
+            },
+            {
+              "chain": [
+                "/etc/ssl/certs/e2b-ca.pem"
+              ],
+              "path": "/etc/ssl/certs/e2b-ca.pem",
+              "status": "observed",
+              "terminalPath": "/etc/ssl/certs/e2b-ca.pem",
+              "terminalSha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1"
+            }
+          ],
+          "kind": "claude",
+          "monotonicNs": 4579372141,
+          "nodes": [
+            {
+              "ctimeNs": 1794244127653935066,
+              "device": 23,
+              "gid": 0,
+              "inode": 144,
+              "kind": "file",
+              "mode": 511,
+              "mtimeNs": 1794212008000000000,
+              "path": "/etc/ssl/certs/1560546e.0",
+              "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+              "size": 595,
+              "status": "present",
+              "uid": 0
+            },
+            {
+              "ctimeNs": 1794244127653935066,
+              "device": 23,
+              "gid": 0,
+              "inode": 144,
+              "kind": "file",
+              "mode": 511,
+              "mtimeNs": 1794212008000000000,
+              "path": "/etc/ssl/certs/e2b-ca.pem",
+              "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+              "size": 595,
+              "status": "present",
+              "uid": 0
+            },
+            {
+              "ctimeNs": 1794244131229266861,
+              "device": 65024,
+              "gid": 0,
+              "inode": 3550,
+              "kind": "file",
+              "mode": 511,
+              "mtimeNs": 1794244127785935066,
+              "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+              "sha256": "ee836ee305e23a18319640cafe0c7ebe628d7fbf985c23cfc5bf453d2ea7224d",
+              "size": 595,
+              "status": "present",
+              "uid": 0
+            }
+          ],
+          "phase": "ready",
+          "utcNs": 1794244131379865480,
+          "version": 1
+        }
+      },
+      "policyChanged": false,
+      "probe": {
+        "phase": "complete",
+        "status": "observed"
+      },
+      "releaseAccepted": false,
+      "sandboxId": "iui98zldpl4fxszi3c2nv",
+      "targetedOnly": true,
+      "templateId": "ivedr9vpyweketvct677",
+      "version": 1
+    }
+  },
+  "summary": {
+    "budget": {
+      "absoluteDeadline": "2026-11-09T17:22:29Z",
+      "afterObservationDeadlineCleanup": false,
+      "buildObservationSeconds": 600,
+      "cleanupOnlyMaxSeconds": 150,
+      "freshInstances": 1,
+      "modelCalls": 0,
+      "overallSeconds": 900,
+      "privateTemplates": 1,
+      "workerInstallCommands": 0
+    },
+    "cleanup": {
+      "claude": {
+        "errors": [],
+        "sandbox": {
+          "absenceConfirmedById": true,
+          "id": "iui98zldpl4fxszi3c2nv"
+        },
+        "status": "complete",
+        "templates": [
+          {
+            "kind": "claude",
+            "name": "mikka-1782-official-claude-control-42661569263-1-claude",
+            "status": "absent",
+            "templateId": "ivedr9vpyweketvct677"
+          }
+        ]
+      }
+    },
+    "failure": null,
+    "identity": {
+      "application": "mikka-1782-official-claude-control",
+      "opsCommit": "7fd8a2681cd71bb6603a485854c8beda2044911b",
+      "ref": "refs/heads/ops/self-hosted-vault-closeout-20261108",
+      "repository": "alexj11324/Mikka",
+      "runAttempt": "1",
+      "runId": "42661569263",
+      "sourceCommit": "623a1afd8715433a58c3e88ce88f8fbcc29d1761",
+      "sourceTree": "193c7c1a101a56a889f7b22eb615e903981942af"
+    },
+    "policyChanged": false,
+    "releaseAccepted": false,
+    "targetedOnly": true,
+    "version": 1
+  }
+}

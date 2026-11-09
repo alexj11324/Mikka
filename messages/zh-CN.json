@@ -5806,9 +5806,6 @@
     "activity": "活动",
     "comment": "+ 评论",
     "conversation": {
-      "switched": "换 {agent} 继续",
-      "switchedAfterFailure": "{previous} 没跑通 · 换 {agent} 继续",
-      "switchedTo": "换 {agent}",
       "fix": "修复",
       "needsYou": "需要你：{what}",
       "verdicts": {
