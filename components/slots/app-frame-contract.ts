@@ -18,3 +18,9 @@ export type AppFrameProps = {
 
 /** The icon rail: RAIL_ITEMS, the update button and the account menu (WorkspaceMenu, compact). */
 export type IconRailProps = RailProps
+
+/**
+ * `FRAME_LISTS_CHATS`, a boolean the slot exports: true when the frame lists the chats itself from
+ * RailProps.chats, so the page draws no bot column and no button to open one.
+ */
+export type FrameListsChats = boolean
