@@ -60,7 +60,7 @@ test('a chat\'s cited runs show the same name, summary and task without reading 
       const run = full.get(id)!
       assert.equal(source.name, threadName(prompts[index], run.agentName), `run ${index}: the same name as from its whole prompt`)
       assert.equal(source.summary, runSummaryText(run), `run ${index}: the same summary as from its whole report`)
-      assert.deepEqual(source.issue, index === 3 ? null : { id: issueId, title: task.title, number: 12, identifier: source.issue?.identifier ?? null })
+      assert.deepEqual(source.issue, index === 3 ? null : { id: issueId, title: task.title, number: 12, identifier: source.issue?.identifier ?? null, status: 'doing' })
       assert.deepEqual(source.pullRequests, index === 3 ? [] : readIssueMetadata(task.content).pullRequests)
     }
     assert.equal((sources[runs[0]] as { name: string }).name, 'Fix the login bug that drops a session when the token refre…')

@@ -1,7 +1,8 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-node_modules/
+# Also a symlink of that name (a link is not a directory, so the slash form misses it).
+node_modules
 
 # next.js
 /.next/

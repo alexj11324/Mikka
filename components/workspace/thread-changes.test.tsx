@@ -18,7 +18,8 @@ mock.module('@pierre/diffs/react', { namedExports: { FileDiff: (props: Drawn & {
 }, VirtualizerContext: createContext(undefined) } })
 mock.module('next-themes', { namedExports: { useTheme: () => ({ resolvedTheme: 'dark' }) } })
 let ThreadChangesView: typeof import('./thread-changes')['ThreadChangesView']
-before(async () => { ({ ThreadChangesView } = await import('./thread-changes')) })
+let DIFF_SURFACE_CSS: string
+before(async () => { ({ ThreadChangesView, DIFF_SURFACE_CSS } = await import('./thread-changes')) })
 
 const LONG = 'export const PriceSchema = z.object({ vendor: z.string(), plan: z.string(), monthly: z.number() });'
 const changes = parseUnifiedDiff(`diff --git a/app/pricing/table.tsx b/app/pricing/table.tsx
@@ -67,9 +68,9 @@ test('each file is drawn by the library with its own look: stacked lines, the th
     // Pierre's WebAssembly highlighter: the default Shiki engine takes ~4 s on a 3,000-line change.
     assert.equal(options.preferredHighlighter, 'highlights')
     assert.equal(options.collapsed, false)
-    // Pierre's default themes: nothing of Mikka's old diff styling is passed in.
+    // Pierre's default themes: nothing of Mikka's old diff styling is passed in, only the card's surface (task-06).
     assert.equal(options.theme, undefined)
-    assert.equal(options.unsafeCSS, undefined)
+    assert.equal(options.unsafeCSS, DIFF_SURFACE_CSS)
   }
   assert.deepEqual(drawn.map(file => [file.fileDiff.name, file.fileDiff.type]), [['app/pricing/table.tsx', 'change'], ['lib/pricing/competitors.ts', 'new']])
 })

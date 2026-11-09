@@ -25,6 +25,7 @@ const runtime = mock.fn((_botId: string | null) => ({ questions: scopedQuestions
 const dbRows: { botId: string | null }[] = []
 const dbPool = { query: mock.fn(async (_q: string, _p?: unknown[]) => ({ rows: dbRows })) }
 const sweepWatchdog = mock.fn(async (..._args: unknown[]) => {})
+const activityChanged = mock.fn((_executor: object, _runId: string) => {})
 const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports: exports })
 stub('./self-improvement/registry.ts', { lockSkillScope: async () => {} })
 stub('./self-improvement/skill-mounts.ts', { recordCompletionSkillMount: mount })
@@ -33,13 +34,14 @@ stub('./issue-access.ts', { issueForUser: async () => ({ id: 'issue' }) })
 stub('./factory/server.ts', { factoryMonitor: { probeRun: monitor }, factoryQuestions: questions })
 stub('./factory/runtime.ts', { factoryRuntimeForBot: runtime })
 stub('./factory/watchdog.ts', { sweepFactoryWatchdog: sweepWatchdog })
+stub('./factory/activity-live.ts', { taskActivityChanged: activityChanged })
 stub('./db/index.ts', { pool: dbPool })
 let effects: typeof import('./run-completion-effects')
 const environment = { routing: process.env.MIKKA_FACTORY_ROUTING_ENABLED, lifecycle: process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED }
 before(async () => { effects = await import('./run-completion-effects') })
 beforeEach(() => {
   trace.length = 0; mountError = null; monitorError = null; questionError = null
-  for (const fn of [mount, monitor, questions.settle, questions.record, scopedQuestions.settle, scopedQuestions.record, runtime, reconcileRun, dbPool.query, sweepWatchdog]) fn.mock.resetCalls()
+  for (const fn of [mount, monitor, questions.settle, questions.record, scopedQuestions.settle, scopedQuestions.record, runtime, reconcileRun, dbPool.query, sweepWatchdog, activityChanged]) fn.mock.resetCalls()
   process.env.MIKKA_FACTORY_ROUTING_ENABLED='0'; process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED='0'
 })
 after(() => {
@@ -77,6 +79,7 @@ test('ordinary unbound completions do not invoke Factory effects', async () => {
   assert.equal(await effects.prepareRunCompletionEffects(client, run, { stopReason: 'submitted', report }, false), report)
   await effects.settleRunCompletionEffects(client, run, 'blocked', false)
   assert.deepEqual(trace, [])
+  assert.equal(activityChanged.mock.callCount(), 0)
 })
 
 test('question settlement and handoff use the existing completion transaction and scoped bot', async () => {
@@ -85,6 +88,7 @@ test('question settlement and handoff use the existing completion transaction an
   assert.deepEqual(runtime.mock.calls[0].arguments, ['bot'])
   assert.deepEqual(scopedQuestions.settle.mock.calls[0].arguments, ['owner', 'run', client])
   assert.deepEqual(scopedQuestions.record.mock.calls[0].arguments, ['owner', 'run', client])
+  assert.deepEqual(activityChanged.mock.calls.map(call => call.arguments), [[client, 'run']])
   assert.deepEqual(trace, ['SAVEPOINT completion_question_settle', 'bot-settle', 'RELEASE SAVEPOINT completion_question_settle', 'SAVEPOINT completion_question_record', 'bot-record', 'RELEASE SAVEPOINT completion_question_record'])
 })
 
@@ -102,6 +106,13 @@ test('known stale question state can settle without consuming a new handoff on s
   await effects.settleRunCompletionEffects(client, run, 'submitted', true)
   assert.deepEqual(trace, ['SAVEPOINT completion_question_settle', 'settle', 'ROLLBACK TO SAVEPOINT completion_question_settle', 'RELEASE SAVEPOINT completion_question_settle'])
   assert.equal(questions.record.mock.callCount(), 0)
+  assert.deepEqual(activityChanged.mock.calls.map(call => call.arguments), [[client, 'run']])
+})
+
+test('a failed completion effect never schedules task activity', async () => {
+  questionError = new Error('completion transaction failed')
+  await assert.rejects(effects.settleRunCompletionEffects(client, run, 'submitted', true), /completion transaction failed/)
+  assert.equal(activityChanged.mock.callCount(), 0)
 })
 
 test('afterRunEnded: flags off touches no pool; on, reconciles only the run per owning bot via reconcile.run', async () => {

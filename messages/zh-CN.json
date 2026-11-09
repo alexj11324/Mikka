@@ -105,6 +105,7 @@
       "privateHint": "初始仅自己可见，创建后可邀请成员协作"
     },
     "list": {
+      "clearFilters": "清除筛选",
       "label": "任务列表",
       "noResults": "没有找到匹配的任务",
       "emptyTitle": "这里还没有任务",
@@ -181,6 +182,12 @@
     "cardPreview": "[卡片]"
   },
   "Plugins": {
+    "ownDescription": {
+      "github": "仓库、PR 和 issue",
+      "linear": "任务和项目",
+      "telegram": "在 Telegram 里和你的 Bot 对话"
+    },
+    "unavailable": "不可用",
     "title": "插件",
     "appsTab": "应用",
     "skillsTab": "技能",
@@ -791,6 +798,7 @@
     "editorAria": "{label}编辑器"
   },
   "Devices": {
+    "scheduledOffline": "已排期 · 上线后运行",
     "otherDevices": "服务器",
     "menu": "{name} 的更多操作",
     "add": {
@@ -994,6 +1002,7 @@
   },
   "Workspace": {
     "loadingEditor": "正在加载任务编辑器",
+    "loading": "正在加载…",
     "loadingCreate": "正在加载新建任务…",
     "signOutFailed": "退出失败，请稍后重试。",
     "allIssues": "全部任务",
@@ -1218,7 +1227,7 @@
     "taskWorkspaceTransferDenied": "任务创建后工作区归属固定，不支持跨工作区转移。",
     "workspaceNotFound": "没有可访问的工作区。",
     "workspacePaymentTaken": "这个团队已经由另一位成员的卡支付。",
-    "workspacePersonal": "个人工作区只有你一人。要邀请成员，请新建团队工作区。",
+    "workspacePersonal": "个人工作区只有你一人。要邀请成员，请新建共享工作区。",
     "workspacePersonalDelete": "个人工作区不能删除。",
     "workspaceMemberExists": "其中一个邮箱已经是工作区成员，请在成员列表中管理或恢复。",
     "workspaceMemberNotFound": "成员不存在。",
@@ -1741,6 +1750,8 @@
     }
   },
   "Settings": {
+    "teamOnlyNotice": "成员、团队、团队权限和审计日志只在共享工作区中",
+    "unavailableTitle": "{title}暂时不可用",
     "title": "设置",
     "searchLabel": "搜索设置",
     "searchPlaceholder": "搜索设置…",
@@ -1859,6 +1870,7 @@
       "account": "此账户"
     },
     "memory": {
+      "emptyBody": "Mikka 会从对话和已连接的应用中记下要点，并显示在这里。",
       "enabled": "使用记忆",
       "learn": "从已连接的 App 中学习",
       "error": "无法更新记忆",
@@ -2591,6 +2603,9 @@
       }
     },
     "billing": {
+      "notConfiguredTitle": "此服务器未设置计费",
+      "notConfiguredBody": "套餐、席位和点数需要支付服务，由部署此服务器的人开启。",
+      "notConfiguredAction": "如何设置计费",
       "loading": "正在加载计费",
       "loadFailed": "读不到计费信息",
       "plan": "方案",
@@ -2681,6 +2696,7 @@
       "afterQuotaSection": "额度用完时"
     },
     "modelOrder": {
+      "fallbackNeedsKey": "需先添加 API 密钥并连接订阅。",
       "placesLabel": "派发顺序",
       "placeServers": "服务器",
       "placeComputers": "电脑",
@@ -3114,7 +3130,7 @@
     "c_6dfc6360": "关联未保存，请检查权限并刷新后重试。",
     "c_b8e346ef": "切换未完成，请重试。",
     "c_cb11190c": "创建团队",
-    "c_d92d1b8d": "创建团队工作区",
+    "c_d92d1b8d": "创建共享工作区",
     "c_63373890": "创建工作区 · Mikka",
     "c_4eec1ff7": "创建新团队",
     "c_4598f1cb": "创建新的 Mikka 工作区，设置名称与专属网址，邀请团队协作。",
@@ -3429,6 +3445,12 @@
       "checking": "待检查"
     },
     "empty": "告诉 {name} 你要做什么",
+    "starters": {
+      "fixBug": "修复我仓库里的一个 bug",
+      "reviewPullRequests": "审阅我未合并的 PR",
+      "summarizeToday": "总结今天需要我处理的事",
+      "dailyBriefing": "设置每日简报"
+    },
     "events": {
       "aThread": "一个线程",
       "aTask": "一个任务",
@@ -3841,12 +3863,12 @@
     "loadingWorkspace": "正在加载工作区…",
     "switchWorkspace": "切换工作区",
     "reloadWorkspace": "重新加载工作区",
-    "newWorkspace": "新建团队工作区",
+    "newWorkspace": "新建共享工作区",
     "workspaceName": "工作区名称",
     "forExampleProductTeam": "例如：产品团队",
     "cancel": "取消",
     "creating": "正在创建…",
-    "createWorkspace": "创建团队工作区",
+    "createWorkspace": "创建共享工作区",
     "sendingChoice": "发送中",
     "cloudKeySetup": "去设置 E2B 密钥",
     "dispatchWait": "等它上线",
@@ -3903,6 +3925,7 @@
     "states": {
       "online": "在线",
       "offline": "离线",
+      "never": "从未上线",
       "starting": "启动中",
       "running": "运行中",
       "paused": "休眠",
@@ -4144,6 +4167,7 @@
       "failed": "未送达，请重试。"
     },
     "addE2BKey": "添加 E2B API Key",
+    "e2bKeyNeeded": "Mikka Cloud 使用你自己的 E2B Key 运行",
     "loading": "正在连接电脑"
   },
   "Shell": {
@@ -4933,6 +4957,10 @@
     "mergeConfirm": "合并"
   },
   "ArtifactReview": {
+    "checksRatio": "{passed}/{total} 项通过",
+    "checksFailedNote": "{count} 项失败",
+    "checksPendingNote": "{count} 项进行中",
+    "evidenceRatio": "{passed}/{total} 项有证据",
     "windowTitle": "{task} · PR #{number}",
     "tooltip": {
       "none": "Artifact · 线程完成后生成",
