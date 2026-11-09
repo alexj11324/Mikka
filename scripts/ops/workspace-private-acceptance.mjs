@@ -593,9 +593,112 @@ async function optionalJson(path) {
     return JSON.parse(await readFile(path, 'utf8'))
   } catch (error) { if (error?.code === 'ENOENT') return null; throw error }
 }
+
+const REPORT_LIMIT = 262_144, CANDIDATES_LIMIT = 4 * 1024 * 1024
+const RECEIPT_KEYS = ['buildReport', 'candidates', 'builderJournal', 'vmCleanup', 'templateCleanups', 'runtime', 'journals']
+
+// Fixed report roles only. A refused report must not erase the independent
+// runtime/cleanup evidence, and can never contribute a success or a raw digest.
+async function closedReport(path, role, detail = {}) {
+  const limit = role === 'candidates' ? CANDIDATES_LIMIT : REPORT_LIMIT
+  const observation = { role, ...detail, type: 'unknown', bytes: null, limit, code: 'read_failed' }
+  try {
+    const info = await lstat(path)
+    observation.type = info.isSymbolicLink() ? 'symlink' : info.isFile() ? 'file' : info.isDirectory() ? 'directory' : 'other'
+    observation.bytes = Number.isSafeInteger(info.size) && info.size >= 0 ? info.size : null
+    if (!info.isFile() || info.isSymbolicLink()) observation.code = 'not_regular'
+    else if (info.size > limit) observation.code = 'too_large'
+    else {
+      const raw = await readFile(path, 'utf8')
+      observation.bytes = Buffer.byteLength(raw)
+      if (observation.bytes > limit) observation.code = 'too_large'
+      else {
+        try { return { value: JSON.parse(raw), observation: { ...observation, code: 'ok' } } }
+        catch { observation.code = 'invalid_json' }
+      }
+    }
+  } catch (error) {
+    if (error?.code === 'ENOENT') Object.assign(observation, { type: 'missing', bytes: null, code: 'missing' })
+  }
+  return { value: null, observation }
+}
+
+export async function readAcceptanceInputs(base, outcomes) {
+  const builds = resolve(base, 'candidates'), runtime = resolve(base, 'runtime'), reports = []
+  const take = async (path, role, detail) => {
+    const result = await closedReport(path, role, detail)
+    reports.push(result.observation)
+    return result.value
+  }
+  let names = []
+  try { names = await readdir(builds) }
+  catch (error) {
+    if (error?.code !== 'ENOENT') reports.push({ role: 'templateCleanupInventory', type: 'unknown', bytes: null, limit: null, code: 'read_failed' })
+  }
+  const cleanupNames = names.filter(name => /^cleanup(?:-(?:[2-9]|[1-9][0-9]+))?\.json$/.test(name))
+    .sort((a, b) => Number(a.match(/\d+/)?.[0] ?? 1) - Number(b.match(/\d+/)?.[0] ?? 1))
+  const input = {
+    buildReport: await take(resolve(builds, 'build-report.json'), 'buildReport'),
+    candidates: await take(resolve(builds, 'candidates.json'), 'candidates'),
+    builderJournal: await take(resolve(builds, 'creation-journal.json'), 'builderJournal'),
+    vmCleanup: await take(resolve(runtime, 'cleanup.json'), 'vmCleanup'),
+    templateCleanups: [], runtime: {}, journals: {}, outcomes,
+  }
+  for (const [index, name] of cleanupNames.entries())
+    input.templateCleanups.push(await take(resolve(builds, name), 'templateCleanups', { ordinal: index + 1 }))
+  for (const kind of KINDS) {
+    input.runtime[kind] = await take(resolve(runtime, `${kind}.json`), 'runtime', { kind })
+    input.journals[kind] = await take(resolve(runtime, `${kind}.cleanup.json`), 'journals', { kind })
+  }
+  return { input, reports }
+}
+
+export function summarizeCollectedAcceptance(context, { input, reports }) {
+  // The source gate ran before any report read. Only fixed-source projections
+  // are retained here; arbitrary parser/SDK errors and report paths stay local.
+  const refused = reports.filter(row => !['ok', 'missing'].includes(row.code))
+  let verdict, projectionFailed = false
+  try { verdict = summarizeAcceptance(context, input) }
+  catch {
+    projectionFailed = true
+    verdict = summarizeAcceptance(context, { outcomes: input.outcomes })
+    verdict.cases = KINDS.map(kind => {
+      try { return { ...runtimeEvidence(input.runtime?.[kind], kind), identityMatched: false, runtimePassed: false } }
+      catch { return { ...runtimeEvidence(null, kind), identityMatched: false, runtimePassed: false } }
+    })
+    verdict.runtimeCleanup = Array.isArray(input.vmCleanup?.cleanup)
+      ? input.vmCleanup.cleanup.slice(0, 2).map(cleanupEvidence) : []
+  }
+  const unavailableReceipts = RECEIPT_KEYS.filter(key => refused.some(row => row.role === key
+    || (key === 'templateCleanups' && row.role === 'templateCleanupInventory')))
+  const receipts = Object.fromEntries(RECEIPT_KEYS.map(key => {
+    if (unavailableReceipts.includes(key)) return [key, null]
+    try { return [key, hash(JSON.stringify(input[key]))] }
+    catch { projectionFailed = true; unavailableReceipts.push(key); return [key, null] }
+  }))
+  verdict.collection = { stage: projectionFailed ? 'projection' : refused.length ? 'report_read' : 'complete',
+    code: projectionFailed ? 'projection_failed' : refused.length ? 'receipt_unavailable' : 'ok', reports }
+  if (refused.length || projectionFailed) verdict.passed = false
+  return { verdict, receipts, unavailableReceipts }
+}
 async function save(path, value) {
   await mkdir(resolve(path, '..'), { recursive: true, mode: 0o700 })
   await writeFile(path, JSON.stringify(value, null, 2) + '\n', { mode: 0o600 })
+}
+
+const COLLECTOR_FAILURE_CODES = ['workspace_ops_arguments', 'workspace_context_refused', 'workspace_checkout_refused',
+  'workspace_source_file_refused', 'workspace_source_refused', 'workspace_dependency_refused', 'workspace_worker_refused',
+  'workspace_python_version_refused', 'workspace_sdk_shape_refused', 'workspace_saved_source_refused',
+  'workspace_report_refused', 'workspace_receipt_context', 'workspace_diagnostic_source_refused']
+let collectorStage = 'source'
+export function collectorFailure(error, stage) {
+  const closedStage = one(stage, ['source', 'input', 'projection'], 'source')
+  const code = COLLECTOR_FAILURE_CODES.includes(error?.message) ? error.message
+    : error?.code === 'ERR_ASSERTION' ? 'ops_identity_refused'
+      : ['ENOENT', 'ENOTDIR', 'EACCES', 'EPERM', 'ELOOP'].includes(error?.code) ? 'filesystem_refused'
+        : error?.code === 'ENOBUFS' ? 'source_probe_failed'
+          : error instanceof SyntaxError ? 'json_invalid' : 'internal'
+  return { event: 'workspace_private_ops_refused', stage: closedStage, code, sourceVerified: closedStage !== 'source' }
 }
 
 async function main([operation, sourceDirectory, ...extra]) {
@@ -603,6 +706,7 @@ async function main([operation, sourceDirectory, ...extra]) {
   const diagnostic = operation === 'diagnostic-check' || operation === 'diagnose'
   const directory = resolve(sourceDirectory), evidence = resolve(process.env.RUNNER_TEMP, diagnostic ? 'workspace-private-diagnostic/evidence' : 'workspace-private/evidence')
   const source = await verifySources(directory)
+  collectorStage = 'input'
   if (operation === 'check') { console.log(JSON.stringify(source)); return }
   if (diagnostic) {
     check(P0.source === FINALIZE_DIAGNOSTIC.sourceCommit && P0.tree === FINALIZE_DIAGNOSTIC.sourceTree
@@ -647,28 +751,22 @@ async function main([operation, sourceDirectory, ...extra]) {
   const saved = await optionalJson(resolve(evidence, 'source.json'))
   check(saved?.sourceCommit === P0.source && saved.sourceTree === P0.tree && saved.opsSource === source.opsSource
     && saved.runId === source.runId && saved.runAttempt === source.runAttempt && saved.workerSha === P0.workerSha, 'workspace_saved_source_refused')
-  const base = resolve(process.env.RUNNER_TEMP, 'workspace-private'), builds = resolve(base, 'candidates'), runtime = resolve(base, 'runtime')
-  const names = await readdir(builds).catch(error => { if (error.code === 'ENOENT') return []; throw error })
-  const cleanupNames = names.filter(name => /^cleanup(?:-(?:[2-9]|[1-9][0-9]+))?\.json$/.test(name))
-    .sort((a, b) => Number(a.match(/\d+/)?.[0] ?? 1) - Number(b.match(/\d+/)?.[0] ?? 1))
-  const input = { buildReport: await optionalJson(resolve(builds, 'build-report.json')), candidates: await optionalJson(resolve(builds, 'candidates.json')),
-    builderJournal: await optionalJson(resolve(builds, 'creation-journal.json')), vmCleanup: await optionalJson(resolve(runtime, 'cleanup.json')),
-    templateCleanups: await Promise.all(cleanupNames.map(name => optionalJson(resolve(builds, name)))),
-    runtime: Object.fromEntries(await Promise.all(KINDS.map(async kind => [kind, await optionalJson(resolve(runtime, `${kind}.json`))]))),
-    journals: Object.fromEntries(await Promise.all(KINDS.map(async kind => [kind, await optionalJson(resolve(runtime, `${kind}.cleanup.json`))]))),
-    outcomes: { build: process.env.BUILD_OUTCOME, acceptance: process.env.ACCEPTANCE_OUTCOME,
-      vmCleanup: process.env.VM_CLEANUP_OUTCOME, templateCleanup: process.env.TEMPLATE_CLEANUP_OUTCOME } }
-  const verdict = summarizeAcceptance({ opsSource: source.opsSource, workerSha: saved.workerSha, runId: source.runId, runAttempt: source.runAttempt }, input)
+  const loaded = await readAcceptanceInputs(resolve(process.env.RUNNER_TEMP, 'workspace-private'), {
+    build: process.env.BUILD_OUTCOME, acceptance: process.env.ACCEPTANCE_OUTCOME,
+    vmCleanup: process.env.VM_CLEANUP_OUTCOME, templateCleanup: process.env.TEMPLATE_CLEANUP_OUTCOME })
+  collectorStage = 'projection'
+  const { verdict, receipts, unavailableReceipts } = summarizeCollectedAcceptance({ opsSource: source.opsSource,
+    workerSha: saved.workerSha, runId: source.runId, runAttempt: source.runAttempt }, loaded)
   await save(resolve(evidence, 'verdict.json'), verdict)
   // Source reports remain private runner inputs. Only these closed projections
   // and their hashes are uploaded, not stdout, SDK responses or capability files.
   await save(resolve(evidence, 'receipt-digests.json'), { version: 1, sourceCommit: P0.source, opsSource: source.opsSource,
-    receipts: Object.fromEntries(Object.entries(input).filter(([key]) => key !== 'outcomes').map(([key, value]) => [key, hash(JSON.stringify(value))])) })
+    receipts, unavailableReceipts })
   console.log(JSON.stringify({ sourceCommit: P0.source, opsSource: source.opsSource, passed: verdict.passed,
     runtimeCleanupConfirmed: verdict.runtimeCleanupConfirmed, templateCleanupConfirmed: verdict.templateCleanupConfirmed }))
   if (!verdict.passed) process.exitCode = 1
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  main(process.argv.slice(2)).catch(() => { console.error('workspace_private_ops_refused'); process.exitCode = 1 })
+  main(process.argv.slice(2)).catch(error => { console.error(JSON.stringify(collectorFailure(error, collectorStage))); process.exitCode = 1 })
 }

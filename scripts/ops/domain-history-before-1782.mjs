@@ -74,17 +74,19 @@ export function candidateInventory(rows, ownerId) {
 }
 
 /** Use the existing relation-picker's real cursor, never fabricate a cursor or
- * search all APP rows. Read at most five authorized pages, then retain the last
- * <=100 eligible rows in the API's actual order. Main 5ba orders updatedAt DESC,
- * id DESC; this is a bounded search tail, not a claim about Task creation age. */
-export async function searchCandidates(client, scope, observeInventory = () => {}) {
-  check(UUID.test(scope.workspaceId) && typeof scope.ownerId === 'string' && scope.ownerId.length > 0, 'sample_invalid')
+ * search all APP rows. Read at most five authorized pages, retaining the first
+ * or last <=100 eligible rows in actual API order. Main 5ba orders updatedAt
+ * DESC, id DESC; neither boundary makes a claim about Task creation age.
+ * Only selectScope chooses the production boundary; no CLI/env override. */
+export async function searchCandidates(client, scope, observeInventory = () => {}, position = 'last') {
+  check(UUID.test(scope.workspaceId) && typeof scope.ownerId === 'string' && scope.ownerId.length > 0
+    && ['first', 'last'].includes(position), 'sample_invalid')
   const retained = new Map(), seenRows = new Set(), seenCursors = new Set()
   let cursor = null
   const counts = { pages: 0, returned: 0, own: 0, ownWorkspace: 0, ownPersonal: 0, ownUnknownScope: 0,
     ownScopeOmitted: 0, ownerIdFieldPresent: 0, candidateCount: 0, hasMore: false, pageLimitReached: false,
-    candidateLimitReached: false, eligibleCount: 0, discardedEarlierRows: 0, retainedOwn: 0,
-    selection: 'last_100_of_bounded_api_search', pageSize: 50, maxPages: 5, maxCandidates: 100 }
+    candidateLimitReached: false, eligibleCount: 0, discardedEarlierRows: 0, discardedLaterRows: 0, retainedOwn: 0,
+    selection: position + '_100_of_bounded_api_search', pageSize: 50, maxPages: 5, maxCandidates: 100 }
   for (let page = 0; page < 5; page++) {
     const query = new URLSearchParams({ workspaceId: scope.workspaceId, limit: '50', q: '' })
     if (cursor !== null) query.set('cursor', cursor)
@@ -97,7 +99,9 @@ export async function searchCandidates(client, scope, observeInventory = () => {
     // Keep server order within each page; sorting UUIDs here would select a
     // different boundary. The final UUID list alone is canonicalized below.
     for (const row of result.items) if (Object.hasOwn(inventory.taskOwners, row.id)) {
-      counts.eligibleCount++; retained.set(row.id, inventory.taskOwners[row.id])
+      counts.eligibleCount++
+      if (position === 'first' && retained.size === 100) continue
+      retained.set(row.id, inventory.taskOwners[row.id])
       if (retained.size > 100) retained.delete(retained.keys().next().value)
     }
     counts.pages++; counts.returned += result.items.length
@@ -105,7 +109,8 @@ export async function searchCandidates(client, scope, observeInventory = () => {
     counts.candidateCount = retained.size; counts.hasMore = result.nextCursor !== null
     counts.pageLimitReached = counts.pages === 5 && counts.hasMore
     counts.candidateLimitReached = counts.eligibleCount > 100
-    counts.discardedEarlierRows = counts.eligibleCount - retained.size
+    counts.discardedEarlierRows = position === 'last' ? counts.eligibleCount - retained.size : 0
+    counts.discardedLaterRows = position === 'first' ? counts.eligibleCount - retained.size : 0
     counts.retainedOwn = [...retained.values()].filter(owner => owner === scope.ownerId).length
     // Replay is refused even at the fifth-page boundary; reaching a collection
     // cap is not permission to accept a repeated opaque server cursor.
@@ -135,7 +140,9 @@ export async function selectScope(client, email, observeInventory = () => {}) {
   }
   check(matches.length === 1, 'workspace_refused')
   const { workspaceId, adminId } = matches[0]
-  const { candidateTaskIds, taskOwners } = await searchCandidates(client, { ownerId, workspaceId }, observeInventory)
+  // The preceding tail run classified no receipts. This fixed first boundary
+  // includes the previously unclassified first27 without changing eligibility.
+  const { candidateTaskIds, taskOwners } = await searchCandidates(client, { ownerId, workspaceId }, observeInventory, 'first')
   check(candidateTaskIds.length > 0, 'sample_missing')
   const scope = { ownerId, workspaceId, workspaceKind: 'team', adminId, candidateTaskIds, taskOwners }
   // Every candidate needs a fresh ordinary detail read before APP is opened.

@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import test from 'node:test'
 import { assertOpsContext } from './self-hosted-ingress-probe.mjs'
-import { P0, FINALIZE_DIAGNOSTIC, assertDependencies, assertSourceIdentity, assertWorkerIdentity, diagnoseExistingBuild, summarizeAcceptance } from './workspace-private-acceptance.mjs'
+import { P0, FINALIZE_DIAGNOSTIC, assertDependencies, assertSourceIdentity, assertWorkerIdentity, diagnoseExistingBuild,
+  collectorFailure, readAcceptanceInputs, summarizeAcceptance, summarizeCollectedAcceptance } from './workspace-private-acceptance.mjs'
 
 const context = { opsSource: 'a'.repeat(40), workerSha: P0.workerSha, runId: '123', runAttempt: '2' }
 const identity = { sourceCommit: P0.source, workerSha: context.workerSha, workflowCommit: context.opsSource,
@@ -40,6 +44,144 @@ function fixtureReceipts() {
       templates: kinds.map(kind => ({ kind, name: templates[kind].name, templateId: templates[kind].templateId, status: 'deleted' })) }],
     outcomes: { build: 'success', acceptance: 'success', vmCleanup: 'success', templateCleanup: 'success' } }
 }
+
+async function onDiskReceipts(t, input = fixtureReceipts()) {
+  const base = await mkdtemp(join(tmpdir(), 'workspace-receipt-read-'))
+  t.after(() => rm(base, { recursive: true, force: true }))
+  await mkdir(join(base, 'candidates')); await mkdir(join(base, 'runtime'))
+  const save = (name, value) => writeFile(join(base, name), JSON.stringify(value, null, 2) + '\n')
+  await save('candidates/build-report.json', input.buildReport)
+  await save('candidates/candidates.json', input.candidates)
+  await save('candidates/creation-journal.json', input.builderJournal)
+  await save('runtime/cleanup.json', input.vmCleanup)
+  for (const [index, row] of input.templateCleanups.entries())
+    await save(`candidates/cleanup${index ? `-${index + 1}` : ''}.json`, row)
+  for (const kind of kinds) {
+    await save(`runtime/${kind}.json`, input.runtime[kind])
+    await save(`runtime/${kind}.cleanup.json`, input.journals[kind])
+  }
+  return { base, input, save }
+}
+
+test('a complete candidates receipt above the old cap is read while its unretained content stays private', async t => {
+  const input = fixtureReceipts(), privateText = 'synthetic-model-receipt-not-for-artifact'
+  // Actual builders carry two templates with preload/fresh changes and model
+  // slots. Exercise the real file boundary independently of the small fixtures.
+  input.candidates.templates.claude.models = [{ models: Array.from({ length: 500 }, (_, i) => `model-${i}`),
+    modelSlots: Array.from({ length: 500 }, (_, i) => ({ slot: `model-${i}`, model: 'm'.repeat(128), name: 'n'.repeat(200) })) }]
+  input.candidates.templates.codex.models = structuredClone(input.candidates.templates.claude.models)
+  input.candidates.unretained = privateText
+  const { base } = await onDiskReceipts(t, input)
+  const bytes = (await readFile(join(base, 'candidates/candidates.json'))).length
+  assert(bytes > 262_144 && bytes < 4 * 1024 * 1024)
+  const loaded = await readAcceptanceInputs(base, input.outcomes)
+  assert.deepEqual(loaded.input.candidates, input.candidates)
+  const report = loaded.reports.find(row => row.role === 'candidates')
+  assert.deepEqual(report, { role: 'candidates', type: 'file', bytes, limit: 4 * 1024 * 1024, code: 'ok' })
+  const result = summarizeCollectedAcceptance(context, loaded)
+  assert.equal(result.verdict.passed, true)
+  assert.equal(result.verdict.collection.code, 'ok')
+  assert.deepEqual(result.unavailableReceipts, [])
+  assert.match(result.receipts.candidates, /^[0-9a-f]{64}$/)
+  assert.equal(JSON.stringify(result).includes(privateText), false)
+  assert.equal(JSON.stringify(result).includes('modelSlots'), false)
+})
+
+test('an over-4-MiB candidates file fails closed without erasing independent runtime and cleanup observations', async t => {
+  const input = fixtureReceipts(), privateText = 'synthetic-private-report-data'
+  input.runtime.claude.stage = 'initial_ingress'; input.runtime.claude.passed = false; input.runtime.claude.failure = 'positive_control'
+  input.outcomes.acceptance = 'failure'
+  const { base, save } = await onDiskReceipts(t, input)
+  await save('candidates/candidates.json', { ...input.candidates, unretained: privateText + 'x'.repeat(4 * 1024 * 1024) })
+  const loaded = await readAcceptanceInputs(base, input.outcomes)
+  const read = loaded.reports.find(row => row.role === 'candidates')
+  assert.equal(read.type, 'file'); assert.equal(read.code, 'too_large'); assert(read.bytes > read.limit)
+  assert.equal(loaded.input.candidates, null)
+  const result = summarizeCollectedAcceptance(context, loaded)
+  assert.equal(result.verdict.passed, false)
+  assert.equal(result.verdict.collection.stage, 'report_read')
+  assert.equal(result.verdict.collection.code, 'receipt_unavailable')
+  assert.equal(result.verdict.cases[0].stage, 'initial_ingress')
+  assert.equal(result.verdict.cases[0].failure, 'positive_control')
+  assert.equal(result.verdict.cases[0].identityMatched, false)
+  assert.equal(result.verdict.cases[0].runtimePassed, false)
+  assert.equal(result.verdict.runtimeCleanup[0].outcome, 'provider_kill_acknowledged_and_absent')
+  assert.equal(result.verdict.templateCleanupConfirmed, true)
+  assert.equal(result.receipts.candidates, null)
+  assert.deepEqual(result.unavailableReceipts, ['candidates'])
+  assert.match(result.receipts.runtime, /^[0-9a-f]{64}$/)
+  assert.equal(JSON.stringify(result).includes(privateText), false)
+  assert.equal(JSON.stringify(result).includes(base), false)
+})
+
+test('the larger candidates allowance does not increase any runtime, journal or cleanup report limit', async t => {
+  const { base, input, save } = await onDiskReceipts(t)
+  await save('runtime/cleanup.json', { ...input.vmCleanup, unretained: 'x'.repeat(262_144) })
+  const loaded = await readAcceptanceInputs(base, input.outcomes)
+  const refused = loaded.reports.find(row => row.role === 'vmCleanup')
+  assert.equal(refused.code, 'too_large'); assert.equal(refused.limit, 262_144)
+  assert(loaded.reports.filter(row => row.role !== 'candidates').every(row => row.limit === 262_144))
+  const result = summarizeCollectedAcceptance(context, loaded)
+  assert.equal(result.verdict.passed, false)
+  assert.equal(result.verdict.build.passed, true)
+  assert.equal(result.verdict.cases[0].runtimePassed, true)
+  assert.equal(result.verdict.runtimeCleanupConfirmed, false)
+  assert.deepEqual(result.unavailableReceipts, ['vmCleanup'])
+})
+
+test('malformed, non-regular and missing fixed reports retain only closed file observations', async t => {
+  for (const [kind, code] of [['invalid_json', 'invalid_json'], ['directory', 'not_regular'], ['symlink', 'not_regular'], ['missing', 'missing']]) {
+    const { base, input } = await onDiskReceipts(t)
+    const path = join(base, 'runtime/claude.json')
+    await rm(path)
+    if (kind === 'invalid_json') await writeFile(path, '{synthetic-secret-parser-message')
+    if (kind === 'directory') await mkdir(path)
+    if (kind === 'symlink') await symlink(join(base, 'runtime/codex.json'), path)
+    const loaded = await readAcceptanceInputs(base, input.outcomes)
+    const observed = loaded.reports.find(row => row.role === 'runtime' && row.kind === 'claude')
+    assert.equal(observed.code, code)
+    assert.equal(observed.type, kind === 'invalid_json' ? 'file' : kind)
+    const result = summarizeCollectedAcceptance(context, loaded)
+    assert.equal(result.verdict.passed, false)
+    assert.equal(result.verdict.cases[1].runtimePassed, true)
+    assert.equal(JSON.stringify(result).includes(base), false)
+    assert.equal(JSON.stringify(result).includes('synthetic-secret-parser-message'), false)
+    assert.equal(JSON.stringify(result).includes('SyntaxError'), false)
+  }
+})
+
+test('an unexpected projection fault retains closed runtime diagnostics and cannot publish success or exception text', () => {
+  const input = fixtureReceipts(), privateText = 'synthetic-private-exception'
+  Object.defineProperty(input.runtime.claude, 'version', { get() { throw new Error(privateText) } })
+  const result = summarizeCollectedAcceptance(context, { input, reports: [] })
+  assert.equal(result.verdict.passed, false)
+  assert.equal(result.verdict.collection.stage, 'projection')
+  assert.equal(result.verdict.collection.code, 'projection_failed')
+  assert.equal(result.verdict.cases[0].stage, 'completed')
+  assert.equal(result.verdict.cases[0].identityMatched, false)
+  assert.equal(result.verdict.cases[1].runtimePassed, false)
+  assert.equal(result.verdict.runtimeCleanup[1].absent, true)
+  assert.equal(JSON.stringify(result).includes(privateText), false)
+})
+
+test('source/input/projection failures emit only closed codes and source refusal cannot reach report reads', () => {
+  assert.deepEqual(collectorFailure(new Error('workspace_source_refused'), 'source'), {
+    event: 'workspace_private_ops_refused', stage: 'source', code: 'workspace_source_refused', sourceVerified: false })
+  assert.equal(collectorFailure(Object.assign(new Error('private assertion text'), { code: 'ERR_ASSERTION' }), 'source').code, 'ops_identity_refused')
+  assert.equal(collectorFailure(new SyntaxError('private parse bytes'), 'input').code, 'json_invalid')
+  const privateText = 'synthetic-private-error-path-and-capability'
+  for (const stage of ['source', 'input', 'projection', privateText]) {
+    const row = collectorFailure(Object.assign(new Error(privateText), { code: privateText, path: privateText }), stage)
+    assert.equal(row.code, 'internal')
+    assert.equal(JSON.stringify(row).includes(privateText), false)
+    assert.equal(row.sourceVerified, stage === 'input' || stage === 'projection')
+  }
+  const source = readFileSync(new URL('./workspace-private-acceptance.mjs', import.meta.url), 'utf8')
+  const main = source.slice(source.indexOf('async function main('))
+  assert(main.indexOf('const source = await verifySources(directory)') < main.indexOf("collectorStage = 'input'"))
+  assert(main.indexOf("collectorStage = 'input'") < main.indexOf("optionalJson(resolve(evidence, 'source.json'))"))
+  assert(main.indexOf('const source = await verifySources(directory)') < main.indexOf('await readAcceptanceInputs('))
+})
 
 test('the real original Ops push is required; source checks never impersonate main or another run', () => {
   const branch = 'ops/self-hosted-vault-closeout-20261108'

@@ -603,6 +603,7 @@ test('the finite search tail reaches the 27 previously unread rows and retains e
   const expected = rows.slice(-100)
   assert.equal(calls, 3); assert.equal(result.counts.returned, 127); assert.equal(result.counts.eligibleCount, 127)
   assert.equal(result.counts.candidateCount, 100); assert.equal(result.counts.discardedEarlierRows, 27)
+  assert.equal(result.counts.discardedLaterRows, 0)
   assert.equal(result.counts.hasMore, false); assert.equal(result.counts.pageLimitReached, false)
   assert.equal(result.counts.candidateLimitReached, true)
   assert.equal(result.counts.retainedOwn, expected.filter(row => row.ownerId === scope.ownerId).length)
@@ -623,6 +624,64 @@ test('a replayed opaque cursor is refused at the candidate limit and at the fift
         nextCursor: page === replayAt ? 'cursor1' : 'cursor' + page, truncated: false }
     } }, scope), error => error.code === 'response_invalid')
     assert.equal(calls, replayAt)
+  }
+})
+
+test('production first100 reads the complete 127-row API window and authorizes the previously unclassified first27', async () => {
+  const email = 'synthetic@example.invalid', inventories = [], details = []
+  const rows = Array.from({ length: 127 }, (_, index) => ({ id: id(2000 - index),
+    ownerId: index < 18 ? scope.ownerId : 'authorized-other', title: 'never-record-this-title' }))
+  const byId = new Map(rows.map(row => [row.id, row])); let pages = 0
+  const client = {
+    json: async path => {
+      if (path === '/api/auth/get-session') return { user: { id: scope.ownerId, email } }
+      if (path === '/api/workspace' || path === '/api/workspace?workspace=' + scope.workspaceId) return sharedView()
+      const url = new URL(path, 'https://synthetic.invalid')
+      assert.equal(url.pathname, '/api/issues/search'); assert.equal(url.searchParams.get('workspaceId'), scope.workspaceId)
+      assert.equal(url.searchParams.get('cursor'), pages ? 'opaque' + pages : null)
+      const start = pages++ * 50
+      return { items: rows.slice(start, start + 50), nextCursor: pages < 3 ? 'opaque' + pages : null, truncated: false }
+    },
+    rpc: async (action, [taskId], options) => {
+      assert.equal(action, 'issues.getIssue'); assert.deepEqual(options, { headers: { 'x-mikka-workspace-id': scope.workspaceId } })
+      details.push(taskId); const row = byId.get(taskId)
+      return { issue: { id: taskId, userId: row.ownerId, workspaceId: scope.workspaceId, ownershipState: 'bound', scope: 'personal' } }
+    },
+  }
+  const selected = await selectScope(client, email, counts => inventories.push(counts)), expected = rows.slice(0, 100)
+  assert.deepEqual(selected.candidateTaskIds, expected.map(row => row.id).sort())
+  assert.deepEqual(details.sort(), selected.candidateTaskIds)
+  assert.ok(rows.slice(0, 27).every(row => selected.candidateTaskIds.includes(row.id)))
+  assert.deepEqual(selected.taskOwners, Object.fromEntries(expected.map(row => [row.id, row.ownerId])))
+  const counts = inventories.at(-1)
+  assert.equal(pages, 3); assert.equal(counts.returned, 127); assert.equal(counts.eligibleCount, 127)
+  assert.equal(counts.candidateCount, 100); assert.equal(counts.discardedEarlierRows, 0); assert.equal(counts.discardedLaterRows, 27)
+  assert.equal(counts.retainedOwn, 18); assert.equal(counts.hasMore, false); assert.equal(counts.pageLimitReached, false)
+  assert.equal(counts.candidateLimitReached, true); assert.equal(counts.selection, 'first_100_of_bounded_api_search')
+  for (const raw of ['never-record-this-title', 'authorized-other', scope.ownerId, id(2000)]) assert.ok(!JSON.stringify(inventories).includes(raw))
+})
+
+test('source-only first selection keeps both finite bounds and refuses replay after reaching one hundred', async () => {
+  let calls = 0
+  await assert.rejects(searchCandidates({ json: async () => { calls++ } }, scope, () => {}, 'all'), error => error.code === 'sample_invalid')
+  assert.equal(calls, 0)
+  const result = await searchCandidates({ json: async () => {
+    const start = calls++ * 50
+    return { items: Array.from({ length: 50 }, (_, index) => ({ id: id(start + index + 1), ownerId: scope.ownerId })),
+      nextCursor: 'cursor' + calls, truncated: false }
+  } }, scope, () => {}, 'first')
+  assert.equal(calls, 5); assert.deepEqual(result.candidateTaskIds, Array.from({ length: 100 }, (_, index) => id(index + 1)))
+  assert.equal(result.counts.eligibleCount, 250); assert.equal(result.counts.pageLimitReached, true)
+  assert.equal(result.counts.discardedEarlierRows, 0); assert.equal(result.counts.discardedLaterRows, 150)
+  assert.equal(result.counts.candidateLimitReached, true)
+  for (const replayAt of [2, 5]) {
+    let page = 0
+    await assert.rejects(searchCandidates({ json: async () => {
+      page++
+      return { items: Array.from({ length: 50 }, (_, index) => ({ id: id((page - 1) * 50 + index + 1), ownerId: scope.ownerId })),
+        nextCursor: page === replayAt ? 'cursor1' : 'cursor' + page, truncated: false }
+    } }, scope, () => {}, 'first'), error => error.code === 'response_invalid')
+    assert.equal(page, replayAt)
   }
 })
 
