@@ -83,9 +83,10 @@ export function assertOfficialWebCors(response, officialOrigin) {
 
 /** Event queues retain a notification arriving before its HTTP request returns.
  * Waiting is event-driven and has a deadline; there is no refresh/poll loop. */
-export function socketEvents(url, protocol) {
+export function socketEvents(url, protocol, { jsonLines = false } = {}) {
   const socket = new WebSocket(url, protocol)
   const queue = [], listeners = new Set()
+  let received = 0
   const closed = new Promise(resolve => socket.addEventListener('close', event => resolve({ code: event.code }), { once: true }))
   const ready = new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('SELF_HOSTED_SOCKET_OPEN_TIMEOUT')), 15_000)
@@ -93,14 +94,20 @@ export function socketEvents(url, protocol) {
     socket.addEventListener('error', () => { clearTimeout(timer); reject(new Error('SELF_HOSTED_SOCKET_OPEN_FAILED')) }, { once: true })
   })
   socket.addEventListener('message', event => {
-    let value
-    try { value = JSON.parse(String(event.data)) } catch { return }
-    const listener = [...listeners].find(item => item.matches(value))
-    if (listener) listener.done(value)
-    else queue.push(value)
+    // Mailpit batches complete JSON notifications in one frame. Mikka live
+    // keeps its ordinary single-JSON framing, including whitespace/newlines.
+    for (const payload of jsonLines ? String(event.data).split('\n') : [String(event.data)]) {
+      let value
+      try { value = JSON.parse(payload) } catch { continue }
+      received = Math.min(1_000_000, received + 1)
+      const listener = [...listeners].find(item => item.matches(value))
+      if (listener) listener.done(value)
+      else queue.push(value)
+    }
   })
   return {
     ready, closed,
+    get receivedCount() { return received },
     get isOpen() { return socket.readyState === WebSocket.OPEN },
     next(matches, timeout = 30_000) {
       const found = queue.findIndex(matches)
@@ -113,6 +120,16 @@ export function socketEvents(url, protocol) {
     },
     close() { for (const listener of listeners) listener.cancel(); listeners.clear(); socket.close() },
   }
+}
+
+/** A failed SMTP check retains counts, never message IDs, addresses, subjects,
+ * bodies or authentication links. Only the disposable fixture calls this. */
+export function mailpitObservation(inbox, { email, subject, from }) {
+  if (!Array.isArray(inbox?.messages) || inbox.messages.length > 50) return { read: 'invalid' }
+  const recipient = inbox.messages.filter(message => Array.isArray(message?.To) && message.To.some(to => to?.Address === email))
+  const matched = recipient.filter(message => message.Subject === subject)
+  return { read: 'ok', messages: inbox.messages.length, recipientMatches: recipient.length,
+    subjectMatches: matched.length, senderMatches: matched.filter(message => message.From?.Address === from).length }
 }
 
 /** Provision only this fixture bucket with AWS Signature V4. Actual object PUT
@@ -182,12 +199,27 @@ export async function runAcceptance(env = process.env) {
     await createFixtureBucket(env)
 
     report.stage = 'smtp-and-auth'
-    const mailbox = socketEvents(`${mailpit.replace('http:', 'ws:')}/api/events`)
+    const mailbox = socketEvents(`${mailpit.replace('http:', 'ws:')}/api/events`, undefined, { jsonLines: true })
     sockets.push(mailbox); await mailbox.ready
     const email = `selfhost-${randomUUID()}@selfhost.example.test`
     const password = randomBytes(24).toString('base64url'), replacement = randomBytes(24).toString('base64url')
     const nextMail = async subject => {
-      const event = await mailbox.next(value => value.Type === 'new' && value.Data?.Subject === subject && value.Data?.To?.some(to => to.Address === email))
+      let event
+      try { event = await mailbox.next(value => value.Type === 'new' && value.Data?.Subject === subject && value.Data?.To?.some(to => to.Address === email)) }
+      catch (error) {
+        if (error?.message === 'SELF_HOSTED_EVENT_TIMEOUT') {
+          report.mailObservation = { kind: subject === 'Verify your Mikka email address' ? 'verification' : 'password-reset',
+            eventsReceived: mailbox.receivedCount, read: 'unavailable' }
+          // One bounded diagnostic snapshot after failure, never a retry or a
+          // substitute for receiving the required WebSocket event.
+          try {
+            const response = await fetch(`${mailpit}/api/v1/messages?limit=50`, { redirect: 'error', signal: AbortSignal.timeout(5000) })
+            if (response.ok) Object.assign(report.mailObservation, mailpitObservation(await response.json(), { email, subject, from: sender }))
+            else { Object.assign(report.mailObservation, { read: 'http_error', httpStatus: response.status }); await response.body?.cancel() }
+          } catch { /* Keep the closed unavailable result; never retain provider errors. */ }
+        }
+        throw error
+      }
       check(event.Data.From?.Address === sender, 'MAIL_SENDER')
       const response = await fetch(`${mailpit}/api/v1/message/${encodeURIComponent(event.Data.ID)}`, { redirect: 'error', signal: AbortSignal.timeout(10_000) })
       check(response.ok, 'MAIL_READ')
