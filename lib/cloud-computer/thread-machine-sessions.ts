@@ -70,7 +70,8 @@ export async function readFactoryComputerSessions(
   }>(`SELECT s.id,s."runId",s."startedAt",s."endedAt",s.reason,s.source
     FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id
     JOIN agent_runs r ON r.id=a."runId" AND r."userId"=t."userId" AND r."issueId"=t."issueId"
-    JOIN thread_machine_sessions s ON s."runId"=r.id AND s."ownerId"=r."userId"
+      AND r."workspaceId"=t."workspaceId"
+    JOIN thread_machine_sessions s ON s."runId"=r.id AND s."ownerId"=r."userId" AND s."workspaceId"=r."workspaceId"
     JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=s."ownerId"
       AND b."workspaceId"=s."workspaceId" AND b."botId" IS NOT DISTINCT FROM s."botId"
     JOIN bots runtime ON runtime.id=b."botId" AND runtime."ownerId"=b."ownerId" AND runtime."workspaceId"=b."workspaceId"

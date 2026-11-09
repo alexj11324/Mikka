@@ -13,18 +13,21 @@ import { readIssueMetadata } from '@/lib/issue-metadata'
 import { dispatchLinearIssueSync, dispatchLinearWebhook } from '@/lib/linear-sync/dispatch'
 import { linearSyncEnabled } from '@/lib/linear-sync/flags'
 import { runAction } from '@/lib/action-error'
+import { loadWorkspaceContext } from '@/lib/workspace-access'
+import { withTaskWorkspace } from '@/lib/task-workspace'
 
 export async function getLinearIntegrationState() {
   if (!await linearSyncEnabled()) return { enabled: false, configured: false, connected: false, organizationName: null, syncs: [], errors: [], inboundErrors: [] }
   const user = await requireUser()
+  const context = await loadWorkspaceContext(undefined, user)
   const [connection] = await db.select({ organizationName: linearConnections.organizationName, connected: linearConnections.userId })
     .from(linearConnections).where(and(eq(linearConnections.userId, user.id), isNull(linearConnections.revokedAt))).limit(1)
   const syncs = await db.select({ id: linearTeamSyncs.id, linearTeamId: linearTeamSyncs.linearTeamId, linearTeamKey: linearTeamSyncs.linearTeamKey, linearTeamName: linearTeamSyncs.linearTeamName, active: linearTeamSyncs.active, lastError: linearTeamSyncs.lastError })
-    .from(linearTeamSyncs).where(eq(linearTeamSyncs.ownerId, user.id)).orderBy(desc(linearTeamSyncs.createdAt))
+    .from(linearTeamSyncs).where(and(eq(linearTeamSyncs.ownerId, user.id), eq(linearTeamSyncs.workspaceId, context.workspace.id))).orderBy(desc(linearTeamSyncs.createdAt))
   const errors = await db.select({ id: linearSyncOutbox.id, issueId: issues.id, title: issues.title, identifier: linearIssueLinks.linearIdentifier, message: linearSyncOutbox.lastError, updatedAt: linearSyncOutbox.updatedAt })
     .from(linearSyncOutbox).innerJoin(issues, eq(issues.id, linearSyncOutbox.issueId))
     .leftJoin(linearIssueLinks, eq(linearIssueLinks.issueId, issues.id))
-    .where(and(eq(issues.userId, user.id), eq(linearSyncOutbox.status, 'failed')))
+    .where(and(eq(issues.userId, user.id), eq(issues.workspaceId, context.workspace.id), eq(linearSyncOutbox.status, 'failed')))
     .orderBy(desc(linearSyncOutbox.updatedAt)).limit(20)
   const inboundErrors = await db.select({ id: linearSyncInbox.deliveryId, eventType: linearSyncInbox.eventType, message: linearSyncInbox.lastError, receivedAt: linearSyncInbox.receivedAt })
     .from(linearSyncInbox).innerJoin(linearConnections, and(eq(linearConnections.organizationId, linearSyncInbox.organizationId), eq(linearConnections.userId, user.id)))
@@ -38,9 +41,10 @@ export async function getLinearBoardSync() {
   return runAction(async () => {
     if (!await linearSyncEnabled()) return { synced: false }
     const user = await requireUser()
+    const context = await loadWorkspaceContext(undefined, user)
     const [row] = await db.select({ id: linearTeamSyncs.id }).from(linearTeamSyncs)
       .innerJoin(linearConnections, and(eq(linearConnections.userId, linearTeamSyncs.ownerId), isNull(linearConnections.revokedAt)))
-      .where(and(eq(linearTeamSyncs.ownerId, user.id), eq(linearTeamSyncs.active, true))).limit(1)
+      .where(and(eq(linearTeamSyncs.ownerId, user.id), eq(linearTeamSyncs.workspaceId, context.workspace.id), eq(linearTeamSyncs.active, true))).limit(1)
     return { synced: Boolean(row) }
   })
 }
@@ -60,31 +64,37 @@ export async function listLinearTeamOptions() {
   return (await linearTeams(token)).map(({ id, key, name }) => ({ id, key, name }))
 }
 
-export async function enableLinearTeam(input: { teamId: string }) {
+export async function enableLinearTeam(input: { teamId: string; workspaceId?: string }) {
   if (!await linearSyncEnabled()) return { error: 'linearSyncDisabled' as const }
   const user = await requireUser()
-  const parsed = z.object({ teamId: z.string().uuid() }).safeParse(input)
+  const parsed = z.object({ teamId: z.uuid(), workspaceId: z.uuid().optional() }).safeParse(input)
   if (!parsed.success) return { error: 'linearTeamInvalid' as const }
+  const context = await loadWorkspaceContext(parsed.data.workspaceId, user)
   const token = await linearAccessToken(user.id)
   const team = (await linearTeams(token)).find(option => option.id === parsed.data.teamId)
   if (!team) return { error: 'linearTeamUnavailable' as const }
   const [existing] = await db.select().from(linearTeamSyncs).where(eq(linearTeamSyncs.linearTeamId, team.id)).limit(1)
-  if (existing && existing.ownerId !== user.id) return { error: 'linearTeamAlreadyLinked' as const }
+  if (existing && (existing.ownerId !== user.id || existing.workspaceId && existing.workspaceId !== context.workspace.id)) return { error: 'linearTeamAlreadyLinked' as const }
   const now = new Date()
-  await db.transaction(async tx => {
-    await tx.update(linearTeamSyncs).set({ active: false, updatedAt: now }).where(eq(linearTeamSyncs.ownerId, user.id))
-    if (existing) await tx.update(linearTeamSyncs).set({ linearTeamKey: team.key, linearTeamName: team.name, active: true, lastError: null, lastErrorAt: null, updatedAt: now }).where(eq(linearTeamSyncs.id, existing.id))
-    else await tx.insert(linearTeamSyncs).values({ id: crypto.randomUUID(), ownerId: user.id, linearTeamId: team.id, linearTeamKey: team.key, linearTeamName: team.name, active: true, updatedAt: now })
+  await withTaskWorkspace(user, context.workspace.id, () => db.transaction(async tx => {
+    // Serialize first binding and retries; never move a provider binding.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`linear-team-binding:${team.id}`}, 0))`)
+    const [current] = await tx.select().from(linearTeamSyncs).where(eq(linearTeamSyncs.linearTeamId, team.id)).for('update')
+    if (current && (current.ownerId !== user.id || current.workspaceId && current.workspaceId !== context.workspace.id)) throw new Error('linearTeamAlreadyLinked')
+    await tx.update(linearTeamSyncs).set({ active: false, updatedAt: now }).where(and(eq(linearTeamSyncs.ownerId, user.id), eq(linearTeamSyncs.workspaceId, context.workspace.id)))
+    if (current) await tx.update(linearTeamSyncs).set({ workspaceId: context.workspace.id, linearTeamKey: team.key, linearTeamName: team.name, active: true, lastError: null, lastErrorAt: null, updatedAt: now }).where(eq(linearTeamSyncs.id, current.id))
+    else await tx.insert(linearTeamSyncs).values({ id: crypto.randomUUID(), ownerId: user.id, workspaceId: context.workspace.id, linearTeamId: team.id, linearTeamKey: team.key, linearTeamName: team.name, active: true, updatedAt: now })
     if (!existing || existing.linearTeamKey !== team.key) await ownerIssueListsChanged(tx, user.id)
-  })
+  }))
   return { success: true as const }
 }
 
 export async function disableLinearTeam(id: string) {
   const user = await requireUser()
+  const context = await loadWorkspaceContext(undefined, user)
   const parsed = z.uuid().safeParse(id)
   if (!parsed.success) return { error: 'linearTeamInvalid' as const }
-  await db.update(linearTeamSyncs).set({ active: false, updatedAt: new Date() }).where(and(eq(linearTeamSyncs.id, parsed.data), eq(linearTeamSyncs.ownerId, user.id)))
+  await db.update(linearTeamSyncs).set({ active: false, updatedAt: new Date() }).where(and(eq(linearTeamSyncs.id, parsed.data), eq(linearTeamSyncs.ownerId, user.id), eq(linearTeamSyncs.workspaceId, context.workspace.id)))
   return { success: true as const }
 }
 
@@ -100,7 +110,7 @@ export async function retryLinearIssue(issueId: string) {
     // snapshot above may predate retirement or another publication generation.
     const [latest] = await tx.select().from(issues).where(eq(issues.id, issue.id)).for('update')
     if (!latest || latest.userId !== user.id) return { error: 'issueOwnerOnly' as const }
-    if (latest.linearSyncBlocked || latest.scope !== 'workspace' || readIssueMetadata(latest.content).deletedAt) return { error: 'linearIssueInvalid' as const }
+    if (latest.linearSyncBlocked || latest.linearSyncPolicy !== 'explicit' || latest.ownershipState !== 'bound' || readIssueMetadata(latest.content).deletedAt) return { error: 'linearIssueInvalid' as const }
     const [verifiedLink] = await tx.select({ id: linearIssueLinks.id }).from(linearIssueLinks).innerJoin(linearTeamSyncs, eq(linearTeamSyncs.id, linearIssueLinks.teamSyncId))
       .where(and(eq(linearIssueLinks.issueId, issue.id), eq(linearIssueLinks.ownerId, user.id), eq(linearIssueLinks.externalTargetVerified, true), eq(linearTeamSyncs.ownerId, user.id), eq(linearTeamSyncs.active, true))).limit(1)
     if (!verifiedLink) return { error: 'linearIssueInvalid' as const }

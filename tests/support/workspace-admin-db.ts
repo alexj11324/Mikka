@@ -40,16 +40,29 @@ export async function seedAgent(pool: Pool, userId: string, harness = 'codex') {
   return id
 }
 
-export async function seedRun(pool: Pool, input: { userId: string; agentId: string; botId?: string | null; issueId?: string | null; status?: string; startedAt?: Date | null; finishedAt?: Date | null }) {
+export async function seedRun(pool: Pool, input: { userId: string; agentId: string; workspaceId?: string; botId?: string | null; issueId?: string | null; status?: string; startedAt?: Date | null; finishedAt?: Date | null }) {
   const id = randomUUID()
-  await pool.query('insert into agent_runs (id,"userId","agentId","botId","issueId",status,"startedAt","finishedAt") values ($1,$2,$3,$4,$5,$6,$7,$8)',
-    [id, input.userId, input.agentId, input.botId ?? null, input.issueId ?? null, input.status ?? 'succeeded', input.startedAt ?? null, input.finishedAt ?? null])
+  const workspaceId = input.workspaceId ?? (!input.botId && !input.issueId ? await seedPersonalWorkspace(pool, input.userId) : null)
+  await pool.query('insert into agent_runs (id,"userId","agentId","workspaceId","botId","issueId",status,"startedAt","finishedAt") values ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+    [id, input.userId, input.agentId, workspaceId, input.botId ?? null, input.issueId ?? null, input.status ?? 'succeeded', input.startedAt ?? null, input.finishedAt ?? null])
   return id
 }
 
-export async function seedIssue(pool: Pool, userId: string) {
+/** Fixtures explicitly default to a personal tenant; production never backfills by creator. */
+export async function seedPersonalWorkspace(pool: Pool, userId: string) {
+  const existing = (await pool.query<{ id: string }>('select id from mikka_workspaces where "userId"=$1 and kind=\'personal\'', [userId])).rows[0]
+  if (existing) return existing.id
   const id = randomUUID()
-  await pool.query(`insert into issues (id,"userId",title,content,status,priority) values ($1,$2,'Task','{"type":"doc"}','todo','normal')`, [id, userId])
+  await pool.query('insert into mikka_workspaces (id,"userId",name,slug,kind) values ($1,$2,\'Personal\',$3,\'personal\')', [id, userId, `personal-${id}`])
+  await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,\'admin\',\'active\')', [id, userId, `${userId}@example.invalid`])
+  return id
+}
+
+export async function seedIssue(pool: Pool, userId: string, workspaceId?: string) {
+  const id = randomUUID()
+  const tenant = workspaceId ?? await seedPersonalWorkspace(pool, userId)
+  await pool.query(`insert into issues (id,"userId","workspaceId","ownershipState",scope,"linearSyncPolicy","linearSyncBlocked",title,content,status,priority)
+    select $1,$2,w.id,'bound',case when w.kind='personal' then 'personal' else 'workspace' end,'disabled',true,'Task','{"type":"doc"}','todo','normal' from mikka_workspaces w where w.id=$3`, [id, userId, tenant])
   return id
 }
 
@@ -62,7 +75,7 @@ export async function seedTeam(pool: Pool, workspaceId: string, ownerId: string,
 }
 
 export async function seedTeamIssue(pool: Pool, workspaceId: string, teamId: string, userId: string) {
-  const issueId = await seedIssue(pool, userId)
+  const issueId = await seedIssue(pool, userId, workspaceId)
   await pool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [issueId, teamId, workspaceId, userId])
   return issueId
 }

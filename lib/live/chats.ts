@@ -1,29 +1,29 @@
 import type { PoolClient } from 'pg'
 import { afterDatabaseCommit } from '../db/commit-effects'
 import { LIVE_ID, type LiveInvalidation } from './events'
-import { ownerLiveScope } from './owner-scope'
+import { coordinatorSessionScope } from './coordinator-session'
 import { liveGatewayConfig, type LiveScope } from './scope'
 
 type Database = Pick<PoolClient, 'query'>
 type Target = { scope: LiveScope; events: LiveInvalidation[] }
 
-/** A bot chat is private to its owner. Its keys go only to the owner's actual
- * home channel: the bot list's key (the home ID) and, while the owner still
- * owns the bot, that chat's own key (the bot ID). Neither carries a message. */
+/** A bot chat is private to its owner within the bot's persisted tenant.
+ * Recheck membership when delivering; an owner-wide home channel must never
+ * receive a different workspace's bot IDs. Neither key carries a message. */
 export async function botChatTargets(database: Database, workspaceDatabase: Database, ownerId: string, botId: string | null, list = true): Promise<Target[]> {
-  const scope = await ownerLiveScope(workspaceDatabase, ownerId)
+  if (!botId || !LIVE_ID.test(botId)) return []
+  const scope = await coordinatorSessionScope(database, workspaceDatabase, ownerId, botId)
   if (!scope) return []
   const events: LiveInvalidation[] = list ? [{ kind: 'bot_chat_list', id: scope.workspaceId }] : []
-  if (botId && LIVE_ID.test(botId)) {
-    const { rowCount } = await database.query('SELECT 1 FROM bots WHERE id=$1 AND "ownerId"=$2', [botId, ownerId])
-    if (rowCount) events.push({ kind: 'bot_chat', id: botId })
-  }
+  events.push({ kind: 'bot_chat', id: botId })
   return events.length ? [{ scope, events }] : []
 }
 
 /** A run's state shows on its cards in its own bot's chat, for the run's owner only. */
 export async function runBotChatTargets(database: Database, workspaceDatabase: Database, runId: string): Promise<Target[]> {
-  const { rows: [run] } = await database.query<{ userId: string; botId: string | null }>('SELECT "userId","botId" FROM agent_runs WHERE id=$1', [runId])
+  const { rows: [run] } = await database.query<{ userId: string; botId: string | null }>(
+    `SELECT r."userId",r."botId" FROM agent_runs r JOIN bots b ON b.id=r."botId"
+     WHERE r.id=$1 AND r."workspaceId"=b."workspaceId" AND r."userId"=b."ownerId"`, [runId])
   return run?.botId ? botChatTargets(database, workspaceDatabase, run.userId, run.botId, false) : []
 }
 

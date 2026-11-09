@@ -88,23 +88,37 @@ test('workspace usage', { skip: !dbUrl }, async t => {
     assert.deepEqual(september.totals, { threads: 1, seconds: 3600 })
   })
 
-  await t.test('ancestry outside the visible bots is preserved without exposing or recounting its root', async () => {
+  await t.test('cross-workspace ancestry is rejected without exposing its root or changing either run', async () => {
     for (const rootDate of ['2026-09-30T09:00:00Z', '2026-10-01T09:00:00Z']) {
       const originWorkspace = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
       const currentWorkspace = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
       const origin = await seedBot(pool, originWorkspace.id, admin, 'Private original bot')
       const current = await seedBot(pool, currentWorkspace.id, admin, 'Current bot')
-      const issue = await seedIssue(pool, admin)
+      const issue = await seedIssue(pool, admin, originWorkspace.id)
       const root = await run(admin, agent, origin, rootDate, rootDate, rootDate)
       const retry = await run(admin, agent, current, '2026-10-03T09:00:00Z', '2026-10-03T09:00:00Z', '2026-10-03T10:00:00Z')
-      await pool.query('update agent_runs set "issueId"=$2 where id=$1', [root, issue])
-      await pool.query('update agent_runs set "issueId"=$2,"retryOf"=$3 where id=$1', [retry, issue, root])
-      assert.equal((await listIssueRunChains(pool, issue, [admin], 20))[0].rootRunId, root)
-      assert.deepEqual(await listBotRunRoots(pool, [current], at('2026-10-01'), at('2026-11-01')), [], 'an out-of-scope root is not a new thread or a returned identifier')
+      const tx = await pool.connect()
+      try {
+        await tx.query('BEGIN')
+        await tx.query('update agent_runs set "issueId"=$2 where id=$1', [root, issue])
+        assert.equal((await listIssueRunChains(tx, issue, [admin], 20))[0].rootRunId, root)
+        await assert.rejects(tx.query('update agent_runs set "issueId"=$2,"retryOf"=$3 where id=$1', [retry, issue, root]),
+          { code: '23514', message: 'taskWorkspaceMismatch' })
+      } finally {
+        await tx.query('ROLLBACK')
+        tx.release()
+      }
+      assert.deepEqual((await pool.query('SELECT "issueId","retryOf" FROM agent_runs WHERE id=ANY($1::uuid[]) ORDER BY id', [[root, retry]])).rows,
+        [{ issueId: null, retryOf: null }, { issueId: null, retryOf: null }], 'a rejected cross-workspace task binding leaves both runs unchanged')
+      await assert.rejects(pool.query('update agent_runs set "retryOf"=$2 where id=$1', [retry, root]),
+        { code: '23514', message: 'taskWorkspaceMismatch' })
+      assert.deepEqual((await pool.query('SELECT "issueId","retryOf" FROM agent_runs WHERE id=ANY($1::uuid[]) ORDER BY id', [[root, retry]])).rows,
+        [{ issueId: null, retryOf: null }, { issueId: null, retryOf: null }], 'task-free runs cannot acquire a parent from another workspace either')
+      assert.deepEqual((await listBotRunRoots(pool, [current], at('2026-10-01'), at('2026-11-01'))).map(row => row.rootRunId), [retry], 'only the independent current-workspace root is returned')
       const usage = await workspaceUsage(admin, currentWorkspace.id, '2026-10')
-      assert.deepEqual(usage.totals, { threads: 0, seconds: 3600 })
+      assert.deepEqual(usage.totals, { threads: 1, seconds: 3600 })
       assert.deepEqual(usage.bots.map(bot => bot.id), [current])
-      assert.ok(usage.daily.every(day => day.threads === 0))
+      assert.equal(usage.daily.reduce((sum, day) => sum + day.threads, 0), 1)
     }
   })
 

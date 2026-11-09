@@ -154,17 +154,19 @@ test('managed subscription routes authorize the existing service and native HTTP
     assert.equal(await count('model.denied'), denied + 1, 'suppressing allowed audits never suppresses a denial')
     assert.equal(workerCalls, workerBefore, 'revoked probes cannot reach the worker')
   })
-  await t.test('native HTTP uses only a bound broker and intersects current Bot and task workspaces on every request', async () => {
-    const botId = await seedBot(pool, one.id, ownerId)
+  await t.test('native HTTP uses a broker in the frozen task tenant and rejects foreign Bot attribution', async () => {
+    const botId = await seedBot(pool, two.id, ownerId)
+    const foreignBot = await seedBot(pool, one.id, ownerId)
     const team = await seedTeam(pool, two.id, ownerId)
     const issueId = randomUUID()
-    await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope) VALUES($1,$2,'Managed native fixture','{"type":"doc"}','doing','normal','workspace')`, [issueId, ownerId])
+    await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority,scope) VALUES($1,$2,$3,'Managed native fixture','{"type":"doc"}','doing','normal','workspace')`, [issueId, ownerId, two.id])
     await pool.query('INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES($1,$2,$3,$4)', [issueId, team.id, two.id, ownerId])
     const deviceId = randomUUID(), agentId = randomUUID(), runId = randomUUID()
     await pool.query(`INSERT INTO devices(id,"ownerId",name,harnesses) VALUES($1,$2,'managed native fixture',$3)`, [deviceId, ownerId, JSON.stringify([{ harness: 'codex', installed: true, subscriptionBroker: true }])])
     await pool.query(`INSERT INTO agents(id,"userId",harness,name,"deviceId") VALUES($1,$2,'codex',$3,$4)`, [agentId, ownerId, `managed-${agentId}`, deviceId])
-    const bindingId = await bind(one.id, agentId, 'codex_cli')
+    const bindingId = await bind(two.id, agentId, 'codex_cli')
     await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","botId","issueId","deviceId",status,"leaseExpiresAt") VALUES($1,$2,$3,$4,$5,$6,'running',now()+interval '2 minutes')`, [runId, ownerId, agentId, botId, issueId, deviceId])
+    await assert.rejects(pool.query('UPDATE agent_runs SET "botId"=$2 WHERE id=$1', [runId, foreignBot]), /taskWorkspaceMismatch/)
     await pool.query('INSERT INTO byos_native_runs("runId","bindingId") VALUES($1,$2)', [runId, bindingId])
     const payload = { path: '/responses', headers: {}, body: { model: 'fixture-model', stream: true } }
     const post = (body: unknown) => fetch(`${origin}/native/${deviceId}/${runId}`, { method: 'POST', body: JSON.stringify(body) })

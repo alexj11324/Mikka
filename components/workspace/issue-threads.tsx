@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/reui/badge'
 import { runResult, useRunResultLabel, type RunResult } from '@/hooks/use-run-result'
 import { GROUP_BADGES, ThreadStatusIcon } from './thread-status-icon'
+import { HarnessMark, harnessName } from '@/components/labels/entity-labels'
 import type { ThreadGroup } from '@/lib/thread-groups'
 import { cn } from '@/lib/utils'
 import { InlineLoadError } from '@/components/load-error'
@@ -44,12 +45,12 @@ export type AgentActivityRow = { id: string; at: string; node: ReactNode }
 
 /**
  * 活动's Agent rows (R-62, decision 2026-11-09-0045): one row per Agent stretch, oldest first, never one per
- * run. The first names its Agent; a later one reads 「换 Codex」. A row shows the stretch's latest state and
- * opens the task's one conversation at the stretch's first thread.
+ * run. Every row is labelled by its Agent, its mark and name as the Agents list shows them (R-74, R-78), never a
+ * 「换」 verb: as Warp does, a change of Agent is read from the next row's name. A row shows the stretch's latest
+ * run result and opens the task's one conversation at the stretch's first thread.
  */
 export function useAgentActivity(issueId: string, openId: string | null, onOpen: (id: string) => void, enabled = true): { rows: AgentActivityRow[]; error: ReactNode } {
   const t = useTranslations('IssueThreads')
-  const tTask = useTranslations('Shell.panel.task')
   const resultLabel = useRunResultLabel()
   const format = useFormatter()
   const now = useNow({ updateInterval: 60_000 })
@@ -58,9 +59,9 @@ export function useAgentActivity(issueId: string, openId: string | null, onOpen:
   if (!enabled) return { rows: [], error: null }
   if (error) return { rows: [], error: <InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { void mutate() }} /> }
   const stretches = agentStretches(data ?? [])
-  const rows = stretches.map(({ agent, first, last, ids }, index): AgentActivityRow => {
-    const own = last.detail ? harnessLabel(last.detail.harness) : (last.ownerName ? t('ownerThread', { name: last.ownerName }) : t('hidden'))
-    const name = index > 0 && agent ? tTask('switchRow', { agent: harnessLabel(agent) }) : own
+  const rows = stretches.map(({ first, last, ids }, index): AgentActivityRow => {
+    const harness = last.detail?.harness ?? null
+    const name = harness ? harnessName(harness) : (last.ownerName ? t('ownerThread', { name: last.ownerName }) : t('hidden'))
     const view = threadQuestionView(last)
     const outcome = acceptedProducerOutcome(last, issueId, allTasks)
     // The stretch's latest run, in the run-result words the right column and iOS use (glossary: Run result).
@@ -68,7 +69,7 @@ export function useAgentActivity(issueId: string, openId: string | null, onOpen:
     const group = RESULT_GROUP[result]
     const open = openId !== null && ids.includes(openId)
     const body = <>
-      <ThreadStatusIcon group={group} />
+      {harness ? <span data-slot="agent-mark" className="flex size-5 shrink-0 items-center justify-center [&_svg]:size-4.5"><HarnessMark harness={harness} /></span> : <ThreadStatusIcon group={group} />}
       <span className="min-w-0 flex-1 truncate text-left text-sm font-medium">{name}</span>
       <Badge variant={view.stopping ? 'secondary' : GROUP_BADGES[group]} size="sm" data-group={group} data-run-result={result}>{view.stopping ? t('stopping') : resultLabel(result, reason)}</Badge>
       <time className="min-w-14 shrink-0 whitespace-nowrap text-right text-xs font-normal text-muted-foreground tabular-nums" dateTime={new Date(last.finishedAt ?? last.createdAt).toISOString()}>{format.relativeTime(threadTime(last, now), now)}</time>

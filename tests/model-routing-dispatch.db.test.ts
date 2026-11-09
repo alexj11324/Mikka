@@ -294,7 +294,7 @@ test('difficulty routing: real eligibility, explicit precedence, frozen queue an
       import('../lib/factory/checks'), import('../lib/factory/check-independence'), import('../lib/agent-tool-approval/policy-store'),
       import('../lib/agent-kit/worker-digest'), import('../lib/model-routing-outcome'), import('../lib/factory/event-id'), import('../lib/captures/store'), import('../lib/thread-execution-identity-view'),
     ])
-    const issueId = await seedIssue(pool, scope.ownerId), sourceEventId = randomUUID()
+    const issueId = await seedIssue(pool, scope.ownerId, scope.workspaceId), sourceEventId = randomUUID()
     await pool.query('UPDATE issues SET title=$2 WHERE id=$1', [issueId, 'PRIVATE_ROUTING_TASK_CONTENT'])
     await pool.query(`INSERT INTO coordinator_events (id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES ($1,$2,$3,$4,'user_message',$5,$6)`,
       [sourceEventId, scope.ownerId, scope.botId, issueId, `routing-fixture:${sourceEventId}`, JSON.stringify({ text: 'Inspect the punctuation in this title.' })])
@@ -343,7 +343,7 @@ test('difficulty routing: real eligibility, explicit precedence, frozen queue an
   })
 
   await t.test('only an inherited profile invokes model routing; fixed or explicit models retain precedence', async () => {
-    const store = new profiles.AgentProfileStore(pool), issueId = await seedIssue(pool, scope.ownerId)
+    const store = new profiles.AgentProfileStore(pool), issueId = await seedIssue(pool, scope.ownerId, scope.workspaceId)
     const inherited = await store.create(scope, { name: 'Inherited routing fixture', harness: 'claude_code', model: { mode: 'inherit' }, instructions: 'PRIVATE_PROFILE_CONTENT' })
     const easy = decisionFixture('claude-haiku-5-5')
     const inheritedResult = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, profileId: inherited.id, location: 'local' }, { modelDecision: easy.decision })
@@ -379,7 +379,7 @@ test('difficulty routing: real eligibility, explicit precedence, frozen queue an
     for (const unavailable of [false, true]) {
       await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=ANY($1::uuid[])', [[strongSource, standardSource, lightSource], quota('claude')])
       await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [claude.id])
-      const issueId = await seedIssue(pool, scope.ownerId), sourceEventId = randomUUID()
+      const issueId = await seedIssue(pool, scope.ownerId, scope.workspaceId), sourceEventId = randomUUID()
       const probe = decisionFixture('claude-haiku-5-5', 'easy', 'default', { unavailable })
       const selected = await profiles.resolveAgentProfileDispatch(pool, scope, { issueId, profileId: profile.id, location: 'local' }, { modelDecision: probe.decision })
       const target = localTarget(selected.target)

@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { randomUUID } from 'node:crypto';
@@ -28,15 +29,17 @@ test('monitor sweep: finds unobserved monitor completions per (user, bot), is id
     const dir = new URL('../../drizzle/', import.meta.url);
     for (const f of orderMigrations((await readdir(dir)).filter(f => f.endsWith('.sql')))) await pool.query(await readFile(new URL(f, dir), 'utf8'));
     await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','O','o@example.invalid',true,now(),now()),('other','X','x@example.invalid',true,now(),now())`);
-    const botB = randomUUID();
+    const botB = randomUUID(), ownerBot = randomUUID();
     type Seed = { userId: string; botId: string | null; stage?: string; status?: string; finished?: boolean };
     const seed = async ({ userId, botId, stage = 'monitor', status = 'running', finished = true }: Seed) => {
       const [deviceId, agentId, issueId, taskId, attemptId, runId, candidateId, sourceEventId, eventId] = Array.from({ length: 9 }, () => randomUUID());
+      const workspaceId = await seedFixtureWorkspace(pool, userId);
+      if (botId) await pool.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,$4) ON CONFLICT (id) DO NOTHING`, [botId, userId, workspaceId, `Monitor ${botId}`]);
       await pool.query(`INSERT INTO devices (id,"ownerId",name,harnesses,"lastSeenAt") VALUES ($1,$2,'Mac','[]',now())`, [deviceId, userId]);
       await pool.query(`INSERT INTO agents (id,"userId",name,harness) VALUES ($1,$2,$3,'codex')`, [agentId, userId, agentId]);
-      await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,'Fixture','{}','todo','normal')`, [issueId, userId]);
-      await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,$2,'user_message',$3,'{"text":"synthetic"}')`, [sourceEventId, userId, sourceEventId]);
-      await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","deviceId","issueId",status,kind,prompt) VALUES ($1,$2,$3,$4,$5,'succeeded','acceptance','p')`, [runId, userId, agentId, deviceId, issueId]);
+      await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,$2,'Fixture','{}','todo','normal',$3,'bound')`, [issueId, userId, workspaceId]);
+      await pool.query(`INSERT INTO coordinator_events (id,"userId","botId",kind,"dedupeKey",payload) VALUES ($1,$2,$4,'user_message',$3,'{"text":"synthetic"}')`, [sourceEventId, userId, sourceEventId, botId]);
+      await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","deviceId","issueId","botId",status,kind,prompt) VALUES ($1,$2,$3,$4,$5,$6,'succeeded','acceptance','p')`, [runId, userId, agentId, deviceId, issueId, botId]);
       const c = await pool.connect();
       try {
         await c.query('BEGIN');
@@ -56,7 +59,7 @@ test('monitor sweep: finds unobserved monitor completions per (user, bot), is id
     const ownerDue = await seed({ userId: 'owner', botId: null });
     const ownerDue2 = await seed({ userId: 'owner', botId: null });
     const otherDue = await seed({ userId: 'other', botId: botB });
-    await observe(await seed({ userId: 'owner', botId: botB })); // already observed
+    await observe(await seed({ userId: 'owner', botId: ownerBot })); // already observed
     await seed({ userId: 'other', botId: null, status: 'cancelled' });
     await seed({ userId: 'other', botId: null, stage: 'verify' });
     await seed({ userId: 'owner', botId: randomUUID(), finished: false });

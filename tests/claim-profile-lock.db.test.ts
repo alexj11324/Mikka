@@ -111,7 +111,7 @@ test('cloud locked run Profile: fresh authority and normal Task database budget'
     const ownerId = await seedUser(pool, 'locked-requester'), payer = await seedUser(pool, 'locked-subscriber')
     const { id: workspaceId } = await seedWorkspace(pool, ownerId, [{ userId: ownerId, role: 'admin' }, { userId: payer, role: 'member' }])
     const { id: payerWorkspace } = await seedWorkspace(pool, payer, [{ userId: payer, role: 'admin' }])
-    const botId = await seedBot(pool, workspaceId, ownerId), issueId = await seedIssue(pool, ownerId)
+    const botId = await seedBot(pool, workspaceId, ownerId), issueId = await seedIssue(pool, ownerId, workspaceId)
     const deviceId = randomUUID(), repoId = randomUUID(), agentId = randomUUID(), connection = randomUUID()
     const model = harness === 'claude_code' ? 'claude-haiku-5-5' : 'gpt-6-luna'
     const actor = { userId: ownerId, workspaceId }, scope = { ownerId, workspaceId, botId }

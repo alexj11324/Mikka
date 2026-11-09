@@ -2,9 +2,8 @@
 // are fixtures; registered tool/step/runtime/store/decision code is real.
 import assert from "node:assert/strict";
 import { mock, type TestContext } from "node:test";
-import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
-import type { Pool, PoolClient } from "pg";
+import type { Pool } from "pg";
 import type { FactorySnapshot } from "../../lib/factory/store";
 import type { FactoryCheckRecoveryDependencies } from "../../lib/factory/check-recovery";
 import { factoryBinding } from "../../lib/factory/dispatch";
@@ -28,8 +27,13 @@ export async function exerciseFactoryRecoveryEntry(
     latestRequest: () => unknown;
   },
 ) {
-  const { db } = fixture,
-    currentTx = new AsyncLocalStorage<PoolClient>();
+  const { db } = fixture;
+  const { pool: applicationPool } = await import("../../lib/db");
+  const { workspacePool } = await import("../../lib/workspace-db");
+  assert.equal(applicationPool.options.connectionString, db.options.connectionString,
+    "registered recovery uses the caller's real isolated APP request scope");
+  assert.equal(workspacePool.options.connectionString, db.options.connectionString,
+    "registered recovery uses the same real isolated Workspace authority");
   let revoked = false,
     guardCalls = 0,
     runtimeCalls = 0;
@@ -48,23 +52,9 @@ export async function exerciseFactoryRecoveryEntry(
   const previous = flags.map((key) => process.env[key]);
   try {
     for (const key of flags) process.env[key] = "1";
-    stub("../../lib/db/index.ts", {
-      db: null,
-      pool: db,
-      withDatabaseClient: (tx: PoolClient, fn: () => Promise<unknown>) =>
-        currentTx.run(tx, fn),
-    });
-    stub("../../lib/issue-access.ts", {
-      requireUser: unused,
-      requireIssueAccess: unused,
-      issueForUser: async (user: string, issue: string) =>
-        (
-          await (currentTx.getStore() ?? db).query(
-            'SELECT id FROM issues WHERE id=$1 AND "userId"=$2',
-            [issue, user],
-          )
-        ).rows[0] ?? null,
-    });
+    // The registered entry uses real APP scope, the Workspace membership lease,
+    // and canonical full-reader task visibility. Only unrelated host/transport
+    // boundaries below are isolated from this offline fixture.
     stub("../../lib/agent-runs.ts", {
       addRunMessage: unused,
       queueRun: unused,
@@ -96,7 +86,6 @@ export async function exerciseFactoryRecoveryEntry(
       },
     });
     stub("../../lib/coordinator/store.ts", { editMemory: unused });
-    stub("../../lib/issue-visibility.ts", { issueVisibility: unused });
     stub("../../lib/device-link.ts", { DEVICE_ONLINE_WINDOW_MS: 60000 });
     stub("../../lib/search/index.ts", { webSearch: unused });
     stub("../../lib/composio.ts", { runComposioAction: unused });
@@ -128,7 +117,11 @@ export async function exerciseFactoryRecoveryEntry(
           undefined,
           undefined,
           undefined,
-          { invoke: fixture.modelInvoke, collectImages },
+          { invoke: (...args) => {
+            assert.equal(applicationPool.totalCount - applicationPool.idleCount, 0,
+              "registered recovery releases its actual APP client before invoking the model");
+            return fixture.modelInvoke(...args);
+          }, collectImages },
         );
       },
     });
@@ -230,6 +223,35 @@ export async function exerciseFactoryRecoveryEntry(
           assert.equal(fixture.callCount(), count + 1);
         },
       );
+    await t.test(
+      "registered recovery rejects suspended Workspace membership without model or task effects",
+      async () => {
+        const { snapshot } = await fixture.failedReview();
+        const count = fixture.callCount();
+        const { rows: [bot] } = await db.query<{ workspaceId: string }>(
+          'SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2',
+          [fixture.botId, "owner"],
+        );
+        assert.ok(bot?.workspaceId);
+        const taskState = async () => (await db.query(
+          'SELECT to_jsonb(t) AS value FROM factory_tasks t WHERE id=$1',
+          [snapshot.task.id],
+        )).rows[0].value;
+        const before = await taskState();
+        await db.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2',
+          [bot.workspaceId, "owner"]);
+        try {
+          assert.deepEqual(await tools.recover_factory_check.execute!(
+            { binding: factoryBinding(snapshot.task) }, call,
+          ), { error: "factoryNotFound" });
+          assert.equal(fixture.callCount(), count);
+          assert.deepEqual(await taskState(), before);
+        } finally {
+          await db.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2',
+            [bot.workspaceId, "owner"]);
+        }
+      },
+    );
     await t.test(
       "real recovery step rechecks native scope before resolving runtime or model",
       async () => {

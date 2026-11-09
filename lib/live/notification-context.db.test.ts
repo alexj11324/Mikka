@@ -72,7 +72,7 @@ test('real Factory notifications retain their database across COMMIT and delayed
       const issueId = randomUUID(), sourceEventId = randomUUID(), botId = randomUUID()
       for (const [index, pool] of pools.entries()) {
         await pool.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,$4)', [botId, owner, index ? intended : wrong, `Context fixture ${botId}`])
-        await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Context fixture','{"type":"doc","content":[]}','todo','normal')`, [issueId, owner])
+        await pool.query(`INSERT INTO issues(id,"userId","workspaceId","ownershipState",scope,title,content,status,priority) VALUES($1,$2,$3,'bound',$4,'Context fixture','{"type":"doc","content":[]}','todo','normal')`, [issueId, owner, index ? intended : wrong, index ? 'personal' : 'workspace'])
         await pool.query('INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload) VALUES($1,$2,$3,\'user_message\',$4,\'{"text":"Isolated fixture"}\')', [sourceEventId, owner, botId, sourceEventId])
       }
       const store = createFactoryStore(requestPool, async (user, issue, client) => (await client.query('SELECT id FROM issues WHERE id=$1 AND "userId"=$2', [issue, user])).rowCount === 1, botId)
@@ -80,11 +80,13 @@ test('real Factory notifications retain their database across COMMIT and delayed
         issueId, sourceEventId, eventId: randomUUID(), rationale: 'Context fixture', missingInformation: [], missingPermissions: [], needsSpec: false,
       }, tx)))
       // The default database deliberately has the same task, issue, Bot and
-      // owner IDs. Only the Bot's workspace differs, so using it leaks a key.
+      // owner IDs. Its persisted task/issue/Bot tenant differs, so falling back
+      // to it would still address a valid but unauthorized notification key.
       const clone = await defaultPool.connect()
       try {
         await clone.query('BEGIN')
         const task = (await tx.query('SELECT to_jsonb(t) AS value FROM factory_tasks t WHERE id=$1', [result.task.id])).rows[0].value
+        task.workspaceId = wrong
         await clone.query('INSERT INTO factory_tasks SELECT * FROM jsonb_populate_record(NULL::factory_tasks,$1)', [task])
         const attempts = (await tx.query('SELECT to_jsonb(a) AS value FROM factory_attempts a WHERE "taskId"=$1', [result.task.id])).rows
         for (const attempt of attempts) await clone.query('INSERT INTO factory_attempts SELECT * FROM jsonb_populate_record(NULL::factory_attempts,$1)', [attempt.value])
@@ -179,7 +181,7 @@ test('real Factory notifications retain their database across COMMIT and delayed
         for (const runOwner of [`${owner}-other`, owner]) {
           const issueId = randomUUID(), otherAgent = randomUUID(), otherRun = randomUUID()
           if (runOwner !== owner) await requestPool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,\'Activity fixture\',$2,true,now(),now())', [runOwner,`${runOwner}@example.invalid`])
-          await requestPool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Other activity fixture','{"type":"doc","content":[]}','todo','normal')`, [issueId,runOwner])
+          await requestPool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority) VALUES($1,$2,$3,'Other activity fixture','{"type":"doc","content":[]}','todo','normal')`, [issueId,runOwner,intended])
           await requestPool.query('INSERT INTO agents(id,"userId",harness,name) VALUES($1,$2,\'codex\',$3)', [otherAgent,runOwner,otherAgent])
           await requestPool.query('INSERT INTO agent_runs(id,"userId","issueId","agentId") VALUES($1,$2,$3,$4)', [otherRun,runOwner,issueId,otherAgent])
           // Each run obeys the real issue/owner constraints. Only the task's
@@ -204,12 +206,13 @@ test('real Factory notifications retain their database across COMMIT and delayed
         [runId,owner,task.issueId,agentId,task.botId])
       await requestPool.query('UPDATE factory_attempts SET "runId"=$2 WHERE id=$1 AND "taskId"=$3', [task.attemptId,runId,task.id])
       const { submitArtifact } = await import('../artifacts/store')
+      const { withTaskWorkspace } = await import('../task-workspace')
       const { artifactStorage } = await import('../artifacts/storage')
       assert.equal(artifactStorage(), 'inline', 'the notification fixture never uploads external objects')
       const submit = (artifactId?: string) => submitArtifact({ userId: owner, runId, issueId: task.issueId, botId: task.botId, authorName: 'Fixture' },
         { title: 'Running task document', kind: 'markdown', content: '# Committed task document', ...(artifactId ? { artifactId } : {}) })
       let artifactId = '', before = sent.length
-      await requestScope.run(() => app.db.transaction(outer => app.withDatabaseTransaction(outer, async () => {
+      await requestScope.run(() => withTaskWorkspace(owner,intended,() => app.db.transaction(outer => app.withDatabaseTransaction(outer, async () => {
         const result = await submit()
         assert.ok(!('error' in result)); artifactId = result.artifactId
         assert.equal((await requestPool.query('SELECT id FROM artifacts WHERE id=$1', [artifactId])).rowCount, 0)
@@ -217,18 +220,18 @@ test('real Factory notifications retain their database across COMMIT and delayed
         // notification. Only the unrelated Coordinator scheduler can run now.
         await drain(); await drain()
         assert.deepEqual(taskDeliveries(before), [])
-      })))
+      }))))
       assert.equal((await requestPool.query('SELECT id FROM artifacts WHERE id=$1', [artifactId])).rowCount, 1)
       await drain(); await drain()
       assert.deepEqual(taskDeliveries(before), [expected(task)])
       before = sent.length
-      await assert.rejects(requestScope.run(() => app.db.transaction(outer => app.withDatabaseTransaction(outer, async () => {
+      await assert.rejects(requestScope.run(() => withTaskWorkspace(owner,intended,() => app.db.transaction(outer => app.withDatabaseTransaction(outer, async () => {
         const result = await submit(artifactId)
         assert.ok(!('error' in result)); assert.equal(result.version, 2)
         await drain(); await drain()
         assert.deepEqual(taskDeliveries(before), [])
         throw new Error('artifact activity rollback')
-      }))), /artifact activity rollback/)
+      })))), /artifact activity rollback/)
       await drain(); await drain()
       assert.deepEqual(taskDeliveries(before), [])
       assert.equal((await requestPool.query('SELECT "latestVersion" FROM artifacts WHERE id=$1', [artifactId])).rows[0].latestVersion, 1)

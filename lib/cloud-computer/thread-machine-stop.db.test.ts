@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 // #467 follow-up: ensureThreadMachine never starts a machine for a queued run whose stop was
 // requested. Check 1 runs under the first run lock before any provider call; check 2 re-takes
 // the run lock after the sandbox is created and before the worker is started.
@@ -44,6 +45,7 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
 
     const owner = "owner", workspaceId = randomUUID(), botId = randomUUID(), botDevice = randomUUID(), agentId = randomUUID(), repoId = randomUUID();
     await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,'Fixture','thr-stop@example.invalid',true,now(),now())`, [owner]);
+    await seedFixtureWorkspace(pool, owner, 'team', workspaceId);
     await pool.query(`INSERT INTO devices (id,"ownerId",name,kind) VALUES ($1,$2,'bot','cloud')`, [botDevice, owner]);
     await pool.query(`INSERT INTO agents (id,"userId",harness,name,"deviceId") VALUES ($1,$2,'codex','Fixture',$3)`, [agentId, owner, botDevice]);
     await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,'/fixture/repo')`, [repoId, botDevice, owner]);
@@ -217,7 +219,7 @@ test("a stop-requested queued run ends instead of provisioning, at both check po
     await t.test("an adopted task machine preserves native history without a retry or continuation link", async () => {
       const runId = await retainedUnclaimedRun(), source = await queuedRun(), issueId = randomUUID();
       const machine = (await pool.query('SELECT * FROM thread_machines WHERE "runId"=$1', [runId])).rows[0];
-      await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,'Adopted task fixture','{"type":"doc","content":[]}'::jsonb,'todo','normal')`, [issueId, owner]);
+      await pool.query(`INSERT INTO issues (id,"userId","workspaceId",title,content,status,priority) VALUES ($1,$2,$3,'Adopted task fixture','{"type":"doc","content":[]}'::jsonb,'todo','normal')`, [issueId, owner, workspaceId]);
       await pool.query(`UPDATE agent_runs SET "issueId"=$2 WHERE id=$1`, [runId, issueId]);
       await pool.query(`UPDATE thread_machines SET "issueId"=$2 WHERE "runId"=$1`, [runId, issueId]);
       await pool.query(`UPDATE agent_runs SET "issueId"=$2,"deviceId"=$3,"deviceRepoId"=$4,status='succeeded',"sessionId"='fixture-adopted-session',"startedAt"=now(),"finishedAt"=now() WHERE id=$1`, [source, issueId, machine.deviceId, machine.repoId]);

@@ -43,7 +43,7 @@ before(async () => {
     teamDeletionImpact: respond('teamDeletionImpact', { teamId: 't', name: 'Platform', tasks: 42, projects: 5 }),
     deleteTeamData: respond('deleteTeamData', { deleted: { tasks: 42, projects: 5 } }),
   } })
-  mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => ({ user: { id: actor.userId, email: actor.email, name: actor.name } }) } } } })
+  mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => ({ user: { id: actor.userId, email: actor.email, name: actor.name }, session: { id: 'workspace-fixture-session' } }) } } } })
   mock.module('@/lib/db', { namedExports: { pool: { query: () => { throw Error('unexpected query') } }, db: { insert: () => ({ values: async (row: Record<string, unknown>) => { inserted.push(row) } }) } } })
   mock.module('@/lib/run-policy-stop', { namedExports: { stopRunsForPolicyChange: respond('stopRunsForPolicyChange', 0) } })
   mock.module('@/lib/workspace-admin/bots', { namedExports: {
