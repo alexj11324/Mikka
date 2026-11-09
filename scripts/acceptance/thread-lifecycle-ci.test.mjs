@@ -353,3 +353,21 @@ test('the privileged job starts only after metadata authorization and keeps exac
   assert.ok(!acceptance.includes('VERCEL_TEAM_TOKEN'))
   assert.ok(!acceptance.includes('E2B_ACCEPTANCE_TEMPLATE'))
 })
+
+
+test('serialized release job names retain the full proof and allow the cheap caller skip', () => {
+  const nested = jobs(true)
+  nested.jobs = nested.jobs.map(job => job.name === 'test' || job.name === 'check' ? job : { ...job, name: 'release / ' + job.name })
+  nested.jobs.push({ ...nested.jobs[0], id: 99, name: 'release / recheck' }); nested.total_count++
+  assert.equal(selectRelease(expected(), nested, ['README.md']).runtime, 'validated_and_published')
+  nested.jobs.find(job => job.name === 'release / subscriptions').conclusion = 'skipped'
+  assert.throws(() => selectRelease(expected(), nested, relevant), /thread_lifecycle_ci:jobs/)
+  const skipped = jobs(false)
+  skipped.jobs = [...skipped.jobs.slice(0, 2), { ...skipped.jobs[2], name: 'release' }]; skipped.total_count = 3
+  assert.equal(selectRelease(expected(), skipped, ['README.md']).selected, false)
+  assert.equal(selectRelease(expected(), skipped, relevant).reason, 'lifecycle_changes')
+  const rechecked = jobs(false)
+  rechecked.jobs = rechecked.jobs.map(job => job.name === 'test' || job.name === 'check' ? job : { ...job, name: 'release / ' + job.name })
+  rechecked.jobs.push({ ...rechecked.jobs[0], id: 99, name: 'release / recheck' }); rechecked.total_count++
+  assert.equal(selectRelease(expected(), rechecked, ['README.md']).selected, false)
+})
