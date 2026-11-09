@@ -229,8 +229,22 @@ export async function runInboxProduction({ env = process.env, event, attestation
       'An existing task or suggestion is never mutated during inventory.',
       'The owner API retains completion history; cleanup dismisses only the exact disposable suggestion and leaves its receipt.'] }
   let client, account, ownerId, source, originalWorkspaceId, originalCookie = '', personalWorkspaceId, signInAttempted = false
-  let suggestionId, boundFixture, live, phase = 'target', deadline, closing = false, mutationStarted = false
+  let suggestionId, boundFixture, live, phase = 'target', deadline, closing = false, bindingJournaled = false
   let selected, fixture
+  const cleanupWriteAllowed = (path, init) => {
+    if (init.method !== 'POST' || typeof init.body !== 'string' || init.body.length > 4096) return false
+    let body; try { body = JSON.parse(init.body) } catch { return false }
+    if (!object(body)) return false
+    const keys = Object.keys(body).sort().join(',')
+    if (path === '/mikka/api/auth/sign-out') return keys === ''
+    if (!ownerId) return false
+    if (path === '/mikka/api/rpc') return keys === 'action,args,version' && body.version === 1
+      && body.action === 'workspace.switchWorkspace' && UUID.test(originalWorkspaceId ?? '')
+      && Array.isArray(body.args) && body.args.length === 1 && body.args[0] === originalWorkspaceId
+    return path === '/mikka/api/inbox' && bindingJournaled && Boolean(boundFixture)
+      && keys === 'action,id,type,workspaceId' && body.workspaceId === personalWorkspaceId
+      && body.type === 'suggestion' && body.id === suggestionId && ['reopen', 'reject'].includes(body.action)
+  }
   const lease = async () => {
     const fresh = await selectTarget({ env, event, attestation: selected?.attestation ?? attestation, fetchImpl, now,
       expectedSelection: selected, assertTarget })
@@ -295,6 +309,7 @@ export async function runInboxProduction({ env = process.env, event, attestation
       driverRunId: Number(env.GITHUB_RUN_ID), driverAttempt: Number(env.GITHUB_RUN_ATTEMPT), ownerHash: digest(ownerId),
       workspaceId: personalWorkspaceId, suggestionId, ...boundFixture, state, observedAt: new Date(now()).toISOString() }) }
     catch { throw new ProbeError('receipt_failed') }
+    if (state === 'bound_before_mutation') bindingJournaled = true
   }
   const githubRead = async path => {
     check(/^\/repos\/alexj11324\/Mikka-handoff\/issues\/(?:[1-9]\d*|(?:events|comments)\/[1-9]\d*)$/.test(path)
@@ -326,9 +341,13 @@ export async function runInboxProduction({ env = process.env, event, attestation
     client = createSessionClient(CORE_ORIGIN, async (url, init) => {
       const targetUrl = new URL(url), headers = new Headers(init.headers)
       check(targetUrl.origin === CORE_ORIGIN && targetUrl.pathname.startsWith('/mikka/api/'), 'target_refused')
-      // Recheck actual main, Web, PR head and the exact live window before
-      // each write. Revoking this driver's own session always remains cleanup.
-      if (!['GET', 'HEAD'].includes(init.method ?? 'GET') && targetUrl.pathname !== '/mikka/api/auth/sign-out') await lease()
+      // A lease withdrawal must stop new business without stranding this
+      // attempt's own journaled resources. Closing permits only those exact
+      // cleanup commands, the saved workspace, and this session's logout.
+      if (!['GET', 'HEAD'].includes(init.method ?? 'GET')) {
+        if (closing) check(cleanupWriteAllowed(targetUrl.pathname, init), 'cleanup_failed')
+        else await lease()
+      }
       if (targetUrl.pathname === '/mikka/api/auth/get-session') targetUrl.searchParams.set('disableCookieCache', 'true')
       if (signInAttempted && !originalCookie && headers.get('cookie')) originalCookie = headers.get('cookie')
       return boundedFetch(targetUrl, { ...init, headers, redirect: 'error' })
@@ -441,7 +460,7 @@ export async function runInboxProduction({ env = process.env, event, attestation
       await checkpoint('bound_before_mutation')
       report.checks.fixture = { suggestionId, ...boundFixture }
       live = inboxLiveSocket(await read('live_ticket', '/api/live/ticket?workspace=' + personalWorkspaceId), { ownerId, workspaceId: personalWorkspaceId, now, socketFactory })
-      await live.ready(); mutationStarted = true
+      await live.ready()
       const until = new Date(now() + 120_000).toISOString(), snoozePush = live.expect()
       await command('snooze', true, until); await snoozePush(); await command('snooze', false, until, 'snooze_duplicate')
       check((await ownItems('pending', 'pending_after_snooze')).length === 0, 'command_mismatch')
@@ -478,7 +497,7 @@ export async function runInboxProduction({ env = process.env, event, attestation
   finally {
     closing = true
     const clean = async (step, work) => { try { await work() } catch (error) { report.cleanup.failures.push({ step, ...failure(error) }) } }
-    if (client && mutationStarted && suggestionId && boundFixture) await clean('own_suggestion', async () => {
+    if (client && bindingJournaled && suggestionId && boundFixture) await clean('own_suggestion', async () => {
       // A lost HTTP response is recovered by these same idempotent owner
       // commands, using only the source-bound UUID journaled before mutation.
       await command('reopen', null, undefined, 'cleanup_reopen')

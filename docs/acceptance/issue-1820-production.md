@@ -183,9 +183,10 @@ historical state. This is why historical suggestions are never mutation fixtures
 Completion receipts are intentionally retained by the product; cleanup does not
 delete audit history.
 
-A withdrawn window blocks even fixture business cleanup. The exact binding journal
-and closed failure receipt remain available for diagnosis and a new explicitly
-bounded cleanup attempt; session revocation is still attempted. A lost HTTP write
+A withdrawn window blocks new business commands. The automatic closing path still
+permits only the already journaled suggestion UUID's reopen/reject, the saved
+original workspace restoration, and this attempt's session revocation. It cannot
+snooze, accept, undo, switch to another workspace, or act on another item. A lost HTTP write
 response uses only idempotent commands on the already journaled UUID. Any cleanup
 refusal, missing coverage, unavailable source, changed deployment, or malformed
 response prevents a pass. HTTP failures retain numeric status and an allowlisted

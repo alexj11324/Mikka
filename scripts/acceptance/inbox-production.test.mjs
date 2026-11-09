@@ -159,11 +159,13 @@ test('untrusted target fails before accessing credentials or network', async () 
   assert.equal(report.status, 'failed'); assert.equal(credentialsRead, false); assert.equal(requested, false)
 })
 
-test('withdrawn release authority blocks the next write and still revokes this driver session', async () => {
+test('withdrawn release authority stops new business but finishes only the journaled cleanup, saved workspace and session', async () => {
   const f = fixture({ windowLost: true }), report = await runInboxProduction(f.args)
   assert.equal(report.status, 'failed'); assert.equal(report.failure.code, 'inbox_window_invalid')
-  assert.deepEqual(f.mutations, ['snooze'], 'later writes cannot bypass the changed window, including fixture cleanup')
-  assert.equal(report.cleanup.status, 'failed'); assert.equal(report.cleanup.originalCookieRejected, true)
+  assert.deepEqual(f.mutations, ['snooze', 'reopen', 'reject'], 'the duplicate business write is refused but exact owned cleanup remains authorized')
+  assert.equal(report.cleanup.status, 'passed'); assert.equal(report.cleanup.originalCookieRejected, true)
+  assert.equal(report.cleanup.workspaceRestored, true); assert.equal(report.cleanup.ownSuggestionDismissed, true)
+  assert.equal(f.state().snoozedUntil, null); assert.ok(f.state().rejectedAt); assert.equal(f.state().selected, HOME)
   assert.equal(report.cleanup.liveClosed, true); assert.equal(f.receipts[0].state, 'bound_before_mutation')
   noLeaks(report)
 })
