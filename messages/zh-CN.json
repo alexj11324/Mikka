@@ -4361,7 +4361,9 @@
           "merged": "PR 已合并"
         },
         "result": {
-          "running": "进行中",
+          "running": "运行中",
+          "queued": "排队中",
+          "waiting": "等你回复",
           "needsReply": "等你回复",
           "paused": "已暂停",
           "failed": "失败",
