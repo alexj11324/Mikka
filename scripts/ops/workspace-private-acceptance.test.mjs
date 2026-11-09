@@ -36,7 +36,7 @@ function fixtureReceipts() {
       productionTaskAuthorityTested: false, subscriptionsTested: false, agentRootIsolationProven: false,
       frameworkVersions: { next: '16.4.1', vite: '8.3.6', react: '19.3.1', 'react-dom': '19.3.1' },
       frameworkLockSha256: P0.files['scripts/e2b/fixtures/preview-frameworks/package-lock.json'],
-      stage: 'completed', passed: true, guard, resumedGuard: guard, frameworks, terminal: { passed: true } }])),
+      stage: 'completed', passed: true, guard, resumedGuard: guard, frameworks, previewStopped: true, terminal: { passed: true } }])),
     vmCleanup: { version: 1, sourceCommit: P0.source, opsSource: context.opsSource,
       cleanup: kinds.map(kind => ({ kind, stopped: true, absent: true, scopeVerified: true, killAcknowledged: true,
         outcome: 'provider_kill_acknowledged_and_absent' })) },
@@ -923,4 +923,36 @@ test('takeover phases remain distinct closed failures without changing runtime o
       assert.equal(Object.hasOwn(result.cases[0], 'error'), false)
     }
   }
+})
+
+test('preview shutdown failure retains both completed frameworks and the exact stage without claiming PTY or dropping cleanup', () => {
+  const input = fixtureReceipts(), privateText = 'synthetic-private-shutdown-command-url-and-output'
+  Object.assign(input.runtime.claude, { stage: 'preview_shutdown', passed: false, failure: 'process',
+    previewStopped: false, terminal: undefined, message: privateText, command: privateText })
+  input.outcomes.acceptance = 'failure'
+  const result = summarizeAcceptance(context, input), row = result.cases[0]
+  assert.equal(result.passed, false); assert.equal(row.runtimePassed, false)
+  assert.equal(row.stage, 'preview_shutdown'); assert.equal(row.failure, 'process'); assert.equal(row.previewStopped, false)
+  assert.equal(row.frameworks.length, 2)
+  assert.ok(row.frameworks.every(value => value.hotReload && value.revoked && value.takeoverDenied && value.websocket.closed))
+  assert.equal(row.terminal.passed, false)
+  assert.equal(result.cases[1].runtimePassed, true)
+  assert.equal(result.runtimeCleanupConfirmed, true); assert.equal(result.templateCleanupConfirmed, true)
+  assert.equal(JSON.stringify(result).includes(privateText), false)
+})
+
+test('completed runtime needs the exact preview shutdown boolean and never copies private reply fields', () => {
+  const privateText = 'synthetic-private-shutdown-reply'
+  for (const value of [undefined, null, false, 'true', 1, {}, []]) {
+    const input = fixtureReceipts()
+    input.runtime.claude.previewStopped = value
+    input.runtime.claude.shutdownReply = { stopped: true, private: privateText }
+    const result = summarizeAcceptance(context, input)
+    assert.equal(result.cases[0].previewStopped, value === false ? false : null)
+    assert.equal(result.cases[0].runtimePassed, false); assert.equal(result.passed, false)
+    assert.equal(result.cases[1].runtimePassed, true)
+    assert.equal(JSON.stringify(result).includes(privateText), false)
+  }
+  const input = fixtureReceipts(), result = summarizeAcceptance(context, input)
+  assert.equal(result.passed, true); assert.ok(result.cases.every(row => row.previewStopped === true))
 })

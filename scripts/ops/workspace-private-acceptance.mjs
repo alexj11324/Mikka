@@ -9,8 +9,8 @@ import { pathToFileURL } from 'node:url'
 import { assertOpsContext } from './self-hosted-ingress-probe.mjs'
 
 export const P0 = Object.freeze({
-  source: '06a3ec1e6567dcd5da95757ad11b1b7db46a127b',
-  tree: '650b5f348ea8c90da2c4389d4f84e9784c69c7ee',
+  source: 'b315f01116d64bc8a7cc1ef4312e4d14e7790dbb',
+  tree: '95f69cec928307e837e3e19fd401100ed7a90117',
   workerSha: '300c7be89fb2bbb701e29d4c74ec7962694613e1',
   sdks: { nodeMajor: '24', pnpm: '10.34.3', javascriptE2b: '2.61.0', pythonE2b: '2.62.0', next: '16.4.1' },
   files: {
@@ -22,11 +22,11 @@ export const P0 = Object.freeze({
     'scripts/e2b/build-template.py': '33ff017fa85e6e05fbdf7d0e8a5c59db4da98825e2aff73ac3314956e479b42c',
     'scripts/e2b/build-template.test.py': '0481716b0fd2accfd66d08975ceee67ac5fdf6ae82c3918c20164632c79a3ed2',
     'scripts/e2b/official-files.py': '66911624af52df59ef715eb105af9a3025bacf12460105fadc7f87e4d2dd63b5',
-    'scripts/e2b/official-files.test.py': '0d31956e8825cedd739563404ae5d31c80b9388310399968b297344c581a3201',
+    'scripts/e2b/official-files.test.py': '9f5c3b13a0b219fa55570964139214fe89db36c76c3b58ba00313a587dade7d0',
     'scripts/e2b/cleanup-template-candidates.py': '893b0d50f30f4b21f92f155aee97965e12f84fd0e21ea0ada3dfb3a00392533d',
     'scripts/e2b/cleanup-template-candidates.test.py': '826a489c570a788ea018b6a6ce786fd3e71b41dc8d514cfd8a09e516f8bf84f1',
-    'scripts/e2b/workspace-ingress-acceptance.mjs': '880497f82bb3135b33315abd8d10d1cebe113289cccfd34abb315197c37e102e',
-    'scripts/e2b/workspace-ingress-acceptance.test.mjs': '899641f96cb548158b733f043d509640eb6aaf6366bebe4e8199d2fb5aec9b0d',
+    'scripts/e2b/workspace-ingress-acceptance.mjs': 'e28a551e6f14d38d4fcbd521ab1f20f09c895c3b5e9e18a8cb3f9ed9de8ae7f0',
+    'scripts/e2b/workspace-ingress-acceptance.test.mjs': '9b172bf3dd2f877d487a3b1f064c9fc548088d1b3f6a4ae0af7c560039c34043',
     'scripts/e2b/workspace-ingress-servers.py': '5c0c12ff3f5573f7a6032a359a372b2a4697b17e44501c7d175bd10c809c74b8',
     'scripts/e2b/workspace-terminal-acceptance.mjs': 'd6d9d535c393e179eca800a44e5dfed508b06135d8891a793af05d539fa8252c',
     'scripts/e2b/workspace-terminal-acceptance.test.mjs': '971003d90739338112ae83838abc218811818600dcebe7fdbdd46b5e2214dce3',
@@ -106,7 +106,7 @@ const CONSERVATION_REMOVED_PATH_CODES = ['provider_shared_directory', 'provider_
 const BUILD_STAGES = ['identity', 'credential', 'preflight', 'build', 'complete', 'cleanup', 'probe_cleanup',
   ...KINDS.flatMap(kind => ['build', 'private', 'models', 'conservation'].map(prefix => `${prefix}_${kind}`))]
 const RUNTIME_STAGES = ['create', 'identity', 'prelistener_guard', 'initial_ingress', 'gateway_listener_wiring',
-  'framework_dependencies', 'next', 'vite', 'terminal', 'pause_resume', 'completed']
+  'framework_dependencies', 'next', 'vite', 'preview_shutdown', 'terminal', 'pause_resume', 'completed']
 const IDENTITY_OPERATIONS = ['get_info', 'source_command', 'source_compare']
 const IDENTITY_ERROR_TYPES = ['Error', 'TypeError', 'SyntaxError', 'CommandExitError', 'ConnectError',
   'SandboxError', 'SandboxNotFoundError', 'SandboxNotRunningError', 'SandboxUnreachableError', 'FileNotFoundError',
@@ -483,7 +483,7 @@ function runtimeEvidence(row, kind) {
     fixtureId: UUID.test(row?.fixtureId ?? '') ? row.fixtureId : null, stage: one(row?.stage, RUNTIME_STAGES),
     failure: row?.failure === undefined ? null : one(row.failure, RUNTIME_CODES, 'internal'), passed: row?.passed === true,
     identityDiagnostic: row?.stage === 'identity' ? identityFailureEvidence(row.identityDiagnostic) : null,
-    ...flags(row, ['productionTaskAuthorityTested', 'subscriptionsTested', 'agentRootIsolationProven']),
+    ...flags(row, ['productionTaskAuthorityTested', 'subscriptionsTested', 'agentRootIsolationProven', 'previewStopped']),
     frameworkVersions: Object.fromEntries(Object.entries(FRAMEWORK_VERSIONS).map(([key, version]) => [key, row?.frameworkVersions?.[key] === version ? version : null])),
     frameworkLockSha256: DIGEST.test(row?.frameworkLockSha256 ?? '') ? row.frameworkLockSha256 : null,
     guard: guardEvidence(row?.guard), resumedGuard: guardEvidence(row?.resumedGuard),
@@ -562,7 +562,7 @@ export function summarizeAcceptance(context, input) {
       && Object.values(proof.frameworkVersions).every(Boolean)
       && proof.frameworkLockSha256 === P0.files['scripts/e2b/fixtures/preview-frameworks/package-lock.json']
       && proof.frameworks.length === 2 && ['next', 'vite'].every(name => proof.frameworks.some(value => value.framework === name
-        && FRAMEWORK_FLAGS.every(key => value[key] === true) && value.websocket.closed)) && proof.terminal.passed
+        && FRAMEWORK_FLAGS.every(key => value[key] === true) && value.websocket.closed)) && proof.previewStopped && proof.terminal.passed
     return { ...proof, identityMatched: !!identityMatched, runtimePassed: !!runtimePassed }
   })
   const runtimeCleanup = Array.isArray(vmCleanup?.cleanup) ? vmCleanup.cleanup.map(cleanupEvidence) : []

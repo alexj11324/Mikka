@@ -1,0 +1,117 @@
+name: Issue 1782 read-only domain history after
+on:
+  push:
+    branches: [ops/self-hosted-vault-closeout-20261108]
+    paths:
+      - .github/workflows/issue1782-domain-history-after.yml
+      - scripts/ops/domain-history-after-1782.mjs
+      - scripts/ops/domain-history-after-1782.test.mjs
+      - scripts/ops/domain-history-after-1782.db.test.mjs
+permissions:
+  contents: read
+jobs:
+  domain_history_after:
+    name: Read-only exact historical UUID comparison after batch 1782
+    # Activate only after real before evidence and deployed M have been bound.
+    if: >-
+      false && github.repository == 'alexj11324/Mikka' && github.actor == 'alexj11324' &&
+      github.ref == 'refs/heads/ops/self-hosted-vault-closeout-20261108' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    concurrency:
+      group: production-smoke-owner-acceptance
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      contents: read
+      actions: read
+      issues: read
+      id-token: write
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e-local-only
+          POSTGRES_DB: mikka_domain_history_1782_fixture
+        ports:
+          - 127.0.0.1:5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e -d mikka_domain_history_1782_fixture"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Install only the bounded PostgreSQL driver outside checkout
+        timeout-minutes: 2
+        env:
+          DOMAIN_HISTORY_DEPENDENCIES: ${{ runner.temp }}/domain-history-dependencies
+        run: npm install --prefix "$DOMAIN_HISTORY_DEPENDENCIES" --ignore-scripts --no-audit --no-fund pg@8.16.3
+      - name: Verify frozen history and paired creator SQL on isolated PG17 before credentials
+        timeout-minutes: 1
+        env:
+          DOMAIN_HISTORY_DEPENDENCIES: ${{ runner.temp }}/domain-history-dependencies
+          DOMAIN_HISTORY_TEST_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_domain_history_1782_fixture
+        run: node --test scripts/ops/domain-history-after-1782.db.test.mjs
+      - name: Verify all unit contracts and the actual finite account window before credentials
+        timeout-minutes: 2
+        run: |
+          node --test scripts/ops/domain-history-before-1782.test.mjs scripts/ops/domain-history-after-1782.test.mjs
+          node scripts/ops/domain-history-after-1782.mjs check
+      - name: Read only existing shared account email
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_EMAIL
+          recursive: false
+          include-imports: false
+      - name: Read only existing shared account password
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_PASSWORD
+          recursive: false
+          include-imports: false
+      - name: Read only existing APP database binding
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: MIKKA_DATABASE_URL
+          recursive: false
+          include-imports: false
+      - name: Compare only frozen historical IDs in one read-only transaction
+        timeout-minutes: 3
+        env:
+          DOMAIN_HISTORY_DEPENDENCIES: ${{ runner.temp }}/domain-history-dependencies
+        run: node scripts/ops/domain-history-after-1782.mjs capture
+      - name: Retain only closed after evidence and its digest receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: domain-history-after-1782-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/domain-history-after-1782/*.json
+          retention-days: 14
+          if-no-files-found: warn
