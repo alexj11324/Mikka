@@ -109,8 +109,8 @@ Codex 已有的规则保持不变。
 
 2026-11-09 的[纯官方定点控制](https://github.com/alexj11324/Mikka/actions/runs/42628079564)
 又证明 Desktop 在 fresh 阶段将两个原普通文件重新链接：
-`/etc/ssl/certs/1560546e.0` 的原始 target 为 `e2b-ca.pem`，
-`/etc/ssl/certs/e2b-ca.pem` 的原始 target 为 `/usr/local/share/ca-certificates/e2b-ca.crt`。
+`/etc/ssl/certs/1560546e.0` 在 fresh 阶段的精确 symlink target 为 `e2b-ca.pem`，
+`/etc/ssl/certs/e2b-ca.pem` 在 fresh 阶段的精确 symlink target 为 `/usr/local/share/ca-certificates/e2b-ca.crt`。
 两条规则仅适用于 `desktop`，原文件 SHA-256 均须为
 `4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1`，
 解析终点必须是该精确根路径的普通文件，内容与同阶段 provider root 一致。
