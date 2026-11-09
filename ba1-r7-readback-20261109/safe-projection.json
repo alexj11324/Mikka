@@ -1,0 +1,220 @@
+{
+  "version": 1,
+  "reader": "issue1505 root; original owner explicitly stated no original reads at 1752/6747987384; claimed at 1752/6748082904",
+  "runId": 42670591517,
+  "attempt": 1,
+  "sourceCommit": "ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d",
+  "workerFingerprintObserved": "75b7462d53f9725cb92d40112c504b4f32d795c0",
+  "builder": {
+    "path": "scripts/e2b/build-template.py",
+    "bytes": 55730,
+    "sha256": "0adb53fbdd6cbcd61f1d1804aee3e2df1538997c0724556062f2741c5ac1cdb1",
+    "gitBlob": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3"
+  },
+  "jobs": [
+    {
+      "id": 129345782798,
+      "name": "test",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T18:03:44Z",
+      "completedAt": "2026-11-09T18:04:00Z"
+    },
+    {
+      "id": 129345959354,
+      "name": "check",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T18:04:03Z",
+      "completedAt": "2026-11-09T18:04:22Z"
+    },
+    {
+      "id": 129346157656,
+      "name": "validate / build",
+      "status": "completed",
+      "conclusion": "failure",
+      "startedAt": "2026-11-09T18:04:24Z",
+      "completedAt": "2026-11-09T18:14:16Z"
+    },
+    {
+      "id": 129348941810,
+      "name": "cleanup",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T18:15:07Z",
+      "completedAt": "2026-11-09T18:15:25Z"
+    }
+  ],
+  "rawLogs": [
+    {
+      "name": "build.log",
+      "bytes": 140277,
+      "sha256": "fa004707efcaa384cf0aeb452a4832cfa0b2d60cf6dad75e04f102f3c93a570c"
+    },
+    {
+      "name": "cleanup.log",
+      "bytes": 28693,
+      "sha256": "587c74c09fcaf291f78188755f06577059fda5cfa44753784fb308c2b0eca425"
+    }
+  ],
+  "strictReceipts": {
+    "codex": {
+      "at": "2026-11-09T18:06:35.3937533Z",
+      "receipt": {
+        "before": {
+          "entries": 39643,
+          "sha256": "1ea4eaed8fba093f641ea972c787906f1ce915c443841ca58d5cb8dd395eecfb"
+        },
+        "after": {
+          "entries": 39643,
+          "sha256": "1ea4eaed8fba093f641ea972c787906f1ce915c443841ca58d5cb8dd395eecfb"
+        }
+      }
+    },
+    "claude": {
+      "at": "2026-11-09T18:08:02.9220162Z",
+      "receipt": {
+        "before": {
+          "entries": 44198,
+          "sha256": "5ba76e4a1e849b3fbc52d6b444092b1469e673bf5670707c54e12a256d4be18a"
+        },
+        "after": {
+          "entries": 44198,
+          "sha256": "5ba76e4a1e849b3fbc52d6b444092b1469e673bf5670707c54e12a256d4be18a"
+        }
+      }
+    },
+    "desktop": {
+      "at": "2026-11-09T18:09:05.5017923Z",
+      "receipt": {
+        "before": {
+          "entries": 103616,
+          "sha256": "454626a0849dde26867920f6d43c5544c4f98538744aa79a3d2bc45b35a1080a"
+        },
+        "after": {
+          "entries": 103616,
+          "sha256": "454626a0849dde26867920f6d43c5544c4f98538744aa79a3d2bc45b35a1080a"
+        }
+      }
+    }
+  },
+  "readyObservedAt": {
+    "codex": "2026-11-09T18:06:51.6589364Z",
+    "claude": "2026-11-09T18:08:29.5900935Z",
+    "desktop": "2026-11-09T18:09:47.4484886Z"
+  },
+  "buildFinished": {
+    "codex": {
+      "at": "2026-11-09T18:07:04.3519758Z",
+      "duration": "2m20s"
+    },
+    "claude": {
+      "at": "2026-11-09T18:08:39.8711242Z",
+      "duration": "3m55s"
+    },
+    "desktop": {
+      "at": "2026-11-09T18:10:00.9435807Z",
+      "duration": "5m16s"
+    }
+  },
+  "conservationFailures": [
+    {
+      "at": "2026-11-09T18:11:14.3717780Z",
+      "data": {
+        "kind": "claude",
+        "stage": "fresh_scan",
+        "code": "official_files_changed",
+        "exitCode": 1,
+        "changes": [
+          {
+            "after": {
+              "kind": "link",
+              "sha256": null,
+              "target": "e2b-ca.pem"
+            },
+            "before": {
+              "kind": "file",
+              "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+              "target": null
+            },
+            "kind": "file",
+            "path": "/etc/ssl/certs/1560546e.0"
+          },
+          {
+            "after": {
+              "kind": "link",
+              "sha256": null,
+              "target": "/usr/local/share/ca-certificates/e2b-ca.crt"
+            },
+            "before": {
+              "kind": "file",
+              "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+              "target": null
+            },
+            "kind": "file",
+            "path": "/etc/ssl/certs/e2b-ca.pem"
+          }
+        ]
+      }
+    }
+  ],
+  "privateCandidateDeletion": [
+    {
+      "at": "2026-11-09T18:14:13.3203884Z",
+      "data": [
+        {
+          "name": "mikka-ba1fb9755d7e-42670591517-1-desktop",
+          "kind": "desktop",
+          "templateId": "jabr8qwavoajcxb04x7c",
+          "status": "deleted"
+        },
+        {
+          "name": "mikka-ba1fb9755d7e-42670591517-1-claude",
+          "kind": "claude",
+          "templateId": "bjv7lrddb1v52iend5l6",
+          "status": "deleted"
+        },
+        {
+          "name": "mikka-ba1fb9755d7e-42670591517-1-codex",
+          "kind": "codex",
+          "templateId": "d0z8vre0uqh6fx0s8kus",
+          "status": "deleted"
+        }
+      ]
+    }
+  ],
+  "finalCleanup": [
+    {
+      "at": "2026-11-09T18:15:22.1825332Z",
+      "data": {
+        "sourceCommit": "ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d",
+        "runId": "42670591517",
+        "sandboxes": [],
+        "templates": [
+          {
+            "name": "mikka-ba1fb9755d7e-42670591517-1-desktop",
+            "kind": "desktop",
+            "status": "absent"
+          },
+          {
+            "name": "mikka-ba1fb9755d7e-42670591517-1-claude",
+            "kind": "claude",
+            "status": "absent"
+          },
+          {
+            "name": "mikka-ba1fb9755d7e-42670591517-1-codex",
+            "kind": "codex",
+            "status": "absent"
+          }
+        ],
+        "errors": []
+      }
+    }
+  ],
+  "limits": [
+    "Only the recorded Claude fresh_scan refusal is asserted; lack of another diagnostic line does not prove all other parallel future results were returned.",
+    "No Desktop backup node-by-node baseline/post SHA was emitted in this run; the Desktop strict aggregate is equal.",
+    "No new release, real subscriptions or formal startup acceptance completed.",
+    "Cleanup deleted status is the fixed builder exact-ID DELETE followed by GET404; outer cleanup separately confirms names absent and no scoped sandboxes/errors."
+  ]
+}

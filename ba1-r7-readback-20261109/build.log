@@ -1,0 +1,1056 @@
+﻿2026-11-09T18:04:25.3333514Z Current runner version: '2.338.2'
+2026-11-09T18:04:25.3370963Z ##[group]Runner Image Provisioner
+2026-11-09T18:04:25.3372326Z Hosted Compute Agent
+2026-11-09T18:04:25.3373402Z Version: 20261028.624
+2026-11-09T18:04:25.3374554Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+2026-11-09T18:04:25.3375915Z Build Date: 2026-10-28T21:51:42Z
+2026-11-09T18:04:25.3377304Z Worker ID: {965d3f7a-9265-4afa-907b-f005cf1578d5}
+2026-11-09T18:04:25.3378892Z Region: eastus
+2026-11-09T18:04:25.3379999Z Cloud: Azure
+2026-11-09T18:04:25.3380955Z ##[endgroup]
+2026-11-09T18:04:25.3383503Z ##[group]Operating System
+2026-11-09T18:04:25.3384714Z Ubuntu
+2026-11-09T18:04:25.3385713Z 24.04.5
+2026-11-09T18:04:25.3386855Z LTS
+2026-11-09T18:04:25.3387875Z ##[endgroup]
+2026-11-09T18:04:25.3389350Z ##[group]Runner Image
+2026-11-09T18:04:25.3390476Z Image: ubuntu-24.04
+2026-11-09T18:04:25.3391548Z Version: 20261101.360.1
+2026-11-09T18:04:25.3393914Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261101.360/images/ubuntu/Ubuntu2404-Readme.md
+2026-11-09T18:04:25.3396997Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261101.360
+2026-11-09T18:04:25.3399156Z ##[endgroup]
+2026-11-09T18:04:25.3401248Z ##[group]GITHUB_TOKEN Permissions
+2026-11-09T18:04:25.3404224Z Contents: read
+2026-11-09T18:04:25.3405447Z Metadata: read
+2026-11-09T18:04:25.3406369Z ##[endgroup]
+2026-11-09T18:04:25.3409723Z Secret source: Actions
+2026-11-09T18:04:25.3411533Z Cache mode: write
+2026-11-09T18:04:25.3412907Z Prepare workflow directory
+2026-11-09T18:04:25.3923745Z Prepare all required actions
+2026-11-09T18:04:25.3999000Z Getting action download info
+2026-11-09T18:04:25.6013254Z Download action repository 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-11-09T18:04:25.6880491Z Download action repository 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-11-09T18:04:25.7727367Z Download action repository 'Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d' (SHA:d2e351f16c6ca20d17c85e6c992e04bdeb64e87d)
+2026-11-09T18:04:25.9115564Z Download action repository 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-11-09T18:04:26.1282855Z Uses: alexj11324/Mikka/.github/workflows/e2b-template.yml@refs/heads/main (ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d)
+2026-11-09T18:04:26.1287767Z Complete job name: validate / build
+2026-11-09T18:04:26.2229121Z ##[group]Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+2026-11-09T18:04:26.2230255Z with:
+2026-11-09T18:04:26.2230702Z   persist-credentials: false
+2026-11-09T18:04:26.2231214Z   repository: alexj11324/Mikka
+2026-11-09T18:04:26.2235319Z   token: ***
+2026-11-09T18:04:26.2235743Z   ssh-strict: true
+2026-11-09T18:04:26.2236169Z   ssh-user: git
+2026-11-09T18:04:26.2236578Z   clean: true
+2026-11-09T18:04:26.2237010Z   sparse-checkout-cone-mode: true
+2026-11-09T18:04:26.2237545Z   fetch-depth: 1
+2026-11-09T18:04:26.2237964Z   fetch-tags: false
+2026-11-09T18:04:26.2238595Z   show-progress: true
+2026-11-09T18:04:26.2239042Z   lfs: false
+2026-11-09T18:04:26.2239444Z   submodules: false
+2026-11-09T18:04:26.2239891Z   set-safe-directory: true
+2026-11-09T18:04:26.2240390Z   allow-unsafe-pr-checkout: false
+2026-11-09T18:04:26.2241168Z ##[endgroup]
+2026-11-09T18:04:26.4893446Z Syncing repository: alexj11324/Mikka
+2026-11-09T18:04:26.4896018Z ##[group]Getting Git version info
+2026-11-09T18:04:26.4897222Z Working directory is '/home/runner/work/Mikka/Mikka'
+2026-11-09T18:04:26.4898965Z [command]/usr/bin/git version
+2026-11-09T18:04:26.4993920Z git version 2.56.0
+2026-11-09T18:04:26.5109853Z ##[endgroup]
+2026-11-09T18:04:26.5123934Z Temporarily overriding HOME='/home/runner/work/_temp/37059c64-e972-4b89-beb0-3d0ce7f15de6' before making global git config changes
+2026-11-09T18:04:26.5126340Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T18:04:26.5128901Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T18:04:26.5131691Z Deleting the contents of '/home/runner/work/Mikka/Mikka'
+2026-11-09T18:04:26.5133492Z ##[group]Initializing the repository
+2026-11-09T18:04:26.5134567Z [command]/usr/bin/git init /home/runner/work/Mikka/Mikka
+2026-11-09T18:04:26.5274421Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-09T18:04:26.5276164Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-09T18:04:26.5277655Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-09T18:04:26.5279119Z hint: call:
+2026-11-09T18:04:26.5279760Z hint:
+2026-11-09T18:04:26.5280557Z hint: 	git config --global init.defaultBranch <name>
+2026-11-09T18:04:26.5281520Z hint:
+2026-11-09T18:04:26.5282426Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-09T18:04:26.5283938Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-09T18:04:26.5285146Z hint:
+2026-11-09T18:04:26.5285838Z hint: 	git branch -m <name>
+2026-11-09T18:04:26.5286570Z hint:
+2026-11-09T18:04:26.5287563Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-09T18:04:26.5290399Z Initialized empty Git repository in /home/runner/work/Mikka/Mikka/.git/
+2026-11-09T18:04:26.5305627Z [command]/usr/bin/git remote add origin https://github.com/alexj11324/Mikka
+2026-11-09T18:04:26.5356805Z ##[endgroup]
+2026-11-09T18:04:26.5358110Z ##[group]Disabling automatic garbage collection
+2026-11-09T18:04:26.5361501Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-09T18:04:26.5399921Z ##[endgroup]
+2026-11-09T18:04:26.5401191Z ##[group]Setting up auth
+2026-11-09T18:04:26.5408553Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T18:04:26.5448802Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T18:04:26.5850245Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T18:04:26.5898100Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T18:04:26.6149690Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T18:04:26.6193913Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T18:04:26.6470263Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-09T18:04:26.6511897Z ##[endgroup]
+2026-11-09T18:04:26.6513255Z ##[group]Fetching the repository
+2026-11-09T18:04:26.6529703Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d:refs/remotes/origin/main
+2026-11-09T18:04:27.8898701Z From https://github.com/alexj11324/Mikka
+2026-11-09T18:04:27.8899526Z  * [new ref]         ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d -> origin/main
+2026-11-09T18:04:27.8903616Z ##[endgroup]
+2026-11-09T18:04:27.8904411Z ##[group]Determining the checkout info
+2026-11-09T18:04:27.8906579Z ##[endgroup]
+2026-11-09T18:04:27.8922123Z [command]/usr/bin/git sparse-checkout disable
+2026-11-09T18:04:27.8981675Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-09T18:04:27.9020002Z ##[group]Checking out the ref
+2026-11-09T18:04:27.9023964Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-11-09T18:04:28.6018138Z Switched to a new branch 'main'
+2026-11-09T18:04:28.6023641Z branch 'main' set up to track 'origin/main'.
+2026-11-09T18:04:28.6045389Z ##[endgroup]
+2026-11-09T18:04:28.6098568Z [command]/usr/bin/git log -1 --format=%H
+2026-11-09T18:04:28.6133642Z ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d
+2026-11-09T18:04:28.6143529Z ##[group]Removing auth
+2026-11-09T18:04:28.6147398Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T18:04:28.6190067Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T18:04:28.6445011Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T18:04:28.6480571Z http.https://github.com/.extraheader
+2026-11-09T18:04:28.6489481Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-09T18:04:28.6535487Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T18:04:28.6792185Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T18:04:28.6837921Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T18:04:28.7087948Z ##[endgroup]
+2026-11-09T18:04:28.7368450Z ##[group]Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+2026-11-09T18:04:28.7369032Z with:
+2026-11-09T18:04:28.7369312Z   node-version: 24
+2026-11-09T18:04:28.7369584Z   always-auth: false
+2026-11-09T18:04:28.7369849Z   check-latest: false
+2026-11-09T18:04:28.7372623Z   token: ***
+2026-11-09T18:04:28.7372875Z ##[endgroup]
+2026-11-09T18:04:28.9020041Z Found in cache @ /opt/hostedtoolcache/node/24.22.2/x64
+2026-11-09T18:04:28.9025868Z (node:2440) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T18:04:28.9026901Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T18:04:28.9028675Z ##[group]Environment details
+2026-11-09T18:04:31.1970790Z node: v24.22.2
+2026-11-09T18:04:31.1971303Z npm: 11.19.1
+2026-11-09T18:04:31.1971614Z yarn: 1.22.22
+2026-11-09T18:04:31.1972815Z ##[endgroup]
+2026-11-09T18:04:31.2150488Z ##[group]Run node scripts/release/web-deploy.mjs main
+2026-11-09T18:04:31.2150993Z [36;1mnode scripts/release/web-deploy.mjs main[0m
+2026-11-09T18:04:31.2258105Z shell: /usr/bin/bash -e {0}
+2026-11-09T18:04:31.2258736Z env:
+2026-11-09T18:04:31.2262047Z   GITHUB_TOKEN: ***
+2026-11-09T18:04:31.2262291Z ##[endgroup]
+2026-11-09T18:04:31.7175544Z Current main matches this release
+2026-11-09T18:04:31.7967349Z ##[group]Run python3 -m venv "$RUNNER_TEMP/e2b"
+2026-11-09T18:04:31.7967768Z [36;1mpython3 -m venv "$RUNNER_TEMP/e2b"[0m
+2026-11-09T18:04:31.7968581Z [36;1m"$RUNNER_TEMP/e2b/bin/pip" install --disable-pip-version-check 'e2b==2.62.0'[0m
+2026-11-09T18:04:31.7990032Z shell: /usr/bin/bash -e {0}
+2026-11-09T18:04:31.7990328Z ##[endgroup]
+2026-11-09T18:04:35.4469965Z Collecting e2b==2.62.0
+2026-11-09T18:04:35.5725551Z   Downloading e2b-2.62.0-py3-none-any.whl.metadata (5.4 kB)
+2026-11-09T18:04:35.6304230Z Collecting python-dateutil>=2.8.2 (from e2b==2.62.0)
+2026-11-09T18:04:35.6619469Z   Downloading python_dateutil-4.0.0-py3-none-any.whl.metadata (7.3 kB)
+2026-11-09T18:04:35.7204083Z Collecting wcmatch<12,>=10.1 (from e2b==2.62.0)
+2026-11-09T18:04:35.7532980Z   Downloading wcmatch-11.2-py3-none-any.whl.metadata (6.0 kB)
+2026-11-09T18:04:35.8007950Z Collecting protobuf-py<0.7,>=0.6.0 (from e2b==2.62.0)
+2026-11-09T18:04:35.8607482Z   Downloading protobuf_py-0.6.0-py3-none-any.whl.metadata (10 kB)
+2026-11-09T18:04:35.9258169Z Collecting httpx<1.0.0,>=0.27.0 (from e2b==2.62.0)
+2026-11-09T18:04:35.9573260Z   Downloading httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+2026-11-09T18:04:36.0089004Z Collecting h2<5,>=4.4.1 (from e2b==2.62.0)
+2026-11-09T18:04:36.0405567Z   Downloading h2-4.4.1-py3-none-any.whl.metadata (3.8 kB)
+2026-11-09T18:04:36.0931213Z Collecting attrs>=23.2.0 (from e2b==2.62.0)
+2026-11-09T18:04:36.1250447Z   Downloading attrs-26.1.0-py3-none-any.whl.metadata (8.8 kB)
+2026-11-09T18:04:36.1845193Z Collecting packaging>=24.1 (from e2b==2.62.0)
+2026-11-09T18:04:36.2159811Z   Downloading packaging-26.3-py3-none-any.whl.metadata (3.5 kB)
+2026-11-09T18:04:36.2711746Z Collecting typing-extensions>=4.10.0 (from e2b==2.62.0)
+2026-11-09T18:04:36.3031560Z   Downloading typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+2026-11-09T18:04:36.4049906Z Collecting rich>=14.0.0 (from e2b==2.62.0)
+2026-11-09T18:04:36.4368789Z   Downloading rich-15.0.0-py3-none-any.whl.metadata (18 kB)
+2026-11-09T18:04:36.4931835Z Collecting connectrpc<0.13,>=0.12.1 (from e2b==2.62.0)
+2026-11-09T18:04:36.5259447Z   Downloading connectrpc-0.12.1-py3-none-any.whl.metadata (7.2 kB)
+2026-11-09T18:04:36.6275565Z Collecting pyqwest<0.13,>=0.12.0 (from e2b==2.62.0)
+2026-11-09T18:04:36.6602194Z   Downloading pyqwest-0.12.0-cp311-abi3-manylinux_2_28_x86_64.whl.metadata (3.1 kB)
+2026-11-09T18:04:36.7054963Z Collecting e2b-dockerfile-utils<0.2,>=0.1.0 (from e2b==2.62.0)
+2026-11-09T18:04:36.7381508Z   Downloading e2b_dockerfile_utils-0.1.1-py3-none-any.whl.metadata (2.3 kB)
+2026-11-09T18:04:36.7925730Z Collecting hyperframe<7,>=6.1 (from h2<5,>=4.4.1->e2b==2.62.0)
+2026-11-09T18:04:36.8276359Z   Downloading hyperframe-6.1.0-py3-none-any.whl.metadata (4.3 kB)
+2026-11-09T18:04:36.8722838Z Collecting hpack<5,>=4.2 (from h2<5,>=4.4.1->e2b==2.62.0)
+2026-11-09T18:04:36.9042069Z   Downloading hpack-4.2.0-py3-none-any.whl.metadata (3.3 kB)
+2026-11-09T18:04:36.9718625Z Collecting anyio (from httpx<1.0.0,>=0.27.0->e2b==2.62.0)
+2026-11-09T18:04:37.0032307Z   Downloading anyio-4.16.0-py3-none-any.whl.metadata (4.7 kB)
+2026-11-09T18:04:37.0616766Z Collecting certifi (from httpx<1.0.0,>=0.27.0->e2b==2.62.0)
+2026-11-09T18:04:37.0936379Z   Downloading certifi-2026.10.23-py3-none-any.whl.metadata (2.5 kB)
+2026-11-09T18:04:37.1516102Z Collecting httpcore==1.* (from httpx<1.0.0,>=0.27.0->e2b==2.62.0)
+2026-11-09T18:04:37.1832094Z   Downloading httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+2026-11-09T18:04:37.2426569Z Collecting idna (from httpx<1.0.0,>=0.27.0->e2b==2.62.0)
+2026-11-09T18:04:37.2741420Z   Downloading idna-3.20-py3-none-any.whl.metadata (7.2 kB)
+2026-11-09T18:04:37.3245344Z Collecting h11>=0.16 (from httpcore==1.*->httpx<1.0.0,>=0.27.0->e2b==2.62.0)
+2026-11-09T18:04:37.3560548Z   Downloading h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+2026-11-09T18:04:37.4387448Z Collecting protobuf-py-ext==0.6.0 (from protobuf-py<0.7,>=0.6.0->e2b==2.62.0)
+2026-11-09T18:04:37.5001905Z   Downloading protobuf_py_ext-0.6.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (1.1 kB)
+2026-11-09T18:04:37.5691049Z Collecting opentelemetry-api>=1.39.1 (from pyqwest<0.13,>=0.12.0->e2b==2.62.0)
+2026-11-09T18:04:37.6012137Z   Downloading opentelemetry_api-1.45.2-py3-none-any.whl.metadata (1.4 kB)
+2026-11-09T18:04:37.6584991Z Collecting tzdata (from python-dateutil>=2.8.2->e2b==2.62.0)
+2026-11-09T18:04:37.6902185Z   Downloading tzdata-2026.6-py2.py3-none-any.whl.metadata (1.4 kB)
+2026-11-09T18:04:37.7474846Z Collecting markdown-it-py>=2.2.0 (from rich>=14.0.0->e2b==2.62.0)
+2026-11-09T18:04:37.7793778Z   Downloading markdown_it_py-4.2.0-py3-none-any.whl.metadata (7.4 kB)
+2026-11-09T18:04:37.8390917Z Collecting pygments<3.0.0,>=2.13.0 (from rich>=14.0.0->e2b==2.62.0)
+2026-11-09T18:04:37.8711556Z   Downloading pygments-2.21.0-py3-none-any.whl.metadata (2.5 kB)
+2026-11-09T18:04:37.9444918Z Collecting bracex>=3.2 (from wcmatch<12,>=10.1->e2b==2.62.0)
+2026-11-09T18:04:37.9760120Z   Downloading bracex-3.2.2-py3-none-any.whl.metadata (3.3 kB)
+2026-11-09T18:04:38.0427674Z Collecting mdurl~=0.1 (from markdown-it-py>=2.2.0->rich>=14.0.0->e2b==2.62.0)
+2026-11-09T18:04:38.0747805Z   Downloading mdurl-0.1.2-py3-none-any.whl.metadata (1.6 kB)
+2026-11-09T18:04:38.1537979Z Downloading e2b-2.62.0-py3-none-any.whl (426 kB)
+2026-11-09T18:04:38.2519347Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 426.4/426.4 kB 4.6 MB/s eta 0:00:00
+2026-11-09T18:04:38.2841087Z Downloading attrs-26.1.0-py3-none-any.whl (67 kB)
+2026-11-09T18:04:38.2885631Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 67.5/67.5 kB 22.2 MB/s eta 0:00:00
+2026-11-09T18:04:38.3218297Z Downloading connectrpc-0.12.1-py3-none-any.whl (70 kB)
+2026-11-09T18:04:38.3262999Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 70.1/70.1 kB 23.0 MB/s eta 0:00:00
+2026-11-09T18:04:38.3595126Z Downloading e2b_dockerfile_utils-0.1.1-py3-none-any.whl (19 kB)
+2026-11-09T18:04:38.3938170Z Downloading h2-4.4.1-py3-none-any.whl (62 kB)
+2026-11-09T18:04:38.3981580Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 62.6/62.6 kB 21.7 MB/s eta 0:00:00
+2026-11-09T18:04:38.4302781Z Downloading httpx-0.28.1-py3-none-any.whl (73 kB)
+2026-11-09T18:04:38.4343686Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 73.5/73.5 kB 28.2 MB/s eta 0:00:00
+2026-11-09T18:04:38.4666412Z Downloading httpcore-1.0.9-py3-none-any.whl (78 kB)
+2026-11-09T18:04:38.4714318Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 78.8/78.8 kB 22.1 MB/s eta 0:00:00
+2026-11-09T18:04:38.5035254Z Downloading packaging-26.3-py3-none-any.whl (129 kB)
+2026-11-09T18:04:38.5101779Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 130.0/130.0 kB 25.1 MB/s eta 0:00:00
+2026-11-09T18:04:38.5466880Z Downloading protobuf_py-0.6.0-py3-none-any.whl (216 kB)
+2026-11-09T18:04:38.5554177Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 216.1/216.1 kB 30.3 MB/s eta 0:00:00
+2026-11-09T18:04:38.5891430Z Downloading protobuf_py_ext-0.6.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (500 kB)
+2026-11-09T18:04:38.6231585Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 500.5/500.5 kB 15.2 MB/s eta 0:00:00
+2026-11-09T18:04:38.6580134Z Downloading pyqwest-0.12.0-cp311-abi3-manylinux_2_28_x86_64.whl (5.7 MB)
+2026-11-09T18:04:38.7414654Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.7/5.7 MB 70.1 MB/s eta 0:00:00
+2026-11-09T18:04:38.7730224Z Downloading python_dateutil-4.0.0-py3-none-any.whl (92 kB)
+2026-11-09T18:04:38.7771757Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 92.9/92.9 kB 33.9 MB/s eta 0:00:00
+2026-11-09T18:04:38.8086754Z Downloading rich-15.0.0-py3-none-any.whl (310 kB)
+2026-11-09T18:04:38.8141127Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 310.7/310.7 kB 84.5 MB/s eta 0:00:00
+2026-11-09T18:04:38.8461141Z Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+2026-11-09T18:04:38.8500783Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 45.6/45.6 kB 16.8 MB/s eta 0:00:00
+2026-11-09T18:04:38.8840369Z Downloading wcmatch-11.2-py3-none-any.whl (44 kB)
+2026-11-09T18:04:38.8883466Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 44.4/44.4 kB 15.2 MB/s eta 0:00:00
+2026-11-09T18:04:38.9206197Z Downloading bracex-3.2.2-py3-none-any.whl (14 kB)
+2026-11-09T18:04:38.9552285Z Downloading hpack-4.2.0-py3-none-any.whl (34 kB)
+2026-11-09T18:04:38.9896015Z Downloading hyperframe-6.1.0-py3-none-any.whl (13 kB)
+2026-11-09T18:04:39.0246852Z Downloading markdown_it_py-4.2.0-py3-none-any.whl (91 kB)
+2026-11-09T18:04:39.0292219Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 91.7/91.7 kB 32.6 MB/s eta 0:00:00
+2026-11-09T18:04:39.0613803Z Downloading opentelemetry_api-1.45.2-py3-none-any.whl (60 kB)
+2026-11-09T18:04:39.0656595Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 60.3/60.3 kB 21.8 MB/s eta 0:00:00
+2026-11-09T18:04:39.0978648Z Downloading pygments-2.21.0-py3-none-any.whl (1.3 MB)
+2026-11-09T18:04:39.1086080Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.3/1.3 MB 138.4 MB/s eta 0:00:00
+2026-11-09T18:04:39.1406268Z Downloading anyio-4.16.0-py3-none-any.whl (134 kB)
+2026-11-09T18:04:39.1451295Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 134.5/134.5 kB 47.7 MB/s eta 0:00:00
+2026-11-09T18:04:39.1767850Z Downloading idna-3.20-py3-none-any.whl (69 kB)
+2026-11-09T18:04:39.1811305Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 69.6/69.6 kB 24.6 MB/s eta 0:00:00
+2026-11-09T18:04:39.2127603Z Downloading certifi-2026.10.23-py3-none-any.whl (135 kB)
+2026-11-09T18:04:39.2182697Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 135.1/135.1 kB 33.4 MB/s eta 0:00:00
+2026-11-09T18:04:39.2500393Z Downloading tzdata-2026.6-py2.py3-none-any.whl (348 kB)
+2026-11-09T18:04:39.2555162Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 348.2/348.2 kB 91.7 MB/s eta 0:00:00
+2026-11-09T18:04:39.2871430Z Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+2026-11-09T18:04:39.3211927Z Downloading mdurl-0.1.2-py3-none-any.whl (10.0 kB)
+2026-11-09T18:04:39.4314894Z Installing collected packages: tzdata, typing-extensions, pygments, protobuf-py-ext, packaging, mdurl, idna, hyperframe, hpack, h11, e2b-dockerfile-utils, certifi, bracex, attrs, wcmatch, python-dateutil, protobuf-py, opentelemetry-api, markdown-it-py, httpcore, h2, anyio, rich, pyqwest, httpx, connectrpc, e2b
+2026-11-09T18:04:41.7363767Z Successfully installed anyio-4.16.0 attrs-26.1.0 bracex-3.2.2 certifi-2026.10.23 connectrpc-0.12.1 e2b-2.62.0 e2b-dockerfile-utils-0.1.1 h11-0.16.0 h2-4.4.1 hpack-4.2.0 httpcore-1.0.9 httpx-0.28.1 hyperframe-6.1.0 idna-3.20 markdown-it-py-4.2.0 mdurl-0.1.2 opentelemetry-api-1.45.2 packaging-26.3 protobuf-py-0.6.0 protobuf-py-ext-0.6.0 pygments-2.21.0 pyqwest-0.12.0 python-dateutil-4.0.0 rich-15.0.0 typing-extensions-4.16.0 tzdata-2026.6 wcmatch-11.2
+2026-11-09T18:04:41.8310228Z ##[group]Run Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+2026-11-09T18:04:41.8310666Z with:
+2026-11-09T18:04:41.8310863Z   method: oidc
+2026-11-09T18:04:41.8311117Z   identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+2026-11-09T18:04:41.8311432Z   oidc-audience: mikka-infisical
+2026-11-09T18:04:41.8311714Z   project-id: 89850d6a-f020-4936-863e-df77380dfe40
+2026-11-09T18:04:41.8312001Z   env-slug: prod
+2026-11-09T18:04:41.8312205Z   secret-path: /vercel
+2026-11-09T18:04:41.8312432Z   secret-name: E2B_API_KEY
+2026-11-09T18:04:41.8312662Z   include-imports: false
+2026-11-09T18:04:41.8312914Z   domain: https://app.infisical.com
+2026-11-09T18:04:41.8313176Z   export-type: env
+2026-11-09T18:04:41.8313390Z   file-output-path: /.env
+2026-11-09T18:04:41.8313628Z   recursive: false
+2026-11-09T18:04:41.8313823Z ##[endgroup]
+2026-11-09T18:04:42.0974871Z (node:2556) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T18:04:42.0976970Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T18:04:42.2838673Z Injected secrets as environment variables
+2026-11-09T18:04:42.2967201Z ##[group]Run name="mikka-${GITHUB_SHA::12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+2026-11-09T18:04:42.2967808Z [36;1mname="mikka-${GITHUB_SHA::12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"[0m
+2026-11-09T18:04:42.2968890Z [36;1m"$RUNNER_TEMP/e2b/bin/python" scripts/e2b/build-template.py --name "$name" --source-ref "$GITHUB_SHA" --json > "$RUNNER_TEMP/candidates.json"[0m
+2026-11-09T18:04:42.2969654Z [36;1mnode --input-type=module - "$RUNNER_TEMP/candidates.json" <<'JS'[0m
+2026-11-09T18:04:42.2970118Z [36;1mimport { readFileSync, appendFileSync } from 'node:fs'[0m
+2026-11-09T18:04:42.2971030Z [36;1mimport { assertReportIdentity, cleanupIdentity, reportDigest, reportStep, templateModelsDigest } from './scripts/e2b/runtime-report.mjs'[0m
+2026-11-09T18:04:42.2971785Z [36;1mreportStep(() => {[0m
+2026-11-09T18:04:42.2972179Z [36;1m  const bytes = readFileSync(process.argv[2]), report = JSON.parse(bytes)[0m
+2026-11-09T18:04:42.2972799Z [36;1m  const expected = { sourceCommit: process.env.GITHUB_SHA, workerSha: report.workerSha,[0m
+2026-11-09T18:04:42.2973406Z [36;1m    runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT }[0m
+2026-11-09T18:04:42.2973868Z [36;1m  assertReportIdentity(report, expected)[0m
+2026-11-09T18:04:42.2974250Z [36;1m  for (const kind of ['desktop', 'claude', 'codex']) {[0m
+2026-11-09T18:04:42.2974710Z [36;1m    const row = report.templates[kind], proof = row.conservation[0m
+2026-11-09T18:04:42.2975298Z [36;1m    if (row.baseTemplate !== kind || row.preinstalled !== true || !row.buildId || !Array.isArray(row.models)[0m
+2026-11-09T18:04:42.2976149Z [36;1m      || !proof?.before?.entries || JSON.stringify(proof.before) !== JSON.stringify(proof.after)) throw Error('runtime_report_preservation_invalid')[0m
+2026-11-09T18:04:42.2976996Z [36;1m    console.log(`${kind}: ${proof.before.entries} preserved entries, manifest ${proof.before.sha256}`)[0m
+2026-11-09T18:04:42.2977472Z [36;1m  }[0m
+2026-11-09T18:04:42.2979248Z [36;1m  appendFileSync(process.env.GITHUB_OUTPUT, `source-sha=${report.workerSha}\ntemplate-models-sha256=${templateModelsDigest(report)}\ncandidate-sha256=${reportDigest(bytes)}\ncandidate-identities=${cleanupIdentity(report, expected)}\n`)[0m
+2026-11-09T18:04:42.2980283Z [36;1m})[0m
+2026-11-09T18:04:42.2980481Z [36;1mJS[0m
+2026-11-09T18:04:42.3000863Z shell: /usr/bin/bash -e {0}
+2026-11-09T18:04:42.3001117Z env:
+2026-11-09T18:04:42.3001503Z   E2B_API_KEY: ***
+2026-11-09T18:04:42.3001715Z ##[endgroup]
+2026-11-09T18:04:43.3256066Z [claude] [2026-11-09T18:04:43.325131] [debug] Build started
+2026-11-09T18:04:43.3427334Z [desktop] [2026-11-09T18:04:43.342534] [debug] Build started
+2026-11-09T18:04:43.3604177Z [codex] [2026-11-09T18:04:43.360218] [debug] Build started
+2026-11-09T18:04:43.3712568Z [claude] [2026-11-09T18:04:43.371043] [info] Requesting build for template: mikka-ba1fb9755d7e-42670591517-1-claude
+2026-11-09T18:04:43.3723784Z [desktop] [2026-11-09T18:04:43.371887] [info] Requesting build for template: mikka-ba1fb9755d7e-42670591517-1-desktop
+2026-11-09T18:04:43.3725972Z [codex] [2026-11-09T18:04:43.372449] [info] Requesting build for template: mikka-ba1fb9755d7e-42670591517-1-codex
+2026-11-09T18:04:43.5641843Z [desktop] [2026-11-09T18:04:43.563906] [info] Template created with ID: jabr8qwavoajcxb04x7c, Build ID: ca32d04e-cbb4-4651-8a3b-291894236dd0
+2026-11-09T18:04:43.5700235Z [codex] [2026-11-09T18:04:43.569794] [info] Template created with ID: d0z8vre0uqh6fx0s8kus, Build ID: bdd80d18-1ad7-441a-80bb-209423297824
+2026-11-09T18:04:43.5786811Z [claude] [2026-11-09T18:04:43.578430] [info] Template created with ID: bjv7lrddb1v52iend5l6, Build ID: 20598356-f8a7-43c8-b117-1eb8242c1ebe
+2026-11-09T18:04:43.6610735Z [desktop] [2026-11-09T18:04:43.660756] [info] Skipping upload of 'official-files.py', already cached
+2026-11-09T18:04:43.6680196Z [codex] [2026-11-09T18:04:43.667850] [info] Skipping upload of 'official-files.py', already cached
+2026-11-09T18:04:43.6700903Z [claude] [2026-11-09T18:04:43.669844] [info] Skipping upload of 'official-files.py', already cached
+2026-11-09T18:04:43.7571204Z [claude] [2026-11-09T18:04:43.756895] [info] Skipping upload of 'e2b-finalization-files.json', already cached
+2026-11-09T18:04:43.7616395Z [codex] [2026-11-09T18:04:43.761431] [info] Skipping upload of 'e2b-finalization-files.json', already cached
+2026-11-09T18:04:43.7775746Z [desktop] [2026-11-09T18:04:43.777405] [info] Skipping upload of 'e2b-finalization-files.json', already cached
+2026-11-09T18:04:43.8484797Z [claude] [2026-11-09T18:04:43.848203] [info] Skipping upload of 'e2b-certificate-relinks.json', already cached
+2026-11-09T18:04:43.8554907Z [codex] [2026-11-09T18:04:43.855275] [info] Skipping upload of 'e2b-certificate-relinks.json', already cached
+2026-11-09T18:04:43.8733636Z [desktop] [2026-11-09T18:04:43.873092] [info] Skipping upload of 'e2b-certificate-relinks.json', already cached
+2026-11-09T18:04:43.9346129Z [claude] [2026-11-09T18:04:43.934285] [info] Skipping upload of 'start-prebuilt.sh', already cached
+2026-11-09T18:04:43.9418736Z [codex] [2026-11-09T18:04:43.941660] [info] Skipping upload of 'start-prebuilt.sh', already cached
+2026-11-09T18:04:43.9627154Z [desktop] [2026-11-09T18:04:43.962531] [info] Skipping upload of 'start-prebuilt.sh', already cached
+2026-11-09T18:04:44.0365276Z [claude] [2026-11-09T18:04:44.036239] [info] Skipping upload of 'instance-bootstrap.sh', already cached
+2026-11-09T18:04:44.0366256Z [claude] [2026-11-09T18:04:44.036295] [info] All file uploads completed
+2026-11-09T18:04:44.0367020Z [claude] [2026-11-09T18:04:44.036315] [info] Starting building...
+2026-11-09T18:04:44.0371722Z [codex] [2026-11-09T18:04:44.037012] [info] Skipping upload of 'instance-bootstrap.sh', already cached
+2026-11-09T18:04:44.0372653Z [codex] [2026-11-09T18:04:44.037048] [info] All file uploads completed
+2026-11-09T18:04:44.0373317Z [codex] [2026-11-09T18:04:44.037065] [info] Starting building...
+2026-11-09T18:04:44.0576810Z [desktop] [2026-11-09T18:04:44.057421] [info] Skipping upload of 'instance-bootstrap.sh', already cached
+2026-11-09T18:04:44.0578039Z [desktop] [2026-11-09T18:04:44.057468] [info] All file uploads completed
+2026-11-09T18:04:44.0579086Z [desktop] [2026-11-09T18:04:44.057488] [info] Starting building...
+2026-11-09T18:04:44.1222493Z [claude] [2026-11-09T18:04:44.121970] [info] Waiting for logs...
+2026-11-09T18:04:44.1300404Z [codex] [2026-11-09T18:04:44.129894] [info] Waiting for logs...
+2026-11-09T18:04:44.1384693Z [desktop] [2026-11-09T18:04:44.138316] [info] Waiting for logs...
+2026-11-09T18:04:44.1909378Z [claude] [2026-11-09T18:04:44.088498+00:00] [info] Building template bjv7lrddb1v52iend5l6/20598356-f8a7-43c8-b117-1eb8242c1ebe
+2026-11-09T18:04:44.2047151Z [codex] [2026-11-09T18:04:44.090149+00:00] [info] Building template d0z8vre0uqh6fx0s8kus/bdd80d18-1ad7-441a-80bb-209423297824
+2026-11-09T18:04:44.2049121Z [codex] [2026-11-09T18:04:44.158091+00:00] [info] CACHED [base] FROM TEMPLATE codex [75c5a3e5dcf2f23afcd35dec586502d021acd7973ebb7eced0e6997eac01ff3b]
+2026-11-09T18:04:44.2050720Z [codex] [2026-11-09T18:04:44.158171+00:00] [info] [base] DEFAULT USER user [4dcf74275c7cf78e60c5b4111949885dd2d467abdd8e4cb2bb21ce9b0de376ce]
+2026-11-09T18:04:44.2147161Z [desktop] [2026-11-09T18:04:44.104757+00:00] [info] Building template jabr8qwavoajcxb04x7c/ca32d04e-cbb4-4651-8a3b-291894236dd0
+2026-11-09T18:04:44.2149128Z [desktop] [2026-11-09T18:04:44.132499+00:00] [info] CACHED [base] FROM TEMPLATE desktop [4c5ac275c3f929bf2dcaec858b50166a19d5c79c13686b1acf846f34f05db40d]
+2026-11-09T18:04:44.2150728Z [desktop] [2026-11-09T18:04:44.132613+00:00] [info] [base] DEFAULT USER user [ae4c8db68a3061d2ce36b074e3fa179459b9a683cbee2986ac735594a6df7022]
+2026-11-09T18:04:44.4549546Z [claude] [2026-11-09T18:04:44.175539+00:00] [info] CACHED [base] FROM TEMPLATE claude [324bec5c9ab51fc06e69f7c025f089a652d8cb33eebbc9f71178705ebfee5470]
+2026-11-09T18:04:44.4551481Z [claude] [2026-11-09T18:04:44.175632+00:00] [info] [base] DEFAULT USER user [25bad58e12ac36f308d512a5aa2dc60950fc0884fef5301207daf92d11e56c3d]
+2026-11-09T18:04:46.6224753Z [desktop] [2026-11-09T18:04:46.342711+00:00] [debug] Updating envd to version v0.10.0
+2026-11-09T18:04:47.1642626Z [desktop] [2026-11-09T18:04:46.910349+00:00] [debug] [base] [stdout]: passwd: password expiry information changed.
+2026-11-09T18:04:48.0176179Z [claude] [2026-11-09T18:04:47.755655+00:00] [debug] Updating envd to version v0.10.0
+2026-11-09T18:04:48.2377917Z [desktop] [2026-11-09T18:04:48.015193+00:00] [debug] Adding layer to cache: ac04fcc0-d1cc-4f7f-a545-d1f2e75d675d
+2026-11-09T18:04:48.2379283Z [desktop] [2026-11-09T18:04:48.015381+00:00] [debug] Uploading layer: ac04fcc0-d1cc-4f7f-a545-d1f2e75d675d
+2026-11-09T18:04:48.2380897Z [desktop] [2026-11-09T18:04:48.015842+00:00] [info] [builder 1/12] WORKDIR / [0abef404fe128c1e1f0dfbd788cf381290f67f28d5ca55c8555d1008e4b635f6]
+2026-11-09T18:04:48.7788499Z [desktop] [2026-11-09T18:04:48.632467+00:00] [debug] Adding layer to cache: 8e84d366-996b-41c7-82c3-aaab588cdad6
+2026-11-09T18:04:48.7789661Z [desktop] [2026-11-09T18:04:48.632655+00:00] [debug] Uploading layer: 8e84d366-996b-41c7-82c3-aaab588cdad6
+2026-11-09T18:04:48.7791325Z [desktop] [2026-11-09T18:04:48.632998+00:00] [info] [builder 2/12] RUN test ! -e /opt/mikka && test ! -L /opt/mikka && mkdir -m 0755 /opt/mikka root [4f43483b68c935ac81d77572f1c213262ef7a2ff50cacd067868ddcd197cb6e5]
+2026-11-09T18:04:49.0465535Z [desktop] [2026-11-09T18:04:48.867757+00:00] [debug] Saved: ac04fcc0-d1cc-4f7f-a545-d1f2e75d675d
+2026-11-09T18:04:49.3201927Z [desktop] [2026-11-09T18:04:49.036065+00:00] [debug] Adding layer to cache: cd2cc48f-0c8c-4d12-a618-e405587be67c
+2026-11-09T18:04:49.3203402Z [desktop] [2026-11-09T18:04:49.036278+00:00] [debug] Uploading layer: cd2cc48f-0c8c-4d12-a618-e405587be67c
+2026-11-09T18:04:49.3205194Z [desktop] [2026-11-09T18:04:49.036618+00:00] [info] [builder 3/12] COPY official-files.py /opt/mikka/official-files.py   [6385f78b60baab97c06e2938b293493498e82fc1bfcec1c6d750c3374ebc5767]
+2026-11-09T18:04:49.3206363Z [desktop] [2026-11-09T18:04:49.072788+00:00] [debug] Saved: 8e84d366-996b-41c7-82c3-aaab588cdad6
+2026-11-09T18:04:49.9241337Z [desktop] [2026-11-09T18:04:49.709948+00:00] [debug] Saved: cd2cc48f-0c8c-4d12-a618-e405587be67c
+2026-11-09T18:04:50.4505300Z [claude] [2026-11-09T18:04:50.217270+00:00] [debug] [base] [stdout]: passwd: password changed.
+2026-11-09T18:04:50.4604484Z [desktop] [2026-11-09T18:04:50.200739+00:00] [debug] Adding layer to cache: 30b17a1d-4f83-4820-b418-8c92ad397a6e
+2026-11-09T18:04:50.4606074Z [desktop] [2026-11-09T18:04:50.201045+00:00] [debug] Uploading layer: 30b17a1d-4f83-4820-b418-8c92ad397a6e
+2026-11-09T18:04:50.4608486Z [desktop] [2026-11-09T18:04:50.201478+00:00] [info] [builder 4/12] COPY e2b-finalization-files.json /opt/mikka/e2b-finalization-files.json   [16d51ba0cdbcfb705c22b841b718a3b5d96a950047bb91e0d1de3fd0173a9bd6]
+2026-11-09T18:04:50.9911886Z [desktop] [2026-11-09T18:04:50.707440+00:00] [debug] Saved: 30b17a1d-4f83-4820-b418-8c92ad397a6e
+2026-11-09T18:04:51.2588622Z [claude] [2026-11-09T18:04:50.955868+00:00] [debug] Adding layer to cache: 1dbd5dad-b587-4006-83b1-358e3668cc6a
+2026-11-09T18:04:51.2589755Z [claude] [2026-11-09T18:04:50.956007+00:00] [debug] Uploading layer: 1dbd5dad-b587-4006-83b1-358e3668cc6a
+2026-11-09T18:04:51.2590882Z [claude] [2026-11-09T18:04:50.956344+00:00] [info] [builder 1/12] WORKDIR / [36b5998948b9d67fc3c11774d23c389037926d09aeb533c86b3e51080f3c81c7]
+2026-11-09T18:04:51.2611256Z [desktop] [2026-11-09T18:04:51.167028+00:00] [debug] Adding layer to cache: ba284cb9-7375-43c9-bece-dd821a9fdaed
+2026-11-09T18:04:51.2612384Z [desktop] [2026-11-09T18:04:51.167296+00:00] [debug] Uploading layer: ba284cb9-7375-43c9-bece-dd821a9fdaed
+2026-11-09T18:04:51.2613974Z [desktop] [2026-11-09T18:04:51.167707+00:00] [info] [builder 5/12] COPY e2b-certificate-relinks.json /opt/mikka/e2b-certificate-relinks.json   [45760d1e8c6ad8423acccf8aa47a097f5eb7d91b4a5d3f38b4f4084cec66244b]
+2026-11-09T18:04:51.4559349Z [codex] [2026-11-09T18:04:51.220755+00:00] [debug] Updating envd to version v0.10.0
+2026-11-09T18:04:51.7912308Z [claude] [2026-11-09T18:04:51.606910+00:00] [debug] Adding layer to cache: d174a470-868c-4913-b88e-558e03c34b61
+2026-11-09T18:04:51.7913686Z [claude] [2026-11-09T18:04:51.607060+00:00] [debug] Uploading layer: d174a470-868c-4913-b88e-558e03c34b61
+2026-11-09T18:04:51.7915298Z [claude] [2026-11-09T18:04:51.607362+00:00] [info] [builder 2/12] RUN test ! -e /opt/mikka && test ! -L /opt/mikka && mkdir -m 0755 /opt/mikka root [ab76e5310bad9837b4d2fe2d2ee6f470e663b1085a97a827e449a525176ee8d3]
+2026-11-09T18:04:52.3229945Z [claude] [2026-11-09T18:04:52.045205+00:00] [debug] Saved: 1dbd5dad-b587-4006-83b1-358e3668cc6a
+2026-11-09T18:04:52.3230938Z [claude] [2026-11-09T18:04:52.116697+00:00] [debug] Adding layer to cache: 3fff48f9-bbd8-4da6-881e-65152a9c756d
+2026-11-09T18:04:52.3232283Z [claude] [2026-11-09T18:04:52.116833+00:00] [debug] Uploading layer: 3fff48f9-bbd8-4da6-881e-65152a9c756d
+2026-11-09T18:04:52.3233684Z [claude] [2026-11-09T18:04:52.117098+00:00] [info] [builder 3/12] COPY official-files.py /opt/mikka/official-files.py   [d8ab9896a2d2b1f52847877f8e34f2836a1b1e10040bc3c9191e760abd9cfe8c]
+2026-11-09T18:04:52.3234871Z [claude] [2026-11-09T18:04:52.161121+00:00] [debug] Saved: d174a470-868c-4913-b88e-558e03c34b61
+2026-11-09T18:04:52.3337253Z [desktop] [2026-11-09T18:04:52.246040+00:00] [debug] Saved: ba284cb9-7375-43c9-bece-dd821a9fdaed
+2026-11-09T18:04:52.5879721Z [claude] [2026-11-09T18:04:52.540515+00:00] [debug] Saved: 3fff48f9-bbd8-4da6-881e-65152a9c756d
+2026-11-09T18:04:52.8028556Z [codex] [2026-11-09T18:04:52.643811+00:00] [debug] [base] [stdout]: passwd: password changed.
+2026-11-09T18:04:53.1329639Z [claude] [2026-11-09T18:04:52.963190+00:00] [debug] Adding layer to cache: 4a24d5bd-4180-4d23-8f06-89e7f999bd6e
+2026-11-09T18:04:53.1330728Z [claude] [2026-11-09T18:04:52.963355+00:00] [debug] Uploading layer: 4a24d5bd-4180-4d23-8f06-89e7f999bd6e
+2026-11-09T18:04:53.1332271Z [claude] [2026-11-09T18:04:52.963644+00:00] [info] [builder 4/12] COPY e2b-finalization-files.json /opt/mikka/e2b-finalization-files.json   [39f48c7a867850b950830c1c82e84c23c370acdb190ba0e180660685d9a34026]
+2026-11-09T18:04:53.3330886Z [codex] [2026-11-09T18:04:53.209162+00:00] [debug] Adding layer to cache: 42f59a4e-53f5-4fac-9258-7b46623adbff
+2026-11-09T18:04:53.3331934Z [codex] [2026-11-09T18:04:53.209307+00:00] [debug] Uploading layer: 42f59a4e-53f5-4fac-9258-7b46623adbff
+2026-11-09T18:04:53.3333365Z [codex] [2026-11-09T18:04:53.209663+00:00] [info] [builder 1/12] WORKDIR / [1a192fbda7e9266019481c59c1e07e79d6a17ae0da3e270b116065d21d978b1a]
+2026-11-09T18:04:53.3981743Z [claude] [2026-11-09T18:04:53.279766+00:00] [debug] Saved: 4a24d5bd-4180-4d23-8f06-89e7f999bd6e
+2026-11-09T18:04:53.4009390Z [desktop] [2026-11-09T18:04:53.297541+00:00] [debug] Adding layer to cache: 5d49b377-aa40-4598-9c38-85f61a280933
+2026-11-09T18:04:53.4010470Z [desktop] [2026-11-09T18:04:53.297741+00:00] [debug] Uploading layer: 5d49b377-aa40-4598-9c38-85f61a280933
+2026-11-09T18:04:53.4011912Z [desktop] [2026-11-09T18:04:53.298131+00:00] [info] [builder 6/12] COPY start-prebuilt.sh /opt/mikka/start-prebuilt.sh   [0a134f1fae7b40037899b55dd86c31dc86bcea7238c332bb07b4a90303eb9d69]
+2026-11-09T18:04:53.5999111Z [codex] [2026-11-09T18:04:53.566454+00:00] [debug] Adding layer to cache: 391d9532-4dda-489c-a227-6f291955ac2f
+2026-11-09T18:04:53.6000137Z [codex] [2026-11-09T18:04:53.566646+00:00] [debug] Uploading layer: 391d9532-4dda-489c-a227-6f291955ac2f
+2026-11-09T18:04:53.6001638Z [codex] [2026-11-09T18:04:53.567009+00:00] [info] [builder 2/12] RUN test ! -e /opt/mikka && test ! -L /opt/mikka && mkdir -m 0755 /opt/mikka root [43781000e9b7958cab70d0d2113d33da053b19154e6dbdf6140bee88e6cb13fa]
+2026-11-09T18:04:53.9449925Z [claude] [2026-11-09T18:04:53.717895+00:00] [debug] Adding layer to cache: c82c961b-3d1c-41c7-b347-19f26aad0535
+2026-11-09T18:04:53.9450943Z [claude] [2026-11-09T18:04:53.718056+00:00] [debug] Uploading layer: c82c961b-3d1c-41c7-b347-19f26aad0535
+2026-11-09T18:04:53.9452912Z [claude] [2026-11-09T18:04:53.718487+00:00] [info] [builder 5/12] COPY e2b-certificate-relinks.json /opt/mikka/e2b-certificate-relinks.json   [b98f2759e2cd863d6dc93b1a2778a7da26ac0282e6afdfe059bf61a19dc2eec9]
+2026-11-09T18:04:53.9458680Z [desktop] [2026-11-09T18:04:53.796682+00:00] [debug] Adding layer to cache: 378cf6d8-269d-418b-9ebb-8a498c43d9df
+2026-11-09T18:04:53.9459678Z [desktop] [2026-11-09T18:04:53.797140+00:00] [debug] Uploading layer: 378cf6d8-269d-418b-9ebb-8a498c43d9df
+2026-11-09T18:04:53.9461126Z [desktop] [2026-11-09T18:04:53.797549+00:00] [info] [builder 7/12] COPY instance-bootstrap.sh /opt/mikka/instance-bootstrap.sh   [a1d554dcb594917d45411faf27ec014a52e104a66f29347c1416b7595713f2c6]
+2026-11-09T18:04:53.9462393Z [desktop] [2026-11-09T18:04:53.853420+00:00] [debug] Saved: 5d49b377-aa40-4598-9c38-85f61a280933
+2026-11-09T18:04:54.1332019Z [codex] [2026-11-09T18:04:53.867512+00:00] [debug] Adding layer to cache: ef58cc88-03a0-41d2-a6c1-14775492ec76
+2026-11-09T18:04:54.1333267Z [codex] [2026-11-09T18:04:53.867680+00:00] [debug] Uploading layer: ef58cc88-03a0-41d2-a6c1-14775492ec76
+2026-11-09T18:04:54.1335037Z [codex] [2026-11-09T18:04:53.868064+00:00] [info] [builder 3/12] COPY official-files.py /opt/mikka/official-files.py   [197f23e5eaebf58e3bf5c8891ad9b5db4b78300aaf08c85fb6dbfca307d78df5]
+2026-11-09T18:04:54.1336573Z [codex] [2026-11-09T18:04:54.032296+00:00] [debug] Saved: 42f59a4e-53f5-4fac-9258-7b46623adbff
+2026-11-09T18:04:54.2215335Z [claude] [2026-11-09T18:04:53.989217+00:00] [debug] Saved: c82c961b-3d1c-41c7-b347-19f26aad0535
+2026-11-09T18:04:54.3990583Z [codex] [2026-11-09T18:04:54.172255+00:00] [debug] Saved: 391d9532-4dda-489c-a227-6f291955ac2f
+2026-11-09T18:04:54.3991656Z [codex] [2026-11-09T18:04:54.233614+00:00] [debug] Adding layer to cache: 3045d45f-7760-4eff-a60f-9dfcde0fbd5f
+2026-11-09T18:04:54.3992808Z [codex] [2026-11-09T18:04:54.233817+00:00] [debug] Uploading layer: 3045d45f-7760-4eff-a60f-9dfcde0fbd5f
+2026-11-09T18:04:54.3994452Z [codex] [2026-11-09T18:04:54.234130+00:00] [info] [builder 4/12] COPY e2b-finalization-files.json /opt/mikka/e2b-finalization-files.json   [e7ab2d306a24bb373172f418b41e2cc402de7583b45c4fc5b6dce98c963a10a7]
+2026-11-09T18:04:54.3995882Z [codex] [2026-11-09T18:04:54.314037+00:00] [debug] Saved: ef58cc88-03a0-41d2-a6c1-14775492ec76
+2026-11-09T18:04:54.4757168Z [desktop] [2026-11-09T18:04:54.424468+00:00] [debug] Saved: 378cf6d8-269d-418b-9ebb-8a498c43d9df
+2026-11-09T18:04:54.4945558Z [claude] [2026-11-09T18:04:54.267244+00:00] [debug] Adding layer to cache: d8af3bad-fa04-4346-aafb-cc2f4096a409
+2026-11-09T18:04:54.4946587Z [claude] [2026-11-09T18:04:54.267436+00:00] [debug] Uploading layer: d8af3bad-fa04-4346-aafb-cc2f4096a409
+2026-11-09T18:04:54.4947985Z [claude] [2026-11-09T18:04:54.267790+00:00] [info] [builder 6/12] COPY start-prebuilt.sh /opt/mikka/start-prebuilt.sh   [514b5f4d2dd3d480ad066e721b4712c2d2034a533d23d8a7d664719e4f96e3d5]
+2026-11-09T18:04:54.6736675Z [codex] [2026-11-09T18:04:54.567231+00:00] [debug] Saved: 3045d45f-7760-4eff-a60f-9dfcde0fbd5f
+2026-11-09T18:04:54.6738513Z [codex] [2026-11-09T18:04:54.576306+00:00] [debug] Adding layer to cache: 2569e270-b833-4b0d-a90f-b21e5da4b2d2
+2026-11-09T18:04:54.6739857Z [codex] [2026-11-09T18:04:54.576479+00:00] [debug] Uploading layer: 2569e270-b833-4b0d-a90f-b21e5da4b2d2
+2026-11-09T18:04:54.6741918Z [codex] [2026-11-09T18:04:54.576817+00:00] [info] [builder 5/12] COPY e2b-certificate-relinks.json /opt/mikka/e2b-certificate-relinks.json   [3d4d9ef6c705cc0186b5c349208a165ca4ddaf02f71097a590ffc8b5a870fe5f]
+2026-11-09T18:04:54.7484673Z [desktop] [2026-11-09T18:04:54.540171+00:00] [debug] Adding layer to cache: 315c6cf1-1ea1-4cab-ae43-67dbcce7ae43
+2026-11-09T18:04:54.7486534Z [desktop] [2026-11-09T18:04:54.540374+00:00] [debug] Uploading layer: 315c6cf1-1ea1-4cab-ae43-67dbcce7ae43
+2026-11-09T18:04:54.7489739Z [desktop] [2026-11-09T18:04:54.540826+00:00] [info] [builder 8/12] RUN python3 /opt/mikka/official-files.py capture /opt/mikka/official-files-before.json --kind desktop --cli-manifest /opt/mikka/original-cli.json root [09d059fe6857b9938b54298b49053e53a3e704961358390ded0345f2604d1bbc]
+2026-11-09T18:04:54.7690718Z [claude] [2026-11-09T18:04:54.661946+00:00] [debug] Saved: d8af3bad-fa04-4346-aafb-cc2f4096a409
+2026-11-09T18:04:55.0139992Z [desktop] [2026-11-09T18:04:54.857830+00:00] [debug] Saved: 315c6cf1-1ea1-4cab-ae43-67dbcce7ae43
+2026-11-09T18:04:55.0345281Z [claude] [2026-11-09T18:04:54.787919+00:00] [debug] Adding layer to cache: 28973034-d535-4db0-8e29-f868c06cc5f2
+2026-11-09T18:04:55.0346285Z [claude] [2026-11-09T18:04:54.788097+00:00] [debug] Uploading layer: 28973034-d535-4db0-8e29-f868c06cc5f2
+2026-11-09T18:04:55.0347736Z [claude] [2026-11-09T18:04:54.788404+00:00] [info] [builder 7/12] COPY instance-bootstrap.sh /opt/mikka/instance-bootstrap.sh   [4586e060b333b7da967819842d92f1044e0d56658b381587f27c145c74aa4e66]
+2026-11-09T18:04:55.2197561Z [codex] [2026-11-09T18:04:54.936044+00:00] [debug] Saved: 2569e270-b833-4b0d-a90f-b21e5da4b2d2
+2026-11-09T18:04:55.2199153Z [codex] [2026-11-09T18:04:54.946177+00:00] [debug] Adding layer to cache: 828cc59e-c7bf-4c06-9a01-806e660b90c2
+2026-11-09T18:04:55.2200125Z [codex] [2026-11-09T18:04:54.946360+00:00] [debug] Uploading layer: 828cc59e-c7bf-4c06-9a01-806e660b90c2
+2026-11-09T18:04:55.2201508Z [codex] [2026-11-09T18:04:54.946694+00:00] [info] [builder 6/12] COPY start-prebuilt.sh /opt/mikka/start-prebuilt.sh   [a2129f8c0c21fe9ebdb743cafdc5a8082ea8dccf214e5ccfd57fcd9ae5ffec4c]
+2026-11-09T18:04:55.3000146Z [claude] [2026-11-09T18:04:55.212277+00:00] [debug] Saved: 28973034-d535-4db0-8e29-f868c06cc5f2
+2026-11-09T18:04:55.4865383Z [codex] [2026-11-09T18:04:55.305773+00:00] [debug] Adding layer to cache: 0f30a139-adc8-4989-9090-54ba448b35eb
+2026-11-09T18:04:55.4866403Z [codex] [2026-11-09T18:04:55.305968+00:00] [debug] Uploading layer: 0f30a139-adc8-4989-9090-54ba448b35eb
+2026-11-09T18:04:55.4867859Z [codex] [2026-11-09T18:04:55.306613+00:00] [info] [builder 7/12] COPY instance-bootstrap.sh /opt/mikka/instance-bootstrap.sh   [7e80ef12571e115918a5cf005a2627e47c8c60b5b8d411774c67758121715e58]
+2026-11-09T18:04:55.4869426Z [codex] [2026-11-09T18:04:55.361833+00:00] [debug] Saved: 828cc59e-c7bf-4c06-9a01-806e660b90c2
+2026-11-09T18:04:55.5712333Z [claude] [2026-11-09T18:04:55.442878+00:00] [debug] Adding layer to cache: 55ee1746-7df1-4779-bd0b-3e0b89f2d36a
+2026-11-09T18:04:55.5713350Z [claude] [2026-11-09T18:04:55.443025+00:00] [debug] Uploading layer: 55ee1746-7df1-4779-bd0b-3e0b89f2d36a
+2026-11-09T18:04:55.5715290Z [claude] [2026-11-09T18:04:55.443329+00:00] [info] [builder 8/12] RUN python3 /opt/mikka/official-files.py capture /opt/mikka/official-files-before.json --kind claude --cli-manifest /opt/mikka/original-cli.json root [0dad153baf730ab94e244e72057a93372e7bd51344f13a6120cafb2b82a8be5e]
+2026-11-09T18:04:55.7510251Z [codex] [2026-11-09T18:04:55.590954+00:00] [debug] Saved: 0f30a139-adc8-4989-9090-54ba448b35eb
+2026-11-09T18:04:55.7511241Z [codex] [2026-11-09T18:04:55.680915+00:00] [debug] Adding layer to cache: 4836abb6-45ca-432f-a0b4-8fbad1540aa8
+2026-11-09T18:04:55.7512195Z [codex] [2026-11-09T18:04:55.681087+00:00] [debug] Uploading layer: 4836abb6-45ca-432f-a0b4-8fbad1540aa8
+2026-11-09T18:04:55.7514150Z [codex] [2026-11-09T18:04:55.681425+00:00] [info] [builder 8/12] RUN python3 /opt/mikka/official-files.py capture /opt/mikka/official-files-before.json --kind codex --cli-manifest /opt/mikka/original-cli.json root [092c0bcd4d3191a87957b3558004a52287118f359fc57dd6f5b249d5108e13b1]
+2026-11-09T18:04:55.8435810Z [claude] [2026-11-09T18:04:55.748873+00:00] [debug] Saved: 55ee1746-7df1-4779-bd0b-3e0b89f2d36a
+2026-11-09T18:04:56.2924320Z [codex] [2026-11-09T18:04:56.032053+00:00] [debug] Saved: 4836abb6-45ca-432f-a0b4-8fbad1540aa8
+2026-11-09T18:06:04.2181112Z [claude] [2026-11-09T18:06:03.996006+00:00] [info] [builder 8/12] [stdout]: {"entries":44198,"sha256":"5ba76e4a1e849b3fbc52d6b444092b1469e673bf5670707c54e12a256d4be18a"}
+2026-11-09T18:06:04.7603891Z [claude] [2026-11-09T18:06:04.611569+00:00] [debug] Adding layer to cache: ab36cd3b-c597-44ff-aaf3-f7f5d6834edd
+2026-11-09T18:06:04.7605670Z [claude] [2026-11-09T18:06:04.611809+00:00] [debug] Uploading layer: ab36cd3b-c597-44ff-aaf3-f7f5d6834edd
+2026-11-09T18:06:04.7608056Z [claude] [2026-11-09T18:06:04.612233+00:00] [info] [builder 9/12] RUN bash /opt/mikka/instance-bootstrap.sh ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d 75b7462d53f9725cb92d40112c504b4f32d795c0 claude root [174691d012d3ade625efdef279e2d009afccc435a70819a3254517ab8c578132]
+2026-11-09T18:06:05.3017185Z [claude] [2026-11-09T18:06:05.132573+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase validation 12
+2026-11-09T18:06:05.6637873Z [codex] [2026-11-09T18:06:05.462876+00:00] [info] [builder 8/12] [stdout]: {"entries":39643,"sha256":"1ea4eaed8fba093f641ea972c787906f1ce915c443841ca58d5cb8dd395eecfb"}
+2026-11-09T18:06:05.9284262Z [codex] [2026-11-09T18:06:05.822105+00:00] [debug] Adding layer to cache: f5fdac48-960e-4a2a-bb95-ab9fd0ac65e0
+2026-11-09T18:06:05.9285194Z [codex] [2026-11-09T18:06:05.822412+00:00] [debug] Uploading layer: f5fdac48-960e-4a2a-bb95-ab9fd0ac65e0
+2026-11-09T18:06:05.9286962Z [codex] [2026-11-09T18:06:05.822752+00:00] [info] [builder 9/12] RUN bash /opt/mikka/instance-bootstrap.sh ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d 75b7462d53f9725cb92d40112c504b4f32d795c0 codex root [5fce3ea86861017191a817f15806c01be4bf84018a3d7cf51cdcca7f8cb1928c]
+2026-11-09T18:06:06.2035087Z [codex] [2026-11-09T18:06:05.959534+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase validation 7
+2026-11-09T18:06:11.0764605Z [codex] [2026-11-09T18:06:11.005338+00:00] [info] [builder 9/12] [stdout]: {"version":1,"kind":"codex","original":{"claude_code":null,"codex":{"path":"/usr/local/lib/node_modules/@openai/codex/bin/codex.js","sha256":"e14fc83739c13c1074b12bd1acce4010c893c7f6fbfc1593b4a31d74cabb57af"}},"added":{}}
+2026-11-09T18:06:11.0766569Z [codex] [2026-11-09T18:06:11.011262+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase source 5050
+2026-11-09T18:06:11.3512500Z [codex] [2026-11-09T18:06:11.093877+00:00] [debug] Saved: f5fdac48-960e-4a2a-bb95-ab9fd0ac65e0
+2026-11-09T18:06:11.6267394Z [codex] [2026-11-09T18:06:11.393484+00:00] [info] [builder 9/12] [stdout]: /opt/mikka/archives/node-v24.19.0-linux-x64.tar.xz: OK
+2026-11-09T18:06:14.0436051Z [codex] [2026-11-09T18:06:13.930881+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase node 2921
+2026-11-09T18:06:14.5829049Z [codex] [2026-11-09T18:06:14.495680+00:00] [info] [builder 9/12] [stdout]: /opt/mikka/archives/gh_2.83.2_linux_amd64.tar.gz: OK
+2026-11-09T18:06:15.1335050Z [codex] [2026-11-09T18:06:14.875831+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase gh 945
+2026-11-09T18:06:15.1338154Z [codex] [2026-11-09T18:06:14.951052+00:00] [info] [builder 9/12] [stdout]: {"version":1,"importers":[".","packages/config","packages/protocol","packages/daemon"],"sourcePackageSha256":"ed9893d62d9d90299de21eb0325e73ab3c97202dec5eafe3d9983c04b64a6add","sourceLockSha256":"e18697f2dd891b9159e43e40d1f8af4018d087cf2a0e668b9e358a766b020c28","installLockSha256":"fd0e2e1eaee640541b4cb1b61fd0f62edbc5c7b760236995f751acf10ed17d24","workspaceSha256":"5a24e67ade7fae19b2d160b4ca61b58170eb3c04a18f8b06efb9a5a0fae36b9f"}
+2026-11-09T18:06:16.4730774Z [codex] [2026-11-09T18:06:16.361487+00:00] [info] [builder 9/12] [stdout]: Scope: 3 of 4 workspace projects
+2026-11-09T18:06:16.7387626Z [codex] [2026-11-09T18:06:16.490935+00:00] [info] [builder 9/12] [stdout]: Lockfile is up to date, resolution step is skipped
+2026-11-09T18:06:16.7389096Z [codex] [2026-11-09T18:06:16.530974+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-09T18:06:16.7390267Z [codex] [2026-11-09T18:06:16.570141+00:00] [info] [builder 9/12] [stdout]: .                                        | +357 ++++++++++++++++++++++++++++++++
+2026-11-09T18:06:17.0159473Z [codex] [2026-11-09T18:06:16.752364+00:00] [info] [builder 9/12] [stdout]: ╭───────────────────────────────────────────────╮
+2026-11-09T18:06:17.0160612Z [codex] [2026-11-09T18:06:16.752401+00:00] [info] [builder 9/12] [stdout]: │                                               │
+2026-11-09T18:06:17.0162121Z [codex] [2026-11-09T18:06:16.752408+00:00] [info] [builder 9/12] [stdout]: │     Update available! 10.34.3 → 12.18.0.      │
+2026-11-09T18:06:17.0163229Z [codex] [2026-11-09T18:06:16.752421+00:00] [info] [builder 9/12] [stdout]: │     Changelog: https://pnpm.io/v/12.18.0      │
+2026-11-09T18:06:17.0164313Z [codex] [2026-11-09T18:06:16.752431+00:00] [info] [builder 9/12] [stdout]: │   To update, run: corepack use pnpm@12.18.0   │
+2026-11-09T18:06:17.0165341Z [codex] [2026-11-09T18:06:16.752437+00:00] [info] [builder 9/12] [stdout]: │                                               │
+2026-11-09T18:06:17.0166380Z [codex] [2026-11-09T18:06:16.752442+00:00] [info] [builder 9/12] [stdout]: ╰───────────────────────────────────────────────╯
+2026-11-09T18:06:17.8261656Z [codex] [2026-11-09T18:06:17.531847+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 357, reused 0, downloaded 14, added 0
+2026-11-09T18:06:18.9030510Z [codex] [2026-11-09T18:06:18.657809+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 357, reused 0, downloaded 111, added 58
+2026-11-09T18:06:19.7104209Z [codex] [2026-11-09T18:06:19.659479+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 357, reused 0, downloaded 125, added 61
+2026-11-09T18:06:21.0538107Z [codex] [2026-11-09T18:06:20.986881+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 357, reused 0, downloaded 126, added 61
+2026-11-09T18:06:22.1336116Z [codex] [2026-11-09T18:06:21.987733+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 357, reused 0, downloaded 205, added 89
+2026-11-09T18:06:23.2111315Z [codex] [2026-11-09T18:06:22.989928+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 357, reused 0, downloaded 319, added 141
+2026-11-09T18:06:23.7610266Z [codex] [2026-11-09T18:06:23.544992+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 357, reused 0, downloaded 354, added 357, done
+2026-11-09T18:06:23.7611439Z [codex] [2026-11-09T18:06:23.714342+00:00] [info] [builder 9/12] [stdout]: .../esbuild@0.28.2/node_modules/esbuild postinstall$ node install.js
+2026-11-09T18:06:24.0352326Z [codex] [2026-11-09T18:06:23.768942+00:00] [info] [builder 9/12] [stdout]: .../esbuild@0.28.2/node_modules/esbuild postinstall: Done
+2026-11-09T18:06:24.2994116Z [codex] [2026-11-09T18:06:24.141779+00:00] [info] [builder 9/12] [stdout]: Done in 8.1s using pnpm v10.34.3
+2026-11-09T18:06:24.2995111Z [codex] [2026-11-09T18:06:24.221730+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase dependencies 9345
+2026-11-09T18:06:24.8420067Z [codex] [2026-11-09T18:06:24.788867+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase build 567
+2026-11-09T18:06:25.3953153Z [codex] [2026-11-09T18:06:25.164434+00:00] [info] [builder 9/12] [stdout]: {"version":1,"kind":"codex","original":{"claude_code":null,"codex":{"path":"/usr/local/lib/node_modules/@openai/codex/bin/codex.js","sha256":"e14fc83739c13c1074b12bd1acce4010c893c7f6fbfc1593b4a31d74cabb57af"}},"added":{"claude_code":{"path":"/opt/mikka/releases/ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d/worker-install/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk-linux-x64@0.3.305/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/claude","sha256":"86cb722ab68348877dba7971e4d0c659919e05e6228c05e006e83da320e656ef"}}}
+2026-11-09T18:06:25.3956288Z [codex] [2026-11-09T18:06:25.301153+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase cli 512
+2026-11-09T18:06:25.3957292Z [codex] [2026-11-09T18:06:25.341063+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase journal 39
+2026-11-09T18:06:25.3958551Z [codex] [2026-11-09T18:06:25.341549+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase desktop 0
+2026-11-09T18:06:25.6605278Z [codex] [2026-11-09T18:06:25.473016+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase finalize 131
+2026-11-09T18:06:25.6606674Z [codex] [2026-11-09T18:06:25.473058+00:00] [info] [builder 9/12] [stdout]: mikka-official-instance-ready ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d 75b7462d53f9725cb92d40112c504b4f32d795c0
+2026-11-09T18:06:28.3960676Z [codex] [2026-11-09T18:06:28.119999+00:00] [debug] Adding layer to cache: 6501a32d-c372-4307-8ef8-f1a8f2cbda4a
+2026-11-09T18:06:28.3962068Z [codex] [2026-11-09T18:06:28.120220+00:00] [debug] Uploading layer: 6501a32d-c372-4307-8ef8-f1a8f2cbda4a
+2026-11-09T18:06:28.3963850Z [codex] [2026-11-09T18:06:28.120655+00:00] [info] [builder 10/12] RUN export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH
+2026-11-09T18:06:28.3964683Z node --input-type=module <<'JS'
+2026-11-09T18:06:28.3965032Z import assert from 'node:assert/strict'
+2026-11-09T18:06:28.3965425Z import { execFileSync } from 'node:child_process'
+2026-11-09T18:06:28.3966015Z import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+2026-11-09T18:06:28.3966760Z import { createRequire } from 'node:module'
+2026-11-09T18:06:28.3967118Z import { tmpdir } from 'node:os'
+2026-11-09T18:06:28.3967432Z import { join } from 'node:path'
+2026-11-09T18:06:28.3967785Z const npm = '/opt/mikka/runtime/node/bin/npm'
+2026-11-09T18:06:28.3968427Z createRequire(realpathSync(npm))('pacote')
+2026-11-09T18:06:28.3969034Z const directory = mkdtempSync(join(tmpdir(), 'mikka-npm-runtime-'))
+2026-11-09T18:06:28.3969425Z try {
+2026-11-09T18:06:28.3969766Z   const home = join(directory, 'home'), temp = join(directory, 'tmp')
+2026-11-09T18:06:28.3970186Z   mkdirSync(home); mkdirSync(temp)
+2026-11-09T18:06:28.3970967Z   writeFileSync(join(directory, 'package.json'), JSON.stringify({ private: true, scripts: { test: `node -e "console.log('Mikka npm runtime verified')"` } }))
+2026-11-09T18:06:28.3971715Z   const output = execFileSync(npm, ['test'], {
+2026-11-09T18:06:28.3972102Z     cwd: directory, encoding: 'utf8', timeout: 30_000,
+2026-11-09T18:06:28.3972903Z     env: { PATH: '/opt/mikka/runtime/node/bin:/usr/local/bin:/usr/bin:/bin', HOME: home, TMPDIR: temp, LANG: 'C.UTF-8', NPM_CONFIG_UPDATE_NOTIFIER: 'false' },
+2026-11-09T18:06:28.3973544Z   })
+2026-11-09T18:06:28.3973850Z   assert.match(output, /^Mikka npm runtime verified\r?$/m)
+2026-11-09T18:06:28.3974263Z   console.log('Private npm runtime verified')
+2026-11-09T18:06:28.3974726Z } finally { rmSync(directory, { recursive: true, force: true }) }
+2026-11-09T18:06:28.3975264Z JS user [d723297bd53889192860f927f415c5f00359ed12fd9cf98643d3d90a247a6b52]
+2026-11-09T18:06:29.1911913Z [codex] [2026-11-09T18:06:28.961192+00:00] [info] [builder 10/12] [stdout]: Private npm runtime verified
+2026-11-09T18:06:29.1912876Z [codex] [2026-11-09T18:06:29.134603+00:00] [debug] Adding layer to cache: fab31e51-02d7-4383-9acb-5d898e19f94e
+2026-11-09T18:06:29.1913747Z [codex] [2026-11-09T18:06:29.135039+00:00] [debug] Uploading layer: fab31e51-02d7-4383-9acb-5d898e19f94e
+2026-11-09T18:06:29.1915563Z [codex] [2026-11-09T18:06:29.135786+00:00] [info] [builder 11/12] RUN python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --receipt /opt/mikka/official-files-conservation.json root [540f32f027f4409abcdb70be09c3cea15b2126d8b9666027ff323d93f1c60354]
+2026-11-09T18:06:33.4863824Z [codex] [2026-11-09T18:06:33.445235+00:00] [debug] Saved: 6501a32d-c372-4307-8ef8-f1a8f2cbda4a
+2026-11-09T18:06:33.7645125Z [codex] [2026-11-09T18:06:33.557016+00:00] [debug] Saved: fab31e51-02d7-4383-9acb-5d898e19f94e
+2026-11-09T18:06:35.3937533Z [codex] [2026-11-09T18:06:35.181026+00:00] [info] [builder 11/12] [stdout]: {"before":{"entries":39643,"sha256":"1ea4eaed8fba093f641ea972c787906f1ce915c443841ca58d5cb8dd395eecfb"},"after":{"entries":39643,"sha256":"1ea4eaed8fba093f641ea972c787906f1ce915c443841ca58d5cb8dd395eecfb"}}
+2026-11-09T18:06:35.6587047Z [codex] [2026-11-09T18:06:35.417629+00:00] [debug] Adding layer to cache: 5bd55aa3-0ef6-43d6-9f76-1629cfad7ea4
+2026-11-09T18:06:35.6590593Z [codex] [2026-11-09T18:06:35.417953+00:00] [debug] Uploading layer: 5bd55aa3-0ef6-43d6-9f76-1629cfad7ea4
+2026-11-09T18:06:35.6591686Z [codex] [2026-11-09T18:06:35.418572+00:00] [info] [builder 12/12] USER root [32a421a2639546030f6444b8e06e375637eaa9d098fe2e13b72078dc63130d7d]
+2026-11-09T18:06:37.5512379Z [codex] [2026-11-09T18:06:37.504794+00:00] [debug] Adding layer to cache: 43e34a17-fd8b-46bc-976c-7a91ffe787ce
+2026-11-09T18:06:37.5513777Z [codex] [2026-11-09T18:06:37.505159+00:00] [debug] Uploading layer: 43e34a17-fd8b-46bc-976c-7a91ffe787ce
+2026-11-09T18:06:37.5514854Z [codex] [2026-11-09T18:06:37.505516+00:00] [info] [resize-disk] Resizing disk [f0e4253f9d5363bc04b5a1e803a822898a94615008369d51f5d479b8ea4dcfb3]
+2026-11-09T18:06:37.8175040Z [codex] [2026-11-09T18:06:37.589166+00:00] [info] resize-disk: 19425 MiB free already >= target 16384 MiB, no resize needed
+2026-11-09T18:06:37.8176059Z [codex] [2026-11-09T18:06:37.589970+00:00] [debug] Adding layer to cache: be8f8079-4511-44e8-9a3c-185ce36c6903
+2026-11-09T18:06:37.8176952Z [codex] [2026-11-09T18:06:37.590063+00:00] [debug] Uploading layer: be8f8079-4511-44e8-9a3c-185ce36c6903
+2026-11-09T18:06:37.8178896Z [codex] [2026-11-09T18:06:37.590331+00:00] [info] [finalize] Finalizing template build [fc1fc5a3ead94364f23ea7da003cb9dafe8e4beaf0fc71248d51cc6613eb6d44]
+2026-11-09T18:06:38.5344692Z [claude] [2026-11-09T18:06:38.242799+00:00] [debug] Saved: ab36cd3b-c597-44ff-aaf3-f7f5d6834edd
+2026-11-09T18:06:38.8992301Z [codex] [2026-11-09T18:06:38.632335+00:00] [debug] Saved: 5bd55aa3-0ef6-43d6-9f76-1629cfad7ea4
+2026-11-09T18:06:38.8993355Z [codex] [2026-11-09T18:06:38.640390+00:00] [debug] [config] [stdout]: Starting configuration script
+2026-11-09T18:06:38.8994710Z [codex] [2026-11-09T18:06:38.640542+00:00] [debug] [config] [stdout]: Create default user 'user' (if doesn't exist yet)
+2026-11-09T18:06:38.8996891Z [codex] [2026-11-09T18:06:38.640867+00:00] [debug] [config] [stdout]: Copy skeleton files to /home/user (keeping existing files)
+2026-11-09T18:06:38.8997884Z [codex] [2026-11-09T18:06:38.644723+00:00] [debug] [config] [stdout]: skel: keeping existing .bash_logout
+2026-11-09T18:06:38.8999039Z [codex] [2026-11-09T18:06:38.644887+00:00] [debug] [config] [stdout]: skel: keeping existing .bashrc
+2026-11-09T18:06:38.8999864Z [codex] [2026-11-09T18:06:38.645022+00:00] [debug] [config] [stdout]: skel: keeping existing .profile
+2026-11-09T18:06:38.9000713Z [codex] [2026-11-09T18:06:38.645486+00:00] [debug] [config] [stdout]: Add sudo to 'user' with no password
+2026-11-09T18:06:38.9001524Z [codex] [2026-11-09T18:06:38.671324+00:00] [debug] [config] [stdout]: passwd: password changed.
+2026-11-09T18:06:38.9002312Z [codex] [2026-11-09T18:06:38.675293+00:00] [debug] [config] [stdout]: sudoers entry already present
+2026-11-09T18:06:38.9003145Z [codex] [2026-11-09T18:06:38.675323+00:00] [debug] [config] [stdout]: Give 'user' ownership to /home/user
+2026-11-09T18:06:38.9003982Z [codex] [2026-11-09T18:06:38.679015+00:00] [debug] [config] [stdout]: Give 777 permission to /usr/local
+2026-11-09T18:06:38.9004764Z [codex] [2026-11-09T18:06:38.756385+00:00] [debug] Saved: 43e34a17-fd8b-46bc-976c-7a91ffe787ce
+2026-11-09T18:06:38.9005524Z [codex] [2026-11-09T18:06:38.791165+00:00] [debug] [config] [stdout]: Create /code directory
+2026-11-09T18:06:38.9006276Z [codex] [2026-11-09T18:06:38.793019+00:00] [debug] [config] [stdout]: Give 777 permission to /code
+2026-11-09T18:06:38.9007059Z [codex] [2026-11-09T18:06:38.794196+00:00] [debug] [config] [stdout]: Finished configuration script
+2026-11-09T18:06:38.9007897Z [codex] [2026-11-09T18:06:38.795055+00:00] [info] Running start command: bash /opt/mikka/start-prebuilt.sh
+2026-11-09T18:06:38.9011291Z [codex] [2026-11-09T18:06:38.795078+00:00] [info] Waiting for template to be ready: test -s /home/user/.mikka/preloaded.pid && read -r mikka_preloaded_pid < /home/user/.mikka/preloaded.pid && kill -0 "$mikka_preloaded_pid" && tr '\0' '\n' < "/proc/$mikka_preloaded_pid/cmdline" | grep -Fxq -- '--wait-bootstrap' && test ! -e /home/user/.mikka/bootstrap.json && test ! -e /home/user/.mikka/worker/device.json && python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization codex > /opt/mikka/official-files-ready.json
+2026-11-09T18:06:38.9013726Z [codex] [2026-11-09T18:06:38.806314+00:00] [debug] Template is not ready: exit status 1
+2026-11-09T18:06:39.1652877Z [codex] [2026-11-09T18:06:38.867703+00:00] [debug] Saved: be8f8079-4511-44e8-9a3c-185ce36c6903
+2026-11-09T18:06:51.6589364Z [codex] [2026-11-09T18:06:51.425633+00:00] [info] Template is ready
+2026-11-09T18:06:51.6590194Z [codex] [2026-11-09T18:06:51.496163+00:00] [debug] [certs] [stdout]: Updating certificates in /etc/ssl/certs...
+2026-11-09T18:06:52.7357766Z [codex] [2026-11-09T18:06:52.458583+00:00] [debug] [certs] [stderr]: rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL
+2026-11-09T18:06:52.7359548Z [codex] [2026-11-09T18:06:52.464040+00:00] [debug] [certs] [stdout]: 148 added, 0 removed; done.
+2026-11-09T18:06:52.7360664Z [codex] [2026-11-09T18:06:52.464088+00:00] [debug] [certs] [stdout]: Running hooks in /etc/ca-certificates/update.d...
+2026-11-09T18:06:52.7362085Z [codex] [2026-11-09T18:06:52.465445+00:00] [debug] [certs] [stdout]: done.
+2026-11-09T18:06:57.4229003Z [claude] [2026-11-09T18:06:57.145071+00:00] [info] [builder 9/12] [stdout]: {"version":1,"kind":"claude","original":{"claude_code":{"path":"/usr/local/bin/claude","sha256":"4f4178ce41d83e23341ebfbaecdbcf8ea6bf7baea0690025abe49eeec3a5d01d"},"codex":null},"added":{}}
+2026-11-09T18:06:57.4230865Z [claude] [2026-11-09T18:06:57.150056+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase source 52022
+2026-11-09T18:06:57.6250554Z [codex] [2026-11-09T18:06:57.583747+00:00] [debug] Adding layer to cache: bdd80d18-1ad7-441a-80bb-209423297824
+2026-11-09T18:06:57.6251507Z [codex] [2026-11-09T18:06:57.583952+00:00] [debug] Uploading layer: bdd80d18-1ad7-441a-80bb-209423297824
+2026-11-09T18:06:57.6252627Z [codex] [2026-11-09T18:06:57.584403+00:00] [info] [optimize] Optimizing template [d4bd341c0a39ea31e1f0db46f1b4fb5d6a7178d815bb563996c9c71725ee7538]
+2026-11-09T18:06:58.2336878Z [claude] [2026-11-09T18:06:58.084602+00:00] [info] [builder 9/12] [stdout]: /opt/mikka/archives/node-v24.19.0-linux-x64.tar.xz: OK
+2026-11-09T18:07:00.9497982Z [claude] [2026-11-09T18:07:00.731366+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase node 3581
+2026-11-09T18:07:01.7555940Z [claude] [2026-11-09T18:07:01.720705+00:00] [info] [builder 9/12] [stdout]: /opt/mikka/archives/gh_2.83.2_linux_amd64.tar.gz: OK
+2026-11-09T18:07:02.2994517Z [claude] [2026-11-09T18:07:02.115453+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase gh 1384
+2026-11-09T18:07:02.2997443Z [claude] [2026-11-09T18:07:02.198278+00:00] [info] [builder 9/12] [stdout]: {"version":1,"importers":[".","packages/config","packages/protocol","packages/daemon"],"sourcePackageSha256":"ed9893d62d9d90299de21eb0325e73ab3c97202dec5eafe3d9983c04b64a6add","sourceLockSha256":"e18697f2dd891b9159e43e40d1f8af4018d087cf2a0e668b9e358a766b020c28","installLockSha256":"fd0e2e1eaee640541b4cb1b61fd0f62edbc5c7b760236995f751acf10ed17d24","workspaceSha256":"5a24e67ade7fae19b2d160b4ca61b58170eb3c04a18f8b06efb9a5a0fae36b9f"}
+2026-11-09T18:07:03.8063474Z [codex] [2026-11-09T18:07:03.751099+00:00] [debug] Saved: bdd80d18-1ad7-441a-80bb-209423297824
+2026-11-09T18:07:04.3519758Z [codex] [2026-11-09T18:07:04.207441+00:00] [info] Build finished, took 2m20s
+2026-11-09T18:07:04.4262274Z [codex] [2026-11-09T18:07:04.426001] [debug] Build finished
+2026-11-09T18:07:04.7505092Z [claude] [2026-11-09T18:07:04.611604+00:00] [info] [builder 9/12] [stdout]: Scope: 3 of 4 workspace projects
+2026-11-09T18:07:05.0214922Z [claude] [2026-11-09T18:07:04.760769+00:00] [info] [builder 9/12] [stdout]: Lockfile is up to date, resolution step is skipped
+2026-11-09T18:07:05.0216042Z [claude] [2026-11-09T18:07:04.802228+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-09T18:07:05.0217148Z [claude] [2026-11-09T18:07:04.841429+00:00] [info] [builder 9/12] [stdout]: .                                        | +357 ++++++++++++++++++++++++++++++++
+2026-11-09T18:07:05.3000134Z [claude] [2026-11-09T18:07:05.039787+00:00] [info] [builder 9/12] [stdout]: ╭───────────────────────────────────────────────╮
+2026-11-09T18:07:05.3002011Z [claude] [2026-11-09T18:07:05.039843+00:00] [info] [builder 9/12] [stdout]: │                                               │
+2026-11-09T18:07:05.3003376Z [claude] [2026-11-09T18:07:05.039858+00:00] [info] [builder 9/12] [stdout]: │     Update available! 10.34.3 → 12.18.0.      │
+2026-11-09T18:07:05.3004759Z [claude] [2026-11-09T18:07:05.039866+00:00] [info] [builder 9/12] [stdout]: │     Changelog: https://pnpm.io/v/12.18.0      │
+2026-11-09T18:07:05.3006162Z [claude] [2026-11-09T18:07:05.039874+00:00] [info] [builder 9/12] [stdout]: │   To update, run: corepack use pnpm@12.18.0   │
+2026-11-09T18:07:05.3007489Z [claude] [2026-11-09T18:07:05.039886+00:00] [info] [builder 9/12] [stdout]: │                                               │
+2026-11-09T18:07:05.3009205Z [claude] [2026-11-09T18:07:05.039893+00:00] [info] [builder 9/12] [stdout]: ╰───────────────────────────────────────────────╯
+2026-11-09T18:07:05.8610767Z [claude] [2026-11-09T18:07:05.804694+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 357, reused 0, downloaded 15, added 0
+2026-11-09T18:07:06.9415619Z [claude] [2026-11-09T18:07:06.803899+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 357, reused 0, downloaded 139, added 77
+2026-11-09T18:07:08.0284975Z [claude] [2026-11-09T18:07:07.803967+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 357, reused 0, downloaded 214, added 212
+2026-11-09T18:07:08.8599538Z [claude] [2026-11-09T18:07:08.804433+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 357, reused 0, downloaded 306, added 309
+2026-11-09T18:07:09.9272443Z [claude] [2026-11-09T18:07:09.804846+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 357, reused 0, downloaded 331, added 321
+2026-11-09T18:07:11.0260319Z [claude] [2026-11-09T18:07:10.804659+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 357, reused 0, downloaded 351, added 354
+2026-11-09T18:07:12.8972875Z [claude] [2026-11-09T18:07:12.860782+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 357, reused 0, downloaded 352, added 354
+2026-11-09T18:07:13.9616915Z [claude] [2026-11-09T18:07:13.862859+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 357, reused 0, downloaded 353, added 356
+2026-11-09T18:07:16.9026401Z [claude] [2026-11-09T18:07:16.770277+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 357, reused 0, downloaded 354, added 356
+2026-11-09T18:07:16.9027807Z [claude] [2026-11-09T18:07:16.771155+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 357, reused 0, downloaded 354, added 357, done
+2026-11-09T18:07:17.1673563Z [claude] [2026-11-09T18:07:16.973898+00:00] [info] [builder 9/12] [stdout]: .../esbuild@0.28.2/node_modules/esbuild postinstall$ node install.js
+2026-11-09T18:07:17.1674864Z [claude] [2026-11-09T18:07:17.054264+00:00] [info] [builder 9/12] [stdout]: .../esbuild@0.28.2/node_modules/esbuild postinstall: Done
+2026-11-09T18:07:17.7046388Z [claude] [2026-11-09T18:07:17.550306+00:00] [info] [builder 9/12] [stdout]: Done in 13.4s using pnpm v10.34.3
+2026-11-09T18:07:17.7047465Z [claude] [2026-11-09T18:07:17.644673+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase dependencies 15529
+2026-11-09T18:07:18.5302012Z [claude] [2026-11-09T18:07:18.248252+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase build 603
+2026-11-09T18:07:33.9451869Z [claude] [2026-11-09T18:07:33.803925+00:00] [info] [builder 9/12] [stdout]: {"version":1,"kind":"claude","original":{"claude_code":{"path":"/usr/local/bin/claude","sha256":"4f4178ce41d83e23341ebfbaecdbcf8ea6bf7baea0690025abe49eeec3a5d01d"},"codex":null},"added":{"codex":{"path":"/opt/mikka/harness/codex/0.163.0/package/vendor/x86_64-unknown-linux-musl/bin/codex","sha256":"399ff69c431c066e40de318fba45c2b07f45a76b19939d247ee4828fc70c4215"}}}
+2026-11-09T18:07:35.1350615Z [claude] [2026-11-09T18:07:35.046015+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase cli 16797
+2026-11-09T18:07:35.4007966Z [claude] [2026-11-09T18:07:35.091670+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase journal 45
+2026-11-09T18:07:35.4009336Z [claude] [2026-11-09T18:07:35.092870+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase desktop 0
+2026-11-09T18:07:35.4010964Z [claude] [2026-11-09T18:07:35.219165+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase finalize 127
+2026-11-09T18:07:35.4012490Z [claude] [2026-11-09T18:07:35.219199+00:00] [info] [builder 9/12] [stdout]: mikka-official-instance-ready ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d 75b7462d53f9725cb92d40112c504b4f32d795c0
+2026-11-09T18:07:37.2766016Z [claude] [2026-11-09T18:07:37.094406+00:00] [debug] Adding layer to cache: 778cec7a-8990-4f38-be64-251184109d89
+2026-11-09T18:07:37.2766995Z [claude] [2026-11-09T18:07:37.094860+00:00] [debug] Uploading layer: 778cec7a-8990-4f38-be64-251184109d89
+2026-11-09T18:07:37.2768115Z [claude] [2026-11-09T18:07:37.095515+00:00] [info] [builder 10/12] RUN export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH
+2026-11-09T18:07:37.2769215Z node --input-type=module <<'JS'
+2026-11-09T18:07:37.2769595Z import assert from 'node:assert/strict'
+2026-11-09T18:07:37.2770020Z import { execFileSync } from 'node:child_process'
+2026-11-09T18:07:37.2770651Z import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+2026-11-09T18:07:37.2771223Z import { createRequire } from 'node:module'
+2026-11-09T18:07:37.2771602Z import { tmpdir } from 'node:os'
+2026-11-09T18:07:37.2771932Z import { join } from 'node:path'
+2026-11-09T18:07:37.2772269Z const npm = '/opt/mikka/runtime/node/bin/npm'
+2026-11-09T18:07:37.2772653Z createRequire(realpathSync(npm))('pacote')
+2026-11-09T18:07:37.2773131Z const directory = mkdtempSync(join(tmpdir(), 'mikka-npm-runtime-'))
+2026-11-09T18:07:37.2773493Z try {
+2026-11-09T18:07:37.2773814Z   const home = join(directory, 'home'), temp = join(directory, 'tmp')
+2026-11-09T18:07:37.2774214Z   mkdirSync(home); mkdirSync(temp)
+2026-11-09T18:07:37.2774936Z   writeFileSync(join(directory, 'package.json'), JSON.stringify({ private: true, scripts: { test: `node -e "console.log('Mikka npm runtime verified')"` } }))
+2026-11-09T18:07:37.2775633Z   const output = execFileSync(npm, ['test'], {
+2026-11-09T18:07:37.2776011Z     cwd: directory, encoding: 'utf8', timeout: 30_000,
+2026-11-09T18:07:37.2776754Z     env: { PATH: '/opt/mikka/runtime/node/bin:/usr/local/bin:/usr/bin:/bin', HOME: home, TMPDIR: temp, LANG: 'C.UTF-8', NPM_CONFIG_UPDATE_NOTIFIER: 'false' },
+2026-11-09T18:07:37.2777358Z   })
+2026-11-09T18:07:37.2777652Z   assert.match(output, /^Mikka npm runtime verified\r?$/m)
+2026-11-09T18:07:37.2778033Z   console.log('Private npm runtime verified')
+2026-11-09T18:07:37.2778627Z } finally { rmSync(directory, { recursive: true, force: true }) }
+2026-11-09T18:07:37.2779179Z JS user [1e1e5b6a48bb2f95a5f096e5227b0079e3be047cc7f08489722104be24baa741]
+2026-11-09T18:07:38.3511999Z [claude] [2026-11-09T18:07:38.174214+00:00] [info] [builder 10/12] [stdout]: Private npm runtime verified
+2026-11-09T18:07:38.6274615Z [claude] [2026-11-09T18:07:38.579155+00:00] [debug] Adding layer to cache: 14921a7b-6fbd-4f82-8bfb-04e5337be2d8
+2026-11-09T18:07:38.6275855Z [claude] [2026-11-09T18:07:38.579376+00:00] [debug] Uploading layer: 14921a7b-6fbd-4f82-8bfb-04e5337be2d8
+2026-11-09T18:07:38.6278538Z [claude] [2026-11-09T18:07:38.579838+00:00] [info] [builder 11/12] RUN python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --receipt /opt/mikka/official-files-conservation.json root [7cce92f77abb76a2acae6d3d0e3d64a4128077098b0a1bdab8774801e4b4b66c]
+2026-11-09T18:07:46.8383622Z [claude] [2026-11-09T18:07:46.581727+00:00] [debug] Saved: 778cec7a-8990-4f38-be64-251184109d89
+2026-11-09T18:07:46.8384476Z [claude] [2026-11-09T18:07:46.692386+00:00] [debug] Saved: 14921a7b-6fbd-4f82-8bfb-04e5337be2d8
+2026-11-09T18:07:52.4110677Z mikka-conservation-stage {"kind":"codex","phase":"create","elapsedMs":1826}
+2026-11-09T18:07:53.8559774Z mikka-conservation-stage {"kind":"codex","phase":"preload_receipts","elapsedMs":1445}
+2026-11-09T18:07:55.0131551Z [desktop] [2026-11-09T18:07:54.745562+00:00] [info] [builder 8/12] [stdout]: {"entries":103616,"sha256":"454626a0849dde26867920f6d43c5544c4f98538744aa79a3d2bc45b35a1080a"}
+2026-11-09T18:07:55.2912869Z [desktop] [2026-11-09T18:07:55.164844+00:00] [debug] Adding layer to cache: fe7a1914-25c0-4e2b-b191-f449daa3e167
+2026-11-09T18:07:55.2913928Z [desktop] [2026-11-09T18:07:55.165063+00:00] [debug] Uploading layer: fe7a1914-25c0-4e2b-b191-f449daa3e167
+2026-11-09T18:07:55.2915842Z [desktop] [2026-11-09T18:07:55.165435+00:00] [info] [builder 9/12] RUN bash /opt/mikka/instance-bootstrap.sh ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d 75b7462d53f9725cb92d40112c504b4f32d795c0 desktop root [6ac9b0d14fbe09a7895af28012f607d4ff29426f191f1e1a590dc0c64078d1ea]
+2026-11-09T18:07:55.5673820Z [desktop] [2026-11-09T18:07:55.350204+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase validation 10
+2026-11-09T18:08:01.5506554Z [desktop] [2026-11-09T18:08:01.366638+00:00] [info] [builder 9/12] [stdout]: {"version":1,"kind":"desktop","original":{"claude_code":null,"codex":null},"added":{}}
+2026-11-09T18:08:01.5507892Z [desktop] [2026-11-09T18:08:01.370911+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase source 6021
+2026-11-09T18:08:02.0890231Z [desktop] [2026-11-09T18:08:01.827698+00:00] [info] [builder 9/12] [stdout]: /opt/mikka/archives/node-v24.19.0-linux-x64.tar.xz: OK
+2026-11-09T18:08:02.9220162Z [claude] [2026-11-09T18:08:02.680753+00:00] [info] [builder 11/12] [stdout]: {"before":{"entries":44198,"sha256":"5ba76e4a1e849b3fbc52d6b444092b1469e673bf5670707c54e12a256d4be18a"},"after":{"entries":44198,"sha256":"5ba76e4a1e849b3fbc52d6b444092b1469e673bf5670707c54e12a256d4be18a"}}
+2026-11-09T18:08:02.9222838Z [claude] [2026-11-09T18:08:02.817628+00:00] [debug] Adding layer to cache: 259c61d9-4f65-402a-891b-608f9f3358ac
+2026-11-09T18:08:02.9223964Z [claude] [2026-11-09T18:08:02.817778+00:00] [debug] Uploading layer: 259c61d9-4f65-402a-891b-608f9f3358ac
+2026-11-09T18:08:02.9225043Z [claude] [2026-11-09T18:08:02.818051+00:00] [info] [builder 12/12] USER root [2673569de293b297a4da990701b2bc8cc2dfac731b7ff387f0a1570e212f53a3]
+2026-11-09T18:08:04.5561764Z [desktop] [2026-11-09T18:08:04.523210+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase node 3152
+2026-11-09T18:08:04.8210377Z [desktop] [2026-11-09T18:08:04.667858+00:00] [debug] Saved: fe7a1914-25c0-4e2b-b191-f449daa3e167
+2026-11-09T18:08:05.3511606Z [desktop] [2026-11-09T18:08:05.104187+00:00] [info] [builder 9/12] [stdout]: /opt/mikka/archives/gh_2.83.2_linux_amd64.tar.gz: OK
+2026-11-09T18:08:05.6162724Z [desktop] [2026-11-09T18:08:05.502696+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase gh 979
+2026-11-09T18:08:05.6167574Z [desktop] [2026-11-09T18:08:05.577018+00:00] [info] [builder 9/12] [stdout]: {"version":1,"importers":[".","packages/config","packages/protocol","packages/daemon"],"sourcePackageSha256":"ed9893d62d9d90299de21eb0325e73ab3c97202dec5eafe3d9983c04b64a6add","sourceLockSha256":"e18697f2dd891b9159e43e40d1f8af4018d087cf2a0e668b9e358a766b020c28","installLockSha256":"fd0e2e1eaee640541b4cb1b61fd0f62edbc5c7b760236995f751acf10ed17d24","workspaceSha256":"5a24e67ade7fae19b2d160b4ca61b58170eb3c04a18f8b06efb9a5a0fae36b9f"}
+2026-11-09T18:08:06.1459388Z [claude] [2026-11-09T18:08:05.894268+00:00] [debug] Adding layer to cache: 8102636a-1433-4d09-a426-7609e36cea02
+2026-11-09T18:08:06.1460359Z [claude] [2026-11-09T18:08:05.894432+00:00] [debug] Uploading layer: 8102636a-1433-4d09-a426-7609e36cea02
+2026-11-09T18:08:06.1461449Z [claude] [2026-11-09T18:08:05.894715+00:00] [info] [resize-disk] Resizing disk [3eaf164ac6b4705e8b5a86ca996afe26544c261418a16a9cb9e7bfad2307cd09]
+2026-11-09T18:08:07.2454476Z [desktop] [2026-11-09T18:08:07.015263+00:00] [info] [builder 9/12] [stdout]: Scope: 3 of 4 workspace projects
+2026-11-09T18:08:07.2455642Z [desktop] [2026-11-09T18:08:07.139584+00:00] [info] [builder 9/12] [stdout]: Lockfile is up to date, resolution step is skipped
+2026-11-09T18:08:07.5082191Z [desktop] [2026-11-09T18:08:07.181616+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-09T18:08:07.5083685Z [claude] [2026-11-09T18:08:07.425099+00:00] [info] resize-disk: 18914 MiB free already >= target 16384 MiB, no resize needed
+2026-11-09T18:08:07.5085176Z [claude] [2026-11-09T18:08:07.443810+00:00] [debug] Adding layer to cache: 4af079c9-fdd3-49c1-88e8-cf98ad4d2913
+2026-11-09T18:08:07.5086388Z [claude] [2026-11-09T18:08:07.443937+00:00] [debug] Uploading layer: 4af079c9-fdd3-49c1-88e8-cf98ad4d2913
+2026-11-09T18:08:07.5087753Z [claude] [2026-11-09T18:08:07.444309+00:00] [info] [finalize] Finalizing template build [d4f51fd63fb016958133fea228b3d2bdd41104c3264d055b84bfc0d63ff82f28]
+2026-11-09T18:08:07.5106512Z [desktop] [2026-11-09T18:08:07.219372+00:00] [info] [builder 9/12] [stdout]: .                                        | +357 ++++++++++++++++++++++++++++++++
+2026-11-09T18:08:07.5107852Z [desktop] [2026-11-09T18:08:07.420169+00:00] [info] [builder 9/12] [stdout]: ╭───────────────────────────────────────────────╮
+2026-11-09T18:08:07.5109250Z [desktop] [2026-11-09T18:08:07.420234+00:00] [info] [builder 9/12] [stdout]: │                                               │
+2026-11-09T18:08:07.5110304Z [desktop] [2026-11-09T18:08:07.420245+00:00] [info] [builder 9/12] [stdout]: │     Update available! 10.34.3 → 12.18.0.      │
+2026-11-09T18:08:07.5111402Z [desktop] [2026-11-09T18:08:07.420252+00:00] [info] [builder 9/12] [stdout]: │     Changelog: https://pnpm.io/v/12.18.0      │
+2026-11-09T18:08:07.5112499Z [desktop] [2026-11-09T18:08:07.420260+00:00] [info] [builder 9/12] [stdout]: │   To update, run: corepack use pnpm@12.18.0   │
+2026-11-09T18:08:07.5113554Z [desktop] [2026-11-09T18:08:07.420271+00:00] [info] [builder 9/12] [stdout]: │                                               │
+2026-11-09T18:08:07.5114639Z [desktop] [2026-11-09T18:08:07.420280+00:00] [info] [builder 9/12] [stdout]: ╰───────────────────────────────────────────────╯
+2026-11-09T18:08:08.3154508Z [desktop] [2026-11-09T18:08:08.183058+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 357, reused 0, downloaded 13, added 0
+2026-11-09T18:08:09.3987723Z [desktop] [2026-11-09T18:08:09.188808+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 357, reused 0, downloaded 110, added 65
+2026-11-09T18:08:10.4777931Z [desktop] [2026-11-09T18:08:10.189752+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 357, reused 0, downloaded 125, added 69
+2026-11-09T18:08:12.3461328Z [desktop] [2026-11-09T18:08:12.097989+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 357, reused 0, downloaded 126, added 69
+2026-11-09T18:08:12.3564275Z [claude] [2026-11-09T18:08:12.148314+00:00] [debug] [config] [stdout]: Starting configuration script
+2026-11-09T18:08:12.3565337Z [claude] [2026-11-09T18:08:12.150430+00:00] [debug] [config] [stdout]: Create default user 'user' (if doesn't exist yet)
+2026-11-09T18:08:12.3566481Z [claude] [2026-11-09T18:08:12.152969+00:00] [debug] [config] [stdout]: Copy skeleton files to /home/user (keeping existing files)
+2026-11-09T18:08:12.3567434Z [claude] [2026-11-09T18:08:12.155419+00:00] [debug] Saved: 259c61d9-4f65-402a-891b-608f9f3358ac
+2026-11-09T18:08:12.3568642Z [claude] [2026-11-09T18:08:12.156503+00:00] [debug] [config] [stdout]: skel: keeping existing .bash_logout
+2026-11-09T18:08:12.3569560Z [claude] [2026-11-09T18:08:12.156580+00:00] [debug] [config] [stdout]: skel: keeping existing .bashrc
+2026-11-09T18:08:12.3570442Z [claude] [2026-11-09T18:08:12.156597+00:00] [debug] [config] [stdout]: skel: keeping existing .profile
+2026-11-09T18:08:12.3571345Z [claude] [2026-11-09T18:08:12.156933+00:00] [debug] [config] [stdout]: Add sudo to 'user' with no password
+2026-11-09T18:08:12.3572233Z [claude] [2026-11-09T18:08:12.179561+00:00] [debug] [config] [stdout]: passwd: password changed.
+2026-11-09T18:08:12.3572957Z [claude] [2026-11-09T18:08:12.181957+00:00] [debug] [config] [stdout]: sudoers entry already present
+2026-11-09T18:08:12.3574107Z [claude] [2026-11-09T18:08:12.181992+00:00] [debug] [config] [stdout]: Give 'user' ownership to /home/user
+2026-11-09T18:08:12.3574818Z [claude] [2026-11-09T18:08:12.286888+00:00] [debug] Saved: 8102636a-1433-4d09-a426-7609e36cea02
+2026-11-09T18:08:12.6344281Z [claude] [2026-11-09T18:08:12.388991+00:00] [debug] Saved: 4af079c9-fdd3-49c1-88e8-cf98ad4d2913
+2026-11-09T18:08:12.6345917Z [claude] [2026-11-09T18:08:12.414392+00:00] [debug] [config] [stdout]: Give 777 permission to /usr/local
+2026-11-09T18:08:12.6347451Z [claude] [2026-11-09T18:08:12.439428+00:00] [debug] [config] [stdout]: Create /code directory
+2026-11-09T18:08:12.6348829Z [claude] [2026-11-09T18:08:12.441496+00:00] [debug] [config] [stdout]: Give 777 permission to /code
+2026-11-09T18:08:12.6349814Z [claude] [2026-11-09T18:08:12.443168+00:00] [debug] [config] [stdout]: Finished configuration script
+2026-11-09T18:08:12.6350744Z [claude] [2026-11-09T18:08:12.443831+00:00] [info] Running start command: bash /opt/mikka/start-prebuilt.sh
+2026-11-09T18:08:12.6354126Z [claude] [2026-11-09T18:08:12.443851+00:00] [info] Waiting for template to be ready: test -s /home/user/.mikka/preloaded.pid && read -r mikka_preloaded_pid < /home/user/.mikka/preloaded.pid && kill -0 "$mikka_preloaded_pid" && tr '\0' '\n' < "/proc/$mikka_preloaded_pid/cmdline" | grep -Fxq -- '--wait-bootstrap' && test ! -e /home/user/.mikka/bootstrap.json && test ! -e /home/user/.mikka/worker/device.json && python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization claude > /opt/mikka/official-files-ready.json
+2026-11-09T18:08:12.6356778Z [claude] [2026-11-09T18:08:12.471179+00:00] [debug] Template is not ready: exit status 1
+2026-11-09T18:08:13.1490831Z [desktop] [2026-11-09T18:08:13.098748+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 357, reused 0, downloaded 245, added 151
+2026-11-09T18:08:14.2232575Z [desktop] [2026-11-09T18:08:14.105953+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 357, reused 0, downloaded 283, added 167
+2026-11-09T18:08:15.3096771Z [desktop] [2026-11-09T18:08:15.007146+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 357, reused 0, downloaded 354, added 357, done
+2026-11-09T18:08:15.3098454Z [desktop] [2026-11-09T18:08:15.202271+00:00] [info] [builder 9/12] [stdout]: .../esbuild@0.28.2/node_modules/esbuild postinstall$ node install.js
+2026-11-09T18:08:15.3099733Z [desktop] [2026-11-09T18:08:15.262162+00:00] [info] [builder 9/12] [stdout]: .../esbuild@0.28.2/node_modules/esbuild postinstall: Done
+2026-11-09T18:08:15.8389644Z [desktop] [2026-11-09T18:08:15.593668+00:00] [info] [builder 9/12] [stdout]: Done in 9s using pnpm v10.34.3
+2026-11-09T18:08:15.8390720Z [desktop] [2026-11-09T18:08:15.676371+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase dependencies 10173
+2026-11-09T18:08:16.3721038Z [desktop] [2026-11-09T18:08:16.214019+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase build 537
+2026-11-09T18:08:21.4984748Z [desktop] [2026-11-09T18:08:21.221962+00:00] [info] [builder 9/12] [stdout]: {"version":1,"kind":"desktop","original":{"claude_code":null,"codex":null},"added":{"claude_code":{"path":"/opt/mikka/releases/ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d/worker-install/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk-linux-x64@0.3.305/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/claude","sha256":"86cb722ab68348877dba7971e4d0c659919e05e6228c05e006e83da320e656ef"},"codex":{"path":"/opt/mikka/harness/codex/0.163.0/package/vendor/x86_64-unknown-linux-musl/bin/codex","sha256":"399ff69c431c066e40de318fba45c2b07f45a76b19939d247ee4828fc70c4215"}}}
+2026-11-09T18:08:21.4988092Z [desktop] [2026-11-09T18:08:21.376143+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase cli 5161
+2026-11-09T18:08:21.4989397Z [desktop] [2026-11-09T18:08:21.419834+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase journal 43
+2026-11-09T18:08:22.8219820Z [desktop] [2026-11-09T18:08:22.654475+00:00] [info] [builder 9/12] [stdout]: Collecting aiohttp==3.13.3
+2026-11-09T18:08:22.8221852Z [desktop] [2026-11-09T18:08:22.732441+00:00] [info] [builder 9/12] [stdout]: Downloading aiohttp-3.13.3-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (8.1 kB)
+2026-11-09T18:08:22.8223516Z [desktop] [2026-11-09T18:08:22.750566+00:00] [info] [builder 9/12] [stdout]: Collecting aiohappyeyeballs>=2.5.0 (from aiohttp==3.13.3)
+2026-11-09T18:08:22.8224826Z [desktop] [2026-11-09T18:08:22.760302+00:00] [info] [builder 9/12] [stdout]: Downloading aiohappyeyeballs-2.7.1-py3-none-any.whl.metadata (5.9 kB)
+2026-11-09T18:08:22.8226043Z [desktop] [2026-11-09T18:08:22.772034+00:00] [info] [builder 9/12] [stdout]: Collecting aiosignal>=1.4.0 (from aiohttp==3.13.3)
+2026-11-09T18:08:22.8227224Z [desktop] [2026-11-09T18:08:22.781537+00:00] [info] [builder 9/12] [stdout]: Downloading aiosignal-1.4.0-py3-none-any.whl.metadata (3.7 kB)
+2026-11-09T18:08:23.0966916Z [desktop] [2026-11-09T18:08:22.796255+00:00] [info] [builder 9/12] [stdout]: Collecting async-timeout<6.0,>=4.0 (from aiohttp==3.13.3)
+2026-11-09T18:08:23.0968712Z [desktop] [2026-11-09T18:08:22.807810+00:00] [info] [builder 9/12] [stdout]: Downloading async_timeout-5.0.1-py3-none-any.whl.metadata (5.1 kB)
+2026-11-09T18:08:23.0970041Z [desktop] [2026-11-09T18:08:22.828740+00:00] [info] [builder 9/12] [stdout]: Collecting attrs>=17.3.0 (from aiohttp==3.13.3)
+2026-11-09T18:08:23.0971317Z [desktop] [2026-11-09T18:08:22.838410+00:00] [info] [builder 9/12] [stdout]: Downloading attrs-26.1.0-py3-none-any.whl.metadata (8.8 kB)
+2026-11-09T18:08:23.0972617Z [desktop] [2026-11-09T18:08:22.926762+00:00] [info] [builder 9/12] [stdout]: Collecting frozenlist>=1.1.1 (from aiohttp==3.13.3)
+2026-11-09T18:08:23.0974288Z [desktop] [2026-11-09T18:08:22.938750+00:00] [info] [builder 9/12] [stdout]: Downloading frozenlist-1.8.0-cp310-cp310-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl.metadata (20 kB)
+2026-11-09T18:08:23.3737551Z [desktop] [2026-11-09T18:08:23.309110+00:00] [info] [builder 9/12] [stdout]: Collecting multidict<7.0,>=4.5 (from aiohttp==3.13.3)
+2026-11-09T18:08:23.3739981Z [desktop] [2026-11-09T18:08:23.319125+00:00] [info] [builder 9/12] [stdout]: Downloading multidict-6.9.1-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (5.3 kB)
+2026-11-09T18:08:23.6382637Z [desktop] [2026-11-09T18:08:23.393028+00:00] [info] [builder 9/12] [stdout]: Collecting propcache>=0.2.0 (from aiohttp==3.13.3)
+2026-11-09T18:08:23.6384400Z [desktop] [2026-11-09T18:08:23.403338+00:00] [info] [builder 9/12] [stdout]: Downloading propcache-0.5.4-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (25 kB)
+2026-11-09T18:08:23.9030818Z [desktop] [2026-11-09T18:08:23.657170+00:00] [info] [builder 9/12] [stdout]: Collecting yarl<2.0,>=1.17.0 (from aiohttp==3.13.3)
+2026-11-09T18:08:23.9033225Z [desktop] [2026-11-09T18:08:23.666990+00:00] [info] [builder 9/12] [stdout]: Downloading yarl-1.25.1-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (111 kB)
+2026-11-09T18:08:23.9035061Z [desktop] [2026-11-09T18:08:23.698262+00:00] [info] [builder 9/12] [stdout]: Collecting typing-extensions>=4.1.0 (from multidict<7.0,>=4.5->aiohttp==3.13.3)
+2026-11-09T18:08:23.9036462Z [desktop] [2026-11-09T18:08:23.708318+00:00] [info] [builder 9/12] [stdout]: Downloading typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+2026-11-09T18:08:23.9037740Z [desktop] [2026-11-09T18:08:23.726881+00:00] [info] [builder 9/12] [stdout]: Collecting idna>=2.0 (from yarl<2.0,>=1.17.0->aiohttp==3.13.3)
+2026-11-09T18:08:23.9039202Z [desktop] [2026-11-09T18:08:23.736450+00:00] [info] [builder 9/12] [stdout]: Downloading idna-3.20-py3-none-any.whl.metadata (7.2 kB)
+2026-11-09T18:08:23.9040725Z [desktop] [2026-11-09T18:08:23.764937+00:00] [info] [builder 9/12] [stdout]: Downloading aiohttp-3.13.3-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (1.7 MB)
+2026-11-09T18:08:23.9042904Z [desktop] [2026-11-09T18:08:23.792422+00:00] [info] [builder 9/12] [stdout]: ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.7/1.7 MB 72.2 MB/s  0:00:00
+2026-11-09T18:08:23.9044097Z [desktop] [2026-11-09T18:08:23.801756+00:00] [info] [builder 9/12] [stdout]: Downloading async_timeout-5.0.1-py3-none-any.whl (6.2 kB)
+2026-11-09T18:08:23.9045786Z [desktop] [2026-11-09T18:08:23.811771+00:00] [info] [builder 9/12] [stdout]: Downloading multidict-6.9.1-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (303 kB)
+2026-11-09T18:08:23.9047526Z [desktop] [2026-11-09T18:08:23.821784+00:00] [info] [builder 9/12] [stdout]: Downloading yarl-1.25.1-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (118 kB)
+2026-11-09T18:08:23.9049246Z [desktop] [2026-11-09T18:08:23.832046+00:00] [info] [builder 9/12] [stdout]: Downloading aiohappyeyeballs-2.7.1-py3-none-any.whl (15 kB)
+2026-11-09T18:08:23.9050425Z [desktop] [2026-11-09T18:08:23.842643+00:00] [info] [builder 9/12] [stdout]: Downloading aiosignal-1.4.0-py3-none-any.whl (7.5 kB)
+2026-11-09T18:08:23.9051353Z [desktop] [2026-11-09T18:08:23.852943+00:00] [info] [builder 9/12] [stdout]: Downloading attrs-26.1.0-py3-none-any.whl (67 kB)
+2026-11-09T18:08:23.9052541Z [desktop] [2026-11-09T18:08:23.863451+00:00] [info] [builder 9/12] [stdout]: Downloading frozenlist-1.8.0-cp310-cp310-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (219 kB)
+2026-11-09T18:08:24.1708997Z [desktop] [2026-11-09T18:08:23.873977+00:00] [info] [builder 9/12] [stdout]: Downloading idna-3.20-py3-none-any.whl (69 kB)
+2026-11-09T18:08:24.1710608Z [desktop] [2026-11-09T18:08:23.884516+00:00] [info] [builder 9/12] [stdout]: Downloading propcache-0.5.4-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (224 kB)
+2026-11-09T18:08:24.1712110Z [desktop] [2026-11-09T18:08:23.893852+00:00] [info] [builder 9/12] [stdout]: Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+2026-11-09T18:08:24.1713942Z [desktop] [2026-11-09T18:08:23.988952+00:00] [info] [builder 9/12] [stdout]: Installing collected packages: typing-extensions, propcache, idna, frozenlist, attrs, async-timeout, aiohappyeyeballs, multidict, aiosignal, yarl, aiohttp
+2026-11-09T18:08:24.4456420Z [desktop] [2026-11-09T18:08:24.325742+00:00] [info] [builder 9/12] [stdout]: Successfully installed aiohappyeyeballs-2.7.1 aiohttp-3.13.3 aiosignal-1.4.0 async-timeout-5.0.1 attrs-26.1.0 frozenlist-1.8.0 idna-3.20 multidict-6.9.1 propcache-0.5.4 typing-extensions-4.16.0 yarl-1.25.1
+2026-11-09T18:08:24.4460728Z [desktop] [2026-11-09T18:08:24.326879+00:00] [info] [builder 9/12] [stderr]: WARNING: Running pip as the 'root' user can result in broken permissions and conflicting behaviour with the system package manager, possibly rendering your system unusable. It is recommended to use a virtual environment instead: https://pip.pypa.io/warnings/venv. Use the --root-user-action option if you know what you are doing and want to suppress this warning.
+2026-11-09T18:08:25.2585320Z [desktop] [2026-11-09T18:08:25.166143+00:00] [info] [builder 9/12] [stdout]: /opt/mikka/archives/cua-driver.tar.gz: OK
+2026-11-09T18:08:26.0743174Z [desktop] [2026-11-09T18:08:25.946938+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase desktop 4527
+2026-11-09T18:08:26.3385381Z [desktop] [2026-11-09T18:08:26.075180+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase finalize 128
+2026-11-09T18:08:26.3386814Z [desktop] [2026-11-09T18:08:26.075212+00:00] [info] [builder 9/12] [stdout]: mikka-official-instance-ready ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d 75b7462d53f9725cb92d40112c504b4f32d795c0
+2026-11-09T18:08:29.5900935Z [claude] [2026-11-09T18:08:29.426681+00:00] [info] Template is ready
+2026-11-09T18:08:29.5902069Z [claude] [2026-11-09T18:08:29.507570+00:00] [debug] [certs] [stdout]: Updating certificates in /etc/ssl/certs...
+2026-11-09T18:08:30.3926867Z [claude] [2026-11-09T18:08:30.281776+00:00] [debug] [certs] [stderr]: rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL
+2026-11-09T18:08:30.3928817Z [claude] [2026-11-09T18:08:30.287221+00:00] [debug] [certs] [stdout]: 121 added, 0 removed; done.
+2026-11-09T18:08:30.3929816Z [claude] [2026-11-09T18:08:30.287248+00:00] [debug] [certs] [stdout]: Running hooks in /etc/ca-certificates/update.d...
+2026-11-09T18:08:30.3930846Z [claude] [2026-11-09T18:08:30.288839+00:00] [debug] [certs] [stdout]: done.
+2026-11-09T18:08:30.4642833Z [desktop] [2026-11-09T18:08:30.310453+00:00] [debug] Adding layer to cache: ffd48849-e19a-48d8-ad89-874bfa2b9645
+2026-11-09T18:08:30.4643959Z [desktop] [2026-11-09T18:08:30.310964+00:00] [debug] Uploading layer: ffd48849-e19a-48d8-ad89-874bfa2b9645
+2026-11-09T18:08:30.4645151Z [desktop] [2026-11-09T18:08:30.311408+00:00] [info] [builder 10/12] RUN export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH
+2026-11-09T18:08:30.4645949Z node --input-type=module <<'JS'
+2026-11-09T18:08:30.4646333Z import assert from 'node:assert/strict'
+2026-11-09T18:08:30.4646808Z import { execFileSync } from 'node:child_process'
+2026-11-09T18:08:30.4647472Z import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+2026-11-09T18:08:30.4648078Z import { createRequire } from 'node:module'
+2026-11-09T18:08:30.4648813Z import { tmpdir } from 'node:os'
+2026-11-09T18:08:30.4649195Z import { join } from 'node:path'
+2026-11-09T18:08:30.4649596Z const npm = '/opt/mikka/runtime/node/bin/npm'
+2026-11-09T18:08:30.4650041Z createRequire(realpathSync(npm))('pacote')
+2026-11-09T18:08:30.4650612Z const directory = mkdtempSync(join(tmpdir(), 'mikka-npm-runtime-'))
+2026-11-09T18:08:30.4651054Z try {
+2026-11-09T18:08:30.4651437Z   const home = join(directory, 'home'), temp = join(directory, 'tmp')
+2026-11-09T18:08:30.4651916Z   mkdirSync(home); mkdirSync(temp)
+2026-11-09T18:08:30.4652819Z   writeFileSync(join(directory, 'package.json'), JSON.stringify({ private: true, scripts: { test: `node -e "console.log('Mikka npm runtime verified')"` } }))
+2026-11-09T18:08:30.4653594Z   const output = execFileSync(npm, ['test'], {
+2026-11-09T18:08:30.4653979Z     cwd: directory, encoding: 'utf8', timeout: 30_000,
+2026-11-09T18:08:30.4654736Z     env: { PATH: '/opt/mikka/runtime/node/bin:/usr/local/bin:/usr/bin:/bin', HOME: home, TMPDIR: temp, LANG: 'C.UTF-8', NPM_CONFIG_UPDATE_NOTIFIER: 'false' },
+2026-11-09T18:08:30.4655339Z   })
+2026-11-09T18:08:30.4655643Z   assert.match(output, /^Mikka npm runtime verified\r?$/m)
+2026-11-09T18:08:30.4656036Z   console.log('Private npm runtime verified')
+2026-11-09T18:08:30.4656487Z } finally { rmSync(directory, { recursive: true, force: true }) }
+2026-11-09T18:08:30.4657036Z JS user [b98229315f1aed451809eb598100d8e1cbbb9eab52ee5987d889d114961f9a9f]
+2026-11-09T18:08:31.3019843Z [desktop] [2026-11-09T18:08:31.092899+00:00] [info] [builder 10/12] [stdout]: Private npm runtime verified
+2026-11-09T18:08:31.8324074Z [desktop] [2026-11-09T18:08:31.561322+00:00] [debug] Adding layer to cache: 0690c61a-2087-4577-bb04-4ef7dd0db589
+2026-11-09T18:08:31.8325406Z [desktop] [2026-11-09T18:08:31.561564+00:00] [debug] Uploading layer: 0690c61a-2087-4577-bb04-4ef7dd0db589
+2026-11-09T18:08:31.8327875Z [desktop] [2026-11-09T18:08:31.562004+00:00] [info] [builder 11/12] RUN python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --receipt /opt/mikka/official-files-conservation.json root [260bddd1344ded73d6d98aba716b132a50a85ddb8fb0350ce77eb55741884cf9]
+2026-11-09T18:08:33.6343129Z [claude] [2026-11-09T18:08:33.515778+00:00] [debug] Adding layer to cache: 20598356-f8a7-43c8-b117-1eb8242c1ebe
+2026-11-09T18:08:33.6344217Z [claude] [2026-11-09T18:08:33.515891+00:00] [debug] Uploading layer: 20598356-f8a7-43c8-b117-1eb8242c1ebe
+2026-11-09T18:08:33.6345415Z [claude] [2026-11-09T18:08:33.516154+00:00] [info] [optimize] Optimizing template [0fd74614d2833e1c1f82bad8ca6f143c3aaf595634cc1fd290eeaf54c95d5a5a]
+2026-11-09T18:08:38.0628733Z [desktop] [2026-11-09T18:08:37.888065+00:00] [debug] Saved: ffd48849-e19a-48d8-ad89-874bfa2b9645
+2026-11-09T18:08:38.0630158Z [desktop] [2026-11-09T18:08:38.023056+00:00] [debug] Saved: 0690c61a-2087-4577-bb04-4ef7dd0db589
+2026-11-09T18:08:39.6061963Z [claude] [2026-11-09T18:08:39.420970+00:00] [debug] Saved: 20598356-f8a7-43c8-b117-1eb8242c1ebe
+2026-11-09T18:08:39.8711242Z [claude] [2026-11-09T18:08:39.788087+00:00] [info] Build finished, took 3m55s
+2026-11-09T18:08:40.1494947Z [claude] [2026-11-09T18:08:40.149255] [debug] Build finished
+2026-11-09T18:09:05.5017923Z [desktop] [2026-11-09T18:09:05.212796+00:00] [info] [builder 11/12] [stdout]: {"before":{"entries":103616,"sha256":"454626a0849dde26867920f6d43c5544c4f98538744aa79a3d2bc45b35a1080a"},"after":{"entries":103616,"sha256":"454626a0849dde26867920f6d43c5544c4f98538744aa79a3d2bc45b35a1080a"}}
+2026-11-09T18:09:05.5019991Z [desktop] [2026-11-09T18:09:05.440146+00:00] [debug] Adding layer to cache: 8ab7f8c0-3bfa-4129-a01d-cb6360143e87
+2026-11-09T18:09:05.5020921Z [desktop] [2026-11-09T18:09:05.440526+00:00] [debug] Uploading layer: 8ab7f8c0-3bfa-4129-a01d-cb6360143e87
+2026-11-09T18:09:05.5022039Z [desktop] [2026-11-09T18:09:05.440913+00:00] [info] [builder 12/12] USER root [24d1d094f4b6ee0dbe86b496c0e8f7145cae9870651c9866038ef092fbdb2924]
+2026-11-09T18:09:07.6533813Z [desktop] [2026-11-09T18:09:07.370163+00:00] [debug] Adding layer to cache: 1457faa9-0b9b-499d-b3a4-17365e7c9b31
+2026-11-09T18:09:07.6535042Z [desktop] [2026-11-09T18:09:07.370679+00:00] [debug] Uploading layer: 1457faa9-0b9b-499d-b3a4-17365e7c9b31
+2026-11-09T18:09:07.6536242Z [desktop] [2026-11-09T18:09:07.371163+00:00] [info] [resize-disk] Resizing disk [c5da43d89593d94e87b86f3cdad0bc54eb3c6353634b8aabdb3e58c1993a3c09]
+2026-11-09T18:09:09.2602082Z [desktop] [2026-11-09T18:09:09.086646+00:00] [info] resize-disk: 18808 MiB free already >= target 16384 MiB, no resize needed
+2026-11-09T18:09:09.2603300Z [desktop] [2026-11-09T18:09:09.088367+00:00] [debug] Adding layer to cache: 6f9cb2dd-1bfd-43ea-a864-b4bf4185c62d
+2026-11-09T18:09:09.2604360Z [desktop] [2026-11-09T18:09:09.088707+00:00] [debug] Uploading layer: 6f9cb2dd-1bfd-43ea-a864-b4bf4185c62d
+2026-11-09T18:09:09.2605674Z [desktop] [2026-11-09T18:09:09.090145+00:00] [info] [finalize] Finalizing template build [44d61a524c781c1599d3a06c64837d45a33cad2c27d6fee867cf9efbb9253781]
+2026-11-09T18:09:10.6010167Z [desktop] [2026-11-09T18:09:10.419889+00:00] [debug] [config] [stdout]: Starting configuration script
+2026-11-09T18:09:10.6011266Z [desktop] [2026-11-09T18:09:10.427279+00:00] [debug] [config] [stdout]: Create default user 'user' (if doesn't exist yet)
+2026-11-09T18:09:10.6012312Z [desktop] [2026-11-09T18:09:10.444575+00:00] [debug] [config] [stdout]: Copy skeleton files to /home/user (keeping existing files)
+2026-11-09T18:09:10.6013264Z [desktop] [2026-11-09T18:09:10.446451+00:00] [debug] [config] [stdout]: skel: keeping existing .profile
+2026-11-09T18:09:10.6014116Z [desktop] [2026-11-09T18:09:10.446478+00:00] [debug] [config] [stdout]: skel: keeping existing .bashrc
+2026-11-09T18:09:10.6014971Z [desktop] [2026-11-09T18:09:10.446485+00:00] [debug] [config] [stdout]: skel: keeping existing .bash_logout
+2026-11-09T18:09:10.6015875Z [desktop] [2026-11-09T18:09:10.446492+00:00] [debug] [config] [stdout]: Add sudo to 'user' with no password
+2026-11-09T18:09:10.6016800Z [desktop] [2026-11-09T18:09:10.489214+00:00] [debug] [config] [stdout]: passwd: password expiry information changed.
+2026-11-09T18:09:10.6017683Z [desktop] [2026-11-09T18:09:10.495158+00:00] [debug] [config] [stdout]: sudoers entry already present
+2026-11-09T18:09:10.6018839Z [desktop] [2026-11-09T18:09:10.495201+00:00] [debug] [config] [stdout]: Give 'user' ownership to /home/user
+2026-11-09T18:09:10.6019705Z [desktop] [2026-11-09T18:09:10.501299+00:00] [debug] [config] [stdout]: Give 777 permission to /usr/local
+2026-11-09T18:09:10.6020509Z [desktop] [2026-11-09T18:09:10.559243+00:00] [debug] [config] [stdout]: Create /code directory
+2026-11-09T18:09:10.6021273Z [desktop] [2026-11-09T18:09:10.561643+00:00] [debug] [config] [stdout]: Give 777 permission to /code
+2026-11-09T18:09:10.6022407Z [desktop] [2026-11-09T18:09:10.562906+00:00] [debug] [config] [stdout]: Finished configuration script
+2026-11-09T18:09:10.6023162Z [desktop] [2026-11-09T18:09:10.563614+00:00] [info] Running start command: bash /opt/mikka/start-prebuilt.sh
+2026-11-09T18:09:10.6026525Z [desktop] [2026-11-09T18:09:10.563649+00:00] [info] Waiting for template to be ready: test -s /home/user/.mikka/preloaded.pid && read -r mikka_preloaded_pid < /home/user/.mikka/preloaded.pid && kill -0 "$mikka_preloaded_pid" && tr '\0' '\n' < "/proc/$mikka_preloaded_pid/cmdline" | grep -Fxq -- '--wait-bootstrap' && test ! -e /home/user/.mikka/bootstrap.json && test ! -e /home/user/.mikka/worker/device.json && test ! -e /run/mikka-viewer/key && test "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6080/vnc)" = 401 && python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization desktop > /opt/mikka/official-files-ready.json
+2026-11-09T18:09:10.8657687Z [desktop] [2026-11-09T18:09:10.616660+00:00] [debug] Template is not ready: exit status 1
+2026-11-09T18:09:12.7737000Z [desktop] [2026-11-09T18:09:12.649375+00:00] [debug] Template is not ready: exit status 1
+2026-11-09T18:09:16.6299289Z mikka-conservation-stage {"kind":"claude","phase":"create","elapsedMs":1177}
+2026-11-09T18:09:17.1050042Z [desktop] [2026-11-09T18:09:16.806822+00:00] [debug] Saved: 8ab7f8c0-3bfa-4129-a01d-cb6360143e87
+2026-11-09T18:09:17.1051011Z [desktop] [2026-11-09T18:09:16.917723+00:00] [debug] Saved: 1457faa9-0b9b-499d-b3a4-17365e7c9b31
+2026-11-09T18:09:17.1051893Z [desktop] [2026-11-09T18:09:17.020755+00:00] [debug] Saved: 6f9cb2dd-1bfd-43ea-a864-b4bf4185c62d
+2026-11-09T18:09:19.8579673Z mikka-conservation-stage {"kind":"claude","phase":"preload_receipts","elapsedMs":3228}
+2026-11-09T18:09:47.4484886Z [desktop] [2026-11-09T18:09:47.220954+00:00] [info] Template is ready
+2026-11-09T18:09:47.4487075Z [desktop] [2026-11-09T18:09:47.391176+00:00] [debug] [certs] [stdout]: Updating certificates in /etc/ssl/certs...
+2026-11-09T18:09:48.2823774Z [desktop] [2026-11-09T18:09:48.217551+00:00] [debug] [certs] [stderr]: rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL
+2026-11-09T18:09:48.2825109Z [desktop] [2026-11-09T18:09:48.222852+00:00] [debug] [certs] [stdout]: 121 added, 0 removed; done.
+2026-11-09T18:09:48.2826220Z [desktop] [2026-11-09T18:09:48.222917+00:00] [debug] [certs] [stdout]: Running hooks in /etc/ca-certificates/update.d...
+2026-11-09T18:09:48.5647940Z [desktop] [2026-11-09T18:09:48.462031+00:00] [debug] [certs] [stdout]: Replacing debian:ACCVRAIZ1.pem
+2026-11-09T18:09:48.5649781Z [desktop] [2026-11-09T18:09:48.462998+00:00] [debug] [certs] [stdout]: Replacing debian:AC_RAIZ_FNMT-RCM.pem
+2026-11-09T18:09:48.5651126Z [desktop] [2026-11-09T18:09:48.463763+00:00] [debug] [certs] [stdout]: Replacing debian:AC_RAIZ_FNMT-RCM_SERVIDORES_SEGUROS.pem
+2026-11-09T18:09:48.5652017Z [desktop] [2026-11-09T18:09:48.465223+00:00] [debug] [certs] [stdout]: Replacing debian:ANF_Secure_Server_Root_CA.pem
+2026-11-09T18:09:48.5652899Z [desktop] [2026-11-09T18:09:48.466968+00:00] [debug] [certs] [stdout]: Replacing debian:Actalis_Authentication_Root_CA.pem
+2026-11-09T18:09:48.5653721Z [desktop] [2026-11-09T18:09:48.467865+00:00] [debug] [certs] [stdout]: Replacing debian:Amazon_Root_CA_1.pem
+2026-11-09T18:09:48.5654506Z [desktop] [2026-11-09T18:09:48.469349+00:00] [debug] [certs] [stdout]: Replacing debian:Amazon_Root_CA_2.pem
+2026-11-09T18:09:48.5655249Z [desktop] [2026-11-09T18:09:48.469980+00:00] [debug] [certs] [stdout]: Replacing debian:Amazon_Root_CA_3.pem
+2026-11-09T18:09:48.5656043Z [desktop] [2026-11-09T18:09:48.470776+00:00] [debug] [certs] [stdout]: Replacing debian:Amazon_Root_CA_4.pem
+2026-11-09T18:09:48.5656875Z [desktop] [2026-11-09T18:09:48.471502+00:00] [debug] [certs] [stdout]: Replacing debian:Atos_TrustedRoot_Root_CA_ECC_TLS_2021.pem
+2026-11-09T18:09:48.5657782Z [desktop] [2026-11-09T18:09:48.472586+00:00] [debug] [certs] [stdout]: Replacing debian:Atos_TrustedRoot_Root_CA_RSA_TLS_2021.pem
+2026-11-09T18:09:48.5659480Z [desktop] [2026-11-09T18:09:48.473561+00:00] [debug] [certs] [stdout]: Replacing debian:Autoridad_de_Certificacion_Firmaprofesional_CIF_A62634068.pem
+2026-11-09T18:09:48.5660402Z [desktop] [2026-11-09T18:09:48.474543+00:00] [debug] [certs] [stdout]: Replacing debian:BJCA_Global_Root_CA1.pem
+2026-11-09T18:09:48.5661349Z [desktop] [2026-11-09T18:09:48.475033+00:00] [debug] [certs] [stdout]: Replacing debian:BJCA_Global_Root_CA2.pem
+2026-11-09T18:09:48.5662164Z [desktop] [2026-11-09T18:09:48.475975+00:00] [debug] [certs] [stdout]: Replacing debian:Buypass_Class_2_Root_CA.pem
+2026-11-09T18:09:48.5662982Z [desktop] [2026-11-09T18:09:48.476855+00:00] [debug] [certs] [stdout]: Replacing debian:Buypass_Class_3_Root_CA.pem
+2026-11-09T18:09:48.5663763Z [desktop] [2026-11-09T18:09:48.477890+00:00] [debug] [certs] [stdout]: Replacing debian:CA_Disig_Root_R2.pem
+2026-11-09T18:09:48.5664522Z [desktop] [2026-11-09T18:09:48.478762+00:00] [debug] [certs] [stdout]: Replacing debian:CFCA_EV_ROOT.pem
+2026-11-09T18:09:48.5665359Z [desktop] [2026-11-09T18:09:48.479313+00:00] [debug] [certs] [stdout]: Replacing debian:COMODO_ECC_Certification_Authority.pem
+2026-11-09T18:09:48.5666247Z [desktop] [2026-11-09T18:09:48.480353+00:00] [debug] [certs] [stdout]: Replacing debian:COMODO_RSA_Certification_Authority.pem
+2026-11-09T18:09:48.5667063Z [desktop] [2026-11-09T18:09:48.481091+00:00] [debug] [certs] [stdout]: Replacing debian:Certainly_Root_E1.pem
+2026-11-09T18:09:48.5667818Z [desktop] [2026-11-09T18:09:48.482105+00:00] [debug] [certs] [stdout]: Replacing debian:Certainly_Root_R1.pem
+2026-11-09T18:09:48.5668882Z [desktop] [2026-11-09T18:09:48.483282+00:00] [debug] [certs] [stdout]: Replacing debian:Certigna_Root_CA.pem
+2026-11-09T18:09:48.5669650Z [desktop] [2026-11-09T18:09:48.484147+00:00] [debug] [certs] [stdout]: Replacing debian:Certum_EC-384_CA.pem
+2026-11-09T18:09:48.5670455Z [desktop] [2026-11-09T18:09:48.485089+00:00] [debug] [certs] [stdout]: Replacing debian:Certum_Trusted_Network_CA.pem
+2026-11-09T18:09:48.5671289Z [desktop] [2026-11-09T18:09:48.486510+00:00] [debug] [certs] [stdout]: Replacing debian:Certum_Trusted_Network_CA_2.pem
+2026-11-09T18:09:48.5672102Z [desktop] [2026-11-09T18:09:48.487852+00:00] [debug] [certs] [stdout]: Replacing debian:Certum_Trusted_Root_CA.pem
+2026-11-09T18:09:48.5672947Z [desktop] [2026-11-09T18:09:48.488880+00:00] [debug] [certs] [stdout]: Replacing debian:D-TRUST_BR_Root_CA_1_2020.pem
+2026-11-09T18:09:48.5673760Z [desktop] [2026-11-09T18:09:48.490089+00:00] [debug] [certs] [stdout]: Replacing debian:D-TRUST_BR_Root_CA_2_2023.pem
+2026-11-09T18:09:48.5674559Z [desktop] [2026-11-09T18:09:48.490959+00:00] [debug] [certs] [stdout]: Replacing debian:D-TRUST_EV_Root_CA_1_2020.pem
+2026-11-09T18:09:48.5675356Z [desktop] [2026-11-09T18:09:48.492216+00:00] [debug] [certs] [stdout]: Replacing debian:D-TRUST_EV_Root_CA_2_2023.pem
+2026-11-09T18:09:48.5676176Z [desktop] [2026-11-09T18:09:48.493297+00:00] [debug] [certs] [stdout]: Replacing debian:D-TRUST_Root_Class_3_CA_2_2009.pem
+2026-11-09T18:09:48.5677044Z [desktop] [2026-11-09T18:09:48.494246+00:00] [debug] [certs] [stdout]: Replacing debian:D-TRUST_Root_Class_3_CA_2_EV_2009.pem
+2026-11-09T18:09:48.5677910Z [desktop] [2026-11-09T18:09:48.495210+00:00] [debug] [certs] [stdout]: Replacing debian:DigiCert_Assured_ID_Root_G2.pem
+2026-11-09T18:09:48.5678996Z [desktop] [2026-11-09T18:09:48.496013+00:00] [debug] [certs] [stdout]: Replacing debian:DigiCert_Assured_ID_Root_G3.pem
+2026-11-09T18:09:48.5679838Z [desktop] [2026-11-09T18:09:48.496933+00:00] [debug] [certs] [stdout]: Replacing debian:DigiCert_Global_Root_G2.pem
+2026-11-09T18:09:48.5680639Z [desktop] [2026-11-09T18:09:48.497744+00:00] [debug] [certs] [stdout]: Replacing debian:DigiCert_Global_Root_G3.pem
+2026-11-09T18:09:48.5681463Z [desktop] [2026-11-09T18:09:48.498490+00:00] [debug] [certs] [stdout]: Replacing debian:DigiCert_TLS_ECC_P384_Root_G5.pem
+2026-11-09T18:09:48.5682315Z [desktop] [2026-11-09T18:09:48.499682+00:00] [debug] [certs] [stdout]: Replacing debian:DigiCert_TLS_RSA4096_Root_G5.pem
+2026-11-09T18:09:48.5683295Z [desktop] [2026-11-09T18:09:48.500850+00:00] [debug] [certs] [stdout]: Replacing debian:DigiCert_Trusted_Root_G4.pem
+2026-11-09T18:09:48.5684094Z [desktop] [2026-11-09T18:09:48.501973+00:00] [debug] [certs] [stdout]: Replacing debian:GDCA_TrustAUTH_R5_ROOT.pem
+2026-11-09T18:09:48.5684992Z [desktop] [2026-11-09T18:09:48.503077+00:00] [debug] [certs] [stdout]: Replacing debian:GTS_Root_R1.pem
+2026-11-09T18:09:48.5685734Z [desktop] [2026-11-09T18:09:48.503821+00:00] [debug] [certs] [stdout]: Replacing debian:GTS_Root_R3.pem
+2026-11-09T18:09:48.5686451Z [desktop] [2026-11-09T18:09:48.504578+00:00] [debug] [certs] [stdout]: Replacing debian:GTS_Root_R4.pem
+2026-11-09T18:09:48.5687238Z [desktop] [2026-11-09T18:09:48.505202+00:00] [debug] [certs] [stdout]: Replacing debian:GlobalSign_ECC_Root_CA_-_R4.pem
+2026-11-09T18:09:48.5688066Z [desktop] [2026-11-09T18:09:48.506001+00:00] [debug] [certs] [stdout]: Replacing debian:GlobalSign_ECC_Root_CA_-_R5.pem
+2026-11-09T18:09:48.5689006Z [desktop] [2026-11-09T18:09:48.506820+00:00] [debug] [certs] [stdout]: Replacing debian:GlobalSign_Root_CA_-_R3.pem
+2026-11-09T18:09:48.5689809Z [desktop] [2026-11-09T18:09:48.508051+00:00] [debug] [certs] [stdout]: Replacing debian:GlobalSign_Root_CA_-_R6.pem
+2026-11-09T18:09:48.5690615Z [desktop] [2026-11-09T18:09:48.508691+00:00] [debug] [certs] [stdout]: Replacing debian:GlobalSign_Root_E46.pem
+2026-11-09T18:09:48.5691388Z [desktop] [2026-11-09T18:09:48.509917+00:00] [debug] [certs] [stdout]: Replacing debian:GlobalSign_Root_R46.pem
+2026-11-09T18:09:48.5692252Z [desktop] [2026-11-09T18:09:48.510759+00:00] [debug] [certs] [stdout]: Replacing debian:Go_Daddy_Root_Certificate_Authority_-_G2.pem
+2026-11-09T18:09:48.5693128Z [desktop] [2026-11-09T18:09:48.511495+00:00] [debug] [certs] [stdout]: Replacing debian:HARICA_TLS_ECC_Root_CA_2021.pem
+2026-11-09T18:09:48.5693952Z [desktop] [2026-11-09T18:09:48.512700+00:00] [debug] [certs] [stdout]: Replacing debian:HARICA_TLS_RSA_Root_CA_2021.pem
+2026-11-09T18:09:48.5694920Z [desktop] [2026-11-09T18:09:48.513567+00:00] [debug] [certs] [stdout]: Replacing debian:Hellenic_Academic_and_Research_Institutions_ECC_RootCA_2015.pem
+2026-11-09T18:09:48.5695986Z [desktop] [2026-11-09T18:09:48.514889+00:00] [debug] [certs] [stdout]: Replacing debian:Hellenic_Academic_and_Research_Institutions_RootCA_2015.pem
+2026-11-09T18:09:48.5696892Z [desktop] [2026-11-09T18:09:48.516047+00:00] [debug] [certs] [stdout]: Replacing debian:HiPKI_Root_CA_-_G1.pem
+2026-11-09T18:09:48.5697677Z [desktop] [2026-11-09T18:09:48.517248+00:00] [debug] [certs] [stdout]: Replacing debian:Hongkong_Post_Root_CA_3.pem
+2026-11-09T18:09:48.5698788Z [desktop] [2026-11-09T18:09:48.518497+00:00] [debug] [certs] [stdout]: Replacing debian:ISRG_Root_X1.pem
+2026-11-09T18:09:48.5699543Z [desktop] [2026-11-09T18:09:48.519279+00:00] [debug] [certs] [stdout]: Replacing debian:ISRG_Root_X2.pem
+2026-11-09T18:09:48.5700345Z [desktop] [2026-11-09T18:09:48.520453+00:00] [debug] [certs] [stdout]: Replacing debian:IdenTrust_Commercial_Root_CA_1.pem
+2026-11-09T18:09:48.5701226Z [desktop] [2026-11-09T18:09:48.521749+00:00] [debug] [certs] [stdout]: Replacing debian:IdenTrust_Public_Sector_Root_CA_1.pem
+2026-11-09T18:09:48.5702020Z [desktop] [2026-11-09T18:09:48.522912+00:00] [debug] [certs] [stdout]: Replacing debian:Izenpe.com.pem
+2026-11-09T18:09:48.5702827Z [desktop] [2026-11-09T18:09:48.523879+00:00] [debug] [certs] [stdout]: Replacing debian:Microsec_e-Szigno_Root_CA_2009.pem
+2026-11-09T18:09:48.8340717Z [desktop] [2026-11-09T18:09:48.524762+00:00] [debug] [certs] [stdout]: Replacing debian:Microsoft_ECC_Root_Certificate_Authority_2017.pem
+2026-11-09T18:09:48.8342767Z [desktop] [2026-11-09T18:09:48.526105+00:00] [debug] [certs] [stdout]: Replacing debian:Microsoft_RSA_Root_Certificate_Authority_2017.pem
+2026-11-09T18:09:48.8343855Z [desktop] [2026-11-09T18:09:48.527486+00:00] [debug] [certs] [stdout]: Replacing debian:NAVER_Global_Root_Certification_Authority.pem
+2026-11-09T18:09:48.8345266Z [desktop] [2026-11-09T18:09:48.541082+00:00] [debug] [certs] [stdout]: Replacing debian:NetLock_Arany_=Class_Gold=_Főtanúsítvány.pem
+2026-11-09T18:09:48.8346700Z [desktop] [2026-11-09T18:09:48.542638+00:00] [debug] [certs] [stdout]: Replacing debian:OISTE_Server_Root_ECC_G1.pem
+2026-11-09T18:09:48.8347679Z [desktop] [2026-11-09T18:09:48.544392+00:00] [debug] [certs] [stdout]: Replacing debian:OISTE_Server_Root_RSA_G1.pem
+2026-11-09T18:09:48.8348969Z [desktop] [2026-11-09T18:09:48.545444+00:00] [debug] [certs] [stdout]: Replacing debian:OISTE_WISeKey_Global_Root_GB_CA.pem
+2026-11-09T18:09:48.8349871Z [desktop] [2026-11-09T18:09:48.546218+00:00] [debug] [certs] [stdout]: Replacing debian:OISTE_WISeKey_Global_Root_GC_CA.pem
+2026-11-09T18:09:48.8350693Z [desktop] [2026-11-09T18:09:48.547424+00:00] [debug] [certs] [stdout]: Replacing debian:QuoVadis_Root_CA_1_G3.pem
+2026-11-09T18:09:48.8351489Z [desktop] [2026-11-09T18:09:48.548708+00:00] [debug] [certs] [stdout]: Replacing debian:QuoVadis_Root_CA_2_G3.pem
+2026-11-09T18:09:48.8352280Z [desktop] [2026-11-09T18:09:48.549961+00:00] [debug] [certs] [stdout]: Replacing debian:QuoVadis_Root_CA_3_G3.pem
+2026-11-09T18:09:48.8353170Z [desktop] [2026-11-09T18:09:48.550740+00:00] [debug] [certs] [stdout]: Replacing debian:SSL.com_EV_Root_Certification_Authority_ECC.pem
+2026-11-09T18:09:48.8354165Z [desktop] [2026-11-09T18:09:48.552026+00:00] [debug] [certs] [stdout]: Replacing debian:SSL.com_EV_Root_Certification_Authority_RSA_R2.pem
+2026-11-09T18:09:48.8355122Z [desktop] [2026-11-09T18:09:48.552948+00:00] [debug] [certs] [stdout]: Replacing debian:SSL.com_Root_Certification_Authority_ECC.pem
+2026-11-09T18:09:48.8356106Z [desktop] [2026-11-09T18:09:48.554361+00:00] [debug] [certs] [stdout]: Replacing debian:SSL.com_Root_Certification_Authority_RSA.pem
+2026-11-09T18:09:48.8356993Z [desktop] [2026-11-09T18:09:48.555206+00:00] [debug] [certs] [stdout]: Replacing debian:SSL.com_TLS_ECC_Root_CA_2022.pem
+2026-11-09T18:09:48.8357835Z [desktop] [2026-11-09T18:09:48.556392+00:00] [debug] [certs] [stdout]: Replacing debian:SSL.com_TLS_RSA_Root_CA_2022.pem
+2026-11-09T18:09:48.8358975Z [desktop] [2026-11-09T18:09:48.557441+00:00] [debug] [certs] [stdout]: Replacing debian:SZAFIR_ROOT_CA2.pem
+2026-11-09T18:09:48.8359882Z [desktop] [2026-11-09T18:09:48.558228+00:00] [debug] [certs] [stdout]: Replacing debian:Sectigo_Public_Server_Authentication_Root_E46.pem
+2026-11-09T18:09:48.8360875Z [desktop] [2026-11-09T18:09:48.559357+00:00] [debug] [certs] [stdout]: Replacing debian:Sectigo_Public_Server_Authentication_Root_R46.pem
+2026-11-09T18:09:48.8361747Z [desktop] [2026-11-09T18:09:48.560774+00:00] [debug] [certs] [stdout]: Replacing debian:SecureSign_Root_CA14.pem
+2026-11-09T18:09:48.8362528Z [desktop] [2026-11-09T18:09:48.561685+00:00] [debug] [certs] [stdout]: Replacing debian:SecureSign_Root_CA15.pem
+2026-11-09T18:09:48.8363377Z [desktop] [2026-11-09T18:09:48.562447+00:00] [debug] [certs] [stdout]: Replacing debian:Security_Communication_ECC_RootCA1.pem
+2026-11-09T18:09:48.8364259Z [desktop] [2026-11-09T18:09:48.563397+00:00] [debug] [certs] [stdout]: Replacing debian:Security_Communication_RootCA2.pem
+2026-11-09T18:09:48.8365433Z [desktop] [2026-11-09T18:09:48.564302+00:00] [debug] [certs] [stdout]: Replacing debian:Starfield_Root_Certificate_Authority_-_G2.pem
+2026-11-09T18:09:48.8366458Z [desktop] [2026-11-09T18:09:48.565280+00:00] [debug] [certs] [stdout]: Replacing debian:Starfield_Services_Root_Certificate_Authority_-_G2.pem
+2026-11-09T18:09:48.8367425Z [desktop] [2026-11-09T18:09:48.566439+00:00] [debug] [certs] [stdout]: Replacing debian:SwissSign_RSA_TLS_Root_CA_2022_-_1.pem
+2026-11-09T18:09:48.8368571Z [desktop] [2026-11-09T18:09:48.567395+00:00] [debug] [certs] [stdout]: Replacing debian:T-TeleSec_GlobalRoot_Class_2.pem
+2026-11-09T18:09:48.8369441Z [desktop] [2026-11-09T18:09:48.568220+00:00] [debug] [certs] [stdout]: Replacing debian:T-TeleSec_GlobalRoot_Class_3.pem
+2026-11-09T18:09:48.8370365Z [desktop] [2026-11-09T18:09:48.569249+00:00] [debug] [certs] [stdout]: Replacing debian:TUBITAK_Kamu_SM_SSL_Kok_Sertifikasi_-_Surum_1.pem
+2026-11-09T18:09:48.8371428Z [desktop] [2026-11-09T18:09:48.570333+00:00] [debug] [certs] [stdout]: Replacing debian:TWCA_CYBER_Root_CA.pem
+2026-11-09T18:09:48.8372218Z [desktop] [2026-11-09T18:09:48.571513+00:00] [debug] [certs] [stdout]: Replacing debian:TWCA_Global_Root_CA.pem
+2026-11-09T18:09:48.8373327Z [desktop] [2026-11-09T18:09:48.572377+00:00] [debug] [certs] [stdout]: Replacing debian:TWCA_Root_Certification_Authority.pem
+2026-11-09T18:09:48.8374228Z [desktop] [2026-11-09T18:09:48.573144+00:00] [debug] [certs] [stdout]: Replacing debian:Telekom_Security_TLS_ECC_Root_2020.pem
+2026-11-09T18:09:48.8375157Z [desktop] [2026-11-09T18:09:48.574409+00:00] [debug] [certs] [stdout]: Replacing debian:Telekom_Security_TLS_RSA_Root_2023.pem
+2026-11-09T18:09:48.8376299Z [desktop] [2026-11-09T18:09:48.575644+00:00] [debug] [certs] [stdout]: Replacing debian:Telia_Root_CA_v2.pem
+2026-11-09T18:09:48.8377124Z [desktop] [2026-11-09T18:09:48.576901+00:00] [debug] [certs] [stdout]: Replacing debian:TrustAsia_Global_Root_CA_G3.pem
+2026-11-09T18:09:48.8377971Z [desktop] [2026-11-09T18:09:48.577773+00:00] [debug] [certs] [stdout]: Replacing debian:TrustAsia_Global_Root_CA_G4.pem
+2026-11-09T18:09:48.8379065Z [desktop] [2026-11-09T18:09:48.578530+00:00] [debug] [certs] [stdout]: Replacing debian:TrustAsia_TLS_ECC_Root_CA.pem
+2026-11-09T18:09:48.8379904Z [desktop] [2026-11-09T18:09:48.579728+00:00] [debug] [certs] [stdout]: Replacing debian:TrustAsia_TLS_RSA_Root_CA.pem
+2026-11-09T18:09:48.8380688Z [desktop] [2026-11-09T18:09:48.580842+00:00] [debug] [certs] [stdout]: Replacing debian:TunTrust_Root_CA.pem
+2026-11-09T18:09:48.8381496Z [desktop] [2026-11-09T18:09:48.582071+00:00] [debug] [certs] [stdout]: Replacing debian:UCA_Extended_Validation_Root.pem
+2026-11-09T18:09:48.8382312Z [desktop] [2026-11-09T18:09:48.583464+00:00] [debug] [certs] [stdout]: Replacing debian:UCA_Global_G2_Root.pem
+2026-11-09T18:09:48.8383168Z [desktop] [2026-11-09T18:09:48.584291+00:00] [debug] [certs] [stdout]: Replacing debian:USERTrust_ECC_Certification_Authority.pem
+2026-11-09T18:09:48.8384094Z [desktop] [2026-11-09T18:09:48.585519+00:00] [debug] [certs] [stdout]: Replacing debian:USERTrust_RSA_Certification_Authority.pem
+2026-11-09T18:09:48.8384933Z [desktop] [2026-11-09T18:09:48.586623+00:00] [debug] [certs] [stdout]: Replacing debian:certSIGN_Root_CA_G2.pem
+2026-11-09T18:09:48.8385721Z [desktop] [2026-11-09T18:09:48.587331+00:00] [debug] [certs] [stdout]: Replacing debian:e-Szigno_Root_CA_2017.pem
+2026-11-09T18:09:48.8386522Z [desktop] [2026-11-09T18:09:48.588104+00:00] [debug] [certs] [stdout]: Replacing debian:e-Szigno_TLS_Root_CA_2023.pem
+2026-11-09T18:09:48.8387330Z [desktop] [2026-11-09T18:09:48.588805+00:00] [debug] [certs] [stdout]: Replacing debian:emSign_ECC_Root_CA_-_C3.pem
+2026-11-09T18:09:48.8388112Z [desktop] [2026-11-09T18:09:48.589772+00:00] [debug] [certs] [stdout]: Replacing debian:emSign_Root_CA_-_C1.pem
+2026-11-09T18:09:48.8389004Z [desktop] [2026-11-09T18:09:48.590889+00:00] [debug] [certs] [stdout]: Replacing debian:emSign_Root_CA_-_G1.pem
+2026-11-09T18:09:48.8389778Z [desktop] [2026-11-09T18:09:48.591593+00:00] [debug] [certs] [stdout]: Replacing debian:vTrus_ECC_Root_CA.pem
+2026-11-09T18:09:48.8390527Z [desktop] [2026-11-09T18:09:48.592654+00:00] [debug] [certs] [stdout]: Replacing debian:vTrus_Root_CA.pem
+2026-11-09T18:09:48.8391328Z [desktop] [2026-11-09T18:09:48.593334+00:00] [debug] [certs] [stdout]: Replacing debian:SECOM_TLS_ECC_Root_CA_2024.pem
+2026-11-09T18:09:48.8392167Z [desktop] [2026-11-09T18:09:48.594525+00:00] [debug] [certs] [stdout]: Replacing debian:SECOM_TLS_RSA_Root_CA_2024.pem
+2026-11-09T18:09:48.8392971Z [desktop] [2026-11-09T18:09:48.595192+00:00] [debug] [certs] [stdout]: Replacing debian:Telia_EC_TLS_Root_CA_v3.pem
+2026-11-09T18:09:48.8393781Z [desktop] [2026-11-09T18:09:48.596218+00:00] [debug] [certs] [stdout]: Replacing debian:Telia_RSA_TLS_Root_CA_v3.pem
+2026-11-09T18:09:48.8394528Z [desktop] [2026-11-09T18:09:48.596838+00:00] [debug] [certs] [stdout]: Replacing debian:e2b-ca.pem
+2026-11-09T18:09:48.8395309Z [desktop] [2026-11-09T18:09:48.620752+00:00] [debug] [certs] [stdout]: done.
+2026-11-09T18:09:48.8395877Z [desktop] [2026-11-09T18:09:48.620800+00:00] [debug] [certs] [stdout]: done.
+2026-11-09T18:09:53.4058747Z [desktop] [2026-11-09T18:09:53.314706+00:00] [debug] Adding layer to cache: ca32d04e-cbb4-4651-8a3b-291894236dd0
+2026-11-09T18:09:53.4060594Z [desktop] [2026-11-09T18:09:53.315077+00:00] [debug] Uploading layer: ca32d04e-cbb4-4651-8a3b-291894236dd0
+2026-11-09T18:09:53.4061968Z [desktop] [2026-11-09T18:09:53.315477+00:00] [info] [optimize] Optimizing template [9112c6b32d3d71819575492c3452c5245b13ac2d3f08bd3041817f24c4f2fb6a]
+2026-11-09T18:10:00.9434838Z [desktop] [2026-11-09T18:10:00.750263+00:00] [debug] Saved: ca32d04e-cbb4-4651-8a3b-291894236dd0
+2026-11-09T18:10:00.9435807Z [desktop] [2026-11-09T18:10:00.910528+00:00] [info] Build finished, took 5m16s
+2026-11-09T18:10:01.2110846Z [desktop] [2026-11-09T18:10:01.210856] [debug] Build finished
+2026-11-09T18:10:22.3821567Z mikka-conservation-stage {"kind":"codex","phase":"fresh_scan","elapsedMs":148526}
+2026-11-09T18:10:22.6219767Z mikka-conservation-stage {"kind":"codex","phase":"fresh_receipt","elapsedMs":240}
+2026-11-09T18:10:25.3437247Z mikka-conservation-stage {"kind":"desktop","phase":"create","elapsedMs":2167}
+2026-11-09T18:10:27.2006963Z mikka-conservation-stage {"kind":"desktop","phase":"preload_receipts","elapsedMs":1857}
+2026-11-09T18:11:14.3717780Z mikka-conservation-failed {"kind":"claude","stage":"fresh_scan","code":"official_files_changed","exitCode":1,"changes":[{"after":{"kind":"link","sha256":null,"target":"e2b-ca.pem"},"before":{"kind":"file","sha256":"4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1","target":null},"kind":"file","path":"/etc/ssl/certs/1560546e.0"},{"after":{"kind":"link","sha256":null,"target":"/usr/local/share/ca-certificates/e2b-ca.crt"},"before":{"kind":"file","sha256":"4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1","target":null},"kind":"file","path":"/etc/ssl/certs/e2b-ca.pem"}]}
+2026-11-09T18:14:11.9248174Z mikka-conservation-stage {"kind":"desktop","phase":"fresh_scan","elapsedMs":224724}
+2026-11-09T18:14:12.0076888Z mikka-conservation-stage {"kind":"desktop","phase":"fresh_receipt","elapsedMs":83}
+2026-11-09T18:14:13.3203884Z mikka-template-cleanup [{"name":"mikka-ba1fb9755d7e-42670591517-1-desktop","kind":"desktop","templateId":"jabr8qwavoajcxb04x7c","status":"deleted"},{"name":"mikka-ba1fb9755d7e-42670591517-1-claude","kind":"claude","templateId":"bjv7lrddb1v52iend5l6","status":"deleted"},{"name":"mikka-ba1fb9755d7e-42670591517-1-codex","kind":"codex","templateId":"d0z8vre0uqh6fx0s8kus","status":"deleted"}]
+2026-11-09T18:14:13.3206799Z Traceback (most recent call last):
+2026-11-09T18:14:13.3207357Z   File "/home/runner/work/Mikka/Mikka/scripts/e2b/build-template.py", line 939, in <module>
+2026-11-09T18:14:13.3208586Z     main()
+2026-11-09T18:14:13.3209305Z   File "/home/runner/work/Mikka/Mikka/scripts/e2b/build-template.py", line 926, in main
+2026-11-09T18:14:13.3209906Z     templates = dict(pool.map(one, kinds))
+2026-11-09T18:14:13.3210232Z                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-09T18:14:13.3284892Z   File "/usr/lib/python3.12/concurrent/futures/_base.py", line 619, in result_iterator
+2026-11-09T18:14:13.3285734Z     yield _result_or_cancel(fs.pop())
+2026-11-09T18:14:13.3286256Z           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-09T18:14:13.3287110Z   File "/usr/lib/python3.12/concurrent/futures/_base.py", line 317, in _result_or_cancel
+2026-11-09T18:14:13.3287923Z     return fut.result(timeout)
+2026-11-09T18:14:13.3288596Z            ^^^^^^^^^^^^^^^^^^^
+2026-11-09T18:14:13.3289262Z   File "/usr/lib/python3.12/concurrent/futures/_base.py", line 449, in result
+2026-11-09T18:14:13.3289707Z     return self.__get_result()
+2026-11-09T18:14:13.3289978Z            ^^^^^^^^^^^^^^^^^^^
+2026-11-09T18:14:13.3290401Z   File "/usr/lib/python3.12/concurrent/futures/_base.py", line 401, in __get_result
+2026-11-09T18:14:13.3290821Z     raise self._exception
+2026-11-09T18:14:13.3291680Z   File "/usr/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+2026-11-09T18:14:13.3292352Z     result = self.fn(*self.args, **self.kwargs)
+2026-11-09T18:14:13.3292929Z              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-09T18:14:13.3293687Z   File "/home/runner/work/Mikka/Mikka/scripts/e2b/build-template.py", line 919, in one
+2026-11-09T18:14:13.3295036Z     entry['conservation'] = probe_conservation(result.template_id, api_key, kind)
+2026-11-09T18:14:13.3295867Z                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-09T18:14:13.3296828Z   File "/home/runner/work/Mikka/Mikka/scripts/e2b/build-template.py", line 667, in probe_conservation
+2026-11-09T18:14:13.3299065Z     result = sandbox.commands.run(ANONYMOUS_WORKER_READY + f' && python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization {kind} --receipt /opt/mikka/fresh-conservation.json >/dev/null',
+2026-11-09T18:14:13.3300983Z              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-09T18:14:13.3301814Z   File "/home/runner/work/_temp/e2b/lib/python3.12/site-packages/e2b/sandbox_sync/commands/command.py", line 442, in run
+2026-11-09T18:14:13.3302374Z     else proc.wait(
+2026-11-09T18:14:13.3302587Z          ^^^^^^^^^^
+2026-11-09T18:14:13.3303295Z   File "/home/runner/work/_temp/e2b/lib/python3.12/site-packages/e2b/sandbox_sync/commands/command_handle.py", line 210, in wait
+2026-11-09T18:14:13.3304127Z     raise CommandExitException(
+2026-11-09T18:14:13.3304822Z e2b.sandbox.commands.command_handle.CommandExitException: Command exited with code 1 and error:
+2026-11-09T18:14:13.3305628Z Traceback (most recent call last):
+2026-11-09T18:14:13.3316631Z   File "/opt/mikka/official-files.py", line 395, in <module>
+2026-11-09T18:14:13.3317213Z     main()
+2026-11-09T18:14:13.3317552Z   File "/opt/mikka/official-files.py", line 386, in main
+2026-11-09T18:14:13.3318065Z     result = verify(json.loads(args.manifest.read_text()), args.e2b_finalization)
+2026-11-09T18:14:13.3318889Z              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-09T18:14:13.3319318Z   File "/opt/mikka/official-files.py", line 319, in verify
+2026-11-09T18:14:13.3319941Z     raise RuntimeError('official_files_changed ' + json.dumps(refused, sort_keys=True, separators=(',', ':')))
+2026-11-09T18:14:13.3322511Z RuntimeError: official_files_changed [{"after":{"kind":"link","sha256":null,"target":"e2b-ca.pem"},"before":{"kind":"file","sha256":"4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1","target":null},"kind":"file","path":"/etc/ssl/certs/1560546e.0"},{"after":{"kind":"link","sha256":null,"target":"/usr/local/share/ca-certificates/e2b-ca.crt"},"before":{"kind":"file","sha256":"4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1","target":null},"kind":"file","path":"/etc/ssl/certs/e2b-ca.pem"}]
+2026-11-09T18:14:13.3324224Z 
+2026-11-09T18:14:13.3820235Z ##[error]Process completed with exit code 1.
+2026-11-09T18:14:13.3879847Z ##[group]Run args=()
+2026-11-09T18:14:13.3880138Z [36;1margs=()[0m
+2026-11-09T18:14:13.3880543Z [36;1mif [ "$BUILD_OUTCOME" = success ]; then args+=(--report "$RUNNER_TEMP/candidates.json"); fi[0m
+2026-11-09T18:14:13.3881197Z [36;1mif [ "$BUILD_OUTCOME" = success ] && [ "$ARTIFACT_OUTCOME" = success ]; then args+=(--sandboxes-only); fi[0m
+2026-11-09T18:14:13.3882007Z [36;1m"$RUNNER_TEMP/e2b/bin/python" scripts/e2b/cleanup-template-candidates.py "${args[@]}" --output "$RUNNER_TEMP/build-cleanup.json"[0m
+2026-11-09T18:14:13.3901725Z shell: /usr/bin/bash -e {0}
+2026-11-09T18:14:13.3901978Z env:
+2026-11-09T18:14:13.3902326Z   E2B_API_KEY: ***
+2026-11-09T18:14:13.3902551Z   BUILD_OUTCOME: failure
+2026-11-09T18:14:13.3902795Z   ARTIFACT_OUTCOME: skipped
+2026-11-09T18:14:13.3903029Z ##[endgroup]
+2026-11-09T18:14:14.4206790Z mikka-release-cleanup {"sourceCommit":"ba1fb9755d7e16b02c8c5f6d4f6d3869333f359d","runId":"42670591517","sandboxes":[],"templates":[{"name":"mikka-ba1fb9755d7e-42670591517-1-desktop","kind":"desktop","status":"absent"},{"name":"mikka-ba1fb9755d7e-42670591517-1-claude","kind":"claude","status":"absent"},{"name":"mikka-ba1fb9755d7e-42670591517-1-codex","kind":"codex","status":"absent"}],"errors":[]}
+2026-11-09T18:14:14.4776741Z ##[group]Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+2026-11-09T18:14:14.4777196Z with:
+2026-11-09T18:14:14.4777455Z   name: e2b-candidate-build-cleanup-42670591517-1
+2026-11-09T18:14:14.4777822Z   path: /home/runner/work/_temp/build-cleanup.json
+2026-11-09T18:14:14.4778141Z   if-no-files-found: warn
+2026-11-09T18:14:14.4778803Z   retention-days: 7
+2026-11-09T18:14:14.4779082Z   compression-level: 6
+2026-11-09T18:14:14.4779304Z   overwrite: false
+2026-11-09T18:14:14.4779532Z   include-hidden-files: false
+2026-11-09T18:14:14.4779778Z env:
+2026-11-09T18:14:14.4780126Z   E2B_API_KEY: ***
+2026-11-09T18:14:14.4780355Z ##[endgroup]
+2026-11-09T18:14:14.6446406Z (node:2852) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T18:14:14.6447259Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T18:14:14.6493731Z With the provided path, there will be 1 file uploaded
+2026-11-09T18:14:14.6500577Z Artifact name is valid!
+2026-11-09T18:14:14.6501683Z Root directory input is valid!
+2026-11-09T18:14:14.8485100Z Beginning upload of artifact content to blob storage
+2026-11-09T18:14:14.8702380Z (node:2852) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T18:14:14.8976132Z Uploaded bytes 352
+2026-11-09T18:14:14.9136212Z Finished uploading artifact content to blob storage!
+2026-11-09T18:14:14.9137622Z SHA256 digest of uploaded artifact zip is 50249a4c2552025c25dfa18b4972813ab0b605199d6cc1583944abbc166ae7d7
+2026-11-09T18:14:14.9139763Z Finalizing artifact upload
+2026-11-09T18:14:15.2496206Z Artifact e2b-candidate-build-cleanup-42670591517-1.zip successfully finalized. Artifact ID 13699257347
+2026-11-09T18:14:15.2498438Z Artifact e2b-candidate-build-cleanup-42670591517-1 has been successfully uploaded! Final size is 352 bytes. Artifact ID is 13699257347
+2026-11-09T18:14:15.2503879Z Artifact download URL: https://github.com/alexj11324/Mikka/actions/runs/42670591517/artifacts/13699257347
+2026-11-09T18:14:15.2713403Z Post job cleanup.
+2026-11-09T18:14:15.3638372Z [command]/usr/bin/git version
+2026-11-09T18:14:15.3686094Z git version 2.56.0
+2026-11-09T18:14:15.3730793Z Temporarily overriding HOME='/home/runner/work/_temp/276c0ff1-68a7-4151-b90a-af3eb94036be' before making global git config changes
+2026-11-09T18:14:15.3732761Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T18:14:15.3736743Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T18:14:15.3779559Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T18:14:15.3822215Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T18:14:15.4106765Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T18:14:15.4147511Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T18:14:15.4462096Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T18:14:15.4535523Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T18:14:15.4979539Z Evaluate and set job outputs
+2026-11-09T18:14:15.4986935Z Cleaning up orphan processes
+2026-11-09T18:14:15.5303486Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020, actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "archivePrefix": "ba1-r7-readback-20261109",
+  "evidenceParent": "e37bcb71fdfb0de7dc4e8bc7c3d6a78af23dc631",
+  "sourceDirectory": "/workspace/scratch/263e36984c81/ba1-r7-readback-1505",
+  "sourceFiles": [
+    {
+      "source": "/workspace/scratch/263e36984c81/ba1-r7-readback-1505/build.log",
+      "path": "build.log",
+      "bytes": 140277,
+      "sha256": "fa004707efcaa384cf0aeb452a4832cfa0b2d60cf6dad75e04f102f3c93a570c",
+      "gitBlob": "65eb4995ff41e1a09b5f9a1d4649dee86d9affa1",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/ba1-r7-readback-1505/cleanup.log",
+      "path": "cleanup.log",
+      "bytes": 28693,
+      "sha256": "587c74c09fcaf291f78188755f06577059fda5cfa44753784fb308c2b0eca425",
+      "gitBlob": "3b80d6b314fb616e87aa9466dfdf8922befdff80",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/ba1-r7-readback-1505/jobs.json",
+      "path": "jobs.json",
+      "bytes": 17304,
+      "sha256": "f5f594c9075c1663b234307353735dadb59a544f1fdfec3c58eedf7621d50de3",
+      "gitBlob": "2628dbddc265f14af455a83d22708bf05070d9bb",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/ba1-r7-readback-1505/run.json",
+      "path": "run.json",
+      "bytes": 13666,
+      "sha256": "2cb2d42ef76c25822480d1306798913b1fdad88edea986b00b6d6f96c77fac0d",
+      "gitBlob": "cc2d83f1c4c6071864a049f050b1a19b20545d67",
+      "mode": "100644"
+    },
+    {
+      "source": "/workspace/scratch/263e36984c81/ba1-r7-readback-1505/safe-projection.json",
+      "path": "safe-projection.json",
+      "bytes": 6482,
+      "sha256": "f865d19d329bf1cf7a45782805e0be26f41800d3bb3b2d2ccb0c2c09d32973c1",
+      "gitBlob": "aca0ff9c7bb93ee2e987b238b590972df8d48ba5",
+      "mode": "100644"
+    }
+  ],
+  "sourceFileCount": 5,
+  "sourceBytes": 206422,
+  "generatedFiles": [
+    {
+      "path": "README.md",
+      "bytes": 2023,
+      "sha256": "6ef885fbadc27eb97db9d366bf0a8f0c1533c2e65091071d9e886b97b9770097",
+      "gitBlob": "a57de6c63fbfa183db871f1a57c8d16ad85db2d7",
+      "mode": "100644"
+    }
+  ],
+  "sourceFilesUnchanged": true,
+  "newOriginalLogOrArtifactDownloads": 0,
+  "newTests": 0,
+  "productionActions": 0,
+  "refMutations": 0,
+  "newFormalSamples": 0,
+  "laterCiFailureMaterialsIncluded": false,
+  "limits": [
+    "Only the recorded Claude fresh_scan refusal is asserted; lack of another diagnostic line does not prove all other parallel future results were returned.",
+    "No Desktop backup node-by-node baseline/post SHA was emitted in this run; the Desktop strict aggregate is equal.",
+    "No new release, real subscriptions or formal startup acceptance completed.",
+    "Cleanup deleted status is the fixed builder exact-ID DELETE followed by GET404; outer cleanup separately confirms names absent and no scoped sandboxes/errors."
+  ]
+}
