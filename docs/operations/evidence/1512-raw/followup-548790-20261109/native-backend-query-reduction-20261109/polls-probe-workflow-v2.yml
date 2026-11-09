@@ -1,0 +1,214 @@
+name: Issue 1512 device SQL probe
+on:
+  push:
+    branches: [ops/1512-device-sql-probe-20261109]
+permissions:
+  contents: read
+concurrency:
+  group: issue1512-device-sql-probe-20261109
+  cancel-in-progress: false
+jobs:
+  paired-device-polls-db:
+    if: github.repository == 'alexj11324/Mikka' && github.event_name == 'push' && github.ref == 'refs/heads/ops/1512-device-sql-probe-20261109' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: mikka_1512_polls_e2e
+        ports:
+          - 127.0.0.1:55491:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      E2E_DATABASE_URL: postgres://postgres@127.0.0.1:55491/mikka_1512_polls_e2e
+      MIKKA_DATABASE_URL: postgres://postgres@127.0.0.1:55491/mikka_1512_polls_e2e
+      DATABASE_URL: postgres://postgres@127.0.0.1:55491/mikka_1512_polls_e2e
+      REQUIRE_DB: '1'
+      BETTER_AUTH_URL: http://127.0.0.1:3100
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify fixed repository, source and candidate files
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, subprocess
+          root = pathlib.Path.cwd()
+          report = root / 'device-polls-probe-reports'
+          report.mkdir()
+          base = 'd4f3c6be8137d906407711c6ea3ac8808ab1d860'
+          tree = '0cc30d9e0ca2f4c37b4dabdc58f0813facdce3fa'
+          original = 'c04690ff2c337886ea18e7a4fa73509ebff6de32'
+          original_tree = 'a69946cdb08bceb994e11b3278572bea5e7e63c9'
+          expected = {
+            "app/v1/devices/[deviceId]/runs/route.ts": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c",
+            "app/v1/devices/[deviceId]/repos/route.ts": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888",
+            "lib/device-heartbeat.db.test.ts": "6e8a9ddcb8855de98b443531b6d7524952e740d49eb38194a17234d87eda9b6d",
+            "lib/device-unit-fence.db.test.ts": "e4f1ee4f90de93ce22f74e5dc97a3475816a5d2a932b0d327ee2441953224d51"
+          }
+          established = {
+            'lib/device-enrollment.ts': '59a025174235a9bbb5a17aa5c654a96d52deb002bb72859ae655af0322b0fede',
+            'lib/device-management.ts': '17fb62c6033acded70487b56e09f989410b782d4afaaa0445988442b5f5754b1',
+            'lib/device-enrollment.db.test.ts': '2fa9b163ce0219171d4bc46d5107d1db55628dc847f88dc33165ec0e5028f526',
+          }
+          def git(*args): return subprocess.check_output(['git', *args], text=True).strip()
+          assert os.environ['GITHUB_REPOSITORY'] == 'alexj11324/Mikka'
+          assert os.environ['GITHUB_EVENT_NAME'] == 'push'
+          assert os.environ['GITHUB_REF'] == 'refs/heads/ops/1512-device-sql-probe-20261109'
+          assert os.environ['GITHUB_RUN_ATTEMPT'] == '1'
+          assert git('rev-parse', 'HEAD') == os.environ['GITHUB_SHA']
+          assert git('rev-parse', base + '^{tree}') == tree
+          assert git('rev-parse', 'HEAD^') == base
+          assert git('rev-parse', original + '^{tree}') == original_tree
+          assert git('rev-parse', base + '^') == original
+          workflow = '.github/workflows/issue1512-device-sql-probe.yml'
+          assert set(git('diff', '--name-only', base, 'HEAD').splitlines()) == set(expected) | {workflow}
+          assert set(git('diff', '--name-only', original, base).splitlines()) == set(established) | {workflow}
+          for name, digest in established.items():
+            assert hashlib.sha256((root / name).read_bytes()).hexdigest() == digest
+            assert git('rev-parse', 'HEAD:' + name) == git('rev-parse', base + ':' + name)
+          files = []
+          for name, digest in expected.items():
+            data = (root / name).read_bytes()
+            assert hashlib.sha256(data).hexdigest() == digest
+            assert git('ls-files', '-s', name).startswith('100644 ')
+            files.append({'path': name, 'bytes': len(data), 'sha256': digest, 'gitBlob': git('rev-parse', 'HEAD:' + name), 'baselineGitBlob': git('rev-parse', base + ':' + name)})
+          assert git('status', '--porcelain', '--untracked-files=no') == ''
+          receipt = {'schema': 'issue1512.device-polls-probe-source.v1', 'repository': os.environ['GITHUB_REPOSITORY'],
+            'ref': os.environ['GITHUB_REF'], 'runId': os.environ['GITHUB_RUN_ID'], 'runAttempt': 1,
+            'baseline': base, 'baselineTree': tree, 'candidate': git('rev-parse', 'HEAD'), 'candidateTree': git('rev-parse', 'HEAD^{tree}'),
+            'original': original, 'originalTree': original_tree, 'establishedFiles': established,
+            'files': files, 'workflowSha256': hashlib.sha256((root / workflow).read_bytes()).hexdigest(),
+            'boundary': 'Dedicated PG17 service only; no production configuration, identity, model execution or Native acceptance.'}
+          (report / 'source.safe.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          PY
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.22.1
+          cache: pnpm
+      - name: Install the unchanged dependency lock
+        run: pnpm install --frozen-lockfile
+      - name: Generate an ephemeral test-only auth secret
+        run: |
+          node --input-type=commonjs - <<'NODE'
+          const { appendFileSync, writeSync } = require('node:fs')
+          const secret = require('node:crypto').randomBytes(32).toString('hex')
+          writeSync(1, `::add-mask::${secret}\n`)
+          appendFileSync(process.env.GITHUB_ENV, `BETTER_AUTH_SECRET=${secret}\n`)
+          NODE
+      - name: Initialize only the dedicated loopback database
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYCODE'
+          import json, pathlib, subprocess
+          root = pathlib.Path.cwd()
+          assert json.loads((root / 'package.json').read_text())['scripts']['test:e2e:setup'] == 'node --experimental-strip-types scripts/setup-e2e-db.mjs'
+          with (root / 'device-polls-probe-reports' / 'database-setup.original.log').open('wb') as log:
+            result = subprocess.run(['node', '--experimental-strip-types', 'scripts/setup-e2e-db.mjs'], stdout=log, stderr=subprocess.STDOUT, timeout=120)
+          assert result.returncode == 0, 'Isolated database initialization failed; original log retained'
+          PYCODE
+      - name: Run every canonical device revocation suite segment against baseline and candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYCODE'
+          import hashlib, json, os, pathlib, re, shlex, shutil, subprocess, time
+          root = pathlib.Path.cwd()
+          report = root / 'device-polls-probe-reports'
+          binding = json.loads((report / 'source.safe.json').read_text())
+          baseline = pathlib.Path(os.environ['RUNNER_TEMP']) / 'issue1512-device-polls-baseline'
+          assert not baseline.exists()
+          parts = [
+            'node --import ./scripts/server-test.mjs --import tsx --test lib/device-revocation.db.test.ts lib/device-mailbox-notices.db.test.ts lib/device-work.db.test.ts lib/device-presence.db.test.ts lib/demo-device-cleanup.db.test.ts',
+            'node --test-force-exit --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/device-route-fence.db.test.ts lib/device-heartbeat.db.test.ts lib/cloud-subscription-lease-route.db.test.ts',
+            'node --test-force-exit --test-concurrency=1 --import ./scripts/server-test.mjs --import tsx --test lib/device-unit-fence.db.test.ts',
+          ]
+          assert json.loads((root / 'package.json').read_text())['scripts']['test:device-revocation-db'] == ' && '.join(parts)
+          commands = [[*shlex.split(part)[:1], '--test-reporter=tap', *shlex.split(part)[1:]] for part in parts]
+          expected_counts = [16, 11, 5]
+          expected_failures = {
+            'runs poll reads current authority, ownership and results in one snapshot',
+            'repos poll reads current authority, ownership and results in one snapshot',
+          }
+          cases = []
+          receipt = {'schema': 'issue1512.device-polls-probe-paired.v1', 'postgresObserved': False, 'canonicalScript': ' && '.join(parts), 'commands': commands,
+            'baseline': binding['baseline'], 'candidate': binding['candidate'], 'expectedTestsPerSegment': expected_counts,
+            'nativeBudgetRemains': {'native': 473, 'web': 402, 'pass': False}, 'cases': cases, 'verified': False,
+            'boundary': 'The three existing commands run separately so expected baseline count failures do not skip later fence tests. Only the TAP reporter is added; no test selection, assertion or product switch changes.'}
+          def describe(path):
+            data = path.read_bytes()
+            return {'path': path.name, 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
+          try:
+            version = subprocess.check_output(['node', '--input-type=module', '-e',
+              "import pg from 'pg'; const url=new URL(process.env.E2E_DATABASE_URL); if(url.hostname!=='127.0.0.1'||url.port!=='55491'||url.pathname!=='/mikka_1512_polls_e2e')throw Error('isolated target required'); const p=new pg.Pool({connectionString:url.href}); try{const {rows}=await p.query(\"SELECT current_setting('server_version') AS version,current_setting('server_version_num') AS number,current_database() AS database\"); console.log(JSON.stringify(rows[0]));}finally{await p.end();}"], text=True)
+            receipt['postgres'] = json.loads(version)
+            assert 170000 <= int(receipt['postgres']['number']) < 180000
+            assert receipt['postgres']['database'] == 'mikka_1512_polls_e2e'
+            receipt['postgresObserved'] = True
+            receipt['node'] = subprocess.check_output(['node', '--version'], text=True).strip()
+            subprocess.run(['git', 'worktree', 'add', '--detach', str(baseline), binding['baseline']], check=True)
+            for name in ['lib/device-heartbeat.db.test.ts', 'lib/device-unit-fence.db.test.ts']:
+              shutil.copyfile(root / name, baseline / name)
+            (baseline / 'node_modules').symlink_to(root / 'node_modules', target_is_directory=True)
+            for row in binding['files']:
+              actual = hashlib.sha256((baseline / row['path']).read_bytes()).hexdigest()
+              if row['path'].endswith('.db.test.ts'): assert actual == row['sha256']
+              else:
+                original = subprocess.check_output(['git', 'show', binding['baseline'] + ':' + row['path']])
+                assert actual == hashlib.sha256(original).hexdigest()
+            for label, cwd in [('baseline-red', baseline), ('candidate-green', root)]:
+              segments = []
+              case = {'case': label, 'segments': segments}
+              cases.append(case)
+              for number, command in enumerate(commands, 1):
+                log = report / (label + '-segment-' + str(number) + '.original.log')
+                began = time.monotonic()
+                with log.open('wb') as stream:
+                  process = subprocess.run(command, cwd=cwd, env={**os.environ, 'TSX_TSCONFIG_PATH': str(cwd / 'tsconfig.json')}, stdout=stream, stderr=subprocess.STDOUT, timeout=180)
+                text = log.read_text()
+                summary = {key: int(value) for key, value in re.findall(r'^# (tests|suites|pass|fail|cancelled|skipped|todo) (\d+)\s*$', text, re.M)}
+                failures = re.findall(r'^not ok \d+ - (.+)\s*$', text, re.M)
+                segments.append({'segment': number, 'returncode': process.returncode, 'durationSeconds': round(time.monotonic() - began, 3), 'summary': summary, 'failureNames': failures, 'log': describe(log)})
+            for case in cases:
+              for index, segment in enumerate(case['segments']):
+                assert segment['summary']['tests'] == expected_counts[index]
+                assert all(segment['summary'][key] == 0 for key in ['cancelled', 'skipped', 'todo'])
+                is_red = case['case'] == 'baseline-red' and index == 1
+                assert segment['returncode'] == (1 if is_red else 0)
+                assert segment['summary']['fail'] == (2 if is_red else 0)
+                assert segment['summary']['pass'] == expected_counts[index] - (2 if is_red else 0)
+                assert set(segment['failureNames']) == (expected_failures if is_red else set())
+            for row in binding['files']:
+              assert hashlib.sha256((root / row['path']).read_bytes()).hexdigest() == row['sha256']
+            assert subprocess.check_output(['git', 'status', '--porcelain', '--untracked-files=no'], text=True).strip() == ''
+            receipt['verified'] = True
+          finally:
+            if baseline.exists():
+              cleanup = subprocess.run(['git', 'worktree', 'remove', '--force', str(baseline)], capture_output=True)
+              receipt['baselineWorktreeRemoved'] = cleanup.returncode == 0 and not baseline.exists()
+            receipt['serviceCleanup'] = 'GitHub Actions tears down the isolated PostgreSQL service after this job; terminal job evidence must confirm completion.'
+            (report / 'paired.safe.json').write_text(json.dumps(receipt, indent=2) + '\n')
+            print(json.dumps({'verified': receipt['verified'], 'postgresObserved': receipt['postgresObserved'], 'cases': cases}))
+          PYCODE
+      - name: Preserve source binding, setup and all six complete logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: issue1512-device-polls-probe-${{ github.sha }}
+          path: device-polls-probe-reports/
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "reviewedIndexSha256": "c2199f4fd26734b2df6ac67c75eab4a39640e53d11dfeea6d638845b8ef7b91d",
+  "runtimeFiles": 4,
+  "testFiles": 2,
+  "conclusions": [
+    "Own child span catches exceptions before unchanged asToolResult conversion; original Workflow parent OK does not erase child ERROR.",
+    "Repository telemetry accepts only existing closed codes and does not inspect arbitrary returned content.",
+    "Original authorization, retries, SELECT count and return object are preserved by exact regression evidence."
+  ],
+  "sourceCorrection": "The timedPhase comment is imprecise: the actual no-recording branch also creates an own dispatch phase span. Root withdrew an initially proposed !recording guard after reading that code; no such change or new test was applied.",
+  "approvedForIntegration": true,
+  "productionVerificationPending": true,
+  "additionalTestsRunByReviewer": 0
+}

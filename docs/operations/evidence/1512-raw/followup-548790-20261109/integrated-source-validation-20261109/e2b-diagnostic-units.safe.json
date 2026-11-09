@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "label": "e2b-diagnostic-units",
+  "argv": [
+    "node",
+    "--test",
+    "--test-reporter=tap",
+    "scripts/e2b/validate-template-subscriptions.test.mjs"
+  ],
+  "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-integration-checkout",
+  "sourceTree": "5ffff474defa47634334484fe18916130e3f72d8",
+  "sourceTreeUnchanged": true,
+  "trackedWorktreeUnchanged": true,
+  "start": "2026-11-09T03:15:13.046040+00:00",
+  "end": "2026-11-09T03:15:14.116248+00:00",
+  "durationSeconds": 1.07,
+  "exitCode": 0,
+  "log": {
+    "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/integrated-source-validation-20261109/e2b-diagnostic-units.original.log",
+    "bytes": 7998,
+    "sha256": "e3e9b0cf01baece3fffca4f1ac3e98e83d9463f6874f8c14b53d27414f518ece"
+  },
+  "environment": {
+    "pinnedPnpm": "10.34.3",
+    "nodeOptions": "--max-old-space-size=4096",
+    "databaseOrCredentialEnvironmentForwarded": false,
+    "sourceSecurityOrSandboxOverrides": false
+  },
+  "published": false,
+  "productionAccepted": false
+}

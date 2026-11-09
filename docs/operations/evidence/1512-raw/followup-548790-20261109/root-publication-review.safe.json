@@ -1,0 +1,12 @@
+{
+  "schema": 1,
+  "scope": "Checkpoint17 exact selected files, with gzip decoded for scanning",
+  "decodedPayloadFiles": 211,
+  "unclassifiedCredentialShapes": [],
+  "componentPrivacyReviewsRetained": true,
+  "publicGitSshAndVersionedTestLiteralsNotPersonalAccounts": true,
+  "privateApiResponsesAndSignedDownloadUrlsExcluded": true,
+  "rawProductionPromptsMessagesInputsOutputsAndCredentialsExcluded": true,
+  "originalFailedReceiptsRetained": true,
+  "largeSourceInventories": "Lossless gzip; original paths/hashes remain in author index and compressed-artifacts.safe.json maps exact restoration."
+}

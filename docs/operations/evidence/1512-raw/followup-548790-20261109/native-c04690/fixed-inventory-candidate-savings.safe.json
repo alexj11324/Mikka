@@ -1,0 +1,239 @@
+{
+  "schema": "issue1512.c04690.fixed-inventory-candidate-savings.v1",
+  "recordedAt": "2026-11-09T03:31:11.579540+00:00",
+  "source": {
+    "publicPrHead": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+    "tree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+    "actualAcceptanceCheckout": "fd053d254e377f35ff8e2529edb1ad544c23fab1"
+  },
+  "originalGate": {
+    "native": 473,
+    "web": 402,
+    "difference": 71,
+    "pass": false,
+    "unchanged": true
+  },
+  "rows": [
+    {
+      "scope": "/v1/devices/enroll",
+      "originalNativeQueries": 4,
+      "originalWebQueries": 0,
+      "candidate": "A",
+      "sourceCompatibleInvocations": 1,
+      "savedPerEligibleInvocation": 3,
+      "fixedInventoryNativeReduction": 3,
+      "fixedInventoryWebReduction": 0,
+      "boundary": "Successful consume: actual PG helper 4 to 1. One source-compatible BEGIN/DELETE/unknown/COMMIT group; no original HTTP context."
+    },
+    {
+      "scope": "/v1/devices/[deviceId]/heartbeat",
+      "originalNativeQueries": 20,
+      "originalWebQueries": 0,
+      "candidate": "B",
+      "sourceCompatibleInvocations": 2,
+      "savedPerEligibleInvocation": 3,
+      "fixedInventoryNativeReduction": 6,
+      "fixedInventoryWebReduction": 0,
+      "boundary": "Only no-completion/no-failure pending-command read: actual PG helper 4 to 1. Two source-compatible normal-heartbeat groups; future receipt arrays and call count unknown."
+    },
+    {
+      "scope": "/v1/devices/[deviceId]/runs",
+      "originalNativeQueries": 12,
+      "originalWebQueries": 0,
+      "candidate": "C",
+      "sourceCompatibleInvocations": 2,
+      "savedPerEligibleInvocation": 4,
+      "fixedInventoryNativeReduction": 8,
+      "fixedInventoryWebReduction": 0,
+      "boundary": "SOURCE_DERIVED_ONLY: observed source-compatible route 6 to 2 with one initial auth and one fresh authority/list statement. Offline business boundary only 2 to 1; standalone real PG candidate did not run."
+    },
+    {
+      "scope": "/v1/devices/[deviceId]/repos",
+      "originalNativeQueries": 12,
+      "originalWebQueries": 0,
+      "candidate": "C",
+      "sourceCompatibleInvocations": 2,
+      "savedPerEligibleInvocation": 4,
+      "fixedInventoryNativeReduction": 8,
+      "fixedInventoryWebReduction": 0,
+      "boundary": "SOURCE_DERIVED_ONLY: same 6 to 2 path with no additional settings SQL observed. Nonempty repository settings remain; cannot generalize two total queries to all nonempty branches."
+    },
+    {
+      "scope": "/actions/coordinator/poll",
+      "originalNativeQueries": 84,
+      "originalWebQueries": 92,
+      "candidate": "policy-v2",
+      "sourceCompatibleInvocations": 4,
+      "savedPerEligibleInvocation": 1,
+      "fixedInventoryNativeReduction": 4,
+      "fixedInventoryWebReduction": 0,
+      "boundary": "Four Native active readBatch chats have two same-workspace policy reads each; real reader unit path 2 to 1. Web standalone invocation does not qualify; after jobs bypass reuse."
+    },
+    {
+      "scope": "/v1/devices/register",
+      "originalNativeQueries": 15,
+      "originalWebQueries": 0,
+      "candidate": "unchanged",
+      "sourceCompatibleInvocations": 1,
+      "savedPerEligibleInvocation": 0,
+      "fixedInventoryNativeReduction": 0,
+      "fixedInventoryWebReduction": 0,
+      "boundary": "Additional source-only insert/link and agent-write proposals are not implemented and receive zero credit."
+    },
+    {
+      "scope": "/v1/devices/[deviceId]/gateway",
+      "originalNativeQueries": 5,
+      "originalWebQueries": 0,
+      "candidate": "unchanged",
+      "sourceCompatibleInvocations": 1,
+      "savedPerEligibleInvocation": 0,
+      "fixedInventoryNativeReduction": 0,
+      "fixedInventoryWebReduction": 0,
+      "boundary": "Original authority fence before ticket issuance remains. No credit for unestablished fusion."
+    },
+    {
+      "scope": "/v1/devices/[deviceId]/commands",
+      "originalNativeQueries": 6,
+      "originalWebQueries": 0,
+      "candidate": "unchanged",
+      "sourceCompatibleInvocations": null,
+      "savedPerEligibleInvocation": 0,
+      "fixedInventoryNativeReduction": 0,
+      "fixedInventoryWebReduction": 0,
+      "boundary": "Existing deviceMayHaveWork path does not call B pendingDeviceCommands."
+    },
+    {
+      "scope": "after:factory-dispatch-recovery",
+      "originalNativeQueries": 12,
+      "originalWebQueries": 0,
+      "candidate": "unchanged",
+      "sourceCompatibleInvocations": 2,
+      "savedPerEligibleInvocation": 0,
+      "fixedInventoryNativeReduction": 0,
+      "fixedInventoryWebReduction": 0,
+      "boundary": "Two source-compatible six-query cycles. No safe implemented reduction; all remain counted."
+    },
+    {
+      "scope": "/api/devices/enrollment",
+      "originalNativeQueries": 7,
+      "originalWebQueries": 0,
+      "candidate": "unchanged",
+      "sourceCompatibleInvocations": null,
+      "savedPerEligibleInvocation": 0,
+      "fixedInventoryNativeReduction": 0,
+      "fixedInventoryWebReduction": 0,
+      "boundary": "Three session and three user reads plus one unknown statement. HTTP methods/parameters are not available; no duplicate grant-mint claim."
+    },
+    {
+      "scope": "after:live-notify",
+      "originalNativeQueries": 1,
+      "originalWebQueries": 0,
+      "candidate": "unchanged",
+      "sourceCompatibleInvocations": null,
+      "savedPerEligibleInvocation": 0,
+      "fixedInventoryNativeReduction": 0,
+      "fixedInventoryWebReduction": 0,
+      "boundary": "Kept in original measured scope."
+    },
+    {
+      "scope": "all other original scopes, disjoint remainder",
+      "originalNativeQueries": 295,
+      "originalWebQueries": 310,
+      "candidate": "unchanged",
+      "sourceCompatibleInvocations": null,
+      "savedPerEligibleInvocation": 0,
+      "fixedInventoryNativeReduction": 0,
+      "fixedInventoryWebReduction": 0,
+      "boundary": "Includes standalone Native/Web model menus at 57 queries each; no policy reuse across their distinct requests."
+    }
+  ],
+  "fixedInventoryCounterfactual": {
+    "nativeReduction": 29,
+    "webReduction": 0,
+    "native": 444,
+    "web": 402,
+    "remainingDifference": 42,
+    "containsSourceDerivedCOnlyReduction": 16,
+    "isMeasuredCandidateNativeResult": false
+  },
+  "alreadyExecutedHelperOrReaderEvidenceOnly": {
+    "nativeReduction": 13,
+    "webReduction": 0,
+    "native": 460,
+    "web": 402,
+    "remainingDifference": 58,
+    "isMeasuredCandidateNativeResult": false,
+    "boundary": "A+B true PG 13/13; policy real-reader unit mock boundary 38/38. Applying those per-invocation effects to old inventory is still a counterfactual."
+  },
+  "unknowns": [
+    "Original v1 context fields are unknown; source-compatible query sequences are not complete observed HTTP method/invocation/parameter pairing.",
+    "All original query ordinals and unknown statements remain included. Native original unknown-context queries 165 and unknown-structure queries 150; Web 77 and 134.",
+    "Future polling count, receipt arrays, repository/settings branches, lastUsedAt writes, fence idle reacquisition, task timing and after-work window membership are unknown. No favorable timing saving is assigned.",
+    "C standalone PG first baseline segment timed out; no candidate PG assertion or real route 6-to-2 result was established there. New canonical CI must supply its own evidence.",
+    "Unimplemented registration/agent-write proposals (3) and optional Bot reuse proposal (4) are excluded; gateway/recovery/browser enrollment remain unchanged."
+  ],
+  "inputs": [
+    {
+      "path": "native-c04690/native-c04690-original/lifecycle.json",
+      "bytes": 696142,
+      "sha256": "19a1cfbd9225c580a2309f76016e099d4354e5fba3ee9562c59d2782db14dcdc",
+      "gitBlob": "1cd8ce2c9528225884da22282e254311c797d07d"
+    },
+    {
+      "path": "native-c04690/read-batch-source-analysis.safe.json",
+      "bytes": 25254,
+      "sha256": "661cee0ae8e27cec7e29c4244ca7f005ca5af64aa1977b47bcd97d3a0b0c8968",
+      "gitBlob": "ddc02b3267353bc5e4d47e4b091d0f751297fa73"
+    },
+    {
+      "path": "native-c04690/heartbeat-register-gateway-source-analysis.safe.json",
+      "bytes": 29428,
+      "sha256": "fbb2e43c76dacbabb53a23ae8231dd00af25084fc2aaff56c5b305ca6fa600ec",
+      "gitBlob": "214343d71241241a23bd2e295d9f88d0550eb9ab"
+    },
+    {
+      "path": "native-c04690/recovery-enrollment-source-analysis.safe.json",
+      "bytes": 18736,
+      "sha256": "e9006ed08ed4e5061353c63bdeaa3c3e09740270c7c1f03c45a909a50848dce6",
+      "gitBlob": "53e03891f470bc2e1d3303e23b26771d7bb571ea"
+    },
+    {
+      "path": "native-backend-query-reduction-20261109/pg-independent-verification.safe.json",
+      "bytes": 7570,
+      "sha256": "9e79f183b596a127f90b94ae00e5e6607b462f6f30836c1ef72dd56bf2ef8f96",
+      "gitBlob": "9b62b2ce743bf320dc1d7cb3e3057da5d2d98345"
+    },
+    {
+      "path": "native-backend-query-reduction-20261109/polls-candidate-v1-review.safe.json",
+      "bytes": 7637,
+      "sha256": "e7c8e3051727563667bc82686e306951b29af08c40a40d6a3fd7fd7ad30bb072",
+      "gitBlob": "a880fe967a9eb64d581e0a696586a5f506c49308"
+    },
+    {
+      "path": "native-backend-query-reduction-20261109/polls-probe-v1-failure.safe.json",
+      "bytes": 6315,
+      "sha256": "eae62b085db0a9d105bdb8a9633c033b053ba03dc1a233651784f0d8dedf5092",
+      "gitBlob": "11a16a437621ff78a0524dc41c722ba1697b8867"
+    },
+    {
+      "path": "read-batch-policy-20261109/final-source-manifest-v2.safe.json",
+      "bytes": 4062,
+      "sha256": "34b59d740801b5a98ae2a8c23b9d2a57ef28cea5073e8a35522fc5ac91cd9b76",
+      "gitBlob": "85fde868221f08b460234aea89e7fd2b29198cae"
+    },
+    {
+      "path": "read-batch-policy-20261109/implementation-receipt-v2.safe.json",
+      "bytes": 3476,
+      "sha256": "59ef4c5c0142e8663ca3d750cf268ec89544d8b2a1ac88fc48921145891e0230",
+      "gitBlob": "7a95d9401c2ef470fe45d8400e27ae532b432034"
+    }
+  ],
+  "activity": {
+    "sourceEdits": 0,
+    "testsRun": 0,
+    "databaseQueries": 0,
+    "newNativeRuns": 0,
+    "newModels": 0,
+    "networkNeededForThisArithmetic": false
+  }
+}

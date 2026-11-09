@@ -1,0 +1,42 @@
+diff --git a/lib/personal-policy.test.ts b/lib/personal-policy.test.ts
+index 91ad2d545..fef80337b 100644
+--- a/lib/personal-policy.test.ts
++++ b/lib/personal-policy.test.ts
+@@ -66,7 +66,9 @@ const owner = 'policy-fixture-owner'
+ 
+ function policyReader(allowed: boolean | undefined = true) {
+   const calls: string[] = []
+-  const state = { allowed, error: null as Error | null, sharedKeys: true, sharedOwners: ['policy-fixture-peer'] }
++  const state: { allowed: boolean | undefined; error: Error | null; sharedKeys: boolean; sharedOwners: string[] } = {
++    allowed, error: null, sharedKeys: true, sharedOwners: ['policy-fixture-peer'],
++  }
+   const key = (mine: boolean) => ({
+     id: mine ? '10000000-0000-4000-8000-000000000002' : '10000000-0000-4000-8000-000000000003',
+     ownerId: mine ? owner : 'policy-fixture-peer', provider: 'openai', protocol: 'openai', name: mine ? 'own' : 'shared',
+diff --git a/lib/tracing/logs.test.ts b/lib/tracing/logs.test.ts
+index 68827307c..8ca4cd89b 100644
+--- a/lib/tracing/logs.test.ts
++++ b/lib/tracing/logs.test.ts
+@@ -81,8 +81,8 @@ test('HTTP completes while waitUntil retains an earlier in-flight Workflow trace
+       pending.add(deferred.promise)
+       release = () => { complete(); pending.delete(deferred.promise); deferred.resolve() }
+     },
+-    forceFlush: async () => { flushCalls++; await Promise.all([...pending]) },
+-    shutdown: async () => { await Promise.all([...pending]) },
++    forceFlush: async () => { flushCalls++; await Promise.all(pending) },
++    shutdown: async () => { await Promise.all(pending) },
+   }
+   const provider = createTracerProvider({ exporter: new SafeExporter(sink), sampleRate: 0.1, environment: 'dev', logger: logs.getLogger('test'), serverless: true })
+   const key = Symbol.for('@vercel/request-context'), previous = Object.getOwnPropertyDescriptor(globalThis, key)
+@@ -131,7 +131,10 @@ test('HTTP completes while waitUntil retains an earlier in-flight Workflow trace
+     assert.equal(pending.size, 0); assert.equal(completed, 2)
+     assert.equal(delivered.length, 5)
+     assert.equal(delivered.filter(span => span.name === 'mikka.ai.generation').length, 1)
+-    assert.equal(delivered.filter(span => span.name.startsWith('dispatch')).length, 2)
++    assert.equal(delivered.filter(span => {
++      assert.ok(typeof span.name === 'string')
++      return span.name.startsWith('dispatch')
++    }).length, 2)
+     assert.equal(new Set(delivered.map(span => span.spanId)).size, 5)
+   } finally {
+     if (pending.size) release?.()

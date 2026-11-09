@@ -1,0 +1,32 @@
+/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/native-backend-query-reduction-20261109/offline-device-polls.test.cjs:23
+    throw new Error('Unexpected dependency in offline read probe')
+    ^
+
+Error: Unexpected dependency in offline read probe
+    at require (/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/native-backend-query-reduction-20261109/offline-device-polls.test.cjs:23:11)
+    at evalmachine.<anonymous>:1135:31
+    at evaluate (/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/native-backend-query-reduction-20261109/offline-device-polls.test.cjs:25:88)
+    at Object.<anonymous> (/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/native-backend-query-reduction-20261109/offline-device-polls.test.cjs:33:16)
+    at Module._compile (node:internal/modules/cjs/loader:1929:14)
+    at Object..js (node:internal/modules/cjs/loader:2060:10)
+    at Module.load (node:internal/modules/cjs/loader:1651:32)
+    at Module._load (node:internal/modules/cjs/loader:1443:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+
+Node.js v24.22.1
+✖ ../offline-device-polls.test.cjs (679.778706ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 0
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 690.391653
+
+✖ failing tests:
+
+test at ../offline-device-polls.test.cjs:1:1
+✖ ../offline-device-polls.test.cjs (679.778706ms)
+  'test failed'

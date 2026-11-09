@@ -1,0 +1,117 @@
+{
+  "version": 2,
+  "sourceManifest": {
+    "path": "final-source-manifest-v2.safe.json",
+    "bytes": 4062,
+    "sha256": "34b59d740801b5a98ae2a8c23b9d2a57ef28cea5073e8a35522fc5ac91cd9b76",
+    "gitBlobSha1": "85fde868221f08b460234aea89e7fd2b29198cae"
+  },
+  "v1IndexPreserved": {
+    "path": "review-index.safe.json",
+    "bytes": 3516,
+    "sha256": "ec9c5185d5f5412efd2618e99b5a22569bf40fc44ad62178c748c60b1ed4bb42",
+    "gitBlobSha1": "1b6b3e58551d686c0df5ada5d456f108d0d3ff67"
+  },
+  "files": [
+    {
+      "path": "read-batch-policy-v2.patch",
+      "bytes": 17545,
+      "sha256": "570f875267c9cede7a9546e94d4d3390d0e2a2e913728605b1adefd1e6109ece",
+      "gitBlobSha1": "232b1bd4f345f21ceefd8cd5ba672c23cdab1308"
+    },
+    {
+      "path": "read-batch-policy-v1-to-v2.patch",
+      "bytes": 3499,
+      "sha256": "e75046ae32dffa061c139c76369ff076114c528e1839b5a9932a11b4344680fd",
+      "gitBlobSha1": "5688c5c5c5f0e896a3cb71e1cfa3237835078e4e"
+    },
+    {
+      "path": "final-source-manifest-v2.safe.json",
+      "bytes": 4062,
+      "sha256": "34b59d740801b5a98ae2a8c23b9d2a57ef28cea5073e8a35522fc5ac91cd9b76",
+      "gitBlobSha1": "85fde868221f08b460234aea89e7fd2b29198cae"
+    },
+    {
+      "path": "policy-active-afterjob-v1-red.log",
+      "bytes": 1583,
+      "sha256": "92210786a8e4298169669eef13b656e14c9a023b57de3d09150422385a9cfee8",
+      "gitBlobSha1": "23425d39ac846735cc644830d0c532e92c382e2d"
+    },
+    {
+      "path": "policy-active-afterjob-v1-red.safe.json",
+      "bytes": 1790,
+      "sha256": "7d4d102425c41e52c7642b58caedbfbcd8e9b3fd16ae411367770a6d47bf0031",
+      "gitBlobSha1": "bb420232b81860d3b222506e0c8436691af53554"
+    },
+    {
+      "path": "policy-v2-focused-tests.log",
+      "bytes": 9425,
+      "sha256": "59bd956584a298dc6ee58a7a86c3b2b7831ee4130e563b01f6d0f3452a63bfa5",
+      "gitBlobSha1": "5f00da2cc3d33c69625f4e554f12ea1ba1f08267"
+    },
+    {
+      "path": "policy-v2-focused-tests.safe.json",
+      "bytes": 923,
+      "sha256": "e3d0e9b99528f63bbc1d603947aaecb64d5c7f0c7a0377eeb051aefbd9e49ef1",
+      "gitBlobSha1": "f989fbf3fb6ba74f9261491743967392d8cd57a1"
+    },
+    {
+      "path": "policy-v2-targeted-lint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "policy-v2-targeted-lint.safe.json",
+      "bytes": 770,
+      "sha256": "c6f5db03282ad683b857b3a4b576fa878f732aaef445b79010d264878adc1322",
+      "gitBlobSha1": "56b8981960758be02e2cefce340f3f24497bf767"
+    },
+    {
+      "path": "implementation-receipt-v2.safe.json",
+      "bytes": 3476,
+      "sha256": "59ef4c5c0142e8663ca3d750cf268ec89544d8b2a1ac88fc48921145891e0230",
+      "gitBlobSha1": "7a95d9401c2ef470fe45d8400e27ae532b432034"
+    },
+    {
+      "path": "README-v2.md",
+      "bytes": 1418,
+      "sha256": "62a4d84793a55ffcb7fd46e0b0f335a769bc1c16e413af6eb2fc5f8c92adf391",
+      "gitBlobSha1": "96069f6269c47c2f9268c68285309019aa87caea"
+    },
+    {
+      "path": "v2-source/lib/desktop-rpc/read-batch-context.ts",
+      "bytes": 6263,
+      "sha256": "871d9a5bd92d084919d4124c5c26b90d6ad7195f55f91502e02d52bc55083f6e",
+      "gitBlobSha1": "e32da5e4d7294af3363eb2de4623a52aeb7e4f47"
+    },
+    {
+      "path": "v2-source/lib/personal-policy.ts",
+      "bytes": 8694,
+      "sha256": "1e09dbc751b0e740d54cbbc6db79b0d4a0bf48cc409137eabc36ecd38f8861f6",
+      "gitBlobSha1": "dc710f0a16a5e28e5a34d5112a86fab349a2639a"
+    },
+    {
+      "path": "v2-source/lib/personal-policy.test.ts",
+      "bytes": 14319,
+      "sha256": "f88b80ba03110c2dee52f337641793e8bfde2b7d0555e832cc3f6cfc1df23630",
+      "gitBlobSha1": "91ad2d545028162faac1c7e3cc7454770b357e47"
+    },
+    {
+      "path": "public-scan-v2.safe.json",
+      "bytes": 111,
+      "sha256": "61bbe17d611d1c9af66ea5a621fb793b80772bf4dd671a3dcf3bdd424452eeda",
+      "gitBlobSha1": "722c62f30ca7590c4f49ac43467af9222a3fb483"
+    }
+  ],
+  "payloadFileCount": 15,
+  "payloadBytes": 73878,
+  "publicScan": {
+    "path": "public-scan-v2.safe.json",
+    "bytes": 111,
+    "sha256": "61bbe17d611d1c9af66ea5a621fb793b80772bf4dd671a3dcf3bdd424452eeda",
+    "gitBlobSha1": "722c62f30ca7590c4f49ac43467af9222a3fb483"
+  },
+  "sourceCopy": "/workspace/scratch/812e3b7d6d45/issue1512-read-batch-policy-copy",
+  "acceptance": "Native473 / Web402 remains RED; no production or CI run performed."
+}

@@ -1,0 +1,529 @@
+{
+  "schema": "issue1512-recovery-enrollment-source-analysis-v1",
+  "sourceTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+  "sourceMain": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "sourcePrHead": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+  "actualAcceptanceSource": "fd053d254e377f35ff8e2529edb1ad544c23fab1",
+  "original": {
+    "path": "native-c04690-original/lifecycle.json",
+    "bytes": 696142,
+    "sha256": "19a1cfbd9225c580a2309f76016e099d4354e5fba3ee9562c59d2782db14dcdc",
+    "gitBlobSha1": "1cd8ce2c9528225884da22282e254311c797d07d"
+  },
+  "source": [
+    {
+      "path": "app/api/devices/enrollment/route.ts",
+      "bytes": 2145,
+      "sha256": "08c91a56354263fcce77afc73ec9b44b2889ea07f0ae56007e07879fa07d36a4",
+      "gitBlobSha1": "ad314e0e15565b27c705d40a22181151b5157abe",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/device-enrollment.ts",
+      "bytes": 1338,
+      "sha256": "70a9b0a0c8c2d1b8c39098b19c52229188b8da98b75188aaff6e4e595584afae",
+      "gitBlobSha1": "f9490f18359d2d3a9b61b068bfb14ef4b965144d",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/fresh-session.ts",
+      "bytes": 2709,
+      "sha256": "1100600b5c2cd015e3e5de2302860ff15e3b3915d086bee7a77bf05f302e6750",
+      "gitBlobSha1": "ea79357b95916168b13d2707594244896a60a7c5",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/api-auth.ts",
+      "bytes": 2491,
+      "sha256": "6ffd944bab6c8d0aed2bff26f07b0c75369fbbdf55b5ce88fe805bcb30f8f9ef",
+      "gitBlobSha1": "b2e86c5aece99ae4be5291caebc8043400318616",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/auth.ts",
+      "bytes": 9220,
+      "sha256": "d86af1c463c32f045f84e4f57b8ae94f3b61fd537f1f10e854e9ef80e7fd3f2a",
+      "gitBlobSha1": "62651c4c8536bd218ab8ed90474da33b1b970626",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "apps/desktop/src/main/index.ts",
+      "bytes": 29563,
+      "sha256": "4c85b97a6c5c030edc2c499c805326124b334d814412c9151f1a3097577dc7c1",
+      "gitBlobSha1": "61da70923e2109761919f8b4968c0cb701917ff3",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "apps/desktop/src/main/bridge.ts",
+      "bytes": 4822,
+      "sha256": "69b494ad37f9b810bff648d6f29e12653627ef76a6765b27dfea7fb542c2d06a",
+      "gitBlobSha1": "4bd9aa4867ebbcd1bfa3e20da21fd21f31a59a28",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "apps/desktop/src/main/local-setup.ts",
+      "bytes": 2843,
+      "sha256": "a368c563deb313ed556024fc152a3940ff68c58ac1b2f40feb8d29f767fc59a8",
+      "gitBlobSha1": "0da85bb69edd8d4bd10c994d50069d7db80b72b9",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "apps/desktop/src/main/ssh-install.ts",
+      "bytes": 18756,
+      "sha256": "2180a5f03d0ddc692e206f126d07f14715d1b4e48025347d48a9d755c96222f5",
+      "gitBlobSha1": "678df02e8bbf82ad49e894de20edc750b36cafcc",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/factory/dispatch-recovery.ts",
+      "bytes": 11963,
+      "sha256": "b8cf436b0707dc54ba9b33d41f4a07e207871a93aceeac9517b014139cc7c915",
+      "gitBlobSha1": "b5825251d9c889fbc6db0686903f4f16e1a55a35",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/factory/dispatch-recovery-server.ts",
+      "bytes": 201,
+      "sha256": "93c09e5276d6050dee86c1ad13b676783fb5ba8f6913661c78b9518f43c0f8a6",
+      "gitBlobSha1": "f15a0904c14cb10821487aa44ae8cd180f396e82",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/heartbeat/route.ts",
+      "bytes": 9566,
+      "sha256": "b32fa96dd7fa77afca9900389f1a11266293eccfd7ce8b89e02d734a0de1395c",
+      "gitBlobSha1": "7f2aec2241f2842e12ce7be6bfee68f13d2db9b3",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/db/device-scope.ts",
+      "bytes": 14907,
+      "sha256": "2083d7616e9a18421dcb8d55c309dba8a2761bf140faeba106a5b24393748b98",
+      "gitBlobSha1": "80ce39633e6482f3e28654b917c57d1cca9f1e35",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/db/request-scope.ts",
+      "bytes": 4779,
+      "sha256": "67bbb85d950948802449a1d0c2638e62bd4d1731ffe883837bc53059ac50b6f0",
+      "gitBlobSha1": "b3445c20e6be5061bcbfe0fe56903b8dd767dfd3",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/db/commit-effects.ts",
+      "bytes": 6982,
+      "sha256": "83e00e079304c5cce58d142e6af39763c0c331944d84bf5b1fc30b3f88f8bc9a",
+      "gitBlobSha1": "5f55d0c87e886422398b6767d62cd5a4cea718a6",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/coordinator/wake-after-commit.ts",
+      "bytes": 2290,
+      "sha256": "f5313189e9b675b829f3d0f61ed5dcdb3d483e06acea8f5fff2557666b0654f8",
+      "gitBlobSha1": "32049055d34d149dabf7a4e8179998ffbd88f924",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "packages/protocol/src/device.ts",
+      "bytes": 36003,
+      "sha256": "bead7208b80c039a4b3b228a0584a37790b6620efb783ace6eee6d21061c4d8c",
+      "gitBlobSha1": "15adb85a11653e8380927843120abbf685c4bce6",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "apps/desktop/test/db-query-diagnostics.cjs",
+      "bytes": 18406,
+      "sha256": "763d180bfc0d0a62e67a99624a4815eeca953bbcb7290193a5515bb67e24ccad",
+      "gitBlobSha1": "93fc0510b98e9a3812e6b4452a929ac5900fe458",
+      "equalsSourceTree": true
+    }
+  ],
+  "acceptance": {
+    "nativeLogin": 473,
+    "webLogin": 402,
+    "nativeBudgetStatus": "RED",
+    "policySavingsAreSourceInferredOnly": true,
+    "productionPassed": false,
+    "backgroundSubtracted": false,
+    "queryWindowsOrCheckpointsChanged": false
+  },
+  "readOnlyScope": [
+    "after:factory-dispatch-recovery",
+    "/api/devices/enrollment"
+  ],
+  "selected": {
+    "nativeLogin": {
+      "after:factory-dispatch-recovery": {
+        "total": 12,
+        "knownContexts": 0,
+        "unknownContexts": 12,
+        "records": [
+          {
+            "ordinal": 26759,
+            "contextStatus": "unknown",
+            "statement": {
+              "status": "unknown"
+            }
+          },
+          {
+            "ordinal": 26761,
+            "contextStatus": "unknown",
+            "statement": {
+              "status": "known",
+              "normalizedStructureId": "d43f1541a045",
+              "command": "SELECT",
+              "parameterCount": 2
+            }
+          },
+          {
+            "ordinal": 26762,
+            "contextStatus": "unknown",
+            "statement": {
+              "status": "known",
+              "normalizedStructureId": "a8402858d4f1",
+              "command": "BEGIN",
+              "parameterCount": 0
+            }
+          },
+          {
+            "ordinal": 26764,
+            "contextStatus": "unknown",
+            "statement": {
+              "status": "known",
+              "normalizedStructureId": "87a68411468b",
+              "command": "SELECT",
+              "parameterCount": 2
+            }
+          },
+          {
+            "ordinal": 26765,
+            "contextStatus": "unknown",
+            "statement": {
+              "status": "unknown"
+            }
+          },
+          {
+            "ordinal": 26767,
+            "contextStatus": "unknown",
+            "statement": {
+              "status": "known",
+              "normalizedStructureId": "79663c1d3b43",
+              "command": "COMMIT",
+              "parameterCount": 0
+            }
+          },
+          {
+            "ordinal": 26788,
+            "contextStatus": "unknown",
+            "statement": {
+              "status": "unknown"
+            }
+          },
+          {
+            "ordinal": 26789,
+            "contextStatus": "unknown",
+            "statement": {
+              "status": "known",
+              "normalizedStructureId": "d43f1541a045",
+              "command": "SELECT",
+              "parameterCount": 2
+            }
+          },
+          {
+            "ordinal": 26790,
+            "contextStatus": "unknown",
+            "statement": {
+              "status": "known",
+              "normalizedStructureId": "a8402858d4f1",
+              "command": "BEGIN",
+              "parameterCount": 0
+            }
+          },
+          {
+            "ordinal": 26792,
+            "contextStatus": "unknown",
+            "statement": {
+              "status": "known",
+              "normalizedStructureId": "87a68411468b",
+              "command": "SELECT",
+              "parameterCount": 2
+            }
+          },
+          {
+            "ordinal": 26793,
+            "contextStatus": "unknown",
+            "statement": {
+              "status": "unknown"
+            }
+          },
+          {
+            "ordinal": 26794,
+            "contextStatus": "unknown",
+            "statement": {
+              "status": "known",
+              "normalizedStructureId": "79663c1d3b43",
+              "command": "COMMIT",
+              "parameterCount": 0
+            }
+          }
+        ]
+      },
+      "/api/devices/enrollment": {
+        "total": 7,
+        "knownContexts": 0,
+        "unknownContexts": 7,
+        "records": [
+          {
+            "ordinal": 26367,
+            "contextStatus": "unknown",
+            "statement": {
+              "status": "known",
+              "normalizedStructureId": "8fa591ff58d0",
+              "command": "SELECT",
+              "parameterCount": 1
+            }
+          },
+          {
+            "ordinal": 26368,
+            "contextStatus": "unknown",
+            "statement": {
+              "status": "known",
+              "normalizedStructureId": "1b6dae6d78fb",
+              "command": "SELECT",
+              "parameterCount": 1
+            }
+          },
+          {
+            "ordinal": 26546,
+            "contextStatus": "unknown",
+            "statement": {
+              "status": "known",
+              "normalizedStructureId": "8fa591ff58d0",
+              "command": "SELECT",
+              "parameterCount": 1
+            }
+          },
+          {
+            "ordinal": 26547,
+            "contextStatus": "unknown",
+            "statement": {
+              "status": "known",
+              "normalizedStructureId": "1b6dae6d78fb",
+              "command": "SELECT",
+              "parameterCount": 1
+            }
+          },
+          {
+            "ordinal": 26548,
+            "contextStatus": "unknown",
+            "statement": {
+              "status": "unknown"
+            }
+          },
+          {
+            "ordinal": 26549,
+            "contextStatus": "unknown",
+            "statement": {
+              "status": "known",
+              "normalizedStructureId": "8fa591ff58d0",
+              "command": "SELECT",
+              "parameterCount": 1
+            }
+          },
+          {
+            "ordinal": 26550,
+            "contextStatus": "unknown",
+            "statement": {
+              "status": "known",
+              "normalizedStructureId": "1b6dae6d78fb",
+              "command": "SELECT",
+              "parameterCount": 1
+            }
+          }
+        ]
+      }
+    },
+    "webLogin": {
+      "after:factory-dispatch-recovery": {
+        "total": 0,
+        "knownContexts": 0,
+        "unknownContexts": 0,
+        "records": []
+      },
+      "/api/devices/enrollment": {
+        "total": 0,
+        "knownContexts": 0,
+        "unknownContexts": 0,
+        "records": []
+      }
+    }
+  },
+  "exactSourceStructureBindings": [
+    {
+      "source": "lib/db/device-scope.ts",
+      "line": 96,
+      "function": "acquireFence",
+      "statement": {
+        "status": "known",
+        "normalizedStructureId": "d43f1541a045",
+        "command": "SELECT",
+        "parameterCount": 2
+      }
+    },
+    {
+      "source": "lib/db/device-scope.ts",
+      "line": 139,
+      "function": "lockAuthority",
+      "statement": {
+        "status": "known",
+        "normalizedStructureId": "d43f1541a045",
+        "command": "SELECT",
+        "parameterCount": 2
+      }
+    },
+    {
+      "source": "lib/factory/dispatch-recovery.ts",
+      "line": 143,
+      "function": "deviceOnline",
+      "statement": {
+        "status": "known",
+        "normalizedStructureId": "87a68411468b",
+        "command": "SELECT",
+        "parameterCount": 2
+      }
+    }
+  ],
+  "authStructureBindings": [
+    {
+      "table": "session",
+      "qualifiedWhereColumn": "token",
+      "statement": {
+        "status": "known",
+        "normalizedStructureId": "8fa591ff58d0",
+        "command": "SELECT",
+        "parameterCount": 1
+      },
+      "method": "Reconstructed compiler structure from the actual installed Kysely adapter findOne and convertWhereClause; no SQL is executed, no parameter value retained."
+    },
+    {
+      "table": "user",
+      "qualifiedWhereColumn": "id",
+      "statement": {
+        "status": "known",
+        "normalizedStructureId": "1b6dae6d78fb",
+        "command": "SELECT",
+        "parameterCount": 1
+      },
+      "method": "Reconstructed compiler structure from the actual installed Kysely adapter findOne and convertWhereClause; no SQL is executed, no parameter value retained."
+    }
+  ],
+  "authDependency": {
+    "version": "1.7.12",
+    "adapter": {
+      "path": "installed @better-auth/kysely-adapter/dist/index.mjs",
+      "bytes": 31637,
+      "sha256": "b5f033d42be5c229089639a83a25d2bf42d26273a3181abba0f558205e797dfa",
+      "gitBlobSha1": "c3c5300ba2b1a8a79d8b3ad90711348f9e232459"
+    },
+    "betterAuthInternalAdapter": {
+      "path": "installed better-auth/dist/db/internal-adapter.mjs",
+      "bytes": 35836,
+      "sha256": "f9c5e9c8faa058a19ec73690b6faa5331e49ca8f9057cdb16307b064a017b1b6",
+      "gitBlobSha1": "dd52273a772e738ae7ff4625d7ed77ae3cb50cf5"
+    }
+  },
+  "recovery": {
+    "nativeQueryCount": 12,
+    "webQueryCount": 0,
+    "ordinalGroupsSourceCompatible": [
+      [
+        26759,
+        26761,
+        26762,
+        26764,
+        26765,
+        26767
+      ],
+      [
+        26788,
+        26789,
+        26790,
+        26792,
+        26793,
+        26794
+      ]
+    ],
+    "sourceSequence": [
+      "Heartbeat schedules the existing afterJob once per eligible factory-enabled beat. No scheduling change is proposed.",
+      "deviceOnline obtains the existing guarded pool connection. The unit fence may acquire its BEGIN/SET plus a live credential FOR SHARE before the application transaction.",
+      "The application runs BEGIN, reads the exact owner/device, checks enabled/online with the current protocol rule, scans current queued Factory attempts under FOR UPDATE OF r SKIP LOCKED, inserts deduplicated events for returned runs, and COMMITs.",
+      "Only actual insertEvent rowCount=1 schedules wakeCoordinatorAfterCommit; failures ROLLBACK and always release the client."
+    ],
+    "unknownStatements": "The first and fifth statement of each observed six-query group are unknown. Source is consistent with the fence BEGIN/SET batch and queued run SELECT containing SQL literals, respectively; unknown diagnostics cannot prove their raw statement identity.",
+    "eventInsertBinding": {
+      "source": "lib/factory/dispatch-recovery.ts",
+      "line": 80,
+      "function": "insertEvent",
+      "statement": {
+        "status": "known",
+        "normalizedStructureId": "7c1326d6e651",
+        "command": "INSERT",
+        "parameterCount": 8
+      }
+    },
+    "eventInsertObservedWithinSelectedScope": 0,
+    "inference": "Two BEGIN/COMMIT cycles with two device reads and no matching insertEvent structure are consistent with empty recovery. Contexts are unknown and no rows/parameters are retained, so neither exact invocation pairing nor same-credential/device duplication is proven.",
+    "preservedSemantics": [
+      "fresh credential revocation/expiry fence",
+      "owner/device check",
+      "enabled and nonfuture lastSeenAt within DEVICE_ONLINE_WINDOW_MS",
+      "current task attempt and owner joins",
+      "queued run and noncancelled/nonrevoked task checks",
+      "wasUnavailable or a recorded run_dispatch_failed event",
+      "FOR UPDATE OF r SKIP LOCKED",
+      "dedupeKey uniqueness and rowCount-based winner",
+      "after-commit coordinator wake only on actual insert",
+      "rollback/release behavior"
+    ],
+    "rejectedOptimization": {
+      "proposal": "Add a read-only no-candidate precheck before the current recovery transaction.",
+      "reason": "Even if it reduces empty-path SQL, every positive candidate adds a SQL call that did not previously exist. This violates the issue all-branches no-increase requirement. Not implemented or tested."
+    },
+    "atomicFusionStatus": "No all-branches query-nonincreasing, semantics-preserving smaller fusion was established by this read-only inspection. Combining clock/ownership, row locks, deduplicated writes and commit effects needs a concrete proof; no source edit is authorized here."
+  },
+  "enrollment": {
+    "nativeQueryCount": 7,
+    "webQueryCount": 0,
+    "knownSessionReads": 3,
+    "knownUserReads": 3,
+    "unknownStatements": 1,
+    "sourceCallChain": [
+      "Main bridge setup admission uses readLocalDeviceOwner -> GET ?view=owner -> Better Auth with disableCookieCache:true.",
+      "Installer waitOnline verifies the returned daemon against readLocalDeviceAccount -> GET full view -> current owner plus active local device IDs; a changed account refuses.",
+      "Automatic setup resolves the current owner before its same-owner no-op branch, so a later context still performs a fresh account check.",
+      "Only mintEnrollment -> POST can call mintDeviceEnrollment. POST retains origin and fresh session guards. GET is read-only."
+    ],
+    "missingEvidence": "All seven query contexts are unknown. The sole unknown statement is compatible with full GET device ownership SQL or POST enrollment INSERT, both contain SQL literals rejected by the diagnostic shape subset. No method/request/correlation or parameter/row values exist in the original to distinguish them.",
+    "noDuplicateMintClaim": true,
+    "noQueryRemovalOrCacheProposal": true,
+    "preservedSemantics": [
+      "fresh session on each account admission",
+      "sign-out and A/B/A account changes",
+      "main-owned account identity",
+      "exact daemon owner/device verification",
+      "origin and session checks on grant mint",
+      "single-use/expiry/credential issuance in the separate consume endpoint (owned by another review scope)"
+    ]
+  },
+  "outcome": "NO_ACTION for recovery/enrollment. Keep all 19 measured queries in the original budget. Policy v2 is a separately frozen candidate; it does not make Native473/Web402 pass.",
+  "execution": {
+    "networkCalls": 0,
+    "models": 0,
+    "vms": 0,
+    "ciRuns": 0,
+    "additionalTestsRunForThisInspection": 0,
+    "sourceEditsForThisInspection": 0,
+    "privateParametersOrIdentifiersExported": false,
+    "unknownSqlLiteralsExported": false
+  }
+}

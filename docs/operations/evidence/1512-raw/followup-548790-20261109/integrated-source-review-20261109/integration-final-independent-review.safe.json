@@ -1,0 +1,247 @@
+{
+  "schemaVersion": 1,
+  "reviewedAtUTC": "2026-11-09T03:23:10.184030+00:00",
+  "status": "no_blocking_findings_in_final_requested_scope",
+  "finalAuthorTree": "fb8bad033883b43bafd1c875a9f168ee58d48ebe",
+  "treeSource": "Author final-five-files receipt and fixed message; all six reviewed worktree blobs independently match stage-0 index.",
+  "scope": "Final three test files, two canonical generated files, and the already reviewed four documentation hunks. Static source/diff/hash review only.",
+  "files": [
+    {
+      "path": "lib/personal-policy.test.ts",
+      "bytes": 14410,
+      "sha256": "b7059da0fe12fde89aaf1753e3029ee21868d5e5895e5651ecd6f495786103fe",
+      "gitBlobSha": "fef80337b9b5244d2e8565236c6dd96f7d329acd"
+    },
+    {
+      "path": "lib/tracing/logs.test.ts",
+      "bytes": 11375,
+      "sha256": "5f1fbf880f6eff2e9a1282b8f80b78235c4650d28dd367373e96a266a5dabc17",
+      "gitBlobSha": "737fa373e4a8333a4a703bf6133f9a533d585460"
+    },
+    {
+      "path": "lib/coordinator/repository-resolution.test.ts",
+      "bytes": 22313,
+      "sha256": "8c9cf8f665aad36d864d72b712a43e2b197b2477900b2739cd52118695bd85c2",
+      "gitBlobSha": "a5157f09e8022bf9077053686d36aa02760a4e94"
+    },
+    {
+      "path": "apps/api/generated/routes.json",
+      "bytes": 75102,
+      "sha256": "a15a7aec0a38ee092f4b2e1a2ea4209ef08b776eb74db7bd59d697dd47370979",
+      "gitBlobSha": "17c08e555f327646bfa01df49ab6406053dfe538"
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "bytes": 77403,
+      "sha256": "daa44b2e1ead0540f14d806995bc3fcdeecc374ff042fc443cabce714134a7e4",
+      "gitBlobSha": "08aaff7b3c936a3a0ede346ab51a15ebf2fd785d"
+    },
+    {
+      "path": "docs/operations/tracing.md",
+      "bytes": 65784,
+      "sha256": "817d0020dbf8f961b338c276e0a0b10da523febe47b4c813dd665be4303738b4",
+      "gitBlobSha": "35694355877eea55393ba9299f7796c2c171ccb7"
+    }
+  ],
+  "indexBlobs": {
+    "apps/api/generated/routes.json": {
+      "mode": "100644",
+      "blob": "17c08e555f327646bfa01df49ab6406053dfe538"
+    },
+    "apps/api/generated/routes.ts": {
+      "mode": "100644",
+      "blob": "08aaff7b3c936a3a0ede346ab51a15ebf2fd785d"
+    },
+    "docs/operations/tracing.md": {
+      "mode": "100644",
+      "blob": "35694355877eea55393ba9299f7796c2c171ccb7"
+    },
+    "lib/coordinator/repository-resolution.test.ts": {
+      "mode": "100644",
+      "blob": "a5157f09e8022bf9077053686d36aa02760a4e94"
+    },
+    "lib/personal-policy.test.ts": {
+      "mode": "100644",
+      "blob": "fef80337b9b5244d2e8565236c6dd96f7d329acd"
+    },
+    "lib/tracing/logs.test.ts": {
+      "mode": "100644",
+      "blob": "737fa373e4a8333a4a703bf6133f9a533d585460"
+    }
+  },
+  "testReview": {
+    "policy": "Exact explicit boolean|undefined fixture-state annotation; all runtime statements and assertions preserved.",
+    "logs": "Exact Promise.all(Set) cleanup and assert.ok(typeof span.name===string) narrowing previously reviewed; 5 spans/2 dispatch/unique IDs and pending/reject/throw behavior assertions preserved. Final change additionally removes exactly one trailing LF.",
+    "repositoryResolution": "Exactly one trailing LF removed from the previously frozen returned-refusal test; no statement/assertion changed.",
+    "typeOrLintSuppressionsAdded": 0,
+    "assertionsRemoved": 0,
+    "eofOnlyByteComparisonsPassed": true
+  },
+  "generatedReview": {
+    "generator": {
+      "path": "apps/api/scripts/generate-routes.mjs",
+      "bytes": 6166,
+      "sha256": "db8865da2530e549b83f369f2de609da9ae73a9b262b387bf3c33046c0df7433",
+      "gitBlobSha": "2431a145d316e10fcdb74a6040efcdea2b6a9f00"
+    },
+    "algorithm": "inspectRoute reads UTF-8 source and createHash(sha256).update(source).digest(hex); both inventories serialize the same route records.",
+    "reviewerExecutedGenerator": false,
+    "matchesPreservedCanonicalCommandOutput": true,
+    "routesBeforeAfter": [
+      240,
+      240
+    ],
+    "methodsBeforeAfter": [
+      312,
+      312
+    ],
+    "changedRoutes": [
+      {
+        "route": "/mikka/api/devices/enrollment",
+        "source": "app/api/devices/enrollment/route.ts",
+        "beforeGeneratedSourceHash": "38fe0c41d60482f1314b414e1f3177add2f667ffa8ad3546794d15f5e9fce6aa",
+        "afterGeneratedSourceHash": "08c91a56354263fcce77afc73ec9b44b2889ea07f0ae56007e07879fa07d36a4",
+        "actualSourceSha256": "08c91a56354263fcce77afc73ec9b44b2889ea07f0ae56007e07879fa07d36a4",
+        "baselineM1SourceSha256": "08c91a56354263fcce77afc73ec9b44b2889ea07f0ae56007e07879fa07d36a4",
+        "sourceChangedFromM1": false
+      },
+      {
+        "route": "/mikka/api/mobile/model",
+        "source": "app/api/mobile/model/route.ts",
+        "beforeGeneratedSourceHash": "9deeaa949f66beb9006576b3ebb0a29c81aabbdd4831f62ab8be63be59d7aa09",
+        "afterGeneratedSourceHash": "40afa67a3d516a46b49ec19fe2f1a844f2be44398532387802ff262d34de6f17",
+        "actualSourceSha256": "40afa67a3d516a46b49ec19fe2f1a844f2be44398532387802ff262d34de6f17",
+        "baselineM1SourceSha256": "40afa67a3d516a46b49ec19fe2f1a844f2be44398532387802ff262d34de6f17",
+        "sourceChangedFromM1": false
+      },
+      {
+        "route": "/mikka/v1/devices/[deviceId]/repos",
+        "source": "app/v1/devices/[deviceId]/repos/route.ts",
+        "beforeGeneratedSourceHash": "7a7d4b6f53cf5c58cb710f3beb01af9ce6fb2ce09da6e227a07a8ac2cc1bcdd9",
+        "afterGeneratedSourceHash": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888",
+        "actualSourceSha256": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888",
+        "baselineM1SourceSha256": "7a7d4b6f53cf5c58cb710f3beb01af9ce6fb2ce09da6e227a07a8ac2cc1bcdd9",
+        "sourceChangedFromM1": true
+      },
+      {
+        "route": "/mikka/v1/devices/[deviceId]/runs",
+        "source": "app/v1/devices/[deviceId]/runs/route.ts",
+        "beforeGeneratedSourceHash": "329cd0aea78b05551fbe72b2d8562ce0fa9c67d3cee4318f324f1d3238d72e54",
+        "afterGeneratedSourceHash": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c",
+        "actualSourceSha256": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c",
+        "baselineM1SourceSha256": "329cd0aea78b05551fbe72b2d8562ce0fa9c67d3cee4318f324f1d3238d72e54",
+        "sourceChangedFromM1": true
+      }
+    ],
+    "changedSourceHashValuesPerFile": 4,
+    "totalChangedSourceHashLines": 8,
+    "allOtherJsonFieldsAndOrderUnchanged": true,
+    "allOtherTsBytesIncludingImportsAndLoadersUnchanged": true,
+    "tsAndJsonRouteRecordsIdentical": true,
+    "historicalDrift": "Enrollment and mobile/model route source already had the new digest in M1; only their generated hashes were stale. Repos/runs source is the actual C overlay.",
+    "freshMainBoundary": "Root separately verified fresh main 0a355 route/generator non-overlap. This reviewer made no network read and does not independently certify that remote comparison."
+  },
+  "documentationReview": {
+    "hunks": 4,
+    "result": "Previously reviewed source contracts remain accurate; documentation bytes/hash unchanged. Active policy scope, device authority snapshots, owned refusal ERROR, and waitUntil queued/inflight+Logs flush match actual implementation. No production pass or Native query saving is asserted by these paragraphs.",
+    "priorReview": {
+      "path": "integration-test-docs-independent-review.safe.json",
+      "bytes": 16727,
+      "sha256": "283bd9a17fa53b9951ed3c0365b15ab6cf48fb9eba8adce32f052f08a1ca5baf",
+      "gitBlobSha": "2b3df869f9b3cfe70cbc0eceeda108c609d199a0"
+    }
+  },
+  "frozenOtherOverlayPaths": {
+    "count": 20,
+    "allOriginalBytesAndModesUnchanged": true,
+    "paths": [
+      "lib/tracing/node.ts",
+      "lib/dispatch-timing.ts",
+      "lib/coordinator/repository-resolution.ts",
+      "workflows/coordinator/steps.ts",
+      "workflows/coordinator/factory-steps.ts",
+      "tests/cloud-dispatch-startup.test.ts",
+      "lib/desktop-rpc/read-batch-context.ts",
+      "lib/personal-policy.ts",
+      "scripts/e2b/validate-template-subscriptions.mjs",
+      "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "lib/device-enrollment.ts",
+      "lib/device-management.ts",
+      "lib/device-enrollment.db.test.ts",
+      "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+      "docs/operations/tracing.md",
+      "app/v1/devices/[deviceId]/runs/route.ts",
+      "app/v1/devices/[deviceId]/repos/route.ts",
+      "lib/device-heartbeat.db.test.ts",
+      "lib/device-unit-fence.db.test.ts"
+    ]
+  },
+  "evidence": [
+    {
+      "path": "final-five-files.safe.json",
+      "bytes": 1249,
+      "sha256": "745714642cd2b2e6f3f5c6eb2a6db896ef8071a8e1c208635b2726f7bed3a885",
+      "gitBlobSha": "17772189c4722e7c1afa2ede1197aa3d59dfb45c"
+    },
+    {
+      "path": "eof-only.safe.json",
+      "bytes": 1465,
+      "sha256": "4e42ac08a89b33ff2c493a8f99c6091319d55033a377b4deea5e0ae401ec8119",
+      "gitBlobSha": "7616f61c7c6e31e91532af55e0e39fc462790688"
+    },
+    {
+      "path": "generated-command-side-effect.safe.json",
+      "bytes": 1132,
+      "sha256": "aa76a9c98d8ae3f0d93449d00e6fb993f7cdcd7a59b228965a924e2d261cbac9",
+      "gitBlobSha": "8369d444ceaf44903eca8047bdef839047747f44"
+    },
+    {
+      "path": "generated-route-check.safe.json",
+      "bytes": 994,
+      "sha256": "0279c1a0eb8589a0f9a1556937cf1b86f42007388be9d40662997a702be7231f",
+      "gitBlobSha": "c903c4b5e25159ed5ef36f6a9354907246df59d4"
+    }
+  ],
+  "patches": [
+    {
+      "path": "reviewed-test-fixture-fix.patch",
+      "bytes": 2525,
+      "sha256": "19cc61de58ddfac20aeeed93430b6d0575be50aaacf04b446d49ccafd3923085",
+      "gitBlobSha": "d1e828dfc8ce32aa846afeac89719e662d7e1fc8"
+    },
+    {
+      "path": "reviewed-eof-only.patch",
+      "bytes": 807,
+      "sha256": "df643084cd3730d21477714c6b36ef4fb91df04c093cfd980d36ed081d13b7c2",
+      "gitBlobSha": "498ad5530208a09825a248b0b48f6a44d4eaf89f"
+    },
+    {
+      "path": "reviewed-generated-routes.patch",
+      "bytes": 10086,
+      "sha256": "f27b785b9140c7aa4ac54b82808922bcab0f2edf9a33ec994bf26ed0773aeba5",
+      "gitBlobSha": "27e124ba471c8258328d47044d0c56e61bd48f79"
+    },
+    {
+      "path": "reviewed-tracing-docs.patch",
+      "bytes": 4572,
+      "sha256": "436b4623a50451316af6005006b0835a246498d001a9b9d9c6eabd65be48f4aa",
+      "gitBlobSha": "38b28083356ddd4800378439113dbfdf0948bbfe"
+    }
+  ],
+  "reviewerActions": {
+    "tests": 0,
+    "typecheck": 0,
+    "lint": 0,
+    "generatorRuns": 0,
+    "networkCalls": 0,
+    "posthogCalls": 0,
+    "sourceEdits": 0,
+    "indexEdits": 0,
+    "resourcesStarted": 0
+  },
+  "limitations": [
+    "This static approval does not replace the author/CI canonical validation or actual Native/production evidence.",
+    "Test/docs and generated patches have distinct baselines, named in the earlier review and author receipts; do not blindly apply them as one baseline patch."
+  ]
+}

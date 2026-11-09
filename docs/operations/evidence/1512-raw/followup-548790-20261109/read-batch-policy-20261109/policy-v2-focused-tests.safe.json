@@ -1,0 +1,25 @@
+{
+  "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test --test-reporter=tap lib/personal-policy.test.ts lib/desktop-rpc/read-batch.test.ts lib/desktop-rpc/read-batch-context.test.ts",
+  "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-read-batch-policy-copy",
+  "exitCode": 0,
+  "toolChunk": "b7b239",
+  "counts": {
+    "tests": 38,
+    "pass": 38,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0
+  },
+  "log": {
+    "path": "policy-v2-focused-tests.log",
+    "bytes": 9425,
+    "sha256": "59bd956584a298dc6ee58a7a86c3b2b7831ee4130e563b01f6d0f3452a63bfa5",
+    "gitBlobSha1": "5f00da2cc3d33c69625f4e554f12ea1ba1f08267"
+  },
+  "sourceManifest": {
+    "path": "final-source-manifest-v2.safe.json",
+    "bytes": 4062,
+    "sha256": "34b59d740801b5a98ae2a8c23b9d2a57ef28cea5073e8a35522fc5ac91cd9b76",
+    "gitBlobSha1": "85fde868221f08b460234aea89e7fd2b29198cae"
+  }
+}

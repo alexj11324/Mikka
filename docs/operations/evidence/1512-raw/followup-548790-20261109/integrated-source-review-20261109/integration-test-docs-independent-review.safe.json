@@ -1,0 +1,387 @@
+{
+  "schemaVersion": 1,
+  "reviewedAtUTC": "2026-11-09T03:20:32.231451+00:00",
+  "status": "no_blocking_findings_in_reviewed_scope",
+  "scope": "Independent read-only review of the two frozen fixture type/lint deltas and four tracing documentation hunks. Not a fresh-main integration, runtime test, production acceptance or merge approval.",
+  "checkout": "/workspace/scratch/812e3b7d6d45/issue1512-integration-checkout",
+  "baselineUpstreamMain": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "baselineTree": "8c5c12ea993533403d13e21dc75647bb28022767",
+  "fixtureBeforeTree": "3c485bb71045af3616f16de6d40824850c32c84c",
+  "fixtureAfterTree": "5ffff474defa47634334484fe18916130e3f72d8",
+  "reviewedFiles": [
+    {
+      "path": "lib/personal-policy.test.ts",
+      "bytes": 14410,
+      "sha256": "b7059da0fe12fde89aaf1753e3029ee21868d5e5895e5651ecd6f495786103fe",
+      "gitBlobSha": "fef80337b9b5244d2e8565236c6dd96f7d329acd"
+    },
+    {
+      "path": "lib/tracing/logs.test.ts",
+      "bytes": 11376,
+      "sha256": "d84f79591aa47966bd57fb570c8362608fb22778d8db1e1af7340bf49724e2f8",
+      "gitBlobSha": "8ca4cd89bd42d03c7a14f0007ef52728e47412d6"
+    },
+    {
+      "path": "docs/operations/tracing.md",
+      "bytes": 65784,
+      "sha256": "817d0020dbf8f961b338c276e0a0b10da523febe47b4c813dd665be4303738b4",
+      "gitBlobSha": "35694355877eea55393ba9299f7796c2c171ccb7"
+    }
+  ],
+  "patches": [
+    {
+      "baseline": "previous integrated fixture bytes, tree 3c485bb71045af3616f16de6d40824850c32c84c",
+      "path": "reviewed-test-fixture-fix.patch",
+      "bytes": 2525,
+      "sha256": "19cc61de58ddfac20aeeed93430b6d0575be50aaacf04b446d49ccafd3923085",
+      "gitBlobSha": "d1e828dfc8ce32aa846afeac89719e662d7e1fc8"
+    },
+    {
+      "baseline": "M1 tree 8c5c12ea993533403d13e21dc75647bb28022767 (documentation only)",
+      "path": "reviewed-tracing-docs.patch",
+      "bytes": 4572,
+      "sha256": "436b4623a50451316af6005006b0835a246498d001a9b9d9c6eabd65be48f4aa",
+      "gitBlobSha": "38b28083356ddd4800378439113dbfdf0948bbfe"
+    }
+  ],
+  "fixtureFindings": [
+    {
+      "path": "lib/personal-policy.test.ts",
+      "conclusion": "Explicit mutable fixture state type permits the existing missing-policy undefined assignment. Error remains Error|null; shared-key/owner fields retain their intended types. Runtime values, consumers and all assertions are byte-identical outside this declaration.",
+      "exactMechanicalDeltaVerified": true
+    },
+    {
+      "path": "lib/tracing/logs.test.ts",
+      "conclusion": "Promise.all receives the same Set iterable directly; no wait is removed. A runtime typeof string assertion narrows decoded span.name before startsWith. Exact five-span, two-dispatch, one-generation, five-unique-ID, HTTP-response-before-flush, in-flight lifetime and reject/throw checks are retained.",
+      "exactMechanicalDeltaVerified": true,
+      "newRuntimeAssertions": 1,
+      "assertionsRemoved": 0,
+      "typeOrLintSuppressionsAdded": 0
+    }
+  ],
+  "documentationFindings": [
+    {
+      "topic": "Active read-batch policy observation",
+      "conclusion": "Matches active scope, actual COMMIT_EXECUTOR/database identity, exact workspace, and finally clear. Existing consumers retain separate key/share/authority reads. after/cron/workflow currentRoute labels bypass memo even while active.",
+      "sources": [
+        "lib/desktop-rpc/read-batch-context.ts",
+        "lib/personal-policy.ts",
+        "lib/background.ts",
+        "lib/tracing/jobs.ts",
+        "lib/tracing/labels.ts"
+      ],
+      "limit": "The implementation uses the innermost route label, not a separate immutable execution-kind marker; current reviewed paths preserve it, as covered by the earlier v2 review. No new universal guarantee about arbitrary future relabeling is claimed."
+    },
+    {
+      "topic": "Device snapshots/enrollment/pending commands",
+      "conclusion": "Runs/repos use existing readUnderDeviceAuthority so credential liveness and owner/device/list checks share one statement snapshot; prior authentication remains. Nonempty repo settings stay separate. Enrollment DELETE CTE and INSERT are atomic; only no-receipt pending-command branch combines state and queue. Existing acknowledgement/revocation transaction body remains. Documentation does not claim the entire HTTP request uses one SQL or that Native comparison passed.",
+      "sources": [
+        "lib/db/request-scope.ts",
+        "lib/db/device-scope.ts",
+        "app/v1/devices/[deviceId]/runs/route.ts",
+        "app/v1/devices/[deviceId]/repos/route.ts",
+        "lib/device-enrollment.ts",
+        "lib/device-management.ts"
+      ]
+    },
+    {
+      "topic": "Returned coded refusal spans",
+      "conclusion": "Both asToolResult wrappers own coordinator.tool before the original catch/return mapping. withRunSpan marks/rethrows the actual error, retaining child ERROR independently of SDK parent OK. Seven explicit repository refusal codes mark owned phase and dispatch and set failed=true without generic output inspection.",
+      "sources": [
+        "workflows/coordinator/steps.ts",
+        "workflows/coordinator/factory-steps.ts",
+        "lib/tracing/context.ts",
+        "lib/coordinator/repository-resolution.ts",
+        "lib/dispatch-timing.ts"
+      ],
+      "limit": "A direct withResolvedRepository call still owns its phase even outside withDispatchTiming; no enclosing dispatch is invented."
+    },
+    {
+      "topic": "Serverless flush lifetime",
+      "conclusion": "batcher.forceFlush().finally(exporter.forceFlush) joins queued and already-started transport within the waitUntil lifetime; flushTelemetry runs concurrently through allSettled. Existing catch boundaries contain rejected/synchronous exporter failure and do not await telemetry on the business response path.",
+      "sources": [
+        "lib/tracing/node.ts",
+        "lib/tracing/flush.ts",
+        "lib/tracing/logs.test.ts"
+      ],
+      "limit": "Source/fixture contract, not proof that every historical production omission had this unique cause or that final production is complete."
+    }
+  ],
+  "otherOverlayPaths": {
+    "count": 21,
+    "allBytesAndModesMatchFrozenOriginalOverlay": true,
+    "files": [
+      {
+        "path": "lib/tracing/node.ts",
+        "bytes": 7287,
+        "sha256": "e1ccb4a2aaba54d8e3be4d27d9ff18b31dd9fc683f72117f6dd0ea730099f4d0",
+        "gitBlobSha": "00775a5928228262a66b12b845ee0dc18f6c6047",
+        "mode": "100644"
+      },
+      {
+        "path": "lib/dispatch-timing.ts",
+        "bytes": 4016,
+        "sha256": "9c8282c0d2b0a0b9ea8bf904eaade82ce5337c3e0abf1706ece87d485457a700",
+        "gitBlobSha": "f82563e766f5c0477479b2d487e0f92e60a08b75",
+        "mode": "100644"
+      },
+      {
+        "path": "lib/coordinator/repository-resolution.ts",
+        "bytes": 11263,
+        "sha256": "0f2974a3c864dd9384122f811dcbec56188c28d3a19566a3b8e1db72264902d6",
+        "gitBlobSha": "6826efdd6895fa3f584e35ff2f1edb527cd080fa",
+        "mode": "100644"
+      },
+      {
+        "path": "workflows/coordinator/steps.ts",
+        "bytes": 91110,
+        "sha256": "dff7bb2a993b9510cc70ecde1c5b2bc03e6a8fb5ffa1c68919ce49e19d1a57ad",
+        "gitBlobSha": "3f480288b10905be0877ad3d192d6483d1c7d096",
+        "mode": "100644"
+      },
+      {
+        "path": "workflows/coordinator/factory-steps.ts",
+        "bytes": 11913,
+        "sha256": "a60e07f292989ebab18e2cdb6bfc74e46fd9e12f6c694c1cbb2f62047189b9f6",
+        "gitBlobSha": "0e2ecce921c4b56795ad1096f2b1eae987299e95",
+        "mode": "100644"
+      },
+      {
+        "path": "lib/coordinator/repository-resolution.test.ts",
+        "bytes": 22314,
+        "sha256": "9a0bedfd3aac7948c84a09dd48d09cc25041092c9f2481799cff5446603acc9c",
+        "gitBlobSha": "32e27a1aa7c6a0359ad4cc4a75c3162eb8a42570",
+        "mode": "100644"
+      },
+      {
+        "path": "tests/cloud-dispatch-startup.test.ts",
+        "bytes": 32351,
+        "sha256": "01445c824a8d9d3474f744fc83a4cf26180d6a0f32002d7f21f28383538865cf",
+        "gitBlobSha": "609029dde521868c00ab7eb687394ad5cacd6183",
+        "mode": "100644"
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-context.ts",
+        "bytes": 6263,
+        "sha256": "871d9a5bd92d084919d4124c5c26b90d6ad7195f55f91502e02d52bc55083f6e",
+        "gitBlobSha": "e32da5e4d7294af3363eb2de4623a52aeb7e4f47",
+        "mode": "100644"
+      },
+      {
+        "path": "lib/personal-policy.ts",
+        "bytes": 8694,
+        "sha256": "1e09dbc751b0e740d54cbbc6db79b0d4a0bf48cc409137eabc36ecd38f8861f6",
+        "gitBlobSha": "dc710f0a16a5e28e5a34d5112a86fab349a2639a",
+        "mode": "100644"
+      },
+      {
+        "path": "scripts/e2b/validate-template-subscriptions.mjs",
+        "bytes": 34092,
+        "sha256": "9cce7fe66cb9a836f0807288c2570d6ec135c505b1c101b09fbd6cd31a8f76b0",
+        "gitBlobSha": "f36ecf2d08f1bc2754b21be0d47d149871bb67c5",
+        "mode": "100644"
+      },
+      {
+        "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+        "bytes": 65889,
+        "sha256": "6034046687d6007dde4fdbe0cbd24e538ffa75b058c2fd8b68f8cdd2a291e9a7",
+        "gitBlobSha": "628395f91d97a64655afb80117788d70207200c0",
+        "mode": "100644"
+      },
+      {
+        "path": "lib/device-enrollment.ts",
+        "bytes": 1050,
+        "sha256": "59a025174235a9bbb5a17aa5c654a96d52deb002bb72859ae655af0322b0fede",
+        "gitBlobSha": "8fe53cb39985150e5fc05daa6370121cb5426d53",
+        "mode": "100644"
+      },
+      {
+        "path": "lib/device-management.ts",
+        "bytes": 3206,
+        "sha256": "17fb62c6033acded70487b56e09f989410b782d4afaaa0445988442b5f5754b1",
+        "gitBlobSha": "c2243c5732d67b3ff5444196ce3b45e9aca67805",
+        "mode": "100644"
+      },
+      {
+        "path": "lib/device-enrollment.db.test.ts",
+        "bytes": 24843,
+        "sha256": "2fa9b163ce0219171d4bc46d5107d1db55628dc847f88dc33165ec0e5028f526",
+        "gitBlobSha": "071b2243d35cd6fdd97b7be0f17f21728578c537",
+        "mode": "100644"
+      },
+      {
+        "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+        "bytes": 3767,
+        "sha256": "a70e04b6b7ad83be663ebe08daee4257f73de7fe07bb3366d05bc83b94eb9c56",
+        "gitBlobSha": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+        "mode": "100755"
+      },
+      {
+        "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+        "bytes": 4466,
+        "sha256": "11fa656bc01369f27d1255e2d912964b4dfae26b5f6ad8de786425e5738ac31c",
+        "gitBlobSha": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+        "mode": "100755"
+      },
+      {
+        "path": "docs/operations/tracing.md",
+        "bytes": 65784,
+        "sha256": "817d0020dbf8f961b338c276e0a0b10da523febe47b4c813dd665be4303738b4",
+        "gitBlobSha": "35694355877eea55393ba9299f7796c2c171ccb7",
+        "mode": "100644"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/runs/route.ts",
+        "bytes": 1305,
+        "sha256": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c",
+        "gitBlobSha": "5a4c4f8486239161b325b9774b3086afe666dfa9",
+        "mode": "100644"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/repos/route.ts",
+        "bytes": 1983,
+        "sha256": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888",
+        "gitBlobSha": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b",
+        "mode": "100644"
+      },
+      {
+        "path": "lib/device-heartbeat.db.test.ts",
+        "bytes": 21505,
+        "sha256": "6e8a9ddcb8855de98b443531b6d7524952e740d49eb38194a17234d87eda9b6d",
+        "gitBlobSha": "27bbb720ac8f5bd3716787db62eb11833e9f3530",
+        "mode": "100644"
+      },
+      {
+        "path": "lib/device-unit-fence.db.test.ts",
+        "bytes": 11425,
+        "sha256": "e4f1ee4f90de93ce22f74e5dc97a3475816a5d2a932b0d327ee2441953224d51",
+        "gitBlobSha": "bc65b3faf494d2fd7c797b68f34d04227df38b7a",
+        "mode": "100644"
+      }
+    ]
+  },
+  "sourceReferences": [
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "bytes": 6263,
+      "sha256": "871d9a5bd92d084919d4124c5c26b90d6ad7195f55f91502e02d52bc55083f6e",
+      "gitBlobSha": "e32da5e4d7294af3363eb2de4623a52aeb7e4f47"
+    },
+    {
+      "path": "lib/personal-policy.ts",
+      "bytes": 8694,
+      "sha256": "1e09dbc751b0e740d54cbbc6db79b0d4a0bf48cc409137eabc36ecd38f8861f6",
+      "gitBlobSha": "dc710f0a16a5e28e5a34d5112a86fab349a2639a"
+    },
+    {
+      "path": "lib/db/request-scope.ts",
+      "bytes": 4779,
+      "sha256": "67bbb85d950948802449a1d0c2638e62bd4d1731ffe883837bc53059ac50b6f0",
+      "gitBlobSha": "b3445c20e6be5061bcbfe0fe56903b8dd767dfd3"
+    },
+    {
+      "path": "lib/db/device-scope.ts",
+      "bytes": 14907,
+      "sha256": "2083d7616e9a18421dcb8d55c309dba8a2761bf140faeba106a5b24393748b98",
+      "gitBlobSha": "80ce39633e6482f3e28654b917c57d1cca9f1e35"
+    },
+    {
+      "path": "lib/background.ts",
+      "bytes": 2955,
+      "sha256": "73937274e1c23817cef7eaacf0da24feb4d724b25fd9d562f4cd683869050310",
+      "gitBlobSha": "c5cfbf01c9fd6f725f1c2a806ef9f59af57ee8e0"
+    },
+    {
+      "path": "lib/tracing/jobs.ts",
+      "bytes": 2650,
+      "sha256": "6ea794db16ebd2020c31c338d4856c4909b4009a618b97a2d4eb5092a30bb8f1",
+      "gitBlobSha": "6cec226926da96c89acc06479a6b6c13902b0470"
+    },
+    {
+      "path": "lib/tracing/labels.ts",
+      "bytes": 2278,
+      "sha256": "39d29ed6eba5cfd364e50a78c21b940136636eb887934170df003217be94da7d",
+      "gitBlobSha": "4eddcee8197d25708e18fc1070ce13b4e0125126"
+    },
+    {
+      "path": "lib/device-enrollment.ts",
+      "bytes": 1050,
+      "sha256": "59a025174235a9bbb5a17aa5c654a96d52deb002bb72859ae655af0322b0fede",
+      "gitBlobSha": "8fe53cb39985150e5fc05daa6370121cb5426d53"
+    },
+    {
+      "path": "lib/device-management.ts",
+      "bytes": 3206,
+      "sha256": "17fb62c6033acded70487b56e09f989410b782d4afaaa0445988442b5f5754b1",
+      "gitBlobSha": "c2243c5732d67b3ff5444196ce3b45e9aca67805"
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/runs/route.ts",
+      "bytes": 1305,
+      "sha256": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c",
+      "gitBlobSha": "5a4c4f8486239161b325b9774b3086afe666dfa9"
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/repos/route.ts",
+      "bytes": 1983,
+      "sha256": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888",
+      "gitBlobSha": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b"
+    },
+    {
+      "path": "lib/dispatch-timing.ts",
+      "bytes": 4016,
+      "sha256": "9c8282c0d2b0a0b9ea8bf904eaade82ce5337c3e0abf1706ece87d485457a700",
+      "gitBlobSha": "f82563e766f5c0477479b2d487e0f92e60a08b75"
+    },
+    {
+      "path": "lib/coordinator/repository-resolution.ts",
+      "bytes": 11263,
+      "sha256": "0f2974a3c864dd9384122f811dcbec56188c28d3a19566a3b8e1db72264902d6",
+      "gitBlobSha": "6826efdd6895fa3f584e35ff2f1edb527cd080fa"
+    },
+    {
+      "path": "workflows/coordinator/steps.ts",
+      "bytes": 91110,
+      "sha256": "dff7bb2a993b9510cc70ecde1c5b2bc03e6a8fb5ffa1c68919ce49e19d1a57ad",
+      "gitBlobSha": "3f480288b10905be0877ad3d192d6483d1c7d096"
+    },
+    {
+      "path": "workflows/coordinator/factory-steps.ts",
+      "bytes": 11913,
+      "sha256": "a60e07f292989ebab18e2cdb6bfc74e46fd9e12f6c694c1cbb2f62047189b9f6",
+      "gitBlobSha": "0e2ecce921c4b56795ad1096f2b1eae987299e95"
+    },
+    {
+      "path": "lib/tracing/context.ts",
+      "bytes": 4360,
+      "sha256": "c0c6ced12ec5f1f2f406221b1dd94b9bf2af72c130bc706e615beab2f774b168",
+      "gitBlobSha": "fe005d26c2ea903250683d9351334b95ef328383"
+    },
+    {
+      "path": "lib/tracing/node.ts",
+      "bytes": 7287,
+      "sha256": "e1ccb4a2aaba54d8e3be4d27d9ff18b31dd9fc683f72117f6dd0ea730099f4d0",
+      "gitBlobSha": "00775a5928228262a66b12b845ee0dc18f6c6047"
+    },
+    {
+      "path": "lib/tracing/flush.ts",
+      "bytes": 657,
+      "sha256": "22e4cda2056cca851351d40ac3389ad7242b034aec5371b01537f611d3f60c95",
+      "gitBlobSha": "0149083f1f9e36adca769c2e799afe84a90bd139"
+    }
+  ],
+  "validationBoundary": {
+    "reviewerRanTests": false,
+    "reviewerRanTypecheckOrLint": false,
+    "reviewerNetworkCalls": 0,
+    "reviewerPosthogCalls": 0,
+    "reviewerSourceEdits": 0,
+    "reviewerIndexEdits": 0,
+    "reviewerResourcesStarted": 0,
+    "authorRuntimeResultsNotReclassifiedAsReviewerRuns": true
+  },
+  "limitations": [
+    "The local integrated tree is based on M1 plus the reviewed overlay. Fresh-main dependency/source integration and canonical gates remain with root/validation owner.",
+    "All original RED source/logs and author GREEN receipts remain untouched; this receipt attests static delta and source-contract review only."
+  ]
+}

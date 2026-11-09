@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "changes": [
+    {
+      "path": "lib/coordinator/repository-resolution.test.ts",
+      "beforeBytes": 22314,
+      "beforeSHA256": "9a0bedfd3aac7948c84a09dd48d09cc25041092c9f2481799cff5446603acc9c",
+      "afterBytes": 22313,
+      "afterSHA256": "8c9cf8f665aad36d864d72b712a43e2b197b2477900b2739cd52118695bd85c2",
+      "removedBytes": 1,
+      "onlyTrailingEmptyLineRemoved": true
+    },
+    {
+      "path": "lib/tracing/logs.test.ts",
+      "beforeBytes": 11376,
+      "beforeSHA256": "d84f79591aa47966bd57fb570c8362608fb22778d8db1e1af7340bf49724e2f8",
+      "afterBytes": 11375,
+      "afterSHA256": "5f1fbf880f6eff2e9a1282b8f80b78235c4650d28dd367373e96a266a5dabc17",
+      "removedBytes": 1,
+      "onlyTrailingEmptyLineRemoved": true
+    }
+  ],
+  "patchSHA256": "df643084cd3730d21477714c6b36ef4fb91df04c093cfd980d36ed081d13b7c2",
+  "sourceTree": "fb8bad033883b43bafd1c875a9f168ee58d48ebe",
+  "testsRerun": false,
+  "originalCachedDiffCheck": {
+    "exitCode": 2,
+    "toolChunk": "7228fb",
+    "findings": [
+      {
+        "path": "lib/coordinator/repository-resolution.test.ts",
+        "line": 269,
+        "kind": "new blank line at EOF"
+      },
+      {
+        "path": "lib/tracing/logs.test.ts",
+        "line": 181,
+        "kind": "new blank line at EOF"
+      }
+    ]
+  },
+  "finalCachedDiffCheck": {
+    "exitCode": 0,
+    "logBytes": 0,
+    "logSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

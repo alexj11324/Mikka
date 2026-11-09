@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "label": "generated-route-check",
+  "argv": [
+    "node",
+    "apps/api/scripts/generate-routes.mjs",
+    "--check"
+  ],
+  "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-integration-checkout",
+  "sourceTree": "5ffff474defa47634334484fe18916130e3f72d8",
+  "sourceTreeUnchanged": true,
+  "trackedWorktreeUnchanged": false,
+  "start": "2026-11-09T03:15:54.025581+00:00",
+  "end": "2026-11-09T03:15:54.896424+00:00",
+  "durationSeconds": 0.871,
+  "exitCode": 0,
+  "log": {
+    "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/integrated-source-validation-20261109/generated-route-check.original.log",
+    "bytes": 29,
+    "sha256": "8161ac117625d055e97a3f44780d9b000fe6b67e14123a51e6244ed927163c7d"
+  },
+  "environment": {
+    "pinnedPnpm": "10.34.3",
+    "nodeOptions": "--max-old-space-size=4096",
+    "databaseOrCredentialEnvironmentForwarded": false,
+    "sourceSecurityOrSandboxOverrides": false
+  },
+  "published": false,
+  "productionAccepted": false
+}

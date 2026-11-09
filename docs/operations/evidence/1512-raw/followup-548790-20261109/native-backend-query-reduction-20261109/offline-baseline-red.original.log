@@ -1,0 +1,48 @@
+✖ a valid enrollment performs one query at the database boundary (22.702831ms)
+ℹ {"scenario":"valid-enrollment","queryCalls":4,"postgresObserved":false}
+✖ reading pending commands without receipts performs one query at the database boundary (15.807417ms)
+ℹ {"scenario":"pending-without-receipts","queryCalls":4,"postgresObserved":false}
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 500.168149
+
+✖ failing tests:
+
+test at ../offline-query-boundary.test.cjs:36:1
+✖ a valid enrollment performs one query at the database boundary (22.702831ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  4 !== 1
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/native-backend-query-reduction-20261109/offline-query-boundary.test.cjs:49:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 4,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at ../offline-query-boundary.test.cjs:52:1
+✖ reading pending commands without receipts performs one query at the database boundary (15.807417ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  4 !== 1
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/native-backend-query-reduction-20261109/offline-query-boundary.test.cjs:65:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 4,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

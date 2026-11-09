@@ -1,0 +1,38 @@
+{
+  "command": [
+    "node",
+    "--experimental-test-module-mocks",
+    "--import",
+    "./scripts/server-test.mjs",
+    "--import",
+    "tsx",
+    "--test",
+    "--test-reporter=tap",
+    "--test-name-pattern=a Native read batch shares",
+    "lib/personal-policy.test.ts"
+  ],
+  "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-read-batch-policy-copy",
+  "exitCode": 0,
+  "log": {
+    "path": "policy-first-green.log",
+    "bytes": 664,
+    "sha256": "a276fd3e569f9f3665af46df5aaf3ee6ed3b3ee03b898790dbd8b554c73c0cc7"
+  },
+  "source": [
+    {
+      "path": "lib/personal-policy.ts",
+      "sha256": "1e09dbc751b0e740d54cbbc6db79b0d4a0bf48cc409137eabc36ecd38f8861f6"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "sha256": "3fded6ee9b183d10ec94cb30e0bd1afab83c4e86b2e0ae1fa675fc9e2544693a"
+    },
+    {
+      "path": "lib/personal-policy.test.ts",
+      "sha256": "3cf1eb17e4c2784664f889494b554254b1f2f5ff458dd1e324de1cbdd00ecbf3"
+    }
+  ],
+  "executedAt": "2026-11-09T02:27:14.058935+00:00",
+  "externalRequests": 0,
+  "models": 0
+}

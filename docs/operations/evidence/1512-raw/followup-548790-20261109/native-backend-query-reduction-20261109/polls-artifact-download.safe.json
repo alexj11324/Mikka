@@ -1,0 +1,41 @@
+{
+  "schema": "issue1512.device-polls-artifact-download.v1",
+  "runId": 42553864534,
+  "artifactId": 13646906448,
+  "archive": {
+    "path": "device-polls-probe-original.zip",
+    "bytes": 6599,
+    "sha256": "704e185c4babea468dc87879b533d3dc105f4e2908124aee188fa93f6324623a",
+    "apiDigestMatched": true,
+    "gitBlob": "616489e221c3f6476adab1c358be5494c19037e0"
+  },
+  "crcValid": true,
+  "safeMemberPaths": true,
+  "files": [
+    {
+      "path": "polls-ci-original/baseline-red-segment-1.original.log",
+      "bytes": 941,
+      "sha256": "f045375d06a66561600073270fe968edfbcd76b4482b7cf9e83ba66315766d16",
+      "gitBlob": "0044ce53e48cacdcc172c33b5347566dd431975d"
+    },
+    {
+      "path": "polls-ci-original/database-setup.original.log",
+      "bytes": 20231,
+      "sha256": "fcafc7f1bc92c8821840175cf3de269a0b07136050ca944532bb3e3ded3372ed",
+      "gitBlob": "ae266dd561cbecbd577dbaca183e9fad1d5da185"
+    },
+    {
+      "path": "polls-ci-original/paired.safe.json",
+      "bytes": 2607,
+      "sha256": "4d146a99e590a4d03141ff25b86bedf20e3f32219171e7b4ad7a3d003ef9dfee",
+      "gitBlob": "dfd6ce3cf75b7b42295a1d60e087a78e625beae0"
+    },
+    {
+      "path": "polls-ci-original/source.safe.json",
+      "bytes": 2326,
+      "sha256": "134fe41a5e64986098984cdafa6be318119f5d7501f4dd8ff1cf9f2e5c3b5bfe",
+      "gitBlob": "84e1f6b736e46fb282b9cd1ceba510e24594e508"
+    }
+  ],
+  "boundary": "One GitHub artifact API request, followed by one transfer of its returned file reference. Download URL is not retained."
+}

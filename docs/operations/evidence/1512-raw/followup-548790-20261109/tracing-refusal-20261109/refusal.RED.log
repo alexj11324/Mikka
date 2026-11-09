@@ -1,0 +1,43 @@
+✖ closed repository refusals keep their exact result and mark phase plus dispatch beneath an OK Workflow step (78.807268ms)
+(node:14) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:14) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✖ both actual Factory read tools return their refusal unchanged while an owned child keeps ERROR (524.741598ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5282.478654
+
+✖ failing tests:
+
+test at lib/coordinator/repository-resolution.test.ts:1:13477
+✖ closed repository refusals keep their exact result and mark phase plus dispatch beneath an OK Workflow step (78.807268ms)
+  AssertionError [ERR_ASSERTION]: the own phase and dispatch remain ERROR after the SDK marks its parent OK
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/issue1512-tracing-core-copy/lib/coordinator/repository-resolution.test.ts:238:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at tests/cloud-dispatch-startup.test.ts:1:21582
+✖ both actual Factory read tools return their refusal unchanged while an owned child keeps ERROR (524.741598ms)
+  AssertionError [ERR_ASSERTION]: each actual asToolResult must own the failing operation span
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/issue1512-tracing-core-copy/tests/cloud-dispatch-startup.test.ts:377:12)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }

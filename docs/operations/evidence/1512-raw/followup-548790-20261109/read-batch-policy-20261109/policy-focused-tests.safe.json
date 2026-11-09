@@ -1,0 +1,47 @@
+{
+  "command": [
+    "node",
+    "--experimental-test-module-mocks",
+    "--import",
+    "./scripts/server-test.mjs",
+    "--import",
+    "tsx",
+    "--test",
+    "--test-reporter=tap",
+    "lib/personal-policy.test.ts",
+    "lib/desktop-rpc/read-batch.test.ts",
+    "lib/desktop-rpc/read-batch-context.test.ts"
+  ],
+  "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-read-batch-policy-copy",
+  "exitCode": 0,
+  "log": {
+    "path": "policy-focused-tests.log",
+    "bytes": 8962,
+    "sha256": "c7f7dd5c8dd1ea008b3a02dcc96356dfb61e43950a9d7d8c5377f54f4f313548"
+  },
+  "source": [
+    {
+      "path": "lib/personal-policy.ts",
+      "sha256": "1e09dbc751b0e740d54cbbc6db79b0d4a0bf48cc409137eabc36ecd38f8861f6"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "sha256": "bbb930a53ce88568f15a5891445eca03e0065ae4373b213f85d11523a3944eac"
+    },
+    {
+      "path": "lib/personal-policy.test.ts",
+      "sha256": "2ed7fc9fea9a82661d575178c5f21cdf0a4db2325d5bcdfa1abcfd2abff45e94"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch.test.ts",
+      "sha256": "68ccad0a96c16a39bb30df26bf3fdb593a59827857df9dbda3b715809948961b"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.test.ts",
+      "sha256": "a548b3d73268bd35f81ce8648b673c66b5931c37ed405ed100479c34c10d5353"
+    }
+  ],
+  "executedAt": "2026-11-09T02:29:17.378467+00:00",
+  "externalRequests": 0,
+  "models": 0
+}

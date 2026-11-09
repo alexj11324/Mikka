@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "label": "pnpm-runtime-lint",
+  "argv": [
+    "pnpm",
+    "lint:runtime"
+  ],
+  "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-integration-checkout",
+  "sourceTree": "5ffff474defa47634334484fe18916130e3f72d8",
+  "sourceTreeUnchanged": true,
+  "trackedWorktreeUnchanged": true,
+  "start": "2026-11-09T03:15:54.020262+00:00",
+  "end": "2026-11-09T03:15:54.518708+00:00",
+  "durationSeconds": 0.498,
+  "exitCode": 0,
+  "log": {
+    "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/integrated-source-validation-20261109/pnpm-runtime-lint.original.log",
+    "bytes": 429,
+    "sha256": "174954c64218eb0607903090f4eb75bd5eefc05dc21da11ff492db949e21d29c"
+  },
+  "environment": {
+    "pinnedPnpm": "10.34.3",
+    "nodeOptions": "--max-old-space-size=4096",
+    "databaseOrCredentialEnvironmentForwarded": false,
+    "sourceSecurityOrSandboxOverrides": false
+  },
+  "published": false,
+  "productionAccepted": false
+}

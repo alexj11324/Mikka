@@ -1,0 +1,41 @@
+{
+  "command": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test --test-reporter=tap --test-name-pattern='afterJob cannot reuse' lib/personal-policy.test.ts",
+  "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-read-batch-policy-copy",
+  "exitCode": 1,
+  "toolChunk": "71ce7f",
+  "counts": {
+    "pass": 0,
+    "fail": 1,
+    "cancelled": 0,
+    "skipped": 0
+  },
+  "failure": "The actual afterJob callback returns the parent batch true observation after the fixture policy was revoked to false, while the parent batch is still active.",
+  "runtimeSource": [
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "bytes": 6079,
+      "sha256": "bbb930a53ce88568f15a5891445eca03e0065ae4373b213f85d11523a3944eac",
+      "gitBlobSha1": "6e20b1494a534b48900df3b9cf0ce4db16d3b159"
+    },
+    {
+      "path": "lib/personal-policy.ts",
+      "bytes": 8694,
+      "sha256": "1e09dbc751b0e740d54cbbc6db79b0d4a0bf48cc409137eabc36ecd38f8861f6",
+      "gitBlobSha1": "dc710f0a16a5e28e5a34d5112a86fab349a2639a"
+    }
+  ],
+  "v1Manifest": {
+    "path": "final-source-manifest.safe.json",
+    "bytes": 3691,
+    "sha256": "862b5b6c9d0232f8afc0651ce8b1fce48e7002d245734a6d1edb960aad2f7f24",
+    "gitBlobSha1": "1a0c00fb908cfc5d99336a6f201c565c45d20b2e"
+  },
+  "testSeam": "The real afterJob retainContext=true with its supported schedule seam, called before parent withReadBatchContext settlement. It is an appended regression test, not a previously frozen v1 test.",
+  "testSourceAtExecutionNotSeparatelyFrozen": true,
+  "log": {
+    "path": "policy-active-afterjob-v1-red.log",
+    "bytes": 1583,
+    "sha256": "92210786a8e4298169669eef13b656e14c9a023b57de3d09150422385a9cfee8",
+    "gitBlobSha1": "23425d39ac846735cc644830d0c532e92c382e2d"
+  }
+}

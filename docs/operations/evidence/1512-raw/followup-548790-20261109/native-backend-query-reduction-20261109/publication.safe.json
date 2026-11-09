@@ -1,0 +1,62 @@
+{
+  "schema": "issue1512.device-sql-probe-publication.v1",
+  "branch": "ops/1512-device-sql-probe-20261109",
+  "repository": "alexj11324/Mikka",
+  "head": "d4f3c6be8137d906407711c6ea3ac8808ab1d860",
+  "tree": "0cc30d9e0ca2f4c37b4dabdc58f0813facdce3fa",
+  "parent": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+  "parentTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+  "remoteBranchAbsentBeforeCreate": true,
+  "absenceResponse": "GitHub API 404 observed twice; base commit access succeeded.",
+  "remoteRefReadbackMatched": true,
+  "remoteCommitAndFourFileCompareVerified": true,
+  "files": [
+    {
+      "path": "lib/device-enrollment.ts",
+      "sha256": "59a025174235a9bbb5a17aa5c654a96d52deb002bb72859ae655af0322b0fede",
+      "gitBlobSha": "8fe53cb39985150e5fc05daa6370121cb5426d53",
+      "characters": 1050,
+      "remoteRawBytesEqualLocal": true
+    },
+    {
+      "path": "lib/device-management.ts",
+      "sha256": "17fb62c6033acded70487b56e09f989410b782d4afaaa0445988442b5f5754b1",
+      "gitBlobSha": "c2243c5732d67b3ff5444196ce3b45e9aca67805",
+      "characters": 3206,
+      "remoteRawBytesEqualLocal": true
+    },
+    {
+      "path": "lib/device-enrollment.db.test.ts",
+      "sha256": "2fa9b163ce0219171d4bc46d5107d1db55628dc847f88dc33165ec0e5028f526",
+      "gitBlobSha": "071b2243d35cd6fdd97b7be0f17f21728578c537",
+      "characters": 24843,
+      "remoteRawBytesEqualLocal": true
+    },
+    {
+      "path": ".github/workflows/issue1512-device-sql-probe.yml",
+      "sha256": "f57f57cb1d43fcb0436b02142311fb3cd1124e07943a2fe39ce50080b333983d",
+      "gitBlobSha": "0bdf202ffc6de25adbec90677537546438e9bb66",
+      "characters": 10639,
+      "remoteRawBytesEqualLocal": true
+    }
+  ],
+  "run": {
+    "id": 42551207785,
+    "name": "Issue 1512 device SQL probe",
+    "createdAt": "2026-11-09T02:29:18Z",
+    "observedStatus": "queued",
+    "conclusion": null
+  },
+  "boundary": "Only the exact reviewed temporary branch was created. No main or PR1799 ref update; no workflow dispatch/rerun, no production secrets/identity/model/native execution. Test outcomes are pending.",
+  "privateApiFiles": [
+    "private/remote-commit.original.json",
+    "private/remote-compare.original.json",
+    "private/published-ref.original.json",
+    "private/initial-run-list.original.json"
+  ],
+  "cleanupPending": [
+    "Job-owned PostgreSQL service termination",
+    "Evidence acquisition",
+    "Owned temporary branch removal"
+  ]
+}

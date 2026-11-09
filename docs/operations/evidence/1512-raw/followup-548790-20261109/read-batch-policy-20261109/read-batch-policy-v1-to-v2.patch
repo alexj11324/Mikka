@@ -1,0 +1,68 @@
+--- a/lib/desktop-rpc/read-batch-context.ts
++++ b/lib/desktop-rpc/read-batch-context.ts
+@@ -1,5 +1,6 @@
+ import { AsyncLocalStorage } from 'node:async_hooks'
+ import { COMMIT_EXECUTOR } from '../db/commit-effects'
++import { currentRoute } from '../tracing/labels'
+ import { isLiveRevisionKind, LIVE_ID } from '../live/events'
+ import type { LiveScope } from '../live/scope'
+ import { liveRevisionKey, readLiveRevisions, type LiveRef, type LiveRevisions } from '../live/revisions'
+@@ -27,10 +28,11 @@
+ 
+ /** Chat model readers consult the same workspace policy for keys and subscriptions.
+  * Share only its observation in this read batch; each consumer keeps its own
+- * data and authority checks. A request proxy must name its actual executor. */
++ * data and authority checks. A request proxy must name its actual executor.
++ * Deferred jobs have their own observation even while the parent is active. */
+ export function readBatchSubscriptionPolicy(database: object, workspaceId: string, read: () => Promise<boolean>): Promise<boolean> {
+   const scope = batches.getStore()
+-  if (!scope?.active) return read()
++  if (!scope?.active || /^(?:after|cron|workflow):/.test(currentRoute() ?? '')) return read()
+   const executor = (database as { [COMMIT_EXECUTOR]?: object })[COMMIT_EXECUTOR] ?? database
+   let policies = scope.subscriptionPolicies.get(executor)
+   if (!policies) { policies = new Map(); scope.subscriptionPolicies.set(executor, policies) }
+--- a/lib/personal-policy.test.ts
++++ b/lib/personal-policy.test.ts
+@@ -239,3 +239,42 @@
+   assert.equal(await memberSubscriptionsAllowed(ordinary, workspace), true)
+   assert.equal(f.calls.length, 3)
+ })
++
++
++test('afterJob cannot reuse a foreground policy while its parent read batch is still active', async () => {
++  const { afterJob } = await import('./background')
++  const f = policyReader()
++  let deferred!: () => unknown
++  await withReadBatchContext(async () => {
++    assert.equal(await memberSubscriptionsAllowed(f.query, workspace), true)
++    afterJob('after:factory-dispatch-recovery', () => memberSubscriptionsAllowed(f.query, workspace), {
++      retainContext: true, schedule: task => { deferred = task },
++    })
++    f.state.allowed = false
++    assert.equal(await deferred(), false, 'the real deferred job must query its current policy even before the batch settles')
++    f.state.allowed = true
++    assert.equal(await deferred(), true, 'separate background calls must not share their own earlier observation')
++    assert.equal(await memberSubscriptionsAllowed(f.query, workspace), true, 'foreground siblings keep their own batch observation')
++    assert.equal(f.calls.length, 3)
++  })
++})
++
++
++test('cron and workflow jobs cannot inherit an active foreground policy observation', async () => {
++  const { cronJob } = await import('./background')
++  const { runJob } = await import('./tracing/jobs')
++  for (const kind of ['cron', 'workflow'] as const) {
++    const f = policyReader(false)
++    const read = () => memberSubscriptionsAllowed(f.query, workspace)
++    const job = kind === 'cron' ? cronJob('policy-fixture', read) : () => runJob('workflow:policy-fixture/read', 'workflow', read)
++    await withReadBatchContext(async () => {
++      assert.equal(await read(), false)
++      f.state.allowed = true
++      assert.equal(await job(), true)
++      f.state.allowed = false
++      assert.equal(await job(), false)
++      assert.equal(await read(), false)
++      assert.equal(f.calls.length, 3)
++    })
++  }
++})

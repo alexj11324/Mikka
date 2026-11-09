@@ -1,0 +1,181 @@
+{
+  "schema": 1,
+  "findings": [
+    {
+      "path": "cloud-boundary.original.log",
+      "line": 2,
+      "category": "package_version_or_versioned_source_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "pnpm-check.original.log",
+      "line": 2,
+      "category": "package_version_or_versioned_source_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "pnpm-check.original.log",
+      "line": 6,
+      "category": "package_version_or_versioned_source_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "pnpm-check.original.log",
+      "line": 37,
+      "category": "package_version_or_versioned_source_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "pnpm-check.original.log",
+      "line": 125,
+      "category": "package_version_or_versioned_source_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "pnpm-check.original.log",
+      "line": 155,
+      "category": "package_version_or_versioned_source_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "pnpm-check.original.log",
+      "line": 195,
+      "category": "package_version_or_versioned_source_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "pnpm-lint-v2.original.log",
+      "line": 2,
+      "category": "package_version_or_versioned_source_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "pnpm-lint-v2.original.log",
+      "line": 6,
+      "category": "package_version_or_versioned_source_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "pnpm-lint-v2.original.log",
+      "line": 12,
+      "category": "package_version_or_versioned_source_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "pnpm-lint-v2.original.log",
+      "line": 18,
+      "category": "package_version_or_versioned_source_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "pnpm-lint-v2.original.log",
+      "line": 89,
+      "category": "package_version_or_versioned_source_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "pnpm-lint-v2.original.log",
+      "line": 94,
+      "category": "package_version_or_versioned_source_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "pnpm-lint.original.log",
+      "line": 2,
+      "category": "package_version_or_versioned_source_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "pnpm-lint.original.log",
+      "line": 6,
+      "category": "package_version_or_versioned_source_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "pnpm-runtime-lint.original.log",
+      "line": 2,
+      "category": "package_version_or_versioned_source_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "pnpm-typecheck-final.original.log",
+      "line": 2,
+      "category": "package_version_or_versioned_source_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "pnpm-typecheck-final.original.log",
+      "line": 6,
+      "category": "package_version_or_versioned_source_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "pnpm-typecheck-v2.original.log",
+      "line": 2,
+      "category": "package_version_or_versioned_source_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "pnpm-typecheck-v2.original.log",
+      "line": 6,
+      "category": "package_version_or_versioned_source_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "pnpm-typecheck.original.log",
+      "line": 2,
+      "category": "package_version_or_versioned_source_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "pre-eof-trim/lib/coordinator/repository-resolution.test.ts",
+      "line": 36,
+      "category": "public_github_ssh_transport_syntax",
+      "valuePrinted": false
+    },
+    {
+      "path": "tracked-source-inventory.safe.json",
+      "line": 7257,
+      "category": "retina_asset_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "tracked-source-inventory.safe.json",
+      "line": 7264,
+      "category": "retina_asset_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "tracked-source-inventory.safe.json",
+      "line": 7278,
+      "category": "retina_asset_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "tracked-source-inventory.safe.json",
+      "line": 7285,
+      "category": "retina_asset_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "tracked-source-inventory.safe.json",
+      "line": 17491,
+      "category": "retina_asset_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "tracked-source-inventory.safe.json",
+      "line": 17498,
+      "category": "retina_asset_filename",
+      "valuePrinted": false
+    },
+    {
+      "path": "tracked-source-inventory.safe.json",
+      "line": 40234,
+      "category": "package_version_or_versioned_source_filename",
+      "valuePrinted": false
+    }
+  ],
+  "unclassifiedCount": 0,
+  "valuesPrinted": false
+}

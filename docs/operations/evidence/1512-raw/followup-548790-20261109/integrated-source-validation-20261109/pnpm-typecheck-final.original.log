@@ -1,0 +1,8 @@
+
+> next-app@0.0.1 typecheck /workspace/scratch/812e3b7d6d45/issue1512-integration-checkout
+> tsrs --noEmit && tsrs --noEmit -p apps/api/tsconfig.json && pnpm --filter @mikka/frontend typecheck
+
+
+> @mikka/frontend@0.0.1 typecheck /workspace/scratch/812e3b7d6d45/issue1512-integration-checkout/apps/frontend
+> tsc --noEmit -p tsconfig.json
+

@@ -1,0 +1,37 @@
+{
+  "source": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+  "files": [
+    {
+      "path": "scripts/ops/run-trace-benchmark.ts",
+      "bytes": 19846,
+      "sha256": "0962440794712e7f42a919d755cba69c7e2fcc15f1fad02de29ba9d2b31f9de4",
+      "gitBlobSha": "09280f0dfb945157aa8c692699fecbc2989f15dc"
+    },
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "bytes": 13984,
+      "sha256": "474e7d33bcc1a521ae61ab30040f1715c376b2d8b160b5db89aacf2785aea8c4",
+      "gitBlobSha": "b248a4d97240ba895c3c165b2d7d5c4a763ffe23"
+    },
+    {
+      "path": "lib/tracing/node.ts",
+      "bytes": 7106,
+      "sha256": "adefe4b0af2c59021f37ae77262da07cc11c2369941b7482553f4299739de670",
+      "gitBlobSha": "3037a3b0cc2538451917cdd8e454a376553fc47c"
+    },
+    {
+      "path": "lib/tracing/config.ts",
+      "bytes": 3376,
+      "sha256": "b26acae1c89e8a74a6aae8769ffbab32af72c72250b239711b0786f160f65856",
+      "gitBlobSha": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483"
+    }
+  ],
+  "provenance": {
+    "receiptPath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/controlled-failure-1d126-source/source-receipt.safe.json",
+    "bytes": 990,
+    "sha256": "a7e51284fc741b5b94dc8acd2173025cc85462e0b9cd3c9464114a13a2dcd376",
+    "actualRunHead": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+    "checkoutAndSourceGuardStepSucceeded": true,
+    "baselineBeforeLaterTracingAndSqlFixes": true
+  }
+}

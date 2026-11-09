@@ -1,0 +1,12 @@
+✔ a valid enrollment performs one query at the database boundary (14.853531ms)
+ℹ {"scenario":"valid-enrollment","queryCalls":1,"postgresObserved":false}
+✔ reading pending commands without receipts performs one query at the database boundary (13.013143ms)
+ℹ {"scenario":"pending-without-receipts","queryCalls":1,"postgresObserved":false}
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 327.586326

@@ -1,0 +1,8 @@
+{
+  "schema": 1,
+  "previousCheckpointCommit": "f2ae6662cccdadc9a5aeab36a604bc545984e456",
+  "previousCheckpointPrefix": "docs/operations/evidence/1512-raw/post-merge-c04690-m1",
+  "addedInThisCheckpoint": "native-c04690/native-c04690-job.original.log.gz",
+  "publicationIndex": "native-c04690-publication/native-c04690-publication-index.safe.json",
+  "scope": "Late original Native job-log gzip and analyses; original five JSON and prior review payload remain in checkpoint16. Original ZIP/PNG bytes are not claimed archived here."
+}

@@ -1,0 +1,1 @@
+lib/device-heartbeat.db.test.ts:169:59: warning unicorn(no-thenable): Do not add `then` to an object. help: If an object is defined as 'thenable', once it's accidentally used in an await expression, it may cause problems

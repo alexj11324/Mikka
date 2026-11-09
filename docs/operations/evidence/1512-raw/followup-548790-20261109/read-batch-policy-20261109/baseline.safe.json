@@ -1,0 +1,43 @@
+{
+  "localSnapshotCommit": "5975e42ef3436a53546948b556166777d1b0be9d",
+  "localSnapshotIsNotProductionCommit": true,
+  "sourceMain": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "sourcePrHead": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+  "sourceTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+  "copy": "/workspace/scratch/812e3b7d6d45/issue1512-read-batch-policy-copy",
+  "authorizedFiles": [
+    "lib/personal-policy.ts",
+    "lib/desktop-rpc/read-batch-context.ts",
+    "lib/personal-policy.test.ts"
+  ],
+  "source": [
+    {
+      "path": "lib/personal-policy.ts",
+      "bytes": 8535,
+      "sha256": "12de39231eea7fd56ae09cc4b0b601d196dcbab9748d02a0de3f3ddbbc22bb12",
+      "gitBlobSha1": "bbb9684619cbfa8faca236a78e6f8f61148d9a94"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "bytes": 5039,
+      "sha256": "5a4a3ec8120558c25c5c9b4db117df1acc3f4f8dfe3f5c66146c6a30d60da00f",
+      "gitBlobSha1": "9ddddf4230c9f63ca9fb5f966de87116449844fe"
+    },
+    {
+      "path": "lib/personal-policy.test.ts",
+      "bytes": 2560,
+      "sha256": "6f8e71d5ed5bd981d1ab887a79be4db96fa7074e3ab329fd4d4b0eb880e05231",
+      "gitBlobSha1": "bb2de016988758cbf34c00a8284a084c19b9e809"
+    }
+  ],
+  "scope": "Only memberSubscriptionsAllowed observation reuse within active readBatch for exact effective executor and workspace; no Bot/menu changes.",
+  "testSeams": [
+    "actual createReadBatch with existing action schema",
+    "actual usableApiKeys and pooledOwners consumers",
+    "actual memberSubscriptionsAllowed public reader"
+  ],
+  "externalNetwork": 0,
+  "newExternalResources": 0,
+  "dependencyInstall": false,
+  "sharedSourceOrIndexTouched": false
+}

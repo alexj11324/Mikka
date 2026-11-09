@@ -1,0 +1,6 @@
+{
+  "scope": "Top-level patch, manifests, receipts, README and original synthetic test logs. Source checkout excluded.",
+  "credentialOrEmailMatches": [],
+  "privateValuesPrinted": false,
+  "allInputsSyntheticOrSourceMetadata": true
+}

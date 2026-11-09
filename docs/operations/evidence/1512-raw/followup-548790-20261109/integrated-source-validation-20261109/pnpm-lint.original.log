@@ -1,0 +1,31 @@
+
+> next-app@0.0.1 lint /workspace/scratch/812e3b7d6d45/issue1512-integration-checkout
+> pnpm lint:code && pnpm lint:ui
+
+
+> next-app@0.0.1 lint:code /workspace/scratch/812e3b7d6d45/issue1512-integration-checkout
+> oxlint --deny-warnings && pnpm check:migrations && pnpm test:migrations && pnpm check:factory
+
+
+  ! unicorn(no-useless-spread): `Promise.all` accepts an iterable, so it's unnecessary to convert the iterable to an array.
+    ,-[lib/tracing/logs.test.ts:84:64]
+ 83 |     },
+ 84 |     forceFlush: async () => { flushCalls++; await Promise.all([...pending]) },
+    :                                                                ^^^
+ 85 |     shutdown: async () => { await Promise.all([...pending]) },
+    `----
+  help: Consider removing the spread operator.
+
+  ! unicorn(no-useless-spread): `Promise.all` accepts an iterable, so it's unnecessary to convert the iterable to an array.
+    ,-[lib/tracing/logs.test.ts:85:48]
+ 84 |     forceFlush: async () => { flushCalls++; await Promise.all([...pending]) },
+ 85 |     shutdown: async () => { await Promise.all([...pending]) },
+    :                                                ^^^
+ 86 |   }
+    `----
+  help: Consider removing the spread operator.
+
+Found 2 warnings and 0 errors.
+Finished in 416ms on 3956 files with 97 rules using 8 threads.
+ ELIFECYCLE  Command failed with exit code 1.
+ ELIFECYCLE  Command failed with exit code 1.

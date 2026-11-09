@@ -1,0 +1,99 @@
+{
+  "schema": 1,
+  "scope": "Evidence text files, source fixtures and local test outputs. No credentials were read or forwarded.",
+  "rawSensitiveValuesPrinted": false,
+  "findings": [
+    {
+      "path": "cloud-boundary.original.log",
+      "category": "email",
+      "count": 1,
+      "lines": [
+        2
+      ]
+    },
+    {
+      "path": "pnpm-check.original.log",
+      "category": "email",
+      "count": 6,
+      "lines": [
+        2,
+        6,
+        37,
+        125,
+        155,
+        195
+      ]
+    },
+    {
+      "path": "pnpm-lint-v2.original.log",
+      "category": "email",
+      "count": 6,
+      "lines": [
+        2,
+        6,
+        12,
+        18,
+        89,
+        94
+      ]
+    },
+    {
+      "path": "pnpm-lint.original.log",
+      "category": "email",
+      "count": 2,
+      "lines": [
+        2,
+        6
+      ]
+    },
+    {
+      "path": "pnpm-runtime-lint.original.log",
+      "category": "email",
+      "count": 1,
+      "lines": [
+        2
+      ]
+    },
+    {
+      "path": "pnpm-typecheck-final.original.log",
+      "category": "email",
+      "count": 2,
+      "lines": [
+        2,
+        6
+      ]
+    },
+    {
+      "path": "pnpm-typecheck-v2.original.log",
+      "category": "email",
+      "count": 2,
+      "lines": [
+        2,
+        6
+      ]
+    },
+    {
+      "path": "pnpm-typecheck.original.log",
+      "category": "email",
+      "count": 1,
+      "lines": [
+        2
+      ]
+    },
+    {
+      "path": "tracked-source-inventory.safe.json",
+      "category": "email",
+      "count": 7,
+      "lines": [
+        7257,
+        7264,
+        7278,
+        7285,
+        17491,
+        17498,
+        40234
+      ]
+    }
+  ],
+  "rawIndexSnapshotExcluded": true
+}

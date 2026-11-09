@@ -1,0 +1,85 @@
+{
+  "status": "local_patch_ready_for_independent_review",
+  "changedFiles": [
+    "lib/desktop-rpc/read-batch-context.ts",
+    "lib/personal-policy.test.ts",
+    "lib/personal-policy.ts"
+  ],
+  "copy": "/workspace/scratch/812e3b7d6d45/issue1512-read-batch-policy-copy",
+  "behavior": "Only memberSubscriptionsAllowed uses the existing active readBatch lifetime to reuse one policy observation for the same effective database executor and exact workspace ID.",
+  "identity": "Within active batch, COMMIT_EXECUTOR resolves the actual held client or request/default pool behind the query proxy; plain database readers retain their object identity. Ordinary reads never inspect this key.",
+  "lifetime": "Each batch owns its map; concurrent batches are distinct. finally disables and clears all batch maps. Detached callbacks after either success or failure read again.",
+  "unchanged": [
+    "Original SELECT text and values",
+    "absent-policy default true",
+    "explicit false result",
+    "rejected original error object",
+    "API-key and pooled-owner consumer branches",
+    "every own/shared key and shared-owner query",
+    "workspace membership and Bot/session guards",
+    "all ordinary/non-batch paths",
+    "menu request batching contract",
+    "12 lifecycle checkpoints and budgets",
+    "device/background queries"
+  ],
+  "verification": [
+    {
+      "receipt": "policy-baseline-red.safe.json",
+      "result": "Real createReadBatch with existing action schema and real usableApiKeys/pooledOwners: original runtime failed policy query count 2 !== 1; 0/1 pass, exit 1."
+    },
+    {
+      "receipt": "policy-first-green.safe.json",
+      "result": "Same seam after minimal implementation: 1/1 pass, exit 0."
+    },
+    {
+      "receipt": "policy-focused-tests.safe.json",
+      "result": "Personal policy plus existing readBatch and context suites: 36/36 pass, no skipped/cancelled tests, exit 0."
+    },
+    {
+      "receipt": "policy-targeted-lint.safe.json",
+      "result": "Explicit --no-ignore all three final files, exit 0."
+    }
+  ],
+  "boundaryCoverage": [
+    "false blocks other members' credentials but preserves own keys",
+    "absent row retains true default",
+    "two simultaneous batches each query independently",
+    "actual production pool proxy sees two distinct request pools and exact workspace separation",
+    "a bound alias of the same actual executor joins its observation",
+    "original rejection shared only within one batch and fresh next request",
+    "bound after-work observes changes after successful and rejected lifetimes",
+    "key/share rows remain freshly queried even while policy observation is shared",
+    "ordinary reads see every revoke/restore and do not inspect batch metadata",
+    "existing HTTP authRequired mapping and per-item ownership tests still pass"
+  ],
+  "originalAcceptance": {
+    "nativeLogin": 473,
+    "webLogin": 402,
+    "result": "RED",
+    "unchanged": true
+  },
+  "estimatedEffect": {
+    "basis": "Four existing Native chat invocations each issued two same-workspace policy SELECTs. This local test proves the two consumers reuse one observation, not an actual Native rerun.",
+    "maximumLoginQueryReduction": 4,
+    "counterfactualNativeLogin": 469,
+    "counterfactualStillRed": true
+  },
+  "notClaimed": [
+    "production pass",
+    "Native acceptance improvement measured",
+    "full repository typecheck",
+    "Bot projection optimization",
+    "menu optimization"
+  ],
+  "execution": {
+    "network": 0,
+    "realDatabaseQueries": 0,
+    "models": 0,
+    "VMs": 0,
+    "CI": 0,
+    "dependencyInstalls": 0,
+    "rootSourceOrIndexEdits": 0,
+    "publishedRefs": 0,
+    "activeProcesses": 0
+  }
+}

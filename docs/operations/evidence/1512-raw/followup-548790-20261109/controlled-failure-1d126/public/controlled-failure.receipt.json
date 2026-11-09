@@ -1,0 +1,344 @@
+{
+  "version": 1,
+  "kind": "controlled_failure_otlp_probe",
+  "sourceRevision": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+  "environment": "dev",
+  "startedAt": "2026-11-09T02:43:10.028Z",
+  "endedAt": "2026-11-09T02:43:11.147Z",
+  "boundary": "20 synthetic test-environment HTTP/real PostgreSQL failures through the product sampler, retention and safe exporters. No production coding run or model. Raw OTLP callback success is not backend ingestion evidence.",
+  "configuredSampleRate": 0.1,
+  "attempted": 20,
+  "failedResponses": 20,
+  "initialUnsampled": 17,
+  "localRetainedRoots": 20,
+  "localExportedSpans": 80,
+  "localExportedLogs": 40,
+  "traceIds": [
+    "142e5c51ad8f7ccf5b0ee00ee5974fc7",
+    "18aa62f9b603d3fbe1c5b69ed14ee70d",
+    "1c0ce5cb77ec34d689a629c48c8d1ce5",
+    "214ef3d5f15104544ee4c93d8d0a0465",
+    "2e79557078cd398fffba9b521f1cd130",
+    "2f7c169fa19a3f77b899506ca7df8f7d",
+    "42170c9357e9d05a66a874e69fc1615d",
+    "570a22f1d589534befe0d4dad97c87c6",
+    "58ed88c9d5faa22053ce3bbd25850747",
+    "5b8b4c28b5ba2e13335411ba0701c903",
+    "7030ffd78b98df3e6abcd922eeeedc1f",
+    "75dc3064bde7124904087f98e5b05cb8",
+    "7de6056348d9c1cab657ed06b3f8449a",
+    "8063811ce484c0b392f49fec65e1e427",
+    "a5b501b3cb2f80fad9a2e96e65ef6eee",
+    "c94701a417b50a28405e753ddf45cd11",
+    "cb4cd300706d382dd5479cdc11590568",
+    "f57d8fe0f040c11885c9cb01261a5ca7",
+    "f5dac85c72e9138b4cc53797892a596e",
+    "fb64a993ca432ae0392d4c100d4833fc"
+  ],
+  "perTrace": [
+    {
+      "traceId": "570a22f1d589534befe0d4dad97c87c6",
+      "rootSpanId": "088f015527430dc0",
+      "pgSpanIds": [
+        "4c5d38f52e54d376",
+        "baa975b1870dae27",
+        "0bf9846c7d6f93e3"
+      ],
+      "errorSpanIds": [
+        "0bf9846c7d6f93e3",
+        "088f015527430dc0"
+      ]
+    },
+    {
+      "traceId": "214ef3d5f15104544ee4c93d8d0a0465",
+      "rootSpanId": "31d4168efa4aeb6d",
+      "pgSpanIds": [
+        "75450f6d5de1ef4b",
+        "40b86ad0b73a0954",
+        "317d1f8d972d0e22"
+      ],
+      "errorSpanIds": [
+        "317d1f8d972d0e22",
+        "31d4168efa4aeb6d"
+      ]
+    },
+    {
+      "traceId": "2f7c169fa19a3f77b899506ca7df8f7d",
+      "rootSpanId": "55e557e7357871ef",
+      "pgSpanIds": [
+        "d52ed59488f179f4",
+        "9e62198717ec6e02",
+        "3c1db16b2ccfdc0e"
+      ],
+      "errorSpanIds": [
+        "3c1db16b2ccfdc0e",
+        "55e557e7357871ef"
+      ]
+    },
+    {
+      "traceId": "cb4cd300706d382dd5479cdc11590568",
+      "rootSpanId": "e6d0cbecadec26cf",
+      "pgSpanIds": [
+        "0f63ad96ade40f67",
+        "f7912aaa11d6ee97",
+        "6df61317c7da2177"
+      ],
+      "errorSpanIds": [
+        "6df61317c7da2177",
+        "e6d0cbecadec26cf"
+      ]
+    },
+    {
+      "traceId": "f57d8fe0f040c11885c9cb01261a5ca7",
+      "rootSpanId": "8c3b344c89665d85",
+      "pgSpanIds": [
+        "1fa57778882b8563",
+        "41ddb5ac00475593",
+        "c582db086f2abf55"
+      ],
+      "errorSpanIds": [
+        "c582db086f2abf55",
+        "8c3b344c89665d85"
+      ]
+    },
+    {
+      "traceId": "142e5c51ad8f7ccf5b0ee00ee5974fc7",
+      "rootSpanId": "e2b2aa90de71c2a7",
+      "pgSpanIds": [
+        "d306d2db3a077819",
+        "ce6cbe4e33c6218f",
+        "87679ef5bae0761c"
+      ],
+      "errorSpanIds": [
+        "87679ef5bae0761c",
+        "e2b2aa90de71c2a7"
+      ]
+    },
+    {
+      "traceId": "5b8b4c28b5ba2e13335411ba0701c903",
+      "rootSpanId": "a843952be7f5fbea",
+      "pgSpanIds": [
+        "192c2e5a61e0a6ff",
+        "2c97f4a8e0adfd5b",
+        "d693ec3570142c8c"
+      ],
+      "errorSpanIds": [
+        "d693ec3570142c8c",
+        "a843952be7f5fbea"
+      ]
+    },
+    {
+      "traceId": "c94701a417b50a28405e753ddf45cd11",
+      "rootSpanId": "d1fe8aeeca9030d6",
+      "pgSpanIds": [
+        "56daa393713225f1",
+        "3048a82f99e291b1",
+        "1e1c656ffc4a06f7"
+      ],
+      "errorSpanIds": [
+        "1e1c656ffc4a06f7",
+        "d1fe8aeeca9030d6"
+      ]
+    },
+    {
+      "traceId": "58ed88c9d5faa22053ce3bbd25850747",
+      "rootSpanId": "a12488869d632180",
+      "pgSpanIds": [
+        "3063d88cc86c61bb",
+        "dfd2624f57955080",
+        "22661d540c1e8ef3"
+      ],
+      "errorSpanIds": [
+        "22661d540c1e8ef3",
+        "a12488869d632180"
+      ]
+    },
+    {
+      "traceId": "75dc3064bde7124904087f98e5b05cb8",
+      "rootSpanId": "ab3c610aecd7fc97",
+      "pgSpanIds": [
+        "771e7d2d7471d3cd",
+        "2080d247d8c24918",
+        "257263ba999722c8"
+      ],
+      "errorSpanIds": [
+        "257263ba999722c8",
+        "ab3c610aecd7fc97"
+      ]
+    },
+    {
+      "traceId": "7030ffd78b98df3e6abcd922eeeedc1f",
+      "rootSpanId": "ff66008764c97a04",
+      "pgSpanIds": [
+        "6dcdb9d3cfb11699",
+        "f8ddeef3093ce031",
+        "bd4eae99e6c23aa5"
+      ],
+      "errorSpanIds": [
+        "bd4eae99e6c23aa5",
+        "ff66008764c97a04"
+      ]
+    },
+    {
+      "traceId": "42170c9357e9d05a66a874e69fc1615d",
+      "rootSpanId": "3339b8d138e311da",
+      "pgSpanIds": [
+        "ab74f0a4b4313301",
+        "e34601f812de328b",
+        "6dd20538543ca656"
+      ],
+      "errorSpanIds": [
+        "6dd20538543ca656",
+        "3339b8d138e311da"
+      ]
+    },
+    {
+      "traceId": "fb64a993ca432ae0392d4c100d4833fc",
+      "rootSpanId": "73bde89441229ecd",
+      "pgSpanIds": [
+        "e98eafbba86d9a99",
+        "4639660f45b5cb57",
+        "9edbc53a6cdecd6f"
+      ],
+      "errorSpanIds": [
+        "9edbc53a6cdecd6f",
+        "73bde89441229ecd"
+      ]
+    },
+    {
+      "traceId": "f5dac85c72e9138b4cc53797892a596e",
+      "rootSpanId": "9974bcd642f42d6e",
+      "pgSpanIds": [
+        "19cb01b83d60f75b",
+        "0631fe45e1157bb4",
+        "fe487a32ea39e7ea"
+      ],
+      "errorSpanIds": [
+        "fe487a32ea39e7ea",
+        "9974bcd642f42d6e"
+      ]
+    },
+    {
+      "traceId": "2e79557078cd398fffba9b521f1cd130",
+      "rootSpanId": "07373826911edaf8",
+      "pgSpanIds": [
+        "6aa1c114add261b0",
+        "b6c272e3ccebd7af",
+        "1f4880ca1582d38c"
+      ],
+      "errorSpanIds": [
+        "1f4880ca1582d38c",
+        "07373826911edaf8"
+      ]
+    },
+    {
+      "traceId": "18aa62f9b603d3fbe1c5b69ed14ee70d",
+      "rootSpanId": "376f707b5360b4e3",
+      "pgSpanIds": [
+        "5dad94da69849fca",
+        "2b50323e137b26a3",
+        "012206725d1cb29e"
+      ],
+      "errorSpanIds": [
+        "012206725d1cb29e",
+        "376f707b5360b4e3"
+      ]
+    },
+    {
+      "traceId": "1c0ce5cb77ec34d689a629c48c8d1ce5",
+      "rootSpanId": "f903f1ed00c72ce5",
+      "pgSpanIds": [
+        "15b48221904b9e12",
+        "e084eeca1bdb48d6",
+        "2dc5afad3594e207"
+      ],
+      "errorSpanIds": [
+        "2dc5afad3594e207",
+        "f903f1ed00c72ce5"
+      ]
+    },
+    {
+      "traceId": "8063811ce484c0b392f49fec65e1e427",
+      "rootSpanId": "330c54563d35f077",
+      "pgSpanIds": [
+        "b048868eed31ca71",
+        "b39541dda34119fb",
+        "666974edf3ffde6d"
+      ],
+      "errorSpanIds": [
+        "666974edf3ffde6d",
+        "330c54563d35f077"
+      ]
+    },
+    {
+      "traceId": "7de6056348d9c1cab657ed06b3f8449a",
+      "rootSpanId": "1c2cf313d032627f",
+      "pgSpanIds": [
+        "124b9e2f432601c5",
+        "07af5aade18a7f4a",
+        "1e2041f0ed378225"
+      ],
+      "errorSpanIds": [
+        "1e2041f0ed378225",
+        "1c2cf313d032627f"
+      ]
+    },
+    {
+      "traceId": "a5b501b3cb2f80fad9a2e96e65ef6eee",
+      "rootSpanId": "6fd4473913886f22",
+      "pgSpanIds": [
+        "c06b8af847d2a3c4",
+        "c48d8486847ada0e",
+        "8bd60396598844ac"
+      ],
+      "errorSpanIds": [
+        "8bd60396598844ac",
+        "6fd4473913886f22"
+      ]
+    }
+  ],
+  "checks": {
+    "allAttemptsCompleted": true,
+    "rootsRetained": true,
+    "ordinaryFailures": true,
+    "realPgErrorPerTrace": true,
+    "safeCausePerTrace": true,
+    "linkedErrorLogPerTrace": true,
+    "unsampledFailuresPromoted": true,
+    "rawSqlErrorAbsent": true
+  },
+  "backendObserved": false,
+  "cleanupComplete": true,
+  "transportBoundary": "Raw OTLP exporter callback batches/items; not HTTP wire attempts or stored PostHog rows.",
+  "transport": {
+    "spans": {
+      "enabled": true,
+      "batchesAttempted": 1,
+      "recordsAttempted": 80,
+      "batchesSucceeded": 1,
+      "recordsSucceeded": 80,
+      "batchesFailed": 0,
+      "recordsFailed": 0,
+      "exportThrows": 0,
+      "flushFailures": 0,
+      "shutdownFailures": 0,
+      "batchesPending": 0,
+      "recordsPending": 0
+    },
+    "logs": {
+      "enabled": true,
+      "batchesAttempted": 1,
+      "recordsAttempted": 40,
+      "batchesSucceeded": 1,
+      "recordsSucceeded": 40,
+      "batchesFailed": 0,
+      "recordsFailed": 0,
+      "exportThrows": 0,
+      "flushFailures": 0,
+      "shutdownFailures": 0,
+      "batchesPending": 0,
+      "recordsPending": 0
+    }
+  },
+  "result": "exported_awaiting_backend_verification"
+}

@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "kind": "original-codex-factory-argument-equality",
+  "observedAt": "2026-11-09 03:11:39 UTC",
+  "sourceRevision": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "workflowRunId": "wrun_41M6YZRNVK20WAZG415PMFS85S",
+  "traceId": "0000000000000000fc116ba2f35a31c3",
+  "toolCallHash": "4dda8ba793ad3ceaad75d42cf54e01ed",
+  "boundedOriginalWindow": [
+    "2026-11-09T01:45:10Z",
+    "2026-11-09T01:50:35Z"
+  ],
+  "queryNumber": 5,
+  "readOnly": true,
+  "rawInputOutputReturned": false,
+  "result": [
+    {
+      "fixtureMatched": true,
+      "exactCallCount": "1",
+      "fixtureIssueReferenceFound": true,
+      "inputHasOnlyTaskId": true,
+      "taskIdIsUuid": true,
+      "taskIdEqualsLatestFixtureIssueId": true
+    }
+  ],
+  "conclusion": "The exact original get_factory_task call used only taskId and that value equals the UUID in its latest owned startup fixture's user request. The fixture request names an existing Issue and asks dispatch_run. This is Issue ID / Factory task ID confusion in this original model call; the failure is not evidence of an Agent start or provider timeout.",
+  "limitations": [
+    "No raw user text, tool input/output, token, connection credential, email or prompt is returned.",
+    "The query establishes equality against the persisted original request, not what objects existed before cleanup.",
+    "No Factory task is pre-created, no principal is changed, and no model request is retried.",
+    "No claim that a future Codex call will choose dispatch_run correctly."
+  ],
+  "resources": {
+    "modelCalls": 0,
+    "tasksCreated": 0,
+    "vmsCreated": 0,
+    "databaseMutations": 0
+  }
+}
+

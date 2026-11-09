@@ -1,0 +1,40 @@
+{
+  "artifactId": 13645387942,
+  "runId": 42551207785,
+  "jobId": 128946987410,
+  "path": "device-sql-probe-original.zip",
+  "bytes": 5718,
+  "apiDigest": "sha256:3354e680867161df2e73c2d9ddf4af7900441ad918aff10de09878b16d2d43e9",
+  "sha256": "3354e680867161df2e73c2d9ddf4af7900441ad918aff10de09878b16d2d43e9",
+  "gitBlobSha": "6d049a0ced3eb0337340eb8027f660a4554c0610",
+  "crcPassed": true,
+  "safePathsAndNoSymlinks": true,
+  "files": [
+    {
+      "path": "ci-original/candidate-green.original.log",
+      "bytes": 4878,
+      "sha256": "66fb5b3fc74c4bb00ad9551f22ece03509c7495243d3076a5c26952a5d8a12ce",
+      "gitBlobSha": "3160d319587e6d50069ac933576a43b9cae28e0d"
+    },
+    {
+      "path": "ci-original/baseline-red.original.log",
+      "bytes": 6234,
+      "sha256": "868ae9bb7b7cf14cd38b5ebd89fd7054e859728a4bbec4c5dd7cb3ef9b5d9360",
+      "gitBlobSha": "3797b99255525d12f60c5245a7ceadbb875da8c9"
+    },
+    {
+      "path": "ci-original/paired.safe.json",
+      "bytes": 2053,
+      "sha256": "096afcb67046ea6fbef22ba15ec28fd010eb938f2cc1b9bc335ff076eeae4e4c",
+      "gitBlobSha": "babbfc517343421b6c54c44de885d93f6a84d78d"
+    },
+    {
+      "path": "ci-original/source.safe.json",
+      "bytes": 1540,
+      "sha256": "86c2551217d05c8b801d53e38b24fbf4b8ae2579bead3fdb885b65fa610e2d0d",
+      "gitBlobSha": "a71074a1a7826dd327d1353bc7e5f9e745e698f2"
+    }
+  ],
+  "downloadMethod": "one connector artifact download request; copied its returned file reference once",
+  "downloadUrlOmitted": true
+}

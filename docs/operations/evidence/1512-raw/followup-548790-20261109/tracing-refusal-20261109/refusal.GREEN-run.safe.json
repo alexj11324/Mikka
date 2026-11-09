@@ -1,0 +1,58 @@
+{
+  "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-tracing-core-copy",
+  "command": [
+    "node",
+    "--experimental-test-module-mocks",
+    "--import",
+    "./scripts/server-test.mjs",
+    "--import",
+    "tsx",
+    "--test",
+    "--test-name-pattern=closed repository refusals|both actual Factory read tools",
+    "lib/coordinator/repository-resolution.test.ts",
+    "tests/cloud-dispatch-startup.test.ts"
+  ],
+  "startedAt": "2026-11-09T02:33:22.637761+00:00",
+  "endedAt": "2026-11-09T02:33:26.372967+00:00",
+  "exitCode": 0,
+  "source": {
+    "lib/dispatch-timing.ts": {
+      "bytes": 4016,
+      "sha256": "9c8282c0d2b0a0b9ea8bf904eaade82ce5337c3e0abf1706ece87d485457a700"
+    },
+    "lib/coordinator/repository-resolution.ts": {
+      "bytes": 11263,
+      "sha256": "0f2974a3c864dd9384122f811dcbec56188c28d3a19566a3b8e1db72264902d6"
+    },
+    "workflows/coordinator/steps.ts": {
+      "bytes": 91110,
+      "sha256": "dff7bb2a993b9510cc70ecde1c5b2bc03e6a8fb5ffa1c68919ce49e19d1a57ad"
+    },
+    "workflows/coordinator/factory-steps.ts": {
+      "bytes": 11913,
+      "sha256": "a60e07f292989ebab18e2cdb6bfc74e46fd9e12f6c694c1cbb2f62047189b9f6"
+    },
+    "lib/coordinator/repository-resolution.test.ts": {
+      "bytes": 22314,
+      "sha256": "9a0bedfd3aac7948c84a09dd48d09cc25041092c9f2481799cff5446603acc9c"
+    },
+    "tests/cloud-dispatch-startup.test.ts": {
+      "bytes": 32351,
+      "sha256": "01445c824a8d9d3474f744fc83a4cf26180d6a0f32002d7f21f28383538865cf"
+    },
+    "lib/tracing/node.ts": {
+      "bytes": 7287,
+      "sha256": "e1ccb4a2aaba54d8e3be4d27d9ff18b31dd9fc683f72117f6dd0ea730099f4d0"
+    },
+    "lib/tracing/logs.test.ts": {
+      "bytes": 11318,
+      "sha256": "6e1f3200889e5f446a0427b4c62d7db3195d58f8d72853bbd1dc6cb03118200b"
+    }
+  },
+  "sourceUnchangedDuringTest": true,
+  "log": {
+    "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/tracing-refusal-20261109/refusal.GREEN.log",
+    "bytes": 640,
+    "sha256": "f0667796e9fa6aca71b6a876d596a0f06ec812f70a843778545d3bdeba763879"
+  }
+}

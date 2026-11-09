@@ -1,0 +1,13 @@
+✔ closed repository refusals keep their exact result and mark phase plus dispatch beneath an OK Workflow step (76.036852ms)
+(node:14) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:14) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ both actual Factory read tools return their refusal unchanged while an owned child keeps ERROR (453.188512ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3645.425336

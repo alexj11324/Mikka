@@ -1,0 +1,16 @@
+{
+  "schema": "issue1512.device-polls-workflow-review.v2",
+  "previousWorkflowSha256": "d88a6d21a820db4728ea86221805e023bb34ea8dc2648e63bf02a0bcf8d6b928",
+  "onlyChange": "Bind the service published port to 127.0.0.1:55491:5432",
+  "workflow": {
+    "path": "polls-probe-workflow-v2.yml",
+    "targetPath": ".github/workflows/issue1512-device-sql-probe.yml",
+    "bytes": 14258,
+    "sha256": "7de214a59f7f38fe4c34b2f453ec3ec402411bab23d4c721f28a11ad4de06541",
+    "gitBlob": "a73bfc08be4a375327ae38051d9aad5821db86f2"
+  },
+  "yamlParsed": true,
+  "embeddedPythonSyntax": true,
+  "parentReview": "Root approved v1 plus this exact binding change; no further authorization pending",
+  "published": false
+}

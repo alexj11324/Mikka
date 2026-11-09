@@ -1,0 +1,159 @@
+{
+  "schema": "issue1512.device-backend-proposal.v1",
+  "recordedAt": "2026-11-09T02:26:40.160502+00:00",
+  "sourceHead": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+  "sourceTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+  "localSameTreeCommit": "5975e42ef3436a53546948b556166777d1b0be9d",
+  "productFiles": [
+    {
+      "path": "checkout/lib/device-enrollment.ts",
+      "bytes": 1050,
+      "sha256": "59a025174235a9bbb5a17aa5c654a96d52deb002bb72859ae655af0322b0fede",
+      "gitBlobSha": "8fe53cb39985150e5fc05daa6370121cb5426d53"
+    },
+    {
+      "path": "checkout/lib/device-management.ts",
+      "bytes": 3206,
+      "sha256": "17fb62c6033acded70487b56e09f989410b782d4afaaa0445988442b5f5754b1",
+      "gitBlobSha": "c2243c5732d67b3ff5444196ce3b45e9aca67805"
+    },
+    {
+      "path": "checkout/lib/device-enrollment.db.test.ts",
+      "bytes": 24843,
+      "sha256": "2fa9b163ce0219171d4bc46d5107d1db55628dc847f88dc33165ec0e5028f526",
+      "gitBlobSha": "071b2243d35cd6fdd97b7be0f17f21728578c537"
+    }
+  ],
+  "productPatch": {
+    "path": "candidate-v1.patch",
+    "bytes": 7384,
+    "sha256": "4df0f1c8fe631abac01f2d6caa75d680ea769ed4dfde0e6014b481ec7a7cb1b0",
+    "gitBlobSha": "89a182e863d92f1d175e5566a47d67409444a606"
+  },
+  "temporaryProbeWorkflow": {
+    "path": "checkout/.github/workflows/issue1512-device-sql-probe.yml",
+    "bytes": 10639,
+    "sha256": "f57f57cb1d43fcb0436b02142311fb3cd1124e07943a2fe39ce50080b333983d",
+    "gitBlobSha": "0bdf202ffc6de25adbec90677537546438e9bb66"
+  },
+  "changes": [
+    {
+      "id": "A",
+      "function": "consumeDeviceEnrollment",
+      "behavior": "One PostgreSQL data-modifying CTE consumes an unexpired single-use grant and inserts the ordinary credential. No returned row means no credential. Both mutations fail atomically.",
+      "existingSemanticsToVerify": [
+        "owner binding",
+        "expired/missing grant rejected",
+        "one concurrent winner",
+        "insertion failure leaves the grant reusable"
+      ],
+      "queryBoundaryBefore": 4,
+      "queryBoundaryCandidate": 1
+    },
+    {
+      "id": "B",
+      "function": "pendingDeviceCommands",
+      "behavior": "Only completed.length===0 and failed.length===0 uses one read joining the current device removal state to its oldest pending command. Existing non-empty receipt/failed-command transaction and uninstall credential revocation remain byte-identical below the branch.",
+      "existingSemanticsToVerify": [
+        "removed devices expose only uninstall",
+        "disabled devices retain control commands",
+        "missing device returns empty",
+        "no cross-device commands",
+        "no writes on reads",
+        "fresh committed removal observed next call",
+        "receipt and uninstall revocation remain protected by original transaction"
+      ],
+      "queryBoundaryBefore": 4,
+      "queryBoundaryCandidate": 1
+    }
+  ],
+  "localVerification": {
+    "probe": {
+      "path": "offline-query-boundary.test.cjs",
+      "bytes": 3954,
+      "sha256": "2b6bfa74b4c237a817ac16f9f673a164a8b7fec61b8544ceb7d35e2e3433f84f",
+      "gitBlobSha": "10eed73ad8adeea5e857edb8222a20850d90c207"
+    },
+    "baselineLog": {
+      "path": "offline-baseline-red.original.log",
+      "bytes": 1853,
+      "sha256": "6fe55982721704c0a3d40abaeb879b69327d9f5d0802c550898ba2e9dfa9dfd4",
+      "gitBlobSha": "da2a7d3f440eda0df98b7202a41cb1b4cfe05705"
+    },
+    "baselineExit": 1,
+    "baselineTests": 2,
+    "baselineFailures": 2,
+    "candidateLog": {
+      "path": "offline-candidate-green.original.log",
+      "bytes": 460,
+      "sha256": "c683b8823351399bc816691d5f41cc57b946ded873f0aebdad530a9e9800c7f3",
+      "gitBlobSha": "cf92ac8e038030e1ebc41d36153e91051483fb64"
+    },
+    "candidateExit": 0,
+    "candidateTests": 2,
+    "candidateFailures": 0,
+    "postgresObserved": false,
+    "limit": "Actual source bodies evaluated with a fake database query boundary; real PostgreSQL atomicity/concurrency/revocation still require the planned isolated job.",
+    "lintLog": {
+      "path": "targeted-lint.original.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    "lintCommand": "./node_modules/.bin/oxlint --no-ignore lib/device-enrollment.ts lib/device-management.ts lib/device-enrollment.db.test.ts",
+    "lintExit": 0,
+    "diffCheckExit": 0,
+    "workflowYamlAndEmbeddedPythonSyntax": "passed",
+    "canonicalTypecheck": "not run for this isolated candidate; no typecheck success claimed"
+  },
+  "realPostgresPlan": {
+    "status": "prepared, not published or executed",
+    "branch": "ops/1512-device-sql-probe-20261109",
+    "trigger": "exact branch push only, attempt 1",
+    "sourceParent": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+    "guards": [
+      "repository/event/ref/attempt",
+      "exact parent and a699 source tree",
+      "three exact product/test SHA256 values and 100644 modes",
+      "only these three files plus dedicated workflow may differ",
+      "canonical full device-enrollment DB entry point",
+      "same new tests on exact old helpers and exact candidate",
+      "candidate bytes unchanged after tests"
+    ],
+    "permissions": {
+      "contents": "read"
+    },
+    "secrets": false,
+    "oidc": false,
+    "models": false,
+    "native": false,
+    "postgres": "single job-owned postgres:17 service, trust-authenticated loopback mikka_1512_device_e2e only",
+    "timeoutMinutes": 10,
+    "expectedTestsPerCase": 13,
+    "expectedBaseline": "11 pass / 2 count-regression failures / 0 skips",
+    "expectedCandidate": "13 pass / 0 failures / 0 skips",
+    "proofStatus": "expectations only; not observed",
+    "cleanup": "test schema finally hooks, owned baseline worktree removal, GHA service teardown, branch removal after source-bound evidence freeze"
+  },
+  "riskReview": {
+    "alignment": "Targets only measured enrollment/heartbeat SQL sources; no measurement-window, threshold, scheduling, Native UI or daemon version change.",
+    "impact": "Credential consumption remains owner-bound and atomic; a changed SQL expression is security-relevant and is not accepted until real PG concurrency/rollback tests pass. B excludes all acknowledgement and credential-revocation writes.",
+    "verification": "Local red/green at actual function query boundary and targeted lint are observed. Real PG and canonical merged-source gates are outstanding.",
+    "rollback": "Revert two helper edits; no migrations or stored-data format changes. Test and temporary workflow are separable.",
+    "errorDetection": "Full suite must include exact two baseline failures and no unexpected failure/skip; actual Native full-window budget must be rerun only through the later authorized final gate. Local counts cannot satisfy that acceptance."
+  },
+  "unchangedNativeFailure": {
+    "native": 473,
+    "web": 402,
+    "pass": false,
+    "predictedSavingsAreNotAcceptance": true
+  },
+  "execution": {
+    "sourceOrIndexOutsideIsolatedCopyChanged": false,
+    "externalActions": 0,
+    "resourcesOwned": 0,
+    "realPgRuns": 0,
+    "nativeRuns": 0,
+    "models": 0
+  }
+}

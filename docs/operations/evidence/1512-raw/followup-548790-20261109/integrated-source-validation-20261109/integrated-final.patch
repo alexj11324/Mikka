@@ -1,0 +1,1494 @@
+diff --git a/app/v1/devices/[deviceId]/repos/route.ts b/app/v1/devices/[deviceId]/repos/route.ts
+index 9fe33b05a..7ab99bf8f 100644
+--- a/app/v1/devices/[deviceId]/repos/route.ts
++++ b/app/v1/devices/[deviceId]/repos/route.ts
+@@ -1,10 +1,8 @@
+ import { withDeviceRoute } from '@/lib/device-route'
+ import { NextResponse } from 'next/server'
+-import { eq } from 'drizzle-orm'
+-import { db } from '@/lib/db'
++import { readUnderDeviceAuthority } from '@/lib/db'
+ import { readRepositoryDaemonSettings } from '@/lib/device-repositories'
+-import { deviceRepos } from '@/lib/db/schema'
+-import { authenticateDevice, ownsDevice } from '@/lib/device-link'
++import { authenticateDevice } from '@/lib/device-link'
+ 
+ export const dynamic = 'force-dynamic'
+ 
+@@ -13,8 +11,13 @@ async function handleGET(request: Request, { params }: { params: Promise<{ devic
+   const caller = await authenticateDevice(request)
+   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+   const { deviceId } = await params
+-  if (!await ownsDevice(deviceId, caller.userId)) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
+-  const rows = await db.select({ id: deviceRepos.id, repoPath: deviceRepos.repoPath, remoteUrl: deviceRepos.remoteUrl }).from(deviceRepos).where(eq(deviceRepos.deviceId, deviceId))
++  // Read the current owner and repository list under the same fresh credential
++  // snapshot. Nonempty lists retain their existing owner-scoped settings reads.
++  const rows = await readUnderDeviceAuthority<{ id: string; repoPath: string; remoteUrl: string | null }[] | null>(`SELECT COALESCE(
++    (SELECT json_agg(json_build_object('id',r.id,'repoPath',r."repoPath",'remoteUrl',r."remoteUrl"))
++      FROM device_repos r WHERE r."deviceId"=d.id), '[]'::json)
++    FROM devices d WHERE d.id=$1 AND d."ownerId"=$2 AND d."removedAt" IS NULL`, [deviceId, caller.userId])
++  if (!rows) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
+   const repos = await Promise.all(rows.map(async repo => {
+     const settings = repo.remoteUrl ? await readRepositoryDaemonSettings(caller.userId, repo.remoteUrl) : null
+     return {
+diff --git a/app/v1/devices/[deviceId]/runs/route.ts b/app/v1/devices/[deviceId]/runs/route.ts
+index 3bbb71a8a..5a4c4f848 100644
+--- a/app/v1/devices/[deviceId]/runs/route.ts
++++ b/app/v1/devices/[deviceId]/runs/route.ts
+@@ -1,9 +1,7 @@
+ import { withDeviceRoute } from '@/lib/device-route'
+ import { NextResponse } from 'next/server'
+-import { and, eq } from 'drizzle-orm'
+-import { db } from '@/lib/db'
+-import { agentRuns } from '@/lib/db/schema'
+-import { authenticateDevice, ownedDevice } from '@/lib/device-link'
++import { readUnderDeviceAuthority } from '@/lib/db'
++import { authenticateDevice } from '@/lib/device-link'
+ 
+ export const dynamic = 'force-dynamic'
+ 
+@@ -12,15 +10,14 @@ async function handleGET(request: Request, { params }: { params: Promise<{ devic
+   const caller = await authenticateDevice(request)
+   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+   const { deviceId } = await params
+-  const device = await ownedDevice(deviceId, caller.userId)
+-  if (!device) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
++  // Credential, current ownership and queued work share one read snapshot.
+   // A device with scheduling off gets no work; it stays registered.
+-  if (!device.enabled) return NextResponse.json({ runIds: [] })
+-  const rows = await db
+-    .select({ id: agentRuns.id })
+-    .from(agentRuns)
+-    .where(and(eq(agentRuns.deviceId, deviceId), eq(agentRuns.status, 'queued')))
+-  return NextResponse.json({ runIds: rows.map(row => row.id) })
++  const result = await readUnderDeviceAuthority<{ runIds: string[] } | null>(`SELECT json_build_object('runIds',
++    CASE WHEN d.enabled THEN COALESCE((SELECT json_agg(r.id) FROM agent_runs r
++      WHERE r."deviceId"=d.id AND r.status=$3), '[]'::json) ELSE '[]'::json END)
++    FROM devices d WHERE d.id=$1 AND d."ownerId"=$2 AND d."removedAt" IS NULL`, [deviceId, caller.userId, 'queued'])
++  if (!result) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
++  return NextResponse.json(result)
+ }
+ 
+ export const GET = withDeviceRoute(handleGET)
+diff --git a/apps/api/generated/routes.json b/apps/api/generated/routes.json
+index de55c9964..17c08e555 100644
+--- a/apps/api/generated/routes.json
++++ b/apps/api/generated/routes.json
+@@ -832,7 +832,7 @@
+         "GET",
+         "POST"
+       ],
+-      "sourceHash": "38fe0c41d60482f1314b414e1f3177add2f667ffa8ad3546794d15f5e9fce6aa"
++      "sourceHash": "08c91a56354263fcce77afc73ec9b44b2889ea07f0ae56007e07879fa07d36a4"
+     },
+     {
+       "path": "/mikka/api/devices/ssh",
+@@ -1330,7 +1330,7 @@
+         "POST",
+         "PUT"
+       ],
+-      "sourceHash": "9deeaa949f66beb9006576b3ebb0a29c81aabbdd4831f62ab8be63be59d7aa09"
++      "sourceHash": "40afa67a3d516a46b49ec19fe2f1a844f2be44398532387802ff262d34de6f17"
+     },
+     {
+       "path": "/mikka/api/mobile/open",
+@@ -2075,7 +2075,7 @@
+       "methods": [
+         "GET"
+       ],
+-      "sourceHash": "7a7d4b6f53cf5c58cb710f3beb01af9ce6fb2ce09da6e227a07a8ac2cc1bcdd9"
++      "sourceHash": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888"
+     },
+     {
+       "path": "/mikka/v1/devices/[deviceId]/runs",
+@@ -2084,7 +2084,7 @@
+       "methods": [
+         "GET"
+       ],
+-      "sourceHash": "329cd0aea78b05551fbe72b2d8562ce0fa9c67d3cee4318f324f1d3238d72e54"
++      "sourceHash": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c"
+     },
+     {
+       "path": "/mikka/v1/devices/[deviceId]/runs/[runId]/attachments/[id]",
+diff --git a/apps/api/generated/routes.ts b/apps/api/generated/routes.ts
+index a9b258ade..08aaff7b3 100644
+--- a/apps/api/generated/routes.ts
++++ b/apps/api/generated/routes.ts
+@@ -87,7 +87,7 @@ export const routes: ApiRoute[] = [
+   { ...{"path":"/mikka/api/device-tokens","template":"/api/device-tokens","source":"app/api/device-tokens/route.ts","methods":["GET"],"sourceHash":"83690e72095683aef1961e15b399dab4abaac18d56f67e04357e6decf722173d"}, load: () => import("../../../app/api/device-tokens/route") },
+   { ...{"path":"/mikka/api/device-tokens/[tokenId]/revoke","template":"/api/device-tokens/[tokenId]/revoke","source":"app/api/device-tokens/[tokenId]/revoke/route.ts","methods":["POST"],"sourceHash":"ab4b013b0030ecc407065f75f86227fb80c144a7fae59a63cf7991d442bcd9f6"}, load: () => import("../../../app/api/device-tokens/[tokenId]/revoke/route") },
+   { ...{"path":"/mikka/api/devices/computer","template":"/api/devices/computer","source":"app/api/devices/computer/route.ts","methods":["GET","POST"],"sourceHash":"248ddab360d6d736b940af14cf7f68fcd432d0d911ee2f3b786e693d3922c5c2"}, load: () => import("../../../app/api/devices/computer/route") },
+-  { ...{"path":"/mikka/api/devices/enrollment","template":"/api/devices/enrollment","source":"app/api/devices/enrollment/route.ts","methods":["GET","POST"],"sourceHash":"38fe0c41d60482f1314b414e1f3177add2f667ffa8ad3546794d15f5e9fce6aa"}, load: () => import("../../../app/api/devices/enrollment/route") },
++  { ...{"path":"/mikka/api/devices/enrollment","template":"/api/devices/enrollment","source":"app/api/devices/enrollment/route.ts","methods":["GET","POST"],"sourceHash":"08c91a56354263fcce77afc73ec9b44b2889ea07f0ae56007e07879fa07d36a4"}, load: () => import("../../../app/api/devices/enrollment/route") },
+   { ...{"path":"/mikka/api/devices/ssh","template":"/api/devices/ssh","source":"app/api/devices/ssh/route.ts","methods":["POST"],"sourceHash":"2626cc2b4623bdfdb7387ab0debef43b2a9cb334eaced7a85f5f446ae950d799"}, load: () => import("../../../app/api/devices/ssh/route") },
+   { ...{"path":"/mikka/api/devices/[deviceId]/commands","template":"/api/devices/[deviceId]/commands","source":"app/api/devices/[deviceId]/commands/route.ts","methods":["GET","POST"],"sourceHash":"89c93bc677ba5938dbc399382cc4e2a50817f09da593a0e135b52d9e9a09923f"}, load: () => import("../../../app/api/devices/[deviceId]/commands/route") },
+   { ...{"path":"/mikka/api/factory/agent-profiles","template":"/api/factory/agent-profiles","source":"app/api/factory/agent-profiles/route.ts","methods":["GET","POST"],"sourceHash":"30043b81aea21e265ce8e9df6ba36bb520cdf7f806b6a9636b39b15538f369fb"}, load: () => import("../../../app/api/factory/agent-profiles/route") },
+@@ -139,7 +139,7 @@ export const routes: ApiRoute[] = [
+   { ...{"path":"/mikka/api/mobile/chat/stop","template":"/api/mobile/chat/stop","source":"app/api/mobile/chat/stop/route.ts","methods":["POST"],"sourceHash":"b3407c3590b1e5488324cfa538c6e2245105c0c150938fb102579756d6187024"}, load: () => import("../../../app/api/mobile/chat/stop/route") },
+   { ...{"path":"/mikka/api/mobile/groups/[id]","template":"/api/mobile/groups/[id]","source":"app/api/mobile/groups/[id]/route.ts","methods":["PATCH"],"sourceHash":"7026d9b5fcf35701046e3e312f6b3c3a9d801869d4b4cfe94d2902d0388ca24c"}, load: () => import("../../../app/api/mobile/groups/[id]/route") },
+   { ...{"path":"/mikka/api/mobile/home","template":"/api/mobile/home","source":"app/api/mobile/home/route.ts","methods":["GET"],"sourceHash":"72a71986d9a6e06888ee6def12bf0ac5019110712ddc047e8155c97360b6824b"}, load: () => import("../../../app/api/mobile/home/route") },
+-  { ...{"path":"/mikka/api/mobile/model","template":"/api/mobile/model","source":"app/api/mobile/model/route.ts","methods":["GET","POST","PUT"],"sourceHash":"9deeaa949f66beb9006576b3ebb0a29c81aabbdd4831f62ab8be63be59d7aa09"}, load: () => import("../../../app/api/mobile/model/route") },
++  { ...{"path":"/mikka/api/mobile/model","template":"/api/mobile/model","source":"app/api/mobile/model/route.ts","methods":["GET","POST","PUT"],"sourceHash":"40afa67a3d516a46b49ec19fe2f1a844f2be44398532387802ff262d34de6f17"}, load: () => import("../../../app/api/mobile/model/route") },
+   { ...{"path":"/mikka/api/mobile/open","template":"/api/mobile/open","source":"app/api/mobile/open/route.ts","methods":["GET","POST"],"sourceHash":"b480abfc4e7a12917755e26d1e6662e7d1a5d4a51a4c65e20fc38c0824a222c2"}, load: () => import("../../../app/api/mobile/open/route") },
+   { ...{"path":"/mikka/api/mobile/pending-actions/[id]","template":"/api/mobile/pending-actions/[id]","source":"app/api/mobile/pending-actions/[id]/route.ts","methods":["POST"],"sourceHash":"5b2faf507ecdd174036caae23329be22f18394788acffa9039ee90fc9bbdd7cf"}, load: () => import("../../../app/api/mobile/pending-actions/[id]/route") },
+   { ...{"path":"/mikka/api/mobile/preferences","template":"/api/mobile/preferences","source":"app/api/mobile/preferences/route.ts","methods":["GET","PATCH"],"sourceHash":"13fe0612951a7a73f382bf095bbfc2cdd111d5abbeba1643059b2bc796afe2d8"}, load: () => import("../../../app/api/mobile/preferences/route") },
+@@ -218,8 +218,8 @@ export const routes: ApiRoute[] = [
+   { ...{"path":"/mikka/v1/devices/[deviceId]/gateway","template":"/v1/devices/[deviceId]/gateway","source":"app/v1/devices/[deviceId]/gateway/route.ts","methods":["GET"],"sourceHash":"3c5a79fbfc2a2a7d18d9261a2786489515cd5ef8409313648e23b432941bd8d8"}, load: () => import("../../../app/v1/devices/[deviceId]/gateway/route") },
+   { ...{"path":"/mikka/v1/devices/[deviceId]/github-token","template":"/v1/devices/[deviceId]/github-token","source":"app/v1/devices/[deviceId]/github-token/route.ts","methods":["POST"],"sourceHash":"cc13635353aeaeca38dbfaf1f8d651af57780d46aa3b77f990dd1b2edbad9ba5"}, load: () => import("../../../app/v1/devices/[deviceId]/github-token/route") },
+   { ...{"path":"/mikka/v1/devices/[deviceId]/heartbeat","template":"/v1/devices/[deviceId]/heartbeat","source":"app/v1/devices/[deviceId]/heartbeat/route.ts","methods":["POST"],"sourceHash":"b32fa96dd7fa77afca9900389f1a11266293eccfd7ce8b89e02d734a0de1395c"}, load: () => import("../../../app/v1/devices/[deviceId]/heartbeat/route") },
+-  { ...{"path":"/mikka/v1/devices/[deviceId]/repos","template":"/v1/devices/[deviceId]/repos","source":"app/v1/devices/[deviceId]/repos/route.ts","methods":["GET"],"sourceHash":"7a7d4b6f53cf5c58cb710f3beb01af9ce6fb2ce09da6e227a07a8ac2cc1bcdd9"}, load: () => import("../../../app/v1/devices/[deviceId]/repos/route") },
+-  { ...{"path":"/mikka/v1/devices/[deviceId]/runs","template":"/v1/devices/[deviceId]/runs","source":"app/v1/devices/[deviceId]/runs/route.ts","methods":["GET"],"sourceHash":"329cd0aea78b05551fbe72b2d8562ce0fa9c67d3cee4318f324f1d3238d72e54"}, load: () => import("../../../app/v1/devices/[deviceId]/runs/route") },
++  { ...{"path":"/mikka/v1/devices/[deviceId]/repos","template":"/v1/devices/[deviceId]/repos","source":"app/v1/devices/[deviceId]/repos/route.ts","methods":["GET"],"sourceHash":"5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888"}, load: () => import("../../../app/v1/devices/[deviceId]/repos/route") },
++  { ...{"path":"/mikka/v1/devices/[deviceId]/runs","template":"/v1/devices/[deviceId]/runs","source":"app/v1/devices/[deviceId]/runs/route.ts","methods":["GET"],"sourceHash":"0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c"}, load: () => import("../../../app/v1/devices/[deviceId]/runs/route") },
+   { ...{"path":"/mikka/v1/devices/[deviceId]/runs/[runId]/attachments/[id]","template":"/v1/devices/[deviceId]/runs/[runId]/attachments/[id]","source":"app/v1/devices/[deviceId]/runs/[runId]/attachments/[id]/route.ts","methods":["GET"],"sourceHash":"8e276cb00cdd9162b7c904ca7c74739f3f4d84917bffa438828cb0a5f96fbbf9"}, load: () => import("../../../app/v1/devices/[deviceId]/runs/[runId]/attachments/[id]/route") },
+   { ...{"path":"/mikka/v1/devices/[deviceId]/runs/[runId]/claim","template":"/v1/devices/[deviceId]/runs/[runId]/claim","source":"app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts","methods":["POST"],"sourceHash":"1310564b0ba665075a28204da7383013e25ca8d4b3356d3befcf33fe2707bf67"}, load: () => import("../../../app/v1/devices/[deviceId]/runs/[runId]/claim/route") },
+   { ...{"path":"/mikka/v1/devices/[deviceId]/runs/[runId]/computer-authority","template":"/v1/devices/[deviceId]/runs/[runId]/computer-authority","source":"app/v1/devices/[deviceId]/runs/[runId]/computer-authority/route.ts","methods":["GET"],"sourceHash":"d2691ac74323509fd19007e2b3a55d16b0f7923b58ed1e6805d4dd6fb1154f8e"}, load: () => import("../../../app/v1/devices/[deviceId]/runs/[runId]/computer-authority/route") },
+diff --git a/docs/operations/tracing.md b/docs/operations/tracing.md
+index e75e8377f..356943558 100644
+--- a/docs/operations/tracing.md
++++ b/docs/operations/tracing.md
+@@ -380,8 +380,13 @@ account/workspace switches, credentials, catalog loading and explicit writes
+ remain separate. The allowlisted views may perform their existing idempotent
+ initialization; this is not a database `READ ONLY` transaction. Batches share
+ only the current request's workspace memo and real owner/revision reads, never
+-a cross-request authorization cache. Revision keys are combined before each
+-reader proceeds to its data, preserving the original Live catch-up behavior.
++a cross-request authorization cache. The chat model readers also share their
++workspace subscription-policy observation within that active batch and actual
++database executor. Each reader still performs its own key, share and authority
++checks. Deferred, cron and workflow jobs read their own policy observation,
++even while the foreground batch remains active; the observation is cleared
++when the batch settles. Revision keys are combined before each reader proceeds
++to its data, preserving the original Live catch-up behavior.
+ The validated batch declares only its existing owner-list revision kinds. Once
+ an original reader resolves its real personal home, it can read those home
+ counters together, including a sibling whose workspace lookup finishes later.
+@@ -390,6 +395,16 @@ revision. Selected-team and entity keys still follow their original readers.
+ If a later reader fails, its planned home counter can be unused; no extra SQL
+ statement or response key is introduced, but this is not zero extra bytes for
+ every failed batch.
++
++Device run/repository polls read credential liveness, current device ownership
++and the requested list in one existing authority-bearing SQL snapshot. A
++revocation, expiry, removal or ownership change committed before that read is
++refused. Nonempty repository results keep their original settings reads. Grant
++consumption and credential issuance share one atomic SQL statement. A pending
++command read without completion/failure receipts reads the device state and
++queue together; acknowledgement and revocation transactions retain their
++existing behavior. These reductions do not alter the full Native measurement
++window or remove background traffic from its budget.
+ No task/thread list is truncated or substituted for another. Queued reads are
+ discarded when their owner/session/workspace generation retires, and in-flight
+ responses retain Main's existing identity fence. There is no timed collection
+@@ -682,6 +697,16 @@ type/code fields. Bodies are the fixed strings `mikka.stage.completed` or
+ `mikka.stage.failed`; free-form messages and cause messages are excluded.
+ Ordinary successful SQL spans are APM-only.
+ 
++Coordinator tools that convert a coded exception into an ordinary result keep
++an owned `coordinator.tool` child span around the operation. That child retains
++the safe exception type/code and `ERROR` status when the Workflow SDK records
++the returned result and completes its parent step as `OK`. The closed
++repository-resolution refusal branches likewise mark their owned
++`dispatch.resolveRepository` and enclosing `dispatch_run` spans with
++`error.type=DispatchRefusal` and the existing refusal code. Their
++`dispatch_timing.failed` is true. These explicit boundaries preserve the
++business return values; telemetry does not inspect arbitrary result contents.
++
+ Batching, bounded queues, exporter timeouts and an outage circuit breaker keep
+ telemetry off the business response path. No log export adds a database query
+ or an application polling loop. See the official [Node.js Logs guide](https://posthog.com/docs/logs/installation/nodejs).
+@@ -794,7 +819,10 @@ See the [exports API](https://posthog.com/docs/api/exports).
+   entry loads. Set `1` locally to see every request.
+ - Batch span processor (5 s, 512 spans per export, queue of 2048, then
+   dropped). On Vercel a flush is handed to `waitUntil` when a request's root
+-  span ends, after the response.
++  span ends, after the response. Its lifetime covers both the queued batches
++  and the exporter transport already started by the batch timer; native Logs
++  flush concurrently. Exporter rejection or a synchronous failure stays inside
++  the existing telemetry failure boundary.
+ - Exporting never blocks or fails a request. A failed export drops its spans
+   and pauses exporting for a minute; there are no retries beyond the
+   exporter's own bounded 5 s attempt.
+diff --git a/lib/coordinator/repository-resolution.test.ts b/lib/coordinator/repository-resolution.test.ts
+index 1d76b2da5..a5157f09e 100644
+--- a/lib/coordinator/repository-resolution.test.ts
++++ b/lib/coordinator/repository-resolution.test.ts
+@@ -2,6 +2,15 @@ import assert from 'node:assert/strict'
+ import { mock, test } from 'node:test'
+ import { findRepository, resolveRepository, withResolvedRepository, type RepositoryLister } from './repository-resolution'
+ import { GITHUB_APP_INSTALL_URL } from '@/lib/github/repository-match'
++import { createRequire } from 'node:module'
++import { dirname, join } from 'node:path'
++import { pathToFileURL } from 'node:url'
++import { context, propagation, SpanStatusCode, trace } from '@opentelemetry/api'
++import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base'
++import { InMemoryLogRecordExporter } from '@opentelemetry/sdk-logs'
++import { createTracerProvider, SafeExporter } from '../tracing/node'
++import { createLogProvider } from '../tracing/logs'
++import { withDispatchTiming, type DispatchTiming } from '../dispatch-timing'
+ 
+ const ISSUE = '550e8400-e29b-41d4-a716-446655440000'
+ const repos = (...names: string[]) => ({ repositories: names.map(fullName => ({ fullName, private: true })) })
+@@ -184,3 +193,76 @@ test('workspace discovery orders ambiguous names but neither authorizes nor sile
+   assert.equal(unavailable.mock.callCount(), 1, 'discovery adds no retry')
+   assert.equal(refusedContext.mock.callCount(), 0)
+ })
++
++
++test('closed repository refusals keep their exact result and mark phase plus dispatch beneath an OK Workflow step', async () => {
++  const require = createRequire(import.meta.url), workflowRequire = createRequire(require.resolve('workflow'))
++  const official = await import(pathToFileURL(join(dirname(workflowRequire.resolve('@workflow/core')), 'telemetry.js')).href)
++  const memory = new InMemorySpanExporter(), logMemory = new InMemoryLogRecordExporter()
++  const logs = createLogProvider({ endpoint: 'https://unused.test/i/v1/traces', token: 'unused', environment: 'dev', exporter: logMemory })
++  const provider = createTracerProvider({ exporter: new SafeExporter(memory), sampleRate: 1, environment: 'dev', logger: logs.getLogger('test'), serverless: false })
++  provider.register()
++  try {
++    const observations: { code: string; ownStatuses: number[]; ownCodes: unknown[]; parentStatus: number; failed: boolean; errorLogs: number }[] = []
++    for (const code of ['githubNotConnected', 'githubNotConfigured', 'githubReconnectRequired', 'githubUnavailable', 'githubRepositoryForbidden', 'repositoryNotFound', 'repositoryAmbiguous']) {
++      memory.reset(); logMemory.reset()
++      const list = mock.fn<RepositoryLister>(async () => {
++        if (code === 'repositoryNotFound') return repos()
++        if (code === 'repositoryAmbiguous') return repos('one/repository', 'two/repository')
++        throw Object.assign(new Error('PRIVATE_REFUSAL_MESSAGE'), { name: 'GitHubAccessError', code })
++      })
++      const dispatch = mock.fn(async () => ({ runId: 'never' })), lines: DispatchTiming[] = []
++      const result = await official.trace('step.execute repository fixture', (step: { setAttribute(key: string, value: string): void }) => {
++        step.setAttribute('workflow.run.id', 'wrun_repository_refusal_fixture')
++        return withDispatchTiming(() => withResolvedRepository('PRIVATE_OWNER', ISSUE, 'repository', dispatch, list, noContext),
++          Date.now, line => lines.push(line), async () => ({ workflowRunId: 'wrun_repository_refusal_fixture', stepId: 'step_fixture', attempt: 1 }))
++      })
++      assert.equal(result.error, code)
++      assert.equal(result.issueId, ISSUE)
++      if (code.startsWith('github')) assert.deepEqual(result, { error: code, repository: 'repository', issueId: ISSUE })
++      assert.equal(dispatch.mock.callCount(), 0)
++      assert.equal(list.mock.callCount(), code === 'githubUnavailable' ? 2 : 1, 'fresh authorization and existing retry semantics are unchanged')
++      await provider.forceFlush(); await logs.forceFlush()
++      const spans = memory.getFinishedSpans(), own = spans.filter(span => span.name.startsWith('dispatch'))
++      const parent = spans.find(span => span.name === 'step.execute')!
++      assert.equal(own.length, 2)
++      assert.ok(own.every(span => span.spanContext().traceId === parent.spanContext().traceId))
++      const root = own.find(span => span.name === 'dispatch_run')!, phase = own.find(span => span.name === 'dispatch.resolveRepository')!
++      assert.equal(phase.parentSpanContext?.spanId, root.spanContext().spanId)
++      assert.equal(root.parentSpanContext?.spanId, parent.spanContext().spanId)
++      assert.doesNotMatch(JSON.stringify({ spans: spans.map(span => ({ attributes: span.attributes, status: span.status, events: span.events })), logs: logMemory.getFinishedLogRecords().map(record => ({ body: record.body, attributes: record.attributes })) }), /PRIVATE_OWNER|PRIVATE_REFUSAL_MESSAGE/)
++      observations.push({ code, ownStatuses: own.map(span => span.status.code), ownCodes: own.map(span => span.attributes['mikka.error.code']), parentStatus: parent.status.code, failed: lines[0].failed,
++        errorLogs: logMemory.getFinishedLogRecords().filter(record => record.body === 'mikka.stage.failed' && record.attributes['mikka.error.code'] === code).length })
++    }
++    assert.ok(observations.every(item => item.parentStatus === SpanStatusCode.OK), 'official Workflow preserves the returned-result step semantics')
++    assert.ok(observations.every(item => item.ownStatuses.every(status => status === SpanStatusCode.ERROR)), 'the own phase and dispatch remain ERROR after the SDK marks its parent OK')
++    assert.ok(observations.every(item => item.ownCodes.every(code => code === item.code)))
++    assert.ok(observations.every(item => item.failed && item.errorLogs === 2))
++
++    // A later successful request returns the same object and cannot inherit a refusal.
++    memory.reset(); logMemory.reset()
++    const success = { runId: 'same-success-object', get content(): never { throw new Error('UNREAD_CONTENT') } }, lines: DispatchTiming[] = []
++    const result = await official.trace('step.execute successful repository fixture', () =>
++      withDispatchTiming(() => withResolvedRepository('alex', ISSUE, 'Mikka_test', async () => success, lister(), noContext),
++        Date.now, line => lines.push(line), async () => ({ workflowRunId: 'wrun_repository_success_fixture', stepId: 'step_fixture', attempt: 1 })))
++    assert.equal(result, success)
++    await provider.forceFlush(); await logs.forceFlush()
++    assert.equal(lines[0].failed, false)
++    assert.ok(memory.getFinishedSpans().every(span => span.status.code !== SpanStatusCode.ERROR && span.attributes['mikka.error.code'] === undefined))
++
++    // A malformed host error preserves the old return contract but is not a
++    // member of the closed repository telemetry code set.
++    memory.reset(); logMemory.reset()
++    const unknownLines: DispatchTiming[] = []
++    const unknown = await withDispatchTiming(() => withResolvedRepository('alex', ISSUE, 'repository', async () => success,
++      async () => { throw accessError('PRIVATE_UNKNOWN_CODE') }, noContext), Date.now, line => unknownLines.push(line),
++      async () => ({ workflowRunId: 'wrun_repository_unknown_fixture', stepId: 'step_fixture', attempt: 1 }))
++    assert.deepEqual(unknown, { error: 'PRIVATE_UNKNOWN_CODE', repository: 'repository', issueId: ISSUE })
++    await provider.forceFlush(); await logs.forceFlush()
++    assert.equal(unknownLines[0].failed, false)
++    assert.doesNotMatch(JSON.stringify(memory.getFinishedSpans().map(span => span.attributes)), /PRIVATE_UNKNOWN_CODE/)
++  } finally {
++    await provider.shutdown(); await logs.shutdown()
++    trace.disable(); context.disable(); propagation.disable()
++  }
++})
+diff --git a/lib/coordinator/repository-resolution.ts b/lib/coordinator/repository-resolution.ts
+index faa8276d7..6826efdd6 100644
+--- a/lib/coordinator/repository-resolution.ts
++++ b/lib/coordinator/repository-resolution.ts
+@@ -1,6 +1,6 @@
+ import { defaultAgentCopy } from '@/lib/agent-copy'
+ import { isBareRepositoryName, relatedRepositories } from '@/lib/github/repository-match'
+-import { timedPhase } from '@/lib/dispatch-timing'
++import { recordRepositoryRefusal, timedPhase } from '@/lib/dispatch-timing'
+ 
+ type Repository = { fullName: string; private?: boolean; description?: string | null; homepage?: string | null }
+ /** Lists one user's own authorized repositories. The host passes the user id; a model never does. */
+@@ -129,7 +129,11 @@ export async function sameRepository(userId: string, named: string, remoteUrl: s
+ 
+ /** Dispatches only with a resolved repository; otherwise nothing is queued and the result carries the card. */
+ export async function withResolvedRepository<T>(userId: string, issueId: string, repo: string, dispatch: (repo: string) => Promise<T>, list: RepositoryLister = ownRepositories, context: RepositoryContextSource = taskContext) {
+-  const resolved = await timedPhase('resolveRepository', () => resolveRepository(userId, repo, list, () => context(userId, issueId)))
++  const resolved = await timedPhase('resolveRepository', async () => {
++    const resolved = await resolveRepository(userId, repo, list, () => context(userId, issueId))
++    if ('error' in resolved) recordRepositoryRefusal(resolved.error)
++    return resolved
++  })
+   return 'repo' in resolved ? dispatch(resolved.repo) : { ...resolved, issueId }
+ }
+ 
+diff --git a/lib/desktop-rpc/read-batch-context.ts b/lib/desktop-rpc/read-batch-context.ts
+index 9ddddf423..e32da5e4d 100644
+--- a/lib/desktop-rpc/read-batch-context.ts
++++ b/lib/desktop-rpc/read-batch-context.ts
+@@ -1,4 +1,6 @@
+ import { AsyncLocalStorage } from 'node:async_hooks'
++import { COMMIT_EXECUTOR } from '../db/commit-effects'
++import { currentRoute } from '../tracing/labels'
+ import { isLiveRevisionKind, LIVE_ID } from '../live/events'
+ import type { LiveScope } from '../live/scope'
+ import { liveRevisionKey, readLiveRevisions, type LiveRef, type LiveRevisions } from '../live/revisions'
+@@ -11,6 +13,7 @@ type BatchContext = {
+   active: boolean
+   owners: Map<object, Map<string, Promise<LiveScope | null>>>
+   revisions: Map<Database, RevisionQueue>
++  subscriptionPolicies: Map<object, Map<string, Promise<boolean>>>
+   ownerRevisionKinds: ReturnType<typeof readBatchOwnerRevisionKinds>
+ }
+ const batches = new AsyncLocalStorage<BatchContext>()
+@@ -18,9 +21,24 @@ const batches = new AsyncLocalStorage<BatchContext>()
+ /** Installed only by the bounded read action. Detached after-work cannot keep
+  * using the batch's authority/revision observations once its items settle. */
+ export async function withReadBatchContext<T>(work: () => Promise<T>, actions: readonly BatchReadAction[] = []): Promise<T> {
+-  const scope: BatchContext = { active: true, owners: new Map(), revisions: new Map(), ownerRevisionKinds: readBatchOwnerRevisionKinds(actions) }
++  const scope: BatchContext = { active: true, owners: new Map(), revisions: new Map(), subscriptionPolicies: new Map(), ownerRevisionKinds: readBatchOwnerRevisionKinds(actions) }
+   try { return await batches.run(scope, work) }
+-  finally { scope.active = false; scope.owners.clear(); scope.revisions.clear() }
++  finally { scope.active = false; scope.owners.clear(); scope.revisions.clear(); scope.subscriptionPolicies.clear() }
++}
++
++/** Chat model readers consult the same workspace policy for keys and subscriptions.
++ * Share only its observation in this read batch; each consumer keeps its own
++ * data and authority checks. A request proxy must name its actual executor.
++ * Deferred jobs have their own observation even while the parent is active. */
++export function readBatchSubscriptionPolicy(database: object, workspaceId: string, read: () => Promise<boolean>): Promise<boolean> {
++  const scope = batches.getStore()
++  if (!scope?.active || /^(?:after|cron|workflow):/.test(currentRoute() ?? '')) return read()
++  const executor = (database as { [COMMIT_EXECUTOR]?: object })[COMMIT_EXECUTOR] ?? database
++  let policies = scope.subscriptionPolicies.get(executor)
++  if (!policies) { policies = new Map(); scope.subscriptionPolicies.set(executor, policies) }
++  let pending = policies.get(workspaceId)
++  if (!pending) { pending = Promise.resolve().then(read); policies.set(workspaceId, pending) }
++  return pending
+ }
+ 
+ export function readBatchOwnerScope(database: object, ownerId: string, read: () => Promise<LiveScope | null>): Promise<LiveScope | null> {
+diff --git a/lib/device-enrollment.db.test.ts b/lib/device-enrollment.db.test.ts
+index 431897540..071b2243d 100644
+--- a/lib/device-enrollment.db.test.ts
++++ b/lib/device-enrollment.db.test.ts
+@@ -145,6 +145,30 @@ test('registration grant is user-bound, expires, and has one concurrent winner',
+   assert.equal(await consumeDeviceEnrollment('invalid'), null)
+ }))
+ 
++test('registration grant consumption uses one PostgreSQL statement', t => run(async () => {
++  const grant = await mintDeviceEnrollment('single-statement-owner')
++  const result = await measured(() => consumeDeviceEnrollment(grant))
++  assert.ok(result.value, 'a valid grant still issues its credential')
++  t.diagnostic(JSON.stringify({ scenario: 'enrollment-consumption', statements: result.statements }))
++  assert.equal(result.statements, 1)
++}))
++
++test('a failed credential insertion does not consume the enrollment grant', () => run(async () => {
++  const { pool } = await import('./db')
++  const grant = await mintDeviceEnrollment('rollback-owner')
++  await pool.query(`ALTER TABLE device_tokens ADD CONSTRAINT enrollment_insert_failure CHECK ("userId" <> 'rollback-owner')`)
++  try {
++    await assert.rejects(consumeDeviceEnrollment(grant), /enrollment_insert_failure/)
++  } finally {
++    await pool.query('ALTER TABLE device_tokens DROP CONSTRAINT enrollment_insert_failure')
++  }
++  const credential = await consumeDeviceEnrollment(grant)
++  assert.ok(credential, 'failed insertion rolls the grant consumption back')
++  assert.equal(await consumeDeviceEnrollment(grant), null, 'the successful retry still consumes the grant once')
++  const { rows } = await pool.query('SELECT "userId" FROM device_tokens WHERE "tokenHash"=$1', [hashDeviceToken(credential)])
++  assert.deepEqual(rows, [{ userId: 'rollback-owner' }])
++}))
++
+ test('daemon acceptance follows real local enrollment and owner routes without a cloud token binding', () => run(async () => {
+   const { pool } = await import('./db')
+   const { GET: readTokens } = await import('../app/api/device-tokens/route')
+@@ -259,6 +283,35 @@ test('management queue is owner-scoped, serial and acknowledges only its device'
+   assert.equal(receipt.rows[0].completedAt.getTime(), replay.rows[0].completedAt.getTime())
+ }))
+ 
++test('pending commands without receipts are one read and preserve current device removal state', t => run(async () => {
++  const { pool } = await import('./db')
++  const active = randomUUID(), removed = randomUUID(), empty = randomUUID(), foreign = randomUUID()
++  const restart = randomUUID(), later = randomUUID(), hidden = randomUUID(), uninstall = randomUUID(), other = randomUUID()
++  await pool.query(`INSERT INTO devices(id,"ownerId",enabled,"removedAt")
++    VALUES($1,'pending-owner',false,NULL),($2,'pending-owner',false,now()),($3,'pending-owner',true,NULL),($4,'other-owner',true,NULL)`, [active, removed, empty, foreign])
++  await pool.query(`INSERT INTO device_management_commands(id,"deviceId",kind,"createdAt") VALUES
++    ($1,$6,'restart',now()-interval '3 seconds'),($2,$6,'update',now()),
++    ($3,$7,'restart',now()-interval '3 seconds'),($4,$7,'uninstall',now()),($5,$8,'redetect',now()-interval '5 seconds')`,
++  [restart, later, hidden, uninstall, other, active, removed, foreign])
++  const snapshot = async () => (await pool.query('SELECT id,"completedAt",error FROM device_management_commands WHERE "deviceId"=ANY($1::uuid[]) ORDER BY id', [[active, removed, empty, foreign]])).rows
++  const before = await snapshot()
++  const cases = [
++    { scenario: 'disabled-device', device: active, expected: [{ id: restart, kind: 'restart' }] },
++    { scenario: 'removed-device', device: removed, expected: [{ id: uninstall, kind: 'uninstall' }] },
++    { scenario: 'empty-device', device: empty, expected: [] },
++    { scenario: 'missing-device', device: randomUUID(), expected: [] },
++  ]
++  for (const { scenario, device, expected } of cases) {
++    const result = await measured(() => pendingDeviceCommands(device, []))
++    assert.deepEqual(result.value, expected)
++    t.diagnostic(JSON.stringify({ scenario, statements: result.statements }))
++    assert.equal(result.statements, 1)
++  }
++  assert.deepEqual(await snapshot(), before, 'a read does not acknowledge or fail any command')
++  await pool.query('UPDATE devices SET "removedAt"=now() WHERE id=$1', [active])
++  assert.deepEqual(await pendingDeviceCommands(active, []), [], 'the next call observes a committed removal and does not reuse an earlier device state')
++}))
++
+ test('a fresh login cannot admit an old daemon, and updating cannot revive a revoked credential', () => run(async () => {
+   const { pool } = await import('./db')
+   const { withDeviceRoute } = await import('./device-route')
+diff --git a/lib/device-enrollment.ts b/lib/device-enrollment.ts
+index f9490f183..8fe53cb39 100644
+--- a/lib/device-enrollment.ts
++++ b/lib/device-enrollment.ts
+@@ -11,15 +11,10 @@ export async function mintDeviceEnrollment(userId: string) {
+ 
+ /** Consumption and credential issuance commit together; parallel replay loses. */
+ export async function consumeDeviceEnrollment(token: string): Promise<string | null> {
+-  const connection = await pool.connect()
+-  try {
+-    await connection.query('BEGIN')
+-    const grant = await connection.query<{ userId: string }>(`DELETE FROM device_enrollments WHERE "tokenHash"=$1 AND "expiresAt">now() RETURNING "userId"`, [hashDeviceToken(token)])
+-    if (!grant.rows[0]) { await connection.query('ROLLBACK'); return null }
+-    const credential = newDeviceToken()
+-    await connection.query(`INSERT INTO device_tokens (id,"userId","tokenHash",name) VALUES ($1,$2,$3,'SSH')`, [randomUUID(), grant.rows[0].userId, hashDeviceToken(credential)])
+-    await connection.query('COMMIT')
+-    return credential
+-  } catch (error) { await connection.query('ROLLBACK'); throw error }
+-  finally { connection.release() }
++  const credential = newDeviceToken()
++  const { rows } = await pool.query<{ id: string }>(`WITH consumed AS (
++    DELETE FROM device_enrollments WHERE "tokenHash"=$1 AND "expiresAt">now() RETURNING "userId"
++  ) INSERT INTO device_tokens (id,"userId","tokenHash",name)
++    SELECT $2,"userId",$3,'SSH' FROM consumed RETURNING id`, [hashDeviceToken(token), randomUUID(), hashDeviceToken(credential)])
++  return rows.length ? credential : null
+ }
+diff --git a/lib/device-heartbeat.db.test.ts b/lib/device-heartbeat.db.test.ts
+index 68423cee4..27bbb720a 100644
+--- a/lib/device-heartbeat.db.test.ts
++++ b/lib/device-heartbeat.db.test.ts
+@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
+ import { createHash, randomBytes, randomUUID } from 'node:crypto'
+ import { mock, test } from 'node:test'
+ import { isE2eTarget } from '../tests/helpers/e2e-target.mjs'
++import { measured } from '../tests/helpers/read-metrics'
+ 
+ // Database regressions execute only in CI against ephemeral Postgres 17.
+ // Local pure runs skip them; REQUIRE_DB=1 makes a missing database fail.
+@@ -111,6 +112,77 @@ dbTest('a heartbeat re-checks execution identities only when the harnesses chang
+   })
+ })
+ 
++for (const kind of ['runs', 'repos'] as const) dbTest(`${kind} poll reads current authority, ownership and results in one snapshot`, { timeout: 20_000 }, async t => {
++  const [{ createRequestDatabaseScope, pool }, runs, repos] = await Promise.all([
++    import('./db'), import('../app/v1/devices/[deviceId]/runs/route'), import('../app/v1/devices/[deviceId]/repos/route'),
++  ])
++  const scope = createRequestDatabaseScope(databaseUrl!)
++  const owner = `poll-${kind}-${randomUUID()}`, foreign = `poll-other-${randomUUID()}`
++  const owners = [owner, foreign]
++  t.after(async () => {
++    await scope.run(async () => {
++      await pool.query('DELETE FROM device_repos WHERE "userId"=ANY($1::text[])', [owners])
++      await pool.query('DELETE FROM agent_runs WHERE "userId"=ANY($1::text[])', [owners])
++      await pool.query('DELETE FROM agents WHERE "userId"=ANY($1::text[])', [owners])
++      await pool.query('DELETE FROM device_tokens WHERE "userId"=ANY($1::text[])', [owners])
++      await pool.query('DELETE FROM devices WHERE "ownerId"=ANY($1::text[])', [owners])
++      await pool.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [owners])
++    })
++    await scope.close()
++  })
++  await scope.run(async () => {
++    for (const user of owners) await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$1||'@example.invalid',false,now(),now())`, [user])
++    const fixture = async () => {
++      const device = randomUUID(), tokenId = randomUUID(), credential = `orv_${randomBytes(32).toString('base64url')}`
++      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind) VALUES($1,$2,'Poll fixture','local')`, [device, owner])
++      await pool.query('INSERT INTO device_tokens(id,"userId","tokenHash","lastUsedAt") VALUES($1,$2,$3,now())', [tokenId, owner, createHash('sha256').update(credential).digest('hex')])
++      const request = () => new Request(`http://127.0.0.1/mikka/v1/devices/${device}/${kind}`, { headers: { authorization: `Bearer ${credential}`, 'x-mikka-client-version': '999.0.0' } })
++      return { device, tokenId, request }
++    }
++    const get = kind === 'runs' ? runs.GET : repos.GET
++    const current = await fixture()
++    const read = () => get(current.request(), { params: Promise.resolve({ deviceId: current.device }) })
++    const result = await measured(async () => {
++      const response = await read()
++      assert.equal(response.status, 200)
++      return response.json()
++    })
++    assert.deepEqual(result.value, kind === 'runs' ? { runIds: [] } : { repos: [] })
++    t.diagnostic(JSON.stringify({ scenario: `${kind}-empty-poll`, statements: result.statements }))
++    if (kind === 'runs') {
++      const agent = randomUUID(), queued = randomUUID()
++      await pool.query(`INSERT INTO agents(id,"userId",name,harness) VALUES($1,$2,'Poll agent','codex')`, [agent, owner])
++      await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","deviceId",status) VALUES($1,$2,$3,$4,'queued')`, [queued, owner, agent, current.device])
++      assert.deepEqual(await (await read()).json(), { runIds: [queued] })
++      await pool.query('UPDATE devices SET enabled=false WHERE id=$1', [current.device])
++      assert.deepEqual(await (await read()).json(), { runIds: [] }, 'disabled devices receive no queued work')
++    } else {
++      const repo = randomUUID(), repoPath = 'v2/github.com/fixture/poll-repo'
++      await pool.query('INSERT INTO device_repos(id,"userId","deviceId","repoPath") VALUES($1,$2,$3,$4)', [repo, owner, current.device, repoPath])
++      assert.deepEqual(await (await read()).json(), { repos: [{ repoId: repo, name: 'poll-repo', path: repoPath, remoteUrl: null }] })
++    }
++    for (const change of ['revoked', 'expired', 'removed', 'foreign-owner'] as const) {
++      const f = await fixture()
++      const entered = Promise.withResolvers<void>(), gate = Promise.withResolvers<{ deviceId: string }>()
++      // The wrapped handler reads params after real initial authentication and
++      // waits for this promise before any business read.
++      const pending = get(f.request(), { get params() { entered.resolve(); return gate.promise } })
++      try {
++        await Promise.race([entered.promise, pending.then(() => { throw new Error('Poll completed before the params barrier') })])
++        if (change === 'revoked') await pool.query('UPDATE device_tokens SET "revokedAt"=now() WHERE id=$1', [f.tokenId])
++        else if (change === 'expired') await pool.query(`UPDATE device_tokens SET "expiresAt"=now()-interval '1 second' WHERE id=$1`, [f.tokenId])
++        else if (change === 'removed') await pool.query('UPDATE devices SET "removedAt"=now() WHERE id=$1', [f.device])
++        else await pool.query('UPDATE devices SET "ownerId"=$2 WHERE id=$1', [f.device, foreign])
++      } finally { gate.resolve({ deviceId: f.device }) }
++      const response = await pending
++      assert.equal(response.status, change === 'revoked' || change === 'expired' ? 401 : 404, `${change} between authentication and the snapshot is refused`)
++      const body = await response.json()
++      assert.equal('runIds' in body || 'repos' in body, false, 'no business data accompanies a refused read')
++    }
++    assert.equal(result.statements, 2, 'one fresh authentication and one authority/owner/result snapshot')
++  })
++})
++
+ dbTest('initial claim repository handoff removes a real cloud repos request without increasing SQL, rows or response bytes', async t => {
+   const [{ createRequestDatabaseScope, pool }, { GET }, { readRepositorySettings }] = await Promise.all([
+     import('./db'), import('../app/v1/devices/[deviceId]/repos/route'), import('./device-repositories'),
+diff --git a/lib/device-management.ts b/lib/device-management.ts
+index c2e44913f..c2243c573 100644
+--- a/lib/device-management.ts
++++ b/lib/device-management.ts
+@@ -14,6 +14,15 @@ export async function enqueueDeviceCommand(userId: string, deviceId: string, kin
+   return id
+ }
+ export async function pendingDeviceCommands(deviceId: string, completed: string[], failed: { id: string; error: string }[] = []) {
++  // With no receipts this is one read: removal state and the pending command
++  // share a snapshot. Acknowledgements and credential revocation stay below.
++  if (!completed.length && !failed.length) {
++    const { rows } = await pool.query<{ id: string; kind: DeviceCommandKind }>(`SELECT c.id,c.kind
++      FROM devices d JOIN device_management_commands c ON c."deviceId"=d.id
++      WHERE d.id=$1 AND c."completedAt" IS NULL AND (d."removedAt" IS NULL OR c.kind='uninstall')
++      ORDER BY c."createdAt" LIMIT 1`, [deviceId])
++    return rows
++  }
+   const connection = await pool.connect()
+   try {
+     await connection.query('BEGIN')
+diff --git a/lib/device-unit-fence.db.test.ts b/lib/device-unit-fence.db.test.ts
+index a5237da05..bc65b3faf 100644
+--- a/lib/device-unit-fence.db.test.ts
++++ b/lib/device-unit-fence.db.test.ts
+@@ -147,15 +147,22 @@ test('when no fence connection can be had the request is refused with 503, never
+   for (const answer of await Promise.all(holding)) assert.equal(answer.status, 200)
+ })
+ 
+-test('ten concurrent device requests complete with three fence connections; fewer authorization transactions and round trips than one fence per statement', { skip: !url }, async t => {
+-  const { overrideDeploymentSwitch, runs } = await modules()
++test('ten concurrent multi-statement device requests complete with three fence connections; fewer authorization transactions and round trips than one fence per statement', { skip: !url }, async t => {
++  const { overrideDeploymentSwitch, withDeviceRoute, pool } = await modules()
++  // Pure polling routes carry authority in one read snapshot. Keep exercising
++  // the unit fence with an actual protected burst of two separate statements.
++  const protectedBurst = withDeviceRoute(async () => {
++    await pool.query('SELECT 1')
++    await pool.query('SELECT 2')
++    return Response.json({ ok: true })
++  })
+   const fs = await Promise.all(Array.from({ length: 10 }, () => fixture()))
+-  const answers = await Promise.all(fs.map(f => runs.GET(request(f), { params: Promise.resolve({ deviceId: f.device }) })))
++  const answers = await Promise.all(fs.map(f => protectedBurst(request(f))))
+   for (const answer of answers) assert.equal(answer.status, 200)
+ 
+   // Count actual backend transaction completions on the request's checked-out
+   // clients. Database-wide statistics lag each backend and include our reader's
+-  // own transactions, so a sleep + pg_stat_clear_snapshot cannot isolate this poll.
++  // own transactions, so a sleep + pg_stat_clear_snapshot cannot isolate this burst.
+   let completed = 0, roundTrips = 0, explicit = 0
+   type Message = { status?: string; text?: string }
+   type MessageConnection = { on: (event: string, listener: (message: Message) => void) => unknown; removeListener: (event: string, listener: (message: Message) => void) => unknown }
+@@ -179,9 +186,9 @@ test('ten concurrent device requests complete with three fence connections; fewe
+       overrideDeploymentSwitch('deviceUnitFence', unit)
+       const f = fs[0]
+       // Warm connections and install the observer before the measured request.
+-      assert.equal((await runs.GET(request(f), { params: Promise.resolve({ deviceId: f.device }) })).status, 200)
++      assert.equal((await protectedBurst(request(f))).status, 200)
+       const before = { completed, roundTrips, explicit }
+-      assert.equal((await runs.GET(request(f), { params: Promise.resolve({ deviceId: f.device }) })).status, 200)
++      assert.equal((await protectedBurst(request(f))).status, 200)
+       // The route awaits its fence COMMIT in finally. ReadyForQuery(I) includes
+       // both explicit COMMIT/ROLLBACK and implicit autocommit transactions.
+       return { completed: completed - before.completed, roundTrips: roundTrips - before.roundTrips, explicit: explicit - before.explicit }
+diff --git a/lib/dispatch-timing.ts b/lib/dispatch-timing.ts
+index 7f5ca1b72..f82563e76 100644
+--- a/lib/dispatch-timing.ts
++++ b/lib/dispatch-timing.ts
+@@ -1,4 +1,5 @@
+ import { AsyncLocalStorage } from 'node:async_hooks'
++import { SpanStatusCode, trace } from '@opentelemetry/api'
+ import { stepIdentity } from '@/lib/model-call-timing'
+ import { withRunSpan } from './tracing/context'
+ 
+@@ -24,9 +25,26 @@ export interface DispatchTiming {
+   failed: boolean
+ }
+ 
+-type Recording = { phases: DispatchTiming['phases']; github: DispatchTiming['github'] }
++type Recording = { phases: DispatchTiming['phases']; github: DispatchTiming['github']; refusal?: string }
+ 
+ const current = new AsyncLocalStorage<Recording>()
++const repositoryRefusals = new Set(['githubNotConnected', 'githubNotConfigured', 'githubReconnectRequired', 'githubUnavailable', 'githubRepositoryForbidden', 'repositoryNotFound', 'repositoryAmbiguous'])
++
++function markRefusal(code: string) {
++  try {
++    const span = trace.getActiveSpan()
++    span?.setAttributes({ 'error.type': 'DispatchRefusal', 'mikka.error.code': code })
++    span?.setStatus({ code: SpanStatusCode.ERROR })
++  } catch { /* telemetry never changes a returned refusal */ }
++}
++
++/** A closed repository Resolution refusal, recorded before its phase ends. */
++export function recordRepositoryRefusal(code: string) {
++  if (!repositoryRefusals.has(code)) return
++  const recording = current.getStore()
++  if (recording) recording.refusal ??= code
++  markRefusal(code)
++}
+ 
+ /** Times one part of a dispatch; outside a timed dispatch it only runs it. */
+ export async function timedPhase<T>(phase: string, run: () => Promise<T>, now: () => number = Date.now): Promise<T> {
+@@ -52,8 +70,12 @@ export async function withDispatchTiming<T>(run: () => Promise<T>, now: () => nu
+   const started = now()
+   let failed = true
+   try {
+-    const result = await withRunSpan('dispatch_run', {}, () => current.run(recording, run))
+-    failed = false
++    const result = await withRunSpan('dispatch_run', {}, () => current.run(recording, async () => {
++      const result = await run()
++      if (recording.refusal) markRefusal(recording.refusal)
++      return result
++    }))
++    failed = recording.refusal !== undefined
+     return result
+   } finally {
+     const endedAt = now()
+diff --git a/lib/personal-policy.test.ts b/lib/personal-policy.test.ts
+index bb2de0169..fef80337b 100644
+--- a/lib/personal-policy.test.ts
++++ b/lib/personal-policy.test.ts
+@@ -1,6 +1,11 @@
+ import assert from 'node:assert/strict'
++import { AsyncLocalStorage } from 'node:async_hooks'
+ import { mock, test } from 'node:test'
+ import type { Pool } from 'pg'
++import { COMMIT_EXECUTOR } from './db/commit-effects'
++import { createReadBatch } from './desktop-rpc/read-batch'
++import { withReadBatchContext } from './desktop-rpc/read-batch-context'
++import { desktopActionSchemas } from './desktop-rpc/schemas'
+ 
+ const changed = () => assert.fail('a read cannot emit an execution side effect')
+ for (const [path, names] of [
+@@ -11,7 +16,8 @@ for (const [path, names] of [
+ ] as const) mock.module(new URL(path, import.meta.url).href, {
+   namedExports: Object.fromEntries(names.map(name => [name, changed])),
+ })
+-const { othersMayUse } = await import('./personal-policy')
++const { othersMayUse, pooledOwners, memberSubscriptionsAllowed } = await import('./personal-policy')
++const { usableApiKeys } = await import('./model-api-keys')
+ 
+ function reader(results: { allowOthers: boolean }[][], error?: Error) {
+   const calls: { sql: string; values: unknown[] }[] = []
+@@ -54,3 +60,223 @@ test('a failed authorization read propagates its original cause without another
+   await assert.rejects(othersMayUse(query, 'payor', 'workspace'), cause => cause === error)
+   assert.equal(calls.length, 1)
+ })
++
++const workspace = '10000000-0000-4000-8000-000000000001'
++const owner = 'policy-fixture-owner'
++
++function policyReader(allowed: boolean | undefined = true) {
++  const calls: string[] = []
++  const state: { allowed: boolean | undefined; error: Error | null; sharedKeys: boolean; sharedOwners: string[] } = {
++    allowed, error: null, sharedKeys: true, sharedOwners: ['policy-fixture-peer'],
++  }
++  const key = (mine: boolean) => ({
++    id: mine ? '10000000-0000-4000-8000-000000000002' : '10000000-0000-4000-8000-000000000003',
++    ownerId: mine ? owner : 'policy-fixture-peer', provider: 'openai', protocol: 'openai', name: mine ? 'own' : 'shared',
++    baseUrl: null, last4: 'test', models: ['fixture-model'], modelsError: null, responsesApi: true,
++  })
++  const query = { async query(sql: string, values: unknown[]) {
++    assert.match(sql, /^SELECT /, 'these public readers cannot write')
++    if (sql.includes('FROM workspace_personal_policies')) {
++      calls.push('policy'); assert.equal(values.length, 1)
++      if (state.error) throw state.error
++      return { rows: state.allowed === undefined ? [] : [{ subscriptions: state.allowed }] }
++    }
++    if (sql.includes('FROM model_api_keys WHERE')) {
++      calls.push('own-keys'); assert.deepEqual(values, [owner]); return { rows: [key(true)] }
++    }
++    if (sql.includes('FROM model_api_key_shares')) {
++      calls.push('shared-keys'); assert.deepEqual(values, [workspace, owner]); return { rows: state.sharedKeys ? [key(false)] : [] }
++    }
++    if (sql.includes('FROM workspace_subscription_shares')) {
++      calls.push('shared-owners'); assert.deepEqual(values, [workspace, owner]); return { rows: state.sharedOwners.map(ownerId => ({ ownerId })) }
++    }
++    assert.fail('unexpected policy consumer query')
++  } } as unknown as Pick<Pool, 'query'>
++  return { query, calls, state }
++}
++
++async function readPolicyConsumers(query: Pick<Pool, 'query'>) {
++  // The real chat-choice path reads keys before considering pooled subscriptions.
++  const keys = await usableApiKeys(query, owner, workspace)
++  const owners = await pooledOwners(query, owner, workspace)
++  return { keys: keys.map(key => ({ id: key.id, mine: key.mine })), owners }
++}
++
++function batchConsumers(query: Pick<Pool, 'query'>) {
++  const batch = createReadBatch(() => ({ 'coordinator.syncCoordinatorChat': {
++    args: desktopActionSchemas['coordinator.syncCoordinatorChat'], invoke: () => readPolicyConsumers(query),
++  } }))
++  return batch([{ action: 'coordinator.syncCoordinatorChat', args: [null] }])
++}
++
++test('a Native read batch shares its workspace policy across the real key and subscription readers', async () => {
++  const f = policyReader()
++  assert.deepEqual(await batchConsumers(f.query), [{ ok: true, result: {
++    keys: [{ id: '10000000-0000-4000-8000-000000000002', mine: true }, { id: '10000000-0000-4000-8000-000000000003', mine: false }],
++    owners: ['policy-fixture-peer'],
++  } }])
++  assert.equal(f.calls.filter(call => call === 'policy').length, 1, 'one actual policy SELECT for both consumers in this batch')
++  assert.deepEqual(f.calls.filter(call => call !== 'policy'), ['own-keys', 'shared-keys', 'shared-owners'], 'consumer guards and data reads still run')
++})
++
++test('a refused batch policy still permits own keys and skips every shared credential read', async () => {
++  const f = policyReader(false)
++  assert.deepEqual(await batchConsumers(f.query), [{ ok: true, result: {
++    keys: [{ id: '10000000-0000-4000-8000-000000000002', mine: true }], owners: [],
++  } }])
++  assert.deepEqual(f.calls, ['policy', 'own-keys'])
++  f.state.allowed = undefined
++  const [next] = await batchConsumers(f.query)
++  assert.equal(next.ok && (next.result as { owners: string[] }).owners.length, 1, 'the next request observes the original absent-policy default')
++  assert.equal(f.calls.filter(call => call === 'policy').length, 2, 'false is an observation, not a missing cache entry')
++})
++
++test('concurrent batches never share a policy observation, while sibling reads join only their batch', async () => {
++  const f = policyReader()
++  const read = () => withReadBatchContext(() => Promise.all([
++    memberSubscriptionsAllowed(f.query, workspace), memberSubscriptionsAllowed(f.query, workspace),
++  ]))
++  assert.deepEqual(await Promise.all([read(), read()]), [[true, true], [true, true]])
++  assert.equal(f.calls.length, 2)
++  f.state.allowed = false
++  assert.deepEqual(await read(), [false, false])
++  assert.equal(f.calls.length, 3)
++})
++
++test('a batch policy belongs to its actual request database executor and exact workspace', async () => {
++  const { pool, createRequestDatabaseScope } = await import('./db/request-scope')
++  const first = createRequestDatabaseScope('postgres://first.example.invalid/policy-test')
++  const second = createRequestDatabaseScope('postgres://second.example.invalid/policy-test')
++  const firstPool = first.run(() => Reflect.get(pool, COMMIT_EXECUTOR)) as Pool
++  const secondPool = second.run(() => Reflect.get(pool, COMMIT_EXECUTOR)) as Pool
++  assert.notEqual(firstPool, secondPool)
++  const anotherWorkspace = '10000000-0000-4000-8000-000000000004'
++  const calls: string[] = []
++  const firstQuery = mock.method(firstPool, 'query', (async (_sql: string, values: string[]) => {
++    calls.push(`first:${values[0]}`); return { rows: [{ subscriptions: values[0] === workspace }] }
++  }) as Pool['query'])
++  const secondQuery = mock.method(secondPool, 'query', (async (_sql: string, values: string[]) => {
++    calls.push(`second:${values[0]}`); return { rows: [{ subscriptions: false }] }
++  }) as Pool['query'])
++  const alias = { [COMMIT_EXECUTOR]: firstPool, query: firstPool.query.bind(firstPool) }
++  try {
++    const result = await withReadBatchContext(() => Promise.all([
++      first.run(() => memberSubscriptionsAllowed(pool, workspace)),
++      second.run(() => memberSubscriptionsAllowed(pool, workspace)),
++      first.run(() => memberSubscriptionsAllowed(pool, anotherWorkspace)),
++      first.run(() => memberSubscriptionsAllowed(alias, workspace)),
++      second.run(() => memberSubscriptionsAllowed(pool, workspace)),
++    ]))
++    assert.deepEqual(result, [true, false, false, true, false])
++    assert.deepEqual(calls.sort(), [`first:${workspace}`, `first:${anotherWorkspace}`, `second:${workspace}`].sort())
++    await first.run(() => memberSubscriptionsAllowed(pool, workspace))
++    assert.equal(calls.length, 4, 'ordinary access still queries the real database')
++  } finally {
++    firstQuery.mock.restore(); secondQuery.mock.restore()
++    await Promise.all([first.close(), second.close()])
++  }
++})
++
++test('a failed batch policy preserves its original rejection and cannot poison the next request', async () => {
++  const f = policyReader(), failure = new Error('synthetic_policy_unavailable')
++  f.state.error = failure
++  const results = await withReadBatchContext(() => Promise.allSettled([
++    memberSubscriptionsAllowed(f.query, workspace), memberSubscriptionsAllowed(f.query, workspace),
++  ]))
++  assert.equal(f.calls.length, 1)
++  for (const result of results) {
++    assert.equal(result.status, 'rejected')
++    if (result.status === 'rejected') assert.equal(result.reason, failure)
++  }
++  const [failed] = await batchConsumers(f.query)
++  assert.deepEqual(failed, { ok: false, status: 500, error: { code: 'desktop_rpc_failed' } })
++  assert.equal(f.calls.length, 2, 'an independent batch retries the original read once')
++  f.state.error = null
++  assert.equal((await batchConsumers(f.query))[0].ok, true)
++  assert.equal(f.calls.filter(call => call === 'policy').length, 3)
++})
++
++test('bound after-work reads fresh after both fulfilled and rejected batch lifetimes', async () => {
++  for (const reject of [false, true]) {
++    const f = policyReader(), failure = new Error('synthetic_batch_failure')
++    let after!: () => Promise<boolean>
++    const work = withReadBatchContext(async () => {
++      assert.equal(await memberSubscriptionsAllowed(f.query, workspace), true)
++      after = AsyncLocalStorage.bind(() => memberSubscriptionsAllowed(f.query, workspace))
++      if (reject) throw failure
++    })
++    if (reject) await assert.rejects(work, error => error === failure)
++    else await work
++    f.state.allowed = false
++    assert.equal(await after(), false)
++    f.state.allowed = true
++    assert.equal(await after(), true)
++    assert.equal(f.calls.length, 3)
++  }
++})
++
++test('only the policy is shared: credential shares and own-key reads remain fresh in the batch', async () => {
++  const f = policyReader()
++  await withReadBatchContext(async () => {
++    assert.equal((await readPolicyConsumers(f.query)).keys.length, 2)
++    f.state.sharedKeys = false; f.state.sharedOwners = []
++    assert.deepEqual(await readPolicyConsumers(f.query), {
++      keys: [{ id: '10000000-0000-4000-8000-000000000002', mine: true }], owners: [],
++    })
++  })
++  for (const name of ['own-keys', 'shared-keys', 'shared-owners']) assert.equal(f.calls.filter(call => call === name).length, 2)
++  assert.equal(f.calls.filter(call => call === 'policy').length, 1)
++})
++
++test('ordinary policy readers observe changes on every call without touching batch metadata', async () => {
++  const f = policyReader()
++  const ordinary = new Proxy(f.query, { get(target, property, receiver) {
++    if (property === COMMIT_EXECUTOR) assert.fail('ordinary reads must not inspect the batch executor key')
++    return Reflect.get(target, property, receiver)
++  } })
++  assert.equal(await memberSubscriptionsAllowed(ordinary, workspace), true)
++  f.state.allowed = false
++  assert.equal(await memberSubscriptionsAllowed(ordinary, workspace), false)
++  f.state.allowed = undefined
++  assert.equal(await memberSubscriptionsAllowed(ordinary, workspace), true)
++  assert.equal(f.calls.length, 3)
++})
++
++
++test('afterJob cannot reuse a foreground policy while its parent read batch is still active', async () => {
++  const { afterJob } = await import('./background')
++  const f = policyReader()
++  let deferred!: () => unknown
++  await withReadBatchContext(async () => {
++    assert.equal(await memberSubscriptionsAllowed(f.query, workspace), true)
++    afterJob('after:factory-dispatch-recovery', () => memberSubscriptionsAllowed(f.query, workspace), {
++      retainContext: true, schedule: task => { deferred = task },
++    })
++    f.state.allowed = false
++    assert.equal(await deferred(), false, 'the real deferred job must query its current policy even before the batch settles')
++    f.state.allowed = true
++    assert.equal(await deferred(), true, 'separate background calls must not share their own earlier observation')
++    assert.equal(await memberSubscriptionsAllowed(f.query, workspace), true, 'foreground siblings keep their own batch observation')
++    assert.equal(f.calls.length, 3)
++  })
++})
++
++
++test('cron and workflow jobs cannot inherit an active foreground policy observation', async () => {
++  const { cronJob } = await import('./background')
++  const { runJob } = await import('./tracing/jobs')
++  for (const kind of ['cron', 'workflow'] as const) {
++    const f = policyReader(false)
++    const read = () => memberSubscriptionsAllowed(f.query, workspace)
++    const job = kind === 'cron' ? cronJob('policy-fixture', read) : () => runJob('workflow:policy-fixture/read', 'workflow', read)
++    await withReadBatchContext(async () => {
++      assert.equal(await read(), false)
++      f.state.allowed = true
++      assert.equal(await job(), true)
++      f.state.allowed = false
++      assert.equal(await job(), false)
++      assert.equal(await read(), false)
++      assert.equal(f.calls.length, 3)
++    })
++  }
++})
+diff --git a/lib/personal-policy.ts b/lib/personal-policy.ts
+index bbb968461..dc710f0a1 100644
+--- a/lib/personal-policy.ts
++++ b/lib/personal-policy.ts
+@@ -4,6 +4,7 @@ import { runChanged } from './live/panels'
+ import { runListChanged } from './live/lists'
+ import { runControlChanged } from './device-gateway-notify'
+ import { armDueTimerAfterCommit } from './due-timer'
++import { readBatchSubscriptionPolicy } from './desktop-rpc/read-batch-context'
+ 
+ /**
+  * Decision 2026-11-01-2240: a person's own subscriptions and API keys always run
+@@ -16,8 +17,10 @@ type Query = Pick<Pool | PoolClient, 'query'>
+ 
+ /** The admin switch over other members' use; an absent row means on. It never limits the owner's own use. */
+ export async function memberSubscriptionsAllowed(query: Query, workspaceId: string): Promise<boolean> {
+-  const { rows: [row] } = await query.query<{ subscriptions: boolean }>('SELECT subscriptions FROM workspace_personal_policies WHERE "workspaceId"=$1', [workspaceId])
+-  return row?.subscriptions ?? true
++  return readBatchSubscriptionPolicy(query, workspaceId, async () => {
++    const { rows: [row] } = await query.query<{ subscriptions: boolean }>('SELECT subscriptions FROM workspace_personal_policies WHERE "workspaceId"=$1', [workspaceId])
++    return row?.subscriptions ?? true
++  })
+ }
+ 
+ /** 分享给团队成员: the owner also lets other members' bots here use it (Alex, 「B」). */
+diff --git a/lib/tracing/logs.test.ts b/lib/tracing/logs.test.ts
+index 8e6dc9b95..737fa373e 100644
+--- a/lib/tracing/logs.test.ts
++++ b/lib/tracing/logs.test.ts
+@@ -1,12 +1,23 @@
+ import assert from 'node:assert/strict'
+ import test from 'node:test'
+-import { SpanStatusCode } from '@opentelemetry/api'
++import { context, propagation, SpanStatusCode, trace } from '@opentelemetry/api'
++import { ExportResultCode, type ExportResult } from '@opentelemetry/core'
++import { createRequire } from 'node:module'
++import { dirname, join } from 'node:path'
++import { pathToFileURL } from 'node:url'
++import { setImmediate as nextTurn } from 'node:timers/promises'
+ import { InMemoryLogRecordExporter } from '@opentelemetry/sdk-logs'
+-import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base'
++import { InMemorySpanExporter, type ReadableSpan, type SpanExporter } from '@opentelemetry/sdk-trace-base'
+ import { createLogProvider } from './logs'
+ import { createTracerProvider, SafeExporter } from './node'
+ import { CodedError } from '@mikka/protocol/coded-error'
+ import { safeErrorAttributes } from '@mikka/protocol/tracing'
++import { registerTelemetryFlush } from './flush'
++import { withRunSpan } from './context'
++import { observeAiRequest } from './ai'
++import { createApiHandler } from '../../apps/api/src/application'
++import { beginRequestTrace } from '../../apps/api/runtime/request-trace'
++import { decodeOtlp } from '../../tests/mvp/trace-collector.mjs'
+ 
+ test('Workflow and failure logs share OTel trace/span IDs and exclude content', async () => {
+   const logMemory = new InMemoryLogRecordExporter()
+@@ -45,3 +56,125 @@ test('tail-retained ordinary failures give native Logs the same effective rate a
+     assert.equal(record.spanContext?.traceFlags, saved.spanContext().traceFlags)
+   } finally { await provider.shutdown(); await logs.shutdown() }
+ })
++
++
++// Use the pinned SDK's real serializer and Workflow tracing helper. Transport
++// completion is local and controlled; this fixture never opens a socket.
++test('HTTP completes while waitUntil retains an earlier in-flight Workflow trace export', async t => {
++  const require = createRequire(import.meta.url)
++  const exporterRequire = createRequire(require.resolve('@opentelemetry/exporter-trace-otlp-proto'))
++  const { ProtobufTraceSerializer } = exporterRequire('@opentelemetry/otlp-transformer')
++  const workflowRequire = createRequire(require.resolve('workflow'))
++  const official = await import(pathToFileURL(join(dirname(workflowRequire.resolve('@workflow/core')), 'telemetry.js')).href)
++  const delivered: ReturnType<typeof decodeOtlp> = []
++  const logMemory = new InMemoryLogRecordExporter()
++  const logs = createLogProvider({ endpoint: 'https://unused.test/i/v1/traces', token: 'unused', environment: 'dev', exporter: logMemory })
++  const pending = new Set<Promise<void>>()
++  let release: (() => void) | undefined, sent = 0, completed = 0, flushCalls = 0
++  const sink: SpanExporter = {
++    export(spans: ReadableSpan[], done: (result: ExportResult) => void) {
++      sent++
++      const decoded = decodeOtlp(Buffer.from(ProtobufTraceSerializer.serializeRequest(spans)), 'traces')
++      const complete = () => { delivered.push(...decoded); completed++; done({ code: ExportResultCode.SUCCESS }) }
++      if (sent !== 1) { complete(); return }
++      const deferred = Promise.withResolvers<void>()
++      pending.add(deferred.promise)
++      release = () => { complete(); pending.delete(deferred.promise); deferred.resolve() }
++    },
++    forceFlush: async () => { flushCalls++; await Promise.all(pending) },
++    shutdown: async () => { await Promise.all(pending) },
++  }
++  const provider = createTracerProvider({ exporter: new SafeExporter(sink), sampleRate: 0.1, environment: 'dev', logger: logs.getLogger('test'), serverless: true })
++  const key = Symbol.for('@vercel/request-context'), previous = Object.getOwnPropertyDescriptor(globalThis, key)
++  const lifetimes: Promise<unknown>[] = []
++  Object.defineProperty(globalThis, key, { configurable: true, value: { get: () => ({ waitUntil: (value: Promise<unknown>) => lifetimes.push(value) }) } })
++  const unregister = registerTelemetryFlush(() => logs.forceFlush())
++  provider.register()
++  try {
++    const captured: unknown[] = [], disposed = Promise.withResolvers<void>()
++    t.mock.timers.enable({ apis: ['setTimeout'] })
++    const app = createApiHandler([{
++      path: '/mikka/api/trace-flush-fixture', template: '/api/trace-flush-fixture', source: 'fixture', methods: ['POST'],
++      load: async () => ({ POST: async () => {
++        await official.trace('step.execute fixture', async (span: { setAttribute(key: string, value: string): void }) => {
++          span.setAttribute('workflow.run.id', 'wrun_local_export_fixture')
++          await observeAiRequest({ modelId: 'fixture-model', route: 'subscription', operation: 'bot', posthog: { capture: event => { captured.push(event) } } },
++            async receipt => { receipt({ usage: { inputTokens: 5, outputTokens: 1 } }); return undefined })
++          await withRunSpan('dispatch_run', {}, () => withRunSpan('dispatch.resolveRepository', {}, async () => undefined))
++        })
++        t.mock.timers.tick(5000)
++        assert.equal(pending.size, 1)
++        return new Response('business response')
++      } }),
++    }], (request, route) => {
++      const active = beginRequestTrace(request, route)
++      return { ...active, finish(status, error) { active.finish(status, error); disposed.resolve() } }
++    })
++    const response = await app.fetch(new Request('https://mikka.test/mikka/api/trace-flush-fixture', { method: 'POST' }))
++    assert.equal(response.status, 200)
++    assert.equal(await response.text(), 'business response', 'response disposal does not await the transport')
++    await disposed.promise
++    assert.equal(pending.size, 1)
++    assert.equal(lifetimes.length, 1)
++    let settled = false
++    const lifetime = Promise.all(lifetimes).then(() => { settled = true })
++    await nextTurn()
++    await logs.forceFlush()
++    assert.equal(captured.length, 1)
++    assert.equal(sent, 2); assert.equal(completed, 1)
++    assert.deepEqual(delivered.map(span => span.name), ['POST /api/trace-flush-fixture'])
++    assert.deepEqual(logMemory.getFinishedLogRecords().map(record => record.attributes['mikka.stage']).sort(), ['dispatch.resolveRepository', 'dispatch_run', 'step.execute'])
++    assert.equal(settled, false, 'waitUntil must also retain the earlier export already removed from the batch queue')
++    assert.equal(flushCalls, 1)
++    release!()
++    await lifetime
++    assert.equal(pending.size, 0); assert.equal(completed, 2)
++    assert.equal(delivered.length, 5)
++    assert.equal(delivered.filter(span => span.name === 'mikka.ai.generation').length, 1)
++    assert.equal(delivered.filter(span => {
++      assert.ok(typeof span.name === 'string')
++      return span.name.startsWith('dispatch')
++    }).length, 2)
++    assert.equal(new Set(delivered.map(span => span.spanId)).size, 5)
++  } finally {
++    if (pending.size) release?.()
++    t.mock.timers.reset(); unregister()
++    await provider.shutdown(); await logs.shutdown()
++    trace.disable(); context.disable(); propagation.disable()
++    if (previous) Object.defineProperty(globalThis, key, previous); else Reflect.deleteProperty(globalThis, key)
++  }
++})
++
++for (const failure of ['reject', 'throw'] as const) test(`exporter forceFlush ${failure} does not fail the HTTP response or retained lifetime`, async () => {
++  let calls = 0
++  const sink: SpanExporter = {
++    export(_spans, done) { done({ code: ExportResultCode.SUCCESS }) },
++    forceFlush() { calls++; if (failure === 'throw') throw new Error('fixture'); return Promise.reject(new Error('fixture')) },
++    shutdown: async () => {},
++  }
++  const provider = createTracerProvider({ exporter: new SafeExporter(sink), sampleRate: 1, environment: 'dev', serverless: true })
++  const key = Symbol.for('@vercel/request-context'), previous = Object.getOwnPropertyDescriptor(globalThis, key)
++  const lifetimes: Promise<unknown>[] = []
++  Object.defineProperty(globalThis, key, { configurable: true, value: { get: () => ({ waitUntil: (value: Promise<unknown>) => lifetimes.push(value) }) } })
++  provider.register()
++  try {
++    const disposed = Promise.withResolvers<void>()
++    const app = createApiHandler([{
++      path: '/mikka/api/trace-flush-fixture', template: '/api/trace-flush-fixture', source: 'fixture', methods: ['POST'],
++      load: async () => ({ POST: () => new Response('business response') }),
++    }], (request, route) => {
++      const active = beginRequestTrace(request, route)
++      return { ...active, finish(status, error) { active.finish(status, error); disposed.resolve() } }
++    })
++    const response = await app.fetch(new Request('https://mikka.test/mikka/api/trace-flush-fixture', { method: 'POST' }))
++    assert.equal(response.status, 200); assert.equal(await response.text(), 'business response')
++    await disposed.promise
++    assert.equal(lifetimes.length, 1)
++    await Promise.all(lifetimes)
++    assert.equal(calls, 1)
++  } finally {
++    await provider.shutdown()
++    trace.disable(); context.disable(); propagation.disable()
++    if (previous) Object.defineProperty(globalThis, key, previous); else Reflect.deleteProperty(globalThis, key)
++  }
++})
+diff --git a/lib/tracing/node.ts b/lib/tracing/node.ts
+index 3037a3b0c..00775a592 100644
+--- a/lib/tracing/node.ts
++++ b/lib/tracing/node.ts
+@@ -83,7 +83,9 @@ export function createTracerProvider({ exporter, sampleRate, environment, versio
+     sampler: new RunSampler(sampleRate),
+     // Logs see the retained span, including the effective rate after a tail
+     // promotion, so APM and native Logs describe the same sampling decision.
+-    spanProcessors: [new RouteAttributesProcessor(), new RetainingSpanProcessor(logger ? new StageLogProcessor(logger, batcher) : batcher), new FlushOnRootEnd(async () => { await Promise.allSettled([batcher.forceFlush(), flushTelemetry()]) }, serverless)],
++    // The SDK batch flush drains queued spans, but not an export its timer
++    // already started. Keep that transport in waitUntil as well.
++    spanProcessors: [new RouteAttributesProcessor(), new RetainingSpanProcessor(logger ? new StageLogProcessor(logger, batcher) : batcher), new FlushOnRootEnd(async () => { await Promise.allSettled([batcher.forceFlush().finally(() => exporter.forceFlush?.()), flushTelemetry()]) }, serverless)],
+   })
+ }
+ 
+diff --git a/packages/daemon/test/fakes/fake-claude-generation-abort.mjs b/packages/daemon/test/fakes/fake-claude-generation-abort.mjs
+old mode 100644
+new mode 100755
+diff --git a/packages/daemon/test/fakes/fake-codex-generation-completion.mjs b/packages/daemon/test/fakes/fake-codex-generation-completion.mjs
+old mode 100644
+new mode 100755
+diff --git a/scripts/e2b/validate-template-subscriptions.mjs b/scripts/e2b/validate-template-subscriptions.mjs
+index 7ee7564fe..f36ecf2d0 100644
+--- a/scripts/e2b/validate-template-subscriptions.mjs
++++ b/scripts/e2b/validate-template-subscriptions.mjs
+@@ -8,6 +8,7 @@ import { createHash, randomUUID } from 'node:crypto'
+ import { runCloudStartup, createSessionClient, smokeAcceptanceAccount, selectAcceptanceTeam, restoreAcceptanceWorkspace, acceptanceBot,
+   STARTUP_FAILURE_CODES, STARTUP_FAILURE_PHASES, bootstrapAdoptionEvidence, bootstrapAdoptionDiagnostics } from '../acceptance/cloud-startup.mjs'
+ import { readRuntimeTiming, runtimeEvidence } from '../acceptance/cloud-startup-evidence.mjs'
++import { ACTION_ERROR_CODES } from '../../lib/action-result.ts'
+ 
+ const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
+ const KINDS = [['claude', 'claude_code', 'claude-haiku-5-5'], ['codex', 'codex', 'gpt-6-luna']]
+@@ -35,6 +36,34 @@ const CLEANUP_STEPS = new Map([['factoryCancelled', 'factory_cancel'], ['taskDel
+ const CLEANUP_CODES = new Set(['startup_cleanup_scope_mismatch', 'startup_factory_list_invalid',
+   'startup_api_refused', 'startup_rpc_refused', 'startup_action_refused', 'startup_workspace_restore_failed'])
+ const cliVersion = value => typeof value === 'string' && value.length <= 32 && /^[0-9]+\.[0-9]+\.[0-9]+$/.test(value)
++const REQUEST_TRACE_SCOPE = 'submission_http_only_workflow_may_use_another_trace'
++// Existing public action codes plus the dispatch, repository, Profile and
++// Factory return sites. A new/unrecognized code stays unknown, never raw text.
++const DISPATCH_REFUSAL_CODES = new Set([...ACTION_ERROR_CODES,
++  'machineUnavailable', 'threadProfileMismatch', 'repositoryRequired', 'repositoryAmbiguous', 'repositoryNotFound',
++  'githubNotConnected', 'githubNotConfigured', 'githubReconnectRequired', 'githubUnavailable', 'githubRepositoryForbidden',
++  'agentProfileScopeNotFound', 'agentProfileNotFound', 'agentProfileModelUnavailable', 'agentProfileUnavailable',
++  'agentProfilePinConflict', 'agentProfileSelectionInvalid', 'agentProfileArchived', 'agentProfileDisabled',
++  'agentProfileVersionConflict', 'agentProfileDecisionUnavailable',
++  'factoryLifecycleUnavailable', 'factoryTransition', 'factoryReplayMismatch', 'factoryStopped',
++  'factoryStale', 'factoryRunStillActive', 'factorySourceMismatch',
++])
++
++/** Correlate a failed submission even before a run exists. Never promote its
++ * HTTP trace to a workflow/run trace or copy tool inputs, outputs or messages. */
++function startupCorrelation(sample, sourceCommit, harness) {
++  if (sample?.sourceCommit !== sourceCommit || sample.harness !== harness) return undefined
++  const trace = sample.requestTraceId, workflow = sample.workflowRunId, refusal = sample.dispatchRefusal
++  if (trace === undefined && workflow === undefined && refusal === undefined) return undefined
++  const requestTraceId = sample.requestTraceScope === REQUEST_TRACE_SCOPE && typeof trace === 'string'
++    && /^[a-f0-9]{32}$/.test(trace) && trace !== '0'.repeat(32) ? trace : null
++  // Keep the startup reader's alphanumeric grammar, bounded for publication;
++  // do not assume every World or future SDK uses today's 26-character ULID.
++  const workflowRunId = typeof workflow === 'string' && /^wrun_[A-Za-z0-9]{1,128}$/.test(workflow) ? workflow : null
++  const code = refusal?.code
++  return { requestTraceId, requestTraceScope: requestTraceId ? REQUEST_TRACE_SCOPE : null, workflowRunId,
++    dispatchRefusal: refusal == null ? null : { code: typeof code === 'string' && DISPATCH_REFUSAL_CODES.has(code) ? code : 'unknown' } }
++}
+ 
+ function registrationDiagnostic(report, kind, proof) {
+   const harness = kind === 'claude' ? 'claude_code' : 'codex', row = report.templates?.[kind]
+@@ -95,6 +124,7 @@ function candidateDiagnostic(kind, stage, error, acceptance, cleanupErrors, devi
+   const sampleFailure = startupFailure(sample)
+   const failure = sampleFailure ?? startupFailure(acceptance)
+   const harness = kind === 'claude' ? 'claude_code' : 'codex'
++  const correlation = error ? startupCorrelation(sample, sourceCommit, harness) : undefined
+   const runIdHash = UUID.test(sample?.runId ?? '') ? createHash('sha256').update(sample.runId).digest('hex').slice(0, 16) : null
+   const timing = runIdHash ? readRuntimeTiming(sample?.runtimeTiming, { runIdHash, harness }) : null
+   const evidence = runtimeEvidence(timing, { requireOfficial: true })
+@@ -140,6 +170,7 @@ function candidateDiagnostic(kind, stage, error, acceptance, cleanupErrors, devi
+     sampleStatus: SAMPLE_STATUSES.has(sample?.status) ? sample.status : 'unavailable',
+     sampleError: sampleFailure?.code ?? null,
+     ...(error && failure ? { failure } : {}),
++    ...(correlation ? { startupCorrelation: correlation } : {}),
+     cleanupErrors: [...cleanup], ...(observation ? { observation } : {}), ...(fixture ? { fixture } : {}),
+     ...(cleanupFailures.length ? { cleanupFailures: cleanupFailures.slice(0, 8), cleanupFailuresTruncated: cleanupFailures.length > 8 } : {}),
+     // Only the existing strict candidateReceipt can populate this proof. A
+diff --git a/scripts/e2b/validate-template-subscriptions.test.mjs b/scripts/e2b/validate-template-subscriptions.test.mjs
+index a70f45e73..628395f91 100644
+--- a/scripts/e2b/validate-template-subscriptions.test.mjs
++++ b/scripts/e2b/validate-template-subscriptions.test.mjs
+@@ -204,6 +204,140 @@ function candidateFixture(runAcceptance, cleanupFailure, { failRestore = false,
+   } }
+ }
+ 
++const startupTrace = '0123456789abcdef0123456789abcdef'
++const startupTraceScope = 'submission_http_only_workflow_may_use_another_trace'
++const startupWorkflow = 'wrun_01K4BZQ5T2J8HXFM6WD3PNAVCE'
++const preRunFailure = (harness, code, extra = {}) => ({
++  sourceCommit: COMMIT, harness, status: 'failed', error: code,
++  failure: { phase: 'coordinator_stream', code }, cleanup: { status: 'passed', errors: [] },
++  requestTraceId: startupTrace, requestTraceScope: startupTraceScope, workflowRunId: startupWorkflow,
++  ...extra,
++})
++
++/** Exercise the public failure-file seam without publishing a bootstrap for a run that never bound. */
++async function preRunFailureArtifact(sample, harness = 'claude_code') {
++  const root = await mkdtemp(join(tmpdir(), 'template-gate-correlation-'))
++  try {
++    const fixture = candidateFixture(async options => accepted(options.harness))
++    const run = fixture.options.runAcceptance, create = fixture.options.sandboxFactory
++    fixture.options.runAcceptance = async (options, dependencies) => {
++      assert.equal(options.timeoutMs, 240000)
++      if (options.harness !== harness) return run(options, dependencies)
++      return { mode: 'candidate', status: 'failed', cleanup: { errors: [] }, samples: [sample] }
++    }
++    fixture.options.sandboxFactory = async (template, options) => {
++      const sandbox = await create(template, options), read = sandbox.files.read
++      if (template.endsWith(harness === 'claude_code' ? 'claude' : 'codex')) sandbox.files.read = path => {
++        if (path.endsWith('bootstrap-proof.json')) throw Object.assign(new Error('private missing bootstrap path'), { code: 'ENOENT' })
++        return read(path)
++      }
++      return sandbox
++    }
++    const input = join(root, 'candidate.json'), output = join(root, 'accepted.json'), diagnostics = join(root, 'diagnostics.json')
++    await writeFile(input, JSON.stringify(report))
++    await assert.rejects(validateSubscriptionFiles(input, output, diagnostics, fixture.options), /template_gate_subscription_or_cleanup_failed/)
++    const raw = await readFile(diagnostics, 'utf8'), value = JSON.parse(raw)
++    const kind = harness === 'claude_code' ? 'claude' : 'codex'
++    const failed = value.candidates.find(row => row.kind === kind), passed = value.candidates.find(row => row.kind !== kind)
++    assert.equal(value.status, 'failed')
++    assert.equal(failed.code, 'template_gate_bootstrap_proof_invalid')
++    assert.equal(failed.runIdHash, null)
++    assert.equal(passed.passedReceipt.status, 'passed')
++    assert.ok(!Object.hasOwn(passed, 'startupCorrelation'))
++    assert.equal(fixture.events.filter(event => event === 'removed').length, 2)
++    assert.equal(fixture.events.filter(event => event.startsWith('killed-')).length, 2)
++    assert.ok(fixture.events.includes('restored-workspace') && fixture.events.includes('signed-out'))
++    await assert.rejects(stat(output), { code: 'ENOENT' })
++    assert.equal((await stat(diagnostics)).mode & 0o777, 0o600)
++    return { raw, failed }
++  } finally { await rm(root, { recursive: true, force: true }) }
++}
++
++for (const [harness, code, dispatchRefusal] of [
++  ['claude_code', 'startup_dispatch_refused', { code: 'githubNotConnected' }],
++  ['codex', 'startup_timeout', null],
++]) test(`startup correlation survives ${harness} failure before a run exists`, async () => {
++  const { failed } = await preRunFailureArtifact(preRunFailure(harness, code, { dispatchRefusal }), harness)
++  assert.deepEqual(failed.failure, { phase: 'coordinator_stream', code })
++  assert.deepEqual(failed.startupCorrelation, {
++    requestTraceId: startupTrace, requestTraceScope: startupTraceScope,
++    workflowRunId: startupWorkflow, dispatchRefusal,
++  })
++})
++
++test('startup correlation requires exact candidate binding and existing metadata', async () => {
++  for (const extra of [
++    { sourceCommit: 'f'.repeat(40) }, { sourceCommit: undefined }, { sourceCommit: { value: COMMIT } },
++    { harness: 'codex' }, { harness: undefined }, { harness: ['claude_code'] },
++    { requestTraceId: undefined, workflowRunId: undefined, dispatchRefusal: undefined },
++  ]) {
++    const { raw, failed } = await preRunFailureArtifact(preRunFailure('claude_code', 'startup_dispatch_refused', {
++      dispatchRefusal: { code: 'githubNotConnected' }, ...extra,
++    }))
++    assert.ok(!Object.hasOwn(failed, 'startupCorrelation'))
++    assert.ok(!raw.includes(startupTrace) && !raw.includes(startupWorkflow))
++    assert.equal(failed.sampleError, 'startup_dispatch_refused')
++  }
++})
++
++test('startup correlation rejects malformed identifiers and preserves independently valid fields', async () => {
++  let coercions = 0
++  const nonString = { toString() { coercions++; return startupTrace } }
++  for (const requestTraceId of [undefined, null, 1, true, [], nonString, '0'.repeat(32), 'f'.repeat(31),
++    'F'.repeat(32), `${startupTrace}\n`, 'private-canary@example.invalid']) {
++    const { failed } = await preRunFailureArtifact(preRunFailure('claude_code', 'startup_timeout', { requestTraceId }))
++    assert.deepEqual(failed.startupCorrelation, {
++      requestTraceId: null, requestTraceScope: null, workflowRunId: startupWorkflow, dispatchRefusal: null,
++    })
++  }
++  for (const workflowRunId of [undefined, null, 1, nonString, 'wrun_', `wrun_${'a'.repeat(129)}`,
++    `${startupWorkflow}\n`, `${startupWorkflow}/private`, 'wrun_private-canary@example.invalid']) {
++    const { failed } = await preRunFailureArtifact(preRunFailure('claude_code', 'startup_timeout', { workflowRunId }))
++    assert.equal(failed.startupCorrelation.workflowRunId, null)
++    assert.equal(failed.startupCorrelation.requestTraceId, startupTrace)
++  }
++  for (const workflowRunId of ['wrun_legacy1', `wrun_${'a'.repeat(128)}`]) {
++    const { failed } = await preRunFailureArtifact(preRunFailure('claude_code', 'startup_timeout', { workflowRunId }))
++    assert.equal(failed.startupCorrelation.workflowRunId, workflowRunId)
++  }
++  const { failed } = await preRunFailureArtifact(preRunFailure('claude_code', 'startup_timeout', {
++    requestTraceScope: 'private_scope_or_run_trace_claim',
++  }))
++  assert.equal(failed.startupCorrelation.requestTraceId, null)
++  assert.equal(failed.startupCorrelation.requestTraceScope, null)
++  assert.equal(coercions, 0)
++})
++
++test('startup correlation keeps only closed refusal codes and never emits prompts or other identities', async () => {
++  const secret = 'PRIVATE_PROMPT_RESPONSE_CREDENTIAL_CANARY', privateId = '90000000-0000-4000-8000-000000000009'
++  for (const code of ['githubNotConnected', 'deviceNotFound', 'machineUnavailable', 'agentProfilePinConflict', 'factorySourceMismatch',
++    'githubNotConnected_PRIVATE_CANARY', 'private-canary@example.invalid', '__proto__', 'constructor', 503, { private: secret }]) {
++    const expected = ['githubNotConnected', 'deviceNotFound', 'machineUnavailable', 'agentProfilePinConflict', 'factorySourceMismatch'].includes(code) ? code : 'unknown'
++    const { raw, failed } = await preRunFailureArtifact(preRunFailure('claude_code', 'startup_dispatch_refused', {
++      dispatchRefusal: { code, detail: secret, message: secret, raw: secret, userId: privateId },
++      prompt: secret, providerText: secret, issueId: privateId, botId: privateId,
++      dispatchCallId: privateId, stepId: privateId, cookie: secret,
++    }))
++    assert.deepEqual(failed.startupCorrelation, {
++      requestTraceId: startupTrace, requestTraceScope: startupTraceScope,
++      workflowRunId: startupWorkflow, dispatchRefusal: { code: expected },
++    })
++    for (const forbidden of [secret, privateId, 'private-canary@example.invalid', 'githubNotConnected_PRIVATE_CANARY']) assert.ok(!raw.includes(forbidden))
++  }
++})
++
++test('successful candidate diagnostics do not gain startup correlation metadata', async () => {
++  const diagnostics = [], fixture = candidateFixture(async options => {
++    const value = accepted(options.harness)
++    Object.assign(value.samples[0], { requestTraceId: startupTrace, requestTraceScope: startupTraceScope,
++      workflowRunId: startupWorkflow, dispatchRefusal: { code: 'githubNotConnected' } })
++    return value
++  })
++  await validateTemplateSubscriptions(report, { ...fixture.options, onDiagnostic: row => diagnostics.push(row) })
++  assert.equal(diagnostics.length, 2)
++  assert.ok(diagnostics.every(row => row.code === 'passed' && !Object.hasOwn(row, 'startupCorrelation')))
++})
++
+ test('a failed subscription still tests the other candidate and closes every created instance and device', async () => {
+   const fixture = candidateFixture(async options => {
+     if (options.harness === 'claude_code') throw Error('fixture provider blocked')
+@@ -331,6 +465,7 @@ test('a failure before a sample exists preserves the startup phase without inven
+   assert.equal(failed.sampleError, null)
+   assert.equal(failed.runIdHash, null)
+   assert.ok(!Object.hasOwn(failed, 'observation'))
++  assert.ok(!Object.hasOwn(failed, 'startupCorrelation'))
+   assert.ok(!Object.hasOwn(failed, 'passedReceipt'))
+ })
+ 
+diff --git a/tests/cloud-dispatch-startup.test.ts b/tests/cloud-dispatch-startup.test.ts
+index c006685c7..609029dde 100644
+--- a/tests/cloud-dispatch-startup.test.ts
++++ b/tests/cloud-dispatch-startup.test.ts
+@@ -3,6 +3,14 @@ import { before, beforeEach, mock, test } from 'node:test'
+ import { ComputerError } from '../lib/computer/store'
+ import { ActionFailureError } from '../lib/action-error'
+ import * as profileDefinitions from '../lib/factory/agent-profile-definition'
++import { createRequire } from 'node:module'
++import { dirname, join } from 'node:path'
++import { pathToFileURL } from 'node:url'
++import { context, propagation, SpanStatusCode, trace } from '@opentelemetry/api'
++import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base'
++import { InMemoryLogRecordExporter } from '@opentelemetry/sdk-logs'
++import { createTracerProvider, SafeExporter } from '../lib/tracing/node'
++import { createLogProvider } from '../lib/tracing/logs'
+ 
+ const owner = 'synthetic-owner', botId = '10000000-0000-4000-8000-000000000001'
+ const issueId = '10000000-0000-4000-8000-000000000002', runId = '10000000-0000-4000-8000-000000000003'
+@@ -30,14 +38,14 @@ let preferLocal = false
+ const hostSourceQueries: string[] = []
+ type RequestSource = { userId: string; botId: string; issueId: string | null; kind: string; deliveredAt: Date | null; payload: Record<string, unknown> }
+ let requestSource: RequestSource | null = null
+-let modelResolutions = 0, bindingSelections = 0, credentialReads = 0
++let modelResolutions = 0, bindingSelections = 0, credentialReads = 0, factoryReadCalls = 0
+ const queued = new Map<string, Record<string, unknown>>()
+ const subscription = { id: bindingId, consumerId: agentId, ownerId: owner, workspaceId, connectionId: 'connection', connectionRevision: 3, route: 'codex_cli', modelId: model }
+ const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports: exports })
+ const unused = () => { throw new Error('Unexpected side effect in startup fixture') }
+ const target = () => ({ workspaceId, agentId: replaceAgent && awake ? 'different-agent' : agentId, repoId, deviceId })
+ async function query(sql: string, values: unknown[] = []) {
+-  if (/^(BEGIN|COMMIT|ROLLBACK)$/.test(sql) || sql.startsWith('SELECT pg_advisory_xact_lock')) return { rows: [], rowCount: 0 }
++  if (/^(BEGIN|COMMIT|ROLLBACK)$/.test(sql) || sql === 'BEGIN ISOLATION LEVEL REPEATABLE READ' || sql.startsWith('SELECT pg_advisory_xact_lock')) return { rows: [], rowCount: 0 }
+   if (sql.includes('FROM workspace_computer_policies')) return { rows: permission === undefined ? [] : [{ permission }], rowCount: 1 }
+   if (sql.includes('FROM suggestion_executions')) return { rows: [], rowCount: Number(suggestionAllowed) }
+   if (sql.startsWith('SELECT "agentDefinition"')) return { rows: [{ agentDefinition: { model, subscription: { bindingId } } }], rowCount: 1 }
+@@ -55,7 +63,7 @@ async function query(sql: string, values: unknown[] = []) {
+   }
+   if (sql.includes('EXISTS (SELECT 1 FROM computer_run_bindings')) return { rows: [{ cloud: true }], rowCount: 1 }
+   if (sql.includes('FROM agent_runs')) return { rows: previous ? [{ ...previous, remoteUrl: null, harness: 'codex', cloudWorkspaceId: workspaceId, cloudBotId: botId }] : [], rowCount: Number(Boolean(previous)) }
+-  if (sql.includes('FROM factory_tasks')) return { rows: pendingSpec ? [{ stage: 'spec', status: 'pending' }] : [], rowCount: Number(pendingSpec) }
++  if (sql.includes('FROM factory_tasks')) { factoryReadCalls++; return { rows: pendingSpec ? [{ stage: 'spec', status: 'pending' }] : [], rowCount: Number(pendingSpec) } }
+   if (sql.includes('FROM bots') || sql.includes('FROM bot_cloud_runtimes')) return { rows: present && values[0] === botId && values[1] === owner ? [target()] : [], rowCount: Number(present) }
+   throw new Error(`Unexpected query in startup fixture: ${sql}`)
+ }
+@@ -167,7 +175,7 @@ beforeEach(() => {
+   permission = undefined; awake = credentialAvailable = true; switchedCredential = moveDevice = replaceAgent = revokeDuringWake = revokeWorkspaceDuringWake = false
+   selectedSource = 'subscription'; selectedHarness = 'codex'; selectedModel = model; deviceId = 'device'; repoId = 'repo'
+   previous = null; pendingSpec = false; requestSource = null; preferLocal = false
+-  selectedStages.length = selectedProfiles.length = selectedLocations.length = hostSourceQueries.length = 0; modelResolutions = bindingSelections = credentialReads = 0; queued.clear()
++  selectedStages.length = selectedProfiles.length = selectedLocations.length = hostSourceQueries.length = 0; modelResolutions = bindingSelections = credentialReads = factoryReadCalls = 0; queued.clear()
+ })
+ 
+ const cloudTaskSource = (): RequestSource => ({ userId: owner, botId, issueId, kind: 'user_message', deliveredAt: new Date(),
+@@ -332,6 +340,49 @@ for (const refusal of ['owner', 'runtime', 'workspace', 'issue', 'policy', 'sugg
+   assert.equal(queued.size, 0)
+ })
+ 
++
++test('both actual Factory read tools return their refusal unchanged while an owned child keeps ERROR', async () => {
++  const require = createRequire(import.meta.url), workflowRequire = createRequire(require.resolve('workflow'))
++  const official = await import(pathToFileURL(join(dirname(workflowRequire.resolve('@workflow/core')), 'telemetry.js')).href)
++  const sdk = await import('../workflows/coordinator/steps'), factory = await import('../workflows/coordinator/factory-steps')
++  const memory = new InMemorySpanExporter(), logMemory = new InMemoryLogRecordExporter()
++  const logs = createLogProvider({ endpoint: 'https://unused.test/i/v1/traces', token: 'unused', environment: 'dev', exporter: logMemory })
++  const provider = createTracerProvider({ exporter: new SafeExporter(memory), sampleRate: 1, environment: 'dev', logger: logs.getLogger('test'), serverless: false })
++  provider.register()
++  try {
++    const observations: { children: number; statuses: number[]; codes: unknown[]; errorLogs: number }[] = []
++    for (const read of [
++      () => sdk.readFactoryTask(owner, issueId, undefined, botId),
++      () => factory.getFactoryTask(owner, { taskId: issueId }),
++    ]) {
++      memory.reset(); logMemory.reset()
++      const result = await official.trace('step.execute readFactoryTask fixture', (step: { setAttribute(key: string, value: string): void }) => {
++        step.setAttribute('workflow.run.id', 'wrun_factory_refusal_fixture')
++        return read()
++      })
++      assert.deepEqual(result, { error: 'factoryNotFound' })
++      await provider.forceFlush(); await logs.forceFlush()
++      const spans = memory.getFinishedSpans(), children = spans.filter(span => span.name === 'coordinator.tool')
++      const parent = spans.find(span => span.name === 'step.execute')!
++      assert.equal(parent.status.code, SpanStatusCode.OK, 'the SDK legitimately persists the returned result; child ERROR must survive that')
++      assert.ok(children.every(span => span.parentSpanContext?.spanId === parent.spanContext().spanId && span.spanContext().traceId === parent.spanContext().traceId))
++      const failures = logMemory.getFinishedLogRecords().filter(record => record.body === 'mikka.stage.failed' && record.attributes['mikka.stage'] === 'coordinator.tool')
++      assert.ok(failures.every(record => children.some(span => span.spanContext().spanId === record.spanContext?.spanId && span.spanContext().traceId === record.spanContext?.traceId)))
++      assert.doesNotMatch(JSON.stringify(spans.map(span => ({ attributes: span.attributes, status: span.status, events: span.events }))), new RegExp(owner + '|' + issueId + '|' + botId))
++      observations.push({ children: children.length, statuses: children.map(span => span.status.code), codes: children.map(span => span.attributes['mikka.error.code']), errorLogs: failures.length })
++    }
++    assert.equal(factoryReadCalls, 2, 'each real store read executes its one existing mocked SELECT; no extra read is added')
++    assert.deepEqual(calls, [])
++    assert.equal(modelResolutions, 0); assert.equal(credentialReads, 0); assert.equal(queued.size, 0)
++    assert.ok(observations.every(item => item.children === 1), 'each actual asToolResult must own the failing operation span')
++    assert.ok(observations.every(item => item.statuses[0] === SpanStatusCode.ERROR && item.codes[0] === 'factoryNotFound' && item.errorLogs === 1))
++  } finally {
++    await provider.shutdown(); await logs.shutdown()
++    trace.disable(); context.disable(); propagation.disable()
++  }
++})
++
++
+ test('preparation permits authorized quota fallback and leaves the original selection for queue-time validation', async () => {
+   awake = false; switchedCredential = true
+   assert.ok('runId' in await dispatchThread(owner, { botId, issueId, harness: 'codex' }, 'subscription-call'))
+diff --git a/workflows/coordinator/factory-steps.ts b/workflows/coordinator/factory-steps.ts
+index 665573940..0e2ecce92 100644
+--- a/workflows/coordinator/factory-steps.ts
++++ b/workflows/coordinator/factory-steps.ts
+@@ -14,12 +14,13 @@ import type { QuestionReference, ContextQuestionAnswer } from '@/lib/factory/que
+ import { improvementStore, skillAssignments, improvementFactory, skillRegistry, skillEvaluations } from '@/lib/self-improvement/server'
+ import { readCommittedSkill } from '@/lib/self-improvement/source'
+ import { ImprovementError, type Feedback, type ImprovementHandoff, type ImprovementRehearsal, type ImprovementRegistration, type SkillEvaluationCommand } from '@/lib/self-improvement/contract'
++import { withRunSpan } from '@/lib/tracing/context'
+ 
+ type ToolResult<T> = T | { error: string }
+ 
+ async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
+   try {
+-    return await fn()
++    return await withRunSpan('coordinator.tool', {}, fn)
+   } catch (error) {
+     if (error instanceof ActionFailureError || error instanceof FactoryError || error instanceof ImprovementError) return { error: error.code }
+     throw error
+diff --git a/workflows/coordinator/steps.ts b/workflows/coordinator/steps.ts
+index fcafd4f1e..3f480288b 100644
+--- a/workflows/coordinator/steps.ts
++++ b/workflows/coordinator/steps.ts
+@@ -62,6 +62,7 @@ import { recordDecision, settleTurn } from '@/lib/attention/store'
+ import type { CreateIssueInput, UpdateIssueInput } from '@/lib/coordinator/issue-input'
+ import { systemActor } from '@/lib/activity-actor'
+ import { timedPhase, withDispatchTiming } from '@/lib/dispatch-timing'
++import { withRunSpan } from '@/lib/tracing/context'
+ 
+ // Every function here is a durable step: it runs with full Node access, its
+ // result is recorded, and a failure is retried. Tools return `{ error }` for
+@@ -82,7 +83,7 @@ export async function computerToolsEnabled() {
+ 
+ async function asToolResult<T>(fn: () => Promise<T>): Promise<ToolResult<T>> {
+   try {
+-    return await fn()
++    return await withRunSpan('coordinator.tool', {}, fn)
+   } catch (error) {
+     if (error instanceof ActionFailureError) {
+       // A refused run says why, so the Coordinator acts on the cause instead of guessing one.

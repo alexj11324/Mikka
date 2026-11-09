@@ -1,0 +1,77 @@
+{
+  "schema": "issue1512.device-sql-probe-paired.v1",
+  "postgresObserved": true,
+  "command": [
+    "node",
+    "--test-reporter=tap",
+    "--experimental-test-module-mocks",
+    "--import",
+    "./tests/support/server-only.mjs",
+    "--import",
+    "tsx",
+    "--test",
+    "lib/device-enrollment.db.test.ts"
+  ],
+  "baseline": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+  "candidate": "d4f3c6be8137d906407711c6ea3ac8808ab1d860",
+  "expectedTestsPerCase": 13,
+  "nativeBudgetRemains": {
+    "native": 473,
+    "web": 402,
+    "pass": false
+  },
+  "cases": [
+    {
+      "case": "baseline-red",
+      "returncode": 1,
+      "durationSeconds": 36.489,
+      "summary": {
+        "tests": 13,
+        "suites": 0,
+        "pass": 11,
+        "fail": 2,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "failureNames": [
+        "registration grant consumption uses one PostgreSQL statement",
+        "pending commands without receipts are one read and preserve current device removal state"
+      ],
+      "log": {
+        "path": "baseline-red.original.log",
+        "bytes": 6234,
+        "sha256": "868ae9bb7b7cf14cd38b5ebd89fd7054e859728a4bbec4c5dd7cb3ef9b5d9360"
+      }
+    },
+    {
+      "case": "candidate-green",
+      "returncode": 0,
+      "durationSeconds": 33.32,
+      "summary": {
+        "tests": 13,
+        "suites": 0,
+        "pass": 13,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "failureNames": [],
+      "log": {
+        "path": "candidate-green.original.log",
+        "bytes": 4878,
+        "sha256": "66fb5b3fc74c4bb00ad9551f22ece03509c7495243d3076a5c26952a5d8a12ce"
+      }
+    }
+  ],
+  "verified": true,
+  "postgres": {
+    "version": "17.11 (Debian 17.11-1.pgdg13+2)",
+    "number": "170011",
+    "database": "mikka_1512_device_e2e"
+  },
+  "node": "v24.22.1",
+  "baselineWorktreeRemoved": true,
+  "serviceCleanup": "GitHub Actions tears down the isolated PostgreSQL service after this job; terminal job evidence must confirm completion."
+}

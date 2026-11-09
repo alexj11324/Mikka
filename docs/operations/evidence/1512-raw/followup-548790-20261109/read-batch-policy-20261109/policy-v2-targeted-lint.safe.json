@@ -1,0 +1,19 @@
+{
+  "command": "./node_modules/.bin/oxlint --no-ignore lib/desktop-rpc/read-batch-context.ts lib/personal-policy.ts lib/personal-policy.test.ts",
+  "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-read-batch-policy-copy",
+  "exitCode": 0,
+  "toolChunk": "1f823c",
+  "log": {
+    "path": "policy-v2-targeted-lint.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "gitBlobSha1": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+  },
+  "sourceManifest": {
+    "path": "final-source-manifest-v2.safe.json",
+    "bytes": 4062,
+    "sha256": "34b59d740801b5a98ae2a8c23b9d2a57ef28cea5073e8a35522fc5ac91cd9b76",
+    "gitBlobSha1": "85fde868221f08b460234aea89e7fd2b29198cae"
+  },
+  "fullRepositoryTypecheckPerformed": false
+}

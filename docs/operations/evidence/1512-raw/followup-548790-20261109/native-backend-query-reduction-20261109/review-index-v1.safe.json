@@ -1,0 +1,79 @@
+{
+  "schema": "issue1512.device-backend-review-index.v1",
+  "files": [
+    {
+      "path": "candidate-v1-review.safe.json",
+      "bytes": 7170,
+      "sha256": "25419143f0f0b08781d177fda131db5dbd0a0492d03c9f2c82ab92648de3f687",
+      "gitBlobSha": "d01115fe55c1ce3124e0b70a3a729d0d1e971ab6"
+    },
+    {
+      "path": "candidate-v1.patch",
+      "bytes": 7384,
+      "sha256": "4df0f1c8fe631abac01f2d6caa75d680ea769ed4dfde0e6014b481ec7a7cb1b0",
+      "gitBlobSha": "89a182e863d92f1d175e5566a47d67409444a606"
+    },
+    {
+      "path": "checkout/.github/workflows/issue1512-device-sql-probe.yml",
+      "bytes": 10639,
+      "sha256": "f57f57cb1d43fcb0436b02142311fb3cd1124e07943a2fe39ce50080b333983d",
+      "gitBlobSha": "0bdf202ffc6de25adbec90677537546438e9bb66"
+    },
+    {
+      "path": "baseline.safe.json",
+      "bytes": 1885,
+      "sha256": "e8e2b72df341741ebc41afc557aeccdbe501b1017fcac63b805d2eafacd8f5ec",
+      "gitBlobSha": "484b9c24de931c66a0f6ab8a9f0a15a6266e9026"
+    },
+    {
+      "path": "offline-query-boundary.test.cjs",
+      "bytes": 3954,
+      "sha256": "2b6bfa74b4c237a817ac16f9f673a164a8b7fec61b8544ceb7d35e2e3433f84f",
+      "gitBlobSha": "10eed73ad8adeea5e857edb8222a20850d90c207"
+    },
+    {
+      "path": "offline-baseline-red.original.log",
+      "bytes": 1853,
+      "sha256": "6fe55982721704c0a3d40abaeb879b69327d9f5d0802c550898ba2e9dfa9dfd4",
+      "gitBlobSha": "da2a7d3f440eda0df98b7202a41cb1b4cfe05705"
+    },
+    {
+      "path": "offline-enrollment-green.original.log",
+      "bytes": 272,
+      "sha256": "db926d5665bae2adad6e519cd8c5d02e539b7d71415b1f96f6a645baf3d20b17",
+      "gitBlobSha": "98da64e1ec17ee55ba2cf63fc04fed1566054522"
+    },
+    {
+      "path": "offline-candidate-green.original.log",
+      "bytes": 460,
+      "sha256": "c683b8823351399bc816691d5f41cc57b946ded873f0aebdad530a9e9800c7f3",
+      "gitBlobSha": "cf92ac8e038030e1ebc41d36153e91051483fb64"
+    },
+    {
+      "path": "targeted-lint.original.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlobSha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    }
+  ],
+  "candidateFiles": [
+    {
+      "path": "checkout/lib/device-enrollment.ts",
+      "bytes": 1050,
+      "sha256": "59a025174235a9bbb5a17aa5c654a96d52deb002bb72859ae655af0322b0fede",
+      "gitBlobSha": "8fe53cb39985150e5fc05daa6370121cb5426d53"
+    },
+    {
+      "path": "checkout/lib/device-management.ts",
+      "bytes": 3206,
+      "sha256": "17fb62c6033acded70487b56e09f989410b782d4afaaa0445988442b5f5754b1",
+      "gitBlobSha": "c2243c5732d67b3ff5444196ce3b45e9aca67805"
+    },
+    {
+      "path": "checkout/lib/device-enrollment.db.test.ts",
+      "bytes": 24843,
+      "sha256": "2fa9b163ce0219171d4bc46d5107d1db55628dc847f88dc33165ec0e5028f526",
+      "gitBlobSha": "071b2243d35cd6fdd97b7be0f17f21728578c537"
+    }
+  ]
+}

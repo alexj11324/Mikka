@@ -1,0 +1,100 @@
+{
+  "kind": "local deterministic business-refusal baseline RED source binding",
+  "frozenAt": "2026-11-09T02:32:35.809736+00:00",
+  "baselineRevision": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "copy": "/workspace/scratch/812e3b7d6d45/issue1512-tracing-core-copy",
+  "command": [
+    "node",
+    "--experimental-test-module-mocks",
+    "--import",
+    "./scripts/server-test.mjs",
+    "--import",
+    "tsx",
+    "--test",
+    "--test-name-pattern=closed repository refusals|both actual Factory read tools",
+    "lib/coordinator/repository-resolution.test.ts",
+    "tests/cloud-dispatch-startup.test.ts"
+  ],
+  "result": {
+    "exitCode": 1,
+    "tests": 2,
+    "passed": 0,
+    "failed": 2,
+    "log": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/tracing-refusal-20261109/refusal.RED.log",
+    "bytes": 2083,
+    "sha256": "8ea876e4a77b734206a1782f014011abc00ccb5d89952a89fa3a2cbd51cf122a"
+  },
+  "files": [
+    {
+      "path": "lib/dispatch-timing.ts",
+      "baseline": {
+        "bytes": 3006,
+        "sha256": "51dd22558c3d50f88e19c64d1b11d1225e568dd74954f4d59dc256d426fc7c00"
+      },
+      "red": {
+        "bytes": 3006,
+        "sha256": "51dd22558c3d50f88e19c64d1b11d1225e568dd74954f4d59dc256d426fc7c00"
+      }
+    },
+    {
+      "path": "lib/coordinator/repository-resolution.ts",
+      "baseline": {
+        "bytes": 11110,
+        "sha256": "fb746519443b7e3a02647bb9c55929b2023e4d9afb5682d92fc3977823bf1d77"
+      },
+      "red": {
+        "bytes": 11110,
+        "sha256": "fb746519443b7e3a02647bb9c55929b2023e4d9afb5682d92fc3977823bf1d77"
+      }
+    },
+    {
+      "path": "workflows/coordinator/steps.ts",
+      "baseline": {
+        "bytes": 91023,
+        "sha256": "79f2c771ab0eaf305a85c13547f0c22b526cb40f7d0622c905def3845fc3f9f0"
+      },
+      "red": {
+        "bytes": 91023,
+        "sha256": "79f2c771ab0eaf305a85c13547f0c22b526cb40f7d0622c905def3845fc3f9f0"
+      }
+    },
+    {
+      "path": "workflows/coordinator/factory-steps.ts",
+      "baseline": {
+        "bytes": 11826,
+        "sha256": "8750d7b19bfe516194d7146205e0ff72d5ec8208944b8be352bfad8a0b454e6e"
+      },
+      "red": {
+        "bytes": 11826,
+        "sha256": "8750d7b19bfe516194d7146205e0ff72d5ec8208944b8be352bfad8a0b454e6e"
+      }
+    },
+    {
+      "path": "lib/coordinator/repository-resolution.test.ts",
+      "baseline": {
+        "bytes": 15458,
+        "sha256": "0c62c58a19b96921c5a144f4a6f4ff5dc99754e5b70b1eda42d9b2d0b74bd6e7"
+      },
+      "red": {
+        "bytes": 22314,
+        "sha256": "9a0bedfd3aac7948c84a09dd48d09cc25041092c9f2481799cff5446603acc9c"
+      }
+    },
+    {
+      "path": "tests/cloud-dispatch-startup.test.ts",
+      "baseline": {
+        "bytes": 28252,
+        "sha256": "b9e49b8d89cd891575317370c5175e91391168eea4dcf8aa07218d2d82e4f505"
+      },
+      "red": {
+        "bytes": 32351,
+        "sha256": "01445c824a8d9d3474f744fc83a4cf26180d6a0f32002d7f21f28383538865cf"
+      }
+    }
+  ],
+  "frozenFlushFilesVerifiedUnchanged": {
+    "lib/tracing/node.ts": "e1ccb4a2aaba54d8e3be4d27d9ff18b31dd9fc683f72117f6dd0ea730099f4d0",
+    "lib/tracing/logs.test.ts": "6e1f3200889e5f446a0427b4c62d7db3195d58f8d72853bbd1dc6cb03118200b"
+  },
+  "boundary": "Real Mikka helpers and installed pinned official Workflow trace helper; existing fake pool and injected repository lister; no network, database, model or browser."
+}

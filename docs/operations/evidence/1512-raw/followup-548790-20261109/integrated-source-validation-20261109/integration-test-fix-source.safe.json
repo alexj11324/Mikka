@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "previousTree": "3c485bb71045af3616f16de6d40824850c32c84c",
+  "sourceTree": "5ffff474defa47634334484fe18916130e3f72d8",
+  "files": [
+    {
+      "path": "lib/personal-policy.test.ts",
+      "bytes": 14410,
+      "sha256": "b7059da0fe12fde89aaf1753e3029ee21868d5e5895e5651ecd6f495786103fe",
+      "gitBlobSha": "fef80337b9b5244d2e8565236c6dd96f7d329acd"
+    },
+    {
+      "path": "lib/tracing/logs.test.ts",
+      "bytes": 11376,
+      "sha256": "d84f79591aa47966bd57fb570c8362608fb22778d8db1e1af7340bf49724e2f8",
+      "gitBlobSha": "8ca4cd89bd42d03c7a14f0007ef52728e47412d6"
+    }
+  ],
+  "patch": {
+    "bytes": 2525,
+    "sha256": "19cc61de58ddfac20aeeed93430b6d0575be50aaacf04b446d49ccafd3923085"
+  },
+  "other21OverlayPathsUnchanged": true,
+  "runtimeOrAssertionsRemoved": false
+}

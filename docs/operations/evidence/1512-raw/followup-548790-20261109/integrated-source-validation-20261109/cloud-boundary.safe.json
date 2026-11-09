@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "label": "cloud-boundary",
+  "argv": [
+    "pnpm",
+    "check:cloud-boundary"
+  ],
+  "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-integration-checkout",
+  "sourceTree": "5ffff474defa47634334484fe18916130e3f72d8",
+  "sourceTreeUnchanged": true,
+  "trackedWorktreeUnchanged": false,
+  "start": "2026-11-09T03:15:54.017664+00:00",
+  "end": "2026-11-09T03:16:05.021728+00:00",
+  "durationSeconds": 11.004,
+  "exitCode": 0,
+  "log": {
+    "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/integrated-source-validation-20261109/cloud-boundary.original.log",
+    "bytes": 3175,
+    "sha256": "b40a7e23e3ee1fe699b489961cca94a90fd34752b2a30aedd4c3885733df4d10"
+  },
+  "environment": {
+    "pinnedPnpm": "10.34.3",
+    "nodeOptions": "--max-old-space-size=4096",
+    "databaseOrCredentialEnvironmentForwarded": false,
+    "sourceSecurityOrSandboxOverrides": false
+  },
+  "published": false,
+  "productionAccepted": false
+}

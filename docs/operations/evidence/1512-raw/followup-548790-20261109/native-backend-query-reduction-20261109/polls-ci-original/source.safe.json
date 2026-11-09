@@ -1,0 +1,50 @@
+{
+  "schema": "issue1512.device-polls-probe-source.v1",
+  "repository": "alexj11324/Mikka",
+  "ref": "refs/heads/ops/1512-device-sql-probe-20261109",
+  "runId": "42553864534",
+  "runAttempt": 1,
+  "baseline": "d4f3c6be8137d906407711c6ea3ac8808ab1d860",
+  "baselineTree": "0cc30d9e0ca2f4c37b4dabdc58f0813facdce3fa",
+  "candidate": "c1ac101fa068bbda26b19e342f8e228076e68707",
+  "candidateTree": "2a35e4a4afd37b2b9172d20dd433758e7b9ab854",
+  "original": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+  "originalTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+  "establishedFiles": {
+    "lib/device-enrollment.ts": "59a025174235a9bbb5a17aa5c654a96d52deb002bb72859ae655af0322b0fede",
+    "lib/device-management.ts": "17fb62c6033acded70487b56e09f989410b782d4afaaa0445988442b5f5754b1",
+    "lib/device-enrollment.db.test.ts": "2fa9b163ce0219171d4bc46d5107d1db55628dc847f88dc33165ec0e5028f526"
+  },
+  "files": [
+    {
+      "path": "app/v1/devices/[deviceId]/runs/route.ts",
+      "bytes": 1305,
+      "sha256": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c",
+      "gitBlob": "5a4c4f8486239161b325b9774b3086afe666dfa9",
+      "baselineGitBlob": "3bbb71a8a7d249eb517d75a95986cf75d1994168"
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/repos/route.ts",
+      "bytes": 1983,
+      "sha256": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888",
+      "gitBlob": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b",
+      "baselineGitBlob": "9fe33b05a9570ab59e4bb041f9a1344c44ab31ad"
+    },
+    {
+      "path": "lib/device-heartbeat.db.test.ts",
+      "bytes": 21505,
+      "sha256": "6e8a9ddcb8855de98b443531b6d7524952e740d49eb38194a17234d87eda9b6d",
+      "gitBlob": "27bbb720ac8f5bd3716787db62eb11833e9f3530",
+      "baselineGitBlob": "68423cee4e9fa1f0f89274ed3dec67859e6f164b"
+    },
+    {
+      "path": "lib/device-unit-fence.db.test.ts",
+      "bytes": 11425,
+      "sha256": "e4f1ee4f90de93ce22f74e5dc97a3475816a5d2a932b0d327ee2441953224d51",
+      "gitBlob": "bc65b3faf494d2fd7c797b68f34d04227df38b7a",
+      "baselineGitBlob": "a5237da052e304897cd48afdebc42ee6f7571d96"
+    }
+  ],
+  "workflowSha256": "7de214a59f7f38fe4c34b2f453ec3ec402411bab23d4c721f28a11ad4de06541",
+  "boundary": "Dedicated PG17 service only; no production configuration, identity, model execution or Native acceptance."
+}

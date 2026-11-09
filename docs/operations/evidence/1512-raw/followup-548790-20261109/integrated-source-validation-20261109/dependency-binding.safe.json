@@ -1,0 +1,48 @@
+{
+  "dependencySourceComparisons": [
+    {
+      "path": "package.json",
+      "candidateSHA256": "67ae032661666e1eb97e683147c2fc0ce9ce02d2989232549416470e1a6787f6",
+      "installedSourceSHA256": "67ae032661666e1eb97e683147c2fc0ce9ce02d2989232549416470e1a6787f6",
+      "sameBytes": true
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "candidateSHA256": "345a6e1d97bb3a0028497f3294a86944bc9f617af892de71990d40d2cdf36054",
+      "installedSourceSHA256": "345a6e1d97bb3a0028497f3294a86944bc9f617af892de71990d40d2cdf36054",
+      "sameBytes": true
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "candidateSHA256": "8977ce9916b92a015e0f4dad1d45bcf51c9427637a5988fcdc585a1a21a0301e",
+      "installedSourceSHA256": "8977ce9916b92a015e0f4dad1d45bcf51c9427637a5988fcdc585a1a21a0301e",
+      "sameBytes": true
+    },
+    {
+      "path": "packages/protocol/package.json",
+      "candidateSHA256": "cc63fa445e0bf6b64966641eaf8d08b3c1dbe4cffe3216f5c3bec3bc68434f70",
+      "installedSourceSHA256": "cc63fa445e0bf6b64966641eaf8d08b3c1dbe4cffe3216f5c3bec3bc68434f70",
+      "sameBytes": true
+    },
+    {
+      "path": "packages/daemon/package.json",
+      "candidateSHA256": "11d2828499ff46ddf10ae2eb6653b400ae3863c012b1c979c66a53560120ec30",
+      "installedSourceSHA256": "11d2828499ff46ddf10ae2eb6653b400ae3863c012b1c979c66a53560120ec30",
+      "sameBytes": true
+    },
+    {
+      "path": "apps/frontend/package.json",
+      "candidateSHA256": "1e7f72216b72ab5581be6257acb78d03d5bed0957741c918c7542dedca10924b",
+      "installedSourceSHA256": "1e7f72216b72ab5581be6257acb78d03d5bed0957741c918c7542dedca10924b",
+      "sameBytes": true
+    },
+    {
+      "path": "apps/mobile/package.json",
+      "candidateSHA256": "8b017a9ae6c5a3c9671272b7976c4ee4511b0ac26b745d9f78c187b222929157",
+      "installedSourceSHA256": "8b017a9ae6c5a3c9671272b7976c4ee4511b0ac26b745d9f78c187b222929157",
+      "sameBytes": true
+    }
+  ],
+  "pinnedPnpmVersion": "10.34.3",
+  "nodeVersion": "v24.22.1"
+}

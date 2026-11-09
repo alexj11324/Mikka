@@ -1,0 +1,153 @@
+{
+  "schema": "issue1512.native-c04690-publication-index.v1",
+  "createdAt": "2026-11-09T02:40:09.411751+00:00",
+  "prefix": "native-c04690",
+  "publicationStatus": "prepared locally; root chooses the evidence-branch parent with its fresh lease",
+  "sourceHead": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+  "actualCheckout": "fd053d254e377f35ff8e2529edb1ad544c23fab1",
+  "actualTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+  "runId": 42545814990,
+  "jobId": 128933980013,
+  "jobConclusion": "success",
+  "nativeLoginBudget": {
+    "native": 473,
+    "web": 402,
+    "pass": false
+  },
+  "firstStartupBudget": {
+    "bundled": 176,
+    "hosted": 194,
+    "pass": true
+  },
+  "payloadFilesExcludingIndex": 17,
+  "payloadBytesExcludingIndex": 1415565,
+  "files": [
+    {
+      "path": "native-c04690/native-c04690-original/lifecycle.json",
+      "bytes": 696142,
+      "sha256": "19a1cfbd9225c580a2309f76016e099d4354e5fba3ee9562c59d2782db14dcdc",
+      "gitBlobSha": "1cd8ce2c9528225884da22282e254311c797d07d"
+    },
+    {
+      "path": "native-c04690/native-c04690-original/parity/parity.json",
+      "bytes": 107080,
+      "sha256": "c3e493ee0b9de363c2f7fcec7a18b0f51f58db91fd1c11b174aa463bf2ee72dc",
+      "gitBlobSha": "ffc6a14d090cc3f9483bfe81bb8264b16cca0ad0"
+    },
+    {
+      "path": "native-c04690/native-c04690-original/smoke.json",
+      "bytes": 3105,
+      "sha256": "07936d4873c30334bc4375227eb072eab1e5b8e364de15a6a31f0962a772d8c8",
+      "gitBlobSha": "93b03d05fdaf467dffc5441f562b98b037b8b5da"
+    },
+    {
+      "path": "native-c04690/package-c04690-original/mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "f2813213e20fa25c7bca6ea28d41803350fb98ef1dded7881cd0938f7ccf30d9",
+      "gitBlobSha": "135cb38707654d6427c9a7d7ca589517da33cac0"
+    },
+    {
+      "path": "native-c04690/package-c04690-original/native-crypto.json",
+      "bytes": 2868,
+      "sha256": "90467538c77f433bf1e95fb4d39f868283655e93e12133a1d50818a1afc1f78b",
+      "gitBlobSha": "2195b9aa46324cc40db26930b643e4c31ff37748"
+    },
+    {
+      "path": "native-c04690/download-receipt.safe.json",
+      "bytes": 655,
+      "sha256": "bce60f55d1995ffec9ffcac873a1444bcf7480090d7be671b67f8d395c0669a2",
+      "gitBlobSha": "0554782f95a9a2a6ba84e090a62f73f2624ac662"
+    },
+    {
+      "path": "native-c04690/original-archives-and-files.safe.json",
+      "bytes": 113371,
+      "sha256": "09cc9e30354bb65074d8a5cbe7e813f79a6725eb7c2daa94cc1f383007b1a50b",
+      "gitBlobSha": "0fc6fee0bdc5af3ef1585a1052b5ad4a46e80edd"
+    },
+    {
+      "path": "native-c04690/independent-arithmetic.safe.json",
+      "bytes": 4823,
+      "sha256": "5408db124be776bf33f409cc48a93b5a9d9ca6395979911158b19a474a33ca92",
+      "gitBlobSha": "1a928aaf4def8544b1832bb461abbe9f64108d3b"
+    },
+    {
+      "path": "native-c04690/diagnostics-reconciliation.safe.json",
+      "bytes": 122061,
+      "sha256": "a3cc9b0702cf1970c5106c4ae5aa2f4aaae0343c478b9ec18b8160748e2ed513",
+      "gitBlobSha": "4716eb7d7b160a9bb6c5df98e772d37e1fc9c5b4"
+    },
+    {
+      "path": "native-c04690/query-delta-vs-ae1504.safe.json",
+      "bytes": 142980,
+      "sha256": "32b0aeabde513427fafdf1b6cbc7bcbf333a13a07269e126e3d768a4e14e6c54",
+      "gitBlobSha": "e67df07cc5ee4ab9fdaaf07083afcde30d6d6767"
+    },
+    {
+      "path": "native-c04690/terminal-review.safe.json",
+      "bytes": 142201,
+      "sha256": "61c395d3f96e6ec5cbef9ae82f41747168928f4a84102757f87b939d38617f83",
+      "gitBlobSha": "44b2594c50f44bcdab03e1b567b1ed98c8edfef3"
+    },
+    {
+      "path": "native-c04690/query-labels.json",
+      "bytes": 3178,
+      "sha256": "353e3e28d4db9ec946dae81822c7727b275e33ff406d0d81a50a8b172ad26214",
+      "gitBlobSha": "48c0aed38d68d5b77d34ffd1cb4310e01a18b165"
+    },
+    {
+      "path": "native-c04690/verify_native.py",
+      "bytes": 12194,
+      "sha256": "08946a522243eee358e802bbfd4ef3e70a99c3b0b801e25e8f8d5b3025c8e18d",
+      "gitBlobSha": "89eb17161df62fe2eb9f581ed29c5264d93cb04c"
+    },
+    {
+      "path": "native-c04690/verify_diagnostics.py",
+      "bytes": 11858,
+      "sha256": "081ba5629a7f10427718cb24d4407ba62d90959c6e0aee0810635a77e9b0a6fa",
+      "gitBlobSha": "7229e495d9892297e22f50770e01ac22b1547fa5"
+    },
+    {
+      "path": "native-c04690/publication-screen-v1.safe.json",
+      "bytes": 4703,
+      "sha256": "284e07400685b2b11fc5d612c1712922d8c00ed18138d26210dfee9ea45902e0",
+      "gitBlobSha": "826017831c91c4e559700229c3f49902f42598ae"
+    },
+    {
+      "path": "native-c04690/log-archive.safe.json",
+      "bytes": 4134,
+      "sha256": "f9392aece603580ea9f0319faa473878eacbdd5b7207587b2c64a6a7bd24bfcc",
+      "gitBlobSha": "0e2b1132b2c2cb1b114b9d47bcf655f7df0f9558"
+    },
+    {
+      "path": "native-c04690/native-c04690-job.original.log.gz",
+      "bytes": 43255,
+      "sha256": "9d5fb948b4d85bac67a7187660bdf56db81b5ddf8b158f77c2aa9e1cebf47ad9",
+      "gitBlobSha": "82452fa9d83aef4b74f145b8451eea0535c21c04"
+    }
+  ],
+  "originals": {
+    "jsonFiles": 5,
+    "allOriginalPathsAndHashesIndexed": 310,
+    "pngFilesIndexedButNotPublished": 305,
+    "rawZipFilesPublished": 0,
+    "rawLogPublished": false,
+    "deterministicRawLogGzipPublished": true,
+    "gitCommitMetadataWithPersonalEmailsPublished": false
+  },
+  "privacy": {
+    "selectedTextCredentialAndEmailFindings": 0,
+    "originalJobLogEmailPatternCandidates": 11,
+    "jobLogCandidatesResolvedAgainstSameSourcePackageVersions": 11,
+    "unresolvedFindings": 0,
+    "boundary": "Exact selected text only; public GitHub job logs use GitHub masking. Pattern screening does not prove absence of arbitrary unrecognized secrets. PNG pixels and ZIP contents are excluded."
+  },
+  "preservation": [
+    "Original five JSON files copied byte-for-byte; original ZIPs, PNGs and decoded full log kept local.",
+    "All four measured windows, 12 checkpoints, 24 bucket records and explicit diagnostics unknowns are retained.",
+    "Lifecycle owner and peer before-baseline false remain false; successful after-baselines and cleanup are separate.",
+    "CI job success does not override the 473>402 full Native login budget failure.",
+    "Later ordinal-gap localization is not an alternative acceptance window and does not deduct background traffic.",
+    "The prior ae1504 green evidence and all earlier red evidence are unchanged."
+  ],
+  "rootArithmeticReceipt": "Not included in this agent-prepared package; root can append its own independent arithmetic receipt separately."
+}

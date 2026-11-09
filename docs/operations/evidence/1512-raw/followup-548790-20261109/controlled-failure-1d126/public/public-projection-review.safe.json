@@ -1,0 +1,16 @@
+{
+  "reviewedAtUTC": "2026-11-09T02:59:47.646225+00:00",
+  "scope": "Public files in this single controlled-failure evidence directory before final index generation",
+  "publicFilesReviewed": 18,
+  "staticChecks": [
+    "email_address",
+    "credential_token",
+    "signed_url_query",
+    "account_or_credential_metadata_key"
+  ],
+  "findings": [],
+  "projection": "Run/job/artifact IDs and terminal status; source/git/hash receipts; fixed controlled dev trace/span IDs; allowlisted APM/log attributes; numeric overhead distributions. GitHub actor/account metadata and full logs remain private.",
+  "limits": "Finite static scan and field-projection review, not a general secret scanner or privacy audit. Original safe artifact receipts are copied byte-for-byte; no secrets or user payloads were present in those receipts.",
+  "privatePlatformResponsesAndLogsCopiedIntoPublic": false,
+  "safeArtifactReceiptsCopiedByteForByte": true
+}

@@ -1,0 +1,17 @@
+{
+  "schema": "issue1512.device-probe-cleanup-pending.v1",
+  "recordedAt": "2026-11-09T02:45:59.140016+00:00",
+  "ownedRef": "refs/heads/ops/1512-device-sql-probe-20261109",
+  "expectedHead": "d4f3c6be8137d906407711c6ea3ac8808ab1d860",
+  "computeResourcesActive": 0,
+  "postgresServiceAndNetworkTerminated": true,
+  "jobCompletedAt": "2026-11-09T02:33:43Z",
+  "gitReadbackMatchedExpectedHead": true,
+  "singleGitDeleteAttempt": {
+    "expectedLeaseUsed": true,
+    "exitCode": 128,
+    "reason": "No CLI GitHub credential was configured; terminal prompts disabled. No credential was requested or read.",
+    "rawLog": "owned-ref-delete.original.log"
+  },
+  "nextAction": "Root explicitly took fixed owned-ref cleanup through its existing transport; no additional cleanup workflow or credential discovery will be attempted."
+}

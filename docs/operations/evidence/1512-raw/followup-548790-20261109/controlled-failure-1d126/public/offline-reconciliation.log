@@ -1,0 +1,19 @@
+{
+  "backendObserved": true,
+  "completeTraces": 20,
+  "counts": {
+    "spanRows": 80,
+    "spanUuids": 80,
+    "logicalTraceSpanPairs": 80,
+    "logRows": 40,
+    "logUuids": 40,
+    "errorLogTraceSpanPairs": 40
+  },
+  "initialUnsampled": 17,
+  "effectiveRate": 1,
+  "stableSnapshots": true,
+  "handlerDeltaMeanMs": 0.34458290666665925,
+  "handlerDeltaP95Ms": 0.43658000000004904,
+  "sourceRevision": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+  "finalFixSourceAcceptance": false
+}

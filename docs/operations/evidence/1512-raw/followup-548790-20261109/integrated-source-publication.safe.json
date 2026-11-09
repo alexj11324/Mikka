@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "recordedAt": "2026-11-09 03:27:57 UTC",
+  "repository": "alexj11324/Mikka",
+  "pr": 1799,
+  "branch": "fix/1512-daemon-fixture-executable-20261109",
+  "oldHead": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+  "main": "0a355918330f6dac04d2b0ee4716cd056c263162",
+  "finalCommit": "548790b4676d5e43556bf62cf452c3c5aee68073",
+  "finalTree": "933f76fbff37682f2f9cfaf64e672d229531f5ff",
+  "parents": [
+    "5be4f347b9af8c2560c525c6901551f68639c4f1"
+  ],
+  "mergeCommit": "5be4f347b9af8c2560c525c6901551f68639c4f1",
+  "mergeParents": [
+    "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+    "0a355918330f6dac04d2b0ee4716cd056c263162"
+  ],
+  "sourceFilesVerified": 23,
+  "mainOnlyPathsPreserved": true,
+  "updatedWithExpectedHead": true,
+  "force": false,
+  "mainUpdated": false,
+  "publishedAt": "2026-11-09 03:26:48 UTC",
+  "commentId": 6731506973,
+  "changedPathsRelativeToMain": 25,
+  "initialCIRun": 42556448828,
+  "initialWorkflowCount": 10,
+  "localSourceTree": "fb8bad033883b43bafd1c875a9f168ee58d48ebe",
+  "localDependencyBoundary": "M1; exact fresh-main package/lock are different and require this public commit's CI",
+  "fullNativePrevious": {
+    "native": 473,
+    "web": 402,
+    "accepted": false
+  },
+  "productionModelCasesAccepted": 0,
+  "issueClosed": false,
+  "mainOrSmokeHold": false
+}
+

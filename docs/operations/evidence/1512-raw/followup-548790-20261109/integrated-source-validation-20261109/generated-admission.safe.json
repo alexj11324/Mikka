@@ -1,0 +1,74 @@
+{
+  "schema": 1,
+  "sourceTree": "fb8bad033883b43bafd1c875a9f168ee58d48ebe",
+  "files": [
+    {
+      "path": "apps/api/generated/routes.json",
+      "savedRemoteSourcePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/generated-main0a-source/routes.json",
+      "savedRemoteSHA256": "cdfd0e47464368692ecdb5013ec706140eb7be41fe2fca5b8f44d93575595704",
+      "baselineIdentical": true,
+      "final": {
+        "path": "apps/api/generated/routes.json",
+        "mode": "100644",
+        "gitBlobSha": "17c08e555f327646bfa01df49ab6406053dfe538",
+        "bytes": 75102,
+        "sha256": "a15a7aec0a38ee092f4b2e1a2ea4209ef08b776eb74db7bd59d697dd47370979"
+      }
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "savedRemoteSourcePath": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/generated-main0a-source/routes.ts",
+      "savedRemoteSHA256": "f2cab24a1f878750c979097c3b5802a8411e73afb69cd648bbced385569273b0",
+      "baselineIdentical": true,
+      "final": {
+        "path": "apps/api/generated/routes.ts",
+        "mode": "100644",
+        "gitBlobSha": "08aaff7b3c936a3a0ede346ab51a15ebf2fd785d",
+        "bytes": 77403,
+        "sha256": "daa44b2e1ead0540f14d806995bc3fcdeecc374ff042fc443cabce714134a7e4"
+      }
+    }
+  ],
+  "routes": 240,
+  "methods": 312,
+  "sourceHashChangesPerFile": 4,
+  "routeChanges": [
+    {
+      "path": "/mikka/api/devices/enrollment",
+      "source": "app/api/devices/enrollment/route.ts",
+      "oldSourceHash": "38fe0c41d60482f1314b414e1f3177add2f667ffa8ad3546794d15f5e9fce6aa",
+      "newSourceHash": "08c91a56354263fcce77afc73ec9b44b2889ea07f0ae56007e07879fa07d36a4"
+    },
+    {
+      "path": "/mikka/api/mobile/model",
+      "source": "app/api/mobile/model/route.ts",
+      "oldSourceHash": "9deeaa949f66beb9006576b3ebb0a29c81aabbdd4831f62ab8be63be59d7aa09",
+      "newSourceHash": "40afa67a3d516a46b49ec19fe2f1a844f2be44398532387802ff262d34de6f17"
+    },
+    {
+      "path": "/mikka/v1/devices/[deviceId]/repos",
+      "source": "app/v1/devices/[deviceId]/repos/route.ts",
+      "oldSourceHash": "7a7d4b6f53cf5c58cb710f3beb01af9ce6fb2ce09da6e227a07a8ac2cc1bcdd9",
+      "newSourceHash": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888"
+    },
+    {
+      "path": "/mikka/v1/devices/[deviceId]/runs",
+      "source": "app/v1/devices/[deviceId]/runs/route.ts",
+      "oldSourceHash": "329cd0aea78b05551fbe72b2d8562ce0fa9c67d3cee4318f324f1d3238d72e54",
+      "newSourceHash": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c"
+    }
+  ],
+  "generationCommand": [
+    "node",
+    "apps/api/scripts/generate-routes.mjs",
+    "--check"
+  ],
+  "originalGenerationReceipt": "generated-route-check.safe.json",
+  "canonicalGeneratedOutputReusedExactBytes": true,
+  "freshMainBinding": {
+    "sha": "0a355918330f6dac04d2b0ee4716cd056c263162",
+    "rootPerformedNetworkRead": true,
+    "thisAgentComparedSavedBytesToM1": true
+  },
+  "typecheckNotRerunAfterAdmission": true
+}

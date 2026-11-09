@@ -1,0 +1,32 @@
+{
+  "schema": 1,
+  "entries": [
+    {
+      "original": {
+        "path": "tracked-source-inventory-final.safe.json",
+        "bytes": 1749242,
+        "sha256": "7f2fd765b0cdd08bd56284491e50ff710f1345987feb35b23eaf64d3f516f738",
+        "gitBlobSha": "d4b7716e8e40925f72dc32fd9d14cbaac66b6130"
+      },
+      "storedPath": "integrated-source-validation-20261109/tracked-source-inventory-final.safe.json.gz",
+      "storedBytes": 530311,
+      "storedSha256": "80f52b58f2817d4908dd272d971b9707ef2d8c6f553ae154307cad92f6fe7da4",
+      "format": "gzip level9 mtime0 empty filename",
+      "roundtripExact": true
+    },
+    {
+      "original": {
+        "path": "tracked-source-inventory.safe.json",
+        "bytes": 1749221,
+        "sha256": "3379077bbf79658b997ef721d4c2a2f3f13b36c8ea6c7ca80bb3aea7375d0689",
+        "gitBlobSha": "48f3c6e6c72eda4739716da1fd8fe390024e45a6"
+      },
+      "storedPath": "integrated-source-validation-20261109/tracked-source-inventory.safe.json.gz",
+      "storedBytes": 530297,
+      "storedSha256": "360c93c34298732c41a9f7b195dd7a1dba2a233ad4fc8ae505505f516d4cf734",
+      "format": "gzip level9 mtime0 empty filename",
+      "roundtripExact": true
+    }
+  ],
+  "boundary": "Two reproducible full tracked-source inventories are archived losslessly as gzip; their original hashes and filenames in the author index remain unchanged."
+}

@@ -1,0 +1,8 @@
+
+> next-app@0.0.1 typecheck /workspace/scratch/812e3b7d6d45/issue1512-integration-checkout
+> tsrs --noEmit && tsrs --noEmit -p apps/api/tsconfig.json && pnpm --filter @mikka/frontend typecheck
+
+lib/personal-policy.test.ts(126,3): error TS2322: Type 'undefined' is not assignable to type 'boolean'.
+lib/personal-policy.test.ts(238,3): error TS2322: Type 'undefined' is not assignable to type 'boolean'.
+lib/tracing/logs.test.ts(134,43): error TS18048: 'span.name' is possibly 'undefined'.
+ ELIFECYCLE  Command failed with exit code 2.

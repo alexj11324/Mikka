@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "command": [
+    "node",
+    "apps/api/scripts/generate-routes.mjs",
+    "--check"
+  ],
+  "exitCode": 0,
+  "actualBehavior": "The existing CLI does not parse --check; it unconditionally rewrites both generated route inventories including sourceHash fields.",
+  "files": [
+    {
+      "path": "apps/api/generated/routes.json",
+      "beforeSHA256": "cdfd0e47464368692ecdb5013ec706140eb7be41fe2fca5b8f44d93575595704",
+      "generatedSHA256": "a15a7aec0a38ee092f4b2e1a2ea4209ef08b776eb74db7bd59d697dd47370979",
+      "generatedBytes": 75102,
+      "restoredBytesExact": true
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "beforeSHA256": "f2cab24a1f878750c979097c3b5802a8411e73afb69cd648bbced385569273b0",
+      "generatedSHA256": "daa44b2e1ead0540f14d806995bc3fcdeecc374ff042fc443cabce714134a7e4",
+      "generatedBytes": 77403,
+      "restoredBytesExact": true
+    }
+  ],
+  "patchSHA256": "f27b785b9140c7aa4ac54b82808922bcab0f2edf9a33ec994bf26ed0773aeba5",
+  "restoredFromOwnIndexAfterPreservingOutput": true,
+  "sharedIndexTouched": false,
+  "finalTypecheckMustReconfirmStableWorktree": true
+}

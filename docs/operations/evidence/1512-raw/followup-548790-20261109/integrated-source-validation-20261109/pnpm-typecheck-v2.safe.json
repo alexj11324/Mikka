@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "label": "pnpm-typecheck-v2",
+  "argv": [
+    "pnpm",
+    "typecheck"
+  ],
+  "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-integration-checkout",
+  "sourceTree": "5ffff474defa47634334484fe18916130e3f72d8",
+  "sourceTreeUnchanged": true,
+  "trackedWorktreeUnchanged": false,
+  "start": "2026-11-09T03:15:13.044104+00:00",
+  "end": "2026-11-09T03:16:01.363811+00:00",
+  "durationSeconds": 48.32,
+  "exitCode": 0,
+  "log": {
+    "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/integrated-source-validation-20261109/pnpm-typecheck-v2.original.log",
+    "bytes": 339,
+    "sha256": "aea6a699ac1b37a3be4cacc0519923975215e97264341eea0d6f40e0d45c0d98"
+  },
+  "environment": {
+    "pinnedPnpm": "10.34.3",
+    "nodeOptions": "--max-old-space-size=4096",
+    "databaseOrCredentialEnvironmentForwarded": false,
+    "sourceSecurityOrSandboxOverrides": false
+  },
+  "published": false,
+  "productionAccepted": false
+}

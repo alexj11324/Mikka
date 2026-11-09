@@ -1,0 +1,31 @@
+{
+  "schema": 1,
+  "files": [
+    {
+      "path": "app/api/devices/enrollment/route.ts",
+      "lastPathCommit": "6180cd8889006f4e1618c2549b1aa12d13506ee8",
+      "subject": "Avoid unused device-list reads during Desktop setup admission and merge current main",
+      "parentSources": [
+        {
+          "commit": "99eb23a1d87d3117e580c7bb4d59efe796e3e18c",
+          "sha256": "38fe0c41d60482f1314b414e1f3177add2f667ffa8ad3546794d15f5e9fce6aa"
+        },
+        {
+          "commit": "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+          "sha256": "38fe0c41d60482f1314b414e1f3177add2f667ffa8ad3546794d15f5e9fce6aa"
+        }
+      ]
+    },
+    {
+      "path": "app/api/mobile/model/route.ts",
+      "lastPathCommit": "f3336eec99a9d8439668d516677c5389a95a7326",
+      "subject": "fix(acceptance): restore implicit model defaults with scoped row receipts",
+      "parentSources": [
+        {
+          "commit": "d58d5aa19c11d28c6d1e9e0378e54f5e29e0a7b0",
+          "sha256": "9deeaa949f66beb9006576b3ebb0a29c81aabbdd4831f62ab8be63be59d7aa09"
+        }
+      ]
+    }
+  ]
+}

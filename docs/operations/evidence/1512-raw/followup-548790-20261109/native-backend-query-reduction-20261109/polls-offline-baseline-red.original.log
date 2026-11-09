@@ -1,0 +1,48 @@
+✖ runs returns its empty list with one post-auth business read (53.859533ms)
+ℹ {"scenario":"runs","postAuthBusinessQueries":2,"postgresObserved":false}
+✖ repos returns its empty list with one post-auth business read (31.156958ms)
+ℹ {"scenario":"repos","postAuthBusinessQueries":2,"postgresObserved":false}
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1052.603035
+
+✖ failing tests:
+
+test at ../offline-device-polls.test.cjs:39:39
+✖ runs returns its empty list with one post-auth business read (53.859533ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/native-backend-query-reduction-20261109/offline-device-polls.test.cjs:71:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at ../offline-device-polls.test.cjs:39:39
+✖ repos returns its empty list with one post-auth business read (31.156958ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  2 !== 1
+  
+      at TestContext.<anonymous> (/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/native-backend-query-reduction-20261109/offline-device-polls.test.cjs:71:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 2,
+    expected: 1,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

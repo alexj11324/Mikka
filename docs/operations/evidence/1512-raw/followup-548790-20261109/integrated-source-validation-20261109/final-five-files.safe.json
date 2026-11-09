@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "sourceTree": "fb8bad033883b43bafd1c875a9f168ee58d48ebe",
+  "files": [
+    {
+      "path": "lib/personal-policy.test.ts",
+      "bytes": 14410,
+      "sha256": "b7059da0fe12fde89aaf1753e3029ee21868d5e5895e5651ecd6f495786103fe",
+      "gitBlobSha": "fef80337b9b5244d2e8565236c6dd96f7d329acd"
+    },
+    {
+      "path": "lib/tracing/logs.test.ts",
+      "bytes": 11375,
+      "sha256": "5f1fbf880f6eff2e9a1282b8f80b78235c4650d28dd367373e96a266a5dabc17",
+      "gitBlobSha": "737fa373e4a8333a4a703bf6133f9a533d585460"
+    },
+    {
+      "path": "lib/coordinator/repository-resolution.test.ts",
+      "bytes": 22313,
+      "sha256": "8c9cf8f665aad36d864d72b712a43e2b197b2477900b2739cd52118695bd85c2",
+      "gitBlobSha": "a5157f09e8022bf9077053686d36aa02760a4e94"
+    },
+    {
+      "path": "apps/api/generated/routes.json",
+      "bytes": 75102,
+      "sha256": "a15a7aec0a38ee092f4b2e1a2ea4209ef08b776eb74db7bd59d697dd47370979",
+      "gitBlobSha": "17c08e555f327646bfa01df49ab6406053dfe538"
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "bytes": 77403,
+      "sha256": "daa44b2e1ead0540f14d806995bc3fcdeecc374ff042fc443cabce714134a7e4",
+      "gitBlobSha": "08aaff7b3c936a3a0ede346ab51a15ebf2fd785d"
+    }
+  ]
+}

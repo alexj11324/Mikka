@@ -1,0 +1,22 @@
+{
+  "sourceTree": "3c485bb71045af3616f16de6d40824850c32c84c",
+  "files": [
+    {
+      "path": "lib/personal-policy.test.ts",
+      "bytes": 14319,
+      "sha256": "f88b80ba03110c2dee52f337641793e8bfde2b7d0555e832cc3f6cfc1df23630",
+      "gitBlobSha": "91ad2d545028162faac1c7e3cc7454770b357e47"
+    },
+    {
+      "path": "lib/tracing/logs.test.ts",
+      "bytes": 11318,
+      "sha256": "6e1f3200889e5f446a0427b4c62d7db3195d58f8d72853bbd1dc6cb03118200b",
+      "gitBlobSha": "68827307cb5451d05aab09ced4343606ac240f4c"
+    }
+  ],
+  "redLogs": [
+    "pnpm-typecheck.original.log",
+    "pnpm-lint.original.log"
+  ],
+  "runtimeFilesFrozen": true
+}

@@ -1,0 +1,110 @@
+{
+  "sourceTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+  "localSnapshotCommit": "5975e42ef3436a53546948b556166777d1b0be9d",
+  "localSnapshotIsNotProductionCommit": true,
+  "sourceMain": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "sourcePrHead": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+  "baseline": {
+    "path": "baseline.safe.json",
+    "bytes": 1683,
+    "sha256": "61312cd54e078b485310dccb8d20a5a8a0997063758d0afafd30cc6a0150526d",
+    "gitBlobSha1": "689ec6a6685206ca6dca579af90917d2e35d46b3"
+  },
+  "v1ManifestPreserved": {
+    "path": "final-source-manifest.safe.json",
+    "bytes": 3691,
+    "sha256": "862b5b6c9d0232f8afc0651ce8b1fce48e7002d245734a6d1edb960aad2f7f24",
+    "gitBlobSha1": "1a0c00fb908cfc5d99336a6f201c565c45d20b2e"
+  },
+  "final": [
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "bytes": 6263,
+      "sha256": "871d9a5bd92d084919d4124c5c26b90d6ad7195f55f91502e02d52bc55083f6e",
+      "gitBlobSha1": "e32da5e4d7294af3363eb2de4623a52aeb7e4f47"
+    },
+    {
+      "path": "lib/personal-policy.ts",
+      "bytes": 8694,
+      "sha256": "1e09dbc751b0e740d54cbbc6db79b0d4a0bf48cc409137eabc36ecd38f8861f6",
+      "gitBlobSha1": "dc710f0a16a5e28e5a34d5112a86fab349a2639a"
+    },
+    {
+      "path": "lib/personal-policy.test.ts",
+      "bytes": 14319,
+      "sha256": "f88b80ba03110c2dee52f337641793e8bfde2b7d0555e832cc3f6cfc1df23630",
+      "gitBlobSha1": "91ad2d545028162faac1c7e3cc7454770b357e47"
+    }
+  ],
+  "unchangedBoundarySources": [
+    {
+      "path": "lib/background.ts",
+      "bytes": 2955,
+      "sha256": "73937274e1c23817cef7eaacf0da24feb4d724b25fd9d562f4cd683869050310",
+      "gitBlobSha1": "c5cfbf01c9fd6f725f1c2a806ef9f59af57ee8e0"
+    },
+    {
+      "path": "lib/tracing/jobs.ts",
+      "bytes": 2650,
+      "sha256": "6ea794db16ebd2020c31c338d4856c4909b4009a618b97a2d4eb5092a30bb8f1",
+      "gitBlobSha1": "6cec226926da96c89acc06479a6b6c13902b0470"
+    },
+    {
+      "path": "lib/tracing/labels.ts",
+      "bytes": 2278,
+      "sha256": "39d29ed6eba5cfd364e50a78c21b940136636eb887934170df003217be94da7d",
+      "gitBlobSha1": "4eddcee8197d25708e18fc1070ce13b4e0125126"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch.ts",
+      "bytes": 3099,
+      "sha256": "8aadc849e1de11727a67f03c0d0d07d656136e455f4ef7bf32281f6b10194fdb",
+      "gitBlobSha1": "528365a2f6735a12fa514f6088bf81446c813ec7"
+    },
+    {
+      "path": "lib/db/request-scope.ts",
+      "bytes": 4779,
+      "sha256": "67bbb85d950948802449a1d0c2638e62bd4d1731ffe883837bc53059ac50b6f0",
+      "gitBlobSha1": "b3445c20e6be5061bcbfe0fe56903b8dd767dfd3"
+    },
+    {
+      "path": "lib/model-api-keys.ts",
+      "bytes": 26494,
+      "sha256": "1574f8712bfe1ea8428a86e91cf137e75d2f0849bfea1cec2b0de34db0b8dffb",
+      "gitBlobSha1": "d46338c3d695ffd0fd1bc245f0db3f63d0c2ed4d"
+    },
+    {
+      "path": "lib/execution-settings.ts",
+      "bytes": 23629,
+      "sha256": "12fc04116782566b78b17a5f2068756a6230e45930eff36912b3d2fa0045abf6",
+      "gitBlobSha1": "0c0b7accd10ea84957428a79d9e58a9924b9d841"
+    },
+    {
+      "path": "lib/bot-model-choice.ts",
+      "bytes": 8023,
+      "sha256": "941903810b3ec2b39bb8a58539b3d52ab08cde98fa9e8332a9a9777311144521",
+      "gitBlobSha1": "d2fd785e8e164ea86387bfd013d070da9ed3e3f0"
+    },
+    {
+      "path": "lib/subscription-runtime.ts",
+      "bytes": 8794,
+      "sha256": "29a32862ced49bce348486a26a620b5588f5932c8c456dd29785fbe1b75089a1",
+      "gitBlobSha1": "a38fa4d16a8736b4e0299b5c5540fd1e7e514f2b"
+    }
+  ],
+  "patch": {
+    "path": "read-batch-policy-v2.patch",
+    "bytes": 17545,
+    "sha256": "570f875267c9cede7a9546e94d4d3390d0e2a2e913728605b1adefd1e6109ece",
+    "gitBlobSha1": "232b1bd4f345f21ceefd8cd5ba672c23cdab1308"
+  },
+  "v1ToV2Patch": {
+    "path": "read-batch-policy-v1-to-v2.patch",
+    "bytes": 3499,
+    "sha256": "e75046ae32dffa061c139c76369ff076114c528e1839b5a9932a11b4344680fd",
+    "gitBlobSha1": "5688c5c5c5f0e896a3cb71e1cfa3237835078e4e"
+  },
+  "gitDiffCheckExitCode": 0,
+  "sourceEditsConfinedToIsolatedCopy": true,
+  "published": false
+}

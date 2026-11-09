@@ -1,0 +1,132 @@
+TAP version 13
+# (node:2984) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:2984) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: desktop account context reads only the current browser owner's active local devices
+ok 1 - desktop account context reads only the current browser owner's active local devices
+  ---
+  duration_ms: 528.31865
+  type: 'test'
+  ...
+# Subtest: local setup owner view retains fresh session checks without reading unused devices
+ok 2 - local setup owner view retains fresh session checks without reading unused devices
+  ---
+  duration_ms: 4.468077
+  type: 'test'
+  ...
+# Subtest: owner token pagination preserves microsecond ordering and rejects foreign or malformed anchors
+ok 3 - owner token pagination preserves microsecond ordering and rejects foreign or malformed anchors
+  ---
+  duration_ms: 340.755333
+  type: 'test'
+  ...
+# {"level":"info","msg":"db_sample","timestamp":"2026-11-09T02:32:15.990Z","sampleRate":0.01,"route":null,"command":"BEGIN","tables":[],"statement":"a8402858d4f1","rows":0,"bytes":0}
+# Subtest: registration grant is user-bound, expires, and has one concurrent winner
+ok 4 - registration grant is user-bound, expires, and has one concurrent winner
+  ---
+  duration_ms: 480.702654
+  type: 'test'
+  ...
+# Subtest: registration grant consumption uses one PostgreSQL statement
+not ok 5 - registration grant consumption uses one PostgreSQL statement
+  ---
+  duration_ms: 250.923839
+  type: 'test'
+  location: '/home/runner/work/_temp/issue1512-device-sql-baseline/lib/device-enrollment.db.test.ts:8:2338'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    4 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 4
+  operator: 'strictEqual'
+  stack: |-
+    <anonymous> (/home/runner/work/_temp/issue1512-device-sql-baseline/lib/device-enrollment.db.test.ts:153:10)
+    process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# {"scenario":"enrollment-consumption","statements":4}
+# Subtest: a failed credential insertion does not consume the enrollment grant
+ok 6 - a failed credential insertion does not consume the enrollment grant
+  ---
+  duration_ms: 468.84992
+  type: 'test'
+  ...
+# Subtest: daemon acceptance follows real local enrollment and owner routes without a cloud token binding
+ok 7 - daemon acceptance follows real local enrollment and owner routes without a cloud token binding
+  ---
+  duration_ms: 732.107538
+  type: 'test'
+  ...
+# {"level":"info","msg":"db_sample","timestamp":"2026-11-09T02:32:18.051Z","sampleRate":0.01,"route":null,"command":"COMMIT","tables":[],"statement":"79663c1d3b43","rows":0,"bytes":0}
+# Subtest: online removal offers only uninstall, and its own receipt revokes credentials
+ok 8 - online removal offers only uninstall, and its own receipt revokes credentials
+  ---
+  duration_ms: 12683.004092
+  type: 'test'
+  ...
+# Subtest: unacknowledged uninstall expires after ten minutes; offline removal revokes immediately
+ok 9 - unacknowledged uninstall expires after ten minutes; offline removal revokes immediately
+  ---
+  duration_ms: 12.777213
+  type: 'test'
+  ...
+# {"level":"info","msg":"db_sample","timestamp":"2026-11-09T02:32:30.500Z","sampleRate":0.01,"route":null,"command":"INSERT","tables":["device_management_commands","devices"],"statement":"ee2dff3007c4","rows":1,"bytes":47}
+# {"level":"info","msg":"db_sample","timestamp":"2026-11-09T02:32:30.507Z","sampleRate":0.01,"route":null,"command":"COMMIT","tables":[],"statement":"79663c1d3b43","rows":0,"bytes":0}
+# Subtest: management queue is owner-scoped, serial and acknowledges only its device
+ok 10 - management queue is owner-scoped, serial and acknowledges only its device
+  ---
+  duration_ms: 11.321687
+  type: 'test'
+  ...
+# Subtest: pending commands without receipts are one read and preserve current device removal state
+not ok 11 - pending commands without receipts are one read and preserve current device removal state
+  ---
+  duration_ms: 3.402796
+  type: 'test'
+  location: '/home/runner/work/_temp/issue1512-device-sql-baseline/lib/device-enrollment.db.test.ts:8:11978'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    4 !== 1
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 1
+  actual: 4
+  operator: 'strictEqual'
+  stack: |-
+    <anonymous> (/home/runner/work/_temp/issue1512-device-sql-baseline/lib/device-enrollment.db.test.ts:308:12)
+    process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# {"scenario":"disabled-device","statements":4}
+# Subtest: a fresh login cannot admit an old daemon, and updating cannot revive a revoked credential
+ok 12 - a fresh login cannot admit an old daemon, and updating cannot revive a revoked credential
+  ---
+  duration_ms: 20.399234
+  type: 'test'
+  ...
+# Subtest: registration metadata cannot disguise an old daemon behind a current header
+ok 13 - registration metadata cannot disguise an old daemon behind a current header
+  ---
+  duration_ms: 14.757395
+  type: 'test'
+  ...
+# {"level":"info","msg":"db_transport_sample","timestamp":"2026-11-09T02:32:50.541Z","runtime":"a6acd613-a374-4ba0-a03a-aa997ce16587","windowStart":"2026-11-09T02:32:15.053Z","windowEnd":"2026-11-09T02:32:50.541Z","elapsedMs":35488,"measurement":"postgres_protocol_plaintext_received","pgProtocolReceiveBytes":72234,"knownPgProtocolReceiveBytes":72234,"connections":4,"scopes":["device_fence","request"],"unknownReadings":0,"coverage":"observed_connections","startupExcluded":true,"excludes":["TLS","TCP","startup_before_registration","other_runtimes","Go_workers","supplier_metering"]}
+1..13
+# tests 13
+# suites 0
+# pass 11
+# fail 2
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 36441.031835

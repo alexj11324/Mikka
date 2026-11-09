@@ -1,0 +1,351 @@
+{
+  "schema": 1,
+  "scanned": "final local evidence text, logs and source snapshots; binary index and tool symlink excluded",
+  "findings": [
+    {
+      "path": "cloud-boundary.original.log",
+      "line": 2,
+      "category": "email_shape",
+      "classification": "package_version_or_versioned_source_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "integrated-final.patch",
+      "line": 1286,
+      "category": "email_shape",
+      "classification": "literal_in_versioned_test_fixture",
+      "fixtureSource": [
+        {
+          "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+          "line": 287
+        }
+      ],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "integrated-final.patch",
+      "line": 1293,
+      "category": "email_shape",
+      "classification": "literal_in_versioned_test_fixture",
+      "fixtureSource": [
+        {
+          "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+          "line": 294
+        }
+      ],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "integrated-final.patch",
+      "line": 1313,
+      "category": "email_shape",
+      "classification": "literal_in_versioned_test_fixture",
+      "fixtureSource": [
+        {
+          "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+          "line": 287
+        }
+      ],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "integrated-final.patch",
+      "line": 1324,
+      "category": "email_shape",
+      "classification": "literal_in_versioned_test_fixture",
+      "fixtureSource": [
+        {
+          "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+          "line": 287
+        }
+      ],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "pnpm-check.original.log",
+      "line": 2,
+      "category": "email_shape",
+      "classification": "package_version_or_versioned_source_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "pnpm-check.original.log",
+      "line": 6,
+      "category": "email_shape",
+      "classification": "package_version_or_versioned_source_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "pnpm-check.original.log",
+      "line": 37,
+      "category": "email_shape",
+      "classification": "package_version_or_versioned_source_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "pnpm-check.original.log",
+      "line": 125,
+      "category": "email_shape",
+      "classification": "package_version_or_versioned_source_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "pnpm-check.original.log",
+      "line": 155,
+      "category": "email_shape",
+      "classification": "package_version_or_versioned_source_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "pnpm-check.original.log",
+      "line": 195,
+      "category": "email_shape",
+      "classification": "package_version_or_versioned_source_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "pnpm-lint-v2.original.log",
+      "line": 2,
+      "category": "email_shape",
+      "classification": "package_version_or_versioned_source_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "pnpm-lint-v2.original.log",
+      "line": 6,
+      "category": "email_shape",
+      "classification": "package_version_or_versioned_source_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "pnpm-lint-v2.original.log",
+      "line": 12,
+      "category": "email_shape",
+      "classification": "package_version_or_versioned_source_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "pnpm-lint-v2.original.log",
+      "line": 18,
+      "category": "email_shape",
+      "classification": "package_version_or_versioned_source_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "pnpm-lint-v2.original.log",
+      "line": 89,
+      "category": "email_shape",
+      "classification": "package_version_or_versioned_source_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "pnpm-lint-v2.original.log",
+      "line": 94,
+      "category": "email_shape",
+      "classification": "package_version_or_versioned_source_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "pnpm-lint.original.log",
+      "line": 2,
+      "category": "email_shape",
+      "classification": "package_version_or_versioned_source_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "pnpm-lint.original.log",
+      "line": 6,
+      "category": "email_shape",
+      "classification": "package_version_or_versioned_source_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "pnpm-runtime-lint.original.log",
+      "line": 2,
+      "category": "email_shape",
+      "classification": "package_version_or_versioned_source_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "pnpm-typecheck-final.original.log",
+      "line": 2,
+      "category": "email_shape",
+      "classification": "package_version_or_versioned_source_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "pnpm-typecheck-final.original.log",
+      "line": 6,
+      "category": "email_shape",
+      "classification": "package_version_or_versioned_source_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "pnpm-typecheck-v2.original.log",
+      "line": 2,
+      "category": "email_shape",
+      "classification": "package_version_or_versioned_source_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "pnpm-typecheck-v2.original.log",
+      "line": 6,
+      "category": "email_shape",
+      "classification": "package_version_or_versioned_source_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "pnpm-typecheck.original.log",
+      "line": 2,
+      "category": "email_shape",
+      "classification": "package_version_or_versioned_source_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "pre-eof-trim/lib/coordinator/repository-resolution.test.ts",
+      "line": 36,
+      "category": "email_shape",
+      "classification": "public_github_ssh_transport_syntax",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "tracked-source-inventory-final.safe.json",
+      "line": 7258,
+      "category": "email_shape",
+      "classification": "retina_asset_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "tracked-source-inventory-final.safe.json",
+      "line": 7265,
+      "category": "email_shape",
+      "classification": "retina_asset_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "tracked-source-inventory-final.safe.json",
+      "line": 7279,
+      "category": "email_shape",
+      "classification": "retina_asset_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "tracked-source-inventory-final.safe.json",
+      "line": 7286,
+      "category": "email_shape",
+      "classification": "retina_asset_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "tracked-source-inventory-final.safe.json",
+      "line": 17492,
+      "category": "email_shape",
+      "classification": "retina_asset_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "tracked-source-inventory-final.safe.json",
+      "line": 17499,
+      "category": "email_shape",
+      "classification": "retina_asset_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "tracked-source-inventory-final.safe.json",
+      "line": 40235,
+      "category": "email_shape",
+      "classification": "package_version_or_versioned_source_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "tracked-source-inventory.safe.json",
+      "line": 7257,
+      "category": "email_shape",
+      "classification": "retina_asset_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "tracked-source-inventory.safe.json",
+      "line": 7264,
+      "category": "email_shape",
+      "classification": "retina_asset_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "tracked-source-inventory.safe.json",
+      "line": 7278,
+      "category": "email_shape",
+      "classification": "retina_asset_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "tracked-source-inventory.safe.json",
+      "line": 7285,
+      "category": "email_shape",
+      "classification": "retina_asset_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "tracked-source-inventory.safe.json",
+      "line": 17491,
+      "category": "email_shape",
+      "classification": "retina_asset_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "tracked-source-inventory.safe.json",
+      "line": 17498,
+      "category": "email_shape",
+      "classification": "retina_asset_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    },
+    {
+      "path": "tracked-source-inventory.safe.json",
+      "line": 40234,
+      "category": "email_shape",
+      "classification": "package_version_or_versioned_source_filename",
+      "fixtureSource": [],
+      "matchedValuePrinted": false
+    }
+  ],
+  "unclassifiedCount": 0,
+  "externalCredentialReads": 0,
+  "credentialEnvironmentForwarded": false,
+  "valuesPrinted": false,
+  "scopeLimitation": "A shape scan and source fixture attribution, not a claim to detect every possible secret."
+}

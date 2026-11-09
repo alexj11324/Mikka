@@ -1,0 +1,163 @@
+{
+  "schema": "issue1512.device-polls-candidate.v1",
+  "createdAt": "2026-11-09T02:53:58.911753+00:00",
+  "repository": "alexj11324/Mikka",
+  "publicBaseline": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+  "baselineTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+  "localBaselineCommit": "5975e42ef3436a53546948b556166777d1b0be9d",
+  "localBaselineTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+  "files": [
+    {
+      "path": "app/v1/devices/[deviceId]/runs/route.ts",
+      "bytes": 1305,
+      "sha256": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c",
+      "gitBlob": "5a4c4f8486239161b325b9774b3086afe666dfa9",
+      "mode": "100644",
+      "baselineBytes": 1226,
+      "baselineSha256": "329cd0aea78b05551fbe72b2d8562ce0fa9c67d3cee4318f324f1d3238d72e54",
+      "baselineGitBlob": "3bbb71a8a7d249eb517d75a95986cf75d1994168"
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/repos/route.ts",
+      "bytes": 1983,
+      "sha256": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888",
+      "gitBlob": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b",
+      "mode": "100644",
+      "baselineBytes": 1704,
+      "baselineSha256": "7a7d4b6f53cf5c58cb710f3beb01af9ce6fb2ce09da6e227a07a8ac2cc1bcdd9",
+      "baselineGitBlob": "9fe33b05a9570ab59e4bb041f9a1344c44ab31ad"
+    },
+    {
+      "path": "lib/device-heartbeat.db.test.ts",
+      "bytes": 21505,
+      "sha256": "6e8a9ddcb8855de98b443531b6d7524952e740d49eb38194a17234d87eda9b6d",
+      "gitBlob": "27bbb720ac8f5bd3716787db62eb11833e9f3530",
+      "mode": "100644",
+      "baselineBytes": 16173,
+      "baselineSha256": "d27f3a3a5ea9d491b0d1ff74b183f0c0134ec496a677a9a2494efee3b40544dc",
+      "baselineGitBlob": "68423cee4e9fa1f0f89274ed3dec67859e6f164b"
+    },
+    {
+      "path": "lib/device-unit-fence.db.test.ts",
+      "bytes": 11425,
+      "sha256": "e4f1ee4f90de93ce22f74e5dc97a3475816a5d2a932b0d327ee2441953224d51",
+      "gitBlob": "bc65b3faf494d2fd7c797b68f34d04227df38b7a",
+      "mode": "100644",
+      "baselineBytes": 11209,
+      "baselineSha256": "414ea10a0dba789b36633215c42c2d308e853a09f257027dc93b42bee09842da",
+      "baselineGitBlob": "a5237da052e304897cd48afdebc42ee6f7571d96"
+    }
+  ],
+  "patch": {
+    "path": "polls-candidate-v1.patch",
+    "bytes": 13917,
+    "sha256": "c55f88df7bc65b09364c1f222aec4c4894d356ce0dd9f07be2e59cca7c8406ee",
+    "gitBlob": "53029a7d87480601c7f0ecac4f7710799132a26c"
+  },
+  "changes": [
+    "Only the two pure GET list reads use the existing readUnderDeviceAuthority scalar subquery. Initial authentication, cloud/version checks, and nonempty repository settings reads remain.",
+    "Credential liveness, current device owner/removal and list result are read in one statement snapshot. No cross-request cache, new SQL statements, scheduling, window or budget changes.",
+    "Two real PostgreSQL tests retain data/disabled semantics and commit token revocation/expiry/device removal/ownership transfer after real initial authentication and before business snapshot, using a params Promise barrier.",
+    "The existing ten-concurrent-request unit-fence measurement uses an explicit two-statement withDeviceRoute prototype. All original strict transaction/round-trip and concurrency assertions remain; production fence implementation and switch are unchanged."
+  ],
+  "localValidation": {
+    "node": "v24.22.1",
+    "offlineProbe": {
+      "red": {
+        "exitCode": 1,
+        "tests": 2,
+        "pass": 0,
+        "fail": 2,
+        "queriesPerRoute": 2,
+        "log": {
+          "path": "polls-offline-baseline-red.original.log",
+          "bytes": 1791,
+          "sha256": "f4bf2e8e961677d8bbdc6855ac71a5da87520612467fc6459176d111c9f0aa7f",
+          "gitBlob": "60034bf85a5436bc7b7ff7cb996c05f4a83f6b95"
+        }
+      },
+      "green": {
+        "exitCode": 0,
+        "tests": 2,
+        "pass": 2,
+        "fail": 0,
+        "queriesPerRoute": 1,
+        "log": {
+          "path": "polls-offline-candidate-green.original.log",
+          "bytes": 428,
+          "sha256": "cd03d66892163d97b15164bf30eccda61bb134085792bfe3b7afd30553e61d6f",
+          "gitBlob": "e6f0ea92e5ffea5dd0bd3cd5cb366eae1765f6d2"
+        }
+      },
+      "boundary": "Actual handler/getter/ORM/schema/authority-reader source bodies with a fake DB boundary. Route admission is not part of this probe. No PostgreSQL SQL execution, planner, network, token race or Native acceptance is established."
+    },
+    "initialHarnessFailure": {
+      "classification": "Probe schema loading failed before product RED; retained separately",
+      "log": {
+        "path": "polls-offline-harness-initial-failure.original.log",
+        "bytes": 1475,
+        "sha256": "2f12f8232f2f6044a99f20bd21a834650bcc70b0b14510be1c392f4e8c1ef21a",
+        "gitBlob": "cf1780b8471363ee978e4874eb69727866601fdd"
+      }
+    },
+    "lint": {
+      "initialExitCode": 1,
+      "initialReason": "Intentional thenable fixture triggered unicorn/no-thenable. Replaced by ordinary Promise with a params access barrier, without a lint suppression.",
+      "initialLog": {
+        "path": "polls-targeted-lint.original.log",
+        "bytes": 221,
+        "sha256": "dbe88f816ebc0f16fd43e56246b24b7c7d9ca0cb96f42b6ba8f1952b1703fae1",
+        "gitBlob": "1a8cfd4255e275048f973a6c71e7856c997878ca"
+      },
+      "finalExitCode": 0,
+      "command": [
+        "oxlint",
+        "--no-ignore",
+        "--deny-warnings",
+        "app/v1/devices/[deviceId]/runs/route.ts",
+        "app/v1/devices/[deviceId]/repos/route.ts",
+        "lib/device-heartbeat.db.test.ts",
+        "lib/device-unit-fence.db.test.ts"
+      ],
+      "finalLog": {
+        "path": "polls-targeted-lint-green.original.log",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+      }
+    },
+    "diffCheckExitCode": 0,
+    "canonicalTypecheckRun": false
+  },
+  "realPostgresValidation": {
+    "executed": false,
+    "requiresParentReviewBeforePublication": true,
+    "plan": "A second bounded PG17 service probe: exact old route source plus these same two DB test files, then the candidate. Execute current test:device-revocation-db entrypoint (no skip) after canonical isolated migrations; verify two new expected count REDs and all existing revocation/fence/heartbeat/cloud lease regressions. Existing A+B device-enrollment suite remains separately proven at d4f3c6b."
+  },
+  "originalNativeGate": {
+    "native": 473,
+    "web": 402,
+    "pass": false,
+    "unchanged": true
+  },
+  "limits": [
+    "Offline count is only post-auth business query count 2 to 1. Full route query counts await actual PostgreSQL; no 6 to 2 claim is observed yet.",
+    "Read-under-authority is an existing lock-free read snapshot: revocation committed before that statement is refused; this does not claim a lock held until HTTP response completion.",
+    "Nonempty repositories still perform their existing settings reads under ordinary device authority. No fixed two-query claim for that path.",
+    "No workflow/ref publication, production SQL, model execution or Native rerun for this candidate has occurred."
+  ],
+  "aPlusBSeparateProof": {
+    "filesUnchanged": true,
+    "candidate": "d4f3c6be8137d906407711c6ea3ac8808ab1d860",
+    "runId": 42551207785,
+    "tests": 13,
+    "pass": 13,
+    "postgres": "17.11",
+    "receipt": {
+      "path": "pg-independent-verification.safe.json",
+      "bytes": 7570,
+      "sha256": "9e79f183b596a127f90b94ae00e5e6607b462f6f30836c1ef72dd56bf2ef8f96",
+      "gitBlob": "9b62b2ce743bf320dc1d7cb3e3057da5d2d98345"
+    }
+  }
+}

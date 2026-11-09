@@ -1,0 +1,205 @@
+diff --git a/app/v1/devices/[deviceId]/repos/route.ts b/app/v1/devices/[deviceId]/repos/route.ts
+index 9fe33b05a..7ab99bf8f 100644
+--- a/app/v1/devices/[deviceId]/repos/route.ts
++++ b/app/v1/devices/[deviceId]/repos/route.ts
+@@ -1,10 +1,8 @@
+ import { withDeviceRoute } from '@/lib/device-route'
+ import { NextResponse } from 'next/server'
+-import { eq } from 'drizzle-orm'
+-import { db } from '@/lib/db'
++import { readUnderDeviceAuthority } from '@/lib/db'
+ import { readRepositoryDaemonSettings } from '@/lib/device-repositories'
+-import { deviceRepos } from '@/lib/db/schema'
+-import { authenticateDevice, ownsDevice } from '@/lib/device-link'
++import { authenticateDevice } from '@/lib/device-link'
+ 
+ export const dynamic = 'force-dynamic'
+ 
+@@ -13,8 +11,13 @@ async function handleGET(request: Request, { params }: { params: Promise<{ devic
+   const caller = await authenticateDevice(request)
+   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+   const { deviceId } = await params
+-  if (!await ownsDevice(deviceId, caller.userId)) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
+-  const rows = await db.select({ id: deviceRepos.id, repoPath: deviceRepos.repoPath, remoteUrl: deviceRepos.remoteUrl }).from(deviceRepos).where(eq(deviceRepos.deviceId, deviceId))
++  // Read the current owner and repository list under the same fresh credential
++  // snapshot. Nonempty lists retain their existing owner-scoped settings reads.
++  const rows = await readUnderDeviceAuthority<{ id: string; repoPath: string; remoteUrl: string | null }[] | null>(`SELECT COALESCE(
++    (SELECT json_agg(json_build_object('id',r.id,'repoPath',r."repoPath",'remoteUrl',r."remoteUrl"))
++      FROM device_repos r WHERE r."deviceId"=d.id), '[]'::json)
++    FROM devices d WHERE d.id=$1 AND d."ownerId"=$2 AND d."removedAt" IS NULL`, [deviceId, caller.userId])
++  if (!rows) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
+   const repos = await Promise.all(rows.map(async repo => {
+     const settings = repo.remoteUrl ? await readRepositoryDaemonSettings(caller.userId, repo.remoteUrl) : null
+     return {
+diff --git a/app/v1/devices/[deviceId]/runs/route.ts b/app/v1/devices/[deviceId]/runs/route.ts
+index 3bbb71a8a..5a4c4f848 100644
+--- a/app/v1/devices/[deviceId]/runs/route.ts
++++ b/app/v1/devices/[deviceId]/runs/route.ts
+@@ -1,9 +1,7 @@
+ import { withDeviceRoute } from '@/lib/device-route'
+ import { NextResponse } from 'next/server'
+-import { and, eq } from 'drizzle-orm'
+-import { db } from '@/lib/db'
+-import { agentRuns } from '@/lib/db/schema'
+-import { authenticateDevice, ownedDevice } from '@/lib/device-link'
++import { readUnderDeviceAuthority } from '@/lib/db'
++import { authenticateDevice } from '@/lib/device-link'
+ 
+ export const dynamic = 'force-dynamic'
+ 
+@@ -12,15 +10,14 @@ async function handleGET(request: Request, { params }: { params: Promise<{ devic
+   const caller = await authenticateDevice(request)
+   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+   const { deviceId } = await params
+-  const device = await ownedDevice(deviceId, caller.userId)
+-  if (!device) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
++  // Credential, current ownership and queued work share one read snapshot.
+   // A device with scheduling off gets no work; it stays registered.
+-  if (!device.enabled) return NextResponse.json({ runIds: [] })
+-  const rows = await db
+-    .select({ id: agentRuns.id })
+-    .from(agentRuns)
+-    .where(and(eq(agentRuns.deviceId, deviceId), eq(agentRuns.status, 'queued')))
+-  return NextResponse.json({ runIds: rows.map(row => row.id) })
++  const result = await readUnderDeviceAuthority<{ runIds: string[] } | null>(`SELECT json_build_object('runIds',
++    CASE WHEN d.enabled THEN COALESCE((SELECT json_agg(r.id) FROM agent_runs r
++      WHERE r."deviceId"=d.id AND r.status=$3), '[]'::json) ELSE '[]'::json END)
++    FROM devices d WHERE d.id=$1 AND d."ownerId"=$2 AND d."removedAt" IS NULL`, [deviceId, caller.userId, 'queued'])
++  if (!result) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
++  return NextResponse.json(result)
+ }
+ 
+ export const GET = withDeviceRoute(handleGET)
+diff --git a/lib/device-heartbeat.db.test.ts b/lib/device-heartbeat.db.test.ts
+index 68423cee4..27bbb720a 100644
+--- a/lib/device-heartbeat.db.test.ts
++++ b/lib/device-heartbeat.db.test.ts
+@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
+ import { createHash, randomBytes, randomUUID } from 'node:crypto'
+ import { mock, test } from 'node:test'
+ import { isE2eTarget } from '../tests/helpers/e2e-target.mjs'
++import { measured } from '../tests/helpers/read-metrics'
+ 
+ // Database regressions execute only in CI against ephemeral Postgres 17.
+ // Local pure runs skip them; REQUIRE_DB=1 makes a missing database fail.
+@@ -111,6 +112,77 @@ dbTest('a heartbeat re-checks execution identities only when the harnesses chang
+   })
+ })
+ 
++for (const kind of ['runs', 'repos'] as const) dbTest(`${kind} poll reads current authority, ownership and results in one snapshot`, { timeout: 20_000 }, async t => {
++  const [{ createRequestDatabaseScope, pool }, runs, repos] = await Promise.all([
++    import('./db'), import('../app/v1/devices/[deviceId]/runs/route'), import('../app/v1/devices/[deviceId]/repos/route'),
++  ])
++  const scope = createRequestDatabaseScope(databaseUrl!)
++  const owner = `poll-${kind}-${randomUUID()}`, foreign = `poll-other-${randomUUID()}`
++  const owners = [owner, foreign]
++  t.after(async () => {
++    await scope.run(async () => {
++      await pool.query('DELETE FROM device_repos WHERE "userId"=ANY($1::text[])', [owners])
++      await pool.query('DELETE FROM agent_runs WHERE "userId"=ANY($1::text[])', [owners])
++      await pool.query('DELETE FROM agents WHERE "userId"=ANY($1::text[])', [owners])
++      await pool.query('DELETE FROM device_tokens WHERE "userId"=ANY($1::text[])', [owners])
++      await pool.query('DELETE FROM devices WHERE "ownerId"=ANY($1::text[])', [owners])
++      await pool.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [owners])
++    })
++    await scope.close()
++  })
++  await scope.run(async () => {
++    for (const user of owners) await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$1||'@example.invalid',false,now(),now())`, [user])
++    const fixture = async () => {
++      const device = randomUUID(), tokenId = randomUUID(), credential = `orv_${randomBytes(32).toString('base64url')}`
++      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind) VALUES($1,$2,'Poll fixture','local')`, [device, owner])
++      await pool.query('INSERT INTO device_tokens(id,"userId","tokenHash","lastUsedAt") VALUES($1,$2,$3,now())', [tokenId, owner, createHash('sha256').update(credential).digest('hex')])
++      const request = () => new Request(`http://127.0.0.1/mikka/v1/devices/${device}/${kind}`, { headers: { authorization: `Bearer ${credential}`, 'x-mikka-client-version': '999.0.0' } })
++      return { device, tokenId, request }
++    }
++    const get = kind === 'runs' ? runs.GET : repos.GET
++    const current = await fixture()
++    const read = () => get(current.request(), { params: Promise.resolve({ deviceId: current.device }) })
++    const result = await measured(async () => {
++      const response = await read()
++      assert.equal(response.status, 200)
++      return response.json()
++    })
++    assert.deepEqual(result.value, kind === 'runs' ? { runIds: [] } : { repos: [] })
++    t.diagnostic(JSON.stringify({ scenario: `${kind}-empty-poll`, statements: result.statements }))
++    if (kind === 'runs') {
++      const agent = randomUUID(), queued = randomUUID()
++      await pool.query(`INSERT INTO agents(id,"userId",name,harness) VALUES($1,$2,'Poll agent','codex')`, [agent, owner])
++      await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","deviceId",status) VALUES($1,$2,$3,$4,'queued')`, [queued, owner, agent, current.device])
++      assert.deepEqual(await (await read()).json(), { runIds: [queued] })
++      await pool.query('UPDATE devices SET enabled=false WHERE id=$1', [current.device])
++      assert.deepEqual(await (await read()).json(), { runIds: [] }, 'disabled devices receive no queued work')
++    } else {
++      const repo = randomUUID(), repoPath = 'v2/github.com/fixture/poll-repo'
++      await pool.query('INSERT INTO device_repos(id,"userId","deviceId","repoPath") VALUES($1,$2,$3,$4)', [repo, owner, current.device, repoPath])
++      assert.deepEqual(await (await read()).json(), { repos: [{ repoId: repo, name: 'poll-repo', path: repoPath, remoteUrl: null }] })
++    }
++    for (const change of ['revoked', 'expired', 'removed', 'foreign-owner'] as const) {
++      const f = await fixture()
++      const entered = Promise.withResolvers<void>(), gate = Promise.withResolvers<{ deviceId: string }>()
++      // The wrapped handler reads params after real initial authentication and
++      // waits for this promise before any business read.
++      const pending = get(f.request(), { get params() { entered.resolve(); return gate.promise } })
++      try {
++        await Promise.race([entered.promise, pending.then(() => { throw new Error('Poll completed before the params barrier') })])
++        if (change === 'revoked') await pool.query('UPDATE device_tokens SET "revokedAt"=now() WHERE id=$1', [f.tokenId])
++        else if (change === 'expired') await pool.query(`UPDATE device_tokens SET "expiresAt"=now()-interval '1 second' WHERE id=$1`, [f.tokenId])
++        else if (change === 'removed') await pool.query('UPDATE devices SET "removedAt"=now() WHERE id=$1', [f.device])
++        else await pool.query('UPDATE devices SET "ownerId"=$2 WHERE id=$1', [f.device, foreign])
++      } finally { gate.resolve({ deviceId: f.device }) }
++      const response = await pending
++      assert.equal(response.status, change === 'revoked' || change === 'expired' ? 401 : 404, `${change} between authentication and the snapshot is refused`)
++      const body = await response.json()
++      assert.equal('runIds' in body || 'repos' in body, false, 'no business data accompanies a refused read')
++    }
++    assert.equal(result.statements, 2, 'one fresh authentication and one authority/owner/result snapshot')
++  })
++})
++
+ dbTest('initial claim repository handoff removes a real cloud repos request without increasing SQL, rows or response bytes', async t => {
+   const [{ createRequestDatabaseScope, pool }, { GET }, { readRepositorySettings }] = await Promise.all([
+     import('./db'), import('../app/v1/devices/[deviceId]/repos/route'), import('./device-repositories'),
+diff --git a/lib/device-unit-fence.db.test.ts b/lib/device-unit-fence.db.test.ts
+index a5237da05..bc65b3faf 100644
+--- a/lib/device-unit-fence.db.test.ts
++++ b/lib/device-unit-fence.db.test.ts
+@@ -147,15 +147,22 @@ test('when no fence connection can be had the request is refused with 503, never
+   for (const answer of await Promise.all(holding)) assert.equal(answer.status, 200)
+ })
+ 
+-test('ten concurrent device requests complete with three fence connections; fewer authorization transactions and round trips than one fence per statement', { skip: !url }, async t => {
+-  const { overrideDeploymentSwitch, runs } = await modules()
++test('ten concurrent multi-statement device requests complete with three fence connections; fewer authorization transactions and round trips than one fence per statement', { skip: !url }, async t => {
++  const { overrideDeploymentSwitch, withDeviceRoute, pool } = await modules()
++  // Pure polling routes carry authority in one read snapshot. Keep exercising
++  // the unit fence with an actual protected burst of two separate statements.
++  const protectedBurst = withDeviceRoute(async () => {
++    await pool.query('SELECT 1')
++    await pool.query('SELECT 2')
++    return Response.json({ ok: true })
++  })
+   const fs = await Promise.all(Array.from({ length: 10 }, () => fixture()))
+-  const answers = await Promise.all(fs.map(f => runs.GET(request(f), { params: Promise.resolve({ deviceId: f.device }) })))
++  const answers = await Promise.all(fs.map(f => protectedBurst(request(f))))
+   for (const answer of answers) assert.equal(answer.status, 200)
+ 
+   // Count actual backend transaction completions on the request's checked-out
+   // clients. Database-wide statistics lag each backend and include our reader's
+-  // own transactions, so a sleep + pg_stat_clear_snapshot cannot isolate this poll.
++  // own transactions, so a sleep + pg_stat_clear_snapshot cannot isolate this burst.
+   let completed = 0, roundTrips = 0, explicit = 0
+   type Message = { status?: string; text?: string }
+   type MessageConnection = { on: (event: string, listener: (message: Message) => void) => unknown; removeListener: (event: string, listener: (message: Message) => void) => unknown }
+@@ -179,9 +186,9 @@ test('ten concurrent device requests complete with three fence connections; fewe
+       overrideDeploymentSwitch('deviceUnitFence', unit)
+       const f = fs[0]
+       // Warm connections and install the observer before the measured request.
+-      assert.equal((await runs.GET(request(f), { params: Promise.resolve({ deviceId: f.device }) })).status, 200)
++      assert.equal((await protectedBurst(request(f))).status, 200)
+       const before = { completed, roundTrips, explicit }
+-      assert.equal((await runs.GET(request(f), { params: Promise.resolve({ deviceId: f.device }) })).status, 200)
++      assert.equal((await protectedBurst(request(f))).status, 200)
+       // The route awaits its fence COMMIT in finally. ReadyForQuery(I) includes
+       // both explicit COMMIT/ROLLBACK and implicit autocommit transactions.
+       return { completed: completed - before.completed, roundTrips: roundTrips - before.roundTrips, explicit: explicit - before.explicit }

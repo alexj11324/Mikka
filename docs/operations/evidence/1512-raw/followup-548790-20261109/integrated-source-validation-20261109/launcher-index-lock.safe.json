@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "events": [
+    {
+      "label": "pnpm-typecheck-v2",
+      "toolChunk": "a9a3e7",
+      "exitCode": 1
+    },
+    {
+      "label": "pnpm-lint-v2",
+      "toolChunk": "703bde",
+      "exitCode": 1
+    }
+  ],
+  "failure": "Concurrent launcher source-binding git write-tree calls contended for the isolated checkout index.lock before launching either check.",
+  "checksActuallyStarted": false,
+  "testOutputFilesCreated": false,
+  "resolution": "The launcher now reads the frozen tree receipt and compares read-only git ls-files --stage records before/after. No product source, test, pnpm version or sandbox behavior changed.",
+  "sharedIndexTouched": false
+}

@@ -1,0 +1,18 @@
+diff --git a/lib/coordinator/repository-resolution.test.ts b/lib/coordinator/repository-resolution.test.ts
+index 32e27a1aa..a5157f09e 100644
+--- a/lib/coordinator/repository-resolution.test.ts
++++ b/lib/coordinator/repository-resolution.test.ts
+@@ -266,4 +266,3 @@ test('closed repository refusals keep their exact result and mark phase plus dis
+     trace.disable(); context.disable(); propagation.disable()
+   }
+ })
+-
+diff --git a/lib/tracing/logs.test.ts b/lib/tracing/logs.test.ts
+index 8ca4cd89b..737fa373e 100644
+--- a/lib/tracing/logs.test.ts
++++ b/lib/tracing/logs.test.ts
+@@ -178,4 +178,3 @@ for (const failure of ['reject', 'throw'] as const) test(`exporter forceFlush ${
+     if (previous) Object.defineProperty(globalThis, key, previous); else Reflect.deleteProperty(globalThis, key)
+   }
+ })
+-

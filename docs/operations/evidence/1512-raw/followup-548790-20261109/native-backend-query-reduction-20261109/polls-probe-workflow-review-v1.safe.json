@@ -1,0 +1,54 @@
+{
+  "schema": "issue1512.device-polls-workflow-review.v1",
+  "workflow": {
+    "path": "polls-probe-workflow-v1.yml",
+    "targetPath": ".github/workflows/issue1512-device-sql-probe.yml",
+    "bytes": 14248,
+    "sha256": "d88a6d21a820db4728ea86221805e023bb34ea8dc2648e63bf02a0bcf8d6b928",
+    "gitBlob": "116b8bb7aa2c55bd842b027d401ec6c6e45d2168"
+  },
+  "checks": [
+    {
+      "step": "Verify fixed repository, source and candidate files",
+      "pythonSyntax": true
+    },
+    {
+      "step": "Generate an ephemeral test-only auth secret",
+      "nodeSyntax": true,
+      "executed": false
+    },
+    {
+      "step": "Initialize only the dedicated loopback database",
+      "pythonSyntax": true
+    },
+    {
+      "step": "Run every canonical device revocation suite segment against baseline and candidate",
+      "pythonSyntax": true
+    }
+  ],
+  "guards": {
+    "parent": "d4f3c6be8137d906407711c6ea3ac8808ab1d860",
+    "baselineTree": "0cc30d9e0ca2f4c37b4dabdc58f0813facdce3fa",
+    "allowedDelta": [
+      "app/v1/devices/[deviceId]/runs/route.ts",
+      "app/v1/devices/[deviceId]/repos/route.ts",
+      "lib/device-heartbeat.db.test.ts",
+      "lib/device-unit-fence.db.test.ts",
+      ".github/workflows/issue1512-device-sql-probe.yml"
+    ],
+    "contentsReadOnly": true,
+    "oidc": false,
+    "productionSecrets": false,
+    "service": "postgres:17",
+    "fixedLoopbackDatabase": "mikka_1512_polls_e2e",
+    "timeoutMinutes": 10,
+    "expectedTestCountsNotObserved": [
+      16,
+      11,
+      5
+    ]
+  },
+  "publicationPerformed": false,
+  "postgresExecuted": false,
+  "externalCallsPerformed": false
+}

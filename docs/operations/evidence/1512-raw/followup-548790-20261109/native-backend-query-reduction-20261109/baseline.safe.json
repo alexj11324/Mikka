@@ -1,0 +1,45 @@
+{
+  "schema": "issue1512.device-backend-baseline.v1",
+  "recordedAt": "2026-11-09T02:21:26.248398+00:00",
+  "sourceHead": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+  "sourceTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+  "localExactTreeCommit": "5975e42ef3436a53546948b556166777d1b0be9d",
+  "localTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+  "files": [
+    {
+      "path": "checkout/lib/device-enrollment.ts",
+      "bytes": 1338,
+      "sha256": "70a9b0a0c8c2d1b8c39098b19c52229188b8da98b75188aaff6e4e595584afae",
+      "gitBlobSha": "f9490f18359d2d3a9b61b068bfb14ef4b965144d"
+    },
+    {
+      "path": "checkout/lib/device-management.ts",
+      "bytes": 2661,
+      "sha256": "a56cd2bf4496d32670a80250ebbe4eaa2bb23df3e1fa7e3b1b4687835d0e5847",
+      "gitBlobSha": "c2e44913f843391095232bdda81d774a58ff9d24"
+    },
+    {
+      "path": "checkout/lib/device-enrollment.db.test.ts",
+      "bytes": 21207,
+      "sha256": "87cf5abd7276b90828d1e94ba28d92dec2b58bc5b4963565d1b107df24eba470",
+      "gitBlobSha": "431897540dc97e29fbc514ecb1ccd1dbf5d0c9ed"
+    }
+  ],
+  "node": "v24.22.1",
+  "localPostgreSqlAvailable": false,
+  "localPgSearch": "PATH and cached files under /workspace/scratch, /tmp, /opt checked; no postgres/initdb/pg_ctl/psql",
+  "probe": {
+    "path": "offline-query-boundary.test.cjs",
+    "bytes": 3954,
+    "sha256": "2b6bfa74b4c237a817ac16f9f673a164a8b7fec61b8544ceb7d35e2e3433f84f",
+    "gitBlobSha": "10eed73ad8adeea5e857edb8222a20850d90c207"
+  },
+  "localBoundary": "Actual source bodies transpiled and evaluated with a database query boundary fake; actual crypto helper functions extracted from unchanged device-link.ts. No PostgreSQL atomicity, locks or revocation is established.",
+  "originalNativeBudget": {
+    "native": 473,
+    "web": 402,
+    "pass": false
+  },
+  "externalActions": 0,
+  "sourceOrIndexOutsideIsolatedCopyChanged": false
+}

@@ -1,0 +1,75 @@
+{
+  "schema": "issue1512.device-polls-probe-paired.v1",
+  "postgresObserved": true,
+  "canonicalScript": "node --import ./scripts/server-test.mjs --import tsx --test lib/device-revocation.db.test.ts lib/device-mailbox-notices.db.test.ts lib/device-work.db.test.ts lib/device-presence.db.test.ts lib/demo-device-cleanup.db.test.ts && node --test-force-exit --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/device-route-fence.db.test.ts lib/device-heartbeat.db.test.ts lib/cloud-subscription-lease-route.db.test.ts && node --test-force-exit --test-concurrency=1 --import ./scripts/server-test.mjs --import tsx --test lib/device-unit-fence.db.test.ts",
+  "commands": [
+    [
+      "node",
+      "--test-reporter=tap",
+      "--import",
+      "./scripts/server-test.mjs",
+      "--import",
+      "tsx",
+      "--test",
+      "lib/device-revocation.db.test.ts",
+      "lib/device-mailbox-notices.db.test.ts",
+      "lib/device-work.db.test.ts",
+      "lib/device-presence.db.test.ts",
+      "lib/demo-device-cleanup.db.test.ts"
+    ],
+    [
+      "node",
+      "--test-reporter=tap",
+      "--test-force-exit",
+      "--experimental-test-module-mocks",
+      "--import",
+      "./scripts/server-test.mjs",
+      "--import",
+      "tsx",
+      "--test",
+      "lib/device-route-fence.db.test.ts",
+      "lib/device-heartbeat.db.test.ts",
+      "lib/cloud-subscription-lease-route.db.test.ts"
+    ],
+    [
+      "node",
+      "--test-reporter=tap",
+      "--test-force-exit",
+      "--test-concurrency=1",
+      "--import",
+      "./scripts/server-test.mjs",
+      "--import",
+      "tsx",
+      "--test",
+      "lib/device-unit-fence.db.test.ts"
+    ]
+  ],
+  "baseline": "d4f3c6be8137d906407711c6ea3ac8808ab1d860",
+  "candidate": "c1ac101fa068bbda26b19e342f8e228076e68707",
+  "expectedTestsPerSegment": [
+    16,
+    11,
+    5
+  ],
+  "nativeBudgetRemains": {
+    "native": 473,
+    "web": 402,
+    "pass": false
+  },
+  "cases": [
+    {
+      "case": "baseline-red",
+      "segments": []
+    }
+  ],
+  "verified": false,
+  "boundary": "The three existing commands run separately so expected baseline count failures do not skip later fence tests. Only the TAP reporter is added; no test selection, assertion or product switch changes.",
+  "postgres": {
+    "version": "17.11 (Debian 17.11-1.pgdg13+2)",
+    "number": "170011",
+    "database": "mikka_1512_polls_e2e"
+  },
+  "node": "v24.22.1",
+  "baselineWorktreeRemoved": true,
+  "serviceCleanup": "GitHub Actions tears down the isolated PostgreSQL service after this job; terminal job evidence must confirm completion."
+}

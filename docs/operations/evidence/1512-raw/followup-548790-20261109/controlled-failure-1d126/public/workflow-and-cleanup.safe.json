@@ -1,0 +1,249 @@
+{
+  "run": {
+    "id": 42552094175,
+    "head_sha": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+    "head_branch": "main",
+    "path": ".github/workflows/run-trace-acceptance.yml",
+    "event": "workflow_dispatch",
+    "status": "completed",
+    "conclusion": "success",
+    "run_attempt": 1,
+    "created_at": "2026-11-09T02:38:58Z",
+    "updated_at": "2026-11-09T02:43:16Z",
+    "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42552094175"
+  },
+  "terminalRunObservedAt": "2026-11-09 02:44:20 UTC",
+  "job": {
+    "id": 128949713707,
+    "name": "controlled-failure",
+    "status": "completed",
+    "conclusion": "success",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1
+      },
+      {
+        "name": "Initialize containers",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2
+      },
+      {
+        "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3
+      },
+      {
+        "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4
+      },
+      {
+        "name": "Bind the isolated probe to this exact main revision",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5
+      },
+      {
+        "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6
+      },
+      {
+        "name": "Install locked dependencies before loading the project token",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7
+      },
+      {
+        "name": "Verify the isolated export and workflow guards before credentials",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8
+      },
+      {
+        "name": "Measure current-source overhead with the local memory exporters",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9
+      },
+      {
+        "name": "Read only the existing PostHog project ingestion token",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10
+      },
+      {
+        "name": "Export exactly 20 ordinary controlled failures from the isolated database",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 11
+      },
+      {
+        "name": "Preserve the safe callback receipt for separate backend verification",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 12
+      },
+      {
+        "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 21
+      },
+      {
+        "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 22
+      },
+      {
+        "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 23
+      },
+      {
+        "name": "Stop containers",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 24
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 25
+      }
+    ]
+  },
+  "otherJobs": [
+    {
+      "id": 128949714567,
+      "name": "export",
+      "status": "completed",
+      "conclusion": "skipped"
+    },
+    {
+      "id": 128949715136,
+      "name": "acceptance",
+      "status": "completed",
+      "conclusion": "skipped"
+    }
+  ],
+  "cleanup": {
+    "stopContainersStepSuccess": true,
+    "actualRemovals": [
+      {
+        "kind": "container",
+        "resourceId": "12fff7ce392526c8684f4bf839024fff838ea96285800b776ec7af59988b1e9e",
+        "commandAtUTC": "2026-11-09T02:43:12.5385577Z",
+        "commandLogLine": 1195,
+        "removalEchoObserved": true,
+        "echoAtUTC": "2026-11-09T02:43:13.7049183Z"
+      },
+      {
+        "kind": "network",
+        "resourceId": "github_network_fdd58ac1688a4e0f9e7a4d11cd251e21",
+        "commandAtUTC": "2026-11-09T02:43:13.7079095Z",
+        "commandLogLine": 1198,
+        "removalEchoObserved": true,
+        "echoAtUTC": "2026-11-09T02:43:13.8013806Z"
+      }
+    ],
+    "benchmarkCleanupComplete": true
+  },
+  "artifact": {
+    "id": 13645667123,
+    "name": "run-trace-controlled-failure-42552094175",
+    "size_in_bytes": 3352,
+    "digest": "sha256:382c8866b47780caa8872e816b0ff60a9e0de7e354b657943cc008a395540491",
+    "created_at": "2026-11-09T02:43:11Z",
+    "expires_at": "2026-11-16T02:43:11Z",
+    "expired": false
+  },
+  "artifactIntegrity": {
+    "artifactId": 13645667123,
+    "runId": 42552094175,
+    "observedAt": "2026-11-09T02:45:23.881291+00:00",
+    "bytes": 3352,
+    "sha256": "382c8866b47780caa8872e816b0ff60a9e0de7e354b657943cc008a395540491",
+    "apiSizeMatched": true,
+    "apiDigestMatched": true,
+    "zipCrcPassed": true,
+    "pathAndSymlinkChecksPassed": true,
+    "downloadToolCalls": 1,
+    "binaryDownloadAttempts": 1,
+    "signedUrlNotPersisted": true,
+    "members": [
+      {
+        "path": "controlled-failure.receipt.json",
+        "bytes": 8829,
+        "sha256": "bd60679a1d6169815dcc16488f60973b1f2a5a7d6f83624c380b483490c99115",
+        "zipCRC32": "18fa049a"
+      },
+      {
+        "path": "overhead.receipt.json",
+        "bytes": 1348,
+        "sha256": "aac5169ba36d1ce5be053911eb6a5fa6d2e64a452f0b34911fadfe442c9216b5",
+        "zipCRC32": "f7098091"
+      }
+    ]
+  },
+  "retrieval": {
+    "finalJobLogDownloads": 1,
+    "artifactDownloadToolCalls": 1,
+    "artifactBinaryDownloads": 1,
+    "allResourcesTerminal": true,
+    "noRerunOrCancellation": true,
+    "detailedJobGetUnsupported": {
+      "path": "private/job.full-get-blocked.original.json",
+      "status": "GitHub fetch rejected this endpoint with INVALID_ARGUMENT before a job payload; preserved. Existing purpose-built job summaries plus final original log provide the cleanup evidence."
+    }
+  },
+  "privateOriginals": [
+    {
+      "path": "private/run.final.original.json",
+      "bytes": 26873,
+      "sha256": "02ebbbc3fe16be34a41c8754866d1c9acace3f80f5a03c2baf42a0bc9028d6be"
+    },
+    {
+      "path": "private/jobs.final.original.json",
+      "bytes": 4670,
+      "sha256": "9a79ece37319f58586ec84b790d10c903c801b5591dbf4e0a051b09fa4541af1"
+    },
+    {
+      "path": "private/artifacts.final.original.json",
+      "bytes": 1289,
+      "sha256": "b70e73c717d01b08c828464da01922eb3354d19a57068c1e273fa9dda1682c7a"
+    },
+    {
+      "path": "private/job-128949713707.original.log",
+      "bytes": 82579,
+      "sha256": "f0cb43363215e1cfcbebf275cfef7b1373629055b89aaf80bfafe2194624722d"
+    },
+    {
+      "path": "private/job-128949713707.original-response.json",
+      "bytes": 85071,
+      "sha256": "049791c86fe0cee2b6a8e7dc6a8389c0993224110c738088d8924d127b79ba55"
+    },
+    {
+      "path": "private/job.full-get-blocked.original.json",
+      "bytes": 634,
+      "sha256": "b2208ba22d696f72eb150cf767d163e4899da4229a4a9ad2b6acb0ec290a2cd8"
+    }
+  ],
+  "omitted": "Public projection omits actor, author, email, repository account metadata and any credentials. Signed artifact URL was not persisted.",
+  "transportDispatchContext": {
+    "transportRunId": 42552029222,
+    "transportCommit": "a0dd581c5b573e9809ef7cc362da93f1429dee13",
+    "dispatchUuid": "ff0c7964-6603-4bb5-8f7d-740cf9e1899d",
+    "source": "Parent-provided dispatch mapping; no duplicate transport log/artifact retrieval by this owner."
+  }
+}

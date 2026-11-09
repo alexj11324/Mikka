@@ -1,0 +1,216 @@
+{
+  "schema": "issue1512.device-backend-pg-review.v1",
+  "recordedAt": "2026-11-09T02:38:48.544695+00:00",
+  "runId": 42551207785,
+  "runAttempt": 1,
+  "jobId": 128946987410,
+  "status": "completed",
+  "conclusion": "success",
+  "jobCompletedAt": "2026-11-09T02:33:43Z",
+  "source": {
+    "schema": "issue1512.device-sql-probe-source.v1",
+    "repository": "alexj11324/Mikka",
+    "ref": "refs/heads/ops/1512-device-sql-probe-20261109",
+    "runId": "42551207785",
+    "runAttempt": 1,
+    "baseline": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+    "baselineTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+    "candidate": "d4f3c6be8137d906407711c6ea3ac8808ab1d860",
+    "candidateTree": "0cc30d9e0ca2f4c37b4dabdc58f0813facdce3fa",
+    "files": [
+      {
+        "path": "lib/device-enrollment.ts",
+        "bytes": 1050,
+        "sha256": "59a025174235a9bbb5a17aa5c654a96d52deb002bb72859ae655af0322b0fede",
+        "gitBlob": "8fe53cb39985150e5fc05daa6370121cb5426d53",
+        "baselineGitBlob": "f9490f18359d2d3a9b61b068bfb14ef4b965144d"
+      },
+      {
+        "path": "lib/device-management.ts",
+        "bytes": 3206,
+        "sha256": "17fb62c6033acded70487b56e09f989410b782d4afaaa0445988442b5f5754b1",
+        "gitBlob": "c2243c5732d67b3ff5444196ce3b45e9aca67805",
+        "baselineGitBlob": "c2e44913f843391095232bdda81d774a58ff9d24"
+      },
+      {
+        "path": "lib/device-enrollment.db.test.ts",
+        "bytes": 24843,
+        "sha256": "2fa9b163ce0219171d4bc46d5107d1db55628dc847f88dc33165ec0e5028f526",
+        "gitBlob": "071b2243d35cd6fdd97b7be0f17f21728578c537",
+        "baselineGitBlob": "431897540dc97e29fbc514ecb1ccd1dbf5d0c9ed"
+      }
+    ],
+    "workflowSha256": "f57f57cb1d43fcb0436b02142311fb3cd1124e07943a2fe39ce50080b333983d",
+    "boundary": "Dedicated PG17 service only; no production configuration, identity, model execution or Native acceptance."
+  },
+  "environment": {
+    "postgres": {
+      "version": "17.11 (Debian 17.11-1.pgdg13+2)",
+      "number": "170011",
+      "database": "mikka_1512_device_e2e"
+    },
+    "node": "v24.22.1",
+    "databaseScope": "isolated loopback PG17 job-owned service and per-test random schema",
+    "productionDatabaseUsed": false,
+    "productionSecretsUsed": false,
+    "oidcUsed": false,
+    "modelRuns": 0,
+    "nativeRuns": 0
+  },
+  "actualTests": {
+    "baseline-red": {
+      "tests": 13,
+      "pass": 11,
+      "fail": 2,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "candidate-green": {
+      "tests": 13,
+      "pass": 13,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    }
+  },
+  "actualQueryMetrics": {
+    "baseline-red": [
+      {
+        "scenario": "enrollment-consumption",
+        "statements": 4
+      },
+      {
+        "scenario": "disabled-device",
+        "statements": 4
+      }
+    ],
+    "candidate-green": [
+      {
+        "scenario": "enrollment-consumption",
+        "statements": 1
+      },
+      {
+        "scenario": "disabled-device",
+        "statements": 1
+      },
+      {
+        "scenario": "removed-device",
+        "statements": 1
+      },
+      {
+        "scenario": "empty-device",
+        "statements": 1
+      },
+      {
+        "scenario": "missing-device",
+        "statements": 1
+      }
+    ]
+  },
+  "functionalBehaviorObserved": [
+    "same full existing test:device-enrollment-db on exact baseline helpers and candidate helpers",
+    "owner-bound, expired/invalid grants and one concurrent winner",
+    "insert failure rolls grant consumption back; retry succeeds exactly once",
+    "disabled control queue retained, removed device only uninstall, empty/missing device empty",
+    "empty receipt path writes no completion/failure state and rereads committed removal",
+    "non-empty acknowledgements remain device-scoped and serial",
+    "uninstall receipt still revokes original credential; sibling credential survives",
+    "offline removal and uninstall expiry retain existing rejection behavior",
+    "old-version and revoked-token admissions remain rejected"
+  ],
+  "originalWarningsRetained": [
+    "Node experimental module mocking warning",
+    "Node mock.module namedExports deprecation warning"
+  ],
+  "cleanup": {
+    "baselineWorktreeRemoved": true,
+    "testSchemaAfterHooksCompletedWithoutFailure": true,
+    "stopContainersStep": {
+      "number": 18,
+      "conclusion": "success",
+      "completedAt": "2026-11-09T02:33:41Z"
+    },
+    "rawLogRemovalEvidence": [
+      {
+        "line": 3186,
+        "kind": "container-removal"
+      },
+      {
+        "line": 3189,
+        "kind": "network-removal"
+      }
+    ],
+    "jobOwnedPostgresAndNetworkStopped": true,
+    "temporaryBranchDeletion": "pending; source evidence already frozen"
+  },
+  "receipts": [
+    {
+      "path": "ci-original/source.safe.json",
+      "bytes": 1540,
+      "sha256": "86c2551217d05c8b801d53e38b24fbf4b8ae2579bead3fdb885b65fa610e2d0d",
+      "gitBlobSha": "a71074a1a7826dd327d1353bc7e5f9e745e698f2"
+    },
+    {
+      "path": "ci-original/paired.safe.json",
+      "bytes": 2053,
+      "sha256": "096afcb67046ea6fbef22ba15ec28fd010eb938f2cc1b9bc335ff076eeae4e4c",
+      "gitBlobSha": "babbfc517343421b6c54c44de885d93f6a84d78d"
+    },
+    {
+      "path": "ci-original/baseline-red.original.log",
+      "bytes": 6234,
+      "sha256": "868ae9bb7b7cf14cd38b5ebd89fd7054e859728a4bbec4c5dd7cb3ef9b5d9360",
+      "gitBlobSha": "3797b99255525d12f60c5245a7ceadbb875da8c9"
+    },
+    {
+      "path": "ci-original/candidate-green.original.log",
+      "bytes": 4878,
+      "sha256": "66fb5b3fc74c4bb00ad9551f22ece03509c7495243d3076a5c26952a5d8a12ce",
+      "gitBlobSha": "3160d319587e6d50069ac933576a43b9cae28e0d"
+    },
+    {
+      "path": "artifact-download.safe.json",
+      "bytes": 1506,
+      "sha256": "74ceecd8467b5d8d97259c4bc2e52dbc2135e318ef6882cba9afb4e1b00fd197",
+      "gitBlobSha": "0abed44ed8ab7889767c0ab2047d1b77f608df8f"
+    },
+    {
+      "path": "device-sql-probe-original.zip",
+      "bytes": 5718,
+      "sha256": "3354e680867161df2e73c2d9ddf4af7900441ad918aff10de09878b16d2d43e9",
+      "gitBlobSha": "6d049a0ced3eb0337340eb8027f660a4554c0610"
+    },
+    {
+      "path": "probe-job.original.log",
+      "bytes": 400234,
+      "sha256": "b067d41563864f9bcde6bd02a0ccdd9d94163f2f55e696830c61796a16c1e26d",
+      "gitBlobSha": "4b93bbf2ae54229ee92131c5c04d219cd23aebb8"
+    },
+    {
+      "path": "private/terminal-run.original.json",
+      "bytes": 12320,
+      "sha256": "9225ecf4c4786f7a96a9b3cdf60440b23c79d8e51156cacf35ba4db8507d92e3",
+      "gitBlobSha": "5a66c4e10c8cd054bbcb553f8ce433e8391edab1"
+    },
+    {
+      "path": "private/terminal-jobs.original.json",
+      "bytes": 3585,
+      "sha256": "c1fc331547dcedf60dfa6a94c48022e08f4c8cfc819ecd75916730beed8c2068",
+      "gitBlobSha": "34ee7cdc03f12e80f561a323465d21bba64bf483"
+    },
+    {
+      "path": "private/terminal-artifacts.original.json",
+      "bytes": 787,
+      "sha256": "ff25cc879d11e81b15bb369820c48cb53ce4070b6641d949fcee9f5e8559c693",
+      "gitBlobSha": "40046a177751cf0a157fd41ef7e7df3d47129a6e"
+    }
+  ],
+  "limits": [
+    "This verifies exact A+B helper behavior against PostgreSQL 17.11. It does not verify unimplemented runs/repos optimization or full product CI.",
+    "Baseline elapsed36.489s and candidate33.32s are complete-suite durations, not a telemetry or production latency benchmark.",
+    "Actual full Native473>Web402 failure remains unchanged; per-function query reduction is not replacement acceptance.",
+    "No rerun, workflow dispatch or production release was performed."
+  ]
+}

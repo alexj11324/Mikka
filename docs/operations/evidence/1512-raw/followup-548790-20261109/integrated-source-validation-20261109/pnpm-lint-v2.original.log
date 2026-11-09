@@ -1,0 +1,100 @@
+
+> next-app@0.0.1 lint /workspace/scratch/812e3b7d6d45/issue1512-integration-checkout
+> pnpm lint:code && pnpm lint:ui
+
+
+> next-app@0.0.1 lint:code /workspace/scratch/812e3b7d6d45/issue1512-integration-checkout
+> oxlint --deny-warnings && pnpm check:migrations && pnpm test:migrations && pnpm check:factory
+
+Found 0 warnings and 0 errors.
+Finished in 407ms on 3956 files with 97 rules using 8 threads.
+
+> next-app@0.0.1 check:migrations /workspace/scratch/812e3b7d6d45/issue1512-integration-checkout
+> node scripts/check-migrations.mjs
+
+migrations: 拿不到 origin/main，跳过「晚于 main 最新迁移」这一项
+migrations: 254 个迁移文件检查通过
+
+> next-app@0.0.1 test:migrations /workspace/scratch/812e3b7d6d45/issue1512-integration-checkout
+> node --test scripts/activity-actor-validation.test.mjs scripts/check-migrations.test.mjs scripts/migration-order.test.mjs scripts/migrate-mode.test.mjs scripts/migration-guard.test.mjs scripts/migration-steps.test.mjs scripts/migration-targets.test.mjs scripts/scope-migration-history.test.mjs scripts/integration-migration-history.test.mjs
+
+✔ actor checks are validated independently in replay-safe standalone files (7.295658ms)
+✔ 历史重号在白名单内通过 (7.71505ms)
+✔ 新的 NNNN_ 文件被拒绝 (0.43083ms)
+✔ 修改旧迁移被拒绝 (5.915844ms)
+✔ 删除旧迁移被拒绝 (7.500017ms)
+✔ 非法时间戳被拒绝 (0.279372ms)
+✔ 不晚于 main 最新迁移被拒绝 (0.157317ms)
+✔ 晚于 main 最新迁移通过 (0.150277ms)
+✔ 时间戳重复被拒绝 (0.144538ms)
+✔ 拿不到 main 时只跳过顺序检查 (0.214043ms)
+✔ consolidated migration aliases preserve immutable SQL and refuse ambiguous old receipts (18.876386ms)
+Retained test fixture: /tmp/migration-mode-oSiuus
+Retained test fixture: /tmp/migration-preview-target-sD4cWs
+Retained test fixture: /tmp/code-only-build-eVATas
+Retained test fixture: /tmp/migration-preflight-yXMhsx
+✔ explicit MIGRATE=0 exits before filesystem or database work in production (326.74869ms)
+✔ explicit Preview migration never connects to the global application target (62.756359ms)
+✔ the build runs migrations only after compilation and type checking succeed (22.040314ms)
+✔ all files preflight before a database connection, even if an earlier file is valid (65.697502ms)
+✔ Vercel production migrates only from main (2.946489ms)
+✔ outside Vercel MIGRATE=1 reaches only loopback databases unless --allow-remote (0.681349ms)
+✔ Vercel preview keeps its own preview database target (2.407285ms)
+✔ loopback detection (0.546295ms)
+✔ migrates unasked only in Vercel production or when every target is loopback off Vercel (0.438813ms)
+✔ only the explicit baseline precedes legacy migrations, without changing their IDs (9.388327ms)
+✔ missing baseline fails before connecting to any database (7.438223ms)
+✔ known legacy artifact compatibility runs before mainline artifact creation (0.192311ms)
+✔ BYOS migration aliases recognize both recorded branch histories without replay (13.260579ms)
+✔ Agent Kit migration alias requires its original exact SQL (0.302477ms)
+✔ local repository defaults only accepts the exact SQL under its historical name (0.260684ms)
+✔ device authorization recognizes its historical name only for identical SQL (0.224619ms)
+✔ publication migration keeps the exact historical SQL receipt (0.244099ms)
+✔ credential vault migration recognizes the exact previously applied Preview SQL (0.319914ms)
+✔ a normal file is sent whole, in one transaction (3.106191ms)
+✔ directives count only in the header (leading comment / blank lines) (1.501557ms)
+✔ no-transaction: exactly one statement, trailing semicolon optional, comments ignored (1.376028ms)
+✔ no-transaction rejects a second statement (QA: files used to be split on ;) (0.920621ms)
+✔ no-transaction rejects any $ quoting (0.322217ms)
+✔ no-transaction rejects BEGIN / COMMIT / END / ROLLBACK (0.319643ms)
+✔ empty files and misplaced CONCURRENTLY are rejected (0.223668ms)
+✔ assertIndexValid passes a valid index and fails a missing or INVALID one (0.498133ms)
+✔ index names are looked up the way Postgres stores them (0.272632ms)
+✔ QA string forms: the raw file is executed, never the stripped text (0.347215ms)
+✔ no-transaction: the ; count must survive comment stripping (0.299091ms)
+✔ all tracked SQL preflights without altering historical migration bytes (27.16343ms)
+✔ concurrent index plans carry their table and schema (0.805767ms)
+✔ dropInvalidIndex drops only an INVALID index on the expected table, concurrently and schema-qualified (0.579024ms)
+✔ Preview migration routes both targets to its configured branch, never the global application URL (2.538003ms)
+✔ production and local migration targets retain their separate configured URLs (0.239282ms)
+✔ scope aliases pin identical SQL and keep the two-body historical name ambiguous (3.558164ms)
+✔ all partial and mixed ledger models either preserve ordered progress or fail closed (179.302038ms)
+✔ a later recorded gate cannot prove which older verified-target body ran (0.762451ms)
+✔ actual runner model skips old DDL, applies only missing suffixes, and replays nothing on retry (10.978829ms)
+✔ renamed scope sources preserve the complete previous ledger without DDL or replacement entries (2.673388ms)
+✔ mixed previous and oldest unambiguous prefixes execute only the missing suffix (6.179932ms)
+✔ actual runner model refuses ambiguous, gapped or changed history before pending DDL (9.868513ms)
+✔ actual runner model rolls back DDL when the ledger write fails (1.911336ms)
+✔ an unrelated AgentKit ledger addition from 79 to 80 neither authorizes nor aliases scope DDL (5.897206ms)
+✔ actual runner model retains both DDL and ledger after lost COMMIT response; retry does not repeat it (4.124778ms)
+ℹ tests 55
+ℹ suites 0
+ℹ pass 55
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 646.208883
+
+> next-app@0.0.1 check:factory /workspace/scratch/812e3b7d6d45/issue1512-integration-checkout
+> node scripts/check-factory.mjs
+
+factory: mikka (1 repositories, 1 runners, digest 5d6471b07f847683d43313aa54bc48d3ee9ac02fdf9cc2a10142cac7f962743f)
+
+> next-app@0.0.1 lint:ui /workspace/scratch/812e3b7d6d45/issue1512-integration-checkout
+> node scripts/lint-ui.mjs
+
+
+UI policy: 3169 business files, 0 errors; 287 component-library files excluded (no source verification).
+Interaction policy: 531 files, including downloaded business blocks; only UI/ReUI primitives excluded.
+{}

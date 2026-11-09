@@ -1,0 +1,52 @@
+{
+  "schema": "issue1512.device-sql-job-log-archive.v1",
+  "compression": {
+    "format": "gzip",
+    "level": 9,
+    "mtime": 0,
+    "filename": ""
+  },
+  "files": [
+    {
+      "raw": {
+        "path": "probe-job.original.log",
+        "bytes": 400234,
+        "sha256": "b067d41563864f9bcde6bd02a0ccdd9d94163f2f55e696830c61796a16c1e26d",
+        "gitBlob": "4b93bbf2ae54229ee92131c5c04d219cd23aebb8"
+      },
+      "gzip": {
+        "path": "archive-logs/device-sql-probe-job.original.log.gz",
+        "bytes": 70516,
+        "sha256": "51397650bbbe1ac250953577dda1445e672e8441606d6912bbc26770dcd3767c",
+        "gitBlob": "67559f48554fe6e3a036f8a407592ad6d3361421"
+      },
+      "roundtrip": {
+        "bytesEqual": true,
+        "sha256Equal": true,
+        "gitBlobEqual": true,
+        "originalUnchanged": true
+      }
+    },
+    {
+      "raw": {
+        "path": "polls-probe-job.original.log",
+        "bytes": 411450,
+        "sha256": "88241227ce9fa72bbe9d721f3d3b34a998f0fb1f76b77b63831b6e1d89f7fba2",
+        "gitBlob": "fce188ece8ab556f4a74b25886c48db99fee147f"
+      },
+      "gzip": {
+        "path": "archive-logs/device-polls-probe-job.original.log.gz",
+        "bytes": 73533,
+        "sha256": "8223767b73541dfafe376696c6ee8f275fa2dbaad7c84a6c2f06c17c2e27c34c",
+        "gitBlob": "66efb564a49d9f5deced6484d2f34f66c9921fa9"
+      },
+      "roundtrip": {
+        "bytesEqual": true,
+        "sha256Equal": true,
+        "gitBlobEqual": true,
+        "originalUnchanged": true
+      }
+    }
+  ],
+  "sourceBoundary": "Full GitHub-decoded job logs. GitHub Actions masked its known credentials; exact decoded UTF-8 bytes are preserved and are not claimed to be the original pre-decoding wire archive. Raw logs remain local unchanged. Only deterministic gzip is included in the public payload."
+}

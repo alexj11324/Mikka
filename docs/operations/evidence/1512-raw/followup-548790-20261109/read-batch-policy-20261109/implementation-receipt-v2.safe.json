@@ -1,0 +1,68 @@
+{
+  "version": 2,
+  "v1ReceiptPreserved": {
+    "path": "implementation-receipt.safe.json",
+    "bytes": 3686,
+    "sha256": "2aa8d6afddbccd5ba1d54f12f250158687d986f139ffaf770fe0fe8b0b711dfe",
+    "gitBlobSha1": "b754b978298560d9fef8c7149039ba8be1334d29"
+  },
+  "sourceManifest": {
+    "path": "final-source-manifest-v2.safe.json",
+    "bytes": 4062,
+    "sha256": "34b59d740801b5a98ae2a8c23b9d2a57ef28cea5073e8a35522fc5ac91cd9b76",
+    "gitBlobSha1": "85fde868221f08b460234aea89e7fd2b29198cae"
+  },
+  "additionalRed": {
+    "path": "policy-active-afterjob-v1-red.safe.json",
+    "bytes": 1790,
+    "sha256": "7d4d102425c41e52c7642b58caedbfbcd8e9b3fd16ae411367770a6d47bf0031",
+    "gitBlobSha1": "bb420232b81860d3b222506e0c8436691af53554"
+  },
+  "changesFromV1": [
+    "Only the policy observation helper checks existing currentRoute() for after:, cron:, and workflow: prefixes before using the active batch map.",
+    "Real afterJob retains the scheduling ALS snapshot and executes while the parent batch remains active in the regression. Repeated jobs read each current policy, foreground siblings retain their original request-local observation.",
+    "Actual cronJob and workflow runJob are checked against false/true observations without changing scheduler behavior."
+  ],
+  "unchanged": [
+    "Original SQL text, parameters, false/absent-row/error semantics, all credential data and authorization consumers",
+    "Effective database executor plus exact workspace identity",
+    "Batch lifetime invalidation and per-request map isolation",
+    "Other owner/revision batch helpers",
+    "Background scheduling, timing, database requests, invocation order and query windows",
+    "Original Native/Web totals, no background subtraction"
+  ],
+  "contextBoundary": "The existing global route scope exposes the innermost route. Standard afterJob/cronJob/runJob install their labelled context. This change excludes those existing labelled scopes; it does not create a new general scheduler or replace route context semantics.",
+  "noCycle": "read-batch-context imports tracing/labels, which imports only node:async_hooks; it does not import jobs/background or OpenTelemetry.",
+  "validation": {
+    "newRegression": "v1 real active afterJob 0/1 pass, exit1; v2 same behavior now included in 38/38 pass",
+    "focusedTests": {
+      "path": "policy-v2-focused-tests.safe.json",
+      "bytes": 923,
+      "sha256": "e3d0e9b99528f63bbc1d603947aaecb64d5c7f0c7a0377eeb051aefbd9e49ef1",
+      "gitBlobSha1": "f989fbf3fb6ba74f9261491743967392d8cd57a1"
+    },
+    "targetedLint": {
+      "path": "policy-v2-targeted-lint.safe.json",
+      "bytes": 770,
+      "sha256": "c6f5db03282ad683b857b3a4b576fa878f732aaef445b79010d264878adc1322",
+      "gitBlobSha1": "56b8981960758be02e2cefce340f3f24497bf767"
+    },
+    "diffCheckExitCode": 0,
+    "fullRepositoryTypecheckPerformed": false,
+    "databaseConnectionsOpened": 0,
+    "networkCalls": 0,
+    "newModels": 0,
+    "newVmOrCi": 0
+  },
+  "acceptance": {
+    "originalNativeLogin": 473,
+    "originalWebLogin": 402,
+    "nativeBudgetStatus": "RED",
+    "maximumSourceInferredSavings": 4,
+    "counterfactualOnlyNativeLogin": 469,
+    "counterfactualIsNotAcceptance": true,
+    "productionPassed": false,
+    "published": false
+  },
+  "cleanup": "Both fixture request-pool objects were ended by the completed focused test. All test and lint processes exited. Existing dependency symlink was reused; no installation or service started."
+}

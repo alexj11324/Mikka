@@ -1,0 +1,39 @@
+{
+  "schema": "issue1512.device-sql-owned-resource-state.v1",
+  "recordedAt": "2026-11-09T03:18:43.531337+00:00",
+  "jobs": [
+    {
+      "runId": 42551207785,
+      "jobId": 128946987410,
+      "outcome": "success",
+      "completedAt": "2026-11-09T02:33:43Z",
+      "stopContainers": "success",
+      "baselineWorktreeRemoved": true,
+      "containerAndNetworkRemovalInFullLog": true
+    },
+    {
+      "runId": 42553864534,
+      "jobId": 128955152580,
+      "outcome": "failure",
+      "completedAt": "2026-11-09T03:03:34Z",
+      "stopContainers": "success",
+      "baselineWorktreeRemoved": true,
+      "containerAndNetworkRemovalInFullLog": true
+    }
+  ],
+  "activeOwnedComputeResources": 0,
+  "reference": {
+    "name": "ops/1512-device-sql-probe-20261109",
+    "lastObservedHead": "c1ac101fa068bbda26b19e342f8e228076e68707",
+    "state": "Retained by explicit root instruction for later exact-owned-ref cleanup. Root will freshly verify its lease before deletion.",
+    "historicalDeletionFailure": "owned-ref-delete.original.log and owned-ref-cleanup-pending.safe.json refer to the earlier d4 head; they are preserved historical failures, not a claim that the current head is d4."
+  },
+  "unpublishedFollowup": {
+    "draft": "polls-workflow-diagnostic-runner.v1.py",
+    "executed": false,
+    "published": false,
+    "excludedFromPublicPayload": true,
+    "reason": "Root chose forthcoming canonical PR CI for candidate PG validation."
+  },
+  "noFurtherCredentialProbeOrResourceCreation": true
+}

@@ -1,0 +1,196 @@
+TAP version 13
+# Subtest: the production gate logs in as SMOKE without pinning an owner workspace or bot
+ok 1 - the production gate logs in as SMOKE without pinning an owner workspace or bot
+  ---
+  duration_ms: 11.326404
+  type: 'test'
+  ...
+# Subtest: a different application commit is refused before login, enrollment or candidate creation
+ok 2 - a different application commit is refused before login, enrollment or candidate creation
+  ---
+  duration_ms: 28.687001
+  type: 'test'
+  ...
+# Subtest: a release receipt names the actual candidate, revision, model and registered device
+ok 3 - a release receipt names the actual candidate, revision, model and registered device
+  ---
+  duration_ms: 5.86068
+  type: 'test'
+  ...
+# Subtest: startup correlation survives claude_code failure before a run exists
+ok 4 - startup correlation survives claude_code failure before a run exists
+  ---
+  duration_ms: 17.477263
+  type: 'test'
+  ...
+# Subtest: startup correlation survives codex failure before a run exists
+ok 5 - startup correlation survives codex failure before a run exists
+  ---
+  duration_ms: 8.137939
+  type: 'test'
+  ...
+# Subtest: startup correlation requires exact candidate binding and existing metadata
+ok 6 - startup correlation requires exact candidate binding and existing metadata
+  ---
+  duration_ms: 45.092921
+  type: 'test'
+  ...
+# Subtest: startup correlation rejects malformed identifiers and preserves independently valid fields
+ok 7 - startup correlation rejects malformed identifiers and preserves independently valid fields
+  ---
+  duration_ms: 133.871672
+  type: 'test'
+  ...
+# Subtest: startup correlation keeps only closed refusal codes and never emits prompts or other identities
+ok 8 - startup correlation keeps only closed refusal codes and never emits prompts or other identities
+  ---
+  duration_ms: 157.557525
+  type: 'test'
+  ...
+# Subtest: successful candidate diagnostics do not gain startup correlation metadata
+ok 9 - successful candidate diagnostics do not gain startup correlation metadata
+  ---
+  duration_ms: 5.11183
+  type: 'test'
+  ...
+# Subtest: a failed subscription still tests the other candidate and closes every created instance and device
+ok 10 - a failed subscription still tests the other candidate and closes every created instance and device
+  ---
+  duration_ms: 4.386284
+  type: 'test'
+  ...
+# Subtest: candidate acceptance is pinned to the outer SMOKE/team payer and always closes its normal session
+ok 11 - candidate acceptance is pinned to the outer SMOKE/team payer and always closes its normal session
+  ---
+  duration_ms: 9.726769
+  type: 'test'
+  ...
+# Subtest: a real receipt rejection persists its run hash and reason without provider text or credentials
+ok 12 - a real receipt rejection persists its run hash and reason without provider text or credentials
+  ---
+  duration_ms: 24.297567
+  type: 'test'
+  ...
+# Subtest: preflight failures preserve their phase and closed error details without producing an accepted file
+ok 13 - preflight failures preserve their phase and closed error details without producing an accepted file
+  ---
+  duration_ms: 147.78305
+  type: 'test'
+  ...
+# Subtest: a failure before a sample exists preserves the startup phase without inventing sample evidence
+ok 14 - a failure before a sample exists preserves the startup phase without inventing sample evidence
+  ---
+  duration_ms: 3.408878
+  type: 'test'
+  ...
+# Subtest: startup failure projection drops unknown content and only admits numeric HTTP error statuses
+ok 15 - startup failure projection drops unknown content and only admits numeric HTTP error statuses
+  ---
+  duration_ms: 25.417453
+  type: 'test'
+  ...
+# Subtest: failure diagnostics retain only fixed cleanup outcomes and unknown exceptions become a generic code
+ok 16 - failure diagnostics retain only fixed cleanup outcomes and unknown exceptions become a generic code
+  ---
+  duration_ms: 3.431683
+  type: 'test'
+  ...
+# Subtest: retained cleanup identities must belong to this case and contain at most four distinct UUIDs
+ok 17 - retained cleanup identities must belong to this case and contain at most four distinct UUIDs
+  ---
+  duration_ms: 10.278011
+  type: 'test'
+  ...
+# Subtest: a terminal-before-proof failure identifies only its owned case and the missing evidence
+ok 18 - a terminal-before-proof failure identifies only its owned case and the missing evidence
+  ---
+  duration_ms: 3.227103
+  type: 'test'
+  ...
+# Subtest: cleanup failures retain bounded step families and HTTP status without arbitrary causes
+ok 19 - cleanup failures retain bounded step families and HTTP status without arbitrary causes
+  ---
+  duration_ms: 8.528065
+  type: 'test'
+  ...
+# Subtest: a failed pair preserves the genuine passing receipt without creating publishable evidence
+ok 20 - a failed pair preserves the genuine passing receipt without creating publishable evidence
+  ---
+  duration_ms: 11.964669
+  type: 'test'
+  ...
+# Subtest: failure projection bounds cleanup rows and refuses foreign or malformed fixture identities
+ok 21 - failure projection bounds cleanup rows and refuses foreign or malformed fixture identities
+  ---
+  duration_ms: 15.704455
+  type: 'test'
+  ...
+# Subtest: the observed Codex adapter-start failure retains false agent_start and error cli_init
+ok 22 - the observed Codex adapter-start failure retains false agent_start and error cli_init
+  ---
+  duration_ms: 6.379213
+  type: 'test'
+  ...
+# Subtest: failed execution retains only bound registration binary metadata without a passing receipt
+ok 23 - failed execution retains only bound registration binary metadata without a passing receipt
+  ---
+  duration_ms: 3.287264
+  type: 'test'
+  ...
+# Subtest: registration diagnostics reject unbounded or non-original binary metadata without leaking it
+ok 24 - registration diagnostics reject unbounded or non-original binary metadata without leaking it
+  ---
+  duration_ms: 20.816896
+  type: 'test'
+  ...
+# Subtest: bootstrap adoption is required; ordinary FD3, wrong run, duplicate warmup or descriptor auth cannot publish
+ok 25 - bootstrap adoption is required; ordinary FD3, wrong run, duplicate warmup or descriptor auth cannot publish
+  ---
+  duration_ms: 5.112301
+  type: 'test'
+  ...
+# Subtest: bootstrap projection, repeated publication and VM proof failures still reclaim both candidate devices and VMs
+ok 26 - bootstrap projection, repeated publication and VM proof failures still reclaim both candidate devices and VMs
+  ---
+  duration_ms: 8.014582
+  type: 'test'
+  ...
+# Subtest: bootstrap failure diagnostics preserve existing strict timings and final binding checks without accepting the pair
+ok 27 - bootstrap failure diagnostics preserve existing strict timings and final binding checks without accepting the pair
+  ---
+  duration_ms: 11.898428
+  type: 'test'
+  ...
+# Subtest: bootstrap failure timing projection rejects foreign, oversized and private values without widening adoption
+ok 28 - bootstrap failure timing projection rejects foreign, oversized and private values without widening adoption
+  ---
+  duration_ms: 2.050466
+  type: 'test'
+  ...
+# Subtest: bootstrap failure binding checks name the rejected predicate without exporting bootstrap or hint values
+ok 29 - bootstrap failure binding checks name the rejected predicate without exporting bootstrap or hint values
+  ---
+  duration_ms: 16.725367
+  type: 'test'
+  ...
+# Subtest: successful candidate gate adds no failure diagnostics and keeps the original accepted receipt
+ok 30 - successful candidate gate adds no failure diagnostics and keeps the original accepted receipt
+  ---
+  duration_ms: 2.544483
+  type: 'test'
+  ...
+# Subtest: failure projection distinguishes the closed 3c production shapes using synthetic identities
+ok 31 - failure projection distinguishes the closed 3c production shapes using synthetic identities
+  ---
+  duration_ms: 2.901251
+  type: 'test'
+  ...
+1..31
+# tests 31
+# suites 0
+# pass 31
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 927.200965

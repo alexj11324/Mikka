@@ -1,0 +1,96 @@
+{
+  "schema": "issue1512.device-polls-publication.v1",
+  "recordedAt": "2026-11-09T03:00:00.161636+00:00",
+  "repository": "alexj11324/Mikka",
+  "ref": "refs/heads/ops/1512-device-sql-probe-20261109",
+  "parent": "d4f3c6be8137d906407711c6ea3ac8808ab1d860",
+  "parentTree": "0cc30d9e0ca2f4c37b4dabdc58f0813facdce3fa",
+  "commit": "c1ac101fa068bbda26b19e342f8e228076e68707",
+  "tree": "2a35e4a4afd37b2b9172d20dd433758e7b9ab854",
+  "fastForward": true,
+  "force": false,
+  "expectedLeaseMatched": true,
+  "publicReadback": {
+    "parentAndTree": true,
+    "changedPathsExact": true,
+    "rawFilesByteEqual": true,
+    "files": [
+      {
+        "path": "app/v1/devices/[deviceId]/runs/route.ts",
+        "bytes": 1305,
+        "sha256": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c",
+        "gitBlob": "5a4c4f8486239161b325b9774b3086afe666dfa9",
+        "mode": "100644",
+        "baselineBytes": 1226,
+        "baselineSha256": "329cd0aea78b05551fbe72b2d8562ce0fa9c67d3cee4318f324f1d3238d72e54",
+        "baselineGitBlob": "3bbb71a8a7d249eb517d75a95986cf75d1994168"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/repos/route.ts",
+        "bytes": 1983,
+        "sha256": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888",
+        "gitBlob": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b",
+        "mode": "100644",
+        "baselineBytes": 1704,
+        "baselineSha256": "7a7d4b6f53cf5c58cb710f3beb01af9ce6fb2ce09da6e227a07a8ac2cc1bcdd9",
+        "baselineGitBlob": "9fe33b05a9570ab59e4bb041f9a1344c44ab31ad"
+      },
+      {
+        "path": "lib/device-heartbeat.db.test.ts",
+        "bytes": 21505,
+        "sha256": "6e8a9ddcb8855de98b443531b6d7524952e740d49eb38194a17234d87eda9b6d",
+        "gitBlob": "27bbb720ac8f5bd3716787db62eb11833e9f3530",
+        "mode": "100644",
+        "baselineBytes": 16173,
+        "baselineSha256": "d27f3a3a5ea9d491b0d1ff74b183f0c0134ec496a677a9a2494efee3b40544dc",
+        "baselineGitBlob": "68423cee4e9fa1f0f89274ed3dec67859e6f164b"
+      },
+      {
+        "path": "lib/device-unit-fence.db.test.ts",
+        "bytes": 11425,
+        "sha256": "e4f1ee4f90de93ce22f74e5dc97a3475816a5d2a932b0d327ee2441953224d51",
+        "gitBlob": "bc65b3faf494d2fd7c797b68f34d04227df38b7a",
+        "mode": "100644",
+        "baselineBytes": 11209,
+        "baselineSha256": "414ea10a0dba789b36633215c42c2d308e853a09f257027dc93b42bee09842da",
+        "baselineGitBlob": "a5237da052e304897cd48afdebc42ee6f7571d96"
+      },
+      {
+        "path": "polls-probe-workflow-v2.yml",
+        "targetPath": ".github/workflows/issue1512-device-sql-probe.yml",
+        "bytes": 14258,
+        "sha256": "7de214a59f7f38fe4c34b2f453ec3ec402411bab23d4c721f28a11ad4de06541",
+        "gitBlob": "a73bfc08be4a375327ae38051d9aad5821db86f2"
+      }
+    ],
+    "postUpdateRefMatched": true
+  },
+  "workflowRun": {
+    "id": 42553864534,
+    "createdAt": "2026-11-09T02:59:17Z",
+    "statusAtRead": "in_progress",
+    "conclusion": null,
+    "attempt": 1
+  },
+  "boundary": {
+    "mainOrPRBranchUpdated": false,
+    "nativeWorkflowTriggered": false,
+    "modelRunRequested": false,
+    "productionSecretsRequested": false,
+    "service": "postgres:17",
+    "database": "mikka_1512_polls_e2e",
+    "portBinding": "127.0.0.1:55491:5432",
+    "timeoutMinutes": 10,
+    "expectedTestsNotObserved": [
+      16,
+      11,
+      5
+    ],
+    "requiresActualTerminalAndCleanupEvidence": true
+  },
+  "preservedPreviousWorkflow": {
+    "path": "a-plus-b-probe-workflow.original.yml",
+    "sha256": "f57f57cb1d43fcb0436b02142311fb3cd1124e07943a2fe39ce50080b333983d",
+    "bytes": 10639
+  }
+}

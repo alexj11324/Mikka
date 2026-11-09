@@ -1,0 +1,201 @@
+{
+  "reviewer": "posthog_recovery",
+  "reviewedAt": "2026-11-09T02:41:19.145982+00:00",
+  "reviewMode": "Read-only source and existing raw evidence; no runtime test repeated",
+  "scope": "policy v2 only, exact three final files and current background/consumer call paths",
+  "sourceCopy": "/workspace/scratch/812e3b7d6d45/issue1512-read-batch-policy-copy",
+  "localSnapshotCommit": "5975e42ef3436a53546948b556166777d1b0be9d",
+  "sourceTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+  "localSnapshotIsNotProductionCommit": true,
+  "reviewedIndex": {
+    "path": "review-index-v2.safe.json",
+    "bytes": 4419,
+    "sha256": "84c08ea4475223608fcb373b2f424865392cd1607d0cc3c8602cd0e74fdc5eeb"
+  },
+  "manifest": {
+    "path": "final-source-manifest-v2.safe.json",
+    "bytes": 4062,
+    "sha256": "34b59d740801b5a98ae2a8c23b9d2a57ef28cea5073e8a35522fc5ac91cd9b76"
+  },
+  "threeSourceCopiesMatchManifest": true,
+  "unchangedBoundaryHashesMatchManifest": true,
+  "fifteenExistingPayloadHashesVerified": true,
+  "blockingFindings": [],
+  "conclusion": "No concrete regression found in the reviewed current call graph. The active, effective executor and exact workspace observation is limited to a validated Native read batch. Existing labelled background paths bypass it.",
+  "checks": [
+    {
+      "topic": "Real afterJob with inherited active scope",
+      "result": "after() captures all ALS via bindRequestCallback. afterJob enters runJob inside that restored callback; runJob then installs its own routeScope label. The existing v1 RED and v2 test run the actual afterJob while withReadBatchContext is still active, proving false/true fresh reads and unchanged foreground observation.",
+      "paths": [
+        "lib/background.ts",
+        "lib/tracing/jobs.ts",
+        "apps/api/compat/server.ts",
+        "apps/api/src/context.ts",
+        "lib/personal-policy.test.ts"
+      ]
+    },
+    {
+      "topic": "Lifetime and failures",
+      "result": "withReadBatchContext clears all policy maps and active=false in finally, including rejection. Promise<boolean> is the cache entry, so false is retained; the original read rejection is shared without conversion and a new batch reads again. Missing policy remains the existing true default.",
+      "paths": [
+        "lib/desktop-rpc/read-batch-context.ts",
+        "lib/personal-policy.ts",
+        "lib/personal-policy.test.ts"
+      ]
+    },
+    {
+      "topic": "Executor and workspace identity",
+      "result": "The request pool proxy COMMIT_EXECUTOR resolves held client, request pool or default pool. Distinct actual executors and exact workspace strings separate entries; aliases of the same executor share only the same policy observation. The first read Promise is created in its original ALS scope. Ordinary/non-active readers return before accessing the executor metadata.",
+      "paths": [
+        "lib/db/request-scope.ts",
+        "lib/db/commit-effects.ts",
+        "lib/desktop-rpc/read-batch-context.ts"
+      ]
+    },
+    {
+      "topic": "Authorization and consumer semantics",
+      "result": "The original policy SELECT and params are unchanged. Own-key reads remain allowed when the shared policy is false; shared credential data, membership checks, connection states and exact credential grant SQL remain outside the memo. The Native closed action list still rejects mutating/nested actions before any invocation. No production writer or dispatch action was added to the batch.",
+      "paths": [
+        "lib/personal-policy.ts",
+        "lib/model-api-keys.ts",
+        "lib/execution-settings.ts",
+        "lib/desktop-rpc/read-batch-contract.ts",
+        "lib/desktop-rpc/read-batch.ts"
+      ]
+    },
+    {
+      "topic": "Current nested labels",
+      "result": "currentRoute is innermost and withDatabaseOperation can overwrite a job label. In the reviewed current server call paths, these overrides occur in request/page/Server Action readers; no production afterJob/workflow path was found calling the policy-bearing coordinator action wrapper inside an inherited active batch. after:coordinator-wake uses wakeCoordinator -> coordinatorEnabled -> botModelReady -> resolveBotModelChoice -> usableApiKeys/pooled bindings without withDatabaseOperation. getModelOrder explicitly preserves currentRoute.",
+      "paths": [
+        "lib/tracing/labels.ts",
+        "lib/db/egress-sample.ts",
+        "lib/coordinator/wake.ts",
+        "lib/coordinator/model-ready.ts",
+        "lib/bot-model-choice.ts",
+        "app/actions/coordinator.ts",
+        "app/actions/model-order.ts"
+      ]
+    },
+    {
+      "topic": "Imports",
+      "result": "The added personal-policy -> read-batch-context edge reaches only existing revision/contract helpers plus the new commit-effects and labels imports. labels imports node:async_hooks only; commit-effects imports pg and node:async_hooks and has no back edge; live revisions/events and read-batch-contract have no personal-policy edge. No new static import cycle or import-time query was found."
+    }
+  ],
+  "nonblockingBoundary": "This prefix check is not an immutable execution-kind capability. A constructed or future afterJob -> withDatabaseOperation(non-job label) -> policy read can hide the job label while the batch stays active. No such policy-bearing production call chain was established here, so this is recorded as a scope limitation rather than an invented production defect or new acceptance gate.",
+  "existingVerificationRead": {
+    "source": "policy-v2-focused-tests.log and source-bound receipt, not rerun by reviewer",
+    "tests": 38,
+    "passed": 38,
+    "failed": 0,
+    "skipped": 0,
+    "exitCode": 0,
+    "activeAfterJobV1Red": "true !== false, preserved original receipt",
+    "targetedLint": "existing no-ignore Oxlint exit 0, raw empty stdout; not described as full repo lint"
+  },
+  "sourceHashes": [
+    {
+      "path": "lib/background.ts",
+      "bytes": 2955,
+      "sha256": "73937274e1c23817cef7eaacf0da24feb4d724b25fd9d562f4cd683869050310"
+    },
+    {
+      "path": "lib/tracing/jobs.ts",
+      "bytes": 2650,
+      "sha256": "6ea794db16ebd2020c31c338d4856c4909b4009a618b97a2d4eb5092a30bb8f1"
+    },
+    {
+      "path": "lib/tracing/labels.ts",
+      "bytes": 2278,
+      "sha256": "39d29ed6eba5cfd364e50a78c21b940136636eb887934170df003217be94da7d"
+    },
+    {
+      "path": "lib/db/commit-effects.ts",
+      "bytes": 6982,
+      "sha256": "83e00e079304c5cce58d142e6af39763c0c331944d84bf5b1fc30b3f88f8bc9a"
+    },
+    {
+      "path": "lib/db/request-scope.ts",
+      "bytes": 4779,
+      "sha256": "67bbb85d950948802449a1d0c2638e62bd4d1731ffe883837bc53059ac50b6f0"
+    },
+    {
+      "path": "lib/db/egress-sample.ts",
+      "bytes": 4294,
+      "sha256": "eb2628088a55ba1141e1b49390629f3e9e01850ef3e197838e1e7ac06ea5764c"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch.ts",
+      "bytes": 3099,
+      "sha256": "8aadc849e1de11727a67f03c0d0d07d656136e455f4ef7bf32281f6b10194fdb"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-contract.ts",
+      "bytes": 1637,
+      "sha256": "cdd915dacd21d2e9555896daeaa5e5c1f5b23a193cb48e0b959507e96e990000"
+    },
+    {
+      "path": "lib/live/revisions.ts",
+      "bytes": 4070,
+      "sha256": "bd2b351ade97a5b0f3f12f43d606ce9f9d8eca9b90de33400be94203d9d76328"
+    },
+    {
+      "path": "lib/live/events.ts",
+      "bytes": 4679,
+      "sha256": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5"
+    },
+    {
+      "path": "lib/coordinator/wake.ts",
+      "bytes": 8325,
+      "sha256": "010fbba7546f32261e5bf0d5256b739367b7438df2499d0edf7032c4442d82b6"
+    },
+    {
+      "path": "lib/coordinator/model-ready.ts",
+      "bytes": 1934,
+      "sha256": "a3c11f5eea106bb2c5c4ec44f8e9ccfce5b2e4782171bd64aa794fb560b566e7"
+    },
+    {
+      "path": "lib/bot-model-choice.ts",
+      "bytes": 8023,
+      "sha256": "941903810b3ec2b39bb8a58539b3d52ab08cde98fa9e8332a9a9777311144521"
+    },
+    {
+      "path": "lib/execution-settings.ts",
+      "bytes": 23629,
+      "sha256": "12fc04116782566b78b17a5f2068756a6230e45930eff36912b3d2fa0045abf6"
+    },
+    {
+      "path": "lib/model-api-keys.ts",
+      "bytes": 26494,
+      "sha256": "1574f8712bfe1ea8428a86e91cf137e75d2f0849bfea1cec2b0de34db0b8dffb"
+    },
+    {
+      "path": "app/actions/coordinator.ts",
+      "bytes": 23196,
+      "sha256": "b70ceec98efa1edfc1074598b2a6cf12b58d4f2539bb351854a562fa43f9d451"
+    },
+    {
+      "path": "app/actions/model-order.ts",
+      "bytes": 3523,
+      "sha256": "33f7f6b528185876a17e5e79e32c3bf9e5e69a26dd98816ead468a3a0a8cef1f"
+    },
+    {
+      "path": "apps/api/compat/server.ts",
+      "bytes": 4200,
+      "sha256": "8f22ce6266c90e650cf674501775055370cee16abe48a43c089275e0fcac5304"
+    },
+    {
+      "path": "apps/api/src/context.ts",
+      "bytes": 2405,
+      "sha256": "73b5ecaa23a4848e3224c4c6dab58b732f10162994f497ea2e6803fd0d9e06a5"
+    }
+  ],
+  "remainingAcceptance": "Original Native 473 / Web 402 remains RED. This review makes no new production query-count or production acceptance claim.",
+  "reviewerActions": {
+    "productEdits": 0,
+    "runtimeTests": 0,
+    "networkQueries": 0,
+    "modelCalls": 0,
+    "createdResources": 0,
+    "remainingOwnedProcesses": 0
+  }
+}

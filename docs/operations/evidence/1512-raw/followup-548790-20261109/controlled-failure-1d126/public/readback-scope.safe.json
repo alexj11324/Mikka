@@ -1,0 +1,36 @@
+{
+  "projectId": 670821,
+  "sourceRevision": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+  "environment": "dev",
+  "service": "mikka-web",
+  "windowUTC": [
+    "2026-11-09 02:43:10",
+    "2026-11-09 02:43:12"
+  ],
+  "traceIds": [
+    "142e5c51ad8f7ccf5b0ee00ee5974fc7",
+    "18aa62f9b603d3fbe1c5b69ed14ee70d",
+    "1c0ce5cb77ec34d689a629c48c8d1ce5",
+    "214ef3d5f15104544ee4c93d8d0a0465",
+    "2e79557078cd398fffba9b521f1cd130",
+    "2f7c169fa19a3f77b899506ca7df8f7d",
+    "42170c9357e9d05a66a874e69fc1615d",
+    "570a22f1d589534befe0d4dad97c87c6",
+    "58ed88c9d5faa22053ce3bbd25850747",
+    "5b8b4c28b5ba2e13335411ba0701c903",
+    "7030ffd78b98df3e6abcd922eeeedc1f",
+    "75dc3064bde7124904087f98e5b05cb8",
+    "7de6056348d9c1cab657ed06b3f8449a",
+    "8063811ce484c0b392f49fec65e1e427",
+    "a5b501b3cb2f80fad9a2e96e65ef6eee",
+    "c94701a417b50a28405e753ddf45cd11",
+    "cb4cd300706d382dd5479cdc11590568",
+    "f57d8fe0f040c11885c9cb01261a5ca7",
+    "f5dac85c72e9138b4cc53797892a596e",
+    "fb64a993ca432ae0392d4c100d4833fc"
+  ],
+  "runnerReceiptSha256": "bd60679a1d6169815dcc16488f60973b1f2a5a7d6f83624c380b483490c99115",
+  "queryTemplateFileSha256": "9dc2522e30104bf082610a2cf0df8ae9164bbf1b839e00b09ade8c5a76579855",
+  "backendObserved": false,
+  "queriesExecutedAtPreparation": 0
+}

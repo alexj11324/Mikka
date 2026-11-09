@@ -1,0 +1,56 @@
+{
+  "schema": "issue1512.device-sql-public-screening.v1",
+  "recordedAt": "2026-11-09T03:18:43.531115+00:00",
+  "filesScreened": 41,
+  "initialScreening": {
+    "path": "public-screening-initial.safe.json",
+    "bytes": 7188,
+    "sha256": "8174df55836af97a0eef79deb1557cc5191e625a1e8583ef28604e836ea11162",
+    "gitBlob": "6a7193f818e630ea85a4a11fa57e19c9c23b6180"
+  },
+  "credentialEmailJwtAndSignedUrlPatternHits": 0,
+  "unresolvedFindings": 0,
+  "withheldPublicFiles": [],
+  "structuredCredentialChecks": {
+    "unmaskedCredentialFieldLines": 0,
+    "maskedEphemeralBetterAuthSecretLines": {
+      "path": "polls-probe-job.original.log",
+      "lines": [
+        3013,
+        3105,
+        3144
+      ]
+    }
+  },
+  "syntheticPostgresFaultRows": {
+    "path": "probe-job.original.log",
+    "lines": [
+      3113,
+      3124
+    ],
+    "classification": "Expected database CHECK-constraint failure rows for rollback-owner from the disposable isolated enrollment test. Values are synthetic fixture IDs/hash/timestamps, not customer data or production credentials. The raw row text is not repeated in this receipt.",
+    "source": {
+      "path": "lib/device-enrollment.db.test.ts",
+      "sha256": "2fa9b163ce0219171d4bc46d5107d1db55628dc847f88dc33165ec0e5028f526",
+      "publicCommit": "d4f3c6be8137d906407711c6ea3ac8808ab1d860",
+      "constraint": "enrollment_insert_failure"
+    }
+  },
+  "provenance": {
+    "repository": "alexj11324/Mikka",
+    "publicRuns": [
+      42551207785,
+      42553864534
+    ],
+    "sourceReadbackCommits": [
+      "d4f3c6be8137d906407711c6ea3ac8808ab1d860",
+      "c1ac101fa068bbda26b19e342f8e228076e68707"
+    ],
+    "workflowBoundary": "Both jobs use only a dedicated GitHub Actions loopback PostgreSQL service. No Infisical/OIDC/production secret/model execution. The second job generated a temporary test-only auth secret, masked by GitHub."
+  },
+  "limits": [
+    "Pattern scanning and source review do not constitute an exhaustive proof that arbitrary text can never contain a secret. No unresolved sensitive value was found in the selected bytes.",
+    "Private API responses, signed download file references, raw local ZIPs, the unpublished diagnostic draft, and complete uncompressed job logs are excluded from this payload.",
+    "The public evidence retains synthetic fixture data and raw failed-test output. It does not redact or rewrite original failures."
+  ]
+}

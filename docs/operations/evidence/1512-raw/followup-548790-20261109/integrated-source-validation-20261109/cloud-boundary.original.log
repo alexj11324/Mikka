@@ -1,0 +1,59 @@
+
+> next-app@0.0.1 check:cloud-boundary /workspace/scratch/812e3b7d6d45/issue1512-integration-checkout
+> node scripts/cloud-boundary-policy.mjs && node --test scripts/cloud-boundary-policy.test.mjs
+
+cloud boundary: public core and clients pass; no private cloud service primitives added
+✔ the existing public repository passes without moving core, billing, credentials or plugins (3981.451885ms)
+✔ rejects cloud issuer environment (0.324804ms)
+✔ rejects computed environment access (0.322491ms)
+✔ rejects constant-folded environment access (0.29597ms)
+✔ rejects cloud data-encryption credential (0.291474ms)
+✔ rejects private JWK material (0.274347ms)
+✔ rejects aliased cloud signing primitive (0.245113ms)
+✔ rejects cloud JWT construction (0.221617ms)
+✔ rejects private signing schema (0.231572ms)
+✔ rejects private schema under a renamed source path (0.262759ms)
+✔ rejects GitHub token exchange endpoint (0.247416ms)
+✔ rejects GitHub SDK token mint (0.179083ms)
+✔ rejects forwarded webhook signature header (0.140203ms)
+✔ rejects Headers signature mutation (0.134455ms)
+✔ rejects new Expo sender (0.129227ms)
+✔ rejects new Expo base endpoint (0.097358ms)
+✔ rejects new Expo receipt reader (0.119162ms)
+✔ rejects new Expo SDK sender (0.090638ms)
+✔ rejects server-keyed usage outside the private schema (0.156718ms)
+✔ rejects private metering schema (0.148046ms)
+✔ rejects registered cloud push endpoint (0.124059ms)
+✔ rejects route-table model endpoint (0.153974ms)
+✔ rejects request path dispatch (0.118681ms)
+✔ rejects cloud OAuth issuer handler (0.121214ms)
+✔ rejects private package import (0.095385ms)
+✔ rejects dynamic private package import (0.118931ms)
+✔ DDL and quoted cloud schemas are guarded without parsing SQL as JavaScript (0.109377ms)
+✔ file routes and vendored private service source cannot bypass primitive detection (0.15751ms)
+✔ private service dependencies cannot move into a public build through a package manifest (0.169738ms)
+✔ allows public cloud client (0.129417ms)
+✔ allows public receipts client (0.07855ms)
+✔ allows protocol path type (0.083958ms)
+✔ allows JWKS verification (0.127283ms)
+✔ allows public JWK material (0.078349ms)
+✔ allows stripping a private JWK field (0.102026ms)
+✔ allows webhook verification (0.121175ms)
+✔ allows own GitHub App signing (0.111579ms)
+✔ allows own-installation billing (0.200766ms)
+✔ allows public cloud connection state (0.069426ms)
+✔ allows public protocol dependency (0.06564ms)
+✔ allows explanatory comment (0.121425ms)
+✔ an existing Expo exception permits exactly one retained primitive, with no whole-file exemption (0.418077ms)
+✔ every exception has a reason, one exact fingerprint and a positive hit count (5.466157ms)
+✔ removed or changed retained code requires removing its stale exception (11.063425ms)
+✔ the CI command fails on an added untracked violation and passes again after removal (788.811498ms)
+✔ the same policy command is a local check and a required source CI step (4.510803ms)
+ℹ tests 46
+ℹ suites 0
+ℹ pass 46
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5180.455382

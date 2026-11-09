@@ -1,0 +1,208 @@
+{
+  "schema": "issue1512.device-polls-independent-source-review.v1",
+  "reviewer": "native_6180_review",
+  "result": "NO_SOURCE_BLOCKER_FOUND",
+  "sourceOnly": true,
+  "baseline": {
+    "publicHead": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+    "tree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+    "localSnapshotCommit": "5975e42ef3436a53546948b556166777d1b0be9d",
+    "localCommitIsNotProductionIdentity": true
+  },
+  "inputs": {
+    "authorReceipt": {
+      "path": "polls-candidate-v1-review.safe.json",
+      "bytes": 7637,
+      "sha256": "e7c8e3051727563667bc82686e306951b29af08c40a40d6a3fd7fd7ad30bb072",
+      "gitBlobSha1": "a880fe967a9eb64d581e0a696586a5f506c49308"
+    },
+    "patch": {
+      "path": "polls-candidate-v1.patch",
+      "bytes": 13917,
+      "sha256": "c55f88df7bc65b09364c1f222aec4c4894d356ce0dd9f07be2e59cca7c8406ee",
+      "gitBlobSha1": "53029a7d87480601c7f0ecac4f7710799132a26c"
+    },
+    "reviewedFiles": [
+      {
+        "path": "app/v1/devices/[deviceId]/runs/route.ts",
+        "bytes": 1305,
+        "sha256": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c",
+        "gitBlobSha1": "5a4c4f8486239161b325b9774b3086afe666dfa9"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/repos/route.ts",
+        "bytes": 1983,
+        "sha256": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888",
+        "gitBlobSha1": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b"
+      },
+      {
+        "path": "lib/device-heartbeat.db.test.ts",
+        "bytes": 21505,
+        "sha256": "6e8a9ddcb8855de98b443531b6d7524952e740d49eb38194a17234d87eda9b6d",
+        "gitBlobSha1": "27bbb720ac8f5bd3716787db62eb11833e9f3530"
+      },
+      {
+        "path": "lib/device-unit-fence.db.test.ts",
+        "bytes": 11425,
+        "sha256": "e4f1ee4f90de93ce22f74e5dc97a3475816a5d2a932b0d327ee2441953224d51",
+        "gitBlobSha1": "bc65b3faf494d2fd7c797b68f34d04227df38b7a"
+      }
+    ],
+    "unchangedGuardSources": [
+      {
+        "path": "lib/device-route.ts",
+        "bytes": 3276,
+        "sha256": "06fc3702e5bb2cf3664d24d8675258a06bdcf1b19fde6776e9bff4c5640cbc69",
+        "gitBlobSha1": "5ac62fb64d304522f42a803c932483c0dbc58d9e",
+        "equalsBaseline": true
+      },
+      {
+        "path": "lib/device-link.ts",
+        "bytes": 14932,
+        "sha256": "3fa0e53848f09e9d9834d9ca6609b6e3538ba1efd0dae4edbf079f56ff151b63",
+        "gitBlobSha1": "b7f43aa78a7323b89a459905163d13627a976fe8",
+        "equalsBaseline": true
+      },
+      {
+        "path": "lib/device-token-scope.ts",
+        "bytes": 1579,
+        "sha256": "f0fc39acf62b88d7c51635275b592cd3dc883c49adbd17761d438b1c48f66cbf",
+        "gitBlobSha1": "b065d6a06b2f2aaa766605d869b7d7fa9e600b07",
+        "equalsBaseline": true
+      },
+      {
+        "path": "lib/db/device-scope.ts",
+        "bytes": 14907,
+        "sha256": "2083d7616e9a18421dcb8d55c309dba8a2761bf140faeba106a5b24393748b98",
+        "gitBlobSha1": "80ce39633e6482f3e28654b917c57d1cca9f1e35",
+        "equalsBaseline": true
+      },
+      {
+        "path": "lib/db/request-scope.ts",
+        "bytes": 4779,
+        "sha256": "67bbb85d950948802449a1d0c2638e62bd4d1731ffe883837bc53059ac50b6f0",
+        "gitBlobSha1": "b3445c20e6be5061bcbfe0fe56903b8dd767dfd3",
+        "equalsBaseline": true
+      },
+      {
+        "path": "lib/device-repositories.ts",
+        "bytes": 4148,
+        "sha256": "30d18a0c6c450d41dff2506198fbc6f073b94fe4c874a28e1e5dea86085afd7b",
+        "gitBlobSha1": "d5879728fc203efbff13f3051f4958e89cd558b2",
+        "equalsBaseline": true
+      },
+      {
+        "path": "tests/helpers/read-metrics.ts",
+        "bytes": 5086,
+        "sha256": "12455a4db9599a97f33da57627b6e8cee40fc68bc3b4de5eb9fa0202a49adcd4",
+        "gitBlobSha1": "5c836b5b3663ba8152319f92bc603a7fcc545b90",
+        "equalsBaseline": true
+      }
+    ]
+  },
+  "findings": [
+    {
+      "area": "request admission and cloud scope",
+      "status": "preserved",
+      "detail": "Both exports remain withDeviceRoute(handleGET). Real initial authenticateDevice, version controls, scoped-cloud machine/binding checks and path restriction remain unchanged. The inner authenticateDevice reads the admitted caller context; no caller is cached across requests and no auth write/scope check is moved into the new SQL."
+    },
+    {
+      "area": "fresh credential and effective database",
+      "status": "preserved",
+      "detail": "Existing readUnderDeviceAuthority delegates to readUnderAuthority using the current request pool. The outer statement checks its ALS caller tokenId/userId, revokedAt IS NULL and expiry against clock_timestamp. No token row yields DeviceAuthorityRevoked; the unchanged route wrapper maps that cause to 401. There is no default-pool substitution in a request scope."
+    },
+    {
+      "area": "scalar SQL and absence",
+      "status": "valid_source_shape",
+      "detail": "Each supplied SELECT is a scalar subquery under the credential SELECT. devices.id is primary-key unique, so at most one device result exists. Missing/foreign/removed device yields scalar NULL while a live token row still exists; the route returns 404. Empty data uses JSON [] rather than NULL, so an authorized empty device remains 200."
+    },
+    {
+      "area": "queued runs and disabled devices",
+      "status": "preserved",
+      "detail": "The device predicate still requires exact id, current caller owner and removedAt IS NULL. d.enabled=false produces {runIds:[]}; enabled devices return only queued ids for that device. UUID JSON values preserve string output. No run claims, credential issuance, dispatch or mutation are added."
+    },
+    {
+      "area": "repository list and settings",
+      "status": "preserved",
+      "detail": "The projected fields remain id/repoPath/remoteUrl. Disabled device handling remains the old repos behavior: ownership is required but enabled is not a repo-list gate. Existing per-remote readRepositoryDaemonSettings remains, normalizes remoteKey and filters by caller.userId, reads only setup/networkAllow, and uses the ordinary guarded database path. Null/invalid remotes keep the old no-settings path; push approval is not added."
+    },
+    {
+      "area": "snapshot contract",
+      "status": "intentional_existing_read_contract",
+      "detail": "These two pure GET reads use the existing unlocked read-only authority snapshot contract. This does not claim the token is locked until HTTP response completion. No gateway ticket or write path is converted, and no deviceUnitFence flag or guard implementation is changed. Nonempty repository settings still take the existing authority protection for their subsequent reads."
+    },
+    {
+      "area": "post-auth race tests",
+      "status": "meaningful_source_design",
+      "detail": "The tests enter the exported wrapped handlers with a real token fixture, not an injected admitted caller. handleGET destructuring reads the params getter only after withDeviceRoute has finished its real initial authentication. That getter signals the barrier; the handler waits for the pending params Promise before its business SELECT. Each revoke/expire/remove/owner update is awaited before release. Early completion fails the test. Expected statuses remain 401 for revoke/expire and 404 for remove/owner change; refused responses must contain no business data keys."
+    },
+    {
+      "area": "actual query counting and behavior coverage",
+      "status": "strict_checks_retained",
+      "detail": "The existing measured helper intercepts pg.Client.query before app pools are imported. The new exact count assertion is after the data/disabled and race checks, so expected baseline count failures do not bypass those earlier checks. The original cloud nonempty-repository handoff scenarios, settings payload checks and strict query/row/wire comparisons remain unchanged. No missing database is silently accepted when REQUIRE_DB=1."
+    },
+    {
+      "area": "unit fence regression",
+      "status": "not_weakened",
+      "detail": "The measurement target now uses the actual withDeviceRoute plus two separate actual pool.query calls, preserving a real protected multi-statement burst after the two list routes become single snapshots. It still launches ten requests, warms each mode, uses backend command tags/ReadyForQuery, and requires strictly fewer explicit transactions and round trips under unit fencing. Earlier held-burst, inter-burst revoke, timeout and unavailable-fence tests are unchanged."
+    }
+  ],
+  "evidenceRead": {
+    "offlineBaseline": {
+      "path": "polls-offline-baseline-red.original.log",
+      "bytes": 1791,
+      "sha256": "f4bf2e8e961677d8bbdc6855ac71a5da87520612467fc6459176d111c9f0aa7f",
+      "gitBlobSha1": "60034bf85a5436bc7b7ff7cb996c05f4a83f6b95"
+    },
+    "offlineBaselineCounts": {
+      "tests": 2,
+      "pass": 0,
+      "fail": 2,
+      "postAuthBusinessQueriesPerRoute": 2
+    },
+    "offlineCandidate": {
+      "path": "polls-offline-candidate-green.original.log",
+      "bytes": 428,
+      "sha256": "cd03d66892163d97b15164bf30eccda61bb134085792bfe3b7afd30553e61d6f",
+      "gitBlobSha1": "e6f0ea92e5ffea5dd0bd3cd5cb366eae1765f6d2"
+    },
+    "offlineCandidateCounts": {
+      "tests": 2,
+      "pass": 2,
+      "fail": 0,
+      "postAuthBusinessQueriesPerRoute": 1
+    },
+    "offlineLimitation": "Fake DB boundary only. These logs do not establish PostgreSQL scalar evaluation, real authority races, total per-route SQL or Native acceptance.",
+    "realPg": {
+      "terminalObservedByReviewer": false,
+      "statusAtReview": "in_progress reported by author; no result claimed",
+      "reportedOpsCandidate": "c1ac101fa068bbda26b19e342f8e228076e68707",
+      "reportedTree": "2a35e4a4afd37b2b9172d20dd433758e7b9ab854",
+      "reportedRunId": 42553864534,
+      "networkReadByReviewer": false,
+      "soleOriginalReader": "current_source_review"
+    }
+  },
+  "limits": [
+    "The four reviewed source hashes match the frozen author manifest. This review has not run PostgreSQL or any tests.",
+    "Actual original query contexts for runs/repos remain unknown. No fixed full-login saving of 16 or final Native success is asserted.",
+    "Only the empty local test path asserts exactly one authentication plus one snapshot. Cloud admission, stale lastUsedAt and nonempty repository settings can require additional existing reads/writes.",
+    "json_agg changes database result encoding. Neither this source review nor the offline 2-to-1 probe proves C old-versus-new database wire bytes for every nonempty branch. No such claim is made.",
+    "Independent ordering of repository/run rows was not part of the old unordered SELECT contract; no new order guarantee is asserted."
+  ],
+  "acceptance": {
+    "originalNativeLogin": 473,
+    "originalWebLogin": 402,
+    "status": "RED until a new source full Native original proves otherwise",
+    "originalWindowsAndCheckpointsUntouched": true
+  },
+  "operations": {
+    "sourceModified": false,
+    "indexModified": false,
+    "testRuns": 0,
+    "networkCalls": 0,
+    "newModelsVmsOrCi": 0,
+    "authorFrozenIndexModified": false,
+    "receiptWrittenOutsideCheckout": true
+  }
+}

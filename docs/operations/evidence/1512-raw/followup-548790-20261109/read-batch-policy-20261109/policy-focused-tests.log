@@ -1,0 +1,229 @@
+TAP version 13
+# Subtest: concurrent owner-wide readers reuse their actual personal home only within the batch
+ok 1 - concurrent owner-wide readers reuse their actual personal home only within the batch
+  ---
+  duration_ms: 2.404949
+  type: 'test'
+  ...
+# Subtest: different Live kinds share one revision query before either consumer reads its data
+ok 2 - different Live kinds share one revision query before either consumer reads its data
+  ---
+  duration_ms: 9.216346
+  type: 'test'
+  ...
+# Subtest: owner observations are separate for parallel batches, owners and database authorities
+ok 3 - owner observations are separate for parallel batches, owners and database authorities
+  ---
+  duration_ms: 0.774629
+  type: 'test'
+  ...
+# Subtest: later reads in one batch keep the earlier revision, while the next batch reads the new revision
+ok 4 - later reads in one batch keep the earlier revision, while the next batch reads the new revision
+  ---
+  duration_ms: 0.719576
+  type: 'test'
+  ...
+# Subtest: a missing or failed revision never becomes fabricated proof and does not poison the next request
+ok 5 - a missing or failed revision never becomes fabricated proof and does not poison the next request
+  ---
+  duration_ms: 0.878725
+  type: 'test'
+  ...
+# Subtest: ordinary revision readers and different database scopes remain independent
+ok 6 - ordinary revision readers and different database scopes remain independent
+  ---
+  duration_ms: 0.864545
+  type: 'test'
+  ...
+# Subtest: bound after-work cannot reuse an already completed batch authority observation
+ok 7 - bound after-work cannot reuse an already completed batch authority observation
+  ---
+  duration_ms: 0.276176
+  type: 'test'
+  ...
+# Subtest: notification target resolution never inherits an earlier list-read home, even inside the batch
+ok 8 - notification target resolution never inherits an earlier list-read home, even inside the batch
+  ---
+  duration_ms: 0.187753
+  type: 'test'
+  ...
+# Subtest: planned owner readers share one earlier observation without exposing each other's keys
+ok 9 - planned owner readers share one earlier observation without exposing each other's keys
+  ---
+  duration_ms: 1.116605
+  type: 'test'
+  ...
+# Subtest: an undeclared batch keeps ordinary per-reader observations
+ok 10 - an undeclared batch keeps ordinary per-reader observations
+  ---
+  duration_ms: 0.58318
+  type: 'test'
+  ...
+# Subtest: a selected team key stays late and total requested and returned keys stay unchanged
+ok 11 - a selected team key stays late and total requested and returned keys stay unchanged
+  ---
+  duration_ms: 0.829552
+  type: 'test'
+  ...
+# Subtest: owner homes and database authorities do not borrow another planned observation
+ok 12 - owner homes and database authorities do not borrow another planned observation
+  ---
+  duration_ms: 0.865325
+  type: 'test'
+  ...
+# Subtest: absent homes and invalid or nonrevision refs never trigger an owner prefetch
+ok 13 - absent homes and invalid or nonrevision refs never trigger an owner prefetch
+  ---
+  duration_ms: 0.509879
+  type: 'test'
+  ...
+# Subtest: an entity or another owner key does not start the resolved home's list prefetch
+ok 14 - an entity or another owner key does not start the resolved home's list prefetch
+  ---
+  duration_ms: 0.484561
+  type: 'test'
+  ...
+# Subtest: missing and failed prefetched revisions remain unknown until another request reads
+ok 15 - missing and failed prefetched revisions remain unknown until another request reads
+  ---
+  duration_ms: 1.559443
+  type: 'test'
+  ...
+# Subtest: throw and cancellation release the plan as well as its earlier observations
+ok 16 - throw and cancellation release the plan as well as its earlier observations
+  ---
+  duration_ms: 0.574577
+  type: 'test'
+  ...
+# Subtest: the ordinary version-1 RPC preserves batch order, original results and wire values
+ok 17 - the ordinary version-1 RPC preserves batch order, original results and wire values
+  ---
+  duration_ms: 12.604659
+  type: 'test'
+  ...
+# Subtest: every item is validated before any original action runs, including nested and mutating calls
+ok 18 - every item is validated before any original action runs, including nested and mutating calls
+  ---
+  duration_ms: 9.124758
+  type: 'test'
+  ...
+# Subtest: each business failure keeps the single-action HTTP mapping without exposing its error message
+ok 19 - each business failure keeps the single-action HTTP mapping without exposing its error message
+  ---
+  duration_ms: 1.202395
+  type: 'test'
+  ...
+# Subtest: thrown and returned authRequired both preserve Main HTTP 401 after all item work settles
+ok 20 - thrown and returned authRequired both preserve Main HTTP 401 after all item work settles
+  ---
+  duration_ms: 1.520525
+  type: 'test'
+  ...
+# Subtest: parallel batch requests retain their real session and each original ownership check
+ok 21 - parallel batch requests retain their real session and each original ownership check
+  ---
+  duration_ms: 1.882831
+  type: 'test'
+  ...
+# Subtest: batch readers share the API request memo while later requests authorize a fresh workspace view
+ok 22 - batch readers share the API request memo while later requests authorize a fresh workspace view
+  ---
+  duration_ms: 1.752034
+  type: 'test'
+  ...
+# Subtest: only the validated prepared owner readers contribute revision kinds across different readiness times
+ok 23 - only the validated prepared owner readers contribute revision kinds across different readiness times
+  ---
+  duration_ms: 10.542927
+  type: 'test'
+  ...
+# (node:15) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:15) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: a shared credential check returns its current authorization in one read
+ok 24 - a shared credential check returns its current authorization in one read
+  ---
+  duration_ms: 2.846365
+  type: 'test'
+  ...
+# Subtest: a missing share does not issue an additional read or write
+ok 25 - a missing share does not issue an additional read or write
+  ---
+  duration_ms: 0.184749
+  type: 'test'
+  ...
+# Subtest: a refused share does not issue an additional read or write
+ok 26 - a refused share does not issue an additional read or write
+  ---
+  duration_ms: 0.082414
+  type: 'test'
+  ...
+# Subtest: repeated permission checks observe revoke and restore without reusing an earlier grant
+ok 27 - repeated permission checks observe revoke and restore without reusing an earlier grant
+  ---
+  duration_ms: 0.167673
+  type: 'test'
+  ...
+# Subtest: a failed authorization read propagates its original cause without another query
+ok 28 - a failed authorization read propagates its original cause without another query
+  ---
+  duration_ms: 0.467986
+  type: 'test'
+  ...
+# Subtest: a Native read batch shares its workspace policy across the real key and subscription readers
+ok 29 - a Native read batch shares its workspace policy across the real key and subscription readers
+  ---
+  duration_ms: 2.643769
+  type: 'test'
+  ...
+# Subtest: a refused batch policy still permits own keys and skips every shared credential read
+ok 30 - a refused batch policy still permits own keys and skips every shared credential read
+  ---
+  duration_ms: 0.491001
+  type: 'test'
+  ...
+# Subtest: concurrent batches never share a policy observation, while sibling reads join only their batch
+ok 31 - concurrent batches never share a policy observation, while sibling reads join only their batch
+  ---
+  duration_ms: 0.466394
+  type: 'test'
+  ...
+# Subtest: a batch policy belongs to its actual request database executor and exact workspace
+ok 32 - a batch policy belongs to its actual request database executor and exact workspace
+  ---
+  duration_ms: 564.177802
+  type: 'test'
+  ...
+# Subtest: a failed batch policy preserves its original rejection and cannot poison the next request
+ok 33 - a failed batch policy preserves its original rejection and cannot poison the next request
+  ---
+  duration_ms: 0.92816
+  type: 'test'
+  ...
+# Subtest: bound after-work reads fresh after both fulfilled and rejected batch lifetimes
+ok 34 - bound after-work reads fresh after both fulfilled and rejected batch lifetimes
+  ---
+  duration_ms: 0.343428
+  type: 'test'
+  ...
+# Subtest: only the policy is shared: credential shares and own-key reads remain fresh in the batch
+ok 35 - only the policy is shared: credential shares and own-key reads remain fresh in the batch
+  ---
+  duration_ms: 0.334825
+  type: 'test'
+  ...
+# Subtest: ordinary policy readers observe changes on every call without touching batch metadata
+ok 36 - ordinary policy readers observe changes on every call without touching batch metadata
+  ---
+  duration_ms: 0.131699
+  type: 'test'
+  ...
+1..36
+# tests 36
+# suites 0
+# pass 36
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1354.660334

@@ -1,0 +1,96 @@
+✔ one match dispatches straight away with owner/repo; the lister is asked for the dispatching user only (4.120992ms)
+✔ a GitHub repository named by owner/repo or URL runs only when the person's live list has it; no list, no dispatch; other hosts go on as given (1.650368ms)
+✔ several matches return the candidates as one choice card and dispatch nothing (0.589399ms)
+✔ no match returns the GitHub install option and dispatches nothing (0.506764ms)
+✔ another user's repositories are never matched (0.777271ms)
+✔ GitHub not connected or unavailable is a clear error and dispatches nothing; other failures still throw (0.874899ms)
+✔ find_repository lists the user's own repositories, matches a name, and an owner/repo exactly (0.825604ms)
+✔ an exact name never hides the others: every candidate comes back with its description and homepage (0.393493ms)
+✔ dispatch_run with a bare name that several fit dispatches nothing; this workspace's repositories only come first (0.622999ms)
+✔ sameRepository tells a named repository from the thread's (0.737883ms)
+✔ on-demand discovery preserves every repository beyond 300 and marks only fresh authorized workspace candidates (0.63673ms)
+✔ workspace discovery orders ambiguous names but neither authorizes nor silently picks a repository (0.691422ms)
+✔ closed repository refusals keep their exact result and mark phase plus dispatch beneath an OK Workflow step (88.297264ms)
+✔ one line per dispatch: phases in order, GitHub requests counted, nothing else (2.592458ms)
+✔ a failed dispatch still logs what ran, and the failure reaches the caller (0.942391ms)
+✔ outside a timed dispatch a phase only runs and a GitHub request is not counted (0.142916ms)
+✔ a broken log never fails the dispatch (0.154462ms)
+{"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794191628645,"endedAt":1794191629025,"totalMs":380,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":2},{"phase":"requestedAgentProfile","ms":41},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":2},{"phase":"resolveModelDispatch","ms":2},{"phase":"ensureBotCloudRuntime","ms":1},{"phase":"bindAgentToConnection","ms":1},{"phase":"authorizeSubscriptionWorkspace","ms":1},{"phase":"issueForUser","ms":0},{"phase":"ensureBotCloudRuntime","ms":9},{"phase":"ensureDeviceRepository","ms":0},{"phase":"queueCloudRun","ms":1},{"phase":"ensureThreadMachine","ms":23},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":0}],"github":{"requests":0,"ms":0},"failed":false}
+{"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794191629029,"endedAt":1794191629040,"totalMs":11,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":2},{"phase":"requestedAgentProfile","ms":0},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":0},{"phase":"ensureBotCloudRuntime","ms":0},{"phase":"bindAgentToConnection","ms":0},{"phase":"authorizeSubscriptionWorkspace","ms":1},{"phase":"issueForUser","ms":0},{"phase":"ensureBotCloudRuntime","ms":0},{"phase":"ensureDeviceRepository","ms":0},{"phase":"queueCloudRun","ms":0},{"phase":"ensureThreadMachine","ms":1},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":0}],"github":{"requests":0,"ms":0},"failed":false}
+{"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794191629041,"endedAt":1794191629046,"totalMs":5,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"requestedAgentProfile","ms":1},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":1}],"github":{"requests":0,"ms":0},"failed":false}
+{"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794191629048,"endedAt":1794191629057,"totalMs":9,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":6},{"phase":"requestedAgentProfile","ms":0},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":0}],"github":{"requests":0,"ms":0},"failed":false}
+{"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794191629058,"endedAt":1794191629065,"totalMs":7,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":2},{"phase":"requestedAgentProfile","ms":1},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":1}],"github":{"requests":0,"ms":0},"failed":false}
+{"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794191629065,"endedAt":1794191629071,"totalMs":6,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":2},{"phase":"requestedAgentProfile","ms":0},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":0}],"github":{"requests":0,"ms":0},"failed":false}
+{"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794191629072,"endedAt":1794191629077,"totalMs":5,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"requestedAgentProfile","ms":0},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":0}],"github":{"requests":0,"ms":0},"failed":false}
+{"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794191629078,"endedAt":1794191629083,"totalMs":5,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"requestedAgentProfile","ms":0},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":1}],"github":{"requests":0,"ms":0},"failed":false}
+{"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794191629083,"endedAt":1794191629089,"totalMs":6,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"requestedAgentProfile","ms":0},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":0}],"github":{"requests":0,"ms":0},"failed":false}
+{"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794191629089,"endedAt":1794191629096,"totalMs":7,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"requestedAgentProfile","ms":1},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":0}],"github":{"requests":0,"ms":0},"failed":false}
+{"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794191629096,"endedAt":1794191629101,"totalMs":5,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":2},{"phase":"requestedAgentProfile","ms":0},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":0}],"github":{"requests":0,"ms":0},"failed":false}
+{"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794191629102,"endedAt":1794191629107,"totalMs":5,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"requestedAgentProfile","ms":0},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":0}],"github":{"requests":0,"ms":0},"failed":false}
+{"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794191629108,"endedAt":1794191629127,"totalMs":19,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":2},{"phase":"requestedAgentProfile","ms":0},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":0},{"phase":"ensureBotCloudRuntime","ms":0},{"phase":"bindAgentToConnection","ms":0},{"phase":"authorizeSubscriptionWorkspace","ms":1},{"phase":"issueForUser","ms":0},{"phase":"ensureBotCloudRuntime","ms":0},{"phase":"ensureDeviceRepository","ms":1},{"phase":"queueCloudRun","ms":0},{"phase":"ensureThreadMachine","ms":10},{"phase":"startLifecycle","ms":1},{"phase":"runPlacement","ms":0}],"github":{"requests":0,"ms":0},"failed":false}
+{"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794191629127,"endedAt":1794191629141,"totalMs":14,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"requestedAgentProfile","ms":0},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":0},{"phase":"ensureBotCloudRuntime","ms":0},{"phase":"bindAgentToConnection","ms":0},{"phase":"authorizeSubscriptionWorkspace","ms":1},{"phase":"issueForUser","ms":0},{"phase":"ensureBotCloudRuntime","ms":0},{"phase":"ensureDeviceRepository","ms":0},{"phase":"queueCloudRun","ms":0},{"phase":"ensureThreadMachine","ms":5},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":1}],"github":{"requests":0,"ms":0},"failed":false}
+cloud task dispatch refused { error: 'Error', code: undefined }
+cloud task dispatch refused { error: 'Error', code: undefined }
+cloud task dispatch refused { error: 'Error', code: undefined }
+cloud task dispatch refused { error: 'ComputerError', code: 409 }
+cloud task dispatch refused { error: 'ComputerError', code: 409 }
+cloud task dispatch refused { error: 'ComputerError', code: 409 }
+(node:15) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:15) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+✔ a bound task-form source keeps the selected cloud placement with cloud model target (865.831888ms)
+✔ a bound task-form source keeps the selected cloud placement with omitted model target (11.982875ms)
+✔ a missing task-form source cannot prepare or dispatch a cloud repository (5.917751ms)
+✔ a owner task-form source cannot prepare or dispatch a cloud repository (11.002025ms)
+✔ a bot task-form source cannot prepare or dispatch a cloud repository (7.305834ms)
+✔ a issue task-form source cannot prepare or dispatch a cloud repository (6.139059ms)
+✔ a unbound task-form source cannot prepare or dispatch a cloud repository (6.039579ms)
+✔ a kind task-form source cannot prepare or dispatch a cloud repository (5.541154ms)
+✔ a undelivered task-form source cannot prepare or dispatch a cloud repository (5.733414ms)
+✔ a device task-form source cannot prepare or dispatch a cloud repository (6.991189ms)
+✔ a malformed task-form source cannot prepare or dispatch a cloud repository (5.524088ms)
+✔ a null task-form source cannot prepare or dispatch a cloud repository (6.132175ms)
+✔ ordinary existing-issue chat retains automatic placement and its selected Profile (19.337696ms)
+✔ a cloud task-form choice overrides local preferences before selection when the model omits target (16.103716ms)
+✔ cloud startup succeeds only after both machine preparation and lifecycle launch (3.245383ms)
+✔ a requested specification selects the planner before normal desktop admission (8.161854ms)
+✔ a pending specification selects the planner before normal desktop admission (75.919754ms)
+✔ a desktop profile admission refusal reaches the tool with safe guidance and starts no run (6.016129ms)
+✔ direct desktop callers retain a profile refusal code and safe guidance without exception details (1.425068ms)
+✔ model arguments cannot grant local recovery; only the separate host placement argument can (8.905626ms)
+✔ a machine failure uses the unclaimed infrastructure-failure path without requesting a user stop (13.583387ms)
+✔ a lifecycle failure uses the unclaimed infrastructure-failure path without requesting a user stop (8.160607ms)
+✔ a lost startup-failure race grants no local placement recovery or failed-run ancestry (3.606016ms)
+✔ a sleeping Bot dispatches codex with its selected subscription, without a separate wake tool (6.385867ms)
+✔ a sleeping Bot dispatches codex with its selected api_key, without a separate wake tool (5.18732ms)
+✔ a sleeping Bot dispatches claude_code with its selected subscription, without a separate wake tool (5.31984ms)
+✔ a sleeping Bot dispatches claude_code with its selected api_key, without a separate wake tool (4.755549ms)
+✔ a owner refusal performs no cloud preparation or queue write (0.337969ms)
+✔ a runtime refusal performs no cloud preparation or queue write (0.248966ms)
+✔ a workspace refusal performs no cloud preparation or queue write (0.795028ms)
+✔ a issue refusal performs no cloud preparation or queue write (0.592503ms)
+✔ a policy refusal performs no cloud preparation or queue write (1.04109ms)
+✔ a suggestion refusal performs no cloud preparation or queue write (0.594246ms)
+✔ a subscription refusal performs no cloud preparation or queue write (1.084575ms)
+✔ a key-switch refusal performs no cloud preparation or queue write (0.949161ms)
+cloud task dispatch refused { error: 'ComputerError', code: 409 }
+cloud task dispatch refused { error: 'Error', code: undefined }
+✔ both actual Factory read tools return their refusal unchanged while an owned child keeps ERROR (32.828374ms)
+✔ preparation permits authorized quota fallback and leaves the original selection for queue-time validation (7.036648ms)
+✔ desktop dispatch rejects workspace access before model resolution (0.707646ms)
+✔ desktop dispatch rejects issue access before model resolution (0.501597ms)
+✔ a wake failure queues no run or continuation write for the ended thread (1.725251ms)
+✔ a wake cannot swap the selected Agent, even inside the same workspace (0.911965ms)
+✔ a credential revoked during the wake is still rejected by the queue (1.487081ms)
+✔ workspace access revoked during the wake stops before queueing a run (1.796889ms)
+✔ a repeated dispatch keeps its queue key and one run after waking once (6.259492ms)
+✔ a completed thread retains its model, binding, ancestry and read-only policy through wake (12.44204ms)
+✔ a working thread receives its message without waking or reselecting anything (0.938685ms)
+ℹ tests 63
+ℹ suites 0
+ℹ pass 63
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4241.433815

@@ -1,0 +1,6 @@
+
+> next-app@0.0.1 lint:runtime /workspace/scratch/812e3b7d6d45/issue1512-integration-checkout
+> oxlint --no-ignore --deny-warnings apps/api/compat apps/api/plugins apps/api/routes apps/api/runtime apps/api/scripts apps/api/src apps/api/*.mjs apps/api/nitro.config.ts apps/frontend/scripts apps/frontend/src apps/frontend/vite.config.mjs
+
+Found 0 warnings and 0 errors.
+Finished in 30ms on 87 files with 97 rules using 8 threads.

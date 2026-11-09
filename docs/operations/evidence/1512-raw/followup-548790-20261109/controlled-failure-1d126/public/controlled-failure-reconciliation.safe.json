@@ -1,0 +1,1944 @@
+{
+  "schemaVersion": 1,
+  "kind": "controlled_failure_posthog_readback",
+  "verifiedAtUTC": "2026-11-09T02:54:07.978311+00:00",
+  "status": "passed_for_exact_source_controlled_dev_case",
+  "backendObserved": true,
+  "overallIssue1512Acceptance": false,
+  "finalFixSourceAcceptance": false,
+  "productionModelCasePerformed": false,
+  "scope": {
+    "projectId": 670821,
+    "sourceRevision": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+    "environment": "dev",
+    "service": "mikka-web",
+    "windowUTC": [
+      "2026-11-09 02:43:10",
+      "2026-11-09 02:43:12"
+    ],
+    "traceIds": [
+      "142e5c51ad8f7ccf5b0ee00ee5974fc7",
+      "18aa62f9b603d3fbe1c5b69ed14ee70d",
+      "1c0ce5cb77ec34d689a629c48c8d1ce5",
+      "214ef3d5f15104544ee4c93d8d0a0465",
+      "2e79557078cd398fffba9b521f1cd130",
+      "2f7c169fa19a3f77b899506ca7df8f7d",
+      "42170c9357e9d05a66a874e69fc1615d",
+      "570a22f1d589534befe0d4dad97c87c6",
+      "58ed88c9d5faa22053ce3bbd25850747",
+      "5b8b4c28b5ba2e13335411ba0701c903",
+      "7030ffd78b98df3e6abcd922eeeedc1f",
+      "75dc3064bde7124904087f98e5b05cb8",
+      "7de6056348d9c1cab657ed06b3f8449a",
+      "8063811ce484c0b392f49fec65e1e427",
+      "a5b501b3cb2f80fad9a2e96e65ef6eee",
+      "c94701a417b50a28405e753ddf45cd11",
+      "cb4cd300706d382dd5479cdc11590568",
+      "f57d8fe0f040c11885c9cb01261a5ca7",
+      "f5dac85c72e9138b4cc53797892a596e",
+      "fb64a993ca432ae0392d4c100d4833fc"
+    ]
+  },
+  "preparedScopeReceipt": "readback-scope.safe.json",
+  "sourceRevision": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+  "sourceBoundary": "Actual exact-1d126 OTLP and overhead baseline. This source does not contain the subsequent flush, returned-refusal or SQL fixes. A later candidate requires its own source-bound evidence.",
+  "runnerReceipt": {
+    "path": "controlled-failure.receipt.json",
+    "bytes": 8829,
+    "sha256": "bd60679a1d6169815dcc16488f60973b1f2a5a7d6f83624c380b483490c99115",
+    "backendObserved": false,
+    "localRetainedRoots": 20,
+    "localExportedSpans": 80,
+    "localExportedLogs": 40,
+    "initialUnsampled": 17,
+    "configuredSampleRate": 0.1,
+    "transport": {
+      "spans": {
+        "enabled": true,
+        "batchesAttempted": 1,
+        "recordsAttempted": 80,
+        "batchesSucceeded": 1,
+        "recordsSucceeded": 80,
+        "batchesFailed": 0,
+        "recordsFailed": 0,
+        "exportThrows": 0,
+        "flushFailures": 0,
+        "shutdownFailures": 0,
+        "batchesPending": 0,
+        "recordsPending": 0
+      },
+      "logs": {
+        "enabled": true,
+        "batchesAttempted": 1,
+        "recordsAttempted": 40,
+        "batchesSucceeded": 1,
+        "recordsSucceeded": 40,
+        "batchesFailed": 0,
+        "recordsFailed": 0,
+        "exportThrows": 0,
+        "flushFailures": 0,
+        "shutdownFailures": 0,
+        "batchesPending": 0,
+        "recordsPending": 0
+      }
+    },
+    "cleanupComplete": true
+  },
+  "captures": [
+    {
+      "snapshot": "s1",
+      "name": "span_counts",
+      "requestedAt": "2026-11-09 02:46:29 UTC",
+      "path": "private/posthog/s1.span_counts.original.json",
+      "bytes": 8677,
+      "sha256": "e4eb374595e193b20e07745bab6812fe4a9fab2813249498ef21e6e652093f38",
+      "querySha256": "6d3010ceb7d3ab76c5b2b685eb93bfb5fed61eab25d66c57fcb97dcd0f3074bc",
+      "rawResultsSha256": "a3ed126cf8f75b6b688cef6eff704fcd544cc1a985493be12180d27aa90b63c8",
+      "actualRows": 20,
+      "queryEchoExact": true,
+      "formattedResultsExact": true,
+      "explicitServerTruncationFlag": null,
+      "enumeration": "at most 20 fixed trace groups"
+    },
+    {
+      "snapshot": "s1",
+      "name": "log_counts_canonical",
+      "requestedAt": "2026-11-09 02:48:10 UTC",
+      "path": "private/posthog/s1.log_counts_canonical.original.json",
+      "bytes": 8891,
+      "sha256": "3ff43cc875318ddd3d859a1e31d562939d9322ed274d59bd3dc72c6c63ec0019",
+      "querySha256": "31eb11e437d22c1e201fc9f1b917908b4343fb7aa9ce0841955f6dcf273f21aa",
+      "rawResultsSha256": "5f6f515b80cfd8bf56f27f1d1381251de1d09a90a1c63e28c790837b9a0576d5",
+      "actualRows": 20,
+      "queryEchoExact": true,
+      "formattedResultsExact": true,
+      "explicitServerTruncationFlag": null,
+      "enumeration": "at most 20 fixed trace groups"
+    },
+    {
+      "snapshot": "s1",
+      "name": "span_rows",
+      "requestedAt": "2026-11-09 02:47:19 UTC",
+      "path": "private/posthog/s1.span_rows.original.json",
+      "bytes": 75673,
+      "sha256": "1e102599b42e033828a013285b6417750f45ce8a5a545d84db1cd34c5577896e",
+      "querySha256": "6e42bd464cdd29003d81e39d5175e88d34c0535ea1b1fa0c0c30b7ae322ece8f",
+      "rawResultsSha256": "fd13489b13776bc91087888042f2a60bd2ea6262b96b2ffb3b96b7c54b86340e",
+      "actualRows": 80,
+      "queryEchoExact": true,
+      "formattedResultsExact": true,
+      "explicitServerTruncationFlag": null,
+      "enumeration": "detail is below LIMIT 500 and agrees with independent exact-ID summary"
+    },
+    {
+      "snapshot": "s1",
+      "name": "log_rows",
+      "requestedAt": "2026-11-09 02:47:19 UTC",
+      "path": "private/posthog/s1.log_rows.original.json",
+      "bytes": 35667,
+      "sha256": "e918d782a9bbef16d4eab88765086e9b162d2a84d67fb7b78b51beec40524922",
+      "querySha256": "4fd102e59b39bbe1f7669241faaf8147d5696cf1a2021c6eb9f0e3057b03a284",
+      "rawResultsSha256": "16fad76d8c610120d966b784daf44f54a586072cb62be63128aea05c84c98ffd",
+      "actualRows": 40,
+      "queryEchoExact": true,
+      "formattedResultsExact": true,
+      "explicitServerTruncationFlag": null,
+      "enumeration": "detail is below LIMIT 500 and agrees with independent exact-ID summary"
+    },
+    {
+      "snapshot": "s2",
+      "name": "span_counts",
+      "requestedAt": "2026-11-09 02:48:37 UTC",
+      "path": "private/posthog/s2.span_counts.original.json",
+      "bytes": 8638,
+      "sha256": "1cd51d4bdaaaa44afc5bd35dc4adbbc1c4d8f71c54af495af63477117d834fed",
+      "querySha256": "6d3010ceb7d3ab76c5b2b685eb93bfb5fed61eab25d66c57fcb97dcd0f3074bc",
+      "rawResultsSha256": "a3ed126cf8f75b6b688cef6eff704fcd544cc1a985493be12180d27aa90b63c8",
+      "actualRows": 20,
+      "queryEchoExact": true,
+      "formattedResultsExact": true,
+      "explicitServerTruncationFlag": null,
+      "enumeration": "at most 20 fixed trace groups"
+    },
+    {
+      "snapshot": "s2",
+      "name": "log_counts_canonical",
+      "requestedAt": "2026-11-09 02:48:37 UTC",
+      "path": "private/posthog/s2.log_counts_canonical.original.json",
+      "bytes": 8830,
+      "sha256": "e5cea030f76fd93e46b8ef53d20f28ad8467a318e9b3a2a3f754d6e7ad5aea46",
+      "querySha256": "31eb11e437d22c1e201fc9f1b917908b4343fb7aa9ce0841955f6dcf273f21aa",
+      "rawResultsSha256": "5f6f515b80cfd8bf56f27f1d1381251de1d09a90a1c63e28c790837b9a0576d5",
+      "actualRows": 20,
+      "queryEchoExact": true,
+      "formattedResultsExact": true,
+      "explicitServerTruncationFlag": null,
+      "enumeration": "at most 20 fixed trace groups"
+    },
+    {
+      "snapshot": "s2",
+      "name": "span_rows",
+      "requestedAt": "2026-11-09 02:48:37 UTC",
+      "path": "private/posthog/s2.span_rows.original.json",
+      "bytes": 75652,
+      "sha256": "3a11d33a6a515101599a6d9dbf4f9a820c8c53bfc451c85c54248aa2c9fb012a",
+      "querySha256": "6e42bd464cdd29003d81e39d5175e88d34c0535ea1b1fa0c0c30b7ae322ece8f",
+      "rawResultsSha256": "fd13489b13776bc91087888042f2a60bd2ea6262b96b2ffb3b96b7c54b86340e",
+      "actualRows": 80,
+      "queryEchoExact": true,
+      "formattedResultsExact": true,
+      "explicitServerTruncationFlag": null,
+      "enumeration": "detail is below LIMIT 500 and agrees with independent exact-ID summary"
+    },
+    {
+      "snapshot": "s2",
+      "name": "log_rows",
+      "requestedAt": "2026-11-09 02:48:37 UTC",
+      "path": "private/posthog/s2.log_rows.original.json",
+      "bytes": 35646,
+      "sha256": "7e28a0e5ae651c7a4f0fbbb9119a64700873354a60d67f2f3f1625657b82843e",
+      "querySha256": "4fd102e59b39bbe1f7669241faaf8147d5696cf1a2021c6eb9f0e3057b03a284",
+      "rawResultsSha256": "16fad76d8c610120d966b784daf44f54a586072cb62be63128aea05c84c98ffd",
+      "actualRows": 40,
+      "queryEchoExact": true,
+      "formattedResultsExact": true,
+      "explicitServerTruncationFlag": null,
+      "enumeration": "detail is below LIMIT 500 and agrees with independent exact-ID summary"
+    },
+    {
+      "snapshot": "s1",
+      "name": "log_counts",
+      "requestedAt": "2026-11-09 02:46:29 UTC",
+      "path": "private/posthog/s1.log_counts.original.json",
+      "bytes": 8848,
+      "sha256": "04308e1aa564b4b580291cf966bb8ad600f25d253e73afeb403d1c315340c503",
+      "querySha256": "a9c2c4eb502a923806c73416f35fbbfaba28ea2e8bbfd8744f2758c04c455982",
+      "rawResultsSha256": "4266d2a5f7ab5157eec4f955306a2973e3725de6f45b178528cdc2db808ff96d",
+      "actualRows": 20,
+      "queryEchoExact": true,
+      "formattedResultsExact": true,
+      "explicitServerTruncationFlag": null,
+      "enumeration": "at most 20 fixed trace groups"
+    }
+  ],
+  "posthogQueryCount": 9,
+  "snapshotsStable": true,
+  "snapshotComparison": {
+    "span_counts": {
+      "rawResultsIdentical": true,
+      "sha256": "a3ed126cf8f75b6b688cef6eff704fcd544cc1a985493be12180d27aa90b63c8"
+    },
+    "log_counts_canonical": {
+      "rawResultsIdentical": true,
+      "sha256": "5f6f515b80cfd8bf56f27f1d1381251de1d09a90a1c63e28c790837b9a0576d5"
+    },
+    "span_rows": {
+      "rawResultsIdentical": true,
+      "sha256": "fd13489b13776bc91087888042f2a60bd2ea6262b96b2ffb3b96b7c54b86340e"
+    },
+    "log_rows": {
+      "rawResultsIdentical": true,
+      "sha256": "16fad76d8c610120d966b784daf44f54a586072cb62be63128aea05c84c98ffd"
+    }
+  },
+  "backend": {
+    "spanRows": 80,
+    "spanUuids": 80,
+    "logicalTraceSpanPairs": 80,
+    "logRows": 40,
+    "logUuids": 40,
+    "errorLogTraceSpanPairs": 40,
+    "observedTraceIds": [
+      "142e5c51ad8f7ccf5b0ee00ee5974fc7",
+      "18aa62f9b603d3fbe1c5b69ed14ee70d",
+      "1c0ce5cb77ec34d689a629c48c8d1ce5",
+      "214ef3d5f15104544ee4c93d8d0a0465",
+      "2e79557078cd398fffba9b521f1cd130",
+      "2f7c169fa19a3f77b899506ca7df8f7d",
+      "42170c9357e9d05a66a874e69fc1615d",
+      "570a22f1d589534befe0d4dad97c87c6",
+      "58ed88c9d5faa22053ce3bbd25850747",
+      "5b8b4c28b5ba2e13335411ba0701c903",
+      "7030ffd78b98df3e6abcd922eeeedc1f",
+      "75dc3064bde7124904087f98e5b05cb8",
+      "7de6056348d9c1cab657ed06b3f8449a",
+      "8063811ce484c0b392f49fec65e1e427",
+      "a5b501b3cb2f80fad9a2e96e65ef6eee",
+      "c94701a417b50a28405e753ddf45cd11",
+      "cb4cd300706d382dd5479cdc11590568",
+      "f57d8fe0f040c11885c9cb01261a5ca7",
+      "f5dac85c72e9138b4cc53797892a596e",
+      "fb64a993ca432ae0392d4c100d4833fc"
+    ],
+    "completeFailureTraceIds": [
+      "142e5c51ad8f7ccf5b0ee00ee5974fc7",
+      "18aa62f9b603d3fbe1c5b69ed14ee70d",
+      "1c0ce5cb77ec34d689a629c48c8d1ce5",
+      "214ef3d5f15104544ee4c93d8d0a0465",
+      "2e79557078cd398fffba9b521f1cd130",
+      "2f7c169fa19a3f77b899506ca7df8f7d",
+      "42170c9357e9d05a66a874e69fc1615d",
+      "570a22f1d589534befe0d4dad97c87c6",
+      "58ed88c9d5faa22053ce3bbd25850747",
+      "5b8b4c28b5ba2e13335411ba0701c903",
+      "7030ffd78b98df3e6abcd922eeeedc1f",
+      "75dc3064bde7124904087f98e5b05cb8",
+      "7de6056348d9c1cab657ed06b3f8449a",
+      "8063811ce484c0b392f49fec65e1e427",
+      "a5b501b3cb2f80fad9a2e96e65ef6eee",
+      "c94701a417b50a28405e753ddf45cd11",
+      "cb4cd300706d382dd5479cdc11590568",
+      "f57d8fe0f040c11885c9cb01261a5ca7",
+      "f5dac85c72e9138b4cc53797892a596e",
+      "fb64a993ca432ae0392d4c100d4833fc"
+    ],
+    "missingTraceIds": [],
+    "physicalDuplicateSpans": 0,
+    "physicalDuplicateLogs": 0
+  },
+  "perTrace": [
+    {
+      "traceId": "142e5c51ad8f7ccf5b0ee00ee5974fc7",
+      "rootSpanId": "e2b2aa90de71c2a7",
+      "pgSpanIds": [
+        "87679ef5bae0761c",
+        "ce6cbe4e33c6218f",
+        "d306d2db3a077819"
+      ],
+      "errorSpanIds": [
+        "87679ef5bae0761c",
+        "e2b2aa90de71c2a7"
+      ],
+      "spanRowUuids": [
+        "01a1be30-2bad-7480-bf83-1c87e0179cc3",
+        "01a1be30-2bad-7480-bf83-1c9f81148dd0",
+        "01a1be30-2bad-7480-bf83-1caa7b9a47c9",
+        "01a1be30-2bae-74d2-9113-78f9a531e409"
+      ],
+      "errorLogUuids": [
+        "01a1be30-2d6b-7c80-9467-95c2ccbeddc1",
+        "01a1be30-2d6b-7c80-9467-95d916ca692e"
+      ],
+      "root": {
+        "started_utc": "2026-11-09T02:43:10.129000Z",
+        "ended_utc": "2026-11-09T02:43:10.136502Z",
+        "span_row_uuid": "01a1be30-2bae-74d2-9113-78f9a531e409",
+        "trace_id_hex": "142e5c51ad8f7ccf5b0ee00ee5974fc7",
+        "span_id_hex": "e2b2aa90de71c2a7",
+        "parent_span_id_hex": "0000000000000000",
+        "is_root_span": true,
+        "service": "mikka-web",
+        "environment": "dev",
+        "service_version": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+        "stage": "GET /api/trace-benchmark",
+        "status_code": 2,
+        "duration_ms": 7.502,
+        "route": "/api/trace-benchmark",
+        "method": "GET",
+        "http_status": 500.0,
+        "db_system": null,
+        "db_operation": null,
+        "statement_id": null,
+        "sample_rate": 1.0,
+        "retention": "error_or_slow",
+        "critical_raw": false,
+        "error_type": "CodedError",
+        "error_code": "trace_acceptance_failed",
+        "error_detail": "controlled_database_failure",
+        "error_causes": "CodedError:trace_acceptance_failed:controlled_database_failure > error:22012",
+        "_rawBooleanFields": {
+          "is_root_span": "True",
+          "critical_raw": "false"
+        }
+      },
+      "pgErrorMetadata": [
+        {
+          "spanId": "87679ef5bae0761c",
+          "errorCode": null,
+          "errorType": null
+        }
+      ],
+      "checks": {
+        "exactLocalSpanSet": true,
+        "spanPhysicalAndUniqueCounts": true,
+        "oneActualRoot": true,
+        "rootHttpFailure": true,
+        "ordinaryRoot": true,
+        "safeRootCodeDetailCause": true,
+        "allSpansEffectiveRateOne": true,
+        "exactPgChildren": true,
+        "onePgError": true,
+        "exactErrorSpanSet": true,
+        "logPhysicalAndUniqueCounts": true,
+        "exactErrorLogSpanSet": true,
+        "allLogsErrorAndSafe": true,
+        "allLogsEffectiveRateOne": true,
+        "rootErrorLogLinked": true,
+        "exactServiceEnvironmentVersion": true
+      },
+      "complete": true
+    },
+    {
+      "traceId": "18aa62f9b603d3fbe1c5b69ed14ee70d",
+      "rootSpanId": "376f707b5360b4e3",
+      "pgSpanIds": [
+        "012206725d1cb29e",
+        "2b50323e137b26a3",
+        "5dad94da69849fca"
+      ],
+      "errorSpanIds": [
+        "012206725d1cb29e",
+        "376f707b5360b4e3"
+      ],
+      "spanRowUuids": [
+        "01a1be30-2bae-74d2-9113-77bf71dacb7c",
+        "01a1be30-2bae-74d2-9113-77ca62b89e89",
+        "01a1be30-2bae-74d2-9113-77d0681def1c",
+        "01a1be30-2bae-74d2-9113-799973013d45"
+      ],
+      "errorLogUuids": [
+        "01a1be30-2d6b-7c80-9467-9709e0627b7d",
+        "01a1be30-2d6b-7c80-9467-971f43b663b6"
+      ],
+      "root": {
+        "started_utc": "2026-11-09T02:43:10.202000Z",
+        "ended_utc": "2026-11-09T02:43:10.206750Z",
+        "span_row_uuid": "01a1be30-2bae-74d2-9113-799973013d45",
+        "trace_id_hex": "18aa62f9b603d3fbe1c5b69ed14ee70d",
+        "span_id_hex": "376f707b5360b4e3",
+        "parent_span_id_hex": "0000000000000000",
+        "is_root_span": true,
+        "service": "mikka-web",
+        "environment": "dev",
+        "service_version": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+        "stage": "GET /api/trace-benchmark",
+        "status_code": 2,
+        "duration_ms": 4.75,
+        "route": "/api/trace-benchmark",
+        "method": "GET",
+        "http_status": 500.0,
+        "db_system": null,
+        "db_operation": null,
+        "statement_id": null,
+        "sample_rate": 1.0,
+        "retention": "error_or_slow",
+        "critical_raw": false,
+        "error_type": "CodedError",
+        "error_code": "trace_acceptance_failed",
+        "error_detail": "controlled_database_failure",
+        "error_causes": "CodedError:trace_acceptance_failed:controlled_database_failure > error:22012",
+        "_rawBooleanFields": {
+          "is_root_span": "True",
+          "critical_raw": "false"
+        }
+      },
+      "pgErrorMetadata": [
+        {
+          "spanId": "012206725d1cb29e",
+          "errorCode": null,
+          "errorType": null
+        }
+      ],
+      "checks": {
+        "exactLocalSpanSet": true,
+        "spanPhysicalAndUniqueCounts": true,
+        "oneActualRoot": true,
+        "rootHttpFailure": true,
+        "ordinaryRoot": true,
+        "safeRootCodeDetailCause": true,
+        "allSpansEffectiveRateOne": true,
+        "exactPgChildren": true,
+        "onePgError": true,
+        "exactErrorSpanSet": true,
+        "logPhysicalAndUniqueCounts": true,
+        "exactErrorLogSpanSet": true,
+        "allLogsErrorAndSafe": true,
+        "allLogsEffectiveRateOne": true,
+        "rootErrorLogLinked": true,
+        "exactServiceEnvironmentVersion": true
+      },
+      "complete": true
+    },
+    {
+      "traceId": "1c0ce5cb77ec34d689a629c48c8d1ce5",
+      "rootSpanId": "f903f1ed00c72ce5",
+      "pgSpanIds": [
+        "15b48221904b9e12",
+        "2dc5afad3594e207",
+        "e084eeca1bdb48d6"
+      ],
+      "errorSpanIds": [
+        "2dc5afad3594e207",
+        "f903f1ed00c72ce5"
+      ],
+      "spanRowUuids": [
+        "01a1be30-2bae-74d2-9113-77e301980785",
+        "01a1be30-2bae-74d2-9113-77fb6a0c0fda",
+        "01a1be30-2bae-74d2-9113-78056b82fc1c",
+        "01a1be30-2bae-74d2-9113-79acc28985b7"
+      ],
+      "errorLogUuids": [
+        "01a1be30-2d6b-7c80-9467-972ec3e1fa07",
+        "01a1be30-2d6b-7c80-9467-973aee011210"
+      ],
+      "root": {
+        "started_utc": "2026-11-09T02:43:10.208000Z",
+        "ended_utc": "2026-11-09T02:43:10.212965Z",
+        "span_row_uuid": "01a1be30-2bae-74d2-9113-79acc28985b7",
+        "trace_id_hex": "1c0ce5cb77ec34d689a629c48c8d1ce5",
+        "span_id_hex": "f903f1ed00c72ce5",
+        "parent_span_id_hex": "0000000000000000",
+        "is_root_span": true,
+        "service": "mikka-web",
+        "environment": "dev",
+        "service_version": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+        "stage": "GET /api/trace-benchmark",
+        "status_code": 2,
+        "duration_ms": 4.965,
+        "route": "/api/trace-benchmark",
+        "method": "GET",
+        "http_status": 500.0,
+        "db_system": null,
+        "db_operation": null,
+        "statement_id": null,
+        "sample_rate": 1.0,
+        "retention": "error_or_slow",
+        "critical_raw": false,
+        "error_type": "CodedError",
+        "error_code": "trace_acceptance_failed",
+        "error_detail": "controlled_database_failure",
+        "error_causes": "CodedError:trace_acceptance_failed:controlled_database_failure > error:22012",
+        "_rawBooleanFields": {
+          "is_root_span": "True",
+          "critical_raw": "false"
+        }
+      },
+      "pgErrorMetadata": [
+        {
+          "spanId": "2dc5afad3594e207",
+          "errorCode": null,
+          "errorType": null
+        }
+      ],
+      "checks": {
+        "exactLocalSpanSet": true,
+        "spanPhysicalAndUniqueCounts": true,
+        "oneActualRoot": true,
+        "rootHttpFailure": true,
+        "ordinaryRoot": true,
+        "safeRootCodeDetailCause": true,
+        "allSpansEffectiveRateOne": true,
+        "exactPgChildren": true,
+        "onePgError": true,
+        "exactErrorSpanSet": true,
+        "logPhysicalAndUniqueCounts": true,
+        "exactErrorLogSpanSet": true,
+        "allLogsErrorAndSafe": true,
+        "allLogsEffectiveRateOne": true,
+        "rootErrorLogLinked": true,
+        "exactServiceEnvironmentVersion": true
+      },
+      "complete": true
+    },
+    {
+      "traceId": "214ef3d5f15104544ee4c93d8d0a0465",
+      "rootSpanId": "31d4168efa4aeb6d",
+      "pgSpanIds": [
+        "317d1f8d972d0e22",
+        "40b86ad0b73a0954",
+        "75450f6d5de1ef4b"
+      ],
+      "errorSpanIds": [
+        "317d1f8d972d0e22",
+        "31d4168efa4aeb6d"
+      ],
+      "spanRowUuids": [
+        "01a1be30-2bad-7480-bf83-1bce6b352aba",
+        "01a1be30-2bad-7480-bf83-1bd98fb5c3ea",
+        "01a1be30-2bad-7480-bf83-1bebddaadc3f",
+        "01a1be30-2bae-74d2-9113-78bc68a74a93"
+      ],
+      "errorLogUuids": [
+        "01a1be30-2d6b-7c80-9467-95485c7009b7",
+        "01a1be30-2d6b-7c80-9467-955bb19e9b5e"
+      ],
+      "root": {
+        "started_utc": "2026-11-09T02:43:10.075000Z",
+        "ended_utc": "2026-11-09T02:43:10.083790Z",
+        "span_row_uuid": "01a1be30-2bae-74d2-9113-78bc68a74a93",
+        "trace_id_hex": "214ef3d5f15104544ee4c93d8d0a0465",
+        "span_id_hex": "31d4168efa4aeb6d",
+        "parent_span_id_hex": "0000000000000000",
+        "is_root_span": true,
+        "service": "mikka-web",
+        "environment": "dev",
+        "service_version": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+        "stage": "GET /api/trace-benchmark",
+        "status_code": 2,
+        "duration_ms": 8.79,
+        "route": "/api/trace-benchmark",
+        "method": "GET",
+        "http_status": 500.0,
+        "db_system": null,
+        "db_operation": null,
+        "statement_id": null,
+        "sample_rate": 1.0,
+        "retention": "error_or_slow",
+        "critical_raw": false,
+        "error_type": "CodedError",
+        "error_code": "trace_acceptance_failed",
+        "error_detail": "controlled_database_failure",
+        "error_causes": "CodedError:trace_acceptance_failed:controlled_database_failure > error:22012",
+        "_rawBooleanFields": {
+          "is_root_span": "True",
+          "critical_raw": "false"
+        }
+      },
+      "pgErrorMetadata": [
+        {
+          "spanId": "317d1f8d972d0e22",
+          "errorCode": null,
+          "errorType": null
+        }
+      ],
+      "checks": {
+        "exactLocalSpanSet": true,
+        "spanPhysicalAndUniqueCounts": true,
+        "oneActualRoot": true,
+        "rootHttpFailure": true,
+        "ordinaryRoot": true,
+        "safeRootCodeDetailCause": true,
+        "allSpansEffectiveRateOne": true,
+        "exactPgChildren": true,
+        "onePgError": true,
+        "exactErrorSpanSet": true,
+        "logPhysicalAndUniqueCounts": true,
+        "exactErrorLogSpanSet": true,
+        "allLogsErrorAndSafe": true,
+        "allLogsEffectiveRateOne": true,
+        "rootErrorLogLinked": true,
+        "exactServiceEnvironmentVersion": true
+      },
+      "complete": true
+    },
+    {
+      "traceId": "2e79557078cd398fffba9b521f1cd130",
+      "rootSpanId": "07373826911edaf8",
+      "pgSpanIds": [
+        "1f4880ca1582d38c",
+        "6aa1c114add261b0",
+        "b6c272e3ccebd7af"
+      ],
+      "errorSpanIds": [
+        "07373826911edaf8",
+        "1f4880ca1582d38c"
+      ],
+      "spanRowUuids": [
+        "01a1be30-2bae-74d2-9113-778ff4167f7e",
+        "01a1be30-2bae-74d2-9113-77944c80437a",
+        "01a1be30-2bae-74d2-9113-77af92fa17fe",
+        "01a1be30-2bae-74d2-9113-798da7822ec8"
+      ],
+      "errorLogUuids": [
+        "01a1be30-2d6b-7c80-9467-96e0e8ee6e9a",
+        "01a1be30-2d6b-7c80-9467-96f969cf4254"
+      ],
+      "root": {
+        "started_utc": "2026-11-09T02:43:10.197000Z",
+        "ended_utc": "2026-11-09T02:43:10.201523Z",
+        "span_row_uuid": "01a1be30-2bae-74d2-9113-798da7822ec8",
+        "trace_id_hex": "2e79557078cd398fffba9b521f1cd130",
+        "span_id_hex": "07373826911edaf8",
+        "parent_span_id_hex": "0000000000000000",
+        "is_root_span": true,
+        "service": "mikka-web",
+        "environment": "dev",
+        "service_version": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+        "stage": "GET /api/trace-benchmark",
+        "status_code": 2,
+        "duration_ms": 4.523,
+        "route": "/api/trace-benchmark",
+        "method": "GET",
+        "http_status": 500.0,
+        "db_system": null,
+        "db_operation": null,
+        "statement_id": null,
+        "sample_rate": 1.0,
+        "retention": "error_or_slow",
+        "critical_raw": false,
+        "error_type": "CodedError",
+        "error_code": "trace_acceptance_failed",
+        "error_detail": "controlled_database_failure",
+        "error_causes": "CodedError:trace_acceptance_failed:controlled_database_failure > error:22012",
+        "_rawBooleanFields": {
+          "is_root_span": "True",
+          "critical_raw": "false"
+        }
+      },
+      "pgErrorMetadata": [
+        {
+          "spanId": "1f4880ca1582d38c",
+          "errorCode": null,
+          "errorType": null
+        }
+      ],
+      "checks": {
+        "exactLocalSpanSet": true,
+        "spanPhysicalAndUniqueCounts": true,
+        "oneActualRoot": true,
+        "rootHttpFailure": true,
+        "ordinaryRoot": true,
+        "safeRootCodeDetailCause": true,
+        "allSpansEffectiveRateOne": true,
+        "exactPgChildren": true,
+        "onePgError": true,
+        "exactErrorSpanSet": true,
+        "logPhysicalAndUniqueCounts": true,
+        "exactErrorLogSpanSet": true,
+        "allLogsErrorAndSafe": true,
+        "allLogsEffectiveRateOne": true,
+        "rootErrorLogLinked": true,
+        "exactServiceEnvironmentVersion": true
+      },
+      "complete": true
+    },
+    {
+      "traceId": "2f7c169fa19a3f77b899506ca7df8f7d",
+      "rootSpanId": "55e557e7357871ef",
+      "pgSpanIds": [
+        "3c1db16b2ccfdc0e",
+        "9e62198717ec6e02",
+        "d52ed59488f179f4"
+      ],
+      "errorSpanIds": [
+        "3c1db16b2ccfdc0e",
+        "55e557e7357871ef"
+      ],
+      "spanRowUuids": [
+        "01a1be30-2bad-7480-bf83-1bfb8c9000a4",
+        "01a1be30-2bad-7480-bf83-1c0385d6a0a6",
+        "01a1be30-2bad-7480-bf83-1c18c5fdfa8c",
+        "01a1be30-2bae-74d2-9113-78c2f6e6ccf5"
+      ],
+      "errorLogUuids": [
+        "01a1be30-2d6b-7c80-9467-956c3c30a7ac",
+        "01a1be30-2d6b-7c80-9467-957f1ca1b44b"
+      ],
+      "root": {
+        "started_utc": "2026-11-09T02:43:10.087000Z",
+        "ended_utc": "2026-11-09T02:43:10.100400Z",
+        "span_row_uuid": "01a1be30-2bae-74d2-9113-78c2f6e6ccf5",
+        "trace_id_hex": "2f7c169fa19a3f77b899506ca7df8f7d",
+        "span_id_hex": "55e557e7357871ef",
+        "parent_span_id_hex": "0000000000000000",
+        "is_root_span": true,
+        "service": "mikka-web",
+        "environment": "dev",
+        "service_version": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+        "stage": "GET /api/trace-benchmark",
+        "status_code": 2,
+        "duration_ms": 13.4,
+        "route": "/api/trace-benchmark",
+        "method": "GET",
+        "http_status": 500.0,
+        "db_system": null,
+        "db_operation": null,
+        "statement_id": null,
+        "sample_rate": 1.0,
+        "retention": "error_or_slow",
+        "critical_raw": false,
+        "error_type": "CodedError",
+        "error_code": "trace_acceptance_failed",
+        "error_detail": "controlled_database_failure",
+        "error_causes": "CodedError:trace_acceptance_failed:controlled_database_failure > error:22012",
+        "_rawBooleanFields": {
+          "is_root_span": "True",
+          "critical_raw": "false"
+        }
+      },
+      "pgErrorMetadata": [
+        {
+          "spanId": "3c1db16b2ccfdc0e",
+          "errorCode": null,
+          "errorType": null
+        }
+      ],
+      "checks": {
+        "exactLocalSpanSet": true,
+        "spanPhysicalAndUniqueCounts": true,
+        "oneActualRoot": true,
+        "rootHttpFailure": true,
+        "ordinaryRoot": true,
+        "safeRootCodeDetailCause": true,
+        "allSpansEffectiveRateOne": true,
+        "exactPgChildren": true,
+        "onePgError": true,
+        "exactErrorSpanSet": true,
+        "logPhysicalAndUniqueCounts": true,
+        "exactErrorLogSpanSet": true,
+        "allLogsErrorAndSafe": true,
+        "allLogsEffectiveRateOne": true,
+        "rootErrorLogLinked": true,
+        "exactServiceEnvironmentVersion": true
+      },
+      "complete": true
+    },
+    {
+      "traceId": "42170c9357e9d05a66a874e69fc1615d",
+      "rootSpanId": "3339b8d138e311da",
+      "pgSpanIds": [
+        "6dd20538543ca656",
+        "ab74f0a4b4313301",
+        "e34601f812de328b"
+      ],
+      "errorSpanIds": [
+        "3339b8d138e311da",
+        "6dd20538543ca656"
+      ],
+      "spanRowUuids": [
+        "01a1be30-2bae-74d2-9113-76f2cda0842c",
+        "01a1be30-2bae-74d2-9113-770b22fceb49",
+        "01a1be30-2bae-74d2-9113-771de859bca3",
+        "01a1be30-2bae-74d2-9113-7954dab2542f"
+      ],
+      "errorLogUuids": [
+        "01a1be30-2d6b-7c80-9467-968477591374",
+        "01a1be30-2d6b-7c80-9467-96989dbf311b"
+      ],
+      "root": {
+        "started_utc": "2026-11-09T02:43:10.178000Z",
+        "ended_utc": "2026-11-09T02:43:10.183370Z",
+        "span_row_uuid": "01a1be30-2bae-74d2-9113-7954dab2542f",
+        "trace_id_hex": "42170c9357e9d05a66a874e69fc1615d",
+        "span_id_hex": "3339b8d138e311da",
+        "parent_span_id_hex": "0000000000000000",
+        "is_root_span": true,
+        "service": "mikka-web",
+        "environment": "dev",
+        "service_version": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+        "stage": "GET /api/trace-benchmark",
+        "status_code": 2,
+        "duration_ms": 5.37,
+        "route": "/api/trace-benchmark",
+        "method": "GET",
+        "http_status": 500.0,
+        "db_system": null,
+        "db_operation": null,
+        "statement_id": null,
+        "sample_rate": 1.0,
+        "retention": "error_or_slow",
+        "critical_raw": false,
+        "error_type": "CodedError",
+        "error_code": "trace_acceptance_failed",
+        "error_detail": "controlled_database_failure",
+        "error_causes": "CodedError:trace_acceptance_failed:controlled_database_failure > error:22012",
+        "_rawBooleanFields": {
+          "is_root_span": "True",
+          "critical_raw": "false"
+        }
+      },
+      "pgErrorMetadata": [
+        {
+          "spanId": "6dd20538543ca656",
+          "errorCode": null,
+          "errorType": null
+        }
+      ],
+      "checks": {
+        "exactLocalSpanSet": true,
+        "spanPhysicalAndUniqueCounts": true,
+        "oneActualRoot": true,
+        "rootHttpFailure": true,
+        "ordinaryRoot": true,
+        "safeRootCodeDetailCause": true,
+        "allSpansEffectiveRateOne": true,
+        "exactPgChildren": true,
+        "onePgError": true,
+        "exactErrorSpanSet": true,
+        "logPhysicalAndUniqueCounts": true,
+        "exactErrorLogSpanSet": true,
+        "allLogsErrorAndSafe": true,
+        "allLogsEffectiveRateOne": true,
+        "rootErrorLogLinked": true,
+        "exactServiceEnvironmentVersion": true
+      },
+      "complete": true
+    },
+    {
+      "traceId": "570a22f1d589534befe0d4dad97c87c6",
+      "rootSpanId": "088f015527430dc0",
+      "pgSpanIds": [
+        "0bf9846c7d6f93e3",
+        "4c5d38f52e54d376",
+        "baa975b1870dae27"
+      ],
+      "errorSpanIds": [
+        "088f015527430dc0",
+        "0bf9846c7d6f93e3"
+      ],
+      "spanRowUuids": [
+        "01a1be30-2bad-7480-bf83-1b97625ac609",
+        "01a1be30-2bad-7480-bf83-1ba495bce2d0",
+        "01a1be30-2bad-7480-bf83-1bb89ccd9e4a",
+        "01a1be30-2bae-74d2-9113-78a89955bc16"
+      ],
+      "errorLogUuids": [
+        "01a1be30-2d6b-7c80-9467-952158dbb8d1",
+        "01a1be30-2d6b-7c80-9467-9533ded8e4a6"
+      ],
+      "root": {
+        "started_utc": "2026-11-09T02:43:10.057000Z",
+        "ended_utc": "2026-11-09T02:43:10.063133Z",
+        "span_row_uuid": "01a1be30-2bae-74d2-9113-78a89955bc16",
+        "trace_id_hex": "570a22f1d589534befe0d4dad97c87c6",
+        "span_id_hex": "088f015527430dc0",
+        "parent_span_id_hex": "0000000000000000",
+        "is_root_span": true,
+        "service": "mikka-web",
+        "environment": "dev",
+        "service_version": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+        "stage": "GET /api/trace-benchmark",
+        "status_code": 2,
+        "duration_ms": 6.133,
+        "route": "/api/trace-benchmark",
+        "method": "GET",
+        "http_status": 500.0,
+        "db_system": null,
+        "db_operation": null,
+        "statement_id": null,
+        "sample_rate": 1.0,
+        "retention": "error_or_slow",
+        "critical_raw": false,
+        "error_type": "CodedError",
+        "error_code": "trace_acceptance_failed",
+        "error_detail": "controlled_database_failure",
+        "error_causes": "CodedError:trace_acceptance_failed:controlled_database_failure > error:22012",
+        "_rawBooleanFields": {
+          "is_root_span": "True",
+          "critical_raw": "false"
+        }
+      },
+      "pgErrorMetadata": [
+        {
+          "spanId": "0bf9846c7d6f93e3",
+          "errorCode": null,
+          "errorType": null
+        }
+      ],
+      "checks": {
+        "exactLocalSpanSet": true,
+        "spanPhysicalAndUniqueCounts": true,
+        "oneActualRoot": true,
+        "rootHttpFailure": true,
+        "ordinaryRoot": true,
+        "safeRootCodeDetailCause": true,
+        "allSpansEffectiveRateOne": true,
+        "exactPgChildren": true,
+        "onePgError": true,
+        "exactErrorSpanSet": true,
+        "logPhysicalAndUniqueCounts": true,
+        "exactErrorLogSpanSet": true,
+        "allLogsErrorAndSafe": true,
+        "allLogsEffectiveRateOne": true,
+        "rootErrorLogLinked": true,
+        "exactServiceEnvironmentVersion": true
+      },
+      "complete": true
+    },
+    {
+      "traceId": "58ed88c9d5faa22053ce3bbd25850747",
+      "rootSpanId": "a12488869d632180",
+      "pgSpanIds": [
+        "22661d540c1e8ef3",
+        "3063d88cc86c61bb",
+        "dfd2624f57955080"
+      ],
+      "errorSpanIds": [
+        "22661d540c1e8ef3",
+        "a12488869d632180"
+      ],
+      "spanRowUuids": [
+        "01a1be30-2bad-7480-bf83-1d1aadc9f635",
+        "01a1be30-2bad-7480-bf83-1d2b09dfe87e",
+        "01a1be30-2bae-74d2-9113-768434f92849",
+        "01a1be30-2bae-74d2-9113-792b7373c12a"
+      ],
+      "errorLogUuids": [
+        "01a1be30-2d6b-7c80-9467-962daef508db",
+        "01a1be30-2d6b-7c80-9467-963bcbaad986"
+      ],
+      "root": {
+        "started_utc": "2026-11-09T02:43:10.154000Z",
+        "ended_utc": "2026-11-09T02:43:10.160475Z",
+        "span_row_uuid": "01a1be30-2bae-74d2-9113-792b7373c12a",
+        "trace_id_hex": "58ed88c9d5faa22053ce3bbd25850747",
+        "span_id_hex": "a12488869d632180",
+        "parent_span_id_hex": "0000000000000000",
+        "is_root_span": true,
+        "service": "mikka-web",
+        "environment": "dev",
+        "service_version": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+        "stage": "GET /api/trace-benchmark",
+        "status_code": 2,
+        "duration_ms": 6.475,
+        "route": "/api/trace-benchmark",
+        "method": "GET",
+        "http_status": 500.0,
+        "db_system": null,
+        "db_operation": null,
+        "statement_id": null,
+        "sample_rate": 1.0,
+        "retention": "error_or_slow",
+        "critical_raw": false,
+        "error_type": "CodedError",
+        "error_code": "trace_acceptance_failed",
+        "error_detail": "controlled_database_failure",
+        "error_causes": "CodedError:trace_acceptance_failed:controlled_database_failure > error:22012",
+        "_rawBooleanFields": {
+          "is_root_span": "True",
+          "critical_raw": "false"
+        }
+      },
+      "pgErrorMetadata": [
+        {
+          "spanId": "22661d540c1e8ef3",
+          "errorCode": null,
+          "errorType": null
+        }
+      ],
+      "checks": {
+        "exactLocalSpanSet": true,
+        "spanPhysicalAndUniqueCounts": true,
+        "oneActualRoot": true,
+        "rootHttpFailure": true,
+        "ordinaryRoot": true,
+        "safeRootCodeDetailCause": true,
+        "allSpansEffectiveRateOne": true,
+        "exactPgChildren": true,
+        "onePgError": true,
+        "exactErrorSpanSet": true,
+        "logPhysicalAndUniqueCounts": true,
+        "exactErrorLogSpanSet": true,
+        "allLogsErrorAndSafe": true,
+        "allLogsEffectiveRateOne": true,
+        "rootErrorLogLinked": true,
+        "exactServiceEnvironmentVersion": true
+      },
+      "complete": true
+    },
+    {
+      "traceId": "5b8b4c28b5ba2e13335411ba0701c903",
+      "rootSpanId": "a843952be7f5fbea",
+      "pgSpanIds": [
+        "192c2e5a61e0a6ff",
+        "2c97f4a8e0adfd5b",
+        "d693ec3570142c8c"
+      ],
+      "errorSpanIds": [
+        "a843952be7f5fbea",
+        "d693ec3570142c8c"
+      ],
+      "spanRowUuids": [
+        "01a1be30-2bad-7480-bf83-1cbb3c5360e3",
+        "01a1be30-2bad-7480-bf83-1cce587cfc65",
+        "01a1be30-2bad-7480-bf83-1cd1638573d7",
+        "01a1be30-2bae-74d2-9113-7903096ebaf2"
+      ],
+      "errorLogUuids": [
+        "01a1be30-2d6b-7c80-9467-95e055882beb",
+        "01a1be30-2d6b-7c80-9467-95f2afb7456b"
+      ],
+      "root": {
+        "started_utc": "2026-11-09T02:43:10.139000Z",
+        "ended_utc": "2026-11-09T02:43:10.145222Z",
+        "span_row_uuid": "01a1be30-2bae-74d2-9113-7903096ebaf2",
+        "trace_id_hex": "5b8b4c28b5ba2e13335411ba0701c903",
+        "span_id_hex": "a843952be7f5fbea",
+        "parent_span_id_hex": "0000000000000000",
+        "is_root_span": true,
+        "service": "mikka-web",
+        "environment": "dev",
+        "service_version": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+        "stage": "GET /api/trace-benchmark",
+        "status_code": 2,
+        "duration_ms": 6.222,
+        "route": "/api/trace-benchmark",
+        "method": "GET",
+        "http_status": 500.0,
+        "db_system": null,
+        "db_operation": null,
+        "statement_id": null,
+        "sample_rate": 1.0,
+        "retention": "error_or_slow",
+        "critical_raw": false,
+        "error_type": "CodedError",
+        "error_code": "trace_acceptance_failed",
+        "error_detail": "controlled_database_failure",
+        "error_causes": "CodedError:trace_acceptance_failed:controlled_database_failure > error:22012",
+        "_rawBooleanFields": {
+          "is_root_span": "True",
+          "critical_raw": "false"
+        }
+      },
+      "pgErrorMetadata": [
+        {
+          "spanId": "d693ec3570142c8c",
+          "errorCode": null,
+          "errorType": null
+        }
+      ],
+      "checks": {
+        "exactLocalSpanSet": true,
+        "spanPhysicalAndUniqueCounts": true,
+        "oneActualRoot": true,
+        "rootHttpFailure": true,
+        "ordinaryRoot": true,
+        "safeRootCodeDetailCause": true,
+        "allSpansEffectiveRateOne": true,
+        "exactPgChildren": true,
+        "onePgError": true,
+        "exactErrorSpanSet": true,
+        "logPhysicalAndUniqueCounts": true,
+        "exactErrorLogSpanSet": true,
+        "allLogsErrorAndSafe": true,
+        "allLogsEffectiveRateOne": true,
+        "rootErrorLogLinked": true,
+        "exactServiceEnvironmentVersion": true
+      },
+      "complete": true
+    },
+    {
+      "traceId": "7030ffd78b98df3e6abcd922eeeedc1f",
+      "rootSpanId": "ff66008764c97a04",
+      "pgSpanIds": [
+        "6dcdb9d3cfb11699",
+        "bd4eae99e6c23aa5",
+        "f8ddeef3093ce031"
+      ],
+      "errorSpanIds": [
+        "bd4eae99e6c23aa5",
+        "ff66008764c97a04"
+      ],
+      "spanRowUuids": [
+        "01a1be30-2bae-74d2-9113-76ca0fd26967",
+        "01a1be30-2bae-74d2-9113-76d1bd9f5228",
+        "01a1be30-2bae-74d2-9113-76e5db1f1881",
+        "01a1be30-2bae-74d2-9113-794afd153d9d"
+      ],
+      "errorLogUuids": [
+        "01a1be30-2d6b-7c80-9467-96653977844a",
+        "01a1be30-2d6b-7c80-9467-9676cfd21d26"
+      ],
+      "root": {
+        "started_utc": "2026-11-09T02:43:10.170000Z",
+        "ended_utc": "2026-11-09T02:43:10.175380Z",
+        "span_row_uuid": "01a1be30-2bae-74d2-9113-794afd153d9d",
+        "trace_id_hex": "7030ffd78b98df3e6abcd922eeeedc1f",
+        "span_id_hex": "ff66008764c97a04",
+        "parent_span_id_hex": "0000000000000000",
+        "is_root_span": true,
+        "service": "mikka-web",
+        "environment": "dev",
+        "service_version": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+        "stage": "GET /api/trace-benchmark",
+        "status_code": 2,
+        "duration_ms": 5.38,
+        "route": "/api/trace-benchmark",
+        "method": "GET",
+        "http_status": 500.0,
+        "db_system": null,
+        "db_operation": null,
+        "statement_id": null,
+        "sample_rate": 1.0,
+        "retention": "error_or_slow",
+        "critical_raw": false,
+        "error_type": "CodedError",
+        "error_code": "trace_acceptance_failed",
+        "error_detail": "controlled_database_failure",
+        "error_causes": "CodedError:trace_acceptance_failed:controlled_database_failure > error:22012",
+        "_rawBooleanFields": {
+          "is_root_span": "True",
+          "critical_raw": "false"
+        }
+      },
+      "pgErrorMetadata": [
+        {
+          "spanId": "bd4eae99e6c23aa5",
+          "errorCode": null,
+          "errorType": null
+        }
+      ],
+      "checks": {
+        "exactLocalSpanSet": true,
+        "spanPhysicalAndUniqueCounts": true,
+        "oneActualRoot": true,
+        "rootHttpFailure": true,
+        "ordinaryRoot": true,
+        "safeRootCodeDetailCause": true,
+        "allSpansEffectiveRateOne": true,
+        "exactPgChildren": true,
+        "onePgError": true,
+        "exactErrorSpanSet": true,
+        "logPhysicalAndUniqueCounts": true,
+        "exactErrorLogSpanSet": true,
+        "allLogsErrorAndSafe": true,
+        "allLogsEffectiveRateOne": true,
+        "rootErrorLogLinked": true,
+        "exactServiceEnvironmentVersion": true
+      },
+      "complete": true
+    },
+    {
+      "traceId": "75dc3064bde7124904087f98e5b05cb8",
+      "rootSpanId": "ab3c610aecd7fc97",
+      "pgSpanIds": [
+        "2080d247d8c24918",
+        "257263ba999722c8",
+        "771e7d2d7471d3cd"
+      ],
+      "errorSpanIds": [
+        "257263ba999722c8",
+        "ab3c610aecd7fc97"
+      ],
+      "spanRowUuids": [
+        "01a1be30-2bae-74d2-9113-769208fe0d7e",
+        "01a1be30-2bae-74d2-9113-76a7da358f33",
+        "01a1be30-2bae-74d2-9113-76b2bf6b2f6f",
+        "01a1be30-2bae-74d2-9113-793b311261b8"
+      ],
+      "errorLogUuids": [
+        "01a1be30-2d6b-7c80-9467-964369ab8774",
+        "01a1be30-2d6b-7c80-9467-965da308a759"
+      ],
+      "root": {
+        "started_utc": "2026-11-09T02:43:10.163000Z",
+        "ended_utc": "2026-11-09T02:43:10.168583Z",
+        "span_row_uuid": "01a1be30-2bae-74d2-9113-793b311261b8",
+        "trace_id_hex": "75dc3064bde7124904087f98e5b05cb8",
+        "span_id_hex": "ab3c610aecd7fc97",
+        "parent_span_id_hex": "0000000000000000",
+        "is_root_span": true,
+        "service": "mikka-web",
+        "environment": "dev",
+        "service_version": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+        "stage": "GET /api/trace-benchmark",
+        "status_code": 2,
+        "duration_ms": 5.583,
+        "route": "/api/trace-benchmark",
+        "method": "GET",
+        "http_status": 500.0,
+        "db_system": null,
+        "db_operation": null,
+        "statement_id": null,
+        "sample_rate": 1.0,
+        "retention": "error_or_slow",
+        "critical_raw": false,
+        "error_type": "CodedError",
+        "error_code": "trace_acceptance_failed",
+        "error_detail": "controlled_database_failure",
+        "error_causes": "CodedError:trace_acceptance_failed:controlled_database_failure > error:22012",
+        "_rawBooleanFields": {
+          "is_root_span": "True",
+          "critical_raw": "false"
+        }
+      },
+      "pgErrorMetadata": [
+        {
+          "spanId": "257263ba999722c8",
+          "errorCode": null,
+          "errorType": null
+        }
+      ],
+      "checks": {
+        "exactLocalSpanSet": true,
+        "spanPhysicalAndUniqueCounts": true,
+        "oneActualRoot": true,
+        "rootHttpFailure": true,
+        "ordinaryRoot": true,
+        "safeRootCodeDetailCause": true,
+        "allSpansEffectiveRateOne": true,
+        "exactPgChildren": true,
+        "onePgError": true,
+        "exactErrorSpanSet": true,
+        "logPhysicalAndUniqueCounts": true,
+        "exactErrorLogSpanSet": true,
+        "allLogsErrorAndSafe": true,
+        "allLogsEffectiveRateOne": true,
+        "rootErrorLogLinked": true,
+        "exactServiceEnvironmentVersion": true
+      },
+      "complete": true
+    },
+    {
+      "traceId": "7de6056348d9c1cab657ed06b3f8449a",
+      "rootSpanId": "1c2cf313d032627f",
+      "pgSpanIds": [
+        "07af5aade18a7f4a",
+        "124b9e2f432601c5",
+        "1e2041f0ed378225"
+      ],
+      "errorSpanIds": [
+        "1c2cf313d032627f",
+        "1e2041f0ed378225"
+      ],
+      "spanRowUuids": [
+        "01a1be30-2bae-74d2-9113-784e508d5af9",
+        "01a1be30-2bae-74d2-9113-78567da5e320",
+        "01a1be30-2bae-74d2-9113-786e489f8f81",
+        "01a1be30-2bae-74d2-9113-79c568b8d031"
+      ],
+      "errorLogUuids": [
+        "01a1be30-2d6b-7c80-9467-9766ee57812a",
+        "01a1be30-2d6b-7c80-9467-977cac61175f"
+      ],
+      "root": {
+        "started_utc": "2026-11-09T02:43:10.221000Z",
+        "ended_utc": "2026-11-09T02:43:10.225972Z",
+        "span_row_uuid": "01a1be30-2bae-74d2-9113-79c568b8d031",
+        "trace_id_hex": "7de6056348d9c1cab657ed06b3f8449a",
+        "span_id_hex": "1c2cf313d032627f",
+        "parent_span_id_hex": "0000000000000000",
+        "is_root_span": true,
+        "service": "mikka-web",
+        "environment": "dev",
+        "service_version": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+        "stage": "GET /api/trace-benchmark",
+        "status_code": 2,
+        "duration_ms": 4.972,
+        "route": "/api/trace-benchmark",
+        "method": "GET",
+        "http_status": 500.0,
+        "db_system": null,
+        "db_operation": null,
+        "statement_id": null,
+        "sample_rate": 1.0,
+        "retention": "error_or_slow",
+        "critical_raw": false,
+        "error_type": "CodedError",
+        "error_code": "trace_acceptance_failed",
+        "error_detail": "controlled_database_failure",
+        "error_causes": "CodedError:trace_acceptance_failed:controlled_database_failure > error:22012",
+        "_rawBooleanFields": {
+          "is_root_span": "True",
+          "critical_raw": "false"
+        }
+      },
+      "pgErrorMetadata": [
+        {
+          "spanId": "1e2041f0ed378225",
+          "errorCode": null,
+          "errorType": null
+        }
+      ],
+      "checks": {
+        "exactLocalSpanSet": true,
+        "spanPhysicalAndUniqueCounts": true,
+        "oneActualRoot": true,
+        "rootHttpFailure": true,
+        "ordinaryRoot": true,
+        "safeRootCodeDetailCause": true,
+        "allSpansEffectiveRateOne": true,
+        "exactPgChildren": true,
+        "onePgError": true,
+        "exactErrorSpanSet": true,
+        "logPhysicalAndUniqueCounts": true,
+        "exactErrorLogSpanSet": true,
+        "allLogsErrorAndSafe": true,
+        "allLogsEffectiveRateOne": true,
+        "rootErrorLogLinked": true,
+        "exactServiceEnvironmentVersion": true
+      },
+      "complete": true
+    },
+    {
+      "traceId": "8063811ce484c0b392f49fec65e1e427",
+      "rootSpanId": "330c54563d35f077",
+      "pgSpanIds": [
+        "666974edf3ffde6d",
+        "b048868eed31ca71",
+        "b39541dda34119fb"
+      ],
+      "errorSpanIds": [
+        "330c54563d35f077",
+        "666974edf3ffde6d"
+      ],
+      "spanRowUuids": [
+        "01a1be30-2bae-74d2-9113-781fbafdf3a1",
+        "01a1be30-2bae-74d2-9113-782977c8c496",
+        "01a1be30-2bae-74d2-9113-783c08c19e04",
+        "01a1be30-2bae-74d2-9113-79b4aff08497"
+      ],
+      "errorLogUuids": [
+        "01a1be30-2d6b-7c80-9467-97485900cd64",
+        "01a1be30-2d6b-7c80-9467-9756838ef296"
+      ],
+      "root": {
+        "started_utc": "2026-11-09T02:43:10.215000Z",
+        "ended_utc": "2026-11-09T02:43:10.220125Z",
+        "span_row_uuid": "01a1be30-2bae-74d2-9113-79b4aff08497",
+        "trace_id_hex": "8063811ce484c0b392f49fec65e1e427",
+        "span_id_hex": "330c54563d35f077",
+        "parent_span_id_hex": "0000000000000000",
+        "is_root_span": true,
+        "service": "mikka-web",
+        "environment": "dev",
+        "service_version": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+        "stage": "GET /api/trace-benchmark",
+        "status_code": 2,
+        "duration_ms": 5.125,
+        "route": "/api/trace-benchmark",
+        "method": "GET",
+        "http_status": 500.0,
+        "db_system": null,
+        "db_operation": null,
+        "statement_id": null,
+        "sample_rate": 1.0,
+        "retention": "error_or_slow",
+        "critical_raw": false,
+        "error_type": "CodedError",
+        "error_code": "trace_acceptance_failed",
+        "error_detail": "controlled_database_failure",
+        "error_causes": "CodedError:trace_acceptance_failed:controlled_database_failure > error:22012",
+        "_rawBooleanFields": {
+          "is_root_span": "True",
+          "critical_raw": "false"
+        }
+      },
+      "pgErrorMetadata": [
+        {
+          "spanId": "666974edf3ffde6d",
+          "errorCode": null,
+          "errorType": null
+        }
+      ],
+      "checks": {
+        "exactLocalSpanSet": true,
+        "spanPhysicalAndUniqueCounts": true,
+        "oneActualRoot": true,
+        "rootHttpFailure": true,
+        "ordinaryRoot": true,
+        "safeRootCodeDetailCause": true,
+        "allSpansEffectiveRateOne": true,
+        "exactPgChildren": true,
+        "onePgError": true,
+        "exactErrorSpanSet": true,
+        "logPhysicalAndUniqueCounts": true,
+        "exactErrorLogSpanSet": true,
+        "allLogsErrorAndSafe": true,
+        "allLogsEffectiveRateOne": true,
+        "rootErrorLogLinked": true,
+        "exactServiceEnvironmentVersion": true
+      },
+      "complete": true
+    },
+    {
+      "traceId": "a5b501b3cb2f80fad9a2e96e65ef6eee",
+      "rootSpanId": "6fd4473913886f22",
+      "pgSpanIds": [
+        "8bd60396598844ac",
+        "c06b8af847d2a3c4",
+        "c48d8486847ada0e"
+      ],
+      "errorSpanIds": [
+        "6fd4473913886f22",
+        "8bd60396598844ac"
+      ],
+      "spanRowUuids": [
+        "01a1be30-2bae-74d2-9113-7871fcaedb08",
+        "01a1be30-2bae-74d2-9113-788a3886bd1c",
+        "01a1be30-2bae-74d2-9113-7894949785b5",
+        "01a1be30-2bae-74d2-9113-79d17b75f91e"
+      ],
+      "errorLogUuids": [
+        "01a1be30-2d6b-7c80-9467-9784d73a5895",
+        "01a1be30-2d6b-7c80-9467-979b97bdf444"
+      ],
+      "root": {
+        "started_utc": "2026-11-09T02:43:10.227000Z",
+        "ended_utc": "2026-11-09T02:43:10.232455Z",
+        "span_row_uuid": "01a1be30-2bae-74d2-9113-79d17b75f91e",
+        "trace_id_hex": "a5b501b3cb2f80fad9a2e96e65ef6eee",
+        "span_id_hex": "6fd4473913886f22",
+        "parent_span_id_hex": "0000000000000000",
+        "is_root_span": true,
+        "service": "mikka-web",
+        "environment": "dev",
+        "service_version": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+        "stage": "GET /api/trace-benchmark",
+        "status_code": 2,
+        "duration_ms": 5.455,
+        "route": "/api/trace-benchmark",
+        "method": "GET",
+        "http_status": 500.0,
+        "db_system": null,
+        "db_operation": null,
+        "statement_id": null,
+        "sample_rate": 1.0,
+        "retention": "error_or_slow",
+        "critical_raw": false,
+        "error_type": "CodedError",
+        "error_code": "trace_acceptance_failed",
+        "error_detail": "controlled_database_failure",
+        "error_causes": "CodedError:trace_acceptance_failed:controlled_database_failure > error:22012",
+        "_rawBooleanFields": {
+          "is_root_span": "True",
+          "critical_raw": "false"
+        }
+      },
+      "pgErrorMetadata": [
+        {
+          "spanId": "8bd60396598844ac",
+          "errorCode": null,
+          "errorType": null
+        }
+      ],
+      "checks": {
+        "exactLocalSpanSet": true,
+        "spanPhysicalAndUniqueCounts": true,
+        "oneActualRoot": true,
+        "rootHttpFailure": true,
+        "ordinaryRoot": true,
+        "safeRootCodeDetailCause": true,
+        "allSpansEffectiveRateOne": true,
+        "exactPgChildren": true,
+        "onePgError": true,
+        "exactErrorSpanSet": true,
+        "logPhysicalAndUniqueCounts": true,
+        "exactErrorLogSpanSet": true,
+        "allLogsErrorAndSafe": true,
+        "allLogsEffectiveRateOne": true,
+        "rootErrorLogLinked": true,
+        "exactServiceEnvironmentVersion": true
+      },
+      "complete": true
+    },
+    {
+      "traceId": "c94701a417b50a28405e753ddf45cd11",
+      "rootSpanId": "d1fe8aeeca9030d6",
+      "pgSpanIds": [
+        "1e1c656ffc4a06f7",
+        "3048a82f99e291b1",
+        "56daa393713225f1"
+      ],
+      "errorSpanIds": [
+        "1e1c656ffc4a06f7",
+        "d1fe8aeeca9030d6"
+      ],
+      "spanRowUuids": [
+        "01a1be30-2bad-7480-bf83-1ce3bfe90064",
+        "01a1be30-2bad-7480-bf83-1cf393bb697c",
+        "01a1be30-2bad-7480-bf83-1d03123bf889",
+        "01a1be30-2bae-74d2-9113-7917064bad9b"
+      ],
+      "errorLogUuids": [
+        "01a1be30-2d6b-7c80-9467-960caf33db45",
+        "01a1be30-2d6b-7c80-9467-961e87988bcf"
+      ],
+      "root": {
+        "started_utc": "2026-11-09T02:43:10.147000Z",
+        "ended_utc": "2026-11-09T02:43:10.152409Z",
+        "span_row_uuid": "01a1be30-2bae-74d2-9113-7917064bad9b",
+        "trace_id_hex": "c94701a417b50a28405e753ddf45cd11",
+        "span_id_hex": "d1fe8aeeca9030d6",
+        "parent_span_id_hex": "0000000000000000",
+        "is_root_span": true,
+        "service": "mikka-web",
+        "environment": "dev",
+        "service_version": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+        "stage": "GET /api/trace-benchmark",
+        "status_code": 2,
+        "duration_ms": 5.409,
+        "route": "/api/trace-benchmark",
+        "method": "GET",
+        "http_status": 500.0,
+        "db_system": null,
+        "db_operation": null,
+        "statement_id": null,
+        "sample_rate": 1.0,
+        "retention": "error_or_slow",
+        "critical_raw": false,
+        "error_type": "CodedError",
+        "error_code": "trace_acceptance_failed",
+        "error_detail": "controlled_database_failure",
+        "error_causes": "CodedError:trace_acceptance_failed:controlled_database_failure > error:22012",
+        "_rawBooleanFields": {
+          "is_root_span": "True",
+          "critical_raw": "false"
+        }
+      },
+      "pgErrorMetadata": [
+        {
+          "spanId": "1e1c656ffc4a06f7",
+          "errorCode": null,
+          "errorType": null
+        }
+      ],
+      "checks": {
+        "exactLocalSpanSet": true,
+        "spanPhysicalAndUniqueCounts": true,
+        "oneActualRoot": true,
+        "rootHttpFailure": true,
+        "ordinaryRoot": true,
+        "safeRootCodeDetailCause": true,
+        "allSpansEffectiveRateOne": true,
+        "exactPgChildren": true,
+        "onePgError": true,
+        "exactErrorSpanSet": true,
+        "logPhysicalAndUniqueCounts": true,
+        "exactErrorLogSpanSet": true,
+        "allLogsErrorAndSafe": true,
+        "allLogsEffectiveRateOne": true,
+        "rootErrorLogLinked": true,
+        "exactServiceEnvironmentVersion": true
+      },
+      "complete": true
+    },
+    {
+      "traceId": "cb4cd300706d382dd5479cdc11590568",
+      "rootSpanId": "e6d0cbecadec26cf",
+      "pgSpanIds": [
+        "0f63ad96ade40f67",
+        "6df61317c7da2177",
+        "f7912aaa11d6ee97"
+      ],
+      "errorSpanIds": [
+        "6df61317c7da2177",
+        "e6d0cbecadec26cf"
+      ],
+      "spanRowUuids": [
+        "01a1be30-2bad-7480-bf83-1c2ffa5d301d",
+        "01a1be30-2bad-7480-bf83-1c3015f2e360",
+        "01a1be30-2bad-7480-bf83-1c4e586f7353",
+        "01a1be30-2bae-74d2-9113-78d7691ef66c"
+      ],
+      "errorLogUuids": [
+        "01a1be30-2d6b-7c80-9467-9588d2fb0592",
+        "01a1be30-2d6b-7c80-9467-9595a4314245"
+      ],
+      "root": {
+        "started_utc": "2026-11-09T02:43:10.103000Z",
+        "ended_utc": "2026-11-09T02:43:10.114726Z",
+        "span_row_uuid": "01a1be30-2bae-74d2-9113-78d7691ef66c",
+        "trace_id_hex": "cb4cd300706d382dd5479cdc11590568",
+        "span_id_hex": "e6d0cbecadec26cf",
+        "parent_span_id_hex": "0000000000000000",
+        "is_root_span": true,
+        "service": "mikka-web",
+        "environment": "dev",
+        "service_version": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+        "stage": "GET /api/trace-benchmark",
+        "status_code": 2,
+        "duration_ms": 11.726,
+        "route": "/api/trace-benchmark",
+        "method": "GET",
+        "http_status": 500.0,
+        "db_system": null,
+        "db_operation": null,
+        "statement_id": null,
+        "sample_rate": 1.0,
+        "retention": "error_or_slow",
+        "critical_raw": false,
+        "error_type": "CodedError",
+        "error_code": "trace_acceptance_failed",
+        "error_detail": "controlled_database_failure",
+        "error_causes": "CodedError:trace_acceptance_failed:controlled_database_failure > error:22012",
+        "_rawBooleanFields": {
+          "is_root_span": "True",
+          "critical_raw": "false"
+        }
+      },
+      "pgErrorMetadata": [
+        {
+          "spanId": "6df61317c7da2177",
+          "errorCode": null,
+          "errorType": null
+        }
+      ],
+      "checks": {
+        "exactLocalSpanSet": true,
+        "spanPhysicalAndUniqueCounts": true,
+        "oneActualRoot": true,
+        "rootHttpFailure": true,
+        "ordinaryRoot": true,
+        "safeRootCodeDetailCause": true,
+        "allSpansEffectiveRateOne": true,
+        "exactPgChildren": true,
+        "onePgError": true,
+        "exactErrorSpanSet": true,
+        "logPhysicalAndUniqueCounts": true,
+        "exactErrorLogSpanSet": true,
+        "allLogsErrorAndSafe": true,
+        "allLogsEffectiveRateOne": true,
+        "rootErrorLogLinked": true,
+        "exactServiceEnvironmentVersion": true
+      },
+      "complete": true
+    },
+    {
+      "traceId": "f57d8fe0f040c11885c9cb01261a5ca7",
+      "rootSpanId": "8c3b344c89665d85",
+      "pgSpanIds": [
+        "1fa57778882b8563",
+        "41ddb5ac00475593",
+        "c582db086f2abf55"
+      ],
+      "errorSpanIds": [
+        "8c3b344c89665d85",
+        "c582db086f2abf55"
+      ],
+      "spanRowUuids": [
+        "01a1be30-2bad-7480-bf83-1c5d9a19a776",
+        "01a1be30-2bad-7480-bf83-1c63682b5bda",
+        "01a1be30-2bad-7480-bf83-1c7314fbd9fa",
+        "01a1be30-2bae-74d2-9113-78e1d5b510ef"
+      ],
+      "errorLogUuids": [
+        "01a1be30-2d6b-7c80-9467-95a3c9c9e3d1",
+        "01a1be30-2d6b-7c80-9467-95bd897dcac5"
+      ],
+      "root": {
+        "started_utc": "2026-11-09T02:43:10.118000Z",
+        "ended_utc": "2026-11-09T02:43:10.126300Z",
+        "span_row_uuid": "01a1be30-2bae-74d2-9113-78e1d5b510ef",
+        "trace_id_hex": "f57d8fe0f040c11885c9cb01261a5ca7",
+        "span_id_hex": "8c3b344c89665d85",
+        "parent_span_id_hex": "0000000000000000",
+        "is_root_span": true,
+        "service": "mikka-web",
+        "environment": "dev",
+        "service_version": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+        "stage": "GET /api/trace-benchmark",
+        "status_code": 2,
+        "duration_ms": 8.3,
+        "route": "/api/trace-benchmark",
+        "method": "GET",
+        "http_status": 500.0,
+        "db_system": null,
+        "db_operation": null,
+        "statement_id": null,
+        "sample_rate": 1.0,
+        "retention": "error_or_slow",
+        "critical_raw": false,
+        "error_type": "CodedError",
+        "error_code": "trace_acceptance_failed",
+        "error_detail": "controlled_database_failure",
+        "error_causes": "CodedError:trace_acceptance_failed:controlled_database_failure > error:22012",
+        "_rawBooleanFields": {
+          "is_root_span": "True",
+          "critical_raw": "false"
+        }
+      },
+      "pgErrorMetadata": [
+        {
+          "spanId": "c582db086f2abf55",
+          "errorCode": null,
+          "errorType": null
+        }
+      ],
+      "checks": {
+        "exactLocalSpanSet": true,
+        "spanPhysicalAndUniqueCounts": true,
+        "oneActualRoot": true,
+        "rootHttpFailure": true,
+        "ordinaryRoot": true,
+        "safeRootCodeDetailCause": true,
+        "allSpansEffectiveRateOne": true,
+        "exactPgChildren": true,
+        "onePgError": true,
+        "exactErrorSpanSet": true,
+        "logPhysicalAndUniqueCounts": true,
+        "exactErrorLogSpanSet": true,
+        "allLogsErrorAndSafe": true,
+        "allLogsEffectiveRateOne": true,
+        "rootErrorLogLinked": true,
+        "exactServiceEnvironmentVersion": true
+      },
+      "complete": true
+    },
+    {
+      "traceId": "f5dac85c72e9138b4cc53797892a596e",
+      "rootSpanId": "9974bcd642f42d6e",
+      "pgSpanIds": [
+        "0631fe45e1157bb4",
+        "19cb01b83d60f75b",
+        "fe487a32ea39e7ea"
+      ],
+      "errorSpanIds": [
+        "9974bcd642f42d6e",
+        "fe487a32ea39e7ea"
+      ],
+      "spanRowUuids": [
+        "01a1be30-2bae-74d2-9113-77540cabe754",
+        "01a1be30-2bae-74d2-9113-776771edca7c",
+        "01a1be30-2bae-74d2-9113-7773155c3d69",
+        "01a1be30-2bae-74d2-9113-797f7e47f598"
+      ],
+      "errorLogUuids": [
+        "01a1be30-2d6b-7c80-9467-96c843636d18",
+        "01a1be30-2d6b-7c80-9467-96d9727b9a02"
+      ],
+      "root": {
+        "started_utc": "2026-11-09T02:43:10.191000Z",
+        "ended_utc": "2026-11-09T02:43:10.195448Z",
+        "span_row_uuid": "01a1be30-2bae-74d2-9113-797f7e47f598",
+        "trace_id_hex": "f5dac85c72e9138b4cc53797892a596e",
+        "span_id_hex": "9974bcd642f42d6e",
+        "parent_span_id_hex": "0000000000000000",
+        "is_root_span": true,
+        "service": "mikka-web",
+        "environment": "dev",
+        "service_version": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+        "stage": "GET /api/trace-benchmark",
+        "status_code": 2,
+        "duration_ms": 4.448,
+        "route": "/api/trace-benchmark",
+        "method": "GET",
+        "http_status": 500.0,
+        "db_system": null,
+        "db_operation": null,
+        "statement_id": null,
+        "sample_rate": 1.0,
+        "retention": "error_or_slow",
+        "critical_raw": false,
+        "error_type": "CodedError",
+        "error_code": "trace_acceptance_failed",
+        "error_detail": "controlled_database_failure",
+        "error_causes": "CodedError:trace_acceptance_failed:controlled_database_failure > error:22012",
+        "_rawBooleanFields": {
+          "is_root_span": "True",
+          "critical_raw": "false"
+        }
+      },
+      "pgErrorMetadata": [
+        {
+          "spanId": "fe487a32ea39e7ea",
+          "errorCode": null,
+          "errorType": null
+        }
+      ],
+      "checks": {
+        "exactLocalSpanSet": true,
+        "spanPhysicalAndUniqueCounts": true,
+        "oneActualRoot": true,
+        "rootHttpFailure": true,
+        "ordinaryRoot": true,
+        "safeRootCodeDetailCause": true,
+        "allSpansEffectiveRateOne": true,
+        "exactPgChildren": true,
+        "onePgError": true,
+        "exactErrorSpanSet": true,
+        "logPhysicalAndUniqueCounts": true,
+        "exactErrorLogSpanSet": true,
+        "allLogsErrorAndSafe": true,
+        "allLogsEffectiveRateOne": true,
+        "rootErrorLogLinked": true,
+        "exactServiceEnvironmentVersion": true
+      },
+      "complete": true
+    },
+    {
+      "traceId": "fb64a993ca432ae0392d4c100d4833fc",
+      "rootSpanId": "73bde89441229ecd",
+      "pgSpanIds": [
+        "4639660f45b5cb57",
+        "9edbc53a6cdecd6f",
+        "e98eafbba86d9a99"
+      ],
+      "errorSpanIds": [
+        "73bde89441229ecd",
+        "9edbc53a6cdecd6f"
+      ],
+      "spanRowUuids": [
+        "01a1be30-2bae-74d2-9113-77250059ec43",
+        "01a1be30-2bae-74d2-9113-7737e01f43b7",
+        "01a1be30-2bae-74d2-9113-774510d50bd0",
+        "01a1be30-2bae-74d2-9113-796ce5ca10f5"
+      ],
+      "errorLogUuids": [
+        "01a1be30-2d6b-7c80-9467-96ab6e76150f",
+        "01a1be30-2d6b-7c80-9467-96be9db2003e"
+      ],
+      "root": {
+        "started_utc": "2026-11-09T02:43:10.185000Z",
+        "ended_utc": "2026-11-09T02:43:10.190099Z",
+        "span_row_uuid": "01a1be30-2bae-74d2-9113-796ce5ca10f5",
+        "trace_id_hex": "fb64a993ca432ae0392d4c100d4833fc",
+        "span_id_hex": "73bde89441229ecd",
+        "parent_span_id_hex": "0000000000000000",
+        "is_root_span": true,
+        "service": "mikka-web",
+        "environment": "dev",
+        "service_version": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+        "stage": "GET /api/trace-benchmark",
+        "status_code": 2,
+        "duration_ms": 5.099,
+        "route": "/api/trace-benchmark",
+        "method": "GET",
+        "http_status": 500.0,
+        "db_system": null,
+        "db_operation": null,
+        "statement_id": null,
+        "sample_rate": 1.0,
+        "retention": "error_or_slow",
+        "critical_raw": false,
+        "error_type": "CodedError",
+        "error_code": "trace_acceptance_failed",
+        "error_detail": "controlled_database_failure",
+        "error_causes": "CodedError:trace_acceptance_failed:controlled_database_failure > error:22012",
+        "_rawBooleanFields": {
+          "is_root_span": "True",
+          "critical_raw": "false"
+        }
+      },
+      "pgErrorMetadata": [
+        {
+          "spanId": "9edbc53a6cdecd6f",
+          "errorCode": null,
+          "errorType": null
+        }
+      ],
+      "checks": {
+        "exactLocalSpanSet": true,
+        "spanPhysicalAndUniqueCounts": true,
+        "oneActualRoot": true,
+        "rootHttpFailure": true,
+        "ordinaryRoot": true,
+        "safeRootCodeDetailCause": true,
+        "allSpansEffectiveRateOne": true,
+        "exactPgChildren": true,
+        "onePgError": true,
+        "exactErrorSpanSet": true,
+        "logPhysicalAndUniqueCounts": true,
+        "exactErrorLogSpanSet": true,
+        "allLogsErrorAndSafe": true,
+        "allLogsEffectiveRateOne": true,
+        "rootErrorLogLinked": true,
+        "exactServiceEnvironmentVersion": true
+      },
+      "complete": true
+    }
+  ],
+  "mismatches": [],
+  "checks": {
+    "exact20InputIds": true,
+    "sourceAndDevScopeMatched": true,
+    "completePageEnumeration": true,
+    "summaryAndRowsAgree": true,
+    "runnerAndBackendSpanSetsAgree": true,
+    "allRootsErrorAndSafeCause": true,
+    "allSpanEffectiveRatesAndRetention": true,
+    "allPgChildrenPresent": true,
+    "allRootErrorLogsLinked": true,
+    "allPgErrorLogsLinked": true,
+    "observedLogCountMatchesLocalReceipt": true,
+    "twoStableSnapshots": true
+  },
+  "normalizationCorrection": "The original uppercase ERROR summary is preserved. Actual backend severity_text is error; only the summary expression was changed to lower(severity_text)=error. APM True/False and log 1 booleans are normalized with raw spelling retained.",
+  "limitations": [
+    "This is a finite dev controlled-failure trace set in the authorized project, not a production coding/model run or complete issue acceptance.",
+    "PG ERROR span code/type fields are null; PostgreSQL 22012 is preserved in each root and same-span root ERROR log cause chain. No missing PG attribute was invented.",
+    "The tool provides formatted pipe tables without an explicit server truncation flag. Completeness is established here by below-limit details, independent summaries, the actual finite local span-ID set and two identical snapshots.",
+    "Raw OTLP callback counts are batches/items, not HTTP wire-attempt or billing counts.",
+    "No additional run, model, configuration mutation or query retry was triggered."
+  ]
+}

@@ -1,0 +1,12 @@
+✔ runs returns its empty list with one post-auth business read (39.440099ms)
+ℹ {"scenario":"runs","postAuthBusinessQueries":1,"postgresObserved":false}
+✔ repos returns its empty list with one post-auth business read (28.489025ms)
+ℹ {"scenario":"repos","postAuthBusinessQueries":1,"postgresObserved":false}
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 750.50375

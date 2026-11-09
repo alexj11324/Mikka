@@ -1,0 +1,30 @@
+{
+  "command": [
+    "node_modules/.bin/oxlint",
+    "--no-ignore",
+    "lib/personal-policy.ts",
+    "lib/desktop-rpc/read-batch-context.ts",
+    "lib/personal-policy.test.ts"
+  ],
+  "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-read-batch-policy-copy",
+  "exitCode": 0,
+  "log": {
+    "path": "policy-targeted-lint.log",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "source": [
+    {
+      "path": "lib/personal-policy.ts",
+      "sha256": "1e09dbc751b0e740d54cbbc6db79b0d4a0bf48cc409137eabc36ecd38f8861f6"
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "sha256": "bbb930a53ce88568f15a5891445eca03e0065ae4373b213f85d11523a3944eac"
+    },
+    {
+      "path": "lib/personal-policy.test.ts",
+      "sha256": "2ed7fc9fea9a82661d575178c5f21cdf0a4db2325d5bcdfa1abcfd2abff45e94"
+    }
+  ]
+}

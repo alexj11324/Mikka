@@ -1,0 +1,942 @@
+TAP version 13
+# Subtest: one match dispatches straight away with owner/repo; the lister is asked for the dispatching user only
+ok 1 - one match dispatches straight away with owner/repo; the lister is asked for the dispatching user only
+  ---
+  duration_ms: 5.32014
+  type: 'test'
+  ...
+# Subtest: a GitHub repository named by owner/repo or URL runs only when the person's live list has it; no list, no dispatch; other hosts go on as given
+ok 2 - a GitHub repository named by owner/repo or URL runs only when the person's live list has it; no list, no dispatch; other hosts go on as given
+  ---
+  duration_ms: 2.72362
+  type: 'test'
+  ...
+# Subtest: several matches return the candidates as one choice card and dispatch nothing
+ok 3 - several matches return the candidates as one choice card and dispatch nothing
+  ---
+  duration_ms: 0.870574
+  type: 'test'
+  ...
+# Subtest: no match returns the GitHub install option and dispatches nothing
+ok 4 - no match returns the GitHub install option and dispatches nothing
+  ---
+  duration_ms: 0.917194
+  type: 'test'
+  ...
+# Subtest: another user's repositories are never matched
+ok 5 - another user's repositories are never matched
+  ---
+  duration_ms: 3.192198
+  type: 'test'
+  ...
+# Subtest: GitHub not connected or unavailable is a clear error and dispatches nothing; other failures still throw
+ok 6 - GitHub not connected or unavailable is a clear error and dispatches nothing; other failures still throw
+  ---
+  duration_ms: 1.452192
+  type: 'test'
+  ...
+# Subtest: find_repository lists the user's own repositories, matches a name, and an owner/repo exactly
+ok 7 - find_repository lists the user's own repositories, matches a name, and an owner/repo exactly
+  ---
+  duration_ms: 1.342827
+  type: 'test'
+  ...
+# Subtest: an exact name never hides the others: every candidate comes back with its description and homepage
+ok 8 - an exact name never hides the others: every candidate comes back with its description and homepage
+  ---
+  duration_ms: 0.597402
+  type: 'test'
+  ...
+# Subtest: dispatch_run with a bare name that several fit dispatches nothing; this workspace's repositories only come first
+ok 9 - dispatch_run with a bare name that several fit dispatches nothing; this workspace's repositories only come first
+  ---
+  duration_ms: 0.779106
+  type: 'test'
+  ...
+# Subtest: sameRepository tells a named repository from the thread's
+ok 10 - sameRepository tells a named repository from the thread's
+  ---
+  duration_ms: 1.031497
+  type: 'test'
+  ...
+# Subtest: on-demand discovery preserves every repository beyond 300 and marks only fresh authorized workspace candidates
+ok 11 - on-demand discovery preserves every repository beyond 300 and marks only fresh authorized workspace candidates
+  ---
+  duration_ms: 0.723182
+  type: 'test'
+  ...
+# Subtest: workspace discovery orders ambiguous names but neither authorizes nor silently picks a repository
+ok 12 - workspace discovery orders ambiguous names but neither authorizes nor silently picks a repository
+  ---
+  duration_ms: 0.540436
+  type: 'test'
+  ...
+# Subtest: closed repository refusals keep their exact result and mark phase plus dispatch beneath an OK Workflow step
+ok 13 - closed repository refusals keep their exact result and mark phase plus dispatch beneath an OK Workflow step
+  ---
+  duration_ms: 121.237325
+  type: 'test'
+  ...
+# Subtest: concurrent owner-wide readers reuse their actual personal home only within the batch
+ok 14 - concurrent owner-wide readers reuse their actual personal home only within the batch
+  ---
+  duration_ms: 1.734668
+  type: 'test'
+  ...
+# Subtest: different Live kinds share one revision query before either consumer reads its data
+ok 15 - different Live kinds share one revision query before either consumer reads its data
+  ---
+  duration_ms: 12.536561
+  type: 'test'
+  ...
+# Subtest: owner observations are separate for parallel batches, owners and database authorities
+ok 16 - owner observations are separate for parallel batches, owners and database authorities
+  ---
+  duration_ms: 1.385321
+  type: 'test'
+  ...
+# Subtest: later reads in one batch keep the earlier revision, while the next batch reads the new revision
+ok 17 - later reads in one batch keep the earlier revision, while the next batch reads the new revision
+  ---
+  duration_ms: 0.765816
+  type: 'test'
+  ...
+# Subtest: a missing or failed revision never becomes fabricated proof and does not poison the next request
+ok 18 - a missing or failed revision never becomes fabricated proof and does not poison the next request
+  ---
+  duration_ms: 1.253883
+  type: 'test'
+  ...
+# Subtest: ordinary revision readers and different database scopes remain independent
+ok 19 - ordinary revision readers and different database scopes remain independent
+  ---
+  duration_ms: 0.551663
+  type: 'test'
+  ...
+# Subtest: bound after-work cannot reuse an already completed batch authority observation
+ok 20 - bound after-work cannot reuse an already completed batch authority observation
+  ---
+  duration_ms: 1.016504
+  type: 'test'
+  ...
+# Subtest: notification target resolution never inherits an earlier list-read home, even inside the batch
+ok 21 - notification target resolution never inherits an earlier list-read home, even inside the batch
+  ---
+  duration_ms: 0.19194
+  type: 'test'
+  ...
+# Subtest: planned owner readers share one earlier observation without exposing each other's keys
+ok 22 - planned owner readers share one earlier observation without exposing each other's keys
+  ---
+  duration_ms: 0.687337
+  type: 'test'
+  ...
+# Subtest: an undeclared batch keeps ordinary per-reader observations
+ok 23 - an undeclared batch keeps ordinary per-reader observations
+  ---
+  duration_ms: 0.33088
+  type: 'test'
+  ...
+# Subtest: a selected team key stays late and total requested and returned keys stay unchanged
+ok 24 - a selected team key stays late and total requested and returned keys stay unchanged
+  ---
+  duration_ms: 0.642489
+  type: 'test'
+  ...
+# Subtest: owner homes and database authorities do not borrow another planned observation
+ok 25 - owner homes and database authorities do not borrow another planned observation
+  ---
+  duration_ms: 0.66257
+  type: 'test'
+  ...
+# Subtest: absent homes and invalid or nonrevision refs never trigger an owner prefetch
+ok 26 - absent homes and invalid or nonrevision refs never trigger an owner prefetch
+  ---
+  duration_ms: 0.31814
+  type: 'test'
+  ...
+# Subtest: an entity or another owner key does not start the resolved home's list prefetch
+ok 27 - an entity or another owner key does not start the resolved home's list prefetch
+  ---
+  duration_ms: 0.359693
+  type: 'test'
+  ...
+# Subtest: missing and failed prefetched revisions remain unknown until another request reads
+ok 28 - missing and failed prefetched revisions remain unknown until another request reads
+  ---
+  duration_ms: 0.981681
+  type: 'test'
+  ...
+# Subtest: throw and cancellation release the plan as well as its earlier observations
+ok 29 - throw and cancellation release the plan as well as its earlier observations
+  ---
+  duration_ms: 0.634298
+  type: 'test'
+  ...
+# Subtest: the ordinary version-1 RPC preserves batch order, original results and wire values
+ok 30 - the ordinary version-1 RPC preserves batch order, original results and wire values
+  ---
+  duration_ms: 16.615808
+  type: 'test'
+  ...
+# Subtest: every item is validated before any original action runs, including nested and mutating calls
+ok 31 - every item is validated before any original action runs, including nested and mutating calls
+  ---
+  duration_ms: 14.110908
+  type: 'test'
+  ...
+# Subtest: each business failure keeps the single-action HTTP mapping without exposing its error message
+ok 32 - each business failure keeps the single-action HTTP mapping without exposing its error message
+  ---
+  duration_ms: 1.601457
+  type: 'test'
+  ...
+# Subtest: thrown and returned authRequired both preserve Main HTTP 401 after all item work settles
+ok 33 - thrown and returned authRequired both preserve Main HTTP 401 after all item work settles
+  ---
+  duration_ms: 1.925967
+  type: 'test'
+  ...
+# Subtest: parallel batch requests retain their real session and each original ownership check
+ok 34 - parallel batch requests retain their real session and each original ownership check
+  ---
+  duration_ms: 3.165297
+  type: 'test'
+  ...
+# Subtest: batch readers share the API request memo while later requests authorize a fresh workspace view
+ok 35 - batch readers share the API request memo while later requests authorize a fresh workspace view
+  ---
+  duration_ms: 2.412922
+  type: 'test'
+  ...
+# Subtest: only the validated prepared owner readers contribute revision kinds across different readiness times
+ok 36 - only the validated prepared owner readers contribute revision kinds across different readiness times
+  ---
+  duration_ms: 13.72786
+  type: 'test'
+  ...
+# (node:29) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:29) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: a shared credential check returns its current authorization in one read
+ok 37 - a shared credential check returns its current authorization in one read
+  ---
+  duration_ms: 2.531291
+  type: 'test'
+  ...
+# Subtest: a missing share does not issue an additional read or write
+ok 38 - a missing share does not issue an additional read or write
+  ---
+  duration_ms: 0.17219
+  type: 'test'
+  ...
+# Subtest: a refused share does not issue an additional read or write
+ok 39 - a refused share does not issue an additional read or write
+  ---
+  duration_ms: 0.08648
+  type: 'test'
+  ...
+# Subtest: repeated permission checks observe revoke and restore without reusing an earlier grant
+ok 40 - repeated permission checks observe revoke and restore without reusing an earlier grant
+  ---
+  duration_ms: 0.171589
+  type: 'test'
+  ...
+# Subtest: a failed authorization read propagates its original cause without another query
+ok 41 - a failed authorization read propagates its original cause without another query
+  ---
+  duration_ms: 0.50358
+  type: 'test'
+  ...
+# Subtest: a Native read batch shares its workspace policy across the real key and subscription readers
+ok 42 - a Native read batch shares its workspace policy across the real key and subscription readers
+  ---
+  duration_ms: 2.303247
+  type: 'test'
+  ...
+# Subtest: a refused batch policy still permits own keys and skips every shared credential read
+ok 43 - a refused batch policy still permits own keys and skips every shared credential read
+  ---
+  duration_ms: 0.631052
+  type: 'test'
+  ...
+# Subtest: concurrent batches never share a policy observation, while sibling reads join only their batch
+ok 44 - concurrent batches never share a policy observation, while sibling reads join only their batch
+  ---
+  duration_ms: 0.546785
+  type: 'test'
+  ...
+# Subtest: a batch policy belongs to its actual request database executor and exact workspace
+ok 45 - a batch policy belongs to its actual request database executor and exact workspace
+  ---
+  duration_ms: 614.816293
+  type: 'test'
+  ...
+# Subtest: a failed batch policy preserves its original rejection and cannot poison the next request
+ok 46 - a failed batch policy preserves its original rejection and cannot poison the next request
+  ---
+  duration_ms: 1.102233
+  type: 'test'
+  ...
+# Subtest: bound after-work reads fresh after both fulfilled and rejected batch lifetimes
+ok 47 - bound after-work reads fresh after both fulfilled and rejected batch lifetimes
+  ---
+  duration_ms: 0.580316
+  type: 'test'
+  ...
+# Subtest: only the policy is shared: credential shares and own-key reads remain fresh in the batch
+ok 48 - only the policy is shared: credential shares and own-key reads remain fresh in the batch
+  ---
+  duration_ms: 0.511031
+  type: 'test'
+  ...
+# Subtest: ordinary policy readers observe changes on every call without touching batch metadata
+ok 49 - ordinary policy readers observe changes on every call without touching batch metadata
+  ---
+  duration_ms: 0.214073
+  type: 'test'
+  ...
+# Subtest: afterJob cannot reuse a foreground policy while its parent read batch is still active
+ok 50 - afterJob cannot reuse a foreground policy while its parent read batch is still active
+  ---
+  duration_ms: 75.763552
+  type: 'test'
+  ...
+# Subtest: cron and workflow jobs cannot inherit an active foreground policy observation
+ok 51 - cron and workflow jobs cannot inherit an active foreground policy observation
+  ---
+  duration_ms: 0.806878
+  type: 'test'
+  ...
+# Subtest: each generation shares its APM ancestry and session, captures numeric usage/cost and never captures content
+ok 52 - each generation shares its APM ancestry and session, captures numeric usage/cost and never captures content
+  ---
+  duration_ms: 15.317589
+  type: 'test'
+  ...
+# Subtest: stream first token, finish and cancellation preserve the original stream and produce one receipt
+ok 53 - stream first token, finish and cancellation preserve the original stream and produce one receipt
+  ---
+  duration_ms: 3.519222
+  type: 'test'
+  ...
+# Subtest: missing and invalid token counts stay absent; public v7 and provider v4 cache fields agree
+ok 54 - missing and invalid token counts stay absent; public v7 and provider v4 cache fields agree
+  ---
+  duration_ms: 0.399262
+  type: 'test'
+  ...
+# Subtest: actual subscription SDK streams retain numeric cache writes from both pinned CPA usage spellings
+ok 55 - actual subscription SDK streams retain numeric cache writes from both pinned CPA usage spellings
+  ---
+  duration_ms: 80.889177
+  type: 'test'
+  ...
+# Subtest: cache write fallback reads only numeric receipt fields and keeps normalized values authoritative
+ok 56 - cache write fallback reads only numeric receipt fields and keeps normalized values authoritative
+  ---
+  duration_ms: 0.544452
+  type: 'test'
+  ...
+# Subtest: credential-looking labels and URLs are omitted from AI events and spans
+ok 57 - credential-looking labels and URLs are omitted from AI events and spans
+  ---
+  duration_ms: 6.650338
+  type: 'test'
+  ...
+# Subtest: stream read errors and error parts record safe error causes once without swallowing provider errors
+ok 58 - stream read errors and error parts record safe error causes once without swallowing provider errors
+  ---
+  duration_ms: 10.265093
+  type: 'test'
+  ...
+# Subtest: abort and consumer cancellation end telemetry once and still cancel upstream
+ok 59 - abort and consumer cancellation end telemetry once and still cancel upstream
+  ---
+  duration_ms: 0.805546
+  type: 'test'
+  ...
+# Subtest: setup errors and an unavailable telemetry sink preserve business behavior
+ok 60 - setup errors and an unavailable telemetry sink preserve business behavior
+  ---
+  duration_ms: 1.792045
+  type: 'test'
+  ...
+# Subtest: non-SDK Decisions expose only validated numeric scores and usage, not answers
+ok 61 - non-SDK Decisions expose only validated numeric scores and usage, not answers
+  ---
+  duration_ms: 1.010975
+  type: 'test'
+  ...
+# Subtest: mobile API context joins the server and database spans with version attribution
+ok 62 - mobile API context joins the server and database spans with version attribution
+  ---
+  duration_ms: 56.461098
+  type: 'test'
+  ...
+# Subtest: mobile attribution stays in its request and cannot overwrite machine routes
+ok 63 - mobile attribution stays in its request and cannot overwrite machine routes
+  ---
+  duration_ms: 19.283405
+  type: 'test'
+  ...
+# Subtest: untrusted version and unrelated request headers never enter spans
+ok 64 - untrusted version and unrelated request headers never enter spans
+  ---
+  duration_ms: 12.466044
+  type: 'test'
+  ...
+# Subtest: a failed request records its error code on the span, never the message
+ok 65 - a failed request records its error code on the span, never the message
+  ---
+  duration_ms: 3.685563
+  type: 'test'
+  ...
+# Subtest: request attribution stays on each parent chain when concurrent requests share a trace
+ok 66 - request attribution stays on each parent chain when concurrent requests share a trace
+  ---
+  duration_ms: 7.970941
+  type: 'test'
+  ...
+# Subtest: request attribution channel projects only valid closed metadata
+ok 67 - request attribution channel projects only valid closed metadata
+  ---
+  duration_ms: 1.040791
+  type: 'test'
+  ...
+# Subtest: read-batch actions retain separate parent chains and one physical request identity
+ok 68 - read-batch actions retain separate parent chains and one physical request identity
+  ---
+  duration_ms: 3.077525
+  type: 'test'
+  ...
+# Subtest: read-batch failures retain error status without exporting payloads or forcing ordinary sampling
+ok 69 - read-batch failures retain error status without exporting payloads or forcing ordinary sampling
+  ---
+  duration_ms: 3.388314
+  type: 'test'
+  ...
+# Subtest: device registration hands the daemon only a public token and the PostHog endpoint
+ok 70 - device registration hands the daemon only a public token and the PostHog endpoint
+  ---
+  duration_ms: 6.040969
+  type: 'test'
+  ...
+# Subtest: at equal rates the server keeps exactly the daemon traces the daemon kept
+ok 71 - at equal rates the server keeps exactly the daemon traces the daemon kept
+  ---
+  duration_ms: 40.228668
+  type: 'test'
+  ...
+# Subtest: Workflow and failure logs share OTel trace/span IDs and exclude content
+ok 72 - Workflow and failure logs share OTel trace/span IDs and exclude content
+  ---
+  duration_ms: 14.83454
+  type: 'test'
+  ...
+# Subtest: tail-retained ordinary failures give native Logs the same effective rate as APM
+ok 73 - tail-retained ordinary failures give native Logs the same effective rate as APM
+  ---
+  duration_ms: 9.147486
+  type: 'test'
+  ...
+# Subtest: HTTP completes while waitUntil retains an earlier in-flight Workflow trace export
+ok 74 - HTTP completes while waitUntil retains an earlier in-flight Workflow trace export
+  ---
+  duration_ms: 75.153701
+  type: 'test'
+  ...
+# Subtest: exporter forceFlush reject does not fail the HTTP response or retained lifetime
+ok 75 - exporter forceFlush reject does not fail the HTTP response or retained lifetime
+  ---
+  duration_ms: 4.057664
+  type: 'test'
+  ...
+# Subtest: exporter forceFlush throw does not fail the HTTP response or retained lifetime
+ok 76 - exporter forceFlush throw does not fail the HTTP response or retained lifetime
+  ---
+  duration_ms: 5.631019
+  type: 'test'
+  ...
+# Subtest: request, deferred job, durable queue carrier and remote run share ancestry and safe session metadata
+ok 77 - request, deferred job, durable queue carrier and remote run share ancestry and safe session metadata
+  ---
+  duration_ms: 11.120354
+  type: 'test'
+  ...
+# Subtest: ordinary errors and slow requests retain their local child timeline; fast success stays sampled
+ok 78 - ordinary errors and slow requests retain their local child timeline; fast success stays sampled
+  ---
+  duration_ms: 14.8812
+  type: 'test'
+  ...
+# Subtest: an after scheduler without an async context still keeps the scheduling request
+ok 79 - an after scheduler without an async context still keeps the scheduling request
+  ---
+  duration_ms: 2.86231
+  type: 'test'
+  ...
+# Subtest: head-sampled ordinary failures use effective rate one for the entire local tree
+ok 80 - head-sampled ordinary failures use effective rate one for the entire local tree
+  ---
+  duration_ms: 5.24089
+  type: 'test'
+  ...
+# Subtest: a critical failure is retained, preserves safe cause detail and never exports the message
+ok 81 - a critical failure is retained, preserves safe cause detail and never exports the message
+  ---
+  duration_ms: 2.212749
+  type: 'test'
+  ...
+# Subtest: durable SDK stage labels and run identity survive attributes added after span start
+ok 82 - durable SDK stage labels and run identity survive attributes added after span start
+  ---
+  duration_ms: 3.618711
+  type: 'test'
+  ...
+# Subtest: server tracing
+    # Subtest: a span per statement, with route, client kind, operation, statement id, rows and size
+    ok 1 - a span per statement, with route, client kind, operation, statement id, rows and size
+      ---
+      duration_ms: 2.280892
+      type: 'test'
+      ...
+    # Subtest: queued queries retain their own request trace, parent and operation without connection spans
+    ok 2 - queued queries retain their own request trace, parent and operation without connection spans
+      ---
+      duration_ms: 0.33125
+      type: 'test'
+      ...
+    # Subtest: an after() job keeps its own route and continues the scheduling request's trace
+    ok 3 - an after() job keeps its own route and continues the scheduling request's trace
+      ---
+      duration_ms: 0.210288
+      type: 'test'
+      ...
+    # Subtest: a Workflow step is labelled with its workflow and step
+    ok 4 - a Workflow step is labelled with its workflow and step
+      ---
+      duration_ms: 0.120082
+      type: 'test'
+      ...
+    # Subtest: a cron handler runs as cron:<name> inside its request
+    ok 5 - a cron handler runs as cron:<name> inside its request
+      ---
+      duration_ms: 0.185781
+      type: 'test'
+      ...
+    # Subtest: no parameter value, row content, error value, token, email, prompt or password leaves the process
+    ok 6 - no parameter value, row content, error value, token, email, prompt or password leaves the process
+      ---
+      duration_ms: 4.507975
+      type: 'test'
+      ...
+    1..6
+ok 83 - server tracing
+  ---
+  duration_ms: 117.631113
+  type: 'suite'
+  ...
+# Subtest: sampling and settings
+    # Subtest: tests, CI and builds never trace; 10% by default; 1 allowed in dev
+    ok 1 - tests, CI and builds never trace; 10% by default; 1 allowed in dev
+      ---
+      duration_ms: 0.313463
+      type: 'test'
+      ...
+    # Subtest: off without a token or at rate 0; PostHog endpoint by default
+    ok 2 - off without a token or at rate 0; PostHog endpoint by default
+      ---
+      duration_ms: 0.315266
+      type: 'test'
+      ...
+    # Subtest: rate 0 provider records nothing
+    ok 3 - rate 0 provider records nothing
+      ---
+      duration_ms: 0.673236
+      type: 'test'
+      ...
+    1..3
+ok 84 - sampling and settings
+  ---
+  duration_ms: 1.55706
+  type: 'suite'
+  ...
+# Subtest: export failures
+    # Subtest: a failed export is reported as success and pauses exporting instead of retrying
+    ok 1 - a failed export is reported as success and pauses exporting instead of retrying
+      ---
+      duration_ms: 0.282015
+      type: 'test'
+      ...
+    # Subtest: a throwing exporter never throws into the caller
+    ok 2 - a throwing exporter never throws into the caller
+      ---
+      duration_ms: 0.130166
+      type: 'test'
+      ...
+    1..2
+ok 85 - export failures
+  ---
+  duration_ms: 0.502969
+  type: 'suite'
+  ...
+# Subtest: helpers
+    # Subtest: client kind from the route prefix
+    ok 1 - client kind from the route prefix
+      ---
+      duration_ms: 0.162425
+      type: 'test'
+      ...
+    # Subtest: statements keep placeholders and lose literals
+    ok 2 - statements keep placeholders and lose literals
+      ---
+      duration_ms: 0.094072
+      type: 'test'
+      ...
+    # Subtest: strings lose query strings, emails and IPs
+    ok 3 - strings lose query strings, emails and IPs
+      ---
+      duration_ms: 0.102996
+      type: 'test'
+      ...
+    # Subtest: a multi-statement result sums its rows and keeps the last command
+    ok 4 - a multi-statement result sums its rows and keeps the last command
+      ---
+      duration_ms: 0.128814
+      type: 'test'
+      ...
+    # Subtest: response size is estimated from a sample of rows
+    ok 5 - response size is estimated from a sample of rows
+      ---
+      duration_ms: 0.163106
+      type: 'test'
+      ...
+    1..5
+ok 86 - helpers
+  ---
+  duration_ms: 0.837925
+  type: 'suite'
+  ...
+# Subtest: database region evidence projects the actual pg host without exporting its endpoint
+ok 87 - database region evidence projects the actual pg host without exporting its endpoint
+  ---
+  duration_ms: 0.147473
+  type: 'test'
+  ...
+# Subtest: database region evidence cannot be supplied by a caller or inferred from unrecognized peers
+ok 88 - database region evidence cannot be supplied by a caller or inferred from unrecognized peers
+  ---
+  duration_ms: 0.137077
+  type: 'test'
+  ...
+# {"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794194093094,"endedAt":1794194093217,"totalMs":123,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"requestedAgentProfile","ms":8},{"phase":"issueForUser","ms":1},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":1},{"phase":"ensureBotCloudRuntime","ms":1},{"phase":"bindAgentToConnection","ms":0},{"phase":"authorizeSubscriptionWorkspace","ms":0},{"phase":"issueForUser","ms":0},{"phase":"ensureBotCloudRuntime","ms":8},{"phase":"ensureDeviceRepository","ms":1},{"phase":"queueCloudRun","ms":0},{"phase":"ensureThreadMachine","ms":37},{"phase":"startLifecycle","ms":1},{"phase":"runPlacement","ms":0}],"github":{"requests":0,"ms":0},"failed":false}
+# {"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794194093219,"endedAt":1794194093233,"totalMs":14,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"requestedAgentProfile","ms":1},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":1},{"phase":"ensureBotCloudRuntime","ms":0},{"phase":"bindAgentToConnection","ms":0},{"phase":"authorizeSubscriptionWorkspace","ms":1},{"phase":"issueForUser","ms":0},{"phase":"ensureBotCloudRuntime","ms":0},{"phase":"ensureDeviceRepository","ms":1},{"phase":"queueCloudRun","ms":0},{"phase":"ensureThreadMachine","ms":1},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":0}],"github":{"requests":0,"ms":0},"failed":false}
+# {"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794194093234,"endedAt":1794194093239,"totalMs":5,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"requestedAgentProfile","ms":0},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":0}],"github":{"requests":0,"ms":0},"failed":false}
+# {"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794194093239,"endedAt":1794194093246,"totalMs":7,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"requestedAgentProfile","ms":1},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":1}],"github":{"requests":0,"ms":0},"failed":false}
+# {"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794194093247,"endedAt":1794194093252,"totalMs":5,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"requestedAgentProfile","ms":0},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":1}],"github":{"requests":0,"ms":0},"failed":false}
+# {"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794194093252,"endedAt":1794194093256,"totalMs":4,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"requestedAgentProfile","ms":1},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":0}],"github":{"requests":0,"ms":0},"failed":false}
+# {"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794194093257,"endedAt":1794194093261,"totalMs":4,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"requestedAgentProfile","ms":0},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":1}],"github":{"requests":0,"ms":0},"failed":false}
+# {"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794194093261,"endedAt":1794194093266,"totalMs":5,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"requestedAgentProfile","ms":0},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":1}],"github":{"requests":0,"ms":0},"failed":false}
+# {"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794194093266,"endedAt":1794194093271,"totalMs":5,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":0},{"phase":"requestedAgentProfile","ms":1},{"phase":"issueForUser","ms":1},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":0}],"github":{"requests":0,"ms":0},"failed":false}
+# {"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794194093272,"endedAt":1794194093276,"totalMs":4,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"requestedAgentProfile","ms":1},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":0}],"github":{"requests":0,"ms":0},"failed":false}
+# {"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794194093277,"endedAt":1794194093281,"totalMs":4,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"requestedAgentProfile","ms":0},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":1}],"github":{"requests":0,"ms":0},"failed":false}
+# {"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794194093281,"endedAt":1794194093286,"totalMs":5,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":2},{"phase":"requestedAgentProfile","ms":0},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":1}],"github":{"requests":0,"ms":0},"failed":false}
+# {"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794194093286,"endedAt":1794194093295,"totalMs":9,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"requestedAgentProfile","ms":0},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"resolveModelDispatch","ms":0},{"phase":"ensureBotCloudRuntime","ms":0},{"phase":"bindAgentToConnection","ms":0},{"phase":"authorizeSubscriptionWorkspace","ms":1},{"phase":"issueForUser","ms":0},{"phase":"ensureBotCloudRuntime","ms":0},{"phase":"ensureDeviceRepository","ms":0},{"phase":"queueCloudRun","ms":0},{"phase":"ensureThreadMachine","ms":1},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":0}],"github":{"requests":0,"ms":0},"failed":false}
+# {"msg":"dispatch_timing","boundary":"dispatch_run_entry","workflowRunId":null,"stepId":null,"attempt":null,"startedAt":1794194093295,"endedAt":1794194093303,"totalMs":8,"phases":[{"phase":"authorizeDispatch","ms":0},{"phase":"executionWorkspace","ms":1},{"phase":"requestedAgentProfile","ms":0},{"phase":"issueForUser","ms":0},{"phase":"executionWorkspace","ms":0},{"phase":"resolveModelDispatch","ms":0},{"phase":"ensureBotCloudRuntime","ms":0},{"phase":"bindAgentToConnection","ms":1},{"phase":"authorizeSubscriptionWorkspace","ms":0},{"phase":"issueForUser","ms":0},{"phase":"ensureBotCloudRuntime","ms":0},{"phase":"ensureDeviceRepository","ms":0},{"phase":"queueCloudRun","ms":0},{"phase":"ensureThreadMachine","ms":1},{"phase":"startLifecycle","ms":0},{"phase":"runPlacement","ms":0}],"github":{"requests":0,"ms":0},"failed":false}
+# cloud task dispatch refused { error: 'Error', code: undefined }
+# cloud task dispatch refused { error: 'Error', code: undefined }
+# cloud task dispatch refused { error: 'Error', code: undefined }
+# cloud task dispatch refused { error: 'ComputerError', code: 409 }
+# cloud task dispatch refused { error: 'ComputerError', code: 409 }
+# cloud task dispatch refused { error: 'ComputerError', code: 409 }
+# (node:207) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:207) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: a bound task-form source keeps the selected cloud placement with cloud model target
+ok 89 - a bound task-form source keeps the selected cloud placement with cloud model target
+  ---
+  duration_ms: 527.316304
+  type: 'test'
+  ...
+# Subtest: a bound task-form source keeps the selected cloud placement with omitted model target
+ok 90 - a bound task-form source keeps the selected cloud placement with omitted model target
+  ---
+  duration_ms: 14.243478
+  type: 'test'
+  ...
+# Subtest: a missing task-form source cannot prepare or dispatch a cloud repository
+ok 91 - a missing task-form source cannot prepare or dispatch a cloud repository
+  ---
+  duration_ms: 5.466551
+  type: 'test'
+  ...
+# Subtest: a owner task-form source cannot prepare or dispatch a cloud repository
+ok 92 - a owner task-form source cannot prepare or dispatch a cloud repository
+  ---
+  duration_ms: 7.182502
+  type: 'test'
+  ...
+# Subtest: a bot task-form source cannot prepare or dispatch a cloud repository
+ok 93 - a bot task-form source cannot prepare or dispatch a cloud repository
+  ---
+  duration_ms: 5.859033
+  type: 'test'
+  ...
+# Subtest: a issue task-form source cannot prepare or dispatch a cloud repository
+ok 94 - a issue task-form source cannot prepare or dispatch a cloud repository
+  ---
+  duration_ms: 4.443086
+  type: 'test'
+  ...
+# Subtest: a unbound task-form source cannot prepare or dispatch a cloud repository
+ok 95 - a unbound task-form source cannot prepare or dispatch a cloud repository
+  ---
+  duration_ms: 4.417668
+  type: 'test'
+  ...
+# Subtest: a kind task-form source cannot prepare or dispatch a cloud repository
+ok 96 - a kind task-form source cannot prepare or dispatch a cloud repository
+  ---
+  duration_ms: 5.036742
+  type: 'test'
+  ...
+# Subtest: a undelivered task-form source cannot prepare or dispatch a cloud repository
+ok 97 - a undelivered task-form source cannot prepare or dispatch a cloud repository
+  ---
+  duration_ms: 5.11551
+  type: 'test'
+  ...
+# Subtest: a device task-form source cannot prepare or dispatch a cloud repository
+ok 98 - a device task-form source cannot prepare or dispatch a cloud repository
+  ---
+  duration_ms: 5.097994
+  type: 'test'
+  ...
+# Subtest: a malformed task-form source cannot prepare or dispatch a cloud repository
+ok 99 - a malformed task-form source cannot prepare or dispatch a cloud repository
+  ---
+  duration_ms: 4.486852
+  type: 'test'
+  ...
+# Subtest: a null task-form source cannot prepare or dispatch a cloud repository
+ok 100 - a null task-form source cannot prepare or dispatch a cloud repository
+  ---
+  duration_ms: 4.7438
+  type: 'test'
+  ...
+# Subtest: ordinary existing-issue chat retains automatic placement and its selected Profile
+ok 101 - ordinary existing-issue chat retains automatic placement and its selected Profile
+  ---
+  duration_ms: 8.911089
+  type: 'test'
+  ...
+# Subtest: a cloud task-form choice overrides local preferences before selection when the model omits target
+ok 102 - a cloud task-form choice overrides local preferences before selection when the model omits target
+  ---
+  duration_ms: 8.52612
+  type: 'test'
+  ...
+# Subtest: cloud startup succeeds only after both machine preparation and lifecycle launch
+ok 103 - cloud startup succeeds only after both machine preparation and lifecycle launch
+  ---
+  duration_ms: 2.865054
+  type: 'test'
+  ...
+# Subtest: a requested specification selects the planner before normal desktop admission
+ok 104 - a requested specification selects the planner before normal desktop admission
+  ---
+  duration_ms: 6.3341
+  type: 'test'
+  ...
+# Subtest: a pending specification selects the planner before normal desktop admission
+ok 105 - a pending specification selects the planner before normal desktop admission
+  ---
+  duration_ms: 5.131415
+  type: 'test'
+  ...
+# Subtest: a desktop profile admission refusal reaches the tool with safe guidance and starts no run
+ok 106 - a desktop profile admission refusal reaches the tool with safe guidance and starts no run
+  ---
+  duration_ms: 5.006376
+  type: 'test'
+  ...
+# Subtest: direct desktop callers retain a profile refusal code and safe guidance without exception details
+ok 107 - direct desktop callers retain a profile refusal code and safe guidance without exception details
+  ---
+  duration_ms: 1.843663
+  type: 'test'
+  ...
+# Subtest: model arguments cannot grant local recovery; only the separate host placement argument can
+ok 108 - model arguments cannot grant local recovery; only the separate host placement argument can
+  ---
+  duration_ms: 5.236994
+  type: 'test'
+  ...
+# Subtest: a machine failure uses the unclaimed infrastructure-failure path without requesting a user stop
+ok 109 - a machine failure uses the unclaimed infrastructure-failure path without requesting a user stop
+  ---
+  duration_ms: 12.878008
+  type: 'test'
+  ...
+# Subtest: a lifecycle failure uses the unclaimed infrastructure-failure path without requesting a user stop
+ok 110 - a lifecycle failure uses the unclaimed infrastructure-failure path without requesting a user stop
+  ---
+  duration_ms: 3.608947
+  type: 'test'
+  ...
+# Subtest: a lost startup-failure race grants no local placement recovery or failed-run ancestry
+ok 111 - a lost startup-failure race grants no local placement recovery or failed-run ancestry
+  ---
+  duration_ms: 2.5905
+  type: 'test'
+  ...
+# Subtest: a sleeping Bot dispatches codex with its selected subscription, without a separate wake tool
+ok 112 - a sleeping Bot dispatches codex with its selected subscription, without a separate wake tool
+  ---
+  duration_ms: 4.944112
+  type: 'test'
+  ...
+# Subtest: a sleeping Bot dispatches codex with its selected api_key, without a separate wake tool
+ok 113 - a sleeping Bot dispatches codex with its selected api_key, without a separate wake tool
+  ---
+  duration_ms: 4.82347
+  type: 'test'
+  ...
+# Subtest: a sleeping Bot dispatches claude_code with its selected subscription, without a separate wake tool
+ok 114 - a sleeping Bot dispatches claude_code with its selected subscription, without a separate wake tool
+  ---
+  duration_ms: 5.030954
+  type: 'test'
+  ...
+# Subtest: a sleeping Bot dispatches claude_code with its selected api_key, without a separate wake tool
+ok 115 - a sleeping Bot dispatches claude_code with its selected api_key, without a separate wake tool
+  ---
+  duration_ms: 5.035982
+  type: 'test'
+  ...
+# Subtest: a owner refusal performs no cloud preparation or queue write
+ok 116 - a owner refusal performs no cloud preparation or queue write
+  ---
+  duration_ms: 0.35796
+  type: 'test'
+  ...
+# Subtest: a runtime refusal performs no cloud preparation or queue write
+ok 117 - a runtime refusal performs no cloud preparation or queue write
+  ---
+  duration_ms: 0.150697
+  type: 'test'
+  ...
+# Subtest: a workspace refusal performs no cloud preparation or queue write
+ok 118 - a workspace refusal performs no cloud preparation or queue write
+  ---
+  duration_ms: 0.591583
+  type: 'test'
+  ...
+# Subtest: a issue refusal performs no cloud preparation or queue write
+ok 119 - a issue refusal performs no cloud preparation or queue write
+  ---
+  duration_ms: 0.479063
+  type: 'test'
+  ...
+# Subtest: a policy refusal performs no cloud preparation or queue write
+ok 120 - a policy refusal performs no cloud preparation or queue write
+  ---
+  duration_ms: 0.935182
+  type: 'test'
+  ...
+# Subtest: a suggestion refusal performs no cloud preparation or queue write
+ok 121 - a suggestion refusal performs no cloud preparation or queue write
+  ---
+  duration_ms: 0.681859
+  type: 'test'
+  ...
+# Subtest: a subscription refusal performs no cloud preparation or queue write
+ok 122 - a subscription refusal performs no cloud preparation or queue write
+  ---
+  duration_ms: 1.586345
+  type: 'test'
+  ...
+# Subtest: a key-switch refusal performs no cloud preparation or queue write
+ok 123 - a key-switch refusal performs no cloud preparation or queue write
+  ---
+  duration_ms: 0.955612
+  type: 'test'
+  ...
+# cloud task dispatch refused { error: 'ComputerError', code: 409 }
+# cloud task dispatch refused { error: 'Error', code: undefined }
+# Subtest: both actual Factory read tools return their refusal unchanged while an owned child keeps ERROR
+ok 124 - both actual Factory read tools return their refusal unchanged while an owned child keeps ERROR
+  ---
+  duration_ms: 44.965026
+  type: 'test'
+  ...
+# Subtest: preparation permits authorized quota fallback and leaves the original selection for queue-time validation
+ok 125 - preparation permits authorized quota fallback and leaves the original selection for queue-time validation
+  ---
+  duration_ms: 5.636877
+  type: 'test'
+  ...
+# Subtest: desktop dispatch rejects workspace access before model resolution
+ok 126 - desktop dispatch rejects workspace access before model resolution
+  ---
+  duration_ms: 0.60325
+  type: 'test'
+  ...
+# Subtest: desktop dispatch rejects issue access before model resolution
+ok 127 - desktop dispatch rejects issue access before model resolution
+  ---
+  duration_ms: 0.646035
+  type: 'test'
+  ...
+# Subtest: a wake failure queues no run or continuation write for the ended thread
+ok 128 - a wake failure queues no run or continuation write for the ended thread
+  ---
+  duration_ms: 1.889592
+  type: 'test'
+  ...
+# Subtest: a wake cannot swap the selected Agent, even inside the same workspace
+ok 129 - a wake cannot swap the selected Agent, even inside the same workspace
+  ---
+  duration_ms: 0.630371
+  type: 'test'
+  ...
+# Subtest: a credential revoked during the wake is still rejected by the queue
+ok 130 - a credential revoked during the wake is still rejected by the queue
+  ---
+  duration_ms: 1.277859
+  type: 'test'
+  ...
+# Subtest: workspace access revoked during the wake stops before queueing a run
+ok 131 - workspace access revoked during the wake stops before queueing a run
+  ---
+  duration_ms: 1.307583
+  type: 'test'
+  ...
+# Subtest: a repeated dispatch keeps its queue key and one run after waking once
+ok 132 - a repeated dispatch keeps its queue key and one run after waking once
+  ---
+  duration_ms: 5.098836
+  type: 'test'
+  ...
+# Subtest: a completed thread retains its model, binding, ancestry and read-only policy through wake
+ok 133 - a completed thread retains its model, binding, ancestry and read-only policy through wake
+  ---
+  duration_ms: 10.311222
+  type: 'test'
+  ...
+# Subtest: a working thread receives its message without waking or reselecting anything
+ok 134 - a working thread receives its message without waking or reselecting anything
+  ---
+  duration_ms: 1.061211
+  type: 'test'
+  ...
+1..134
+# tests 146
+# suites 4
+# pass 146
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5293.213328

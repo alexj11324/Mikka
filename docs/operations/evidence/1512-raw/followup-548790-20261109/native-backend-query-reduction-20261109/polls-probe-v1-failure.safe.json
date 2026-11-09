@@ -1,0 +1,144 @@
+{
+  "schema": "issue1512.device-polls-first-probe-failure.v1",
+  "recordedAt": "2026-11-09T03:11:15.115488+00:00",
+  "runId": 42553864534,
+  "jobId": 128955152580,
+  "source": {
+    "candidate": "c1ac101fa068bbda26b19e342f8e228076e68707",
+    "tree": "2a35e4a4afd37b2b9172d20dd433758e7b9ab854",
+    "baseline": "d4f3c6be8137d906407711c6ea3ac8808ab1d860",
+    "files": [
+      {
+        "path": "app/v1/devices/[deviceId]/runs/route.ts",
+        "bytes": 1305,
+        "sha256": "0d53b2cd3cbc133d2a8235041c1853dac9f317866764c52554aea3a809743b5c",
+        "gitBlob": "5a4c4f8486239161b325b9774b3086afe666dfa9",
+        "baselineGitBlob": "3bbb71a8a7d249eb517d75a95986cf75d1994168"
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/repos/route.ts",
+        "bytes": 1983,
+        "sha256": "5da882dfd3be76380d8130a6082741107227f94aaabd1d4d12f6e9701291f888",
+        "gitBlob": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b",
+        "baselineGitBlob": "9fe33b05a9570ab59e4bb041f9a1344c44ab31ad"
+      },
+      {
+        "path": "lib/device-heartbeat.db.test.ts",
+        "bytes": 21505,
+        "sha256": "6e8a9ddcb8855de98b443531b6d7524952e740d49eb38194a17234d87eda9b6d",
+        "gitBlob": "27bbb720ac8f5bd3716787db62eb11833e9f3530",
+        "baselineGitBlob": "68423cee4e9fa1f0f89274ed3dec67859e6f164b"
+      },
+      {
+        "path": "lib/device-unit-fence.db.test.ts",
+        "bytes": 11425,
+        "sha256": "e4f1ee4f90de93ce22f74e5dc97a3475816a5d2a932b0d327ee2441953224d51",
+        "gitBlob": "bc65b3faf494d2fd7c797b68f34d04227df38b7a",
+        "baselineGitBlob": "a5237da052e304897cd48afdebc42ee6f7571d96"
+      }
+    ]
+  },
+  "actualOutcome": {
+    "jobConclusion": "failure",
+    "testStep": "Python subprocess timeout after 180 seconds in baseline segment 1",
+    "assertionRedEstablished": false,
+    "completeSuiteSummaryObserved": false,
+    "visiblePassedTopLevelTests": 1,
+    "testsVisible": [
+      "normal demo cleanup stops active runs, preserves history and excludes prefix/version lookalikes"
+    ],
+    "candidateExecutionStarted": false,
+    "remainingFiveSegmentsExecuted": false,
+    "coverage": "TAP may buffer later test-file output; absence of visible test lines is not proof that their child processes did not run. No completed result is claimed for them."
+  },
+  "postgres": {
+    "version": "17.11 (Debian 17.11-1.pgdg13+2)",
+    "number": "170011",
+    "database": "mikka_1512_polls_e2e"
+  },
+  "node": "v24.22.1",
+  "diagnosis": {
+    "confirmed": "The baseline first canonical command did not exit within its original 180-second subprocess deadline. It emitted one completed demo cleanup test and a later transport sample. No overall TAP summary exists.",
+    "causeOfNonExit": "unknown; no active process or lock snapshot was captured in this run",
+    "observedContainerEvents": [
+      "expected test-initiated backend termination",
+      "one missing issues relation in an isolated test schema",
+      "periodic health probe role-root rejection (health command uses default role; application PostgreSQL operations and setup succeeded)"
+    ],
+    "noUnprovenCauseAssigned": true,
+    "canonicalRunner": "scripts/run-db-tests.mjs executes the package script unchanged and does not add a force-exit flag. suiteEnv adds only required DB flags and configured port.",
+    "existingReference": {
+      "source": "c046 actual CI PG1, already archived; not reused as current candidate validation",
+      "firstSegmentTests": 16,
+      "firstSegmentPass": 16,
+      "firstSegmentDurationMs": 39450.645703,
+      "wholeScriptSeconds": 72.8,
+      "originalLog": {
+        "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/ci-c04690/private/128930709969-pg1.original.log",
+        "bytes": 1040134,
+        "sha256": "fd80926bdba1448f86f650de8822a3085b462f0d423cc3ee6671aa6209c006dd",
+        "gitBlob": "8a3eaa0409ae45ba3667b94ac47bae39afbaead3"
+      }
+    }
+  },
+  "cleanup": {
+    "baselineWorktreeRemoved": true,
+    "stopContainersStep": "success",
+    "dockerContainerRemoved": true,
+    "dockerNetworkRemoved": true,
+    "githubOrphanCleanupObserved": true,
+    "jobCompletedAt": "2026-11-09T03:03:34Z",
+    "activeOwnedComputeResources": 0,
+    "ownedOpsRefRetainedForAuthorizedFollowup": true
+  },
+  "nativeGateRemains": {
+    "native": 473,
+    "web": 402,
+    "pass": false
+  },
+  "originals": [
+    {
+      "path": "device-polls-probe-original.zip",
+      "bytes": 6599,
+      "sha256": "704e185c4babea468dc87879b533d3dc105f4e2908124aee188fa93f6324623a",
+      "gitBlob": "616489e221c3f6476adab1c358be5494c19037e0"
+    },
+    {
+      "path": "polls-probe-job.original.log",
+      "bytes": 411450,
+      "sha256": "88241227ce9fa72bbe9d721f3d3b34a998f0fb1f76b77b63831b6e1d89f7fba2",
+      "gitBlob": "fce188ece8ab556f4a74b25886c48db99fee147f"
+    },
+    {
+      "path": "polls-artifact-download.safe.json",
+      "bytes": 1522,
+      "sha256": "37fa011bd45496219a345687090153852538d4538700dd096820fab57beb4013",
+      "gitBlob": "342705e8b19174ec1d1b733ced9b28ba90e1ce3a"
+    },
+    {
+      "path": "polls-ci-original/baseline-red-segment-1.original.log",
+      "bytes": 941,
+      "sha256": "f045375d06a66561600073270fe968edfbcd76b4482b7cf9e83ba66315766d16",
+      "gitBlob": "0044ce53e48cacdcc172c33b5347566dd431975d"
+    },
+    {
+      "path": "polls-ci-original/database-setup.original.log",
+      "bytes": 20231,
+      "sha256": "fcafc7f1bc92c8821840175cf3de269a0b07136050ca944532bb3e3ded3372ed",
+      "gitBlob": "ae266dd561cbecbd577dbaca183e9fad1d5da185"
+    },
+    {
+      "path": "polls-ci-original/paired.safe.json",
+      "bytes": 2607,
+      "sha256": "4d146a99e590a4d03141ff25b86bedf20e3f32219171e7b4ad7a3d003ef9dfee",
+      "gitBlob": "dfd6ce3cf75b7b42295a1d60e087a78e625beae0"
+    },
+    {
+      "path": "polls-ci-original/source.safe.json",
+      "bytes": 2326,
+      "sha256": "134fe41a5e64986098984cdafa6be318119f5d7501f4dd8ff1cf9f2e5c3b5bfe",
+      "gitBlob": "84e1f6b736e46fb282b9cd1ceba510e24594e508"
+    }
+  ],
+  "authorizedNextStep": "Workflow-only diagnostic followup: same canonical test set and 180-second deadline, spec reporter, one bounded process/PG wait snapshot near deadline, owned process-group cleanup, disposable per-segment DB clone and continue remaining segments. Any timeout remains RED; source code unchanged."
+}

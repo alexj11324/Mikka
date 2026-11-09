@@ -1,0 +1,69 @@
+{
+  "sourceRevision": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+  "receipt": {
+    "bytes": 1348,
+    "sha256": "aac5169ba36d1ce5be053911eb6a5fa6d2e64a452f0b34911fadfe442c9216b5"
+  },
+  "environment": {
+    "node": "v24.22.2",
+    "platform": "linux",
+    "postgres": "real loopback",
+    "requests_per_condition": 600,
+    "queries_per_request": 3
+  },
+  "warmupPerCondition": 100,
+  "measuredPerCondition": 600,
+  "totalMeasuredRequests": 1200,
+  "queriesPerRequest": 3,
+  "design": "Sequential conditions in alternating 20-request blocks with alternating order; not a per-request randomized paired-statistics experiment.",
+  "handler": {
+    "off": {
+      "n": 600,
+      "mean_ms": 0.3718352466666721,
+      "p50_ms": 0.31988400000000183,
+      "p95_ms": 0.6043230000000221,
+      "p99_ms": 1.1887460000000374
+    },
+    "on": {
+      "n": 600,
+      "mean_ms": 0.7164181533333314,
+      "p50_ms": 0.6461860000001707,
+      "p95_ms": 1.0409030000000712,
+      "p99_ms": 2.0854009999999334
+    },
+    "delta_mean_ms": 0.34458290666665925,
+    "delta_p95_ms": 0.43658000000004904
+  },
+  "roundTrip": {
+    "off": {
+      "n": 600,
+      "mean_ms": 0.6335694116666621,
+      "p50_ms": 0.5292990000000373,
+      "p95_ms": 1.0960360000000264,
+      "p99_ms": 2.7947229999999763
+    },
+    "on": {
+      "n": 600,
+      "mean_ms": 0.9801910766666668,
+      "p50_ms": 0.8727990000002137,
+      "p95_ms": 1.536832000000004,
+      "p99_ms": 2.8573880000000145
+    },
+    "delta_mean_ms": 0.3466216650000047,
+    "delta_p95_ms": 0.44079599999997754
+  },
+  "retention": {
+    "critical": "600/600",
+    "controlled_failures": "20/20",
+    "linked_error_logs": 20,
+    "safe_cause_chain": true,
+    "raw_sql_error_exported": false
+  },
+  "limits": [
+    "Actual loopback HTTP and pg driver on this GitHub runner; async batched memory exporters.",
+    "Excludes remote PostHog collector delivery, model/provider work and cloud provisioning.",
+    "The memory-only overhead process has its own 20 local failures; it is not the separately exported set of 20 trace IDs.",
+    "Only distribution summaries were emitted. No per-request samples, confidence interval or independent rerun are claimed.",
+    "Exact 1d126 baseline, before later flush, returned-refusal and SQL changes. This is not validation of those later changes."
+  ]
+}

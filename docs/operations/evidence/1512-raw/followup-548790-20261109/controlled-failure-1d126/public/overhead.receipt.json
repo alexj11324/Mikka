@@ -1,0 +1,51 @@
+{
+  "environment": {
+    "node": "v24.22.2",
+    "platform": "linux",
+    "postgres": "real loopback",
+    "requests_per_condition": 600,
+    "queries_per_request": 3
+  },
+  "boundary": "Real HTTP and pg driver; async batched in-memory collectors. Excludes external collector network, model and cloud provisioning latency.",
+  "handler": {
+    "off": {
+      "n": 600,
+      "mean_ms": 0.3718352466666721,
+      "p50_ms": 0.31988400000000183,
+      "p95_ms": 0.6043230000000221,
+      "p99_ms": 1.1887460000000374
+    },
+    "on": {
+      "n": 600,
+      "mean_ms": 0.7164181533333314,
+      "p50_ms": 0.6461860000001707,
+      "p95_ms": 1.0409030000000712,
+      "p99_ms": 2.0854009999999334
+    },
+    "delta_mean_ms": 0.34458290666665925,
+    "delta_p95_ms": 0.43658000000004904
+  },
+  "round_trip": {
+    "off": {
+      "n": 600,
+      "mean_ms": 0.6335694116666621,
+      "p50_ms": 0.5292990000000373,
+      "p95_ms": 1.0960360000000264,
+      "p99_ms": 2.7947229999999763
+    },
+    "on": {
+      "n": 600,
+      "mean_ms": 0.9801910766666668,
+      "p50_ms": 0.8727990000002137,
+      "p95_ms": 1.536832000000004,
+      "p99_ms": 2.8573880000000145
+    }
+  },
+  "retention": {
+    "critical": "600/600",
+    "controlled_failures": "20/20",
+    "linked_error_logs": 20,
+    "safe_cause_chain": true,
+    "raw_sql_error_exported": false
+  }
+}

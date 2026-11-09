@@ -1,0 +1,46 @@
+{
+  "schema": 1,
+  "label": "integrated-focused-units",
+  "argv": [
+    "node",
+    "--experimental-test-module-mocks",
+    "--import",
+    "./scripts/server-test.mjs",
+    "--import",
+    "tsx",
+    "--test",
+    "--test-reporter=tap",
+    "lib/tracing/tracing.test.ts",
+    "lib/tracing/clients.test.ts",
+    "lib/tracing/daemon-settings.test.ts",
+    "lib/tracing/run-context.test.ts",
+    "lib/tracing/ai.test.ts",
+    "lib/tracing/logs.test.ts",
+    "lib/coordinator/repository-resolution.test.ts",
+    "tests/cloud-dispatch-startup.test.ts",
+    "lib/personal-policy.test.ts",
+    "lib/desktop-rpc/read-batch-context.test.ts",
+    "lib/desktop-rpc/read-batch.test.ts"
+  ],
+  "cwd": "/workspace/scratch/812e3b7d6d45/issue1512-integration-checkout",
+  "sourceTree": "5ffff474defa47634334484fe18916130e3f72d8",
+  "sourceTreeUnchanged": true,
+  "trackedWorktreeUnchanged": true,
+  "start": "2026-11-09T03:14:48.203010+00:00",
+  "end": "2026-11-09T03:14:53.550581+00:00",
+  "durationSeconds": 5.348,
+  "exitCode": 0,
+  "log": {
+    "path": "/workspace/scratch/812e3b7d6d45/issue1512-evidence-work/integrated-source-validation-20261109/integrated-focused-units.original.log",
+    "bytes": 43728,
+    "sha256": "98bf8d5fddd276c05c38d60391666d37d693a1e6a3e94130cb80a6f15f6a0197"
+  },
+  "environment": {
+    "pinnedPnpm": "10.34.3",
+    "nodeOptions": "--max-old-space-size=4096",
+    "databaseOrCredentialEnvironmentForwarded": false,
+    "sourceSecurityOrSandboxOverrides": false
+  },
+  "published": false,
+  "productionAccepted": false
+}

@@ -1,0 +1,19 @@
+{
+  "reason": "Actual controlled-failure log detail returns lower-case severity_text=error; native formatted bool returns True/False in APM and 1/0 in log projection.",
+  "originalTemplatesModified": false,
+  "originalUppercaseCountPreserved": "private/posthog/s1.log_counts.original.json",
+  "summaryCorrection": {
+    "original": "countIf(severity_text = 'ERROR')",
+    "current": "countIf(lower(severity_text) = 'error')",
+    "scopeOrFilteringChanged": false
+  },
+  "normalization": {
+    "booleans": "Accept only observed True/False, true/false or 1/0, retain raw spelling.",
+    "severity": "Retain raw severity_text and compare lowercased exact error. No INFO or unknown severity promoted."
+  },
+  "detailCountsObserved": {
+    "spanRows": 80,
+    "logRows": 40
+  },
+  "backendValidationNotYetComplete": true
+}

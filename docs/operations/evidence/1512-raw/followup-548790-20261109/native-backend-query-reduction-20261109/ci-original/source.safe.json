@@ -1,0 +1,36 @@
+{
+  "schema": "issue1512.device-sql-probe-source.v1",
+  "repository": "alexj11324/Mikka",
+  "ref": "refs/heads/ops/1512-device-sql-probe-20261109",
+  "runId": "42551207785",
+  "runAttempt": 1,
+  "baseline": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+  "baselineTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+  "candidate": "d4f3c6be8137d906407711c6ea3ac8808ab1d860",
+  "candidateTree": "0cc30d9e0ca2f4c37b4dabdc58f0813facdce3fa",
+  "files": [
+    {
+      "path": "lib/device-enrollment.ts",
+      "bytes": 1050,
+      "sha256": "59a025174235a9bbb5a17aa5c654a96d52deb002bb72859ae655af0322b0fede",
+      "gitBlob": "8fe53cb39985150e5fc05daa6370121cb5426d53",
+      "baselineGitBlob": "f9490f18359d2d3a9b61b068bfb14ef4b965144d"
+    },
+    {
+      "path": "lib/device-management.ts",
+      "bytes": 3206,
+      "sha256": "17fb62c6033acded70487b56e09f989410b782d4afaaa0445988442b5f5754b1",
+      "gitBlob": "c2243c5732d67b3ff5444196ce3b45e9aca67805",
+      "baselineGitBlob": "c2e44913f843391095232bdda81d774a58ff9d24"
+    },
+    {
+      "path": "lib/device-enrollment.db.test.ts",
+      "bytes": 24843,
+      "sha256": "2fa9b163ce0219171d4bc46d5107d1db55628dc847f88dc33165ec0e5028f526",
+      "gitBlob": "071b2243d35cd6fdd97b7be0f17f21728578c537",
+      "baselineGitBlob": "431897540dc97e29fbc514ecb1ccd1dbf5d0c9ed"
+    }
+  ],
+  "workflowSha256": "f57f57cb1d43fcb0436b02142311fb3cd1124e07943a2fe39ce50080b333983d",
+  "boundary": "Dedicated PG17 service only; no production configuration, identity, model execution or Native acceptance."
+}

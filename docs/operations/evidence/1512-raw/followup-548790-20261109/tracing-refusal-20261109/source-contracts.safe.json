@@ -1,0 +1,65 @@
+{
+  "dependencySource": "Installed pinned official dependency sources, unchanged. Exact application baseline M1 plus frozen flush patch common to both RED and GREEN.",
+  "workflowVersion": "5.2.3",
+  "otelTraceVersion": "2.12.0",
+  "sources": [
+    {
+      "label": "officialWorkflowTelemetry",
+      "path": "/workspace/scratch/af05d9e4f31e/Mikka-observability-1512/node_modules/.pnpm/@workflow+core@5.2.3_@opentelemetry+api@1.10.0_ws@8.22.0/node_modules/@workflow/core/dist/telemetry.js",
+      "bytes": 57882,
+      "sha256": "cd68b1af79068a5538b53af7dadf03cb5b4b4f661c09826400bbba6d04124760",
+      "contract": "Actual official trace helper used by fixture; its successful callback sets parent step status OK then ends it.",
+      "preservedAs": "contracts/officialWorkflowTelemetry.js"
+    },
+    {
+      "label": "officialSpanStatus",
+      "path": "/workspace/scratch/af05d9e4f31e/Mikka-observability-1512/node_modules/.pnpm/@opentelemetry+sdk-trace@2.12.0_@opentelemetry+api@1.10.0/node_modules/@opentelemetry/sdk-trace/build/src/Span.js",
+      "bytes": 15656,
+      "sha256": "4730a2f1696940de6ff13891dd79aad9d144d58afd530425920ae02128de0144",
+      "contract": "An OK status overrides prior ERROR and later status changes are ignored. Relevant to refused-result proposal.",
+      "preservedAs": "contracts/officialSpanStatus.js"
+    },
+    {
+      "label": "lib/tracing/context.ts",
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-tracing-core-copy/lib/tracing/context.ts",
+      "bytes": 4360,
+      "sha256": "c0c6ced12ec5f1f2f406221b1dd94b9bf2af72c130bc706e615beab2f774b168",
+      "preservedAs": "contracts/product/lib/tracing/context.ts"
+    },
+    {
+      "label": "lib/tracing/logs.ts",
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-tracing-core-copy/lib/tracing/logs.ts",
+      "bytes": 4312,
+      "sha256": "08286b12ffb5db4010d5dbcc887726840792a79417bafa7d2ae26e72910a2e3d",
+      "preservedAs": "contracts/product/lib/tracing/logs.ts"
+    },
+    {
+      "label": "lib/tracing/sanitize.ts",
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-tracing-core-copy/lib/tracing/sanitize.ts",
+      "bytes": 6160,
+      "sha256": "39093ea5a24982773e7292f2d75fbc1dc3411787f37cf4a4957088e4285bef03",
+      "preservedAs": "contracts/product/lib/tracing/sanitize.ts"
+    },
+    {
+      "label": "packages/protocol/src/tracing.ts",
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-tracing-core-copy/packages/protocol/src/tracing.ts",
+      "bytes": 2589,
+      "sha256": "cef008055b6401d04ba96ba593312592caa4080c1afd911d1a69d8e3aeddcf27",
+      "preservedAs": "contracts/product/packages/protocol/src/tracing.ts"
+    },
+    {
+      "label": "scripts/server-test.mjs",
+      "path": "/workspace/scratch/812e3b7d6d45/issue1512-tracing-core-copy/scripts/server-test.mjs",
+      "bytes": 408,
+      "sha256": "b58352ccee3ea3f88525bbe0acc3b606f3dfbe0f0047d7502b148d13bbf485c5",
+      "preservedAs": "contracts/product/scripts/server-test.mjs"
+    }
+  ],
+  "semantics": [
+    "Workflow trace success sets its own span OK after the callback returns; original asToolResult returned an error object before that point.",
+    "OTel Span.setStatus permits OK to replace prior ERROR, so marking the SDK-owned span would not survive.",
+    "withRunSpan owns a distinct child, catches real thrown errors with safeErrorAttributes, and never changes status on successful callback completion.",
+    "Repository returned Resolution errors are explicitly marked inside resolveRepository, then a closed code is applied to the enclosing owned dispatch span before it ends.",
+    "Existing sanitizers discard messages, stacks, arbitrary error content and unapproved attribute keys. No arbitrary returned object is scanned."
+  ]
+}

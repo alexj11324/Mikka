@@ -1,0 +1,9 @@
+TAP version 13
+# Failed to wake the Coordinator { name: 'Error', code: undefined }
+# Subtest: normal demo cleanup stops active runs, preserves history and excludes prefix/version lookalikes
+ok 1 - normal demo cleanup stops active runs, preserves history and excludes prefix/version lookalikes
+  ---
+  duration_ms: 5671.813636
+  type: 'test'
+  ...
+# {"level":"info","msg":"db_transport_sample","timestamp":"2026-11-09T03:00:55.117Z","runtime":"310547e2-16c1-40b9-a0e0-a64504015f47","windowStart":"2026-11-09T03:00:32.371Z","windowEnd":"2026-11-09T03:00:55.117Z","elapsedMs":22746,"measurement":"postgres_protocol_plaintext_received","pgProtocolReceiveBytes":20019,"knownPgProtocolReceiveBytes":20019,"connections":8,"scopes":["default","request","workspace"],"unknownReadings":0,"coverage":"observed_connections","startupExcluded":true,"excludes":["TLS","TCP","startup_before_registration","other_runtimes","Go_workers","supplier_metering"]}

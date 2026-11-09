@@ -1,0 +1,22 @@
+{
+  "command": [
+    "python3",
+    "public/reconcile-controlled-failure.py"
+  ],
+  "startedAt": "2026-11-09T02:54:07.937499+00:00",
+  "endedAt": "2026-11-09T02:54:07.984600+00:00",
+  "exitCode": 0,
+  "source": {
+    "path": "reconcile-controlled-failure.py",
+    "bytes": 18512,
+    "sha256": "654513ccecba5834e649e0d18e8566515b043777a1747193867eb2bcb0b252b3"
+  },
+  "log": {
+    "path": "offline-reconciliation.log",
+    "bytes": 484,
+    "sha256": "d8f60b90c46dd52221fede90bbd1dbf8ed3cc7118a043d92b7415ff83a4488b9"
+  },
+  "networkCalls": 0,
+  "modelCalls": 0,
+  "originalResponsesOrReceiptsModified": false
+}

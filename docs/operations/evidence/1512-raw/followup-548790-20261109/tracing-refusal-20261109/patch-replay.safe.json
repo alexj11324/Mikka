@@ -1,0 +1,12 @@
+{
+  "baselineRevision": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "patch": {
+    "path": "returned-refusal.patch",
+    "bytes": 22010,
+    "sha256": "70f2724b5d1b88311f874c53099a9815a9bc8d499547353b2fd8959ffbf1492e"
+  },
+  "gitApplyCheckExit": 0,
+  "gitApplyExit": 0,
+  "sixFinalFilesByteEqual": true,
+  "temporaryReplayRemoved": true
+}

@@ -1,0 +1,366 @@
+{
+  "schemaVersion": 1,
+  "kind": "closed_business_refusal_tracing_fix",
+  "frozenAt": "2026-11-09T02:36:56.109455+00:00",
+  "baselineRevision": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "copy": "/workspace/scratch/812e3b7d6d45/issue1512-tracing-core-copy",
+  "changedFiles": [
+    {
+      "path": "lib/dispatch-timing.ts",
+      "baseline": {
+        "bytes": 3006,
+        "sha256": "51dd22558c3d50f88e19c64d1b11d1225e568dd74954f4d59dc256d426fc7c00"
+      },
+      "final": {
+        "bytes": 4016,
+        "sha256": "9c8282c0d2b0a0b9ea8bf904eaade82ce5337c3e0abf1706ece87d485457a700"
+      },
+      "mode": "100644"
+    },
+    {
+      "path": "lib/coordinator/repository-resolution.ts",
+      "baseline": {
+        "bytes": 11110,
+        "sha256": "fb746519443b7e3a02647bb9c55929b2023e4d9afb5682d92fc3977823bf1d77"
+      },
+      "final": {
+        "bytes": 11263,
+        "sha256": "0f2974a3c864dd9384122f811dcbec56188c28d3a19566a3b8e1db72264902d6"
+      },
+      "mode": "100644"
+    },
+    {
+      "path": "workflows/coordinator/steps.ts",
+      "baseline": {
+        "bytes": 91023,
+        "sha256": "79f2c771ab0eaf305a85c13547f0c22b526cb40f7d0622c905def3845fc3f9f0"
+      },
+      "final": {
+        "bytes": 91110,
+        "sha256": "dff7bb2a993b9510cc70ecde1c5b2bc03e6a8fb5ffa1c68919ce49e19d1a57ad"
+      },
+      "mode": "100644"
+    },
+    {
+      "path": "workflows/coordinator/factory-steps.ts",
+      "baseline": {
+        "bytes": 11826,
+        "sha256": "8750d7b19bfe516194d7146205e0ff72d5ec8208944b8be352bfad8a0b454e6e"
+      },
+      "final": {
+        "bytes": 11913,
+        "sha256": "a60e07f292989ebab18e2cdb6bfc74e46fd9e12f6c694c1cbb2f62047189b9f6"
+      },
+      "mode": "100644"
+    },
+    {
+      "path": "lib/coordinator/repository-resolution.test.ts",
+      "baseline": {
+        "bytes": 15458,
+        "sha256": "0c62c58a19b96921c5a144f4a6f4ff5dc99754e5b70b1eda42d9b2d0b74bd6e7"
+      },
+      "final": {
+        "bytes": 22314,
+        "sha256": "9a0bedfd3aac7948c84a09dd48d09cc25041092c9f2481799cff5446603acc9c"
+      },
+      "mode": "100644"
+    },
+    {
+      "path": "tests/cloud-dispatch-startup.test.ts",
+      "baseline": {
+        "bytes": 28252,
+        "sha256": "b9e49b8d89cd891575317370c5175e91391168eea4dcf8aa07218d2d82e4f505"
+      },
+      "final": {
+        "bytes": 32351,
+        "sha256": "01445c824a8d9d3474f744fc83a4cf26180d6a0f32002d7f21f28383538865cf"
+      },
+      "mode": "100644"
+    }
+  ],
+  "scope": [
+    "Own coordinator.tool child wraps each existing asToolResult callback before its unchanged catch. Actual FactoryError is marked before conversion to its unchanged business result.",
+    "Only seven existing repository Resolution errors are explicitly marked; no arbitrary result inspection. Existing resolver/listing/authorization/retry and dispatch result are preserved.",
+    "The enclosing owned dispatch span and dispatch_timing.failed reflect those repository refusals. Other returned refusal branches are not claimed covered."
+  ],
+  "closedRepositoryCodes": [
+    "githubNotConnected",
+    "githubNotConfigured",
+    "githubReconnectRequired",
+    "githubUnavailable",
+    "githubRepositoryForbidden",
+    "repositoryNotFound",
+    "repositoryAmbiguous"
+  ],
+  "taxonomy": {
+    "newOwnedSpan": "coordinator.tool",
+    "retention": "withRunSpan existing critical behavior; one extra span per asToolResult invocation",
+    "successLog": "No new success log: coordinator.tool successes remain APM-only under the existing StageLogProcessor prefix list.",
+    "errorLog": "Existing mikka.stage.failed ERROR with the same actual trace/span IDs.",
+    "repositoryErrorType": "DispatchRefusal",
+    "attributes": [
+      "error.type",
+      "mikka.error.code"
+    ],
+    "noNewAttributeKeys": true
+  },
+  "verification": {
+    "sameTestRed": {
+      "tests": 2,
+      "passed": 0,
+      "failed": 2,
+      "exitCode": 1
+    },
+    "sameTestGreen": {
+      "tests": 2,
+      "passed": 2,
+      "failed": 0,
+      "exitCode": 0
+    },
+    "relatedExistingSuites": {
+      "tests": 63,
+      "passed": 63,
+      "failed": 0,
+      "exitCode": 0,
+      "files": [
+        "lib/coordinator/repository-resolution.test.ts",
+        "tests/cloud-dispatch-startup.test.ts",
+        "lib/dispatch-timing.test.ts"
+      ]
+    },
+    "targetedOxlint": {
+      "exitCode": 0,
+      "files": 6,
+      "stdoutBytes": 0
+    },
+    "initialWrongLinterCommand": {
+      "preserved": true,
+      "exitCode": 1,
+      "classification": "Setup/invocation error: this repository uses oxlint, not eslint; module not found before any lint execution."
+    },
+    "patchReplay": "git apply --check + apply on exact six M1 baseline files; final bytes equal.",
+    "notRun": [
+      "Full root/API/frontend typecheck",
+      "Full repository lint or unit suite",
+      "Actual DB or Native acceptance",
+      "Production model invocation or PostHog requery"
+    ]
+  },
+  "behaviorEvidence": [
+    "All seven closed repository codes retain original results; fresh listing remains once, or the original second attempt for githubUnavailable. Dispatch callback remains uncalled on refusal.",
+    "Both actual Factory tools invoke the real Factory store/view over the existing fake pool and return exactly factoryNotFound. Total existing mocked factory SELECT count is two; no model resolution, credential read or queue write.",
+    "Actual pinned official Workflow parent remains OK, while owned child ERROR survives; trace/span parent and ERROR log joins verified.",
+    "Later successful request returns the same object reference and does not inherit a refusal. A throwing content getter is not inspected.",
+    "Malformed non-member host code keeps the existing return result but is not exported by the new repository marker.",
+    "Existing owner, workspace, revoked credential, queue deduplication and cloud startup regression tests pass."
+  ],
+  "limitations": [
+    "Local deterministic unit/integration fixtures use actual product helper code and pinned official Workflow/OTel code with an injected repository lister and existing fake SQL pool. They are not production backend proof or live provider/CLI calls.",
+    "No production causality claim is made for missing APM delivery. This patch concerns visible returned-refusal status and code classification.",
+    "New coordinator.tool critical spans increase telemetry volume by one span per wrapped operation; no measured production volume or cost prediction."
+  ],
+  "sharedSourceModified": false,
+  "frozenFlushFilesVerifiedUnchanged": {
+    "lib/tracing/node.ts": "e1ccb4a2aaba54d8e3be4d27d9ff18b31dd9fc683f72117f6dd0ea730099f4d0",
+    "lib/tracing/logs.test.ts": "6e1f3200889e5f446a0427b4c62d7db3195d58f8d72853bbd1dc6cb03118200b"
+  },
+  "resources": {
+    "actualModelCalls": 0,
+    "networkCalls": 0,
+    "actualDatabaseQueries": 0,
+    "createdCloudResources": 0,
+    "remainingOwnedProcesses": 0
+  },
+  "artifacts": [
+    {
+      "path": "baseline/lib/coordinator/repository-resolution.test.ts",
+      "bytes": 15458,
+      "sha256": "0c62c58a19b96921c5a144f4a6f4ff5dc99754e5b70b1eda42d9b2d0b74bd6e7"
+    },
+    {
+      "path": "baseline/lib/coordinator/repository-resolution.ts",
+      "bytes": 11110,
+      "sha256": "fb746519443b7e3a02647bb9c55929b2023e4d9afb5682d92fc3977823bf1d77"
+    },
+    {
+      "path": "baseline/lib/dispatch-timing.ts",
+      "bytes": 3006,
+      "sha256": "51dd22558c3d50f88e19c64d1b11d1225e568dd74954f4d59dc256d426fc7c00"
+    },
+    {
+      "path": "baseline/tests/cloud-dispatch-startup.test.ts",
+      "bytes": 28252,
+      "sha256": "b9e49b8d89cd891575317370c5175e91391168eea4dcf8aa07218d2d82e4f505"
+    },
+    {
+      "path": "baseline/workflows/coordinator/factory-steps.ts",
+      "bytes": 11826,
+      "sha256": "8750d7b19bfe516194d7146205e0ff72d5ec8208944b8be352bfad8a0b454e6e"
+    },
+    {
+      "path": "baseline/workflows/coordinator/steps.ts",
+      "bytes": 91023,
+      "sha256": "79f2c771ab0eaf305a85c13547f0c22b526cb40f7d0622c905def3845fc3f9f0"
+    },
+    {
+      "path": "contracts/officialSpanStatus.js",
+      "bytes": 15656,
+      "sha256": "4730a2f1696940de6ff13891dd79aad9d144d58afd530425920ae02128de0144"
+    },
+    {
+      "path": "contracts/officialWorkflowTelemetry.js",
+      "bytes": 57882,
+      "sha256": "cd68b1af79068a5538b53af7dadf03cb5b4b4f661c09826400bbba6d04124760"
+    },
+    {
+      "path": "contracts/product/lib/tracing/context.ts",
+      "bytes": 4360,
+      "sha256": "c0c6ced12ec5f1f2f406221b1dd94b9bf2af72c130bc706e615beab2f774b168"
+    },
+    {
+      "path": "contracts/product/lib/tracing/logs.ts",
+      "bytes": 4312,
+      "sha256": "08286b12ffb5db4010d5dbcc887726840792a79417bafa7d2ae26e72910a2e3d"
+    },
+    {
+      "path": "contracts/product/lib/tracing/sanitize.ts",
+      "bytes": 6160,
+      "sha256": "39093ea5a24982773e7292f2d75fbc1dc3411787f37cf4a4957088e4285bef03"
+    },
+    {
+      "path": "contracts/product/packages/protocol/src/tracing.ts",
+      "bytes": 2589,
+      "sha256": "cef008055b6401d04ba96ba593312592caa4080c1afd911d1a69d8e3aeddcf27"
+    },
+    {
+      "path": "contracts/product/scripts/server-test.mjs",
+      "bytes": 408,
+      "sha256": "b58352ccee3ea3f88525bbe0acc3b606f3dfbe0f0047d7502b148d13bbf485c5"
+    },
+    {
+      "path": "final/lib/coordinator/repository-resolution.test.ts",
+      "bytes": 22314,
+      "sha256": "9a0bedfd3aac7948c84a09dd48d09cc25041092c9f2481799cff5446603acc9c"
+    },
+    {
+      "path": "final/lib/coordinator/repository-resolution.ts",
+      "bytes": 11263,
+      "sha256": "0f2974a3c864dd9384122f811dcbec56188c28d3a19566a3b8e1db72264902d6"
+    },
+    {
+      "path": "final/lib/dispatch-timing.ts",
+      "bytes": 4016,
+      "sha256": "9c8282c0d2b0a0b9ea8bf904eaade82ce5337c3e0abf1706ece87d485457a700"
+    },
+    {
+      "path": "final/tests/cloud-dispatch-startup.test.ts",
+      "bytes": 32351,
+      "sha256": "01445c824a8d9d3474f744fc83a4cf26180d6a0f32002d7f21f28383538865cf"
+    },
+    {
+      "path": "final/workflows/coordinator/factory-steps.ts",
+      "bytes": 11913,
+      "sha256": "a60e07f292989ebab18e2cdb6bfc74e46fd9e12f6c694c1cbb2f62047189b9f6"
+    },
+    {
+      "path": "final/workflows/coordinator/steps.ts",
+      "bytes": 91110,
+      "sha256": "dff7bb2a993b9510cc70ecde1c5b2bc03e6a8fb5ffa1c68919ce49e19d1a57ad"
+    },
+    {
+      "path": "patch-replay.safe.json",
+      "bytes": 341,
+      "sha256": "d8a9acf986da77b8068bbbef34b46d9e4cfd11af6c56301480615666ce8e37b0"
+    },
+    {
+      "path": "red/lib/coordinator/repository-resolution.test.ts",
+      "bytes": 22314,
+      "sha256": "9a0bedfd3aac7948c84a09dd48d09cc25041092c9f2481799cff5446603acc9c"
+    },
+    {
+      "path": "red/lib/coordinator/repository-resolution.ts",
+      "bytes": 11110,
+      "sha256": "fb746519443b7e3a02647bb9c55929b2023e4d9afb5682d92fc3977823bf1d77"
+    },
+    {
+      "path": "red/lib/dispatch-timing.ts",
+      "bytes": 3006,
+      "sha256": "51dd22558c3d50f88e19c64d1b11d1225e568dd74954f4d59dc256d426fc7c00"
+    },
+    {
+      "path": "red/tests/cloud-dispatch-startup.test.ts",
+      "bytes": 32351,
+      "sha256": "01445c824a8d9d3474f744fc83a4cf26180d6a0f32002d7f21f28383538865cf"
+    },
+    {
+      "path": "red/workflows/coordinator/factory-steps.ts",
+      "bytes": 11826,
+      "sha256": "8750d7b19bfe516194d7146205e0ff72d5ec8208944b8be352bfad8a0b454e6e"
+    },
+    {
+      "path": "red/workflows/coordinator/steps.ts",
+      "bytes": 91023,
+      "sha256": "79f2c771ab0eaf305a85c13547f0c22b526cb40f7d0622c905def3845fc3f9f0"
+    },
+    {
+      "path": "refusal.GREEN-run.safe.json",
+      "bytes": 2047,
+      "sha256": "327dad34a8e27ea1b401891c36d16bf70d12cfb6262c9b54ae08da15fc4f2462"
+    },
+    {
+      "path": "refusal.GREEN.log",
+      "bytes": 640,
+      "sha256": "f0667796e9fa6aca71b6a876d596a0f06ec812f70a843778545d3bdeba763879"
+    },
+    {
+      "path": "refusal.RED-source.safe.json",
+      "bytes": 3364,
+      "sha256": "3e3377eb1eb2f5949249a0a94be7c0f7b061eb199ace9a0cd0f9a070f2d35d93"
+    },
+    {
+      "path": "refusal.RED.log",
+      "bytes": 2083,
+      "sha256": "8ea876e4a77b734206a1782f014011abc00ccb5d89952a89fa3a2cbd51cf122a"
+    },
+    {
+      "path": "refusal.related.GREEN-run.safe.json",
+      "bytes": 2007,
+      "sha256": "b740d81a93b2cc871e1820c375d7779ce3adbaded37f5a9851063b9b7eb02a90"
+    },
+    {
+      "path": "refusal.related.GREEN.log",
+      "bytes": 14970,
+      "sha256": "eb5995d59845f6728f585c9735596e2c5c1c72c256b29dd9f0b89a4be52ce9a7"
+    },
+    {
+      "path": "refusal.targeted-lint.log",
+      "bytes": 808,
+      "sha256": "1a190b51921d6c1e92921f5b0b8116f0af80e2f28b9fb32eefdb7475736e2af4"
+    },
+    {
+      "path": "refusal.targeted-lint.safe.json",
+      "bytes": 1758,
+      "sha256": "6a60d1c85aac0b1a8727409adc0eb6ca4996c456d902a0d8dc8602b534663dc8"
+    },
+    {
+      "path": "refusal.targeted-oxlint.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "refusal.targeted-oxlint.safe.json",
+      "bytes": 1760,
+      "sha256": "67021a20879d6fb7ac03101c890caeee68af872ea3412cbcd51f88b9257b6ca8"
+    },
+    {
+      "path": "returned-refusal.patch",
+      "bytes": 22010,
+      "sha256": "70f2724b5d1b88311f874c53099a9815a9bc8d499547353b2fd8959ffbf1492e"
+    },
+    {
+      "path": "source-contracts.safe.json",
+      "bytes": 3750,
+      "sha256": "1d3931fe55b86dd3977338dd9f4d99d7186fccec6fca71d36d472c5b93818c3a"
+    }
+  ]
+}

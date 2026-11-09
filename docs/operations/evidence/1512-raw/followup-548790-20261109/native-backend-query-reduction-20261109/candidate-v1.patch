@@ -1,0 +1,117 @@
+diff --git a/lib/device-enrollment.db.test.ts b/lib/device-enrollment.db.test.ts
+index 431897540..071b2243d 100644
+--- a/lib/device-enrollment.db.test.ts
++++ b/lib/device-enrollment.db.test.ts
+@@ -145,6 +145,30 @@ test('registration grant is user-bound, expires, and has one concurrent winner',
+   assert.equal(await consumeDeviceEnrollment('invalid'), null)
+ }))
+ 
++test('registration grant consumption uses one PostgreSQL statement', t => run(async () => {
++  const grant = await mintDeviceEnrollment('single-statement-owner')
++  const result = await measured(() => consumeDeviceEnrollment(grant))
++  assert.ok(result.value, 'a valid grant still issues its credential')
++  t.diagnostic(JSON.stringify({ scenario: 'enrollment-consumption', statements: result.statements }))
++  assert.equal(result.statements, 1)
++}))
++
++test('a failed credential insertion does not consume the enrollment grant', () => run(async () => {
++  const { pool } = await import('./db')
++  const grant = await mintDeviceEnrollment('rollback-owner')
++  await pool.query(`ALTER TABLE device_tokens ADD CONSTRAINT enrollment_insert_failure CHECK ("userId" <> 'rollback-owner')`)
++  try {
++    await assert.rejects(consumeDeviceEnrollment(grant), /enrollment_insert_failure/)
++  } finally {
++    await pool.query('ALTER TABLE device_tokens DROP CONSTRAINT enrollment_insert_failure')
++  }
++  const credential = await consumeDeviceEnrollment(grant)
++  assert.ok(credential, 'failed insertion rolls the grant consumption back')
++  assert.equal(await consumeDeviceEnrollment(grant), null, 'the successful retry still consumes the grant once')
++  const { rows } = await pool.query('SELECT "userId" FROM device_tokens WHERE "tokenHash"=$1', [hashDeviceToken(credential)])
++  assert.deepEqual(rows, [{ userId: 'rollback-owner' }])
++}))
++
+ test('daemon acceptance follows real local enrollment and owner routes without a cloud token binding', () => run(async () => {
+   const { pool } = await import('./db')
+   const { GET: readTokens } = await import('../app/api/device-tokens/route')
+@@ -259,6 +283,35 @@ test('management queue is owner-scoped, serial and acknowledges only its device'
+   assert.equal(receipt.rows[0].completedAt.getTime(), replay.rows[0].completedAt.getTime())
+ }))
+ 
++test('pending commands without receipts are one read and preserve current device removal state', t => run(async () => {
++  const { pool } = await import('./db')
++  const active = randomUUID(), removed = randomUUID(), empty = randomUUID(), foreign = randomUUID()
++  const restart = randomUUID(), later = randomUUID(), hidden = randomUUID(), uninstall = randomUUID(), other = randomUUID()
++  await pool.query(`INSERT INTO devices(id,"ownerId",enabled,"removedAt")
++    VALUES($1,'pending-owner',false,NULL),($2,'pending-owner',false,now()),($3,'pending-owner',true,NULL),($4,'other-owner',true,NULL)`, [active, removed, empty, foreign])
++  await pool.query(`INSERT INTO device_management_commands(id,"deviceId",kind,"createdAt") VALUES
++    ($1,$6,'restart',now()-interval '3 seconds'),($2,$6,'update',now()),
++    ($3,$7,'restart',now()-interval '3 seconds'),($4,$7,'uninstall',now()),($5,$8,'redetect',now()-interval '5 seconds')`,
++  [restart, later, hidden, uninstall, other, active, removed, foreign])
++  const snapshot = async () => (await pool.query('SELECT id,"completedAt",error FROM device_management_commands WHERE "deviceId"=ANY($1::uuid[]) ORDER BY id', [[active, removed, empty, foreign]])).rows
++  const before = await snapshot()
++  const cases = [
++    { scenario: 'disabled-device', device: active, expected: [{ id: restart, kind: 'restart' }] },
++    { scenario: 'removed-device', device: removed, expected: [{ id: uninstall, kind: 'uninstall' }] },
++    { scenario: 'empty-device', device: empty, expected: [] },
++    { scenario: 'missing-device', device: randomUUID(), expected: [] },
++  ]
++  for (const { scenario, device, expected } of cases) {
++    const result = await measured(() => pendingDeviceCommands(device, []))
++    assert.deepEqual(result.value, expected)
++    t.diagnostic(JSON.stringify({ scenario, statements: result.statements }))
++    assert.equal(result.statements, 1)
++  }
++  assert.deepEqual(await snapshot(), before, 'a read does not acknowledge or fail any command')
++  await pool.query('UPDATE devices SET "removedAt"=now() WHERE id=$1', [active])
++  assert.deepEqual(await pendingDeviceCommands(active, []), [], 'the next call observes a committed removal and does not reuse an earlier device state')
++}))
++
+ test('a fresh login cannot admit an old daemon, and updating cannot revive a revoked credential', () => run(async () => {
+   const { pool } = await import('./db')
+   const { withDeviceRoute } = await import('./device-route')
+diff --git a/lib/device-enrollment.ts b/lib/device-enrollment.ts
+index f9490f183..8fe53cb39 100644
+--- a/lib/device-enrollment.ts
++++ b/lib/device-enrollment.ts
+@@ -11,15 +11,10 @@ export async function mintDeviceEnrollment(userId: string) {
+ 
+ /** Consumption and credential issuance commit together; parallel replay loses. */
+ export async function consumeDeviceEnrollment(token: string): Promise<string | null> {
+-  const connection = await pool.connect()
+-  try {
+-    await connection.query('BEGIN')
+-    const grant = await connection.query<{ userId: string }>(`DELETE FROM device_enrollments WHERE "tokenHash"=$1 AND "expiresAt">now() RETURNING "userId"`, [hashDeviceToken(token)])
+-    if (!grant.rows[0]) { await connection.query('ROLLBACK'); return null }
+-    const credential = newDeviceToken()
+-    await connection.query(`INSERT INTO device_tokens (id,"userId","tokenHash",name) VALUES ($1,$2,$3,'SSH')`, [randomUUID(), grant.rows[0].userId, hashDeviceToken(credential)])
+-    await connection.query('COMMIT')
+-    return credential
+-  } catch (error) { await connection.query('ROLLBACK'); throw error }
+-  finally { connection.release() }
++  const credential = newDeviceToken()
++  const { rows } = await pool.query<{ id: string }>(`WITH consumed AS (
++    DELETE FROM device_enrollments WHERE "tokenHash"=$1 AND "expiresAt">now() RETURNING "userId"
++  ) INSERT INTO device_tokens (id,"userId","tokenHash",name)
++    SELECT $2,"userId",$3,'SSH' FROM consumed RETURNING id`, [hashDeviceToken(token), randomUUID(), hashDeviceToken(credential)])
++  return rows.length ? credential : null
+ }
+diff --git a/lib/device-management.ts b/lib/device-management.ts
+index c2e44913f..c2243c573 100644
+--- a/lib/device-management.ts
++++ b/lib/device-management.ts
+@@ -14,6 +14,15 @@ export async function enqueueDeviceCommand(userId: string, deviceId: string, kin
+   return id
+ }
+ export async function pendingDeviceCommands(deviceId: string, completed: string[], failed: { id: string; error: string }[] = []) {
++  // With no receipts this is one read: removal state and the pending command
++  // share a snapshot. Acknowledgements and credential revocation stay below.
++  if (!completed.length && !failed.length) {
++    const { rows } = await pool.query<{ id: string; kind: DeviceCommandKind }>(`SELECT c.id,c.kind
++      FROM devices d JOIN device_management_commands c ON c."deviceId"=d.id
++      WHERE d.id=$1 AND c."completedAt" IS NULL AND (d."removedAt" IS NULL OR c.kind='uninstall')
++      ORDER BY c."createdAt" LIMIT 1`, [deviceId])
++    return rows
++  }
+   const connection = await pool.connect()
+   try {
+     await connection.query('BEGIN')

@@ -1,0 +1,849 @@
+{
+  "schema": "issue1512-heartbeat-register-gateway-source-analysis-v1",
+  "sourceMain": "01a6bfb3a6c537e2b466911f57429f109b418aa8",
+  "sourcePrHead": "c04690ff2c337886ea18e7a4fa73509ebff6de32",
+  "sourceTree": "a69946cdb08bceb994e11b3278572bea5e7e63c9",
+  "actualAcceptanceSource": "fd053d254e377f35ff8e2529edb1ad544c23fab1",
+  "original": {
+    "path": "native-c04690-original/lifecycle.json",
+    "bytes": 696142,
+    "sha256": "19a1cfbd9225c580a2309f76016e099d4354e5fba3ee9562c59d2782db14dcdc",
+    "gitBlobSha1": "1cd8ce2c9528225884da22282e254311c797d07d"
+  },
+  "source": [
+    {
+      "path": "app/v1/devices/[deviceId]/heartbeat/route.ts",
+      "bytes": 9566,
+      "sha256": "b32fa96dd7fa77afca9900389f1a11266293eccfd7ce8b89e02d734a0de1395c",
+      "gitBlobSha1": "7f2aec2241f2842e12ce7be6bfee68f13d2db9b3",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "app/v1/devices/register/route.ts",
+      "bytes": 3326,
+      "sha256": "49651433d1adb9a477bca74a42b64980f050aac8eb0a19807367a78cc141b1f1",
+      "gitBlobSha1": "31a4233e453241fc8d9d061ab88bc0b2197d506e",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/gateway/route.ts",
+      "bytes": 2096,
+      "sha256": "3c5a79fbfc2a2a7d18d9261a2786489515cd5ef8409313648e23b432941bd8d8",
+      "gitBlobSha1": "f73be7416f5e8665effb4b8a09faf0222f159cc9",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/device-route.ts",
+      "bytes": 3276,
+      "sha256": "06fc3702e5bb2cf3664d24d8675258a06bdcf1b19fde6776e9bff4c5640cbc69",
+      "gitBlobSha1": "5ac62fb64d304522f42a803c932483c0dbc58d9e",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/device-request-context.ts",
+      "bytes": 254,
+      "sha256": "cae65440525d8e346f68af014850d841e3eb8fda904667182811dc3444ffd948",
+      "gitBlobSha1": "2651be4e5ed32e399688cfa8b32692b31554f92e",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/device-heartbeat-body.ts",
+      "bytes": 2718,
+      "sha256": "79af5953c3bf3744d766887a427b9f8ea0a01a4e4b9ef934a9f8c21f1d85a0c2",
+      "gitBlobSha1": "1d2c0a689c27d53a62b522f5e7a38021e9fa7a65",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/device-link.ts",
+      "bytes": 14932,
+      "sha256": "3fa0e53848f09e9d9834d9ca6609b6e3538ba1efd0dae4edbf079f56ff151b63",
+      "gitBlobSha1": "b7f43aa78a7323b89a459905163d13627a976fe8",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/db/device-scope.ts",
+      "bytes": 14907,
+      "sha256": "2083d7616e9a18421dcb8d55c309dba8a2761bf140faeba106a5b24393748b98",
+      "gitBlobSha1": "80ce39633e6482f3e28654b917c57d1cca9f1e35",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/db/request-scope.ts",
+      "bytes": 4779,
+      "sha256": "67bbb85d950948802449a1d0c2638e62bd4d1731ffe883837bc53059ac50b6f0",
+      "gitBlobSha1": "b3445c20e6be5061bcbfe0fe56903b8dd767dfd3",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/device-management.ts",
+      "bytes": 2661,
+      "sha256": "a56cd2bf4496d32670a80250ebbe4eaa2bb23df3e1fa7e3b1b4687835d0e5847",
+      "gitBlobSha1": "c2e44913f843391095232bdda81d774a58ff9d24",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/device-agents.ts",
+      "bytes": 3148,
+      "sha256": "7754bb3313624709990b6a236e9dc766711ba57a593843c403c732232460f41c",
+      "gitBlobSha1": "fed144bcc3ac2d30be0883626cf3f123570564a7",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/device-agents.test.ts",
+      "bytes": 2617,
+      "sha256": "4e6bbba7688bdf48ccf0e62ed25272d398b4e21802bf3d768220315778692535",
+      "gitBlobSha1": "521ed51570fc664b85d4e1edd042238f944c2e7d",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/device-token-scope.ts",
+      "bytes": 1579,
+      "sha256": "f0fc39acf62b88d7c51635275b592cd3dc883c49adbd17761d438b1c48f66cbf",
+      "gitBlobSha1": "b065d6a06b2f2aaa766605d869b7d7fa9e600b07",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/device-removal.ts",
+      "bytes": 5290,
+      "sha256": "a49c662158f83c764817bf1989a763051c3c43d75f81901ad6d57cf9d85b044f",
+      "gitBlobSha1": "e9712832319a9ae3a93088b8ec122c8dbdf6430b",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/device-gateway-ticket.ts",
+      "bytes": 1745,
+      "sha256": "e6358b210bd3c5955be1caaf9c21369b13533345cc72f83e00af68d278ceda88",
+      "gitBlobSha1": "5a84bce13112ea010708fcd4406c19c683c62a50",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/builtin-gateway/request.ts",
+      "bytes": 4583,
+      "sha256": "7dca6d2e75cc1b8f72638ff2a23a17cf52513b1d0df5be95de17f0f02bee13aa",
+      "gitBlobSha1": "72949dfba5553cb0f640c2574ce099a192859c44",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/live/lists.ts",
+      "bytes": 16900,
+      "sha256": "cd3ca286889860cef3958b7e30f4b14c706bef9bbb3eccc43cfc50c16d2df24f",
+      "gitBlobSha1": "f764bcfa72366a3fdcb6aa6dfd69adb3efd1709d",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/db/schema.ts",
+      "bytes": 88064,
+      "sha256": "8b9d4fc48436efa65052f29b993501440862018d37c00b342af02688ccc28305",
+      "gitBlobSha1": "d537271bb2bde1c2fc4028e80d073e821cf5fe7c",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "drizzle/20261029011701_cli_run_policy.sql",
+      "bytes": 2492,
+      "sha256": "3917975dff59ad31cdd8a9f7025b5c14d2a9951de531b7f2644b1a5f6cc44a3c",
+      "gitBlobSha1": "aa18991cdcebb26136da367cd28ec2db29c9d078",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/device-unit-fence.db.test.ts",
+      "bytes": 11209,
+      "sha256": "414ea10a0dba789b36633215c42c2d308e853a09f257027dc93b42bee09842da",
+      "gitBlobSha1": "a5237da052e304897cd48afdebc42ee6f7571d96",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "lib/device-route-fence.db.test.ts",
+      "bytes": 6255,
+      "sha256": "807ca25b55897be37e616a1ae892a149d3570c3efbc8a6f9ca8696493a8fff9b",
+      "gitBlobSha1": "85ad4273e1f1f533b2dd361005a3b46719d0c667",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "tests/settings-activity.db.test.ts",
+      "bytes": 27206,
+      "sha256": "38f788eeeda08309e4a4c90733767ffc65e16ef163c0a682f6f9d77fbc663729",
+      "gitBlobSha1": "b5d79d9d714dca1bd02c0a2d35b0e761dd6f76aa",
+      "equalsSourceTree": true
+    },
+    {
+      "path": "apps/desktop/test/db-query-diagnostics.cjs",
+      "bytes": 18406,
+      "sha256": "763d180bfc0d0a62e67a99624a4815eeca953bbcb7290193a5515bb67e24ccad",
+      "gitBlobSha1": "93fc0510b98e9a3812e6b4452a929ac5900fe458",
+      "equalsSourceTree": true
+    }
+  ],
+  "selected": {
+    "/v1/devices/[deviceId]/heartbeat": {
+      "total": 20,
+      "knownContexts": 0,
+      "unknownStatements": 4,
+      "queries": [
+        {
+          "ordinal": 26740,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "e7a90abd2191",
+            "command": "SELECT",
+            "parameterCount": 2
+          }
+        },
+        {
+          "ordinal": 26745,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "unknown"
+          }
+        },
+        {
+          "ordinal": 26746,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "d43f1541a045",
+            "command": "SELECT",
+            "parameterCount": 2
+          }
+        },
+        {
+          "ordinal": 26747,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "7afe414f4d9e",
+            "command": "WITH",
+            "parameterCount": 3
+          }
+        },
+        {
+          "ordinal": 26748,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "3680b5594672",
+            "command": "WITH",
+            "parameterCount": 8
+          }
+        },
+        {
+          "ordinal": 26749,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "a8402858d4f1",
+            "command": "BEGIN",
+            "parameterCount": 0
+          }
+        },
+        {
+          "ordinal": 26751,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "adea43e0f992",
+            "command": "SELECT",
+            "parameterCount": 1
+          }
+        },
+        {
+          "ordinal": 26752,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "unknown"
+          }
+        },
+        {
+          "ordinal": 26754,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "79663c1d3b43",
+            "command": "COMMIT",
+            "parameterCount": 0
+          }
+        },
+        {
+          "ordinal": 26756,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "79663c1d3b43",
+            "command": "COMMIT",
+            "parameterCount": 0
+          }
+        },
+        {
+          "ordinal": 26778,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "e7a90abd2191",
+            "command": "SELECT",
+            "parameterCount": 2
+          }
+        },
+        {
+          "ordinal": 26779,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "unknown"
+          }
+        },
+        {
+          "ordinal": 26780,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "d43f1541a045",
+            "command": "SELECT",
+            "parameterCount": 2
+          }
+        },
+        {
+          "ordinal": 26781,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "7afe414f4d9e",
+            "command": "WITH",
+            "parameterCount": 3
+          }
+        },
+        {
+          "ordinal": 26782,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "3680b5594672",
+            "command": "WITH",
+            "parameterCount": 8
+          }
+        },
+        {
+          "ordinal": 26783,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "a8402858d4f1",
+            "command": "BEGIN",
+            "parameterCount": 0
+          }
+        },
+        {
+          "ordinal": 26784,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "adea43e0f992",
+            "command": "SELECT",
+            "parameterCount": 1
+          }
+        },
+        {
+          "ordinal": 26785,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "unknown"
+          }
+        },
+        {
+          "ordinal": 26786,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "79663c1d3b43",
+            "command": "COMMIT",
+            "parameterCount": 0
+          }
+        },
+        {
+          "ordinal": 26787,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "79663c1d3b43",
+            "command": "COMMIT",
+            "parameterCount": 0
+          }
+        }
+      ]
+    },
+    "/v1/devices/register": {
+      "total": 15,
+      "knownContexts": 0,
+      "unknownStatements": 5,
+      "queries": [
+        {
+          "ordinal": 26723,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "e7a90abd2191",
+            "command": "SELECT",
+            "parameterCount": 2
+          }
+        },
+        {
+          "ordinal": 26724,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "0a5d35015c3d",
+            "command": "UPDATE",
+            "parameterCount": 2
+          }
+        },
+        {
+          "ordinal": 26725,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "unknown"
+          }
+        },
+        {
+          "ordinal": 26726,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "d43f1541a045",
+            "command": "SELECT",
+            "parameterCount": 2
+          }
+        },
+        {
+          "ordinal": 26727,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "53a7d0a9b15c",
+            "command": "INSERT",
+            "parameterCount": 13
+          }
+        },
+        {
+          "ordinal": 26728,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "7afe414f4d9e",
+            "command": "WITH",
+            "parameterCount": 3
+          }
+        },
+        {
+          "ordinal": 26729,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "unknown"
+          }
+        },
+        {
+          "ordinal": 26730,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "a8402858d4f1",
+            "command": "BEGIN",
+            "parameterCount": 0
+          }
+        },
+        {
+          "ordinal": 26731,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "unknown"
+          }
+        },
+        {
+          "ordinal": 26732,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "unknown"
+          }
+        },
+        {
+          "ordinal": 26733,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "6d8018401bd8",
+            "command": "INSERT",
+            "parameterCount": 5
+          }
+        },
+        {
+          "ordinal": 26734,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "6d8018401bd8",
+            "command": "INSERT",
+            "parameterCount": 5
+          }
+        },
+        {
+          "ordinal": 26735,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "unknown"
+          }
+        },
+        {
+          "ordinal": 26736,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "79663c1d3b43",
+            "command": "COMMIT",
+            "parameterCount": 0
+          }
+        },
+        {
+          "ordinal": 26737,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "79663c1d3b43",
+            "command": "COMMIT",
+            "parameterCount": 0
+          }
+        }
+      ]
+    },
+    "/v1/devices/[deviceId]/gateway": {
+      "total": 5,
+      "knownContexts": 0,
+      "unknownStatements": 1,
+      "queries": [
+        {
+          "ordinal": 26739,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "e7a90abd2191",
+            "command": "SELECT",
+            "parameterCount": 2
+          }
+        },
+        {
+          "ordinal": 26741,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "unknown"
+          }
+        },
+        {
+          "ordinal": 26742,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "d43f1541a045",
+            "command": "SELECT",
+            "parameterCount": 2
+          }
+        },
+        {
+          "ordinal": 26743,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "c791f908d816",
+            "command": "SELECT",
+            "parameterCount": 3
+          }
+        },
+        {
+          "ordinal": 26744,
+          "contextStatus": "unknown",
+          "statement": {
+            "status": "known",
+            "normalizedStructureId": "79663c1d3b43",
+            "command": "COMMIT",
+            "parameterCount": 0
+          }
+        }
+      ]
+    }
+  },
+  "boundaries": {
+    "sourceOnly": true,
+    "all40ContextsUnknown": true,
+    "rawStatementsParametersRowsNotRetained": true,
+    "unknownQueryRoleAssignmentsAreSourceOrderInferences": true,
+    "originalNativeLogin": 473,
+    "originalWebLogin": 402,
+    "budgetStatus": "RED",
+    "noRepeatedBusinessOperationInference": true
+  },
+  "exactLiteralStructureBindings": [
+    {
+      "path": "lib/db/device-scope.ts",
+      "line": 96,
+      "function": "acquireFence",
+      "statement": {
+        "status": "known",
+        "normalizedStructureId": "d43f1541a045",
+        "command": "SELECT",
+        "parameterCount": 2
+      }
+    },
+    {
+      "path": "lib/db/device-scope.ts",
+      "line": 139,
+      "function": "lockAuthority",
+      "statement": {
+        "status": "known",
+        "normalizedStructureId": "d43f1541a045",
+        "command": "SELECT",
+        "parameterCount": 2
+      }
+    },
+    {
+      "path": "lib/device-link.ts",
+      "line": 148,
+      "function": "linkDeviceToken",
+      "statement": {
+        "status": "known",
+        "normalizedStructureId": "7afe414f4d9e",
+        "command": "WITH",
+        "parameterCount": 3
+      }
+    },
+    {
+      "path": "lib/device-agents.ts",
+      "line": 39,
+      "function": "ensureDeviceAgents",
+      "statement": {
+        "status": "known",
+        "normalizedStructureId": "6d8018401bd8",
+        "command": "INSERT",
+        "parameterCount": 5
+      }
+    },
+    {
+      "path": "lib/device-management.ts",
+      "line": 20,
+      "function": "pendingDeviceCommands",
+      "statement": {
+        "status": "known",
+        "normalizedStructureId": "adea43e0f992",
+        "command": "SELECT",
+        "parameterCount": 1
+      }
+    }
+  ],
+  "offlineDrizzleCompilerBindings": {
+    "method": "Actual installed drizzle.mock().toSQL() / PgDialect.sqlToQuery(), matching the same source expressions with synthetic in-memory values; no DB connection or query execution.",
+    "toolChunk": "e7f6e9",
+    "exitCode": 0,
+    "bindings": [
+      {
+        "function": "authenticateDevice",
+        "path": "lib/device-link.ts",
+        "shape": "e7a90abd2191",
+        "parameters": 2
+      },
+      {
+        "function": "authenticateDevice lastUsedAt update",
+        "path": "lib/device-link.ts",
+        "shape": "0a5d35015c3d",
+        "parameters": 2
+      },
+      {
+        "function": "ownsDevice",
+        "path": "lib/device-link.ts",
+        "shape": "c791f908d816",
+        "parameters": 3
+      },
+      {
+        "function": "handlePOST new registration",
+        "path": "app/v1/devices/register/route.ts",
+        "shape": "53a7d0a9b15c",
+        "parameters": 13
+      },
+      {
+        "function": "handlePOST heartbeat prior/update",
+        "path": "app/v1/devices/[deviceId]/heartbeat/route.ts",
+        "shape": "3680b5594672",
+        "parameters": 8
+      }
+    ],
+    "allExactMatches": true
+  },
+  "decomposition": {
+    "heartbeat": {
+      "total": 20,
+      "sourceCompatibleCycles": 2,
+      "perCycle": {
+        "authenticationSelect": 1,
+        "unitAuthority": {
+          "beginAndSetUnknown": 1,
+          "liveTokenForShare": 1,
+          "commit": 1
+        },
+        "linkOwnedDeviceAndToken": 1,
+        "priorDeviceAndBeatUpdate": 1,
+        "pendingCommands": {
+          "begin": 1,
+          "removedAtForUpdate": 1,
+          "oldestAllowedCommandUnknown": 1,
+          "commit": 1
+        }
+      },
+      "coveredByExistingSiblingProposal": {
+        "name": "B: no-receipt pendingDeviceCommands read path",
+        "original": 8,
+        "proposed": 2,
+        "savingsAlreadyCountedElsewhere": 6
+      },
+      "unknownRoleNote": "Each cycle has two unknown statements: fence BEGIN/SET and command SELECT are source-order assignments, not recovered SQL text."
+    },
+    "register": {
+      "total": 15,
+      "sourceCompatibleCycles": 1,
+      "path": "New local device path (known INSERT structure), not an existing-device update path.",
+      "authentication": {
+        "tokenSelect": 1,
+        "conditionalLastUsedAtUpdate": 1
+      },
+      "unitAuthority": {
+        "beginAndSetUnknown": 1,
+        "liveTokenForShare": 1,
+        "commit": 1
+      },
+      "deviceInsert": 1,
+      "linkOwnedDeviceAndToken": 1,
+      "ensureAgents": {
+        "probeUnknown": 1,
+        "begin": 1,
+        "advisoryUnknown": 1,
+        "latestLockedDeviceReportUnknown": 1,
+        "individualAgentUpserts": 2,
+        "obsoleteAgentUnlinkUnknown": 1,
+        "commit": 1
+      },
+      "unknownRoleNote": "The five unknown roles follow the exact source sequence. Context/parameter/row evidence is unavailable."
+    },
+    "gateway": {
+      "total": 5,
+      "authenticationSelect": 1,
+      "unitAuthority": {
+        "beginAndSetUnknown": 1,
+        "liveTokenForShare": 1,
+        "commit": 1
+      },
+      "ownedPresentDeviceSelect": 1,
+      "ticketIssuedAfterOwnedDeviceCheck": true
+    },
+    "totals": {
+      "authenticationStatements": 5,
+      "unitAuthorityStatements": 12,
+      "otherStatements": 23,
+      "allStatements": 40,
+      "unknownStatementStructures": 10
+    }
+  },
+  "prioritizedProposals": [
+    {
+      "id": "register-new-device-and-link",
+      "status": "PROPOSAL_ONLY",
+      "scope": [
+        "app/v1/devices/register/route.ts"
+      ],
+      "measuredPathCounterfactualSavings": 1,
+      "design": "Only in the existing new-local-device branch, replace INSERT devices followed by linkDeviceToken with one data-modifying CTE. The link consumes the just-created device id via INSERT RETURNING, with ownerId and tokenId from the already authenticated caller and the same ON CONFLICT DO NOTHING. Keep the existing withDeviceRoute authority boundary, every existing-device/cloud branch, provisioning, tracing response and live invalidation unchanged.",
+      "allBranchCounts": {
+        "newLocalPath": "2 -> 1",
+        "missingForeignOrRemovedRequestedId": "Keep original failed link attempt; only its later new-device insert+link changes 2 -> 1.",
+        "existingOwnedOrCloudPath": "unchanged",
+        "invalidBodyOrOldDaemon": "unchanged"
+      },
+      "semanticPoints": [
+        "The created row is owned by the same caller by construction; no stale ownership projection is reused.",
+        "Single-statement row/foreign-key locking preserves creation-to-link protection under the existing token fence.",
+        "If credential linkage fails, the new device INSERT rolls back with it. This strengthens atomicity relative to the old partial-failure orphan state and must be explicit in implementation review.",
+        "Do not fold initial authentication/lastUsedAt update into this statement or cache caller authority."
+      ],
+      "requiredActualRaces": [
+        "Revoke after authentication but before the combined statement: original typed refusal, zero device/link writes.",
+        "Revoke while the authority-protected statement is in flight: revocation waits for the same boundary; no late unguarded link.",
+        "Force link insertion failure and observe atomic rollback, no live invalidation and no returned device id.",
+        "Run original owned/foreign/removed/cloud registration and chosen-name scenarios unchanged; no tombstone revival or foreign link."
+      ]
+    },
+    {
+      "id": "locked-agent-upserts-and-prune",
+      "status": "PROPOSAL_ONLY",
+      "scope": [
+        "lib/device-agents.ts"
+      ],
+      "measuredPathCounterfactualSavings": 2,
+      "design": "Keep the existing cheap probe, explicit BEGIN, advisory lock, latest device report FOR UPDATE, JavaScript localExecutionHarnesses selection, and COMMIT/ROLLBACK. Inside that same already-held transaction replace n same-form agent UPSERTs plus obsolete-binding UPDATE with one data-modifying CTE using equal-length arrays/rows generated from the same sorted unique current list.",
+      "allBranchCounts": {
+        "unchangedLocalOrCloudProbe": "unchanged; no transaction or advisory lock added",
+        "deviceMissingAfterLock": "unchanged; no mutation statement added",
+        "emptyCurrentList": "one unlink statement -> one unlink statement",
+        "nPositiveHarnesses": "n UPSERT + 1 unlink -> 1 statement",
+        "failureAtMutation": "one statement then original ROLLBACK; never more statements"
+      },
+      "disjointWriteProof": "Inserted/conflict-updated rows have harness in current. Unlinked rows require NOT(harness=ANY(current)) and the same infrastructure name rule. These sets cannot overlap; a differently-harnessed user row with a colliding name is still protected by the original ON CONFLICT WHERE agents.harness=EXCLUDED.harness.",
+      "sourceGuards": [
+        "Keep the original lower(name) owner unique target and ON CONFLICT WHERE condition.",
+        "Never DELETE historical agents; removed harnesses only lose deviceId, preserving run FKs and stable identity on reinstall.",
+        "Keep reported=false re-read after the advisory/device lock; reported=true remains the caller report path.",
+        "The existing per-row CLI policy trigger must keep generation/version and policy fields unchanged."
+      ],
+      "requiredActualRaces": [
+        "Hold the same device advisory lock, replace its stored report, then release: default mode must provision the latest locked report, not input or pre-wait snapshot.",
+        "Concurrent provisioning for the same device remains serialized and produces stable identity names/IDs.",
+        "Removal/reinstall preserves historical agent id and run FKs; absent harness is unlinked only.",
+        "A colliding named user agent with another harness must not be repurposed.",
+        "Force mutation/trigger failure: rollback all agent changes and release the client; retain original no-transaction fast branch."
+      ]
+    }
+  ],
+  "deferredOrRejected": [
+    {
+      "id": "gateway-unlocked-read",
+      "status": "REJECTED",
+      "reason": "readUnderDeviceAuthority is documented for a read-only snapshot. This route signs a 300-second device ticket after the read. The ticket carries device+expiry+MAC and gatewayUpgrade checks that signature rather than the originating token. Replacing the live held authority fence with an unlocked SELECT permits revocation to commit before signing; it does not preserve the current race boundary."
+    },
+    {
+      "id": "gateway-merge-own-projection-into-fence",
+      "status": "NOT_ESTABLISHED",
+      "reason": "A new guarded projection in the existing fence admission could in principle save only the one ordinary ownership SELECT while retaining BEGIN/token lock/COMMIT. No existing API does this. A generic guard change has not been reviewed, and is not proposed as a route-only quick fix."
+    },
+    {
+      "id": "heartbeat-link-and-beat",
+      "status": "DEFERRED",
+      "maximumSourceInferredAdditionalSavings": 2,
+      "reason": "Potentially combine link and the prior/UPDATE statement for valid current-daemon beats, but must preserve the removed-device receipt branch, link-before-invalid-body 404/400 precedence and side effect, old-client path, nonremoved ownership, prior harness/state return, and the original post-link time observation. Clock/locking semantics are not proven by this source-only review; no saving is credited."
+    },
+    {
+      "id": "one-statement-entire-agent-provision",
+      "status": "NOT_ESTABLISHED",
+      "reason": "Collapsing the fast probe, advisory wait, latest report read and all writes into a single CTE risks replacing the post-lock READ COMMITTED snapshot with the pre-wait statement snapshot and moving localExecutionHarnesses semantics into duplicated SQL. It needs a concrete lock/EPQ/new-report race proof. No claimed saving or implementation."
+    },
+    {
+      "id": "fuse-auth-lastUsedAt",
+      "status": "REJECTED_AS_SIMPLE_FUSION",
+      "reason": "The existing lastUsedAt write happens only after expiry, removed-device exception and cloud binding/scope checks. An eager write in the initial token lookup would change rejected-request side effects unless all existing admission semantics are preserved; no such global auth change is proposed."
+    },
+    {
+      "id": "empty-precheck-or-fence-switch",
+      "status": "FORBIDDEN",
+      "reason": "No positive-branch extra SQL, authority bypass, deviceUnitFence switch change, job delay, checkpoint/window change or retry change is allowed."
+    }
+  ],
+  "result": {
+    "recommendedIncrementalCounterfactualSavings": 3,
+    "savingsNotCountedTwice": 6,
+    "productionOrNativeMeasuredSavings": false,
+    "doesNotSolveOriginal71Gap": true,
+    "noSourceEdits": true,
+    "noNewTests": true,
+    "noNetwork": true,
+    "noModelsOrVMsOrCI": true
+  }
+}

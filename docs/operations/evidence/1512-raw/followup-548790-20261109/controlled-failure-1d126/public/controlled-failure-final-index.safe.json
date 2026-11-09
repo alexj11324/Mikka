@@ -1,0 +1,322 @@
+{
+  "schemaVersion": 1,
+  "kind": "controlled_failure_exact_source_final_evidence_index",
+  "frozenAtUTC": "2026-11-09T03:00:17.495097+00:00",
+  "status": "passed_for_exact_source_controlled_dev_case",
+  "sourceRevision": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+  "runId": 42552094175,
+  "jobId": 128949713707,
+  "artifactId": 13645667123,
+  "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/42552094175",
+  "backendObserved": true,
+  "originalRunnerBackendObserved": false,
+  "finalFixSourceAcceptance": false,
+  "overallIssue1512Acceptance": false,
+  "productionModelCasePerformed": false,
+  "sourceBoundary": "Actual exact-1d126 OTLP and overhead baseline. This source does not contain the subsequent flush, returned-refusal or SQL fixes. A later candidate requires its own source-bound evidence.",
+  "scope": {
+    "projectId": 670821,
+    "service": "mikka-web",
+    "environment": "dev",
+    "serviceVersion": "1d1261b607c8d60a27e2131ef59b463156d346d1",
+    "traceIdCount": 20,
+    "windowUTC": [
+      "2026-11-09 02:43:10",
+      "2026-11-09 02:43:12"
+    ],
+    "utcUpperBoundExclusive": true
+  },
+  "actualCounts": {
+    "completeFailureTraces": 20,
+    "spanRows": 80,
+    "uniqueTraceSpanPairs": 80,
+    "errorLogRows": 40,
+    "uniqueErrorLogSpanPairs": 40,
+    "missingTraces": 0,
+    "duplicateSpans": 0,
+    "duplicateLogs": 0,
+    "initialUnsampled": 17
+  },
+  "evidenceBoundary": {
+    "rowCountsSource": "Actual downloaded runner receipt and independent PostHog rows/summaries; 80/40 are measured counts in this index, not earlier plan predictions.",
+    "twoSnapshotsStable": true,
+    "posthogQueryCount": 9,
+    "queriesStopped": true,
+    "normalizationCorrection": "Only error severity summary lowercasing and observed closed boolean spelling normalization; original response retained.",
+    "originalRunnerReceiptModified": false,
+    "originalPosthogResponsesModified": false,
+    "rawOtlpCounters": "Official exporter callbacks in batches/items; not proof of wire HTTP attempt counts or billing.",
+    "pgErrorAttributeLimit": "PG ERROR span code/type remain null. PostgreSQL 22012 is observed in each root and the same-span root ERROR log cause chain.",
+    "overhead": "Separate same-source memory-exporter process, 600 measured and 100 warmup requests per condition, real loopback HTTP/PG; excludes external delivery, model and cloud work."
+  },
+  "cleanup": {
+    "runnerCleanupComplete": true,
+    "stopContainersStepSuccess": true,
+    "containerDeletionEchoObserved": true,
+    "networkDeletionEchoObserved": true,
+    "allRunJobsTerminal": true,
+    "ownerActiveProcesses": 0,
+    "ownerPaidResourcesCreated": 0,
+    "downloadProcessExitCode": 0,
+    "pollingAndDownloadsStopped": true,
+    "noRerunOrCancel": true
+  },
+  "retrievalCounts": {
+    "finalJobLogDownloads": 1,
+    "artifactDownloadToolCalls": 1,
+    "artifactBinaryDownloads": 1,
+    "posthogQueries": 9
+  },
+  "publicFiles": [
+    {
+      "path": "public/README.safe.md",
+      "bytes": 6597,
+      "sha256": "7a703954080611714cf70668967d1a43989a2866bc156831ba47220a85680d6c"
+    },
+    {
+      "path": "public/backend-normalized-rows.safe.json",
+      "bytes": 122816,
+      "sha256": "bad06c35696b6f7ef006c1b9e357614fce921bd83788e800ec3a6c6371b566bb"
+    },
+    {
+      "path": "public/controlled-failure-reconciliation.safe.json",
+      "bytes": 67306,
+      "sha256": "60e6b131f16f9b78fea8ee980d61f3732936612dc3acb940931be1688625cc54"
+    },
+    {
+      "path": "public/controlled-failure.receipt.json",
+      "bytes": 8829,
+      "sha256": "bd60679a1d6169815dcc16488f60973b1f2a5a7d6f83624c380b483490c99115"
+    },
+    {
+      "path": "public/offline-reconciliation-run.safe.json",
+      "bytes": 612,
+      "sha256": "86eb7010db838a369d1087aa3d6f2fdb311e48f20fbe3fe53f26339e25899e3e"
+    },
+    {
+      "path": "public/offline-reconciliation.log",
+      "bytes": 484,
+      "sha256": "d8f60b90c46dd52221fede90bbd1dbf8ed3cc7118a043d92b7415ff83a4488b9"
+    },
+    {
+      "path": "public/overhead-verification.safe.json",
+      "bytes": 2325,
+      "sha256": "7d8a3b66f81f7cc2eda51655a964aaf79a5e0990f11c8987a495dab25c3b3059"
+    },
+    {
+      "path": "public/overhead.receipt.json",
+      "bytes": 1348,
+      "sha256": "aac5169ba36d1ce5be053911eb6a5fa6d2e64a452f0b34911fadfe442c9216b5"
+    },
+    {
+      "path": "public/public-projection-review.safe.json",
+      "bytes": 935,
+      "sha256": "17d9e121192140e515c4b0b259c92b8a25bc86b07c402bc8317036a0c80096d4"
+    },
+    {
+      "path": "public/query-contract-addendum.safe.json",
+      "bytes": 818,
+      "sha256": "0e401412b5338b52d476d5bbbfa0779a59daaf7e8c213c14f24b31debe770d9a"
+    },
+    {
+      "path": "public/readback-scope.safe.json",
+      "bytes": 1290,
+      "sha256": "3f7d805722228965e695eeac6e3f605f84fe16318c499199b6247959a9e06a54"
+    },
+    {
+      "path": "public/reconcile-controlled-failure.py",
+      "bytes": 18512,
+      "sha256": "654513ccecba5834e649e0d18e8566515b043777a1747193867eb2bcb0b252b3"
+    },
+    {
+      "path": "public/requests/log_counts.offset-0.request.json",
+      "bytes": 2121,
+      "sha256": "a8600dde3246a9da8cd5e53e9fef2c6be0068195c5330bba534f12a34ef3447b"
+    },
+    {
+      "path": "public/requests/log_counts_canonical.offset-0.request.json",
+      "bytes": 2128,
+      "sha256": "cd6ba54575a03c5592c88ddafcb3007000ef8330828953d261e0175384909010"
+    },
+    {
+      "path": "public/requests/log_rows.offset-0.request.json",
+      "bytes": 3026,
+      "sha256": "f263ba9448aa4ea3164574c391140c3e4cdcd2659a80c13c5b143f9811511efb"
+    },
+    {
+      "path": "public/requests/span_counts.offset-0.request.json",
+      "bytes": 2070,
+      "sha256": "6f69b1d3a6988e68d3e8480a6cf1b2defdca91519f9cefcb21e064d8005cb1f7"
+    },
+    {
+      "path": "public/requests/span_rows.offset-0.request.json",
+      "bytes": 3568,
+      "sha256": "106150b546a93ef0f7f027fcc6bf8a337f4dc7ebb22b66b6790d55e9a8221459"
+    },
+    {
+      "path": "public/source-binding.safe.json",
+      "bytes": 1412,
+      "sha256": "13130b583b97ed9ff96f9993197586f7431d411952983e735d9deb77c0f4623e"
+    },
+    {
+      "path": "public/workflow-and-cleanup.safe.json",
+      "bytes": 7842,
+      "sha256": "4ae260a15c3addecc5c91923de31d7d3616793495fa5db9a2477c78c1cd8d83f"
+    }
+  ],
+  "externalSources": [
+    {
+      "path": "controlled-failure-1d126-source/source-receipt.safe.json",
+      "bytes": 990,
+      "sha256": "a7e51284fc741b5b94dc8acd2173025cc85462e0b9cd3c9464114a13a2dcd376",
+      "base": "../"
+    },
+    {
+      "path": "controlled-failure-1d126-source/scripts/ops/run-trace-benchmark.ts",
+      "bytes": 19846,
+      "sha256": "0962440794712e7f42a919d755cba69c7e2fcc15f1fad02de29ba9d2b31f9de4",
+      "base": "../"
+    },
+    {
+      "path": "controlled-failure-1d126-source/.github/workflows/run-trace-acceptance.yml",
+      "bytes": 13984,
+      "sha256": "474e7d33bcc1a521ae61ab30040f1715c376b2d8b160b5db89aacf2785aea8c4",
+      "base": "../"
+    },
+    {
+      "path": "controlled-failure-1d126-source/lib/tracing/node.ts",
+      "bytes": 7106,
+      "sha256": "adefe4b0af2c59021f37ae77262da07cc11c2369941b7482553f4299739de670",
+      "base": "../"
+    },
+    {
+      "path": "controlled-failure-1d126-source/lib/tracing/config.ts",
+      "bytes": 3376,
+      "sha256": "b26acae1c89e8a74a6aae8769ffbab32af72c72250b239711b0786f160f65856",
+      "base": "../"
+    },
+    {
+      "path": "controlled-failure-readback-20261109/controlled-failure-query-templates.safe.json",
+      "bytes": 10661,
+      "sha256": "9dc2522e30104bf082610a2cf0df8ae9164bbf1b839e00b09ade8c5a76579855",
+      "base": "../"
+    },
+    {
+      "path": "controlled-failure-readback-20261109/controlled-failure-readback-plan.safe.md",
+      "bytes": 9294,
+      "sha256": "5cd7c9105f81b877bc4c35e1eea8fe264b978c647baf9cda89213cfea85539be",
+      "base": "../"
+    }
+  ],
+  "privacy": "Archive publicFiles only. Private originals are indexed by local relative path, bytes and SHA-256, not reproduced in the public index. Raw GitHub responses/log contain platform metadata; signed artifact download URL was not persisted.",
+  "indexSelfHash": "Excluded from its own file list; final SHA-256 is provided by the accompanying owner handoff.",
+  "noFurtherExecutionRequiredForThisReceipt": true,
+  "privateEvidenceFiles": [
+    {
+      "path": "private/artifacts/artifact-13645667123.integrity.safe.json",
+      "bytes": 812,
+      "sha256": "6a20319603acbee1e4e0a2579591e5f54c8ac464a4196ac2dd8bb7e7ea3a2c5c"
+    },
+    {
+      "path": "private/artifacts/artifact-13645667123.zip",
+      "bytes": 3352,
+      "sha256": "382c8866b47780caa8872e816b0ff60a9e0de7e354b657943cc008a395540491"
+    },
+    {
+      "path": "private/artifacts/extracted/controlled-failure.receipt.json",
+      "bytes": 8829,
+      "sha256": "bd60679a1d6169815dcc16488f60973b1f2a5a7d6f83624c380b483490c99115"
+    },
+    {
+      "path": "private/artifacts/extracted/overhead.receipt.json",
+      "bytes": 1348,
+      "sha256": "aac5169ba36d1ce5be053911eb6a5fa6d2e64a452f0b34911fadfe442c9216b5"
+    },
+    {
+      "path": "private/artifacts.final.original.json",
+      "bytes": 1289,
+      "sha256": "b70e73c717d01b08c828464da01922eb3354d19a57068c1e273fa9dda1682c7a"
+    },
+    {
+      "path": "private/job-128949713707.original-response.json",
+      "bytes": 85071,
+      "sha256": "049791c86fe0cee2b6a8e7dc6a8389c0993224110c738088d8924d127b79ba55"
+    },
+    {
+      "path": "private/job-128949713707.original.log",
+      "bytes": 82579,
+      "sha256": "f0cb43363215e1cfcbebf275cfef7b1373629055b89aaf80bfafe2194624722d"
+    },
+    {
+      "path": "private/job.full-get-blocked.original.json",
+      "bytes": 634,
+      "sha256": "b2208ba22d696f72eb150cf767d163e4899da4229a4a9ad2b6acb0ec290a2cd8"
+    },
+    {
+      "path": "private/jobs.final.original.json",
+      "bytes": 4670,
+      "sha256": "9a79ece37319f58586ec84b790d10c903c801b5591dbf4e0a051b09fa4541af1"
+    },
+    {
+      "path": "private/jobs.initial.original.json",
+      "bytes": 4459,
+      "sha256": "5af43cf9387189de326c7f61a15e432edc2ca35c4229a1f5dd884141b4a021b6"
+    },
+    {
+      "path": "private/posthog/s1.log_counts.original.json",
+      "bytes": 8848,
+      "sha256": "04308e1aa564b4b580291cf966bb8ad600f25d253e73afeb403d1c315340c503"
+    },
+    {
+      "path": "private/posthog/s1.log_counts_canonical.original.json",
+      "bytes": 8891,
+      "sha256": "3ff43cc875318ddd3d859a1e31d562939d9322ed274d59bd3dc72c6c63ec0019"
+    },
+    {
+      "path": "private/posthog/s1.log_rows.original.json",
+      "bytes": 35667,
+      "sha256": "e918d782a9bbef16d4eab88765086e9b162d2a84d67fb7b78b51beec40524922"
+    },
+    {
+      "path": "private/posthog/s1.span_counts.original.json",
+      "bytes": 8677,
+      "sha256": "e4eb374595e193b20e07745bab6812fe4a9fab2813249498ef21e6e652093f38"
+    },
+    {
+      "path": "private/posthog/s1.span_rows.original.json",
+      "bytes": 75673,
+      "sha256": "1e102599b42e033828a013285b6417750f45ce8a5a545d84db1cd34c5577896e"
+    },
+    {
+      "path": "private/posthog/s2.log_counts_canonical.original.json",
+      "bytes": 8830,
+      "sha256": "e5cea030f76fd93e46b8ef53d20f28ad8467a318e9b3a2a3f754d6e7ad5aea46"
+    },
+    {
+      "path": "private/posthog/s2.log_rows.original.json",
+      "bytes": 35646,
+      "sha256": "7e28a0e5ae651c7a4f0fbbb9119a64700873354a60d67f2f3f1625657b82843e"
+    },
+    {
+      "path": "private/posthog/s2.span_counts.original.json",
+      "bytes": 8638,
+      "sha256": "1cd51d4bdaaaa44afc5bd35dc4adbbc1c4d8f71c54af495af63477117d834fed"
+    },
+    {
+      "path": "private/posthog/s2.span_rows.original.json",
+      "bytes": 75652,
+      "sha256": "3a11d33a6a515101599a6d9dbf4f9a820c8c53bfc451c85c54248aa2c9fb012a"
+    },
+    {
+      "path": "private/run.final.original.json",
+      "bytes": 26873,
+      "sha256": "02ebbbc3fe16be34a41c8754866d1c9acace3f80f5a03c2baf42a0bc9028d6be"
+    },
+    {
+      "path": "private/run.initial.original.json",
+      "bytes": 26863,
+      "sha256": "09c611b0b2a3b43712c0f4be5aa2b39b6802e8b8ff7a07693f3cfdf0fe654727"
+    }
+  ],
+  "privateEvidenceNote": "Includes exact original connector response/request captures, the decoded original job log, downloaded ZIP and exact members, plus separately named derived artifact-integrity receipt. Derived integrity metadata is not claimed as a provider response."
+}
