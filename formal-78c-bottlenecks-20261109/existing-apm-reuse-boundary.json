@@ -1,0 +1,22 @@
+{
+  "reviewer": "production_traces",
+  "newQueries": 0,
+  "newProductionMeasurements": 0,
+  "previousApmReads": 12,
+  "previousWindow": [
+    "2026-11-08T00:45:31Z",
+    "2026-11-08T00:51:07Z"
+  ],
+  "reportCommit": "6d48f0b13fb1c8518bb99e86af2bce271af8003e",
+  "reportPath": "evidence/1505-startup-timing-20261108/formal-78c-bottlenecks-20261109/observed-v2.json",
+  "reportBytes": 59264,
+  "reportSha256": "904cfcf8f9eed5ae8392dd521d7e6deaf4d5bbdeeb834f19f3dfa5a137b2f5ff",
+  "queryLogsIncludedInV2": false,
+  "unqueriedPreciseTraceIdentified": false,
+  "limits": [
+    "No fully bound client/server spans for everyHTTP/SQL",
+    "Case2/3 non-SQL959/1729ms are not pureRTT",
+    "No Git subspans or independent E2B restore/boot/Node preload split in old6",
+    "V2 corrects old draft Date.parse(epoch) interpretation; original6unchanged"
+  ]
+}

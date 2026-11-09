@@ -1,0 +1,118 @@
+{
+  "job": 129106661572,
+  "run": 42600269541,
+  "attempt": 1,
+  "source": "a2198c8c2f608f7b8169329b9da853067618dba6",
+  "bytes": 13334,
+  "sha256": "a3f47301994175326fa1c8e1e8435116ef1311a161f905a083e41d821ad2275d",
+  "originalReads": 1,
+  "readClaim": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6738116461",
+  "errorTimestamp": "2026-11-09T10:43:15.780517Z",
+  "error": "webDeploy:matchingWebRunFailed:42601138019",
+  "stack": "waitForWebDeployment scripts/release/web-deploy.mjs:177:47",
+  "expectedSource": "a2198c8c2f608f7b8169329b9da853067618dba6",
+  "selectedWeb": {
+    "run": 42601138019,
+    "attempt": 1,
+    "event": "workflow_dispatch",
+    "conclusion": "cancelled",
+    "createdAt": "2026-11-09T10:28:38Z",
+    "cancelCompletedAt": "2026-11-09T10:43:10Z",
+    "job": 129105623578,
+    "runnerId": 0,
+    "steps": [],
+    "metadataObserver": "daemon_start"
+  },
+  "originalPushWeb": {
+    "run": 42600269460,
+    "attempt": 1,
+    "statusAtFailure": "in_progress",
+    "notInferredFailure": true
+  },
+  "sourceInventory": [
+    {
+      "path": "scripts/release/web-deploy.mjs",
+      "bytes": 19867,
+      "sha256": "e8012d49653ab635ea26d3ba881450860f8c3ead2893d799a98bc395eb65bf9a"
+    },
+    {
+      "path": "scripts/release/web-deploy.test.mjs",
+      "bytes": 46875,
+      "sha256": "9a2e724afc95feb9c5b7056600316cb6911d409e5b614f1b19ec4b54643862b4"
+    },
+    {
+      "path": ".github/workflows/web-deploy.yml",
+      "bytes": 11619,
+      "sha256": "2916c80cc6a764fe2167ad5dad17be68b309161119bffbcb9001ee26b015e9a1"
+    },
+    {
+      "path": "docs/operations/web-deploy.md",
+      "bytes": 17246,
+      "sha256": "afeee307466ed95f4e24ce4c8ee88397a33396d3c1731bc0c062bb3939b11d8c"
+    }
+  ],
+  "conclusion": "The exact observed failure is the existing newest-matching-Web cancellation guard, not a40-minute timeout, original push failure, or SMOKE GitHub failure. No evidence supports changing the selector.",
+  "existingContract": {
+    "latestSameSourceWeb": true,
+    "acceptedEvents": [
+      "push",
+      "workflow_dispatch"
+    ],
+    "maxWaitMs": 2400000,
+    "terminalFailureCancellationTimeoutSkippedReject": true,
+    "actualBuildUploadPublicVersionRequired": true,
+    "currentMainFences": true,
+    "privateOverlayRefreshIsLegitimate": true
+  },
+  "unknown": [
+    "Actual private overlay intent of canceled dispatch is not independently established by this log or run API.",
+    "No inference that queued/unassigned meant redundant or not already selected by a dependent waiter."
+  ],
+  "productionActionsThisInvestigation": 0,
+  "productionQueriesThisInvestigation": 0,
+  "modelCalls": 0,
+  "codeChanges": 0,
+  "testsRun": 0,
+  "cleanupOwnerReceipt": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6738071504",
+  "cleanupOriginalReadByRoot": false,
+  "resourceOutcomeFromOwner": {
+    "originalLogBytes": 29282,
+    "originalLogSha256": "cada1bfc5735334238b7165e5c60bd93e2f9ad46a38ef9348d7bb248166ecd42",
+    "at": "2026-11-09T10:43:38.5902160Z",
+    "source": "a2198c8c2f608f7b8169329b9da853067618dba6",
+    "run": 42600269541,
+    "candidates": [
+      {
+        "kind": "desktop",
+        "id": "kjf7iblzkl83ghlhuoge",
+        "status": "deleted"
+      },
+      {
+        "kind": "claude",
+        "id": "lo38b3ss5jhnguvaqauy",
+        "status": "deleted"
+      },
+      {
+        "kind": "codex",
+        "id": "zke3zdy1by2mr9pk4dlb",
+        "status": "deleted"
+      }
+    ],
+    "sandboxes": [],
+    "errors": [],
+    "scope": "only this runtime release, not global account emptiness"
+  },
+  "originalReadWindow": [
+    "2026-11-09T10:47:04Z",
+    "2026-11-09T10:48:15Z"
+  ],
+  "independentSourceReviewer": "template_prebuild",
+  "rootAlsoReadSourceTestAndDocs": true,
+  "fixedBlobs": {
+    "workflow": "be1f902f97e50628fbe26fa55b9dab0160f749be",
+    "script": "948caacb60d05c04f21e5d0a55303716192771da",
+    "tests": "bb6f99cafcfca2b6058703105649275b5f3739fa",
+    "webWorkflow": "e15741a3ae51a294593eeb2151311378babd8ce4",
+    "docs": "5f1ad8520ba723d5b6eefbc67fa0fc2330b63c68"
+  }
+}
