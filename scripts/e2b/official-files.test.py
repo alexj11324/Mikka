@@ -625,5 +625,131 @@ class ProviderDirectoryFinalization(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
             files.validate_receipt(invalid, 'claude')
 
+
+class DesktopCertificateRelinks(unittest.TestCase):
+    # Official-only run 42628079564 / artifact 13678489689: both packaged
+    # Desktop files kept 0777/root ownership and became these exact links.
+    PATHS = ('/etc/ssl/certs/1560546e.0', '/etc/ssl/certs/e2b-ca.pem')
+    TARGETS = ('e2b-ca.pem', ROOT_CA)
+    DESKTOP_SHA = '4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1'
+    CODEX_SHA = 'a35101e5d97b20191320ecfcb75e4bea784ba8fa9715193eb3a759d54528eda5'
+    ROOT_BEFORE_SHA = '3d3bf4eda47ee4754c04202fe5ac919ae609f21aa750de1f6bdc91e83c16a686'
+    ROOT_FRESH_SHA = 'ffe5cadf73f8a4b863034daae2fdd9b861fb32049d2b4d4d68e49282f396b40e'
+
+    def rows(self, digest=None):
+        digest = digest or self.DESKTOP_SHA
+        before = {path: {'path': path, 'kind': 'file', 'mode': 0o777,
+                         'uid': 0, 'gid': 0, 'sha256': digest} for path in self.PATHS}
+        before[ROOT_CA] = {**before[self.PATHS[0]], 'path': ROOT_CA, 'sha256': self.ROOT_BEFORE_SHA}
+        after = {path: {'path': path, 'kind': 'link', 'mode': 0o777,
+                        'uid': 0, 'gid': 0, 'target': target} for path, target in zip(self.PATHS, self.TARGETS)}
+        after[ROOT_CA] = {**before[ROOT_CA], 'sha256': self.ROOT_FRESH_SHA}
+        return before, after
+
+    def proof(self, kind='desktop', digest=None):
+        before, after = self.rows(digest)
+        manifest = {'version': 1, 'entries': list(before.values())}
+        with patch.object(files, 'entry', side_effect=lambda path: deepcopy(before[str(path)])):
+            strict = files.verify(manifest)
+        with patch.object(files, 'entry', side_effect=lambda path: deepcopy(after[str(path)])), \
+                patch.object(files.Path, 'resolve', return_value=Path(ROOT_CA)):
+            with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                files.verify(manifest)
+            final = files.verify(manifest, kind)
+        return {**strict, 'finalization': final}
+
+    def test_measured_desktop_relinks_and_legacy_codex_scope(self):
+        # The Codex case preserves the existing a351 rule, not a claim that
+        # this control reproduced Codex links or any Codex mode transition.
+        for kind, digest in [('desktop', self.DESKTOP_SHA), ('codex', self.CODEX_SHA)]:
+            with self.subTest(kind=kind):
+                proof = self.proof(kind, digest)
+                self.assertIs(files.validate_receipt(proof, kind), proof)
+                final = proof['finalization']
+                self.assertEqual(final['before'], final['after'])
+                self.assertNotEqual(final['originalBefore'], final['originalAfter'])
+                changes = {row['path']: row for row in final['providerChanges']}
+                for path, target in zip(self.PATHS, self.TARGETS):
+                    self.assertEqual(changes[path], {
+                        'path': path, 'kind': 'file',
+                        'before': {'kind': 'file', 'sha256': digest, 'target': None},
+                        'after': {'kind': 'link', 'sha256': None, 'target': target},
+                        'resolvedSha256': self.ROOT_FRESH_SHA,
+                    })
+                self.assertNotEqual(self.ROOT_FRESH_SHA, digest)
+                rules, _ = files.finalization_policy(kind)
+                self.assertEqual([rules[path]['_certificate']['sha256'] for path in self.PATHS], [digest, digest])
+                self.assertTrue(all('mode' not in rules[path] for path in self.PATHS))
+
+    def test_relinks_keep_exact_path_digest_target_identity_and_scope_guards(self):
+        for path in self.PATHS:
+            mutations = [
+                ('wrong baseline digest', 'desktop', 'before', {'sha256': self.CODEX_SHA}),
+                ('wrong raw target', 'desktop', 'after', {'target': '/opt/mikka/replaced.crt'}),
+                ('different old mode', 'desktop', 'before', {'mode': 0o644}),
+                ('different new mode', 'desktop', 'after', {'mode': 0o775}),
+                ('owner', 'desktop', 'after', {'uid': 1000}),
+                ('group', 'desktop', 'after', {'gid': 1000}),
+                ('type', 'desktop', 'after', {'kind': 'directory'}),
+                ('codex scope', 'codex', 'after', {}),
+                ('claude scope', 'claude', 'after', {}),
+            ]
+            for label, kind, side, update in mutations:
+                before, after = self.rows()
+                (before if side == 'before' else after)[path].update(update)
+                with self.subTest(path=path, defect=label), \
+                        patch.object(files, 'entry', side_effect=lambda p: deepcopy(after[str(p)])), \
+                        patch.object(files.Path, 'resolve', return_value=Path(ROOT_CA)):
+                    with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                        files.verify({'version': 1, 'entries': list(before.values())}, kind)
+        before, after = self.rows()
+        unknown = '/etc/ssl/certs/unobserved-provider-root.pem'
+        original = {**before[self.PATHS[0]], 'path': unknown}
+        changed = {**after[self.PATHS[0]], 'path': unknown}
+        with patch.object(files, 'entry', return_value=changed):
+            with self.assertRaisesRegex(RuntimeError, 'official_files_changed'):
+                files.verify({'version': 1, 'entries': [original]}, 'desktop')
+
+    def test_verify_requires_exact_regular_provider_root_terminal(self):
+        for path in self.PATHS:
+            before, after = self.rows()
+            for label, terminal_path, terminal in [
+                ('wrong terminal', '/opt/mikka/e2b-ca.crt', after[ROOT_CA]),
+                ('directory terminal', ROOT_CA, {**after[ROOT_CA], 'kind': 'directory'}),
+                ('link terminal', ROOT_CA, {**after[ROOT_CA], 'kind': 'link', 'target': '/opt/mikka/replaced.crt'}),
+            ]:
+                def actual_entry(requested):
+                    return deepcopy(after[path] if str(requested) == path else terminal)
+                with self.subTest(path=path, defect=label), \
+                        patch.object(files, 'entry', side_effect=actual_entry), \
+                        patch.object(files.Path, 'resolve', return_value=Path(terminal_path)):
+                    with self.assertRaisesRegex(RuntimeError, '^e2b_certificate_target_invalid$'):
+                        files.verify({'version': 1, 'entries': [before[path]]}, 'desktop')
+
+    def test_relink_receipt_rejects_tampering_and_replacement_of_strict_proof(self):
+        proof = self.proof()
+        for defect in ('missing resolved hash', 'invalid resolved hash', 'wrong raw target',
+                       'wrong baseline', 'missing original kind', 'duplicate path', 'replaced installation'):
+            invalid = deepcopy(proof)
+            change = next(row for row in invalid['finalization']['providerChanges'] if row['path'] == self.PATHS[0])
+            if defect == 'missing resolved hash':
+                change.pop('resolvedSha256')
+            elif defect == 'invalid resolved hash':
+                change['resolvedSha256'] = 'not-a-digest'
+            elif defect == 'wrong raw target':
+                change['after']['target'] = ROOT_CA
+            elif defect == 'wrong baseline':
+                change['before']['sha256'] = self.CODEX_SHA
+            elif defect == 'missing original kind':
+                change.pop('kind')
+            elif defect == 'duplicate path':
+                invalid['finalization']['providerChanges'].append(deepcopy(change))
+            else:
+                invalid['after'] = invalid['finalization']['originalAfter']
+            with self.subTest(defect=defect):
+                with self.assertRaisesRegex(ValueError, 'official_conservation_invalid'):
+                    files.validate_receipt(invalid, 'desktop')
+
+
 if __name__ == '__main__':
     unittest.main()
