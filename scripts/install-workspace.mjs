@@ -23,6 +23,13 @@ export function runProcess(command, args, options) {
 }
 
 const transient = output => /(?:statusCode:\s*|HTTP(?:Error)?[: ]+)(?:502|503|504)\b/.test(output)
+function ffmpegDownloadFailed(output) {
+  const lines = output.split('\n')
+  const own = line => /(?:\/|^)ffmpeg-static(?:@[^\s/]+)? install:/.test(line)
+  return lines.some(line => own(line) && transient(line))
+    && lines.some(line => own(line) && /install: Failed\s*$/.test(line))
+    && !lines.some(line => /(?:preinstall|install|postinstall): Failed\s*$/.test(line) && !own(line))
+}
 async function complete(files) {
   for (const file of files) {
     try {
@@ -39,7 +46,7 @@ async function complete(files) {
 export async function installWorkspace({ cwd = process.cwd(), env = process.env, run = runProcess, packageJson } = {}) {
   const options = { cwd, env }
   const initial = await run('pnpm', ['install', '--frozen-lockfile'], options)
-  const failedDownload = initial.code !== 0 && /ffmpeg-static/.test(initial.output) && transient(initial.output)
+  const failedDownload = initial.code !== 0 && ffmpegDownloadFailed(initial.output)
   if (initial.code !== 0 && !failedDownload) return initial.code
   // The upstream explicit binary override belongs to the operator, never to us.
   if (env.FFMPEG_BIN) return initial.code

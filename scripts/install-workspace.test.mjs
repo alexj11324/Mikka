@@ -76,7 +76,7 @@ test('classified install failure retries the real installer then completes the f
   const code = await installWorkspace({ cwd: f.root, env: f.env, packageJson: f.manifest, run: (command, args, options) => {
     if (command !== 'pnpm') return execute(command, args, options)
     assert.deepEqual(args, ['install', '--frozen-lockfile'])
-    return Promise.resolve(++pnpmCalls === 1 ? { code: 1, output: 'ffmpeg-static@5.3.0 install: statusCode: 504' } : { code: 0, output: '' })
+    return Promise.resolve(++pnpmCalls === 1 ? { code: 1, output: '.../node_modules/ffmpeg-static install: statusCode: 504\n.../node_modules/ffmpeg-static install: Failed' } : { code: 0, output: '' })
   } })
   assert.equal(code, 0)
   assert.equal(pnpmCalls, 2)
@@ -86,7 +86,7 @@ test('persistent HTTP 504 is bounded and never becomes success through the upstr
   const f = await fixture(t), { installWorkspace } = await loadFix()
   let installers = 0
   const code = await installWorkspace({ cwd: f.root, env: f.env, packageJson: f.manifest, run: (command, args, options) => {
-    if (command === 'pnpm') return Promise.resolve({ code: 1, output: 'ffmpeg-static install: statusCode: 504' })
+    if (command === 'pnpm') return Promise.resolve({ code: 1, output: '.../node_modules/ffmpeg-static install: statusCode: 504\n.../node_modules/ffmpeg-static install: Failed' })
     installers++
     return execute(command, args, options)
   } })
@@ -99,10 +99,24 @@ test('unrelated pnpm errors retain their status and do not delete generated or e
   const f = await fixture(t), { installWorkspace } = await loadFix()
   const external = join(f.root, 'external-ffmpeg')
   await writeFile(external, 'owned by operator\n')
-  for (const [env, output] of [[f.env, 'unrelated postinstall HTTP 504'], [{ ...f.env, FFMPEG_BIN: external }, 'ffmpeg-static install: statusCode: 504']]) {
+  for (const [env, output] of [[f.env, 'unrelated postinstall HTTP 504'], [{ ...f.env, FFMPEG_BIN: external }, '.../node_modules/ffmpeg-static install: statusCode: 504\n.../node_modules/ffmpeg-static install: Failed']]) {
     let calls = 0
     assert.equal(await installWorkspace({ cwd: f.root, env, packageJson: f.manifest, run: async () => { calls++; return { code: 23, output } } }), 23)
     assert.equal(calls, 1)
     assert.equal(await readFile(external, 'utf8'), 'owned by operator\n')
   }
+})
+
+test('successful ffmpeg output cannot attribute another package HTTP 504 to ffmpeg', async t => {
+  const f = await fixture(t), { installWorkspace } = await loadFix()
+  const files = ['ffmpeg', 'ffmpeg.README', 'ffmpeg.LICENSE']
+  for (const file of files) await writeFile(join(f.directory, file), 'complete original ' + file + '\n')
+  let calls = 0
+  const result = await installWorkspace({ cwd: f.root, env: f.env, packageJson: f.manifest, run: async () => {
+    calls++
+    return calls === 1 ? { code: 23, output: '.../node_modules/ffmpeg-static install: Done\n.../other-package postinstall: HTTP 504\nELIFECYCLE Command failed with exit code 23' } : { code: 0, output: '' }
+  } })
+  assert.equal(result, 23)
+  assert.equal(calls, 1)
+  for (const file of files) assert.equal(await readFile(join(f.directory, file), 'utf8'), 'complete original ' + file + '\n')
 })
