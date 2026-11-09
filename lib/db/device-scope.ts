@@ -49,7 +49,7 @@ export function isDeviceAuthorityError(error: unknown): boolean {
  * idle-in-transaction timeout (10 s) bounds a hung process; a fence lost that
  * way fails the rest of the request closed.
  */
-type UnitFence = { client: PoolClient | null; acquiring: Promise<void> | null; inflight: number; idle: ReturnType<typeof setTimeout> | null; lost: boolean; source: Pool | null; onError: () => void }
+type UnitFence = { client: PoolClient | null; acquiring: Promise<void> | null; inflight: number; idle: ReturnType<typeof setTimeout> | null; lost: boolean; closed: boolean; source: Pool | null; onError: () => void }
 const authority = new AsyncLocalStorage<{ caller: DeviceAuthority; pools: WeakMap<Pool, Pool>; fence?: UnitFence }>()
 export const FENCE_IDLE_MS = 1_000
 export const FENCE_IDLE_IN_TRANSACTION = '10s'
@@ -64,11 +64,19 @@ export function withDeviceDatabaseAuthority<T>(caller: DeviceAuthority, fn: () =
   return authority.run({ caller, pools: new WeakMap() }, fn)
 }
 
+/** Deferred jobs keep the caller's credential checks, but cannot borrow a
+ * request's finished unit fence. Each statement/transaction releases its own
+ * authority lock before the job waits or returns to the serverless scheduler. */
+export function withBackgroundDeviceAuthority<T>(fn: () => T): T {
+  const caller = authority.getStore()?.caller
+  return caller ? withDeviceDatabaseAuthority(caller, fn) : fn()
+}
+
 /** One device request under the unit fence (lib/device-route.ts, when the deployment switch is on). */
 export async function withDeviceUnitFence<T>(caller: DeviceAuthority, fn: () => Promise<T>): Promise<T> {
-  const fence: UnitFence = { client: null, acquiring: null, inflight: 0, idle: null, lost: false, source: null, onError: () => { fence.lost = true } }
+  const fence: UnitFence = { client: null, acquiring: null, inflight: 0, idle: null, lost: false, closed: false, source: null, onError: () => { fence.lost = true } }
   try { return await authority.run({ caller, pools: new WeakMap(), fence }, fn) }
-  finally { await releaseFence(fence) }
+  finally { fence.closed = true; await releaseFence(fence) }
 }
 
 function fencePool(base: Pool): Pool {
@@ -84,7 +92,7 @@ function fencePool(base: Pool): Pool {
 }
 
 async function acquireFence(fence: UnitFence, caller: DeviceAuthority, base: Pool) {
-  if (fence.lost) throw new DeviceFenceUnavailable()
+  if (fence.lost || fence.closed) throw new DeviceFenceUnavailable()
   if (fence.client) return
   if (!fence.acquiring) fence.acquiring = (async () => {
     let client: PoolClient
