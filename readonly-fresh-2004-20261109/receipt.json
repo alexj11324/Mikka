@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "issue": 1505,
+  "operation": "prepare",
+  "status": "passed",
+  "stage": "normal_repository_readback",
+  "startedAt": "2026-11-09T20:08:39.088Z",
+  "changed": true,
+  "ownerRefreshAttempted": true,
+  "mintAttempted": true,
+  "ownerTokenResolution": {
+    "minimumValidityMs": 660000,
+    "status": "committed",
+    "actualRefresh": "not_independently_observed",
+    "beforeUpdatedAt": "2026-11-09T19:14:32.726Z",
+    "beforeExpiresAt": "2026-11-10T03:14:32.725Z",
+    "afterUpdatedAt": "2026-11-09T19:14:32.726Z",
+    "afterExpiresAt": "2026-11-10T03:14:32.725Z",
+    "persistedMetadataChanged": false
+  },
+  "ownerSourceBaseline": "after_normal_token_resolution",
+  "ownerProviderExpiresAt": "2026-11-10T03:14:32.000Z",
+  "mintOutcome": "received",
+  "mintedTokenSha256": "010a8ccf3ca9a8db198130561dfd645a466ab2586871bbc111460b39138bbd8a",
+  "minted": {
+    "tokenSha256": "010a8ccf3ca9a8db198130561dfd645a466ab2586871bbc111460b39138bbd8a",
+    "providerExpiresAt": "2026-11-10T04:08:42.000Z",
+    "appId": "4840908",
+    "repositoryId": "1436202099",
+    "installationId": "173164679",
+    "permissions": {
+      "metadata": "read",
+      "contents": "read"
+    },
+    "mintScopeConfirmed": true,
+    "checkTokenScopeConfirmed": false
+  },
+  "state": {
+    "version": 1,
+    "issue": 1505,
+    "userId": "cL1NXe1mr7WuIS8xWhU37v0p7kNoUMY3",
+    "ownerUserId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+    "githubAccountId": "183887963",
+    "githubLogin": "alexj11324",
+    "repository": "alexj11324/Mikka-handoff",
+    "appId": "4840908",
+    "appClientId": "Iv23limn1G88pOO6pvyJ",
+    "repositoryId": "1436202099",
+    "installationId": "173164679",
+    "tokenSha256": "010a8ccf3ca9a8db198130561dfd645a466ab2586871bbc111460b39138bbd8a",
+    "providerExpiresAt": "2026-11-10T04:08:42.000Z",
+    "connectionExpiresAt": "2026-11-10T00:08:35.245Z",
+    "connectionUpdatedAt": "2026-11-09T20:08:45.246Z"
+  },
+  "readback": {
+    "connected": true,
+    "samePrincipal": true,
+    "repositoryAccessible": true,
+    "sameAppInstallation": true
+  },
+  "ownerUnchanged": true,
+  "completedAt": "2026-11-09T20:08:46.587Z"
+}

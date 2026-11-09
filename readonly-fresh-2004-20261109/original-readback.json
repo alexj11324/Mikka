@@ -1,0 +1,50 @@
+{
+  "zipBytes": 928,
+  "zipSHA256": "b9ab6be00c2b6430030a6d0696380b1b0af7b2dce3aa6f6f4a925b7ed8b88e40",
+  "receiptBytes": 2132,
+  "receiptSHA256": "64fd08cb121a8edcbdc3bf58f6e79657cef6bb54eb17f43a4946e37047eb6b5c",
+  "members": [
+    "receipt.json"
+  ],
+  "crc": "passed",
+  "status": "passed",
+  "keys": [
+    "version",
+    "issue",
+    "operation",
+    "status",
+    "stage",
+    "startedAt",
+    "changed",
+    "ownerRefreshAttempted",
+    "mintAttempted",
+    "ownerTokenResolution",
+    "ownerSourceBaseline",
+    "ownerProviderExpiresAt",
+    "mintOutcome",
+    "mintedTokenSha256",
+    "minted",
+    "state",
+    "readback",
+    "ownerUnchanged",
+    "completedAt"
+  ],
+  "stateKeys": [
+    "version",
+    "issue",
+    "userId",
+    "ownerUserId",
+    "githubAccountId",
+    "githubLogin",
+    "repository",
+    "appId",
+    "appClientId",
+    "repositoryId",
+    "installationId",
+    "tokenSha256",
+    "providerExpiresAt",
+    "connectionExpiresAt",
+    "connectionUpdatedAt"
+  ],
+  "forbiddenCredentialKeys": []
+}

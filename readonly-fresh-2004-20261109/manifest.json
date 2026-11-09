@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "repository": "alexj11324/Mikka",
+  "parent": "383b5c550073ef1a78777bb03655418ccdd9191f",
+  "baseTree": "b371963accd70f94131e5c5c14027846e3776275",
+  "directory": "readonly-fresh-2004-20261109",
+  "sourceDirectory": "/workspace/scratch/263e36984c81/readonly-fresh-2004-1505",
+  "scope": "Byte-preserving archive of the six root-owned cached files; no new original download, semantic receipt adjudication, CI/prod query or test execution. Original ZIP is represented as explicitly named base64 text. No ref updates.",
+  "sourceFileCount": 6,
+  "sourceBytes": 29888,
+  "payloadFileCount": 6,
+  "payloadBytes": 30201,
+  "files": [
+    {
+      "source": "active.yml",
+      "path": "active.yml",
+      "mode": "100644",
+      "original": {
+        "bytes": 11984,
+        "sha256": "be47d10740c8c189b99f5491aff21a9f31697dfbf574aaa15fe17cacf02a5f72",
+        "gitBlob": "9c2f2fb6163e1dd642ddd81858cc4edf4a805b92"
+      },
+      "archived": {
+        "bytes": 11984,
+        "sha256": "be47d10740c8c189b99f5491aff21a9f31697dfbf574aaa15fe17cacf02a5f72",
+        "gitBlob": "9c2f2fb6163e1dd642ddd81858cc4edf4a805b92"
+      },
+      "representation": "original-utf8-bytes"
+    },
+    {
+      "source": "binding.json",
+      "path": "binding.json",
+      "mode": "100644",
+      "original": {
+        "bytes": 1926,
+        "sha256": "0edc825a8c8792a08eb25cbffda4801e241b27d4e18e4f365bbbe91bab35019d",
+        "gitBlob": "1a1fede1313c73a58afad73a961a78b4a6f93c5a"
+      },
+      "archived": {
+        "bytes": 1926,
+        "sha256": "0edc825a8c8792a08eb25cbffda4801e241b27d4e18e4f365bbbe91bab35019d",
+        "gitBlob": "1a1fede1313c73a58afad73a961a78b4a6f93c5a"
+      },
+      "representation": "original-utf8-bytes"
+    },
+    {
+      "source": "closed.yml",
+      "path": "closed.yml",
+      "mode": "100644",
+      "original": {
+        "bytes": 11892,
+        "sha256": "8c18e3802a52491268bdc3997e622f29dd1ce58f7d70d11bcea665a0b139886b",
+        "gitBlob": "a349ea169ae51408016bb07a83f822653d1dcd91"
+      },
+      "archived": {
+        "bytes": 11892,
+        "sha256": "8c18e3802a52491268bdc3997e622f29dd1ce58f7d70d11bcea665a0b139886b",
+        "gitBlob": "a349ea169ae51408016bb07a83f822653d1dcd91"
+      },
+      "representation": "original-utf8-bytes"
+    },
+    {
+      "source": "original-readback.json",
+      "path": "original-readback.json",
+      "mode": "100644",
+      "original": {
+        "bytes": 1026,
+        "sha256": "8607049bb1ed0a86898bc4f78c84bb5feeb05fa39f19debabf446d4eed00a74a",
+        "gitBlob": "54543e80225b143fd6dbb77c169aa13d20a7b18f"
+      },
+      "archived": {
+        "bytes": 1026,
+        "sha256": "8607049bb1ed0a86898bc4f78c84bb5feeb05fa39f19debabf446d4eed00a74a",
+        "gitBlob": "54543e80225b143fd6dbb77c169aa13d20a7b18f"
+      },
+      "representation": "original-utf8-bytes"
+    },
+    {
+      "source": "original.zip",
+      "path": "original.zip.base64.txt",
+      "mode": "100644",
+      "original": {
+        "bytes": 928,
+        "sha256": "b9ab6be00c2b6430030a6d0696380b1b0af7b2dce3aa6f6f4a925b7ed8b88e40",
+        "gitBlob": "51ce3b2e055f322db231e168a876a38608d8c758"
+      },
+      "archived": {
+        "bytes": 1241,
+        "sha256": "add751556e40a24949d398585284d7438b0da21fa476578ed723dd76bbec96aa",
+        "gitBlob": "ee6e7ca30bcc70d289c899d36b096244c2c37f49"
+      },
+      "representation": "base64-text-one-line-with-final-LF",
+      "decoding": "Decode base64 after removing the single final LF; the archived text is not a ZIP file."
+    },
+    {
+      "source": "receipt.json",
+      "path": "receipt.json",
+      "mode": "100644",
+      "original": {
+        "bytes": 2132,
+        "sha256": "64fd08cb121a8edcbdc3bf58f6e79657cef6bb54eb17f43a4946e37047eb6b5c",
+        "gitBlob": "2d4496252610208d64eef9fdfb807716b901aec1"
+      },
+      "archived": {
+        "bytes": 2132,
+        "sha256": "64fd08cb121a8edcbdc3bf58f6e79657cef6bb54eb17f43a4946e37047eb6b5c",
+        "gitBlob": "2d4496252610208d64eef9fdfb807716b901aec1"
+      },
+      "representation": "original-utf8-bytes"
+    }
+  ]
+}
