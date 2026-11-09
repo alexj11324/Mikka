@@ -8,7 +8,7 @@ jobs:
   publication_preflight:
     name: Read existing shared-account publication resources
     # Review draft. Activate only with actual served source and recorded window.
-    if: false
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/ops/self-hosted-vault-closeout-20261108' }}
     runs-on: ubuntu-latest
     timeout-minutes: 6
     concurrency:

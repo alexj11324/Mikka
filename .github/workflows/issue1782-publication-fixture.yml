@@ -1,0 +1,74 @@
+name: Issue 1782 owned normal publication fixture
+on:
+  push:
+    branches: [ops/self-hosted-vault-closeout-20261108]
+permissions:
+  contents: read
+jobs:
+  publication_fixture:
+    name: Create only the reviewed owned pre-migration publication
+    # Contingency only after a fresh authorized history collection remains empty.
+    # Every actual binding must be reviewed before this can be activated.
+    if: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    concurrency:
+      group: production-smoke-owner-acceptance
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      contents: read
+      actions: read
+      issues: read
+      id-token: write
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Verify finite writes, fixed actual resources and active source window before credentials
+        timeout-minutes: 2
+        run: |
+          node --test scripts/ops/publication-fixture-1782.test.mjs scripts/ops/publication-fixture-budget.test.mjs scripts/ops/publication-fixture-capture-wire.test.mjs
+          node scripts/ops/publication-fixture-1782.mjs check
+      - name: Read only the existing SMOKE email
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_EMAIL
+          recursive: false
+          include-imports: false
+      - name: Read only the existing SMOKE password
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_PASSWORD
+          recursive: false
+          include-imports: false
+      - name: Normal Task and fixed Profile delivery, then exact owned compute cleanup
+        timeout-minutes: 29
+        run: node scripts/ops/publication-fixture-1782.mjs capture
+      - name: Retain closed delivery and cleanup evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: publication-fixture-1782-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/publication-fixture-1782/*.json
+          retention-days: 14
+          if-no-files-found: warn

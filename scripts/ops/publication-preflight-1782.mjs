@@ -1,5 +1,6 @@
-/** Fixed ordinary-session configuration read before a real #1687 baseline.
- * No prompt, Task, model selection, settings write, DB or GitHub mutation. */
+/** Fixed ordinary-session inventory before a real #1687 baseline.
+ * No prompt, Task, model choice, defaults change, direct DB or GitHub mutation.
+ * Normal getters may initialize the Coordinator and refresh catalogues. */
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
@@ -81,9 +82,18 @@ async function deadlineFetch(fetchImpl, url, init, signal, timeoutMs, register =
 // Fill only after actual main is served and root registers the short account
 // window. Owned Bot IDs must come from this batch's real creation receipts.
 // Empty ownedBotIds is a valid inventory run and reports a missing fixture Bot.
-export const BINDING = Object.freeze({ applicationSha: null, opsParentSha: null, workspaceId: null, readerSha256: null,
-  policyAdminSha256: null, ownedBotIds: null, windowCommentId: null, windowCommentBodySha256: null,
-  windowStartsAt: null, windowExpiresAt: null })
+export const BINDING = Object.freeze({
+  "applicationSha": "1c7698655405b289d7fdbd814713d15e542cc2bb",
+  "opsParentSha": "c47f71d7f60d3f490d8006a07dec164ecf71cea6",
+  "workspaceId": "de300001-ece6-4021-8214-c986ea306bde",
+  "readerSha256": "b823ba1c5729768b1da5c3615aba91ac39723bd4c54e9f382b3ed1368d58ec6e",
+  "policyAdminSha256": "b86765f1f6d3a988ed566b140747d124985d558b179d9a0732516cf6d189ae28",
+  "ownedBotIds": [],
+  "windowCommentId": 6753115982,
+  "windowStartsAt": "2026-11-09T22:25:34.000Z",
+  "windowExpiresAt": "2026-11-09T22:37:34.000Z",
+  "windowCommentBodySha256": "e1dc237bdd387e7483f32bd9d64b5941133537245a6cd598cb8340ab2678c3fa"
+})
 
 export function checkBinding(binding = BINDING) {
   check(exact(binding, Object.keys(BINDING)) && SHA.test(binding.applicationSha ?? '') && SHA.test(binding.opsParentSha ?? '')
@@ -193,8 +203,9 @@ export function assertReadRequest(url, init, binding) {
   const a = body.args
   const allowed = ['bots.pollBots', 'task-runs.pollThreads'].includes(body.action) && a.length === 0
     || body.action === 'model-order.getModelOrder' && isDeepStrictEqual(a, [binding.workspaceId])
-    || ['execution-settings.getBotModelMenu', 'coordinator.pollCoordinatorChat'].includes(body.action)
-      && a.length === 1 && binding.ownedBotIds.includes(a[0])
+    || body.action === 'execution-settings.getBotModelMenu' && a.length === 1
+      && (a[0] === null || binding.ownedBotIds.includes(a[0]))
+    || body.action === 'coordinator.pollCoordinatorChat' && a.length === 1 && binding.ownedBotIds.includes(a[0])
     || ['issues.getIssue', 'issue-operations.getDeletedIssue'].includes(body.action) && a.length === 1 && UUID.test(a[0])
   check(allowed, 'read_only_refused')
   check(new Headers(init.headers).get('x-mikka-workspace-id') === binding.workspaceId, 'read_only_refused')
@@ -221,14 +232,54 @@ const official = row => row && Object.hasOwn(MODELS, row.harness) && row.model =
 const sameSource = (a, b) => a.harness === b.harness && a.model === b.model && a.source.connectionId === b.source.connectionId
 const safeAvailability = value => value?.available === true ? 'available' : value?.available === false ? 'unavailable' : 'unknown'
 
+/** Two normal API observations, not a direct menu-to-connection identity claim.
+ * The menu exposes a public owner name, while the order exposes owner/connection
+ * IDs. Correlate only if the whole matching model directory and public name are
+ * unique. A missing or ambiguous choice cannot authorize a setup mutation. */
+export function sharedClaudeChoice(order, menu, workspace, scope) {
+  check(Array.isArray(order?.candidates) && order.candidates.length <= 1000
+    && Array.isArray(menu?.groups) && menu.groups.length <= 100
+    && menu.groups.every(group => Array.isArray(group?.options) && group.options.length <= 1000)
+    && workspace?.currentUserId === scope.ownerId && workspace.workspace?.id === scope.workspaceId
+    && workspace.workspace.kind === 'team' && Array.isArray(workspace.members), 'response_invalid')
+  const admin = workspace.members.filter(row => row.userId === scope.adminId && row.role === 'admin' && row.status === 'active')
+  check(admin.length === 1, 'workspace_refused')
+  const name = admin[0].name
+  const orderMatches = order.candidates.filter(row => row.model === MODELS.claude_code)
+  const menuMatches = menu.groups.flatMap(group => group.options
+    .filter(option => option.modelId === MODELS.claude_code).map(option => ({ group, option })))
+  const named = typeof name === 'string' && name.trim().length > 0 && name.length <= 256
+  const nameMatches = named ? workspace.members.filter(row => row.status === 'active' && row.name === name).length : 0
+  const counts = { orderCandidates: orderMatches.length, menuOptions: menuMatches.length, activeMembersWithAdminName: nameMatches }
+  const absent = orderMatches.length === 0 || menuMatches.length === 0
+  if (absent) return { status: 'unavailable', reason: 'missing_matching_directory_entry', counts }
+  if (orderMatches.length !== 1 || menuMatches.length !== 1 || nameMatches !== 1)
+    return { status: 'unproven', reason: 'ambiguous_model_or_public_owner_name', counts }
+  const source = orderMatches[0], { group, option } = menuMatches[0]
+  if (source.harness !== 'claude_code' || source.source?.kind !== 'subscription'
+    || source.credentialOwnerId !== scope.adminId || !UUID.test(source.source.connectionId)
+    || group.kind !== 'subscription' || group.provider !== 'claude' || group.owner !== name
+    || option.provider !== 'claude' || !UUID.test(option.id))
+    return { status: 'unproven', reason: 'shared_source_or_public_owner_mismatch', counts }
+  return { status: 'correlated_unique_directories', counts,
+    orderObservation: { harness: 'claude_code', model: MODELS.claude_code, kind: 'subscription',
+      connectionId: source.source.connectionId, credentialOwnerSha256: hash(source.credentialOwnerId) },
+    menuObservation: { readTarget: 'workspace_coordinator', choiceId: option.id, provider: 'claude',
+      modelId: option.modelId, kind: group.kind, sharedOwnerNameSha256: hash(name) },
+    limitation: 'menu_does_not_expose_connection_or_owner_ids; revalidate_both_directories_on_new_owned_bot_before_selecting' }
+}
+
 export async function inventory(client, scope, binding = BINDING, now = Date.now()) {
   const requests = [client.json('/api/integrations/github'),
     client.json('/api/factory/agent-profiles?workspaceId=' + scope.workspaceId + '&location=cloud'),
     client.rpc('model-order.getModelOrder', [scope.workspaceId]), client.rpc('bots.pollBots', []),
-    client.json('/api/settings/api-keys?workspace=' + scope.workspaceId)]
+    client.json('/api/settings/api-keys?workspace=' + scope.workspaceId),
+    client.rpc('execution-settings.getBotModelMenu', [null]),
+    client.json('/api/workspace?workspace=' + scope.workspaceId)]
   const settled = await Promise.allSettled(requests)
   const failed = settled.find(row => row.status === 'rejected'); if (failed) throw failed.reason
-  const [github, management, order, bots, keys] = settled.map(row => row.value)
+  const [github, management, order, bots, keys, coordinatorMenu, workspace] = settled.map(row => row.value)
+  const claudeChatChoice = sharedClaudeChoice(order, coordinatorMenu, workspace, scope)
   check(github.viewerId === scope.ownerId && Array.isArray(github.repositories) && github.repositories.length <= 1000
     && Array.isArray(management.profiles) && management.profiles.length < 101 && management.availability
     && Array.isArray(management.catalog?.models) && Array.isArray(order.candidates) && order.candidates.length <= 1000
@@ -316,7 +367,7 @@ export async function inventory(client, scope, binding = BINDING, now = Date.now
   return { repository: { fullName: REPOSITORY, authorized: repositoryAvailable, verification, githubWriteCapability: 'requires_real_run_push_and_server_pr' },
     sources: sources.map(row => ({ harness: row.harness, model: row.model, connectionId: row.source.connectionId,
       catalogAvailability: safeAvailability(management.catalog.models.find(value => official(value) && sameSource(value, row))) })),
-    profiles: summaries, botCount: bots.items.length, ownedBots, defaultLocation: order.location, cloudReady: order.cloudReady,
+    profiles: summaries, botCount: bots.items.length, ownedBots, claudeChatChoice, defaultLocation: order.location, cloudReady: order.cloudReady,
     automaticReviewSourcesBounded: reviewBounded, apiKeyFallbackReachable, oldRunCandidates: old,
     oldRunWindow: { returned: threads.items.length, cap: 200, days: 30, selected: old.length, capReached: threads.items.length === 200 },
     blockers, configurationReady: blockers.length === 0 }
@@ -328,7 +379,7 @@ export async function capture(client, env, binding = BINDING, pin = () => guardM
     mainSha: binding.applicationSha, opsSource: env.GITHUB_SHA, opsParentSha: binding.opsParentSha, runId: env.GITHUB_RUN_ID, runAttempt: 1,
     workspaceId: binding.workspaceId, readerSha256: binding.readerSha256, policyAdminSha256: binding.policyAdminSha256,
     startedAt: new Date(now()).toISOString(), phase: 'source', cleanup: { signedOut: false },
-    limitations: ['no_model_submitted', 'no_task_or_configuration_written', 'normal_read_cache_catalogue_maintenance_not_measured',
+    limitations: ['no_model_submitted', 'no_explicit_task_or_configuration_mutation', 'normal_coordinator_initialization_and_catalogue_maintenance_not_measured',
       'not_a_publication_or_before_snapshot', 'profile_instructions_need_review_before_writable_execution',
       'old_run_candidates_require_exact_APP_recheck_in_before_transaction'] }
   let signedIn = false

@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises'
 import { setTimeout as delay } from 'node:timers/promises'
 import { createSessionClient } from '../acceptance/cloud-startup.mjs'
 import { BINDING, assertReadRequest, authorize, capture, checkBinding, executePreflight, guardContext, guardMain,
-  inventory, publicFailure, windowRecord } from './publication-preflight-1782.mjs'
+  inventory, publicFailure, sharedClaudeChoice, windowRecord } from './publication-preflight-1782.mjs'
 
 const id = n => '00000000-0000-4000-8000-' + String(n).padStart(12, '0')
 const hash = value => createHash('sha256').update(value).digest('hex')
@@ -56,7 +56,7 @@ function ordinaryFixture(change = () => {}) {
     binding, signedOut: 0, sessionReads: 0,
     session: { user: { id: reader, email: env.SMOKE_OWNER_EMAIL } },
     workspace: { currentUserId: reader, workspace: { id: id(90), kind: 'team' }, role: 'member',
-      choices: [{ id: id(90), kind: 'team' }], members: [{ userId: reader, role: 'member', status: 'active' }, { userId: admin, role: 'admin', status: 'active' }] },
+      choices: [{ id: id(90), kind: 'team' }], members: [{ userId: reader, name: 'Synthetic Reader', role: 'member', status: 'active' }, { userId: admin, name: 'Synthetic Admin', role: 'admin', status: 'active' }] },
     github: { viewerId: reader, connected: true, installed: true, repositories: [{ fullName: 'alexj11324/Mikka-handoff' }] },
     verification: { viewerId: reader, repository: 'alexj11324/Mikka-handoff', verifyCommand: 'never-emit-verify-command' },
     management: { profiles: [{ id: id(93), version: 1, digest: 'd'.repeat(64), enabled: true, archivedAt: null, harness: 'codex',
@@ -65,7 +65,7 @@ function ordinaryFixture(change = () => {}) {
     order: { location: 'cloud', cloudReady: true, candidates: [{ harness: 'codex', model: 'gpt-6-luna', source, credentialOwnerId: admin }] },
     bots: { items: [{ id: id(91), name: 'never-emit-bot-name' }], live: { ownerId: reader, workspaceId: id(90) } },
     chat: { botId: id(91), enabled: true, working: false, streamRunId: null, items: [{ text: 'never-emit-chat' }] },
-    menu: { current: { kind: 'subscription', chosen: true, available: true, provider: 'codex', modelId: 'gpt-6-luna' } },
+    menu: { groups: [], current: { kind: 'subscription', chosen: true, available: true, provider: 'codex', modelId: 'gpt-6-luna' } },
     keys: { apiKeyAfterQuota: false, keys: [] },
     threads: { items: [{ id: id(101), issueId: id(1), createdAt: '2026-11-08T18:00:00.000Z', status: 'succeeded', prompt: 'never-emit-prompt', lastReply: 'never-emit-reply' }] },
     deleted: false, issueOwner: reader, issueWorkspace: id(90), deletedAt: '2026-11-09T17:00:00.000Z',
@@ -342,4 +342,71 @@ test('workflow has only existing exact SMOKE reads, least read scopes and the sh
   assert.doesNotMatch(text, /contents: write|actions: write|issues: write|continue-on-error|MIKKA_DATABASE_URL|DATABASE_URL/)
   assert.ok(text.indexOf('node --test scripts/ops/publication-preflight-1782.test.mjs') < text.indexOf('uses: Infisical/secrets-action'))
   assert.ok(text.indexOf('publication-preflight-1782.mjs check') < text.indexOf('uses: Infisical/secrets-action'))
+})
+
+function withSharedClaude(data) {
+  data.order.candidates.push({ harness: 'claude_code', model: 'claude-haiku-5-5',
+    source: { kind: 'subscription', connectionId: id(96) }, credentialOwnerId: admin })
+  data.menu.groups = [{ kind: 'subscription', provider: 'claude', owner: 'Synthetic Admin',
+    credentialLabel: 'never-emit-source-label', options: [{ id: id(97), provider: 'claude', modelId: 'claude-haiku-5-5' }] }]
+}
+test('normal Coordinator menu inventory records the real choice and separate order observation without a selection', async () => {
+  const f = ordinaryFixture(data => { withSharedClaude(data); data.binding.ownedBotIds = [] })
+  const report = await capture(f.client, env, f.binding, async () => ({}), () => now)
+  assert.equal(report.status, 'preflight_blocked', 'missing owned Bot remains an honest setup prerequisite')
+  assert.ok(report.inventory.claudeChatChoice, 'the ordinary menu must yield a source-bound choice observation')
+  const choice = report.inventory.claudeChatChoice
+  assert.equal(choice.status, 'correlated_unique_directories')
+  assert.deepEqual(choice.counts, { orderCandidates: 1, menuOptions: 1, activeMembersWithAdminName: 1 })
+  assert.deepEqual(choice.orderObservation, { harness: 'claude_code', model: 'claude-haiku-5-5', kind: 'subscription',
+    connectionId: id(96), credentialOwnerSha256: hash(admin) })
+  assert.deepEqual(choice.menuObservation, { readTarget: 'workspace_coordinator', choiceId: id(97), provider: 'claude',
+    modelId: 'claude-haiku-5-5', kind: 'subscription', sharedOwnerNameSha256: hash('Synthetic Admin') })
+  assert.match(choice.limitation, /^menu_does_not_expose_connection_or_owner_ids;/)
+  assert.equal(f.calls.filter(call => call.action === 'execution-settings.getBotModelMenu').length, 1)
+  assert.equal(f.calls.some(call => call.action === 'execution-settings.chooseBotModel'), false)
+  assert.equal(report.cleanup.signedOut, true)
+  for (const raw of ['Synthetic Admin', 'never-emit-source-label', admin]) assert.ok(!JSON.stringify(report).includes(raw))
+})
+test('matching model text cannot prove ambiguous directories, owner names, or a different source', () => {
+  const mutations = [
+    data => data.order.candidates.push({ ...data.order.candidates[1], source: { kind: 'subscription', connectionId: id(98) } }),
+    data => data.menu.groups.push({ ...data.menu.groups[0], options: [{ ...data.menu.groups[0].options[0], id: id(98) }] }),
+    data => data.workspace.members.push({ userId: 'another-person', name: 'Synthetic Admin', role: 'member', status: 'active' }),
+    data => { data.menu.groups[0].owner = 'Different Display Name' },
+    data => { delete data.menu.groups[0].owner },
+    data => { data.menu.groups[0].options[0].id = 'apikey:' + id(97) + ':claude-haiku-5-5' },
+    data => { data.order.candidates[1].credentialOwnerId = reader },
+    data => { data.order.candidates[1].source = { kind: 'api_key', keyId: id(96) } },
+  ]
+  for (const mutate of mutations) {
+    const { data } = ordinaryFixture(d => { withSharedClaude(d); mutate(d) })
+    const value = sharedClaudeChoice(data.order, data.menu, data.workspace, { ownerId: reader, adminId: admin, workspaceId: id(90) })
+    assert.equal(value.status, 'unproven'); assert.equal(value.menuObservation, undefined)
+    assert.equal(value.orderObservation, undefined)
+  }
+})
+test('a missing Claude directory remains unavailable and does not fabricate a choice UUID', () => {
+  const { data } = ordinaryFixture()
+  const value = sharedClaudeChoice(data.order, data.menu, data.workspace, { ownerId: reader, adminId: admin, workspaceId: id(90) })
+  assert.equal(value.status, 'unavailable'); assert.equal(value.menuObservation, undefined)
+  assert.equal(value.orderObservation, undefined)
+})
+test('the additional null-target permission is only the normal menu getter, never choose or arbitrary Bot access', () => {
+  const { binding } = fixture(), url = 'https://app.aspectlylabs.com/mikka/api/rpc'
+  const request = (action, args) => ({ method: 'POST', headers: { 'x-mikka-workspace-id': binding.workspaceId },
+    body: JSON.stringify({ version: 1, action, args }) })
+  assert.doesNotThrow(() => assertReadRequest(url, request('execution-settings.getBotModelMenu', [null]), binding))
+  for (const [action, args] of [['execution-settings.chooseBotModel', [null, id(97)]],
+    ['execution-settings.chooseBotModel', [id(91), id(97)]], ['coordinator.pollCoordinatorChat', [null]],
+    ['execution-settings.getBotModelMenu', [id(999)]]])
+    assert.throws(() => assertReadRequest(url, request(action, args), binding), error => error.code === 'read_only_refused')
+})
+test('the menu correlation refuses changed workspace, missing active admin, and malformed menu DTO', () => {
+  for (const mutate of [d => { d.workspace.workspace.id = id(999) }, d => { d.workspace.members[1].status = 'suspended' },
+    d => { d.menu.groups[0].options = null }]) {
+    const { data } = ordinaryFixture(d => { withSharedClaude(d); mutate(d) })
+    assert.throws(() => sharedClaudeChoice(data.order, data.menu, data.workspace, { ownerId: reader, adminId: admin, workspaceId: id(90) }),
+      error => ['response_invalid', 'workspace_refused'].includes(error.code))
+  }
 })
