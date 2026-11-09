@@ -80,6 +80,7 @@ test('migration runner handles historical and new names without replay and rejec
     const ledger = async pool => (await pool.query('SELECT name, "appliedAt" FROM schema_migrations ORDER BY name')).rows
     const triggerState = async (pool, names = null) => (await pool.query(`
       SELECT c.relname AS table_name, t.tgname AS trigger_name,
+        t.tgdeferrable AS deferrable, t.tginitdeferred AS initially_deferred,
         pg_get_triggerdef(t.oid) AS definition, pg_get_functiondef(t.tgfoid) AS function_definition
       FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace
       WHERE NOT t.tgisinternal AND n.nspname='public' AND ($1::text[] IS NULL OR t.tgname=ANY($1::text[]))
@@ -132,7 +133,13 @@ test('migration runner handles historical and new names without replay and rejec
         const before = await ledger(candidate.pool), triggers = await triggerState(candidate.pool)
         assert.ok(triggers.some(row => row.trigger_name === 'coding_review_task_workspace_update'))
         assert.ok(triggers.some(row => row.trigger_name === 'workspace_projects_v2_writer_fence'))
-        assert.ok(!triggers.some(row => row.trigger_name === 'coding_review_new_run'), 'the later task-thread migration removed the superseded trigger')
+        const newRunTriggers = triggers.filter(row => row.trigger_name === 'coding_review_new_run')
+        assert.equal(newRunTriggers.length, 1)
+        assert.equal(newRunTriggers[0].table_name, 'agent_runs')
+        assert.equal(newRunTriggers[0].deferrable, true)
+        assert.equal(newRunTriggers[0].initially_deferred, true)
+        assert.match(newRunTriggers[0].definition, /^CREATE CONSTRAINT TRIGGER coding_review_new_run\b/,
+          'the later task-thread migration replaces the immediate trigger with a deferred constraint trigger')
         await migrate(candidate.url); await migrate(candidate.url)
         assert.deepEqual(await ledger(candidate.pool), before, 'aliases preserve names and appliedAt instead of inserting replacement receipts')
         assert.deepEqual(await triggerState(candidate.pool), triggers, 'no old function or trigger body is replayed over its later refinement')

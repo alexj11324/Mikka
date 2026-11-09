@@ -8,15 +8,15 @@ test('the latest run reads as its own result', () => {
   assert.deepEqual(runResult({ status: 'queued' }, true), { result: 'queued', reason: null })
   assert.deepEqual(runResult({ status: 'succeeded', outcome: 'done' }, true), { result: 'done', reason: null })
   assert.deepEqual(runResult({ status: 'failed', outcome: 'failed' }, true), { result: 'failed', reason: null })
-  assert.deepEqual(runResult({ status: 'failed', outcome: 'blocked' }, true), { result: 'blocked', reason: null })
-  assert.deepEqual(runResult({ status: 'waiting_input' }, true), { result: 'waiting', reason: 'needsReply' })
+  assert.deepEqual(runResult({ status: 'failed', outcome: 'blocked' }, true), { result: 'blocked', reason: 'blocked' })
+  assert.deepEqual(runResult({ status: 'waiting_input' }, true), { result: 'waiting', reason: 'needs_input' })
   assert.deepEqual(runResult({ status: 'paused' }, true), { result: 'blocked', reason: 'quota' })
 })
 
 test('an earlier run keeps its result, except one left waiting, which has ended', () => {
   assert.deepEqual(runResult({ status: 'succeeded', outcome: 'done' }, false), { result: 'done', reason: null })
   assert.deepEqual(runResult({ status: 'failed', outcome: 'failed' }, false), { result: 'failed', reason: null })
-  assert.deepEqual(runResult({ status: 'failed', outcome: 'blocked' }, false), { result: 'blocked', reason: null })
+  assert.deepEqual(runResult({ status: 'failed', outcome: 'blocked' }, false), { result: 'blocked', reason: 'blocked' })
   assert.deepEqual(runResult({ status: 'waiting_input' }, false), { result: 'ended', reason: null })
   assert.deepEqual(runResult({ status: 'succeeded', outcome: 'needs_input' }, false), { result: 'ended', reason: null })
 })
