@@ -1,0 +1,262 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512.existing_run_worker_binding_source_review",
+  "repository": "alexj11324/Mikka",
+  "reviewedTree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+  "featureCommit": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+  "observedAt": "2026-11-09 16:23:25 UTC",
+  "activity": {
+    "sourceReadsOnly": true,
+    "productionCalls": 0,
+    "posthogQueries": 0,
+    "dbReads": 0,
+    "providerCalls": 0,
+    "tests": 0,
+    "resources": 0,
+    "driverEdits": 0,
+    "refUpdates": 0
+  },
+  "conclusion": {
+    "directRunWorkerShaInCurrentDriverReport": false,
+    "directRunWorkerShaInOrdinaryEvidenceApi": false,
+    "daemonServiceVersionIsWorkerSha": false,
+    "existingBootstrapChecksWorkerSha": true,
+    "existingTemplateCatalogueBindsTemplateToWorkerSha": true,
+    "scope": "Source contract only. No current production run, template, configured W or release readiness is asserted."
+  },
+  "paths": [
+    {
+      "id": "tracing_version",
+      "source": "packages/daemon/bin/cloud-worker.ts",
+      "lines": [
+        17,
+        19
+      ],
+      "finding": "daemonTracer.configure(config.tracing,{version:DAEMON_VERSION}) supplies package daemon version, not canonical worker W. The frozen source_correlation query's service.version field cannot by itself become a W attestation.",
+      "queryBoundary": "Query field limitation was supplied by Root; this review did not execute or rewrite the 14 frozen SQL queries."
+    },
+    {
+      "id": "ordinary_evidence",
+      "source": "lib/captures/store.ts",
+      "lines": [
+        294,
+        324
+      ],
+      "finding": "Owner-scoped run evidence returns run id/status/bot/issue/model/harness/profile/routing/executionIdentity and capture/artifact metadata, with no workerSha, sourceCommit or template. The driver's runProof projects model/profile/owner runtime facts only."
+    },
+    {
+      "id": "current_driver_reads",
+      "source": "scripts/acceptance/run-observability.mjs",
+      "lines": [
+        210,
+        224,
+        647,
+        684,
+        731,
+        748
+      ],
+      "finding": "Existing ordinary evidence reads do not return or preserve W. The cleanup POST ends a checked exact run. Machine-view GET is only on the cleanup404/not-created fallback; a null value then proves no machine under that branch, not what W executed."
+    },
+    {
+      "id": "template_catalogue",
+      "source": "lib/cloud-template-models.ts",
+      "lines": [
+        6,
+        25
+      ],
+      "finding": "Existing deployment catalogue includes sourceCommit, workerSha, and desktop/claude/codex template IDs. Parser requires W/source and selected template env pins to match. e2b-runtime selectedTemplate requires the configured additive template to be the matching preinstalled/base kind."
+    },
+    {
+      "id": "existing_marker_read",
+      "source": "lib/cloud-computer/thread-machines.ts",
+      "lines": [
+        858,
+        892,
+        970,
+        987
+      ],
+      "finding": "The already-required startup operation reads root marker /opt/mikka/worker-source-sha or a bootstrap-broker sourceSha, then verifies it equals configured MIKKA_CLOUD_WORKER_SHA. Runtime-refresh verifies the post-switch marker again. The misleading local name sourceSha here is the marker W, not App source M."
+    },
+    {
+      "id": "broker_attestation",
+      "source": "lib/computer/bootstrap-broker.ts",
+      "lines": [
+        31,
+        45,
+        65,
+        97,
+        167,
+        175
+      ],
+      "finding": "Existing stream attestation carries version, exact runId/leaseId, sourceSha and broker mode. It checks current release capability, marker and worker-ready binding. This is consumed inside the startup operation; the current driver and public run evidence do not persist this attestation."
+    },
+    {
+      "id": "registration",
+      "source": "lib/computer/registration-command.ts",
+      "lines": [
+        38,
+        54,
+        65,
+        70
+      ],
+      "finding": "Release-owned source and files must be trusted; capability.workerSha, root marker and worker-ready.sha match expected W before new notice mode. The private registration notice itself binds exact deviceId/workspaceId/token digest, not W. Legacy fallback still occurs only after existing worker-marker verification in thread-machines."
+    },
+    {
+      "id": "preloaded_receipt",
+      "source": "packages/daemon/src/cloud-model-receipt.ts",
+      "lines": [
+        14,
+        21,
+        31,
+        51
+      ],
+      "finding": "Root-owned installed release realpath supplies sourceCommit; immutable marker supplies W. A local preloaded-models receipt stores both with validated model metadata. It is not an existing per-run API or PostHog field; do not claim the driver already exports it."
+    },
+    {
+      "id": "startup_telemetry",
+      "source": "lib/computer/startup-tracing.ts",
+      "lines": [
+        5,
+        8,
+        13,
+        35,
+        41,
+        62
+      ],
+      "finding": "Current startup spans/logs preserve hashed run identity and bounded stage/time records. They do not export W, sourceCommit or template ID. A logged phase/end alone is not a numeric W receipt; use actual success and the source contract carefully."
+    },
+    {
+      "id": "machine_view",
+      "source": "lib/thread-machine-view.ts",
+      "lines": [
+        20,
+        38
+      ],
+      "finding": "Existing owner GET /api/mobile/threads/:id/machine can expose cloud.sandboxId and template from snapshotId. It chooses the latest chain member with a machine and does not return that selected runId. It may serve a live single-run/otherwise independently-bound chain observation, but must not be relabelled as an exact historical-run attestation."
+    },
+    {
+      "id": "bootstrap_opt_in",
+      "source": "lib/captures/bootstrap-evidence.ts",
+      "lines": [
+        50,
+        56
+      ],
+      "finding": "Existing opt-in bootstrap evidence returns authority:none/device/workspace/harness/hint, not W or template. It is not a substitute for released runtime identity."
+    }
+  ],
+  "minimumNoNewPollingEvidence": {
+    "reuse": [
+      "The actual R7 immutable release/candidate evidence that maps runtime source R and W to exact template IDs.",
+      "The actual production deployment's existing configured runtime readback; it should preserve the same W and template mapping.",
+      "The case's existing exact run identity/model/harness/profile evidence and actual successful startup/registration/claim chain."
+    ],
+    "possibleOptionalExistingRead": "If a direct template observation is required, one normal owner machine-view GET may capture template/sandbox while the relevant machine exists, but its chain-selection limitation must be retained. This is a plan only; no read was made.",
+    "interpretation": "Combining release/configuration evidence with successful execution through the mandatory exact-W bootstrap guard is a source-supported binding inference. It is not a newly observed per-run W field. Keep raw W unknown in current report fields that do not carry it.",
+    "forbiddenSubstitutions": [
+      "App source M equals runtime source R is not required.",
+      "Package service.version is not W.",
+      "A phase log or a machine:null cleanup response is not direct proof of the executed worker hash.",
+      "No new PID equality requirement, DB polling, provider command or driver rewrite is proposed."
+    ]
+  },
+  "sources": [
+    {
+      "key": "cloudWorker8c",
+      "path": "https://raw.githubusercontent.com/alexj11324/Mikka/8c423db291f8121980267cd48a24e428c992f618/packages/daemon/bin/cloud-worker.ts",
+      "blob": "1333ebefe933b780b9951717169819976b0d552f",
+      "bytes": 4275,
+      "sha256": "6615659de54e51cb9f18066b21c10fb3bec6b1e210c1ca173cdc3f247ded6f75"
+    },
+    {
+      "key": "threadMachines",
+      "path": "lib/cloud-computer/thread-machines.ts",
+      "blob": "9d2cb49a991f7ab0bf89718aabc08fe78b78b66e",
+      "bytes": 105207,
+      "sha256": "7ea633fcbb55fae1e4006b57552074bef791d02bee4148691b695cf4c671c79b"
+    },
+    {
+      "key": "captureStore",
+      "path": "lib/captures/store.ts",
+      "blob": "e75c63a94e30df38799a9364e3f95923ba1bef06",
+      "bytes": 24778,
+      "sha256": "eb572df8bb2af3a628b4dabf594b170b17aafba1987a97f5dad0d2c585128d71"
+    },
+    {
+      "key": "threadMachineView",
+      "path": "lib/thread-machine-view.ts",
+      "blob": "369fcd11cccd1604b205a53593333133740830fa",
+      "bytes": 2928,
+      "sha256": "a0b8cf4460c8b3435ebee86e59a400afa137073447e1ab9ac2a9eb278d22b462"
+    },
+    {
+      "key": "mobileMachine",
+      "path": "app/api/mobile/threads/[id]/machine/route.ts",
+      "blob": "267e56ef44f4ffaa47229b4bcd4df111173f3b4d",
+      "bytes": 1475,
+      "sha256": "76dca1228bbcf0af62700249b8bb07ba7072e76f3f8b2faa8fdeaf2c9cd7ab38"
+    },
+    {
+      "key": "machineAction",
+      "path": "app/api/threads/[runId]/machine/route.ts",
+      "blob": "39681bce488d7ad650d739f5fead0308cb1ec138",
+      "bytes": 1576,
+      "sha256": "22f11d9eb506b07d33f1947016ba0df8011f1fb94ce8d8975eee6f9ffedbf1c5"
+    },
+    {
+      "key": "registrationCommand",
+      "path": "lib/computer/registration-command.ts",
+      "blob": "470c9efaaf0a75ba5901a69b26a1bf45e16d6557",
+      "bytes": 5697,
+      "sha256": "794d8a9e3275fff6601b7b39107f7ae016ad4a73c8f477daf2a7e44636fb4674"
+    },
+    {
+      "key": "bootstrapBroker",
+      "path": "lib/computer/bootstrap-broker.ts",
+      "blob": "c862e8893758a61781203ac02e986eef1ed43958",
+      "bytes": 10942,
+      "sha256": "c04c47f57308542b32dde3488c281d07ae806386f8d7ba19298f53822e44ff67"
+    },
+    {
+      "key": "receipt8c",
+      "path": "packages/daemon/src/cloud-model-receipt.ts",
+      "blob": "3caff6c7e5ebddd4998fcad65201fda4367afc5b",
+      "bytes": 3263,
+      "sha256": "e086e806480f2e1f9719a6c0e18f3e7dba805fa647252ae4e22ce4366a980eda"
+    },
+    {
+      "key": "startupTracing",
+      "path": "lib/computer/startup-tracing.ts",
+      "blob": "baa08e0fc6cc28b60402e7994ea335307d2de75e",
+      "bytes": 4620,
+      "sha256": "5bf3fcd02b8aa872303f9ff3a48dfb7561fe6c93c0698ebddb66bc2ac7c9ddb8"
+    },
+    {
+      "key": "templateModels",
+      "path": "lib/cloud-template-models.ts",
+      "blob": "dfcb21bc7c09f895c1848719b0904c33d5a2df8b",
+      "bytes": 4411,
+      "sha256": "02a3b30e6191df6d66efb30fc0f83c9eea7757804a53d5ebf80713e1177c7f48"
+    },
+    {
+      "key": "e2bRuntime",
+      "path": "lib/secrets/e2b-runtime.ts",
+      "blob": "0a069258d3a9a260c9a1a7ca337f923618bb3432",
+      "bytes": 4530,
+      "sha256": "aa4ce006f85c843da44dcffab6ce590ef75d81fe84751427797eb0c8e03083c1"
+    },
+    {
+      "key": "bootstrapEvidence",
+      "path": "lib/captures/bootstrap-evidence.ts",
+      "blob": "b2d4182d74f82f3b713b5a633d27efd2cc965e08",
+      "bytes": 4571,
+      "sha256": "dc8bda2cc32cf14051c17d4b2828cfcc0479dd7d0a9fd20e2ba819a3a30d2df0"
+    },
+    {
+      "key": "driver932",
+      "path": "https://raw.githubusercontent.com/alexj11324/Mikka/932bd1549942bc2a8d040c7281a37fbe851c8eb0/scripts/acceptance/run-observability.mjs",
+      "blob": "104075571c73b97a985458f206dba310e4894490",
+      "bytes": 69119,
+      "sha256": "5c91fd686dbaf6e0a511761cdee5d14ae5f8f5d8c63dc5b6284e8a7ea5e16aec"
+    }
+  ]
+}

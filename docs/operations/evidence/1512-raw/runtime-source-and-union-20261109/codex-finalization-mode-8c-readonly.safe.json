@@ -1,0 +1,331 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512-codex-finalization-mode-readonly-diagnosis",
+  "fixedSource": {
+    "repository": "alexj11324/Mikka",
+    "head": "8c423db291f8121980267cd48a24e428c992f618",
+    "tree": "195a66e213ca33c100e2900129079c5f83b06272",
+    "sourceOfHeadTree": "PR1810 current public body and fixed-ref directory source bindings",
+    "scope": "Codex original root CA mode failure; no general provider audit"
+  },
+  "conclusion": {
+    "resolved": false,
+    "knownRefusalCorrect": true,
+    "modeExceptionAdded": false,
+    "workerInstallProvesModeFix": false,
+    "knownWriter": null,
+    "summary": "The formal run observed an original Codex root CA file change 0644 to 0777 during ready finalization after installation strict conservation passed. The 8c Codex policy intentionally still rejects this mode transition. The first control does not meet the baseline-file-exists condition; the owner reports the later full-capture control also did not reproduce it. Private worker-install changes dependency scope and potentially timing but neither changes the certificate policy nor deterministically prevents this earlier baseline condition. There is no proved causal writer or full release fix in the reviewed evidence."
+  },
+  "formalObservation": {
+    "source": "111a8dfb8b227ac0441324339ff42e4328ea609a",
+    "run": 42621280244,
+    "attempt": 1,
+    "buildJob": 129174063546,
+    "cleanupJob": 129182070433,
+    "readerBinding": {
+      "owner": "P0/#1608 designated review agent",
+      "claimComment": 6740994824,
+      "claimUrl": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6740994824",
+      "resultComment": 6741048562,
+      "resultUrl": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6741048562",
+      "thisReviewerDownloadedOriginal": false
+    },
+    "buildOriginal": {
+      "format": "decoded UTF-8 job log, not ZIP",
+      "bytes": 510949,
+      "sha256": "ee6a0cd93122578a6c24a97c4d8324a50914dc55727c6861e83ce3d2a46ee811",
+      "gitBlob": null,
+      "originalGitBlobAvailableToThisReview": false
+    },
+    "cleanupOriginal": {
+      "format": "decoded UTF-8 job log, not ZIP",
+      "bytes": 28701,
+      "sha256": "43fe6bee3ea26c6daf40cd05c91e8c3378d761556b52b86af9eab9e5d0cf001f"
+    },
+    "codex": {
+      "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+      "stage": "ready / provider finalization",
+      "originalModeOctal": "0644",
+      "observedModeOctal": "0777",
+      "originalModeDecimal": 420,
+      "observedModeDecimal": 511,
+      "firstObservedUtc": "2026-11-09T13:03:16Z",
+      "firstOriginalLogLine": 847,
+      "sequence": "full capture -> installation -> strict conservation success -> ready mode refusal",
+      "sequenceSource": "P0 reader result plus #1506 comment6742136076",
+      "repeatedReadyDiagnosticsAreSeparateReruns": false,
+      "baselineSha256": null,
+      "baselineUidGid": null,
+      "boundary": "The public source-bound original-reader summary names the exact mode/path/stage. It does not supply the complete Codex original manifest row; absent fields are kept unknown, not inferred from Desktop/Claude or synthetic tests."
+    },
+    "terminalBuildFailure": {
+      "kind": "desktop",
+      "stage": "fresh_scan",
+      "code": "official_files_changed",
+      "exitCode": 1,
+      "originalLogLines": [
+        3245,
+        3286
+      ],
+      "boundary": "Codex ready diagnostics are an additional observed refusal in the same build. Do not relabel the run's reported final Desktop fresh_scan error as a sole Codex terminal failure."
+    },
+    "cleanup": {
+      "ownerReportedThreeCandidatesDeletedThenAbsent": true,
+      "sandboxes": [],
+      "errors": [],
+      "explicitHttp404Claim": false,
+      "subscriptions": "skipped",
+      "publish": "skipped",
+      "validOldRuntimePreserved": true
+    }
+  },
+  "controls": {
+    "first": {
+      "run": 42628079564,
+      "attempt": 1,
+      "operator": "08d822da081190364530343bf918bbcc2fbbf624",
+      "source": "111a8dfb8b227ac0441324339ff42e4328ea609a",
+      "job": 129196946059,
+      "artifact": {
+        "id": 13678489689,
+        "zipBytes": 3748,
+        "zipSha256": "3a51e3a158dbba0fb4c84e658215fec84a032fd155a1514845e522eff476fd4f",
+        "zipNotDownloadedByThisReview": true
+      },
+      "archivedExport": {
+        "gitBlob": "081ae5d6fd6c024abb95d9d0e778b9f051e5a323",
+        "bytes": 26988,
+        "sha256": "a438b3315bbd10bf470aed59ccb21fb502ceddc06102e49164eeeb9ca6416d3f",
+        "readAndHashVerified": true
+      },
+      "codexMember": {
+        "name": "codex.json",
+        "bytes": 9146,
+        "sha256": "2cc75b6353f6798eb3b9711090146fd86259797e557003ebae47e445673c62fd"
+      },
+      "rootCa": {
+        "before": {
+          "status": "absent"
+        },
+        "pre_finalization": {
+          "status": "absent"
+        },
+        "ready": {
+          "status": "absent"
+        },
+        "fresh": {
+          "status": "present",
+          "kind": "file",
+          "mode": 420,
+          "modeOctal": "0644",
+          "uid": 0,
+          "gid": 0,
+          "sha256": "aca6dfe34be5499f55308479809cb236576fe6dc57c991dfed338437879345fa",
+          "size": 595
+        }
+      },
+      "referenceNodes": "both /etc/ssl/certs root references remain absent/unresolved at all four stages",
+      "preconditionMet": false,
+      "probe": "observed",
+      "cleanup": {
+        "status": "complete",
+        "errors": []
+      },
+      "targetedOnly": true,
+      "releaseAccepted": false,
+      "policyChanged": false
+    },
+    "second": {
+      "ownerReportedFinishedAt": "2026-11-09T14:36:00Z",
+      "description": "Codex-only official full-capture/strict workload control",
+      "ownerReportedResult": "did not reproduce the mode transition and did not establish the formal baseline-CA-exists prerequisite",
+      "sources": [
+        "PR1810 body at fixed8c",
+        "PR1810 comment6743303628",
+        "PR1805 body at fixed4c"
+      ],
+      "runId": null,
+      "artifactId": null,
+      "archivedGitBlob": null,
+      "readOriginalByThisReviewer": false,
+      "limitation": "No confirmable second-control original/index identifier was present in the inspected public progress or existing peer cache. Do not manufacture its provenance, cleanup proof or turn the owner's summary into an independently inspected raw result."
+    }
+  },
+  "currentSourceContract": {
+    "policy": {
+      "codexRootCaAllowedFields": [
+        "sha256 per-boot"
+      ],
+      "modeAllowed": false,
+      "claudeAndDesktopModeRulesNotApplicableToCodex": true,
+      "relinksScopedByTemplate": true,
+      "fullOriginalsStrictInstallUnchanged": true
+    },
+    "matcher": {
+      "reference": "scripts/e2b/official-files.py:173-216,285-330",
+      "behaviour": "All changed fields require the exact kind/path rule. Codex root CA has no mode rule, so 420->511 remains refused; full-original-file verify is separate from finalization."
+    },
+    "negativeRegressionSource": {
+      "path": "scripts/e2b/official-files.test.py",
+      "ranges": [
+        "234-236",
+        "483-487"
+      ],
+      "meaning": "Both existing Codex 0644->0777 refusal assertions remain in the final test source",
+      "executedThisReview": false
+    },
+    "captureOrdering": {
+      "reference": "scripts/e2b/build-template.py:295-323",
+      "order": [
+        "capture full original manifest and CLI inventory",
+        "instance bootstrap and worker dependencies/build",
+        "normal runtime check",
+        "strict original-files conservation receipt",
+        "anonymous start/ready plus permitted finalization",
+        "separate fresh instance conservation probe"
+      ],
+      "baselineOnlyOriginalPathsProtected": true,
+      "whyAbsenceMatters": "verify iterates manifest entries; a CA absent from the baseline cannot exercise a later permission change of an original CA entry. A successful absent-baseline control is not a negative reproduction of the formal existing-file transition."
+    }
+  },
+  "workerInstallAnalysis": {
+    "source": "packages/daemon/scripts/prepare-worker-install.py",
+    "directChanges": [
+      "copy daemon/protocol/config source and patches into a new private release-local worker-install tree",
+      "retain workspace settings and locked package/snapshot records while removing root Web importer dependencies",
+      "run the same normal filtered frozen pnpm install in that private tree",
+      "link the three source node_modules directories back using relative paths"
+    ],
+    "bootstrapDiff": {
+      "commonPrefixLines": 89,
+      "removed": [
+        "env HOME=/opt/mikka/runtime/bootstrap-home COREPACK_HOME=/opt/mikka/runtime/corepack corepack pnpm install --filter @mikka/daemon... --frozen-lockfile"
+      ],
+      "added": [
+        "# pnpm 10 also installs the root importer of a filtered shared-lock workspace.",
+        "# Keep the fetched source intact and install only the worker's locked importers.",
+        "mikka_install=\"$mikka_release/worker-install\"",
+        "(",
+        "  umask 022",
+        "  python3 packages/daemon/scripts/prepare-worker-install.py \"$mikka_release/source\" \"$mikka_install\"",
+        "  cd \"$mikka_install\"",
+        "  env HOME=/opt/mikka/runtime/bootstrap-home COREPACK_HOME=/opt/mikka/runtime/corepack corepack pnpm install --filter @mikka/daemon... --frozen-lockfile",
+        ")",
+        "python3 packages/daemon/scripts/prepare-worker-install.py \"$mikka_release/source\" \"$mikka_install\" --link"
+      ],
+      "commonSuffixLines": 93
+    },
+    "beforeBootstrapBlob": "27c2146b45054c3eb5510afc94ea7ee9696dcb87",
+    "beforeBinding": "previously directly read at Rfacb and e189; compared bytewise to fixed8c bootstrap",
+    "afterBootstrapBlob": "c0172bb8a2d0d4adde7e89991fce36c97b8f8460",
+    "directCertificateWritesInChangedCode": false,
+    "rootCaModePolicyChanged": false,
+    "causalBoundary": "The changed installer executes after the full original manifest capture, so it does not directly remove or repair a root CA entry already in that baseline. Its different dependency graph/hook workload, build fingerprint or elapsed timing could change an asynchronous provider race, but this remains a possibility, not an observed fix or attribution. No claim is made that normal dependency lifecycle scripts can never affect other state.",
+    "localCombinedValidation": "Owner reports exact84/8c frozen-install/build/move validation with cache, no ffmpeg installed, unchanged tracked tree. That does not exercise E2B provider finalization or prove this Codex mode problem solved."
+  },
+  "minimalNextRealFailureDiagnosis": {
+    "noNewRunRequested": true,
+    "firstUseExistingOutputs": [
+      "One assigned reader preserves the next actual R7 build/cleanup originals once and binds exact source R, W, run/attempt and per-kind build identity.",
+      "Keep the first Codex ready RuntimeError metadata separately from any later terminal Desktop/Claude/fresh failure; repeated ready diagnostics are not additional test attempts.",
+      "Recover, when already preserved by that run, the original CA manifest row (presence/kind/mode/uid/gid/SHA only), strict before/after receipt and first ready/fresh change metadata. Do not print certificate bytes or tokens.",
+      "Use the existing bounded conservation_diagnostic projection for fresh-probe failures and the existing [codex] build-log callback for ready failures. These are different stages; the current fresh diagnostic helper does not itself collect pre-freeze ready failure rows.",
+      "Keep actual candidate cleanup and skipped subscription/publication status bound to that same run. Do not claim a guessed writer, 404 or complete global cleanup."
+    ],
+    "ifRequiredRowsNotPreserved": "Report the missing phase/row as unknown. A later separately authorized metadata-only change could persist only these exact existing guard rows/receipts at their existing stages; do not synthesize a CA baseline, chmod it, add sleep/polling, loosen matching or run another provider control solely to obtain a preferred result.",
+    "unresolvedQuestion": "Which actor or asynchronous finalization operation changes an already-existing Codex CA from 0644 to 0777 between strict verification and ready? The evidence establishes the transition/interval, not the writer."
+  },
+  "latestOwnerAction": {
+    "PR1810Head": "8c423db291f8121980267cd48a24e428c992f618",
+    "PR1805Head": "4c2efa6e9c57af88168c2d57039982ae29a9b54e",
+    "jointOwnerComment": 6744544070,
+    "adoptionComment": 6744606081,
+    "action": "Worker-install and existing Claude/Desktop policy fixes have been merged into the shared source and its own CI. No new Codex mode exception or claimed finalization fix.",
+    "nextRuntimeReader": "#1810 actual publication owner remains the designated unique reader; this review did not claim or download that future release."
+  },
+  "sources": [
+    {
+      "path": "scripts/e2b/official-files.py",
+      "blob": "ea0819bf3e2d4ff83e64482b6336567050376591",
+      "bytes": 21445,
+      "sha256": "66911624af52df59ef715eb105af9a3025bacf12460105fadc7f87e4d2dd63b5",
+      "fixed8cDirectoryBinding": true
+    },
+    {
+      "path": "scripts/e2b/official-files.test.py",
+      "blob": "471c80878c7e2b88cd5e8a0864e6f6ef8354df21",
+      "bytes": 47201,
+      "sha256": "a02db5389d866cadcbfa743bad6eaecaefb6b1effbfb0bc863a9287d59849b84",
+      "fixed8cDirectoryBinding": true
+    },
+    {
+      "path": "scripts/e2b/e2b-finalization-files.json",
+      "blob": "16d858b40d2948ac8c4ce18188843c02960bc40e",
+      "bytes": 4355,
+      "sha256": "835046e60c08e44595df509ad5911ece52f151896e5272ca53d41cec376c6c8b",
+      "fixed8cDirectoryBinding": true
+    },
+    {
+      "path": "scripts/e2b/e2b-certificate-relinks.json",
+      "blob": "335540475a9d8aaae8f34915e087b5a862699b95",
+      "bytes": 106048,
+      "sha256": "a28165d7a9de3bed0b78af59c728004e82dc4d7815a14f97c2779c1eb090a845",
+      "fixed8cDirectoryBinding": true
+    },
+    {
+      "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+      "blob": "c0172bb8a2d0d4adde7e89991fce36c97b8f8460",
+      "bytes": 12114,
+      "sha256": "bada7b22a750386a49824057751150526d59eb9c5056d5dd9d09531e6cf68455",
+      "fixed8cDirectoryBinding": true
+    },
+    {
+      "path": "packages/daemon/scripts/prepare-worker-install.py",
+      "blob": "ba5f5ee5cc8356781e7c53e6ef5a7e77b7f8573f",
+      "bytes": 4990,
+      "sha256": "c6c4d4ff4a2b4dba37a458f632565267fb7feb648f5b0e23113e9ccfbc504119",
+      "fixed8cDirectoryBinding": true
+    },
+    {
+      "path": "docs/operations/evidence/1506-official-desktop-certificate-relinks-20261109.json",
+      "blob": "081ae5d6fd6c024abb95d9d0e778b9f051e5a323",
+      "bytes": 26988,
+      "sha256": "a438b3315bbd10bf470aed59ccb21fb502ceddc06102e49164eeeb9ca6416d3f",
+      "fixed8cDirectoryBinding": true
+    },
+    {
+      "path": "docs/operations/evidence/1506-official-desktop-certificate-relinks-20261109.md",
+      "blob": "4adf53c96bc15fd4cb985d410702e63eccd7554b",
+      "bytes": 5844,
+      "sha256": "2206350b297be5ace6de019af070919f667b13c90fac2ad91ecf323a896ec74a",
+      "fixed8cDirectoryBinding": true
+    },
+    {
+      "path": "scripts/e2b/build-template.py",
+      "blob": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+      "bytes": 55730,
+      "sha256": "0adb53fbdd6cbcd61f1d1804aee3e2df1538997c0724556062f2741c5ac1cdb1",
+      "fixed8cDirectoryBinding": true,
+      "reusedPreviouslyReadImmutableSource": true
+    }
+  ],
+  "actions": {
+    "readOnlyGithubSourceAndPublicEvidence": true,
+    "originalJobLogsDownloaded": 0,
+    "artifactDownloads": 0,
+    "testsRun": 0,
+    "providerControls": 0,
+    "VMsCreated": 0,
+    "modelsRun": 0,
+    "productionQueries": 0,
+    "CITriggered": 0,
+    "refsChanged": 0,
+    "matcherChanges": 0,
+    "modeExceptionsAdded": 0
+  },
+  "privacy": {
+    "certificateContentIncluded": false,
+    "credentialsIncluded": false,
+    "rawUserContentIncluded": false
+  }
+}

@@ -1,0 +1,1022 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512.pr1810_union_semantic_review",
+  "repository": "alexj11324/Mikka",
+  "source": {
+    "ours": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+    "theirs": "8c423db291f8121980267cd48a24e428c992f618",
+    "mergeBase": "76537e4c2996f717cbd19589e1efae328028aa4a",
+    "expectedTree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+    "inputReceipt": "9184682713449def6bce722aabd3af905437efbc",
+    "conditionalMainReceipt": "9bd7dfa8f3813fee94e44fefbad391dd8ec95aed",
+    "parentReportedPublication": {
+      "commit": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+      "at": "2026-11-09T16:16:22Z",
+      "tree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+      "runId": 42653081708,
+      "verificationOwner": "/root",
+      "boundary": "Publication facts supplied by parent; this task created only immutable evidence blobs."
+    }
+  },
+  "verdict": {
+    "sourceBlockingFindings": [],
+    "risk": "medium",
+    "statement": "No must-fix merge loss or demonstrated incompatible interface found in the inspected source. New union CI and production acceptance remain pending; neither side's prior success proves the union."
+  },
+  "conflicts": [
+    {
+      "path": "package.json",
+      "baseBlob": "b4c7addbf7d0d147409d2f95fe41c14183edf2a0",
+      "oursBlob": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d",
+      "theirsBlob": "568cfeee161309202699acefd0a57a8edc52bf6e",
+      "result": {
+        "path": "package.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d"
+      },
+      "bytes": 80877,
+      "sha256": "ed9893d62d9d90299de21eb0325e73ab3c97202dec5eafe3d9983c04b64a6add",
+      "resolution": "Keep existing ours: same test:captures installer addition as theirs, plus own mobile mark test; all non-script fields identical in three sources."
+    },
+    {
+      "path": "tests/analytics-policy.test.mjs",
+      "baseBlob": "74c4933788dda4e33caca2675738bc223442adda",
+      "oursBlob": "f162a894cbada7fada30c63a3a49f4b665574f0f",
+      "theirsBlob": "9fc0602f814f3d8e25ba5668f0f174a26f14718b",
+      "result": {
+        "path": "tests/analytics-policy.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f162a894cbada7fada30c63a3a49f4b665574f0f"
+      },
+      "bytes": 26926,
+      "sha256": "a6cf1eb935b3bf5aac97ce4101a3b33a09d63b25530dbf43332484d032841dc2",
+      "resolution": "Keep existing ours: contains exact theirs FFmpeg additions plus the closed SDK bot/browser + masked Replay regression."
+    },
+    {
+      "path": "tests/mvp/pinned-pnpm.test.mjs",
+      "baseBlob": "b22b319424ada32e3592f7a6ea464aa49121aad0",
+      "oursBlob": "0306d340b38cf455facba376c2eb6dda58362c96",
+      "theirsBlob": "29a96d1b50783f839175a72efe9a40bdbbdaaeab",
+      "result": {
+        "path": "tests/mvp/pinned-pnpm.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "29a96d1b50783f839175a72efe9a40bdbbdaaeab"
+      },
+      "bytes": 13631,
+      "sha256": "0a1d47cd00245e0f4530f89c34034e1c8d47034fcad54143b6014669cf5a5a38",
+      "resolution": "Keep existing theirs: retains shared-action credential-scope assertions; generalizes lifecycle helper for real Desktop direct install and adds two direct-install tests."
+    }
+  ],
+  "preservation": [
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+      "expectedSha": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+      "exact": true
+    },
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "104075571c73b97a985458f206dba310e4894490",
+      "expectedSha": "104075571c73b97a985458f206dba310e4894490",
+      "exact": true
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2e3c8c7aad0594df165caf8f798c72034b3d484f",
+      "expectedSha": "2e3c8c7aad0594df165caf8f798c72034b3d484f",
+      "exact": true
+    },
+    {
+      "path": "docs/operations/tracing.md",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "7ec15f7515853877c5940b9e08106df50b0d5c55",
+      "expectedSha": "7ec15f7515853877c5940b9e08106df50b0d5c55",
+      "exact": true
+    },
+    {
+      "path": "instrumentation-client.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "9109982d1c3245179b85a42d6969003aec2f5047",
+      "expectedSha": "9109982d1c3245179b85a42d6969003aec2f5047",
+      "exact": true
+    },
+    {
+      "path": "lib/analytics-policy.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "152b941ff7b05004a7c57a909f776c6268ede106",
+      "expectedSha": "152b941ff7b05004a7c57a909f776c6268ede106",
+      "exact": true
+    },
+    {
+      "path": "lib/replay-readiness.ts",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d60598b09201228e23c5ac7a9df00938192f0e67",
+      "expectedSha": "d60598b09201228e23c5ac7a9df00938192f0e67",
+      "exact": true
+    },
+    {
+      "path": "tests/analytics-policy.test.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "f162a894cbada7fada30c63a3a49f4b665574f0f",
+      "expectedSha": "f162a894cbada7fada30c63a3a49f4b665574f0f",
+      "exact": true
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+      "expectedSha": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+      "exact": true
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+      "expectedSha": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+      "exact": true
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+      "mode": "100755",
+      "type": "blob",
+      "sha": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+      "expectedSha": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+      "exact": true
+    }
+  ],
+  "semanticFindings": [
+    {
+      "area": "Snapshot token cache and Workspace authority",
+      "sources": [
+        {
+          "path": "lib/infisical-workload.ts",
+          "base": "c6b98ddf6242e2fbce9c073ed82602c98b1ad203",
+          "ours": "c6b98ddf6242e2fbce9c073ed82602c98b1ad203",
+          "theirs": "368572bb346f39274b0f1d522f773b97fd1f2764",
+          "union": "368572bb346f39274b0f1d522f773b97fd1f2764"
+        },
+        {
+          "path": "lib/subscription-access-snapshot.ts",
+          "base": "e9ecf72a9e73788811ed181698f1d26d96b5c79d",
+          "ours": "e9ecf72a9e73788811ed181698f1d26d96b5c79d",
+          "theirs": "c77d4615972370c416eaaf87e169b91849ee513b",
+          "union": "c77d4615972370c416eaaf87e169b91849ee513b"
+        },
+        {
+          "path": "lib/personal-policy.ts",
+          "base": "bbb9684619cbfa8faca236a78e6f8f61148d9a94",
+          "ours": "dc710f0a16a5e28e5a34d5112a86fab349a2639a",
+          "theirs": "bbb9684619cbfa8faca236a78e6f8f61148d9a94",
+          "union": "dc710f0a16a5e28e5a34d5112a86fab349a2639a"
+        }
+      ],
+      "conclusion": "Theirs caches only a process-local Infisical machine token, keyed by validated origin/client identity/secret hash, with issuer TTL capped at 60s minus 1s, bounded eight entries, cancellation checks and lease-specific 401/403 invalidation. It does not cache the authorizedAccessName SQL/member result, secret projection or in-flight request. Ours request-local subscription policy remains separate; runMayUseCredentialSql contract is preserved.",
+      "boundary": "Source review only. No credentials, permissions, token values or production revocation behavior were queried."
+    },
+    {
+      "area": "Workflow timing and trace sanitizer",
+      "sources": [
+        {
+          "path": "lib/subscription-workflow-model.ts",
+          "base": "c47738974f8692ebd30a1736e8d39ea7a35ff7f4",
+          "ours": "c47738974f8692ebd30a1736e8d39ea7a35ff7f4",
+          "theirs": "24349e66f47d2ed935f89e509d022826fe37ffb2",
+          "union": "24349e66f47d2ed935f89e509d022826fe37ffb2"
+        },
+        {
+          "path": "lib/tracing/sanitize.ts",
+          "base": "2389f07e8b9f6ec9ff84496f9b7a6f8ea060ffc5",
+          "ours": "2389f07e8b9f6ec9ff84496f9b7a6f8ea060ffc5",
+          "theirs": "9857985199066a39fdc96ba73f7047d21ba6406f",
+          "union": "9857985199066a39fdc96ba73f7047d21ba6406f"
+        },
+        {
+          "path": "lib/tracing/node.ts",
+          "base": "3037a3b0cc2538451917cdd8e454a376553fc47c",
+          "ours": "00775a5928228262a66b12b845ee0dc18f6c6047",
+          "theirs": "3037a3b0cc2538451917cdd8e454a376553fc47c",
+          "union": "00775a5928228262a66b12b845ee0dc18f6c6047"
+        }
+      ],
+      "conclusion": "The timing scope now includes model/credential preparation while requestedAt remains after model resolution; the sanitizer adds only the closed workflow.events.transport enum http|ws. This coexists with ours node tracing/log-flush behavior; no arbitrary URL, payload or browser classification is admitted by that transport addition.",
+      "boundary": "Runtime/ingestion and timing distributions of the union are not inferred from source."
+    },
+    {
+      "area": "Codex MCP failure and daemon tool timing",
+      "sources": [
+        {
+          "path": "packages/daemon/src/adapters/codex-protocol.ts",
+          "base": "838f6407a4c92ef13c95663a405804cebbd97f47",
+          "ours": "838f6407a4c92ef13c95663a405804cebbd97f47",
+          "theirs": "cb2578564cd0c3f686f21eac07dd9edcbcdf1407",
+          "union": "cb2578564cd0c3f686f21eac07dd9edcbcdf1407"
+        },
+        {
+          "path": "packages/daemon/src/adapters/codex.ts",
+          "base": "953af7b99b542aafd9cc724fde76d27f6a6bb2f7",
+          "ours": "953af7b99b542aafd9cc724fde76d27f6a6bb2f7",
+          "theirs": "e85815a955eaff56d7ac389c9d9722c64607345d",
+          "union": "e85815a955eaff56d7ac389c9d9722c64607345d"
+        }
+      ],
+      "conclusion": "Theirs maps MCP status failed with null error to tool-output-error with a fixed fallback string. This is compatible with the already-preserved per-session tool duration completion/error cases and avoids classifying that failed result as successful output.",
+      "boundary": "No SDK or model test was run by this review; the five previously reviewed daemon collection fixes are not removed."
+    },
+    {
+      "area": "Private worker dependency installation",
+      "sources": [
+        {
+          "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+          "base": "27c2146b45054c3eb5510afc94ea7ee9696dcb87",
+          "ours": "27c2146b45054c3eb5510afc94ea7ee9696dcb87",
+          "theirs": "c0172bb8a2d0d4adde7e89991fce36c97b8f8460",
+          "union": "c0172bb8a2d0d4adde7e89991fce36c97b8f8460"
+        },
+        {
+          "path": "packages/daemon/scripts/prepare-worker-install.py",
+          "theirs": "ba5f5ee5cc8356781e7c53e6ef5a7e77b7f8573f",
+          "union": "ba5f5ee5cc8356781e7c53e6ef5a7e77b7f8573f"
+        }
+      ],
+      "conclusion": "The fetched source and source lock remain intact. A separate new worker-install directory retains exact selected config/protocol/daemon importer blocks and locked package/snapshot records, validates link closure, installs with frozen lock, checks source and install lock digests, and links fresh installed module directories back. The original source remains the build input. This replaces the filtered shared-root install behavior without modifying ours trace/generation files.",
+      "boundary": "No installation executed here. Canonical worker/recipe fingerprint comparison is independently owned by acceptance_review."
+    },
+    {
+      "area": "Native document/server choice harness",
+      "sources": [
+        {
+          "path": "apps/desktop/test/native-document.mjs",
+          "base": "2fbdb74c81c0b4890fd52acd90cd9ae769dcaf83",
+          "ours": "2fbdb74c81c0b4890fd52acd90cd9ae769dcaf83",
+          "theirs": "56a076819caa223228cfb3c934554744dfeab358",
+          "union": "56a076819caa223228cfb3c934554744dfeab358"
+        },
+        {
+          "path": "apps/desktop/test/bundled-smoke.mjs",
+          "base": "9a85ff52f207ca7790bb90c0b8ab50832914ab87",
+          "ours": "9a85ff52f207ca7790bb90c0b8ab50832914ab87",
+          "theirs": "2df81511184d89d773b86f7d34ae0c069a49e295",
+          "union": "2df81511184d89d773b86f7d34ae0c069a49e295"
+        },
+        {
+          "path": "apps/desktop/test/bundled-server-choice.mjs",
+          "theirs": "b9e9b44746a735935fcbcd6590c62ee047f27cd8",
+          "union": "b9e9b44746a735935fcbcd6590c62ee047f27cd8"
+        },
+        {
+          "path": "apps/desktop/package.json",
+          "base": "c12c645015568434d28295fc25eb4ae75900c3b4",
+          "ours": "c12c645015568434d28295fc25eb4ae75900c3b4",
+          "theirs": "0e636983586e2f427797c29978c2bf7524caa18c",
+          "union": "0e636983586e2f427797c29978c2bf7524caa18c"
+        }
+      ],
+      "conclusion": "Theirs retains one selection, pre-registered next document event, expected bundled URL and immutable preload server target; timeout/close/crash reject and listeners/timer are removed. Only the known execution-context navigation exception is accepted. Removed outer waits duplicate the helper's retained target check. The new re-export/test is registered in Desktop test command.",
+      "boundary": "No modification to the four complete SQL windows, SQL counter point, comparison thresholds or fixture selection was found in this merge delta. New actual Native results cannot be borrowed from 932."
+    },
+    {
+      "area": "Installer credential scope and tests",
+      "sources": [
+        {
+          "path": ".github/actions/pnpm-install/action.yml",
+          "base": "6563e46bec7c1a02cdbdcd90be0742fb9ecb47d9",
+          "ours": "553d718ad413f0db4b12833e06ffb8f29d98e555",
+          "theirs": "553d718ad413f0db4b12833e06ffb8f29d98e555",
+          "union": "553d718ad413f0db4b12833e06ffb8f29d98e555"
+        },
+        {
+          "path": ".github/workflows/desktop.yml",
+          "base": "cb418bbf2ee0fed758e37f83a9ed6401d8a921b7",
+          "ours": "cb418bbf2ee0fed758e37f83a9ed6401d8a921b7",
+          "theirs": "1cfd9d8be85015b639809faedc8a68fb83609399",
+          "union": "1cfd9d8be85015b639809faedc8a68fb83609399"
+        },
+        {
+          "path": ".github/workflows/workspace-governance-acceptance.yml",
+          "base": "c08b46d994809a80d4c764243174d423d4f5474c",
+          "ours": "c08b46d994809a80d4c764243174d423d4f5474c",
+          "theirs": "c107a7699cc0bb91ac8d9eaf258361d2f04e51a4",
+          "union": "c107a7699cc0bb91ac8d9eaf258361d2f04e51a4"
+        },
+        {
+          "path": "tests/mvp/pinned-pnpm.test.mjs",
+          "base": "b22b319424ada32e3592f7a6ea464aa49121aad0",
+          "ours": "0306d340b38cf455facba376c2eb6dda58362c96",
+          "theirs": "29a96d1b50783f839175a72efe9a40bdbbdaaeab",
+          "union": "29a96d1b50783f839175a72efe9a40bdbbdaaeab"
+        },
+        {
+          "path": "tests/analytics-policy.test.mjs",
+          "base": "74c4933788dda4e33caca2675738bc223442adda",
+          "ours": "f162a894cbada7fada30c63a3a49f4b665574f0f",
+          "theirs": "9fc0602f814f3d8e25ba5668f0f174a26f14718b",
+          "union": "f162a894cbada7fada30c63a3a49f4b665574f0f"
+        }
+      ],
+      "conclusion": "The same shared installer/FFmpeg patch/lock already exists on both sides. Theirs adds read-only GitHub token opt-in to Desktop direct installs and Workspace acceptance; choosing theirs pinned-pnpm test retains shared-action scope guards and adds direct-install coverage. Ours analytics test retains the exact FFmpeg provenance regression plus closed bot/browser and masked-Replay assertions.",
+      "boundary": "No tokens read. Existing credential tests require effective read-only API permission; this review did not execute the token-lifecycle fixture."
+    },
+    {
+      "area": "Read projection and empty migration",
+      "sources": [
+        {
+          "path": "lib/attention/store.ts",
+          "base": "02c4a9da8ddfeb9bcf8a3ac05dbcc54e2d44f83b",
+          "ours": "02c4a9da8ddfeb9bcf8a3ac05dbcc54e2d44f83b",
+          "theirs": "62bf18c2487c207d3b64c6e508f634f6fe5ee0a0",
+          "union": "62bf18c2487c207d3b64c6e508f634f6fe5ee0a0"
+        },
+        {
+          "path": "lib/coordinator/coordinator-bot.ts",
+          "base": "b3e0fa7a5e15c9d5f53e4b76d4476d70cac469e7",
+          "ours": "b3e0fa7a5e15c9d5f53e4b76d4476d70cac469e7",
+          "theirs": "a2a6bf1fd1307babd350c9a168b003e38fa4b3cc",
+          "union": "a2a6bf1fd1307babd350c9a168b003e38fa4b3cc"
+        }
+      ],
+      "conclusion": "Theirs narrows attention stale-row projection to required summary/userId and skips moveExecutionRows only after the existing locked captured tasks/events/runs arrays are all empty; subsequent writes remain restricted to captured ids. Ours source has no same-function edit, so no merge-overwritten guard or result shape was identified.",
+      "boundary": "No SQL count reduction or production performance improvement is claimed by static review."
+    },
+    {
+      "area": "Release and runtime governance",
+      "sources": [
+        {
+          "path": ".github/workflows/e2b-official-runtime.yml",
+          "base": "be1f902f97e50628fbe26fa55b9dab0160f749be",
+          "ours": "be1f902f97e50628fbe26fa55b9dab0160f749be",
+          "theirs": "97cdc7dfefb5dfbe00e733ccb5559fae8de2dfa9",
+          "union": "97cdc7dfefb5dfbe00e733ccb5559fae8de2dfa9"
+        },
+        {
+          "path": "scripts/release/web-deploy.mjs",
+          "base": "948caacb60d05c04f21e5d0a55303716192771da",
+          "ours": "948caacb60d05c04f21e5d0a55303716192771da",
+          "theirs": "f1a2e150c3bb73fb15c6d1e5e325d5cc5187bd4b",
+          "union": "f1a2e150c3bb73fb15c6d1e5e325d5cc5187bd4b"
+        },
+        {
+          "path": "scripts/e2b/official-files.py",
+          "base": "66d74dd81568eb8fcd6c9efed82a199bcbf695d4",
+          "ours": "66d74dd81568eb8fcd6c9efed82a199bcbf695d4",
+          "theirs": "ea0819bf3e2d4ff83e64482b6336567050376591",
+          "union": "ea0819bf3e2d4ff83e64482b6336567050376591"
+        },
+        {
+          "path": "scripts/e2b/e2b-finalization-files.json",
+          "base": "e3bc3b603578e6bcd8c5ed1db8041adeba14a40a",
+          "ours": "e3bc3b603578e6bcd8c5ed1db8041adeba14a40a",
+          "theirs": "16d858b40d2948ac8c4ce18188843c02960bc40e",
+          "union": "16d858b40d2948ac8c4ce18188843c02960bc40e"
+        }
+      ],
+      "conclusion": "Theirs extends the existing runtime await-web job budget to 95m with 90m wait helper; Desktop/direct wait remains 40m. Exact release/source guards are not replaced by this merge. Official-file changes add kind-qualified declared provider finalization cases and retain targetedOnly/releaseAccepted:false evidence labels.",
+      "boundary": "Historical evidence documents are preserved verbatim, not independently revalidated here. They are not current release or production acceptance proof."
+    },
+    {
+      "area": "Separate cloud-startup acceptance reader",
+      "sources": [
+        {
+          "path": "scripts/acceptance/cloud-startup.mjs",
+          "base": "1bca723b8110625b48127a1d28ade9ecf0e153de",
+          "ours": "1bca723b8110625b48127a1d28ade9ecf0e153de",
+          "theirs": "6753c8aa8adf4354b60be3d62dcc5d5458f36cd9",
+          "union": "6753c8aa8adf4354b60be3d62dcc5d5458f36cd9"
+        }
+      ],
+      "conclusion": "Theirs strengthens completed execution-tool recognition: handoff-only tools do not qualify; Codex bash/apply_patch require their successful terminal fields and failed tool outputs remove eligibility. This is a different driver from ours run-observability journal/cleanup flow, whose source is kept byte-for-byte.",
+      "boundary": "No new acceptance requirement is added to issue1512 by this review; actual registered scripts remain governed by their existing workflows."
+    }
+  ],
+  "riskDimensions": {
+    "functional": "Several first-party runtime, subscription and Native harness paths change. Source interfaces inspected have no identified blocker; union execution is required.",
+    "securityPrivacy": "No merged loss of recovery-journal safe projection, closed Replay browser classification, authority checks or credential scope guards was identified. Token cache intentionally changes machine-token reuse, not permission caching.",
+    "performance": "New cache/timing/empty-migration paths can change observed timings and SQL inventory. Do not convert static reductions or prior Native green into this union's result.",
+    "releaseRuntime": "Worker install and provider-conservation inputs are changed on 8c. Worker fingerprint equivalence must use actual canonical inputs, not App revision equality.",
+    "evidence": "Receipts here prove source construction and static compatibility only. Runtime, provider cleanup, actual CI and PostHog observations retain their own source/time bindings."
+  },
+  "construction": {
+    "counts": {
+      "unchanged": 6699,
+      "same_both": 16,
+      "theirs_only": 41,
+      "ours_only": 46,
+      "conflict": 3
+    },
+    "leafCount": 6805,
+    "oursOverlayCount": 42,
+    "theirsOverlayCount": 48,
+    "newProductBlobsRequired": 0,
+    "treeHashValidation": [
+      {
+        "name": "base",
+        "expected": "42625ba25887f1fbf64fd025446aa9e888677232",
+        "actual": "42625ba25887f1fbf64fd025446aa9e888677232",
+        "match": true,
+        "leaves": 6791
+      },
+      {
+        "name": "ours",
+        "expected": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+        "actual": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+        "match": true,
+        "leaves": 6795
+      },
+      {
+        "name": "theirs",
+        "expected": "195a66e213ca33c100e2900129079c5f83b06272",
+        "actual": "195a66e213ca33c100e2900129079c5f83b06272",
+        "match": true,
+        "leaves": 6803
+      }
+    ],
+    "conditionalMainTree": "18b539c3541594cfa540d1e178985f00d03ab4fc",
+    "conditionalDifferenceCount": 40,
+    "conditionalClaim": "Future exact e189+8c merge only; no assertion that the owner has merged/deployed it."
+  },
+  "actualBlobReads": [
+    {
+      "path": "lib/infisical-workload.ts",
+      "gitBlob": "368572bb346f39274b0f1d522f773b97fd1f2764",
+      "bytes": 4990,
+      "sha256": "0b3fee99d37256b03db22c6f8ca74e3d5d1dc00e299ed2b72b96841a0a690166",
+      "basis": "actual decoded blob; full source available and relevant changed/calling sections inspected"
+    },
+    {
+      "path": "lib/subscription-access-snapshot.ts",
+      "gitBlob": "c77d4615972370c416eaaf87e169b91849ee513b",
+      "bytes": 6620,
+      "sha256": "555acc2de14fdaedbf2324d212594bc626741983b3bb4d8e8d9a0ecebf8d5ac9",
+      "basis": "actual decoded blob; full source available and relevant changed/calling sections inspected"
+    },
+    {
+      "path": "lib/subscription-workflow-model.ts",
+      "gitBlob": "24349e66f47d2ed935f89e509d022826fe37ffb2",
+      "bytes": 4050,
+      "sha256": "230d4c4363208611011ea2108e4592c610009cf9cbd549ae5f38db185d8973a0",
+      "basis": "actual decoded blob; full source available and relevant changed/calling sections inspected"
+    },
+    {
+      "path": "lib/tracing/sanitize.ts",
+      "gitBlob": "9857985199066a39fdc96ba73f7047d21ba6406f",
+      "bytes": 6442,
+      "sha256": "ea326c9085d6aeb5749acdf1f3526331566fd7067844449554a0eb678bf89992",
+      "basis": "actual decoded blob; full source available and relevant changed/calling sections inspected"
+    },
+    {
+      "path": "lib/attention/store.ts",
+      "gitBlob": "62bf18c2487c207d3b64c6e508f634f6fe5ee0a0",
+      "bytes": 23748,
+      "sha256": "04a40cacb4a4373af8f9fd626229bdb07c9bf9f7fc47c34a41da66c171941c7c",
+      "basis": "actual decoded blob; full source available and relevant changed/calling sections inspected"
+    },
+    {
+      "path": "lib/coordinator/coordinator-bot.ts",
+      "gitBlob": "a2a6bf1fd1307babd350c9a168b003e38fa4b3cc",
+      "bytes": 22425,
+      "sha256": "691007c37fea38fbc794c83e6a75e28ac40491ff7e2f57ddf5fc92947b9a7257",
+      "basis": "actual decoded blob; full source available and relevant changed/calling sections inspected"
+    },
+    {
+      "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+      "gitBlob": "c0172bb8a2d0d4adde7e89991fce36c97b8f8460",
+      "bytes": 12114,
+      "sha256": "bada7b22a750386a49824057751150526d59eb9c5056d5dd9d09531e6cf68455",
+      "basis": "actual decoded blob; full source available and relevant changed/calling sections inspected"
+    },
+    {
+      "path": "packages/daemon/scripts/prepare-worker-install.py",
+      "gitBlob": "ba5f5ee5cc8356781e7c53e6ef5a7e77b7f8573f",
+      "bytes": 4990,
+      "sha256": "c6c4d4ff4a2b4dba37a458f632565267fb7feb648f5b0e23113e9ccfbc504119",
+      "basis": "actual decoded blob; full source available and relevant changed/calling sections inspected"
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex-protocol.ts",
+      "gitBlob": "cb2578564cd0c3f686f21eac07dd9edcbcdf1407",
+      "bytes": 3995,
+      "sha256": "eb6e8aabbcc5b24fc89f965ce49d35b672636e7b60174014233814b0e576e847",
+      "basis": "actual decoded blob; full source available and relevant changed/calling sections inspected"
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "gitBlob": "e85815a955eaff56d7ac389c9d9722c64607345d",
+      "bytes": 51844,
+      "sha256": "81a9cd38c8a82440e1dc4afe64cffe2d20078a91a3a4c6004b7718943c35bf00",
+      "basis": "actual decoded blob; full source available and relevant changed/calling sections inspected"
+    },
+    {
+      "path": "apps/desktop/test/native-document.mjs",
+      "gitBlob": "56a076819caa223228cfb3c934554744dfeab358",
+      "bytes": 5482,
+      "sha256": "5729e559876012b0c6d0bb4800ffb0e3c74ad45316d83191ce07a1079248b64b",
+      "basis": "actual decoded blob; full source available and relevant changed/calling sections inspected"
+    },
+    {
+      "path": "apps/desktop/test/bundled-server-choice.mjs",
+      "gitBlob": "b9e9b44746a735935fcbcd6590c62ee047f27cd8",
+      "bytes": 60,
+      "sha256": "8ea6d1a4a567ac74c0ff7e0bcaf6c0c135d4cb8e2c5efdacdd5ec12f71efe278",
+      "basis": "actual decoded blob; full source available and relevant changed/calling sections inspected"
+    },
+    {
+      "path": "scripts/e2b/official-files.py",
+      "gitBlob": "ea0819bf3e2d4ff83e64482b6336567050376591",
+      "bytes": 21445,
+      "sha256": "66911624af52df59ef715eb105af9a3025bacf12460105fadc7f87e4d2dd63b5",
+      "basis": "actual decoded blob; full source available and relevant changed/calling sections inspected"
+    },
+    {
+      "path": ".github/workflows/desktop.yml",
+      "gitBlob": "1cfd9d8be85015b639809faedc8a68fb83609399",
+      "bytes": 14601,
+      "sha256": "188e917d7142c9f04462749dbf8e64f35ba7e6573bd14e06e718ae4edc1f5126",
+      "basis": "actual decoded blob; full source available and relevant changed/calling sections inspected"
+    },
+    {
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "gitBlob": "97cdc7dfefb5dfbe00e733ccb5559fae8de2dfa9",
+      "bytes": 18539,
+      "sha256": "4773724c6ccbeadd2b7cf6b1833028971d50e4774590d7a0f14e502c9c20c88e",
+      "basis": "actual decoded blob; full source available and relevant changed/calling sections inspected"
+    },
+    {
+      "path": ".github/workflows/workspace-governance-acceptance.yml",
+      "gitBlob": "c107a7699cc0bb91ac8d9eaf258361d2f04e51a4",
+      "bytes": 15158,
+      "sha256": "a0c3e0fcc7de4bf3662bf0272ddf68480174918f2c7fcd940b341d33faef3a08",
+      "basis": "actual decoded blob; full source available and relevant changed/calling sections inspected"
+    },
+    {
+      "path": "lib/personal-policy.ts",
+      "gitBlob": "dc710f0a16a5e28e5a34d5112a86fab349a2639a",
+      "bytes": 8694,
+      "sha256": "1e09dbc751b0e740d54cbbc6db79b0d4a0bf48cc409137eabc36ecd38f8861f6",
+      "basis": "actual decoded blob; full source available and relevant changed/calling sections inspected"
+    },
+    {
+      "path": "lib/tracing/node.ts",
+      "gitBlob": "00775a5928228262a66b12b845ee0dc18f6c6047",
+      "bytes": 7287,
+      "sha256": "e1ccb4a2aaba54d8e3be4d27d9ff18b31dd9fc683f72117f6dd0ea730099f4d0",
+      "basis": "actual decoded blob; full source available and relevant changed/calling sections inspected"
+    }
+  ],
+  "changedSourceManifest": [
+    {
+      "path": ".github/actions/pnpm-install/action.yml",
+      "status": "modified",
+      "afterGitBlob": "553d718ad413f0db4b12833e06ffb8f29d98e555",
+      "patchBytes": 861,
+      "patchSha256": "489864d8e51c6e33de85127223323723b55e5d00a104995166fe00331b5c5a79"
+    },
+    {
+      "path": ".github/workflows/desktop.yml",
+      "status": "modified",
+      "afterGitBlob": "1cfd9d8be85015b639809faedc8a68fb83609399",
+      "patchBytes": 1061,
+      "patchSha256": "66c63a144b5da9d5c10b0c5ddd812a8321ea92d33c9da02f33fae24d905ea428"
+    },
+    {
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "status": "modified",
+      "afterGitBlob": "97cdc7dfefb5dfbe00e733ccb5559fae8de2dfa9",
+      "patchBytes": 990,
+      "patchSha256": "ac50c53999f8f3fd90c6b2f9b2bff374fc09f310325250978c673ec2e40a2f8f"
+    },
+    {
+      "path": ".github/workflows/issue1415-deployed-production.yml",
+      "status": "modified",
+      "afterGitBlob": "6d0b50becc99ce6d5f6cfb69cceea1037f2ee1be",
+      "patchBytes": 312,
+      "patchSha256": "c318a3f5b6baf02bccfd6312f2a7c136af61c2f51cf499e7734ff8bfda4b6f39"
+    },
+    {
+      "path": ".github/workflows/issue1415-managed-inspection.yml",
+      "status": "modified",
+      "afterGitBlob": "9ece51fc2a39c2d362446e68df1f9bbf2076f641",
+      "patchBytes": 367,
+      "patchSha256": "880724b433b844e9fcb26268b95833ee2ef07dae4987eea4f8124743cf3d3064"
+    },
+    {
+      "path": ".github/workflows/issues-1516-welcome-acceptance.yml",
+      "status": "modified",
+      "afterGitBlob": "4757d62065017957f6e1e4300ab4695507ce40d8",
+      "patchBytes": 720,
+      "patchSha256": "2c19406e733b637d4de9ce6bf1624a76320288003663c39031eb5d822f74c3da"
+    },
+    {
+      "path": ".github/workflows/read-cache-production.yml",
+      "status": "modified",
+      "afterGitBlob": "7ffa772dc65e85ae6665d7fb70f5d5a3b604da22",
+      "patchBytes": 1243,
+      "patchSha256": "8a11dd8d77a2abcb9a340588d0f8778cad0a127614c92fec01201f58556a8ee4"
+    },
+    {
+      "path": ".github/workflows/read-cache.yml",
+      "status": "modified",
+      "afterGitBlob": "86ee0112413eae241189bb2d748a6d6901201c4f",
+      "patchBytes": 451,
+      "patchSha256": "e1c90f0e3dc77e650bef534ee62d9799a5c7653c5c4c39617cfa5ec1ab1b6152"
+    },
+    {
+      "path": ".github/workflows/self-hosted-production.yml",
+      "status": "modified",
+      "afterGitBlob": "862a9f7cdea8df0373207e389f3cbf3afaca46df",
+      "patchBytes": 750,
+      "patchSha256": "01c34131bf568099f87acf432fae608d3cfce8c35fbfa742a6898a483c285a8d"
+    },
+    {
+      "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+      "status": "modified",
+      "afterGitBlob": "42ae23945f798020ec068635e7621869fb427af2",
+      "patchBytes": 453,
+      "patchSha256": "5d83d1a83e5067723e9491b81f7fce2c05cecacdf5e6d924793e5f5e3aa41c30"
+    },
+    {
+      "path": ".github/workflows/ui-policy.yml",
+      "status": "modified",
+      "afterGitBlob": "e3938ad5c343fb14d60709e014cb3d9a3189b104",
+      "patchBytes": 2070,
+      "patchSha256": "dbacc56eae460645aa465b3056018086515cb933c5f1d3239c568c1768e3fc8d"
+    },
+    {
+      "path": ".github/workflows/web-deploy.yml",
+      "status": "modified",
+      "afterGitBlob": "bab7ed46eefd7bd4b6db712e8e141484be9f73ba",
+      "patchBytes": 324,
+      "patchSha256": "fc675179fd5f1f630c99ae66bf67b65b1fa7d3ed40d7df56942d51e29234326f"
+    },
+    {
+      "path": ".github/workflows/workspace-governance-acceptance.yml",
+      "status": "modified",
+      "afterGitBlob": "c107a7699cc0bb91ac8d9eaf258361d2f04e51a4",
+      "patchBytes": 350,
+      "patchSha256": "e8089d14cc8d5be234a45106f5070d939cefffbce5194651519978b9f92c6fc6"
+    },
+    {
+      "path": "Dockerfile",
+      "status": "modified",
+      "afterGitBlob": "19054afe4768b3391515c7a3e0f97a0021f123ee",
+      "patchBytes": 701,
+      "patchSha256": "9a6abd9562a3eb4d19e0a251a2a4f073c7f360d99707d9a2afb292e250084f2b"
+    },
+    {
+      "path": "apps/desktop/package.json",
+      "status": "modified",
+      "afterGitBlob": "0e636983586e2f427797c29978c2bf7524caa18c",
+      "patchBytes": 1970,
+      "patchSha256": "01c929695f24b77f2bbce9638ee43622c888ddd88c5a87d6a3b132fec4261414"
+    },
+    {
+      "path": "apps/desktop/test/bundled-server-choice.mjs",
+      "status": "added",
+      "afterGitBlob": "b9e9b44746a735935fcbcd6590c62ee047f27cd8",
+      "patchBytes": 74,
+      "patchSha256": "c8b0fc03ed00c0936203fd56de2f446595ff0dda9f08a29aecc1f42fc8affa73"
+    },
+    {
+      "path": "apps/desktop/test/bundled-server-choice.test.mjs",
+      "status": "added",
+      "afterGitBlob": "4a5efa813d28f5cf90264f74e48f9187f600f60c",
+      "patchBytes": 10067,
+      "patchSha256": "a88976235dd702bf62ed06aab0fe5a7f313229edaa2fa2f7c2f5a8646d6a0392"
+    },
+    {
+      "path": "apps/desktop/test/bundled-smoke.mjs",
+      "status": "modified",
+      "afterGitBlob": "2df81511184d89d773b86f7d34ae0c069a49e295",
+      "patchBytes": 1135,
+      "patchSha256": "7f99ddc0f4b8391c572c7b69c985e93b80cebf169a4659152a546dddfa1a2fd0"
+    },
+    {
+      "path": "apps/desktop/test/native-document.mjs",
+      "status": "modified",
+      "afterGitBlob": "56a076819caa223228cfb3c934554744dfeab358",
+      "patchBytes": 3232,
+      "patchSha256": "4d7c230b03b8357b37b5d18b04d7925a982ee8bdc7e71da5ec0a348b884e7949"
+    },
+    {
+      "path": "apps/desktop/test/native-document.test.mjs",
+      "status": "modified",
+      "afterGitBlob": "fc89587f2d84cb7256230c440b898d38b8524d85",
+      "patchBytes": 3985,
+      "patchSha256": "9c9deaf5c3d94032c95cff9e133d1307addb3532fcedbaf31d0c457544e4c9d1"
+    },
+    {
+      "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+      "status": "modified",
+      "afterGitBlob": "f1e46c854eb04b42c10afb2e251bab8499f6bc4b",
+      "patchBytes": 5189,
+      "patchSha256": "946dd262062f86ce1e764b6166f86d1a10d1df5eb5b1fb56dae5a796cfdcee65"
+    },
+    {
+      "path": "docs/operations/1506-official-base-conservation-control-20261109.md",
+      "status": "added",
+      "afterGitBlob": "e821895efe3a9234b8f2c8f0416b7dad5254bfee",
+      "patchBytes": 2823,
+      "patchSha256": "ce8fe8587d568eba6b3bff2a4f294fabbaffc5ea4d4282d5bec3fc614a2e2cd7"
+    },
+    {
+      "path": "docs/operations/evidence/1506-official-base-conservation-control-20261109.json",
+      "status": "added",
+      "afterGitBlob": "2f7d1dc33e6ee5357a8b3c531fd8aa45250015e9",
+      "patchBytes": 29630,
+      "patchSha256": "0173135dbaed14526658f7294159a0be831754239170ec30069f3e6529bcc7a1"
+    },
+    {
+      "path": "docs/operations/evidence/1506-official-desktop-certificate-relinks-20261109.json",
+      "status": "added",
+      "afterGitBlob": "081ae5d6fd6c024abb95d9d0e778b9f051e5a323",
+      "patchBytes": 27795,
+      "patchSha256": "bdaaf08ea97dfb6235b979e41f5f0bce7f1cbefa53e78cf5839d1786cb7ab066"
+    },
+    {
+      "path": "docs/operations/evidence/1506-official-desktop-certificate-relinks-20261109.md",
+      "status": "added",
+      "afterGitBlob": "4adf53c96bc15fd4cb985d410702e63eccd7554b",
+      "patchBytes": 5934,
+      "patchSha256": "cf4159f8b8a31e9a39c9917412f1559a9ec596abc0ac041a117d30c753e52f13"
+    },
+    {
+      "path": "docs/operations/web-deploy.md",
+      "status": "modified",
+      "afterGitBlob": "811eb7679a4c2afd1753698538f7d385343f1206",
+      "patchBytes": 1342,
+      "patchSha256": "6556d784e9ae1800bbe8a5c14309cfe7e72a806320d1907f8b7a1aef3d4fd02d"
+    },
+    {
+      "path": "lib/attention/store.ts",
+      "status": "modified",
+      "afterGitBlob": "62bf18c2487c207d3b64c6e508f634f6fe5ee0a0",
+      "patchBytes": 1731,
+      "patchSha256": "699333979e15cb28afc463e54c90df8bc8f507a232f4784d669dfa36a9fa4a50"
+    },
+    {
+      "path": "lib/coordinator/coordinator-bot.ts",
+      "status": "modified",
+      "afterGitBlob": "a2a6bf1fd1307babd350c9a168b003e38fa4b3cc",
+      "patchBytes": 1138,
+      "patchSha256": "ff79d2da7510d6593737b16bd7e0403f2455acb9a094e9c5dfc7fa32f406f9c4"
+    },
+    {
+      "path": "lib/infisical-workload.test.ts",
+      "status": "modified",
+      "afterGitBlob": "be8768899eaf6066ff47aed58f33d4a79651fa7c",
+      "patchBytes": 7778,
+      "patchSha256": "18d57f5c2ba3f47086b3afcd728648a020de40ad289d30421950ca63972bc2df"
+    },
+    {
+      "path": "lib/infisical-workload.ts",
+      "status": "modified",
+      "afterGitBlob": "368572bb346f39274b0f1d522f773b97fd1f2764",
+      "patchBytes": 4770,
+      "patchSha256": "26e13dcf363dc0f02ae79be4039f78e724d01e529cf10efbf162fcdf809ab9a3"
+    },
+    {
+      "path": "lib/subscription-access-snapshot.test.ts",
+      "status": "modified",
+      "afterGitBlob": "cb2090125268fa8640037494fc29968d860cf5f4",
+      "patchBytes": 5819,
+      "patchSha256": "cc409ec77c2ba8d1f93cc32155e40516c0d4d036080eca3f7679b16a7f5a3e59"
+    },
+    {
+      "path": "lib/subscription-access-snapshot.ts",
+      "status": "modified",
+      "afterGitBlob": "c77d4615972370c416eaaf87e169b91849ee513b",
+      "patchBytes": 3227,
+      "patchSha256": "f15f2abf8b7599f54558d97d6f717c0153ec0badaa7fa300e76875497203e270"
+    },
+    {
+      "path": "lib/subscription-workflow-model.test.ts",
+      "status": "modified",
+      "afterGitBlob": "96b23777317bedb29db1df3404d8b08c37cd099a",
+      "patchBytes": 2428,
+      "patchSha256": "f4741f741f71414e143df6d6ee71d6c786048322a298a116a7b8cf726b9f673b"
+    },
+    {
+      "path": "lib/subscription-workflow-model.ts",
+      "status": "modified",
+      "afterGitBlob": "24349e66f47d2ed935f89e509d022826fe37ffb2",
+      "patchBytes": 1720,
+      "patchSha256": "cdfda59c491263a1c123493538d2e5d539fb5951a3be6b2ab6726c5dacdb24ab"
+    },
+    {
+      "path": "lib/tracing/sanitize.ts",
+      "status": "modified",
+      "afterGitBlob": "9857985199066a39fdc96ba73f7047d21ba6406f",
+      "patchBytes": 699,
+      "patchSha256": "a72234b62cad2a71b9e1154f7c0e22e24879e4a6148cd06df4c36194d794ce00"
+    },
+    {
+      "path": "lib/tracing/workflow-transport.test.ts",
+      "status": "added",
+      "afterGitBlob": "a92aa052db23cb4448bd73538da70d3cab0634e6",
+      "patchBytes": 1427,
+      "patchSha256": "1ec968de9f08cf8d8d625e06817e94116135d543513b28020639071ce9c8e882"
+    },
+    {
+      "path": "package.json",
+      "status": "modified",
+      "afterGitBlob": "568cfeee161309202699acefd0a57a8edc52bf6e",
+      "patchBytes": 2557,
+      "patchSha256": "3baa62adc3c9dace4fbd634d763c215e203753ed9db68720bfb9ae8f8769a7d5"
+    },
+    {
+      "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+      "status": "modified",
+      "afterGitBlob": "c0172bb8a2d0d4adde7e89991fce36c97b8f8460",
+      "patchBytes": 1033,
+      "patchSha256": "6aacad2c64fb3166e044cbe6d7581daa783e1a5278fbbbe5ccad191df0e562de"
+    },
+    {
+      "path": "packages/daemon/scripts/prepare-worker-install.py",
+      "status": "added",
+      "afterGitBlob": "ba5f5ee5cc8356781e7c53e6ef5a7e77b7f8573f",
+      "patchBytes": 5121,
+      "patchSha256": "5d1342bf3d1cfa7317b8c9a6d830f3d469702d008e7cd53ca38ac90e926b1171"
+    },
+    {
+      "path": "packages/daemon/scripts/prepare-worker-install.test.py",
+      "status": "added",
+      "afterGitBlob": "cfffaf6cac62d01e075b0fcb08a41f8b40c5f540",
+      "patchBytes": 5812,
+      "patchSha256": "81837dc9c4a4b49632259bae0dbda243bfa46a5d5e157e7472f47cc3857eb409"
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex-protocol.ts",
+      "status": "modified",
+      "afterGitBlob": "cb2578564cd0c3f686f21eac07dd9edcbcdf1407",
+      "patchBytes": 256,
+      "patchSha256": "0dbfc778d847965d1786775358051b056bda304fb0240ef37556c2eec126f193"
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "status": "modified",
+      "afterGitBlob": "e85815a955eaff56d7ac389c9d9722c64607345d",
+      "patchBytes": 519,
+      "patchSha256": "50dbce6549bc4bd798f76d1f5ac01254e27bc6bfb4c9955aa4ee2b5768f3ac0e"
+    },
+    {
+      "path": "packages/daemon/test/codex-item-chunks.test.ts",
+      "status": "added",
+      "afterGitBlob": "7a72cbdf6ae495a62ec2b9684ce9889f69635893",
+      "patchBytes": 2907,
+      "patchSha256": "08acbf2c576547d882a817ffcc2dd9e459065a84598ce89741b128fa671a0fad"
+    },
+    {
+      "path": "patches/ffmpeg-static@5.3.0.patch",
+      "status": "added",
+      "afterGitBlob": "5e27d8d12fbed2d0c2e62083976de11c86d9e1fa",
+      "patchBytes": 23947,
+      "patchSha256": "08ea1ff47a9abf12255c19b75df2853e721ca9c247e228397ca5e0894c8b16d5"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "status": "modified",
+      "afterGitBlob": "4b67909739360248e279efa0c3bb7344379e04fe",
+      "patchBytes": 909,
+      "patchSha256": "23a2aaabf81256e49517e0e18449cb75dbbc8785708faae876c703ffaa8e60a6"
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "status": "modified",
+      "afterGitBlob": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d",
+      "patchBytes": 171,
+      "patchSha256": "fad1338e4064ba42a91547873e5cd849927e45ff84afe423eaffc9d780139b95"
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.mjs",
+      "status": "modified",
+      "afterGitBlob": "6753c8aa8adf4354b60be3d62dcc5d5458f36cd9",
+      "patchBytes": 4980,
+      "patchSha256": "4f68f9f2a39755a073b47a789a9be302e2996b66c5ab51b6f96f54ea5472a83b"
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.test.mjs",
+      "status": "modified",
+      "afterGitBlob": "6ae54051916032d788864a725711975ad1ea007f",
+      "patchBytes": 14103,
+      "patchSha256": "bc34e64e790f97008badcd299e7ca4fa6e3ae9e19c412b5e83e09762e871e8b5"
+    },
+    {
+      "path": "scripts/acceptance/task-secrets.test.mjs",
+      "status": "modified",
+      "afterGitBlob": "b0e809572a9f89f087d8bdb4b572858db8c2dcdf",
+      "patchBytes": 2847,
+      "patchSha256": "d90cd2f5867f0b9a27d9213ccd8dc884e0f664918ea0afa852d6e909e4c1a12b"
+    },
+    {
+      "path": "scripts/check-analytics-ssr.mjs",
+      "status": "modified",
+      "afterGitBlob": "0fad928edefbb3b2677450f9f04778ec088a6195",
+      "patchBytes": 4722,
+      "patchSha256": "0a94398f84f514a52ce778d1c701701b077b213605b994a1f91ab4d7b6738c55"
+    },
+    {
+      "path": "scripts/e2b/e2b-certificate-relinks.json",
+      "status": "modified",
+      "afterGitBlob": "335540475a9d8aaae8f34915e087b5a862699b95",
+      "patchBytes": 577,
+      "patchSha256": "68e5da16e2d362817a7ec516c306a3888eaa4f744dc38afa77fefb5aa875c5cc"
+    },
+    {
+      "path": "scripts/e2b/e2b-finalization-files.json",
+      "status": "modified",
+      "afterGitBlob": "16d858b40d2948ac8c4ce18188843c02960bc40e",
+      "patchBytes": 2539,
+      "patchSha256": "f36d7d9d0eac596b85dbd3dd3d2fd21c69b64133bfa91ba83ac232d30f5fe330"
+    },
+    {
+      "path": "scripts/e2b/official-files.py",
+      "status": "modified",
+      "afterGitBlob": "ea0819bf3e2d4ff83e64482b6336567050376591",
+      "patchBytes": 551,
+      "patchSha256": "24bc0ea013a8d93504ff866d2fceb39c24952fcd28eb7cd86ec7ac68768a8103"
+    },
+    {
+      "path": "scripts/e2b/official-files.test.py",
+      "status": "modified",
+      "afterGitBlob": "471c80878c7e2b88cd5e8a0864e6f6ef8354df21",
+      "patchBytes": 12594,
+      "patchSha256": "fce47e9e8b8c0a51d1bd5553ecfee31315ad36b2659f7b751bc6a626c0415414"
+    },
+    {
+      "path": "scripts/ffmpeg-install.test.mjs",
+      "status": "added",
+      "afterGitBlob": "9ce1e3333fd3ddb10ea206f5144cc466611842a1",
+      "patchBytes": 22530,
+      "patchSha256": "5f2022a8d759d9e944dee2823d117bd9f65aeffabbf138350c4cc18340f0ac40"
+    },
+    {
+      "path": "scripts/release/web-deploy.mjs",
+      "status": "modified",
+      "afterGitBlob": "f1a2e150c3bb73fb15c6d1e5e325d5cc5187bd4b",
+      "patchBytes": 1460,
+      "patchSha256": "4d0c4c28b9713fd3406de2e2e36da9f2bf203e02490330139704b005e2c43fc6"
+    },
+    {
+      "path": "scripts/release/web-deploy.test.mjs",
+      "status": "modified",
+      "afterGitBlob": "7d3b37717d114590497f8646d4f50013b66e8c19",
+      "patchBytes": 3452,
+      "patchSha256": "6a70c80ed8de1ae855ee20d00deed5613e9039970562701c5bce8f54dac644de"
+    },
+    {
+      "path": "tests/analytics-policy.test.mjs",
+      "status": "modified",
+      "afterGitBlob": "9fc0602f814f3d8e25ba5668f0f174a26f14718b",
+      "patchBytes": 5424,
+      "patchSha256": "6db5d93920db83cfe0218fa665ddb23ce95739a2b7ad436f8c7068ed4e1f087a"
+    },
+    {
+      "path": "tests/coordinator-bot.db.test.ts",
+      "status": "modified",
+      "afterGitBlob": "32a8321c981dd6a534f8859fa35f281e874466e6",
+      "patchBytes": 6568,
+      "patchSha256": "7b1ecea70c062619fdcec635996afa9c759ceffe4e7fd9efc8448f244653e963"
+    },
+    {
+      "path": "tests/mvp/pinned-pnpm.test.mjs",
+      "status": "modified",
+      "afterGitBlob": "29a96d1b50783f839175a72efe9a40bdbbdaaeab",
+      "patchBytes": 9407,
+      "patchSha256": "a2a9c2b1605d535af7dd35056e1bd846028228e9ded8730b43be18e1e11a671b"
+    }
+  ],
+  "instructions": {
+    "AGENTS": "fa963e4d0a342002661c58772d370484e8af740a",
+    "CONTRIBUTING": "768523980c14db13055f22a68c7e9c5960013508",
+    "devWorkflow": "d2b2c72d55da3bcd3cf83a32aa690474cbabfe0d",
+    "allUnchangedAcrossThreeInputs": true
+  },
+  "activity": {
+    "newTests": 0,
+    "jobLogs": 0,
+    "artifactDownloads": 0,
+    "posthog": 0,
+    "accounts": 0,
+    "models": 0,
+    "resources": 0,
+    "productBlobs": 0,
+    "trees": 0,
+    "commits": 0,
+    "refUpdates": 0,
+    "evidenceBlobsOnly": true
+  }
+}

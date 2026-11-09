@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "checkpoint": 37,
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequest": 1799,
+  "recordedAt": "2026-11-09 16:24:33 UTC",
+  "prefix": "docs/operations/evidence/1512-raw/runtime-source-and-union-20261109",
+  "head": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+  "tree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+  "orderedParents": [
+    "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+    "8c423db291f8121980267cd48a24e428c992f618"
+  ],
+  "publishedAt": "2026-11-09 16:16:22 UTC",
+  "remoteLeafCount": 6805,
+  "overlayEntries": 42,
+  "currentSynthetic": {
+    "sha": "16dcb17d4d20c32ffbc3f4d3e40b05a594d340f6",
+    "parents": [
+      "e189d7652fd2fce48b77a3697abf5bb177d8ebd1",
+      "6cc38aca620d16b25eebe0c8787747885a2cceb1"
+    ],
+    "tree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+    "actualCheckoutOriginalOwnedBy": "/root/current_source_review",
+    "ciReceipts": "later checkpoint"
+  },
+  "mainCI": {
+    "id": 42653081708,
+    "attempt": 1,
+    "status": "in_progress",
+    "completed": false
+  },
+  "worker": {
+    "oldSource": "facb389f6cc06c453e9135bb60ada1b0f302e0d9",
+    "oldPublishedWitness": "a45382985c12c93fb0832eabd8010f60c9b7dabb",
+    "liveOldProcessRead": false,
+    "newSourceContainsRequiredFixes": true,
+    "conditionalMainTree": "18b539c3541594cfa540d1e178985f00d03ab4fc",
+    "selectedLeaves": 480,
+    "selectedManifestSha256": "ede07be2e171115fd25cf01ed5553c9e4331470dd343eac4ac39601e264384ce",
+    "sameSelectedInputs": true,
+    "actualSharedReleaseCompleted": false,
+    "appRuntimeEqualityRequired": false
+  },
+  "supersededWorkerReview": {
+    "draft": "4af9a5b7c4deae8823837e8dd5962bf13c91745f",
+    "final": "a4b380eba0d6f1b99e73fe633e04fd4e865f2656",
+    "change": "Correct fifth-fix source semantics; no source hashes or canonical equivalence changed"
+  },
+  "completedProductionCases": 0,
+  "productionQueries": 0,
+  "modelCalls": 0,
+  "temporaryVMs": 0,
+  "mainChangedByThisCheckpoint": false,
+  "evidenceParent": "5429efb005f91355dc8251ea118835cebb2be31d",
+  "payloadFiles": 10,
+  "payloadBytes": 907457,
+  "indexExcluded": true,
+  "files": [
+    {
+      "path": "runtime-source-rfacb-versus-932.safe.json",
+      "gitBlob": "ffc352a811178306de5b60d3f3088b1cb11546e2",
+      "bytes": 35600,
+      "sha256": "2fac91f6382546dd9c0cb22713ffba37e4e39b13b6803b44bbe678bb40c6f777"
+    },
+    {
+      "path": "runtime-bootstrap-rfacb-versus-932.safe.json",
+      "gitBlob": "ff80bd2ed2004dc102c5641f7a8f92c3baf36efe",
+      "bytes": 26977,
+      "sha256": "f801f77b9a870c32c00a0f60bdf3639dbbba20148551d8120bcdbeb729db5758"
+    },
+    {
+      "path": "union-inputs-932-8c.safe.json",
+      "gitBlob": "9184682713449def6bce722aabd3af905437efbc",
+      "bytes": 717482,
+      "sha256": "5cda1a5216bd4934c85659ad248e0f32fc6a70ed5dafc29a90de673fc617369b"
+    },
+    {
+      "path": "union-semantic-review.safe.json",
+      "gitBlob": "ab29de85d78b1d6d17885057286814f118d8b9b2",
+      "bytes": 45643,
+      "sha256": "759e04b2ac661d23eed1c6e0a7ddb35f639e26a368275c0979afe475a350dccb"
+    },
+    {
+      "path": "conditional-main-1810.safe.json",
+      "gitBlob": "9bd7dfa8f3813fee94e44fefbad391dd8ec95aed",
+      "bytes": 21065,
+      "sha256": "5429a807e580fdf0883f7bd2242ff762f2d715f9b73a25a3bbcb82b2f0dd546d"
+    },
+    {
+      "path": "worker-canonical-equivalence.safe.json",
+      "gitBlob": "a4b380eba0d6f1b99e73fe633e04fd4e865f2656",
+      "bytes": 27344,
+      "sha256": "dc73c89871e532ddec1b5bc0773dc6df153e491e7021c7c13a019cb31e333cab"
+    },
+    {
+      "path": "codex-finalization-mode-8c-readonly.safe.json",
+      "gitBlob": "61f471f22fd488d3dfea6570c7fc7dc68dba7f9e",
+      "bytes": 15976,
+      "sha256": "4a21295752c82b8e1c57f1baebdb5e3e5bcb367befa9206817370d5dfb075c93"
+    },
+    {
+      "path": "root-union-publish-and-worker.safe.json",
+      "gitBlob": "8cb671fb023494f222a7943bebe327d694b57e98",
+      "bytes": 1862,
+      "sha256": "73ed10d8dc98d53c714d590f70185bcff6ee951a2a961d56922e71ac7845bf3a"
+    },
+    {
+      "path": "README.md",
+      "gitBlob": "5adcd10458f801deb4ab18f58a8265d3f8baa2fa",
+      "bytes": 4256,
+      "sha256": "a55e78315ac5208e42e2116ee60d5b392ba682ad81df42b246594ab903de8001"
+    },
+    {
+      "path": "runtime-run-binding-existing-evidence.safe.json",
+      "gitBlob": "f03d081c341718a4cbc9a8b6df7d7acb13e018dd",
+      "bytes": 11252,
+      "sha256": "f8108397f513c0b0575fabe1d914e15924ee1d63d5d65290ccf9408b286bdb72"
+    }
+  ],
+  "limits": [
+    "Source construction and existing guarded-runtime behavior only; no production acceptance or R7 success claim.",
+    "Historical Codex CA mode transition remains correctly rejected and its writer is unknown.",
+    "Current source CI must finish on its own executed checkout; prior results are historical.",
+    "Normal run-to-worker binding uses release/configuration and successful guarded startup evidence, an explicit inference; service.version is not W."
+  ]
+}

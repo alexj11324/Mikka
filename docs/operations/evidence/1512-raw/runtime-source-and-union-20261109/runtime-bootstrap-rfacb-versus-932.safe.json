@@ -1,0 +1,585 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512-fixed-source-e2b-worker-selection-review",
+  "scope": {
+    "repository": "alexj11324/Mikka",
+    "issue": 1512,
+    "fixed": {
+      "runtimeRevision": "facb389f6cc06c453e9135bb60ada1b0f302e0d9",
+      "runtimeWorkerHash": "a45382985c12c93fb0832eabd8010f60c9b7dabb",
+      "runtimeTree": "d3607fc58871c5b5a20f1617c9879ca86867c8d4",
+      "mainRevision": "e189d7652fd2fce48b77a3697abf5bb177d8ebd1",
+      "mainTree": "74b7be77de23f66162ae9558c863bb2fc9b06a56",
+      "candidateRevision": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "candidateTree": "3c0cc8bb828788e5817fc62048e46fe978e88dd5"
+    },
+    "mode": "read-only source review plus immutable report blob",
+    "daemon27PathDiffOwner": "/root/current_source_review",
+    "productionAcceptanceExecuted": false
+  },
+  "conclusion": {
+    "oldRuntimeAutomaticallyFollowsPublishedNpmDaemon": false,
+    "fixedRuntimeMayRetainOldWorker": true,
+    "legalRuntimeRefreshExists": true,
+    "refreshTarget": "the host-configured fixed MIKKA_CLOUD_WORKER_SOURCE_COMMIT and MIKKA_CLOUD_WORKER_SHA, not a newly published npm version or an app commit chosen by inference",
+    "appCommitMustEqualRuntimeCommit": false,
+    "actualProductionWorkerSourceObserved": false,
+    "summary": "Fresh instances of the configured additive Rfacb/Wa453 image start its built/preloaded worker. Publishing a newer public npm daemon does not update that cloud worker. Current host code can explicitly refresh an idle task, or upgrade an eligible retained idle/unclaimed task during its legitimate next start when its worker fingerprint differs from the configured target. The actual running worker identity must be established from the real release/task evidence; a template/configuration witness and Native CI installed daemon are not that evidence."
+  },
+  "publicWitness": {
+    "providedBy": "root message, existing public Factory progress witness",
+    "url": "https://github.com/alexj11324/Mikka/issues/1752#issuecomment-6742785336",
+    "reportedAt": "2026-11-09T14:39:00Z",
+    "reportedRuntimeRevision": "facb389f6cc06c453e9135bb60ada1b0f302e0d9",
+    "reportedWorkerHash": "a45382985c12c93fb0832eabd8010f60c9b7dabb",
+    "reportedConfigurationKeysConsistent": 6,
+    "reviewerReadOriginalManifest": false,
+    "reviewerQueriedProduction": false,
+    "boundary": "This review did not fetch the live configuration or the manifest artifact and did not inspect the running sandbox. The witness does not independently prove a live worker PID, cwd, compiled source, refreshed release or actual npm version."
+  },
+  "identityContract": [
+    {
+      "identity": "R",
+      "meaning": "fixed public Git source commit used to build the cloud worker",
+      "source": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+      "lines": "12-20,55-61,90-92"
+    },
+    {
+      "identity": "W",
+      "meaning": "worker fingerprint from immutable relevant Git entries (including mode/type/blob/path) and package/lock projections",
+      "source": "scripts/e2b/build-template.py",
+      "lines": "32-41,94-119,201-275",
+      "boundary": "W was not recomputed against R in this source-only review; the supplied W remains the release witness identity."
+    },
+    {
+      "identity": "App source",
+      "meaning": "host application source is a separate identity; the reviewed selection/build/refresh checks do not require AppSHA == R",
+      "sources": [
+        "lib/cloud-template-models.ts",
+        "lib/secrets/e2b-runtime.ts",
+        "lib/computer/official-runtime.ts"
+      ]
+    },
+    {
+      "identity": "npm daemon version",
+      "meaning": "public desktop/service package version is not the E2B cloud-worker release selector",
+      "sources": [
+        "packages/daemon/scripts/build.mjs",
+        "packages/daemon/src/auto-update.ts",
+        "packages/daemon/src/paths.ts"
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "fixed-template-build",
+      "status": "proved by fixed source",
+      "detail": "Template construction fetches and verifies exact R, recomputes the required worker fingerprint, installs the filtered locked dependencies, compiles dist/cloud/cloud-worker.js with W and freezes an anonymous preloaded worker. The cloud worker is not installed from the public npm latest release.",
+      "references": [
+        {
+          "path": "scripts/e2b/build-template.py",
+          "lines": "277-323"
+        },
+        {
+          "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+          "lines": "55-61,90-92,119-127,163-182"
+        },
+        {
+          "path": "packages/daemon/scripts/build-cloud-worker.mjs",
+          "lines": "16-43"
+        }
+      ]
+    },
+    {
+      "id": "existing-bootstrap",
+      "status": "proved by fixed source",
+      "detail": "Install mode seeing an existing worker marker requires that marker to equal requested W and returns. It does not overwrite an old installation. Stage mode is a separate guarded path. The install early-return proves the marker check, not a new live-process verification.",
+      "references": [
+        {
+          "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+          "lines": "21-31"
+        },
+        {
+          "path": "lib/computer/official-runtime.ts",
+          "lines": "40-54"
+        }
+      ]
+    },
+    {
+      "id": "fixed-start",
+      "status": "proved by fixed source",
+      "detail": "start-prebuilt.sh executes the bundled worker under /opt/mikka/worker; the normal start command wakes its existing --wait-bootstrap process or starts the bundle (legacy fallback is the same checkout's local tsx entry). Neither command downloads a new npm daemon.",
+      "references": [
+        {
+          "path": "scripts/e2b/start-prebuilt.sh",
+          "lines": "13-16"
+        },
+        {
+          "path": "lib/computer/worker-command.ts",
+          "lines": "1-9"
+        }
+      ]
+    },
+    {
+      "id": "npm-update-disabled",
+      "status": "proved in immutable Rfacb, and identical entry/CLI/updater bytes directly read at main e189",
+      "detail": "cloud-worker invokes runCli with --hosted-subscriptions and --e2b-container-runtime. The CLI excludes either flag from managedAutoUpdateRuntime enabled eligibility. The updater separately requires prod, systemd/launchd and the actual public global npm mikka.js install. R's main may learn the server-named newer version but offer/install and daemon.update remain unavailable without options.autoUpdate.",
+      "references": [
+        {
+          "path": "packages/daemon/bin/cloud-worker.ts",
+          "lines": "43-47"
+        },
+        {
+          "path": "packages/daemon/src/cli.ts",
+          "lines": "224-240"
+        },
+        {
+          "path": "packages/daemon/src/auto-update.ts",
+          "lines": "37-55"
+        },
+        {
+          "path": "packages/daemon/src/main.ts",
+          "lines": "1895-1931"
+        }
+      ]
+    },
+    {
+      "id": "template-selector",
+      "status": "proved at candidate932; schema directly identical at main e189",
+      "detail": "Task harness selects E2B_CLAUDE_TEMPLATE or E2B_CODEX_TEMPLATE; Bot/desktop selects E2B_BYO_COMPUTER_TEMPLATE. Bare official kind is the supported bootstrap/rollback route. Additive IDs must match the strict configured catalogue, kind and preinstalled flag. Catalogue W and optional R are checked against the corresponding host configuration. The selector does not query the latest npm daemon.",
+      "references": [
+        {
+          "path": "lib/secrets/e2b-runtime.ts",
+          "lines": "25-50"
+        },
+        {
+          "path": "lib/cloud-template-models.ts",
+          "lines": "1-48"
+        },
+        {
+          "path": "lib/cloud-computer/thread-machines.ts",
+          "lines": "105-115,644-646,744-763,798-812"
+        },
+        {
+          "path": "lib/computer/e2b-provider.ts",
+          "lines": "51-65"
+        }
+      ]
+    },
+    {
+      "id": "ordinary-worker-guard",
+      "status": "proved in candidate932 host source, same blob as e189 search binding",
+      "detail": "Fresh provision/ordinary verification compares the sandbox/broker's W with the configured target. A mismatch outside authorized refresh/retained-upgrade eligibility is rejected. Existing running question/claimed work has preservation paths and is not forcibly migrated; this is not a claim that every already active child rechecks the latest W on every call.",
+      "references": [
+        {
+          "path": "lib/cloud-computer/thread-machines.ts",
+          "lines": "700-705,719-732,786-795,856-900,981-987"
+        },
+        {
+          "path": "lib/computer/cloud-worker.ts",
+          "lines": "17-36"
+        }
+      ]
+    },
+    {
+      "id": "legitimate-refresh",
+      "status": "proved in candidate932 host source, same blob as e189 search binding",
+      "detail": "Explicit refresh_runtime requires an existing owned official task machine and terminal/idle eligibility. A legitimate next start may also upgrade a retained queued task or an unclaimed question when source W differs from configured W. The code preserves original VM/task/session ownership, requires idle/no competing active runs, stages fixed configured R/W, switches under owner policy/claim locks and lease checks, revokes superseded device tokens, then starts/registers and verifies the replacement process. This is a real automatic-on-eligible-start exception to 'never refresh', but it is not npm auto-update.",
+      "references": [
+        {
+          "path": "lib/cloud-computer/thread-machines.ts",
+          "lines": "592-640,667-681,710-717,766-782,897-987,1122-1129,1165-1168"
+        },
+        {
+          "path": "lib/computer/official-runtime.ts",
+          "lines": "58-93"
+        },
+        {
+          "path": "packages/daemon/scripts/refresh-cloud-worker.py",
+          "lines": "86-143"
+        }
+      ]
+    },
+    {
+      "id": "live-process-proof",
+      "status": "existing implementation, not executed by this review",
+      "detail": "The refresh verifier binds trusted worker marker W and the release symlink R, checks live PID/cwd/cloud-worker argv/user, and after a switch rejects a process predating it. The host also verifies daemon.status belongs to that PID/device/workspace and requires fresh registration before finishing. Marker or declared catalogue alone is weaker than this existing process evidence.",
+      "references": [
+        {
+          "path": "packages/daemon/scripts/refresh-cloud-worker.py",
+          "lines": "94-107"
+        },
+        {
+          "path": "lib/computer/official-runtime.ts",
+          "lines": "78-93"
+        },
+        {
+          "path": "lib/cloud-computer/thread-machines.ts",
+          "lines": "1100-1129"
+        }
+      ]
+    }
+  ],
+  "runtimeCases": [
+    {
+      "case": "Fresh configured additive image remains Rfacb/Wa453",
+      "outcome": "uses old R-built/preloaded worker; newer npm publication alone has no effect"
+    },
+    {
+      "case": "Fresh bare official claude/codex/desktop template",
+      "outcome": "bootstrap fetches/builds the configured fixed R/W, not latest npm"
+    },
+    {
+      "case": "Existing installation with matching W",
+      "outcome": "idempotent bootstrap exits; no source upgrade implied"
+    },
+    {
+      "case": "Existing ordinary start with W mismatch and no eligible refresh",
+      "outcome": "fails the worker version guard rather than silently replacing source"
+    },
+    {
+      "case": "Eligible retained idle task or unclaimed question, configured target W changed",
+      "outcome": "normal lifecycle may stage/switch to the configured fixed release under existing guards; only actual success receipts prove it happened"
+    },
+    {
+      "case": "Explicit refresh_runtime on owned eligible idle task",
+      "outcome": "same guarded staging/switch/registration/process verification"
+    },
+    {
+      "case": "Already claimed or live question/native child",
+      "outcome": "preservation paths do not establish automatic migration to a new worker; no force-upgrade inference"
+    }
+  ],
+  "minimumActualEvidencePath": {
+    "purpose": "Establish which worker supplied the real acceptance run; reuse existing release/runtime/task evidence, not a new AppSHA == R gate or an additional model run.",
+    "configuration": [
+      "existing accepted release R and W",
+      "selected per-kind template IDs and catalogue consistency across the existing six configuration keys"
+    ],
+    "taskBinding": [
+      "the actual case's selected template provenance / retained-machine branch",
+      "the actual worker W used by the normal bootstrap/registration path"
+    ],
+    "processBinding": [
+      "where the runtime was refreshed, the existing verified_process receipt and matching daemon.status/registration result",
+      "R, W and process identity must describe the same actual worker; omit device/workspace/token values from a public summary"
+    ],
+    "coverageDecision": "Use the separate 27-daemon-path source review to decide whether that actual worker contains the tracing/generation fixes needed by this case. This review does not independently audit or reclassify that diff.",
+    "ifEvidenceMissing": "Keep actual worker identity unknown. Do not fill it with Native installedRevision, npm release metadata, template name alone, or the host app SHA.",
+    "noNewRequirement": "No arbitrary application/runtime SHA equality, template rebuild requirement, extra CLI/model run, new threshold or new account gate is introduced."
+  },
+  "sourceBoundary": {
+    "threadMachinesRuntimeOldBlob": "2d7e635e8a7dc305ecf2cae4095969df52a7735f",
+    "threadMachinesHostCandidateAndMainBlob": "9d2cb49a991f7ab0bf89718aabc08fe78b78b66e",
+    "note": "Rfacb's host thread-machines source differs from e189/932; the current server-side selection/refresh conclusion is bound to the latter. The old cloud worker's no-npm-update conclusion is independently bound to Rfacb's worker/CLI/updater. No assertion that all three complete source trees are identical."
+  },
+  "sources": [
+    {
+      "path": "scripts/e2b/build-template.py",
+      "blob": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+      "bytes": 55730,
+      "sha256": "0adb53fbdd6cbcd61f1d1804aee3e2df1538997c0724556062f2741c5ac1cdb1",
+      "binding": {
+        "R": "peer immutable full-tree comparison reports same blob",
+        "candidate": "peer immutable full-tree comparison reports same blob",
+        "main": "direct fixed-ref source read and bytes hashed"
+      },
+      "readScope": "build, fingerprint and acceptance sections; not every unrelated conservation implementation"
+    },
+    {
+      "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+      "blob": "27c2146b45054c3eb5510afc94ea7ee9696dcb87",
+      "bytes": 11661,
+      "sha256": "6740900ce8fe7367a8e2f980b13556b2ddb3a7d9fbadb49d5eff1482fcbf25f0",
+      "binding": {
+        "R": "peer immutable full-tree comparison reports same blob",
+        "candidate": "peer immutable full-tree comparison reports same blob",
+        "main": "direct fixed-ref source read and bytes hashed"
+      },
+      "readScope": "source read"
+    },
+    {
+      "path": "packages/daemon/scripts/refresh-cloud-worker.py",
+      "blob": "866629a0a0e7e7d5e7fc6788a06135e362d6c4aa",
+      "bytes": 10673,
+      "sha256": "8c51f2efdba116d4f61b54562476c1e7bd098dd282068a48edbd00fdcbf47d6f",
+      "binding": {
+        "R": "peer immutable full-tree comparison reports same blob",
+        "candidate": "peer immutable full-tree comparison reports same blob",
+        "main": "direct fixed-ref source read and bytes hashed"
+      },
+      "readScope": "source read"
+    },
+    {
+      "path": "lib/computer/cloud-worker.ts",
+      "blob": "58923f61f334ef219e1cedbec20263d1de1a3322",
+      "bytes": 5615,
+      "sha256": "a190893dfaac0300940d65c6b0dc137af44d1a77bf3a4b2235c534dbccbb65db",
+      "binding": {
+        "R": "peer immutable full-tree comparison reports same blob",
+        "candidate": "peer immutable full-tree comparison reports same blob",
+        "main": "direct fixed-ref source read and bytes hashed"
+      },
+      "readScope": "source read"
+    },
+    {
+      "path": "packages/daemon/scripts/build.mjs",
+      "blob": "13f7a24627b0d3e360488707d32b42dfcdbd5d4f",
+      "bytes": 4100,
+      "sha256": "def4856fd0f1825cb155d2f0e14ed4e734f62427678817f58071eeed61c7e05d",
+      "binding": {
+        "R": "peer immutable full-tree comparison reports same blob",
+        "candidate": "peer immutable full-tree comparison reports same blob",
+        "main": "direct fixed-ref source read and bytes hashed"
+      },
+      "readScope": "source read"
+    },
+    {
+      "path": "scripts/e2b/start-prebuilt.sh",
+      "blob": "f3896e388043441ec99baf57b179b7cc44597017",
+      "bytes": 929,
+      "sha256": "36e6dd8a960ba870cb9c6ec57f8e00c35cf212cc430580631be42ef8124e5165",
+      "binding": {
+        "R": "peer immutable full-tree comparison reports same blob",
+        "candidate": "peer immutable full-tree comparison reports same blob",
+        "main": "not directly bound in this review"
+      },
+      "readScope": "source read"
+    },
+    {
+      "path": "packages/daemon/scripts/build-cloud-worker.mjs",
+      "blob": "ce864dcd4c83ccce8c1435463f407623e1091694",
+      "bytes": 3086,
+      "sha256": "6b8fe0248d563979955a7061316b3cc9b7610ade531d213859800deeae355012",
+      "binding": {
+        "R": "peer immutable full-tree comparison reports same blob",
+        "candidate": "peer immutable full-tree comparison reports same blob",
+        "main": "not directly bound in this review"
+      },
+      "readScope": "source read"
+    },
+    {
+      "path": "lib/computer/worker-command.ts",
+      "blob": "369c7f762df70aae736bfade41484ce979e8192d",
+      "bytes": 1490,
+      "sha256": "b7cb59619fcfabdd4d74efb3c28ac9da0e240dec3695804a7f8b264df77ad1df",
+      "binding": {
+        "R": "peer immutable full-tree comparison reports same blob",
+        "candidate": "peer immutable full-tree comparison reports same blob",
+        "main": "direct fixed-ref source read and bytes hashed"
+      },
+      "readScope": "source read"
+    },
+    {
+      "path": "lib/computer/official-runtime.ts",
+      "blob": "2348bd2784daef599e6dc47f374919e50eacc839",
+      "bytes": 8112,
+      "sha256": "0a19094131c47bbb6033a927eb230182658b33c7a935fd834ebb905c69adb279",
+      "binding": {
+        "R": "peer immutable full-tree comparison reports same blob",
+        "candidate": "peer immutable full-tree comparison reports same blob",
+        "main": "exact e189 code-search metadata binds same immutable blob; immutable bytes read"
+      },
+      "readScope": "source read"
+    },
+    {
+      "path": "lib/computer/auto-runtime.ts",
+      "blob": "e42b1f98ca05f7e499a181bc1fae2aecdb4a5dde",
+      "bytes": 5630,
+      "sha256": "a3d60c7f5cd73e5f2f2fb340dd186d59ec6f192884fe6a4bc44c1fe4ed64a933",
+      "binding": {
+        "R": "peer immutable full-tree comparison reports same blob",
+        "candidate": "peer immutable full-tree comparison reports same blob",
+        "main": "not directly bound in this review"
+      },
+      "readScope": "source read"
+    },
+    {
+      "path": "lib/computer/dispatch-runtime.ts",
+      "blob": "6e667cdc03ca38e40a96f2e8194045a00f771224",
+      "bytes": 2504,
+      "sha256": "a77c2e4ce9fea7af51609253153536b706aea253ffe4b19245e1e9cf50f33c39",
+      "binding": {
+        "R": "peer immutable full-tree comparison reports same blob",
+        "candidate": "peer immutable full-tree comparison reports same blob",
+        "main": "not directly bound in this review"
+      },
+      "readScope": "source read"
+    },
+    {
+      "path": "lib/computer/task-runtime.ts",
+      "blob": "c73c1dd8dc4bcbe5cd5940f289068422d7b4226a",
+      "bytes": 3351,
+      "sha256": "62a47a606fe5eee2a6bc0f4124667878c40a0f6fd6dca3652c886c370292625c",
+      "binding": {
+        "R": "peer immutable full-tree comparison reports same blob",
+        "candidate": "peer immutable full-tree comparison reports same blob",
+        "main": "not directly bound in this review"
+      },
+      "readScope": "source read"
+    },
+    {
+      "path": "lib/computer/e2b-provider.ts",
+      "blob": "dc921ab82535451ad6624e8d1756aeace081ac2e",
+      "bytes": 12878,
+      "sha256": "f1b45d9db589d0116e42c2199f0fdec8688fee0f2454bd126e29d9367d05dbcd",
+      "binding": {
+        "R": "peer immutable full-tree comparison reports same blob",
+        "candidate": "peer immutable full-tree comparison reports same blob",
+        "main": "not directly bound in this review"
+      },
+      "readScope": "source read"
+    },
+    {
+      "path": "lib/cloud-computer/runtime.ts",
+      "blob": "9bfde92bf6c20789d4f79f4085a0d3d7e8b5f4b6",
+      "bytes": 4974,
+      "sha256": "21e3d147e11a9538ba5b9fd85a8a8db68c6de24e7d0bb155df583d61640f2618",
+      "binding": {
+        "R": "peer immutable full-tree comparison reports same blob",
+        "candidate": "peer immutable full-tree comparison reports same blob",
+        "main": "not directly bound in this review"
+      },
+      "readScope": "source read"
+    },
+    {
+      "path": "lib/computer/wake-worker.ts",
+      "blob": "4ae7185105abe09f63ed99628ddad30d88e83572",
+      "bytes": 1222,
+      "sha256": "d59e13a30bcf5c59fef2e6b7b8641f1a3cb4d79b800e978009277239f63abf13",
+      "binding": {
+        "R": "peer immutable full-tree comparison reports same blob",
+        "candidate": "peer immutable full-tree comparison reports same blob",
+        "main": "direct fixed-ref source read and bytes hashed"
+      },
+      "readScope": "source read"
+    },
+    {
+      "path": "lib/secrets/e2b-runtime.ts",
+      "blob": "0a069258d3a9a260c9a1a7ca337f923618bb3432",
+      "bytes": 4530,
+      "sha256": "aa4ce006f85c843da44dcffab6ce590ef75d81fe84751427797eb0c8e03083c1",
+      "binding": {
+        "R": "peer immutable full-tree comparison reports same blob",
+        "candidate": "peer immutable full-tree comparison reports same blob",
+        "main": "exact e189 code-search metadata binds same immutable blob; immutable bytes read"
+      },
+      "readScope": "source read"
+    },
+    {
+      "path": "lib/computer/bot-runtime.ts",
+      "blob": "cfb37e9e33240617fcad837b2e14da8e234bacea",
+      "bytes": 5514,
+      "sha256": "e8ed0e2faed1a8283be4d4e13d142060c0e7b4f5fbca4b62705060002c5917a0",
+      "binding": {
+        "R": "peer immutable full-tree comparison reports same blob",
+        "candidate": "peer immutable full-tree comparison reports same blob",
+        "main": "not directly bound in this review"
+      },
+      "readScope": "source read"
+    },
+    {
+      "path": "lib/cloud-template-models.ts",
+      "blob": "dfcb21bc7c09f895c1848719b0904c33d5a2df8b",
+      "bytes": 4411,
+      "sha256": "02a3b30e6191df6d66efb30fc0f83c9eea7757804a53d5ebf80713e1177c7f48",
+      "binding": {
+        "R": "peer immutable full-tree comparison reports same blob",
+        "candidate": "direct fixed-ref source read and bytes hashed",
+        "main": "direct fixed-ref source read and bytes hashed"
+      },
+      "readScope": "source read"
+    },
+    {
+      "path": "lib/cloud-computer/thread-machines.ts",
+      "blob": "9d2cb49a991f7ab0bf89718aabc08fe78b78b66e",
+      "bytes": 105207,
+      "sha256": "7ea633fcbb55fae1e4006b57552074bef791d02bee4148691b695cf4c671c79b",
+      "binding": {
+        "R": "peer full-tree proof gives different host source blob 2d7e635e8a7dc305ecf2cae4095969df52a7735f (not read here)",
+        "candidate": "direct fixed-ref source read and bytes hashed",
+        "main": "exact e189 code-search metadata binds same immutable blob; candidate bytes read"
+      },
+      "readScope": "provider, admission, retained/refresh lifecycle and verification sections; not all unrelated thread lifecycle branches"
+    },
+    {
+      "path": "packages/daemon/bin/cloud-worker.ts",
+      "blob": "1333ebefe933b780b9951717169819976b0d552f",
+      "bytes": 4275,
+      "sha256": "6615659de54e51cb9f18066b21c10fb3bec6b1e210c1ca173cdc3f247ded6f75",
+      "binding": {
+        "R": "direct fixed-ref source read and bytes hashed",
+        "main": "direct fixed-ref source read; same bytes",
+        "candidate": "not independently compared in this sub-review; cloud flags are proved in immutable R"
+      },
+      "readScope": "source read"
+    },
+    {
+      "path": "packages/daemon/src/cli.ts",
+      "blob": "0be92f49ab119d6bc10ccfe25286acb1efffe6fd",
+      "bytes": 10817,
+      "sha256": "36993fe5d42d55e30fb0c0333b99f041e44cf8b87eaaf15f6f480a864a386393",
+      "binding": {
+        "R": "direct fixed-ref source read and bytes hashed",
+        "main": "direct fixed-ref source read; same bytes",
+        "candidate": "not independently compared in this sub-review; cloud flags are proved in immutable R"
+      },
+      "readScope": "source read"
+    },
+    {
+      "path": "packages/daemon/src/auto-update.ts",
+      "blob": "8c476363d1933178d69619358ff2bef57f570fc1",
+      "bytes": 4500,
+      "sha256": "983da60094bc9b2e0ff4a0d60350545e604b6a27c6cace5fee8a7ef1e73e54ed",
+      "binding": {
+        "R": "direct fixed-ref source read and bytes hashed",
+        "main": "direct fixed-ref source read; same bytes",
+        "candidate": "not independently compared in this sub-review; cloud flags are proved in immutable R"
+      },
+      "readScope": "source read"
+    },
+    {
+      "path": "packages/daemon/src/main.ts",
+      "blob": "abe9cf6dc0dd634fb76458b0a192f76258d32b43",
+      "bytes": 95949,
+      "sha256": "05042381de1fa1aa881d577b98676c4136ecbfc88226e646a739cfb0c8538cef",
+      "binding": {
+        "R": "direct fixed-ref source read and bytes hashed",
+        "main": "not directly bound here",
+        "candidate": "not independently compared in this sub-review; cloud flags are proved in immutable R"
+      },
+      "readScope": "options plus learnRelease/offerUpdate/checkAutoUpdate/requestUpdate; not all daemon business logic"
+    },
+    {
+      "path": "packages/daemon/src/paths.ts",
+      "blob": "3d9a8043e63e63a43044e2517ef03ab359341b9b",
+      "bytes": 2445,
+      "sha256": "396ce97b11576bbe13a6a976be8883662b0e5d87e5cfcea9e6f64566295b6f16",
+      "binding": {
+        "R": "direct fixed-ref source read and bytes hashed",
+        "main": "not directly bound here",
+        "candidate": "not independently compared in this sub-review; cloud flags are proved in immutable R"
+      },
+      "readScope": "source read"
+    }
+  ],
+  "actions": {
+    "readOnlyGithubSourceRequests": true,
+    "productionQueries": 0,
+    "jobLogsRead": 0,
+    "artifactsDownloaded": 0,
+    "testsRun": 0,
+    "modelsRun": 0,
+    "browsersStarted": 0,
+    "virtualMachinesCreated": 0,
+    "sourceFilesModified": 0,
+    "refsUpdated": 0,
+    "workflowDispatches": 0
+  },
+  "privacy": {
+    "rawUserContentIncluded": false,
+    "credentialsIncluded": false,
+    "environmentValuesRead": false,
+    "readOnlyCodeContainsCredentialHandlingButNoRuntimeSecretsRead": true
+  }
+}

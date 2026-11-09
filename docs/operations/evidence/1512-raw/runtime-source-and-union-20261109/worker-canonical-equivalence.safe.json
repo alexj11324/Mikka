@@ -1,0 +1,743 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512.worker_fingerprint_source_equivalence",
+  "repository": "alexj11324/Mikka",
+  "observedAt": "2026-11-09 16:21:03 UTC",
+  "scope": "Independent fixed-source review and pure in-memory input comparison; no executable build/test, model, provider, VM, production call or ref mutation.",
+  "heads": {
+    "ours": "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+    "upstream": {
+      "observedAt": "2026-11-09 16:16:57 UTC",
+      "head": "8c423db291f8121980267cd48a24e428c992f618",
+      "base": "76537e4c2996f717cbd19589e1efae328028aa4a",
+      "state": "open",
+      "merged": false
+    },
+    "actualMainBaseline": {
+      "commit": "e189d7652fd2fce48b77a3697abf5bb177d8ebd1",
+      "tree": "74b7be77de23f66162ae9558c863bb2fc9b06a56",
+      "treeReconstructed": "74b7be77de23f66162ae9558c863bb2fc9b06a56"
+    },
+    "publishedFeature": {
+      "sha": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+      "tree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+      "parents": [
+        "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+        "8c423db291f8121980267cd48a24e428c992f618"
+      ]
+    },
+    "conditionalUpstreamMerge": {
+      "parents": [
+        "e189d7652fd2fce48b77a3697abf5bb177d8ebd1",
+        "8c423db291f8121980267cd48a24e428c992f618"
+      ],
+      "tree": "18b539c3541594cfa540d1e178985f00d03ab4fc",
+      "actualMainMerge": false
+    }
+  },
+  "inputEvidence": {
+    "union": {
+      "blob": "9184682713449def6bce722aabd3af905437efbc",
+      "bytes": 717482,
+      "sha256": "5cda1a5216bd4934c85659ad248e0f32fc6a70ed5dafc29a90de673fc617369b",
+      "tree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace"
+    },
+    "conditional": {
+      "blob": "9bd7dfa8f3813fee94e44fefbad391dd8ec95aed",
+      "bytes": 21065,
+      "sha256": "5429a807e580fdf0883f7bd2242ff762f2d715f9b73a25a3bbcb82b2f0dd546d",
+      "tree": "18b539c3541594cfa540d1e178985f00d03ab4fc"
+    }
+  },
+  "canonicalAlgorithm": {
+    "path": "scripts/e2b/build-template.py",
+    "blob": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+    "bytes": 55730,
+    "sha256": "0adb53fbdd6cbcd61f1d1804aee3e2df1538997c0724556062f2741c5ac1cdb1",
+    "byteEqualAt8cAnd932": true,
+    "workerPaths": [
+      "package.json",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      "packages/daemon",
+      "packages/protocol",
+      "packages/config",
+      "patches"
+    ],
+    "recipePaths": [
+      "scripts/e2b/official-files.py",
+      "scripts/e2b/e2b-finalization-files.json",
+      "scripts/e2b/e2b-certificate-relinks.json",
+      "scripts/e2b/start-prebuilt.sh",
+      "scripts/e2b/build-template.py",
+      "scripts/e2b/template-capabilities.json",
+      "scripts/e2b/acceptance-daemon.mts",
+      "scripts/e2b/acceptance-bootstrap.mts",
+      "scripts/e2b/start-desktop.sh",
+      "scripts/e2b/viewer-gateway.py",
+      "scripts/e2b/lease-driver.py"
+    ],
+    "rootPackageKeys": [
+      "packageManager",
+      "engines",
+      "pnpm"
+    ],
+    "packageProjection": "Root scripts and other nonselected root keys are omitted. Package manifests beneath selected packages use PACKAGE_KEYS. Invalid JSON is hashed raw.",
+    "lockProjection": "Only daemon/protocol/config transitive importers and reachable lock graph plus shared lock settings are selected.",
+    "leafRule": "All selected non-package/non-lock git ls-tree lines include mode, type, blob and path. Tests inside selected package directories remain inputs.",
+    "anchors": {
+      "paths": [
+        31,
+        41
+      ],
+      "packageKeys": [
+        96,
+        100
+      ],
+      "packageProjection": [
+        108,
+        119
+      ],
+      "lockProjection": [
+        201,
+        253
+      ],
+      "workerHash": [
+        255,
+        275
+      ]
+    }
+  },
+  "equality": {
+    "selectedLeaves": 480,
+    "selectedManifestSha256": "ede07be2e171115fd25cf01ed5553c9e4331470dd343eac4ac39601e264384ce",
+    "selectionIncludesPackageTests": true,
+    "conditionalAndUnionExact": true,
+    "differenceCount": 40,
+    "intersections": [],
+    "selectedManifestHashMeaning": "SHA256 of sorted [path,mode,type,blob] JSON rows plus LF, an independent input-set digest; it is not the canonical worker hash W.",
+    "unionComparedWith8c": {
+      "overlayCount": 48,
+      "canonicalPathIntersections": [
+        {
+          "path": "package.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d"
+        }
+      ],
+      "rootProjectionEqual": true
+    },
+    "conditionalComparedWith8c": {
+      "overlayCount": 8,
+      "canonicalPathIntersections": [
+        {
+          "path": "package.json",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d"
+        }
+      ],
+      "rootProjectionEqual": true
+    },
+    "rootPackageProjections": [
+      {
+        "key": "package8c",
+        "blob": "568cfeee161309202699acefd0a57a8edc52bf6e",
+        "projectionBytes": 59,
+        "projectionSha256": "c464a70eb912204856a2e4fdfc90eeb9ba0e1125d7349b4b217e98653d9f5093",
+        "canonical": "{\"engines\":{\"node\":\"24.x\"},\"packageManager\":\"pnpm@10.34.3\"}"
+      },
+      {
+        "key": "package932",
+        "blob": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d",
+        "projectionBytes": 59,
+        "projectionSha256": "c464a70eb912204856a2e4fdfc90eeb9ba0e1125d7349b4b217e98653d9f5093",
+        "canonical": "{\"engines\":{\"node\":\"24.x\"},\"packageManager\":\"pnpm@10.34.3\"}"
+      },
+      {
+        "key": "packagee189",
+        "blob": "f1b9d887b5f2cd469a83530d45ed5d8ea39c103b",
+        "projectionBytes": 59,
+        "projectionSha256": "c464a70eb912204856a2e4fdfc90eeb9ba0e1125d7349b4b217e98653d9f5093",
+        "canonical": "{\"engines\":{\"node\":\"24.x\"},\"packageManager\":\"pnpm@10.34.3\"}"
+      }
+    ],
+    "conclusion": "W(conditional e189+8c tree18b539)=W(published 932+8c tree9628)=W(8c). First pair has exactly the same 480 selected mode/type/blob/path inputs; bare8c differs only in excluded root package scripts after canonical projection.",
+    "numericWorkerHash": {
+      "value": "75b7462d53f9725cb92d40112c504b4f32d795c0",
+      "provenance": "Reported by the #1810 owner for fixed carrier84e; not independently executed or recomputed in this review.",
+      "limitation": "8c differs from84e only in the ADR outside selected inputs; numeric value remains owner evidence, while this review independently proves source-input equivalence."
+    }
+  },
+  "requiredFixes": [
+    {
+      "id": "claude_aborted_terminal",
+      "presentAt8c": true,
+      "paths": [
+        "packages/daemon/src/adapters/generation-metrics.ts"
+      ],
+      "anchors": [
+        43,
+        54,
+        71,
+        85
+      ],
+      "evidence": "Explicit aborted===true makes a full assistant frame terminal even without stop_reason; output placeholder removed; existing error completion/dedup emits available metrics without inventing missing output."
+    },
+    {
+      "id": "codex_completion_without_usage",
+      "presentAt8c": true,
+      "paths": [
+        "packages/daemon/src/codex-generation-telemetry.ts"
+      ],
+      "anchors": [
+        195,
+        207,
+        231,
+        257
+      ],
+      "evidence": "A readable completed attributes array with every usage key absent is distinguished from malformed or partial usage. Native end/timing is emitted for a valid unique request ancestry; absent usage does not consume a numeric fallback tuple."
+    },
+    {
+      "id": "host_mcp_traceparent",
+      "presentAt8c": true,
+      "paths": [
+        "packages/daemon/src/runs/supervisor.ts",
+        "packages/daemon/src/agents/run-apps.ts",
+        "packages/daemon/src/agents/run-context.ts",
+        "packages/daemon/src/agents/mikka-mcp-context.mjs",
+        "packages/daemon/src/agents/mikka-mcp.mjs",
+        "packages/daemon/src/agents/mikka-mcp-backend.mjs",
+        "packages/daemon/src/agents/mikka-mcp-backend.d.mts"
+      ],
+      "anchors": {
+        "supervisor": [
+          1561,
+          1570
+        ],
+        "runApps": [
+          17,
+          24
+        ],
+        "runContext": [
+          248,
+          253,
+          287
+        ],
+        "backend": [
+          334,
+          354
+        ]
+      },
+      "evidence": "One captured host run context flows through sanitizer to explicit stdio overwrite or private IPC config; fixed Decision endpoint takes a syntactically valid nonzero W3C traceparent only from host config. No tool argument or arbitrary environment fallback."
+    },
+    {
+      "id": "session_tool_duration",
+      "presentAt8c": true,
+      "paths": [
+        "packages/daemon/src/tool-duration.ts",
+        "packages/daemon/src/chunks.ts",
+        "packages/daemon/src/runs/supervisor.ts"
+      ],
+      "anchors": {
+        "toolDuration": [
+          1,
+          20
+        ],
+        "supervisor": [
+          1880,
+          1881,
+          1915
+        ]
+      },
+      "evidence": "Session-local tool-call start map uses monotonic performance clock before outbox batching; terminal output/error removes start and discards supplied duration; no start means unknown rather than invented elapsed."
+    },
+    {
+      "id": "parked_codex_startup_recorder_rebind",
+      "presentAt8c": true,
+      "paths": [
+        "packages/daemon/src/subscription-hosted-runner.ts",
+        "packages/daemon/src/tracing.ts"
+      ],
+      "anchors": {
+        "hostedRunner": [
+          370,
+          388
+        ],
+        "tracing": [
+          361,
+          367
+        ]
+      },
+      "evidence": "The parked prepareAgentStart continuation waits for control.finalOptions, then calls boundStart. The public final start captures daemonTracer.bindStartupTiming(startCodex) exactly once before resolving prepared.start(final). bindStartupTiming captures only the current opted-in startupScope and runs it only while !scope.closed; missing or closed scope explicitly executes under startupScope.exit. A prior or absent recorder is not revived.",
+      "exactSymbol": "daemonTracer.bindStartupTiming",
+      "distinction": "This is the existing startup timing recorder's ALS binding, not generation traceContext adoption."
+    }
+  ],
+  "independentlyReadByteEqualSources": [
+    {
+      "path": "packages/daemon/src/adapters/generation-metrics.ts",
+      "expected932Blob": "4827af84d7b53cff43cea29e73b19a5a780e8572",
+      "ref": "8c423db291f8121980267cd48a24e428c992f618",
+      "blob": "4827af84d7b53cff43cea29e73b19a5a780e8572",
+      "bytes": 6748,
+      "sha256": "1a7f01e9a31b9d5fa68fe66da3bcb72b3d33519a6bcbb49f35f976fcf996ba65",
+      "equal932": true
+    },
+    {
+      "path": "packages/daemon/src/codex-generation-telemetry.ts",
+      "expected932Blob": "ddf484c21b5ac4bdbe75d5ad8f404ad814710e10",
+      "ref": "8c423db291f8121980267cd48a24e428c992f618",
+      "blob": "ddf484c21b5ac4bdbe75d5ad8f404ad814710e10",
+      "bytes": 19801,
+      "sha256": "d776409b58cc8dc2778e5149d52eb6196a7d8d3dfaa75cf06ebb63ba68c9ebbd",
+      "equal932": true
+    },
+    {
+      "path": "packages/daemon/src/runs/supervisor.ts",
+      "expected932Blob": "3367adf7b454b4b044d09858fa2e55ef24ae1195",
+      "ref": "8c423db291f8121980267cd48a24e428c992f618",
+      "blob": "3367adf7b454b4b044d09858fa2e55ef24ae1195",
+      "bytes": 103183,
+      "sha256": "b910e61f7ed8ef1602fe8cac4c4f09da2f6192f969f6239e557e80a10d90747e",
+      "equal932": true
+    },
+    {
+      "path": "packages/daemon/src/agents/run-apps.ts",
+      "expected932Blob": "d8e80f54dd7e24999ea3038f6d645023e5135d7b",
+      "ref": "8c423db291f8121980267cd48a24e428c992f618",
+      "blob": "d8e80f54dd7e24999ea3038f6d645023e5135d7b",
+      "bytes": 2419,
+      "sha256": "d2d45f84b533e1f5e9ca2ca923909db5151fff6197577532e316feaf4a82b5cb",
+      "equal932": true
+    },
+    {
+      "path": "packages/daemon/src/agents/run-context.ts",
+      "expected932Blob": "61fec2db18195fd8d77a4686b7ab8c4aeedcbe6f",
+      "ref": "8c423db291f8121980267cd48a24e428c992f618",
+      "blob": "61fec2db18195fd8d77a4686b7ab8c4aeedcbe6f",
+      "bytes": 30602,
+      "sha256": "3948a2e3dcdef7b5bf8614de738665bf8a639c6a2ba1d36719988cf0802e19b3",
+      "equal932": true
+    },
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp-context.mjs",
+      "expected932Blob": "7c7bba63cf0780d63f0d1b30f6a5a234d3db7d04",
+      "ref": "8c423db291f8121980267cd48a24e428c992f618",
+      "blob": "7c7bba63cf0780d63f0d1b30f6a5a234d3db7d04",
+      "bytes": 2781,
+      "sha256": "bed5e23a0a3e72d73864594aa126a8240c8a1baba4a186c29a7df74e4ea243ce",
+      "equal932": true
+    },
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp.mjs",
+      "expected932Blob": "e314a1c43ac0749a5a773bcef2be02a976fc166f",
+      "ref": "8c423db291f8121980267cd48a24e428c992f618",
+      "blob": "e314a1c43ac0749a5a773bcef2be02a976fc166f",
+      "bytes": 2621,
+      "sha256": "1b73d39ba0a9705b2ac2e85d730dbc7f838b6a4c968c77bfcd1f194847445a21",
+      "equal932": true
+    },
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp-backend.mjs",
+      "expected932Blob": "308c9ed7ab78b636876fd661b55d36dd61b478d2",
+      "ref": "8c423db291f8121980267cd48a24e428c992f618",
+      "blob": "308c9ed7ab78b636876fd661b55d36dd61b478d2",
+      "bytes": 50533,
+      "sha256": "96a0c7551fffd1d6bdd0386f9aa2ea8d37613dd969a244d2caf562a0594b13a9",
+      "equal932": true
+    },
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp-backend.d.mts",
+      "expected932Blob": "02cf186cbe1fa97af6f673123e78ddfb920823fa",
+      "ref": "8c423db291f8121980267cd48a24e428c992f618",
+      "blob": "02cf186cbe1fa97af6f673123e78ddfb920823fa",
+      "bytes": 2313,
+      "sha256": "823a45716a7ef2afd86ac5b6e8fc6d3bc7ec61f932e2566e44481727a85a0fa9",
+      "equal932": true
+    },
+    {
+      "path": "packages/daemon/src/tool-duration.ts",
+      "expected932Blob": "c16c3c18dca3a2de441047e63d48853f06f9d7f3",
+      "ref": "8c423db291f8121980267cd48a24e428c992f618",
+      "blob": "c16c3c18dca3a2de441047e63d48853f06f9d7f3",
+      "bytes": 1022,
+      "sha256": "37e396b98f7883581ab45978ed4722bfc1c6766d3d4563cf019bcdd3aa727a1f",
+      "equal932": true
+    },
+    {
+      "path": "packages/daemon/src/chunks.ts",
+      "expected932Blob": "b0e5b7e58a10fb95cf986e80a1d04b99fcdee52f",
+      "ref": "8c423db291f8121980267cd48a24e428c992f618",
+      "blob": "b0e5b7e58a10fb95cf986e80a1d04b99fcdee52f",
+      "bytes": 3791,
+      "sha256": "3c24fac3a6fe2f36e14924edee0dd8a476bf401f7021fdd1836a5f5cc7f95d22",
+      "equal932": true
+    },
+    {
+      "path": "packages/daemon/src/tracing.ts",
+      "expected932Blob": "0eed0277c933b0d2457909851bab458a482c184d",
+      "ref": "8c423db291f8121980267cd48a24e428c992f618",
+      "blob": "0eed0277c933b0d2457909851bab458a482c184d",
+      "bytes": 27723,
+      "sha256": "80d1f31fecb82659a88c5d2a001d14b87235f58ce8a8fe9768e42b640fcdc5b3",
+      "equal932": true
+    },
+    {
+      "path": "packages/daemon/src/subscription-hosted-runner.ts",
+      "expected932Blob": "62a2d8edd244293b511a00da618849638a943ac0",
+      "ref": "8c423db291f8121980267cd48a24e428c992f618",
+      "blob": "62a2d8edd244293b511a00da618849638a943ac0",
+      "bytes": 26481,
+      "sha256": "f517f5711da1fb01c17ea3222bb233b624875572557cbb6000596ec370a6beed",
+      "equal932": true
+    },
+    {
+      "path": "packages/daemon/src/anonymous-codex-spare.ts",
+      "ref": "8c423db291f8121980267cd48a24e428c992f618",
+      "blob": "00f476c51799a68c4af5edc38d9a62c91aeea545",
+      "bytes": 11991,
+      "sha256": "b7fac1b0fadd1374377ba27b9fe62d60a70a746218fe029237acf870855d6035",
+      "equal932": true
+    }
+  ],
+  "upstreamWorkerDifference": {
+    "path": "packages/daemon/src/adapters/codex.ts",
+    "ours": "953af7b99b542aafd9cc724fde76d27f6a6bb2f7",
+    "upstream": "e85815a955eaff56d7ac389c9d9722c64607345d",
+    "chosenByUnion": "e85815a955eaff56d7ac389c9d9722c64607345d",
+    "change": "The upstream MCP failed-status/no-error mapping is preserved; no claim that original932 has every8c worker change."
+  },
+  "excludedOwnInputs": [
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "mode": "100644",
+      "blob": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/repos/route.ts",
+      "mode": "100644",
+      "blob": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/runs/route.ts",
+      "mode": "100644",
+      "blob": "5a4c4f8486239161b325b9774b3086afe666dfa9",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "apps/api/generated/routes.json",
+      "mode": "100644",
+      "blob": "6fbced33e672f3fa0d5e35bed40b63fa103809d5",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "mode": "100644",
+      "blob": "a0cc13783eb567c256c34e08eaf3f6e9aca157e2",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "mode": "100644",
+      "blob": "67503a9abe7131de3e9bf86629532e015085d4ee",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "mode": "100644",
+      "blob": "dae8798653457afad334c2d909b10b63e9b3956f",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "apps/mobile/components/MikkaMark.tsx",
+      "mode": "100644",
+      "blob": "ebc27114576f23ff25fb18b4e03b6155443a89c4",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "apps/mobile/components/SignIn.tsx",
+      "mode": "100644",
+      "blob": "c92163359be141f59b4154059f1fde9878fac7d6",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "apps/mobile/tests/mikka-mark.test.mts",
+      "mode": "100644",
+      "blob": "9959b52bb3535c5ff73d168eed44a6bae55dfcfc",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "components/swr-defaults.tsx",
+      "mode": "100644",
+      "blob": "9b7a4385896b9aacc69ea898be23636b5a8c62fb",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "docs/design/brand.md",
+      "mode": "100644",
+      "blob": "2bc46816656149b9e760806f00ba3faa35d87386",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "docs/design/components.md",
+      "mode": "100644",
+      "blob": "da7339503dc2fef5f9876157760b58b8f5bbbbbe",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "docs/operations/tracing.md",
+      "mode": "100644",
+      "blob": "7ec15f7515853877c5940b9e08106df50b0d5c55",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "hooks/use-live-lists.ts",
+      "mode": "100644",
+      "blob": "afd0cae59d1b871cbc5175a6de8f2b44f2d036ca",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "instrumentation-client.ts",
+      "mode": "100644",
+      "blob": "9109982d1c3245179b85a42d6969003aec2f5047",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "lib/analytics-policy.ts",
+      "mode": "100644",
+      "blob": "152b941ff7b05004a7c57a909f776c6268ede106",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "lib/coordinator/repository-resolution.test.ts",
+      "mode": "100644",
+      "blob": "a5157f09e8022bf9077053686d36aa02760a4e94",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "lib/coordinator/repository-resolution.ts",
+      "mode": "100644",
+      "blob": "6826efdd6895fa3f584e35ff2f1edb527cd080fa",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "mode": "100644",
+      "blob": "e32da5e4d7294af3363eb2de4623a52aeb7e4f47",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "lib/device-enrollment.db.test.ts",
+      "mode": "100644",
+      "blob": "071b2243d35cd6fdd97b7be0f17f21728578c537",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "lib/device-enrollment.ts",
+      "mode": "100644",
+      "blob": "8fe53cb39985150e5fc05daa6370121cb5426d53",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "lib/device-heartbeat.db.test.ts",
+      "mode": "100644",
+      "blob": "e8f4f35748707364e77c53fa594c166bafc3dae8",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "lib/device-management.ts",
+      "mode": "100644",
+      "blob": "c2243c5732d67b3ff5444196ce3b45e9aca67805",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "lib/device-unit-fence.db.test.ts",
+      "mode": "100644",
+      "blob": "bc65b3faf494d2fd7c797b68f34d04227df38b7a",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "lib/dispatch-timing.ts",
+      "mode": "100644",
+      "blob": "f82563e766f5c0477479b2d487e0f92e60a08b75",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "lib/personal-policy.test.ts",
+      "mode": "100644",
+      "blob": "fef80337b9b5244d2e8565236c6dd96f7d329acd",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "lib/personal-policy.ts",
+      "mode": "100644",
+      "blob": "dc710f0a16a5e28e5a34d5112a86fab349a2639a",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "lib/replay-readiness.ts",
+      "mode": "100644",
+      "blob": "d60598b09201228e23c5ac7a9df00938192f0e67",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "mode": "100644",
+      "blob": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "lib/tracing/logs.test.ts",
+      "mode": "100644",
+      "blob": "737fa373e4a8333a4a703bf6133f9a533d585460",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "lib/tracing/node.ts",
+      "mode": "100644",
+      "blob": "00775a5928228262a66b12b845ee0dc18f6c6047",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "mode": "100644",
+      "blob": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.test.mjs",
+      "mode": "100644",
+      "blob": "56412efdfe5bc638496b89de56281360b4cbe9b5",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "scripts/acceptance/run-observability.md",
+      "mode": "100644",
+      "blob": "4ca2cf35c1f499b338469556836ae0505649e82a",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "mode": "100644",
+      "blob": "104075571c73b97a985458f206dba310e4894490",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "mode": "100644",
+      "blob": "2e3c8c7aad0594df165caf8f798c72034b3d484f",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "mode": "100644",
+      "blob": "f36ecf2d08f1bc2754b21be0d47d149871bb67c5",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "mode": "100644",
+      "blob": "628395f91d97a64655afb80117788d70207200c0",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "scripts/release/mobile-screenshots.mjs",
+      "mode": "100644",
+      "blob": "dcfa0cf9943b7be16e95790af7229e38a75e4c90",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "scripts/release/mobile-screenshots.test.mjs",
+      "mode": "100644",
+      "blob": "6c7fc8c6955837e83ef8ab68a97efe29c6921429",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "mode": "100644",
+      "blob": "a4aec5fe968100f283a8d93b963934430a97fcda",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "tests/analytics-policy.test.mjs",
+      "mode": "100644",
+      "blob": "f162a894cbada7fada30c63a3a49f4b665574f0f",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "tests/cloud-dispatch-startup.test.ts",
+      "mode": "100644",
+      "blob": "609029dde521868c00ab7eb687394ad5cacd6183",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "tests/replay-readiness.test.mjs",
+      "mode": "100644",
+      "blob": "58e4706039dafe6901082676f37a3c92da613d43",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "workflows/coordinator/factory-steps.ts",
+      "mode": "100644",
+      "blob": "0e2ecce921c4b56795ad1096f2b1eae987299e95",
+      "selectedByCanonicalWorker": false
+    },
+    {
+      "path": "workflows/coordinator/steps.ts",
+      "mode": "100644",
+      "blob": "d500795e9a62631b6c7619c4ffd1df67f137ee54",
+      "selectedByCanonicalWorker": false
+    }
+  ],
+  "releaseSequence": [
+    "Use the fixed upstream carrier and its normal main merge only after the original owner's gates and actual source-window release. Conditional18b539 is a source construction, not proof that #1810 has merged.",
+    "Let the #1810 owner perform the one shared actual R7 and preserve the resulting worker/template/release receipts; do not duplicate a second R7 solely for the feature's recovery journal, docs, Native/analytics changes outside W.",
+    "The feature still needs its own latest-source CI/Native and actual main/deployment gates. After its ordinary main merge, the same verified R7 can cover its worker only if actual final selected inputs, W and published template bindings remain the reviewed values.",
+    "Run #1512's actual ACME trace/AI/Replay/Logs acceptance against the released App and observed runtime. App source SHA need not equal the runtime source SHA."
+  ],
+  "limits": [
+    "No new CI/job-log/artifact/provider evidence was read in this review.",
+    "Source availability is not a production execution receipt and does not prove R7 success.",
+    "If #1810 head, actual main inputs, merge conflict resolution, canonical algorithm, selected dependency graph or recipe bytes change, recompute this equivalence instead of reusing it blindly.",
+    "Package tests under selected directories do affect W; only the actual 47-path overlay outside WORKER/RECIPE and projected-out root scripts are excluded."
+  ],
+  "activity": {
+    "productEdits": 0,
+    "tests": 0,
+    "builds": 0,
+    "modelCalls": 0,
+    "productionCalls": 0,
+    "resourcesCreated": 0,
+    "refUpdates": 0
+  },
+  "supersedes": {
+    "draftBlob": "4af9a5b7c4deae8823837e8dd5962bf13c91745f",
+    "reason": "Corrects the fifth fix's specific source semantics: startup timing recorder rebinding across a parked Codex promise, not anonymous generation trace-context adoption. Equality and source hashes are unchanged."
+  },
+  "relatedUnchangedGuarantee": {
+    "id": "anonymous_codex_generation_context_adoption",
+    "paths": [
+      "packages/daemon/src/anonymous-codex-spare.ts",
+      "packages/daemon/src/adapters/codex.ts"
+    ],
+    "anchors": {
+      "spare": [
+        67,
+        113,
+        116,
+        166,
+        189
+      ],
+      "adapter": [
+        464,
+        522,
+        528
+      ]
+    },
+    "evidence": "Separately, the native generation callback uses mutable traceContext reassigned only after fresh adoption checks. This byte-identical safeguard is not counted as the fifth startup recorder fix."
+  }
+}

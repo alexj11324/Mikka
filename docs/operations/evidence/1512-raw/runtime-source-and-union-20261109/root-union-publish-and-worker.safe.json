@@ -1,0 +1,53 @@
+{
+  "checkedAt": {
+    "current_time": "2026-11-09 16:15:01 UTC"
+  },
+  "parents": [
+    "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+    "8c423db291f8121980267cd48a24e428c992f618"
+  ],
+  "base": "76537e4c2996f717cbd19589e1efae328028aa4a",
+  "originalLeafCount": 6795,
+  "unionLeafCount": 6805,
+  "appliedEntries": 42,
+  "oldTreeHash": "3c0cc8bb828788e5817fc62048e46fe978e88dd5",
+  "computedUnionTree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+  "exactPeerLeaves": true,
+  "allUnchangedLeavesPreserved": true,
+  "newProductBlobs": 0,
+  "sourcePublished": true,
+  "publishedAt": {
+    "current_time": "2026-11-09 16:16:22 UTC"
+  },
+  "commit": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+  "remoteLeafReadback": true,
+  "remoteLeafCount": 6805,
+  "mainChanged": false,
+  "testsSucceeded": false,
+  "productionCases": 0,
+  "workerInputs": {
+    "checkedAt": "2026-11-09 16:21:13 UTC",
+    "conditionalTree": "18b539c3541594cfa540d1e178985f00d03ab4fc",
+    "unionTree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+    "conditionalParents": [
+      "e189d7652fd2fce48b77a3697abf5bb177d8ebd1",
+      "8c423db291f8121980267cd48a24e428c992f618"
+    ],
+    "unionHead": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+    "canonicalAlgorithmBlob": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+    "selectedLeafCount": 480,
+    "selectedManifestSha256": "ede07be2e171115fd25cf01ed5553c9e4331470dd343eac4ac39601e264384ce",
+    "manifestSerialization": "JSON.stringify(sorted [path,mode,type,sha] rows) + LF; Array sort uses path.localeCompare, not byte-order sort.",
+    "exactInputEquality": true,
+    "productionReleaseProven": false,
+    "numericWorkerHashIndependentlyExecuted": false
+  },
+  "ci": {
+    "id": 42653081708,
+    "attempt": 1,
+    "status": "in_progress",
+    "conclusion": null,
+    "firstObservedWorkflows": 15
+  },
+  "upstreamMainMergeObserved": false
+}
