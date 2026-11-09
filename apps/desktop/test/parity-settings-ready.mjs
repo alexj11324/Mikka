@@ -110,7 +110,7 @@ export async function settingsReady(page, id, fixture, messages, observed = { li
       break
     case 'bot-permissions':
       // The rule's line shows once the connected apps are read; an account with none says so.
-      await visible(text('Settings.botPermissions.notice'))
+      await visible(text('Settings.botPermissions.rule'))
       await either(text('Settings.botPermissions.empty'), body.getByRole('listitem').first())
       break
     case 'models': {

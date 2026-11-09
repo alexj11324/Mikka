@@ -2251,15 +2251,35 @@
       "actions": "Actions for {site}"
     },
     "botPermissions": {
-      "loading": "Reading connected apps…",
-      "notice": "Every write asks you first for now; finer settings are coming.",
+      "loading": "Reading permissions…",
+      "rule": "The Decision API judges each call; only destructive ones, like deleting or overwriting, ask you first.",
+      "bot": "Bot",
+      "mode": "Approval",
+      "modes": {
+        "ask": "By the rules",
+        "read_only": "Read only"
+      },
       "empty": "No apps connected",
-      "read": "Read",
-      "write": "Writes",
       "level": {
+        "workspaceDefault": "Default (workspace setting)",
+        "default": "Default (Decision API)",
         "allow": "On its own",
         "ask": "Asks you first",
-        "never": "Never"
+        "deny": "Not allowed"
+      },
+      "run": {
+        "install_dependency": "Install dependencies",
+        "write_outside_repo": "Write outside the repository",
+        "git_push": "Push code",
+        "network": "Use the network",
+        "computer_use": "Use the computer"
+      },
+      "errors": {
+        "readFailed": "Couldn't read the permissions",
+        "saveFailed": "Couldn't save",
+        "writePolicyChanged": "The settings just changed; read again",
+        "agentPolicyUnavailable": "This setting can't be saved right now",
+        "workspaceAccessDenied": "Only admins can change workspace settings"
       }
     },
     "workspaceLoading": "Loading the workspace…",
@@ -5883,39 +5903,36 @@
     }
   },
   "HostedPermissions": {
-    "autonomy": "How much it does on its own",
     "apps": "Apps",
     "redLines": "Red lines",
-    "redLinesText": "These always ask – or never happen – whatever you pick above",
-    "redLinesEmpty": "Custom red lines are not available yet",
-    "cautious": "Careful",
-    "cautiousText": "Reads on its own, asks before it changes anything",
-    "balanced": "Balanced",
-    "balancedText": "Works on its own, asks before anything that needs care",
-    "handsoff": "Hands-off",
-    "handsoffText": "Does everything on its own – except the red lines",
-    "allowLong": "On its own",
-    "askLong": "Asks first",
-    "neverLong": "Never",
-    "allowText": "Does it without asking – you see it in the activity",
+    "redLinesText": "Writes set to Not allowed: never done, whatever the Decision API judges",
+    "redLinesEmpty": "No writes are set to Not allowed",
+    "allowText": "Does it without asking – recorded in the activity",
     "askText": "Waits for your OK in the Inbox",
     "neverText": "Won't do it, and tells you it can't",
     "mixed": "Mixed",
-    "locked": "A red line – it can't do this on its own",
+    "locked": "Can't be set to On its own",
     "reads": "Reads",
-    "changes": "Changes",
+    "changes": "Writes",
     "care": "Needs care",
     "nothingToDecide": "Connect an app first",
-    "noActions": "The Bot doesn't use this app for anything yet",
+    "noActions": "No write of this app has its own setting; the Decision API judges each call",
     "noApp": "Nothing open",
-    "noAppText": "Pick an app to see what the Bot may do in it.",
+    "noAppText": "Pick an app to see how the Bot's writes in it are handled.",
     "empty": "No apps connected",
-    "emptyText": "Connect an app and what the Bot may do in it shows up here.",
-    "means": "{allow} on its own · asks before {ask} · never {never}",
+    "emptyText": "Connect an app and the Bot's writes in it show up here.",
+    "means": "{allow} on its own · asks before {ask} · {never} not allowed; the Decision API judges the rest",
     "summaryAllow": "{count} on its own",
     "summaryAsk": "asks before {count}",
-    "summaryNever": "never {count}",
-    "all": "All {kind}"
+    "summaryNever": "{count} not allowed",
+    "all": "All {kind}",
+    "modeAskText": "Writes follow the settings above and the Decision API; agents follow their run permissions",
+    "modeReadOnlyText": "Reads and reports, changes nothing",
+    "unsetText": "Nothing set: an app write goes to the Decision API, an agent action follows the workspace",
+    "runTitle": "Agent run permissions",
+    "runNote": "Claude Code and Codex in the cloud don't stop to confirm each step; these actions follow what is set here",
+    "now": "Now: {value}",
+    "workspace": "Workspace: {value}"
   },
   "HostedBoard": {
     "due": "Due {date}",
