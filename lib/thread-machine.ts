@@ -46,6 +46,14 @@ export function cloudMachineState(state: string, resources?: { sandboxId?: strin
   return CLOUD_STATES.has(state as ThreadMachineState) ? state as ThreadMachineState : 'error'
 }
 
+/**
+ * The word for a machine's state: a computer or server whose daemon has never reported in is 「从未上线」, as
+ * 设备 says it (Devices.neverOnline), not 离线; every other state is its own (ThreadRunPlace.states.*).
+ */
+export function machineStateWord(machine: Pick<ThreadMachine, 'kind' | 'state' | 'lastSeenAt'>): ThreadMachineState | 'never' {
+  return machine.kind !== 'cloud' && machine.state === 'offline' && !machine.lastSeenAt ? 'never' : machine.state
+}
+
 /** The dot on the icon (R-24): green while it can work, red on error, grey otherwise. */
 export function machineDot(state: ThreadMachineState): 'running' | 'failed' | 'idle' {
   if (state === 'online' || state === 'running' || state === 'starting') return 'running'

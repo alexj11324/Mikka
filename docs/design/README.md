@@ -60,9 +60,11 @@ Notes:
   lasting decision in `decisions/` and update its rule in `rules.md`.
 - Feature specs record requirements and their stated implementation evidence.
   Acceptance of a design does not establish that it shipped. Dated audits and
-  research keep their original revision and findings. The official UI layer
-  and the public default slots can render differently; see
-  [UI slots](../ui-overlay.md) before describing implementation coverage.
+  research keep their original revision and findings.
+- There is one UI ([decision](decisions/2026-11-08-2133-one-ui.md)). Describe
+  and review what the official build renders. Some pages come from
+  `mikka-hosted-ui` through [slots](../ui-overlay.md); the defaults in this
+  repository only have to compile and are not a second design.
 
 ## Where things live and who keeps them
 

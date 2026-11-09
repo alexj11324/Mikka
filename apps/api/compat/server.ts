@@ -59,7 +59,11 @@ export class NextResponse<_Body = unknown> extends Response {
   }
   static override json<Body>(body: Body, init?: ResponseInit): NextResponse<Body> {
     const response = Response.json(body, init)
-    return new NextResponse<Body>(response.body, response)
+    // srvx materializes a response after headers are accessed by spreading its
+    // init. Response getters are not own properties, so copy the HTTP fields.
+    return new NextResponse<Body>(response.body, {
+      status: response.status, statusText: response.statusText, headers: response.headers,
+    })
   }
   static override redirect(url: string | URL, init: number | ResponseInit = 307): NextResponse {
     const options = typeof init === 'number' ? { status: init } : init

@@ -1,10 +1,21 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import test, { after } from 'node:test'
 import { gzipSync } from 'node:zlib'
 import type { Pool, PoolClient } from 'pg'
 import { createRetainedDeliverableObserver, type RetainedDeliverableRuntime } from './retained-deliverable'
 import { retainedDeliverableForRecovery, type RetainedDeliverableScope } from '../factory/deliverable-recovery'
 import type { FactoryTask } from '../factory/store'
+
+// The provider-orchestration fixture has no real node-postgres executor.
+// Keep inherited app configuration out; live commit semantics use real PG tests.
+const liveEnvironment = { DEVICE_GATEWAY_URL:process.env.DEVICE_GATEWAY_URL, DEVICE_GATEWAY_PUSH_SECRET:process.env.DEVICE_GATEWAY_PUSH_SECRET }
+process.env.DEVICE_GATEWAY_URL = 'https://unused-retained-fixture.invalid'
+delete process.env.DEVICE_GATEWAY_PUSH_SECRET
+after(() => {
+  for (const [key,value] of Object.entries(liveEnvironment)) {
+    if (value === undefined) delete process.env[key]; else process.env[key] = value
+  }
+})
 
 const id = (n: number) => `71660000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const instant = Date.parse('2026-11-04T04:00:00Z')
@@ -32,20 +43,23 @@ async function fixture() {
     patch: gzipSync(Buffer.from('diff --git a/DELIVERY.md b/DELIVERY.md\nnew file mode 100644\n+verified artifact\n')) }
   const machine = { runId: review.id, ownerId: task.userId, workspaceId: row.workspaceId, sandboxId: row.sandboxId,
     operationId: row.machineOperationId, snapshotId: row.machineSnapshotId, deviceId: producer.deviceId, repoId: producer.deviceRepoId,
-    state: 'paused', workerLeaseId: null as string | null, workerLeaseUntil: null as number | null }
+    state: 'paused', runningSince: null, workerLeaseId: null as string | null, workerLeaseUntil: null as number | null }
   const state = { now: instant, inTransaction: false, eligible: true, permission: 'allow', failLease: false,
+    failSession: null as 'start' | 'end' | null,
     admissionReads: 0, taskLocks: 0, destroyedConnections: 0, beforeSecondRead: undefined as (() => void) | undefined }
   const events: string[] = [], logs: string[] = [], queries: { sql: string; values: unknown[] }[] = []
+  const sessions: { startedAt: number; endedAt: number | null; source: string; reason: string | null }[] = []
   let rollbackMachine = { ...machine }
+  let rollbackSessions = structuredClone(sessions)
   const matches = (values: unknown[]) => [machine.runId, machine.ownerId, machine.workspaceId, machine.sandboxId, machine.operationId, machine.workerLeaseId]
     .every((value, index) => value === values[index])
   const result = (rows: object[] = []) => ({ rows, rowCount: rows.length })
   const query = async (input: string | { text: string; values?: unknown[] }, parameters?: unknown[]) => {
     const sql = typeof input === 'string' ? input : input.text, values = parameters ?? (typeof input === 'string' ? [] : input.values ?? [])
     queries.push({ sql, values })
-    if (sql === 'BEGIN') { assert.equal(state.inTransaction, false); state.inTransaction = true; rollbackMachine = { ...machine }; events.push('begin'); return result() }
+    if (sql === 'BEGIN') { assert.equal(state.inTransaction, false); state.inTransaction = true; rollbackMachine = { ...machine }; rollbackSessions = structuredClone(sessions); events.push('begin'); return result() }
     if (sql === 'COMMIT') { state.inTransaction = false; events.push('commit'); return result() }
-    if (sql === 'ROLLBACK') { Object.assign(machine, rollbackMachine); state.inTransaction = false; events.push('rollback'); return result() }
+    if (sql === 'ROLLBACK') { Object.assign(machine, rollbackMachine); sessions.splice(0,sessions.length,...rollbackSessions); state.inTransaction = false; events.push('rollback'); return result() }
     if (sql.startsWith('SET LOCAL') || sql.startsWith('SELECT set_config')) return result()
     if (sql.includes('pg_advisory_xact_lock')) { assert.equal(state.inTransaction, true); assert.deepEqual(values, [`computer-policy:${row.workspaceId}`]); events.push('policy_lock'); return result() }
     if (sql.startsWith('SELECT permission')) return result([{ permission: state.permission }])
@@ -61,6 +75,19 @@ async function fixture() {
     if (sql.startsWith('SELECT a.id,a.stage,a.status')) return result([{ ownerRevision: 16, completionRevision: 17, evidence: [],
       completionRecoveryEventId: id(15), completionEventId: id(16) }])
     if (sql.startsWith('SELECT "runId" FROM thread_machines')) { assert.equal(state.inTransaction, true); return result([{ runId: machine.runId }]) }
+    if (sql.startsWith('SELECT id FROM agent_runs WHERE')) { assert.equal(state.inTransaction,true); return result([{ id:machine.runId }]) }
+    if (sql.startsWith('WITH parent AS MATERIALIZED')) {
+      assert.equal(state.inTransaction, true, 'session observations share the bounded custody transaction')
+      const held = matches(values) && machine.state === 'paused' && machine.runningSince === null && (machine.workerLeaseUntil ?? 0) > state.now
+      if (!held) return result([{ held: false, changed: false }])
+      const open = sessions.find(session => session.endedAt === null)
+      const starting = sql.includes('INSERT INTO thread_machine_sessions')
+      if (state.failSession === 'start' && starting || state.failSession === 'end' && !starting && open) throw new Error('Synthetic session write failure')
+      if (starting && !open) {
+        sessions.push({ startedAt: state.now, endedAt: null, source: 'observed', reason: null }); events.push('session_started')
+      } else if (!starting && open) { open.endedAt = state.now; open.reason = 'paused'; events.push('session_ended') }
+      return result([{ held: true, changed: starting ? !open : Boolean(open) }])
+    }
     if (sql.startsWith('UPDATE thread_machines SET "workerLeaseId"=$6')) {
       assert.equal(state.inTransaction, true)
       if (state.failLease || (machine.workerLeaseUntil !== null && machine.workerLeaseUntil > state.now)) return result()
@@ -83,7 +110,7 @@ async function fixture() {
     assert.fail(`Unexpected observer fixture query: ${sql}`)
   }
   const tx = { query, release: (error?: Error) => {
-    if (error) { state.destroyedConnections++; Object.assign(machine, rollbackMachine); state.inTransaction = false }
+    if (error) { state.destroyedConnections++; Object.assign(machine, rollbackMachine); sessions.splice(0,sessions.length,...rollbackSessions); state.inTransaction = false }
     assert.equal(state.inTransaction, false)
   } } as unknown as PoolClient
   const pool = { query, connect: async () => tx } as unknown as Pool
@@ -124,7 +151,7 @@ async function fixture() {
   }
   const observe = () => createRetainedDeliverableObserver(pool, lockTask, runtime)(scope)
   const unchanged = () => assert.deepEqual({ producer, review, candidate, question }, originalRows)
-  return { observe, pool, tx, lockTask, scope, row, machine, task, state, events, logs, queries, calls, commands, hooks, output, value, sandbox, runtime, unchanged,
+  return { observe, pool, tx, lockTask, scope, row, machine, sessions, task, state, events, logs, queries, calls, commands, hooks, output, value, sandbox, runtime, unchanged,
     states: () => states }
 }
 
@@ -135,6 +162,10 @@ test('observes only the admitted retained VM, restores pause, and keeps its leas
   assert.equal(observed.leaseId, f.machine.workerLeaseId)
   assert.equal(f.machine.workerLeaseUntil, instant + 180_000)
   assert.equal(f.machine.state, 'paused')
+  assert.equal(f.machine.runningSince, null, 'maintenance never changes the custody state used by recovery')
+  assert.deepEqual(f.sessions, [{ startedAt: instant, endedAt: instant, source: 'observed', reason: 'paused' }])
+  assert.ok(f.events.indexOf('session_started') > f.events.indexOf('connect'))
+  assert.ok(f.events.indexOf('session_ended') > f.events.lastIndexOf('state'))
   assert.deepEqual(f.calls.map(call => call.phase), ['state', 'connect', 'pause', 'state'])
   assert.deepEqual(f.events.filter(event => ['state', 'connect', 'script', 'probe', 'pause'].includes(event)), ['state', 'connect', 'script', 'probe', 'pause', 'state'])
   assert.ok(f.state.taskLocks >= 4, 'each effect rechecks the authorized task and held lease')
@@ -218,6 +249,8 @@ test('provider errors and malformed probe output restore this VM and release onl
     assert.equal(f.calls.filter(call => call.phase === 'pause').length, 1, fault)
     assert.equal(f.machine.workerLeaseId, null, fault)
     assert.equal(f.machine.state, 'paused', fault)
+    assert.equal(f.sessions.length, 1, fault)
+    assert.equal(f.sessions[0].reason, 'paused', fault)
     assert.doesNotMatch(f.logs.join('\n'), /PRIVATE-CREDENTIAL/)
     assert.equal(JSON.parse(f.logs[0]).code, fault === 'safe_code' ? 'retained_delivery_git_filter' :
       fault === 'journal_state' || fault === 'journal_binding' ? `retained_delivery_${fault}_mismatch` : undefined)
@@ -251,6 +284,7 @@ test('a failed or genuinely late connect remains uncertain even after a paused r
     assert.equal(f.machine.workerLeaseUntil, instant + 180_000)
     assert.equal(f.calls.filter(call => call.phase === 'pause').length, 1)
     assert.equal(f.commands.length, 0)
+    assert.deepEqual(f.sessions, [], 'an uncertain connect is not evidence of a start')
     assert.doesNotMatch(f.logs.join('\n'), /PRIVATE-CREDENTIAL/)
     const before = { ...f.machine }, callCount = f.calls.length
     finishConnect?.()
@@ -294,6 +328,8 @@ test('unconfirmed pause retains the lease and records error; it never reports a 
     assert.equal(f.machine.state, 'error', fault)
     assert.ok(f.machine.workerLeaseId, fault)
     assert.equal(f.machine.workerLeaseUntil, instant + 180_000)
+    assert.equal(f.sessions.length, 1)
+    assert.equal(f.sessions[0].endedAt, null, 'pause request or ambiguous result cannot close a running interval')
     assert.doesNotMatch(f.logs.join('\n'), /PRIVATE-CREDENTIAL/)
     f.unchanged()
   }
@@ -307,6 +343,37 @@ test('an already-running provider VM is refused before connect and is not paused
   assert.equal(f.machine.state, 'error'); assert.equal(f.machine.workerLeaseId, null)
 })
 
+test('a failed session write restores the VM or retains uncertainty without inventing a closed interval', async () => {
+  for (const fault of ['start', 'end'] as const) {
+    const f = await fixture()
+    f.state.failSession = fault
+    await assert.rejects(f.observe(), refused)
+    assert.equal(f.calls.filter(call => call.phase === 'pause').length, 1)
+    if (fault === 'start') {
+      assert.deepEqual(f.sessions, [])
+      assert.equal(f.machine.state, 'paused')
+      assert.equal(f.machine.workerLeaseId, null)
+      assert.equal(f.commands.length, 0, 'failed start persistence stops the probe and restores the known VM')
+    } else {
+      assert.equal(f.sessions.length, 1)
+      assert.equal(f.sessions[0].endedAt, null)
+      assert.equal(f.machine.state, 'error')
+      assert.ok(f.machine.workerLeaseId, 'a failed end write stays available to reconciliation')
+    }
+  }
+})
+
+test('a proven pre-connect pause closes an older interval before a distinct maintenance resume', async () => {
+  const f = await fixture()
+  f.sessions.push({ startedAt: instant - 60_000, endedAt: null, source: 'running_since', reason: null })
+  const observed = await f.observe()
+  assert.deepEqual(f.sessions, [
+    { startedAt: instant - 60_000, endedAt: instant, source: 'running_since', reason: 'paused' },
+    { startedAt: instant, endedAt: instant, source: 'observed', reason: 'paused' },
+  ])
+  await observed.release()
+})
+
 test('post-pause custody loss cannot become a successful observation or clear a replacement lease', async () => {
   const f = await fixture(), originalState = f.runtime.state
   f.runtime.state = async (scope, budget) => {
@@ -316,6 +383,7 @@ test('post-pause custody loss cannot become a successful observation or clear a 
   }
   await assert.rejects(f.observe(), refused)
   assert.equal(f.machine.workerLeaseId, id(92)); assert.equal(f.machine.state, 'paused')
+  assert.equal(f.sessions[0].endedAt, null, 'a newer lease cannot be modified by the old pause observation')
 })
 
 test('the success release callback cannot clear a lease or operation assigned after observation', async () => {
