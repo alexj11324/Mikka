@@ -18,7 +18,7 @@ concurrency:
   queue: max
 jobs:
   prepare:
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1505-smoke-github-readonly-20261109' && github.run_attempt == 1
+    if: false # CLOSED_AFTER_ONE_BOUNDED_PREPARATION
     runs-on: ubuntu-latest
     concurrency:
       group: web-deploy-production
