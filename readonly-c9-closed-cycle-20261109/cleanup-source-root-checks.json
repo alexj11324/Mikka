@@ -1,0 +1,35 @@
+{
+  "downloadFunctionUnchanged": true,
+  "archiveFunctionOnlyExactSingleMember": true,
+  "helperHashes": {
+    "scripts/ops/issue1505/github-readonly-provider.mjs": "23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e",
+    "scripts/ops/issue1505/github-readonly-helper.mjs": "cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742",
+    "scripts/ops/issue1505/github-readonly-store.mjs": "1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5",
+    "scripts/ops/issue1505/github-readonly-runner.mjs": "a94187ed60da64a0ef958de1186b2f51dae8f48f154de1895873e5ac351367fb",
+    "scripts/ops/issue1505/github-readonly.test.mjs": "293616146941d59d2196d7343899e1e9e24136ccab03e2025b59dd900e048994"
+  },
+  "sourceBase": "465f1b89c52228b99c4f2424f92722901b910754",
+  "entry": "2026-11-09T13:49:00.000Z",
+  "hardEnd": "2026-11-09T13:59:00.000Z",
+  "jobMinutes": 10,
+  "sourceRun": 42622019169,
+  "artifact": 13677458654,
+  "receipt": {
+    "archiveBytes": 925,
+    "archiveSha256": "87124f31fd4cfc332411985814650992fcdad9f21ca6f5a0709f70abb5c41a81",
+    "receiptBytes": 2132,
+    "receiptSha256": "80031945234e34264c558f830bd64bfa651858e69dbfdfa6354b62deb2a2022d",
+    "verifiedBy": "queued_source_compat",
+    "observedAt": "2026-11-09T13:40:19Z",
+    "vm": "sbx_dgRWQ37UPkIb91MNZmIilG1Bcf39",
+    "memberNames": [
+      "receipt.json"
+    ],
+    "appClientIdLength": 20,
+    "appClientIdSha256": "1048af156b6835ad0956c4e41e34017d8392faa19f9ee57d0380264464fd78ca"
+  },
+  "workflowBytes": 26324,
+  "workflowSha256": "b73f74994833db10cac6e31e7ab109462e261398a77565d0389d32e4db6a5e9d",
+  "onlyGithubActionsPermissionAddedOverPrepare": true,
+  "prodSecretsUnchanged": 5
+}

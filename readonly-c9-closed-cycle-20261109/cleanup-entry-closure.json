@@ -1,0 +1,549 @@
+{
+  "commit": {
+    "sha": "e93477fe401c70dca532784e71b76d56877b6899",
+    "node_id": "C_kwDOVRYxA9oAKGU5MzQ3N2ZlNDAxYzcwZGNhNTMyNzg0ZTcxYjc2ZDU2ODc3YjY4OTk",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/e93477fe401c70dca532784e71b76d56877b6899",
+    "html_url": "https://github.com/alexj11324/Mikka/commit/e93477fe401c70dca532784e71b76d56877b6899",
+    "author": {
+      "name": "Zhixuan Jiang",
+      "email": "zhixuanj@andrew.cmu.edu",
+      "date": "2026-11-09T13:47:41Z"
+    },
+    "committer": {
+      "name": "Zhixuan Jiang",
+      "email": "zhixuanj@andrew.cmu.edu",
+      "date": "2026-11-09T13:47:41Z"
+    },
+    "tree": {
+      "sha": "1a9d726293fba2ffa99fa816f9fb0ef685d4e7e4",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/trees/1a9d726293fba2ffa99fa816f9fb0ef685d4e7e4"
+    },
+    "message": "ops(1505): close verified successful exact c9 child cleanup",
+    "parents": [
+      {
+        "sha": "e5a50fa1d227eca754eb41dc0fc39a14ffd5d377",
+        "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/e5a50fa1d227eca754eb41dc0fc39a14ffd5d377",
+        "html_url": "https://github.com/alexj11324/Mikka/commit/e5a50fa1d227eca754eb41dc0fc39a14ffd5d377"
+      }
+    ],
+    "verification": {
+      "verified": false,
+      "reason": "unsigned",
+      "signature": null,
+      "payload": null,
+      "verified_at": null
+    }
+  },
+  "compare": {
+    "url": "https://api.github.com/repos/alexj11324/Mikka/compare/e5a50fa1d227eca754eb41dc0fc39a14ffd5d377...e93477fe401c70dca532784e71b76d56877b6899",
+    "html_url": "https://github.com/alexj11324/Mikka/compare/e5a50fa1d227eca754eb41dc0fc39a14ffd5d377...e93477fe401c70dca532784e71b76d56877b6899",
+    "permalink_url": "https://github.com/alexj11324/Mikka/compare/alexj11324:e5a50fa...alexj11324:e93477f",
+    "diff_url": "https://github.com/alexj11324/Mikka/compare/e5a50fa1d227eca754eb41dc0fc39a14ffd5d377...e93477fe401c70dca532784e71b76d56877b6899.diff",
+    "patch_url": "https://github.com/alexj11324/Mikka/compare/e5a50fa1d227eca754eb41dc0fc39a14ffd5d377...e93477fe401c70dca532784e71b76d56877b6899.patch",
+    "base_commit": {
+      "sha": "e5a50fa1d227eca754eb41dc0fc39a14ffd5d377",
+      "node_id": "C_kwDOVRYxA9oAKGU1YTUwZmExZDIyN2VjYTc1NGViNDFkYzBmYzM5YTE0ZmZkNWQzNzc",
+      "commit": {
+        "author": {
+          "name": "Zhixuan Jiang",
+          "email": "zhixuanj@andrew.cmu.edu",
+          "date": "2026-11-09T13:40:44Z"
+        },
+        "committer": {
+          "name": "Zhixuan Jiang",
+          "email": "zhixuanj@andrew.cmu.edu",
+          "date": "2026-11-09T13:40:44Z"
+        },
+        "message": "ops(1505): bind cleanup to exact successful c9 readonly child",
+        "tree": {
+          "sha": "0535d53ff29820c36dda4385ebb5ebf9c0d3e152",
+          "url": "https://api.github.com/repos/alexj11324/Mikka/git/trees/0535d53ff29820c36dda4385ebb5ebf9c0d3e152"
+        },
+        "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/e5a50fa1d227eca754eb41dc0fc39a14ffd5d377",
+        "comment_count": 0,
+        "verification": {
+          "verified": false,
+          "reason": "unsigned",
+          "signature": null,
+          "payload": null,
+          "verified_at": null
+        }
+      },
+      "url": "https://api.github.com/repos/alexj11324/Mikka/commits/e5a50fa1d227eca754eb41dc0fc39a14ffd5d377",
+      "html_url": "https://github.com/alexj11324/Mikka/commit/e5a50fa1d227eca754eb41dc0fc39a14ffd5d377",
+      "comments_url": "https://api.github.com/repos/alexj11324/Mikka/commits/e5a50fa1d227eca754eb41dc0fc39a14ffd5d377/comments",
+      "author": {
+        "login": "alexj11324",
+        "id": 183887963,
+        "node_id": "U_kgDOCvXoWw",
+        "avatar_url": "https://avatars.githubusercontent.com/u/183887963?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/alexj11324",
+        "html_url": "https://github.com/alexj11324",
+        "followers_url": "https://api.github.com/users/alexj11324/followers",
+        "following_url": "https://api.github.com/users/alexj11324/following{/other_user}",
+        "gists_url": "https://api.github.com/users/alexj11324/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/alexj11324/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/alexj11324/subscriptions",
+        "organizations_url": "https://api.github.com/users/alexj11324/orgs",
+        "repos_url": "https://api.github.com/users/alexj11324/repos",
+        "events_url": "https://api.github.com/users/alexj11324/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/alexj11324/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "committer": {
+        "login": "alexj11324",
+        "id": 183887963,
+        "node_id": "U_kgDOCvXoWw",
+        "avatar_url": "https://avatars.githubusercontent.com/u/183887963?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/alexj11324",
+        "html_url": "https://github.com/alexj11324",
+        "followers_url": "https://api.github.com/users/alexj11324/followers",
+        "following_url": "https://api.github.com/users/alexj11324/following{/other_user}",
+        "gists_url": "https://api.github.com/users/alexj11324/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/alexj11324/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/alexj11324/subscriptions",
+        "organizations_url": "https://api.github.com/users/alexj11324/orgs",
+        "repos_url": "https://api.github.com/users/alexj11324/repos",
+        "events_url": "https://api.github.com/users/alexj11324/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/alexj11324/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "parents": [
+        {
+          "sha": "465f1b89c52228b99c4f2424f92722901b910754",
+          "url": "https://api.github.com/repos/alexj11324/Mikka/commits/465f1b89c52228b99c4f2424f92722901b910754",
+          "html_url": "https://github.com/alexj11324/Mikka/commit/465f1b89c52228b99c4f2424f92722901b910754"
+        }
+      ]
+    },
+    "merge_base_commit": {
+      "sha": "e5a50fa1d227eca754eb41dc0fc39a14ffd5d377",
+      "node_id": "C_kwDOVRYxA9oAKGU1YTUwZmExZDIyN2VjYTc1NGViNDFkYzBmYzM5YTE0ZmZkNWQzNzc",
+      "commit": {
+        "author": {
+          "name": "Zhixuan Jiang",
+          "email": "zhixuanj@andrew.cmu.edu",
+          "date": "2026-11-09T13:40:44Z"
+        },
+        "committer": {
+          "name": "Zhixuan Jiang",
+          "email": "zhixuanj@andrew.cmu.edu",
+          "date": "2026-11-09T13:40:44Z"
+        },
+        "message": "ops(1505): bind cleanup to exact successful c9 readonly child",
+        "tree": {
+          "sha": "0535d53ff29820c36dda4385ebb5ebf9c0d3e152",
+          "url": "https://api.github.com/repos/alexj11324/Mikka/git/trees/0535d53ff29820c36dda4385ebb5ebf9c0d3e152"
+        },
+        "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/e5a50fa1d227eca754eb41dc0fc39a14ffd5d377",
+        "comment_count": 0,
+        "verification": {
+          "verified": false,
+          "reason": "unsigned",
+          "signature": null,
+          "payload": null,
+          "verified_at": null
+        }
+      },
+      "url": "https://api.github.com/repos/alexj11324/Mikka/commits/e5a50fa1d227eca754eb41dc0fc39a14ffd5d377",
+      "html_url": "https://github.com/alexj11324/Mikka/commit/e5a50fa1d227eca754eb41dc0fc39a14ffd5d377",
+      "comments_url": "https://api.github.com/repos/alexj11324/Mikka/commits/e5a50fa1d227eca754eb41dc0fc39a14ffd5d377/comments",
+      "author": {
+        "login": "alexj11324",
+        "id": 183887963,
+        "node_id": "U_kgDOCvXoWw",
+        "avatar_url": "https://avatars.githubusercontent.com/u/183887963?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/alexj11324",
+        "html_url": "https://github.com/alexj11324",
+        "followers_url": "https://api.github.com/users/alexj11324/followers",
+        "following_url": "https://api.github.com/users/alexj11324/following{/other_user}",
+        "gists_url": "https://api.github.com/users/alexj11324/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/alexj11324/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/alexj11324/subscriptions",
+        "organizations_url": "https://api.github.com/users/alexj11324/orgs",
+        "repos_url": "https://api.github.com/users/alexj11324/repos",
+        "events_url": "https://api.github.com/users/alexj11324/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/alexj11324/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "committer": {
+        "login": "alexj11324",
+        "id": 183887963,
+        "node_id": "U_kgDOCvXoWw",
+        "avatar_url": "https://avatars.githubusercontent.com/u/183887963?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/alexj11324",
+        "html_url": "https://github.com/alexj11324",
+        "followers_url": "https://api.github.com/users/alexj11324/followers",
+        "following_url": "https://api.github.com/users/alexj11324/following{/other_user}",
+        "gists_url": "https://api.github.com/users/alexj11324/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/alexj11324/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/alexj11324/subscriptions",
+        "organizations_url": "https://api.github.com/users/alexj11324/orgs",
+        "repos_url": "https://api.github.com/users/alexj11324/repos",
+        "events_url": "https://api.github.com/users/alexj11324/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/alexj11324/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "parents": [
+        {
+          "sha": "465f1b89c52228b99c4f2424f92722901b910754",
+          "url": "https://api.github.com/repos/alexj11324/Mikka/commits/465f1b89c52228b99c4f2424f92722901b910754",
+          "html_url": "https://github.com/alexj11324/Mikka/commit/465f1b89c52228b99c4f2424f92722901b910754"
+        }
+      ]
+    },
+    "status": "ahead",
+    "ahead_by": 1,
+    "behind_by": 0,
+    "total_commits": 1,
+    "commits": [
+      {
+        "sha": "e93477fe401c70dca532784e71b76d56877b6899",
+        "node_id": "C_kwDOVRYxA9oAKGU5MzQ3N2ZlNDAxYzcwZGNhNTMyNzg0ZTcxYjc2ZDU2ODc3YjY4OTk",
+        "commit": {
+          "author": {
+            "name": "Zhixuan Jiang",
+            "email": "zhixuanj@andrew.cmu.edu",
+            "date": "2026-11-09T13:47:41Z"
+          },
+          "committer": {
+            "name": "Zhixuan Jiang",
+            "email": "zhixuanj@andrew.cmu.edu",
+            "date": "2026-11-09T13:47:41Z"
+          },
+          "message": "ops(1505): close verified successful exact c9 child cleanup",
+          "tree": {
+            "sha": "1a9d726293fba2ffa99fa816f9fb0ef685d4e7e4",
+            "url": "https://api.github.com/repos/alexj11324/Mikka/git/trees/1a9d726293fba2ffa99fa816f9fb0ef685d4e7e4"
+          },
+          "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/e93477fe401c70dca532784e71b76d56877b6899",
+          "comment_count": 0,
+          "verification": {
+            "verified": false,
+            "reason": "unsigned",
+            "signature": null,
+            "payload": null,
+            "verified_at": null
+          }
+        },
+        "url": "https://api.github.com/repos/alexj11324/Mikka/commits/e93477fe401c70dca532784e71b76d56877b6899",
+        "html_url": "https://github.com/alexj11324/Mikka/commit/e93477fe401c70dca532784e71b76d56877b6899",
+        "comments_url": "https://api.github.com/repos/alexj11324/Mikka/commits/e93477fe401c70dca532784e71b76d56877b6899/comments",
+        "author": {
+          "login": "alexj11324",
+          "id": 183887963,
+          "node_id": "U_kgDOCvXoWw",
+          "avatar_url": "https://avatars.githubusercontent.com/u/183887963?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/alexj11324",
+          "html_url": "https://github.com/alexj11324",
+          "followers_url": "https://api.github.com/users/alexj11324/followers",
+          "following_url": "https://api.github.com/users/alexj11324/following{/other_user}",
+          "gists_url": "https://api.github.com/users/alexj11324/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/alexj11324/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/alexj11324/subscriptions",
+          "organizations_url": "https://api.github.com/users/alexj11324/orgs",
+          "repos_url": "https://api.github.com/users/alexj11324/repos",
+          "events_url": "https://api.github.com/users/alexj11324/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/alexj11324/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        },
+        "committer": {
+          "login": "alexj11324",
+          "id": 183887963,
+          "node_id": "U_kgDOCvXoWw",
+          "avatar_url": "https://avatars.githubusercontent.com/u/183887963?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/alexj11324",
+          "html_url": "https://github.com/alexj11324",
+          "followers_url": "https://api.github.com/users/alexj11324/followers",
+          "following_url": "https://api.github.com/users/alexj11324/following{/other_user}",
+          "gists_url": "https://api.github.com/users/alexj11324/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/alexj11324/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/alexj11324/subscriptions",
+          "organizations_url": "https://api.github.com/users/alexj11324/orgs",
+          "repos_url": "https://api.github.com/users/alexj11324/repos",
+          "events_url": "https://api.github.com/users/alexj11324/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/alexj11324/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        },
+        "parents": [
+          {
+            "sha": "e5a50fa1d227eca754eb41dc0fc39a14ffd5d377",
+            "url": "https://api.github.com/repos/alexj11324/Mikka/commits/e5a50fa1d227eca754eb41dc0fc39a14ffd5d377",
+            "html_url": "https://github.com/alexj11324/Mikka/commit/e5a50fa1d227eca754eb41dc0fc39a14ffd5d377"
+          }
+        ]
+      }
+    ],
+    "files": [
+      {
+        "sha": "e41f6431c64b0463dc1dc44f5472d399a689e1a5",
+        "filename": ".github/workflows/issue1505-smoke-github-readonly.yml",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 2,
+        "changes": 4,
+        "blob_url": "https://github.com/alexj11324/Mikka/blob/e93477fe401c70dca532784e71b76d56877b6899/.github%2Fworkflows%2Fissue1505-smoke-github-readonly.yml",
+        "raw_url": "https://github.com/alexj11324/Mikka/raw/e93477fe401c70dca532784e71b76d56877b6899/.github%2Fworkflows%2Fissue1505-smoke-github-readonly.yml",
+        "contents_url": "https://api.github.com/repos/alexj11324/Mikka/contents/.github%2Fworkflows%2Fissue1505-smoke-github-readonly.yml?ref=e93477fe401c70dca532784e71b76d56877b6899",
+        "patch": "@@ -15,7 +15,7 @@ concurrency:\n   queue: max\n jobs:\n   cleanup:\n-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1505-smoke-github-readonly-20261109' && github.run_attempt == 1\n+    if: false\n     runs-on: ubuntu-latest\n     timeout-minutes: 10\n     concurrency:\n@@ -24,7 +24,7 @@ jobs:\n       queue: max\n     env:\n       MIKKA_EDITION: cloud\n-      MIKKA_GITHUB_REPAIR_GO: 'root-reviewed-1505-github-http-v6'\n+      MIKKA_GITHUB_REPAIR_GO: ''\n       MIKKA_1505_CLEANUP_WINDOW_START: '2026-11-09T13:33:00.000Z'\n       MIKKA_1505_CLEANUP_ENTRY_DEADLINE: '2026-11-09T13:49:00.000Z'\n       MIKKA_1505_CLEANUP_HARD_END: '2026-11-09T13:59:00.000Z'"
+      }
+    ]
+  },
+  "runs": {
+    "total_count": 1,
+    "workflow_runs": [
+      {
+        "id": 42628604278,
+        "name": "Issue 1505 exact read-only child cleanup",
+        "node_id": "WFR_kwLOVRYxA88AAAAJ7Nzhdg",
+        "head_branch": "ops/1505-smoke-github-readonly-20261109",
+        "head_sha": "e93477fe401c70dca532784e71b76d56877b6899",
+        "path": ".github/workflows/issue1505-smoke-github-readonly.yml",
+        "display_title": "ops(1505): close verified successful exact c9 child cleanup",
+        "run_number": 13,
+        "event": "push",
+        "status": "completed",
+        "conclusion": "skipped",
+        "workflow_id": 411645081,
+        "check_suite_id": 115456950235,
+        "check_suite_node_id": "CS_kwDOVRYxA88AAAAa4cU_2w",
+        "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42628604278",
+        "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42628604278",
+        "pull_requests": [],
+        "created_at": "2026-11-09T13:47:45Z",
+        "updated_at": "2026-11-09T13:47:55Z",
+        "actor": {
+          "login": "alexj11324",
+          "id": 183887963,
+          "node_id": "U_kgDOCvXoWw",
+          "avatar_url": "https://avatars.githubusercontent.com/u/183887963?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/alexj11324",
+          "html_url": "https://github.com/alexj11324",
+          "followers_url": "https://api.github.com/users/alexj11324/followers",
+          "following_url": "https://api.github.com/users/alexj11324/following{/other_user}",
+          "gists_url": "https://api.github.com/users/alexj11324/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/alexj11324/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/alexj11324/subscriptions",
+          "organizations_url": "https://api.github.com/users/alexj11324/orgs",
+          "repos_url": "https://api.github.com/users/alexj11324/repos",
+          "events_url": "https://api.github.com/users/alexj11324/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/alexj11324/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        },
+        "run_attempt": 1,
+        "referenced_workflows": [],
+        "run_started_at": "2026-11-09T13:47:45Z",
+        "triggering_actor": {
+          "login": "alexj11324",
+          "id": 183887963,
+          "node_id": "U_kgDOCvXoWw",
+          "avatar_url": "https://avatars.githubusercontent.com/u/183887963?v=4",
+          "gravatar_id": "",
+          "url": "https://api.github.com/users/alexj11324",
+          "html_url": "https://github.com/alexj11324",
+          "followers_url": "https://api.github.com/users/alexj11324/followers",
+          "following_url": "https://api.github.com/users/alexj11324/following{/other_user}",
+          "gists_url": "https://api.github.com/users/alexj11324/gists{/gist_id}",
+          "starred_url": "https://api.github.com/users/alexj11324/starred{/owner}{/repo}",
+          "subscriptions_url": "https://api.github.com/users/alexj11324/subscriptions",
+          "organizations_url": "https://api.github.com/users/alexj11324/orgs",
+          "repos_url": "https://api.github.com/users/alexj11324/repos",
+          "events_url": "https://api.github.com/users/alexj11324/events{/privacy}",
+          "received_events_url": "https://api.github.com/users/alexj11324/received_events",
+          "type": "User",
+          "user_view_type": "public",
+          "site_admin": false
+        },
+        "jobs_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42628604278/jobs",
+        "logs_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42628604278/logs",
+        "check_suite_url": "https://api.github.com/repos/alexj11324/Mikka/check-suites/115456950235",
+        "artifacts_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42628604278/artifacts",
+        "cancel_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42628604278/cancel",
+        "rerun_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42628604278/rerun",
+        "previous_attempt_url": null,
+        "workflow_url": "https://api.github.com/repos/alexj11324/Mikka/actions/workflows/411645081",
+        "head_commit": {
+          "id": "e93477fe401c70dca532784e71b76d56877b6899",
+          "tree_id": "1a9d726293fba2ffa99fa816f9fb0ef685d4e7e4",
+          "message": "ops(1505): close verified successful exact c9 child cleanup",
+          "timestamp": "2026-11-09T13:47:41Z",
+          "author": {
+            "name": "Zhixuan Jiang",
+            "email": "zhixuanj@andrew.cmu.edu"
+          },
+          "committer": {
+            "name": "Zhixuan Jiang",
+            "email": "zhixuanj@andrew.cmu.edu"
+          }
+        },
+        "repository": {
+          "id": 1427517699,
+          "node_id": "R_kgDOVRYxAw",
+          "name": "Mikka",
+          "full_name": "alexj11324/Mikka",
+          "private": false,
+          "owner": {
+            "login": "alexj11324",
+            "id": 183887963,
+            "node_id": "U_kgDOCvXoWw",
+            "avatar_url": "https://avatars.githubusercontent.com/u/183887963?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/alexj11324",
+            "html_url": "https://github.com/alexj11324",
+            "followers_url": "https://api.github.com/users/alexj11324/followers",
+            "following_url": "https://api.github.com/users/alexj11324/following{/other_user}",
+            "gists_url": "https://api.github.com/users/alexj11324/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/alexj11324/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/alexj11324/subscriptions",
+            "organizations_url": "https://api.github.com/users/alexj11324/orgs",
+            "repos_url": "https://api.github.com/users/alexj11324/repos",
+            "events_url": "https://api.github.com/users/alexj11324/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/alexj11324/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "html_url": "https://github.com/alexj11324/Mikka",
+          "description": null,
+          "fork": false,
+          "url": "https://api.github.com/repos/alexj11324/Mikka",
+          "forks_url": "https://api.github.com/repos/alexj11324/Mikka/forks",
+          "keys_url": "https://api.github.com/repos/alexj11324/Mikka/keys{/key_id}",
+          "collaborators_url": "https://api.github.com/repos/alexj11324/Mikka/collaborators{/collaborator}",
+          "teams_url": "https://api.github.com/repos/alexj11324/Mikka/teams",
+          "hooks_url": "https://api.github.com/repos/alexj11324/Mikka/hooks",
+          "issue_events_url": "https://api.github.com/repos/alexj11324/Mikka/issues/events{/number}",
+          "events_url": "https://api.github.com/repos/alexj11324/Mikka/events",
+          "assignees_url": "https://api.github.com/repos/alexj11324/Mikka/assignees{/user}",
+          "branches_url": "https://api.github.com/repos/alexj11324/Mikka/branches{/branch}",
+          "tags_url": "https://api.github.com/repos/alexj11324/Mikka/tags",
+          "blobs_url": "https://api.github.com/repos/alexj11324/Mikka/git/blobs{/sha}",
+          "git_tags_url": "https://api.github.com/repos/alexj11324/Mikka/git/tags{/sha}",
+          "git_refs_url": "https://api.github.com/repos/alexj11324/Mikka/git/refs{/sha}",
+          "trees_url": "https://api.github.com/repos/alexj11324/Mikka/git/trees{/sha}",
+          "statuses_url": "https://api.github.com/repos/alexj11324/Mikka/statuses/{sha}",
+          "languages_url": "https://api.github.com/repos/alexj11324/Mikka/languages",
+          "stargazers_url": "https://api.github.com/repos/alexj11324/Mikka/stargazers",
+          "contributors_url": "https://api.github.com/repos/alexj11324/Mikka/contributors",
+          "subscribers_url": "https://api.github.com/repos/alexj11324/Mikka/subscribers",
+          "subscription_url": "https://api.github.com/repos/alexj11324/Mikka/subscription",
+          "commits_url": "https://api.github.com/repos/alexj11324/Mikka/commits{/sha}",
+          "git_commits_url": "https://api.github.com/repos/alexj11324/Mikka/git/commits{/sha}",
+          "comments_url": "https://api.github.com/repos/alexj11324/Mikka/comments{/number}",
+          "issue_comment_url": "https://api.github.com/repos/alexj11324/Mikka/issues/comments{/number}",
+          "contents_url": "https://api.github.com/repos/alexj11324/Mikka/contents/{+path}",
+          "compare_url": "https://api.github.com/repos/alexj11324/Mikka/compare/{base}...{head}",
+          "merges_url": "https://api.github.com/repos/alexj11324/Mikka/merges",
+          "archive_url": "https://api.github.com/repos/alexj11324/Mikka/{archive_format}{/ref}",
+          "downloads_url": "https://api.github.com/repos/alexj11324/Mikka/downloads",
+          "issues_url": "https://api.github.com/repos/alexj11324/Mikka/issues{/number}",
+          "pulls_url": "https://api.github.com/repos/alexj11324/Mikka/pulls{/number}",
+          "milestones_url": "https://api.github.com/repos/alexj11324/Mikka/milestones{/number}",
+          "notifications_url": "https://api.github.com/repos/alexj11324/Mikka/notifications{?since,all,participating}",
+          "labels_url": "https://api.github.com/repos/alexj11324/Mikka/labels{/name}",
+          "releases_url": "https://api.github.com/repos/alexj11324/Mikka/releases{/id}",
+          "deployments_url": "https://api.github.com/repos/alexj11324/Mikka/deployments"
+        },
+        "head_repository": {
+          "id": 1427517699,
+          "node_id": "R_kgDOVRYxAw",
+          "name": "Mikka",
+          "full_name": "alexj11324/Mikka",
+          "private": false,
+          "owner": {
+            "login": "alexj11324",
+            "id": 183887963,
+            "node_id": "U_kgDOCvXoWw",
+            "avatar_url": "https://avatars.githubusercontent.com/u/183887963?v=4",
+            "gravatar_id": "",
+            "url": "https://api.github.com/users/alexj11324",
+            "html_url": "https://github.com/alexj11324",
+            "followers_url": "https://api.github.com/users/alexj11324/followers",
+            "following_url": "https://api.github.com/users/alexj11324/following{/other_user}",
+            "gists_url": "https://api.github.com/users/alexj11324/gists{/gist_id}",
+            "starred_url": "https://api.github.com/users/alexj11324/starred{/owner}{/repo}",
+            "subscriptions_url": "https://api.github.com/users/alexj11324/subscriptions",
+            "organizations_url": "https://api.github.com/users/alexj11324/orgs",
+            "repos_url": "https://api.github.com/users/alexj11324/repos",
+            "events_url": "https://api.github.com/users/alexj11324/events{/privacy}",
+            "received_events_url": "https://api.github.com/users/alexj11324/received_events",
+            "type": "User",
+            "user_view_type": "public",
+            "site_admin": false
+          },
+          "html_url": "https://github.com/alexj11324/Mikka",
+          "description": null,
+          "fork": false,
+          "url": "https://api.github.com/repos/alexj11324/Mikka",
+          "forks_url": "https://api.github.com/repos/alexj11324/Mikka/forks",
+          "keys_url": "https://api.github.com/repos/alexj11324/Mikka/keys{/key_id}",
+          "collaborators_url": "https://api.github.com/repos/alexj11324/Mikka/collaborators{/collaborator}",
+          "teams_url": "https://api.github.com/repos/alexj11324/Mikka/teams",
+          "hooks_url": "https://api.github.com/repos/alexj11324/Mikka/hooks",
+          "issue_events_url": "https://api.github.com/repos/alexj11324/Mikka/issues/events{/number}",
+          "events_url": "https://api.github.com/repos/alexj11324/Mikka/events",
+          "assignees_url": "https://api.github.com/repos/alexj11324/Mikka/assignees{/user}",
+          "branches_url": "https://api.github.com/repos/alexj11324/Mikka/branches{/branch}",
+          "tags_url": "https://api.github.com/repos/alexj11324/Mikka/tags",
+          "blobs_url": "https://api.github.com/repos/alexj11324/Mikka/git/blobs{/sha}",
+          "git_tags_url": "https://api.github.com/repos/alexj11324/Mikka/git/tags{/sha}",
+          "git_refs_url": "https://api.github.com/repos/alexj11324/Mikka/git/refs{/sha}",
+          "trees_url": "https://api.github.com/repos/alexj11324/Mikka/git/trees{/sha}",
+          "statuses_url": "https://api.github.com/repos/alexj11324/Mikka/statuses/{sha}",
+          "languages_url": "https://api.github.com/repos/alexj11324/Mikka/languages",
+          "stargazers_url": "https://api.github.com/repos/alexj11324/Mikka/stargazers",
+          "contributors_url": "https://api.github.com/repos/alexj11324/Mikka/contributors",
+          "subscribers_url": "https://api.github.com/repos/alexj11324/Mikka/subscribers",
+          "subscription_url": "https://api.github.com/repos/alexj11324/Mikka/subscription",
+          "commits_url": "https://api.github.com/repos/alexj11324/Mikka/commits{/sha}",
+          "git_commits_url": "https://api.github.com/repos/alexj11324/Mikka/git/commits{/sha}",
+          "comments_url": "https://api.github.com/repos/alexj11324/Mikka/comments{/number}",
+          "issue_comment_url": "https://api.github.com/repos/alexj11324/Mikka/issues/comments{/number}",
+          "contents_url": "https://api.github.com/repos/alexj11324/Mikka/contents/{+path}",
+          "compare_url": "https://api.github.com/repos/alexj11324/Mikka/compare/{base}...{head}",
+          "merges_url": "https://api.github.com/repos/alexj11324/Mikka/merges",
+          "archive_url": "https://api.github.com/repos/alexj11324/Mikka/{archive_format}{/ref}",
+          "downloads_url": "https://api.github.com/repos/alexj11324/Mikka/downloads",
+          "issues_url": "https://api.github.com/repos/alexj11324/Mikka/issues{/number}",
+          "pulls_url": "https://api.github.com/repos/alexj11324/Mikka/pulls{/number}",
+          "milestones_url": "https://api.github.com/repos/alexj11324/Mikka/milestones{/number}",
+          "notifications_url": "https://api.github.com/repos/alexj11324/Mikka/notifications{?since,all,participating}",
+          "labels_url": "https://api.github.com/repos/alexj11324/Mikka/labels{/name}",
+          "releases_url": "https://api.github.com/repos/alexj11324/Mikka/releases{/id}",
+          "deployments_url": "https://api.github.com/repos/alexj11324/Mikka/deployments"
+        }
+      }
+    ]
+  },
+  "ref": {
+    "ref": "refs/heads/ops/1505-smoke-github-readonly-20261109",
+    "node_id": "REF_kwDOVRYxA9oAMnJlZnMvaGVhZHMvb3BzLzE1MDUtc21va2UtZ2l0aHViLXJlYWRvbmx5LTIwMjYxMTA5",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/refs/heads/ops/1505-smoke-github-readonly-20261109",
+    "object": {
+      "sha": "e93477fe401c70dca532784e71b76d56877b6899",
+      "type": "commit",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/e93477fe401c70dca532784e71b76d56877b6899"
+    }
+  }
+}

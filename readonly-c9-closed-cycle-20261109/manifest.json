@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "issue": 1505,
+  "prepareSource": "c9b6f9531aa40dde6142291e2ce6bac476c5cea5",
+  "cleanupSource": "e5a50fa1d227eca754eb41dc0fc39a14ffd5d377",
+  "originalLogsReadBy": "root",
+  "sourceAndArtifactBound": true,
+  "cleanupConfirmed": true,
+  "formalSamplesAdded": 0,
+  "files": [
+    {
+      "path": "prepare-job-decoded.log",
+      "bytes": 58129,
+      "sha256": "275b9cdf027b577476076c0ca8b2cf5b7a5e45ab3a2e911d81dc0126dacec2bc"
+    },
+    {
+      "path": "prepare-report-log-masked.json",
+      "bytes": 2115,
+      "sha256": "005e744c71d53ed4f11d2347abbb6dbc209fc416cc1f847cc115ccdfa31d5b4c"
+    },
+    {
+      "path": "prepare-run-metadata.json",
+      "bytes": 13593,
+      "sha256": "5139f5f24e727373591720c92067735954a1984b99993255579cd24deeb3006b"
+    },
+    {
+      "path": "prepare-artifact-metadata.json",
+      "bytes": 872,
+      "sha256": "89b2fe074110f1725e77ad7bc11d31ae8428f85d51ab22499d4c48f496c98cea"
+    },
+    {
+      "path": "prepare-entry-closure.json",
+      "bytes": 32121,
+      "sha256": "aca65ec10b2bb9528800d45e1d7afef037320949c5a98cf377ddb40340dafa30"
+    },
+    {
+      "path": "cleanup-job-decoded.log",
+      "bytes": 427483,
+      "sha256": "622a203bc5cd0844ce551400f108a6e5aeef600ba498c7fb15706001c7cb6da1"
+    },
+    {
+      "path": "cleanup-report.json",
+      "bytes": 321,
+      "sha256": "6b094d34eb425204abf0ee13bffa6a81db773415d3f55b3fd3d7b11b089b209b"
+    },
+    {
+      "path": "cleanup-run-metadata.json",
+      "bytes": 13249,
+      "sha256": "ecad7b4a1b55fccdeac1a30ac859dfea02bacc0060a240997515efdbaadc1dda"
+    },
+    {
+      "path": "cleanup-artifact-metadata.json",
+      "bytes": 874,
+      "sha256": "c7e6758b518a1537dd829d8491b0258669d82ebda54607dec2e8e981c0c986d8"
+    },
+    {
+      "path": "cleanup-entry-closure.json",
+      "bytes": 31477,
+      "sha256": "602845af936eb3d9626b1b805a3913f801a440e5122bb93fbb6fca45ec3678ec"
+    },
+    {
+      "path": "cleanup-source-root-checks.json",
+      "bytes": 1693,
+      "sha256": "82addeb2e1d445545c27644a840659fc8bcb2973493e859ef600ab7e568f99ce"
+    },
+    {
+      "path": "README.md",
+      "bytes": 4113,
+      "sha256": "788a94fdcefb4b1fd8159d80b56bfea5752b7de1582d4c4dfa72b4d7fd0a4270"
+    }
+  ]
+}

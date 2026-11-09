@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "issue": 1505,
+  "operation": "cleanup",
+  "status": "passed",
+  "stage": "disconnect_exact_child",
+  "startedAt": "2026-11-09T13:46:32.509Z",
+  "revoked": true,
+  "disconnected": true,
+  "revocation": {
+    "kind": "delete_token",
+    "status": 204
+  },
+  "completedAt": "2026-11-09T13:46:34.061Z"
+}

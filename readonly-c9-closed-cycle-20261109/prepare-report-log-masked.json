@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "issue": 1505,
+  "operation": "prepare",
+  "status": "passed",
+  "stage": "normal_repository_readback",
+  "startedAt": "2026-11-09T13:27:46.045Z",
+  "changed": true,
+  "ownerRefreshAttempted": true,
+  "mintAttempted": true,
+  "ownerTokenResolution": {
+    "minimumValidityMs": 660000,
+    "status": "committed",
+    "actualRefresh": "not_independently_observed",
+    "beforeUpdatedAt": "2026-11-09T10:59:38.653Z",
+    "beforeExpiresAt": "2026-11-09T18:59:38.652Z",
+    "afterUpdatedAt": "2026-11-09T10:59:38.653Z",
+    "afterExpiresAt": "2026-11-09T18:59:38.652Z",
+    "persistedMetadataChanged": false
+  },
+  "ownerSourceBaseline": "after_normal_token_resolution",
+  "ownerProviderExpiresAt": "2026-11-09T18:59:38.000Z",
+  "mintOutcome": "received",
+  "mintedTokenSha256": "1d1fee15399de66a97e389dabb2e48e8f215db9315f62e0f8a10645bf63fb93b",
+  "minted": {
+    "tokenSha256": "1d1fee15399de66a97e389dabb2e48e8f215db9315f62e0f8a10645bf63fb93b",
+    "providerExpiresAt": "2026-11-09T21:27:48.000Z",
+    "appId": "4840908",
+    "repositoryId": "1436202099",
+    "installationId": "173164679",
+    "permissions": {
+      "metadata": "read",
+      "contents": "read"
+    },
+    "mintScopeConfirmed": true,
+    "checkTokenScopeConfirmed": false
+  },
+  "state": {
+    "version": 1,
+    "issue": 1505,
+    "userId": "cL1NXe1mr7WuIS8xWhU37v0p7kNoUMY3",
+    "ownerUserId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+    "githubAccountId": "183887963",
+    "githubLogin": "alexj11324",
+    "repository": "alexj11324/Mikka-handoff",
+    "appId": "4840908",
+    "appClientId": "***",
+    "repositoryId": "1436202099",
+    "installationId": "173164679",
+    "tokenSha256": "1d1fee15399de66a97e389dabb2e48e8f215db9315f62e0f8a10645bf63fb93b",
+    "providerExpiresAt": "2026-11-09T21:27:48.000Z",
+    "connectionExpiresAt": "2026-11-09T17:27:40.208Z",
+    "connectionUpdatedAt": "2026-11-09T13:27:50.209Z"
+  },
+  "readback": {
+    "connected": true,
+    "samePrincipal": true,
+    "repositoryAccessible": true,
+    "sameAppInstallation": true
+  },
+  "ownerUnchanged": true,
+  "completedAt": "2026-11-09T13:27:51.104Z"
+}
