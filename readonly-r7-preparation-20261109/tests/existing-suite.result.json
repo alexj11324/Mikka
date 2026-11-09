@@ -1,0 +1,49 @@
+{
+  "args": [
+    "node",
+    "--test",
+    "scripts/ops/issue1505/github-readonly.test.mjs"
+  ],
+  "cwd": "/workspace/scratch/263e36984c81/readonly-r7-preparation-1505/bundle",
+  "node": "v24.22.1",
+  "startedAt": "2026-11-09T15:36:38.861830+00:00",
+  "finishedAt": "2026-11-09T15:36:39.085956+00:00",
+  "durationSeconds": 0.22365955700024642,
+  "exitCode": 0,
+  "environmentKeptNamesOnly": [
+    "LANG",
+    "LC_ALL",
+    "PATH",
+    "TZ"
+  ],
+  "productionCredentialsPassed": false,
+  "sourceFiles": {
+    "scripts/ops/issue1505/github-readonly-provider.mjs": {
+      "bytes": 14619,
+      "sha256": "23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e",
+      "gitBlob": "d097f62e62ca64a72220bb26cf7966db2acf4b43"
+    },
+    "scripts/ops/issue1505/github-readonly-helper.mjs": {
+      "bytes": 11192,
+      "sha256": "cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742",
+      "gitBlob": "595eee67850779b2bde4597306e6a1c83beee245"
+    },
+    "scripts/ops/issue1505/github-readonly-store.mjs": {
+      "bytes": 8858,
+      "sha256": "1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5",
+      "gitBlob": "0455da9dcc58015184edd734987c2f0d711cdf8a"
+    },
+    "scripts/ops/issue1505/github-readonly-runner.mjs": {
+      "bytes": 6210,
+      "sha256": "85a532d55bb0c9703b2e0e97693ce322b042c01e3768d85b41e7fde5a9e63029",
+      "gitBlob": "f27ee1d6a82c33f9b0deaca36f7c630399ce8f9a"
+    },
+    "scripts/ops/issue1505/github-readonly.test.mjs": {
+      "bytes": 29358,
+      "sha256": "1ef0f176c458efa2e67bad134cbbf4fe8c014abfb1ddc95c04d941c7e3d13259",
+      "gitBlob": "41a1effc37752dc1d7eadcaa0d7238211118b9af"
+    }
+  },
+  "testScope": "existing mocked provider/store/runner fixture suite, only branch/GO literals changed",
+  "productionOrModelCallsClaimed": false
+}

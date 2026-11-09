@@ -1,0 +1,182 @@
+{
+  "sourceCommit": "e5a50fa1d227eca754eb41dc0fc39a14ffd5d377",
+  "sourceUrl": "https://github.com/alexj11324/Mikka/blob/e5a50fa1d227eca754eb41dc0fc39a14ffd5d377/.github/workflows/issue1505-smoke-github-readonly.yml",
+  "originalWorkflow": {
+    "bytes": 26324,
+    "sha256": "b73f74994833db10cac6e31e7ab109462e261398a77565d0389d32e4db6a5e9d",
+    "gitBlob": "c560af8f1dc0759d973f141421df4eb53c71171c"
+  },
+  "preparedWorkflow": {
+    "bytes": 27629,
+    "sha256": "46693c759b2dd89954eb6effe0468f419938203c6b73e94a7e54d617d259071e",
+    "gitBlob": "6ba48d4b31381066cbd9a6696b540b9d1278863c"
+  },
+  "pythonBlocksCompiledWithoutExecution": 7,
+  "newTestsRun": 0,
+  "runtimeOrNetworkStatementsExecuted": false,
+  "all19BindingsUnfilled": true,
+  "unfilledGuardBeforeAnyNetworkOrCredentials": true,
+  "jobDisabled": true,
+  "threeCurrentMainGetsRetained": true,
+  "sevenWindowCallsRetained": true,
+  "twoExistingQueuesRetained": true,
+  "fiveSecretActionBlockByteIdentical": true,
+  "downloadArchiveFunctionByteIdentical": true,
+  "verifiedReceiptFunctionByteIdentical": true,
+  "windowFunctionByteIdentical": true,
+  "singleClosedParentAndWorkflowOnlyDiffGuardRetained": true,
+  "existingFiveHelpersUsedWithoutFurtherChanges": true,
+  "reverseAllAllowedReplacementsMatchesOriginalBytes": true,
+  "replacements": [
+    {
+      "old": "ops/1505-smoke-github-readonly-20261109",
+      "new": "ops/1505-readonly-r7-20261109",
+      "occurrences": 5
+    },
+    {
+      "old": "root-reviewed-1505-github-http-v6",
+      "new": "root-reviewed-1505-github-r7-20261109-v1",
+      "occurrences": 2
+    },
+    {
+      "old": "    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1505-readonly-r7-20261109' && github.run_attempt == 1",
+      "new": "    if: false # OFFLINE_UNBOUND_DO_NOT_ACTIVATE",
+      "occurrences": 1
+    },
+    {
+      "old": "# Exact cleanup of the single successful c9 prepare receipt; one bounded entry.",
+      "new": "# OFFLINE UNBOUND TEMPLATE. Cleanup of the next cycle's exact new receipt only.",
+      "occurrences": 1
+    },
+    {
+      "old": "    timeout-minutes: 10",
+      "new": "    timeout-minutes: __REQUIRED_CLEANUP_JOB_MINUTES__",
+      "occurrences": 1
+    },
+    {
+      "old": "MIKKA_1505_CLEANUP_JOB_MINUTES: '10'",
+      "new": "MIKKA_1505_CLEANUP_JOB_MINUTES: '__REQUIRED_CLEANUP_JOB_MINUTES__'",
+      "occurrences": 1
+    },
+    {
+      "old": "2026-11-09T13:33:00.000Z",
+      "new": "__REQUIRED_CLEANUP_WINDOW_START_UTC__",
+      "occurrences": 1
+    },
+    {
+      "old": "2026-11-09T13:49:00.000Z",
+      "new": "__REQUIRED_CLEANUP_ENTRY_DEADLINE_UTC__",
+      "occurrences": 1
+    },
+    {
+      "old": "2026-11-09T13:59:00.000Z",
+      "new": "__REQUIRED_CLEANUP_HARD_END_UTC__",
+      "occurrences": 1
+    },
+    {
+      "old": "465f1b89c52228b99c4f2424f92722901b910754",
+      "new": "__REQUIRED_CLEANUP_CLOSED_COMMIT__",
+      "occurrences": 1
+    },
+    {
+      "old": "5053519fabc1e8ce3737f0166e61db1b29597be8",
+      "new": "__REQUIRED_CLEANUP_CLOSED_TREE__",
+      "occurrences": 1
+    },
+    {
+      "old": "111a8dfb8b227ac0441324339ff42e4328ea609a",
+      "new": "__REQUIRED_CLEANUP_CURRENT_MAIN_SHA__",
+      "occurrences": 4
+    },
+    {
+      "old": "run.get('head_branch')=='ops/1505-readonly-r7-20261109'",
+      "new": "run.get('head_branch')=='__REQUIRED_PREPARE_BRANCH__'",
+      "occurrences": 2
+    },
+    {
+      "old": "c9b6f9531aa40dde6142291e2ce6bac476c5cea5",
+      "new": "__REQUIRED_PREPARE_HEAD_SHA__",
+      "occurrences": 2
+    },
+    {
+      "old": "411645081",
+      "new": "int('__REQUIRED_PREPARE_WORKFLOW_ID__')",
+      "occurrences": 1
+    },
+    {
+      "old": "issue1505-github-readonly-fresh-42622019169-1",
+      "new": "__REQUIRED_ARTIFACT_NAME__",
+      "occurrences": 1
+    },
+    {
+      "old": "'actions/runs/42622019169/attempts/1'",
+      "new": "'actions/runs/__REQUIRED_PREPARE_RUN_ID__/attempts/__REQUIRED_PREPARE_RUN_ATTEMPT__'",
+      "occurrences": 1
+    },
+    {
+      "old": "'actions/runs/42622019169'",
+      "new": "'actions/runs/__REQUIRED_PREPARE_RUN_ID__'",
+      "occurrences": 1
+    },
+    {
+      "old": "42622019169",
+      "new": "int('__REQUIRED_PREPARE_RUN_ID__')",
+      "occurrences": 3
+    },
+    {
+      "old": "run.get('run_attempt')==1",
+      "new": "run.get('run_attempt')==int('__REQUIRED_PREPARE_RUN_ATTEMPT__')",
+      "occurrences": 1
+    },
+    {
+      "old": "'sourceAttempt':1",
+      "new": "'sourceAttempt':int('__REQUIRED_PREPARE_RUN_ATTEMPT__')",
+      "occurrences": 1
+    },
+    {
+      "old": "actions/artifacts/13677458654",
+      "new": "actions/artifacts/__REQUIRED_ARTIFACT_ID__",
+      "occurrences": 1
+    },
+    {
+      "old": "13677458654",
+      "new": "int('__REQUIRED_ARTIFACT_ID__')",
+      "occurrences": 5
+    },
+    {
+      "old": "sha256:87124f31fd4cfc332411985814650992fcdad9f21ca6f5a0709f70abb5c41a81",
+      "new": "__REQUIRED_ARTIFACT_DIGEST__",
+      "occurrences": 1
+    },
+    {
+      "old": "87124f31fd4cfc332411985814650992fcdad9f21ca6f5a0709f70abb5c41a81",
+      "new": "__REQUIRED_ZIP_SHA256__",
+      "occurrences": 2
+    },
+    {
+      "old": "925",
+      "new": "int('__REQUIRED_ARTIFACT_BYTES__')",
+      "occurrences": 4
+    },
+    {
+      "old": "2132",
+      "new": "int('__REQUIRED_RECEIPT_BYTES__')",
+      "occurrences": 1
+    },
+    {
+      "old": "80031945234e34264c558f830bd64bfa651858e69dbfdfa6354b62deb2a2022d",
+      "new": "__REQUIRED_RECEIPT_SHA256__",
+      "occurrences": 3
+    },
+    {
+      "old": "a94187ed60da64a0ef958de1186b2f51dae8f48f154de1895873e5ac351367fb",
+      "new": "85a532d55bb0c9703b2e0e97693ce322b042c01e3768d85b41e7fde5a9e63029",
+      "occurrences": 1
+    },
+    {
+      "old": "293616146941d59d2196d7343899e1e9e24136ccab03e2025b59dd900e048994",
+      "new": "1ef0f176c458efa2e67bad134cbbf4fe8c014abfb1ddc95c04d941c7e3d13259",
+      "occurrences": 1
+    }
+  ]
+}

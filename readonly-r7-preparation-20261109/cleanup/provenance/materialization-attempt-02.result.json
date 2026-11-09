@@ -1,0 +1,16 @@
+{
+  "command": [
+    "python",
+    "prepare-cleanup-template.py"
+  ],
+  "cwd": "/workspace/scratch/263e36984c81/readonly-r7-preparation-1505",
+  "scope": "static materialization and Python compile only; no tests or runtime/network statements",
+  "result": {
+    "chunk_id": "657d50",
+    "wall_time_seconds": 0.000052602,
+    "exit_code": 0,
+    "original_token_count": 96,
+    "output": "{\"workflow\": \"/workspace/scratch/263e36984c81/readonly-r7-preparation-1505/cleanup/bundle/.github/workflows/issue1505-smoke-github-readonly.yml.in\", \"bytes\": 27629, \"sha256\": \"46693c759b2dd89954eb6effe0468f419938203c6b73e94a7e54d617d259071e\", \"gitBlob\": \"6ba48d4b31381066cbd9a6696b540b9d1278863c\", \"pythonBlocksCompiled\": 7, \"testsRun\": 0, \"bindingsUnfilled\": 19, \"disabled\": true}\n"
+  }
+}
+

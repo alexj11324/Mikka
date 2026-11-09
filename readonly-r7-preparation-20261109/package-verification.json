@@ -1,0 +1,28 @@
+{
+  "checkedAtUtc": "2026-11-09T15:45:54.907716+00:00",
+  "testCounts": {
+    "tests": 47,
+    "pass": 47,
+    "fail": 0,
+    "skipped": 0,
+    "cancelled": 0,
+    "todo": 0
+  },
+  "stderrBytes": 0,
+  "testsActuallyRunThisPackage": 1,
+  "cleanupTestsActuallyRun": 0,
+  "activeYamlFiles": 0,
+  "prepareDynamicBindingsAllUnfilled": true,
+  "cleanupDynamicBindingsAllUnfilled": true,
+  "rootCheckoutReadOnly": {
+    "path": "/workspace/scratch/263e36984c81/Mikka-1505",
+    "head": "4c2efa6e9c57af88168c2d57039982ae29a9b54e",
+    "statusPorcelain": ""
+  },
+  "gitRefsCreatedOrChanged": false,
+  "productionAccess": false,
+  "newResources": false,
+  "activationAuthorized": false,
+  "createsHold": false,
+  "addsProductionGate": false
+}

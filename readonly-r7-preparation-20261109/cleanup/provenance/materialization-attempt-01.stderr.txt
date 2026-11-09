@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/workspace/scratch/263e36984c81/readonly-r7-preparation-1505/prepare-cleanup-template.py", line 127, in <module>
+    assert roundtrip.count(change['new']) == change['occurrences'], change
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: {'old': 'actions/runs/42622019169', 'new': 'actions/runs/__REQUIRED_PREPARE_RUN_ID__', 'occurrences': 1}

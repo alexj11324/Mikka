@@ -1,0 +1,19 @@
+{
+  "pythonBlocksCompiledWithoutExecution": 3,
+  "threeCurrentMainReadsRetained": true,
+  "sixBeforeAfterWindowChecksRetained": true,
+  "jobMinutes": 15,
+  "hardEndRule": "entryDeadlineUtc + 15 minutes <= hardEndUtc",
+  "twoExistingQueuesRetained": true,
+  "fiveOriginalSecretActionsByteIdentical": true,
+  "sixPathAllowlistAndAddsOnlyCheckRetained": true,
+  "exactOrderedParentCheckRetained": true,
+  "productDeltaFromActualMainMustRemainZeroOutsideSixOperatorPaths": true,
+  "providerHelperStoreByteIdentical": true,
+  "runnerTestEachOnlyOneBranchAndOneGoLiteral": true,
+  "newRegressionTestsAdded": 0,
+  "allBindingsRemainUnfilled": true,
+  "githubWorkflowFilesPresent": 0,
+  "jobDisabled": true,
+  "networkStatementsExecutedForStaticVerification": false
+}

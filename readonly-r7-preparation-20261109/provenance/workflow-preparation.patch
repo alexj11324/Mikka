@@ -1,0 +1,135 @@
+--- c9/.github/workflows/issue1505-smoke-github-readonly.yml
++++ bundle/.github/workflows/issue1505-smoke-github-readonly.yml.in
+@@ -1,10 +1,11 @@
++# OFFLINE UNBOUND TEMPLATE. Stored as .yml.in; no ref, activation or production authority.
+ # Root-reviewed prepare-only operator. Unreferenced review commit does not execute.
+ # A new, bounded entry may be published only after current shared-account/writer review.
+ # Does not revoke or renew any historical child. Cleanup must use this run's new receipt.
+ name: Issue 1505 fresh read-only Smoke GitHub preparation
+ on:
+   push:
+-    branches: [ops/1505-smoke-github-readonly-20261109]
++    branches: [ops/1505-readonly-r7-20261109]
+     paths:
+       - .github/workflows/issue1505-smoke-github-readonly.yml
+       - scripts/ops/issue1505/github-readonly-*.mjs
+@@ -17,7 +18,7 @@
+   queue: max
+ jobs:
+   prepare:
+-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1505-smoke-github-readonly-20261109' && github.run_attempt == 1
++    if: false # OFFLINE_UNBOUND_DO_NOT_ACTIVATE
+     runs-on: ubuntu-latest
+     concurrency:
+       group: web-deploy-production
+@@ -26,7 +27,7 @@
+     timeout-minutes: 15
+     env:
+       MIKKA_EDITION: cloud
+-      MIKKA_GITHUB_REPAIR_GO: 'root-reviewed-1505-github-http-v6'
++      MIKKA_GITHUB_REPAIR_GO: 'root-reviewed-1505-github-r7-20261109-v1'
+     permissions:
+       contents: read
+       id-token: write
+@@ -42,20 +43,28 @@
+         run: |
+           python3 - <<'PY'
+           import datetime,hashlib,json,os,pathlib,subprocess
++          def check_window():
++              entry=datetime.datetime.fromisoformat('__REQUIRED_ENTRY_DEADLINE_UTC__')
++              hard=datetime.datetime.fromisoformat('__REQUIRED_HARD_END_UTC__')
++              assert entry.utcoffset()==datetime.timedelta(0) and hard.utcoffset()==datetime.timedelta(0),'window_must_be_utc'
++              assert entry+datetime.timedelta(minutes=15)<=hard,'cleanup_budget_unbound'
++              assert datetime.datetime.now(datetime.timezone.utc)<entry,'prepare_entry_closed'
+           root=pathlib.Path('.')
+-          assert os.environ.get('MIKKA_GITHUB_REPAIR_GO')=='root-reviewed-1505-github-http-v6'
++          assert os.environ.get('MIKKA_GITHUB_REPAIR_GO')=='root-reviewed-1505-github-r7-20261109-v1'
+           assert os.environ.get('GITHUB_REPOSITORY')=='alexj11324/Mikka'
+           assert os.environ.get('GITHUB_RUN_ATTEMPT')=='1'
+-          assert os.environ.get('GITHUB_REF')=='refs/heads/ops/1505-smoke-github-readonly-20261109'
+-          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T13:40:00+00:00')
++          assert os.environ.get('GITHUB_REF')=='refs/heads/ops/1505-readonly-r7-20261109'
++          check_window()
+           def git(*args): return subprocess.check_output(['git',*args],text=True).strip()
+           assert git('rev-parse','HEAD')==os.environ['GITHUB_SHA']
+-          assert git('rev-list','--parents','-n','1','HEAD').split()[1:]==['111a8dfb8b227ac0441324339ff42e4328ea609a','01ef3fa435380f23fbd3cd7cfbe77839cc5511d9']
+-          assert git('rev-parse','111a8dfb8b227ac0441324339ff42e4328ea609a^{tree}')=='6a06f3742fb0dfc35bed19780fe09da2747c1ddc'
+-          expected={"scripts/ops/issue1505/github-readonly-provider.mjs":"23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e","scripts/ops/issue1505/github-readonly-helper.mjs":"cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742","scripts/ops/issue1505/github-readonly-store.mjs":"1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5","scripts/ops/issue1505/github-readonly-runner.mjs":"a94187ed60da64a0ef958de1186b2f51dae8f48f154de1895873e5ac351367fb","scripts/ops/issue1505/github-readonly.test.mjs":"293616146941d59d2196d7343899e1e9e24136ccab03e2025b59dd900e048994"}
++          expected_parents=json.loads('__REQUIRED_ORDERED_PARENTS_JSON__')
++          assert expected_parents==['__REQUIRED_MAIN_SHA__','e93477fe401c70dca532784e71b76d56877b6899'],'ordered_parents_not_bound'
++          assert git('rev-list','--parents','-n','1','HEAD').split()[1:]==expected_parents
++          assert git('rev-parse','__REQUIRED_MAIN_SHA__^{tree}')=='__REQUIRED_MAIN_TREE__'
++          expected={"scripts/ops/issue1505/github-readonly-provider.mjs":"23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e","scripts/ops/issue1505/github-readonly-helper.mjs":"cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742","scripts/ops/issue1505/github-readonly-store.mjs":"1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5","scripts/ops/issue1505/github-readonly-runner.mjs":"85a532d55bb0c9703b2e0e97693ce322b042c01e3768d85b41e7fde5a9e63029","scripts/ops/issue1505/github-readonly.test.mjs":"1ef0f176c458efa2e67bad134cbbf4fe8c014abfb1ddc95c04d941c7e3d13259"}
+           allowed=set(expected)|{'.github/workflows/issue1505-smoke-github-readonly.yml'}
+-          assert set(git('diff','--name-only','111a8dfb8b227ac0441324339ff42e4328ea609a','HEAD').splitlines())==allowed
+-          raw=git('diff','--raw','--no-renames','--abbrev=40','111a8dfb8b227ac0441324339ff42e4328ea609a','HEAD').splitlines()
++          assert set(git('diff','--name-only','__REQUIRED_MAIN_SHA__','HEAD').splitlines())==allowed
++          raw=git('diff','--raw','--no-renames','--abbrev=40','__REQUIRED_MAIN_SHA__','HEAD').splitlines()
+           entries=[line.split('\t',1) for line in raw]
+           assert len(entries)==len(allowed) and all(len(entry)==2 for entry in entries)
+           assert {entry[1] for entry in entries}==allowed
+@@ -73,9 +82,9 @@
+           with urllib.request.build_opener(NoRedirect).open(request,timeout=20) as response:
+               assert response.status==200
+               actual=json.load(response)
+-          assert actual['object']['sha']=='111a8dfb8b227ac0441324339ff42e4328ea609a','main_changed'
+-          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T13:40:00+00:00')
+-          print(json.dumps({'status':'passed','source':os.environ['GITHUB_SHA'],'base':'111a8dfb8b227ac0441324339ff42e4328ea609a','files':len(expected),'productDelta':False}))
++          assert actual['object']['sha']=='__REQUIRED_MAIN_SHA__','main_changed'
++          check_window()
++          print(json.dumps({'status':'passed','source':os.environ['GITHUB_SHA'],'base':'__REQUIRED_MAIN_SHA__','files':len(expected),'productDelta':False}))
+           PY
+       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+         with:
+@@ -90,7 +99,13 @@
+         run: |
+           python3 - <<'PY'
+           import datetime
+-          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T13:40:00+00:00')
++          def check_window():
++              entry=datetime.datetime.fromisoformat('__REQUIRED_ENTRY_DEADLINE_UTC__')
++              hard=datetime.datetime.fromisoformat('__REQUIRED_HARD_END_UTC__')
++              assert entry.utcoffset()==datetime.timedelta(0) and hard.utcoffset()==datetime.timedelta(0),'window_must_be_utc'
++              assert entry+datetime.timedelta(minutes=15)<=hard,'cleanup_budget_unbound'
++              assert datetime.datetime.now(datetime.timezone.utc)<entry,'prepare_entry_closed'
++          check_window()
+           import json,os,urllib.request
+           class NoRedirect(urllib.request.HTTPRedirectHandler):
+               def redirect_request(self,req,fp,code,msg,headers,newurl): return None
+@@ -99,8 +114,8 @@
+           with urllib.request.build_opener(NoRedirect).open(request,timeout=20) as response:
+               assert response.status==200
+               actual=json.load(response)
+-          assert actual['object']['sha']=='111a8dfb8b227ac0441324339ff42e4328ea609a','main_changed'
+-          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T13:40:00+00:00')
++          assert actual['object']['sha']=='__REQUIRED_MAIN_SHA__','main_changed'
++          check_window()
+           PY
+       - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+         with:
+@@ -168,7 +183,13 @@
+         run: |
+           python3 - <<'PY'
+           import datetime
+-          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T13:40:00+00:00')
++          def check_window():
++              entry=datetime.datetime.fromisoformat('__REQUIRED_ENTRY_DEADLINE_UTC__')
++              hard=datetime.datetime.fromisoformat('__REQUIRED_HARD_END_UTC__')
++              assert entry.utcoffset()==datetime.timedelta(0) and hard.utcoffset()==datetime.timedelta(0),'window_must_be_utc'
++              assert entry+datetime.timedelta(minutes=15)<=hard,'cleanup_budget_unbound'
++              assert datetime.datetime.now(datetime.timezone.utc)<entry,'prepare_entry_closed'
++          check_window()
+           import json,os,urllib.request
+           class NoRedirect(urllib.request.HTTPRedirectHandler):
+               def redirect_request(self,req,fp,code,msg,headers,newurl): return None
+@@ -177,8 +198,8 @@
+           with urllib.request.build_opener(NoRedirect).open(request,timeout=20) as response:
+               assert response.status==200
+               actual=json.load(response)
+-          assert actual['object']['sha']=='111a8dfb8b227ac0441324339ff42e4328ea609a','main_changed'
+-          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T13:40:00+00:00')
++          assert actual['object']['sha']=='__REQUIRED_MAIN_SHA__','main_changed'
++          check_window()
+           PY
+           node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1505/github-readonly-runner.mjs --prepare
+       - name: Preserve the exact fresh receipt and any uncertain outcome

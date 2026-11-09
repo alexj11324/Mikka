@@ -1,0 +1,111 @@
+{
+  "sourceCommit": "c9b6f9531aa40dde6142291e2ce6bac476c5cea5",
+  "closedHistory": "e93477fe401c70dca532784e71b76d56877b6899",
+  "files": [
+    {
+      "path": "scripts/ops/issue1505/github-readonly-provider.mjs",
+      "sourceCommit": "c9b6f9531aa40dde6142291e2ce6bac476c5cea5",
+      "sourceUrl": "https://github.com/alexj11324/Mikka/blob/c9b6f9531aa40dde6142291e2ce6bac476c5cea5/scripts/ops/issue1505/github-readonly-provider.mjs",
+      "original": {
+        "bytes": 14619,
+        "sha256": "23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e",
+        "gitBlob": "d097f62e62ca64a72220bb26cf7966db2acf4b43"
+      },
+      "prepared": {
+        "bytes": 14619,
+        "sha256": "23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e",
+        "gitBlob": "d097f62e62ca64a72220bb26cf7966db2acf4b43"
+      },
+      "change": "byte-identical",
+      "inverseBytesMatched": true
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly-helper.mjs",
+      "sourceCommit": "c9b6f9531aa40dde6142291e2ce6bac476c5cea5",
+      "sourceUrl": "https://github.com/alexj11324/Mikka/blob/c9b6f9531aa40dde6142291e2ce6bac476c5cea5/scripts/ops/issue1505/github-readonly-helper.mjs",
+      "original": {
+        "bytes": 11192,
+        "sha256": "cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742",
+        "gitBlob": "595eee67850779b2bde4597306e6a1c83beee245"
+      },
+      "prepared": {
+        "bytes": 11192,
+        "sha256": "cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742",
+        "gitBlob": "595eee67850779b2bde4597306e6a1c83beee245"
+      },
+      "change": "byte-identical",
+      "inverseBytesMatched": true
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly-store.mjs",
+      "sourceCommit": "c9b6f9531aa40dde6142291e2ce6bac476c5cea5",
+      "sourceUrl": "https://github.com/alexj11324/Mikka/blob/c9b6f9531aa40dde6142291e2ce6bac476c5cea5/scripts/ops/issue1505/github-readonly-store.mjs",
+      "original": {
+        "bytes": 8858,
+        "sha256": "1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5",
+        "gitBlob": "0455da9dcc58015184edd734987c2f0d711cdf8a"
+      },
+      "prepared": {
+        "bytes": 8858,
+        "sha256": "1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5",
+        "gitBlob": "0455da9dcc58015184edd734987c2f0d711cdf8a"
+      },
+      "change": "byte-identical",
+      "inverseBytesMatched": true
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly-runner.mjs",
+      "sourceCommit": "c9b6f9531aa40dde6142291e2ce6bac476c5cea5",
+      "sourceUrl": "https://github.com/alexj11324/Mikka/blob/c9b6f9531aa40dde6142291e2ce6bac476c5cea5/scripts/ops/issue1505/github-readonly-runner.mjs",
+      "original": {
+        "bytes": 6213,
+        "sha256": "a94187ed60da64a0ef958de1186b2f51dae8f48f154de1895873e5ac351367fb",
+        "gitBlob": "af91a7a74839aa662e936203f77461fc740af0f2"
+      },
+      "prepared": {
+        "bytes": 6210,
+        "sha256": "85a532d55bb0c9703b2e0e97693ce322b042c01e3768d85b41e7fde5a9e63029",
+        "gitBlob": "f27ee1d6a82c33f9b0deaca36f7c630399ce8f9a"
+      },
+      "change": "exactly one branch literal and one GO literal",
+      "inverseBytesMatched": true
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly.test.mjs",
+      "sourceCommit": "c9b6f9531aa40dde6142291e2ce6bac476c5cea5",
+      "sourceUrl": "https://github.com/alexj11324/Mikka/blob/c9b6f9531aa40dde6142291e2ce6bac476c5cea5/scripts/ops/issue1505/github-readonly.test.mjs",
+      "original": {
+        "bytes": 29361,
+        "sha256": "293616146941d59d2196d7343899e1e9e24136ccab03e2025b59dd900e048994",
+        "gitBlob": "fe9f1418edc33b938bac53142b9880151414df3f"
+      },
+      "prepared": {
+        "bytes": 29358,
+        "sha256": "1ef0f176c458efa2e67bad134cbbf4fe8c014abfb1ddc95c04d941c7e3d13259",
+        "gitBlob": "41a1effc37752dc1d7eadcaa0d7238211118b9af"
+      },
+      "change": "exactly one branch literal and one GO literal",
+      "inverseBytesMatched": true
+    }
+  ],
+  "originalWorkflow": {
+    "bytes": 10748,
+    "sha256": "7b0fca9216363b04a44d27d6fda9cc50f54f73a1adf3acc203a22389ae2f3439",
+    "gitBlob": "aa5becb43ec5dfdfcd34bfeeb4ec5254d6c6ac6c"
+  },
+  "preparedWorkflow": {
+    "path": "bundle/.github/workflows/issue1505-smoke-github-readonly.yml.in",
+    "bytes": 11657,
+    "sha256": "49e10420d09bfd36b9c9b6219195b2486817f06dc1ef34904baa2067bc16cdf8",
+    "gitBlob": "9174caf66a46692eccf381fbff1a4d730355aa5f"
+  },
+  "workflowChanges": [
+    "new exact branch/GO",
+    "disabled job and non-workflow extension",
+    "unfilled actual main/tree/exact ordered parents",
+    "closed e934 history required as second parent",
+    "unfilled UTC entry/hard-end with unchanged 15-minute job budget",
+    "runner/test digest updates after literal-only changes"
+  ],
+  "runtimeImplementationChanged": false
+}

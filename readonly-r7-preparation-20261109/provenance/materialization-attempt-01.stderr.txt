@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/workspace/scratch/263e36984c81/readonly-r7-preparation-1505/prepare-local-package.py", line 90, in <module>
+    assert workflow.count(old_parent_check) == 1
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

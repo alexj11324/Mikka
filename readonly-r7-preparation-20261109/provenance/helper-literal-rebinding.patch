@@ -1,0 +1,24 @@
+--- c9/scripts/ops/issue1505/github-readonly-runner.mjs
++++ bundle/scripts/ops/issue1505/github-readonly-runner.mjs
+@@ -7,8 +7,8 @@
+ 
+ export function configuration(args, env) {
+   check(env.CI === 'true' && env.GITHUB_REPOSITORY === 'alexj11324/Mikka' && env.GITHUB_RUN_ATTEMPT === '1'
+-    && env.GITHUB_REF === 'refs/heads/ops/1505-smoke-github-readonly-20261109'
+-    && env.MIKKA_GITHUB_REPAIR_GO === 'root-reviewed-1505-github-http-v6'
++    && env.GITHUB_REF === 'refs/heads/ops/1505-readonly-r7-20261109'
++    && env.MIKKA_GITHUB_REPAIR_GO === 'root-reviewed-1505-github-r7-20261109-v1'
+     && env.MIKKA_EDITION === 'cloud' && env.NODE_ENV === 'production', 'execution_not_enabled')
+   if (args.length === 1 && args[0] === '--prepare') return { operation: 'prepare' }
+   check(args.length === 3 && args[0] === '--cleanup' && /^[a-f0-9]{64}$/.test(args[2]), 'arguments_invalid')
+--- c9/scripts/ops/issue1505/github-readonly.test.mjs
++++ bundle/scripts/ops/issue1505/github-readonly.test.mjs
+@@ -213,7 +213,7 @@
+ })
+ test('runner exact execution guard rejects rerun, foreign repo, branch and missing GO', () => {
+   const env = { CI: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_RUN_ATTEMPT: '1',
+-    GITHUB_REF: 'refs/heads/ops/1505-smoke-github-readonly-20261109', MIKKA_GITHUB_REPAIR_GO: 'root-reviewed-1505-github-http-v6',
++    GITHUB_REF: 'refs/heads/ops/1505-readonly-r7-20261109', MIKKA_GITHUB_REPAIR_GO: 'root-reviewed-1505-github-r7-20261109-v1',
+     MIKKA_EDITION: 'cloud', NODE_ENV: 'production' }
+   assert.deepEqual(configuration(['--prepare'], env), { operation: 'prepare' })
+   for (const [key, value] of [['GITHUB_RUN_ATTEMPT', '2'], ['GITHUB_REPOSITORY', 'other'], ['GITHUB_REF', 'refs/heads/main'], ['MIKKA_GITHUB_REPAIR_GO', '']])

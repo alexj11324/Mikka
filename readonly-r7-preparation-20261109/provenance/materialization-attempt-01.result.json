@@ -1,0 +1,8 @@
+{
+  "exitCode": 1,
+  "stage": "local_template_literal_match_before_workflow_write_or_tests",
+  "reason": "generator initially expected eleven leading spaces; the fixed original YAML Python block uses ten",
+  "testInvocations": 0,
+  "productionOrNetworkActions": 0,
+  "correction": "derive all generated guard indentation from an explicit ten-space value; original five helper bytes remain unchanged except the requested runner/test branch and GO literals"
+}

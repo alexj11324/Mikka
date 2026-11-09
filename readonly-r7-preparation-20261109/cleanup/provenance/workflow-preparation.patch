@@ -1,0 +1,205 @@
+--- e5a/.github/workflows/issue1505-smoke-github-readonly.yml
++++ cleanup/bundle/.github/workflows/issue1505-smoke-github-readonly.yml.in
+@@ -1,8 +1,8 @@
+-# Exact cleanup of the single successful c9 prepare receipt; one bounded entry.
++# OFFLINE UNBOUND TEMPLATE. Cleanup of the next cycle's exact new receipt only.
+ name: Issue 1505 exact read-only child cleanup
+ on:
+   push:
+-    branches: [ops/1505-smoke-github-readonly-20261109]
++    branches: [ops/1505-readonly-r7-20261109]
+     paths:
+       - .github/workflows/issue1505-smoke-github-readonly.yml
+       - scripts/ops/issue1505/github-readonly-*.mjs
+@@ -15,20 +15,20 @@
+   queue: max
+ jobs:
+   cleanup:
+-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1505-smoke-github-readonly-20261109' && github.run_attempt == 1
++    if: false # OFFLINE_UNBOUND_DO_NOT_ACTIVATE
+     runs-on: ubuntu-latest
+-    timeout-minutes: 10
++    timeout-minutes: __REQUIRED_CLEANUP_JOB_MINUTES__
+     concurrency:
+       group: web-deploy-production
+       cancel-in-progress: false
+       queue: max
+     env:
+       MIKKA_EDITION: cloud
+-      MIKKA_GITHUB_REPAIR_GO: 'root-reviewed-1505-github-http-v6'
+-      MIKKA_1505_CLEANUP_WINDOW_START: '2026-11-09T13:33:00.000Z'
+-      MIKKA_1505_CLEANUP_ENTRY_DEADLINE: '2026-11-09T13:49:00.000Z'
+-      MIKKA_1505_CLEANUP_HARD_END: '2026-11-09T13:59:00.000Z'
+-      MIKKA_1505_CLEANUP_JOB_MINUTES: '10'
++      MIKKA_GITHUB_REPAIR_GO: 'root-reviewed-1505-github-r7-20261109-v1'
++      MIKKA_1505_CLEANUP_WINDOW_START: '__REQUIRED_CLEANUP_WINDOW_START_UTC__'
++      MIKKA_1505_CLEANUP_ENTRY_DEADLINE: '__REQUIRED_CLEANUP_ENTRY_DEADLINE_UTC__'
++      MIKKA_1505_CLEANUP_HARD_END: '__REQUIRED_CLEANUP_HARD_END_UTC__'
++      MIKKA_1505_CLEANUP_JOB_MINUTES: '__REQUIRED_CLEANUP_JOB_MINUTES__'
+     permissions:
+       contents: read
+       actions: read
+@@ -44,6 +44,9 @@
+         run: |
+           python3 - <<'PY'
+           import datetime,os
++          required_bindings={"prepareRunId":"__REQUIRED_PREPARE_RUN_ID__","prepareRunAttempt":"__REQUIRED_PREPARE_RUN_ATTEMPT__","prepareWorkflowId":"__REQUIRED_PREPARE_WORKFLOW_ID__","prepareHeadSha":"__REQUIRED_PREPARE_HEAD_SHA__","prepareBranch":"__REQUIRED_PREPARE_BRANCH__","artifactId":"__REQUIRED_ARTIFACT_ID__","artifactName":"__REQUIRED_ARTIFACT_NAME__","artifactBytes":"__REQUIRED_ARTIFACT_BYTES__","artifactDigest":"__REQUIRED_ARTIFACT_DIGEST__","zipSha256":"__REQUIRED_ZIP_SHA256__","receiptBytes":"__REQUIRED_RECEIPT_BYTES__","receiptSha256":"__REQUIRED_RECEIPT_SHA256__","cleanupClosedCommit":"__REQUIRED_CLEANUP_CLOSED_COMMIT__","cleanupClosedTree":"__REQUIRED_CLEANUP_CLOSED_TREE__","currentMainSha":"__REQUIRED_CLEANUP_CURRENT_MAIN_SHA__","windowStartUtc":"__REQUIRED_CLEANUP_WINDOW_START_UTC__","entryDeadlineUtc":"__REQUIRED_CLEANUP_ENTRY_DEADLINE_UTC__","hardEndUtc":"__REQUIRED_CLEANUP_HARD_END_UTC__","jobMinutes":"__REQUIRED_CLEANUP_JOB_MINUTES__"}
++          if any(not value or '__REQUIRED_' in value for value in required_bindings.values()):
++            raise SystemExit('issue1505_cleanup_binding_unfilled')
+           def stamp(name):
+             value=os.environ.get(name,'')
+             try:
+@@ -64,16 +67,16 @@
+           check_window()
+           import hashlib,json,pathlib,subprocess
+           root=pathlib.Path('.')
+-          assert os.environ.get('MIKKA_GITHUB_REPAIR_GO')=='root-reviewed-1505-github-http-v6'
++          assert os.environ.get('MIKKA_GITHUB_REPAIR_GO')=='root-reviewed-1505-github-r7-20261109-v1'
+           assert os.environ.get('GITHUB_REPOSITORY')=='alexj11324/Mikka'
+           assert os.environ.get('GITHUB_RUN_ATTEMPT')=='1'
+-          assert os.environ.get('GITHUB_REF')=='refs/heads/ops/1505-smoke-github-readonly-20261109'
++          assert os.environ.get('GITHUB_REF')=='refs/heads/ops/1505-readonly-r7-20261109'
+           def git(*args): return subprocess.check_output(['git',*args],text=True).strip()
+           assert git('rev-parse','HEAD')==os.environ['GITHUB_SHA']
+-          base='465f1b89c52228b99c4f2424f92722901b910754'
+-          assert git('rev-parse',base+'^{tree}')=='5053519fabc1e8ce3737f0166e61db1b29597be8'
++          base='__REQUIRED_CLEANUP_CLOSED_COMMIT__'
++          assert git('rev-parse',base+'^{tree}')=='__REQUIRED_CLEANUP_CLOSED_TREE__'
+           assert git('rev-list','--parents','-n','1','HEAD').split()[1:]==[base]
+-          expected={"scripts/ops/issue1505/github-readonly-provider.mjs":"23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e","scripts/ops/issue1505/github-readonly-helper.mjs":"cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742","scripts/ops/issue1505/github-readonly-store.mjs":"1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5","scripts/ops/issue1505/github-readonly-runner.mjs":"a94187ed60da64a0ef958de1186b2f51dae8f48f154de1895873e5ac351367fb","scripts/ops/issue1505/github-readonly.test.mjs":"293616146941d59d2196d7343899e1e9e24136ccab03e2025b59dd900e048994"}
++          expected={"scripts/ops/issue1505/github-readonly-provider.mjs":"23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e","scripts/ops/issue1505/github-readonly-helper.mjs":"cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742","scripts/ops/issue1505/github-readonly-store.mjs":"1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5","scripts/ops/issue1505/github-readonly-runner.mjs":"85a532d55bb0c9703b2e0e97693ce322b042c01e3768d85b41e7fde5a9e63029","scripts/ops/issue1505/github-readonly.test.mjs":"1ef0f176c458efa2e67bad134cbbf4fe8c014abfb1ddc95c04d941c7e3d13259"}
+           assert git('diff','--name-status','--no-renames',base,'HEAD')=='M\t.github/workflows/issue1505-smoke-github-readonly.yml'
+           assert not git('status','--porcelain=v1','--untracked-files=no')
+           for path,want in expected.items():
+@@ -89,11 +92,11 @@
+             with urllib.request.build_opener(NoRedirect()).open(request,timeout=20) as response:
+               if response.status!=200: raise ValueError()
+               actual=json.load(response)
+-            if actual.get('object',{}).get('sha')!='111a8dfb8b227ac0441324339ff42e4328ea609a': raise ValueError()
++            if actual.get('object',{}).get('sha')!='__REQUIRED_CLEANUP_CURRENT_MAIN_SHA__': raise ValueError()
+           except Exception:
+             raise SystemExit('issue1505_cleanup_current_main_changed_or_unavailable') from None
+           check_window()
+-          print(json.dumps({'status':'passed','source':os.environ['GITHUB_SHA'],'base':base,'unchangedExecutionFiles':len(expected),'workflowOnly':True,'currentMain':'111a8dfb8b227ac0441324339ff42e4328ea609a'}))
++          print(json.dumps({'status':'passed','source':os.environ['GITHUB_SHA'],'base':base,'unchangedExecutionFiles':len(expected),'workflowOnly':True,'currentMain':'__REQUIRED_CLEANUP_CURRENT_MAIN_SHA__'}))
+           PY
+       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+         with:
+@@ -133,7 +136,7 @@
+             with urllib.request.build_opener(NoRedirect()).open(request,timeout=20) as response:
+               if response.status!=200: raise ValueError()
+               actual=json.load(response)
+-            if actual.get('object',{}).get('sha')!='111a8dfb8b227ac0441324339ff42e4328ea609a': raise ValueError()
++            if actual.get('object',{}).get('sha')!='__REQUIRED_CLEANUP_CURRENT_MAIN_SHA__': raise ValueError()
+           except Exception:
+             raise SystemExit('issue1505_cleanup_current_main_changed_or_unavailable') from None
+           check_window()
+@@ -157,33 +160,33 @@
+             except Exception:
+               raise SystemExit('issue1505_cleanup_artifact_metadata_unavailable') from None
+           def source_matches(run):
+-            return (run.get('id')==42622019169 and run.get('run_attempt')==1
+-              and run.get('workflow_id')==411645081
++            return (run.get('id')==int('__REQUIRED_PREPARE_RUN_ID__') and run.get('run_attempt')==int('__REQUIRED_PREPARE_RUN_ATTEMPT__')
++              and run.get('workflow_id')==int('__REQUIRED_PREPARE_WORKFLOW_ID__')
+               and run.get('path')=='.github/workflows/issue1505-smoke-github-readonly.yml'
+               and run.get('event')=='push'
+-              and run.get('head_sha')=='c9b6f9531aa40dde6142291e2ce6bac476c5cea5'
+-              and run.get('head_branch')=='ops/1505-smoke-github-readonly-20261109'
++              and run.get('head_sha')=='__REQUIRED_PREPARE_HEAD_SHA__'
++              and run.get('head_branch')=='__REQUIRED_PREPARE_BRANCH__'
+               and run.get('repository',{}).get('id')==1427517699
+               and run.get('repository',{}).get('full_name')=='alexj11324/Mikka'
+               and run.get('head_repository',{}).get('id')==1427517699
+               and run.get('head_repository',{}).get('full_name')=='alexj11324/Mikka'
+               and run.get('status')=='completed' and run.get('conclusion')=='success')
+-          if not source_matches(read('actions/runs/42622019169')):
++          if not source_matches(read('actions/runs/__REQUIRED_PREPARE_RUN_ID__')):
+             raise SystemExit('issue1505_cleanup_source_run_changed')
+-          if not source_matches(read('actions/runs/42622019169/attempts/1')):
++          if not source_matches(read('actions/runs/__REQUIRED_PREPARE_RUN_ID__/attempts/__REQUIRED_PREPARE_RUN_ATTEMPT__')):
+             raise SystemExit('issue1505_cleanup_source_attempt_changed')
+-          artifact=read('actions/artifacts/13677458654')
++          artifact=read('actions/artifacts/__REQUIRED_ARTIFACT_ID__')
+           run=artifact.get('workflow_run') or {}
+-          expected_digest='sha256:87124f31fd4cfc332411985814650992fcdad9f21ca6f5a0709f70abb5c41a81'
+-          if not (artifact.get('id')==13677458654
+-            and artifact.get('name')=='issue1505-github-readonly-fresh-42622019169-1'
+-            and artifact.get('size_in_bytes')==925 and artifact.get('digest')==expected_digest
+-            and artifact.get('expired') is False and run.get('id')==42622019169
+-            and run.get('head_sha')=='c9b6f9531aa40dde6142291e2ce6bac476c5cea5'
+-            and run.get('head_branch')=='ops/1505-smoke-github-readonly-20261109'
++          expected_digest='__REQUIRED_ARTIFACT_DIGEST__'
++          if not (artifact.get('id')==int('__REQUIRED_ARTIFACT_ID__')
++            and artifact.get('name')=='__REQUIRED_ARTIFACT_NAME__'
++            and artifact.get('size_in_bytes')==int('__REQUIRED_ARTIFACT_BYTES__') and artifact.get('digest')==expected_digest
++            and artifact.get('expired') is False and run.get('id')==int('__REQUIRED_PREPARE_RUN_ID__')
++            and run.get('head_sha')=='__REQUIRED_PREPARE_HEAD_SHA__'
++            and run.get('head_branch')=='__REQUIRED_PREPARE_BRANCH__'
+             and run.get('repository_id')==1427517699 and run.get('head_repository_id')==1427517699):
+             raise SystemExit('issue1505_cleanup_artifact_identity_changed')
+-          print(json.dumps({'status':'bound','artifactId':13677458654,'sourceRun':42622019169,'sourceAttempt':1,'zipBytes':925,'zipDigest':expected_digest}))
++          print(json.dumps({'status':'bound','artifactId':int('__REQUIRED_ARTIFACT_ID__'),'sourceRun':int('__REQUIRED_PREPARE_RUN_ID__'),'sourceAttempt':int('__REQUIRED_PREPARE_RUN_ATTEMPT__'),'zipBytes':int('__REQUIRED_ARTIFACT_BYTES__'),'zipDigest':expected_digest}))
+           PY
+       - name: Download the exact fresh prepare ZIP without forwarding authorization
+         env:
+@@ -253,8 +256,8 @@
+           
+           if __name__=='__main__':
+             try:
+-              archive,host=download_archive(os.environ.get('GITHUB_TOKEN'),13677458654,925,
+-                '87124f31fd4cfc332411985814650992fcdad9f21ca6f5a0709f70abb5c41a81')
++              archive,host=download_archive(os.environ.get('GITHUB_TOKEN'),int('__REQUIRED_ARTIFACT_ID__'),int('__REQUIRED_ARTIFACT_BYTES__'),
++                '__REQUIRED_ZIP_SHA256__')
+               directory=pathlib.Path(os.environ['RUNNER_TEMP'])/'issue1505-readonly-original'
+               directory.mkdir(mode=0o700,exist_ok=False)
+               target=directory/'archive.zip'
+@@ -263,7 +266,7 @@
+                 output.write(archive)
+                 output.flush()
+                 os.fsync(output.fileno())
+-              print(json.dumps({'status':'downloaded_immutable_zip','artifactId':13677458654,
++              print(json.dumps({'status':'downloaded_immutable_zip','artifactId':int('__REQUIRED_ARTIFACT_ID__'),
+                 'zipBytes':len(archive),'zipSha256':hashlib.sha256(archive).hexdigest(),
+                 'downloadHost':host,'redirectAuthorizationForwarded':False}))
+             except DownloadRejected as error:
+@@ -333,11 +336,11 @@
+                 reject('input_not_regular')
+               archive=source.read_bytes()
+               members={
+-                'receipt.json':{'bytes':2132,'sha256':'80031945234e34264c558f830bd64bfa651858e69dbfdfa6354b62deb2a2022d'},
++                'receipt.json':{'bytes':int('__REQUIRED_RECEIPT_BYTES__'),'sha256':'__REQUIRED_RECEIPT_SHA256__'},
+               }
+-              original=verified_receipt(archive,925,
+-                '87124f31fd4cfc332411985814650992fcdad9f21ca6f5a0709f70abb5c41a81',members)
+-              wanted='80031945234e34264c558f830bd64bfa651858e69dbfdfa6354b62deb2a2022d'
++              original=verified_receipt(archive,int('__REQUIRED_ARTIFACT_BYTES__'),
++                '__REQUIRED_ZIP_SHA256__',members)
++              wanted='__REQUIRED_RECEIPT_SHA256__'
+               directory=pathlib.Path(os.environ['RUNNER_TEMP'])/'issue1505-cleanup-input'
+               directory.mkdir(mode=0o700,exist_ok=False)
+               target=directory/'receipt.json'
+@@ -348,7 +351,7 @@
+                 os.fsync(output.fileno())
+               if target.read_bytes()!=original:
+                 reject('input_copy_changed')
+-              print(json.dumps({'status':'verified','artifactId':13677458654,'archiveMembersVerified':1,
++              print(json.dumps({'status':'verified','artifactId':int('__REQUIRED_ARTIFACT_ID__'),'archiveMembersVerified':1,
+                 'selectedMember':'receipt.json','originalReceiptBytes':len(original),
+                 'originalReceiptSha256':wanted,'byteIdenticalInput':True}))
+             except ArchiveRejected as error:
+@@ -472,12 +475,12 @@
+             with urllib.request.build_opener(NoRedirect()).open(request,timeout=20) as response:
+               if response.status!=200: raise ValueError()
+               actual=json.load(response)
+-            if actual.get('object',{}).get('sha')!='111a8dfb8b227ac0441324339ff42e4328ea609a': raise ValueError()
++            if actual.get('object',{}).get('sha')!='__REQUIRED_CLEANUP_CURRENT_MAIN_SHA__': raise ValueError()
+           except Exception:
+             raise SystemExit('issue1505_cleanup_current_main_changed_or_unavailable') from None
+           check_window()
+           PY
+-          node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1505/github-readonly-runner.mjs --cleanup "$RUNNER_TEMP/issue1505-cleanup-input/receipt.json" 80031945234e34264c558f830bd64bfa651858e69dbfdfa6354b62deb2a2022d
++          node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1505/github-readonly-runner.mjs --cleanup "$RUNNER_TEMP/issue1505-cleanup-input/receipt.json" __REQUIRED_RECEIPT_SHA256__
+       - if: always()
+         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+         with:

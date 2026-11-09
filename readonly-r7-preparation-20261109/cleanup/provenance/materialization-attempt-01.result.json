@@ -1,0 +1,11 @@
+{
+  "command": ["python", "prepare-cleanup-template.py"],
+  "cwd": "/workspace/scratch/263e36984c81/readonly-r7-preparation-1505",
+  "exitCode": 1,
+  "observedAtUtc": "2026-11-09T15:43:26Z",
+  "scope": "local static materialization only; zero tests or production/network statements",
+  "failure": "Inverse literal check counted the shorter run metadata URL as a substring of the attempt URL.",
+  "correction": "Match the complete quoted source URL literals, including their closing quote; no workflow or helper runtime logic changed.",
+  "workflowWrittenBeforeFailure": false,
+  "stderrSource": "verbatim exec tool output retained after the call"
+}
