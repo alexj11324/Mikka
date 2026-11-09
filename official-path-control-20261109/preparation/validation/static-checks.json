@@ -1,0 +1,59 @@
+{
+  "syntax": {
+    "observer": true,
+    "tests": true,
+    "guest": true,
+    "workflowYaml": true
+  },
+  "disabled": true,
+  "timePinsUnbound": true,
+  "exactThreeFileBundle": true,
+  "oidcBlockByteIdenticalTo08d": true,
+  "oneE2bSecretOnly": true,
+  "jobCeilingMinutes": 20,
+  "cleanupStepMinutes": 3,
+  "guestFunctionsByteIdenticalTo1e": {
+    "identity": true,
+    "node": true,
+    "command": true,
+    "systemd": true,
+    "main": true
+  },
+  "fixedOrderedParents": [
+    "5ba1f9e2359ce714d83cd16fc040f2567c40a6d0",
+    "e93477fe401c70dca532784e71b76d56877b6899"
+  ],
+  "scope": {
+    "codexPaths": [
+      "/usr/local/share/ca-certificates/e2b-ca.crt"
+    ],
+    "desktopPaths": [
+      "/var/lib/apt/extended_states",
+      "/var/backups/apt.extended_states.0"
+    ],
+    "units": [
+      "apt-daily.service",
+      "apt-daily-upgrade.service",
+      "apt-daily.timer",
+      "apt-daily-upgrade.timer"
+    ],
+    "serviceFields": [
+      "ActiveState",
+      "SubState",
+      "MainPID",
+      "ExecMainStartTimestamp",
+      "ExecMainExitTimestamp",
+      "InvocationID",
+      "Result"
+    ],
+    "timerFields": [
+      "LastTriggerUSec"
+    ]
+  },
+  "testMethodCount": 36,
+  "runtime": {
+    "python": "3.12.14",
+    "yaml": "6.0.3"
+  },
+  "noOperatorFunctionsExecuted": true
+}

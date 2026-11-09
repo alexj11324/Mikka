@@ -1,0 +1,356 @@
+{
+  "buildId": "c31e096e-3477-4685-b914-03b2a86dfee8",
+  "buildStarted": true,
+  "cleanup": {
+    "errors": [],
+    "sandbox": {
+      "absenceConfirmedById": true,
+      "id": "i60s51yizx5bykzpp83df"
+    },
+    "status": "complete",
+    "templates": [
+      {
+        "kind": "desktop",
+        "name": "mikka-1505-official-path-control-42670291715-1-desktop",
+        "status": "absent",
+        "templateId": "itr4vtex1pbr2lh6a10v"
+      }
+    ]
+  },
+  "createStarted": true,
+  "identity": {
+    "application": "mikka-1505-official-path-control",
+    "opsCommit": "b75871ea1753f75769daa33b095704475cf9a4a2",
+    "ref": "refs/heads/ops/1505-smoke-github-readonly-20261109",
+    "repository": "alexj11324/Mikka",
+    "runAttempt": "1",
+    "runId": "42670291715",
+    "sourceCommit": "5ba1f9e2359ce714d83cd16fc040f2567c40a6d0"
+  },
+  "kind": "desktop",
+  "name": "mikka-1505-official-path-control-42670291715-1-desktop",
+  "observations": {
+    "before": {
+      "apt": {
+        "units": {
+          "apt-daily-upgrade.service": {
+            "status": "observed",
+            "values": {
+              "ActiveState": "inactive",
+              "ExecMainExitTimestamp": "n/a",
+              "ExecMainStartTimestamp": "n/a",
+              "InvocationID": "",
+              "MainPID": "0",
+              "Result": "success",
+              "SubState": "dead"
+            }
+          },
+          "apt-daily-upgrade.timer": {
+            "status": "observed",
+            "values": {
+              "LastTriggerUSec": "Mon 2026-11-02 14:36:43 UTC"
+            }
+          },
+          "apt-daily.service": {
+            "status": "observed",
+            "values": {
+              "ActiveState": "inactive",
+              "ExecMainExitTimestamp": "n/a",
+              "ExecMainStartTimestamp": "n/a",
+              "InvocationID": "",
+              "MainPID": "0",
+              "Result": "success",
+              "SubState": "dead"
+            }
+          },
+          "apt-daily.timer": {
+            "status": "observed",
+            "values": {
+              "LastTriggerUSec": "Tue 2026-10-06 13:35:18 UTC"
+            }
+          }
+        }
+      },
+      "bootId": "c328594a-7fd2-4595-b65e-5ef71fdc54c9",
+      "kind": "desktop",
+      "monotonicNs": 26665985855,
+      "nodes": [
+        {
+          "ctimeNs": 1793630289577333380,
+          "device": 65024,
+          "gid": 0,
+          "inode": 27661,
+          "kind": "file",
+          "mode": 420,
+          "mtimeNs": 1793630289573333238,
+          "path": "/var/lib/apt/extended_states",
+          "sha256": "da850c564cb1797d4ccea654530605994986e9a81497d9f47fa8497504e89347",
+          "size": 64336,
+          "status": "present",
+          "uid": 0
+        },
+        {
+          "ctimeNs": 1793630234257775707,
+          "device": 65024,
+          "gid": 0,
+          "inode": 375,
+          "kind": "file",
+          "mode": 420,
+          "mtimeNs": 1793630156179741959,
+          "path": "/var/backups/apt.extended_states.0",
+          "sha256": "52f87bdad074b319ed8b601e4c5e97ab0d5ce235bafac3213d32f1873f7413ac",
+          "size": 64273,
+          "status": "present",
+          "uid": 0
+        }
+      ],
+      "phase": "before",
+      "utcNs": 1794247366316355251,
+      "version": 1
+    },
+    "fresh": {
+      "apt": {
+        "units": {
+          "apt-daily-upgrade.service": {
+            "status": "observed",
+            "values": {
+              "ActiveState": "inactive",
+              "ExecMainExitTimestamp": "n/a",
+              "ExecMainStartTimestamp": "n/a",
+              "InvocationID": "",
+              "MainPID": "0",
+              "Result": "success",
+              "SubState": "dead"
+            }
+          },
+          "apt-daily-upgrade.timer": {
+            "status": "observed",
+            "values": {
+              "LastTriggerUSec": "Mon 2026-11-02 14:36:43 UTC"
+            }
+          },
+          "apt-daily.service": {
+            "status": "observed",
+            "values": {
+              "ActiveState": "inactive",
+              "ExecMainExitTimestamp": "n/a",
+              "ExecMainStartTimestamp": "n/a",
+              "InvocationID": "",
+              "MainPID": "0",
+              "Result": "success",
+              "SubState": "dead"
+            }
+          },
+          "apt-daily.timer": {
+            "status": "observed",
+            "values": {
+              "LastTriggerUSec": "Tue 2026-10-06 13:35:18 UTC"
+            }
+          }
+        }
+      },
+      "bootId": "6544a3ab-e184-460e-9aee-f08f65638ea3",
+      "kind": "desktop",
+      "monotonicNs": 19686225810,
+      "nodes": [
+        {
+          "ctimeNs": 1793630289577333380,
+          "device": 65024,
+          "gid": 0,
+          "inode": 27661,
+          "kind": "file",
+          "mode": 420,
+          "mtimeNs": 1793630289573333238,
+          "path": "/var/lib/apt/extended_states",
+          "sha256": "da850c564cb1797d4ccea654530605994986e9a81497d9f47fa8497504e89347",
+          "size": 64336,
+          "status": "present",
+          "uid": 0
+        },
+        {
+          "ctimeNs": 1793630234257775707,
+          "device": 65024,
+          "gid": 0,
+          "inode": 375,
+          "kind": "file",
+          "mode": 420,
+          "mtimeNs": 1793630156179741959,
+          "path": "/var/backups/apt.extended_states.0",
+          "sha256": "52f87bdad074b319ed8b601e4c5e97ab0d5ce235bafac3213d32f1873f7413ac",
+          "size": 64273,
+          "status": "present",
+          "uid": 0
+        }
+      ],
+      "phase": "fresh",
+      "utcNs": 1794247390116862552,
+      "version": 1
+    },
+    "pre_finalization": {
+      "apt": {
+        "units": {
+          "apt-daily-upgrade.service": {
+            "status": "observed",
+            "values": {
+              "ActiveState": "inactive",
+              "ExecMainExitTimestamp": "n/a",
+              "ExecMainStartTimestamp": "n/a",
+              "InvocationID": "",
+              "MainPID": "0",
+              "Result": "success",
+              "SubState": "dead"
+            }
+          },
+          "apt-daily-upgrade.timer": {
+            "status": "observed",
+            "values": {
+              "LastTriggerUSec": "Mon 2026-11-02 14:36:43 UTC"
+            }
+          },
+          "apt-daily.service": {
+            "status": "observed",
+            "values": {
+              "ActiveState": "inactive",
+              "ExecMainExitTimestamp": "n/a",
+              "ExecMainStartTimestamp": "n/a",
+              "InvocationID": "",
+              "MainPID": "0",
+              "Result": "success",
+              "SubState": "dead"
+            }
+          },
+          "apt-daily.timer": {
+            "status": "observed",
+            "values": {
+              "LastTriggerUSec": "Tue 2026-10-06 13:35:18 UTC"
+            }
+          }
+        }
+      },
+      "bootId": "c328594a-7fd2-4595-b65e-5ef71fdc54c9",
+      "kind": "desktop",
+      "monotonicNs": 26997538141,
+      "nodes": [
+        {
+          "ctimeNs": 1793630289577333380,
+          "device": 65024,
+          "gid": 0,
+          "inode": 27661,
+          "kind": "file",
+          "mode": 420,
+          "mtimeNs": 1793630289573333238,
+          "path": "/var/lib/apt/extended_states",
+          "sha256": "da850c564cb1797d4ccea654530605994986e9a81497d9f47fa8497504e89347",
+          "size": 64336,
+          "status": "present",
+          "uid": 0
+        },
+        {
+          "ctimeNs": 1793630234257775707,
+          "device": 65024,
+          "gid": 0,
+          "inode": 375,
+          "kind": "file",
+          "mode": 420,
+          "mtimeNs": 1793630156179741959,
+          "path": "/var/backups/apt.extended_states.0",
+          "sha256": "52f87bdad074b319ed8b601e4c5e97ab0d5ce235bafac3213d32f1873f7413ac",
+          "size": 64273,
+          "status": "present",
+          "uid": 0
+        }
+      ],
+      "phase": "pre_finalization",
+      "utcNs": 1794247366736843776,
+      "version": 1
+    },
+    "ready": {
+      "apt": {
+        "units": {
+          "apt-daily-upgrade.service": {
+            "status": "observed",
+            "values": {
+              "ActiveState": "inactive",
+              "ExecMainExitTimestamp": "n/a",
+              "ExecMainStartTimestamp": "n/a",
+              "InvocationID": "",
+              "MainPID": "0",
+              "Result": "success",
+              "SubState": "dead"
+            }
+          },
+          "apt-daily-upgrade.timer": {
+            "status": "observed",
+            "values": {
+              "LastTriggerUSec": "Mon 2026-11-02 14:36:43 UTC"
+            }
+          },
+          "apt-daily.service": {
+            "status": "observed",
+            "values": {
+              "ActiveState": "inactive",
+              "ExecMainExitTimestamp": "n/a",
+              "ExecMainStartTimestamp": "n/a",
+              "InvocationID": "",
+              "MainPID": "0",
+              "Result": "success",
+              "SubState": "dead"
+            }
+          },
+          "apt-daily.timer": {
+            "status": "observed",
+            "values": {
+              "LastTriggerUSec": "Tue 2026-10-06 13:35:18 UTC"
+            }
+          }
+        }
+      },
+      "bootId": "6544a3ab-e184-460e-9aee-f08f65638ea3",
+      "kind": "desktop",
+      "monotonicNs": 950025536,
+      "nodes": [
+        {
+          "ctimeNs": 1793630289577333380,
+          "device": 65024,
+          "gid": 0,
+          "inode": 27661,
+          "kind": "file",
+          "mode": 420,
+          "mtimeNs": 1793630289573333238,
+          "path": "/var/lib/apt/extended_states",
+          "sha256": "da850c564cb1797d4ccea654530605994986e9a81497d9f47fa8497504e89347",
+          "size": 64336,
+          "status": "present",
+          "uid": 0
+        },
+        {
+          "ctimeNs": 1793630234257775707,
+          "device": 65024,
+          "gid": 0,
+          "inode": 375,
+          "kind": "file",
+          "mode": 420,
+          "mtimeNs": 1793630156179741959,
+          "path": "/var/backups/apt.extended_states.0",
+          "sha256": "52f87bdad074b319ed8b601e4c5e97ab0d5ce235bafac3213d32f1873f7413ac",
+          "size": 64273,
+          "status": "present",
+          "uid": 0
+        }
+      ],
+      "phase": "ready",
+      "utcNs": 1794247368739022034,
+      "version": 1
+    }
+  },
+  "policyChanged": false,
+  "probe": {
+    "phase": "complete",
+    "status": "observed"
+  },
+  "releaseAccepted": false,
+  "sandboxId": "i60s51yizx5bykzpp83df",
+  "targetedOnly": true,
+  "templateId": "itr4vtex1pbr2lh6a10v",
+  "version": 1
+}

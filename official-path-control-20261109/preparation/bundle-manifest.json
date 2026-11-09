@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "active": false,
+  "files": [
+    {
+      "path": ".github/workflows/issue1505-official-path-control.yml.in",
+      "mode": "100644",
+      "bytes": 3654,
+      "sha256": "6fd8dd577c7dfd291e3aa52efc34118c45a157c7803c8ca6d5745959070bb3bc",
+      "gitBlob": "de242448ea7ed635924cbfe68a929c96d349e4e9"
+    },
+    {
+      "path": "scripts/ops/issue1505-official-path-control.py",
+      "mode": "100644",
+      "bytes": 30245,
+      "sha256": "f3ba95f35e783ae4b856d8b3daa95fc0f92fcf5037c8f72e80ed01efa5999d9c",
+      "gitBlob": "58bbc4de18d41eb9735ed79c732f467834015e80"
+    },
+    {
+      "path": "scripts/ops/issue1505-official-path-control.test.py",
+      "mode": "100644",
+      "bytes": 33784,
+      "sha256": "a9a9fa79099eecd29b8fd6ec4635177246a3c8569848c482ed9441cb44fe9761",
+      "gitBlob": "14076ad0e99a9f35602df13a11827487154383b6"
+    }
+  ]
+}

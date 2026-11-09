@@ -1,0 +1,124 @@
+{
+  "buildId": "67996d67-6f74-4a01-87df-dba93c5698c3",
+  "buildStarted": true,
+  "cleanup": {
+    "errors": [],
+    "sandbox": {
+      "absenceConfirmedById": true,
+      "id": "idhdaiwdpb5mu9rga5nx3"
+    },
+    "status": "complete",
+    "templates": [
+      {
+        "kind": "codex",
+        "name": "mikka-1505-official-path-control-42670291715-1-codex",
+        "status": "absent",
+        "templateId": "dfkgci7cyrpu3lxurfja"
+      }
+    ]
+  },
+  "createStarted": true,
+  "identity": {
+    "application": "mikka-1505-official-path-control",
+    "opsCommit": "b75871ea1753f75769daa33b095704475cf9a4a2",
+    "ref": "refs/heads/ops/1505-smoke-github-readonly-20261109",
+    "repository": "alexj11324/Mikka",
+    "runAttempt": "1",
+    "runId": "42670291715",
+    "sourceCommit": "5ba1f9e2359ce714d83cd16fc040f2567c40a6d0"
+  },
+  "kind": "codex",
+  "name": "mikka-1505-official-path-control-42670291715-1-codex",
+  "observations": {
+    "before": {
+      "apt": null,
+      "bootId": "bfcc8656-5af0-4f30-970e-462ccc9c9cfd",
+      "kind": "codex",
+      "monotonicNs": 8486921649,
+      "nodes": [
+        {
+          "gid": 0,
+          "kind": "file",
+          "mode": 420,
+          "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+          "sha256": "713ed37b92f312cf89345677c1d7f413c55b38ca0c1c636ce0fecc672d08ed9a",
+          "status": "present",
+          "uid": 0
+        }
+      ],
+      "phase": "before",
+      "utcNs": 1794247349350326626,
+      "version": 1
+    },
+    "fresh": {
+      "apt": null,
+      "bootId": "e15e0619-7d9b-45e5-95e2-eb1798713281",
+      "kind": "codex",
+      "monotonicNs": 7272307103,
+      "nodes": [
+        {
+          "gid": 0,
+          "kind": "file",
+          "mode": 511,
+          "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+          "sha256": "545244c4bc7f902ed9a6d843dd6ccaed08d0a59bbfc1b60064bd0278e026da5a",
+          "status": "present",
+          "uid": 0
+        }
+      ],
+      "phase": "fresh",
+      "utcNs": 1794247361582618182,
+      "version": 1
+    },
+    "pre_finalization": {
+      "apt": null,
+      "bootId": "bfcc8656-5af0-4f30-970e-462ccc9c9cfd",
+      "kind": "codex",
+      "monotonicNs": 8741068548,
+      "nodes": [
+        {
+          "gid": 0,
+          "kind": "file",
+          "mode": 420,
+          "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+          "sha256": "713ed37b92f312cf89345677c1d7f413c55b38ca0c1c636ce0fecc672d08ed9a",
+          "status": "present",
+          "uid": 0
+        }
+      ],
+      "phase": "pre_finalization",
+      "utcNs": 1794247349713781941,
+      "version": 1
+    },
+    "ready": {
+      "apt": null,
+      "bootId": "e15e0619-7d9b-45e5-95e2-eb1798713281",
+      "kind": "codex",
+      "monotonicNs": 2015132241,
+      "nodes": [
+        {
+          "gid": 0,
+          "kind": "file",
+          "mode": 511,
+          "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+          "sha256": "713ed37b92f312cf89345677c1d7f413c55b38ca0c1c636ce0fecc672d08ed9a",
+          "status": "present",
+          "uid": 0
+        }
+      ],
+      "phase": "ready",
+      "utcNs": 1794247354016092312,
+      "version": 1
+    }
+  },
+  "policyChanged": false,
+  "probe": {
+    "phase": "complete",
+    "status": "observed"
+  },
+  "releaseAccepted": false,
+  "sandboxId": "idhdaiwdpb5mu9rga5nx3",
+  "targetedOnly": true,
+  "templateId": "dfkgci7cyrpu3lxurfja",
+  "version": 1
+}

@@ -1,0 +1,62 @@
+{
+  "budget": {
+    "absoluteDeadline": "2026-11-09T18:16:26Z",
+    "afterObservationDeadlineCleanup": false,
+    "buildObservationSeconds": 600,
+    "cleanupOnlyMaxSeconds": 150,
+    "desktopNoopSeconds": 0,
+    "freshInstances": 2,
+    "modelCalls": 0,
+    "overallSeconds": 900,
+    "privateTemplates": 2,
+    "workerInstallCommands": 0
+  },
+  "cleanup": {
+    "codex": {
+      "errors": [],
+      "sandbox": {
+        "absenceConfirmedById": true,
+        "id": "idhdaiwdpb5mu9rga5nx3"
+      },
+      "status": "complete",
+      "templates": [
+        {
+          "kind": "codex",
+          "name": "mikka-1505-official-path-control-42670291715-1-codex",
+          "status": "absent",
+          "templateId": "dfkgci7cyrpu3lxurfja"
+        }
+      ]
+    },
+    "desktop": {
+      "errors": [],
+      "sandbox": {
+        "absenceConfirmedById": true,
+        "id": "i60s51yizx5bykzpp83df"
+      },
+      "status": "complete",
+      "templates": [
+        {
+          "kind": "desktop",
+          "name": "mikka-1505-official-path-control-42670291715-1-desktop",
+          "status": "absent",
+          "templateId": "itr4vtex1pbr2lh6a10v"
+        }
+      ]
+    }
+  },
+  "failure": null,
+  "identity": {
+    "application": "mikka-1505-official-path-control",
+    "opsCommit": "b75871ea1753f75769daa33b095704475cf9a4a2",
+    "ref": "refs/heads/ops/1505-smoke-github-readonly-20261109",
+    "repository": "alexj11324/Mikka",
+    "runAttempt": "1",
+    "runId": "42670291715",
+    "sourceCommit": "5ba1f9e2359ce714d83cd16fc040f2567c40a6d0"
+  },
+  "policyChanged": false,
+  "releaseAccepted": false,
+  "targetedOnly": true,
+  "version": 1
+}

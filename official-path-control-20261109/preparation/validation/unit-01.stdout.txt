@@ -1,0 +1,2 @@
+{"cleanup": {"codex": {"errors": [{"code": "deadline", "type": "Deadline"}], "status": "not_attempted_deadline"}, "desktop": {"errors": [{"code": "deadline", "type": "Deadline"}], "status": "failed"}}, "failure": null, "type": "issue1505_official_path_control"}
+{"cleanup": {"codex": {"status": "complete"}, "desktop": {"status": "complete"}}, "failure": null, "type": "issue1505_official_path_control"}

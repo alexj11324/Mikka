@@ -1,0 +1,35 @@
+{
+  "sha": "376298951e4eee5970e2f0d00e21acb3ffba4e18",
+  "node_id": "C_kwDOVRYxA9oAKDM3NjI5ODk1MWU0ZWVlNTk3MGUyZjBkMDBlMjFhY2IzZmZiYTRlMTg",
+  "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/376298951e4eee5970e2f0d00e21acb3ffba4e18",
+  "html_url": "https://github.com/alexj11324/Mikka/commit/376298951e4eee5970e2f0d00e21acb3ffba4e18",
+  "author": {
+    "name": "Zhixuan Jiang",
+    "email": "zhixuanj@andrew.cmu.edu",
+    "date": "2026-11-09T18:04:47Z"
+  },
+  "committer": {
+    "name": "Zhixuan Jiang",
+    "email": "zhixuanj@andrew.cmu.edu",
+    "date": "2026-11-09T18:04:47Z"
+  },
+  "tree": {
+    "sha": "6a6b67df65ef69e655865936eaf6e8b67ece9342",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/trees/6a6b67df65ef69e655865936eaf6e8b67ece9342"
+  },
+  "message": "ops(1505): close the completed official path control",
+  "parents": [
+    {
+      "sha": "b75871ea1753f75769daa33b095704475cf9a4a2",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/b75871ea1753f75769daa33b095704475cf9a4a2",
+      "html_url": "https://github.com/alexj11324/Mikka/commit/b75871ea1753f75769daa33b095704475cf9a4a2"
+    }
+  ],
+  "verification": {
+    "verified": false,
+    "reason": "unsigned",
+    "signature": null,
+    "payload": null,
+    "verified_at": null
+  }
+}

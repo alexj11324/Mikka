@@ -1,0 +1,9 @@
+Reviewer: /root/web_wait_review
+Method: read-only static review of supplied complete changed-function excerpts and fixed upstream sources.
+
+No concrete blocking issue found in the received excerpts.
+Read directly: host OBSERVED_PATHS/closed_codex_root/observation; exact ordered double-parent plus three A/100644-entry guard; guest codex_root/observe/main/entry; fixed 08d822da and 1e351dcf upstream sources.
+Confirmed: Codex root-only export matches host schema; absent/changed_during_read/too_large/non-file does not fabricate a digest; Desktop has exactly two nodes and four units with matching closed fields; no CLI/dpkg/APT execution. Exact names, raw A changes, zero old OID and regular 100644 modes reject renames and additional product deltas. Parent order and count are exact, preserving carrier ancestry without bringing its tree into the operator.
+
+Limit: reviewer could not access the complete local bundle/final workflow/tests because its execution environment was unavailable. Eleven host-function and guest-function byte preservation checks and 36/36 results are implementation-agent local evidence, not reviewer reruns. Root independently read the full workflow and observer.
+Observation completion is not reproduction, unique-writer attribution, whole-filesystem conservation, CLI execution, or release acceptance. No further gate or code change requested.

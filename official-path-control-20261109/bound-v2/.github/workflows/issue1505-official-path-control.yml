@@ -1,0 +1,85 @@
+name: Issue 1505 official Codex and Desktop path control
+
+on:
+  push:
+    branches: [ops/1505-smoke-github-readonly-20261109]
+    paths:
+      - .github/workflows/issue1505-official-path-control.yml
+      - scripts/ops/issue1505-official-path-control.py
+      - scripts/ops/issue1505-official-path-control.test.py
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: issue1505-official-path-control
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  observe:
+    # Root-reviewed single official-only diagnostic window; attempt 1 only.
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1505-smoke-github-readonly-20261109' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    # Observation remains 900s; this ceiling leaves the 150s cleanup-only recheck.
+    timeout-minutes: 20
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      CONTROL_GO: 'root-reviewed-1505-official-path-control-20261109-v1'
+      CONTROL_NOT_BEFORE: 2026-11-09T18:01:26Z
+      CONTROL_DEADLINE: 2026-11-09T18:16:26Z
+    steps:
+      - name: Check out the fixed product source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 5ba1f9e2359ce714d83cd16fc040f2567c40a6d0
+          path: source
+          persist-credentials: false
+      - name: Check out this diagnostic revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          path: ops
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify offline source and ownership guards
+        run: |
+          python3 -B ops/scripts/ops/issue1505-official-path-control.test.py
+          python3 -B ops/scripts/ops/issue1505-official-path-control.py verify --source source --output "$RUNNER_TEMP/issue1505-official-path-control"
+      - name: Install only the pinned control SDK
+        run: |
+          python3 -m venv "$RUNNER_TEMP/issue1505-official-path-sdk"
+          "$RUNNER_TEMP/issue1505-official-path-sdk/bin/pip" install --disable-pip-version-check 'e2b==2.62.0'
+      - name: Recheck absolute budget before requesting the key
+        run: python3 -B ops/scripts/ops/issue1505-official-path-control.py verify --source source --output "$RUNNER_TEMP/issue1505-official-path-control"
+      - name: Read only the existing E2B key
+        id: key
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: E2B_API_KEY
+          include-imports: false
+      - name: Observe only fixed Desktop APT and Codex root CA metadata
+        run: >-
+          "$RUNNER_TEMP/issue1505-official-path-sdk/bin/python" -B ops/scripts/ops/issue1505-official-path-control.py diagnose
+          --source source --output "$RUNNER_TEMP/issue1505-official-path-control"
+      - name: Recheck exact owned instances and private templates
+        if: always() && steps.key.outcome == 'success'
+        timeout-minutes: 3
+        run: >-
+          "$RUNNER_TEMP/issue1505-official-path-sdk/bin/python" -B ops/scripts/ops/issue1505-official-path-control.py cleanup
+          --source source --output "$RUNNER_TEMP/issue1505-official-path-control"
+      - name: Preserve closed observations and cleanup receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue1505-official-path-control-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/issue1505-official-path-control/
+          if-no-files-found: warn
+          retention-days: 7

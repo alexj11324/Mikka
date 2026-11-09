@@ -1,0 +1,36 @@
+{
+  "sha": "b52445d24978dc46235b0744783eb7ebb3c3e397",
+  "node_id": "C_kwDOVRYxA9oAKGI1MjQ0NWQyNDk3OGRjNDYyMzViMDc0NDc4M2ViN2ViYjNjM2UzOTc",
+  "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/b52445d24978dc46235b0744783eb7ebb3c3e397",
+  "html_url": "https://github.com/alexj11324/Mikka/commit/b52445d24978dc46235b0744783eb7ebb3c3e397",
+  "author": {
+    "name": "Zhixuan Jiang",
+    "email": "zhixuanj@andrew.cmu.edu",
+    "date": "2026-11-09T17:55:30Z"
+  },
+  "committer": {
+    "name": "Zhixuan Jiang",
+    "email": "zhixuanj@andrew.cmu.edu",
+    "date": "2026-11-09T17:55:30Z"
+  },
+  "tree": {
+    "sha": "d9f16afa55499aa7ef267016825663df5c6cc506",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/trees/d9f16afa55499aa7ef267016825663df5c6cc506"
+  },
+  "message": "ops(1505): close the pre-credential failed control entry",
+  "parents": [
+    {
+      "sha": "37270bae536fec5090de35586257572c141edee7",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/37270bae536fec5090de35586257572c141edee7",
+      "html_url": "https://github.com/alexj11324/Mikka/commit/37270bae536fec5090de35586257572c141edee7"
+    }
+  ],
+  "verification": {
+    "verified": false,
+    "reason": "unsigned",
+    "signature": null,
+    "payload": null,
+    "verified_at": null
+  }
+}
+

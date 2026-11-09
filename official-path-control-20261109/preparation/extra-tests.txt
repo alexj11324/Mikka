@@ -1,0 +1,193 @@
+class PathScopeTests(unittest.TestCase):
+    def test_exact_ordered_parents_accept_only_source_then_closed_carrier(self):
+        def fake_git(parents):
+            def read(directory,*args):
+                if args==('rev-parse','HEAD'):
+                    return control.SOURCE if directory==SOURCE else CTX['opsCommit']
+                if args==('rev-list','--parents','-n','1','HEAD'):
+                    return ' '.join([CTX['opsCommit'],*parents])
+                if args[:2]==('diff','--raw'):
+                    return '\n'.join(':000000 100644 '+'0'*40+' '+'c'*40+' A\t'+path for path in control.PATHS)
+                return '\n'.join(control.PATHS)
+            return read
+        expected=[control.SOURCE,control.CARRIER_PARENT]
+        with patch.object(control,'git',side_effect=fake_git(expected)),patch.object(control.subprocess,'run',return_value=types.SimpleNamespace(returncode=0)):
+            control.checkouts(SOURCE,Path('ops'),CTX)
+        invalid=[expected[::-1],[control.SOURCE,'b'*40],['b'*40,control.CARRIER_PARENT],
+                 [control.SOURCE],[*expected,'b'*40]]
+        for parents in invalid:
+            with self.subTest(parents=parents),patch.object(control,'git',side_effect=fake_git(parents)), \
+                 patch.object(control.subprocess,'run',return_value=types.SimpleNamespace(returncode=0)),self.assertRaises(control.Failure):
+                control.checkouts(SOURCE,Path('ops'),CTX)
+
+    def test_overlay_adds_only_three_regular_files_without_old_carrier_tree(self):
+        correct=[':000000 100644 '+'0'*40+' '+'c'*40+' A\t'+path for path in control.PATHS]
+        invalid=[correct[1:],correct+[correct[0]],
+                 [correct[0].replace('100644','120000'),*correct[1:]],
+                 [correct[0].replace('100644','100755'),*correct[1:]],
+                 [correct[0].replace(':000000',':100644').replace(' A\t',' M\t'),*correct[1:]],
+                 correct+[':000000 100644 '+'0'*40+' '+'d'*40+' A\t.github/workflows/issue1505-smoke-github-readonly.yml']]
+        for changes in invalid:
+            def fake_git(directory,*args):
+                if args==('rev-parse','HEAD'):
+                    return control.SOURCE if directory==SOURCE else CTX['opsCommit']
+                if args==('rev-list','--parents','-n','1','HEAD'):
+                    return ' '.join([CTX['opsCommit'],control.SOURCE,control.CARRIER_PARENT])
+                return '\n'.join(changes if args[:2]==('diff','--raw') else control.PATHS)
+            with self.subTest(changes=changes),patch.object(control,'git',side_effect=fake_git), \
+                 patch.object(control.subprocess,'run',return_value=types.SimpleNamespace(returncode=0)),self.assertRaises(control.Failure):
+                control.checkouts(SOURCE,Path('ops'),CTX)
+
+    def test_only_this_control_go_is_accepted(self):
+        self.assertEqual(control.window(ENV,1794225601),1794226500)
+        for old in ('true','root-reviewed-1505-github-handoff-v3','root-reviewed-1505-github-r7-20261109-v1'):
+            with self.subTest(go=old),self.assertRaises(control.Failure):
+                control.window({**ENV,'CONTROL_GO':old},1794225601)
+
+    def test_codex_actual_public_file_projection_keeps_only_requested_metadata(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/'public-ca.crt';path.write_bytes(b'public certificate fixture')
+            path.chmod(0o644);before=guest['codex_root'](path)
+            path.chmod(0o777);after=guest['codex_root'](path)
+        self.assertEqual(set(before),{'path','status','kind','mode','uid','gid','sha256'})
+        self.assertEqual((before['mode'],after['mode']),(420,511))
+        self.assertEqual(before['sha256'],hashlib.sha256(b'public certificate fixture').hexdigest())
+        self.assertEqual(before['sha256'],after['sha256'])
+        for actual in (before,after):
+            fixture={**actual,'path':control.OBSERVED_PATHS['codex'][0]}
+            value=observed('codex','fresh');value['nodes']=[fixture]
+            self.assertEqual(control.observation(json.dumps(value),'codex','fresh'),value)
+
+    def test_codex_absent_or_unstable_is_explicit_without_a_digest(self):
+        root=control.OBSERVED_PATHS['codex'][0]
+        for row in ({'path':root,'status':'absent'},
+                    {'path':root,'status':'changed_during_read','kind':'file','mode':420,'uid':0,'gid':0},
+                    {'path':root,'status':'too_large','kind':'file','mode':420,'uid':0,'gid':0}):
+            value=observed('codex','before');value['nodes']=[row]
+            self.assertEqual(control.observation(json.dumps(value),'codex','before'),value)
+            self.assertNotIn('sha256',row)
+
+    def test_closed_kind_path_and_schema_reject_other_targets_and_cli_payload(self):
+        for kind in control.KINDS:
+            changes=[lambda x:x.update(cli={}),lambda x:x.update(certificates=[]),
+                     lambda x:x['nodes'][0].update(path='/etc/shadow'),
+                     lambda x:x['nodes'].append(copy.deepcopy(x['nodes'][0])),
+                     lambda x:x.update(version=True)]
+            for change in changes:
+                value=observed(kind,'fresh');change(value)
+                with self.subTest(kind=kind,change=change),self.assertRaises(control.Failure):
+                    control.observation(json.dumps(value),kind,'fresh')
+        for kind in ('claude','ubuntu'):
+            with self.subTest(kind=kind),self.assertRaises(control.Failure):
+                control.observation(json.dumps(observed('codex','before')),kind,'before')
+        value=observed('codex','before');value['apt']={'units':{}}
+        with self.assertRaises(control.Failure):control.observation(json.dumps(value),'codex','before')
+
+    def test_desktop_real_backup_file_and_absence_preserve_closed_metadata(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path=Path(temp)/'backup';path.write_bytes(b'Package: public-fixture\nAuto-Installed: 1\n')
+            before=guest['node'](path);path.unlink();after=guest['node'](path)
+        target=control.OBSERVED_PATHS['desktop'][1]
+        self.assertEqual(before['kind'],'file');self.assertEqual(after['status'],'absent')
+        for sample in (before,after):
+            value=observed('desktop','fresh');value['nodes'][1]={**sample,'path':target}
+            self.assertEqual(control.observation(json.dumps(value),'desktop','fresh'),value)
+
+    def test_systemd_exact_four_units_and_closed_properties_only(self):
+        calls=[]
+        def command(argv):
+            calls.append(argv)
+            fields=guest['SERVICE_FIELDS'] if argv[2].endswith('.service') else ('LastTriggerUSec',)
+            values={'ActiveState':'inactive','SubState':'dead','MainPID':'0',
+                    'ExecMainStartTimestamp':'','ExecMainExitTimestamp':'','InvocationID':'','Result':'success','LastTriggerUSec':''}
+            return '\n'.join(key+'='+values[key] for key in fields)
+        with patch.dict(guest,{'command':command}):units=guest['systemd']()
+        self.assertEqual(len(calls),4)
+        self.assertEqual([argv[2] for argv in calls],list(guest['UNITS']))
+        for argv in calls:
+            fields=guest['SERVICE_FIELDS'] if argv[2].endswith('.service') else ('LastTriggerUSec',)
+            self.assertEqual(argv,['systemctl','show',argv[2],'--no-pager',*[f'--property={field}' for field in fields]])
+        value=observed('desktop','fresh');value['apt']={'units':units}
+        self.assertEqual(control.observation(json.dumps(value),'desktop','fresh'),value)
+        for field,bad in [('MainPID','not-a-pid'),('InvocationID','not-an-id'),('Result','private\ntext')]:
+            malformed=copy.deepcopy(value);malformed['apt']['units']['apt-daily.service']['values'][field]=bad
+            with self.subTest(field=field),self.assertRaises(control.Failure):
+                control.observation(json.dumps(malformed),'desktop','fresh')
+
+    def test_guest_observes_only_fixed_paths_without_cli_or_apt_commands(self):
+        calls=[]
+        class FixedPath:
+            def __init__(self,value):self.value=str(value)
+            def __str__(self):return self.value
+            def read_text(self):
+                self.asserted=self.value
+                if self.value!='/proc/sys/kernel/random/boot_id':raise AssertionError('unexpected read')
+                return '00000000-1111-2222-3333-444444444444'
+        def node(path):
+            calls.append(str(path));return {'path':str(path),'status':'absent'}
+        units={unit:{'status':'unsupported'} for unit in guest['UNITS']}
+        with patch.dict(guest,{'Path':FixedPath,'node':node,'systemd':lambda:units}):
+            for kind in control.KINDS:
+                for phase in guest['PHASES']:
+                    calls.clear();value=guest['observe'](kind,phase)
+                    self.assertEqual(calls,list(control.OBSERVED_PATHS[kind]))
+                    self.assertEqual(control.observation(json.dumps(value),kind,phase),value)
+        parsed=ast.parse(control.GUEST_PROGRAM)
+        functions={node.name for node in parsed.body if isinstance(node,ast.FunctionDef)}
+        self.assertNotIn('cli',functions);self.assertNotIn('certificate_snapshot',functions)
+        for forbidden in ('apt-get','dpkg-query','time.sleep','os.walk','flock','systemctl stop','systemctl disable','E2B_API_KEY','os.environ','shutil'):
+            self.assertNotIn(forbidden,control.GUEST_PROGRAM)
+
+    def test_one_uses_only_observer_commands_and_one_fresh_instance_per_kind(self):
+        for kind in control.KINDS:
+            with self.subTest(kind=kind):
+                steps=[];state={'built':False,'killed':False,'deleted':False,'creates':0}
+                class Image:
+                    def __init__(self,**_kwargs):pass
+                    def __getattr__(self,name):
+                        def record(*args,**kwargs):steps.append((name,args,kwargs));return self
+                        return record
+                    @staticmethod
+                    def build(_image,**kwargs):
+                        state['built']=True
+                        self.assertEqual((kwargs['cpu_count'],kwargs['memory_mb'],kwargs['skip_cache']),(2,4096,True))
+                        kwargs['on_build_logs'](types.SimpleNamespace(message='Template created with ID: owned-id, Build ID: build-id'))
+                        return types.SimpleNamespace(template_id='owned-id',build_id='build-id')
+                class SDK:
+                    @staticmethod
+                    def create(template_id,**kwargs):
+                        state['creates']+=1;self.assertEqual(template_id,'owned-id');self.assertEqual(kwargs['timeout'],120)
+                        self.assertEqual(kwargs['metadata'],{**CTX,'kind':kind})
+                        files=types.SimpleNamespace(read=lambda name,**_k:json.dumps(observed(kind,Path(name).stem)))
+                        def run(command,**_kwargs):
+                            steps.append(('fresh_command',(command,),_kwargs))
+                            return types.SimpleNamespace(exit_code=0,stdout=json.dumps(observed(kind,'fresh')))
+                        return types.SimpleNamespace(sandbox_id='sandbox-id',files=files,commands=types.SimpleNamespace(run=run))
+                    @staticmethod
+                    def get_info(*_args,**_kwargs):
+                        if state['killed']:raise Missing()
+                        return types.SimpleNamespace(sandbox_id='sandbox-id',template_id='owned-id',metadata={**CTX,'kind':kind})
+                    @staticmethod
+                    def kill(sandbox_id,**_kwargs):self.assertEqual(sandbox_id,'sandbox-id');state['killed']=True
+                def request(method,path,_key,body=None):
+                    if not state['built'] or state['deleted']:raise http_error('',404,'',{},None)
+                    if method=='DELETE':state['deleted']=True;return None
+                    return {'templateID':'owned-id','public':False,'isDefault':False,'names':[control.name_for(CTX,kind)]}
+                with tempfile.TemporaryDirectory() as temp:
+                    path=Path(temp)/(kind+'.json')
+                    with patch.dict('sys.modules',{'e2b':types.SimpleNamespace(Template=Image,Sandbox=SDK),
+                                    'e2b.exceptions':types.SimpleNamespace(SandboxNotFoundException=Missing)}), \
+                         patch.object(control,'request',side_effect=request),patch.object(control,'install_alarm'):
+                        control.one(SOURCE,'FAKE_API_KEY',CTX,kind,path,time.time()+60)
+                    value=json.loads(path.read_text())
+                self.assertEqual(value['probe'],{'status':'observed','phase':'complete'})
+                self.assertEqual(value['cleanup']['status'],'complete')
+                self.assertEqual(set(value['observations']),set(guest['PHASES']))
+                self.assertEqual(state['creates'],1);self.assertTrue(state['killed']);self.assertTrue(state['deleted'])
+                self.assertEqual([args for name,args,_ in steps if name=='from_template'],[(kind,)])
+                commands=[args[0] for name,args,_ in steps if name=='run_cmd']
+                self.assertEqual(commands,['test ! -e /opt/mikka && test ! -L /opt/mikka && mkdir -m 0755 /opt/mikka',
+                    f'python3 -B /opt/mikka/observe.py {kind} before',f'python3 -B /opt/mikka/observe.py {kind} pre_finalization'])
+                self.assertEqual([args[0] for name,args,_ in steps if name=='fresh_command'],[f'python3 -B /opt/mikka/observe.py {kind} fresh'])
+                self.assertEqual([args[0] for name,args,_ in steps if name=='set_start_cmd'],[f'python3 -B /opt/mikka/observe.py {kind} ready && exec sleep infinity'])
+

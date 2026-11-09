@@ -1,0 +1,10 @@
+{
+  "ref": "refs/heads/ops/1505-smoke-github-readonly-20261109",
+  "node_id": "REF_kwDOVRYxA9oAMnJlZnMvaGVhZHMvb3BzLzE1MDUtc21va2UtZ2l0aHViLXJlYWRvbmx5LTIwMjYxMTA5",
+  "url": "https://api.github.com/repos/alexj11324/Mikka/git/refs/heads/ops/1505-smoke-github-readonly-20261109",
+  "object": {
+    "sha": "376298951e4eee5970e2f0d00e21acb3ffba4e18",
+    "type": "commit",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/376298951e4eee5970e2f0d00e21acb3ffba4e18"
+  }
+}

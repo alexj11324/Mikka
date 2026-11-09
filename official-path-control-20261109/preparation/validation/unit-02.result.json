@@ -1,0 +1,28 @@
+{
+  "argv": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python",
+    "-B",
+    "bundle/scripts/ops/issue1505-official-path-control.test.py"
+  ],
+  "cwd": "/workspace/scratch/263e36984c81/official-path-control-preparation-1505",
+  "environment": {
+    "PATH": "/usr/local/bin:/usr/bin:/bin",
+    "LC_ALL": "C.UTF-8",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "CONTROL_TEST_SOURCE": "/workspace/scratch/263e36984c81/official-path-control-preparation-1505/source",
+    "TMPDIR": "/workspace/scratch/263e36984c81/official-path-control-preparation-1505/validation/tmp"
+  },
+  "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+  "startedAt": "2026-11-09T17:49:23.240666+00:00",
+  "completedAt": "2026-11-09T17:49:23.502627+00:00",
+  "exitCode": 0,
+  "stdout": {
+    "bytes": 404,
+    "sha256": "2b68c4293367df24671e1e6ed64c1b7a20b7d5b391da089fd6c31add8433361e"
+  },
+  "stderr": {
+    "bytes": 135,
+    "sha256": "9019e84d070d1287d696ee3fd51daf4c5ec87e39c547530af63eba243f751a7e"
+  },
+  "offlineOnly": true
+}

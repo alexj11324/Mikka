@@ -1,0 +1,43 @@
+{
+  "source": "5ba1f9e2359ce714d83cd16fc040f2567c40a6d0",
+  "tree": "a59d2e3ff90594a2625b131ab5a403393715cf40",
+  "plannedBranch": "ops/1505-official-path-control-20261109",
+  "active": false,
+  "timePins": {
+    "notBefore": null,
+    "deadline": null
+  },
+  "sourceMustBeFreshlyConfirmedByRoot": true,
+  "upstream": {
+    "control": "08d822da081190364530343bf918bbcc2fbbf624",
+    "aptMetadata": "1e351dcfe9a4c93430f8e67fabef5b3dc97385e0"
+  },
+  "oidcBlockUnchanged": true,
+  "newBranchSubjectTrust": "unknown-from-public-source",
+  "unchangedGuardAndCleanupFunctions": [
+    "context",
+    "window",
+    "git",
+    "checkouts",
+    "builder",
+    "save",
+    "name_for",
+    "new_ledger",
+    "validate_ledger",
+    "request",
+    "assert_owned",
+    "cleanup_one",
+    "install_alarm"
+  ],
+  "removedOutOfScopeTests": [
+    "test_certificate_chain_refuses_other_destination_and_linked_root",
+    "test_closed_certificate_reference_cannot_forge_hash_path_or_chain",
+    "test_original_cli_identity_keeps_bytes_permissions_and_presence",
+    "test_real_certificate_files_then_exact_relative_absolute_chain"
+  ],
+  "deployableFiles": [
+    ".github/workflows/issue1505-official-path-control.yml.in",
+    "scripts/ops/issue1505-official-path-control.py",
+    "scripts/ops/issue1505-official-path-control.test.py"
+  ]
+}

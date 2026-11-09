@@ -1,0 +1,26 @@
+{
+  "sha": "b75871ea1753f75769daa33b095704475cf9a4a2",
+  "tree": "5f87962642912f59980c71748093ffd4f73e10a5",
+  "parents": [
+    "5ba1f9e2359ce714d83cd16fc040f2567c40a6d0",
+    "b52445d24978dc46235b0744783eb7ebb3c3e397"
+  ],
+  "files": [
+    {
+      "path": ".github/workflows/issue1505-official-path-control.yml",
+      "sha": "6c5a3dcde7f114cbf55c554bcb99bfed28e68ef1",
+      "status": "added"
+    },
+    {
+      "path": "scripts/ops/issue1505-official-path-control.py",
+      "sha": "426330f00dee9d62debf8ce348c5da37c7fa08a1",
+      "status": "added"
+    },
+    {
+      "path": "scripts/ops/issue1505-official-path-control.test.py",
+      "sha": "cdba0c3d840e7cffcb69d2c6c4c12ad597cd108b",
+      "status": "added"
+    }
+  ]
+}
+

@@ -1,0 +1,137 @@
+{
+  "total_count": 1,
+  "jobs": [
+    {
+      "id": 129344720782,
+      "run_id": 42670291715,
+      "workflow_name": "Issue 1505 official Codex and Desktop path control",
+      "head_branch": "ops/1505-smoke-github-readonly-20261109",
+      "run_url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42670291715",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOVRYxA88AAAAeHYvPjg",
+      "head_sha": "b75871ea1753f75769daa33b095704475cf9a4a2",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129344720782",
+      "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42670291715/job/129344720782",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-09T18:01:46Z",
+      "started_at": "2026-11-09T18:01:49Z",
+      "completed_at": "2026-11-09T18:03:17Z",
+      "name": "observe",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-09T18:01:50Z",
+          "completed_at": "2026-11-09T18:01:51Z"
+        },
+        {
+          "name": "Check out the fixed product source",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-09T18:01:51Z",
+          "completed_at": "2026-11-09T18:01:56Z"
+        },
+        {
+          "name": "Check out this diagnostic revision",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-09T18:01:56Z",
+          "completed_at": "2026-11-09T18:02:06Z"
+        },
+        {
+          "name": "Verify offline source and ownership guards",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-11-09T18:02:06Z",
+          "completed_at": "2026-11-09T18:02:07Z"
+        },
+        {
+          "name": "Install only the pinned control SDK",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-11-09T18:02:07Z",
+          "completed_at": "2026-11-09T18:02:14Z"
+        },
+        {
+          "name": "Recheck absolute budget before requesting the key",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-11-09T18:02:14Z",
+          "completed_at": "2026-11-09T18:02:15Z"
+        },
+        {
+          "name": "Read only the existing E2B key",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-11-09T18:02:15Z",
+          "completed_at": "2026-11-09T18:02:16Z"
+        },
+        {
+          "name": "Observe only fixed Desktop APT and Codex root CA metadata",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-11-09T18:02:16Z",
+          "completed_at": "2026-11-09T18:03:11Z"
+        },
+        {
+          "name": "Recheck exact owned instances and private templates",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-11-09T18:03:11Z",
+          "completed_at": "2026-11-09T18:03:12Z"
+        },
+        {
+          "name": "Preserve closed observations and cleanup receipts",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-11-09T18:03:12Z",
+          "completed_at": "2026-11-09T18:03:14Z"
+        },
+        {
+          "name": "Post Check out this diagnostic revision",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-11-09T18:03:14Z",
+          "completed_at": "2026-11-09T18:03:14Z"
+        },
+        {
+          "name": "Post Check out the fixed product source",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20,
+          "started_at": "2026-11-09T18:03:14Z",
+          "completed_at": "2026-11-09T18:03:14Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21,
+          "started_at": "2026-11-09T18:03:14Z",
+          "completed_at": "2026-11-09T18:03:14Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/alexj11324/Mikka/check-runs/129344720782",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000239243,
+      "runner_name": "GitHub Actions 1000239243",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    }
+  ]
+}

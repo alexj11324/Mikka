@@ -1,0 +1,967 @@
+--- fixed-08d/.github/workflows/issue1506-e2b-official-control.yml
++++ bundle/.github/workflows/issue1505-official-path-control.yml.in
+@@ -1,38 +1,39 @@
+-name: Issue 1506 official certificate fresh-boot control
++name: Issue 1505 official Codex and Desktop path control
+ 
+ on:
+   push:
+-    branches: [ops/issue1506-e2b-conservation-control-4]
++    branches: [ops/1505-smoke-github-readonly-20261109]
+     paths:
+-      - .github/workflows/issue1506-e2b-official-control.yml
+-      - scripts/ops/issue1506-e2b-official-control.py
+-      - scripts/ops/issue1506-e2b-official-control.test.py
++      - .github/workflows/issue1505-official-path-control.yml
++      - scripts/ops/issue1505-official-path-control.py
++      - scripts/ops/issue1505-official-path-control.test.py
+ 
+ permissions:
+   contents: read
+   id-token: write
+ 
+ concurrency:
+-  group: issue1506-official-conservation-control
++  group: issue1505-official-path-control
+   cancel-in-progress: false
+   queue: max
+ 
+ jobs:
+   observe:
+     # Disabled preparation. Bind one absolute <=15-minute window only after review.
+-    if: github.ref == 'refs/heads/ops/issue1506-e2b-conservation-control-4' && github.run_attempt == 1
++    if: false
+     runs-on: ubuntu-latest
+-    timeout-minutes: 15
++    # Observation remains 900s; this ceiling leaves the 150s cleanup-only recheck.
++    timeout-minutes: 20
+     env:
+       PYTHONDONTWRITEBYTECODE: '1'
+-      CONTROL_GO: 'true'
+-      CONTROL_NOT_BEFORE: 2026-11-09T13:43:39Z
+-      CONTROL_DEADLINE: 2026-11-09T13:58:39Z
++      CONTROL_GO: 'false'
++      CONTROL_NOT_BEFORE: UNBOUND
++      CONTROL_DEADLINE: UNBOUND
+     steps:
+       - name: Check out the fixed product source
+         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+         with:
+-          ref: 111a8dfb8b227ac0441324339ff42e4328ea609a
++          ref: 5ba1f9e2359ce714d83cd16fc040f2567c40a6d0
+           path: source
+           persist-credentials: false
+       - name: Check out this diagnostic revision
+@@ -44,14 +45,14 @@
+           persist-credentials: false
+       - name: Verify offline source and ownership guards
+         run: |
+-          python3 -B ops/scripts/ops/issue1506-e2b-official-control.test.py
+-          python3 -B ops/scripts/ops/issue1506-e2b-official-control.py verify --source source --output "$RUNNER_TEMP/issue1506-official-control"
++          python3 -B ops/scripts/ops/issue1505-official-path-control.test.py
++          python3 -B ops/scripts/ops/issue1505-official-path-control.py verify --source source --output "$RUNNER_TEMP/issue1505-official-path-control"
+       - name: Install only the pinned control SDK
+         run: |
+-          python3 -m venv "$RUNNER_TEMP/issue1506-official-sdk"
+-          "$RUNNER_TEMP/issue1506-official-sdk/bin/pip" install --disable-pip-version-check 'e2b==2.62.0'
++          python3 -m venv "$RUNNER_TEMP/issue1505-official-path-sdk"
++          "$RUNNER_TEMP/issue1505-official-path-sdk/bin/pip" install --disable-pip-version-check 'e2b==2.62.0'
+       - name: Recheck absolute budget before requesting the key
+-        run: python3 -B ops/scripts/ops/issue1506-e2b-official-control.py verify --source source --output "$RUNNER_TEMP/issue1506-official-control"
++        run: python3 -B ops/scripts/ops/issue1505-official-path-control.py verify --source source --output "$RUNNER_TEMP/issue1505-official-path-control"
+       - name: Read only the existing E2B key
+         id: key
+         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+@@ -64,20 +65,21 @@
+           secret-path: /vercel
+           secret-name: E2B_API_KEY
+           include-imports: false
+-      - name: Observe only official Desktop and Codex certificate nodes
++      - name: Observe only fixed Desktop APT and Codex root CA metadata
+         run: >-
+-          "$RUNNER_TEMP/issue1506-official-sdk/bin/python" -B ops/scripts/ops/issue1506-e2b-official-control.py diagnose
+-          --source source --output "$RUNNER_TEMP/issue1506-official-control"
++          "$RUNNER_TEMP/issue1505-official-path-sdk/bin/python" -B ops/scripts/ops/issue1505-official-path-control.py diagnose
++          --source source --output "$RUNNER_TEMP/issue1505-official-path-control"
+       - name: Recheck exact owned instances and private templates
+         if: always() && steps.key.outcome == 'success'
++        timeout-minutes: 3
+         run: >-
+-          "$RUNNER_TEMP/issue1506-official-sdk/bin/python" -B ops/scripts/ops/issue1506-e2b-official-control.py cleanup
+-          --source source --output "$RUNNER_TEMP/issue1506-official-control"
++          "$RUNNER_TEMP/issue1505-official-path-sdk/bin/python" -B ops/scripts/ops/issue1505-official-path-control.py cleanup
++          --source source --output "$RUNNER_TEMP/issue1505-official-path-control"
+       - name: Preserve closed observations and cleanup receipts
+         if: always()
+         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+         with:
+-          name: issue1506-official-control-${{ github.run_id }}-${{ github.run_attempt }}
+-          path: ${{ runner.temp }}/issue1506-official-control/
++          name: issue1505-official-path-control-${{ github.run_id }}-${{ github.run_attempt }}
++          path: ${{ runner.temp }}/issue1505-official-path-control/
+           if-no-files-found: warn
+           retention-days: 7
+--- fixed-08d/scripts/ops/issue1506-e2b-official-control.py
++++ bundle/scripts/ops/issue1505-official-path-control.py
+@@ -1,22 +1,24 @@
+-"""Bounded official-only targeted control for issue 1506. Not a release gate."""
++"""Bounded official-only targeted control for issue 1505. Not a release gate."""
+ import argparse,hashlib,importlib.metadata,importlib.util,json,logging,multiprocessing,os,re,signal,subprocess,sys,tempfile,time,urllib.request
+ from datetime import datetime
+ from pathlib import Path
+ from urllib.error import HTTPError
+ 
+-SOURCE='111a8dfb8b227ac0441324339ff42e4328ea609a'
++SOURCE='5ba1f9e2359ce714d83cd16fc040f2567c40a6d0'
++CARRIER_PARENT='e93477fe401c70dca532784e71b76d56877b6899'
++GO='root-reviewed-1505-official-path-control-20261109-v1'
+ REPOSITORY='alexj11324/Mikka'
+-BRANCH='refs/heads/ops/issue1506-e2b-conservation-control-4'
+-APPLICATION='mikka-1506-official-control'
+-KINDS=('claude','desktop','codex')
++BRANCH='refs/heads/ops/1505-smoke-github-readonly-20261109'
++APPLICATION='mikka-1505-official-path-control'
++KINDS=('desktop','codex')
+ ACTIVE_KINDS=('desktop','codex')
+-PATHS=('.github/workflows/issue1506-e2b-official-control.yml',
+-       'scripts/ops/issue1506-e2b-official-control.py','scripts/ops/issue1506-e2b-official-control.test.py')
++PATHS=('.github/workflows/issue1505-official-path-control.yml',
++       'scripts/ops/issue1505-official-path-control.py','scripts/ops/issue1505-official-path-control.test.py')
+ BUILDER_SHA='0adb53fbdd6cbcd61f1d1804aee3e2df1538997c0724556062f2741c5ac1cdb1'
+ ERROR_CODES={'identity_invalid','source_mismatch','ops_mismatch','source_dirty','overlay_invalid',
+              'unbound','deadline','key_missing','sdk_mismatch','ledger_invalid','already_started',
+              'template_identity_invalid','sandbox_identity_invalid','sandbox_unreturned','build_unreturned',
+-             'command_failed','observation_invalid','cli_changed','cleanup_incomplete','interrupted','operation_failed'}
++             'command_failed','observation_invalid','cleanup_incomplete','interrupted','operation_failed'}
+ ERROR_TYPES={'Failure','Deadline','HTTPError','TimeoutError','TimeoutException','CommandExitException',
+              'SandboxNotFoundException','NotFoundException','AuthenticationException','BuildException',
+              'OSError','ValueError','RuntimeError','ConnectError','ReadTimeout','ConnectTimeout'}
+@@ -51,7 +53,7 @@
+             'opsCommit':env['GITHUB_SHA'],'runId':env['GITHUB_RUN_ID'],'runAttempt':env['GITHUB_RUN_ATTEMPT']}
+ 
+ def window(env,now=None,cleanup=False):
+-    if env.get('CONTROL_GO')!='true':
++    if env.get('CONTROL_GO')!=GO:
+         fail('unbound')
+     try:
+         start=datetime.strptime(env['CONTROL_NOT_BEFORE'],'%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=__import__('datetime').timezone.utc).timestamp()
+@@ -74,9 +76,22 @@
+     for directory in (source,ops):
+         if subprocess.run(['git','diff','--quiet','HEAD','--'],cwd=directory,check=False).returncode:
+             fail('source_dirty')
+-    if git(ops,'rev-list','--parents','-n','1','HEAD').split()!=[ctx['opsCommit'],SOURCE]:
++    if git(ops,'rev-list','--parents','-n','1','HEAD').split()!=[ctx['opsCommit'],SOURCE,CARRIER_PARENT]:
+         fail('overlay_invalid')
+     if set(git(ops,'diff','--name-only',SOURCE,'HEAD','--').splitlines())!=set(PATHS):
++        fail('overlay_invalid')
++    # The second parent preserves only closed carrier ancestry. The tree adds
++    # these three regular files to SOURCE and cannot restore any old C9 entry.
++    changes=git(ops,'diff','--raw','--no-abbrev',SOURCE,'HEAD','--').splitlines()
++    added=[]
++    for change in changes:
++        metadata,separator,path=change.partition('\t')
++        fields=metadata.split()
++        if (not separator or len(fields)!=5 or fields[:3]!=[':000000','100644','0'*40]
++            or not re.fullmatch(r'[a-f0-9]{40}',fields[3]) or fields[4]!='A'):
++            fail('overlay_invalid')
++        added.append(path)
++    if len(added)!=len(PATHS) or set(added)!=set(PATHS):
+         fail('overlay_invalid')
+     if hashlib.sha256((source/'scripts/e2b/build-template.py').read_bytes()).hexdigest()!=BUILDER_SHA:
+         fail('source_mismatch')
+@@ -96,7 +111,7 @@
+ def name_for(ctx,kind):
+     if kind not in KINDS:
+         fail('ledger_invalid')
+-    return f"mikka-1506-official-control-{ctx['runId']}-{ctx['runAttempt']}-{kind}"
++    return f"mikka-1505-official-path-control-{ctx['runId']}-{ctx['runAttempt']}-{kind}"
+ 
+ def new_ledger(ctx,kind):
+     return {'version':1,'identity':ctx,'kind':kind,'name':name_for(ctx,kind),
+@@ -146,58 +161,27 @@
+     if 'target' in value and (not isinstance(value['target'],str) or len(value['target'])>4096 or any(ord(c)<32 for c in value['target'])):
+         fail('observation_invalid')
+ 
+-CERT_PATHS=('/etc/ssl/certs/1560546e.0','/etc/ssl/certs/e2b-ca.pem','/usr/local/share/ca-certificates/e2b-ca.crt')
+-CERT_TARGETS={CERT_PATHS[0]:'e2b-ca.pem',CERT_PATHS[1]:CERT_PATHS[2]}
+-
+-def certificate_references(nodes):
+-    rows={row['path']:row for row in nodes}
+-    if len(nodes)!=3 or set(rows)!=set(CERT_PATHS):
+-        raise ValueError('certificate_nodes_invalid')
+-    for path,row in rows.items():
+-        if row['status']=='present':
+-            if row['kind']=='link':
+-                if path not in CERT_TARGETS or row['target']!=CERT_TARGETS[path]:
+-                    raise ValueError('certificate_target_invalid')
+-            elif row['kind']!='file':
+-                raise ValueError('certificate_type_invalid')
+-    references=[]
+-    for origin in CERT_PATHS[:2]:
+-        current=origin;chain=[]
+-        for _ in range(3):
+-            row=rows[current]
+-            if row['status']!='present':
+-                references.append({'path':origin,'status':'unresolved'})
+-                break
+-            chain.append(current)
+-            if row['kind']=='file':
+-                references.append({'path':origin,'status':'observed','chain':chain,
+-                                   'terminalPath':current,'terminalSha256':row['sha256']})
+-                break
+-            current=CERT_PATHS[1] if current==CERT_PATHS[0] else CERT_PATHS[2]
+-        else:
+-            raise ValueError('certificate_chain_invalid')
+-    return references
+-
+-def closed_cli(cli):
+-    if cli=={'status':'absent'}:
++OBSERVED_PATHS={'desktop':('/var/lib/apt/extended_states','/var/backups/apt.extended_states.0'),
++                'codex':('/usr/local/share/ca-certificates/e2b-ca.crt',)}
++UNITS=('apt-daily.service','apt-daily-upgrade.service','apt-daily.timer','apt-daily-upgrade.timer')
++SERVICE_FIELDS=('ActiveState','SubState','MainPID','ExecMainStartTimestamp',
++                'ExecMainExitTimestamp','InvocationID','Result')
++
++def closed_codex_root(row):
++    if not isinstance(row,dict) or row.get('path')!=OBSERVED_PATHS['codex'][0]:
++        fail('observation_invalid')
++    if row=={'path':OBSERVED_PATHS['codex'][0],'status':'absent'}:
+         return
+-    if not isinstance(cli,dict) or set(cli)!={'status','discovered','canonical'} or cli['status']!='observed':
+-        fail('observation_invalid')
+-    for key in ('discovered','canonical'):
+-        closed_node(cli[key])
+-        if Path(cli[key]['path']).is_relative_to('/opt/mikka'):
+-            fail('observation_invalid')
+-    if cli['canonical'].get('kind')!='file' or cli['canonical'].get('status')!='present':
+-        fail('observation_invalid')
+-
+-def cli_identity(value):
+-    if value=={'status':'absent'}:
+-        return value
+-    if isinstance(value,dict) and set(value)=={'claude','codex'}:
+-        return {name:cli_identity(row) for name,row in value.items()}
+-    fields={'path','status','kind','mode','uid','gid','sha256','target','type','rdev'}
+-    return {'status':value['status'],**{name:{k:v for k,v in value[name].items() if k in fields}
+-                                      for name in ('discovered','canonical')}}
++    base={'path','status','kind','mode','uid','gid'}
++    if (row.get('status') not in ('present','too_large','changed_during_read')
++        or row.get('kind') not in ('file','link','directory','special')
++        or not base<=set(row)
++        or any(type(row[k]) is not int or not 0<=row[k]<2**64 for k in ('mode','uid','gid'))
++        or row['mode']>4095):
++        fail('observation_invalid')
++    expected=base|({'sha256'} if row['kind']=='file' and row['status']=='present' else set())
++    if set(row)!=expected or ('sha256' in row and not re.fullmatch(r'[a-f0-9]{64}',row['sha256'])):
++        fail('observation_invalid')
+ 
+ def observation(raw,kind,phase):
+     if kind not in KINDS or phase not in ('before','pre_finalization','ready','fresh'):
+@@ -205,33 +189,36 @@
+     if not isinstance(raw,str) or len(raw)>32768:
+         fail('observation_invalid')
+     value=json.loads(raw)
+-    if (not isinstance(value,dict) or set(value)!={'version','kind','phase','utcNs','monotonicNs','bootId','nodes','cli','apt','certificates'}
+-        or value['version']!=1 or value['kind']!=kind or value['phase']!=phase
++    if (not isinstance(value,dict) or set(value)!={'version','kind','phase','utcNs','monotonicNs','bootId','nodes','apt'}
++        or type(value['version']) is not int or value['version']!=1 or value['kind']!=kind or value['phase']!=phase
+         or any(type(value[k]) is not int or value[k]<=0 for k in ('utcNs','monotonicNs'))
+         or not re.fullmatch(r'[a-f0-9-]{36}',value['bootId'])):
+         fail('observation_invalid')
+-    target=('/usr/local/share/e2b','/usr/local/share/e2b/ssl-certs.tar') if kind=='claude' else CERT_PATHS
+-    if not isinstance(value['nodes'],list) or len(value['nodes'])!=len(target):
+-        fail('observation_invalid')
+-    for row,path in zip(value['nodes'],target):
+-        closed_node(row,path)
+-    if value['apt'] is not None:
+-        fail('observation_invalid')
+-    if kind=='claude':
+-        if value['certificates']!=[]:
++    if not isinstance(value['nodes'],list) or len(value['nodes'])!=len(OBSERVED_PATHS[kind]):
++        fail('observation_invalid')
++    for row,path in zip(value['nodes'],OBSERVED_PATHS[kind]):
++        if kind=='codex':
++            closed_codex_root(row)
++        else:
++            closed_node(row,path)
++    if kind=='codex':
++        if value['apt'] is not None:
+             fail('observation_invalid')
+-        closed_cli(value['cli'])
+     else:
+-        if not isinstance(value['cli'],dict) or set(value['cli'])!={'claude','codex'}:
++        apt=value['apt']
++        if not isinstance(apt,dict) or set(apt)!={'units'} or not isinstance(apt['units'],dict) or set(apt['units'])!=set(UNITS):
+             fail('observation_invalid')
+-        for cli in value['cli'].values():
+-            closed_cli(cli)
+-        try:
+-            expected=certificate_references(value['nodes'])
+-        except (ValueError,KeyError,TypeError):
+-            fail('observation_invalid')
+-        if value['certificates']!=expected:
+-            fail('observation_invalid')
++        for unit,row in apt['units'].items():
++            if row=={'status':'unsupported'}:
++                continue
++            fields=set(SERVICE_FIELDS) if unit.endswith('.service') else {'LastTriggerUSec'}
++            if (not isinstance(row,dict) or set(row)!={'status','values'} or row['status']!='observed'
++                or not isinstance(row['values'],dict) or set(row['values'])!=fields
++                or any(not isinstance(v,str) or len(v)>128 or not re.fullmatch(r'[A-Za-z0-9_ .:+/()-]*',v) for v in row['values'].values())):
++                fail('observation_invalid')
++            if unit.endswith('.service') and (not re.fullmatch(r'[0-9]+',row['values']['MainPID'])
++                or row['values']['InvocationID'] and not re.fullmatch(r'[a-f0-9]{32}',row['values']['InvocationID'])):
++                fail('observation_invalid')
+     return value
+ 
+ def request(method,path,key,body=None):
+@@ -370,9 +357,6 @@
+         if result.exit_code!=0:
+             fail('command_failed')
+         value['observations']['fresh']=observation(result.stdout,kind,'fresh')
+-        baseline=cli_identity(value['observations']['before']['cli'])
+-        if any(cli_identity(row['cli'])!=baseline for row in value['observations'].values()):
+-            fail('cli_changed')
+         value['probe']={'status':'observed','phase':'complete'}
+     except BaseException as error:
+         value['probe']={'status':'failed','error':safe(error)}
+@@ -454,19 +438,144 @@
+                 receipts[kind]={'status':'failed','errors':[safe(error)]}
+         signal.alarm(0)
+         report={'version':1,'identity':ctx,'targetedOnly':True,'releaseAccepted':False,'policyChanged':False,
+-                'budget':{'privateTemplates':2,'freshInstances':2,'desktopNoopSeconds':0,'buildObservationSeconds':600,
++                'budget':{'privateTemplates':2,'freshInstances':2,'desktopNoopSeconds':0,'modelCalls':0,'workerInstallCommands':0,'buildObservationSeconds':600,
+                           'absoluteDeadline':os.environ['CONTROL_DEADLINE'],'overallSeconds':900,'cleanupOnlyMaxSeconds':150,
+                           'afterObservationDeadlineCleanup':args.mode=='cleanup' and time.time()>=end},
+                 'failure':failure,'cleanup':receipts}
+         save(args.output/'summary.json',report)
+-        print(json.dumps({'type':'issue1506_official_targeted_control','failure':failure,'cleanup':receipts},sort_keys=True),flush=True)
++        print(json.dumps({'type':'issue1505_official_path_control','failure':failure,'cleanup':receipts},sort_keys=True),flush=True)
+     complete=all(r['status']=='complete' for r in receipts.values())
+     if args.mode=='diagnose':
+         complete=complete and all(json.loads((args.output/(k+'.json')).read_text())['probe']['status']=='observed' for k in ACTIVE_KINDS)
+     return 0 if complete and failure is None else 1
+ 
+ 
+-GUEST_PROGRAM='"""Targeted read-only metadata, never full conservation acceptance."""\nimport hashlib,json,os,re,shutil,signal,stat,subprocess,sys,time\nfrom pathlib import Path\n\nCERT_PATHS=(\'/etc/ssl/certs/1560546e.0\',\'/etc/ssl/certs/e2b-ca.pem\',\'/usr/local/share/ca-certificates/e2b-ca.crt\')\nCERT_TARGETS={CERT_PATHS[0]:\'e2b-ca.pem\',CERT_PATHS[1]:CERT_PATHS[2]}\n\ndef certificate_references(nodes):\n    rows={row[\'path\']:row for row in nodes}\n    if len(nodes)!=3 or set(rows)!=set(CERT_PATHS):\n        raise ValueError(\'certificate_nodes_invalid\')\n    for path,row in rows.items():\n        if row[\'status\']==\'present\':\n            if row[\'kind\']==\'link\':\n                if path not in CERT_TARGETS or row[\'target\']!=CERT_TARGETS[path]:\n                    raise ValueError(\'certificate_target_invalid\')\n            elif row[\'kind\']!=\'file\':\n                raise ValueError(\'certificate_type_invalid\')\n    references=[]\n    for origin in CERT_PATHS[:2]:\n        current=origin;chain=[]\n        for _ in range(3):\n            row=rows[current]\n            if row[\'status\']!=\'present\':\n                references.append({\'path\':origin,\'status\':\'unresolved\'})\n                break\n            chain.append(current)\n            if row[\'kind\']==\'file\':\n                references.append({\'path\':origin,\'status\':\'observed\',\'chain\':chain,\n                                   \'terminalPath\':current,\'terminalSha256\':row[\'sha256\']})\n                break\n            current=CERT_PATHS[1] if current==CERT_PATHS[0] else CERT_PATHS[2]\n        else:\n            raise ValueError(\'certificate_chain_invalid\')\n    return references\n\nPATHS = {\n    \'claude\': (\'/usr/local/share/e2b\', \'/usr/local/share/e2b/ssl-certs.tar\'),\n    \'desktop\': CERT_PATHS,\n    \'codex\': CERT_PATHS,\n}\nPHASES = (\'before\', \'pre_finalization\', \'ready\', \'fresh\')\nSERVICE_FIELDS = (\'ActiveState\',\'SubState\',\'MainPID\',\'ExecMainStartTimestamp\',\n                  \'ExecMainExitTimestamp\',\'InvocationID\',\'Result\')\nUNITS = (\'apt-daily.service\',\'apt-daily-upgrade.service\',\'apt-daily.timer\',\'apt-daily-upgrade.timer\')\n\ndef identity(s):\n    return (s.st_dev,s.st_ino,s.st_mode,s.st_uid,s.st_gid,s.st_size,s.st_mtime_ns,s.st_ctime_ns)\n\ndef node(path):\n    # Same path/kind/mode/uid/gid/hash semantics as official-files.entry,\n    # plus O_NOFOLLOW and stable identity around each bounded file read.\n    value = {\'path\': str(path)}\n    try:\n        before = path.lstat()\n    except FileNotFoundError:\n        return {**value, \'status\':\'absent\'}\n    value.update(status=\'present\',mode=stat.S_IMODE(before.st_mode),uid=before.st_uid,gid=before.st_gid,\n                 device=before.st_dev,inode=before.st_ino,size=before.st_size,\n                 mtimeNs=before.st_mtime_ns,ctimeNs=before.st_ctime_ns)\n    if stat.S_ISLNK(before.st_mode):\n        target = os.readlink(path)\n        if len(target)>4096 or any(ord(c)<32 for c in target):\n            raise ValueError(\'link_metadata_invalid\')\n        value.update(kind=\'link\',target=target)\n    elif stat.S_ISDIR(before.st_mode):\n        value[\'kind\']=\'directory\'\n    elif stat.S_ISREG(before.st_mode):\n        value[\'kind\']=\'file\'\n        if before.st_size>536870912:\n            return {**value,\'status\':\'too_large\'}\n        fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)\n        try:\n            opened=os.fstat(fd)\n            if not stat.S_ISREG(opened.st_mode) or identity(opened)!=identity(before):\n                return {**value,\'status\':\'changed_during_read\'}\n            digest=hashlib.sha256()\n            with os.fdopen(fd,\'rb\',closefd=False) as stream:\n                for block in iter(lambda:stream.read(1048576),b\'\'):\n                    digest.update(block)\n            if identity(os.fstat(fd))!=identity(before) or identity(path.lstat())!=identity(before):\n                return {**value,\'status\':\'changed_during_read\'}\n            value[\'sha256\']=digest.hexdigest()\n        finally:\n            os.close(fd)\n    else:\n        value.update(kind=\'special\',type=stat.S_IFMT(before.st_mode),rdev=before.st_rdev)\n    return value\n\ndef command(argv):\n    try:\n        result=subprocess.run(argv,capture_output=True,text=True,timeout=3,check=False,\n                              env={\'PATH\':\'/usr/sbin:/usr/bin:/sbin:/bin\',\'LC_ALL\':\'C\',\'TZ\':\'UTC\'})\n        if result.returncode or len(result.stdout)>8192:\n            return None\n        return result.stdout.strip()\n    except (OSError,subprocess.TimeoutExpired):\n        return None\n\ndef systemd():\n    rows={}\n    for unit in UNITS:\n        fields=SERVICE_FIELDS if unit.endswith(\'.service\') else (\'LastTriggerUSec\',)\n        raw=command([\'systemctl\',\'show\',unit,\'--no-pager\',*[f\'--property={f}\' for f in fields]])\n        values={}\n        if raw is not None:\n            for line in raw.splitlines():\n                key,sep,value=line.partition(\'=\')\n                if not sep or key not in fields or key in values:\n                    values={};break\n                if len(value)>128 or not re.fullmatch(r\'[A-Za-z0-9_ .:+/()-]*\',value):\n                    values={};break\n                if key==\'MainPID\' and not re.fullmatch(r\'[0-9]+\',value):\n                    values={};break\n                if key==\'InvocationID\' and value and not re.fullmatch(r\'[a-f0-9]{32}\',value):\n                    values={};break\n                values[key]=value\n        rows[unit]={\'status\':\'observed\',\'values\':values} if set(values)==set(fields) else {\'status\':\'unsupported\'}\n    return rows\n\ndef cli(name=\'claude\'):\n    search=[p for p in os.environ.get(\'PATH\',\'\').split(os.pathsep)\n            if p.startswith(\'/\') and not Path(p).is_relative_to(\'/opt/mikka\')]\n    search.append(\'/home/user/.local/bin\')\n    found=shutil.which(name,path=os.pathsep.join(search))\n    if not found:\n        return {\'status\':\'absent\'}\n    discovered=Path(found)\n    canonical=discovered.resolve(strict=True)\n    if canonical.is_relative_to(\'/opt/mikka\') or not canonical.is_absolute():\n        raise ValueError(\'cli_path_invalid\')\n    return {\'status\':\'observed\',\'discovered\':node(discovered),\'canonical\':node(canonical)}\n\ndef certificate_snapshot():\n    nodes=[node(Path(path)) for path in CERT_PATHS]\n    references=certificate_references(nodes)\n    for reference in references:\n        if reference[\'status\']==\'observed\' and str(Path(reference[\'path\']).resolve(strict=True))!=reference[\'terminalPath\']:\n            raise ValueError(\'certificate_resolution_changed\')\n    # Recheck the same three bounded paths after resolution; never hash an\n    # arbitrary link destination or print certificate contents.\n    if [node(Path(path)) for path in CERT_PATHS]!=nodes:\n        raise ValueError(\'certificate_snapshot_changed\')\n    return nodes,references\n\ndef observe(kind,phase):\n    boot=Path(\'/proc/sys/kernel/random/boot_id\').read_text().strip()\n    if not re.fullmatch(r\'[a-f0-9-]{36}\',boot):\n        raise ValueError(\'boot_identity_invalid\')\n    result={\'version\':1,\'kind\':kind,\'phase\':phase,\'utcNs\':time.time_ns(),\n            \'monotonicNs\':time.monotonic_ns(),\'bootId\':boot,\n            \'nodes\':[],\'cli\':None,\'apt\':None,\'certificates\':[]}\n    if kind==\'claude\':\n        result[\'nodes\']=[node(Path(p)) for p in PATHS[kind]]\n        result[\'cli\']=cli()\n    else:\n        result[\'nodes\'],result[\'certificates\']=certificate_snapshot()\n        result[\'cli\']={name:cli(name) for name in (\'claude\',\'codex\')}\n    return result\n\ndef main():\n    kind,phase=sys.argv[1:]\n    if kind not in PATHS or phase not in PHASES:\n        raise ValueError(\'observation_arguments_invalid\')\n    result=observe(kind,phase)\n    raw=json.dumps(result,separators=(\',\',\':\'))+\'\\n\'\n    if len(raw)>32768:\n        raise ValueError(\'observation_too_large\')\n    if phase==\'fresh\':\n        print(raw,end=\'\')\n    else:\n        path=Path(\'/opt/mikka\')/(phase+\'.json\')\n        with path.open(\'x\') as stream:\n            stream.write(raw)\n        path.chmod(0o444)\n\nif __name__==\'__main__\':\n    signal.signal(signal.SIGALRM,lambda *_: (_ for _ in ()).throw(TimeoutError()))\n    signal.alarm(45)\n    try:\n        main()\n    except BaseException:\n        print(\'{"error":"targeted_observation_failed"}\',file=sys.stderr)\n        sys.exit(1)\n'
++GUEST_PROGRAM=r'''"""Only fixed Desktop APT metadata and the Codex public root CA node."""
++import hashlib,json,os,re,signal,stat,subprocess,sys,time
++from pathlib import Path
++PATHS={'desktop':('/var/lib/apt/extended_states','/var/backups/apt.extended_states.0'),
++       'codex':('/usr/local/share/ca-certificates/e2b-ca.crt',)}
++PHASES=('before','pre_finalization','ready','fresh')
++SERVICE_FIELDS=('ActiveState','SubState','MainPID','ExecMainStartTimestamp',
++                'ExecMainExitTimestamp','InvocationID','Result')
++UNITS=('apt-daily.service','apt-daily-upgrade.service','apt-daily.timer','apt-daily-upgrade.timer')
++
++def identity(s):
++    return (s.st_dev,s.st_ino,s.st_mode,s.st_uid,s.st_gid,s.st_size,s.st_mtime_ns,s.st_ctime_ns)
++
++def node(path):
++    # Same path/kind/mode/uid/gid/hash semantics as official-files.entry,
++    # plus O_NOFOLLOW and stable identity around each bounded file read.
++    value = {'path': str(path)}
++    try:
++        before = path.lstat()
++    except FileNotFoundError:
++        return {**value, 'status':'absent'}
++    value.update(status='present',mode=stat.S_IMODE(before.st_mode),uid=before.st_uid,gid=before.st_gid,
++                 device=before.st_dev,inode=before.st_ino,size=before.st_size,
++                 mtimeNs=before.st_mtime_ns,ctimeNs=before.st_ctime_ns)
++    if stat.S_ISLNK(before.st_mode):
++        target = os.readlink(path)
++        if len(target)>4096 or any(ord(c)<32 for c in target):
++            raise ValueError('link_metadata_invalid')
++        value.update(kind='link',target=target)
++    elif stat.S_ISDIR(before.st_mode):
++        value['kind']='directory'
++    elif stat.S_ISREG(before.st_mode):
++        value['kind']='file'
++        if before.st_size>536870912:
++            return {**value,'status':'too_large'}
++        fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
++        try:
++            opened=os.fstat(fd)
++            if not stat.S_ISREG(opened.st_mode) or identity(opened)!=identity(before):
++                return {**value,'status':'changed_during_read'}
++            digest=hashlib.sha256()
++            with os.fdopen(fd,'rb',closefd=False) as stream:
++                for block in iter(lambda:stream.read(1048576),b''):
++                    digest.update(block)
++            if identity(os.fstat(fd))!=identity(before) or identity(path.lstat())!=identity(before):
++                return {**value,'status':'changed_during_read'}
++            value['sha256']=digest.hexdigest()
++        finally:
++            os.close(fd)
++    else:
++        value.update(kind='special',type=stat.S_IFMT(before.st_mode),rdev=before.st_rdev)
++    return value
++
++def command(argv):
++    try:
++        result=subprocess.run(argv,capture_output=True,text=True,timeout=3,check=False,
++                              env={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','LC_ALL':'C','TZ':'UTC'})
++        if result.returncode or len(result.stdout)>8192:
++            return None
++        return result.stdout.strip()
++    except (OSError,subprocess.TimeoutExpired):
++        return None
++
++def systemd():
++    rows={}
++    for unit in UNITS:
++        fields=SERVICE_FIELDS if unit.endswith('.service') else ('LastTriggerUSec',)
++        raw=command(['systemctl','show',unit,'--no-pager',*[f'--property={f}' for f in fields]])
++        values={}
++        if raw is not None:
++            for line in raw.splitlines():
++                key,sep,value=line.partition('=')
++                if not sep or key not in fields or key in values:
++                    values={};break
++                if len(value)>128 or not re.fullmatch(r'[A-Za-z0-9_ .:+/()-]*',value):
++                    values={};break
++                if key=='MainPID' and not re.fullmatch(r'[0-9]+',value):
++                    values={};break
++                if key=='InvocationID' and value and not re.fullmatch(r'[a-f0-9]{32}',value):
++                    values={};break
++                values[key]=value
++        rows[unit]={'status':'observed','values':values} if set(values)==set(fields) else {'status':'unsupported'}
++    return rows
++
++def codex_root(path):
++    # Preserve bounded/stable reading internally, export only the requested fields.
++    fields={'path','status','kind','mode','uid','gid','sha256'}
++    return {key:value for key,value in node(path).items() if key in fields}
++
++def observe(kind,phase):
++    if kind not in PATHS or phase not in PHASES:
++        raise ValueError('observation_arguments_invalid')
++    boot=Path('/proc/sys/kernel/random/boot_id').read_text().strip()
++    if not re.fullmatch(r'[a-f0-9-]{36}',boot):
++        raise ValueError('boot_identity_invalid')
++    nodes=([codex_root(Path(PATHS[kind][0]))] if kind=='codex'
++           else [node(Path(path)) for path in PATHS[kind]])
++    return {'version':1,'kind':kind,'phase':phase,'utcNs':time.time_ns(),
++            'monotonicNs':time.monotonic_ns(),'bootId':boot,'nodes':nodes,
++            'apt':{'units':systemd()} if kind=='desktop' else None}
++
++def main():
++    kind,phase=sys.argv[1:]
++    if kind not in PATHS or phase not in PHASES:
++        raise ValueError('observation_arguments_invalid')
++    result=observe(kind,phase)
++    raw=json.dumps(result,separators=(',',':'))+'\n'
++    if len(raw)>32768:
++        raise ValueError('observation_too_large')
++    if phase=='fresh':
++        print(raw,end='')
++    else:
++        path=Path('/opt/mikka')/(phase+'.json')
++        with path.open('x') as stream:
++            stream.write(raw)
++        path.chmod(0o444)
++
++if __name__=='__main__':
++    signal.signal(signal.SIGALRM,lambda *_: (_ for _ in ()).throw(TimeoutError()))
++    signal.alarm(45)
++    try:
++        main()
++    except BaseException:
++        print('{"error":"targeted_observation_failed"}',file=sys.stderr)
++        sys.exit(1)
++'''
+ 
+ if __name__=='__main__':
+     logging.basicConfig(level=logging.CRITICAL)
+@@ -475,5 +584,5 @@
+     try:
+         code=main()
+     except BaseException as error:
+-        print(json.dumps({'type':'issue1506_official_targeted_control','error':safe(error)}),flush=True);code=1
++        print(json.dumps({'type':'issue1505_official_path_control','error':safe(error)}),flush=True);code=1
+     sys.exit(code)
+--- fixed-08d/scripts/ops/issue1506-e2b-official-control.test.py
++++ bundle/scripts/ops/issue1505-official-path-control.test.py
+@@ -1,26 +1,25 @@
+ """Offline tests only: no SDK import, credentials, API, or resources."""
+-import hashlib,importlib.util,json,os,tempfile,time,types,unittest
++import ast,copy,hashlib,importlib.util,json,os,tempfile,time,types,unittest
+ from pathlib import Path
+ from unittest.mock import patch
+ from urllib.error import HTTPError
+ 
+ HERE=Path(__file__).resolve().parent
+-spec=importlib.util.spec_from_file_location('control',HERE/'issue1506-e2b-official-control.py')
++spec=importlib.util.spec_from_file_location('control',HERE/'issue1505-official-path-control.py')
+ control=importlib.util.module_from_spec(spec);spec.loader.exec_module(control)
+ guest={'__name__':'targeted_guest'}
+ exec(compile(control.GUEST_PROGRAM,'targeted_guest','exec'),guest)
+ SOURCE=Path(os.environ.get('CONTROL_TEST_SOURCE','source')).resolve()
+ ENV={'GITHUB_REPOSITORY':control.REPOSITORY,'GITHUB_REF':control.BRANCH,'GITHUB_SHA':'a'*40,
+-     'GITHUB_RUN_ID':'123456','GITHUB_RUN_ATTEMPT':'1','CONTROL_GO':'true',
++     'GITHUB_RUN_ID':'123456','GITHUB_RUN_ATTEMPT':'1','CONTROL_GO':control.GO,
+      'CONTROL_NOT_BEFORE':'2026-11-09T12:00:00Z','CONTROL_DEADLINE':'2026-11-09T12:15:00Z'}
+ CTX=control.context(ENV)
+ 
+ def observed(kind,phase):
+-    return {'version':1,'kind':kind,'phase':phase,'utcNs':1,'monotonicNs':1,'bootId':'0'*8+'-'+'1'*4+'-'+'2'*4+'-'+'3'*4+'-'+'4'*12,
++    return {'version':1,'kind':kind,'phase':phase,'utcNs':1,'monotonicNs':1,
++            'bootId':'00000000-1111-2222-3333-444444444444',
+             'nodes':[{'path':path,'status':'absent'} for path in guest['PATHS'][kind]],
+-            'cli':{'status':'absent'} if kind=='claude' else {name:{'status':'absent'} for name in ('claude','codex')},
+-            'apt':None,
+-            'certificates':[] if kind=='claude' else [{'path':path,'status':'unresolved'} for path in control.CERT_PATHS[:2]]}
++            'apt':{'units':{unit:{'status':'unsupported'} for unit in guest['UNITS']}} if kind=='desktop' else None}
+ 
+ def http_error(*args,**kwargs):
+     error=HTTPError(*args,**kwargs)
+@@ -65,7 +64,7 @@
+                 control.context({**ENV,field:value})
+ 
+     def test_only_known_run_owned_aliases(self):
+-        self.assertEqual(control.name_for(CTX,'claude'),'mikka-1506-official-control-123456-1-claude')
++        self.assertEqual(control.name_for(CTX,'codex'),'mikka-1505-official-path-control-123456-1-codex')
+         with self.assertRaises(control.Failure):
+             control.name_for(CTX,'ubuntu')
+ 
+@@ -77,7 +76,7 @@
+         self.assertEqual(control.safe(error)['httpStatus'],403)
+         self.assertNotIn('secret',json.dumps(control.safe(error)))
+ 
+-    def test_source_hash_is_actual_fixed_111a(self):
++    def test_source_hash_is_actual_fixed_5ba(self):
+         self.assertEqual(hashlib.sha256((SOURCE/'scripts/e2b/build-template.py').read_bytes()).hexdigest(),control.BUILDER_SHA)
+ 
+     def test_six_guard_dimensions_and_exact_three_path_overlay(self):
+@@ -85,7 +84,9 @@
+             if args==('rev-parse','HEAD'):
+                 return control.SOURCE if directory==SOURCE else CTX['opsCommit']
+             if args==('rev-list','--parents','-n','1','HEAD'):
+-                return CTX['opsCommit']+' '+control.SOURCE
++                return CTX['opsCommit']+' '+control.SOURCE+' '+control.CARRIER_PARENT
++            if args[:2]==('diff','--raw'):
++                return '\n'.join(':000000 100644 '+'0'*40+' '+'c'*40+' A\t'+path for path in control.PATHS)
+             return '\n'.join(control.PATHS)
+         with patch.object(control,'git',side_effect=fake_git),patch.object(control.subprocess,'run',return_value=types.SimpleNamespace(returncode=0)):
+             control.checkouts(SOURCE,Path('ops'),CTX)
+@@ -94,7 +95,7 @@
+         with patch.object(control,'git',side_effect=extra_path),patch.object(control.subprocess,'run',return_value=types.SimpleNamespace(returncode=0)),self.assertRaises(control.Failure):
+             control.checkouts(SOURCE,Path('ops'),CTX)
+ 
+-    def test_source_guard_does_not_accept_second_parent(self):
++    def test_source_guard_rejects_unapproved_second_parent(self):
+         def fake_git(directory,*args):
+             if args==('rev-parse','HEAD'):
+                 return control.SOURCE if directory==SOURCE else CTX['opsCommit']
+@@ -138,27 +139,27 @@
+             control.observation(json.dumps(row),'desktop','before')
+ 
+     def test_extra_payload_or_phase_rejected(self):
+-        row=observed('claude','before');row['secret']='forbidden'
++        row=observed('codex','before');row['secret']='forbidden'
+         with self.assertRaises(control.Failure):
+-            control.observation(json.dumps(row),'claude','before')
++            control.observation(json.dumps(row),'codex','before')
+         with self.assertRaises(control.Failure):
+-            control.observation(json.dumps(observed('claude','ready')),'claude','fresh')
++            control.observation(json.dumps(observed('codex','ready')),'codex','fresh')
+ 
+     def test_foreign_or_modified_ledger_rejected(self):
+-        row=control.new_ledger(CTX,'claude')
+-        for changed in ({**row,'name':'claude'},{**row,'identity':{**CTX,'runId':'999'}},{**row,'templateId':'tmpl'}):
++        row=control.new_ledger(CTX,'codex')
++        for changed in ({**row,'name':'codex'},{**row,'identity':{**CTX,'runId':'999'}},{**row,'templateId':'tmpl'}):
+             with self.subTest(value=changed),self.assertRaises(control.Failure):
+-                control.validate_ledger(changed,CTX,'claude')
++                control.validate_ledger(changed,CTX,'codex')
+ 
+     def cleanup_fixture(self,row,request,sdk):
+         with tempfile.TemporaryDirectory() as temp:
+             path=Path(temp)/'claude.json';control.save(path,row)
+             with patch.object(control,'request',side_effect=request):
+-                result=control.cleanup_one(SOURCE,'FAKE_API_KEY',CTX,'claude',path,sdk)
++                result=control.cleanup_one(SOURCE,'FAKE_API_KEY',CTX,'codex',path,sdk)
+             return result
+ 
+     def test_cleanup_recovers_exact_alias_then_deletes_exact_id(self):
+-        row=control.new_ledger(CTX,'claude');row['buildStarted']=True
++        row=control.new_ledger(CTX,'codex');row['buildStarted']=True
+         calls=[];deleted=False
+         def request(method,path,_key,body=None):
+             nonlocal deleted
+@@ -176,7 +177,7 @@
+         self.assertEqual([x for x in calls if x[0]=='DELETE'],[('DELETE','/templates/owned-id')])
+ 
+     def test_unknown_build_id_alias_absent_is_unresolved(self):
+-        row=control.new_ledger(CTX,'claude');row['buildStarted']=True
++        row=control.new_ledger(CTX,'codex');row['buildStarted']=True
+         def absent(*_args,**_kwargs):raise http_error('',404,'',{},None)
+         result=self.cleanup_fixture(row,absent,(object,Missing))
+         self.assertEqual(result['status'],'failed')
+@@ -184,7 +185,7 @@
+ 
+     def test_public_or_foreign_template_is_not_deleted(self):
+         for mutate in ({'public':True},{'templateID':'foreign'},{'names':['unrelated']}):
+-            row=control.new_ledger(CTX,'claude');row.update(buildStarted=True,templateId='owned-id')
++            row=control.new_ledger(CTX,'codex');row.update(buildStarted=True,templateId='owned-id')
+             calls=[]
+             def request(method,path,_key,body=None):
+                 calls.append((method,path))
+@@ -195,7 +196,7 @@
+             self.assertFalse(any(method=='DELETE' for method,_ in calls))
+ 
+     def test_instance_failure_does_not_skip_template_cleanup(self):
+-        row=control.new_ledger(CTX,'claude')
++        row=control.new_ledger(CTX,'codex')
+         row.update(buildStarted=True,templateId='owned-id',createStarted=True,sandboxId='sandbox-id')
+         class SDK:
+             @staticmethod
+@@ -210,13 +211,13 @@
+         self.assertNotIn('secret',json.dumps(result))
+ 
+     def test_foreign_sandbox_is_not_killed(self):
+-        row=control.new_ledger(CTX,'claude')
++        row=control.new_ledger(CTX,'codex')
+         row.update(buildStarted=True,templateId='owned-id',createStarted=True,sandboxId='sandbox-id')
+         killed=[]
+         class SDK:
+             @staticmethod
+             def get_info(*_args,**_kwargs):
+-                return types.SimpleNamespace(sandbox_id='sandbox-id',template_id='foreign',metadata={**CTX,'kind':'claude'})
++                return types.SimpleNamespace(sandbox_id='sandbox-id',template_id='foreign',metadata={**CTX,'kind':'codex'})
+             @staticmethod
+             def kill(*args,**_kwargs):killed.append(args)
+         def absent(*_args,**_kwargs):raise http_error('',404,'',{},None)
+@@ -224,11 +225,13 @@
+         self.assertEqual(result['status'],'failed');self.assertEqual(killed,[])
+ 
+     def test_two_fixed_budget_paths_no_worker_or_model(self):
+-        self.assertEqual(control.KINDS,('claude','desktop','codex'))
++        self.assertEqual(control.KINDS,('desktop','codex'))
+         self.assertNotIn('E2B_API_KEY',control.GUEST_PROGRAM)
+         self.assertNotIn('apt-get',control.GUEST_PROGRAM)
+         self.assertNotIn('subprocess.Popen',control.GUEST_PROGRAM)
+-        workflow=HERE.parents[1]/'.github/workflows/issue1506-e2b-official-control.yml'
++        workflow=HERE.parents[1]/'.github/workflows/issue1505-official-path-control.yml'
++        if not workflow.exists():
++            workflow=workflow.with_name(workflow.name+'.in')
+         source=workflow.read_text()
+         def field(prefix):
+             values=[line[len(prefix):] for line in source.splitlines() if line.startswith(prefix)]
+@@ -241,11 +244,11 @@
+         if job_if=='false':
+             self.assertEqual((go,start,end),("'false'",'UNBOUND','UNBOUND'))
+         else:
+-            self.assertEqual(job_if,"github.ref == 'refs/heads/ops/issue1506-e2b-conservation-control-4' && github.run_attempt == 1")
+-            self.assertEqual(go,"'true'")
++            self.assertEqual(job_if,"github.ref == 'refs/heads/ops/1505-smoke-github-readonly-20261109' && github.run_attempt == 1")
++            self.assertEqual(go,repr(control.GO))
+             for stamp in (start,end):
+                 self.assertRegex(stamp,r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$')
+-            bound={**ENV,'CONTROL_GO':'true','CONTROL_NOT_BEFORE':start,'CONTROL_DEADLINE':end}
++            bound={**ENV,'CONTROL_GO':control.GO,'CONTROL_NOT_BEFORE':start,'CONTROL_DEADLINE':end}
+             began=control.datetime.strptime(start,'%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=__import__('datetime').timezone.utc).timestamp()
+             self.assertGreater(control.window(bound,now=began),began)
+         self.assertIn("if: always() && steps.key.outcome == 'success'",source)
+@@ -270,7 +273,7 @@
+         with tempfile.TemporaryDirectory() as temp:
+             path=Path(temp)/'claude.json'
+             with patch.dict('sys.modules',{'e2b':module,'e2b.exceptions':types.SimpleNamespace(SandboxNotFoundException=Missing)}),patch.object(control,'request',side_effect=absent):
+-                control.one(SOURCE,'FAKE_API_KEY',CTX,'claude',path,time.time()+60)
++                control.one(SOURCE,'FAKE_API_KEY',CTX,'codex',path,time.time()+60)
+             result=json.loads(path.read_text())
+         self.assertEqual(result['templateId'],'owned-id')
+         self.assertEqual(result['buildId'],'build-id')
+@@ -315,7 +318,7 @@
+                  patch.object(control.importlib.metadata,'version',return_value='2.62.0'), \
+                  patch.object(control,'install_alarm'),patch.object(control,'request',side_effect=alarm_request):
+                 self.assertEqual(control.main(),1)
+-        self.assertEqual(calls,[('GET','/templates/owned-claude')])
++        self.assertEqual(calls,[('GET','/templates/owned-desktop')])
+ 
+ 
+     def test_entry_orchestrates_only_desktop_and_codex(self):
+@@ -354,87 +357,203 @@
+         self.assertEqual(report['budget']['desktopNoopSeconds'],0)
+ 
+ 
+-    def test_real_certificate_files_then_exact_relative_absolute_chain(self):
+-        with tempfile.TemporaryDirectory() as temp:
+-            root=Path(temp);first=root/'1560546e.0';second=root/'e2b-ca.pem';terminal=root/'e2b-ca.crt'
+-            paths=tuple(map(str,(first,second,terminal)))
+-            targets={str(first):second.name,str(second):str(terminal)}
+-            for path in (first,second,terminal):
+-                path.write_bytes(b'original certificate fixture')
+-            with patch.dict(guest,{'CERT_PATHS':paths,'CERT_TARGETS':targets}):
+-                nodes,refs=guest['certificate_snapshot']()
+-                self.assertEqual([r['chain'] for r in refs],[[str(first)],[str(second)]])
+-                first.unlink();first.symlink_to(second.name)
+-                second.unlink();second.symlink_to(terminal)
+-                terminal.write_bytes(b'new boot certificate fixture')
+-                nodes,refs=guest['certificate_snapshot']()
+-            self.assertEqual(nodes[0]['target'],second.name)
+-            self.assertEqual(nodes[1]['target'],str(terminal))
+-            self.assertEqual(refs[0]['chain'],list(paths))
+-            self.assertEqual(refs[1]['chain'],list(paths[1:]))
+-            self.assertTrue(all(r['terminalPath']==str(terminal) for r in refs))
+-            self.assertTrue(all(r['terminalSha256']==hashlib.sha256(b'new boot certificate fixture').hexdigest() for r in refs))
+-
+-    def test_certificate_chain_refuses_other_destination_and_linked_root(self):
+-        with tempfile.TemporaryDirectory() as temp:
+-            root=Path(temp);first=root/'1560546e.0';second=root/'e2b-ca.pem';terminal=root/'e2b-ca.crt';other=root/'other'
+-            paths=tuple(map(str,(first,second,terminal)))
+-            targets={str(first):second.name,str(second):str(terminal)}
+-            first.symlink_to(second.name);second.symlink_to(other);terminal.write_bytes(b'root');other.write_bytes(b'private fixture')
+-            calls=[];real_node=guest['node']
+-            def node(path):
+-                calls.append(str(path))
+-                return real_node(path)
+-            with patch.dict(guest,{'CERT_PATHS':paths,'CERT_TARGETS':targets,'node':node}):
+-                with self.assertRaisesRegex(ValueError,'certificate_target_invalid'):
+-                    guest['certificate_snapshot']()
+-                self.assertNotIn(str(other),calls)
+-                second.unlink();second.symlink_to(terminal)
+-                terminal.unlink();terminal.symlink_to(other)
+-                with self.assertRaisesRegex(ValueError,'certificate_target_invalid'):
+-                    guest['certificate_snapshot']()
+-                self.assertNotIn(str(other),calls)
+-
+-    def test_closed_certificate_reference_cannot_forge_hash_path_or_chain(self):
+-        import copy
+-        row=observed('desktop','fresh')
+-        def file(path,digest):
+-            return {'path':path,'status':'present','kind':'file','mode':0o644,'uid':0,'gid':0,
+-                    'device':1,'inode':1,'size':1,'mtimeNs':1,'ctimeNs':1,'sha256':digest}
+-        row['nodes']=[file(path,'a'*64) for path in control.CERT_PATHS]
+-        for index,target in ((0,'e2b-ca.pem'),(1,control.CERT_PATHS[2])):
+-            row['nodes'][index].pop('sha256')
+-            row['nodes'][index].update(kind='link',target=target)
+-        row['certificates']=[{'path':control.CERT_PATHS[0],'status':'observed','chain':list(control.CERT_PATHS),
+-                              'terminalPath':control.CERT_PATHS[2],'terminalSha256':'a'*64},
+-                             {'path':control.CERT_PATHS[1],'status':'observed','chain':list(control.CERT_PATHS[1:]),
+-                              'terminalPath':control.CERT_PATHS[2],'terminalSha256':'a'*64}]
+-        self.assertEqual(control.observation(json.dumps(row),'desktop','fresh'),row)
+-        for field,value in [('terminalSha256','b'*64),('terminalPath','/etc/shadow'),('chain',[control.CERT_PATHS[0],control.CERT_PATHS[2]])]:
+-            bad=copy.deepcopy(row);bad['certificates'][0][field]=value
++
++
++
++
++
++class PathScopeTests(unittest.TestCase):
++    def test_exact_ordered_parents_accept_only_source_then_closed_carrier(self):
++        def fake_git(parents):
++            def read(directory,*args):
++                if args==('rev-parse','HEAD'):
++                    return control.SOURCE if directory==SOURCE else CTX['opsCommit']
++                if args==('rev-list','--parents','-n','1','HEAD'):
++                    return ' '.join([CTX['opsCommit'],*parents])
++                if args[:2]==('diff','--raw'):
++                    return '\n'.join(':000000 100644 '+'0'*40+' '+'c'*40+' A\t'+path for path in control.PATHS)
++                return '\n'.join(control.PATHS)
++            return read
++        expected=[control.SOURCE,control.CARRIER_PARENT]
++        with patch.object(control,'git',side_effect=fake_git(expected)),patch.object(control.subprocess,'run',return_value=types.SimpleNamespace(returncode=0)):
++            control.checkouts(SOURCE,Path('ops'),CTX)
++        invalid=[expected[::-1],[control.SOURCE,'b'*40],['b'*40,control.CARRIER_PARENT],
++                 [control.SOURCE],[*expected,'b'*40]]
++        for parents in invalid:
++            with self.subTest(parents=parents),patch.object(control,'git',side_effect=fake_git(parents)), \
++                 patch.object(control.subprocess,'run',return_value=types.SimpleNamespace(returncode=0)),self.assertRaises(control.Failure):
++                control.checkouts(SOURCE,Path('ops'),CTX)
++
++    def test_overlay_adds_only_three_regular_files_without_old_carrier_tree(self):
++        correct=[':000000 100644 '+'0'*40+' '+'c'*40+' A\t'+path for path in control.PATHS]
++        invalid=[correct[1:],correct+[correct[0]],
++                 [correct[0].replace('100644','120000'),*correct[1:]],
++                 [correct[0].replace('100644','100755'),*correct[1:]],
++                 [correct[0].replace(':000000',':100644').replace(' A\t',' M\t'),*correct[1:]],
++                 correct+[':000000 100644 '+'0'*40+' '+'d'*40+' A\t.github/workflows/issue1505-smoke-github-readonly.yml']]
++        for changes in invalid:
++            def fake_git(directory,*args):
++                if args==('rev-parse','HEAD'):
++                    return control.SOURCE if directory==SOURCE else CTX['opsCommit']
++                if args==('rev-list','--parents','-n','1','HEAD'):
++                    return ' '.join([CTX['opsCommit'],control.SOURCE,control.CARRIER_PARENT])
++                return '\n'.join(changes if args[:2]==('diff','--raw') else control.PATHS)
++            with self.subTest(changes=changes),patch.object(control,'git',side_effect=fake_git), \
++                 patch.object(control.subprocess,'run',return_value=types.SimpleNamespace(returncode=0)),self.assertRaises(control.Failure):
++                control.checkouts(SOURCE,Path('ops'),CTX)
++
++    def test_only_this_control_go_is_accepted(self):
++        self.assertEqual(control.window(ENV,1794225601),1794226500)
++        for old in ('true','root-reviewed-1505-github-handoff-v3','root-reviewed-1505-github-r7-20261109-v1'):
++            with self.subTest(go=old),self.assertRaises(control.Failure):
++                control.window({**ENV,'CONTROL_GO':old},1794225601)
++
++    def test_codex_actual_public_file_projection_keeps_only_requested_metadata(self):
++        with tempfile.TemporaryDirectory() as temp:
++            path=Path(temp)/'public-ca.crt';path.write_bytes(b'public certificate fixture')
++            path.chmod(0o644);before=guest['codex_root'](path)
++            path.chmod(0o777);after=guest['codex_root'](path)
++        self.assertEqual(set(before),{'path','status','kind','mode','uid','gid','sha256'})
++        self.assertEqual((before['mode'],after['mode']),(420,511))
++        self.assertEqual(before['sha256'],hashlib.sha256(b'public certificate fixture').hexdigest())
++        self.assertEqual(before['sha256'],after['sha256'])
++        for actual in (before,after):
++            fixture={**actual,'path':control.OBSERVED_PATHS['codex'][0]}
++            value=observed('codex','fresh');value['nodes']=[fixture]
++            self.assertEqual(control.observation(json.dumps(value),'codex','fresh'),value)
++
++    def test_codex_absent_or_unstable_is_explicit_without_a_digest(self):
++        root=control.OBSERVED_PATHS['codex'][0]
++        for row in ({'path':root,'status':'absent'},
++                    {'path':root,'status':'changed_during_read','kind':'file','mode':420,'uid':0,'gid':0},
++                    {'path':root,'status':'too_large','kind':'file','mode':420,'uid':0,'gid':0}):
++            value=observed('codex','before');value['nodes']=[row]
++            self.assertEqual(control.observation(json.dumps(value),'codex','before'),value)
++            self.assertNotIn('sha256',row)
++
++    def test_closed_kind_path_and_schema_reject_other_targets_and_cli_payload(self):
++        for kind in control.KINDS:
++            changes=[lambda x:x.update(cli={}),lambda x:x.update(certificates=[]),
++                     lambda x:x['nodes'][0].update(path='/etc/shadow'),
++                     lambda x:x['nodes'].append(copy.deepcopy(x['nodes'][0])),
++                     lambda x:x.update(version=True)]
++            for change in changes:
++                value=observed(kind,'fresh');change(value)
++                with self.subTest(kind=kind,change=change),self.assertRaises(control.Failure):
++                    control.observation(json.dumps(value),kind,'fresh')
++        for kind in ('claude','ubuntu'):
++            with self.subTest(kind=kind),self.assertRaises(control.Failure):
++                control.observation(json.dumps(observed('codex','before')),kind,'before')
++        value=observed('codex','before');value['apt']={'units':{}}
++        with self.assertRaises(control.Failure):control.observation(json.dumps(value),'codex','before')
++
++    def test_desktop_real_backup_file_and_absence_preserve_closed_metadata(self):
++        with tempfile.TemporaryDirectory() as temp:
++            path=Path(temp)/'backup';path.write_bytes(b'Package: public-fixture\nAuto-Installed: 1\n')
++            before=guest['node'](path);path.unlink();after=guest['node'](path)
++        target=control.OBSERVED_PATHS['desktop'][1]
++        self.assertEqual(before['kind'],'file');self.assertEqual(after['status'],'absent')
++        for sample in (before,after):
++            value=observed('desktop','fresh');value['nodes'][1]={**sample,'path':target}
++            self.assertEqual(control.observation(json.dumps(value),'desktop','fresh'),value)
++
++    def test_systemd_exact_four_units_and_closed_properties_only(self):
++        calls=[]
++        def command(argv):
++            calls.append(argv)
++            fields=guest['SERVICE_FIELDS'] if argv[2].endswith('.service') else ('LastTriggerUSec',)
++            values={'ActiveState':'inactive','SubState':'dead','MainPID':'0',
++                    'ExecMainStartTimestamp':'','ExecMainExitTimestamp':'','InvocationID':'','Result':'success','LastTriggerUSec':''}
++            return '\n'.join(key+'='+values[key] for key in fields)
++        with patch.dict(guest,{'command':command}):units=guest['systemd']()
++        self.assertEqual(len(calls),4)
++        self.assertEqual([argv[2] for argv in calls],list(guest['UNITS']))
++        for argv in calls:
++            fields=guest['SERVICE_FIELDS'] if argv[2].endswith('.service') else ('LastTriggerUSec',)
++            self.assertEqual(argv,['systemctl','show',argv[2],'--no-pager',*[f'--property={field}' for field in fields]])
++        value=observed('desktop','fresh');value['apt']={'units':units}
++        self.assertEqual(control.observation(json.dumps(value),'desktop','fresh'),value)
++        for field,bad in [('MainPID','not-a-pid'),('InvocationID','not-an-id'),('Result','private\ntext')]:
++            malformed=copy.deepcopy(value);malformed['apt']['units']['apt-daily.service']['values'][field]=bad
+             with self.subTest(field=field),self.assertRaises(control.Failure):
+-                control.observation(json.dumps(bad),'desktop','fresh')
+-        bad=copy.deepcopy(row);bad['nodes'][0]['target']='/etc/shadow'
+-        with self.assertRaises(control.Failure):
+-            control.observation(json.dumps(bad),'desktop','fresh')
+-        bad=copy.deepcopy(row);bad['nodes'][2].pop('sha256');bad['nodes'][2].update(kind='link',target='/etc/shadow')
+-        with self.assertRaises(control.Failure):
+-            control.observation(json.dumps(bad),'desktop','fresh')
+-
+-    def test_original_cli_identity_keeps_bytes_permissions_and_presence(self):
+-        import copy
+-        row={'status':'observed','discovered':{'path':'/usr/bin/codex','status':'present','kind':'file','mode':0o755,'uid':0,'gid':0,'sha256':'a'*64,'inode':1,'ctimeNs':1},
+-             'canonical':{'path':'/usr/bin/codex','status':'present','kind':'file','mode':0o755,'uid':0,'gid':0,'sha256':'a'*64,'inode':1,'ctimeNs':1}}
+-        baseline=control.cli_identity({'claude':{'status':'absent'},'codex':row})
+-        boot=copy.deepcopy(row)
+-        for field in ('discovered','canonical'):
+-            boot[field].update(inode=2,ctimeNs=99)
+-        self.assertEqual(control.cli_identity({'claude':{'status':'absent'},'codex':boot}),baseline)
+-        for key,value in [('sha256','b'*64),('mode',0o777),('uid',1),('path','/other/codex')]:
+-            changed=copy.deepcopy(row);changed['canonical'][key]=value
+-            with self.subTest(key=key):
+-                self.assertNotEqual(control.cli_identity({'claude':{'status':'absent'},'codex':changed}),baseline)
+-        self.assertNotEqual(control.cli_identity({'claude':{'status':'absent'},'codex':{'status':'absent'}}),baseline)
++                control.observation(json.dumps(malformed),'desktop','fresh')
++
++    def test_guest_observes_only_fixed_paths_without_cli_or_apt_commands(self):
++        calls=[]
++        class FixedPath:
++            def __init__(self,value):self.value=str(value)
++            def __str__(self):return self.value
++            def read_text(self):
++                self.asserted=self.value
++                if self.value!='/proc/sys/kernel/random/boot_id':raise AssertionError('unexpected read')
++                return '00000000-1111-2222-3333-444444444444'
++        def node(path):
++            calls.append(str(path));return {'path':str(path),'status':'absent'}
++        units={unit:{'status':'unsupported'} for unit in guest['UNITS']}
++        with patch.dict(guest,{'Path':FixedPath,'node':node,'systemd':lambda:units}):
++            for kind in control.KINDS:
++                for phase in guest['PHASES']:
++                    calls.clear();value=guest['observe'](kind,phase)
++                    self.assertEqual(calls,list(control.OBSERVED_PATHS[kind]))
++                    self.assertEqual(control.observation(json.dumps(value),kind,phase),value)
++        parsed=ast.parse(control.GUEST_PROGRAM)
++        functions={node.name for node in parsed.body if isinstance(node,ast.FunctionDef)}
++        self.assertNotIn('cli',functions);self.assertNotIn('certificate_snapshot',functions)
++        for forbidden in ('apt-get','dpkg-query','time.sleep','os.walk','flock','systemctl stop','systemctl disable','E2B_API_KEY','os.environ','shutil'):
++            self.assertNotIn(forbidden,control.GUEST_PROGRAM)
++
++    def test_one_uses_only_observer_commands_and_one_fresh_instance_per_kind(self):
++        for kind in control.KINDS:
++            with self.subTest(kind=kind):
++                steps=[];state={'built':False,'killed':False,'deleted':False,'creates':0}
++                class Image:
++                    def __init__(self,**_kwargs):pass
++                    def __getattr__(self,name):
++                        def record(*args,**kwargs):steps.append((name,args,kwargs));return self
++                        return record
++                    @staticmethod
++                    def build(_image,**kwargs):
++                        state['built']=True
++                        self.assertEqual((kwargs['cpu_count'],kwargs['memory_mb'],kwargs['skip_cache']),(2,4096,True))
++                        kwargs['on_build_logs'](types.SimpleNamespace(message='Template created with ID: owned-id, Build ID: build-id'))
++                        return types.SimpleNamespace(template_id='owned-id',build_id='build-id')
++                class SDK:
++                    @staticmethod
++                    def create(template_id,**kwargs):
++                        state['creates']+=1;self.assertEqual(template_id,'owned-id');self.assertEqual(kwargs['timeout'],120)
++                        self.assertEqual(kwargs['metadata'],{**CTX,'kind':kind})
++                        files=types.SimpleNamespace(read=lambda name,**_k:json.dumps(observed(kind,Path(name).stem)))
++                        def run(command,**_kwargs):
++                            steps.append(('fresh_command',(command,),_kwargs))
++                            return types.SimpleNamespace(exit_code=0,stdout=json.dumps(observed(kind,'fresh')))
++                        return types.SimpleNamespace(sandbox_id='sandbox-id',files=files,commands=types.SimpleNamespace(run=run))
++                    @staticmethod
++                    def get_info(*_args,**_kwargs):
++                        if state['killed']:raise Missing()
++                        return types.SimpleNamespace(sandbox_id='sandbox-id',template_id='owned-id',metadata={**CTX,'kind':kind})
++                    @staticmethod
++                    def kill(sandbox_id,**_kwargs):self.assertEqual(sandbox_id,'sandbox-id');state['killed']=True
++                def request(method,path,_key,body=None):
++                    if not state['built'] or state['deleted']:raise http_error('',404,'',{},None)
++                    if method=='DELETE':state['deleted']=True;return None
++                    return {'templateID':'owned-id','public':False,'isDefault':False,'names':[control.name_for(CTX,kind)]}
++                with tempfile.TemporaryDirectory() as temp:
++                    path=Path(temp)/(kind+'.json')
++                    with patch.dict('sys.modules',{'e2b':types.SimpleNamespace(Template=Image,Sandbox=SDK),
++                                    'e2b.exceptions':types.SimpleNamespace(SandboxNotFoundException=Missing)}), \
++                         patch.object(control,'request',side_effect=request),patch.object(control,'install_alarm'):
++                        control.one(SOURCE,'FAKE_API_KEY',CTX,kind,path,time.time()+60)
++                    value=json.loads(path.read_text())
++                self.assertEqual(value['probe'],{'status':'observed','phase':'complete'})
++                self.assertEqual(value['cleanup']['status'],'complete')
++                self.assertEqual(set(value['observations']),set(guest['PHASES']))
++                self.assertEqual(state['creates'],1);self.assertTrue(state['killed']);self.assertTrue(state['deleted'])
++                self.assertEqual([args for name,args,_ in steps if name=='from_template'],[(kind,)])
++                commands=[args[0] for name,args,_ in steps if name=='run_cmd']
++                self.assertEqual(commands,['test ! -e /opt/mikka && test ! -L /opt/mikka && mkdir -m 0755 /opt/mikka',
++                    f'python3 -B /opt/mikka/observe.py {kind} before',f'python3 -B /opt/mikka/observe.py {kind} pre_finalization'])
++                self.assertEqual([args[0] for name,args,_ in steps if name=='fresh_command'],[f'python3 -B /opt/mikka/observe.py {kind} fresh'])
++                self.assertEqual([args[0] for name,args,_ in steps if name=='set_start_cmd'],[f'python3 -B /opt/mikka/observe.py {kind} ready && exec sleep infinity'])
+ 
+ 
+ if __name__=='__main__':

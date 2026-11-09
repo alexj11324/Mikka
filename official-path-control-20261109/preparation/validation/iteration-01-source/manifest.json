@@ -1,0 +1,31 @@
+{
+  "testResult": "../unit-01.result.json",
+  "binding": "first candidate before authorized carrier-parent update",
+  "files": [
+    {
+      "path": "bundle/.github/workflows/issue1505-official-path-control.yml.in",
+      "bytes": 3654,
+      "sha256": "9c67339fa85f30ed955fc5d07f47e1c6b7992704c81bfd4c5108385e505d89a1"
+    },
+    {
+      "path": "bundle/scripts/ops/issue1505-official-path-control.py",
+      "bytes": 29434,
+      "sha256": "8a889bf18283f65eb7afcc28829204f1df6d4c20ccbcf2987ad3a846f3f85074"
+    },
+    {
+      "path": "bundle/scripts/ops/issue1505-official-path-control.test.py",
+      "bytes": 30465,
+      "sha256": "2a63a21f335ab30200482969c281a9b894444180d9ed3112d12bdb49c0000d23"
+    },
+    {
+      "path": "candidate.diff",
+      "bytes": 58370,
+      "sha256": "aee30b662ae252221147c26906bf240967dae77d26351c860c48db6b761e6f39"
+    },
+    {
+      "path": "source-bindings.json",
+      "bytes": 1319,
+      "sha256": "98eed27b73d59ba0e0f125025c28818295b87ebdae8c5a9fe83cd64b53c4d57f"
+    }
+  ]
+}

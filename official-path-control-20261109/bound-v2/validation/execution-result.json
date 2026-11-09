@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+    "-B",
+    "scripts/ops/issue1505-official-path-control.test.py"
+  ],
+  "cwd": "/workspace/scratch/263e36984c81/official-path-control-bound-v2-1505",
+  "startedAt": "2026-11-09T17:56:51.487372+00:00",
+  "completedAt": "2026-11-09T17:56:51.868810+00:00",
+  "exitCode": 0,
+  "stdout": {
+    "bytes": 404,
+    "sha256": "2b68c4293367df24671e1e6ed64c1b7a20b7d5b391da089fd6c31add8433361e"
+  },
+  "stderr": {
+    "bytes": 135,
+    "sha256": "03f43e0ba7a0720c406bc86153e207fd76bbc0a29ece9375b6fc71ad410112de"
+  },
+  "scope": "same 36 offline tests against the actual bound workflow; no provider or credentials"
+}
