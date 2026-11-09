@@ -1,0 +1,19 @@
+{
+  "status": "offline_unbound_disabled",
+  "reason": "Branch literal edits changed runner/test hashes but their embedded expected hashes still referenced the original draft. Bind the actual reviewed files; preserve strict hash enforcement.",
+  "updates": {
+    "github-readonly-runner.mjs": {
+      "previousEmbeddedHash": "85a532d55bb0c9703b2e0e97693ce322b042c01e3768d85b41e7fde5a9e63029",
+      "actualHash": "7859cff4714d5367a29322357bd9945ab8c9c49376c3312d4b8643facaff0f57"
+    },
+    "github-readonly.test.mjs": {
+      "previousEmbeddedHash": "1ef0f176c458efa2e67bad134cbbf4fe8c014abfb1ddc95c04d941c7e3d13259",
+      "actualHash": "a29271758aaa0cc9ed3eac3a8e9ae05f96c91bf955ef48cb97f8490ff8f6a1c2"
+    }
+  },
+  "beforeWorkflowSha256": "2e1c97df2b067900f9f7b31ef621caf655b5372de70350f371f5a8a932782c5d",
+  "afterWorkflowSha256": "6e49a194122e1769cb23e3bed7277677070202f4171a6879abf95cac8afb8be8",
+  "bytes": 11668,
+  "productionCalls": 0,
+  "activated": false
+}

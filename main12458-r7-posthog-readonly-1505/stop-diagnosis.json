@@ -1,0 +1,259 @@
+{
+  "version": 1,
+  "scope": {
+    "projectId": 670821,
+    "service": "mikka-web",
+    "dateFrom": "2026-11-09T21:19:00Z",
+    "dateTo": "2026-11-09T21:22:00Z",
+    "runId": "2a4df252-7528-45ea-839e-6d1a42e1945d",
+    "runIdHash": "a18972ad3b3fa09b",
+    "sourceCommit": "12458fe22e1217f644e8b28f82ab856211e73b72",
+    "r7Run": "42695935772",
+    "attempt": 1
+  },
+  "provenance": {
+    "method": "Existing authenticated read-only PostHog connector; explicit service/time/run filters",
+    "originalActionsDownloads": false,
+    "productionDbRead": false,
+    "newTasksOrModels": false,
+    "posthogWrites": false
+  },
+  "query": {
+    "tool": "query-apm-spans",
+    "filterGroup": [
+      {
+        "key": "mikka.run_id",
+        "type": "span_attribute",
+        "operator": "exact",
+        "value": "2a4df252-7528-45ea-839e-6d1a42e1945d"
+      },
+      {
+        "key": "mikka.route",
+        "type": "span_attribute",
+        "operator": "exact",
+        "value": "/v1/runs/[runId]/complete"
+      }
+    ],
+    "flatSpans": true,
+    "rootSpans": false,
+    "limit": 300
+  },
+  "observations": {
+    "matchingCompletionSpans": 71,
+    "allExactRun": true,
+    "allVersion12458": true,
+    "rollbackPresent": false,
+    "outcomeAttributePresent": false,
+    "safeSelectedSpans": [
+      {
+        "uuid": "01a1c230-011e-7923-a314-5e438e67e508",
+        "traceId": "00000000000000000826C7A400942F4E",
+        "spanId": "D3CB89AEE2A38CCE",
+        "parentSpanId": "D7A63F60EFDACE00",
+        "name": "POST /v1/runs/[runId]/complete",
+        "timestamp": "2026-11-09T21:21:28.027000Z",
+        "endTime": "2026-11-09T21:21:28.299138Z",
+        "statusCode": 0,
+        "httpStatus": "204",
+        "queryTemplate": null,
+        "returnedRows": null,
+        "runId": "2a4df252-7528-45ea-839e-6d1a42e1945d",
+        "route": "/v1/runs/[runId]/complete",
+        "clientKind": "daemon",
+        "service": "mikka-web",
+        "version": "12458fe22e12"
+      },
+      {
+        "uuid": "01a1c230-011d-7332-b742-ffe2fedcb570",
+        "traceId": "00000000000000000826C7A400942F4E",
+        "spanId": "864DEFB4B35B439B",
+        "parentSpanId": "D3CB89AEE2A38CCE",
+        "name": "pg.query:SAVEPOINT orvilo_mvp",
+        "timestamp": "2026-11-09T21:21:28.150000Z",
+        "endTime": "2026-11-09T21:21:28.151563Z",
+        "statusCode": 0,
+        "httpStatus": null,
+        "queryTemplate": "SAVEPOINT completion_question_record",
+        "returnedRows": "0",
+        "runId": "2a4df252-7528-45ea-839e-6d1a42e1945d",
+        "route": "/v1/runs/[runId]/complete",
+        "clientKind": "daemon",
+        "service": "mikka-web",
+        "version": "12458fe22e12"
+      },
+      {
+        "uuid": "01a1c230-011e-7923-a314-5d7d1655722e",
+        "traceId": "00000000000000000826C7A400942F4E",
+        "spanId": "7F57A15DEB8DC8BC",
+        "parentSpanId": "D3CB89AEE2A38CCE",
+        "name": "pg.query:INSERT orvilo_mvp",
+        "timestamp": "2026-11-09T21:21:28.248000Z",
+        "endTime": "2026-11-09T21:21:28.250832Z",
+        "statusCode": 0,
+        "httpStatus": null,
+        "queryTemplate": "INSERT INTO factory_questions (id,\"userId\",\"issueId\",\"taskId\",\"attemptId\",\"candidateId\",stage,\"originRunId\",\"originSessionId\",\"originRevision\",\"waitingBinding\",kind,question,context,options,request,s…",
+        "returnedRows": "1",
+        "runId": "2a4df252-7528-45ea-839e-6d1a42e1945d",
+        "route": "/v1/runs/[runId]/complete",
+        "clientKind": "daemon",
+        "service": "mikka-web",
+        "version": "12458fe22e12"
+      },
+      {
+        "uuid": "01a1c230-011e-7923-a314-5d895ba78368",
+        "traceId": "00000000000000000826C7A400942F4E",
+        "spanId": "9078B6185BB3E778",
+        "parentSpanId": "D3CB89AEE2A38CCE",
+        "name": "pg.query:RELEASE orvilo_mvp",
+        "timestamp": "2026-11-09T21:21:28.251000Z",
+        "endTime": "2026-11-09T21:21:28.252799Z",
+        "statusCode": 0,
+        "httpStatus": null,
+        "queryTemplate": "RELEASE SAVEPOINT completion_question_record",
+        "returnedRows": "0",
+        "runId": "2a4df252-7528-45ea-839e-6d1a42e1945d",
+        "route": "/v1/runs/[runId]/complete",
+        "clientKind": "daemon",
+        "service": "mikka-web",
+        "version": "12458fe22e12"
+      },
+      {
+        "uuid": "01a1c230-011e-7923-a314-5ddc360af775",
+        "traceId": "00000000000000000826C7A400942F4E",
+        "spanId": "6523589CCA7774FE",
+        "parentSpanId": "D3CB89AEE2A38CCE",
+        "name": "pg.query:COMMIT orvilo_mvp",
+        "timestamp": "2026-11-09T21:21:28.266000Z",
+        "endTime": "2026-11-09T21:21:28.268414Z",
+        "statusCode": 0,
+        "httpStatus": null,
+        "queryTemplate": "commit",
+        "returnedRows": "0",
+        "runId": "2a4df252-7528-45ea-839e-6d1a42e1945d",
+        "route": "/v1/runs/[runId]/complete",
+        "clientKind": "daemon",
+        "service": "mikka-web",
+        "version": "12458fe22e12"
+      },
+      {
+        "uuid": "01a1c230-011e-7923-a314-5de722dd5170",
+        "traceId": "00000000000000000826C7A400942F4E",
+        "spanId": "0A311D8CAA8D2F4D",
+        "parentSpanId": "D3CB89AEE2A38CCE",
+        "name": "pg.query:COMMIT orvilo_mvp",
+        "timestamp": "2026-11-09T21:21:28.270000Z",
+        "endTime": "2026-11-09T21:21:28.272226Z",
+        "statusCode": 0,
+        "httpStatus": null,
+        "queryTemplate": "commit",
+        "returnedRows": "0",
+        "runId": "2a4df252-7528-45ea-839e-6d1a42e1945d",
+        "route": "/v1/runs/[runId]/complete",
+        "clientKind": "daemon",
+        "service": "mikka-web",
+        "version": "12458fe22e12"
+      },
+      {
+        "uuid": "01a1c230-011e-7923-a314-5e38fba98f34",
+        "traceId": "00000000000000000826C7A400942F4E",
+        "spanId": "77784C4A67FD4585",
+        "parentSpanId": "D3CB89AEE2A38CCE",
+        "name": "pg.query:COMMIT orvilo_mvp",
+        "timestamp": "2026-11-09T21:21:28.296000Z",
+        "endTime": "2026-11-09T21:21:28.298571Z",
+        "statusCode": 0,
+        "httpStatus": null,
+        "queryTemplate": "COMMIT",
+        "returnedRows": "0",
+        "runId": "2a4df252-7528-45ea-839e-6d1a42e1945d",
+        "route": "/v1/runs/[runId]/complete",
+        "clientKind": "daemon",
+        "service": "mikka-web",
+        "version": "12458fe22e12"
+      }
+    ]
+  },
+  "logObservations": {
+    "count": 109,
+    "newestRead": 100,
+    "newestReadFrom": "2026-11-09T21:21:19.046899Z",
+    "newestReadTo": "2026-11-09T21:21:32.801656Z",
+    "outcomeAttributeInNewest100": false,
+    "exactRunRpcActions": [
+      {
+        "action": "coordinator.sendCoordinatorMessage",
+        "count": 4
+      }
+    ],
+    "scopedAttributeDiscovery": [
+      "mikka.stage",
+      "mikka.run_id",
+      "mikka.run.id_hash",
+      "mikka.rpc.action"
+    ],
+    "notFoundAmongRequestedKeys": [
+      "mikka.outcome",
+      "mikka.error_code"
+    ]
+  },
+  "fixedSources": [
+    {
+      "path": "lib/run-completion-effects.ts",
+      "sha256": "81011e38d1f99bfc05676f8b630de7cdff6822de57fd3fb2adedcb7ed2b68764",
+      "line": 80,
+      "condition": "completion_question_record only when stopReason is asked_human or blocked and no repositorySelection"
+    },
+    {
+      "path": "lib/factory/questions/store.ts",
+      "sha256": "c4e11455471b9a145c1520b0085ab529f8816e1cc2f394bf3e621f54d638d583",
+      "lines": "357-364",
+      "condition": "Before insert, run.status must be stopped, stopReason asked_human/blocked, sessionId present, stopRequestedAt absent"
+    },
+    {
+      "path": "app/v1/runs/[runId]/complete/route.ts",
+      "sha256": "0174eb18a3003b554a4cfd996dc516ce36cef29dd868bfe5e72656b035967991",
+      "line": 43,
+      "condition": "Authenticated daemon completion calls persistRunCompletion"
+    }
+  ],
+  "inference": {
+    "reasonClass": "asked_human or blocked",
+    "basis": "Observed SAVEPOINT completion_question_record, successful INSERT factory_questions returned_rows=1, no rollback, COMMIT and HTTP204, combined with verified fixed-commit branch guards.",
+    "stopRequestedAt": "Absent at successful question recording, inferred from source guard; not a direct captured database value.",
+    "excludedAtThisCompletion": [
+      "ordinary turn_ended branch",
+      "persisted stopRequestedAt already present at question-record guard"
+    ],
+    "unknown": [
+      "asked_human versus blocked",
+      "request_help versus ask_human versus report_blocked",
+      "question text/reason",
+      "any human/operator actor"
+    ]
+  },
+  "limitations": [
+    "Web attributes do not expose the completion stopReason value or handoff tool name.",
+    "Absence of a stop RPC log is not proof no external request ever occurred.",
+    "Only mikka-web was queried; daemon.run outcome was not queried.",
+    "The latest100 of109 matching logs were read; this is not a claim all matching rows were inspected.",
+    "No acceptance criteria changed; this failure still predates and is distinct from adoption gating."
+  ],
+  "recommendedProjectionOnly": {
+    "changeImplemented": false,
+    "fields": [
+      "terminalRunState.stopReason (bounded existing enum from data-run-state chunk)",
+      "handoffKind (bounded enum derived from already-read known handoff tool names)",
+      "successfulExecutionTool (existing exclusion-aware execution set size > 0)"
+    ],
+    "optionalFields": [
+      "thread.question (waiting/resuming/null)",
+      "stopObservedWhileActive (ever-observed thread.stopping boolean; not equivalent to terminal stopRequestedAt)"
+    ],
+    "forbiddenContent": [
+      "tool arguments/output",
+      "prompt/reply/question text",
+      "credentials or raw actor IDs"
+    ],
+    "acceptanceGateChange": false
+  }
+}

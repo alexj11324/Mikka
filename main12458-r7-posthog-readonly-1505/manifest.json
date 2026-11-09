@@ -1,0 +1,56 @@
+{
+  "version": 2,
+  "scope": "#1505 R7 42695935772/A1 exact-run read-only Web diagnosis plus one bounded daemon outcome query",
+  "previousManifest": {
+    "path": "manifest.web-only.json",
+    "bytes": 1017,
+    "sha256": "888a2f236b4ad80a4e6989a0f13e450a67fd1faea166a5d15b546d83c4548184"
+  },
+  "originalFiveFilesUnchanged": true,
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 4810,
+      "sha256": "5733d7253da395295a964409bb67c1e34ab7ed0fc66dd70916200f004ff8fa80"
+    },
+    {
+      "path": "daemon-outcome-appendix.json",
+      "bytes": 2779,
+      "sha256": "4a02d215605635cb54f6fffdc1e9d608fe7c53cf2869be74b7a0848cd6dd5b4d"
+    },
+    {
+      "path": "daemon-outcome-appendix.md",
+      "bytes": 1871,
+      "sha256": "bbc578201f6dba9834f9a3a137d23ef9c5d67944e14aa4a45129163ef08535d3"
+    },
+    {
+      "path": "fixed-source-functions.md",
+      "bytes": 18600,
+      "sha256": "b1cd64c7a60d66ec22e5be9c2380bfa0f586e9d35e9ff341562caa76eeb974a3"
+    },
+    {
+      "path": "fixed-source-manifest.json",
+      "bytes": 1911,
+      "sha256": "3bb3f052cb65519163e2af274bc757242a567a43ce13a5d693504dbaafb20cfa"
+    },
+    {
+      "path": "manifest.web-only.json",
+      "bytes": 1017,
+      "sha256": "888a2f236b4ad80a4e6989a0f13e450a67fd1faea166a5d15b546d83c4548184"
+    },
+    {
+      "path": "scope-and-queries.json",
+      "bytes": 4476,
+      "sha256": "6c68e0eb675faafbeeaed9060f48a9f24322cec27fdf4b7079c10c24128fc824"
+    },
+    {
+      "path": "stop-diagnosis.json",
+      "bytes": 9678,
+      "sha256": "dd66f426773b4c8697234f26920ecbbc7317af5c088098f0e4eb3a8a8228622e"
+    }
+  ],
+  "manifestExcludesItself": true,
+  "sourceChanges": false,
+  "gitMutations": false,
+  "cloudResourcesCreated": false
+}

@@ -1,0 +1,76 @@
+{
+  "template": {
+    "bytes": 11668,
+    "sha256": "6e49a194122e1769cb23e3bed7277677070202f4171a6879abf95cac8afb8be8"
+  },
+  "helpers": [
+    {
+      "path": "scripts/ops/issue1505/github-readonly-helper.mjs",
+      "bytes": 11192,
+      "sha256": "cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742",
+      "gitBlobOid": "595eee67850779b2bde4597306e6a1c83beee245",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly-provider.mjs",
+      "bytes": 14619,
+      "sha256": "23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e",
+      "gitBlobOid": "d097f62e62ca64a72220bb26cf7966db2acf4b43",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly-runner.mjs",
+      "bytes": 6220,
+      "sha256": "7859cff4714d5367a29322357bd9945ab8c9c49376c3312d4b8643facaff0f57",
+      "gitBlobOid": "1ff5d0fc6120069bdedac3dcc28d6dc1cf1fe409",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly-store.mjs",
+      "bytes": 8858,
+      "sha256": "1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5",
+      "gitBlobOid": "0455da9dcc58015184edd734987c2f0d711cdf8a",
+      "mode": "100644"
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly.test.mjs",
+      "bytes": 29368,
+      "sha256": "a29271758aaa0cc9ed3eac3a8e9ae05f96c91bf955ef48cb97f8490ff8f6a1c2",
+      "gitBlobOid": "1faf094767d0a1802fe6c8ab0b5faae017b77fef",
+      "mode": "100644"
+    }
+  ],
+  "bindingTemplate": {
+    "bytes": 1145,
+    "sha256": "c8f4cd2c019a0cd475863e26b20a64c88a93a350545ceeef6b214e398673d8f2"
+  },
+  "historicalReference": {
+    "prepareRunId": 42689909155,
+    "prepareRunAttempt": 1,
+    "prepareHeadSha": "683b5010bec31bb8515fba73dfaa0f68bc1898df",
+    "artifactId": 13705908471,
+    "active": {
+      "bytes": 11984,
+      "sha256": "be47d10740c8c189b99f5491aff21a9f31697dfbf574aaa15fe17cacf02a5f72"
+    },
+    "closed": {
+      "bytes": 11892,
+      "sha256": "8c18e3802a52491268bdc3997e622f29dd1ce58f7d70d11bcea665a0b139886b"
+    },
+    "bindingsSha256": "0edc825a8c8792a08eb25cbffda4801e241b27d4e18e4f365bbbe91bab35019d",
+    "cachedBindingHeadMeaning": "historical binding.json head is the PR head a83b..., not the actual prepare head683b..."
+  },
+  "sourceFilesCopiedWithoutEdits": true,
+  "workflowMarkers": {
+    "__REQUIRED_ENTRY_DEADLINE_UTC__": 3,
+    "__REQUIRED_HARD_END_UTC__": 3,
+    "__REQUIRED_MAIN_SHA__": 8,
+    "__REQUIRED_MAIN_TREE__": 1,
+    "__REQUIRED_ORDERED_PARENTS_JSON__": 1,
+    "__REQUIRED_CLOSED_CARRIER_SHA__": 1
+  },
+  "productionCalls": 0,
+  "gitObjectsCreated": 0,
+  "refUpdates": 0,
+  "helperTestsRerun": 0
+}

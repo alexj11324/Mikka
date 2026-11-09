@@ -1,0 +1,31 @@
+{
+  "status": "observations_only_not_activation_bindings",
+  "observedClosedCarrier": {
+    "sha": "816874b4d522d97d674539468a7cbd7a7ca1f71c",
+    "tree": "e0e5f2b286330f324245e990b3c150df8c1096c4",
+    "basis": "root GET readback and completed cleanup closure.json, released2026-11-09T21:29:14Z",
+    "freshReadRequiredAtActivation": true
+  },
+  "actualFutureApp": {
+    "sha": null,
+    "tree": null
+  },
+  "actualFutureRuntimeRelease": {
+    "runId": null,
+    "attempt": null,
+    "sourceCommit": null,
+    "workerSha": null,
+    "templateIds": null,
+    "allSevenJobsPassed": null
+  },
+  "actualFutureTimes": {
+    "entryDeadlineUtc": null,
+    "hardEndUtc": null
+  },
+  "sharedChildDispositionAtHandoff": null,
+  "defaultPlan": "After the other actual consumer and its exact child cleanup finish, fresh-check the shared account and source; create our child only if still needed.",
+  "legalActiveChildHandoff": "If an authorized exact live child is legitimately handed off with its full provenance and cleanup responsibility, skip duplicate preparation; no cleanup or replacement is implied here.",
+  "currentMainReservation": false,
+  "futureWindowReserved": false,
+  "actualPreparePerformed": false
+}

@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-11-09 21:44:20 UTC",
+  "repository": "alexj11324/Mikka",
+  "pullRequest": {
+    "number": 1842,
+    "url": "https://github.com/alexj11324/Mikka/pull/1842",
+    "headSha": "98a0db9e8ec4264eb641e7fd36c25e344a124cf2",
+    "baseSha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+    "syntheticCandidate": "b65ced9fdf07fb73fb8fd4ff24fabccbf92ca29a",
+    "candidateTree": "3f9ff8a38e91ee3971ea255b9cc1e254ab4c61a4",
+    "orderedCandidateParents": [
+      "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "98a0db9e8ec4264eb641e7fd36c25e344a124cf2"
+    ],
+    "mergeable": true,
+    "mergeableState": "clean"
+  },
+  "counts": {
+    "workflows": 9,
+    "workflowSuccess": 9,
+    "jobs": 35,
+    "jobSuccess": 26,
+    "jobSkipped": 9,
+    "checks": 36,
+    "checkSuccess": 27,
+    "checkSkipped": 9
+  },
+  "workflows": [
+    {
+      "runId": 42700596992,
+      "name": "Workspace governance acceptance",
+      "attempt": 1,
+      "conclusion": "success",
+      "successfulJobs": 1,
+      "skippedJobs": 0,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42700596992"
+    },
+    {
+      "runId": 42700597220,
+      "name": "Unattended sandbox acceptance",
+      "attempt": 1,
+      "conclusion": "success",
+      "successfulJobs": 1,
+      "skippedJobs": 0,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42700597220"
+    },
+    {
+      "runId": 42700597107,
+      "name": "E2B subscription custody",
+      "attempt": 1,
+      "conclusion": "success",
+      "successfulJobs": 1,
+      "skippedJobs": 0,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42700597107"
+    },
+    {
+      "runId": 42700597513,
+      "name": "E2B additive runtime release",
+      "attempt": 1,
+      "conclusion": "success",
+      "successfulJobs": 1,
+      "skippedJobs": 6,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42700597513"
+    },
+    {
+      "runId": 42700597479,
+      "name": "Browser gate",
+      "attempt": 1,
+      "conclusion": "success",
+      "successfulJobs": 1,
+      "skippedJobs": 0,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42700597479"
+    },
+    {
+      "runId": 42700597000,
+      "name": "Cloud computer backend",
+      "attempt": 1,
+      "conclusion": "success",
+      "successfulJobs": 3,
+      "skippedJobs": 0,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42700597000"
+    },
+    {
+      "runId": 42700596995,
+      "name": "Local device Node 22",
+      "attempt": 1,
+      "conclusion": "success",
+      "successfulJobs": 4,
+      "skippedJobs": 0,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42700596995"
+    },
+    {
+      "runId": 42700597274,
+      "name": "SSH device backend",
+      "attempt": 1,
+      "conclusion": "success",
+      "successfulJobs": 1,
+      "skippedJobs": 0,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42700597274"
+    },
+    {
+      "runId": 42700597302,
+      "name": "CI",
+      "attempt": 1,
+      "conclusion": "success",
+      "successfulJobs": 13,
+      "skippedJobs": 3,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42700597302"
+    }
+  ],
+  "requiredStableGates": [
+    {
+      "id": 129443960880,
+      "name": "Browser tests (before merge)",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42700597479/job/129443960880"
+    },
+    {
+      "id": 129446660712,
+      "name": "Production build and browser interactions",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42700597302/job/129446660712"
+    },
+    {
+      "id": 129459660692,
+      "name": "UI policy (strict)",
+      "conclusion": "success",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42700597302/job/129459660692"
+    }
+  ],
+  "currentMainSha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+  "batch1844": {
+    "url": "https://github.com/alexj11324/Mikka/pull/1844",
+    "branch": "batch/issue1506-http-events-codex-20261109t2139",
+    "head": "9f1429343d5fafff2cdf9a473ebec43f07e61721",
+    "base": "12458fe22e1217f644e8b28f82ab856211e73b72",
+    "syntheticCandidate": "23e0bc675a4d7a255204ec7ee2e8bcfdf0b70039",
+    "mergeable": true,
+    "mergeableState": "blocked"
+  },
+  "metadata": {
+    "file": "final-metadata.json",
+    "bytes": 141552,
+    "sha256": "904ab19008fa0f18a82d15a69998b6250d62e8b4745d0a03c1b1b5eed371eb2e"
+  },
+  "limits": [
+    "Metadata-only observation: no Actions original logs or artifacts retrieved.",
+    "PR runtime workflow success comprises its test job plus six conditional skipped production jobs; it is not a production release.",
+    "Synthetic candidate derived from PR and immutable Git commit metadata; no assertion of native binaries or model execution from this snapshot.",
+    "No merge, ref update, resource or production-window operation performed."
+  ]
+}

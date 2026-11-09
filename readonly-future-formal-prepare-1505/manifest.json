@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "status": "future_fresh_child_preparation_disabled_no_actual_binding",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 5569,
+      "sha256": "ecf57a8be49a1f2cedff304770e59e205c82218135208f7a4893494638679fce",
+      "gitBlobOid": "12f4d5044b0f5f574dfe7f3278560e8164623f49"
+    },
+    {
+      "path": "bindings.pending.json",
+      "bytes": 1145,
+      "sha256": "c8f4cd2c019a0cd475863e26b20a64c88a93a350545ceeef6b214e398673d8f2",
+      "gitBlobOid": "3d6d3bdb930c25b0f98c7249697d5ed238d04b61"
+    },
+    {
+      "path": "bundle/scripts/ops/issue1505/github-readonly-helper.mjs",
+      "bytes": 11192,
+      "sha256": "cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742",
+      "gitBlobOid": "595eee67850779b2bde4597306e6a1c83beee245"
+    },
+    {
+      "path": "bundle/scripts/ops/issue1505/github-readonly-provider.mjs",
+      "bytes": 14619,
+      "sha256": "23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e",
+      "gitBlobOid": "d097f62e62ca64a72220bb26cf7966db2acf4b43"
+    },
+    {
+      "path": "bundle/scripts/ops/issue1505/github-readonly-runner.mjs",
+      "bytes": 6220,
+      "sha256": "7859cff4714d5367a29322357bd9945ab8c9c49376c3312d4b8643facaff0f57",
+      "gitBlobOid": "1ff5d0fc6120069bdedac3dcc28d6dc1cf1fe409"
+    },
+    {
+      "path": "bundle/scripts/ops/issue1505/github-readonly-store.mjs",
+      "bytes": 8858,
+      "sha256": "1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5",
+      "gitBlobOid": "0455da9dcc58015184edd734987c2f0d711cdf8a"
+    },
+    {
+      "path": "bundle/scripts/ops/issue1505/github-readonly.test.mjs",
+      "bytes": 29368,
+      "sha256": "a29271758aaa0cc9ed3eac3a8e9ae05f96c91bf955ef48cb97f8490ff8f6a1c2",
+      "gitBlobOid": "1faf094767d0a1802fe6c8ab0b5faae017b77fef"
+    },
+    {
+      "path": "historical/active.yml",
+      "bytes": 11984,
+      "sha256": "be47d10740c8c189b99f5491aff21a9f31697dfbf574aaa15fe17cacf02a5f72",
+      "gitBlobOid": "9c2f2fb6163e1dd642ddd81858cc4edf4a805b92"
+    },
+    {
+      "path": "historical/binding.json",
+      "bytes": 1926,
+      "sha256": "0edc825a8c8792a08eb25cbffda4801e241b27d4e18e4f365bbbe91bab35019d",
+      "gitBlobOid": "1a1fede1313c73a58afad73a961a78b4a6f93c5a"
+    },
+    {
+      "path": "historical/closed.yml",
+      "bytes": 11892,
+      "sha256": "8c18e3802a52491268bdc3997e622f29dd1ce58f7d70d11bcea665a0b139886b",
+      "gitBlobOid": "a349ea169ae51408016bb07a83f822653d1dcd91"
+    },
+    {
+      "path": "observed-context.json",
+      "bytes": 1208,
+      "sha256": "c4e26c720aa79dec374f92029e58a45c2cc737624e5cd17c5893ddd94933e58e",
+      "gitBlobOid": "66395c4382cbb86211414363cbe12ddcc1bf9c22"
+    },
+    {
+      "path": "prepare.template.yml.in",
+      "bytes": 11668,
+      "sha256": "6e49a194122e1769cb23e3bed7277677070202f4171a6879abf95cac8afb8be8",
+      "gitBlobOid": "26b8a8e126b2935eefa4b2d168fce4ad03adcd17"
+    },
+    {
+      "path": "provenance/hash-binding-correction.json",
+      "bytes": 968,
+      "sha256": "8fafb49b5391fc0f0b57bde20ebe95285769780dd6c71cabef3dbac72fbf750e",
+      "gitBlobOid": "fc01cd16900b67a89293520bfd2fe641e731157d"
+    },
+    {
+      "path": "provenance/offline-tests-after-binding-correction.json",
+      "bytes": 769,
+      "sha256": "9ec794de05b525003d5b5692ff598eb04c18604133cfd6f93cc3250b8cbd06eb",
+      "gitBlobOid": "8e6e8a3d4394ba64ee9b4a19b7d935da70c822fe"
+    },
+    {
+      "path": "render.py",
+      "bytes": 11331,
+      "sha256": "a4f0e516e8e719531d569c84ba82e8c0a8470c82f64bc6a39228e588d0916d08",
+      "gitBlobOid": "55f8cd4b18430461453925e21acbdd9f381a8d02"
+    },
+    {
+      "path": "source-bindings.json",
+      "bytes": 2678,
+      "sha256": "374eac288fd1bc71f0c80753679379290e94bec80347f2c9f5ac973df67e8ae1",
+      "gitBlobOid": "89607bc7a4be15b3221758fc00ec88784d7ed127"
+    },
+    {
+      "path": "verification.json",
+      "bytes": 719,
+      "sha256": "9b80daf93edfb3b9523e1ee4f59a9448a8fe197686849056262018379d033abb",
+      "gitBlobOid": "08713e8e03f98ed7df6684319abfc8d137159961"
+    }
+  ],
+  "payloadFiles": 17,
+  "payloadBytes": 132114,
+  "actualSixBindingFieldsNull": true,
+  "futureAppTreeRuntimeAndTimesNull": true,
+  "observedCarrierOnly": "816874b4d522d97d674539468a7cbd7a7ca1f71c",
+  "templateUnchanged": true,
+  "fiveHelpersUnchanged": true,
+  "helperTestsRerun": 0,
+  "compiledPythonBlocks": 3,
+  "oidcScopesUnchanged": 5,
+  "gitObjectsCreated": 0,
+  "refUpdates": 0,
+  "cloudResources": 0,
+  "productionCalls": 0,
+  "activated": false
+}

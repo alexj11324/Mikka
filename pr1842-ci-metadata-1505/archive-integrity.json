@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "status": "original_bytes_preserved_readonly_evidence_archive",
+  "sourceDirectory": "/workspace/scratch/263e36984c81/pr1842-ci-metadata-1505",
+  "originalFiles": [
+    {
+      "path": "final-metadata.json",
+      "sourceLocalPath": "/workspace/scratch/263e36984c81/pr1842-ci-metadata-1505/final-metadata.json",
+      "bytes": 141552,
+      "sha256": "904ab19008fa0f18a82d15a69998b6250d62e8b4745d0a03c1b1b5eed371eb2e",
+      "gitBlobOid": "c267e918ac2fcbb8f712bda702d43185670923b6",
+      "mode": "100644"
+    },
+    {
+      "path": "summary.json",
+      "sourceLocalPath": "/workspace/scratch/263e36984c81/pr1842-ci-metadata-1505/summary.json",
+      "bytes": 4915,
+      "sha256": "2e75b36b47fd7a3133ec2e99848c957496245436ec9f34325083be00dd078acb",
+      "gitBlobOid": "d46fc1de97547bfc6110b1f18423b0d504b8f62a",
+      "mode": "100644"
+    }
+  ],
+  "originalFileCount": 2,
+  "originalBytes": 146467,
+  "originalManifestsPreservedUnmodified": [],
+  "credentialReview": [
+    {
+      "path": "pr1842-ci-metadata-1505/final-metadata.json",
+      "bytes": 141552,
+      "sha256": "904ab19008fa0f18a82d15a69998b6250d62e8b4745d0a03c1b1b5eed371eb2e",
+      "classifiedMatches": [],
+      "unclassifiedMatches": 0
+    },
+    {
+      "path": "pr1842-ci-metadata-1505/summary.json",
+      "bytes": 4915,
+      "sha256": "2e75b36b47fd7a3133ec2e99848c957496245436ec9f34325083be00dd078acb",
+      "classifiedMatches": [],
+      "unclassifiedMatches": 0
+    }
+  ],
+  "unclassifiedCredentialCandidates": 0,
+  "newActionsDownloads": 0,
+  "testsRerun": 0,
+  "productionCalls": 0,
+  "formalAcceptanceClaim": false,
+  "refUpdates": 0
+}

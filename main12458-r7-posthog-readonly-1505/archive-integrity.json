@@ -1,0 +1,170 @@
+{
+  "schemaVersion": 1,
+  "status": "original_bytes_preserved_readonly_evidence_archive",
+  "sourceDirectory": "/workspace/scratch/263e36984c81/main12458-r7-posthog-readonly-1505",
+  "originalFiles": [
+    {
+      "path": "README.md",
+      "sourceLocalPath": "/workspace/scratch/263e36984c81/main12458-r7-posthog-readonly-1505/README.md",
+      "bytes": 4810,
+      "sha256": "5733d7253da395295a964409bb67c1e34ab7ed0fc66dd70916200f004ff8fa80",
+      "gitBlobOid": "046f7b509167d2446d0bec24ca19fde5d018b4a7",
+      "mode": "100644"
+    },
+    {
+      "path": "daemon-outcome-appendix.json",
+      "sourceLocalPath": "/workspace/scratch/263e36984c81/main12458-r7-posthog-readonly-1505/daemon-outcome-appendix.json",
+      "bytes": 2779,
+      "sha256": "4a02d215605635cb54f6fffdc1e9d608fe7c53cf2869be74b7a0848cd6dd5b4d",
+      "gitBlobOid": "8465df06365815b37fc2b4df97f2c9c504037add",
+      "mode": "100644"
+    },
+    {
+      "path": "daemon-outcome-appendix.md",
+      "sourceLocalPath": "/workspace/scratch/263e36984c81/main12458-r7-posthog-readonly-1505/daemon-outcome-appendix.md",
+      "bytes": 1871,
+      "sha256": "bbc578201f6dba9834f9a3a137d23ef9c5d67944e14aa4a45129163ef08535d3",
+      "gitBlobOid": "24d546b4a3c638f91b4d9045834c7eb3011710d9",
+      "mode": "100644"
+    },
+    {
+      "path": "fixed-source-functions.md",
+      "sourceLocalPath": "/workspace/scratch/263e36984c81/main12458-r7-posthog-readonly-1505/fixed-source-functions.md",
+      "bytes": 18600,
+      "sha256": "b1cd64c7a60d66ec22e5be9c2380bfa0f586e9d35e9ff341562caa76eeb974a3",
+      "gitBlobOid": "e44d982a8d4a1e2b09dde5823ff5c933025cd6e2",
+      "mode": "100644"
+    },
+    {
+      "path": "fixed-source-manifest.json",
+      "sourceLocalPath": "/workspace/scratch/263e36984c81/main12458-r7-posthog-readonly-1505/fixed-source-manifest.json",
+      "bytes": 1911,
+      "sha256": "3bb3f052cb65519163e2af274bc757242a567a43ce13a5d693504dbaafb20cfa",
+      "gitBlobOid": "9b9df2930737197ff44ff94aaf207a0551fd3d21",
+      "mode": "100644"
+    },
+    {
+      "path": "manifest.json",
+      "sourceLocalPath": "/workspace/scratch/263e36984c81/main12458-r7-posthog-readonly-1505/manifest.json",
+      "bytes": 1728,
+      "sha256": "bac7c8dae329a6f8cd8cfad1b7b3decb934e10277024adc1ade1d32c17c4838b",
+      "gitBlobOid": "436e1060e5e29172e004ede1c2a4f4e04d042128",
+      "mode": "100644"
+    },
+    {
+      "path": "manifest.web-only.json",
+      "sourceLocalPath": "/workspace/scratch/263e36984c81/main12458-r7-posthog-readonly-1505/manifest.web-only.json",
+      "bytes": 1017,
+      "sha256": "888a2f236b4ad80a4e6989a0f13e450a67fd1faea166a5d15b546d83c4548184",
+      "gitBlobOid": "3c27b8ad53486416c61fcc1fe6c38ebb9b2f71f5",
+      "mode": "100644"
+    },
+    {
+      "path": "scope-and-queries.json",
+      "sourceLocalPath": "/workspace/scratch/263e36984c81/main12458-r7-posthog-readonly-1505/scope-and-queries.json",
+      "bytes": 4476,
+      "sha256": "6c68e0eb675faafbeeaed9060f48a9f24322cec27fdf4b7079c10c24128fc824",
+      "gitBlobOid": "f499f3507fd70eb898410da779662b6a05d31cff",
+      "mode": "100644"
+    },
+    {
+      "path": "stop-diagnosis.json",
+      "sourceLocalPath": "/workspace/scratch/263e36984c81/main12458-r7-posthog-readonly-1505/stop-diagnosis.json",
+      "bytes": 9678,
+      "sha256": "dd66f426773b4c8697234f26920ecbbc7317af5c088098f0e4eb3a8a8228622e",
+      "gitBlobOid": "ee43f2285118152916bb0a84835cf49b6356203d",
+      "mode": "100644"
+    }
+  ],
+  "originalFileCount": 9,
+  "originalBytes": 46870,
+  "originalManifestsPreservedUnmodified": [
+    {
+      "path": "manifest.json",
+      "sourceLocalPath": "/workspace/scratch/263e36984c81/main12458-r7-posthog-readonly-1505/manifest.json",
+      "bytes": 1728,
+      "sha256": "bac7c8dae329a6f8cd8cfad1b7b3decb934e10277024adc1ade1d32c17c4838b",
+      "gitBlobOid": "436e1060e5e29172e004ede1c2a4f4e04d042128",
+      "mode": "100644"
+    },
+    {
+      "path": "manifest.web-only.json",
+      "sourceLocalPath": "/workspace/scratch/263e36984c81/main12458-r7-posthog-readonly-1505/manifest.web-only.json",
+      "bytes": 1017,
+      "sha256": "888a2f236b4ad80a4e6989a0f13e450a67fd1faea166a5d15b546d83c4548184",
+      "gitBlobOid": "3c27b8ad53486416c61fcc1fe6c38ebb9b2f71f5",
+      "mode": "100644"
+    }
+  ],
+  "credentialReview": [
+    {
+      "path": "main12458-r7-posthog-readonly-1505/README.md",
+      "bytes": 4810,
+      "sha256": "5733d7253da395295a964409bb67c1e34ab7ed0fc66dd70916200f004ff8fa80",
+      "classifiedMatches": [],
+      "unclassifiedMatches": 0
+    },
+    {
+      "path": "main12458-r7-posthog-readonly-1505/daemon-outcome-appendix.json",
+      "bytes": 2779,
+      "sha256": "4a02d215605635cb54f6fffdc1e9d608fe7c53cf2869be74b7a0848cd6dd5b4d",
+      "classifiedMatches": [],
+      "unclassifiedMatches": 0
+    },
+    {
+      "path": "main12458-r7-posthog-readonly-1505/daemon-outcome-appendix.md",
+      "bytes": 1871,
+      "sha256": "bbc578201f6dba9834f9a3a137d23ef9c5d67944e14aa4a45129163ef08535d3",
+      "classifiedMatches": [],
+      "unclassifiedMatches": 0
+    },
+    {
+      "path": "main12458-r7-posthog-readonly-1505/fixed-source-functions.md",
+      "bytes": 18600,
+      "sha256": "b1cd64c7a60d66ec22e5be9c2380bfa0f586e9d35e9ff341562caa76eeb974a3",
+      "classifiedMatches": [],
+      "unclassifiedMatches": 0
+    },
+    {
+      "path": "main12458-r7-posthog-readonly-1505/fixed-source-manifest.json",
+      "bytes": 1911,
+      "sha256": "3bb3f052cb65519163e2af274bc757242a567a43ce13a5d693504dbaafb20cfa",
+      "classifiedMatches": [],
+      "unclassifiedMatches": 0
+    },
+    {
+      "path": "main12458-r7-posthog-readonly-1505/manifest.json",
+      "bytes": 1728,
+      "sha256": "bac7c8dae329a6f8cd8cfad1b7b3decb934e10277024adc1ade1d32c17c4838b",
+      "classifiedMatches": [],
+      "unclassifiedMatches": 0
+    },
+    {
+      "path": "main12458-r7-posthog-readonly-1505/manifest.web-only.json",
+      "bytes": 1017,
+      "sha256": "888a2f236b4ad80a4e6989a0f13e450a67fd1faea166a5d15b546d83c4548184",
+      "classifiedMatches": [],
+      "unclassifiedMatches": 0
+    },
+    {
+      "path": "main12458-r7-posthog-readonly-1505/scope-and-queries.json",
+      "bytes": 4476,
+      "sha256": "6c68e0eb675faafbeeaed9060f48a9f24322cec27fdf4b7079c10c24128fc824",
+      "classifiedMatches": [],
+      "unclassifiedMatches": 0
+    },
+    {
+      "path": "main12458-r7-posthog-readonly-1505/stop-diagnosis.json",
+      "bytes": 9678,
+      "sha256": "dd66f426773b4c8697234f26920ecbbc7317af5c088098f0e4eb3a8a8228622e",
+      "classifiedMatches": [],
+      "unclassifiedMatches": 0
+    }
+  ],
+  "unclassifiedCredentialCandidates": 0,
+  "newActionsDownloads": 0,
+  "testsRerun": 0,
+  "productionCalls": 0,
+  "formalAcceptanceClaim": false,
+  "refUpdates": 0
+}

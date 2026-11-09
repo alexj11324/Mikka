@@ -1,0 +1,66 @@
+{
+  "sourceCommit": "12458fe22e1217f644e8b28f82ab856211e73b72",
+  "files": [
+    {
+      "path": "lib/run-completion-effects.ts",
+      "gitBlob": "26ce33aa8613723457fdbb2e4a6f3033eb6bee95",
+      "bytes": 9930,
+      "sha256": "81011e38d1f99bfc05676f8b630de7cdff6822de57fd3fb2adedcb7ed2b68764",
+      "localBytesMatchFixedCommit": true,
+      "completeFunctionRanges": [
+        {
+          "function": "optionalFactoryEffect",
+          "startLine": 41,
+          "endLine": 48
+        },
+        {
+          "function": "settleRunCompletionEffects",
+          "startLine": 73,
+          "endLine": 83
+        }
+      ]
+    },
+    {
+      "path": "lib/factory/questions/store.ts",
+      "gitBlob": "08e2ad1a74722d1b866e9ad3d35b54245fb3561e",
+      "bytes": 51963,
+      "sha256": "c4e11455471b9a145c1520b0085ab529f8816e1cc2f394bf3e621f54d638d583",
+      "localBytesMatchFixedCommit": true,
+      "completeFunctionRanges": [
+        {
+          "function": "questions.record",
+          "startLine": 331,
+          "endLine": 476
+        }
+      ]
+    },
+    {
+      "path": "app/v1/runs/[runId]/complete/route.ts",
+      "gitBlob": "9f42a40b8087f88d6d68c4657fa4751ffa1b2a1c",
+      "bytes": 3839,
+      "sha256": "0174eb18a3003b554a4cfd996dc516ce36cef29dd868bfe5e72656b035967991",
+      "localBytesMatchFixedCommit": true,
+      "completeFunctionRanges": [
+        {
+          "function": "handlePOST",
+          "startLine": 24,
+          "endLine": 60
+        }
+      ]
+    },
+    {
+      "path": "lib/run-publications.ts",
+      "gitBlob": "af132ce1278f7b60f7ac105e02b1d42ea986ba2e",
+      "bytes": 32268,
+      "sha256": "24ffcf3a364ac2d86f80c16fea7b3343e43b9c371b10963b70cbcfea7e6f788b",
+      "localBytesMatchFixedCommit": true,
+      "completeFunctionRanges": [
+        {
+          "function": "completionTransaction",
+          "startLine": 163,
+          "endLine": 258
+        }
+      ]
+    }
+  ]
+}

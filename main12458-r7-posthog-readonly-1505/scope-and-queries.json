@@ -1,0 +1,164 @@
+{
+  "projectId": 670821,
+  "connector": "existing authorized PostHog read-only exec",
+  "queryScope": {
+    "dateRange": {
+      "date_from": "2026-11-09T21:19:00Z",
+      "date_to": "2026-11-09T21:22:00Z"
+    },
+    "serviceNames": [
+      "mikka-web"
+    ],
+    "runId": "2a4df252-7528-45ea-839e-6d1a42e1945d"
+  },
+  "retainedQueries": [
+    {
+      "tool": "query-apm-spans",
+      "arguments": {
+        "query": {
+          "dateRange": {
+            "date_from": "2026-11-09T21:19:00Z",
+            "date_to": "2026-11-09T21:22:00Z"
+          },
+          "serviceNames": [
+            "mikka-web"
+          ],
+          "filterGroup": [
+            {
+              "key": "mikka.run_id",
+              "type": "span_attribute",
+              "operator": "exact",
+              "value": "2a4df252-7528-45ea-839e-6d1a42e1945d"
+            },
+            {
+              "key": "mikka.route",
+              "type": "span_attribute",
+              "operator": "exact",
+              "value": "/v1/runs/[runId]/complete"
+            }
+          ],
+          "flatSpans": true,
+          "rootSpans": false,
+          "limit": 300,
+          "orderBy": "timestamp",
+          "orderDirection": "ASC",
+          "excludeAttributes": false
+        }
+      },
+      "resultCount": 71,
+      "retainedProjection": "stop-diagnosis.json observations.safeSelectedSpans"
+    },
+    {
+      "tool": "logs-count",
+      "arguments": {
+        "query": {
+          "dateRange": {
+            "date_from": "2026-11-09T21:19:00Z",
+            "date_to": "2026-11-09T21:22:00Z"
+          },
+          "serviceNames": [
+            "mikka-web"
+          ],
+          "filterGroup": [
+            {
+              "key": "mikka.run_id",
+              "type": "log_attribute",
+              "operator": "exact",
+              "value": "2a4df252-7528-45ea-839e-6d1a42e1945d"
+            }
+          ]
+        }
+      },
+      "result": {
+        "count": 109
+      }
+    },
+    {
+      "tool": "query-logs",
+      "arguments": {
+        "query": {
+          "dateRange": {
+            "date_from": "2026-11-09T21:19:00Z",
+            "date_to": "2026-11-09T21:22:00Z"
+          },
+          "serviceNames": [
+            "mikka-web"
+          ],
+          "filterGroup": [
+            {
+              "key": "mikka.run_id",
+              "type": "log_attribute",
+              "operator": "exact",
+              "value": "2a4df252-7528-45ea-839e-6d1a42e1945d"
+            }
+          ],
+          "orderBy": "latest",
+          "limit": 100,
+          "excludeAttributes": false
+        }
+      },
+      "resultCount": 100,
+      "retainedProjection": "Only bounded count/range/attribute-presence facts; no raw log bodies or unfiltered rows retained."
+    },
+    {
+      "tool": "logs-attributes-list",
+      "arguments": {
+        "attribute_type": "log",
+        "keys": "mikka.outcome,mikka.stage,mikka.rpc.action,mikka.error_code,mikka.run_id,mikka.run.id_hash",
+        "dateRange": {
+          "date_from": "2026-11-09T21:19:00Z",
+          "date_to": "2026-11-09T21:22:00Z"
+        },
+        "serviceNames": [
+          "mikka-web"
+        ],
+        "filterGroup": [
+          {
+            "key": "mikka.run_id",
+            "type": "log_attribute",
+            "operator": "exact",
+            "value": "2a4df252-7528-45ea-839e-6d1a42e1945d"
+          }
+        ],
+        "limit": 20,
+        "search_values": false
+      },
+      "resultKeys": [
+        "mikka.stage",
+        "mikka.run_id",
+        "mikka.run.id_hash",
+        "mikka.rpc.action"
+      ]
+    },
+    {
+      "tool": "logs-attribute-values-list",
+      "arguments": {
+        "attribute_type": "log",
+        "key": "mikka.rpc.action",
+        "dateRange": {
+          "date_from": "2026-11-09T21:19:00Z",
+          "date_to": "2026-11-09T21:22:00Z"
+        },
+        "serviceNames": [
+          "mikka-web"
+        ],
+        "filterGroup": [
+          {
+            "key": "mikka.run_id",
+            "type": "log_attribute",
+            "operator": "exact",
+            "value": "2a4df252-7528-45ea-839e-6d1a42e1945d"
+          }
+        ]
+      },
+      "result": [
+        {
+          "count": 4,
+          "id": "coordinator.sendCoordinatorMessage",
+          "name": "coordinator.sendCoordinatorMessage"
+        }
+      ]
+    }
+  ],
+  "discardedData": "Unneeded query rows, SQL parameters (never returned), distinct-user identifiers, log bodies, and unrelated service discovery counts are not retained."
+}

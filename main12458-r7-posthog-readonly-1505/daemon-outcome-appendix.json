@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "scope": {
+    "projectId": 670821,
+    "dateRange": {
+      "date_from": "2026-11-09T21:19:00Z",
+      "date_to": "2026-11-09T21:22:00Z"
+    },
+    "service": "mikka-daemon",
+    "runId": "2a4df252-7528-45ea-839e-6d1a42e1945d",
+    "runIdHash": "a18972ad3b3fa09b",
+    "traceId": "00000000000000000826C7A400942F4E"
+  },
+  "query": {
+    "tool": "query-apm-spans",
+    "arguments": {
+      "query": {
+        "dateRange": {
+          "date_from": "2026-11-09T21:19:00Z",
+          "date_to": "2026-11-09T21:22:00Z"
+        },
+        "serviceNames": [
+          "mikka-daemon"
+        ],
+        "traceId": "00000000000000000826C7A400942F4E",
+        "filterGroup": [
+          {
+            "key": "mikka.run_id",
+            "type": "span_attribute",
+            "operator": "exact",
+            "value": "2a4df252-7528-45ea-839e-6d1a42e1945d"
+          },
+          {
+            "key": "mikka.run.id_hash",
+            "type": "span_attribute",
+            "operator": "exact",
+            "value": "a18972ad3b3fa09b"
+          }
+        ],
+        "flatSpans": true,
+        "rootSpans": false,
+        "limit": 100,
+        "orderBy": "timestamp",
+        "orderDirection": "ASC",
+        "excludeAttributes": false
+      }
+    }
+  },
+  "result": {
+    "matchingSpans": 12,
+    "retainedSpans": 1,
+    "span": {
+      "uuid": "01a1c22f-ff31-71c2-a3a1-341d22bf61ef",
+      "traceId": "00000000000000000826C7A400942F4E",
+      "spanId": "2522C49F42D6762C",
+      "parentSpanId": "B6AD2A4AA023F10F",
+      "name": "daemon.run",
+      "service": "mikka-daemon",
+      "serviceVersion": "0.0.1",
+      "statusCode": 0,
+      "timestamp": "2026-11-09T21:21:15.393000Z",
+      "endTime": "2026-11-09T21:21:27.488084Z",
+      "durationNano": 12095084000,
+      "runId": "2a4df252-7528-45ea-839e-6d1a42e1945d",
+      "runIdHash": "a18972ad3b3fa09b",
+      "harness": "codex",
+      "outcome": "blocked"
+    }
+  },
+  "conclusion": {
+    "directlyObservedOutcome": "blocked",
+    "updatesWebOnlyInference": "The prior asked_human-or-blocked source inference is narrowed by the direct daemon.run outcome enum to blocked.",
+    "stillUnknown": [
+      "specific tool call identity",
+      "blocking question/context text",
+      "human/operator actor"
+    ],
+    "notProven": [
+      "template bootstrap adoption",
+      "successful subscription gate",
+      "formal startup acceptance"
+    ]
+  },
+  "retention": {
+    "otherSpansDiscarded": 11,
+    "logBodiesRetained": false,
+    "toolArgumentsOrOutputRetained": false,
+    "sqlParametersRetained": false,
+    "credentialsRetained": false
+  },
+  "operations": {
+    "additionalQueries": 1,
+    "posthogWrites": false,
+    "newTasksOrModels": false,
+    "newCloudResources": false,
+    "sourceChanges": false
+  }
+}

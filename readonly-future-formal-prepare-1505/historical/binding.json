@@ -1,0 +1,61 @@
+{
+  "start": "2026-11-09T20:04:10.000Z",
+  "end": "2026-11-09T22:04:10.000Z",
+  "entry": "2026-11-09T20:14:10.000Z",
+  "hard": "2026-11-09T20:29:10.000Z",
+  "main": "d8e09ac218f5656763a5bc42a75e45fc385caede",
+  "mainTree": "6a088438df9050ac0e4df41ac41de57f2403ac99",
+  "closedCarrier": "195c681d414e958ad43fbd7222872aa13ca0ef05",
+  "releaseComment": 6750082164,
+  "branch": "ops/1505-smoke-github-readonly-20261109",
+  "head": "a83b2a0fbd0b8f45f2e59ce7ceda2f1e06d21055",
+  "workflowPath": ".github/workflows/issue1505-smoke-github-readonly.yml",
+  "active": {
+    "bytes": 11984,
+    "sha256": "be47d10740c8c189b99f5491aff21a9f31697dfbf574aaa15fe17cacf02a5f72",
+    "blob": "9c2f2fb6163e1dd642ddd81858cc4edf4a805b92"
+  },
+  "closed": {
+    "bytes": 11892,
+    "sha256": "8c18e3802a52491268bdc3997e622f29dd1ce58f7d70d11bcea665a0b139886b",
+    "blob": "a349ea169ae51408016bb07a83f822653d1dcd91"
+  },
+  "helpers": [
+    {
+      "path": "scripts/ops/issue1505/github-readonly-helper.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "595eee67850779b2bde4597306e6a1c83beee245",
+      "size": 11192
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly-provider.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "d097f62e62ca64a72220bb26cf7966db2acf4b43",
+      "size": 14619
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly-runner.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1ff5d0fc6120069bdedac3dcc28d6dc1cf1fe409",
+      "size": 6220
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly-store.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "0455da9dcc58015184edd734987c2f0d711cdf8a",
+      "size": 8858
+    },
+    {
+      "path": "scripts/ops/issue1505/github-readonly.test.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "1faf094767d0a1802fe6c8ab0b5faae017b77fef",
+      "size": 29368
+    }
+  ]
+}
+
