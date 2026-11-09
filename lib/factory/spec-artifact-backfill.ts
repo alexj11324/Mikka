@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 import { z } from 'zod';
 import { ExecutionIdentityError } from '../execution-identity';
+import { GovernanceError } from '../governance/errors';
 import { factoryChanged } from '../live/factory';
 import { FactoryError } from './contract';
 import { factoryEventId } from './event-id';
@@ -67,7 +68,8 @@ export async function backfillFactorySpecArtifacts(
         finally { tx.release(); }
       });
     } catch (error) {
-      if (error instanceof ExecutionIdentityError || error instanceof FactoryError && error.code === 'factoryNotFound')
+      if (error instanceof ExecutionIdentityError || error instanceof FactoryError && error.code === 'factoryNotFound'
+        || error instanceof GovernanceError && error.detail === 'access_denied')
         result.skipped.unauthorized++;
       else throw error;
     }
