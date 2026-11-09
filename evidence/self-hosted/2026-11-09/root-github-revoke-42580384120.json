@@ -1,0 +1,84 @@
+{
+  "schema": 1,
+  "kind": "real-self-hosted-github-revocation-only",
+  "upstreamBusinessRun": 42579532129,
+  "startedAt": "2026-11-09T07:37:12.871Z",
+  "imageSource": "88b144d52d091d7ff566c63fce6e902e33edc59e",
+  "image": "ghcr.io/alexj11324/mikka@sha256:96de4972ea7820dca9d7f03d116f8a4589c662ee6a6db9cb33cf8ad0f89ec98e",
+  "codingThreadsRequested": 0,
+  "driverVirtualMachines": 0,
+  "billingConfigurationWrites": 0,
+  "uiOpened": false,
+  "cases": {},
+  "cleanup": {
+    "serverRevoked": true,
+    "workspaceRestored": true,
+    "sessionsSignedOut": true,
+    "privateFiles": true
+  },
+  "stage": "completed",
+  "status": "passed",
+  "driver": {
+    "sha": "63cb7f198f88e24cc9f493fbb50e12402b8553bb",
+    "parent": "50d5c771ecab35b453d0f7a1fb729cad79a3131d",
+    "run": "42580384120",
+    "attempt": 1
+  },
+  "privateBefore": {
+    "id": "dpl_H844syuBfzTwdsPxkdb8F7hRZVyi",
+    "source": "4b6b116a2ecffc00dd44a0c096c65a3f2329df16",
+    "state": "READY"
+  },
+  "publicBefore": "02401458a7fe26e00ce4caa653084c7f9680696d",
+  "billingWorkspaceHash": "683a9e11b0c2d41f",
+  "billingSelection": "existing_paid_personal_normal_oauth",
+  "sharedTeamBillingChanged": false,
+  "origin": "https://extreme-ddr-prevent-popular.trycloudflare.com",
+  "imageId": "sha256:1fb3725678739bf9d448be52ca5ba576ed3e7902b4c9e1240bd5c174f13754b4",
+  "serverId": "ce0105cf-ebcc-451c-9234-f24eb91a3814",
+  "installation": {
+    "linked": true,
+    "localDiscovery": true,
+    "nativeToken": true,
+    "repositoryRestricted": "alexj11324/Mikka",
+    "expiresAt": "2026-11-09T08:37:37.000Z"
+  },
+  "controlWebhook": {
+    "event": "pull_request",
+    "action": "edited",
+    "pullRequest": 1809,
+    "deliveryId": "7066f8a0-dc10-11f1-9465-e85cea7c488a",
+    "bodySha256": "5400686f884f1118e424d5e194fdce0c1e9befb365e671c3ab7ef8d5b5738142",
+    "status": 202
+  },
+  "nativeTokenBefore": 200,
+  "nativeRevocation": {
+    "statuses": [
+      {
+        "status": 200,
+        "afterCommitMs": 247
+      },
+      {
+        "status": 401,
+        "afterCommitMs": 2259
+      }
+    ],
+    "disconnectMs": 387,
+    "providerInvalidated": true,
+    "mechanism": "durable_post_commit_github_disposal",
+    "periodicProductPolling": false
+  },
+  "revocation": {
+    "realEventAfterDisconnect": true,
+    "ingressControlPassedBeforeDisconnect": true,
+    "forwardingObservationMs": 12000,
+    "forwarded": false
+  },
+  "privateAfter": {
+    "id": "dpl_H844syuBfzTwdsPxkdb8F7hRZVyi",
+    "source": "4b6b116a2ecffc00dd44a0c096c65a3f2329df16",
+    "state": "READY"
+  },
+  "publicAfter": "02401458a7fe26e00ce4caa653084c7f9680696d",
+  "finishedAt": "2026-11-09T07:37:57.752Z"
+}

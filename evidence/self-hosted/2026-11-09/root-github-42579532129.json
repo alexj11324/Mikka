@@ -1,0 +1,102 @@
+{
+  "schema": 1,
+  "kind": "real-self-hosted-github-webhook",
+  "startedAt": "2026-11-09T07:29:19.311Z",
+  "imageSource": "88b144d52d091d7ff566c63fce6e902e33edc59e",
+  "image": "ghcr.io/alexj11324/mikka@sha256:96de4972ea7820dca9d7f03d116f8a4589c662ee6a6db9cb33cf8ad0f89ec98e",
+  "codingThreadsRequested": 0,
+  "driverVirtualMachines": 0,
+  "billingConfigurationWrites": 0,
+  "uiOpened": false,
+  "cases": {},
+  "cleanup": {
+    "fixturePrClosed": true,
+    "fixtureRefsDeleted": true,
+    "workspaceRestored": true,
+    "sessionsSignedOut": true,
+    "privateFiles": true
+  },
+  "stage": "revocation",
+  "status": "failed",
+  "driver": {
+    "sha": "50d5c771ecab35b453d0f7a1fb729cad79a3131d",
+    "parent": "6419186f6e46fbf2f7b24d51a57e4970587d80c3",
+    "run": "42579532129",
+    "attempt": 1
+  },
+  "privateBefore": {
+    "id": "dpl_H844syuBfzTwdsPxkdb8F7hRZVyi",
+    "source": "4b6b116a2ecffc00dd44a0c096c65a3f2329df16",
+    "state": "READY"
+  },
+  "publicBefore": "02401458a7fe26e00ce4caa653084c7f9680696d",
+  "billingWorkspaceHash": "683a9e11b0c2d41f",
+  "billingSelection": "existing_paid_personal_normal_oauth",
+  "sharedTeamBillingChanged": false,
+  "origin": "https://troy-receipt-easter-activities.trycloudflare.com",
+  "imageId": "sha256:1fb3725678739bf9d448be52ca5ba576ed3e7902b4c9e1240bd5c174f13754b4",
+  "serverId": "afd10eda-dca7-4674-b890-e831bc894048",
+  "installation": {
+    "linked": true,
+    "localDiscovery": true,
+    "nativeToken": true,
+    "repositoryRestricted": "alexj11324/Mikka",
+    "expiresAt": "2026-11-09T08:29:43.000Z"
+  },
+  "git": {
+    "clone": true,
+    "push": true,
+    "pullRequest": 1809,
+    "head": "f0c74168e682bde3ec804b78d32274b445a0aeca",
+    "base": "acceptance/1565-42579532129-base",
+    "nativeCredential": true,
+    "executionMachine": "actions_runner_no_coding_model",
+    "trace": {
+      "remoteHttpsStarts": 6,
+      "allRemoteUrlsGitHub": true,
+      "placeholderToken": false,
+      "cloudEgressProxy": false,
+      "providerRequestHeadersRecorded": false
+    }
+  },
+  "publicationFixture": {
+    "isolatedDatabaseOnly": true,
+    "realGitHubPr": 1809,
+    "factoryReviewClaimed": false,
+    "taskDispatchClaimed": false
+  },
+  "suggestions": {
+    "webhookReceived": true,
+    "receipt": {
+      "event": "pull_request",
+      "action": "assigned",
+      "pullRequest": 1809,
+      "deliveryId": "5a03e1a0-dc0f-11f1-85ed-ada04ac04f46",
+      "bodySha256": "91d07671f8747baf6e82fccbd847aaa59ae1bd5f54f09f551f412568b304383b",
+      "status": 202
+    },
+    "actualStored": true,
+    "decisionModel": true,
+    "shown": false,
+    "level": "low",
+    "completedMs": 5445
+  },
+  "mergeWriteback": {
+    "realGitHubMerged": true,
+    "mergeCommit": "3521d3334b9353c35abbaf423c64e2e2ad580686",
+    "disposableBaseOnly": true,
+    "publicationState": "merged",
+    "committedReceipts": 2,
+    "receipt": {
+      "event": "pull_request",
+      "action": "closed",
+      "pullRequest": 1809,
+      "deliveryId": "5e014e00-dc0f-11f1-9af9-fe287c1560de",
+      "bodySha256": "6d670c4567211b5133945378a459637b12e4b4fb29271c2717f1a7aa6cae9f7e",
+      "status": 202
+    }
+  },
+  "code": "SERVICES_TOKEN_REVOKED",
+  "errorClass": "Error",
+  "finishedAt": "2026-11-09T07:30:08.263Z"
+}

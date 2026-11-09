@@ -1,0 +1,67 @@
+{
+  "schema": 1,
+  "kind": "real-self-hosted-github-webhook",
+  "startedAt": "2026-11-09T07:24:51.371Z",
+  "imageSource": "88b144d52d091d7ff566c63fce6e902e33edc59e",
+  "image": "ghcr.io/alexj11324/mikka@sha256:96de4972ea7820dca9d7f03d116f8a4589c662ee6a6db9cb33cf8ad0f89ec98e",
+  "codingThreadsRequested": 0,
+  "driverVirtualMachines": 0,
+  "billingConfigurationWrites": 0,
+  "uiOpened": false,
+  "cases": {},
+  "cleanup": {
+    "fixturePrClosed": true,
+    "fixtureRefsDeleted": true,
+    "serverRevoked": true,
+    "workspaceRestored": true,
+    "sessionsSignedOut": true,
+    "privateFiles": true
+  },
+  "stage": "publication_fixture",
+  "status": "failed",
+  "driver": {
+    "sha": "6419186f6e46fbf2f7b24d51a57e4970587d80c3",
+    "parent": "7a0ad4b7890b1c67c5a35eaa64f9560ab46b4343",
+    "run": "42579076817",
+    "attempt": 1
+  },
+  "privateBefore": {
+    "id": "dpl_H844syuBfzTwdsPxkdb8F7hRZVyi",
+    "source": "4b6b116a2ecffc00dd44a0c096c65a3f2329df16",
+    "state": "READY"
+  },
+  "publicBefore": "02401458a7fe26e00ce4caa653084c7f9680696d",
+  "billingWorkspaceHash": "683a9e11b0c2d41f",
+  "billingSelection": "existing_paid_personal_normal_oauth",
+  "sharedTeamBillingChanged": false,
+  "origin": "https://looks-intention-test-groove.trycloudflare.com",
+  "imageId": "sha256:1fb3725678739bf9d448be52ca5ba576ed3e7902b4c9e1240bd5c174f13754b4",
+  "serverId": "cc12063b-c08b-4bb2-b657-7c512001cfd7",
+  "installation": {
+    "linked": true,
+    "localDiscovery": true,
+    "nativeToken": true,
+    "repositoryRestricted": "alexj11324/Mikka",
+    "expiresAt": "2026-11-09T08:25:21.000Z"
+  },
+  "git": {
+    "clone": true,
+    "push": true,
+    "pullRequest": 1808,
+    "head": "fd56cec279fad52c09ebe5cc0fa3d134e3387706",
+    "base": "acceptance/1565-42579076817-base",
+    "nativeCredential": true,
+    "executionMachine": "actions_runner_no_coding_model",
+    "trace": {
+      "remoteHttpsStarts": 6,
+      "allRemoteUrlsGitHub": true,
+      "placeholderToken": false,
+      "cloudEgressProxy": false,
+      "providerRequestHeadersRecorded": false
+    }
+  },
+  "code": "SERVICES_OPERATION_FAILED",
+  "errorClass": "error",
+  "databaseCode": "42703",
+  "finishedAt": "2026-11-09T07:25:35.930Z"
+}

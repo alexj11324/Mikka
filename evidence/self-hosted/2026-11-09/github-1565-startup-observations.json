@@ -1,0 +1,54 @@
+{
+  "schema": 1,
+  "scope": "observed_native_agent_start_upper_bounds",
+  "definition": "driver monotonic time from actual dispatch invocation to observeChunks agentStart via HTTP/live; not provider TTFT",
+  "sampleCounts": {
+    "selfHostedPerHarness": 1,
+    "cloudPerHarness": 1
+  },
+  "sameApprovedWorker": {
+    "source": "facb389f6cc06c453e9135bb60ada1b0f302e0d9",
+    "sha": "a45382985c12c93fb0832eabd8010f60c9b7dabb",
+    "templates": {
+      "desktop": "254vai4zmh475r5hppcj",
+      "claude": "0zd73b9wo0mv4pkk80mm",
+      "codex": "zlsft5zfm3rbeginw6d8"
+    }
+  },
+  "cloudSource": "0a355918330f6dac04d2b0ee4716cd056c263162",
+  "cloudRun": 42557474917,
+  "cloudWholeRunConclusion": "failure retained; additionalBoundsPassed=true",
+  "selfHostedRun": 42561752062,
+  "selfHostedApplication": "9bcdefc5fe0c047393d581eea867ffa801f53dbe",
+  "selfHostedOriginalConclusion": "failure retained; actual delivery verified separately",
+  "controlledBenchmark": false,
+  "limitations": [
+    "Different application builds and task contents",
+    "Not simultaneous; provider and machine cold-start state uncontrolled",
+    "Upper bounds depend on live/HTTP observation scheduling",
+    "No under-five-second or universal no-regression claim",
+    "Different dispatch entry points: self-hosted MCP includes its own overhead; cloud uses the direct run API."
+  ],
+  "cases": [
+    {
+      "harness": "claude_code",
+      "model": "claude-haiku-5-5",
+      "selfHostedAgentStartObservedUpperBoundMs": 30100,
+      "cloudAgentStartObservedUpperBoundMs": 32288,
+      "observedDifferenceMs": -2188,
+      "selfHostedObservedBoundLower": true
+    },
+    {
+      "harness": "codex",
+      "model": "gpt-6-luna",
+      "selfHostedAgentStartObservedUpperBoundMs": 25126,
+      "cloudAgentStartObservedUpperBoundMs": 39164,
+      "observedDifferenceMs": -14038,
+      "selfHostedObservedBoundLower": true
+    }
+  ],
+  "dispatchEndpoints": {
+    "selfHosted": "MCP dispatch_run",
+    "cloud": "POST /api/.../computer/runs"
+  }
+}
