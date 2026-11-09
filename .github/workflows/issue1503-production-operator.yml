@@ -14,7 +14,7 @@ concurrency:
   queue: max
 jobs:
   cleanup:
-    if: github.repository == 'alexj11324/Mikka'
+    if: false
     runs-on: ubuntu-latest
     concurrency:
       group: web-deploy-production
