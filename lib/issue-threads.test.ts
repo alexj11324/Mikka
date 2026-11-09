@@ -215,4 +215,7 @@ test('agentStretches joins consecutive threads by one Agent, oldest first (2026-
     ['claude_code', 'a', 'b', ['a', 'b']], ['codex', 'c', 'c', ['c']], ['claude_code', 'd', 'd', ['d']], [null, 'h1', 'h2', ['h1', 'h2']],
   ])
   assert.deepEqual(agentStretches([]), [])
+  // A Factory check by another Agent is its result card, not a switch.
+  const checks = agentStretches([{ ...t('i', 1, 'claude_code'), kind: 'implement' }, { ...t('r', 2, 'codex'), kind: 'acceptance' }, { ...t('v', 3, 'claude_code'), kind: 'review' }])
+  assert.deepEqual(checks.map(s => [s.agent, s.ids]), [['claude_code', ['i']]])
 })
