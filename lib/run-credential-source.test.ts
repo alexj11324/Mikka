@@ -28,6 +28,14 @@ mock.module(new URL('./workspace-db.ts', import.meta.url).href, { namedExports: 
     transaction: async () => { throw new Error('Unexpected Workspace transaction in credential-source fixture') },
   },
   workspacePool: { query: async (sql: string, args: unknown[]) => {
+    if (sql.includes('from mikka_workspaces w')) {
+      assert.match(sql, /^select w\.kind,l\."organizationId",p\."modelCredentialSharing",p\."mcpSharing",p\."allowedModelProviders"/)
+      assert.match(sql.trim(), /where w\.id=\$1$/)
+      assert.deepEqual(args, [id(2)])
+      // This exact Team Workspace has no Organization. The production
+      // resource-policy reader still runs; no unrelated query is authorized.
+      return { rows: [{ kind: 'team', organizationId: null, modelCredentialSharing: null, mcpSharing: null, allowedModelProviders: null }], rowCount: 1 }
+    }
     assert.match(sql, /FROM mikka_workspace_members/)
     assert.deepEqual(args, [id(2), ['alice']])
     return { rows: [{ userId: 'alice' }], rowCount: 1 }

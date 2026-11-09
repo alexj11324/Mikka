@@ -1,15 +1,16 @@
 import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
 import { randomUUID } from 'node:crypto'
+import { GovernanceError } from '@/lib/governance/errors'
 let session: { user: { id: string; email: string }; session: { id: string; createdAt: Date; updatedAt?: Date } } | null
-let unavailable = false, soleAdmin = false, cancellable = true
+let unavailable = false, soleAdmin = false, lastOwner = false, cancellable = true
 const calls: unknown[][] = [], id = randomUUID(), origin = 'https://mikka.example'
 let route: typeof import('./route')
 let cron: typeof import('../../cron/account-deletions/route')
 before(async () => {
   mock.module('@/lib/auth', { namedExports: { auth: { $context: Promise.resolve({ sessionConfig: { freshAge: 24 * 60 * 60 } }), api: { getSession: async () => session } } } })
   mock.module('@/lib/account/deletion-jobs', { namedExports: {
-    requestAccountDeletion: async (...args: unknown[]) => { calls.push(args); return soleAdmin ? { ok: false, soleAdminOf: ['Team'] } : { ok: true, id } },
+    requestAccountDeletion: async (...args: unknown[]) => { calls.push(args); if (lastOwner) throw new GovernanceError('last_owner'); return soleAdmin ? { ok: false, soleAdminOf: ['Team'] } : { ok: true, id } },
     readAccountDeletionReceipt: async (receipt: string) => { if (unavailable || receipt !== id) throw new Error('unavailable'); return { id, stage: 'storage_pending', remainingObjects: 1 } },
     cancelAccountDeletion: async (...args: unknown[]) => { calls.push(args); return cancellable },
     sweepAccountDeletions: async () => { calls.push(['sweep']); return { scanned: 1, completed: 0, pending: 1 } },
@@ -17,7 +18,7 @@ before(async () => {
   mock.module('@/lib/chat-attachments/store', { namedExports: { cleanupChatFiles: async () => { calls.push(['files']); return { retired: 0 } } } })
   route = await import('./route'); cron = await import('../../cron/account-deletions/route')
 })
-beforeEach(() => { session = { user: { id: 'owner', email: 'Owner@example.invalid' }, session: { id: 'session', createdAt: new Date() } }; unavailable = false; soleAdmin = false; cancellable = true; calls.length = 0 })
+beforeEach(() => { session = { user: { id: 'owner', email: 'Owner@example.invalid' }, session: { id: 'session', createdAt: new Date() } }; unavailable = false; soleAdmin = false; lastOwner = false; cancellable = true; calls.length = 0 })
 const request = (method: string, body?: unknown, headers: Record<string, string> = {}) => new Request(`${origin}/api/account/deletion`, { method, headers: { origin, 'content-type': 'application/json', ...headers }, ...(body ? { body: JSON.stringify(body) } : {}) })
 test('start requires same origin, session and typed email before creating an owner-bound job', async () => {
   assert.equal((await route.POST(request('POST', { email: session!.user.email, requestId: id }, { origin: 'https://other.example' }))).status, 403)
@@ -66,4 +67,12 @@ test('stale sign-in cannot create or reauthorize a deletion even with a known re
   assert.deepEqual(await response.json(), { error: 'SESSION_NOT_FRESH' })
   assert.equal(calls.length, 0)
   assert.equal((await route.GET(request('GET', undefined, { 'x-mikka-deletion-receipt': id }))).status, 200, 'status access does not create fresh deletion authority')
+})
+
+test('last Organization owner refusal keeps the existing account-deletion error contract', async () => {
+  lastOwner = true
+  const response = await route.POST(request('POST', { email: 'owner@example.invalid', requestId: id }))
+  assert.equal(response.status, 409)
+  assert.deepEqual(await response.json(), { error: 'accountLastOrganizationOwner' })
+  assert.equal(response.headers.get('cache-control'), 'private, no-store')
 })

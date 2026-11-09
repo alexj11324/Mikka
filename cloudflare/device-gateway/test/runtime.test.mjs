@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { createHash, createHmac } from 'node:crypto'
-import { realpathSync } from 'node:fs'
+import { realpathSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { after, before, test } from 'node:test'
@@ -18,6 +20,8 @@ const deviceId = '6f1c2b8e-2a8e-4c39-9d1a-3b5d7c9e1f20'
 const sockets = new Set()
 let runtime
 let origin
+let runtimeOptions
+const persistence = mkdtempSync(join(tmpdir(), 'mikka-gateway-revocation-'))
 
 function ticket(id = deviceId, exp = Math.floor(Date.now() / 1000) + 300) {
   const mac = createHmac('sha256', secret).update(`${id}.${exp}`).digest('hex')
@@ -80,7 +84,10 @@ before(async () => {
     cf: false,
     log: new Log(LogLevel.WARN),
   }
-  runtime = new Miniflare(convertV4MiniflareOptions ? convertV4MiniflareOptions(options) : options)
+  runtimeOptions = convertV4MiniflareOptions
+    ? { ...convertV4MiniflareOptions(options), resourcePersistencePath: persistence }
+    : { ...options, durableObjectsPersist: persistence }
+  runtime = new Miniflare(runtimeOptions)
   origin = (await runtime.ready).origin
 })
 
@@ -89,6 +96,7 @@ after(async () => {
     if (socket.readyState === WebSocket.OPEN) socket.close(1000, 'test complete')
   }
   await runtime?.dispose()
+  rmSync(persistence, { recursive: true, force: true })
 })
 
 test('Node built-in WebSocket opens against the Worker with its exact ticket protocol', async () => {
@@ -352,4 +360,55 @@ test('Coordinator session invalidation uses the same scoped wire without reply c
   await pushLive(channel, [invalidation])
   assert.deepEqual(JSON.parse((await received).data), invalidation)
   socket.close(1000, 'done')
+})
+
+test('a durable opaque revocation stops metadata, rejects old-ticket replay after Worker restart, and preserves Personal/new-cap channels', async () => {
+  const channel = liveChannel('revoked-session-capability', 'enterprise-workspace')
+  const personalChannel = liveChannel('same-user', 'personal-home')
+  const newChannel = liveChannel('fresh-assured-session-capability', 'enterprise-workspace')
+  const exp = Math.floor(Date.now() / 1000) + 300
+  const existing = liveSocket(channel, exp, WireWebSocket, 2)
+  const personal = liveSocket(personalChannel, exp, WebSocket, 2)
+  try {
+    await Promise.all([event(existing, 'open'), event(personal, 'open')])
+    await Promise.all([existing.liveReady, personal.liveReady])
+    const observed = []
+    existing.addEventListener('message', value => observed.push(value.data))
+    const before = messages(existing, 3)
+    await pushLive(channel, [{ kind: 'thread', id: deviceId, rev: 8 }, { kind: 'artifact', id: deviceId }, { kind: 'factory_task', id: deviceId }])
+    assert.equal((await before).length, 3)
+    const closed = closeFrame(existing)
+    const control = await fetch(`${origin}/v1/live/${channel}/push`, {
+      method: 'POST', headers: { authorization: `Bearer ${secret}` }, body: JSON.stringify({ type: 'live_revoked' }),
+    })
+    assert.equal(control.status, 200)
+    assert.deepEqual(await control.json(), { revoked: true })
+    assert.equal((await closed).code, 4001)
+    const count = observed.length
+    await pushLive(channel, [{ kind: 'thread', id: deviceId, rev: 9 }, { kind: 'artifact', id: deviceId }, { kind: 'factory_task', id: deviceId }])
+    const personalMessage = event(personal, 'message')
+    await pushLive(personalChannel, [{ kind: 'thread', id: deviceId, rev: 10 }])
+    assert.deepEqual(JSON.parse((await personalMessage).data), { kind: 'thread', id: deviceId, rev: 10 })
+    assert.equal(observed.length, count, 'revoked sockets receive no later UUID or changed revision')
+    personal.close(1000, 'restart fixture')
+  } finally { existing.terminate() }
+
+  // Use the same persisted DO database in a new workerd process, rather than
+  // only proving an in-memory flag. No external Worker is involved.
+  await runtime.dispose()
+  runtime = new Miniflare(runtimeOptions)
+  origin = (await runtime.ready).origin
+  const replay = new WebSocket(`${origin.replace('http:', 'ws:')}/v1/live/${channel}/socket`, ticket(`live:${channel}`, exp))
+  sockets.add(replay)
+  let opened = false
+  replay.addEventListener('open', () => { opened = true })
+  await event(replay, 'error')
+  assert.equal(opened, false, 'an unexpired signed ticket cannot revive the durable tombstone')
+
+  const allowed = liveSocket(newChannel, exp, WebSocket, 2)
+  await event(allowed, 'open'); await allowed.liveReady
+  const changed = event(allowed, 'message')
+  await pushLive(newChannel, [{ kind: 'thread', id: deviceId, rev: 11 }])
+  assert.deepEqual(JSON.parse((await changed).data), { kind: 'thread', id: deviceId, rev: 11 })
+  allowed.close(1000, 'done')
 })

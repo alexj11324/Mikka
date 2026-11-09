@@ -108,7 +108,8 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     assert.equal(full.credentials, 2, 'the page still counts the subscription and key with sharing either allowed or denied')
     assert.equal(Object.hasOwn(context, 'credentials'), false)
     const countStart = fullStatements.findIndex(row => row.sql.startsWith('SELECT id::text AS id FROM byos_connections WHERE'))
-    const saved = allowed ? 4 : 3
+    // No shared keys: only the connected-subscription and own/shared-key count reads.
+    const saved = 3
     assert.ok(countStart >= 0)
     assert.equal(fullStatements.length - contextStatements.length, saved)
     assert.deepEqual(contextStatements, [...fullStatements.slice(0, countStart), ...fullStatements.slice(countStart + saved)], 'every remaining SQL statement and scoped argument is unchanged')

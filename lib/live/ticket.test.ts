@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test, { before, after, mock } from 'node:test'
-import { liveChannelId } from './scope'
+import { liveChannelId, liveTicket } from './scope'
 import { deviceGatewayTicketValid } from '../device-gateway-ticket'
 import { readSessionLiveTicket } from './session-ticket'
 
@@ -23,11 +23,16 @@ before(async () => {
     sessionHeaders = input.headers
     return owner ? { user: { id: owner }, session: { id: `session-${owner}` } } : null
   } } } } })
-  mock.module(new URL('../workspace-db.ts', import.meta.url).href, { namedExports: { workspacePool: { query: async (_sql: string, values: unknown[]) => {
-    membershipReads.push(values)
-    const key = `${values[1]}:${values[0]}`
-    return { rowCount: memberships.has(key) ? 1 : 0, rows: memberships.has(key) ? [{ personalHome: personalHomes.has(key) }] : [] }
-  } } } })
+  // Route/codec fixture only. The real membership, SSO and revocation barriers
+  // are exercised without authorization mocks in live-authority.db.test.ts.
+  mock.module(new URL('../task-workspace.ts', import.meta.url).href, { namedExports: { activeTaskWorkspaces: async (reader: { id: string }, workspaceId: string) => {
+    membershipReads.push([workspaceId, reader.id])
+    const key = `${reader.id}:${workspaceId}`
+    return memberships.has(key) ? [{ id: workspaceId, kind: personalHomes.has(key) ? 'personal' : 'team' }] : []
+  } } })
+  mock.module(new URL('../enterprise/live-authority.ts', import.meta.url).href, { namedExports: { workspaceLiveTicket: async (
+    scope: { ownerId: string; workspaceId: string }, sessionId: string, config: Parameters<typeof liveTicket>[1],
+  ) => ({ status: 'allowed', ticket: liveTicket(scope, config, Date.now(), sessionId) }) } })
   mock.module(new URL('../request-log.ts', import.meta.url).href, { namedExports: { noteLogRpcAction: () => {}, withRequestLog: (_name: string, handler: (request: Request) => Promise<Response>) => handler } })
   route = await import('../../app/api/live/ticket/route')
 })
@@ -86,7 +91,7 @@ test('native session bearer uses the same membership boundary without trusting a
   assert.equal((await request(workspace, { authorization })).status, 401)
 })
 
-test('only the actual personal home receives a bounded routing proof from the existing single membership read', async () => {
+test('only the actual personal home receives a bounded routing proof from the selected workspace', async () => {
   owner = 'scope-owner'; memberships.add(`${owner}:${workspace}`); memberships.add(`${owner}:${second}`)
   personalHomes.add(`${owner}:${workspace}`)
   const before = membershipReads.length

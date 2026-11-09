@@ -8,6 +8,7 @@ import {runPrompt} from '../run-prompt'
 import {DEFAULT_AGENT_DEFINITION} from './builtin'
 import {makeSnapshot} from './definition'
 import { overrideDeploymentSwitch } from '../deployment-switches'
+import { PgDialect } from 'drizzle-orm/pg-core'
 
 const owner=randomUUID(),workspace=randomUUID(),agentId=randomUUID(),deviceId=randomUUID(),repoId=randomUUID(),botId=randomUUID(),issueId=randomUUID()
 const otherWorkspace=randomUUID()
@@ -70,22 +71,49 @@ function equalities(node:SqlChunk,found:[string,string,unknown][]=[]){
  })
  return found
 }
-function workspaceSelect(){
- let table='',filters:[string,string,unknown][]=[]
+function workspaceSelect(columns?:Record<string,unknown>){
+ let table='',filters:[string,string,unknown][]=[],organizationJoin=false
+ let condition:ReturnType<PgDialect['sqlToQuery']>|undefined
+ const organizations=()=>{
+  assert.equal(table,'mikka_organization_workspaces')
+  assert.deepEqual(condition?.params,[workspace])
+  assert.ok(condition?.sql==='"mikka_organization_workspaces"."workspaceId" = $1'||condition?.sql==='"mikka_organization_workspaces"."workspaceId" in ($1)')
+  if(columns!==undefined)assert.deepEqual(Object.keys(columns),['organizationId'])
+  // An exact non-Organization projection, not a replacement authorization.
+  return []
+ }
  const matches=(source:string,column:string,value:unknown)=>filters.some(([name,key,expected])=>name===source&&key===column&&expected===value)
- const query={from(value:Record<symbol,unknown>){table=tableName(value);return query},innerJoin(){return query},where(predicate:SqlChunk){filters=equalities(predicate);return query},
-  async for(){
+ const query={from(value:Record<symbol,unknown>){table=tableName(value);return query},innerJoin(){return query},
+  leftJoin(value:Record<symbol,unknown>,predicate:Parameters<PgDialect['sqlToQuery']>[0]){
+   assert.equal(tableName(value),'mikka_organization_workspaces')
+   const join=new PgDialect().sqlToQuery(predicate)
+   assert.deepEqual(join.params,[])
+   if(table==='mikka_workspaces'){
+    assert.equal(join.sql,'"mikka_organization_workspaces"."workspaceId" = "mikka_workspaces"."id"')
+    assert.deepEqual(Object.keys(columns!),['id','kind','organizationId'])
+   }else{
+    assert.equal(table,'mikka_workspace_members')
+    assert.equal(join.sql,'"mikka_organization_workspaces"."workspaceId" = "mikka_workspace_members"."workspaceId"')
+    assert.deepEqual(Object.keys(columns!),['id','organizationId'])
+   }
+   organizationJoin=true;return query
+  },
+  where(predicate:SqlChunk){filters=equalities(predicate);condition=new PgDialect().sqlToQuery(predicate as unknown as Parameters<PgDialect['sqlToQuery']>[0]);return query},
+  async for(strength:string,options?:{of?:Record<symbol,unknown>}){
    lockOrder.push(table)
    if(table==='mikka_workspaces')return matches(table,'id',workspace)?[{id:workspace,kind:'team',ownerId:owner}]:[]
    if(table==='mikka_workspace_members'){
+    assert.equal(organizationJoin,true);assert.equal(strength,'share')
+    assert.ok(options?.of);assert.equal(tableName(options.of),'mikka_workspace_members')
     memberLease=memberActive&&matches(table,'workspaceId',workspace)&&matches(table,'userId',owner)&&matches(table,'status','active')
-    return memberLease?[{id:owner}]:[]
+    return memberLease?[{id:owner,organizationId:null}]:[]
    }
    throw new Error(`Unexpected workspace lock: ${table}`)
   },
-  async orderBy(){return memberActive&&matches('mikka_workspaces','id',workspace)&&matches('mikka_workspace_members','userId',owner)&&matches('mikka_workspace_members','status','active')?[{id:workspace,kind:'team'}]:[]},
+  async limit(value:number){assert.equal(value,1);return organizations()},
+  async orderBy(){return memberActive&&matches('mikka_workspaces','id',workspace)&&matches('mikka_workspace_members','userId',owner)&&matches('mikka_workspace_members','status','active')?[{id:workspace,kind:'team',...(organizationJoin?{organizationId:null}:{})}]:[]},
   // oxlint-disable-next-line unicorn/no-thenable -- Match an awaited Drizzle selection.
-  then(resolve:(rows:unknown)=>unknown,reject:(error:unknown)=>unknown){return query.orderBy().then(resolve,reject)},
+  then(resolve:(rows:unknown)=>unknown,reject:(error:unknown)=>unknown){return (table==='mikka_organization_workspaces'?Promise.resolve().then(organizations):query.orderBy()).then(resolve,reject)},
  }
  return query
 }

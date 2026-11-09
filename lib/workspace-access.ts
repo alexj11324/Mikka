@@ -1,7 +1,6 @@
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { getLocale } from 'next-intl/server'
 import 'server-only'
-import { cache } from 'react'
 import { cookies } from 'next/headers'
 import { and, asc, eq, inArray, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
@@ -10,10 +9,13 @@ import { z } from 'zod'
 import { requireUser } from '@/lib/issue-access'
 import { workspaceDb, workspacePool } from '@/lib/workspace-db'
 import { workspaces, workspaceMembers, workspaceInvitations } from '@/lib/db/workspace-schema'
+import { organizationWorkspaces } from '@/lib/db/governance-schema'
 import { renameGeneratedWorkspace, type WorkspaceLocale } from '@/lib/workspace-name'
 import { ensurePersonalShare, ensurePersonalWorkspace } from '@/lib/personal-workspace'
 import type { ListLiveRead } from '@/lib/live/list-read'
 import { ownerLiveScope } from '@/lib/live/owner-scope'
+import { filterEnterpriseWorkspaceLinks, requireEnterpriseWorkspace } from '@/lib/enterprise/access'
+import type { EnterprisePrincipal } from '@/lib/enterprise/principal'
 import { getEdition, type MikkaEdition } from '@/lib/edition'
 import { isServerAdmin } from '@/lib/server-admin'
 import { currentRequestScope } from '@/apps/api/src/context'
@@ -29,13 +31,14 @@ export { WorkspaceError }
 export type WorkspaceTransaction = Parameters<Parameters<typeof workspaceDb.transaction>[0]>[0]
 type AuthenticatedUser = Awaited<ReturnType<typeof requireUser>>
 
-export async function requireWorkspace(tx: WorkspaceTransaction, workspaceId: string, userId: string, admin = false) {
+export async function requireWorkspace(tx: WorkspaceTransaction, workspaceId: string, userId: string, admin = false, principal?: EnterprisePrincipal) {
   z.uuid().parse(workspaceId)
   const [row] = await tx.select({ workspace: workspaces, membership: workspaceMembers }).from(workspaces)
     .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
     .where(and(eq(workspaces.id, workspaceId), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active')))
     .for('update').limit(1)
   if (!row || (admin && row.membership.role !== 'admin')) throw new WorkspaceError('workspaceAccessDenied')
+  await requireEnterpriseWorkspace(userId, workspaceId, principal, tx)
   return row
 }
 
@@ -48,18 +51,21 @@ export async function loadWorkspaceContext(requestedId?: string, authenticatedUs
   if (patWorkspace && (requestedId && requestedId !== patWorkspace || selection.workspaceId && selection.workspaceId !== patWorkspace)) throw new WorkspaceError('workspaceAccessDenied')
   // An explicit business target keeps its existing access check. A supplied
   // transport selection is exact: inaccessible choices never fall back home.
-  const context = await readWorkspaceContext(user.id, user.email, user.name, user.image ?? null, patWorkspace ?? requestedId ?? selection.workspaceId ?? '', locale)
+  const { organizationId, ...context } = await readWorkspaceContext(user.id, user.email, user.name, user.image ?? null, patWorkspace ?? requestedId ?? selection.workspaceId ?? '', locale)
   if (selection.present && !context.choices.some(choice => choice.id === selection.workspaceId)) throw new WorkspaceError('workspaceAccessDenied')
+  if (!(await filterEnterpriseWorkspaceLinks(user, [{ id: context.workspace.id, organizationId }])).length) throw new WorkspaceError('workspaceAccessDenied')
   return patWorkspace ? { ...context, choices: context.choices.filter(choice => choice.id === patWorkspace) } : context
 }
 
-// The pages, the switcher and the list actions all ask for the same context. React cache shares it
-// within one server render only (never across requests or users); the key is all primitives.
-const readWorkspaceContext = cache(async (userId: string, email: string, name: string, image: string | null, requestedId: string, locale: WorkspaceLocale) => {
+// Membership and organization linkage share one fresh read. Neither may be
+// memoized across calls, even inside one server render: attaching an organization
+// or revoking membership must affect the next authorization in that render.
+async function readWorkspaceContext(userId: string, email: string, name: string, image: string | null, requestedId: string, locale: WorkspaceLocale) {
   const user = { id: userId, email, name, image }
   const cookieStore = await cookies()
-  const readChoices = () => workspaceDb.select({ id: workspaces.id, name: workspaces.name, kind: workspaces.kind, role: workspaceMembers.role }).from(workspaces)
+  const readChoices = () => workspaceDb.select({ id: workspaces.id, name: workspaces.name, kind: workspaces.kind, role: workspaceMembers.role, organizationId: organizationWorkspaces.organizationId }).from(workspaces)
     .innerJoin(workspaceMembers, eq(workspaceMembers.workspaceId, workspaces.id))
+    .leftJoin(organizationWorkspaces, eq(organizationWorkspaces.workspaceId, workspaces.id))
     .where(and(eq(workspaceMembers.userId, user.id), eq(workspaceMembers.status, 'active'),
       or(eq(workspaces.kind, 'team'), eq(workspaces.userId, user.id)))).orderBy(asc(workspaces.createdAt))
 
@@ -90,13 +96,14 @@ const readWorkspaceContext = cache(async (userId: string, email: string, name: s
   }
   if (!selected) throw new WorkspaceError('workspaceAccessDenied')
   return {
+    organizationId: selected.organizationId,
     workspace: { id: selected.id, name: selected.name, kind: selected.kind },
     choices: choices.map(({ id, name, kind }) => ({ id, name, kind })),
     currentUserId: user.id,
     role: selected.role,
     currentUser: { name: user.name, email: user.email, image: user.image ?? null },
   }
-})
+}
 
 export async function loadWorkspaceSettings(requestedId?: string, authenticatedUser?: AuthenticatedUser) {
   const observedAt = Date.now()

@@ -42,7 +42,7 @@ export class SubscriptionService {
       await assertSubscriptionModelTransport(...args)
     },
     /** Active membership in the workspace database; a teammate's shared subscription needs it for both people. */
-    readonly member: (userId: string, workspaceId: string) => Promise<void> = async () => { throw new SubscriptionRefusal('account_unavailable') }) {}
+    readonly member: (userId: string, workspaceId: string, borrowerId?: string) => Promise<void> = async () => { throw new SubscriptionRefusal('account_unavailable') }) {}
 
   async access(use: SubscriptionUse, signal?: AbortSignal, modelOverride?: string | null): Promise<SubscriptionAccess> {
     const { modelId: boundModelId, ...binding } = await this.repository.binding(use.ownerId, use.bindingId)
@@ -162,7 +162,7 @@ export class SubscriptionService {
     const row=rows[0]
     if (!workerSubscriptionMatches(row.agentDefinition,row.harness,row)) throw new SubscriptionRefusal('binding_mismatch')
     if (String(row.ownerId) !== ownerId) {
-      try { await this.member(ownerId, row.workspaceId); await this.member(String(row.ownerId), row.workspaceId) }
+      try { await this.member(ownerId, row.workspaceId); await this.member(String(row.ownerId), row.workspaceId, ownerId) }
       catch { throw new SubscriptionRefusal('account_unavailable') }
     }
     // The use belongs to the credential's owner: the run owner, or the member who shared it (分享给团队成员).
@@ -250,6 +250,7 @@ export class SubscriptionService {
       const row=(await this.repository.pool.query(`SELECT r."userId",r."agentDefinition" FROM agent_runs r JOIN byos_native_runs n ON n."runId"=r.id JOIN byos_bindings b ON b.id=n."bindingId" WHERE r.id=$1 AND b."ownerId"=$2 AND ${runMayUseCredentialSql('$2', 'r."userId"', 'b."workspaceId"')} AND r."agentId"::text=$3 AND n."bindingId"=$4 AND r.status IN ('preparing','running','paused','waiting_input') AND r."leaseExpiresAt">now() AND r."stopRequestedAt" IS NULL`,[use.runId,use.ownerId,use.consumerId,use.bindingId])).rows[0]
       if (!row || typeof row.userId !== 'string' || !row.userId) throw new SubscriptionRefusal('binding_mismatch')
       executionOwnerId = row.userId
+      if (executionOwnerId !== use.ownerId) await this.member(use.ownerId, use.workspaceId, executionOwnerId)
       if (row.agentDefinition?.cliModelSelection==='auto') selectedModel=undefined
       if (row.agentDefinition?.cliModelSelection==='explicit') selectedModel=row.agentDefinition.model
     }

@@ -2,6 +2,7 @@ import type { Pool, PoolClient } from 'pg'
 import { isDeepStrictEqual } from 'node:util'
 import { z } from 'zod'
 import type { WorkerDefinitionSnapshot } from './agent-kit/worker'
+import { organizationResourceAllowed, assertOrganizationModelProvider } from './governance/resource-access'
 
 /** Authority is host data, never a Decision/model argument. References only: no credentials. */
 const resource = z.object({
@@ -66,11 +67,13 @@ export async function freezeExecutionIdentity(query: Query, run: RunAuthority, m
   let model: ExecutionIdentity['billingAccount']['model'] = { kind: 'native_login', ownerId: run.userId, resourceId: run.deviceId, amount: 'provider_unknown' }
   if (definition.apiKey && definition.subscription) return denied()
   if (definition.apiKey) {
+    if (workspaceId) await assertOrganizationModelProvider(workspaceId, 'api-key', membership)
     const { rows: [key] } = await query.query<{ ownerId: string; shared: boolean }>(`SELECT k."ownerId", EXISTS (
       SELECT 1 FROM model_api_key_shares s WHERE s."keyId"=k.id AND s."workspaceId"=$2
       AND NOT EXISTS (SELECT 1 FROM workspace_personal_policies p WHERE p."workspaceId"=$2 AND NOT p.subscriptions)) AS shared
       FROM model_api_keys k WHERE k.id=$1`, [definition.apiKey.keyId, workspaceId])
     if (!key || (key.ownerId !== run.userId && (!workspaceId || !key.shared || !await executionMembersActive(workspaceId, [run.userId, key.ownerId], membership)))) return denied()
+    if (key.ownerId !== run.userId && !await organizationResourceAllowed(workspaceId!, 'api_key', definition.apiKey.keyId, key.ownerId, membership)) return denied()
     resourceBindings.push({ kind: 'api_key', id: definition.apiKey.keyId, ownerId: key.ownerId, access: key.ownerId === run.userId ? 'owner' : 'workspace_share' })
     model = { kind: 'api_key', ownerId: key.ownerId, resourceId: definition.apiKey.keyId, amount: 'provider_unknown' }
   } else if (definition.subscription) {
@@ -81,6 +84,7 @@ export async function freezeExecutionIdentity(query: Query, run: RunAuthority, m
       AND c.state='connected' AND NOT c.paused AND c.epoch=b."connectionRevision" WHERE b.id=$1`, [definition.subscription.bindingId, workspaceId])
     if (!binding || binding.modelId !== definition.subscription.modelId || binding.route !== definition.subscription.route ||
       (binding.ownerId !== run.userId && (!workspaceId || binding.workspaceId !== workspaceId || !binding.shared || !await executionMembersActive(workspaceId, [run.userId, binding.ownerId], membership)))) return denied()
+    if (binding.ownerId !== run.userId && !await organizationResourceAllowed(workspaceId!, 'subscription', binding.ownerId, binding.ownerId, membership)) return denied()
     resourceBindings.push({ kind: 'subscription', id: definition.subscription.bindingId, ownerId: binding.ownerId, access: binding.ownerId === run.userId ? 'owner' : 'workspace_share', revision: binding.revision })
     model = { kind: 'subscription', ownerId: binding.ownerId, resourceId: definition.subscription.bindingId, amount: 'provider_unknown' }
   } else if (device.kind === 'cloud') return denied()

@@ -10,9 +10,10 @@ const signature = (channel: string, sessionId: string, exp: number, secret: stri
   .update(JSON.stringify(['mikka:live:session:v2', channel, sessionId, exp])).digest('hex')
 
 /** A session id is an identifier, never its bearer. No credential enters URLs or notifications. */
-export function sessionLiveTicket(channel: string, sessionId: string, secret: string, now = Date.now()) {
+export function sessionLiveTicket(channel: string, sessionId: string, secret: string, now = Date.now(), expiresAt?: number) {
   if (!LIVE_CHANNEL.test(channel) || !liveSessionIdValid(sessionId) || !secret) throw new CodedError('desktop_session_expired')
-  const exp = Math.floor(now / 1000) + DEVICE_GATEWAY_TICKET_SECONDS
+  const exp = Math.min(Math.floor(now / 1000) + DEVICE_GATEWAY_TICKET_SECONDS, expiresAt === undefined ? Infinity : Math.floor(expiresAt / 1000))
+  if (!Number.isSafeInteger(exp) || exp * 1000 <= now) throw new CodedError('desktop_session_expired')
   const encoded = Buffer.from(sessionId).toString('base64url')
   return { protocol: `${PREFIX}${exp}.${encoded}.${signature(channel, sessionId, exp, secret)}`, expiresAt: exp * 1000 }
 }

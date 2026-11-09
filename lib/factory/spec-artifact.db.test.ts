@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { readFile, readdir } from 'node:fs/promises';
 import test from 'node:test';
 import { Pool, type PoolClient } from 'pg';
@@ -10,7 +10,8 @@ import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { bindFixtureWorkspaceDatabase } from '../../tests/helpers/workspace-database';
 import { freezeWorkerDefinition } from '../agent-kit/worker';
 import { observePoolCommits } from '../db/commit-effects';
-import { freezeExecutionIdentity } from '../execution-identity';
+import { executionIdentityForRun, freezeExecutionIdentity } from '../execution-identity';
+import { GovernanceError } from '../governance/errors';
 import { createFactoryStore, type FactoryTask } from './store';
 import { factoryBinding } from './dispatch';
 import { syncFactoryPresentation } from './stage-progress';
@@ -249,6 +250,67 @@ test('spec Artifact: real PG completion, immutable replay, concurrent writes and
       assert.equal(applied.created, 1); assert.equal(sawLease, true);
       assert.ok(parseFactorySpecArtifactRef((await pool.query('SELECT output FROM factory_attempts WHERE id=$1', [pending.task.attemptId])).rows[0].output.specArtifact));
       assert.equal((await pool.query('SELECT count(*)::int AS n FROM coordinator_events')).rows[0].n, eventsBefore, 'restoring access still performs a quiet historical copy');
+    });
+
+    await t.test('a provider policy revoked after inspection skips only that historical plan and preserves database failures', async () => {
+      const { createRequestDatabaseScope } = await import('../db/request-scope');
+      const { sealSecret } = await import('../secrets/crypto');
+      // Enterprise reads both stores. Bind the canonical APP request scope to
+      // this owned database without holding an APP connection ahead of WS.
+      const requestScope = createRequestDatabaseScope(target.toString());
+      try { await requestScope.run(async () => {
+        const candidates = [];
+        for (let i = 0; i < 2; i++) candidates.push(await fixture(await seedFixtureWorkspace(pool, 'spec-owner', 'team')));
+        candidates.sort((left, right) => left.task.attemptId < right.task.attemptId ? -1 : 1);
+        const [denied, allowed] = candidates, organizationId = randomUUID(), keyId = randomUUID();
+        assert.ok(denied.task.workspaceId);
+        await pool.query(`INSERT INTO mikka_organizations(id,name,"createdBy") VALUES($1,'Historical plan policy','spec-owner')`, [organizationId]);
+        await pool.query(`INSERT INTO mikka_organization_members("organizationId","userId",role,name,email)
+          VALUES($1,'spec-owner','owner','Fixture','spec-owner@example.invalid')`, [organizationId]);
+        await pool.query('INSERT INTO mikka_organization_workspaces("workspaceId","organizationId") VALUES($1,$2)', [denied.task.workspaceId, organizationId]);
+        await pool.query(`INSERT INTO mikka_organization_resource_policies("organizationId","allowedModelProviders") VALUES($1,'["api-key"]')`, [organizationId]);
+        const sealed = sealSecret('synthetic-plan-key-never-sent-to-a-provider', ['model_api_key', keyId, 'spec-owner'].join('\0'),
+          { WORKSPACE_SECRETS_KEY: randomBytes(32).toString('hex') });
+        await pool.query(`INSERT INTO model_api_keys(id,"ownerId",provider,protocol,ciphertext,iv,"keyVersion",last4,models)
+          VALUES($1,'spec-owner','openai','openai',$2,$3,$4,'test','["example-model"]')`, [keyId, sealed.ciphertext, sealed.iv, sealed.keyVersion]);
+        const definition = freezeWorkerDefinition({ harness: 'codex', instructions: 'Plan the change', prompt: 'Plan', parent: null,
+          executionId: null, model: 'example-model', apiKey: { keyId, model: 'example-model' } });
+        definition.executionIdentity = await freezeExecutionIdentity(pool, { userId: 'spec-owner', botId: null, deviceId,
+          agentDefinition: definition }, pool, denied.task.workspaceId);
+        await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [denied.runId, JSON.stringify(definition)]);
+        await pool.query(`UPDATE factory_attempts SET status='passed',"finishedAt"=clock_timestamp()-interval '1 second'
+          WHERE id=ANY($1::uuid[])`, [candidates.map(value => value.task.attemptId)]);
+        const inspect = await backfillFactorySpecArtifacts(pool, store, 'spec-owner');
+        assert.equal(inspect.wouldCreate, 2, JSON.stringify(inspect));
+        const eventsBefore = (await pool.query('SELECT count(*)::int AS n FROM coordinator_events')).rows[0].n;
+        await pool.query(`UPDATE mikka_organization_resource_policies SET "allowedModelProviders"='[]',revision=revision+1 WHERE "organizationId"=$1`, [organizationId]);
+        await assert.rejects(executionIdentityForRun(pool, denied.runId, 'spec-owner'),
+          error => error instanceof GovernanceError && error.detail === 'access_denied');
+        // The policy refusal is expected; a genuine later APP write failure
+        // must still reject the batch and roll back that candidate's Artifact.
+        const constraint = `spec_backfill_failure_${randomUUID().replaceAll('-', '')}`;
+        await pool.query(`ALTER TABLE artifacts ADD CONSTRAINT "${constraint}" CHECK ("runId" IS DISTINCT FROM '${allowed.runId}'::uuid) NOT VALID`);
+        try {
+          await assert.rejects(backfillFactorySpecArtifacts(pool, store, 'spec-owner', { dryRun: false, cursor: inspect.cursor }),
+            { code: '23514', constraint });
+          assert.equal((await pool.query('SELECT id FROM artifacts WHERE "runId"=$1', [allowed.runId])).rowCount, 0);
+        } finally { await pool.query(`ALTER TABLE artifacts DROP CONSTRAINT "${constraint}"`); }
+        const visited: string[] = [];
+        const observingStore = { lockTask: async (tx: PoolClient, userId: string, taskId: string) => {
+          visited.push(taskId);
+          return store.lockTask(tx, userId, taskId);
+        } };
+        const applied = await backfillFactorySpecArtifacts(pool, observingStore, 'spec-owner', { dryRun: false, cursor: inspect.cursor });
+        assert.equal(applied.created, 1);
+        assert.equal(applied.skipped.unauthorized, inspect.skipped.unauthorized + 1);
+        assert.ok(visited.indexOf(denied.task.id) >= 0 && visited.indexOf(allowed.task.id) > visited.indexOf(denied.task.id),
+          'the real batch proceeds to a later candidate after the policy denial');
+        assert.equal((await pool.query('SELECT id FROM artifacts WHERE "runId"=$1', [denied.runId])).rowCount, 0);
+        assert.equal((await pool.query('SELECT output FROM factory_attempts WHERE id=$1', [denied.task.attemptId])).rows[0].output.specArtifact, undefined);
+        assert.ok(parseFactorySpecArtifactRef((await pool.query('SELECT output FROM factory_attempts WHERE id=$1', [allowed.task.attemptId])).rows[0].output.specArtifact));
+        assert.equal((await pool.query('SELECT count(*)::int AS n FROM coordinator_events')).rows[0].n, eventsBefore,
+          'both refusal and the permitted historical copy remain quiet');
+      }); } finally { await requestScope.close(); }
     });
 
     await t.test('the same transaction fences account deletion before any Artifact write', async () => {

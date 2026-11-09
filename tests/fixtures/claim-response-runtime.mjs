@@ -1,16 +1,51 @@
 // In-memory claim boundary tests. No sockets, providers or database connections.
 import { registerHooks } from 'node:module'
 import assert from 'node:assert/strict'
-import { PgDialect } from 'drizzle-orm/pg-core'
+import { PgDialect, QueryBuilder } from 'drizzle-orm/pg-core'
 
+const expectedMembershipSql = "select \"mikka_workspaces\".\"id\", \"mikka_workspaces\".\"kind\", \"mikka_organization_workspaces\".\"organizationId\" from \"mikka_workspaces\" inner join \"mikka_workspace_members\" on \"mikka_workspace_members\".\"workspaceId\" = \"mikka_workspaces\".\"id\" left join \"mikka_organization_workspaces\" on \"mikka_organization_workspaces\".\"workspaceId\" = \"mikka_workspaces\".\"id\" where (\"mikka_workspace_members\".\"userId\" = $1 and \"mikka_workspace_members\".\"status\" = $2 and \"mikka_workspaces\".\"id\" = $3 and (\"mikka_workspaces\".\"kind\" = $4 or (\"mikka_workspaces\".\"kind\" = $5 and \"mikka_workspaces\".\"userId\" = $6))) order by \"mikka_workspaces\".\"createdAt\" asc"
+function expandMembershipAliases(sql) {
+  for (const [table, name] of [['mikka_workspaces', 'w'], ['mikka_workspace_members', 'm'], ['mikka_organization_workspaces', 'o']]) {
+    sql = sql.replaceAll('"' + table + '" "' + name + '"', '"' + table + '"')
+      .replaceAll('"' + name + '".', '"' + table + '".')
+  }
+  return sql
+}
 const dialect = new PgDialect()
-function workspaceQuery() {
-  let table, condition
+function workspaceQuery(columns) {
+  let table, condition, organizationJoin = false, statement = new QueryBuilder().select(columns)
+  const organizations = () => {
+    const p = globalThis.claimResponseProbe
+    assert.equal(table, 'mikka_organization_workspaces')
+    assert.deepEqual(condition.params, [p.workspace.id])
+    assert.ok(condition.sql === '"mikka_organization_workspaces"."workspaceId" = $1'
+      || condition.sql === '"mikka_organization_workspaces"."workspaceId" in ($1)')
+    if (columns !== undefined) assert.deepEqual(Object.keys(columns), ['organizationId'])
+    // This claim-composition fixture has no Organization-link row. The real
+    // Enterprise gate consumes that exact projection; unknown queries fail.
+    return []
+  }
   const query = {
-    from(value) { table = value[Object.getOwnPropertySymbols(value).find(s => s.description === 'drizzle:Name')]; return query },
-    innerJoin() { return query },
-    where(value) { condition = dialect.sqlToQuery(value); return query },
-    async for(mode) {
+    from(value) { table = value[Object.getOwnPropertySymbols(value).find(s => s.description === 'drizzle:Name')]; statement = statement.from(value); return query },
+    innerJoin(value, predicate) { statement = statement.innerJoin(value, predicate); return query },
+    leftJoin(value, predicate) {
+      const join = dialect.sqlToQuery(predicate)
+      assert.deepEqual(join.params, [])
+      if (table === 'mikka_workspace_members') {
+        assert.equal(value[Object.getOwnPropertySymbols(value).find(s => s.description === 'drizzle:Name')], 'mikka_organization_workspaces')
+        assert.equal(join.sql, '"mikka_organization_workspaces"."workspaceId" = "mikka_workspace_members"."workspaceId"')
+        assert.deepEqual(Object.keys(columns), ['id', 'organizationId'])
+      } else {
+        // The unlocked membership path is checked as a complete real query
+        // at orderBy, including its original base tables and all predicates.
+        assert.deepEqual(Object.keys(columns), ['id', 'kind', 'organizationId'])
+      }
+      statement = statement.leftJoin(value, predicate)
+      organizationJoin = true
+      return query
+    },
+    where(value) { condition = dialect.sqlToQuery(value); statement = statement.where(value); return query },
+    async for(mode, options) {
       const p = globalThis.claimResponseProbe
       assert.equal(mode, 'share')
       if (table === 'mikka_workspaces') {
@@ -19,15 +54,24 @@ function workspaceQuery() {
         return [p.workspace]
       }
       assert.equal(table, 'mikka_workspace_members')
+      assert.equal(organizationJoin, true)
+      assert.ok(options?.of)
+      assert.equal(options.of[Object.getOwnPropertySymbols(options.of).find(s => s.description === 'drizzle:Name')], 'mikka_workspace_members')
       assert.deepEqual(condition.params, [p.workspace.id, p.run.userId, 'active'])
       p.locks.push('workspace_members')
-      return p.memberAllowed && p.workspaceMemberAllowed ? [{ id: p.run.userId }] : []
+      return p.memberAllowed && p.workspaceMemberAllowed ? [{ id: p.run.userId, organizationId: null }] : []
     },
-    async orderBy() {
+    async limit(value) { assert.equal(value, 1); return organizations() },
+    // oxlint-disable-next-line unicorn/no-thenable -- Match the awaited Org-link SELECT.
+    then(resolve, reject) { return Promise.resolve().then(organizations).then(resolve, reject) },
+    async orderBy(order) {
       const p = globalThis.claimResponseProbe
-      assert.equal(table, 'mikka_workspaces')
-      assert.deepEqual(condition.params, [p.run.userId, 'active', p.workspace.id, 'team', 'personal', p.run.userId])
-      return p.memberAllowed && p.workspaceMemberAllowed ? [p.workspace] : []
+      assert.equal(organizationJoin, true)
+      assert.deepEqual(Object.keys(columns), ['id', 'kind', 'organizationId'])
+      const compiled = statement.orderBy(order).toSQL()
+      assert.equal(expandMembershipAliases(compiled.sql), expectedMembershipSql)
+      assert.deepEqual(compiled.params, [p.run.userId, 'active', p.workspace.id, 'team', 'personal', p.run.userId])
+      return p.memberAllowed && p.workspaceMemberAllowed ? [{ ...p.workspace, organizationId: null }] : []
     },
   }
   return query

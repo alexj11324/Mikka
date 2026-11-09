@@ -22,6 +22,7 @@ export const USER_ERROR_CODES = {
   run_failed: [],
   task_secret_unavailable: ['invalid_capability', 'expired_capability', 'binding_mismatch', 'invalid_request', 'destination_denied', 'upstream_unavailable', 'response_blocked', 'limit_exceeded', 'configuration'],
 
+  governance_denied: ["access_denied", "seat_limit", "feature_unavailable", "last_owner", "workspace_attached", "personal_workspace", "invalid_request", "template_limit", "not_found", "plan_changed"],
   installer_failed: ["node_required", "unsupported_os", "npm_permission", "npm_cache_permission", "cancelled", "timeout", "service_failed", "connection_failed", "command_failed"],
   model_tool_unavailable: [],
   cloud_not_connected: [],

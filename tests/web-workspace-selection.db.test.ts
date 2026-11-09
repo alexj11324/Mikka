@@ -119,8 +119,9 @@ test('remote Web Workspace selection survives bearer-only HTTP and never broaden
     const foreign = await seedFixtureWorkspace(workspacePool, outsider.userId, 'team')
     const foreignPersonal = await seedFixtureWorkspace(workspacePool, outsider.userId)
     tenants.push(personal, alpha, beta, foreign, foreignPersonal)
-    // Corrupt membership still cannot expose somebody else's Personal tenant.
-    await workspacePool.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$2,'member','active')`, [foreignPersonal, owner.userId])
+    // Team governance rejects a foreign Personal member at the database edge.
+    // The HTTP cases below still prove that selecting that tenant is denied.
+    await assert.rejects(workspacePool.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$2,'member','active')`, [foreignPersonal, owner.userId]), { code: '23514' })
     const request = (path: string, workspaceId?: string, options: { token?: string; remote?: boolean; body?: unknown; cookie?: string } = {}) => fetch(`${origin}${withBasePath(path)}`, {
       method: options.body === undefined ? 'GET' : 'POST', redirect: 'error',
       headers: { origin: options.remote === false ? origin : officialOrigin, authorization: `Bearer ${options.token ?? owner.token}`,

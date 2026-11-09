@@ -137,3 +137,45 @@ test('Postgres envelopes accept only known message types with validated identifi
     assert.equal(gatewayMessage(invalid), null)
   }
 })
+
+test('opaque live revocation closes only that capability across replicas and rejects a late open result', async t => {
+  const mesh = buses(3), secondKey = 'd'.repeat(64)
+  const first = new GatewayHub(mesh.bus[0], Date.now, config.secret, async () => true)
+  const second = new GatewayHub(mesh.bus[1], Date.now, config.secret, async () => true)
+  t.after(() => { first.stop(); second.stop() })
+  const a = peer(), b = peer(), personal = peer()
+  const socket = { kind: 'live' as const, key: channel, sessionId: 'same-session', revisions: true, expiresAt: Date.now() + 60_000 }
+  await first.open(a.socket, socket)
+  await second.open(b.socket, socket)
+  await second.open(personal.socket, { ...socket, key: secondKey })
+  const checked = Promise.withResolvers<void>(), release = Promise.withResolvers<void>()
+  const delayed = new GatewayHub(mesh.bus[2], Date.now, config.secret, async () => {
+    checked.resolve(); await release.promise; return true
+  })
+  t.after(() => delayed.stop())
+  const late = peer(), opening = delayed.open(late.socket, socket)
+  await checked.promise
+  const push = (body: unknown, secretHeader = `Bearer ${config.secret}`) => gatewayRequest(new Request(`https://self.example/mikka/v1/live/${channel}/push`, {
+    method: 'POST', headers: { authorization: secretHeader }, body: JSON.stringify(body),
+  }), second, env)
+  try {
+    assert.equal((await push({ type: 'live_revoked' }, '')).status, 401)
+    assert.equal((await push({ type: 'live_revoked', extra: true })).status, 400)
+    const accepted = await push({ type: 'live_revoked' })
+    assert.equal(accepted.status, 200)
+    assert.deepEqual(await accepted.json(), { revoked: true })
+  } finally { release.resolve(); await opening }
+  assert.equal(a.closes[0]?.code, 4001)
+  assert.equal(b.closes[0]?.code, 4001)
+  assert.equal(late.closes[0]?.code, 4001)
+  assert.deepEqual(late.messages, [], 'a pre-revocation successful query cannot reopen the channel')
+  assert.equal(await second.authorize(socket), false)
+  assert.deepEqual(personal.closes, [])
+  const before = b.messages.length
+  await second.live(channel, [{ kind: 'factory_task', id: device }])
+  assert.equal(b.messages.length, before)
+  await second.live(secondKey, [{ kind: 'thread', id: device, rev: 12 }])
+  assert.deepEqual(JSON.parse(personal.messages.at(-1)!), { kind: 'thread', id: device, rev: 12 })
+  assert.deepEqual(gatewayMessage({ type: 'live_revoked', key: channel }), { type: 'live_revoked', key: channel })
+  assert.equal(gatewayMessage({ type: 'live_revoked', key: device }), null)
+})

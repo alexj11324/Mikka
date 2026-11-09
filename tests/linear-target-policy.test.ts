@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { randomUUID } from 'node:crypto'
-import { PgDialect } from 'drizzle-orm/pg-core'
+import { QueryBuilder, type PgTable, type SelectedFields } from 'drizzle-orm/pg-core'
 import type { SQL } from 'drizzle-orm'
 
 function reader(rows:unknown[][]) {
@@ -18,13 +18,44 @@ function reader(rows:unknown[][]) {
   return {executor,get writes(){return writes},get reads(){return index}}
 }
 const issue={id:randomUUID(),userId:'owner',workspaceId:randomUUID(),ownershipState:'bound',scope:'workspace',linearSyncPolicy:'explicit',linearSyncBlocked:false,scopeVersion:2,content:{type:'doc',content:[]}}
-const dialect = new PgDialect()
-const workspace = { select: () => {
-  const chain = { from: () => chain, innerJoin: () => chain, where: (condition: SQL) => {
-    const query = dialect.sqlToQuery(condition)
-    assert.ok(query.params.includes(issue.workspaceId)); assert.ok(query.params.includes(issue.userId)); assert.ok(query.params.includes('active'))
-    return { orderBy: async () => [{ id: issue.workspaceId, kind: 'team' }] }
-  } }
+const expectedMembershipSql = "select \"mikka_workspaces\".\"id\", \"mikka_workspaces\".\"kind\", \"mikka_organization_workspaces\".\"organizationId\" from \"mikka_workspaces\" inner join \"mikka_workspace_members\" on \"mikka_workspace_members\".\"workspaceId\" = \"mikka_workspaces\".\"id\" left join \"mikka_organization_workspaces\" on \"mikka_organization_workspaces\".\"workspaceId\" = \"mikka_workspaces\".\"id\" where (\"mikka_workspace_members\".\"userId\" = $1 and \"mikka_workspace_members\".\"status\" = $2 and \"mikka_workspaces\".\"id\" = $3 and (\"mikka_workspaces\".\"kind\" = $4 or (\"mikka_workspaces\".\"kind\" = $5 and \"mikka_workspaces\".\"userId\" = $6))) order by \"mikka_workspaces\".\"createdAt\" asc"
+const workspace = { select: (projection: Record<string, unknown>) => {
+  assert.deepEqual(Object.keys(projection), ['id', 'kind', 'organizationId'])
+  let source: PgTable | undefined, member: PgTable | undefined, organization: PgTable | undefined
+  let memberJoin: SQL | undefined, organizationJoin: SQL | undefined
+  const chain = {
+    from: (table: PgTable) => { assert.equal(source, undefined); source = table; return chain },
+    innerJoin: (table: PgTable, condition: SQL) => {
+      assert.ok(source); assert.equal(member, undefined)
+      member = table; memberJoin = condition
+      return chain
+    },
+    leftJoin: (table: PgTable, condition: SQL) => {
+      assert.ok(member); assert.equal(organization, undefined)
+      organization = table; organizationJoin = condition
+      return chain
+    },
+    where: (condition: SQL) => {
+      assert.ok(source && member && organization && memberJoin && organizationJoin)
+      const query = new QueryBuilder().select(projection as SelectedFields).from(source)
+        .innerJoin(member, memberJoin).leftJoin(organization, organizationJoin).where(condition)
+      return { orderBy: async (order: SQL) => {
+        const compiled = query.orderBy(order).toSQL()
+        let actualSql = compiled.sql
+        // Expand only these three declaration/qualifier pairs. The complete
+        // statement below still rejects a wrong base table, column or binding.
+        for (const [table, name] of [['mikka_workspaces', 'w'], ['mikka_workspace_members', 'm'], ['mikka_organization_workspaces', 'o']]) {
+          actualSql = actualSql.replaceAll('"' + table + '" "' + name + '"', '"' + table + '"')
+            .replaceAll('"' + name + '".', '"' + table + '".')
+        }
+        assert.equal(actualSql, expectedMembershipSql)
+        assert.deepEqual(compiled.params, [issue.userId, 'active', issue.workspaceId, 'team', 'personal', issue.userId])
+        // This active Shared fixture is not linked to an Organization. Keep
+        // the real Enterprise filter in the call path with its SQL NULL link.
+        return [{ id: issue.workspaceId, kind: 'team', organizationId: null }]
+      } }
+    },
+  }
   return chain
 } }
 const globals=globalThis as typeof globalThis & {linearTargetProbe:{tx:unknown;workspace:typeof workspace}}

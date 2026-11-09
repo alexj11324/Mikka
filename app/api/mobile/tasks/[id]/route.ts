@@ -16,8 +16,9 @@ async function handleGET(request: Request, { params }: { params: Promise<{ id: s
   const id = z.uuid().safeParse((await params).id)
   if (!id.success) return json({ error: 'issueNotFound' }, 404)
   try {
-    const { workspace } = await loadWorkspaceContext(undefined, user)
-    const detail = await mobileTask(user, id.data, workspaceSelection(request.headers).present ? workspace.id : undefined)
+    const selectedWorkspaceId = workspaceSelection(request.headers).present
+      ? (await loadWorkspaceContext(undefined, user)).workspace.id : undefined
+    const detail = await mobileTask(user, id.data, selectedWorkspaceId)
     return detail ? json(detail) : json({ error: 'issueNotFound' }, 404)
   } catch (error) {
     if (error instanceof WorkspaceError || (error instanceof ActionFailureError && ['issueNotFound', 'workspaceAccessDenied'].includes(error.code)))

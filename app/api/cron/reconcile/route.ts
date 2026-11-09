@@ -1,3 +1,4 @@
+import { withRecoveryCronAuthority } from '@/lib/enterprise/execution-authority'
 import { cronUnauthorized } from '@/lib/cron-auth'
 import { afterJob, cronJob } from '@/lib/background'
 import { pool } from '@/lib/db'
@@ -44,7 +45,7 @@ async function handleGET(request: Request) {
       await armDueTimer('audit-retention')
     }
     if (due.recovery) {
-      counts.recoveryCounts = await (await import('@/lib/run-recovery')).recoverRuns(work => afterJob('cron:reconcile/group-turns', work))
+      counts.recoveryCounts = await withRecoveryCronAuthority(request, async () => (await import('@/lib/run-recovery')).recoverRuns(work => afterJob('cron:reconcile/group-turns', () => withRecoveryCronAuthority(request, work))))
       await armDueTimer('run-recovery')
     }
     if (due.pushReceipts) counts.pushReceiptCounts = await (await import('@/lib/mobile-push-delivery')).recoverPhonePushReceipts()

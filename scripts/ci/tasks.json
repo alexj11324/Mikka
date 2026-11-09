@@ -430,5 +430,10 @@
     "command": "pnpm test:factory-activity",
     "kind": "integration",
     "env": {}
+  },
+  "core-governance": {
+    "command": "pnpm test:governance",
+    "kind": "core",
+    "env": {}
   }
 }

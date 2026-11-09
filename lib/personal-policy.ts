@@ -4,6 +4,7 @@ import { runChanged } from './live/panels'
 import { runListChanged } from './live/lists'
 import { runControlChanged } from './device-gateway-notify'
 import { armDueTimerAfterCommit } from './due-timer'
+import { organizationResourceAllowed, workspaceResourcePolicy, assertOrganizationResourceShare } from './governance/resource-access'
 
 /**
  * Decision 2026-11-01-2240: a person's own subscriptions and API keys always run
@@ -16,6 +17,7 @@ type Query = Pick<Pool | PoolClient, 'query'>
 
 /** The admin switch over other members' use; an absent row means on. It never limits the owner's own use. */
 export async function memberSubscriptionsAllowed(query: Query, workspaceId: string): Promise<boolean> {
+  if ((await workspaceResourcePolicy(workspaceId)).modelCredentialSharing === 'deny') return false
   const { rows: [row] } = await query.query<{ subscriptions: boolean }>('SELECT subscriptions FROM workspace_personal_policies WHERE "workspaceId"=$1', [workspaceId])
   return row?.subscriptions ?? true
 }
@@ -26,7 +28,7 @@ export async function othersMayUse(query: Query, ownerId: string, workspaceId: s
     SELECT 1 FROM workspace_personal_policies p WHERE p."workspaceId"=$2 AND NOT p.subscriptions
   ) ELSE false END AS "allowOthers" FROM workspace_subscription_shares sh
     WHERE sh."ownerId"=$1 AND sh."workspaceId"=$2`, [ownerId, workspaceId])
-  return Boolean(row?.allowOthers)
+  return Boolean(row?.allowOthers) && await organizationResourceAllowed(workspaceId, 'subscription', ownerId, ownerId)
 }
 
 /**
@@ -34,8 +36,12 @@ export async function othersMayUse(query: Query, ownerId: string, workspaceId: s
  * share first: the deterministic order a bot without its own subscription uses.
  */
 export async function pooledOwners(query: Query, runOwnerId: string, workspaceId: string): Promise<string[]> {
-  if (!(await memberSubscriptionsAllowed(query, workspaceId))) return []
-  return (await query.query<{ ownerId: string }>('SELECT "ownerId" FROM workspace_subscription_shares WHERE "workspaceId"=$1 AND "allowOthers" AND "ownerId"<>$2 ORDER BY "createdAt","ownerId"', [workspaceId, runOwnerId])).rows.map(row => row.ownerId)
+  const owners = (await query.query<{ ownerId: string }>('SELECT "ownerId" FROM workspace_subscription_shares WHERE "workspaceId"=$1 AND "allowOthers" AND "ownerId"<>$2 ORDER BY "createdAt","ownerId"', [workspaceId, runOwnerId])).rows.map(row => row.ownerId)
+  // No borrowed source means no sharing decision. Actual lenders still pass
+  // the current Workspace policy and each Organization approval below.
+  if (!owners.length || !(await memberSubscriptionsAllowed(query, workspaceId))) return []
+  const allowed = await Promise.all(owners.map(ownerId => organizationResourceAllowed(workspaceId, 'subscription', ownerId, ownerId)))
+  return owners.filter((_, index) => allowed[index])
 }
 
 /**
@@ -49,6 +55,7 @@ export async function setSubscriptionShare(query: Query, ownerId: string, worksp
     await stopRunsUsingSubscriptions(query, { ownerId, workspaceId, othersOnly: true })
     return
   }
+  if (allowOthers === true) await assertOrganizationResourceShare(workspaceId, 'subscription', ownerId, ownerId)
   await query.query(`INSERT INTO workspace_subscription_shares ("ownerId","workspaceId","allowOthers") VALUES ($1,$2,COALESCE($3::boolean,false))
     ON CONFLICT ("ownerId","workspaceId") DO UPDATE SET "allowOthers"=COALESCE($3::boolean,workspace_subscription_shares."allowOthers")`, [ownerId, workspaceId, allowOthers ?? null])
   if (allowOthers === false) await stopRunsUsingSubscriptions(query, { ownerId, workspaceId, othersOnly: true })
