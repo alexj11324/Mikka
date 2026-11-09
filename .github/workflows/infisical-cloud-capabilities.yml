@@ -523,3 +523,91 @@ jobs:
           retention-days: 14
 
 # Final-source acceptance remains unpublished until both PR releases complete.
+
+
+  cleanup-root-delivery-receipts:
+    if: >-
+      github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
+      github.repository_owner_id == '183887963' && github.actor == 'alexj11324' &&
+      github.event_name == 'push' && github.ref == 'refs/heads/ops/infisical-cloud-capabilities' &&
+      github.run_attempt == 1 &&
+      startsWith(github.event.head_commit.message, 'ops: inspect private cloud production subscriptions final cleanup existing receipts')
+    permissions:
+      contents: write
+      pull-requests: read
+      actions: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Verify the original delivery receipts and reclaim only their exact stopped branches
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          import { mkdir,writeFile } from 'node:fs/promises'
+          const need=(v,c)=>{if(!v)throw Error('OWNED_DELIVERY_'+c)}
+          const repo='alexj11324/Mikka',originalRun=42561752062
+          async function api(path,method='GET'){
+            const r=await fetch('https://api.github.com/repos/'+repo+'/'+path,{method,redirect:'error',signal:AbortSignal.timeout(20000),
+              headers:{authorization:'Bearer '+process.env.GITHUB_TOKEN,accept:'application/vnd.github+json'}})
+            if(r.status===404){await r.body?.cancel();return null}
+            need(r.ok,'HTTP_'+r.status)
+            return r.status===204?true:r.json()
+          }
+          const run=await api('actions/runs/'+originalRun)
+          need(run.head_sha==='4ad50f96b509a4cc88073e27d0dce21e5983a242'&&run.status==='completed'&&run.conclusion==='failure','ORIGINAL_RUN')
+          const job=await api('actions/jobs/128979483613')
+          need(job.status==='completed'&&job.steps?.some(s=>s.name==="Independently reclaim only this run's access folder and machines"&&s.conclusion==='success'),'ACCOUNT_CLEANUP')
+          const cases=[
+            {pr:1801,harness:'claude_code',issue:'1424c8c7-5f68-4110-a4a9-ae2f7a7c6750',head:'c6c9ed380aaef08325afa098519c2900d490b8e1',ref:'mikka/alex-1',
+              path:'docs/acceptance/self-hosted-batch/42561752062-claude.md',blob:'6dff1c57a31feef22f93cff9091285a49e2844ab'},
+            {pr:1802,harness:'codex',issue:'47befc6c-88e5-446d-9487-2bd1cdf68450',head:'03fae63550356f49ff1e68b64fc5b1b60598ad67',ref:'acceptance/selfhost-42561752062-codex',
+              path:'docs/acceptance/self-hosted-batch/42561752062-codex.md',blob:'d2394065a7284e680824e1b6dfa455dd71d73fcb'}
+          ]
+          const receipts=[]
+          for(const c of cases){
+            const p=await api('pulls/'+c.pr),files=await api('pulls/'+c.pr+'/files?per_page=100')
+            need(p?.state==='closed'&&!p.merged&&p.draft===true&&p.user?.login==='mikka-github[bot]'&&p.head?.sha===c.head&&p.head.ref===c.ref
+              &&p.head.repo?.full_name===repo&&p.base?.repo?.full_name===repo&&p.base.ref==='main'&&p.body?.includes('mikka-issue:'+c.issue),'PR_SCOPE')
+            need(Date.parse(p.created_at)>=Date.parse('2026-11-09T04:26:37Z')&&Date.parse(p.created_at)<=Date.parse('2026-11-09T04:33:05Z'),'PR_TIME')
+            need(files?.length===1&&files[0].filename===c.path&&files[0].sha===c.blob&&files[0].status==='added'&&files[0].deletions===0,'ONE_OWN_FILE')
+            const commit=await api('commits/'+c.head)
+            need(commit.parents?.length===1&&commit.parents[0].sha==='d72a1982bf503b34ad4bc31ab6211cfe018af483'
+              &&commit.files?.length===1&&commit.files[0].filename===c.path,'COMMIT_SCOPE')
+            receipts.push({...c,createdAt:p.created_at,closedAt:p.closed_at,closed:true,merged:false,externalDeliveryReceiptVerified:true})
+          }
+          const refs=[
+            {branch:'acceptance/selfhost-42561752062-claude',sha:'c6c9ed380aaef08325afa098519c2900d490b8e1'},
+            {branch:'acceptance/selfhost-42561752062-codex',sha:'03fae63550356f49ff1e68b64fc5b1b60598ad67'},
+            {branch:'mikka/alex-1',sha:'c6c9ed380aaef08325afa098519c2900d490b8e1'}
+          ]
+          for(const ref of refs){
+            const current=await api('git/ref/heads/'+ref.branch)
+            if(current){
+              need(current.ref==='refs/heads/'+ref.branch&&current.object?.sha===ref.sha,'MOVED_BRANCH')
+              need(await api('git/refs/heads/'+ref.branch,'DELETE')===true,'DELETE_BRANCH')
+            }
+            need(await api('git/ref/heads/'+ref.branch)===null,'BRANCH_REMAINS')
+            ref.absentConfirmed=true
+          }
+          const report={schemaVersion:1,originalRun,cleanupRun:process.env.GITHUB_RUN_ID,driverRevision:process.env.GITHUB_SHA,
+            originalWorkflowStatus:'failure',scope:'independent_clone_push_pull_request_receipts_and_owned_cleanup',
+            receipts,branches:refs,status:'passed',fullFactoryAcceptanceClaimed:false,modelsDispatchedByCleanup:0,observedAt:new Date().toISOString()}
+          await mkdir('.artifacts',{recursive:true})
+          await writeFile('.artifacts/root-native-delivery-cleanup.json',JSON.stringify(report,null,2)+'\n')
+          console.log(JSON.stringify(report))
+          JS
+      - name: Retain the exact public receipt and branch absence checks
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: root-native-delivery-cleanup-${{ github.run_id }}
+          path: .artifacts/root-native-delivery-cleanup.json
+          if-no-files-found: warn
+          retention-days: 14
