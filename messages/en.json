@@ -5674,6 +5674,11 @@
     "appsNote": "Apps you've connected. Bots can use them only while they're on.",
     "addMore": "Add in Plugins",
     "emptyNote": "Apps you connect in Plugins, such as GitHub, Linear or Slack, appear here.",
+    "tabAll": "All",
+    "tabConnected": "Connected",
+    "tabAvailable": "Available",
+    "connectApp": "Connect {name}",
+    "turnOff": "Turn off {name}",
     "state": {
       "on": "On",
       "off": "Turned off",

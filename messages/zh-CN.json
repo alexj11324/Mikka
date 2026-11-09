@@ -5674,6 +5674,11 @@
     "appsNote": "你已连接的应用。Bot 只能在你开启时使用它们。",
     "addMore": "在插件中添加",
     "emptyNote": "在插件中连接 GitHub、Linear、Slack 等应用后，会在这里出现。",
+    "tabAll": "全部",
+    "tabConnected": "已连接",
+    "tabAvailable": "未连接",
+    "connectApp": "连接 {name}",
+    "turnOff": "停用 {name}",
     "state": {
       "on": "已开启",
       "off": "已停用",
