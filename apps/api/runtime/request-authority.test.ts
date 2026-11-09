@@ -195,12 +195,14 @@ test('deployment-local Workflow ingress retains its own HTTPS URL, raw body and 
   }
 })
 
-test('legacy domain remains a fixed redirect without reaching application data', { timeout: 10_000 }, async () => {
+test('legacy domain permanently redirects to the marketing homepage without reaching application data', { timeout: 10_000 }, async () => {
   let invoked = false
   await withHttpApplication({ fetch: withVercelRequestAuthority(() => { invoked = true; return new Response('unreachable') }, { origin: 'https://app.aspectlylabs.com', legacyHost: 'mikka.aspectlylabs.com' }) }, async send => {
-    const result = await send({ host: 'mikka.aspectlylabs.com', 'x-forwarded-host': 'mikka.aspectlylabs.com', origin: undefined }, '/settings?section=account')
-    assert.equal(result.status, 308)
-    assert.equal(result.headers.location, 'https://app.aspectlylabs.com/mikka/settings?section=account')
+    for (const path of ['/', '/settings?section=account', '/mikka/api/auth/callback?code=private', '/nested/']) {
+      const result = await send({ host: 'mikka.aspectlylabs.com', 'x-forwarded-host': 'mikka.aspectlylabs.com', origin: undefined }, path)
+      assert.equal(result.status, 301, path)
+      assert.equal(result.headers.location, 'https://aspectlylabs.com/mikka', path)
+    }
     assert.equal(invoked, false)
   })
 })
