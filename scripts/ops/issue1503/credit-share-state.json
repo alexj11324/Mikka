@@ -2,13 +2,17 @@
   "version": 1,
   "issue": 1503,
   "phase": "credit_share_setup",
+  "setupOnly": true,
   "workspaceId": "93f38d33-9447-4eaf-8a46-0d8889165bcd",
   "ownerUserId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
   "smokeUserId": "cL1NXe1mr7WuIS8xWhU37v0p7kNoUMY3",
   "payerWorkspaceId": "ed898131-d8ea-4734-8e83-9ee2cdfe9206",
-  "startedAt": "2026-11-06T20:08:32.776Z",
+  "startedAt": "2026-11-09T10:59:45.137Z",
   "status": "passed",
   "changed": true,
+  "operatorSha": "1f5ade3bf9039f25342c6593d437fae8d1e84023",
+  "marker": "42605234008-1",
+  "productionBuild": "a2198c8c2f608f7b8169329b9da853067618dba6",
   "payerBefore": {
     "verified": true,
     "positiveBudget": true
@@ -20,7 +24,7 @@
   "after": {
     "mine": true,
     "canShare": true,
-    "sharedAt": "2026-11-06 20:08:33.185314+00"
+    "sharedAt": "2026-11-09 10:59:46.21072+00"
   },
   "sharedPayer": {
     "workspaceId": "ed898131-d8ea-4734-8e83-9ee2cdfe9206",
@@ -28,16 +32,6 @@
     "verified": true,
     "positiveBudget": true
   },
-  "retry": {
-    "requested": true,
-    "queued": true,
-    "botId": "3d3ffb5c-bd4c-4a83-9f31-481d7815a78b",
-    "taskId": "caaaed63-8648-49b0-b17b-ff45c005876b",
-    "issueId": "bf272b85-2430-4546-9038-8f3bc6998a5e",
-    "succeededRunId": "9f49787a-a5e4-437f-8432-c594c713a18e",
-    "source": "normal_retry_coordinator_turn_rpc",
-    "build": "2960d783f0196fed5375593d910a43430a101747"
-  },
-  "stage": "normal_smoke_retry",
-  "completedAt": "2026-11-06T20:08:35.158Z"
+  "stage": "complete",
+  "completedAt": "2026-11-09T10:59:46.966Z"
 }
