@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "kind": "independent-profile404-finding-closure",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pr": 1799,
+  "preparedAtUTC": "2026-11-09T10:28:46.267Z",
+  "previousReviewBlob": "6936de80c51c2091d3da0e20c59684cc1bdc28c5",
+  "finding": "driver-profile-missing-404-confuses-workspace-refusal",
+  "status": "closed-for-exact-reviewed-candidate",
+  "source": {
+    "driver": {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "bytes": 64090,
+      "sha256": "7fa1c032cb0d9b7c5a88c6262b559368445866691796b001648a95efea856950",
+      "gitBlob": "002b8501cd4f4df023148515add7c55e2863dbd3"
+    },
+    "tests": {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "bytes": 81045,
+      "sha256": "b488d49afd89b833298d685dbb468a2520451a5be6f10711b7bdb76d66d5168a",
+      "gitBlob": "aab0a21c4c8fadb9df81ff87ada4fa23198fa575"
+    },
+    "executionEvidenceIndex": {
+      "bytes": 4988,
+      "sha256": "c6132adeca560daf435b51de668f21e2d74ea0eb7e34788684d5e233564cfdaa",
+      "gitBlob": "951913035796cbedcda6265779f5b34383c24793"
+    }
+  },
+  "verifiedDelta": {
+    "entireDriverEqualsPreviousAfterOnlyDeclaredReplacement": true,
+    "replacement": "Parse response JSON first; missing is true only for options.missing && HTTP404 && value?.error === 'agentProfileNotFound'.",
+    "old51TestFileIsExactCompleteBytePrefix": true,
+    "priorTestBlob": "9d1c1c6614dd687a0939c05f2625a813cb6dae62",
+    "originalWorkspaceScanRoutingAndCleanupGuardsUnchanged": true
+  },
+  "behaviorReview": {
+    "newCases": 12,
+    "negativeCases": 10,
+    "positiveCases": 2,
+    "negativeMatrix": {
+      "responses": [
+        "factoryNotFound",
+        "agentProfileScopeNotFound",
+        "unknown string",
+        "nested {code:'agentProfileNotFound'}",
+        "malformed JSON"
+      ],
+      "contexts": [
+        "preflight single-profile GET",
+        "cleanup single-profile GET after profile creation, accepted task and machine end requests"
+      ]
+    },
+    "preflightAssertions": [
+      "blocked/http_refused404",
+      "one matching Personal header/query call",
+      "no profile creation",
+      "no submission",
+      "session closed"
+    ],
+    "cleanupAssertions": [
+      "blocked/cleanup_incomplete",
+      "prior acceptanceStatus runtime_verified is retained separately",
+      "ownRunsStopped=true",
+      "ownMachinesEnded=true",
+      "profileArchived=false",
+      "modelRestored=true",
+      "profile remains enabled/unarchived",
+      "no DELETE",
+      "no implicit-scope retry",
+      "session closed"
+    ],
+    "positives": [
+      "Exact authorized agentProfileNotFound404 permits normal read-only ready preflight",
+      "Exact authorized agentProfileNotFound404 permits cleanup absence without DELETE retry"
+    ],
+    "sourceContract": "Matches previously read P061 closed response codes: only already-authorized readProfileRow absence produces agentProfileNotFound; workspace and profile-scope refusals remain errors.",
+    "remainingFinding": null
+  },
+  "executionEvidence": {
+    "authorIndex": {
+      "oldDriverNewTests": {
+        "tests": 12,
+        "pass": 2,
+        "fail": 10,
+        "skip": 0,
+        "exitCode": 1
+      },
+      "candidateFullSuite": {
+        "tests": 63,
+        "pass": 63,
+        "fail": 0,
+        "skip": 0,
+        "exitCode": 0
+      },
+      "prior51TestFileUnchangedPrefix": true,
+      "strictPatchForwardReverseAndBytes": true
+    },
+    "redReceipt": {
+      "blob": "54b422beeb23886dcf9b1bbba86da8a33f8ff4e6",
+      "exitCode": 1,
+      "driverSha256": "bc541dfafa4d45375ed44fd85d6fd443386e519608443bd1d158ab62949e1892",
+      "testSha256": "b488d49afd89b833298d685dbb468a2520451a5be6f10711b7bdb76d66d5168a"
+    },
+    "greenReceipt": {
+      "blob": "d68697df1c705d700b5801f6efa9174eb2fd959b",
+      "exitCode": 0,
+      "driverSha256": "7fa1c032cb0d9b7c5a88c6262b559368445866691796b001648a95efea856950",
+      "testSha256": "b488d49afd89b833298d685dbb468a2520451a5be6f10711b7bdb76d66d5168a"
+    },
+    "bothReceiptHashesIndependentlyVerified": true,
+    "exactFinalTestsUsedForRedAndGreen": true,
+    "reviewerTestsRun": 0,
+    "originalTAPNotRedownloaded": true,
+    "qualification": "Counts2PASS/10FAIL and63/63 are the author's immutable index results. Independently read execution receipts verify commands, exit codes and exact source hashes; source behavior and assertions independently reviewed."
+  },
+  "limits": [
+    "Closes this one driver error-interpretation finding for002b/aab; no claim of real P0 server, PG or production acceptance.",
+    "Existing non-atomic32-workspace/199-row/30-day/30-second scan boundaries from the prior review remain.",
+    "Author cleanup index reports134989ms VM stopped/deleted and exact404; this reviewer created no resource and did not repeat cleanup API reads."
+  ],
+  "operations": {
+    "sourceWrites": 0,
+    "refUpdates": 0,
+    "testsRun": 0,
+    "resourcesCreated": 0,
+    "productionCalls": 0,
+    "models": 0,
+    "backgroundPolling": false
+  }
+}

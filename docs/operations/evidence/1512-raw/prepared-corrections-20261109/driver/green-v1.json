@@ -1,0 +1,16 @@
+{
+  "label": "green-v1",
+  "exitCode": 0,
+  "bytes": 13311,
+  "durationMs": 1252,
+  "command": [
+    "/vercel/driver-workspace/tools/node-v24.22.2-linux-x64/bin/node",
+    "--test",
+    "--test-reporter=tap",
+    "scripts/acceptance/run-observability.test.mjs"
+  ],
+  "files": {
+    "scripts/acceptance/run-observability.mjs": "bc541dfafa4d45375ed44fd85d6fd443386e519608443bd1d158ab62949e1892",
+    "scripts/acceptance/run-observability.test.mjs": "94cdc3b58b30cc0804b4a34478713c0fca85511aa83385ca8768641cffd4cb90"
+  }
+}

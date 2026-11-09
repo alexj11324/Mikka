@@ -1,0 +1,756 @@
+{
+  "schemaVersion": 1,
+  "kind": "read-only-pure-credential-scope-fix-review",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequest": 1799,
+  "peerPullRequest": 1810,
+  "preparedAtUTC": "2026-11-09T09:49:09.919Z",
+  "identity": {
+    "pureHead": "30e54e5f9e97ed059bb9121edeeb20fa2578e286",
+    "pureTree": "2fa4d7e09a90e7a75151e9ae4065245b391ea366",
+    "parents": [
+      "01b302385666dc5b7a1535a335ef1d953c5d12b8"
+    ],
+    "targetCandidate": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+    "targetTree": "3e09885ffb34a9c04fc8a7ac5b8b88e3415f7325",
+    "changedFiles": 11,
+    "additions": 173,
+    "deletions": 4,
+    "metadataEndpointsAgree": true,
+    "providerPatchBundle": {
+      "format": "Exact GitHub REST per-file patch fields in stable JSON order, not the owner's independently produced git diff bytes.",
+      "bytes": 19230,
+      "sha256": "0d8e96f93da46637f7ca4dc9108218bc5dd25fc29a6472fb30e2b5c0e703d950"
+    }
+  },
+  "publicUpdates": {
+    "accepted": {
+      "commentId": 6736515248,
+      "createdAtUTC": "2026-11-09T09:20:39Z",
+      "url": "https://github.com/alexj11324/Mikka/pull/1810#issuecomment-6736515248"
+    },
+    "published": {
+      "commentId": 6736905024,
+      "createdAtUTC": "2026-11-09T09:41:43Z",
+      "url": "https://github.com/alexj11324/Mikka/pull/1810#issuecomment-6736905024"
+    },
+    "peerBranchAtInitialRead": {
+      "head": "b87a1e3a7dc9490528d2a06cfdceb4fa38ecee10",
+      "merged": false,
+      "observedAtUTC": "2026-11-09T09:43:59.871Z"
+    },
+    "executionReceiptRequest": {
+      "commentId": 6736991592,
+      "url": "https://github.com/alexj11324/Mikka/pull/1810#issuecomment-6736991592",
+      "source": "root reported request; this reviewer did not fetch or post it"
+    }
+  },
+  "sourceConclusion": {
+    "findings": [],
+    "noSourceBlockerForExactElevenFileDelta": true,
+    "earlierAutomaticWriterTokenPathsRemoved": true,
+    "wholePRMergeDecision": "Not issued by this source review. #1810 branch read is still b87; future combined source and execution evidence remain distinct.",
+    "noProductionAcceptanceClaim": true
+  },
+  "credentialBoundary": {
+    "sharedAction": {
+      "input": "ffmpeg-github-token",
+      "required": false,
+      "default": "",
+      "installEnvironmentSource": "${{ inputs.ffmpeg-github-token }}",
+      "implicitGithubTokenFallback": false,
+      "ambientLegacyTokenOverridden": true,
+      "installCommandUnchanged": "pnpm install --frozen-lockfile"
+    },
+    "knownCallers": {
+      "total": 18,
+      "explicitReadToken": 16,
+      "anonymousWriteToken": 2,
+      "classification": "Effective job permissions override workflow permissions; id-token:write is separately preserved as OIDC and is not counted as GitHub API write.",
+      "callsites": [
+        {
+          "path": ".github/workflows/issue1415-deployed-production.yml",
+          "job": "acceptance",
+          "callLine": 45,
+          "rootPermissions": "permissions:\n  contents: read\n",
+          "jobPermissions": "    permissions:\n      contents: read\n      actions: read\n      issues: read\n      id-token: write",
+          "effectivePermissionSource": "job",
+          "input": "ffmpeg-github-token: ${{ github.token }}",
+          "jobIf": [
+            {
+              "line": 29,
+              "text": "    if: >-"
+            }
+          ],
+          "effectivePermissions": {
+            "contents": "read",
+            "actions": "read",
+            "issues": "read",
+            "id-token": "write"
+          }
+        },
+        {
+          "path": ".github/workflows/issue1415-managed-inspection.yml",
+          "job": "inspect",
+          "callLine": 40,
+          "rootPermissions": "permissions:\n  contents: read\n",
+          "jobPermissions": "    permissions:\n      contents: read\n      actions: read\n      issues: read\n      id-token: write",
+          "effectivePermissionSource": "job",
+          "input": "ffmpeg-github-token: ${{ github.token }}",
+          "jobIf": [
+            {
+              "line": 20,
+              "text": "    if: >-"
+            }
+          ],
+          "effectivePermissions": {
+            "contents": "read",
+            "actions": "read",
+            "issues": "read",
+            "id-token": "write"
+          }
+        },
+        {
+          "path": ".github/workflows/issues-1516-welcome-acceptance.yml",
+          "job": "recovery-contract",
+          "callLine": 27,
+          "rootPermissions": "permissions:\n  contents: read",
+          "jobPermissions": null,
+          "effectivePermissionSource": "workflow",
+          "input": "ffmpeg-github-token: ${{ github.token }}",
+          "jobIf": [
+            {
+              "line": 19,
+              "text": "    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1515-1517-acceptance'"
+            }
+          ],
+          "effectivePermissions": {
+            "contents": "read"
+          }
+        },
+        {
+          "path": ".github/workflows/issues-1516-welcome-acceptance.yml",
+          "job": "preflight",
+          "callLine": 59,
+          "rootPermissions": "permissions:\n  contents: read",
+          "jobPermissions": "    permissions:\n      contents: read\n      id-token: write",
+          "effectivePermissionSource": "job",
+          "input": "ffmpeg-github-token: ${{ github.token }}",
+          "jobIf": [
+            {
+              "line": 49,
+              "text": "    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1515-1517-acceptance'"
+            }
+          ],
+          "effectivePermissions": {
+            "contents": "read",
+            "id-token": "write"
+          }
+        },
+        {
+          "path": ".github/workflows/read-cache-production.yml",
+          "job": "guards",
+          "callLine": 44,
+          "rootPermissions": "permissions:\n  contents: read\n",
+          "jobPermissions": "    permissions:\n      contents: read\n      issues: read",
+          "effectivePermissionSource": "job",
+          "input": "ffmpeg-github-token: ${{ github.token }}",
+          "jobIf": [
+            {
+              "line": 37,
+              "text": "    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_sha == github.sha)"
+            }
+          ],
+          "effectivePermissions": {
+            "contents": "read",
+            "issues": "read"
+          }
+        },
+        {
+          "path": ".github/workflows/read-cache-production.yml",
+          "job": "acceptance",
+          "callLine": 88,
+          "rootPermissions": "permissions:\n  contents: read\n",
+          "jobPermissions": "    permissions:\n      contents: read\n      actions: read\n      issues: read\n      id-token: write",
+          "effectivePermissionSource": "job",
+          "input": "ffmpeg-github-token: ${{ github.token }}",
+          "jobIf": [
+            {
+              "line": 70,
+              "text": "    if: >-"
+            }
+          ],
+          "effectivePermissions": {
+            "contents": "read",
+            "actions": "read",
+            "issues": "read",
+            "id-token": "write"
+          }
+        },
+        {
+          "path": ".github/workflows/read-cache-production.yml",
+          "job": "workflow-migration",
+          "callLine": 158,
+          "rootPermissions": "permissions:\n  contents: read\n",
+          "jobPermissions": "    permissions:\n      contents: read\n      actions: read\n      issues: read\n      id-token: write",
+          "effectivePermissionSource": "job",
+          "input": "ffmpeg-github-token: ${{ github.token }}",
+          "jobIf": [
+            {
+              "line": 140,
+              "text": "    if: >-"
+            }
+          ],
+          "effectivePermissions": {
+            "contents": "read",
+            "actions": "read",
+            "issues": "read",
+            "id-token": "write"
+          }
+        },
+        {
+          "path": ".github/workflows/read-cache.yml",
+          "job": "read-cache",
+          "callLine": 78,
+          "rootPermissions": "permissions:\n  contents: read\n",
+          "jobPermissions": null,
+          "effectivePermissionSource": "workflow",
+          "input": "ffmpeg-github-token: ${{ github.token }}",
+          "jobIf": [],
+          "effectivePermissions": {
+            "contents": "read"
+          }
+        },
+        {
+          "path": ".github/workflows/self-hosted-image.yml",
+          "job": "image",
+          "callLine": 68,
+          "rootPermissions": "permissions:\n  contents: read",
+          "jobPermissions": "    permissions:\n      contents: read\n      packages: write",
+          "effectivePermissionSource": "job",
+          "input": null,
+          "jobIf": [
+            {
+              "line": 18,
+              "text": "    if: needs.changes.outputs.image == 'true'"
+            }
+          ],
+          "effectivePermissions": {
+            "contents": "read",
+            "packages": "write"
+          }
+        },
+        {
+          "path": ".github/workflows/self-hosted-production.yml",
+          "job": "guards",
+          "callLine": 32,
+          "rootPermissions": "permissions:\n  contents: read\n",
+          "jobPermissions": null,
+          "effectivePermissionSource": "workflow",
+          "input": "ffmpeg-github-token: ${{ github.token }}",
+          "jobIf": [
+            {
+              "line": 25,
+              "text": "    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_sha == github.sha)"
+            }
+          ],
+          "effectivePermissions": {
+            "contents": "read"
+          }
+        },
+        {
+          "path": ".github/workflows/self-hosted-production.yml",
+          "job": "acceptance",
+          "callLine": 59,
+          "rootPermissions": "permissions:\n  contents: read\n",
+          "jobPermissions": "    permissions:\n      contents: read\n      actions: read\n      issues: read\n      id-token: write",
+          "effectivePermissionSource": "job",
+          "input": "ffmpeg-github-token: ${{ github.token }}",
+          "jobIf": [
+            {
+              "line": 40,
+              "text": "    if: >-"
+            }
+          ],
+          "effectivePermissions": {
+            "contents": "read",
+            "actions": "read",
+            "issues": "read",
+            "id-token": "write"
+          }
+        },
+        {
+          "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+          "job": "acceptance",
+          "callLine": 126,
+          "rootPermissions": "permissions:\n  contents: read",
+          "jobPermissions": "    permissions:\n      contents: read\n      actions: read\n      id-token: write",
+          "effectivePermissionSource": "job",
+          "input": "ffmpeg-github-token: ${{ github.token }}",
+          "jobIf": [
+            {
+              "line": 92,
+              "text": "    if: needs.authorize.outputs.selected == 'true'"
+            }
+          ],
+          "effectivePermissions": {
+            "contents": "read",
+            "actions": "read",
+            "id-token": "write"
+          }
+        },
+        {
+          "path": ".github/workflows/ui-policy.yml",
+          "job": "ui-policy-full",
+          "callLine": 99,
+          "rootPermissions": "permissions:\n  contents: read\n",
+          "jobPermissions": null,
+          "effectivePermissionSource": "workflow",
+          "input": "ffmpeg-github-token: ${{ github.token }}",
+          "jobIf": [
+            {
+              "line": 88,
+              "text": "    if: needs.changes.result == 'success' && needs.changes.outputs.core == 'true'"
+            }
+          ],
+          "effectivePermissions": {
+            "contents": "read"
+          }
+        },
+        {
+          "path": ".github/workflows/ui-policy.yml",
+          "job": "ui-policy-integrations",
+          "callLine": 121,
+          "rootPermissions": "permissions:\n  contents: read\n",
+          "jobPermissions": null,
+          "effectivePermissionSource": "workflow",
+          "input": "ffmpeg-github-token: ${{ github.token }}",
+          "jobIf": [
+            {
+              "line": 110,
+              "text": "    if: needs.changes.result == 'success' && needs.changes.outputs.integration == 'true'"
+            }
+          ],
+          "effectivePermissions": {
+            "contents": "read"
+          }
+        },
+        {
+          "path": ".github/workflows/ui-policy.yml",
+          "job": "source-checks",
+          "callLine": 143,
+          "rootPermissions": "permissions:\n  contents: read\n",
+          "jobPermissions": null,
+          "effectivePermissionSource": "workflow",
+          "input": "ffmpeg-github-token: ${{ github.token }}",
+          "jobIf": [
+            {
+              "line": 132,
+              "text": "    if: needs.changes.result == 'success' && needs.changes.outputs.source == 'true'"
+            }
+          ],
+          "effectivePermissions": {
+            "contents": "read"
+          }
+        },
+        {
+          "path": ".github/workflows/ui-policy.yml",
+          "job": "daemon-checks",
+          "callLine": 208,
+          "rootPermissions": "permissions:\n  contents: read\n",
+          "jobPermissions": null,
+          "effectivePermissionSource": "workflow",
+          "input": "ffmpeg-github-token: ${{ github.token }}",
+          "jobIf": [
+            {
+              "line": 197,
+              "text": "    if: needs.changes.result == 'success' && needs.changes.outputs.daemon == 'true'"
+            }
+          ],
+          "effectivePermissions": {
+            "contents": "read"
+          }
+        },
+        {
+          "path": ".github/workflows/ui-policy.yml",
+          "job": "browser-tests-full",
+          "callLine": 349,
+          "rootPermissions": "permissions:\n  contents: read\n",
+          "jobPermissions": null,
+          "effectivePermissionSource": "workflow",
+          "input": "ffmpeg-github-token: ${{ github.token }}",
+          "jobIf": [
+            {
+              "line": 314,
+              "text": "    if: needs.changes.result == 'success' && needs.changes.outputs.db == 'true'"
+            }
+          ],
+          "effectivePermissions": {
+            "contents": "read"
+          }
+        },
+        {
+          "path": ".github/workflows/self-hosting-ui.yml",
+          "job": "screenshots",
+          "callLine": 35,
+          "effectivePermissions": {
+            "contents": "write"
+          },
+          "input": null
+        }
+      ]
+    },
+    "image": {
+      "hostSharedActionOptIn": false,
+      "automaticFfmpegEnvRemoved": true,
+      "automaticDockerSecretFlagRemoved": true,
+      "permissionsUnchanged": {
+        "contents": "read",
+        "packages": "write"
+      },
+      "newSourceExactlyOriginalAnonymousBlob": "3dc64ed2c8d58efdf981036e7bb6362e1bd92077",
+      "publishResponsibilitiesPreserved": true
+    },
+    "screenshots": {
+      "sourceUnchangedFromC0e": true,
+      "writePermissionsPresent": true,
+      "sharedCallCount": 1,
+      "inputMentioned": false,
+      "persistCredentialsFalse": true
+    },
+    "unchangedControls": [
+      {
+        "path": "Dockerfile",
+        "unchangedFromC0e": true,
+        "blob": "19054afe4768b3391515c7a3e0f97a0021f123ee"
+      },
+      {
+        "path": ".github/workflows/web-deploy.yml",
+        "unchangedFromC0e": true,
+        "blob": "bab7ed46eefd7bd4b6db712e8e141484be9f73ba"
+      }
+    ],
+    "remainingScope": "Explicit read token is still available to that opted-in install process tree; this fix eliminates automatic write-token distribution, not all credentials from every CI process. Image host checkout's pre-existing persistence is outside this new environment path. Anonymous image runtime download limits remain operational behavior to observe in normal combined CI."
+  },
+  "compatibility": {
+    "method": "Full-file byte comparison in V8, no checkout or patch application. Reverse only the exact declared additions for eight workflow files and the action. Remove only declared env/secret text from current image. Compare current/parent original test file directly.",
+    "allElevenCompatibleWithC0e": true,
+    "workflowOptinCounts": [
+      1,
+      1,
+      2,
+      3,
+      1,
+      2,
+      1,
+      5
+    ],
+    "workflowOptinTotal": 16,
+    "unrelatedMockOrPerformanceFilesInDelta": 0,
+    "files": [
+      {
+        "path": ".github/workflows/issue1415-deployed-production.yml",
+        "actualCurrentBlob": "8ef902848aba3a2e59ce01608782697ec7f4d14c",
+        "currentEqualsPureBaseAfterOnlyDeclaredAdditionsRemoved": true,
+        "optinsRemoved": 1,
+        "newBlob": "6d0b50becc99ce6d5f6cfb69cceea1037f2ee1be"
+      },
+      {
+        "path": ".github/workflows/issue1415-managed-inspection.yml",
+        "actualCurrentBlob": "0d8cc322ddddb2bada48abff741cf7887b6631b0",
+        "currentEqualsPureBaseAfterOnlyDeclaredAdditionsRemoved": true,
+        "optinsRemoved": 1,
+        "newBlob": "9ece51fc2a39c2d362446e68df1f9bbf2076f641"
+      },
+      {
+        "path": ".github/workflows/issues-1516-welcome-acceptance.yml",
+        "actualCurrentBlob": "74c7dd24872ef8e02ef27d559822fb6440d01c0a",
+        "currentEqualsPureBaseAfterOnlyDeclaredAdditionsRemoved": true,
+        "optinsRemoved": 2,
+        "newBlob": "4757d62065017957f6e1e4300ab4695507ce40d8"
+      },
+      {
+        "path": ".github/workflows/read-cache-production.yml",
+        "actualCurrentBlob": "82b0a711738730df3dcdc5f6e2f07beda4b7c8c1",
+        "currentEqualsPureBaseAfterOnlyDeclaredAdditionsRemoved": true,
+        "optinsRemoved": 3,
+        "newBlob": "7ffa772dc65e85ae6665d7fb70f5d5a3b604da22"
+      },
+      {
+        "path": ".github/workflows/read-cache.yml",
+        "actualCurrentBlob": "54464667276af18611ba083e968ce9f1672fb301",
+        "currentEqualsPureBaseAfterOnlyDeclaredAdditionsRemoved": true,
+        "optinsRemoved": 1,
+        "newBlob": "86ee0112413eae241189bb2d748a6d6901201c4f"
+      },
+      {
+        "path": ".github/workflows/self-hosted-production.yml",
+        "actualCurrentBlob": "77788506cdb928f64b6975483c73c6523c76d483",
+        "currentEqualsPureBaseAfterOnlyDeclaredAdditionsRemoved": true,
+        "optinsRemoved": 2,
+        "newBlob": "862a9f7cdea8df0373207e389f3cbf3afaca46df"
+      },
+      {
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "actualCurrentBlob": "e90d6530e978d638d3040c0daa4ac6dc84b39767",
+        "currentEqualsPureBaseAfterOnlyDeclaredAdditionsRemoved": true,
+        "optinsRemoved": 1,
+        "newBlob": "42ae23945f798020ec068635e7621869fb427af2"
+      },
+      {
+        "path": ".github/workflows/ui-policy.yml",
+        "actualCurrentBlob": "18e7c54ec507d02b12fd1131b5a8b6112ece2212",
+        "currentEqualsPureBaseAfterOnlyDeclaredAdditionsRemoved": true,
+        "optinsRemoved": 5,
+        "newBlob": "e3938ad5c343fb14d60709e014cb3d9a3189b104"
+      },
+      {
+        "path": "tests/mvp/pinned-pnpm.test.mjs",
+        "actualCurrentBlob": "b22b319424ada32e3592f7a6ea464aa49121aad0",
+        "currentEqualsPureBaseAfterOnlyDeclaredAdditionsRemoved": true,
+        "newBlob": "0306d340b38cf455facba376c2eb6dda58362c96"
+      },
+      {
+        "path": ".github/actions/pnpm-install/action.yml",
+        "actualCurrentBlob": "20a5db53847172db9f52ee12c6c0feeec6c48dce",
+        "currentEqualsPureBaseAfterOnlyDeclaredAdditionsRemoved": true,
+        "newBlob": "553d718ad413f0db4b12833e06ffb8f29d98e555"
+      },
+      {
+        "path": ".github/workflows/self-hosted-image.yml",
+        "actualCurrentBlob": "46f05f36960559221030e89e1add41ecdfced3b4",
+        "currentTransformsToNewOnlyByDeclaredCredentialRemoval": true,
+        "newBlob": "3dc64ed2c8d58efdf981036e7bb6362e1bd92077"
+      }
+    ],
+    "scopeLimit": "Use the 01b→30e eleven-file delta. Do not replace the target tree with pure30e's complete tree, which includes its own ancestors."
+  },
+  "testSourceReview": {
+    "path": "tests/mvp/pinned-pnpm.test.mjs",
+    "newBlob": "0306d340b38cf455facba376c2eb6dda58362c96",
+    "baselineBlob": "b22b319424ada32e3592f7a6ea464aa49121aad0",
+    "oldBytes": 4658,
+    "oldSha256": "41ccbaf785d22fb8a39d5833a23be777622599550b2655c7000c6c5ce1a30df4",
+    "originalWholeFilePreservedAsContiguousSubstring": true,
+    "oldTopLevelTests": 8,
+    "newTopLevelTests": 12,
+    "addedTopLevel": 4,
+    "addedChildCases": 10,
+    "expectedNodeTotal": 22,
+    "realLifecycleFixture": {
+      "temporaryPackage": "dependency-free normal package with postinstall",
+      "actualCommand": "pnpm install --frozen-lockfile, resolved with actual pinned pnpm10.34.3",
+      "sourceConfiguration": "Reads the actual composite install command and env; a closed evaluator resolves only its supported GitHub/input expressions.",
+      "networkSettings": [
+        "COREPACK_ENABLE_NETWORK=0",
+        "npm_config_manage_package_manager_versions=false",
+        "npm_config_offline=true"
+      ],
+      "credentials": "synthetic fixture token only",
+      "receipt": "Only {present: Boolean(process.env.FFMPEG_GITHUB_TOKEN)}",
+      "scenarios": [
+        "no optional input => false",
+        "ambient legacy value with no optional input => false",
+        "confirmed read caller explicit input => true"
+      ],
+      "cleanup": "Temporary directory removed by test.after",
+      "limit": "Runs actual local pnpm/postinstall through the fixture; not a claim that this reviewer executed it or ran an entire GitHub composite job."
+    },
+    "configurationGuards": {
+      "actualWorkflowScan": true,
+      "inputDefaultAndRequiredChecked": true,
+      "installEnvMustBeInputExpression": true,
+      "actualImageEnvAndSecretAbsentChecked": true,
+      "cases": [
+        {
+          "case": "workflow read overridden by job contents write",
+          "accepted": false
+        },
+        {
+          "case": "workflow write overridden by job contents read",
+          "accepted": true
+        },
+        {
+          "case": "unknown inherited permissions",
+          "accepted": false
+        },
+        {
+          "case": "write-all",
+          "accepted": false
+        },
+        {
+          "case": "read-all",
+          "accepted": true
+        },
+        {
+          "case": "contents read with separate OIDC id-token write",
+          "accepted": true
+        },
+        {
+          "case": "packages write",
+          "accepted": false
+        },
+        {
+          "case": "explicit empty job permissions overriding workflow read",
+          "accepted": false
+        }
+      ],
+      "everyCaseAlsoAllowsAnonymous": true
+    },
+    "installerBehaviorUntouched": "No edits in 30e to FFmpeg patch/manifest/download tests/lock/Docker optional-secret contract or web/screenshots source. New proof addresses caller process scope rather than reusing installer HTTP success."
+  },
+  "executionEvidence": {
+    "reviewerTestsRun": 0,
+    "reviewerOwnerOriginalLogsRead": 0,
+    "ownerPublicReport": {
+      "sourceComment": 6736905024,
+      "red": {
+        "scopeTests": 14,
+        "pass": 9,
+        "fail": 5,
+        "skipped": 0,
+        "exitCode": 1
+      },
+      "green": {
+        "tests": 22,
+        "pass": 22,
+        "fail": 0,
+        "skipped": 0,
+        "exitCode": 0
+      },
+      "lintAndDiffReportedExitCode": 0,
+      "evidenceDescriptors": [
+        {
+          "name": "SCOPE-SOURCE-REVIEW",
+          "bytes": 122471,
+          "sha256": "2010b1d8b91c5741fb09d8d2e8b0b9db949c63ba2073ebe483777500ae96319c"
+        },
+        {
+          "name": "owner independent review",
+          "bytes": 23496,
+          "sha256": "e442955ffea0452ce1a1a57617ed0f33d55496502d77edcabb1d9e95042870dc"
+        },
+        {
+          "name": "owner full patch",
+          "bytes": 17231,
+          "sha256": "3207f132f9cf4178f6fa5c5b7ff0c5b64cd2dc30e14663d49bf956631c2653dd"
+        }
+      ]
+    },
+    "safeReceiptsIndependentlyRetrieved": false,
+    "limitation": "Owner reported RED/GREEN is attributed; no original execution output or immutable safe execution receipt was available to this reviewer at freeze. No claim of own execution or independent receipt validation."
+  },
+  "sources": [
+    {
+      "path": ".github/actions/pnpm-install/action.yml",
+      "revision": "30e54e5f9e97ed059bb9121edeeb20fa2578e286",
+      "bytes": 1676,
+      "sha256": "a7158d12a9b6025674fc7c01079b30f2ee29475caf0dafc66a68b0611f4b8200",
+      "gitBlob": "553d718ad413f0db4b12833e06ffb8f29d98e555"
+    },
+    {
+      "path": ".github/workflows/issue1415-deployed-production.yml",
+      "revision": "30e54e5f9e97ed059bb9121edeeb20fa2578e286",
+      "bytes": 6734,
+      "sha256": "4647cfb3bc0cd71b8a52ad8add07ab27a9f36e0ce65ec762e195bb514031a880",
+      "gitBlob": "6d0b50becc99ce6d5f6cfb69cceea1037f2ee1be"
+    },
+    {
+      "path": ".github/workflows/issue1415-managed-inspection.yml",
+      "revision": "30e54e5f9e97ed059bb9121edeeb20fa2578e286",
+      "bytes": 2633,
+      "sha256": "83c91b0249a4f4e232b949d1a91f643b64caffbf5d87cad0cd4c477321802a3e",
+      "gitBlob": "9ece51fc2a39c2d362446e68df1f9bbf2076f641"
+    },
+    {
+      "path": ".github/workflows/issues-1516-welcome-acceptance.yml",
+      "revision": "30e54e5f9e97ed059bb9121edeeb20fa2578e286",
+      "bytes": 5054,
+      "sha256": "0e9fdc0063fc7c3c4e3285c7dc941f202c1e1e0b27489f75ffb0061795b430f1",
+      "gitBlob": "4757d62065017957f6e1e4300ab4695507ce40d8"
+    },
+    {
+      "path": ".github/workflows/read-cache-production.yml",
+      "revision": "30e54e5f9e97ed059bb9121edeeb20fa2578e286",
+      "bytes": 9844,
+      "sha256": "c9b737a96718e2c913ed5f6792413aa9ae625c8d0299a3deb1ad178214a5d108",
+      "gitBlob": "7ffa772dc65e85ae6665d7fb70f5d5a3b604da22"
+    },
+    {
+      "path": ".github/workflows/read-cache.yml",
+      "revision": "30e54e5f9e97ed059bb9121edeeb20fa2578e286",
+      "bytes": 4210,
+      "sha256": "66026952e65f631d6844ac86a3a24d5fc6f11b5fd9009c72ae019d1178262bb0",
+      "gitBlob": "86ee0112413eae241189bb2d748a6d6901201c4f"
+    },
+    {
+      "path": ".github/workflows/self-hosted-image.yml",
+      "revision": "30e54e5f9e97ed059bb9121edeeb20fa2578e286",
+      "bytes": 8923,
+      "sha256": "7618e82b4fb3d571a394fe82fc562acd2af422cc772db86c0a2c94ba041af310",
+      "gitBlob": "3dc64ed2c8d58efdf981036e7bb6362e1bd92077"
+    },
+    {
+      "path": ".github/workflows/self-hosted-production.yml",
+      "revision": "30e54e5f9e97ed059bb9121edeeb20fa2578e286",
+      "bytes": 4272,
+      "sha256": "867f1bafcb613fdb6a544b65c0ef2d044899da452f18fc6d054841411f6ccdc5",
+      "gitBlob": "862a9f7cdea8df0373207e389f3cbf3afaca46df"
+    },
+    {
+      "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+      "revision": "30e54e5f9e97ed059bb9121edeeb20fa2578e286",
+      "bytes": 11224,
+      "sha256": "768a2a9cf7edd806ec619e4b5c6fcc32466f7b8814fff94838f93a9eccd37f38",
+      "gitBlob": "42ae23945f798020ec068635e7621869fb427af2"
+    },
+    {
+      "path": ".github/workflows/ui-policy.yml",
+      "revision": "30e54e5f9e97ed059bb9121edeeb20fa2578e286",
+      "bytes": 22943,
+      "sha256": "7da895fd0678b08acb1667bfc92afe7228872e10631b8578aa1a6696316d025c",
+      "gitBlob": "e3938ad5c343fb14d60709e014cb3d9a3189b104"
+    },
+    {
+      "path": "tests/mvp/pinned-pnpm.test.mjs",
+      "revision": "30e54e5f9e97ed059bb9121edeeb20fa2578e286",
+      "bytes": 12270,
+      "sha256": "adefe699f39fadddc3eb6239bb6e7aa42748cef31d5ecb2167d3e8ebf12a7dee",
+      "gitBlob": "0306d340b38cf455facba376c2eb6dda58362c96"
+    },
+    {
+      "path": ".github/workflows/self-hosting-ui.yml",
+      "revision": "30e54e5f9e97ed059bb9121edeeb20fa2578e286",
+      "bytes": 2118,
+      "sha256": "af9b345b4ec19b97a461e14fc63e8ab52287d91d419c1e1aa30cce0b1a1940f5",
+      "gitBlob": "5aa39770c0a4d6166e0088d5e1d84af746b57d58"
+    },
+    {
+      "path": "Dockerfile",
+      "revision": "30e54e5f9e97ed059bb9121edeeb20fa2578e286",
+      "bytes": 2403,
+      "sha256": "a1f0f64ffa44df45b38b669eea0b1b9e59f17c19b9b7382b1b7ded521883f0ee",
+      "gitBlob": "19054afe4768b3391515c7a3e0f97a0021f123ee"
+    },
+    {
+      "path": ".github/workflows/web-deploy.yml",
+      "revision": "30e54e5f9e97ed059bb9121edeeb20fa2578e286",
+      "bytes": 11670,
+      "sha256": "790c964833cd3352a5238a7e58162ab5783ddfa8886c68a25afc521ab8b04a22",
+      "gitBlob": "bab7ed46eefd7bd4b6db712e8e141484be9f73ba"
+    }
+  ],
+  "operations": {
+    "sourceChanges": 0,
+    "refsChanged": 0,
+    "testsRun": 0,
+    "ownerLogsRead": 0,
+    "models": 0,
+    "productionCalls": 0,
+    "resourceCreation": 0,
+    "settingsChanges": 0,
+    "backgroundPolling": false
+  },
+  "nextStep": "Parent may integrate only the exact delta after its own review; use owner-provided immutable safe receipt when available and ordinary combined CI. No competing implementation or retry requested by this reviewer."
+}

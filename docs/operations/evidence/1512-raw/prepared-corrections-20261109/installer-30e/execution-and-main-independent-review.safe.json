@@ -1,0 +1,335 @@
+{
+  "schemaVersion": 1,
+  "kind": "installer-30e-original-evidence-and-main-76df-bounded-review",
+  "inspectedAt": "2026-11-09 10:12:09 UTC",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "method": {
+    "readOnly": true,
+    "noTestsOrInstalls": true,
+    "noVmOrModels": true,
+    "noCiLogsRead": true,
+    "noRefsChanged": true,
+    "existingOriginalsReadFromImmutableEvidence": true
+  },
+  "installer": {
+    "request": "https://github.com/alexj11324/Mikka/pull/1810#issuecomment-6736991592",
+    "ownerSourceAnnouncement": "https://github.com/alexj11324/Mikka/pull/1810#issuecomment-6736905024",
+    "readableEvidenceAnnouncement": "https://github.com/alexj11324/Mikka/pull/1810#issuecomment-6737156979",
+    "pure": {
+      "commit": "30e54e5f9e97ed059bb9121edeeb20fa2578e286",
+      "tree": "2fa4d7e09a90e7a75151e9ae4065245b391ea366",
+      "parents": [
+        "01b302385666dc5b7a1535a335ef1d953c5d12b8"
+      ]
+    },
+    "evidence": {
+      "commit": "07381085c27941b206f28343aeaeffb9e5e6ff6f",
+      "tree": "5fdf4ab26e4348ba2adb3fe40aff7074535b3609",
+      "parents": [
+        "30e54e5f9e97ed059bb9121edeeb20fa2578e286"
+      ],
+      "directory": "docs/operations/evidence/1506-credential-scope-20261109",
+      "filesReadAndHashVerified": [
+        {
+          "path": "source-review.json",
+          "bytes": 122471,
+          "sha256": "2010b1d8b91c5741fb09d8d2e8b0b9db949c63ba2073ebe483777500ae96319c",
+          "gitBlob": "39883579408b63bae12ce84e0083593f6fc29dd0"
+        },
+        {
+          "path": "independent-review.json",
+          "bytes": 23496,
+          "sha256": "e442955ffea0452ce1a1a57617ed0f33d55496502d77edcabb1d9e95042870dc",
+          "gitBlob": "07e6788f3c61731a4219d5013b33e153331ace54"
+        },
+        {
+          "path": "caller-permissions.json",
+          "bytes": 22427,
+          "sha256": "2ce0d726eb8c8510d381d540a36387e2ab067c0c7693ef88ef33209af4fdfea5",
+          "gitBlob": "8be7edc165ababfcff3e792fb6dc7c4ee9e80be8"
+        },
+        {
+          "path": "scope-change.patch",
+          "bytes": 17231,
+          "sha256": "3207f132f9cf4178f6fa5c5b7ff0c5b64cd2dc30e14663d49bf956631c2653dd",
+          "gitBlob": "dcb432850b6fb8f473e3626f7594321ee20a7d02"
+        },
+        {
+          "path": "red.log",
+          "bytes": 5030,
+          "sha256": "74bd5ced4bc2036677a789ad26baa423f1cd28f04d0f3377dfdbf43e72e8c479",
+          "gitBlob": "452874805f4d1184af09dd3d4a0272e0c7a7c776"
+        },
+        {
+          "path": "green.log",
+          "bytes": 1897,
+          "sha256": "b80d562634a1c319f271e4c5cd079c004ff63ac20bee18d459411af8eab94910",
+          "gitBlob": "df0c8478940686a28c9afc4abc8cf36197c204fc"
+        },
+        {
+          "path": "execution-receipts.json",
+          "bytes": 4280,
+          "sha256": "10bd72fb05bd466a1c605570a22777b6eaff7754938cb8b625503303fe2e3611",
+          "gitBlob": "f215296b04f76688ebe6be1de4308bbb4de1671a"
+        },
+        {
+          "path": "README.md",
+          "bytes": 1517,
+          "sha256": "ef0e0cc503e07408c1caf448db934cd3892abe03c3d250bc0849f342759d4220",
+          "gitBlob": "a0ebde2bb80243a75a2b3bc6a642dffb97ad3efa"
+        }
+      ]
+    },
+    "execution": {
+      "red": {
+        "tests": 14,
+        "pass": 9,
+        "fail": 5,
+        "skip": 0,
+        "exitCode": 1,
+        "rawLog": "452874805f4d1184af09dd3d4a0272e0c7a7c776",
+        "actualFailures": "Two nested postinstall default/ambient probes see true when false required; their enclosing test is also counted failed; missing explicit readonly opt-in and missing composite input form the other two failures. Do not call this 9 failures out of 14."
+      },
+      "green": {
+        "tests": 22,
+        "pass": 22,
+        "fail": 0,
+        "skip": 0,
+        "exitCode": 0,
+        "rawLog": "df0c8478940686a28c9afc4abc8cf36197c204fc"
+      },
+      "observedByReviewer": "Original spec-reporter outputs and execution receipts read, hashes checked; no re-execution.",
+      "packageManager": "pnpm@10.34.3, stated in source/receipt and real resolver gate; no dependency fixture package, normal frozen install/postinstall with synthetic token and offline env.",
+      "sourceBoundary": {
+        "worktreeHead": "927260894305e066e15a4ad50114abce433e6001",
+        "sourceBase": "b87a1e3a7dc9490528d2a06cfdceb4fa38ecee10",
+        "targetedFiles": [
+          {
+            "path": ".github/actions/pnpm-install/action.yml",
+            "bytes": 1676,
+            "sha256": "a7158d12a9b6025674fc7c01079b30f2ee29475caf0dafc66a68b0611f4b8200",
+            "gitBlob": "553d718ad413f0db4b12833e06ffb8f29d98e555",
+            "recordedMatches": true,
+            "remoteMatches": true,
+            "beforeAfterExecutionMatch": true,
+            "mode": "100644"
+          },
+          {
+            "path": ".github/workflows/issue1415-deployed-production.yml",
+            "bytes": 6734,
+            "sha256": "4647cfb3bc0cd71b8a52ad8add07ab27a9f36e0ce65ec762e195bb514031a880",
+            "gitBlob": "6d0b50becc99ce6d5f6cfb69cceea1037f2ee1be",
+            "recordedMatches": true,
+            "remoteMatches": true,
+            "beforeAfterExecutionMatch": true,
+            "mode": "100644"
+          },
+          {
+            "path": ".github/workflows/issue1415-managed-inspection.yml",
+            "bytes": 2633,
+            "sha256": "83c91b0249a4f4e232b949d1a91f643b64caffbf5d87cad0cd4c477321802a3e",
+            "gitBlob": "9ece51fc2a39c2d362446e68df1f9bbf2076f641",
+            "recordedMatches": true,
+            "remoteMatches": true,
+            "beforeAfterExecutionMatch": true,
+            "mode": "100644"
+          },
+          {
+            "path": ".github/workflows/issues-1516-welcome-acceptance.yml",
+            "bytes": 5054,
+            "sha256": "0e9fdc0063fc7c3c4e3285c7dc941f202c1e1e0b27489f75ffb0061795b430f1",
+            "gitBlob": "4757d62065017957f6e1e4300ab4695507ce40d8",
+            "recordedMatches": true,
+            "remoteMatches": true,
+            "beforeAfterExecutionMatch": true,
+            "mode": "100644"
+          },
+          {
+            "path": ".github/workflows/read-cache-production.yml",
+            "bytes": 9844,
+            "sha256": "c9b737a96718e2c913ed5f6792413aa9ae625c8d0299a3deb1ad178214a5d108",
+            "gitBlob": "7ffa772dc65e85ae6665d7fb70f5d5a3b604da22",
+            "recordedMatches": true,
+            "remoteMatches": true,
+            "beforeAfterExecutionMatch": true,
+            "mode": "100644"
+          },
+          {
+            "path": ".github/workflows/read-cache.yml",
+            "bytes": 4210,
+            "sha256": "66026952e65f631d6844ac86a3a24d5fc6f11b5fd9009c72ae019d1178262bb0",
+            "gitBlob": "86ee0112413eae241189bb2d748a6d6901201c4f",
+            "recordedMatches": true,
+            "remoteMatches": true,
+            "beforeAfterExecutionMatch": true,
+            "mode": "100644"
+          },
+          {
+            "path": ".github/workflows/self-hosted-production.yml",
+            "bytes": 4272,
+            "sha256": "867f1bafcb613fdb6a544b65c0ef2d044899da452f18fc6d054841411f6ccdc5",
+            "gitBlob": "862a9f7cdea8df0373207e389f3cbf3afaca46df",
+            "recordedMatches": true,
+            "remoteMatches": true,
+            "beforeAfterExecutionMatch": true,
+            "mode": "100644"
+          },
+          {
+            "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+            "bytes": 11224,
+            "sha256": "768a2a9cf7edd806ec619e4b5c6fcc32466f7b8814fff94838f93a9eccd37f38",
+            "gitBlob": "42ae23945f798020ec068635e7621869fb427af2",
+            "recordedMatches": true,
+            "remoteMatches": true,
+            "beforeAfterExecutionMatch": true,
+            "mode": "100644"
+          },
+          {
+            "path": ".github/workflows/ui-policy.yml",
+            "bytes": 22943,
+            "sha256": "7da895fd0678b08acb1667bfc92afe7228872e10631b8578aa1a6696316d025c",
+            "gitBlob": "e3938ad5c343fb14d60709e014cb3d9a3189b104",
+            "recordedMatches": true,
+            "remoteMatches": true,
+            "beforeAfterExecutionMatch": true,
+            "mode": "100644"
+          },
+          {
+            "path": ".github/workflows/self-hosted-image.yml",
+            "bytes": 8923,
+            "sha256": "7618e82b4fb3d571a394fe82fc562acd2af422cc772db86c0a2c94ba041af310",
+            "gitBlob": "3dc64ed2c8d58efdf981036e7bb6362e1bd92077",
+            "recordedMatches": true,
+            "remoteMatches": true,
+            "beforeAfterExecutionMatch": true,
+            "mode": "100644"
+          },
+          {
+            "path": "tests/mvp/pinned-pnpm.test.mjs",
+            "bytes": 12270,
+            "sha256": "adefe699f39fadddc3eb6239bb6e7aa42748cef31d5ecb2167d3e8ebf12a7dee",
+            "gitBlob": "0306d340b38cf455facba376c2eb6dda58362c96",
+            "recordedMatches": true,
+            "remoteMatches": true,
+            "beforeAfterExecutionMatch": true,
+            "mode": "100644"
+          }
+        ],
+        "elevenFilesBeforeAfterExecutionMatch": true,
+        "embeddedContentMatchesRemotePureBlobs": true,
+        "wholeWorktreeWasPureCheckout": false,
+        "wholePureCiProven": false,
+        "ourFutureUnionCiProven": false
+      },
+      "originalTests": {
+        "count": 8,
+        "bytes": 4658,
+        "sha256": "41ccbaf785d22fb8a39d5833a23be777622599550b2655c7000c6c5ce1a30df4",
+        "contiguousBodyAtOffset272Recomputed": true
+      },
+      "lintAndDiff": {
+        "records": [
+          {
+            "name": "scope-lint",
+            "command": [
+              "pnpm",
+              "exec",
+              "oxlint",
+              "--deny-warnings",
+              "tests/mvp/pinned-pnpm.test.mjs"
+            ],
+            "exitCode": 0,
+            "originalLogSHA256": "6b08fb36ba6fd5b8c1905c262f9acae0a19434f6a513ef66e022bcb5012a6a30"
+          },
+          {
+            "name": "scope-diff-check",
+            "command": [
+              "git",
+              "diff",
+              "--check"
+            ],
+            "exitCode": 0,
+            "originalLogSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "classification": "Owner execution receipts with commands, exit0 and original hashes. Original 89-byte lint stdout is not one of the nine published evidence files; not independently read. Empty diff-check log hash is recorded, not separately fetched."
+      },
+      "cleanup": {
+        "fixtureSource": "lifecyclePresence registers t.after(() => rmSync(directory,{recursive:true,force:true})); all GREEN tests finish with no cleanup hook failure.",
+        "postRemovalAbsenceReadback": false,
+        "cloudVmStopDelete404Evidence": "Not present in the published nine-file evidence set or the read owner comments. No platform cleanup query was made; cloud resource cleanup remains unverified by this reviewer."
+      }
+    },
+    "remainingBoundary": "The source fix is in pure30e. The latest read owner announcement states #1810 batch still b87 and not yet incorporating30e. b87 full CI must not be transferred to this pure or a later combined tree."
+  },
+  "main": {
+    "refObserved": "76df3935c8be5af480485c52e445d389e85d8a35",
+    "tree": "bd554b5317dbee81f543ae024db2b9510a28947e",
+    "parents": [
+      "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+      "2305d24fb4e0343514503ded236a0c790aa5f8af"
+    ],
+    "committedAt": "2026-11-09T09:53:49Z",
+    "title": "test(ios): preflight native driver before App Store compilation",
+    "compareBase": "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+    "compareUrl": "https://github.com/alexj11324/Mikka/compare/0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6...76df3935c8be5af480485c52e445d389e85d8a35",
+    "completeness": {
+      "requestedPerPage": 100,
+      "page": 1,
+      "totalCommits": 8,
+      "returnedCommits": 8,
+      "returnedChangedFiles": 4,
+      "fileApiMaximum": 300,
+      "explanation": "All 8 commits and all 4 changed paths fit the first compare response, below the files API cap; no omitted continuation or first-300 inference."
+    },
+    "paths": [
+      {
+        "path": ".github/workflows/mobile-screenshots.yml",
+        "status": "modified",
+        "gitBlob": "17cedf93280ec9955608c34c7b605f9df6704f4d",
+        "additions": 52,
+        "deletions": 3,
+        "our49Intersection": false,
+        "installer30e11Intersection": false
+      },
+      {
+        "path": "scripts/release/mobile-screenshots-build.sh",
+        "status": "modified",
+        "gitBlob": "298afa10d8274c20c5486eb1fd065090b0d6bdfa",
+        "additions": 10,
+        "deletions": 0,
+        "our49Intersection": false,
+        "installer30e11Intersection": false
+      },
+      {
+        "path": "scripts/release/mobile-screenshots.mjs",
+        "status": "modified",
+        "gitBlob": "7eb7fabb390b1420728579c3a491dade0be894a0",
+        "additions": 116,
+        "deletions": 20,
+        "our49Intersection": false,
+        "installer30e11Intersection": false
+      },
+      {
+        "path": "scripts/release/mobile-screenshots.test.mjs",
+        "status": "modified",
+        "gitBlob": "16c79db4796b2c0dba1ddb0842fc4acb725ff68f",
+        "additions": 155,
+        "deletions": 2,
+        "our49Intersection": false,
+        "installer30e11Intersection": false
+      }
+    ],
+    "ourOverlayPaths": 49,
+    "intersection": [],
+    "installerCorrectionIntersection": [],
+    "behavior": "Changes are confined to iOS mobile screenshot workflow/build/driver/test: fixed Maestro asset download via GitHub CLI, stock Settings accessibility preflight before compilation, finite branch-only credential-free preflight job, metadata-only diagnostics, and outer driver/job time budgets. No Desktop lifecycle/parity/read-batch path or #1512 production driver is changed by this main movement.",
+    "preservation": "Preserve all four main files exactly in any later union. This main movement alone supplies no reason to re-sample Native performance; P0 or other actual source changes retain their separate integration requirements.",
+    "p0MergedByThisCommit": false
+  },
+  "bookkeeping": {
+    "previousDriverPatch": "Root found the first unified patch EOF hunk malformed; runtime/test candidate bytes and their actual51/51 remain unchanged. The first receipt claimed LCS edit roundtrip only. Root exclusively prepares corrected unified patch and strict bidirectional proof; this review did not regenerate it."
+  },
+  "conclusion": "Readable 30e RED/GREEN execution evidence is now independently source/hash checked. Lint raw stdout and cloud VM cleanup remain explicit evidence limits. main76df contributes four unrelated mobile-screenshot paths, with zero direct intersection against either our49 overlay or30e's11-file correction."
+}

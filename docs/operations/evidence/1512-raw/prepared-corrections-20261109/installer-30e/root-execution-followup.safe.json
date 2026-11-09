@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "kind": "root-installer30e-existing-execution-receipt-followup",
+  "ownerEvidenceCommit": "07381085c27941b206f28343aeaeffb9e5e6ff6f",
+  "ownerPublicComment": 6737156979,
+  "pureSource": "30e54e5f9e97ed059bb9121edeeb20fa2578e286",
+  "incorporation": "deded5b133bd11d8612c46c38464393a55165d81",
+  "originalLogs": [
+    {
+      "path": "red.log",
+      "bytes": 5030,
+      "sha256": "74bd5ced4bc2036677a789ad26baa423f1cd28f04d0f3377dfdbf43e72e8c479"
+    },
+    {
+      "path": "green.log",
+      "bytes": 1897,
+      "sha256": "b80d562634a1c319f271e4c5cd079c004ff63ac20bee18d459411af8eab94910"
+    }
+  ],
+  "rootReadLogs": true,
+  "rootByteHashVerified": true,
+  "rootReadExecutionReceipt": true,
+  "rootCheckedAll11ExecutionSourceHashesAgainstIndependentlyReviewedCandidate": true,
+  "red": {
+    "tests": 14,
+    "pass": 9,
+    "fail": 5,
+    "skip": 0
+  },
+  "green": {
+    "tests": 22,
+    "pass": 22,
+    "fail": 0,
+    "skip": 0
+  },
+  "targetedWorktreeHead": "927260894305e066e15a4ad50114abce433e6001",
+  "completePureCheckoutClaimed": false,
+  "combinedCiClaimed": false,
+  "executedAgain": false,
+  "lint": {
+    "ownerReceiptExit": 0,
+    "rawStdoutIndependentlyRead": false
+  },
+  "vmCleanup": {
+    "publicOwnerReportedStopped": true,
+    "stopDeleteExact404OriginalAvailable": false,
+    "independentlyProven": false
+  },
+  "independentSourceAndExecutionReviewBlob": "a3ccbb048b1a6b8a632bfe2bea272f2aaf6b3e78",
+  "sourceFindings": [],
+  "remaining": "Actual final combined-source CI; driver GET-404 cleanup finding is separately being fixed."
+}

@@ -1,0 +1,651 @@
+{
+  "version": 1,
+  "kind": "issue1512-prepared-corrections-checkpoint27",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequest": 1799,
+  "createdAt": "2026-11-09 10:39:52 UTC",
+  "prefix": "docs/operations/evidence/1512-raw/prepared-corrections-20261109",
+  "parentEvidenceCommit": "6258f9a410881f3c0f308254cf714d74dd046866",
+  "publishedSourceHead": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+  "latestUnpublishedOwnCommit": "f0956eb1481cee710efb714ec3635ac66b4b44ec",
+  "fixedUpstreamCommit": "521db4799a4a85e1955f7dd86a1ad5ccef143cc8",
+  "newerObservedMain": "a2198c8c2f608f7b8169329b9da853067618dba6",
+  "payloadFileCount": 88,
+  "payloadBytes": 1637538,
+  "files": [
+    {
+      "path": "await-web-0415/await-web-129069965257.original.log",
+      "sha": "c09f843b78488950e414ecab393e125e769f69a8",
+      "bytes": 13134,
+      "sha256": "437b98816050dec78a2c3fb2d897bfe721f8c6a33953e6ca7e3317ee2c0e3712",
+      "kind": "original-log"
+    },
+    {
+      "path": "await-web-0415/index.safe.json",
+      "sha": "604eb2d9773b5d0d90c99435f46165aa9e2d5c73",
+      "bytes": 18181,
+      "sha256": "7b128788dc93360b4c5e74573082329d709ac1fedaa00b9493a7897f0a46cf65",
+      "kind": "review"
+    },
+    {
+      "path": "current-prepared-source.safe.json",
+      "sha": "9261d8710d1198fb03730bb989b8b543c49b2019",
+      "bytes": 3690,
+      "sha256": "f21b92398f3b90d537b05d310e795b68cac99f0efc558522692f0b77d3e5f5f0",
+      "kind": "current-source-binding"
+    },
+    {
+      "path": "driver/baseline.json",
+      "sha": "847284c46c8a8904679811eb027de9c768923adb",
+      "bytes": 265,
+      "sha256": "81cf6f937d82fe2dc541c1de93fbc00ecca79215aaecd81aff627f2a0de1089f",
+      "kind": "driver-evidence"
+    },
+    {
+      "path": "driver/baseline.tap",
+      "sha": "499afd0742c1ebd4edc00dd0d2038c05fa1f8ef7",
+      "bytes": 9582,
+      "sha256": "f6f7b07a31316d2c53127ba3b57d28824524e825ee6daf048fb2784268aa968d",
+      "kind": "driver-evidence"
+    },
+    {
+      "path": "driver/candidate.corrected.patch",
+      "sha": "eb2af8fda0eba23f3ae299cf42acec31a862ec3a",
+      "bytes": 32864,
+      "sha256": "19f4a4b159e904318d021ce4608634d0362d73c96e2b8a13719e4b6805f8cb53",
+      "kind": "corrected-evidence-patch"
+    },
+    {
+      "path": "driver/candidate.patch",
+      "sha": "6df4bd0655179cafbbeaabcb60d305b785a484f9",
+      "bytes": 32866,
+      "sha256": "c08a7fd735e1e58f8e02b4ad40e7670559d7b13af4ed035442a49499381d0927",
+      "kind": "driver-evidence"
+    },
+    {
+      "path": "driver/candidate/scripts/acceptance/run-observability.mjs",
+      "sha": "eac86cc7081bd23dc93a8c5d6d3b443772037263",
+      "bytes": 64047,
+      "sha256": "bc541dfafa4d45375ed44fd85d6fd443386e519608443bd1d158ab62949e1892",
+      "kind": "driver-evidence"
+    },
+    {
+      "path": "driver/candidate/scripts/acceptance/run-observability.test.mjs",
+      "sha": "9d1c1c6614dd687a0939c05f2625a813cb6dae62",
+      "bytes": 75066,
+      "sha256": "94cdc3b58b30cc0804b4a34478713c0fca85511aa83385ca8768641cffd4cb90",
+      "kind": "driver-evidence"
+    },
+    {
+      "path": "driver/cleanup.safe.json",
+      "sha": "947a5905fe2b7af378f5ef4687d650763416b619",
+      "bytes": 1210,
+      "sha256": "57a7b088a8f57262b4e0448d225639e354aec6c9d78b10d14d0ac3f9140f357a",
+      "kind": "driver-evidence"
+    },
+    {
+      "path": "driver/driver-root-review.safe.json",
+      "sha": "781d304186f357ef609ce06409db546b29807b42",
+      "bytes": 17096,
+      "sha256": "f1bf30088c809fddaedfc5f05e05ddc43d30bb4ca6287ce3600783118fddab43",
+      "kind": "root-review"
+    },
+    {
+      "path": "driver/green-v1.json",
+      "sha": "2e77c1e17b4efe9eddef19546e07737c7c6bd087",
+      "bytes": 521,
+      "sha256": "e2a68e12d33b7fbf4e6f1343f1a2e6e53cd96e09705d9558af73b69ab67089ca",
+      "kind": "driver-evidence"
+    },
+    {
+      "path": "driver/green-v1.tap",
+      "sha": "c17d8726d828a7e0b93813a082efeecab4a15547",
+      "bytes": 13311,
+      "sha256": "d65a9277f9e5d868f9daeb5163e15e52c080d85622254bf31a8a19201ab12975",
+      "kind": "driver-evidence"
+    },
+    {
+      "path": "driver/implementation.safe.json",
+      "sha": "1b3339e6e00603eab116bb1cc1538a4ea337de3a",
+      "bytes": 14506,
+      "sha256": "49f091dae7eb80d5432e5b2aa38af7b61b95163eaa9d082095c2a97dc8adaad2",
+      "kind": "driver-evidence"
+    },
+    {
+      "path": "driver/independent-review-before-404-fix.safe.json",
+      "sha": "6936de80c51c2091d3da0e20c59684cc1bdc28c5",
+      "bytes": 14837,
+      "sha256": "43c340dbbb733dd10febb95bfd79fe8beecb63396b978e2c485e7c7904c7e839",
+      "kind": "independent-finding"
+    },
+    {
+      "path": "driver/index.original.safe.json",
+      "sha": "3723651d50eea82b2fd53d814c0a9f1d9442ec29",
+      "bytes": 5062,
+      "sha256": "0327d82ba43ac32de6a03f0b148dfd25dc30126b09288efc6c59712c8c8013d1",
+      "kind": "original-subindex"
+    },
+    {
+      "path": "driver/manifest.safe.json",
+      "sha": "f591f90a1ff892324429f8922732a297fb2e2f47",
+      "bytes": 7353,
+      "sha256": "f37d8b2e97d8b1b0789c3277e40e35a12f90aa9bf541ab9be608ae1ac1548e5a",
+      "kind": "driver-evidence"
+    },
+    {
+      "path": "driver/privacy.safe.json",
+      "sha": "4d0b5cf963a86dd6066d5f628d104aee31eccf09",
+      "bytes": 689,
+      "sha256": "1276db349d47b4e94a8072fea3cddb90dbd1320d543331659ab6cbbdf32418d5",
+      "kind": "driver-evidence"
+    },
+    {
+      "path": "driver/red-behavior.json",
+      "sha": "c44750b7e90831642015875c822f43d8729a65b5",
+      "bytes": 594,
+      "sha256": "ca71ae68646d1199eb6c8eb9ac6ef099332055af7ec29e9c9af6ec9cd2d9c797",
+      "kind": "driver-evidence"
+    },
+    {
+      "path": "driver/red-behavior.tap",
+      "sha": "47b436ab04554387e7f36846511f72cd34ff6476",
+      "bytes": 29104,
+      "sha256": "832e51700917b54e6a965a1035e639f9bc7791d03ee3bee1270257c1524a8369",
+      "kind": "driver-evidence"
+    },
+    {
+      "path": "driver/red.json",
+      "sha": "3a3cb59d68ac952a02074096b2d1cff41287ab1a",
+      "bytes": 582,
+      "sha256": "34d62d317d10d3df05603bd96946626afd02e4fc8fcdf3174bff2078968f83c2",
+      "kind": "driver-evidence"
+    },
+    {
+      "path": "driver/red.tap",
+      "sha": "e70f881672da9718669682c1e95357bec6a891bf",
+      "bytes": 1682,
+      "sha256": "e03f23ec81c5ffc7fd314328cb9df475d41a0a07d387970733a2892736b55f43",
+      "kind": "driver-evidence"
+    },
+    {
+      "path": "driver/setup.json",
+      "sha": "19bf3e9410925bc537bb7f4d01b583ed68ea23fe",
+      "bytes": 2798,
+      "sha256": "4417760da6cc94b337bba9e14eb460158bd40f95ead8bb0573ad1915943794cf",
+      "kind": "driver-evidence"
+    },
+    {
+      "path": "driver/syntax-v1.test.mjs",
+      "sha": "f8f1a115b89add264760ddde2cbaf39d8c1ea598",
+      "bytes": 75069,
+      "sha256": "4c3b06bda361b9f6e9521bb572b48f42c550c61b9826dfa0ea6fd9851ab8f984",
+      "kind": "driver-evidence"
+    },
+    {
+      "path": "driver404/candidate.patch",
+      "sha": "cb1dddb2e53610a597564292485bfd1b31326e57",
+      "bytes": 7027,
+      "sha256": "d1a9e8f38bca9c5d0b3bc884f2d8efd3b52f9a3aaa1f554ae23aec77b51d93d5",
+      "kind": "driver404-evidence"
+    },
+    {
+      "path": "driver404/cleanup.safe.json",
+      "sha": "11ec8efdd8528290a0200c3ff7704dd46da1242c",
+      "bytes": 1780,
+      "sha256": "9cf85a9eb0742bbf5365ef80433395d53a90b0e4e7c1dbac32cf137386fbb417",
+      "kind": "driver404-evidence"
+    },
+    {
+      "path": "driver404/green.json",
+      "sha": "d68697df1c705d700b5801f6efa9174eb2fd959b",
+      "bytes": 537,
+      "sha256": "27a2504211664e93d75485a026230b1c1a850695b35834a7bdffc00dbfe92f2c",
+      "kind": "driver404-evidence"
+    },
+    {
+      "path": "driver404/green.tap",
+      "sha": "2065169fef0a875735476ca126371351a2512dde",
+      "bytes": 16335,
+      "sha256": "13ddf21abd35c041abef89fb5680c009b9e3a7ca6e7e1c998252f993d8912299",
+      "kind": "driver404-evidence"
+    },
+    {
+      "path": "driver404/implementation.safe.json",
+      "sha": "eca84881906424a213459c240a0ad8d1102a8c01",
+      "bytes": 14785,
+      "sha256": "b480046116efeae633747723b5712f731e33bbd4a87f9605b5d8a20bb8bde90b",
+      "kind": "driver404-evidence"
+    },
+    {
+      "path": "driver404/independent-closure.safe.json",
+      "sha": "90c6086742bd4926d167d7760b90ff5f426d8305",
+      "bytes": 5027,
+      "sha256": "257c62bc39708343eb363ffec810278dde5ed2cb950e5735d8ca2b79847e8f34",
+      "kind": "independent-closure"
+    },
+    {
+      "path": "driver404/index.safe.json",
+      "sha": "951913035796cbedcda6265779f5b34383c24793",
+      "bytes": 4988,
+      "sha256": "c6132adeca560daf435b51de668f21e2d74ea0eb7e34788684d5e233564cfdaa",
+      "kind": "subindex"
+    },
+    {
+      "path": "driver404/manifest.safe.json",
+      "sha": "cf40a7f340e644b578634680cb277cb959f98ba9",
+      "bytes": 3753,
+      "sha256": "3e34401ee654a53c8c04a0917131bb13e4d5d7b89bf86e0493ef0eec43778917",
+      "kind": "driver404-evidence"
+    },
+    {
+      "path": "driver404/patch-proof.json",
+      "sha": "f2a22e1b2e3c1646159c1323c4365ba17e3cb63b",
+      "bytes": 1015,
+      "sha256": "cb49107a205009fffee55bf38266c46285258868fb3b7cf76d7ebf3bc6b7aca1",
+      "kind": "driver404-evidence"
+    },
+    {
+      "path": "driver404/red.json",
+      "sha": "54b422beeb23886dcf9b1bbba86da8a33f8ff4e6",
+      "bytes": 598,
+      "sha256": "0ad47efae4fddd2f0139c16ddca036b7622dcb0368fceb2a5eff4d7bfac3cfa9",
+      "kind": "driver404-evidence"
+    },
+    {
+      "path": "driver404/red.tap",
+      "sha": "799045d2ea22aa930870b9508504d659eb6b5d94",
+      "bytes": 35570,
+      "sha256": "95fe2636ab75ff3f6a618c01264672ffc4bdad289b8f771599911141b76a2613",
+      "kind": "driver404-evidence"
+    },
+    {
+      "path": "driver404/root-closure.safe.json",
+      "sha": "e3b4108855af27068383329020c0e8da22a6830e",
+      "bytes": 11711,
+      "sha256": "8a0090e5ef14e9accf9328f591e65bf2226b11679f53b152ce4c806fade71ce0",
+      "kind": "root-closure"
+    },
+    {
+      "path": "driver404/root-finding.safe.json",
+      "sha": "75cf10f732c676956fe3914f0419bed528fd50d7",
+      "bytes": 1446,
+      "sha256": "cdcd85d58eaf6d5019f0223376b938a8869c52715fc0a1df86b2726b73b977fe",
+      "kind": "root-finding"
+    },
+    {
+      "path": "driver404/setup-transport-error.safe.json",
+      "sha": "9981a0c81c1c2f80e40fec842cce1d478d563c83",
+      "bytes": 1075,
+      "sha256": "9bddbaa670cfd38e4aee25ba2061c15bf99f279cc9efbc67fb5d325382e92fba",
+      "kind": "driver404-evidence"
+    },
+    {
+      "path": "driver404/setup.json",
+      "sha": "25e25f093a47f3faea4352c981c5bb81d21320b4",
+      "bytes": 2718,
+      "sha256": "e2037dfb5d0ebf603a096eb6adf5597b77f6d000d6beb24d8a67f66b3747c50a",
+      "kind": "driver404-evidence"
+    },
+    {
+      "path": "driver404/source/scripts/acceptance/run-observability.mjs",
+      "sha": "002b8501cd4f4df023148515add7c55e2863dbd3",
+      "bytes": 64090,
+      "sha256": "7fa1c032cb0d9b7c5a88c6262b559368445866691796b001648a95efea856950",
+      "kind": "driver404-evidence"
+    },
+    {
+      "path": "driver404/source/scripts/acceptance/run-observability.test.mjs",
+      "sha": "aab0a21c4c8fadb9df81ff87ada4fa23198fa575",
+      "bytes": 81045,
+      "sha256": "b488d49afd89b833298d685dbb468a2520451a5be6f10711b7bdb76d66d5168a",
+      "kind": "driver404-evidence"
+    },
+    {
+      "path": "fixed-p0-premerge/apps/api/generated/routes.json",
+      "sha": "6fbced33e672f3fa0d5e35bed40b63fa103809d5",
+      "bytes": 76186,
+      "sha256": "8c4862ecf9433574458b3c898aea36a7cdf383f9a2599f1346720c883250ebda",
+      "kind": "source"
+    },
+    {
+      "path": "fixed-p0-premerge/apps/api/generated/routes.ts",
+      "sha": "a0cc13783eb567c256c34e08eaf3f6e9aca157e2",
+      "bytes": 78570,
+      "sha256": "96af04380e4e962ad2d3844c1e416fa3f1330231f3e36a1888fba7cb5cb312cc",
+      "kind": "source"
+    },
+    {
+      "path": "fixed-p0-premerge/apps/desktop/src/renderer/rpc.ts",
+      "sha": "dae8798653457afad334c2d909b10b63e9b3956f",
+      "bytes": 4726,
+      "sha256": "6119f76aa46cf1fcd93dc9b389859221c206fecba7cedf265af061fd6862270e",
+      "kind": "source"
+    },
+    {
+      "path": "fixed-p0-premerge/from-c0e94.patch",
+      "sha": "be336947d92df6adbe2f46a091375c31d57ae8ec",
+      "bytes": 58802,
+      "sha256": "728db201a3dea003f8d1e352801448913f133cd64ca199df915036f7169d860e",
+      "kind": "evidence"
+    },
+    {
+      "path": "fixed-p0-premerge/from-p0-61f3599.patch",
+      "sha": "f9938dad2f8bc1d4e3593d94e1922c8466cc1296",
+      "bytes": 24964,
+      "sha256": "6a2a74d6ecdb8e966d064ec1e52f0edf147c21be61a8b5e8ebc2a71995206808",
+      "kind": "evidence"
+    },
+    {
+      "path": "fixed-p0-premerge/generated-union-proof.safe.json",
+      "sha": "449aae80bebffbd87fb9bc0634aacac1252d3f79",
+      "bytes": 15906,
+      "sha256": "b3fb599d7f95d31e873f66b0f3c7f285b315c16cbb66878a9fa165401b89536a",
+      "kind": "evidence"
+    },
+    {
+      "path": "fixed-p0-premerge/index.safe.json",
+      "sha": "f449e443232bed85347e08d6014ec54c25b3a370",
+      "bytes": 4613,
+      "sha256": "84e6107d6f88e8125402ff0eaf0cc00a1fb3e74c7726791f80822ff5559ed3aa",
+      "kind": "original-subindex"
+    },
+    {
+      "path": "fixed-p0-premerge/lib/device-heartbeat.db.test.ts",
+      "sha": "e8f4f35748707364e77c53fa594c166bafc3dae8",
+      "bytes": 21768,
+      "sha256": "2004fa0ffc447ed630142960273495d8b700c68dc74e6903784a146738b54938",
+      "kind": "source"
+    },
+    {
+      "path": "fixed-p0-premerge/p0-premerge-root-review.safe.json",
+      "sha": "995bd1358f928a2ec74906e185963ad7fb589d78",
+      "bytes": 17194,
+      "sha256": "749fcf5638a94cf24c29a8ea6441a00c167147c054c82e4b47fadc71f081f763",
+      "kind": "root-review"
+    },
+    {
+      "path": "fixed-p0-premerge/package.json",
+      "sha": "ef6da7b3d6b33220051fef56d7e9e5e024105310",
+      "bytes": 80810,
+      "sha256": "1445883a119e89e8b1aa35e39df9b625efd4d143e226ecf31a881163c1614925",
+      "kind": "source"
+    },
+    {
+      "path": "fixed-p0-premerge/README.md",
+      "sha": "91385b369d8fb9a2069a5f12a92598185d27ed2c",
+      "bytes": 3234,
+      "sha256": "25224b73165dab1c391a4e14a35d07fa8fead07ab04c222173b376663219cafc",
+      "kind": "evidence"
+    },
+    {
+      "path": "fixed-p0-premerge/source-manifest.safe.json",
+      "sha": "2dd807e543d61001848c341e28ce3284b434bcf8",
+      "bytes": 9230,
+      "sha256": "a50b26dce769852964c0cbb9a1a65f3b85f5729babaf86857a8f97d706c179b1",
+      "kind": "evidence"
+    },
+    {
+      "path": "fixed-p0-premerge/strict-patch-proof.safe.json",
+      "sha": "7b69ebe3312d69c26cf9c44d0682c6cf70d5ed88",
+      "bytes": 30468,
+      "sha256": "8f74f39437e7f3a5d746f072cb848bd2bd948c026048d173999610a104a8ac30",
+      "kind": "evidence"
+    },
+    {
+      "path": "fixed-p0-premerge/workflows/coordinator/steps.ts",
+      "sha": "d500795e9a62631b6c7619c4ffd1df67f137ee54",
+      "bytes": 93440,
+      "sha256": "5f577830a5aee9f0acee251b3a406161c8bd4d6a38e9ac7e6aadc5224ba0048d",
+      "kind": "source"
+    },
+    {
+      "path": "installer-30e/execution-and-main-independent-review.safe.json",
+      "sha": "a3ccbb048b1a6b8a632bfe2bea272f2aaf6b3e78",
+      "bytes": 14789,
+      "sha256": "798f75a94d92c5c0be9e31e2a306b6707337ac349a1e5f21875e3310dcec58f8",
+      "kind": "independent-review"
+    },
+    {
+      "path": "installer-30e/independent-source-review.safe.json",
+      "sha": "32809be58280550a53c9fd97a1f0f97d60652afe",
+      "bytes": 28867,
+      "sha256": "ffed446aab95ff56cb3d964db88ddeeefa982a6c2560d113180c2b428d5ec22f",
+      "kind": "independent-review"
+    },
+    {
+      "path": "installer-30e/installer30e-root-source-review.safe.json",
+      "sha": "9d0b6a8a632aab8383557cc6079391dc3fb81869",
+      "bytes": 9940,
+      "sha256": "8aebf6e51cbb5e2fbb719ba76e935821d32469d77149565f05eb4617c2c902aa",
+      "kind": "root-review"
+    },
+    {
+      "path": "installer-30e/owner-original/caller-permissions.json",
+      "sha": "8be7edc165ababfcff3e792fb6dc7c4ee9e80be8",
+      "bytes": 22427,
+      "sha256": "2ce0d726eb8c8510d381d540a36387e2ab067c0c7693ef88ef33209af4fdfea5",
+      "kind": "owner-original"
+    },
+    {
+      "path": "installer-30e/owner-original/execution-receipts.json",
+      "sha": "f215296b04f76688ebe6be1de4308bbb4de1671a",
+      "bytes": 4280,
+      "sha256": "10bd72fb05bd466a1c605570a22777b6eaff7754938cb8b625503303fe2e3611",
+      "kind": "owner-original"
+    },
+    {
+      "path": "installer-30e/owner-original/green.log",
+      "sha": "df0c8478940686a28c9afc4abc8cf36197c204fc",
+      "bytes": 1897,
+      "sha256": "b80d562634a1c319f271e4c5cd079c004ff63ac20bee18d459411af8eab94910",
+      "kind": "owner-original"
+    },
+    {
+      "path": "installer-30e/owner-original/independent-review.json",
+      "sha": "07e6788f3c61731a4219d5013b33e153331ace54",
+      "bytes": 23496,
+      "sha256": "e442955ffea0452ce1a1a57617ed0f33d55496502d77edcabb1d9e95042870dc",
+      "kind": "owner-original"
+    },
+    {
+      "path": "installer-30e/owner-original/index.json",
+      "sha": "27a0f43c24eefa89c7938b53e42c63afea2b6f89",
+      "bytes": 1379,
+      "sha256": "515849bfb79addfadeab4d2b22c85c991e5efbc30b930cb2ce9a90719cd8a946",
+      "kind": "owner-original-index"
+    },
+    {
+      "path": "installer-30e/owner-original/README.md",
+      "sha": "a0ebde2bb80243a75a2b3bc6a642dffb97ad3efa",
+      "bytes": 1517,
+      "sha256": "ef0e0cc503e07408c1caf448db934cd3892abe03c3d250bc0849f342759d4220",
+      "kind": "owner-original"
+    },
+    {
+      "path": "installer-30e/owner-original/red.log",
+      "sha": "452874805f4d1184af09dd3d4a0272e0c7a7c776",
+      "bytes": 5030,
+      "sha256": "74bd5ced4bc2036677a789ad26baa423f1cd28f04d0f3377dfdbf43e72e8c479",
+      "kind": "owner-original"
+    },
+    {
+      "path": "installer-30e/owner-original/scope-change.patch",
+      "sha": "dcb432850b6fb8f473e3626f7594321ee20a7d02",
+      "bytes": 17231,
+      "sha256": "3207f132f9cf4178f6fa5c5b7ff0c5b64cd2dc30e14663d49bf956631c2653dd",
+      "kind": "owner-original"
+    },
+    {
+      "path": "installer-30e/owner-original/source-review.json",
+      "sha": "39883579408b63bae12ce84e0083593f6fc29dd0",
+      "bytes": 122471,
+      "sha256": "2010b1d8b91c5741fb09d8d2e8b0b9db949c63ba2073ebe483777500ae96319c",
+      "kind": "owner-original"
+    },
+    {
+      "path": "installer-30e/root-execution-followup.safe.json",
+      "sha": "188357d63ffb53c9bf31749881705f444f62db03",
+      "bytes": 1582,
+      "sha256": "5189d8c65b4ebbbb3b4e7d8101ff1868f7627b7591b1f39599ad59c91c82693c",
+      "kind": "root-review"
+    },
+    {
+      "path": "installer-30e/source/.github/actions/pnpm-install/action.yml",
+      "sha": "553d718ad413f0db4b12833e06ffb8f29d98e555",
+      "bytes": 1676,
+      "sha256": "a7158d12a9b6025674fc7c01079b30f2ee29475caf0dafc66a68b0611f4b8200",
+      "kind": "source"
+    },
+    {
+      "path": "installer-30e/source/.github/workflows/issue1415-deployed-production.yml",
+      "sha": "6d0b50becc99ce6d5f6cfb69cceea1037f2ee1be",
+      "bytes": 6734,
+      "sha256": "4647cfb3bc0cd71b8a52ad8add07ab27a9f36e0ce65ec762e195bb514031a880",
+      "kind": "source"
+    },
+    {
+      "path": "installer-30e/source/.github/workflows/issue1415-managed-inspection.yml",
+      "sha": "9ece51fc2a39c2d362446e68df1f9bbf2076f641",
+      "bytes": 2633,
+      "sha256": "83c91b0249a4f4e232b949d1a91f643b64caffbf5d87cad0cd4c477321802a3e",
+      "kind": "source"
+    },
+    {
+      "path": "installer-30e/source/.github/workflows/issues-1516-welcome-acceptance.yml",
+      "sha": "4757d62065017957f6e1e4300ab4695507ce40d8",
+      "bytes": 5054,
+      "sha256": "0e9fdc0063fc7c3c4e3285c7dc941f202c1e1e0b27489f75ffb0061795b430f1",
+      "kind": "source"
+    },
+    {
+      "path": "installer-30e/source/.github/workflows/read-cache-production.yml",
+      "sha": "7ffa772dc65e85ae6665d7fb70f5d5a3b604da22",
+      "bytes": 9844,
+      "sha256": "c9b737a96718e2c913ed5f6792413aa9ae625c8d0299a3deb1ad178214a5d108",
+      "kind": "source"
+    },
+    {
+      "path": "installer-30e/source/.github/workflows/read-cache.yml",
+      "sha": "86ee0112413eae241189bb2d748a6d6901201c4f",
+      "bytes": 4210,
+      "sha256": "66026952e65f631d6844ac86a3a24d5fc6f11b5fd9009c72ae019d1178262bb0",
+      "kind": "source"
+    },
+    {
+      "path": "installer-30e/source/.github/workflows/self-hosted-image.yml",
+      "sha": "3dc64ed2c8d58efdf981036e7bb6362e1bd92077",
+      "bytes": 8923,
+      "sha256": "7618e82b4fb3d571a394fe82fc562acd2af422cc772db86c0a2c94ba041af310",
+      "kind": "source"
+    },
+    {
+      "path": "installer-30e/source/.github/workflows/self-hosted-production.yml",
+      "sha": "862a9f7cdea8df0373207e389f3cbf3afaca46df",
+      "bytes": 4272,
+      "sha256": "867f1bafcb613fdb6a544b65c0ef2d044899da452f18fc6d054841411f6ccdc5",
+      "kind": "source"
+    },
+    {
+      "path": "installer-30e/source/.github/workflows/thread-lifecycle-acceptance.yml",
+      "sha": "42ae23945f798020ec068635e7621869fb427af2",
+      "bytes": 11224,
+      "sha256": "768a2a9cf7edd806ec619e4b5c6fcc32466f7b8814fff94838f93a9eccd37f38",
+      "kind": "source"
+    },
+    {
+      "path": "installer-30e/source/.github/workflows/ui-policy.yml",
+      "sha": "e3938ad5c343fb14d60709e014cb3d9a3189b104",
+      "bytes": 22943,
+      "sha256": "7da895fd0678b08acb1667bfc92afe7228872e10631b8578aa1a6696316d025c",
+      "kind": "source"
+    },
+    {
+      "path": "installer-30e/source/tests/mvp/pinned-pnpm.test.mjs",
+      "sha": "0306d340b38cf455facba376c2eb6dda58362c96",
+      "bytes": 12270,
+      "sha256": "adefe699f39fadddc3eb6239bb6e7aa42748cef31d5ecb2167d3e8ebf12a7dee",
+      "kind": "source"
+    },
+    {
+      "path": "p0-521-rebinding-20261109/61-to-521-complete-path-index.safe.json",
+      "sha": "22692da3f41010c16990976bc3d0f9eccc79f26e",
+      "bytes": 16318,
+      "sha256": "663a61f532756339bd9f63b0aa08199946e6b98d94ea2229d06c94830ed407f5",
+      "kind": "fixed-p521-rebinding"
+    },
+    {
+      "path": "p0-521-rebinding-20261109/from-p0-521db479.patch",
+      "sha": "da029e88c7cf71330f2864186d0fe11d670ec92c",
+      "bytes": 17702,
+      "sha256": "ff1fab435f76db0b06517ef6453034ba6883fd6a3d0b4db21af74870110ec1ca",
+      "kind": "fixed-p521-rebinding"
+    },
+    {
+      "path": "p0-521-rebinding-20261109/index.safe.json",
+      "sha": "c2e0dc20f4f127b9b49ac97b605df9aa0388e9b6",
+      "bytes": 3395,
+      "sha256": "a24b007730bcca83f73b95a49a58a6688a1466bf2428f530b6a3faa52fac6ad9",
+      "kind": "subindex"
+    },
+    {
+      "path": "p0-521-rebinding-20261109/p521-direct-dependencies.safe.json",
+      "sha": "4eeb690ab267cbb0e3b9b4ce4bb36cb668c02599",
+      "bytes": 15701,
+      "sha256": "554e92b9329d3ba825d4af25ffba7549d9d512f8ed0531fad3175e30b021f9f4",
+      "kind": "fixed-p521-rebinding"
+    },
+    {
+      "path": "p0-521-rebinding-20261109/p521-source-binding.safe.json",
+      "sha": "546c92934ce6a36c4db47bfd80687c63feff2a95",
+      "bytes": 11127,
+      "sha256": "5269882d851340102c7d91a66535c159ed876ce904d1007ed4d060234167463c",
+      "kind": "fixed-p521-rebinding"
+    },
+    {
+      "path": "p0-521-rebinding-20261109/root-review.safe.json",
+      "sha": "8e482993dc1a1543e5c1b239ea9ee14107ff8166",
+      "bytes": 2448,
+      "sha256": "786804aa2529dd0f069f218c85fc5416573014e2ddc5c8b26109029b1843baa8",
+      "kind": "root-source-review"
+    },
+    {
+      "path": "README.md",
+      "sha": "407984468f2814ef4c19cb1a20bebff8b7c1d790",
+      "bytes": 9252,
+      "sha256": "a0a9b3e1582aceed6a6e3047de8f55cc45b82e74ead91cc2b42716229d3a20f6",
+      "kind": "readme"
+    },
+    {
+      "path": "unpublished-composition.safe.json",
+      "sha": "5d7de14a8f13b4ee8f7b3bc6a7e5363cbf6e3d0e",
+      "bytes": 2569,
+      "sha256": "fd65bb31d6f001c4b943b3c3d74efe4ab6f76c502df9ba953ee1630b369d1afb",
+      "kind": "root-source-binding"
+    },
+    {
+      "path": "upstream-p521-attempt2-metadata.safe.json",
+      "sha": "70b46115ae76202c906366b1d6bca81fafb83c70",
+      "bytes": 6817,
+      "sha256": "ecfa379fde5349e9f6925c0095dbbd4d11148c15e10f1f19b41cf403052254aa",
+      "kind": "metadata-only"
+    }
+  ],
+  "actualValidation": {
+    "installer": 22,
+    "driverV1": 51,
+    "driverFinal": 63,
+    "combinedCI": false,
+    "productionACMEAccepted": 0
+  },
+  "resources": {
+    "activeOwnedVMs": 0,
+    "driverVmsClosedWithStopDeleteExact404": 2
+  },
+  "boundaries": [
+    "Source incorporation objects remain unpublished at this checkpoint; no production dispatch.",
+    "Upstream A1 providerStarted failure retained with cause unknown; A2 source metadata is success, not a raw checkout proof.",
+    "New actual main package registration is reviewed separately before future combination.",
+    "Previous c0 complete CI/Native in checkpoint26 is not transferred to a future combined source."
+  ]
+}

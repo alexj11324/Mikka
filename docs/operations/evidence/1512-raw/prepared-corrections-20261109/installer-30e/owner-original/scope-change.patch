@@ -1,0 +1,342 @@
+--- a/.github/actions/pnpm-install/action.yml
++++ b/.github/actions/pnpm-install/action.yml
+@@ -4,6 +4,11 @@
+   read-only everywhere except pushes to main: pull requests and branches
+   restore main's entry and never save their own, so cache entries stop
+   multiplying per branch.
++inputs:
++  ffmpeg-github-token:
++    description: Optional API-read-only GitHub token for verified FFmpeg assets.
++    required: false
++    default: ''
+ runs:
+   using: composite
+   steps:
+@@ -26,7 +31,7 @@
+     - shell: bash
+       run: pnpm install --frozen-lockfile
+       env:
+-        FFMPEG_GITHUB_TOKEN: ${{ github.token }}
++        FFMPEG_GITHUB_TOKEN: ${{ inputs.ffmpeg-github-token }}
+     - name: Save the pnpm store (main only)
+       if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.restore.outputs.cache-hit != 'true'
+       uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+--- a/.github/workflows/issue1415-deployed-production.yml
++++ b/.github/workflows/issue1415-deployed-production.yml
+@@ -43,6 +43,8 @@
+         with:
+           persist-credentials: false
+       - uses: ./.github/actions/pnpm-install
++        with:
++          ffmpeg-github-token: ${{ github.token }}
+ 
+       - name: Run the original and explicit-target offline guards before credentials
+         run: pnpm test:read-cache
+--- a/.github/workflows/issue1415-managed-inspection.yml
++++ b/.github/workflows/issue1415-managed-inspection.yml
+@@ -38,6 +38,8 @@
+         with:
+           persist-credentials: false
+       - uses: ./.github/actions/pnpm-install
++        with:
++          ffmpeg-github-token: ${{ github.token }}
+ 
+       - name: Run the existing managed proof and historical inspection guards
+         run: node --import tsx --test scripts/acceptance/workflow-migration-production.test.mjs
+--- a/.github/workflows/issues-1516-welcome-acceptance.yml
++++ b/.github/workflows/issues-1516-welcome-acceptance.yml
+@@ -25,6 +25,8 @@
+           fetch-depth: 0
+           persist-credentials: false
+       - uses: ./.github/actions/pnpm-install
++        with:
++          ffmpeg-github-token: ${{ github.token }}
+       - name: Bind deterministic SDK regressions to the deployed business source
+         env:
+           APPLICATION_SHA: ${{ inputs.application_sha }}
+@@ -55,6 +57,8 @@
+         with:
+           persist-credentials: false
+       - uses: ./.github/actions/pnpm-install
++        with:
++          ffmpeg-github-token: ${{ github.token }}
+       - name: Read application database through the existing workload identity
+         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+         with:
+--- a/.github/workflows/read-cache-production.yml
++++ b/.github/workflows/read-cache-production.yml
+@@ -42,6 +42,8 @@
+         with:
+           persist-credentials: false
+       - uses: ./.github/actions/pnpm-install
++        with:
++          ffmpeg-github-token: ${{ github.token }}
+       - run: node --import tsx --test scripts/acceptance/read-cache.test.mjs scripts/acceptance/read-cache-production.test.mjs scripts/acceptance/workflow-migration-production.test.mjs
+ 
+       - name: Check whether the one-time migration acceptance is still open
+@@ -84,6 +86,8 @@
+         with:
+           persist-credentials: false
+       - uses: ./.github/actions/pnpm-install
++        with:
++          ffmpeg-github-token: ${{ github.token }}
+       - name: Verify the exact production version and its successful Web deployment
+         id: attest
+         run: node --import tsx scripts/acceptance/read-cache-production.mjs --attest
+@@ -152,6 +156,8 @@
+         with:
+           persist-credentials: false
+       - uses: ./.github/actions/pnpm-install
++        with:
++          ffmpeg-github-token: ${{ github.token }}
+       - name: Gate the open migration against current main and its exact deployed Web build
+         id: attest
+         run: node --import tsx scripts/acceptance/read-cache-production.mjs --attest --migration-1415
+--- a/.github/workflows/read-cache.yml
++++ b/.github/workflows/read-cache.yml
+@@ -76,6 +76,8 @@
+     steps:
+       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+       - uses: ./.github/actions/pnpm-install
++        with:
++          ffmpeg-github-token: ${{ github.token }}
+       - name: Verify the bounded read-only driver
+         run: node --test scripts/acceptance/read-cache.test.mjs scripts/acceptance/run-read-cache.test.mjs
+       - name: Generate ephemeral test-only authentication secret
+--- a/.github/workflows/self-hosted-production.yml
++++ b/.github/workflows/self-hosted-production.yml
+@@ -30,6 +30,8 @@
+         with:
+           persist-credentials: false
+       - uses: ./.github/actions/pnpm-install
++        with:
++          ffmpeg-github-token: ${{ github.token }}
+       - run: node --import tsx --test scripts/acceptance/self-hosted-production.test.mjs scripts/ops/production-mobile-daemon.test.mjs
+ 
+   acceptance:
+@@ -55,6 +57,8 @@
+         with:
+           persist-credentials: false
+       - uses: ./.github/actions/pnpm-install
++        with:
++          ffmpeg-github-token: ${{ github.token }}
+       - name: Verify an open core issue, current main and its actual cloud Web publication before credentials
+         id: attest
+         run: node --import tsx scripts/acceptance/self-hosted-production.mjs --attest
+--- a/.github/workflows/thread-lifecycle-acceptance.yml
++++ b/.github/workflows/thread-lifecycle-acceptance.yml
+@@ -124,6 +124,8 @@
+           fetch-depth: 2
+           persist-credentials: false
+       - uses: ./.github/actions/pnpm-install
++        with:
++          ffmpeg-github-token: ${{ github.token }}
+       - name: Check source, official template and disposable database guards without allocating
+         run: node --import ./scripts/server-test.mjs --import tsx scripts/e2b/thread-lifecycle-acceptance.ts --check
+         env: &provider_environment
+--- a/.github/workflows/ui-policy.yml
++++ b/.github/workflows/ui-policy.yml
+@@ -97,6 +97,8 @@
+     steps:
+       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+       - uses: ./.github/actions/pnpm-install
++        with:
++          ffmpeg-github-token: ${{ github.token }}
+       - name: Run selected core tasks through Nx Core
+         run: node scripts/ci/run-units.mjs core
+         env:
+@@ -117,6 +119,8 @@
+     steps:
+       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+       - uses: ./.github/actions/pnpm-install
++        with:
++          ffmpeg-github-token: ${{ github.token }}
+       - name: Run selected integration tasks through Nx Core
+         run: node scripts/ci/run-units.mjs integration
+         env:
+@@ -137,6 +141,8 @@
+     steps:
+       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+       - uses: ./.github/actions/pnpm-install
++        with:
++          ffmpeg-github-token: ${{ github.token }}
+       - name: Shadow selection against full baseline scenarios
+         run: node scripts/ci/shadow.mjs
+       - run: pnpm check:cloud-boundary
+@@ -200,6 +206,8 @@
+     steps:
+       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+       - uses: ./.github/actions/pnpm-install
++        with:
++          ffmpeg-github-token: ${{ github.token }}
+       - name: Daemon unit and transport regression tests
+         run: pnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=github-actions --reporter=json --outputFile.json="$RUNNER_TEMP/pr13-daemon-unit-results.json"
+       - name: Existing mailbox CLI integration tests
+@@ -339,6 +347,8 @@
+     steps:
+       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+       - uses: ./.github/actions/pnpm-install
++        with:
++          ffmpeg-github-token: ${{ github.token }}
+       # The .deb files apt downloads for the packages below, keyed on the package
+       # list and the runner image (a new image can carry newer dependencies).
+       # Read-only except on pushes to main, like the pnpm store.
+--- a/.github/workflows/self-hosted-image.yml
++++ b/.github/workflows/self-hosted-image.yml
+@@ -32,11 +32,9 @@
+       - name: Verify disposable acceptance target guards and model fixture
+         run: node --test scripts/acceptance/self-hosted-fixtures.test.mjs
+       - name: Build the public standalone application
+-        env:
+-          FFMPEG_GITHUB_TOKEN: ${{ github.token }}
+         run: |
+           mikka_image_worker_sha="$(python3 scripts/e2b/build-template.py --worker-hash --source-ref "$GITHUB_SHA")"
+-          docker build --secret id=ffmpeg_github_token,env=FFMPEG_GITHUB_TOKEN --build-arg MIKKA_BUILD_REVISION="$GITHUB_SHA" --build-arg MIKKA_BUILD_WORKER_SHA="$mikka_image_worker_sha" --tag mikka-self-hosted:check .
++          docker build --build-arg MIKKA_BUILD_REVISION="$GITHUB_SHA" --build-arg MIKKA_BUILD_WORKER_SHA="$mikka_image_worker_sha" --tag mikka-self-hosted:check .
+       - name: Verify packaged subscription binaries without network or credentials
+         run: docker run --rm --network none --entrypoint node mikka-self-hosted:check scripts/self-hosted-subscriptions-smoke.mjs
+       - name: Start with an empty database and no Mikka credentials
+--- a/tests/mvp/pinned-pnpm.test.mjs
++++ b/tests/mvp/pinned-pnpm.test.mjs
+@@ -1,3 +1,9 @@
++import { execFileSync } from 'node:child_process'
++import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
++import { tmpdir } from 'node:os'
++import { join } from 'node:path'
++import { fileURLToPath } from 'node:url'
++import yaml from 'js-yaml'
+ import assert from 'node:assert/strict'
+ import test from 'node:test'
+ import { resolvePinnedPnpm } from './pinned-pnpm.mjs'
+@@ -94,3 +100,131 @@
+     assert.equal(fake.calls.length, 0)
+   }
+ })
++
++
++const scopeRoot = fileURLToPath(new URL('../..', import.meta.url))
++const sharedInstallPath = '.github/actions/pnpm-install/action.yml'
++const githubTokenExpression = '$' + '{{ github.token }}'
++const inputTokenExpression = '$' + '{{ inputs.ffmpeg-github-token }}'
++const syntheticToken = 'fixture-only-not-a-real-token'
++const readYaml = path => yaml.load(readFileSync(join(scopeRoot, path), 'utf8'))
++const sharedAction = () => readYaml(sharedInstallPath)
++const sharedStep = job => job.steps.find(step => step.uses === './.github/actions/pnpm-install')
++const apiReadOnly = permissions => permissions === 'read-all' || (
++  permissions && typeof permissions === 'object' && permissions.contents === 'read' &&
++  Object.entries(permissions).every(([key, value]) =>
++    key === 'id-token' ? ['none', 'write'].includes(value) : ['none', 'read'].includes(value))
++)
++function assertCredentialScopes(workflow) {
++  for (const [name, job] of Object.entries(workflow.jobs || {})) {
++    const permissions = job.permissions ?? workflow.permissions
++    const grants = [workflow.env?.FFMPEG_GITHUB_TOKEN, job.env?.FFMPEG_GITHUB_TOKEN]
++    for (const step of job.steps || []) {
++      grants.push(step.env?.FFMPEG_GITHUB_TOKEN)
++      if (step.uses === './.github/actions/pnpm-install') grants.push(step.with?.['ffmpeg-github-token'])
++    }
++    for (const grant of grants.filter(value => value !== undefined && value !== '')) {
++      assert.equal(grant, githubTokenExpression, 'ONLY_EXISTING_JOB_TOKEN')
++      assert.ok(apiReadOnly(permissions), 'READ_ONLY_API_TOKEN_REQUIRED: ' + name)
++    }
++  }
++}
++function resolveInstallValue(value, inputs) {
++  if (value === '') return ''
++  if (value === githubTokenExpression) return syntheticToken
++  if (value === inputTokenExpression) return inputs['ffmpeg-github-token'] ?? ''
++  throw new Error('UNSUPPORTED_INSTALL_EXPRESSION')
++}
++function lifecyclePresence(t, caller, inherited = '') {
++  const action = sharedAction()
++  const install = action.runs.steps.filter(step => step.run === 'pnpm install --frozen-lockfile')
++  assert.equal(install.length, 1)
++  assert.equal(install[0].shell, 'bash')
++  const value = caller.with?.['ffmpeg-github-token'] ?? action.inputs?.['ffmpeg-github-token']?.default ?? ''
++  const inputs = { 'ffmpeg-github-token': resolveInstallValue(value, {}) }
++  const directory = mkdtempSync(join(tmpdir(), 'mikka-install-scope-'))
++  t.after(() => rmSync(directory, { recursive: true, force: true }))
++  writeFileSync(join(directory, 'package.json'), JSON.stringify({
++    name: 'mikka-credential-scope-fixture', version: '1.0.0', private: true,
++    packageManager: pin, scripts: { postinstall: 'node postinstall.cjs' },
++  }))
++  writeFileSync(join(directory, 'pnpm-lock.yaml'),
++    "lockfileVersion: '9.0'\nsettings:\n  autoInstallPeers: true\n  excludeLinksFromLockfile: false\nimporters:\n  .: {}\n")
++  writeFileSync(join(directory, 'postinstall.cjs'),
++    "require('node:fs').writeFileSync('presence.json', JSON.stringify({present: Boolean(process.env.FFMPEG_GITHUB_TOKEN)}))\n")
++  const environment = {
++    PATH: process.env.PATH, HOME: process.env.HOME, CI: 'true',
++    NODE_OPTIONS: '', COREPACK_ENABLE_NETWORK: '0', COREPACK_ENABLE_DOWNLOAD_PROMPT: '0',
++    npm_config_manage_package_manager_versions: 'false', npm_config_offline: 'true',
++    npm_config_store_dir: join(directory, 'store'), FFMPEG_GITHUB_TOKEN: inherited,
++  }
++  for (const [key, value] of Object.entries(install[0].env || {})) {
++    assert.equal(key, 'FFMPEG_GITHUB_TOKEN')
++    environment[key] = resolveInstallValue(value, inputs)
++  }
++  const manager = resolvePinnedPnpm({ packageManager: pin })
++  execFileSync(manager.file, [...manager.args, ...install[0].run.split(' ').slice(1)], {
++    cwd: directory, env: environment, timeout: 30_000, maxBuffer: 64 * 1024, stdio: ['ignore', 'pipe', 'pipe'],
++  })
++  const receipt = JSON.parse(readFileSync(join(directory, 'presence.json'), 'utf8'))
++  assert.deepEqual(Object.keys(receipt), ['present'])
++  return receipt.present
++}
++
++test('shared install defaults to no credential and overrides ambient legacy tokens in real lifecycle scripts', async t => {
++  const caller = sharedStep(readYaml('.github/workflows/self-hosted-image.yml').jobs.image)
++  assert.ok(caller)
++  assert.equal(caller.with?.['ffmpeg-github-token'], undefined)
++  for (const inherited of ['', syntheticToken]) {
++    await t.test(inherited ? 'ambient token is cleared' : 'no input stays empty', t => {
++      assert.equal(lifecyclePresence(t, caller, inherited), false)
++    })
++  }
++})
++
++test('a verified API-read-only caller explicitly delivers its token to the real install process', t => {
++  const workflow = readYaml('.github/workflows/ui-policy.yml')
++  const caller = sharedStep(workflow.jobs['source-checks'])
++  assert.equal(caller.with?.['ffmpeg-github-token'], githubTokenExpression)
++  assertCredentialScopes(workflow)
++  assert.equal(lifecyclePresence(t, caller), true)
++})
++
++test('the actual composite input and all workflow opt-ins preserve the process credential boundary', () => {
++  const action = sharedAction()
++  assert.equal(action.inputs['ffmpeg-github-token'].default, '')
++  assert.equal(action.inputs['ffmpeg-github-token'].required, false)
++  const install = action.runs.steps.find(step => step.run === 'pnpm install --frozen-lockfile')
++  assert.equal(install.env.FFMPEG_GITHUB_TOKEN, inputTokenExpression)
++  for (const name of readdirSync(join(scopeRoot, '.github/workflows')).filter(name => /\.ya?ml$/.test(name))) {
++    assertCredentialScopes(readYaml('.github/workflows/' + name))
++  }
++  const image = readYaml('.github/workflows/self-hosted-image.yml').jobs.image
++  const build = image.steps.find(step => step.name === 'Build the public standalone application')
++  assert.equal(build.env?.FFMPEG_GITHUB_TOKEN, undefined)
++  assert.doesNotMatch(build.run, /--secret\s+[^\n]*ffmpeg_github_token/)
++})
++
++test('credential opt-ins honor job overrides and reject unknown or API-write permissions', async t => {
++  for (const [name, workflowPermissions, jobPermissions, allowed] of [
++    ['workflow read overridden by job write', { contents: 'read' }, { contents: 'write' }, false],
++    ['workflow write overridden by job read', { contents: 'write' }, { contents: 'read' }, true],
++    ['unknown inherited permissions', undefined, undefined, false],
++    ['write-all', 'write-all', undefined, false],
++    ['read-all', 'read-all', undefined, true],
++    ['OIDC is separate from the API token', { contents: 'read', 'id-token': 'write' }, undefined, true],
++    ['package publication token', { contents: 'read', packages: 'write' }, undefined, false],
++    ['explicit empty permissions', { contents: 'read' }, {}, false],
++  ]) {
++    await t.test(name, () => {
++      const job = { steps: [{ uses: './.github/actions/pnpm-install', with: { 'ffmpeg-github-token': githubTokenExpression } }] }
++      if (jobPermissions !== undefined) job.permissions = jobPermissions
++      const workflow = { jobs: { install: job } }
++      if (workflowPermissions !== undefined) workflow.permissions = workflowPermissions
++      if (allowed) assert.doesNotThrow(() => assertCredentialScopes(workflow))
++      else assert.throws(() => assertCredentialScopes(workflow), /READ_ONLY_API_TOKEN_REQUIRED/)
++      delete job.steps[0].with
++      assert.doesNotThrow(() => assertCredentialScopes(workflow), 'anonymous/default-none remains allowed')
++    })
++  }
++})

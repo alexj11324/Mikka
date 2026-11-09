@@ -1,0 +1,232 @@
+TAP version 13
+# Subtest: preflight reads both exact subscription paths without creating profiles, changing settings or submitting tasks
+ok 1 - preflight reads both exact subscription paths without creating profiles, changing settings or submitting tasks
+  ---
+  duration_ms: 70.685012
+  type: 'test'
+  ...
+# Subtest: preflight excludes only a version-bound Factory task proven to belong to another workspace
+ok 2 - preflight excludes only a version-bound Factory task proven to belong to another workspace
+  ---
+  duration_ms: 5.96368
+  type: 'test'
+  ...
+# Subtest: preflight keeps same-workspace, missing and mismatched Factory scope proofs blocked
+ok 3 - preflight keeps same-workspace, missing and mismatched Factory scope proofs blocked
+  ---
+  duration_ms: 40.489214
+  type: 'test'
+  ...
+# Subtest: preflight does not convert current-workspace failed or blocked Factory tasks into terminal tasks
+ok 4 - preflight does not convert current-workspace failed or blocked Factory tasks into terminal tasks
+  ---
+  duration_ms: 5.890725
+  type: 'test'
+  ...
+# Subtest: preflight does not request scope details for already settled Factory tasks
+ok 5 - preflight does not request scope details for already settled Factory tasks
+  ---
+  duration_ms: 16.083721
+  type: 'test'
+  ...
+# Subtest: foreign historical Factory tasks remain untouched while failed owned acceptance still cancels its task
+ok 6 - foreign historical Factory tasks remain untouched while failed owned acceptance still cancels its task
+  ---
+  duration_ms: 19.136442
+  type: 'test'
+  ...
+# Subtest: a default team switches only this login session to its verified personal workspace before reading Coordinator
+ok 7 - a default team switches only this login session to its verified personal workspace before reading Coordinator
+  ---
+  duration_ms: 3.291453
+  type: 'test'
+  ...
+# Subtest: workspace selection rejects ambiguous choices, teams and another account personal membership before switching
+ok 8 - workspace selection rejects ambiguous choices, teams and another account personal membership before switching
+  ---
+  duration_ms: 21.278708
+  type: 'test'
+  ...
+# Subtest: workspace switch acknowledgement and cookie readback failures stop before Coordinator and close the session
+ok 9 - workspace switch acknowledgement and cookie readback failures stop before Coordinator and close the session
+  ---
+  duration_ms: 7.736135
+  type: 'test'
+  ...
+# Subtest: unsafe configuration blocks before any model call and reports only closed failure codes
+ok 10 - unsafe configuration blocks before any model call and reports only closed failure codes
+  ---
+  duration_ms: 6.671953
+  type: 'test'
+  ...
+# Subtest: two executed cases retain exact native receipts, restore model/profile state and never fabricate replay evidence
+ok 11 - two executed cases retain exact native receipts, restore model/profile state and never fabricate replay evidence
+  ---
+  duration_ms: 23.06399
+  type: 'test'
+  ...
+# Subtest: successful terminal runs close only their own machines and retain task evidence
+ok 12 - successful terminal runs close only their own machines and retain task evidence
+  ---
+  duration_ms: 9.362956
+  type: 'test'
+  ...
+# Subtest: a missing machine requires a fresh owned run and an explicit null machine read
+ok 13 - a missing machine requires a fresh owned run and an explicit null machine read
+  ---
+  duration_ms: 13.767241
+  type: 'test'
+  ...
+# Subtest: machine failures never turn a completed task green and do not prevent closing another owned machine
+ok 14 - machine failures never turn a completed task green and do not prevent closing another owned machine
+  ---
+  duration_ms: 104.015973
+  type: 'test'
+  ...
+# Subtest: legacy Factory tasks still require review and verify before the normal deliverable acceptance
+ok 15 - legacy Factory tasks still require review and verify before the normal deliverable acceptance
+  ---
+  duration_ms: 10.241554
+  type: 'test'
+  ...
+# Subtest: missing, failed or stale Factory checks never reach approval, including legacy verify
+ok 16 - missing, failed or stale Factory checks never reach approval, including legacy verify
+  ---
+  duration_ms: 31.925313
+  type: 'test'
+  ...
+# Subtest: deliverable approval requires its receipt, never accepts a repository and never retries a lost response
+ok 17 - deliverable approval requires its receipt, never accepts a repository and never retries a lost response
+  ---
+  duration_ms: 24.513834
+  type: 'test'
+  ...
+# Subtest: uncertain mutation responses never resubmit and still reconcile own temporary settings
+ok 18 - uncertain mutation responses never resubmit and still reconcile own temporary settings
+  ---
+  duration_ms: 6.805458
+  type: 'test'
+  ...
+# Subtest: wrong provider/model and an extra native attempt stop the case without retrying
+ok 19 - wrong provider/model and an extra native attempt stop the case without retrying
+  ---
+  duration_ms: 12.00412
+  type: 'test'
+  ...
+# Subtest: pure source and budget guards reject shared credentials, inherited model choices and retries
+ok 20 - pure source and budget guards reject shared credentials, inherited model choices and retries
+  ---
+  duration_ms: 2.294672
+  type: 'test'
+  ...
+# Subtest: cleanup preserves a concurrent model edit and reports incomplete restoration
+ok 21 - cleanup preserves a concurrent model edit and reports incomplete restoration
+  ---
+  duration_ms: 6.390156
+  type: 'test'
+  ...
+# Subtest: prepare is explicit, requires execution and restores only its acknowledged settings
+ok 22 - prepare is explicit, requires execution and restores only its acknowledged settings
+  ---
+  duration_ms: 16.884298
+  type: 'test'
+  ...
+# Subtest: prepare refuses owner-wide activity and inherited model choices without changing settings
+ok 23 - prepare refuses owner-wide activity and inherited model choices without changing settings
+  ---
+  duration_ms: 3.570434
+  type: 'test'
+  ...
+# Subtest: a blocked case does not prevent preparation and execution of another available model
+ok 24 - a blocked case does not prevent preparation and execution of another available model
+  ---
+  duration_ms: 14.537881
+  type: 'test'
+  ...
+# Subtest: preparation failures restore acknowledged writes but never guess after a lost response
+ok 25 - preparation failures restore acknowledged writes but never guess after a lost response
+  ---
+  duration_ms: 6.614172
+  type: 'test'
+  ...
+# Subtest: restoration failures and concurrent edits remain visible without overwriting them
+ok 26 - restoration failures and concurrent edits remain visible without overwriting them
+  ---
+  duration_ms: 40.428037
+  type: 'test'
+  ...
+# Subtest: issue inventory follows real opaque cursors beyond 100 rows and rejects a moving scan
+ok 27 - issue inventory follows real opaque cursors beyond 100 rows and rejects a moving scan
+  ---
+  duration_ms: 1.139773
+  type: 'test'
+  ...
+# Subtest: browser submission requires one executed case and does not authenticate on invalid options
+ok 28 - browser submission requires one executed case and does not authenticate on invalid options
+  ---
+  duration_ms: 0.205671
+  type: 'test'
+  ...
+# Subtest: browser mode publishes readiness then observes the real-shaped UI click through push without an API submission
+ok 29 - browser mode publishes readiness then observes the real-shaped UI click through push without an API submission
+  ---
+  duration_ms: 21.618824
+  type: 'test'
+  ...
+# Subtest: browser waiting times out or blocks changed UI text without sending or repeating a task
+ok 30 - browser waiting times out or blocks changed UI text without sending or repeating a task
+  ---
+  duration_ms: 6.272467
+  type: 'test'
+  ...
+# Subtest: live transport waits for actual invalidations, rejects disconnects and keeps capabilities out of reports
+ok 31 - live transport waits for actual invalidations, rejects disconnects and keeps capabilities out of reports
+  ---
+  duration_ms: 2.142571
+  type: 'test'
+  ...
+# Subtest: implicit default preflight requires server absence evidence and never writes a preference
+ok 32 - implicit default preflight requires server absence evidence and never writes a preference
+  ---
+  duration_ms: 7.635815
+  type: 'test'
+  ...
+# Subtest: implicit default restores absence with the stored binding and revision, not the catalogue option
+ok 33 - implicit default restores absence with the stored binding and revision, not the catalogue option
+  ---
+  duration_ms: 5.730201
+  type: 'test'
+  ...
+# Subtest: implicit default never overwrites a preference created after preflight
+ok 34 - implicit default never overwrites a preference created after preflight
+  ---
+  duration_ms: 2.039666
+  type: 'test'
+  ...
+# Subtest: implicit default stops after a lost or incomplete first selection receipt without guessing ownership
+ok 35 - implicit default stops after a lost or incomplete first selection receipt without guessing ownership
+  ---
+  duration_ms: 3.502129
+  type: 'test'
+  ...
+# Subtest: implicit default preserves a same-value concurrent rewrite when the revision no longer matches
+ok 36 - implicit default preserves a same-value concurrent rewrite when the revision no longer matches
+  ---
+  duration_ms: 6.062972
+  type: 'test'
+  ...
+# Subtest: implicit default checks absence once after a lost restoration response and does not repeat deletion
+ok 37 - implicit default checks absence once after a lost restoration response and does not repeat deletion
+  ---
+  duration_ms: 8.946318
+  type: 'test'
+  ...
+1..37
+# tests 37
+# suites 0
+# pass 37
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 812.72273

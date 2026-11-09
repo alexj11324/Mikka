@@ -1,0 +1,262 @@
+TAP version 13
+# Subtest: profile preflight refuses workspace admission denied instead of treating any 404 as absence
+not ok 1 - profile preflight refuses workspace admission denied instead of treating any 404 as absence
+  ---
+  duration_ms: 90.770235
+  type: 'test'
+  location: '/vercel/driver-profile404/scripts/acceptance/run-observability.test.mjs:1056:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"version":1,"issue":1512,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"execute","status":"runtime_verified","startedAt":"2026-11-09T10:20:24.232Z","browserReplayVerified":false,"posthogIngestionVerified":false,"budget":{"submissionsPerModel":1,"nativeRunsByFlowVersion":{"1":3,"2":2},"enforcement":"stop_on_first_observed_excess","timeoutMs":480000,"paidResubmissions":0,"hardDollarCap":false},"modelCase":"claude","submissionSource":"api","cases":[{"case":"claude","model":"claude-haiku-5-5","status":"runtime_verified","cleanup":{"state":"complete","profileArchived":true,"modelRestored":true,"evidence":"retained","ownRunsStopped":true,"ownMachinesEnded":true,"machines":[{"runId":"10000000-0000-4000-8000-000000000400","status":"ended"},{"runId":"10000000-0000-4000-8000-000000000401","status":"ended"}]},"preflight":{"ownSubscription":true,"cloudReady":true,"workspaceIdle":true,"modelRestorable":true,"paidFallbackOff":true,"soleFixedProfileAvailable":true,"liveReady":true},"profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","requestTrace":{"traceId":"1525509b40b3e50785130f76fa601e16","parentSpanId":"0a22bbf46b890b84","source":"w3c_client_parent","backendObserved":false},"workflowRunIds":["wrun_abcdefghijklmnop0"],"runs":[{"runId":"10000000-0000-4000-8000-000000000400","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true},{"runId":"10000000-0000-4000-8000-000000000401","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true}],"taskId":"10000000-0000-4000-8000-000000000200","issueId":"10000000-0000-4000-8000-000000000100","task":{"stage":"approval","status":"passed","revision":2},"artifact":{"id":"10000000-0000-4000-8000-000000000500","version":1,"bytes":56,"sha256":"d8b25a2accf4cd3583900ee527f9d782bf11e90ab4359db296888aa67070ca5d"},"checks":[{"stage":"review","runId":"10000000-0000-4000-8000-000000000401","status":"passed"}],"flowVersion":2,"acceptance":{"status":"accepted","id":"10000000-0000-4000-8000-000000000800","stage":"approval"},"durationMs":28}],"sessionClosed":true,"preparation":{"requested":false,"profilesDisabled":0,"profilesRestored":0,"fallbackChanged":false,"restoration":"not_needed"},"workspaceId":"10000000-0000-4000-8000-000000000001","workspaceSelection":"current_personal","botId":"10000000-0000-4000-8000-000000000002","finishedAt":"2026-11-09T10:20:24.319Z"}
+    + actual - expected
+    
+    + 'runtime_verified'
+    - 'blocked'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'blocked'
+  actual: 'runtime_verified'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/driver-profile404/scripts/acceptance/run-observability.test.mjs:1068:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: profile cleanup refuses workspace admission denied without falsely marking an existing profile archived
+not ok 2 - profile cleanup refuses workspace admission denied without falsely marking an existing profile archived
+  ---
+  duration_ms: 21.057268
+  type: 'test'
+  location: '/vercel/driver-profile404/scripts/acceptance/run-observability.test.mjs:1077:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"version":1,"issue":1512,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"execute","status":"runtime_verified","startedAt":"2026-11-09T10:20:24.321Z","browserReplayVerified":false,"posthogIngestionVerified":false,"budget":{"submissionsPerModel":1,"nativeRunsByFlowVersion":{"1":3,"2":2},"enforcement":"stop_on_first_observed_excess","timeoutMs":480000,"paidResubmissions":0,"hardDollarCap":false},"modelCase":"claude","submissionSource":"api","cases":[{"case":"claude","model":"claude-haiku-5-5","status":"runtime_verified","cleanup":{"state":"complete","profileArchived":true,"modelRestored":true,"evidence":"retained","ownRunsStopped":true,"ownMachinesEnded":true,"machines":[{"runId":"10000000-0000-4000-8000-000000000400","status":"ended"},{"runId":"10000000-0000-4000-8000-000000000401","status":"ended"}]},"preflight":{"ownSubscription":true,"cloudReady":true,"workspaceIdle":true,"modelRestorable":true,"paidFallbackOff":true,"soleFixedProfileAvailable":true,"liveReady":true},"profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","requestTrace":{"traceId":"42d2a31c4918ed9669215a71258ed43b","parentSpanId":"61168e3e4a9a844f","source":"w3c_client_parent","backendObserved":false},"workflowRunIds":["wrun_abcdefghijklmnop0"],"runs":[{"runId":"10000000-0000-4000-8000-000000000400","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true},{"runId":"10000000-0000-4000-8000-000000000401","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true}],"taskId":"10000000-0000-4000-8000-000000000200","issueId":"10000000-0000-4000-8000-000000000100","task":{"stage":"approval","status":"passed","revision":2},"artifact":{"id":"10000000-0000-4000-8000-000000000500","version":1,"bytes":56,"sha256":"d8b25a2accf4cd3583900ee527f9d782bf11e90ab4359db296888aa67070ca5d"},"checks":[{"stage":"review","runId":"10000000-0000-4000-8000-000000000401","status":"passed"}],"flowVersion":2,"acceptance":{"status":"accepted","id":"10000000-0000-4000-8000-000000000800","stage":"approval"},"durationMs":19}],"sessionClosed":true,"preparation":{"requested":false,"profilesDisabled":0,"profilesRestored":0,"fallbackChanged":false,"restoration":"not_needed"},"workspaceId":"10000000-0000-4000-8000-000000000001","workspaceSelection":"current_personal","botId":"10000000-0000-4000-8000-000000000002","finishedAt":"2026-11-09T10:20:24.341Z"}
+    + actual - expected
+    
+    + 'runtime_verified'
+    - 'blocked'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'blocked'
+  actual: 'runtime_verified'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/driver-profile404/scripts/acceptance/run-observability.test.mjs:1093:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: profile preflight refuses profile scope denied instead of treating any 404 as absence
+not ok 3 - profile preflight refuses profile scope denied instead of treating any 404 as absence
+  ---
+  duration_ms: 18.572162
+  type: 'test'
+  location: '/vercel/driver-profile404/scripts/acceptance/run-observability.test.mjs:1056:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"version":1,"issue":1512,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"execute","status":"runtime_verified","startedAt":"2026-11-09T10:20:24.342Z","browserReplayVerified":false,"posthogIngestionVerified":false,"budget":{"submissionsPerModel":1,"nativeRunsByFlowVersion":{"1":3,"2":2},"enforcement":"stop_on_first_observed_excess","timeoutMs":480000,"paidResubmissions":0,"hardDollarCap":false},"modelCase":"claude","submissionSource":"api","cases":[{"case":"claude","model":"claude-haiku-5-5","status":"runtime_verified","cleanup":{"state":"complete","profileArchived":true,"modelRestored":true,"evidence":"retained","ownRunsStopped":true,"ownMachinesEnded":true,"machines":[{"runId":"10000000-0000-4000-8000-000000000400","status":"ended"},{"runId":"10000000-0000-4000-8000-000000000401","status":"ended"}]},"preflight":{"ownSubscription":true,"cloudReady":true,"workspaceIdle":true,"modelRestorable":true,"paidFallbackOff":true,"soleFixedProfileAvailable":true,"liveReady":true},"profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","requestTrace":{"traceId":"2c0dda0be04af899a914a569ccfd3386","parentSpanId":"aa6495f3acdae4ce","source":"w3c_client_parent","backendObserved":false},"workflowRunIds":["wrun_abcdefghijklmnop0"],"runs":[{"runId":"10000000-0000-4000-8000-000000000400","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true},{"runId":"10000000-0000-4000-8000-000000000401","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true}],"taskId":"10000000-0000-4000-8000-000000000200","issueId":"10000000-0000-4000-8000-000000000100","task":{"stage":"approval","status":"passed","revision":2},"artifact":{"id":"10000000-0000-4000-8000-000000000500","version":1,"bytes":56,"sha256":"d8b25a2accf4cd3583900ee527f9d782bf11e90ab4359db296888aa67070ca5d"},"checks":[{"stage":"review","runId":"10000000-0000-4000-8000-000000000401","status":"passed"}],"flowVersion":2,"acceptance":{"status":"accepted","id":"10000000-0000-4000-8000-000000000800","stage":"approval"},"durationMs":16}],"sessionClosed":true,"preparation":{"requested":false,"profilesDisabled":0,"profilesRestored":0,"fallbackChanged":false,"restoration":"not_needed"},"workspaceId":"10000000-0000-4000-8000-000000000001","workspaceSelection":"current_personal","botId":"10000000-0000-4000-8000-000000000002","finishedAt":"2026-11-09T10:20:24.360Z"}
+    + actual - expected
+    
+    + 'runtime_verified'
+    - 'blocked'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'blocked'
+  actual: 'runtime_verified'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/driver-profile404/scripts/acceptance/run-observability.test.mjs:1068:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: profile cleanup refuses profile scope denied without falsely marking an existing profile archived
+not ok 4 - profile cleanup refuses profile scope denied without falsely marking an existing profile archived
+  ---
+  duration_ms: 10.80335
+  type: 'test'
+  location: '/vercel/driver-profile404/scripts/acceptance/run-observability.test.mjs:1077:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"version":1,"issue":1512,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"execute","status":"runtime_verified","startedAt":"2026-11-09T10:20:24.361Z","browserReplayVerified":false,"posthogIngestionVerified":false,"budget":{"submissionsPerModel":1,"nativeRunsByFlowVersion":{"1":3,"2":2},"enforcement":"stop_on_first_observed_excess","timeoutMs":480000,"paidResubmissions":0,"hardDollarCap":false},"modelCase":"claude","submissionSource":"api","cases":[{"case":"claude","model":"claude-haiku-5-5","status":"runtime_verified","cleanup":{"state":"complete","profileArchived":true,"modelRestored":true,"evidence":"retained","ownRunsStopped":true,"ownMachinesEnded":true,"machines":[{"runId":"10000000-0000-4000-8000-000000000400","status":"ended"},{"runId":"10000000-0000-4000-8000-000000000401","status":"ended"}]},"preflight":{"ownSubscription":true,"cloudReady":true,"workspaceIdle":true,"modelRestorable":true,"paidFallbackOff":true,"soleFixedProfileAvailable":true,"liveReady":true},"profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","requestTrace":{"traceId":"cd17c1c7757ee46e90f3727926a7e228","parentSpanId":"8ab42815e747aeba","source":"w3c_client_parent","backendObserved":false},"workflowRunIds":["wrun_abcdefghijklmnop0"],"runs":[{"runId":"10000000-0000-4000-8000-000000000400","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true},{"runId":"10000000-0000-4000-8000-000000000401","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true}],"taskId":"10000000-0000-4000-8000-000000000200","issueId":"10000000-0000-4000-8000-000000000100","task":{"stage":"approval","status":"passed","revision":2},"artifact":{"id":"10000000-0000-4000-8000-000000000500","version":1,"bytes":56,"sha256":"d8b25a2accf4cd3583900ee527f9d782bf11e90ab4359db296888aa67070ca5d"},"checks":[{"stage":"review","runId":"10000000-0000-4000-8000-000000000401","status":"passed"}],"flowVersion":2,"acceptance":{"status":"accepted","id":"10000000-0000-4000-8000-000000000800","stage":"approval"},"durationMs":10}],"sessionClosed":true,"preparation":{"requested":false,"profilesDisabled":0,"profilesRestored":0,"fallbackChanged":false,"restoration":"not_needed"},"workspaceId":"10000000-0000-4000-8000-000000000001","workspaceSelection":"current_personal","botId":"10000000-0000-4000-8000-000000000002","finishedAt":"2026-11-09T10:20:24.371Z"}
+    + actual - expected
+    
+    + 'runtime_verified'
+    - 'blocked'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'blocked'
+  actual: 'runtime_verified'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/driver-profile404/scripts/acceptance/run-observability.test.mjs:1093:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: profile preflight refuses unknown error instead of treating any 404 as absence
+not ok 5 - profile preflight refuses unknown error instead of treating any 404 as absence
+  ---
+  duration_ms: 14.201969
+  type: 'test'
+  location: '/vercel/driver-profile404/scripts/acceptance/run-observability.test.mjs:1056:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"version":1,"issue":1512,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"execute","status":"runtime_verified","startedAt":"2026-11-09T10:20:24.371Z","browserReplayVerified":false,"posthogIngestionVerified":false,"budget":{"submissionsPerModel":1,"nativeRunsByFlowVersion":{"1":3,"2":2},"enforcement":"stop_on_first_observed_excess","timeoutMs":480000,"paidResubmissions":0,"hardDollarCap":false},"modelCase":"claude","submissionSource":"api","cases":[{"case":"claude","model":"claude-haiku-5-5","status":"runtime_verified","cleanup":{"state":"complete","profileArchived":true,"modelRestored":true,"evidence":"retained","ownRunsStopped":true,"ownMachinesEnded":true,"machines":[{"runId":"10000000-0000-4000-8000-000000000400","status":"ended"},{"runId":"10000000-0000-4000-8000-000000000401","status":"ended"}]},"preflight":{"ownSubscription":true,"cloudReady":true,"workspaceIdle":true,"modelRestorable":true,"paidFallbackOff":true,"soleFixedProfileAvailable":true,"liveReady":true},"profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","requestTrace":{"traceId":"2fd9c339439746e41a5290874a5370aa","parentSpanId":"5bb6ee9e9f0c2190","source":"w3c_client_parent","backendObserved":false},"workflowRunIds":["wrun_abcdefghijklmnop0"],"runs":[{"runId":"10000000-0000-4000-8000-000000000400","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true},{"runId":"10000000-0000-4000-8000-000000000401","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true}],"taskId":"10000000-0000-4000-8000-000000000200","issueId":"10000000-0000-4000-8000-000000000100","task":{"stage":"approval","status":"passed","revision":2},"artifact":{"id":"10000000-0000-4000-8000-000000000500","version":1,"bytes":56,"sha256":"d8b25a2accf4cd3583900ee527f9d782bf11e90ab4359db296888aa67070ca5d"},"checks":[{"stage":"review","runId":"10000000-0000-4000-8000-000000000401","status":"passed"}],"flowVersion":2,"acceptance":{"status":"accepted","id":"10000000-0000-4000-8000-000000000800","stage":"approval"},"durationMs":13}],"sessionClosed":true,"preparation":{"requested":false,"profilesDisabled":0,"profilesRestored":0,"fallbackChanged":false,"restoration":"not_needed"},"workspaceId":"10000000-0000-4000-8000-000000000001","workspaceSelection":"current_personal","botId":"10000000-0000-4000-8000-000000000002","finishedAt":"2026-11-09T10:20:24.385Z"}
+    + actual - expected
+    
+    + 'runtime_verified'
+    - 'blocked'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'blocked'
+  actual: 'runtime_verified'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/driver-profile404/scripts/acceptance/run-observability.test.mjs:1068:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: profile cleanup refuses unknown error without falsely marking an existing profile archived
+not ok 6 - profile cleanup refuses unknown error without falsely marking an existing profile archived
+  ---
+  duration_ms: 17.051545
+  type: 'test'
+  location: '/vercel/driver-profile404/scripts/acceptance/run-observability.test.mjs:1077:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"version":1,"issue":1512,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"execute","status":"runtime_verified","startedAt":"2026-11-09T10:20:24.386Z","browserReplayVerified":false,"posthogIngestionVerified":false,"budget":{"submissionsPerModel":1,"nativeRunsByFlowVersion":{"1":3,"2":2},"enforcement":"stop_on_first_observed_excess","timeoutMs":480000,"paidResubmissions":0,"hardDollarCap":false},"modelCase":"claude","submissionSource":"api","cases":[{"case":"claude","model":"claude-haiku-5-5","status":"runtime_verified","cleanup":{"state":"complete","profileArchived":true,"modelRestored":true,"evidence":"retained","ownRunsStopped":true,"ownMachinesEnded":true,"machines":[{"runId":"10000000-0000-4000-8000-000000000400","status":"ended"},{"runId":"10000000-0000-4000-8000-000000000401","status":"ended"}]},"preflight":{"ownSubscription":true,"cloudReady":true,"workspaceIdle":true,"modelRestorable":true,"paidFallbackOff":true,"soleFixedProfileAvailable":true,"liveReady":true},"profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","requestTrace":{"traceId":"6fadb9fe97cea672680cd8180ee49f7b","parentSpanId":"bb971288c58605ce","source":"w3c_client_parent","backendObserved":false},"workflowRunIds":["wrun_abcdefghijklmnop0"],"runs":[{"runId":"10000000-0000-4000-8000-000000000400","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true},{"runId":"10000000-0000-4000-8000-000000000401","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true}],"taskId":"10000000-0000-4000-8000-000000000200","issueId":"10000000-0000-4000-8000-000000000100","task":{"stage":"approval","status":"passed","revision":2},"artifact":{"id":"10000000-0000-4000-8000-000000000500","version":1,"bytes":56,"sha256":"d8b25a2accf4cd3583900ee527f9d782bf11e90ab4359db296888aa67070ca5d"},"checks":[{"stage":"review","runId":"10000000-0000-4000-8000-000000000401","status":"passed"}],"flowVersion":2,"acceptance":{"status":"accepted","id":"10000000-0000-4000-8000-000000000800","stage":"approval"},"durationMs":15}],"sessionClosed":true,"preparation":{"requested":false,"profilesDisabled":0,"profilesRestored":0,"fallbackChanged":false,"restoration":"not_needed"},"workspaceId":"10000000-0000-4000-8000-000000000001","workspaceSelection":"current_personal","botId":"10000000-0000-4000-8000-000000000002","finishedAt":"2026-11-09T10:20:24.403Z"}
+    + actual - expected
+    
+    + 'runtime_verified'
+    - 'blocked'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'blocked'
+  actual: 'runtime_verified'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/driver-profile404/scripts/acceptance/run-observability.test.mjs:1093:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: profile preflight refuses nested not-found code instead of treating any 404 as absence
+not ok 7 - profile preflight refuses nested not-found code instead of treating any 404 as absence
+  ---
+  duration_ms: 22.2686
+  type: 'test'
+  location: '/vercel/driver-profile404/scripts/acceptance/run-observability.test.mjs:1056:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"version":1,"issue":1512,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"execute","status":"runtime_verified","startedAt":"2026-11-09T10:20:24.403Z","browserReplayVerified":false,"posthogIngestionVerified":false,"budget":{"submissionsPerModel":1,"nativeRunsByFlowVersion":{"1":3,"2":2},"enforcement":"stop_on_first_observed_excess","timeoutMs":480000,"paidResubmissions":0,"hardDollarCap":false},"modelCase":"claude","submissionSource":"api","cases":[{"case":"claude","model":"claude-haiku-5-5","status":"runtime_verified","cleanup":{"state":"complete","profileArchived":true,"modelRestored":true,"evidence":"retained","ownRunsStopped":true,"ownMachinesEnded":true,"machines":[{"runId":"10000000-0000-4000-8000-000000000400","status":"ended"},{"runId":"10000000-0000-4000-8000-000000000401","status":"ended"}]},"preflight":{"ownSubscription":true,"cloudReady":true,"workspaceIdle":true,"modelRestorable":true,"paidFallbackOff":true,"soleFixedProfileAvailable":true,"liveReady":true},"profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","requestTrace":{"traceId":"a495583c3aa2280249ad1ce3a37ac58a","parentSpanId":"c92e9b7414ac6c84","source":"w3c_client_parent","backendObserved":false},"workflowRunIds":["wrun_abcdefghijklmnop0"],"runs":[{"runId":"10000000-0000-4000-8000-000000000400","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true},{"runId":"10000000-0000-4000-8000-000000000401","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true}],"taskId":"10000000-0000-4000-8000-000000000200","issueId":"10000000-0000-4000-8000-000000000100","task":{"stage":"approval","status":"passed","revision":2},"artifact":{"id":"10000000-0000-4000-8000-000000000500","version":1,"bytes":56,"sha256":"d8b25a2accf4cd3583900ee527f9d782bf11e90ab4359db296888aa67070ca5d"},"checks":[{"stage":"review","runId":"10000000-0000-4000-8000-000000000401","status":"passed"}],"flowVersion":2,"acceptance":{"status":"accepted","id":"10000000-0000-4000-8000-000000000800","stage":"approval"},"durationMs":19}],"sessionClosed":true,"preparation":{"requested":false,"profilesDisabled":0,"profilesRestored":0,"fallbackChanged":false,"restoration":"not_needed"},"workspaceId":"10000000-0000-4000-8000-000000000001","workspaceSelection":"current_personal","botId":"10000000-0000-4000-8000-000000000002","finishedAt":"2026-11-09T10:20:24.425Z"}
+    + actual - expected
+    
+    + 'runtime_verified'
+    - 'blocked'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'blocked'
+  actual: 'runtime_verified'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/driver-profile404/scripts/acceptance/run-observability.test.mjs:1068:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: profile cleanup refuses nested not-found code without falsely marking an existing profile archived
+not ok 8 - profile cleanup refuses nested not-found code without falsely marking an existing profile archived
+  ---
+  duration_ms: 13.153828
+  type: 'test'
+  location: '/vercel/driver-profile404/scripts/acceptance/run-observability.test.mjs:1077:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"version":1,"issue":1512,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"execute","status":"runtime_verified","startedAt":"2026-11-09T10:20:24.425Z","browserReplayVerified":false,"posthogIngestionVerified":false,"budget":{"submissionsPerModel":1,"nativeRunsByFlowVersion":{"1":3,"2":2},"enforcement":"stop_on_first_observed_excess","timeoutMs":480000,"paidResubmissions":0,"hardDollarCap":false},"modelCase":"claude","submissionSource":"api","cases":[{"case":"claude","model":"claude-haiku-5-5","status":"runtime_verified","cleanup":{"state":"complete","profileArchived":true,"modelRestored":true,"evidence":"retained","ownRunsStopped":true,"ownMachinesEnded":true,"machines":[{"runId":"10000000-0000-4000-8000-000000000400","status":"ended"},{"runId":"10000000-0000-4000-8000-000000000401","status":"ended"}]},"preflight":{"ownSubscription":true,"cloudReady":true,"workspaceIdle":true,"modelRestorable":true,"paidFallbackOff":true,"soleFixedProfileAvailable":true,"liveReady":true},"profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","requestTrace":{"traceId":"ef429c01d1432ae2dcb0475295172520","parentSpanId":"521b015b86cdbfcc","source":"w3c_client_parent","backendObserved":false},"workflowRunIds":["wrun_abcdefghijklmnop0"],"runs":[{"runId":"10000000-0000-4000-8000-000000000400","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true},{"runId":"10000000-0000-4000-8000-000000000401","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true}],"taskId":"10000000-0000-4000-8000-000000000200","issueId":"10000000-0000-4000-8000-000000000100","task":{"stage":"approval","status":"passed","revision":2},"artifact":{"id":"10000000-0000-4000-8000-000000000500","version":1,"bytes":56,"sha256":"d8b25a2accf4cd3583900ee527f9d782bf11e90ab4359db296888aa67070ca5d"},"checks":[{"stage":"review","runId":"10000000-0000-4000-8000-000000000401","status":"passed"}],"flowVersion":2,"acceptance":{"status":"accepted","id":"10000000-0000-4000-8000-000000000800","stage":"approval"},"durationMs":12}],"sessionClosed":true,"preparation":{"requested":false,"profilesDisabled":0,"profilesRestored":0,"fallbackChanged":false,"restoration":"not_needed"},"workspaceId":"10000000-0000-4000-8000-000000000001","workspaceSelection":"current_personal","botId":"10000000-0000-4000-8000-000000000002","finishedAt":"2026-11-09T10:20:24.438Z"}
+    + actual - expected
+    
+    + 'runtime_verified'
+    - 'blocked'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'blocked'
+  actual: 'runtime_verified'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/driver-profile404/scripts/acceptance/run-observability.test.mjs:1093:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: profile preflight refuses malformed JSON instead of treating any 404 as absence
+not ok 9 - profile preflight refuses malformed JSON instead of treating any 404 as absence
+  ---
+  duration_ms: 13.696821
+  type: 'test'
+  location: '/vercel/driver-profile404/scripts/acceptance/run-observability.test.mjs:1056:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"version":1,"issue":1512,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"execute","status":"runtime_verified","startedAt":"2026-11-09T10:20:24.439Z","browserReplayVerified":false,"posthogIngestionVerified":false,"budget":{"submissionsPerModel":1,"nativeRunsByFlowVersion":{"1":3,"2":2},"enforcement":"stop_on_first_observed_excess","timeoutMs":480000,"paidResubmissions":0,"hardDollarCap":false},"modelCase":"claude","submissionSource":"api","cases":[{"case":"claude","model":"claude-haiku-5-5","status":"runtime_verified","cleanup":{"state":"complete","profileArchived":true,"modelRestored":true,"evidence":"retained","ownRunsStopped":true,"ownMachinesEnded":true,"machines":[{"runId":"10000000-0000-4000-8000-000000000400","status":"ended"},{"runId":"10000000-0000-4000-8000-000000000401","status":"ended"}]},"preflight":{"ownSubscription":true,"cloudReady":true,"workspaceIdle":true,"modelRestorable":true,"paidFallbackOff":true,"soleFixedProfileAvailable":true,"liveReady":true},"profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","requestTrace":{"traceId":"3fbeb4326a791cfc1f2f5747f0957bf0","parentSpanId":"74f292e9c62c9e4f","source":"w3c_client_parent","backendObserved":false},"workflowRunIds":["wrun_abcdefghijklmnop0"],"runs":[{"runId":"10000000-0000-4000-8000-000000000400","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true},{"runId":"10000000-0000-4000-8000-000000000401","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true}],"taskId":"10000000-0000-4000-8000-000000000200","issueId":"10000000-0000-4000-8000-000000000100","task":{"stage":"approval","status":"passed","revision":2},"artifact":{"id":"10000000-0000-4000-8000-000000000500","version":1,"bytes":56,"sha256":"d8b25a2accf4cd3583900ee527f9d782bf11e90ab4359db296888aa67070ca5d"},"checks":[{"stage":"review","runId":"10000000-0000-4000-8000-000000000401","status":"passed"}],"flowVersion":2,"acceptance":{"status":"accepted","id":"10000000-0000-4000-8000-000000000800","stage":"approval"},"durationMs":12}],"sessionClosed":true,"preparation":{"requested":false,"profilesDisabled":0,"profilesRestored":0,"fallbackChanged":false,"restoration":"not_needed"},"workspaceId":"10000000-0000-4000-8000-000000000001","workspaceSelection":"current_personal","botId":"10000000-0000-4000-8000-000000000002","finishedAt":"2026-11-09T10:20:24.452Z"}
+    + actual - expected
+    
+    + 'runtime_verified'
+    - 'blocked'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'blocked'
+  actual: 'runtime_verified'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/driver-profile404/scripts/acceptance/run-observability.test.mjs:1068:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: profile cleanup refuses malformed JSON without falsely marking an existing profile archived
+not ok 10 - profile cleanup refuses malformed JSON without falsely marking an existing profile archived
+  ---
+  duration_ms: 7.813811
+  type: 'test'
+  location: '/vercel/driver-profile404/scripts/acceptance/run-observability.test.mjs:1077:3'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"version":1,"issue":1512,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"execute","status":"runtime_verified","startedAt":"2026-11-09T10:20:24.452Z","browserReplayVerified":false,"posthogIngestionVerified":false,"budget":{"submissionsPerModel":1,"nativeRunsByFlowVersion":{"1":3,"2":2},"enforcement":"stop_on_first_observed_excess","timeoutMs":480000,"paidResubmissions":0,"hardDollarCap":false},"modelCase":"claude","submissionSource":"api","cases":[{"case":"claude","model":"claude-haiku-5-5","status":"runtime_verified","cleanup":{"state":"complete","profileArchived":true,"modelRestored":true,"evidence":"retained","ownRunsStopped":true,"ownMachinesEnded":true,"machines":[{"runId":"10000000-0000-4000-8000-000000000400","status":"ended"},{"runId":"10000000-0000-4000-8000-000000000401","status":"ended"}]},"preflight":{"ownSubscription":true,"cloudReady":true,"workspaceIdle":true,"modelRestorable":true,"paidFallbackOff":true,"soleFixedProfileAvailable":true,"liveReady":true},"profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","requestTrace":{"traceId":"a121e12f03ba1d4cc43ae0670d717343","parentSpanId":"f080fe21d6cb7e63","source":"w3c_client_parent","backendObserved":false},"workflowRunIds":["wrun_abcdefghijklmnop0"],"runs":[{"runId":"10000000-0000-4000-8000-000000000400","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true},{"runId":"10000000-0000-4000-8000-000000000401","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true}],"taskId":"10000000-0000-4000-8000-000000000200","issueId":"10000000-0000-4000-8000-000000000100","task":{"stage":"approval","status":"passed","revision":2},"artifact":{"id":"10000000-0000-4000-8000-000000000500","version":1,"bytes":56,"sha256":"d8b25a2accf4cd3583900ee527f9d782bf11e90ab4359db296888aa67070ca5d"},"checks":[{"stage":"review","runId":"10000000-0000-4000-8000-000000000401","status":"passed"}],"flowVersion":2,"acceptance":{"status":"accepted","id":"10000000-0000-4000-8000-000000000800","stage":"approval"},"durationMs":7}],"sessionClosed":true,"preparation":{"requested":false,"profilesDisabled":0,"profilesRestored":0,"fallbackChanged":false,"restoration":"not_needed"},"workspaceId":"10000000-0000-4000-8000-000000000001","workspaceSelection":"current_personal","botId":"10000000-0000-4000-8000-000000000002","finishedAt":"2026-11-09T10:20:24.460Z"}
+    + actual - expected
+    
+    + 'runtime_verified'
+    - 'blocked'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'blocked'
+  actual: 'runtime_verified'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/driver-profile404/scripts/acceptance/run-observability.test.mjs:1093:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: profile absence preflight accepts only the normal authorized missing-profile response
+ok 11 - profile absence preflight accepts only the normal authorized missing-profile response
+  ---
+  duration_ms: 5.41356
+  type: 'test'
+  ...
+# Subtest: profile absence cleanup accepts an authorized exact missing-profile code without a DELETE retry
+ok 12 - profile absence cleanup accepts an authorized exact missing-profile code without a DELETE retry
+  ---
+  duration_ms: 12.309715
+  type: 'test'
+  ...
+1..12
+# tests 12
+# suites 0
+# pass 2
+# fail 10
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 457.526408

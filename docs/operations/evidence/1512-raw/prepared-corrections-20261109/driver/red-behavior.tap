@@ -1,0 +1,319 @@
+TAP version 13
+# Subtest: all Factory reads, writes, approval and cleanup pin the authorized personal workspace even when a team is listed first
+not ok 1 - all Factory reads, writes, approval and cleanup pin the authorized personal workspace even when a team is listed first
+  ---
+  duration_ms: 71.464049
+  type: 'test'
+  location: '/vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:769:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"version":1,"issue":1512,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"execute","status":"blocked","startedAt":"2026-11-09T09:54:35.456Z","browserReplayVerified":false,"posthogIngestionVerified":false,"budget":{"submissionsPerModel":1,"nativeRunsByFlowVersion":{"1":3,"2":2},"enforcement":"stop_on_first_observed_excess","timeoutMs":480000,"paidResubmissions":0,"hardDollarCap":false},"modelCase":"claude","submissionSource":"api","cases":[],"sessionClosed":true,"preparation":{"requested":true,"profilesDisabled":0,"profilesRestored":0,"fallbackChanged":false,"restoration":"not_needed","visibleRunRowsChecked":0},"workspaceId":"10000000-0000-4000-8000-000000000001","workspaceSelection":"current_personal","botId":"10000000-0000-4000-8000-000000000002","code":"http_refused","httpStatus":400,"finishedAt":"2026-11-09T09:54:35.525Z"}
+    + actual - expected
+    
+    + 'blocked'
+    - 'runtime_verified'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'runtime_verified'
+  actual: 'blocked'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:773:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: Factory authority refusals remain failures without retrying an implicit workspace
+not ok 2 - Factory authority refusals remain failures without retrying an implicit workspace
+  ---
+  duration_ms: 6.210552
+  type: 'test'
+  location: '/vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:793:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + undefined
+    - '10000000-0000-4000-8000-000000000001'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: '10000000-0000-4000-8000-000000000001'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:801:43)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: Factory cleanup keeps its explicit workspace and exposes revoked authority or mismatch instead of retrying elsewhere
+not ok 3 - Factory cleanup keeps its explicit workspace and exposes revoked authority or mismatch instead of retrying elsewhere
+  ---
+  duration_ms: 4.315448
+  type: 'test'
+  location: '/vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:806:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + 'http_refused'
+    - 'cleanup_incomplete'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'cleanup_incomplete'
+  actual: 'http_refused'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:810:52)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: malformed or foreign personal workspace selection stops before any Factory call
+ok 4 - malformed or foreign personal workspace selection stops before any Factory call
+  ---
+  duration_ms: 6.050251
+  type: 'test'
+  ...
+# Subtest: workspace A idle cannot hide workspace B activity in either scoped reader
+not ok 5 - workspace A idle cannot hide workspace B activity in either scoped reader
+  ---
+  duration_ms: 31.316308
+  type: 'test'
+  location: '/vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:832:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    task-runs.pollThreads:queued:{"version":1,"issue":1512,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"execute","status":"runtime_verified","startedAt":"2026-11-09T09:54:35.544Z","browserReplayVerified":false,"posthogIngestionVerified":false,"budget":{"submissionsPerModel":1,"nativeRunsByFlowVersion":{"1":3,"2":2},"enforcement":"stop_on_first_observed_excess","timeoutMs":480000,"paidResubmissions":0,"hardDollarCap":false},"modelCase":"claude","submissionSource":"api","cases":[{"case":"claude","model":"claude-haiku-5-5","status":"runtime_verified","cleanup":{"state":"complete","profileArchived":true,"modelRestored":true,"evidence":"retained","ownRunsStopped":true,"ownMachinesEnded":true,"machines":[{"runId":"10000000-0000-4000-8000-000000000400","status":"ended"},{"runId":"10000000-0000-4000-8000-000000000401","status":"ended"}]},"preflight":{"ownSubscription":true,"cloudReady":true,"workspaceIdle":true,"modelRestorable":true,"paidFallbackOff":true,"soleFixedProfileAvailable":true,"liveReady":true},"profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","requestTrace":{"traceId":"7eff00f33119b196a0acf18cbbb313a1","parentSpanId":"126cd256a168e487","source":"w3c_client_parent","backendObserved":false},"workflowRunIds":["wrun_abcdefghijklmnop0"],"runs":[{"runId":"10000000-0000-4000-8000-000000000400","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true},{"runId":"10000000-0000-4000-8000-000000000401","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true}],"taskId":"10000000-0000-4000-8000-000000000200","issueId":"10000000-0000-4000-8000-000000000100","task":{"stage":"approval","status":"passed","revision":2},"artifact":{"id":"10000000-0000-4000-8000-000000000500","version":1,"bytes":56,"sha256":"d8b25a2accf4cd3583900ee527f9d782bf11e90ab4359db296888aa67070ca5d"},"checks":[{"stage":"review","runId":"10000000-0000-4000-8000-000000000401","status":"passed"}],"flowVersion":2,"acceptance":{"status":"accepted","id":"10000000-0000-4000-8000-000000000800","stage":"approval"},"durationMs":21}],"sessionClosed":true,"preparation":{"requested":true,"profilesDisabled":1,"profilesRestored":1,"fallbackChanged":true,"restoration":"complete","visibleRunRowsChecked":0,"restoreFailures":0,"fallbackRestored":true},"workspaceId":"10000000-0000-4000-8000-000000000001","workspaceSelection":"current_personal","botId":"10000000-0000-4000-8000-000000000002","finishedAt":"2026-11-09T09:54:35.574Z"}
+    + actual - expected
+    
+    + undefined
+    - 'owner_busy'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'owner_busy'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:837:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: idle proof covers every authorized workspace but reports only the existing 30-day visible window and is not atomic
+not ok 6 - idle proof covers every authorized workspace but reports only the existing 30-day visible window and is not atomic
+  ---
+  duration_ms: 26.313083
+  type: 'test'
+  location: '/vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:846:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    2 !== 4
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 4
+  actual: 2
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:850:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: workspace inventory errors, missing pages, unknown memberships and the workspace cap fail before changing settings
+not ok 7 - workspace inventory errors, missing pages, unknown memberships and the workspace cap fail before changing settings
+  ---
+  duration_ms: 31.145032
+  type: 'test'
+  location: '/vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:859:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"version":1,"issue":1512,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"execute","status":"runtime_verified","startedAt":"2026-11-09T09:54:35.602Z","browserReplayVerified":false,"posthogIngestionVerified":false,"budget":{"submissionsPerModel":1,"nativeRunsByFlowVersion":{"1":3,"2":2},"enforcement":"stop_on_first_observed_excess","timeoutMs":480000,"paidResubmissions":0,"hardDollarCap":false},"modelCase":"claude","submissionSource":"api","cases":[{"case":"claude","model":"claude-haiku-5-5","status":"runtime_verified","cleanup":{"state":"complete","profileArchived":true,"modelRestored":true,"evidence":"retained","ownRunsStopped":true,"ownMachinesEnded":true,"machines":[{"runId":"10000000-0000-4000-8000-000000000400","status":"ended"},{"runId":"10000000-0000-4000-8000-000000000401","status":"ended"}]},"preflight":{"ownSubscription":true,"cloudReady":true,"workspaceIdle":true,"modelRestorable":true,"paidFallbackOff":true,"soleFixedProfileAvailable":true,"liveReady":true},"profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","requestTrace":{"traceId":"9abd07ca5c16e847aa7d2673c1541948","parentSpanId":"47f3e42e8faf76ea","source":"w3c_client_parent","backendObserved":false},"workflowRunIds":["wrun_abcdefghijklmnop0"],"runs":[{"runId":"10000000-0000-4000-8000-000000000400","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true},{"runId":"10000000-0000-4000-8000-000000000401","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true}],"taskId":"10000000-0000-4000-8000-000000000200","issueId":"10000000-0000-4000-8000-000000000100","task":{"stage":"approval","status":"passed","revision":2},"artifact":{"id":"10000000-0000-4000-8000-000000000500","version":1,"bytes":56,"sha256":"d8b25a2accf4cd3583900ee527f9d782bf11e90ab4359db296888aa67070ca5d"},"checks":[{"stage":"review","runId":"10000000-0000-4000-8000-000000000401","status":"passed"}],"flowVersion":2,"acceptance":{"status":"accepted","id":"10000000-0000-4000-8000-000000000800","stage":"approval"},"durationMs":25}],"sessionClosed":true,"preparation":{"requested":true,"profilesDisabled":1,"profilesRestored":1,"fallbackChanged":true,"restoration":"complete","visibleRunRowsChecked":0,"restoreFailures":0,"fallbackRestored":true},"workspaceId":"10000000-0000-4000-8000-000000000001","workspaceSelection":"current_personal","botId":"10000000-0000-4000-8000-000000000002","finishedAt":"2026-11-09T09:54:35.632Z"}
+    + actual - expected
+    
+    + undefined
+    - 'owner_inventory_incomplete'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'owner_inventory_incomplete'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:878:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: a changed workspace inventory cannot turn an incomplete scan into an idle proof
+not ok 8 - a changed workspace inventory cannot turn an incomplete scan into an idle proof
+  ---
+  duration_ms: 22.662418
+  type: 'test'
+  location: '/vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:894:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    {"version":1,"issue":1512,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"execute","status":"runtime_verified","startedAt":"2026-11-09T09:54:35.633Z","browserReplayVerified":false,"posthogIngestionVerified":false,"budget":{"submissionsPerModel":1,"nativeRunsByFlowVersion":{"1":3,"2":2},"enforcement":"stop_on_first_observed_excess","timeoutMs":480000,"paidResubmissions":0,"hardDollarCap":false},"modelCase":"claude","submissionSource":"api","cases":[{"case":"claude","model":"claude-haiku-5-5","status":"runtime_verified","cleanup":{"state":"complete","profileArchived":true,"modelRestored":true,"evidence":"retained","ownRunsStopped":true,"ownMachinesEnded":true,"machines":[{"runId":"10000000-0000-4000-8000-000000000400","status":"ended"},{"runId":"10000000-0000-4000-8000-000000000401","status":"ended"}]},"preflight":{"ownSubscription":true,"cloudReady":true,"workspaceIdle":true,"modelRestorable":true,"paidFallbackOff":true,"soleFixedProfileAvailable":true,"liveReady":true},"profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","requestTrace":{"traceId":"0c4f97c29b633e9c8c97b458f1a575a9","parentSpanId":"0d5d5040f5a08bc8","source":"w3c_client_parent","backendObserved":false},"workflowRunIds":["wrun_abcdefghijklmnop0"],"runs":[{"runId":"10000000-0000-4000-8000-000000000400","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true},{"runId":"10000000-0000-4000-8000-000000000401","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true}],"taskId":"10000000-0000-4000-8000-000000000200","issueId":"10000000-0000-4000-8000-000000000100","task":{"stage":"approval","status":"passed","revision":2},"artifact":{"id":"10000000-0000-4000-8000-000000000500","version":1,"bytes":56,"sha256":"d8b25a2accf4cd3583900ee527f9d782bf11e90ab4359db296888aa67070ca5d"},"checks":[{"stage":"review","runId":"10000000-0000-4000-8000-000000000401","status":"passed"}],"flowVersion":2,"acceptance":{"status":"accepted","id":"10000000-0000-4000-8000-000000000800","stage":"approval"},"durationMs":12}],"sessionClosed":true,"preparation":{"requested":true,"profilesDisabled":1,"profilesRestored":1,"fallbackChanged":true,"restoration":"complete","visibleRunRowsChecked":0,"restoreFailures":0,"fallbackRestored":true},"workspaceId":"10000000-0000-4000-8000-000000000001","workspaceSelection":"current_personal","botId":"10000000-0000-4000-8000-000000000002","finishedAt":"2026-11-09T09:54:35.655Z"}
+    + actual - expected
+    
+    + undefined
+    - 'owner_inventory_changed'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'owner_inventory_changed'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:899:10)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: scoped run reads reject saturation, delta or missing rows, malformed data and a foreign scope
+not ok 9 - scoped run reads reject saturation, delta or missing rows, malformed data and a foreign scope
+  ---
+  duration_ms: 44.785127
+  type: 'test'
+  location: '/vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:903:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    task-runs.pollThreads:{"version":1,"issue":1512,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"execute","status":"runtime_verified","startedAt":"2026-11-09T09:54:35.656Z","browserReplayVerified":false,"posthogIngestionVerified":false,"budget":{"submissionsPerModel":1,"nativeRunsByFlowVersion":{"1":3,"2":2},"enforcement":"stop_on_first_observed_excess","timeoutMs":480000,"paidResubmissions":0,"hardDollarCap":false},"modelCase":"claude","submissionSource":"api","cases":[{"case":"claude","model":"claude-haiku-5-5","status":"runtime_verified","cleanup":{"state":"complete","profileArchived":true,"modelRestored":true,"evidence":"retained","ownRunsStopped":true,"ownMachinesEnded":true,"machines":[{"runId":"10000000-0000-4000-8000-000000000400","status":"ended"},{"runId":"10000000-0000-4000-8000-000000000401","status":"ended"}]},"preflight":{"ownSubscription":true,"cloudReady":true,"workspaceIdle":true,"modelRestorable":true,"paidFallbackOff":true,"soleFixedProfileAvailable":true,"liveReady":true},"profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","requestTrace":{"traceId":"e69655b0a54387c210f115d24b2c9f53","parentSpanId":"07d738afb9c45920","source":"w3c_client_parent","backendObserved":false},"workflowRunIds":["wrun_abcdefghijklmnop0"],"runs":[{"runId":"10000000-0000-4000-8000-000000000400","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true},{"runId":"10000000-0000-4000-8000-000000000401","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true}],"taskId":"10000000-0000-4000-8000-000000000200","issueId":"10000000-0000-4000-8000-000000000100","task":{"stage":"approval","status":"passed","revision":2},"artifact":{"id":"10000000-0000-4000-8000-000000000500","version":1,"bytes":56,"sha256":"d8b25a2accf4cd3583900ee527f9d782bf11e90ab4359db296888aa67070ca5d"},"checks":[{"stage":"review","runId":"10000000-0000-4000-8000-000000000401","status":"passed"}],"flowVersion":2,"acceptance":{"status":"accepted","id":"10000000-0000-4000-8000-000000000800","stage":"approval"},"durationMs":12}],"sessionClosed":true,"preparation":{"requested":true,"profilesDisabled":1,"profilesRestored":1,"fallbackChanged":true,"restoration":"complete","visibleRunRowsChecked":200,"restoreFailures":0,"fallbackRestored":true},"workspaceId":"10000000-0000-4000-8000-000000000001","workspaceSelection":"current_personal","botId":"10000000-0000-4000-8000-000000000002","finishedAt":"2026-11-09T09:54:35.700Z"}
+    + actual - expected
+    
+    + undefined
+    - 'owner_inventory_incomplete'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'owner_inventory_incomplete'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:923:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: fresh authorization failures in another workspace and during restoration remain visible
+not ok 10 - fresh authorization failures in another workspace and during restoration remain visible
+  ---
+  duration_ms: 19.135749
+  type: 'test'
+  location: '/vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:940:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    + actual - expected
+    
+    + undefined
+    - 'http_refused'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'http_refused'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:957:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: the scan rejects a 30-day row expiry at or during the scan and never filters it away
+not ok 11 - the scan rejects a 30-day row expiry at or during the scan and never filters it away
+  ---
+  duration_ms: 11.998417
+  type: 'test'
+  location: '/vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:964:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    missing:{"version":1,"issue":1512,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"execute","status":"runtime_verified","startedAt":"2026-11-09T09:00:00.000Z","browserReplayVerified":false,"posthogIngestionVerified":false,"budget":{"submissionsPerModel":1,"nativeRunsByFlowVersion":{"1":3,"2":2},"enforcement":"stop_on_first_observed_excess","timeoutMs":480000,"paidResubmissions":0,"hardDollarCap":false},"modelCase":"claude","submissionSource":"api","cases":[{"case":"claude","model":"claude-haiku-5-5","status":"runtime_verified","cleanup":{"state":"complete","profileArchived":true,"modelRestored":true,"evidence":"retained","ownRunsStopped":true,"ownMachinesEnded":true,"machines":[{"runId":"10000000-0000-4000-8000-000000000400","status":"ended"},{"runId":"10000000-0000-4000-8000-000000000401","status":"ended"}]},"preflight":{"ownSubscription":true,"cloudReady":true,"workspaceIdle":true,"modelRestorable":true,"paidFallbackOff":true,"soleFixedProfileAvailable":true,"liveReady":true},"profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","requestTrace":{"traceId":"cf35b33ce9057d31f296504091fb4f6f","parentSpanId":"4b0a13aca59e729d","source":"w3c_client_parent","backendObserved":false},"workflowRunIds":["wrun_abcdefghijklmnop0"],"runs":[{"runId":"10000000-0000-4000-8000-000000000400","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true},{"runId":"10000000-0000-4000-8000-000000000401","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true}],"taskId":"10000000-0000-4000-8000-000000000200","issueId":"10000000-0000-4000-8000-000000000100","task":{"stage":"approval","status":"passed","revision":2},"artifact":{"id":"10000000-0000-4000-8000-000000000500","version":1,"bytes":56,"sha256":"d8b25a2accf4cd3583900ee527f9d782bf11e90ab4359db296888aa67070ca5d"},"checks":[{"stage":"review","runId":"10000000-0000-4000-8000-000000000401","status":"passed"}],"flowVersion":2,"acceptance":{"status":"accepted","id":"10000000-0000-4000-8000-000000000800","stage":"approval"},"durationMs":0}],"sessionClosed":true,"preparation":{"requested":true,"profilesDisabled":1,"profilesRestored":1,"fallbackChanged":true,"restoration":"complete","visibleRunRowsChecked":2,"restoreFailures":0,"fallbackRestored":true},"workspaceId":"10000000-0000-4000-8000-000000000001","workspaceSelection":"current_personal","botId":"10000000-0000-4000-8000-000000000002","finishedAt":"2026-11-09T09:00:00.000Z"}
+    + actual - expected
+    
+    + undefined
+    - 'owner_inventory_incomplete'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'owner_inventory_incomplete'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:977:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: one overall scan deadline and backwards time fail closed without extending the scan per workspace
+not ok 12 - one overall scan deadline and backwards time fail closed without extending the scan per workspace
+  ---
+  duration_ms: 34.085822
+  type: 'test'
+  location: '/vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:982:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    30000:{"version":1,"issue":1512,"revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","mode":"execute","status":"runtime_verified","startedAt":"2026-11-09T09:00:00.000Z","browserReplayVerified":false,"posthogIngestionVerified":false,"budget":{"submissionsPerModel":1,"nativeRunsByFlowVersion":{"1":3,"2":2},"enforcement":"stop_on_first_observed_excess","timeoutMs":480000,"paidResubmissions":0,"hardDollarCap":false},"modelCase":"claude","submissionSource":"api","cases":[{"case":"claude","model":"claude-haiku-5-5","status":"runtime_verified","cleanup":{"state":"complete","profileArchived":true,"modelRestored":true,"evidence":"retained","ownRunsStopped":true,"ownMachinesEnded":true,"machines":[{"runId":"10000000-0000-4000-8000-000000000400","status":"ended"},{"runId":"10000000-0000-4000-8000-000000000401","status":"ended"}]},"preflight":{"ownSubscription":true,"cloudReady":true,"workspaceIdle":true,"modelRestorable":true,"paidFallbackOff":true,"soleFixedProfileAvailable":true,"liveReady":true},"profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","requestTrace":{"traceId":"18e80840b69eef4493a0a47d3166e2eb","parentSpanId":"68a51c7ac9032184","source":"w3c_client_parent","backendObserved":false},"workflowRunIds":["wrun_abcdefghijklmnop0"],"runs":[{"runId":"10000000-0000-4000-8000-000000000400","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true},{"runId":"10000000-0000-4000-8000-000000000401","status":"succeeded","harness":"claude_code","model":"claude-haiku-5-5","subscriptionRoute":"claude_code_cli","profileId":"d5c1da60-b232-4ebd-8b67-284d336347c9","ownSubscription":true,"ownCloudRuntime":true}],"taskId":"10000000-0000-4000-8000-000000000200","issueId":"10000000-0000-4000-8000-000000000100","task":{"stage":"approval","status":"passed","revision":2},"artifact":{"id":"10000000-0000-4000-8000-000000000500","version":1,"bytes":56,"sha256":"d8b25a2accf4cd3583900ee527f9d782bf11e90ab4359db296888aa67070ca5d"},"checks":[{"stage":"review","runId":"10000000-0000-4000-8000-000000000401","status":"passed"}],"flowVersion":2,"acceptance":{"status":"accepted","id":"10000000-0000-4000-8000-000000000800","stage":"approval"},"durationMs":0}],"sessionClosed":true,"preparation":{"requested":true,"profilesDisabled":1,"profilesRestored":1,"fallbackChanged":true,"restoration":"complete","visibleRunRowsChecked":0,"restoreFailures":0,"fallbackRestored":true},"workspaceId":"10000000-0000-4000-8000-000000000001","workspaceSelection":"current_personal","botId":"10000000-0000-4000-8000-000000000002","finishedAt":"2026-11-09T09:00:00.000Z"}
+    + actual - expected
+    
+    + undefined
+    - 'owner_inventory_timeout'
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 'owner_inventory_timeout'
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:991:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: a real request AbortSignal expires within the remaining scan deadline and closes the login session
+not ok 13 - a real request AbortSignal expires within the remaining scan deadline and closes the login session
+  ---
+  duration_ms: 1009.338276
+  type: 'test'
+  location: '/vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:1007:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    The expression evaluated to a falsy value:
+    
+      assert.ok(aborted > 0)
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: '=='
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:1028:10)
+    runNextTicks (node:internal/process/task_queues:65:5)
+    listOnTimeout (node:internal/timers:644:9)
+    process.processTimers (node:internal/timers:618:7)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# Subtest: the finite workspace cap and 199-row boundary can succeed without paging or widening the 30-day read
+not ok 14 - the finite workspace cap and 199-row boundary can succeed without paging or widening the 30-day read
+  ---
+  duration_ms: 54.965456
+  type: 'test'
+  location: '/vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:1031:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    undefined !== 32
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 32
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (file:///vercel/driver-workspace/scripts/acceptance/run-observability.test.mjs:1040:10)
+    runNextTicks (node:internal/process/task_queues:65:5)
+    listOnTimeout (node:internal/timers:644:9)
+    process.processTimers (node:internal/timers:618:7)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+1..14
+# tests 14
+# suites 0
+# pass 1
+# fail 13
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1548.964349

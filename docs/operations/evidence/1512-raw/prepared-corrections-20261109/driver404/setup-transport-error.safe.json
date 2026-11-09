@@ -1,0 +1,17 @@
+{
+  "schema": "mikka.issue1512.driver-profile404.setup-transport-error.v1",
+  "phase": "setup upload before Node setup or test execution",
+  "classification": "request-size rejection, not product or assertion RED",
+  "actualError": {
+    "status": 413,
+    "code": "entity_too_large",
+    "message": "Vercel API request failed (413: entity_too_large). Body exceeded 1mb limit",
+    "operation": "POST /v2/sandboxes/sessions/{sessionId}/cmd"
+  },
+  "commandExecutionReceiptReturned": false,
+  "followOnOrchestrationError": "Attempt to read result.items from the error response raised TypeError; no test command ran from this rejected request.",
+  "recovery": "Split the same public source payload into two smaller structured Python upload requests, then execute the planned setup and RED/GREEN commands.",
+  "runtimeSourceChangedForRecovery": false,
+  "originalEnvelopeRetainedInSessionStore": "driver404Fix.vm.setup.raw",
+  "publicationBoundary": "Only closed safe error fields are projected here; provider fallback scaffolding is not part of the public evidence payload."
+}

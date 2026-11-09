@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "kind": "root-fixed-p521-rebinding-review",
+  "p0Commit": "521db4799a4a85e1955f7dd86a1ad5ccef143cc8",
+  "oursLatestPreparedCommit": "f0956eb1481cee710efb714ec3635ac66b4b44ec",
+  "p0Index": "c2e0dc20f4f127b9b49ac97b605df9aa0388e9b6",
+  "indexAndFourPayloadHashesVerified": true,
+  "patchReplay": [
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "preimageBlob": "c69dcfe5f459de0e603651fd510f06cf8d32e75b",
+      "candidateBlob": "dae8798653457afad334c2d909b10b63e9b3956f",
+      "forwardHunks": 3,
+      "reverseHunks": 3,
+      "forwardExact": true,
+      "reverseExact": true
+    },
+    {
+      "path": "workflows/coordinator/steps.ts",
+      "preimageBlob": "5002aebd9ed3df6047ccb3f7a083401c3cad34c3",
+      "candidateBlob": "d500795e9a62631b6c7619c4ffd1df67f137ee54",
+      "forwardHunks": 2,
+      "reverseHunks": 2,
+      "forwardExact": true,
+      "reverseExact": true
+    },
+    {
+      "path": "lib/device-heartbeat.db.test.ts",
+      "preimageBlob": "46c43f5c8bd9d33818f67d1e899f924ac9d267ae",
+      "candidateBlob": "e8f4f35748707364e77c53fa594c166bafc3dae8",
+      "forwardHunks": 2,
+      "reverseHunks": 2,
+      "forwardExact": true,
+      "reverseExact": true
+    },
+    {
+      "path": "package.json",
+      "preimageBlob": "3158b34c16d1734861e1f487f3142a98908e5d78",
+      "candidateBlob": "ef6da7b3d6b33220051fef56d7e9e5e024105310",
+      "forwardHunks": 1,
+      "reverseHunks": 1,
+      "forwardExact": true,
+      "reverseExact": true
+    },
+    {
+      "path": "apps/api/generated/routes.json",
+      "preimageBlob": "016af99a766db7d863704225d451d9eb3a950bbb",
+      "candidateBlob": "6fbced33e672f3fa0d5e35bed40b63fa103809d5",
+      "forwardHunks": 2,
+      "reverseHunks": 2,
+      "forwardExact": true,
+      "reverseExact": true
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "preimageBlob": "f218fd0698bfae6296be7a06c732c26cac412eb7",
+      "candidateBlob": "a0cc13783eb567c256c34e08eaf3f6e9aca157e2",
+      "forwardHunks": 1,
+      "reverseHunks": 1,
+      "forwardExact": true,
+      "reverseExact": true
+    }
+  ],
+  "priorSixSourceCandidatesByteUnchanged": true,
+  "scope": "V8 exact bytes and source review; no filesystem/Node/generator/CI execution. Actual combined commit/tree not created. P521 real Source failure remains unresolved; main later moved a219 and its finite intersection is reviewed separately.",
+  "resourcesCreated": 0,
+  "refsChanged": false
+}

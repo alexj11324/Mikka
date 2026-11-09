@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "kind": "unpublished-correction-objects",
+  "preparedAt": "2026-11-09 10:07:25 UTC",
+  "publishedHead": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+  "installer": {
+    "schema": 1,
+    "kind": "root-installer-pure-delta-unpublished-candidate-tree",
+    "parent": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+    "commit": "deded5b133bd11d8612c46c38464393a55165d81",
+    "tree": "4bd3ea710ac25e1794b2fcc2580810df9fad3ba8",
+    "remoteTreeTruncated": false,
+    "totalLeaves": 6762,
+    "changedPaths": [
+      ".github/actions/pnpm-install/action.yml",
+      ".github/workflows/issue1415-deployed-production.yml",
+      ".github/workflows/issue1415-managed-inspection.yml",
+      ".github/workflows/issues-1516-welcome-acceptance.yml",
+      ".github/workflows/read-cache-production.yml",
+      ".github/workflows/read-cache.yml",
+      ".github/workflows/self-hosted-image.yml",
+      ".github/workflows/self-hosted-production.yml",
+      ".github/workflows/thread-lifecycle-acceptance.yml",
+      ".github/workflows/ui-policy.yml",
+      "tests/mvp/pinned-pnpm.test.mjs"
+    ],
+    "untouchedLeaves": 6751,
+    "allModesTypesBlobsMatched": true,
+    "sourceReview": "9d0b6a8a632aab8383557cc6079391dc3fb81869",
+    "independentReview": "32809be58280550a53c9fd97a1f0f97d60652afe",
+    "refUpdated": false,
+    "ciTriggered": false,
+    "productionCalls": 0,
+    "remaining": "Actual main/P0 and scoped driver union, full source-bound validation before publishing/merge."
+  },
+  "driver": {
+    "parent": "deded5b133bd11d8612c46c38464393a55165d81",
+    "commit": "0c35e2005fc7c92872229ef895a6ef9aa95bef44",
+    "tree": "c450c8245fd1ae6815b43cb43fe6dd0fb0042b25",
+    "leaves": 6762,
+    "changedPaths": [
+      "scripts/acceptance/run-observability.mjs",
+      "scripts/acceptance/run-observability.test.mjs"
+    ],
+    "untouchedLeaves": 6760,
+    "allModesTypesBlobsMatched": true,
+    "refUpdated": false,
+    "ciTriggered": false,
+    "productionCalls": 0
+  },
+  "fixedP0Candidates": {
+    "source": "61f359952fbc8a18de4160926632c58cba2cb432",
+    "index": "f449e443232bed85347e08d6014ec54c25b3a370",
+    "appliedToCandidate": false
+  },
+  "actualMainObserved": "76df3935c8be5af480485c52e445d389e85d8a35",
+  "p0NotMerged": true,
+  "rootProofs": {
+    "installer": "9d0b6a8a632aab8383557cc6079391dc3fb81869",
+    "driver": "781d304186f357ef609ce06409db546b29807b42",
+    "premerge": "995bd1358f928a2ec74906e185963ad7fb589d78"
+  },
+  "refUpdated": false,
+  "ciTriggered": false,
+  "productionDispatch": false,
+  "actualAcmeAcceptedCases": 0,
+  "latestPreparedSource": {
+    "parent": "0c35e2005fc7c92872229ef895a6ef9aa95bef44",
+    "commit": "f0956eb1481cee710efb714ec3635ac66b4b44ec",
+    "tree": "1431bb492e1a10b282202602e977f15dcfe52246",
+    "leaves": 6762,
+    "changedPaths": [
+      "scripts/acceptance/run-observability.mjs",
+      "scripts/acceptance/run-observability.test.mjs"
+    ],
+    "untouchedLeaves": 6760,
+    "allModesTypesBlobsMatch": true,
+    "refUpdated": false,
+    "ciTriggered": false,
+    "productionRequests": 0
+  },
+  "earlierDriverIsSuperseded": true,
+  "driver404FindingClosed": true,
+  "driver404ActualTests": {
+    "oldDriver": {
+      "tests": 12,
+      "pass": 2,
+      "fail": 10
+    },
+    "newDriver": {
+      "tests": 63,
+      "pass": 63,
+      "fail": 0
+    }
+  },
+  "p0LatestObserved": {
+    "commit": "521db4799a4a85e1955f7dd86a1ad5ccef143cc8",
+    "tree": "d82a34d59bf072348869ef086e24ae0ad5a852ec",
+    "sourceCiGate": "Nitro providerStarted assertion failure under owner investigation",
+    "merged": false
+  },
+  "currentMainObserved": "76df3935c8be5af480485c52e445d389e85d8a35",
+  "sourcePublicationPending": true
+}

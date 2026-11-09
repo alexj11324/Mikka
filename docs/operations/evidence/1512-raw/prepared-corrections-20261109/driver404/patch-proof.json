@@ -1,0 +1,49 @@
+{
+  "generator": "Python difflib.unified_diff with splitlines(keepends=True)",
+  "gitVersion": "git version 2.53.0",
+  "forwardMatchesCandidate": true,
+  "reverseMatchesBaseline": true,
+  "steps": [
+    {
+      "command": [
+        "git",
+        "apply",
+        "--check",
+        "/vercel/driver-profile404/evidence/candidate.patch"
+      ],
+      "exitCode": 0,
+      "stdout": ""
+    },
+    {
+      "command": [
+        "git",
+        "apply",
+        "/vercel/driver-profile404/evidence/candidate.patch"
+      ],
+      "exitCode": 0,
+      "stdout": ""
+    },
+    {
+      "command": [
+        "git",
+        "apply",
+        "--reverse",
+        "--check",
+        "/vercel/driver-profile404/evidence/candidate.patch"
+      ],
+      "exitCode": 0,
+      "stdout": ""
+    },
+    {
+      "command": [
+        "git",
+        "apply",
+        "--reverse",
+        "/vercel/driver-profile404/evidence/candidate.patch"
+      ],
+      "exitCode": 0,
+      "stdout": ""
+    }
+  ],
+  "noRepositoryOrIndexUsed": true
+}

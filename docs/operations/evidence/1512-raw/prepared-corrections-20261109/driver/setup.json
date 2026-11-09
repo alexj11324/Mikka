@@ -1,0 +1,76 @@
+{
+  "node": "v24.22.2",
+  "nodePath": "/vercel/driver-workspace/tools/node-v24.22.2-linux-x64/bin/node",
+  "platform": "Linux-6.18.56-x86_64-with-glibc2.43",
+  "archiveBytes": 32039312,
+  "archiveSha256": "48cc0e21e048790e54c0cf5749c2725005313d652651c40b7a21feb9697aaf75",
+  "officialChecksumsMatched": true,
+  "files": [
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "bytes": 59415,
+      "sha256": "1881370b53dc058fe29da04092ee1523b661f04d9077e43b03f8eee2a727da01",
+      "gitBlob": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "bytes": 55389,
+      "sha256": "f89faff19cb4a08c6dc6a01378065d73597f20d51990bd4f99175f4a6be604a3",
+      "gitBlob": "e73f32f4b93a1bffc70d9d9ba96f581e47746a9d"
+    },
+    {
+      "path": "scripts/acceptance/response-cookie-jar.mjs",
+      "bytes": 2277,
+      "sha256": "7fa2b75283ae1c239bf3c613f9176a861d42debd18256b383d26bbc6b39a4178",
+      "gitBlob": "2bb8fa35a4432c2245a744c6cac1c80b715da7a8"
+    },
+    {
+      "path": "lib/desktop-rpc/wire.ts",
+      "bytes": 5364,
+      "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3",
+      "gitBlob": "2c72b5aafa3e6b8f4df8212072e6663e306d9318"
+    },
+    {
+      "path": "lib/live/events.ts",
+      "bytes": 4679,
+      "sha256": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5",
+      "gitBlob": "2349c85fe5cb1e3a001e88fd0bca9142ae0dcc3a"
+    },
+    {
+      "path": "messages/en.json",
+      "bytes": 252792,
+      "sha256": "4085c3132b62352c7f7f0a54cee46a653331b0989eda69cd11165268f2caa98e",
+      "gitBlob": "b27501a8d69d766df76709418c8811e5aa94e815"
+    },
+    {
+      "path": "messages/zh-CN.json",
+      "bytes": 243480,
+      "sha256": "82b800238a52c21080ff4d02e719c0b30c82e5ef62e1acb4d2d6458753e143a6",
+      "gitBlob": "32cb3ded65d4d6b572b8d647354164ab08f4ee96"
+    },
+    {
+      "path": "evidence/base-driver.mjs",
+      "bytes": 59415,
+      "sha256": "1881370b53dc058fe29da04092ee1523b661f04d9077e43b03f8eee2a727da01",
+      "gitBlob": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e"
+    },
+    {
+      "path": "evidence/base-test.mjs",
+      "bytes": 55389,
+      "sha256": "f89faff19cb4a08c6dc6a01378065d73597f20d51990bd4f99175f4a6be604a3",
+      "gitBlob": "e73f32f4b93a1bffc70d9d9ba96f581e47746a9d"
+    },
+    {
+      "path": "evidence/candidate-driver.mjs",
+      "bytes": 64047,
+      "sha256": "bc541dfafa4d45375ed44fd85d6fd443386e519608443bd1d158ab62949e1892",
+      "gitBlob": "eac86cc7081bd23dc93a8c5d6d3b443772037263"
+    },
+    {
+      "path": "evidence/candidate-test.mjs",
+      "bytes": 75069,
+      "sha256": "4c3b06bda361b9f6e9521bb572b48f42c550c61b9826dfa0ea6fd9851ab8f984",
+      "gitBlob": "f8f1a115b89add264760ddde2cbaf39d8c1ea598"
+    }
+  ]
+}

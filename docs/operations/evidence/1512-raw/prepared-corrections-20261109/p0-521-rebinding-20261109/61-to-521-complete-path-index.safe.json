@@ -1,0 +1,490 @@
+{
+  "version": 1,
+  "kind": "fixed-p0-61-to-521-complete-path-rebinding",
+  "repository": "alexj11324/Mikka",
+  "fromCommit": "61f359952fbc8a18de4160926632c58cba2cb432",
+  "fromTree": "ed46d344055cf47c7ae4802a947d9401cd736021",
+  "toCommit": "521db4799a4a85e1955f7dd86a1ad5ccef143cc8",
+  "toTree": "d82a34d59bf072348869ef086e24ae0ad5a852ec",
+  "toParents": [
+    "5a7686b4bb6bbf1c0abe6ce250e8deeb7e1022d3",
+    "76df3935c8be5af480485c52e445d389e85d8a35"
+  ],
+  "compare": {
+    "source": "https://api.github.com/repos/alexj11324/Mikka/compare/61f359952fbc8a18de4160926632c58cba2cb432...521db4799a4a85e1955f7dd86a1ad5ccef143cc8",
+    "status": "ahead",
+    "aheadBy": 12,
+    "behindBy": 0,
+    "mergeBase": "61f359952fbc8a18de4160926632c58cba2cb432",
+    "totalCommits": 12,
+    "changedPathCount": 34,
+    "withinApiFileCap": true
+  },
+  "commits": [
+    {
+      "sha": "adcf75504b6cecd39d533033d47ec526defa4524",
+      "parents": [
+        "88b144d52d091d7ff566c63fce6e902e33edc59e"
+      ]
+    },
+    {
+      "sha": "91d8b3d8551c694749eb4465960442627117cc2b",
+      "parents": [
+        "adcf75504b6cecd39d533033d47ec526defa4524"
+      ]
+    },
+    {
+      "sha": "d763d3d14596d55c0bcbec239e4179a16b3eb3ff",
+      "parents": [
+        "91d8b3d8551c694749eb4465960442627117cc2b"
+      ]
+    },
+    {
+      "sha": "0c66a223f4f1d5127c3d07e25d5f5201532e3e9b",
+      "parents": [
+        "d763d3d14596d55c0bcbec239e4179a16b3eb3ff"
+      ]
+    },
+    {
+      "sha": "f064d32fd07a789134e65361b4afe9b1942117ed",
+      "parents": [
+        "0c66a223f4f1d5127c3d07e25d5f5201532e3e9b"
+      ]
+    },
+    {
+      "sha": "01f106f2e1cffef8b16ea68903532113961705fd",
+      "parents": [
+        "f064d32fd07a789134e65361b4afe9b1942117ed"
+      ]
+    },
+    {
+      "sha": "89870a876fa436da51598aa7e089d74d0f177001",
+      "parents": [
+        "89eae89e9e79422e0a8b4b1346aa1c7fb6470016"
+      ]
+    },
+    {
+      "sha": "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+      "parents": [
+        "89870a876fa436da51598aa7e089d74d0f177001"
+      ]
+    },
+    {
+      "sha": "2305d24fb4e0343514503ded236a0c790aa5f8af",
+      "parents": [
+        "01f106f2e1cffef8b16ea68903532113961705fd"
+      ]
+    },
+    {
+      "sha": "76df3935c8be5af480485c52e445d389e85d8a35",
+      "parents": [
+        "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+        "2305d24fb4e0343514503ded236a0c790aa5f8af"
+      ]
+    },
+    {
+      "sha": "5a7686b4bb6bbf1c0abe6ce250e8deeb7e1022d3",
+      "parents": [
+        "61f359952fbc8a18de4160926632c58cba2cb432",
+        "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6"
+      ]
+    },
+    {
+      "sha": "521db4799a4a85e1955f7dd86a1ad5ccef143cc8",
+      "parents": [
+        "5a7686b4bb6bbf1c0abe6ce250e8deeb7e1022d3",
+        "76df3935c8be5af480485c52e445d389e85d8a35"
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": ".github/workflows/mobile-screenshots.yml",
+      "status": "modified",
+      "gitBlob": "17cedf93280ec9955608c34c7b605f9df6704f4d",
+      "additions": 52,
+      "deletions": 3,
+      "patchPresent": true,
+      "patchBytes": 3290,
+      "patchSha256": "b90d722b19589bf3ac789282ed2152816cabd6f173001c3ab92f849d9690908d"
+    },
+    {
+      "path": "apps/mobile/features/tasks/model/task-conversation.ts",
+      "status": "modified",
+      "gitBlob": "1d68dd6497db7ee3ca7074ebf06061d05f16fdf1",
+      "additions": 53,
+      "deletions": 6,
+      "patchPresent": true,
+      "patchBytes": 4884,
+      "patchSha256": "a02afba139e584ae2d28c0a66c1dcd70acd787bad6fd17501147b577ece0bc24"
+    },
+    {
+      "path": "apps/mobile/features/tasks/model/task-flow.ts",
+      "status": "added",
+      "gitBlob": "00d1d154050e5e87cdc19d234300123877ee97fe",
+      "additions": 27,
+      "deletions": 0,
+      "patchPresent": true,
+      "patchBytes": 2173,
+      "patchSha256": "3bc4b3830d4bb28f27d6a1c371c8b589da1e9ec16385d7d97a3c46139757dadd"
+    },
+    {
+      "path": "apps/mobile/features/tasks/screens/task-conversation-screen.tsx",
+      "status": "modified",
+      "gitBlob": "cccc9fe967434782b357623ea6a11a26444f29d4",
+      "additions": 56,
+      "deletions": 8,
+      "patchPresent": true,
+      "patchBytes": 8207,
+      "patchSha256": "52236a59dec67dd4249c5d203006ecc48bb214a0ac28dba68ce20e40545b0336"
+    },
+    {
+      "path": "apps/mobile/features/tasks/screens/task-screen.tsx",
+      "status": "modified",
+      "gitBlob": "8e467252a4cf15e39457283f5b20e43f8154b787",
+      "additions": 13,
+      "deletions": 9,
+      "patchPresent": true,
+      "patchBytes": 5047,
+      "patchSha256": "f4e99e89da6c06a0e36b03d37023dba4851644cd7c0f0f6b9476c55e6b3811c6"
+    },
+    {
+      "path": "apps/mobile/lib/types.ts",
+      "status": "modified",
+      "gitBlob": "9b6c472b2461992761445ad74047d56a09b675a3",
+      "additions": 6,
+      "deletions": 2,
+      "patchPresent": true,
+      "patchBytes": 1669,
+      "patchSha256": "31e66101f44781f853142205f5735aa056a8e31f8fede3eb454bbb12b411ce02"
+    },
+    {
+      "path": "apps/mobile/scripts/tasks-screenshots.mjs",
+      "status": "modified",
+      "gitBlob": "4222780b21fdf2927ee9592ef3648e408763c3f2",
+      "additions": 35,
+      "deletions": 6,
+      "patchPresent": true,
+      "patchBytes": 5953,
+      "patchSha256": "2bf8fc1b821d3b8e39166e8d38e147f950509632f3a378528f444086ad6bfcdd"
+    },
+    {
+      "path": "apps/mobile/tests/messages.test.mts",
+      "status": "modified",
+      "gitBlob": "b2f9dd006c95ded34707994bfc0ae1b0d6d21891",
+      "additions": 4,
+      "deletions": 1,
+      "patchPresent": true,
+      "patchBytes": 1038,
+      "patchSha256": "e4de78e01499fe0a9b1c0ff01513f472284e76b20524a904f259a010854d8f6c"
+    },
+    {
+      "path": "apps/mobile/tests/task-groups.test.mts",
+      "status": "modified",
+      "gitBlob": "c74b2ca09f8c6b1c38f31e2ccce3e452edbdc803",
+      "additions": 48,
+      "deletions": 4,
+      "patchPresent": true,
+      "patchBytes": 7300,
+      "patchSha256": "1178f17ac3a6c9945439aa3d8ac654ef13e7fdf5fe1a80c73bbe00f929725406"
+    },
+    {
+      "path": "components/workspace/task-detail.tsx",
+      "status": "modified",
+      "gitBlob": "c8a757bb818eb83e58d8e75821dbdda4aa7bd903",
+      "additions": 2,
+      "deletions": 2,
+      "patchPresent": true,
+      "patchBytes": 2029,
+      "patchSha256": "960f738cfb42c09ebf734f2db9a530381da0c859d34505402c71e00e4c02f40d"
+    },
+    {
+      "path": "components/workspace/task-thread-pane.tsx",
+      "status": "added",
+      "gitBlob": "7709b82a87ab8acc68c1b9fa32dfd29d14c1f2b8",
+      "additions": 29,
+      "deletions": 0,
+      "patchPresent": true,
+      "patchBytes": 1574,
+      "patchSha256": "7520563132f61d76defb4ecc0076cb8d2a0c073ffdbd3da8b62f551edf72ffb5"
+    },
+    {
+      "path": "docs/design/decisions/2026-11-08-2140-task-one-conversation.md",
+      "status": "added",
+      "gitBlob": "5ecbc97b275176091b0cfed5fc68de945c77f4c1",
+      "additions": 13,
+      "deletions": 0,
+      "patchPresent": true,
+      "patchBytes": 2144,
+      "patchSha256": "c81c2e69ac30c1d2b704b6ae90cc6c8c3cac23183726bd4b3467872685113fca"
+    },
+    {
+      "path": "docs/design/task-one-conversation/dark-3-task-before.png",
+      "status": "added",
+      "gitBlob": "aaecdd42c4c2d419463033aee4fb84d38403b17e",
+      "additions": 0,
+      "deletions": 0,
+      "patchPresent": false,
+      "binaryPixelReview": false
+    },
+    {
+      "path": "docs/design/task-one-conversation/dark-3-task.png",
+      "status": "added",
+      "gitBlob": "4491b682c65f4ed4875062571fb6b0751d9e0c33",
+      "additions": 0,
+      "deletions": 0,
+      "patchPresent": false,
+      "binaryPixelReview": false
+    },
+    {
+      "path": "docs/design/task-one-conversation/dark-4-conversation-before.png",
+      "status": "added",
+      "gitBlob": "3552472014bc1b670a3e2040375d649d24f1b18f",
+      "additions": 0,
+      "deletions": 0,
+      "patchPresent": false,
+      "binaryPixelReview": false
+    },
+    {
+      "path": "docs/design/task-one-conversation/dark-4-conversation.png",
+      "status": "added",
+      "gitBlob": "b53ac575c858d598cf2a7362b9b132c46c3b1559",
+      "additions": 0,
+      "deletions": 0,
+      "patchPresent": false,
+      "binaryPixelReview": false
+    },
+    {
+      "path": "docs/design/task-one-conversation/dark-4b-review-open.png",
+      "status": "added",
+      "gitBlob": "74ae804e111137d204c66136d4807b7fe6cea802",
+      "additions": 0,
+      "deletions": 0,
+      "patchPresent": false,
+      "binaryPixelReview": false
+    },
+    {
+      "path": "docs/design/task-one-conversation/dark-4c-stage.png",
+      "status": "added",
+      "gitBlob": "d060b13fe7bdf5625a812b1ec25d2435d5f6e428",
+      "additions": 0,
+      "deletions": 0,
+      "patchPresent": false,
+      "binaryPixelReview": false
+    },
+    {
+      "path": "docs/design/task-one-conversation/light-3-task-before.png",
+      "status": "added",
+      "gitBlob": "79d47e100596e7a4543fb02a890f4289f75d8238",
+      "additions": 0,
+      "deletions": 0,
+      "patchPresent": false,
+      "binaryPixelReview": false
+    },
+    {
+      "path": "docs/design/task-one-conversation/light-3-task.png",
+      "status": "added",
+      "gitBlob": "cf54823ad28cbd233edcb1c84fab59a319194902",
+      "additions": 0,
+      "deletions": 0,
+      "patchPresent": false,
+      "binaryPixelReview": false
+    },
+    {
+      "path": "docs/design/task-one-conversation/light-4-conversation-before.png",
+      "status": "added",
+      "gitBlob": "59ce6a8d5ddde64d5463b9ad44ecfc10b11e7d9b",
+      "additions": 0,
+      "deletions": 0,
+      "patchPresent": false,
+      "binaryPixelReview": false
+    },
+    {
+      "path": "docs/design/task-one-conversation/light-4-conversation.png",
+      "status": "added",
+      "gitBlob": "87c8178b17643694194a0314edfd88e2f9965c2a",
+      "additions": 0,
+      "deletions": 0,
+      "patchPresent": false,
+      "binaryPixelReview": false
+    },
+    {
+      "path": "docs/design/task-one-conversation/light-4b-review-open.png",
+      "status": "added",
+      "gitBlob": "d1def534fe381c6ddb89a1cc647d91e46ca5ef58",
+      "additions": 0,
+      "deletions": 0,
+      "patchPresent": false,
+      "binaryPixelReview": false
+    },
+    {
+      "path": "docs/design/task-one-conversation/light-4c-stage.png",
+      "status": "added",
+      "gitBlob": "e3e24a2d7f49922c0e990406c4eb68786f8309c1",
+      "additions": 0,
+      "deletions": 0,
+      "patchPresent": false,
+      "binaryPixelReview": false
+    },
+    {
+      "path": "lib/factory/workspace-reader.ts",
+      "status": "modified",
+      "gitBlob": "223806de72153a8e72d05c343205b6e71cf76f02",
+      "additions": 3,
+      "deletions": 1,
+      "patchPresent": true,
+      "patchBytes": 707,
+      "patchSha256": "001e8d092b205266e08b905b04380559b227753a6eb2084e79d9f5f087d74f9a"
+    },
+    {
+      "path": "messages/en.json",
+      "status": "modified",
+      "gitBlob": "95dc94444fe0149348acfec5598fb8cab743ba32",
+      "additions": 13,
+      "deletions": 2,
+      "patchPresent": true,
+      "patchBytes": 986,
+      "patchSha256": "3098313811c7a37383b7353ca8a38a532ddc1df8583a50dd0ac9c85d2e39e007"
+    },
+    {
+      "path": "messages/zh-CN.json",
+      "status": "modified",
+      "gitBlob": "35ca6cb153df026c66881b0d4083c79ae9119df1",
+      "additions": 13,
+      "deletions": 2,
+      "patchPresent": true,
+      "patchBytes": 981,
+      "patchSha256": "25d8c6218fdd8de03fbe585039c322287789fcaa404eddf04a99ac1f99cec721"
+    },
+    {
+      "path": "package.json",
+      "status": "modified",
+      "gitBlob": "3158b34c16d1734861e1f487f3142a98908e5d78",
+      "additions": 1,
+      "deletions": 1,
+      "patchPresent": true,
+      "patchBytes": 8019,
+      "patchSha256": "09a2a6dca996b3fa9f98a9aafe8b8a649a318efffe95158278079ce2ff7ea1c4"
+    },
+    {
+      "path": "scripts/release/mobile-screenshots-build.sh",
+      "status": "modified",
+      "gitBlob": "298afa10d8274c20c5486eb1fd065090b0d6bdfa",
+      "additions": 10,
+      "deletions": 0,
+      "patchPresent": true,
+      "patchBytes": 574,
+      "patchSha256": "252a97342ee8613e3ce6dbdda1513ff009ddeb5692684434ec0e31c3a84f3f5a"
+    },
+    {
+      "path": "scripts/release/mobile-screenshots.mjs",
+      "status": "modified",
+      "gitBlob": "7eb7fabb390b1420728579c3a491dade0be894a0",
+      "additions": 116,
+      "deletions": 20,
+      "patchPresent": true,
+      "patchBytes": 10386,
+      "patchSha256": "e64ccc37528d65394cb38dfd9e60ad26a34a8c69bf54ab553071d1668f4458eb"
+    },
+    {
+      "path": "scripts/release/mobile-screenshots.test.mjs",
+      "status": "modified",
+      "gitBlob": "16c79db4796b2c0dba1ddb0842fc4acb725ff68f",
+      "additions": 155,
+      "deletions": 2,
+      "patchPresent": true,
+      "patchBytes": 12162,
+      "patchSha256": "4b52315484193c714b0dd233f3c3e53c316b633d1ea208b456bf58dcf7934c49"
+    },
+    {
+      "path": "scripts/task-thread-pane.test.tsx",
+      "status": "added",
+      "gitBlob": "b0e80115a916f3c50af51575b6436d6b04b9abd7",
+      "additions": 52,
+      "deletions": 0,
+      "patchPresent": true,
+      "patchBytes": 3605,
+      "patchSha256": "0a7499d60da39ddb1ff3a11c7bf7e52f25d6d1c76062b86a87891c5b7c7403b4"
+    },
+    {
+      "path": "scripts/thread-composer.test.tsx",
+      "status": "modified",
+      "gitBlob": "050b42cf2a6f9479e843fa82b3001c1f47d86469",
+      "additions": 3,
+      "deletions": 1,
+      "patchPresent": true,
+      "patchBytes": 1478,
+      "patchSha256": "4b67e86d792681aacaf15e12dbbb844f20a9b7c82932e467cb817bcfed175bfd"
+    },
+    {
+      "path": "tests/factory-workspace-admission.db.test.ts",
+      "status": "modified",
+      "gitBlob": "4591fe5afaf179e0fd63df4a0e6cbe4c1c95157d",
+      "additions": 54,
+      "deletions": 2,
+      "patchPresent": true,
+      "patchBytes": 5795,
+      "patchSha256": "7104828225f87c791b889af6e42ed9ff62643c3e9d508717f7034d628b11e250"
+    }
+  ],
+  "exactIntersection": [
+    "package.json"
+  ],
+  "unchangedVerifiedGeneratorInputs": [
+    "app/api/factory/questions/[questionId]/recover/route.ts",
+    "app/api/factory/monitor-incidents/[incidentId]/links/route.ts",
+    "app/api/factory/questions/route.ts",
+    "app/api/factory/questions/[questionId]/route.ts",
+    "app/api/factory/tasks/route/route.ts",
+    "app/api/factory/tasks/[taskId]/route.ts",
+    "app/api/factory/tasks/route.ts",
+    "app/api/factory/tasks/[taskId]/activity/route.ts",
+    "app/api/factory/tasks/[taskId]/approval/route.ts",
+    "app/api/factory/tasks/[taskId]/dispatch/cloud/route.ts",
+    "app/api/factory/tasks/[taskId]/dispatch/route.ts",
+    "app/api/factory/tasks/[taskId]/evidence/[captureId]/route.ts",
+    "app/api/factory/tasks/[taskId]/flow/route.ts",
+    "app/api/mcp/route.ts",
+    "app/api/mobile/home/route.ts",
+    "app/api/mobile/artifacts/[id]/route.ts",
+    "app/api/mobile/push-tokens/route.ts",
+    "app/api/mobile/tasks/route.ts",
+    "app/api/mobile/tasks/[id]/route.ts",
+    "app/api/mobile/threads/[id]/continue/route.ts",
+    "app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts",
+    "app/api/mobile/threads/route.ts",
+    "app/v1/devices/[deviceId]/runs/route.ts",
+    "app/v1/devices/[deviceId]/repos/route.ts",
+    "apps/api/scripts/generate-routes.mjs",
+    "apps/api/generated/routes.json",
+    "apps/api/generated/routes.ts"
+  ],
+  "binaryBoundary": "The twelve added PNG files are bound by API path and Git blob; their pixels were not read or reviewed for this source-union task.",
+  "noRefsChanged": true,
+  "noResourcesCreated": true,
+  "declaredOwned49Overlap": {
+    "ownIndexBlob": "9b9d51a5457665b4438efdf25bdb4bbcd4f45de4",
+    "ownCount": 49,
+    "oldP0Count": 428,
+    "deltaCount": 34,
+    "deltaOwnIntersections": [
+      {
+        "path": "package.json",
+        "newP0": "3158b34c16d1734861e1f487f3142a98908e5d78",
+        "ours": "785071f84b258c420e97d1c2b1e8afe3b9bd7048"
+      }
+    ],
+    "unionPathCount": 457,
+    "unionOwnIntersections": [
+      "apps/api/generated/routes.json",
+      "apps/api/generated/routes.ts",
+      "apps/desktop/src/renderer/rpc.ts",
+      "lib/device-heartbeat.db.test.ts",
+      "package.json",
+      "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+      "workflows/coordinator/steps.ts"
+    ],
+    "warning": "Union of changed-path sets is conservative; it may retain net-reverted paths. Complete61-to521 comparison is34 actual paths. No new full base-to521 tree was read."
+  }
+}

@@ -1,0 +1,321 @@
+{
+  "schemaVersion": 1,
+  "kind": "root-final-driver-profile404-closure",
+  "candidate": [
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "002b8501cd4f4df023148515add7c55e2863dbd3",
+      "before": "eac86cc7081bd23dc93a8c5d6d3b443772037263",
+      "bytes": 64090,
+      "sha256": "7fa1c032cb0d9b7c5a88c6262b559368445866691796b001648a95efea856950"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "mode": "100644",
+      "type": "blob",
+      "sha": "aab0a21c4c8fadb9df81ff87ada4fa23198fa575",
+      "before": "9d1c1c6614dd687a0939c05f2625a813cb6dae62",
+      "bytes": 81045,
+      "sha256": "b488d49afd89b833298d685dbb468a2520451a5be6f10711b7bdb76d66d5168a"
+    }
+  ],
+  "driverOnlyExactTwoLineChange": true,
+  "prior51TestFileExactPrefix": true,
+  "newScenarios": {
+    "refusals": [
+      "factoryNotFound",
+      "agentProfileScopeNotFound",
+      "unknownFixtureProfileError",
+      "nested error.code instead of error string",
+      "malformed JSON"
+    ],
+    "phases": [
+      "preflight GET",
+      "cleanup GET after accepted task and ended machines"
+    ],
+    "negativeCases": 10,
+    "authorizedExactAbsencePositiveCases": 2
+  },
+  "rootReadAllNewTests": true,
+  "rootReadAllOriginalFilesAndByteHashes": true,
+  "red": {
+    "tests": 12,
+    "pass": 2,
+    "fail": 10,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "green": {
+    "tests": 63,
+    "pass": 63,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "actualFailures": [
+    {
+      "name": "profile preflight refuses workspace admission denied instead of treating any 404 as absence",
+      "result": "not ok 1 - profile preflight refuses workspace admission denied instead of treating any 404 as absence",
+      "failureType": "'testCodeFailure'",
+      "expected": "'blocked'",
+      "actual": "'runtime_verified'"
+    },
+    {
+      "name": "profile cleanup refuses workspace admission denied without falsely marking an existing profile archived",
+      "result": "not ok 2 - profile cleanup refuses workspace admission denied without falsely marking an existing profile archived",
+      "failureType": "'testCodeFailure'",
+      "expected": "'blocked'",
+      "actual": "'runtime_verified'"
+    },
+    {
+      "name": "profile preflight refuses profile scope denied instead of treating any 404 as absence",
+      "result": "not ok 3 - profile preflight refuses profile scope denied instead of treating any 404 as absence",
+      "failureType": "'testCodeFailure'",
+      "expected": "'blocked'",
+      "actual": "'runtime_verified'"
+    },
+    {
+      "name": "profile cleanup refuses profile scope denied without falsely marking an existing profile archived",
+      "result": "not ok 4 - profile cleanup refuses profile scope denied without falsely marking an existing profile archived",
+      "failureType": "'testCodeFailure'",
+      "expected": "'blocked'",
+      "actual": "'runtime_verified'"
+    },
+    {
+      "name": "profile preflight refuses unknown error instead of treating any 404 as absence",
+      "result": "not ok 5 - profile preflight refuses unknown error instead of treating any 404 as absence",
+      "failureType": "'testCodeFailure'",
+      "expected": "'blocked'",
+      "actual": "'runtime_verified'"
+    },
+    {
+      "name": "profile cleanup refuses unknown error without falsely marking an existing profile archived",
+      "result": "not ok 6 - profile cleanup refuses unknown error without falsely marking an existing profile archived",
+      "failureType": "'testCodeFailure'",
+      "expected": "'blocked'",
+      "actual": "'runtime_verified'"
+    },
+    {
+      "name": "profile preflight refuses nested not-found code instead of treating any 404 as absence",
+      "result": "not ok 7 - profile preflight refuses nested not-found code instead of treating any 404 as absence",
+      "failureType": "'testCodeFailure'",
+      "expected": "'blocked'",
+      "actual": "'runtime_verified'"
+    },
+    {
+      "name": "profile cleanup refuses nested not-found code without falsely marking an existing profile archived",
+      "result": "not ok 8 - profile cleanup refuses nested not-found code without falsely marking an existing profile archived",
+      "failureType": "'testCodeFailure'",
+      "expected": "'blocked'",
+      "actual": "'runtime_verified'"
+    },
+    {
+      "name": "profile preflight refuses malformed JSON instead of treating any 404 as absence",
+      "result": "not ok 9 - profile preflight refuses malformed JSON instead of treating any 404 as absence",
+      "failureType": "'testCodeFailure'",
+      "expected": "'blocked'",
+      "actual": "'runtime_verified'"
+    },
+    {
+      "name": "profile cleanup refuses malformed JSON without falsely marking an existing profile archived",
+      "result": "not ok 10 - profile cleanup refuses malformed JSON without falsely marking an existing profile archived",
+      "failureType": "'testCodeFailure'",
+      "expected": "'blocked'",
+      "actual": "'runtime_verified'"
+    },
+    {
+      "name": "profile absence preflight accepts only the normal authorized missing-profile response",
+      "result": "ok 11 - profile absence preflight accepts only the normal authorized missing-profile response"
+    },
+    {
+      "name": "profile absence cleanup accepts an authorized exact missing-profile code without a DELETE retry",
+      "result": "ok 12 - profile absence cleanup accepts an authorized exact missing-profile code without a DELETE retry"
+    }
+  ],
+  "execution": {
+    "red": {
+      "label": "profile404-red",
+      "exitCode": 1,
+      "bytes": 35570,
+      "durationMs": 491,
+      "command": [
+        "/vercel/driver-profile404/tools/node-v24.22.2-linux-x64/bin/node",
+        "--test",
+        "--test-reporter=tap",
+        "--test-name-pattern=^profile (preflight|cleanup|absence)",
+        "scripts/acceptance/run-observability.test.mjs"
+      ],
+      "sourceHashes": {
+        "scripts/acceptance/run-observability.mjs": "bc541dfafa4d45375ed44fd85d6fd443386e519608443bd1d158ab62949e1892",
+        "scripts/acceptance/run-observability.test.mjs": "b488d49afd89b833298d685dbb468a2520451a5be6f10711b7bdb76d66d5168a"
+      }
+    },
+    "green": {
+      "label": "profile404-green",
+      "exitCode": 0,
+      "bytes": 16335,
+      "durationMs": 1423,
+      "command": [
+        "/vercel/driver-profile404/tools/node-v24.22.2-linux-x64/bin/node",
+        "--test",
+        "--test-reporter=tap",
+        "scripts/acceptance/run-observability.test.mjs"
+      ],
+      "sourceHashes": {
+        "scripts/acceptance/run-observability.mjs": "7fa1c032cb0d9b7c5a88c6262b559368445866691796b001648a95efea856950",
+        "scripts/acceptance/run-observability.test.mjs": "b488d49afd89b833298d685dbb468a2520451a5be6f10711b7bdb76d66d5168a"
+      }
+    }
+  },
+  "strictRootV8Replays": [
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "hunks": 1,
+      "forward": true,
+      "reverse": true
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "hunks": 1,
+      "forward": true,
+      "reverse": true
+    }
+  ],
+  "actualGitApplyEvidence": {
+    "generator": "Python difflib.unified_diff with splitlines(keepends=True)",
+    "gitVersion": "git version 2.53.0",
+    "forwardMatchesCandidate": true,
+    "reverseMatchesBaseline": true,
+    "steps": [
+      {
+        "command": [
+          "git",
+          "apply",
+          "--check",
+          "/vercel/driver-profile404/evidence/candidate.patch"
+        ],
+        "exitCode": 0,
+        "stdout": ""
+      },
+      {
+        "command": [
+          "git",
+          "apply",
+          "/vercel/driver-profile404/evidence/candidate.patch"
+        ],
+        "exitCode": 0,
+        "stdout": ""
+      },
+      {
+        "command": [
+          "git",
+          "apply",
+          "--reverse",
+          "--check",
+          "/vercel/driver-profile404/evidence/candidate.patch"
+        ],
+        "exitCode": 0,
+        "stdout": ""
+      },
+      {
+        "command": [
+          "git",
+          "apply",
+          "--reverse",
+          "/vercel/driver-profile404/evidence/candidate.patch"
+        ],
+        "exitCode": 0,
+        "stdout": ""
+      }
+    ],
+    "noRepositoryOrIndexUsed": true
+  },
+  "original51Evidence": "3723651d50eea82b2fd53d814c0a9f1d9442ec29",
+  "newEvidence": "951913035796cbedcda6265779f5b34383c24793",
+  "peerFinding": "6936de80c51c2091d3da0e20c59684cc1bdc28c5",
+  "peerClosure": "90c6086742bd4926d167d7760b90ff5f426d8305",
+  "findingClosed": true,
+  "sourceCommit": {
+    "parent": "0c35e2005fc7c92872229ef895a6ef9aa95bef44",
+    "commit": "f0956eb1481cee710efb714ec3635ac66b4b44ec",
+    "tree": "1431bb492e1a10b282202602e977f15dcfe52246",
+    "leaves": 6762,
+    "changedPaths": [
+      "scripts/acceptance/run-observability.mjs",
+      "scripts/acceptance/run-observability.test.mjs"
+    ],
+    "untouchedLeaves": 6760,
+    "allModesTypesBlobsMatch": true,
+    "refUpdated": false,
+    "ciTriggered": false,
+    "productionRequests": 0
+  },
+  "cleanup": {
+    "schema": "mikka.issue1512.driver-profile404.cleanup.v1",
+    "repository": "alexj11324/Mikka",
+    "sandbox": {
+      "name": "mikka-1512-driver-profile404-20261109",
+      "sessionId": "sbx_BP8ghDO4WHA01Se1Zu4CoS3FVAuG",
+      "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+      "teamId": "team_C7lwxVVvnUicFli6112mvxpv",
+      "persistent": false,
+      "ports": [],
+      "region": "iad1",
+      "vcpus": 1,
+      "memoryMiB": 2048,
+      "timeoutMs": 600000,
+      "networkAllowedDomains": [
+        "nodejs.org"
+      ],
+      "image": "vercel/sandbox/universal@sha256:bbec19cffb43ad724eee446d3bd4476e2993849dc0ff0c9f33356f8365d72219",
+      "baseRuntime": "node22"
+    },
+    "lifecycle": {
+      "createdAt": "2026-11-09T10:19:09.908Z",
+      "startedAt": "2026-11-09T10:19:09.932Z",
+      "stoppedAt": "2026-11-09T10:21:24.921Z",
+      "stopStatus": "stopped",
+      "durationMs": 134989,
+      "deleteAcknowledged": true,
+      "finalLookup": {
+        "method": "GET",
+        "operation": "GET /v2/sandboxes/{name}",
+        "name": "mikka-1512-driver-profile404-20261109",
+        "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+        "teamId": "team_C7lwxVVvnUicFli6112mvxpv",
+        "resume": false,
+        "status": 404,
+        "code": "not_found",
+        "requestId": "iad1:iad1::ljkf5-1794219693956-cef4e47b93c7"
+      }
+    },
+    "executedRuntime": "v24.22.2",
+    "boundaries": [
+      "One dedicated temporary VM; Node 24.22.2 was executed separately from the image's Node 22 default.",
+      "No pnpm install, production account, database, browser, model call, workflow dispatch, ref change or other resource was used.",
+      "Cleanup is based on actual stop response, successful deletion response and same-name/project resume:false GET 404, not inferred from timeout.",
+      "No active resource remains from this task."
+    ]
+  },
+  "limitations": {
+    "realP0Service": false,
+    "productionAccount": false,
+    "models": 0,
+    "combinedCi": false,
+    "sourceRefUpdated": false
+  },
+  "currentUpstreamGate": {
+    "source": "521db4799a4a85e1955f7dd86a1ad5ccef143cc8",
+    "sourceJob": 129098715476,
+    "failingStep": "pnpm test:api",
+    "knownAssertion": "Nitro dev-tracing providerStarted",
+    "rawSourceLogReadByRoot": false,
+    "ownerInvestigating": true,
+    "notAttributedToDriver": true
+  },
+  "conclusion": "The inherited generic404 absence finding is closed for these exact driver/test bytes. Ten negative actual HTTP-fixture cases fail old code and all63 pass the corrected code. Final source union and production remain separate."
+}

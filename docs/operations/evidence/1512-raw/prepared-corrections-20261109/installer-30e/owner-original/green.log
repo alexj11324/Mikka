@@ -1,0 +1,32 @@
+✔ the exact native pnpm installed by CI needs no Corepack (1.778493ms)
+✔ an absent native executable falls back to the explicit cached Corepack pin (0.345948ms)
+✔ a native version mismatch does not pass and can use the cached exact pin (0.183487ms)
+✔ both candidates must actually report the exact version (0.608389ms)
+✔ an unavailable cached Corepack version remains a failure with its cause (0.235112ms)
+✔ version-only probes disable manager downloads and retain only local cache selectors (0.248371ms)
+✔ an integrity suffix is retained for Corepack while actual version output is still checked (0.176254ms)
+✔ unpinned managers fail before any command runs (0.202743ms)
+▶ shared install defaults to no credential and overrides ambient legacy tokens in real lifecycle scripts
+  ✔ no input stays empty (652.216237ms)
+  ✔ ambient token is cleared (760.891331ms)
+✔ shared install defaults to no credential and overrides ambient legacy tokens in real lifecycle scripts (1418.259697ms)
+✔ a verified API-read-only caller explicitly delivers its token to the real install process (668.141966ms)
+✔ the actual composite input and all workflow opt-ins preserve the process credential boundary (25.241286ms)
+▶ credential opt-ins honor job overrides and reject unknown or API-write permissions
+  ✔ workflow read overridden by job write (0.739589ms)
+  ✔ workflow write overridden by job read (0.112877ms)
+  ✔ unknown inherited permissions (0.140783ms)
+  ✔ write-all (0.126401ms)
+  ✔ read-all (0.055498ms)
+  ✔ OIDC is separate from the API token (0.051996ms)
+  ✔ package publication token (0.118457ms)
+  ✔ explicit empty permissions (0.104233ms)
+✔ credential opt-ins honor job overrides and reject unknown or API-write permissions (2.180684ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2182.055458

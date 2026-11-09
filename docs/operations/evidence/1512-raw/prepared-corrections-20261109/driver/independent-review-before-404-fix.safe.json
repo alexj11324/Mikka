@@ -1,0 +1,297 @@
+{
+  "schemaVersion": 1,
+  "kind": "independent-source-review-driver-workspace-and-idle-scan",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pr": 1799,
+  "preparedAtUTC": "2026-11-09T10:16:45.032Z",
+  "reviewedCandidate": {
+    "baseline": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+    "baselineDriver": {
+      "bytes": 59415,
+      "sha256": "1881370b53dc058fe29da04092ee1523b661f04d9077e43b03f8eee2a727da01",
+      "gitBlob": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e"
+    },
+    "driver": {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "bytes": 64047,
+      "sha256": "bc541dfafa4d45375ed44fd85d6fd443386e519608443bd1d158ab62949e1892",
+      "gitBlob": "eac86cc7081bd23dc93a8c5d6d3b443772037263"
+    },
+    "tests": {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "bytes": 75066,
+      "sha256": "94cdc3b58b30cc0804b4a34478713c0fca85511aa83385ca8768641cffd4cb90",
+      "gitBlob": "9d1c1c6614dd687a0939c05f2625a813cb6dae62"
+    },
+    "evidenceIndex": {
+      "blob": "3723651d50eea82b2fd53d814c0a9f1d9442ec29",
+      "bytes": 5062,
+      "sha256": "0327d82ba43ac32de6a03f0b148dfd25dc30126b09288efc6c59712c8c8013d1",
+      "gitBlob": "3723651d50eea82b2fd53d814c0a9f1d9442ec29"
+    },
+    "serverContract": "61f359952fbc8a18de4160926632c58cba2cb432"
+  },
+  "conclusion": {
+    "status": "one-concrete-inherited-driver-finding-requires-closure",
+    "newWorkspaceRoutingAndIdleScanSourceBlockers": [],
+    "findings": 1,
+    "noProductionImpactClaim": true,
+    "noApprovalOfUnseenReplacementSource": true
+  },
+  "confirmedContracts": [
+    {
+      "subject": "Factory explicit workspace",
+      "conclusion": "All existing /mikka/api/factory/* requests, including cleanup, receive the previously verified Personal workspace header. Conflicting explicit header/query/body values are refused before fetch. Ordinary session cookies and Origin remain. P061 server selection is a routing input followed by fresh principal/membership and exact business-target checks.",
+      "serverPaths": [
+        "lib/workspace-selection.ts",
+        "lib/factory/workspace-reader.ts",
+        "lib/factory/workspace-http.ts",
+        "lib/factory/agent-profile-server.ts",
+        "lib/factory/agent-profile-http.ts"
+      ],
+      "noImplicitRetry": true,
+      "noAuthorityAdded": true
+    },
+    {
+      "subject": "Complete authorized workspace inventory under fixed P061",
+      "conclusion": "GET /api/workspace exposes the full active membership choices without LIMIT/cursor, restricted to team memberships or the authenticated user's owned Personal workspace. The candidate validates the selected Personal plus every ID/kind, scans each explicit scope with both normal RPC readers, and compares the full sorted set again.",
+      "serverPaths": [
+        "app/api/workspace/route.ts",
+        "lib/workspace-access.ts"
+      ],
+      "perScan": {
+        "maximumWorkspaces": 32,
+        "maximumSuccessfulHTTPReads": 66,
+        "deadlineMs": 30000
+      },
+      "noAdditionalWorkspaceSwitch": true
+    },
+    {
+      "subject": "Actual task/thread response shape",
+      "conclusion": "P061 scopes both queries by authenticated user and effective workspace. beginWorkspaceListRead carries that authorized scope, and ownerListRead returns it even if revision lookup fails. pollThreads with empty args returns full items plus 32-hex version and positions; pollTaskRuns returns items/live. Nonempty response expiry follows the same 30-day SQL window. withDevicePresence only adds presence and does not modify deadline.",
+      "serverPaths": [
+        "app/actions/task-runs.ts",
+        "lib/live/revision-read.ts",
+        "lib/live/list-read-server.ts",
+        "lib/live/presence-read.ts"
+      ],
+      "acceptedEmptyShape": true,
+      "preservesPartialOrSaturatedRejection": true,
+      "serverLimit": 200,
+      "candidateMaximumRowsForSuccess": 199,
+      "noPermanentRefusalIdentifiedForValidResponsesWithinBounds": true
+    },
+    {
+      "subject": "Settings restoration and cleanup authority",
+      "conclusion": "The candidate preserves version/digest/profile-definition checks, reverse-order profile restoration, acknowledged fallback-state checks and the rule that incomplete own-run cleanup blocks preparation restoration. Cross-scope inventory/read refusal remains visible and prevents overwrite; headers are never removed for retry.",
+      "unchangedBlocks": {
+        "readHelper": true,
+        "endCleanup": true,
+        "restoreSettings": true
+      },
+      "qualification": "One inherited missing-404 branch below can misstate single-profile cleanup evidence."
+    }
+  ],
+  "finding": {
+    "id": "driver-profile-missing-404-confuses-workspace-refusal",
+    "classification": "Acceptance-driver error interpretation and cleanup evidence. Not an assertion of product authorization bypass.",
+    "inheritedFromBaseline": true,
+    "affectedCandidate": "eac86cc7081bd23dc93a8c5d6d3b443772037263",
+    "locations": [
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "line": 337,
+        "role": "read() returns null for any404 before parsing JSON when options.missing"
+      },
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "line": 695,
+        "role": "end() single-profile GET with cleanup:true,missing:true"
+      },
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "line": 702,
+        "role": "profileArchived set true even if scope refusal was converted to null"
+      },
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "line": 742,
+        "role": "preflight fixture absence check also uses missing:true"
+      }
+    ],
+    "closedServerCases": [
+      {
+        "httpStatus": 404,
+        "error": "factoryNotFound",
+        "meaning": "Factory Workspace wrapper refused selected tenant or fresh authoritative membership.",
+        "source": "lib/factory/workspace-http.ts lines16-17, workspace-reader.ts lines28-33/43-48",
+        "absenceProof": false
+      },
+      {
+        "httpStatus": 404,
+        "error": "agentProfileScopeNotFound",
+        "meaning": "Owner/membership is unavailable, profile scope differs from selected scope, or membership acquire/check failed.",
+        "source": "lib/factory/agent-profile-store.ts lines18-30/68 and agent-profile-http.ts line28",
+        "absenceProof": false
+      },
+      {
+        "httpStatus": 404,
+        "error": "agentProfileNotFound",
+        "meaning": "Already authorized scope; readProfileRow queried exact id+ownerId+workspaceId and found no row.",
+        "source": "lib/factory/agent-profile-store.ts lines44-49/63-76 and agent-profile-http.ts lines37/50",
+        "absenceProof": true
+      }
+    ],
+    "storeOrder": "validateProfileScope → BEGIN → owner user FOR KEY SHARE → acquireProfileMembership → get/readProfileRow → member.check → COMMIT. Missing owner or membership is a different404 code; no row only produces agentProfileNotFound.",
+    "minimalReachability": [
+      "Driver has created its temporary profile and reached cleanup with ownRunsStopped=true; this is the normal authorized cleanup entry after work is stopped/terminal.",
+      "The single-profile cleanup GET receives fresh P061 workspace/membership refusal:404 with error factoryNotFound or agentProfileScopeNotFound.",
+      "read() returns null without reading that error. end() skips DELETE and writes profileArchived=true, although it cannot confirm the profile is absent or archived.",
+      "A similar specific GET refusal during preflight satisfies the current absence check and allows subsequent setup to continue rather than stopping at this refusal."
+    ],
+    "qualification": "Other subsequent gates may still block the overall case. This finding does not assert every refusal yields runtime_verified, that production encountered the sequence, or that authorization is bypassed.",
+    "currentTestGap": "Existing new cleanup test lines806-815 rejects DELETE401/403/404 only; it does not cover scope404 from the prior cleanup GET. Fixture line144 already emits correct agentProfileNotFound for an absent row.",
+    "minimumCorrection": "Parse JSON first. Only the exact legitimate single-profile absence error agentProfileNotFound with HTTP404 may satisfy these two missing reads. factoryNotFound,agentProfileScopeNotFound,other/unknown codes or malformed404 remain ordinary failures; no fallback scope, mutation retry, authority change or product SQL is needed.",
+    "requiredTargetedRegression": [
+      "After an actually created fixture profile and completed own-run/machine cleanup, make cleanup GET return each closed scope404; require cleanup incomplete, profileArchived=false, blocked report, retained profile, no DELETE/implicit Workspace retry, session close still attempted.",
+      "At the preflight single-profile absence GET, each scope404 must stop before creating a profile or submitting a task.",
+      "Exact authorized agentProfileNotFound404 remains a valid missing result and preserves the normal successful lifecycle.",
+      "Unknown/malformed404 does not silently become absence; retain existing 37+14 behavior assertions."
+    ],
+    "authorHandoff": {
+      "recipient": "/root/current_source_review",
+      "delivered": true,
+      "parentConfirmed": true,
+      "reviewerCodeChanges": 0,
+      "reviewerTestsExecuted": 0
+    }
+  },
+  "limitations": [
+    "The inventory scan proves only the fixed server's authorized active Workspaces and existing 30-day visible windows, not inaccessible or older runs.",
+    "The scan is bounded and non-atomic. Concurrent activity after an observed read remains covered by existing account coordination, not a newly invented lock.",
+    "32 workspaces, fewer than200 rows per reader and30seconds are explicit refusal bounds; exceeding them remains incomplete rather than silently paginated/truncated.",
+    "Source-shaped HTTP/RPC fixtures are not real P0 server/PG/production executions.",
+    "The 51PASS evidence belongs only to the original candidate; the proposed strict404 correction needs its own actual RED/GREEN and source hashes."
+  ],
+  "originalExecutionEvidence": {
+    "source": "Verified-hash index3723651d50eea82b2fd53d814c0a9f1d9442ec29 and its manifest/implementation descriptors.",
+    "originalBaseline": "37/37",
+    "newBehaviorAgainstBaseline": "14groups:1pass,13fail",
+    "candidate": "51/51",
+    "independentlyRerun": false,
+    "rawTAPNotRedownloaded": true,
+    "sourceBytesHashVerified": true
+  },
+  "sourceManifest": [
+    {
+      "path": "app/api/workspace/route.ts",
+      "gitBlob": "10c6f56fc11e998e4adcf4602066dcba10e331b2",
+      "commit": "61f359952fbc8a18de4160926632c58cba2cb432",
+      "bytes": 1479,
+      "sha256": "524b229c3d61c626d88a4f39149e300b55f219df94b3d99f559fe3ae9514751f"
+    },
+    {
+      "path": "lib/workspace-access.ts",
+      "gitBlob": "9194b24354d6082c51b661105949ba983d6bd108",
+      "commit": "61f359952fbc8a18de4160926632c58cba2cb432",
+      "bytes": 8743,
+      "sha256": "f7d43f80867ec36c34717006d052dff3d63dc46d5e1f69df188bd56a8ee75313"
+    },
+    {
+      "path": "app/actions/task-runs.ts",
+      "gitBlob": "f2213c69a435b967feb8d9f335213394c2e08630",
+      "commit": "61f359952fbc8a18de4160926632c58cba2cb432",
+      "bytes": 14442,
+      "sha256": "685edce7f5f2e06da09ddf360167b97d223a80ea632adeb2d7d2edf1874ad021",
+      "verifiedGitBlob": "f2213c69a435b967feb8d9f335213394c2e08630"
+    },
+    {
+      "path": "lib/live/revision-read.ts",
+      "gitBlob": "445ea81dccbed5f4b6ad16816757df0154a74b76",
+      "commit": "61f359952fbc8a18de4160926632c58cba2cb432",
+      "bytes": 2120,
+      "sha256": "7bd1af7dfafddb57c113fb4795a3f42d104516e71ad69034028741ccc7338634"
+    },
+    {
+      "path": "lib/live/list-read-server.ts",
+      "gitBlob": "d1fa48d21bb1b429a9afacf03fa350b8f02f5763",
+      "commit": "61f359952fbc8a18de4160926632c58cba2cb432",
+      "bytes": 1249,
+      "sha256": "b6fa906a7eee521f91160f39d77098b33c640c0ec8ee15fc86a3df7e4518aff7"
+    },
+    {
+      "path": "lib/factory/workspace-reader.ts",
+      "gitBlob": "6db25a28770401bbb16721cba840d7a944774e56",
+      "commit": "61f359952fbc8a18de4160926632c58cba2cb432",
+      "bytes": 3175,
+      "sha256": "9550a2e396a9b8c8e8faaf35fdcac81374b20ea1c9ee7b9da365cd19631243bd"
+    },
+    {
+      "path": "lib/factory/agent-profile-server.ts",
+      "gitBlob": "5cb82c4ace314ba47511541605303c10a7885079",
+      "commit": "61f359952fbc8a18de4160926632c58cba2cb432",
+      "bytes": 1510,
+      "sha256": "84bd9d58955aa1e10441722567329de89fee76bce95fdbbebfd5950bb254f67f"
+    },
+    {
+      "path": "lib/factory/agent-profile-http.ts",
+      "gitBlob": "e53da5fe0c59b8e2477721ff8a4fffaff107d770",
+      "commit": "61f359952fbc8a18de4160926632c58cba2cb432",
+      "bytes": 4226,
+      "sha256": "c6ecba718a6ee40ef2f3241f5fea3e7b42ef6696d0145f0032b00f044d0935bb"
+    },
+    {
+      "path": "lib/live/presence-read.ts",
+      "commit": "61f359952fbc8a18de4160926632c58cba2cb432",
+      "bytes": 796,
+      "sha256": "71ad5dc0fcb9303fd64adae8d4f0f8e812989eec5c00e4fdea1185f22fa1b90e",
+      "gitBlob": "d0bba9326cbfa09dde4d68790b6b92769d6968f1"
+    },
+    {
+      "path": "lib/workspace-selection.ts",
+      "commit": "61f359952fbc8a18de4160926632c58cba2cb432",
+      "bytes": 646,
+      "sha256": "52473c731c762676bf60da2bc17d2426a412b7ae7a6f53fc8992b7e10098d867",
+      "gitBlob": "058c9cc0855614cd2fa21067fe823a850390c11a"
+    },
+    {
+      "path": "lib/factory/workspace-http.ts",
+      "commit": "61f359952fbc8a18de4160926632c58cba2cb432",
+      "bytes": 1133,
+      "sha256": "9b7b6d6d0477eec9bc31e6bf84a0daf4b333ca8426b411df6c5c1bcc3f10ace8",
+      "gitBlob": "765e3061b236887ae804db658f66c45e35bdd1af"
+    },
+    {
+      "path": "lib/factory/agent-profile-store.ts",
+      "commit": "61f359952fbc8a18de4160926632c58cba2cb432",
+      "bytes": 9768,
+      "sha256": "50047b837275e0318f47ea5439e527baecdf545f52c531785231cd6503d95f8b",
+      "gitBlob": "e307d5c05b3e8bea0eb6b3c514da87a697ad5ee4"
+    },
+    {
+      "path": "lib/factory/agent-profile-definition.ts",
+      "commit": "61f359952fbc8a18de4160926632c58cba2cb432",
+      "bytes": 5968,
+      "sha256": "e01939ca24838ddc455b694e4bb42e972e45be9252348d72c8c5fe8322cffc16",
+      "gitBlob": "bc454c89f2c81bc07fc82fc65ac5924f9bb80e4f"
+    },
+    {
+      "path": "lib/task-workspace.ts",
+      "commit": "61f359952fbc8a18de4160926632c58cba2cb432",
+      "bytes": 6398,
+      "sha256": "fb9076ae79b02e01a7bcdf0303e12ad5948b3929247078a9ef9d5c0b7b049bc5",
+      "gitBlob": "abd859b054bf7122c734e93db3380b197a7ec73d"
+    }
+  ],
+  "operations": {
+    "sourceWrites": 0,
+    "refUpdates": 0,
+    "testsRun": 0,
+    "VMsCreated": 0,
+    "productionCalls": 0,
+    "models": 0,
+    "settingsChanged": 0,
+    "backgroundPolling": false
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "scope": "Four actual Node TAP originals plus two controlled candidate source files and synthetic failure source",
+  "classification": "No business data or account credentials were loaded. Known PRIVATE_* values are the existing test fixture literals and remain inside mock requests/fixtures; no real secrets. All run IDs/users in logs are deterministic synthetic fixture values.",
+  "tokenPatternUnresolvedMatches": [],
+  "rawPlatformEnvelopeExcluded": true,
+  "rawSignedUrlsExcluded": true,
+  "notes": "No provider API secrets or production logs were available to this isolated test; network allowlist only permitted the fixed official Node download domain."
+}

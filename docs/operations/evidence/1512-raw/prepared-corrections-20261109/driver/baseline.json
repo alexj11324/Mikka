@@ -1,0 +1,12 @@
+{
+  "label": "baseline",
+  "exitCode": 0,
+  "durationMs": 850,
+  "bytes": 9582,
+  "command": [
+    "/vercel/driver-workspace/tools/node-v24.22.2-linux-x64/bin/node",
+    "--test",
+    "--test-reporter=tap",
+    "scripts/acceptance/run-observability.test.mjs"
+  ]
+}

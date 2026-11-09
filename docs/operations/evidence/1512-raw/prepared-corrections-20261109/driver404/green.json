@@ -1,0 +1,16 @@
+{
+  "label": "profile404-green",
+  "exitCode": 0,
+  "bytes": 16335,
+  "durationMs": 1423,
+  "command": [
+    "/vercel/driver-profile404/tools/node-v24.22.2-linux-x64/bin/node",
+    "--test",
+    "--test-reporter=tap",
+    "scripts/acceptance/run-observability.test.mjs"
+  ],
+  "sourceHashes": {
+    "scripts/acceptance/run-observability.mjs": "7fa1c032cb0d9b7c5a88c6262b559368445866691796b001648a95efea856950",
+    "scripts/acceptance/run-observability.test.mjs": "b488d49afd89b833298d685dbb468a2520451a5be6f10711b7bdb76d66d5168a"
+  }
+}

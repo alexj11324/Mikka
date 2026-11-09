@@ -1,0 +1,47 @@
+{
+  "schema": "mikka.issue1512.driver-profile404.cleanup.v1",
+  "repository": "alexj11324/Mikka",
+  "sandbox": {
+    "name": "mikka-1512-driver-profile404-20261109",
+    "sessionId": "sbx_BP8ghDO4WHA01Se1Zu4CoS3FVAuG",
+    "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+    "teamId": "team_C7lwxVVvnUicFli6112mvxpv",
+    "persistent": false,
+    "ports": [],
+    "region": "iad1",
+    "vcpus": 1,
+    "memoryMiB": 2048,
+    "timeoutMs": 600000,
+    "networkAllowedDomains": [
+      "nodejs.org"
+    ],
+    "image": "vercel/sandbox/universal@sha256:bbec19cffb43ad724eee446d3bd4476e2993849dc0ff0c9f33356f8365d72219",
+    "baseRuntime": "node22"
+  },
+  "lifecycle": {
+    "createdAt": "2026-11-09T10:19:09.908Z",
+    "startedAt": "2026-11-09T10:19:09.932Z",
+    "stoppedAt": "2026-11-09T10:21:24.921Z",
+    "stopStatus": "stopped",
+    "durationMs": 134989,
+    "deleteAcknowledged": true,
+    "finalLookup": {
+      "method": "GET",
+      "operation": "GET /v2/sandboxes/{name}",
+      "name": "mikka-1512-driver-profile404-20261109",
+      "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+      "teamId": "team_C7lwxVVvnUicFli6112mvxpv",
+      "resume": false,
+      "status": 404,
+      "code": "not_found",
+      "requestId": "iad1:iad1::ljkf5-1794219693956-cef4e47b93c7"
+    }
+  },
+  "executedRuntime": "v24.22.2",
+  "boundaries": [
+    "One dedicated temporary VM; Node 24.22.2 was executed separately from the image's Node 22 default.",
+    "No pnpm install, production account, database, browser, model call, workflow dispatch, ref change or other resource was used.",
+    "Cleanup is based on actual stop response, successful deletion response and same-name/project resume:false GET 404, not inferred from timeout.",
+    "No active resource remains from this task."
+  ]
+}

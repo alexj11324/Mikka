@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "kind": "isolated-driver-unit-vm-cleanup",
+  "sandboxName": "mikka-1512-driver-workspace-20261109",
+  "sessionId": "sbx_dJf12TC0ZKpDnkTxap6WJp4qi5BM",
+  "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+  "teamId": "team_C7lwxVVvnUicFli6112mvxpv",
+  "createdAt": "2026-11-09T09:53:03.050Z",
+  "stoppedAt": "2026-11-09T09:56:41.053Z",
+  "configuredTimeoutMs": 900000,
+  "actualDurationMs": 217979,
+  "resources": {
+    "vcpus": 1,
+    "memoryMiB": 2048
+  },
+  "persistent": false,
+  "ports": [],
+  "networkAllowlist": [
+    "nodejs.org"
+  ],
+  "baseRuntime": "node22",
+  "executedNode": "v24.22.2",
+  "stop": {
+    "status": "stopped",
+    "sameSession": true
+  },
+  "deletion": {
+    "acknowledged": true,
+    "name": "mikka-1512-driver-workspace-20261109"
+  },
+  "exactReadback": {
+    "status": 404,
+    "code": "not_found",
+    "operation": "GET /v2/sandboxes/{name}",
+    "resume": false,
+    "name": "mikka-1512-driver-workspace-20261109",
+    "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH"
+  },
+  "activeOwnedSessionsAfterCleanup": 0,
+  "productionAccountsUsed": 0,
+  "modelsRun": 0,
+  "databasesCreated": 0,
+  "ciOrRefsChanged": false,
+  "rawPlatformEnvelopeArchived": false
+}

@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "kind": "fixed-p521-premerge-source-and-dependency-index",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "prefix": "p0-521-rebinding-20261109",
+  "oursCommit": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+  "p0Commit": "521db4799a4a85e1955f7dd86a1ad5ccef143cc8",
+  "p0Tree": "d82a34d59bf072348869ef086e24ae0ad5a852ec",
+  "payloadFileCount": 4,
+  "payloadBytes": 60848,
+  "files": [
+    {
+      "path": "p0-521-rebinding-20261109/61-to-521-complete-path-index.safe.json",
+      "kind": "evidence",
+      "mode": "100644",
+      "bytes": 16318,
+      "sha256": "663a61f532756339bd9f63b0aa08199946e6b98d94ea2229d06c94830ed407f5",
+      "gitBlob": "22692da3f41010c16990976bc3d0f9eccc79f26e",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "p0-521-rebinding-20261109/from-p0-521db479.patch",
+      "kind": "evidence",
+      "mode": "100644",
+      "bytes": 17702,
+      "sha256": "ff1fab435f76db0b06517ef6453034ba6883fd6a3d0b4db21af74870110ec1ca",
+      "gitBlob": "da029e88c7cf71330f2864186d0fe11d670ec92c",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "p0-521-rebinding-20261109/p521-source-binding.safe.json",
+      "kind": "evidence",
+      "mode": "100644",
+      "bytes": 11127,
+      "sha256": "5269882d851340102c7d91a66535c159ed876ce904d1007ed4d060234167463c",
+      "gitBlob": "546c92934ce6a36c4db47bfd80687c63feff2a95",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "p0-521-rebinding-20261109/p521-direct-dependencies.safe.json",
+      "kind": "evidence",
+      "mode": "100644",
+      "bytes": 15701,
+      "sha256": "554e92b9329d3ba825d4af25ffba7549d9d512f8ed0531fad3175e30b021f9f4",
+      "gitBlob": "4eeb690ab267cbb0e3b9b4ce4bb36cb668c02599",
+      "remoteConfirmed": true
+    }
+  ],
+  "reusesSourceIndex": "f449e443232bed85347e08d6014ec54c25b3a370",
+  "sourceCandidateCount": 6,
+  "unchangedExecutableFakes": 2,
+  "changedPathProof": {
+    "from": "61f359952fbc8a18de4160926632c58cba2cb432",
+    "to": "521db4799a4a85e1955f7dd86a1ad5ccef143cc8",
+    "completePaths": 34,
+    "textPatchMetadata": 22,
+    "binaryMetadataOnly": 12,
+    "intersectsOwned49": [
+      "package.json"
+    ],
+    "totalOwnedIntersections": 8
+  },
+  "staticProof": {
+    "forwardPatchExact": 6,
+    "reversePatchExact": 6,
+    "staleP061PackagePatchRejected": true,
+    "queryTemplateHashesMatched": 14,
+    "generatedRouteCount": 243,
+    "generatedMethodCount": 315,
+    "generatedCanonicalExecution": false,
+    "startTracingBlockExact": true
+  },
+  "integrationBoundary": "Static proof is fixed to ours c0e and P521. Parent owns the separately prepared driver objects and full three-way merge from its newer local candidate; the real combined commit parents/tree, source gates and original Native acceptance still require source binding. No ref or CI is changed here.",
+  "unresolvedGate": "P521 Source test:api providerStarted failure is an actual owner-reported blocker whose cause remains unknown; this index never substitutes prior c0e Source or Native success.",
+  "resourceLedger": {
+    "created": 0,
+    "activeOwned": 0,
+    "tests": 0,
+    "ci": 0,
+    "models": 0,
+    "productionRequests": 0,
+    "refsChanged": false
+  },
+  "privacy": {
+    "rawSourceAndEvidenceUnaltered": true,
+    "unreviewedCredentialOrPrivateValueHits": 0,
+    "reservedTestEmailShapeException": 1,
+    "fullScanDetails": "p521-source-binding.safe.json"
+  }
+}

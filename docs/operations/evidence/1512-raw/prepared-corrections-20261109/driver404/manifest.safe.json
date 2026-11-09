@@ -1,0 +1,99 @@
+{
+  "schema": "mikka.issue1512.driver-profile404.manifest.v1",
+  "repository": "alexj11324/Mikka",
+  "suggestedRelativePrefix": "driver-profile404-20261109",
+  "files": [
+    {
+      "path": "source/scripts/acceptance/run-observability.mjs",
+      "bytes": 64090,
+      "sha256": "7fa1c032cb0d9b7c5a88c6262b559368445866691796b001648a95efea856950",
+      "gitBlob": "002b8501cd4f4df023148515add7c55e2863dbd3",
+      "remoteVerified": true
+    },
+    {
+      "path": "source/scripts/acceptance/run-observability.test.mjs",
+      "bytes": 81045,
+      "sha256": "b488d49afd89b833298d685dbb468a2520451a5be6f10711b7bdb76d66d5168a",
+      "gitBlob": "aab0a21c4c8fadb9df81ff87ada4fa23198fa575",
+      "remoteVerified": true
+    },
+    {
+      "path": "red.tap",
+      "bytes": 35570,
+      "sha256": "95fe2636ab75ff3f6a618c01264672ffc4bdad289b8f771599911141b76a2613",
+      "gitBlob": "799045d2ea22aa930870b9508504d659eb6b5d94",
+      "remoteVerified": true
+    },
+    {
+      "path": "red.json",
+      "bytes": 598,
+      "sha256": "0ad47efae4fddd2f0139c16ddca036b7622dcb0368fceb2a5eff4d7bfac3cfa9",
+      "gitBlob": "54b422beeb23886dcf9b1bbba86da8a33f8ff4e6",
+      "remoteVerified": true
+    },
+    {
+      "path": "green.tap",
+      "bytes": 16335,
+      "sha256": "13ddf21abd35c041abef89fb5680c009b9e3a7ca6e7e1c998252f993d8912299",
+      "gitBlob": "2065169fef0a875735476ca126371351a2512dde",
+      "remoteVerified": true
+    },
+    {
+      "path": "green.json",
+      "bytes": 537,
+      "sha256": "27a2504211664e93d75485a026230b1c1a850695b35834a7bdffc00dbfe92f2c",
+      "gitBlob": "d68697df1c705d700b5801f6efa9174eb2fd959b",
+      "remoteVerified": true
+    },
+    {
+      "path": "setup.json",
+      "bytes": 2718,
+      "sha256": "e2037dfb5d0ebf603a096eb6adf5597b77f6d000d6beb24d8a67f66b3747c50a",
+      "gitBlob": "25e25f093a47f3faea4352c981c5bb81d21320b4",
+      "remoteVerified": true
+    },
+    {
+      "path": "candidate.patch",
+      "bytes": 7027,
+      "sha256": "d1a9e8f38bca9c5d0b3bc884f2d8efd3b52f9a3aaa1f554ae23aec77b51d93d5",
+      "gitBlob": "cb1dddb2e53610a597564292485bfd1b31326e57",
+      "remoteVerified": true
+    },
+    {
+      "path": "patch-proof.json",
+      "bytes": 1015,
+      "sha256": "cb49107a205009fffee55bf38266c46285258868fb3b7cf76d7ebf3bc6b7aca1",
+      "gitBlob": "f2a22e1b2e3c1646159c1323c4365ba17e3cb63b",
+      "remoteVerified": true
+    },
+    {
+      "path": "cleanup.safe.json",
+      "bytes": 1780,
+      "sha256": "9cf85a9eb0742bbf5365ef80433395d53a90b0e4e7c1dbac32cf137386fbb417",
+      "gitBlob": "11ec8efdd8528290a0200c3ff7704dd46da1242c",
+      "remoteVerified": true
+    },
+    {
+      "path": "setup-transport-error.safe.json",
+      "bytes": 1075,
+      "sha256": "9bddbaa670cfd38e4aee25ba2061c15bf99f279cc9efbc67fb5d325382e92fba",
+      "gitBlob": "9981a0c81c1c2f80e40fec842cce1d478d563c83",
+      "remoteVerified": true
+    },
+    {
+      "path": "implementation.safe.json",
+      "bytes": 14785,
+      "sha256": "b480046116efeae633747723b5712f731e33bbd4a87f9605b5d8a20bb8bde90b",
+      "gitBlob": "eca84881906424a213459c240a0ad8d1102a8c01",
+      "remoteVerified": true
+    }
+  ],
+  "dataFileCount": 12,
+  "dataBytes": 226575,
+  "sourceChanges": [
+    "scripts/acceptance/run-observability.mjs",
+    "scripts/acceptance/run-observability.test.mjs"
+  ],
+  "readbackBoundary": "Each content byte length, SHA256 and Git blob hash was computed before create_blob and matched the returned immutable Git object SHA. All seven VM original files additionally matched the VM-computed bytes/SHA256/Git blob IDs after chunk reconstruction.",
+  "immutability": "No earlier evidence or repository ref was changed. Source snapshots and evidence remain separate immutable blobs until the parent archives them."
+}

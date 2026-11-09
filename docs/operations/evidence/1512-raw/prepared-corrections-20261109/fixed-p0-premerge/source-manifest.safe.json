@@ -1,0 +1,263 @@
+{
+  "version": 1,
+  "kind": "fixed-p0-premerge-source-manifest",
+  "repository": "alexj11324/Mikka",
+  "source": {
+    "base": {
+      "commit": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+      "tree": "a850a89f11cbb467df869651ee39beca157c6351"
+    },
+    "ours": {
+      "commit": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "tree": "3e09885ffb34a9c04fc8a7ac5b8b88e3415f7325",
+      "overlayPaths": 49,
+      "reviewBlob": "9b9d51a5457665b4438efdf25bdb4bbcd4f45de4"
+    },
+    "p0": {
+      "commit": "61f359952fbc8a18de4160926632c58cba2cb432",
+      "tree": "ed46d344055cf47c7ae4802a947d9401cd736021",
+      "open": true,
+      "merged": false,
+      "statusBasis": "PR metadata actually read in this review; owner CI/merge-tree claims not independently revalidated."
+    }
+  },
+  "reviewInputs": {
+    "reviewBlob": "dbd01504940f0ef306da9a3e222ec0d2bf59c88b",
+    "indexBlob": "f4f65bb46de215ae3125a5a61f342731a11134c0"
+  },
+  "files": [
+    {
+      "path": "apps/api/generated/routes.json",
+      "base": {
+        "gitBlob": "8962037c3ef428b77d4417bfc12281aeb7e30c11",
+        "mode": "100644",
+        "bytes": 76186,
+        "sha256": "cd4fab7b9b3d407d72f66482d12cbf7938a02cbcf3b7a509f84bdb2dc76a5159"
+      },
+      "ours": {
+        "gitBlob": "06017439de4b98555310e13c35c079bca379174f",
+        "mode": "100644",
+        "bytes": 76186,
+        "sha256": "d9a59533489e8a98d80cf7da37f10385475ae415e5410fa151f6270d29008342"
+      },
+      "p0": {
+        "gitBlob": "016af99a766db7d863704225d451d9eb3a950bbb",
+        "mode": "100644",
+        "bytes": 76186,
+        "sha256": "445c3a25ad2b8aa2876f0099d27dcfee9813664be9d44b71c6d4486c9eee22e0"
+      },
+      "candidate": {
+        "path": "apps/api/generated/routes.json",
+        "mode": "100644",
+        "bytes": 76186,
+        "sha256": "8c4862ecf9433574458b3c898aea36a7cdf383f9a2599f1346720c883250ebda",
+        "gitBlob": "6fbced33e672f3fa0d5e35bed40b63fa103809d5"
+      },
+      "newBlobCreated": true
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "base": {
+        "gitBlob": "78fe57ce3f6ceeed2489d569c14b1ae0642aebe0",
+        "mode": "100644",
+        "bytes": 78570,
+        "sha256": "1c5e5d3d31de6325f452078ecd54f4c14be8bc5a6d309f6d5416de9846fe88f2"
+      },
+      "ours": {
+        "gitBlob": "16fe573dc6d192566f6bf2810b9ba94e186cba82",
+        "mode": "100644",
+        "bytes": 78570,
+        "sha256": "3c3d145814c4657cae36cee2147b9728a6d14353c0a217b97941a99327efd84a"
+      },
+      "p0": {
+        "gitBlob": "f218fd0698bfae6296be7a06c732c26cac412eb7",
+        "mode": "100644",
+        "bytes": 78570,
+        "sha256": "f29a01ae21560a84630ee348c8ee183d8304538b3764fc2e6a17a750bd9ffcea"
+      },
+      "candidate": {
+        "path": "apps/api/generated/routes.ts",
+        "mode": "100644",
+        "bytes": 78570,
+        "sha256": "96af04380e4e962ad2d3844c1e416fa3f1330231f3e36a1888fba7cb5cb312cc",
+        "gitBlob": "a0cc13783eb567c256c34e08eaf3f6e9aca157e2"
+      },
+      "newBlobCreated": true
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "base": {
+        "gitBlob": "a9ffaee70d53e2c9c0471b61abbddf80cc244fbe",
+        "mode": "100644",
+        "bytes": 4265,
+        "sha256": "7cadecd350fd73031473a4131edf769c552822a9faf6d26b345e6417dae671c0"
+      },
+      "ours": {
+        "gitBlob": "1dfb20c85e930e3c4b75d4f6e656a04fa9c2ffc5",
+        "mode": "100644",
+        "bytes": 4640,
+        "sha256": "bb72e38f117c01dffbf4f9ec7e2309160e9ac0d4bf485aa476132b22b191e48c"
+      },
+      "p0": {
+        "gitBlob": "c69dcfe5f459de0e603651fd510f06cf8d32e75b",
+        "mode": "100644",
+        "bytes": 4351,
+        "sha256": "b45398ed72f380c00e134338d785bcc4da53784ac08eb35871584ecf10da8f18"
+      },
+      "candidate": {
+        "path": "apps/desktop/src/renderer/rpc.ts",
+        "mode": "100644",
+        "bytes": 4726,
+        "sha256": "6119f76aa46cf1fcd93dc9b389859221c206fecba7cedf265af061fd6862270e",
+        "gitBlob": "dae8798653457afad334c2d909b10b63e9b3956f"
+      },
+      "newBlobCreated": true
+    },
+    {
+      "path": "lib/device-heartbeat.db.test.ts",
+      "base": {
+        "gitBlob": "68423cee4e9fa1f0f89274ed3dec67859e6f164b",
+        "mode": "100644",
+        "bytes": 16173,
+        "sha256": "d27f3a3a5ea9d491b0d1ff74b183f0c0134ec496a677a9a2494efee3b40544dc"
+      },
+      "ours": {
+        "gitBlob": "27bbb720ac8f5bd3716787db62eb11833e9f3530",
+        "mode": "100644",
+        "bytes": 21505,
+        "sha256": "6e8a9ddcb8855de98b443531b6d7524952e740d49eb38194a17234d87eda9b6d"
+      },
+      "p0": {
+        "gitBlob": "46c43f5c8bd9d33818f67d1e899f924ac9d267ae",
+        "mode": "100644",
+        "bytes": 16340,
+        "sha256": "573f3d55b712e706bd057645923b69a0cc4862ec7a5c6002715d340c88848f95"
+      },
+      "candidate": {
+        "path": "lib/device-heartbeat.db.test.ts",
+        "mode": "100644",
+        "bytes": 21768,
+        "sha256": "2004fa0ffc447ed630142960273495d8b700c68dc74e6903784a146738b54938",
+        "gitBlob": "e8f4f35748707364e77c53fa594c166bafc3dae8"
+      },
+      "newBlobCreated": true
+    },
+    {
+      "path": "package.json",
+      "base": {
+        "gitBlob": "4d4d856e9f90ea102c4e42cf42114e9d5daad731",
+        "mode": "100644",
+        "bytes": 80325,
+        "sha256": "e677d9ca43c64d5050c38e880a7d4745c838086e0ed16f83990106f4b1f5e39a"
+      },
+      "ours": {
+        "gitBlob": "785071f84b258c420e97d1c2b1e8afe3b9bd7048",
+        "mode": "100644",
+        "bytes": 80406,
+        "sha256": "8308c63f5f07119923296df96d9c830d8ceeb231b127e8b8b89790edd64cf7a7"
+      },
+      "p0": {
+        "gitBlob": "9b66f41ac8f18216c058e260f81b09aa76ec9560",
+        "mode": "100644",
+        "bytes": 80729,
+        "sha256": "74ee53eddb4e1b7609620b06c65fdf1c4478bfe791514714aaddbdb8cd0af06c"
+      },
+      "candidate": {
+        "path": "package.json",
+        "mode": "100644",
+        "bytes": 80810,
+        "sha256": "1445883a119e89e8b1aa35e39df9b625efd4d143e226ecf31a881163c1614925",
+        "gitBlob": "ef6da7b3d6b33220051fef56d7e9e5e024105310"
+      },
+      "newBlobCreated": true
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "base": {
+        "gitBlob": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+        "mode": "100644",
+        "bytes": 3767,
+        "sha256": "a70e04b6b7ad83be663ebe08daee4257f73de7fe07bb3366d05bc83b94eb9c56"
+      },
+      "ours": {
+        "gitBlob": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+        "mode": "100755",
+        "bytes": 3767,
+        "sha256": "a70e04b6b7ad83be663ebe08daee4257f73de7fe07bb3366d05bc83b94eb9c56"
+      },
+      "p0": {
+        "gitBlob": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+        "mode": "100755",
+        "bytes": 3767,
+        "sha256": "a70e04b6b7ad83be663ebe08daee4257f73de7fe07bb3366d05bc83b94eb9c56"
+      },
+      "candidate": {
+        "gitBlob": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+        "mode": "100755",
+        "bytes": 3767,
+        "sha256": "a70e04b6b7ad83be663ebe08daee4257f73de7fe07bb3366d05bc83b94eb9c56"
+      },
+      "newBlobCreated": false
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+      "base": {
+        "gitBlob": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+        "mode": "100644",
+        "bytes": 4466,
+        "sha256": "11fa656bc01369f27d1255e2d912964b4dfae26b5f6ad8de786425e5738ac31c"
+      },
+      "ours": {
+        "gitBlob": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+        "mode": "100755",
+        "bytes": 4466,
+        "sha256": "11fa656bc01369f27d1255e2d912964b4dfae26b5f6ad8de786425e5738ac31c"
+      },
+      "p0": {
+        "gitBlob": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+        "mode": "100755",
+        "bytes": 4466,
+        "sha256": "11fa656bc01369f27d1255e2d912964b4dfae26b5f6ad8de786425e5738ac31c"
+      },
+      "candidate": {
+        "gitBlob": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+        "mode": "100755",
+        "bytes": 4466,
+        "sha256": "11fa656bc01369f27d1255e2d912964b4dfae26b5f6ad8de786425e5738ac31c"
+      },
+      "newBlobCreated": false
+    },
+    {
+      "path": "workflows/coordinator/steps.ts",
+      "base": {
+        "gitBlob": "4437f048cda5c22142d407e46417abb8f15e80e6",
+        "mode": "100644",
+        "bytes": 91994,
+        "sha256": "6a0707e859999daef3190038bb8c903d583d41805abe7d0784911ebec2faa596"
+      },
+      "ours": {
+        "gitBlob": "8b7a5b06f3d1a9c0ebae03a434095a33fa552894",
+        "mode": "100644",
+        "bytes": 92081,
+        "sha256": "3cecb55acb3f721a65a73649975c18f1f121e4536bdb10c17baba5d62184ba4a"
+      },
+      "p0": {
+        "gitBlob": "5002aebd9ed3df6047ccb3f7a083401c3cad34c3",
+        "mode": "100644",
+        "bytes": 93353,
+        "sha256": "0925b676f1dddeab6d95d07f53418ea86f8332d51c04bf6f04d8567d45633465"
+      },
+      "candidate": {
+        "path": "workflows/coordinator/steps.ts",
+        "mode": "100644",
+        "bytes": 93440,
+        "sha256": "5f577830a5aee9f0acee251b3a406161c8bd4d6a38e9ac7e6aadc5224ba0048d",
+        "gitBlob": "d500795e9a62631b6c7619c4ffd1df67f137ee54"
+      },
+      "newBlobCreated": true
+    }
+  ],
+  "contentCandidates": 6,
+  "identicalExecutableFakes": 2,
+  "refsChanged": 0
+}

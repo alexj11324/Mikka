@@ -1,0 +1,144 @@
+{
+  "version": 1,
+  "kind": "fixed-p0-61f-c0e-premerge-object-index",
+  "repository": "alexj11324/Mikka",
+  "baseCommit": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+  "oursCommit": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+  "p0Commit": "61f359952fbc8a18de4160926632c58cba2cb432",
+  "sourceContentCandidates": 6,
+  "unchangedExecutableFakes": 2,
+  "payloadFileCount": 12,
+  "payloadBytes": 498104,
+  "files": [
+    {
+      "path": "apps/api/generated/routes.json",
+      "kind": "source",
+      "mode": "100644",
+      "bytes": 76186,
+      "sha256": "8c4862ecf9433574458b3c898aea36a7cdf383f9a2599f1346720c883250ebda",
+      "gitBlob": "6fbced33e672f3fa0d5e35bed40b63fa103809d5",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "kind": "source",
+      "mode": "100644",
+      "bytes": 78570,
+      "sha256": "96af04380e4e962ad2d3844c1e416fa3f1330231f3e36a1888fba7cb5cb312cc",
+      "gitBlob": "a0cc13783eb567c256c34e08eaf3f6e9aca157e2",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "kind": "source",
+      "mode": "100644",
+      "bytes": 4726,
+      "sha256": "6119f76aa46cf1fcd93dc9b389859221c206fecba7cedf265af061fd6862270e",
+      "gitBlob": "dae8798653457afad334c2d909b10b63e9b3956f",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "from-c0e94.patch",
+      "kind": "evidence",
+      "mode": "100644",
+      "bytes": 58802,
+      "sha256": "728db201a3dea003f8d1e352801448913f133cd64ca199df915036f7169d860e",
+      "gitBlob": "be336947d92df6adbe2f46a091375c31d57ae8ec",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "from-p0-61f3599.patch",
+      "kind": "evidence",
+      "mode": "100644",
+      "bytes": 24964,
+      "sha256": "6a2a74d6ecdb8e966d064ec1e52f0edf147c21be61a8b5e8ebc2a71995206808",
+      "gitBlob": "f9938dad2f8bc1d4e3593d94e1922c8466cc1296",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "generated-union-proof.safe.json",
+      "kind": "evidence",
+      "mode": "100644",
+      "bytes": 15906,
+      "sha256": "b3fb599d7f95d31e873f66b0f3c7f285b315c16cbb66878a9fa165401b89536a",
+      "gitBlob": "449aae80bebffbd87fb9bc0634aacac1252d3f79",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "lib/device-heartbeat.db.test.ts",
+      "kind": "source",
+      "mode": "100644",
+      "bytes": 21768,
+      "sha256": "2004fa0ffc447ed630142960273495d8b700c68dc74e6903784a146738b54938",
+      "gitBlob": "e8f4f35748707364e77c53fa594c166bafc3dae8",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "package.json",
+      "kind": "source",
+      "mode": "100644",
+      "bytes": 80810,
+      "sha256": "1445883a119e89e8b1aa35e39df9b625efd4d143e226ecf31a881163c1614925",
+      "gitBlob": "ef6da7b3d6b33220051fef56d7e9e5e024105310",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "README.md",
+      "kind": "evidence",
+      "mode": "100644",
+      "bytes": 3234,
+      "sha256": "25224b73165dab1c391a4e14a35d07fa8fead07ab04c222173b376663219cafc",
+      "gitBlob": "91385b369d8fb9a2069a5f12a92598185d27ed2c",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "source-manifest.safe.json",
+      "kind": "evidence",
+      "mode": "100644",
+      "bytes": 9230,
+      "sha256": "a50b26dce769852964c0cbb9a1a65f3b85f5729babaf86857a8f97d706c179b1",
+      "gitBlob": "2dd807e543d61001848c341e28ce3284b434bcf8",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "strict-patch-proof.safe.json",
+      "kind": "evidence",
+      "mode": "100644",
+      "bytes": 30468,
+      "sha256": "8f74f39437e7f3a5d746f072cb848bd2bd948c026048d173999610a104a8ac30",
+      "gitBlob": "7b69ebe3312d69c26cf9c44d0682c6cf70d5ed88",
+      "remoteConfirmed": true
+    },
+    {
+      "path": "workflows/coordinator/steps.ts",
+      "kind": "source",
+      "mode": "100644",
+      "bytes": 93440,
+      "sha256": "5f577830a5aee9f0acee251b3a406161c8bd4d6a38e9ac7e6aadc5224ba0048d",
+      "gitBlob": "d500795e9a62631b6c7619c4ffd1df67f137ee54",
+      "remoteConfirmed": true
+    }
+  ],
+  "strictReplay": {
+    "forward": 12,
+    "reverse": 12,
+    "wrongPreimageRejected": 12,
+    "alteredHunkRejected": 12,
+    "executedIn": "V8 only"
+  },
+  "generated": {
+    "routes": 243,
+    "methods": 315,
+    "p0SourceHashChanges": 22,
+    "oursSourceHashChanges": 2,
+    "intersection": 0,
+    "actualSourceHashesVerified": 24,
+    "canonicalGeneratorExecuted": false
+  },
+  "refsChanged": false,
+  "ciTriggered": false,
+  "resourcesCreated": 0,
+  "productionRequests": 0,
+  "actualP0AndMainRebindingRequired": true,
+  "productionOrCombinedNativeAcceptanceClaimed": false
+}

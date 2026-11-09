@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "kind": "root-confirmed-driver-profile404-finding",
+  "candidate": "eac86cc7081bd23dc93a8c5d6d3b443772037263",
+  "preExistingIn": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e",
+  "sourceReadByRoot": [
+    "e307d5c05b3e8bea0eb6b3c514da87a697ad5ee4",
+    "e53da5fe0c59b8e2477721ff8a4fffaff107d770",
+    "765e3061b236887ae804db658f66c45e35bdd1af"
+  ],
+  "peerFinding": "6936de80c51c2091d3da0e20c59684cc1bdc28c5",
+  "path": "read(options.missing) returns null for all404 before JSON -> preflight treats refused scope as missing; cleanup after ownRunsStopped/profileCreated skips DELETE and sets profileArchived=true",
+  "exactAbsent": "404 with exact string error agentProfileNotFound after authorized scoped store.get has no row",
+  "refusedCodes": [
+    "factoryNotFound",
+    "agentProfileScopeNotFound"
+  ],
+  "triage": {
+    "estimatedOccurrence": 2,
+    "estimatedImpact": 6,
+    "product": 12,
+    "basis": "Fresh authorization/scope refusal is an explicit existing server path. An unresolved temporary profile can be recorded as cleaned; this undermines required cleanup proof. No actual production occurrence claimed.",
+    "authorizationEvidenceRisk": true
+  },
+  "fix": "Parse JSON before missing shortcut and accept only exact absent code; retain all other failures. Add real HTTP fixture preflight and cleanup GET examples.",
+  "status": "fix-under-actual-Node-verification",
+  "productionImpactObserved": false
+}

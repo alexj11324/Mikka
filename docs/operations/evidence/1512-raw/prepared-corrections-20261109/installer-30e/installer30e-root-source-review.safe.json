@@ -1,0 +1,270 @@
+{
+  "schema": 1,
+  "kind": "root-independent-installer-credential-scope-30e-source-review",
+  "source": {
+    "candidate": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+    "candidateTree": "3e09885ffb34a9c04fc8a7ac5b8b88e3415f7325",
+    "donor": "30e54e5f9e97ed059bb9121edeeb20fa2578e286",
+    "donorTree": "2fa4d7e09a90e7a75151e9ae4065245b391ea366",
+    "soleDonorParent": "01b302385666dc5b7a1535a335ef1d953c5d12b8"
+  },
+  "files": [
+    {
+      "path": ".github/actions/pnpm-install/action.yml",
+      "preimage": {
+        "sha": "20a5db53847172db9f52ee12c6c0feeec6c48dce",
+        "mode": "100644",
+        "bytes": 1514,
+        "sha256": "8b95a775175947954d8f049d1f5737e8961a6f512debfa343fb4981340679eb2"
+      },
+      "output": {
+        "path": ".github/actions/pnpm-install/action.yml",
+        "sha": "553d718ad413f0db4b12833e06ffb8f29d98e555",
+        "bytes": 1676,
+        "sha256": "a7158d12a9b6025674fc7c01079b30f2ee29475caf0dafc66a68b0611f4b8200"
+      },
+      "hunks": 2,
+      "exactForward": true,
+      "exactReverse": true
+    },
+    {
+      "path": ".github/workflows/issue1415-deployed-production.yml",
+      "preimage": {
+        "sha": "8ef902848aba3a2e59ce01608782697ec7f4d14c",
+        "mode": "100644",
+        "bytes": 6669,
+        "sha256": "3c31bd09bf80f5fe8892d62287084d0d1061a17b82926e4c2c0eaaf2f1ce93e4"
+      },
+      "output": {
+        "path": ".github/workflows/issue1415-deployed-production.yml",
+        "sha": "6d0b50becc99ce6d5f6cfb69cceea1037f2ee1be",
+        "bytes": 6734,
+        "sha256": "4647cfb3bc0cd71b8a52ad8add07ab27a9f36e0ce65ec762e195bb514031a880"
+      },
+      "hunks": 1,
+      "exactForward": true,
+      "exactReverse": true
+    },
+    {
+      "path": ".github/workflows/issue1415-managed-inspection.yml",
+      "preimage": {
+        "sha": "0d8cc322ddddb2bada48abff741cf7887b6631b0",
+        "mode": "100644",
+        "bytes": 2568,
+        "sha256": "2b965718b1f41a2062f28f641b0251746c2edd9bf90dceb994bdd00e51a6072b"
+      },
+      "output": {
+        "path": ".github/workflows/issue1415-managed-inspection.yml",
+        "sha": "9ece51fc2a39c2d362446e68df1f9bbf2076f641",
+        "bytes": 2633,
+        "sha256": "83c91b0249a4f4e232b949d1a91f643b64caffbf5d87cad0cd4c477321802a3e"
+      },
+      "hunks": 1,
+      "exactForward": true,
+      "exactReverse": true
+    },
+    {
+      "path": ".github/workflows/issues-1516-welcome-acceptance.yml",
+      "preimage": {
+        "sha": "74c7dd24872ef8e02ef27d559822fb6440d01c0a",
+        "mode": "100644",
+        "bytes": 4924,
+        "sha256": "6bcac62664aaeb38d9d3867e3960f944763cd5836c26da2be02c6eadec8df410"
+      },
+      "output": {
+        "path": ".github/workflows/issues-1516-welcome-acceptance.yml",
+        "sha": "4757d62065017957f6e1e4300ab4695507ce40d8",
+        "bytes": 5054,
+        "sha256": "0e9fdc0063fc7c3c4e3285c7dc941f202c1e1e0b27489f75ffb0061795b430f1"
+      },
+      "hunks": 2,
+      "exactForward": true,
+      "exactReverse": true
+    },
+    {
+      "path": ".github/workflows/read-cache-production.yml",
+      "preimage": {
+        "sha": "82b0a711738730df3dcdc5f6e2f07beda4b7c8c1",
+        "mode": "100644",
+        "bytes": 9649,
+        "sha256": "6fa04f0827113289c841cd709a7ea61bc1e0a6d0ab9850f35bf60b0c7dd7ea0f"
+      },
+      "output": {
+        "path": ".github/workflows/read-cache-production.yml",
+        "sha": "7ffa772dc65e85ae6665d7fb70f5d5a3b604da22",
+        "bytes": 9844,
+        "sha256": "c9b737a96718e2c913ed5f6792413aa9ae625c8d0299a3deb1ad178214a5d108"
+      },
+      "hunks": 3,
+      "exactForward": true,
+      "exactReverse": true
+    },
+    {
+      "path": ".github/workflows/read-cache.yml",
+      "preimage": {
+        "sha": "54464667276af18611ba083e968ce9f1672fb301",
+        "mode": "100644",
+        "bytes": 4145,
+        "sha256": "fb011ef1b3c47f8be147ddc6e57b324d1959ce5a1df6ca850908aef338af1ca0"
+      },
+      "output": {
+        "path": ".github/workflows/read-cache.yml",
+        "sha": "86ee0112413eae241189bb2d748a6d6901201c4f",
+        "bytes": 4210,
+        "sha256": "66026952e65f631d6844ac86a3a24d5fc6f11b5fd9009c72ae019d1178262bb0"
+      },
+      "hunks": 1,
+      "exactForward": true,
+      "exactReverse": true
+    },
+    {
+      "path": ".github/workflows/self-hosted-image.yml",
+      "preimage": {
+        "sha": "46f05f36960559221030e89e1add41ecdfced3b4",
+        "mode": "100644",
+        "bytes": 9043,
+        "sha256": "5c5bd3c7a46f09cf463df367869fdaef058d85272d2fcc752404cb0b0ea13b21"
+      },
+      "output": {
+        "path": ".github/workflows/self-hosted-image.yml",
+        "sha": "3dc64ed2c8d58efdf981036e7bb6362e1bd92077",
+        "bytes": 8923,
+        "sha256": "7618e82b4fb3d571a394fe82fc562acd2af422cc772db86c0a2c94ba041af310"
+      },
+      "hunks": 1,
+      "exactForward": true,
+      "exactReverse": true
+    },
+    {
+      "path": ".github/workflows/self-hosted-production.yml",
+      "preimage": {
+        "sha": "77788506cdb928f64b6975483c73c6523c76d483",
+        "mode": "100644",
+        "bytes": 4142,
+        "sha256": "d867da4aa718c860cd885dd24fac121dd7d5b870db060356f9ffd79713051eff"
+      },
+      "output": {
+        "path": ".github/workflows/self-hosted-production.yml",
+        "sha": "862a9f7cdea8df0373207e389f3cbf3afaca46df",
+        "bytes": 4272,
+        "sha256": "867f1bafcb613fdb6a544b65c0ef2d044899da452f18fc6d054841411f6ccdc5"
+      },
+      "hunks": 2,
+      "exactForward": true,
+      "exactReverse": true
+    },
+    {
+      "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+      "preimage": {
+        "sha": "e90d6530e978d638d3040c0daa4ac6dc84b39767",
+        "mode": "100644",
+        "bytes": 11159,
+        "sha256": "2785f0cf435c58c364875ec091463e0feed4913e865057f002331da33dd65371"
+      },
+      "output": {
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "sha": "42ae23945f798020ec068635e7621869fb427af2",
+        "bytes": 11224,
+        "sha256": "768a2a9cf7edd806ec619e4b5c6fcc32466f7b8814fff94838f93a9eccd37f38"
+      },
+      "hunks": 1,
+      "exactForward": true,
+      "exactReverse": true
+    },
+    {
+      "path": ".github/workflows/ui-policy.yml",
+      "preimage": {
+        "sha": "18e7c54ec507d02b12fd1131b5a8b6112ece2212",
+        "mode": "100644",
+        "bytes": 22618,
+        "sha256": "0e62df8a85e4f58a5c790233d7c1a229579db34b137bbc3b644e60f5ae5408d4"
+      },
+      "output": {
+        "path": ".github/workflows/ui-policy.yml",
+        "sha": "e3938ad5c343fb14d60709e014cb3d9a3189b104",
+        "bytes": 22943,
+        "sha256": "7da895fd0678b08acb1667bfc92afe7228872e10631b8578aa1a6696316d025c"
+      },
+      "hunks": 5,
+      "exactForward": true,
+      "exactReverse": true
+    },
+    {
+      "path": "tests/mvp/pinned-pnpm.test.mjs",
+      "preimage": {
+        "sha": "b22b319424ada32e3592f7a6ea464aa49121aad0",
+        "mode": "100644",
+        "bytes": 4658,
+        "sha256": "41ccbaf785d22fb8a39d5833a23be777622599550b2655c7000c6c5ce1a30df4"
+      },
+      "output": {
+        "path": "tests/mvp/pinned-pnpm.test.mjs",
+        "sha": "0306d340b38cf455facba376c2eb6dda58362c96",
+        "bytes": 12270,
+        "sha256": "adefe699f39fadddc3eb6239bb6e7aa42748cef31d5ecb2167d3e8ebf12a7dee"
+      },
+      "hunks": 2,
+      "exactForward": true,
+      "exactReverse": true
+    }
+  ],
+  "scope": {
+    "default": "explicit empty optional input; install-step env overwrites ambient FFMPEG_GITHUB_TOKEN with input",
+    "optIns": 16,
+    "workflowFilesWithOnlyWithAddition": 8,
+    "writeCallers": "Image and screenshots do not supply input; image Docker invocation has neither token env nor BuildKit secret binding.",
+    "readOnlyMeaning": "GitHub API contents/actions/issues read under explicit caller workflow/job permissions. OIDC id-token:write is separate and retained, so not a claim whole job is read-only.",
+    "installerHttpBoundary": "Unmodified pinned downloader remains two official sources, bounded deadlines/redirects/integrity; scope correction addresses subprocess inheritance separately.",
+    "permissionMutations": 0,
+    "publicationResponsibilitiesChanged": false,
+    "extraTokenIdentity": false
+  },
+  "testReview": {
+    "originalTopLevel": 8,
+    "originalContinuousBytes": 4658,
+    "newTopLevel": 4,
+    "newNested": 10,
+    "totalReportedTests": 22,
+    "method": "New tests parse actual action/workflows with js-yaml, execute real pinned pnpm frozen install on a dependency-free synthetic package, and observe only Boolean environment presence from actual postinstall; inherited token clearing and explicit read-only opt-in differentiated.",
+    "negativePermissions": [
+      "workflow read overridden by job write",
+      "unknown inherited",
+      "write-all",
+      "packages:write",
+      "explicit empty permissions"
+    ],
+    "positivePermissions": [
+      "workflow write overridden by job read",
+      "read-all",
+      "API read plus independent id-token:write"
+    ],
+    "existingEightPreserved": true,
+    "ownerExecutionReport": {
+      "comment": 6736905024,
+      "scopeRed": {
+        "tests": 14,
+        "pass": 9,
+        "fail": 5,
+        "skip": 0
+      },
+      "green": {
+        "tests": 22,
+        "pass": 22,
+        "skip": 0
+      },
+      "independentlyExecutedByRoot": false,
+      "receiptRequested": 6736991592
+    }
+  },
+  "findings": [],
+  "integrationStatus": "All 11 exact patches apply forward and reverse against c0e bytes. No source branch/ref changed, no test or production call executed. Await actual P0 and driver union before one source publication.",
+  "exclusions": [
+    "Unrelated donor mock DB helper",
+    "15 unrelated owner performance files"
+  ],
+  "remaining": [
+    "Read existing owner execution receipt when supplied",
+    "Final-source formal CI executes new scope regression",
+    "No claim that read-only token is isolated from lifecycle when explicitly opted in; sharing is now caller-explicit within API-read-only jobs."
+  ]
+}

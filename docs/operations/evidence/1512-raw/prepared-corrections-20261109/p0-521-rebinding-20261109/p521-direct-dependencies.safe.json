@@ -1,0 +1,337 @@
+{
+  "version": 1,
+  "kind": "fixed-p521-direct-observability-dependency-review",
+  "repository": "alexj11324/Mikka",
+  "sources": {
+    "ours": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+    "p0": "521db4799a4a85e1955f7dd86a1ad5ccef143cc8",
+    "p0Tree": "d82a34d59bf072348869ef086e24ae0ad5a852ec",
+    "completeP0Diff": 428,
+    "subsequentCompleteDiff": 34,
+    "scope": "Direct acceptance dependencies only, not a broad428-file audit or production execution."
+  },
+  "conclusion": {
+    "additionalHelperPatchIdentified": false,
+    "knownAdaptations": "The separately owned two-file driver candidate and eight-intersection source union remain required. No additional benchmark, controlled-failure, fixed-query, normalizer, reconciler, PNG or Replay helper schema adaptation was identified.",
+    "unresolvedActualGate": "Parent relayed an actual Source test:api providerStarted failure. Source comparison neither explains it nor proves the integration will fix it; owner retains the original assertion and owns reproduction."
+  },
+  "directFiles": [
+    {
+      "path": "scripts/ops/run-trace-benchmark.ts",
+      "ref": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "bytes": 19846,
+      "sha256": "0962440794712e7f42a919d755cba69c7e2fcc15f1fad02de29ba9d2b31f9de4",
+      "gitBlob": "09280f0dfb945157aa8c692699fecbc2989f15dc"
+    },
+    {
+      "path": ".github/workflows/run-trace-acceptance.yml",
+      "ref": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "bytes": 13984,
+      "sha256": "474e7d33bcc1a521ae61ab30040f1715c376b2d8b160b5db89aacf2785aea8c4",
+      "gitBlob": "b248a4d97240ba895c3c165b2d7d5c4a763ffe23"
+    },
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "ref": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "gitBlob": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e",
+      "bytes": 59415,
+      "sha256": "1881370b53dc058fe29da04092ee1523b661f04d9077e43b03f8eee2a727da01"
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "ref": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "gitBlob": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+      "bytes": 25516,
+      "sha256": "c78a8bbe27c6f7a06279ef6ec5332026bb92ba1283f1051ed035d94b98ca7606"
+    },
+    {
+      "path": "scripts/acceptance/factory-continuation.mjs",
+      "ref": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "gitBlob": "948dc10fb070e34c794eca24b4f9865c94904170",
+      "bytes": 10654,
+      "sha256": "0f338e8f1de05aa3a3d6e3e30cc66544be15ab85c2946803f24c1b2c09ce409e"
+    },
+    {
+      "path": "scripts/ops/posthog-export-evidence.mjs",
+      "ref": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "bytes": 11762,
+      "sha256": "94282fae71b089bfe7154b907c1ebd45fc5c352e16c3369e184b64a1374b8045",
+      "gitBlob": "a986e913cc0f5b79386f5bf50cef8fbefae6ac0e"
+    },
+    {
+      "path": "scripts/ops/posthog-replay-evidence.mjs",
+      "ref": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "bytes": 13579,
+      "sha256": "4df87f17ee6175a0b3498652f9af4ac61afec35dea022c116d81050396a0bddf",
+      "gitBlob": "fe28b5927b8df35d42bce2984a95dcfdd50e6965"
+    }
+  ],
+  "workflowDriver": {
+    "path": "scripts/acceptance/run-observability-workflow.mjs",
+    "gitBlob": "51582624d55f19efb3dd9398f2d7f0b0ece5f3f7",
+    "bytes": 11693,
+    "sha256": "811ba05e172f6a896867949d701911b845289db290950339b29a0a8c5463ec6a"
+  },
+  "benchmark": {
+    "unchangedIn428And34": true,
+    "actualEntry": "scripts/ops/run-trace-benchmark.ts",
+    "flow": "Local Node HTTP handler and dedicated loopback PostgreSQL pool; uses beginRequestTrace, withTraceMetadata, product sampling/retention/exporters and real SELECT1/0 failures.",
+    "workspaceDatabaseOrFactoryAuthorizationImported": false,
+    "traceEntryAndCoreImportsUnchangedByP0": true,
+    "exactMainGuardPreserved": true,
+    "controlledFailureCount": 20,
+    "memoryBenchmarkBeforeTokenStep": true,
+    "transportCallbackIsNotBackendObservation": true
+  },
+  "receipts": {
+    "factoryAdmission": "P0 wraps Factory handlers in a fresh Workspace lease. Current driver owner supplies explicit Personal headers on existing reads/writes/cleanup, scoped owner-wide idle inventory, and exact agentProfileNotFound-only absence. These are separate owned source/test objects, not edits made by this review.",
+    "defaultBrowser": "P521 factory reader now uses saved cookie, then Personal, then first choice; the normal browser path is no longer known to disagree with Workspace default for the Team-first/no-cookie case. Actual browser execution is still required.",
+    "runAndFactoryFields": "Inspected changed task/list/approval handlers, chat store, local admission, computer queue, Factory dispatch/runtime/reconcile. They add/fence Workspace context but do not rename the consumed run/model/harness/executionIdentity, task.stage/status/sourceEventId/candidateId/attempt outputs or trace carrier ID fields. The existing runProof identity equality and flowVersion-specific checks remain strict.",
+    "traceCapture": "The inspected admission and queue captureTraceContext calls retain runId/threadId/taskId/posthogDistinctId; new workspaceId persistence does not replace those IDs. The union coordinator.tool span keeps the P0 scoped actor/token principal.",
+    "historicalContinuation": "factory-continuation.mjs remains a historical fixed review+verify continuation harness. run-trace-acceptance dispatches run-observability-workflow.mjs, whose driver has flowVersion2 execute+review and historical execute+review+verify checks. No new historical continuation run or added issue1512 acceptance requirement is inferred."
+  },
+  "offlinePosthog": {
+    "queries": {
+      "gitBlob": "07f2013526784be3bff29fd23073f5320a980cf3",
+      "bytes": 58165,
+      "sha256": "a52df37feff2ef4c304d4bc47960657dc5c5badbde0fba4416f0e9bf4fea4c68"
+    },
+    "normalizer": {
+      "gitBlob": "8bd8d631b24cb134e1581e48eca86e8f16d3f557",
+      "bytes": 19913,
+      "sha256": "56ce0805aa5e75fece1efcd06ab9c0652ab90037c7e453e7e4fe6b7748b36ae5"
+    },
+    "reconciler": {
+      "gitBlob": "521ef985cd815b19b5220025adbd053879ccb41e",
+      "bytes": 28367,
+      "sha256": "52884757d76555bd8478ec7e3154a0b58746a6c9bbe56e7c15083494526626d2"
+    },
+    "queryCount": 14,
+    "all14SqlHashesMatchNormalizer": true,
+    "sqlHashProof": [
+      {
+        "name": "lookup_trace_by_ids",
+        "sha256": "9508fdb7327e3688a12377021e821bf7d6dbd3acb85ef956207091d3136d8fdb",
+        "expected": "9508fdb7327e3688a12377021e821bf7d6dbd3acb85ef956207091d3136d8fdb",
+        "match": true
+      },
+      {
+        "name": "lookup_trace_count",
+        "sha256": "e7568116c4ba4d329a4f929a314557646ef9172185c16beb92bb08320239086d",
+        "expected": "e7568116c4ba4d329a4f929a314557646ef9172185c16beb92bb08320239086d",
+        "match": true
+      },
+      {
+        "name": "span_timeline",
+        "sha256": "ea6a0f5e5a26dc82e9d44e2cf7707e316b89169265f49d52f79e871083c5d2b3",
+        "expected": "ea6a0f5e5a26dc82e9d44e2cf7707e316b89169265f49d52f79e871083c5d2b3",
+        "match": true
+      },
+      {
+        "name": "trace_integrity",
+        "sha256": "f925cc10817c9903888b5d014d049bd70fa79aa29de29db259aaad0dd8a4036e",
+        "expected": "f925cc10817c9903888b5d014d049bd70fa79aa29de29db259aaad0dd8a4036e",
+        "match": true
+      },
+      {
+        "name": "generation_receipts",
+        "sha256": "621c07e4b85df37f0793f4dce6786c5447a8612d9b9f120f6129b093dcc206a5",
+        "expected": "621c07e4b85df37f0793f4dce6786c5447a8612d9b9f120f6129b093dcc206a5",
+        "match": true
+      },
+      {
+        "name": "tail_error_retention",
+        "sha256": "93cadd4c63825a6c291f53e857a28de50695311137f0e533589415c80c70f727",
+        "expected": "93cadd4c63825a6c291f53e857a28de50695311137f0e533589415c80c70f727",
+        "match": true
+      },
+      {
+        "name": "safe_native_logs",
+        "sha256": "8008fa8570622dd8a11d26968fd72f0392fab91521dc774ed432e8de5efde394",
+        "expected": "8008fa8570622dd8a11d26968fd72f0392fab91521dc774ed432e8de5efde394",
+        "match": true
+      },
+      {
+        "name": "source_correlation",
+        "sha256": "a460dfed6c168ab732064df0ab1a9cc1fdadbf64077eee81a75bd632cf4fa8b3",
+        "expected": "a460dfed6c168ab732064df0ab1a9cc1fdadbf64077eee81a75bd632cf4fa8b3",
+        "match": true
+      },
+      {
+        "name": "replay_correlation",
+        "sha256": "07cbb3f5c660377a577aafd882d3e64436fd61d907656643bbf21a1b82b36304",
+        "expected": "07cbb3f5c660377a577aafd882d3e64436fd61d907656643bbf21a1b82b36304",
+        "match": true
+      },
+      {
+        "name": "capture_summary",
+        "sha256": "9b7d18e1e1596aef96ab253706b32d81ea25a89f9a74299b36e3c9d7522639e9",
+        "expected": "9b7d18e1e1596aef96ab253706b32d81ea25a89f9a74299b36e3c9d7522639e9",
+        "match": true
+      },
+      {
+        "name": "apm_generation_spans",
+        "sha256": "1d43fcc835476f143ba6c51c390a8cfbc5c522fc9a0c8184374046ec76050b40",
+        "expected": "1d43fcc835476f143ba6c51c390a8cfbc5c522fc9a0c8184374046ec76050b40",
+        "match": true
+      },
+      {
+        "name": "ai_capture_summary",
+        "sha256": "d0f778fb375bdebc0de8643d79f74d2a17ba9125581409be58c55645afaf47ec",
+        "expected": "d0f778fb375bdebc0de8643d79f74d2a17ba9125581409be58c55645afaf47ec",
+        "match": true
+      },
+      {
+        "name": "apm_session_links",
+        "sha256": "6ac78767b11634edf38640c61fd37f5f34d393bcf44adbab9ea0cf109ffa1edb",
+        "expected": "6ac78767b11634edf38640c61fd37f5f34d393bcf44adbab9ea0cf109ffa1edb",
+        "match": true
+      },
+      {
+        "name": "native_generation_collection",
+        "sha256": "8de7a9e941869dc778ab5dd9bc61ac9a0484626d8d2e08518a2bbd17fc08bde4",
+        "expected": "8de7a9e941869dc778ab5dd9bc61ac9a0484626d8d2e08518a2bbd17fc08bde4",
+        "match": true
+      }
+    ],
+    "workspaceOrOwnershipColumnsConsumed": false,
+    "links": [
+      "run_id",
+      "thread_id",
+      "task_id",
+      "session_id",
+      "trace_id_hex",
+      "span_id_hex",
+      "parent_span_id_hex"
+    ],
+    "otherDimensions": [
+      "service/version/environment",
+      "stage",
+      "workflow/step/workflow_run_id",
+      "model/provider/operation/harness",
+      "tokens/cache/timing/cost",
+      "native collection counters and flags"
+    ],
+    "sameWorkspaceDoesNotProveCorrelation": true,
+    "boundaries": [
+      "Query template status remains prepared_not_production_validated.",
+      "Normalizer preserves unknown truncation and does not claim complete enumeration or acceptance.",
+      "Reconciler compares two snapshots and sets overallAcceptance to null; tail retention, source correlation, replay correlation and session links remain outside its evaluated core.",
+      "No PostHog queries, normalization execution, reconciliation execution, screenshot rendering or Replay playback were performed in this task."
+    ]
+  },
+  "nitro": {
+    "test": {
+      "path": "apps/api/runtime/dev-tracing.test.mjs",
+      "gitBlob": "50b1820de31fbc2c21a0700abe37780c07d4484d"
+    },
+    "developmentWrapper": {
+      "path": "apps/api/scripts/dev.mjs",
+      "gitBlob": "6246f21a01e8992af844c6482fd4260e1a375db5"
+    },
+    "compileTracing": {
+      "path": "apps/api/scripts/finalize-build.mjs",
+      "gitBlob": "6f89f2ecb3e5306229c4b0b1de54c4e0e3aeb8df"
+    },
+    "startEntry": {
+      "path": "apps/api/runtime/tracing-start.ts",
+      "gitBlob": "bad641bcdf634325e876a02a1d32e09f3affd57a"
+    },
+    "instrumentation": {
+      "path": "instrumentation.ts",
+      "gitBlob": "e6635a158cc7f502f84cca60a2154605260646e4"
+    },
+    "config": {
+      "path": "lib/tracing/config.ts",
+      "gitBlob": "5c0864d4ea0852bf5bd5b80e56b6fe3d47ac9483",
+      "bytes": 3376,
+      "sha256": "b26acae1c89e8a74a6aae8769ffbab32af72c72250b239711b0786f160f65856"
+    },
+    "p521Node": "3037a3b0cc2538451917cdd8e454a376553fc47c",
+    "oursNode": "00775a5928228262a66b12b845ee0dc18f6c6047",
+    "startTracingBlock": {
+      "exact": true,
+      "bytes": 1334,
+      "sha256": "4e43f329a7062ecd9a63f447caf4743f83f2273eb36c47b9e422504d934e479a"
+    },
+    "onlyNodeDelta": "FlushOnRootEnd callback awaits exporter.forceFlush after batcher.forceFlush, including already in-flight exports. Provider creation and registration control flow is byte-identical.",
+    "testOrder": "Actual worker HTTP200, then providerStarted, pgWrapped, queryFailed, version/worker replacement, PG OTLP span and private-byte absence. providerStarted false precedes and is not an OTLP delivery assertion.",
+    "wrapperOrder": "A separate generated asset statically imports mikka-tracing.mjs before an awaited dynamic application import. No missing await is demonstrated.",
+    "unresolvedBranches": [
+      "Tracing entry did not execute in the served worker",
+      "traceSettings returned null and the process-global slot cached null",
+      "startTracing initialization threw and the entry caught only its error name"
+    ],
+    "minimalOwnerDiagnostics": [
+      "Distinguish global symbol slot undefined/null/provider without serializing the provider.",
+      "Record traceSettings enabled and public-token presence only as booleans; never log the token.",
+      "Record closed booleans for CI present, Vercel, NODE_ENV test/development/production, NEXT_PHASE production-build and positive sample rate.",
+      "Preserve the existing tracing-start error-name diagnostic and original providerStarted/pgWrapped/PG-span assertions; do not widen deadlines or retry for a pass."
+    ],
+    "causeEstablished": false,
+    "flakyClassification": false
+  },
+  "changedDirectSourceDiffs": [
+    {
+      "path": "app/api/factory/tasks/[taskId]/route.ts",
+      "baseBlob": "765fc699a7c1463309b0957e1d13609aab283c2f",
+      "headBlob": "d513b56dd3a5327bcfed4340c81689aaaf346938"
+    },
+    {
+      "path": "app/api/factory/tasks/[taskId]/approval/route.ts",
+      "baseBlob": "6c284931a32b5f87e45fa4e79159666d94fcaea4",
+      "headBlob": "d3b583a364b8ac587485fab4d38189fbcc28f6a5"
+    },
+    {
+      "path": "app/api/factory/tasks/route.ts",
+      "baseBlob": "20869b39ac12f9761150cb59343145b1fb623563",
+      "headBlob": "d09f99faee9718518ab389b037ec28deda932949"
+    },
+    {
+      "path": "lib/coordinator/store.ts",
+      "baseBlob": "0198839eeb0ebb522b22a790f08c65b35550584c",
+      "headBlob": "251018f9b612d7332d37bdfb1e639d33a84b555b"
+    },
+    {
+      "path": "lib/run-admission-store.ts",
+      "baseBlob": "435067185c479b273568ad1ffed3950221166bda",
+      "headBlob": "356744968463ecbfb82e69cca4625eef33fbb217"
+    },
+    {
+      "path": "lib/run-claim-response.ts",
+      "baseBlob": "f62eb72e5e250aefc32ed48cebf14ead9b8a1a00",
+      "headBlob": "c0b33daeb61a84beeee11784a3532522070dc605"
+    },
+    {
+      "path": "lib/computer/queue-run.ts",
+      "baseBlob": "0e1def1db4f72d4595e434e123a314dcf511f02b",
+      "headBlob": "3b82afaeccaee589fb3db9826acfff87e9944fde"
+    },
+    {
+      "path": "lib/factory/task-dispatch.ts",
+      "baseBlob": "342e84bfdb7ead0c31e1897a89741e42f85d03d0",
+      "headBlob": "6f3190fd07dbcafa135c854adfe2dbaa33022b63"
+    },
+    {
+      "path": "lib/factory/runtime.ts",
+      "baseBlob": "934ea30f6051450ad456037e6cc1b6e77f355a77",
+      "headBlob": "2d5b5a49e30bb379f5a9671e7b2317bbe4249c8f"
+    },
+    {
+      "path": "lib/factory/reconcile.ts",
+      "baseBlob": "2f01685d1ce1dc3a9c4fddb55cc0df377c054e47",
+      "headBlob": "9d28eb034d0ce6f1ea626d2ba13cb9f6243a2616"
+    }
+  ],
+  "execution": {
+    "sourceReadsOnly": true,
+    "v8HashAndPatchArithmeticOnly": true,
+    "ciOrTestsRun": 0,
+    "jobLogsDownloaded": 0,
+    "models": 0,
+    "productionRequests": 0,
+    "resourcesCreated": 0,
+    "sourceChanged": false,
+    "refsChanged": false
+  }
+}

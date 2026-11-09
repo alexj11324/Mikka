@@ -1,0 +1,352 @@
+{
+  "schema": "mikka.issue1512.driver-profile404.implementation.v1",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "scope": "Acceptance driver only: distinguish authorized profile absence from Workspace/scope refusal on preflight and cleanup GET.",
+  "priorEvidenceIndex": "3723651d50eea82b2fd53d814c0a9f1d9442ec29",
+  "source": [
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "before": {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "bytes": 64047,
+        "sha256": "bc541dfafa4d45375ed44fd85d6fd443386e519608443bd1d158ab62949e1892",
+        "gitBlob": "eac86cc7081bd23dc93a8c5d6d3b443772037263"
+      },
+      "after": {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "bytes": 64090,
+        "sha256": "7fa1c032cb0d9b7c5a88c6262b559368445866691796b001648a95efea856950",
+        "gitBlob": "002b8501cd4f4df023148515add7c55e2863dbd3"
+      }
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "before": {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "bytes": 75066,
+        "sha256": "94cdc3b58b30cc0804b4a34478713c0fca85511aa83385ca8768641cffd4cb90",
+        "gitBlob": "9d1c1c6614dd687a0939c05f2625a813cb6dae62"
+      },
+      "after": {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "bytes": 81045,
+        "sha256": "b488d49afd89b833298d685dbb468a2520451a5be6f10711b7bdb76d66d5168a",
+        "gitBlob": "aab0a21c4c8fadb9df81ff87ada4fa23198fa575"
+      }
+    }
+  ],
+  "exactRuntimeChange": {
+    "before": "    if (options.missing && response.status === 404) return null\n    const value = await response.json().catch(() => null)",
+    "after": "    const value = await response.json().catch(() => null)\n    if (options.missing && response.status === 404 && value?.error === 'agentProfileNotFound') return null",
+    "onlyThisReplacement": true
+  },
+  "prior51Tests": {
+    "entireFileUnchangedPrefix": true,
+    "bytes": 75066,
+    "sha256": "94cdc3b58b30cc0804b4a34478713c0fca85511aa83385ca8768641cffd4cb90",
+    "newTestsAppendedOnly": true
+  },
+  "serverContract": {
+    "fixedCommit": "61f359952fbc8a18de4160926632c58cba2cb432",
+    "sources": [
+      {
+        "path": "lib/factory/workspace-http.ts",
+        "gitBlob": "765e3061b236887ae804db658f66c45e35bdd1af",
+        "contract": "FactoryError factoryNotFound returns HTTP 404 with exact error string factoryNotFound.",
+        "url": "https://github.com/alexj11324/Mikka/blob/61f359952fbc8a18de4160926632c58cba2cb432/lib/factory/workspace-http.ts"
+      },
+      {
+        "path": "lib/factory/agent-profile-http.ts",
+        "gitBlob": "e53da5fe0c59b8e2477721ff8a4fffaff107d770",
+        "contract": "Body/query/session scope mismatch returns agentProfileScopeNotFound; AgentProfileError serializes its exact error code and HTTP status.",
+        "url": "https://github.com/alexj11324/Mikka/blob/61f359952fbc8a18de4160926632c58cba2cb432/lib/factory/agent-profile-http.ts"
+      },
+      {
+        "path": "lib/factory/agent-profile-store.ts",
+        "gitBlob": "e307d5c05b3e8bea0eb6b3c514da87a697ad5ee4",
+        "contract": "validate scope, owner key-share guard and membership acquisition precede the scoped row read. Only no matching id+ownerId+workspaceId row throws agentProfileNotFound. Post-operation member.check is not claimed on that thrown missing-row path.",
+        "url": "https://github.com/alexj11324/Mikka/blob/61f359952fbc8a18de4160926632c58cba2cb432/lib/factory/agent-profile-store.ts"
+      }
+    ]
+  },
+  "findingOrigin": "The generic missing:true + HTTP404 shortcut was inherited from the earlier driver. The Workspace adaptation exposed distinct authorization-404 semantics; it did not introduce a product authorization bypass.",
+  "behavior": {
+    "allowedMissing": "Only after JSON parsing, HTTP 404 with value?.error exactly the primitive string agentProfileNotFound returns null when missing:true.",
+    "refused404": [
+      "factoryNotFound",
+      "agentProfileScopeNotFound",
+      "unknown error string",
+      "nested object {code:agentProfileNotFound}",
+      "malformed JSON"
+    ],
+    "refusalPaths": [
+      "preflight fixture-profile GET, before creation or submission",
+      "cleanup profile GET after owned run and machine stop checks"
+    ],
+    "cleanupFailureAssertions": [
+      "blocked result and incomplete cleanup",
+      "profileArchived remains false",
+      "existing profile remains enabled and unarchived",
+      "no DELETE retry or fallback Workspace",
+      "original explicit header/query scope remains intact",
+      "session closes"
+    ],
+    "legalAbsenceCases": [
+      "authorized missing profile permits preflight",
+      "a truly removed profile permits cleanup without a DELETE retry"
+    ]
+  },
+  "execution": {
+    "runtime": "v24.22.2",
+    "nodePath": "/vercel/driver-profile404/tools/node-v24.22.2-linux-x64/bin/node",
+    "officialNodeArchiveSha256": "48cc0e21e048790e54c0cf5749c2725005313d652651c40b7a21feb9697aaf75",
+    "officialChecksumsMatched": true,
+    "dependencyInputManifest": [
+      {
+        "path": "scripts/acceptance/response-cookie-jar.mjs",
+        "bytes": 2277,
+        "sha256": "7fa2b75283ae1c239bf3c613f9176a861d42debd18256b383d26bbc6b39a4178",
+        "gitBlob": "2bb8fa35a4432c2245a744c6cac1c80b715da7a8"
+      },
+      {
+        "path": "lib/desktop-rpc/wire.ts",
+        "bytes": 5364,
+        "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3",
+        "gitBlob": "2c72b5aafa3e6b8f4df8212072e6663e306d9318"
+      },
+      {
+        "path": "lib/live/events.ts",
+        "bytes": 4679,
+        "sha256": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5",
+        "gitBlob": "2349c85fe5cb1e3a001e88fd0bca9142ae0dcc3a"
+      },
+      {
+        "path": "messages/en.json",
+        "bytes": 252792,
+        "sha256": "4085c3132b62352c7f7f0a54cee46a653331b0989eda69cd11165268f2caa98e",
+        "gitBlob": "b27501a8d69d766df76709418c8811e5aa94e815"
+      },
+      {
+        "path": "messages/zh-CN.json",
+        "bytes": 243480,
+        "sha256": "82b800238a52c21080ff4d02e719c0b30c82e5ef62e1acb4d2d6458753e143a6",
+        "gitBlob": "32cb3ded65d4d6b572b8d647354164ab08f4ee96"
+      },
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "bytes": 64047,
+        "sha256": "bc541dfafa4d45375ed44fd85d6fd443386e519608443bd1d158ab62949e1892",
+        "gitBlob": "eac86cc7081bd23dc93a8c5d6d3b443772037263"
+      },
+      {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "bytes": 81045,
+        "sha256": "b488d49afd89b833298d685dbb468a2520451a5be6f10711b7bdb76d66d5168a",
+        "gitBlob": "aab0a21c4c8fadb9df81ff87ada4fa23198fa575"
+      },
+      {
+        "path": "evidence/base-driver.mjs",
+        "bytes": 64047,
+        "sha256": "bc541dfafa4d45375ed44fd85d6fd443386e519608443bd1d158ab62949e1892",
+        "gitBlob": "eac86cc7081bd23dc93a8c5d6d3b443772037263"
+      },
+      {
+        "path": "evidence/base-test.mjs",
+        "bytes": 75066,
+        "sha256": "94cdc3b58b30cc0804b4a34478713c0fca85511aa83385ca8768641cffd4cb90",
+        "gitBlob": "9d1c1c6614dd687a0939c05f2625a813cb6dae62"
+      },
+      {
+        "path": "evidence/candidate-driver.mjs",
+        "bytes": 64090,
+        "sha256": "7fa1c032cb0d9b7c5a88c6262b559368445866691796b001648a95efea856950",
+        "gitBlob": "002b8501cd4f4df023148515add7c55e2863dbd3"
+      },
+      {
+        "path": "evidence/candidate-test.mjs",
+        "bytes": 81045,
+        "sha256": "b488d49afd89b833298d685dbb468a2520451a5be6f10711b7bdb76d66d5168a",
+        "gitBlob": "aab0a21c4c8fadb9df81ff87ada4fa23198fa575"
+      }
+    ],
+    "red": {
+      "label": "profile404-red",
+      "exitCode": 1,
+      "bytes": 35570,
+      "durationMs": 491,
+      "command": [
+        "/vercel/driver-profile404/tools/node-v24.22.2-linux-x64/bin/node",
+        "--test",
+        "--test-reporter=tap",
+        "--test-name-pattern=^profile (preflight|cleanup|absence)",
+        "scripts/acceptance/run-observability.test.mjs"
+      ],
+      "sourceHashes": {
+        "scripts/acceptance/run-observability.mjs": "bc541dfafa4d45375ed44fd85d6fd443386e519608443bd1d158ab62949e1892",
+        "scripts/acceptance/run-observability.test.mjs": "b488d49afd89b833298d685dbb468a2520451a5be6f10711b7bdb76d66d5168a"
+      },
+      "tests": 12,
+      "pass": 2,
+      "fail": 10,
+      "skipped": 0,
+      "cancelled": 0,
+      "tapGitBlob": "799045d2ea22aa930870b9508504d659eb6b5d94",
+      "failureNames": [
+        "not ok 1 - profile preflight refuses workspace admission denied instead of treating any 404 as absence",
+        "not ok 2 - profile cleanup refuses workspace admission denied without falsely marking an existing profile archived",
+        "not ok 3 - profile preflight refuses profile scope denied instead of treating any 404 as absence",
+        "not ok 4 - profile cleanup refuses profile scope denied without falsely marking an existing profile archived",
+        "not ok 5 - profile preflight refuses unknown error instead of treating any 404 as absence",
+        "not ok 6 - profile cleanup refuses unknown error without falsely marking an existing profile archived",
+        "not ok 7 - profile preflight refuses nested not-found code instead of treating any 404 as absence",
+        "not ok 8 - profile cleanup refuses nested not-found code without falsely marking an existing profile archived",
+        "not ok 9 - profile preflight refuses malformed JSON instead of treating any 404 as absence",
+        "not ok 10 - profile cleanup refuses malformed JSON without falsely marking an existing profile archived"
+      ]
+    },
+    "green": {
+      "label": "profile404-green",
+      "exitCode": 0,
+      "bytes": 16335,
+      "durationMs": 1423,
+      "command": [
+        "/vercel/driver-profile404/tools/node-v24.22.2-linux-x64/bin/node",
+        "--test",
+        "--test-reporter=tap",
+        "scripts/acceptance/run-observability.test.mjs"
+      ],
+      "sourceHashes": {
+        "scripts/acceptance/run-observability.mjs": "7fa1c032cb0d9b7c5a88c6262b559368445866691796b001648a95efea856950",
+        "scripts/acceptance/run-observability.test.mjs": "b488d49afd89b833298d685dbb468a2520451a5be6f10711b7bdb76d66d5168a"
+      },
+      "tests": 63,
+      "pass": 63,
+      "fail": 0,
+      "skipped": 0,
+      "cancelled": 0,
+      "tapGitBlob": "2065169fef0a875735476ca126371351a2512dde"
+    },
+    "testBoundary": "Real Node native test execution with source-shaped in-memory HTTP/live fixtures. No P0 server, database, account, browser or model was executed.",
+    "setupFailureSeparate": true
+  },
+  "patch": {
+    "gitBlob": "cb1dddb2e53610a597564292485bfd1b31326e57",
+    "proofGitBlob": "f2a22e1b2e3c1646159c1323c4365ba17e3cb63b",
+    "generator": "Python difflib.unified_diff with splitlines(keepends=True)",
+    "gitVersion": "git version 2.53.0",
+    "forwardMatchesCandidate": true,
+    "reverseMatchesBaseline": true,
+    "steps": [
+      {
+        "command": [
+          "git",
+          "apply",
+          "--check",
+          "/vercel/driver-profile404/evidence/candidate.patch"
+        ],
+        "exitCode": 0,
+        "stdout": ""
+      },
+      {
+        "command": [
+          "git",
+          "apply",
+          "/vercel/driver-profile404/evidence/candidate.patch"
+        ],
+        "exitCode": 0,
+        "stdout": ""
+      },
+      {
+        "command": [
+          "git",
+          "apply",
+          "--reverse",
+          "--check",
+          "/vercel/driver-profile404/evidence/candidate.patch"
+        ],
+        "exitCode": 0,
+        "stdout": ""
+      },
+      {
+        "command": [
+          "git",
+          "apply",
+          "--reverse",
+          "/vercel/driver-profile404/evidence/candidate.patch"
+        ],
+        "exitCode": 0,
+        "stdout": ""
+      }
+    ],
+    "noRepositoryOrIndexUsed": true
+  },
+  "originalRecovery": {
+    "files": [
+      {
+        "path": "red.tap",
+        "bytes": 35570,
+        "sha256": "95fe2636ab75ff3f6a618c01264672ffc4bdad289b8f771599911141b76a2613",
+        "gitBlob": "799045d2ea22aa930870b9508504d659eb6b5d94",
+        "remoteVerified": true
+      },
+      {
+        "path": "red.json",
+        "bytes": 598,
+        "sha256": "0ad47efae4fddd2f0139c16ddca036b7622dcb0368fceb2a5eff4d7bfac3cfa9",
+        "gitBlob": "54b422beeb23886dcf9b1bbba86da8a33f8ff4e6",
+        "remoteVerified": true
+      },
+      {
+        "path": "green.tap",
+        "bytes": 16335,
+        "sha256": "13ddf21abd35c041abef89fb5680c009b9e3a7ca6e7e1c998252f993d8912299",
+        "gitBlob": "2065169fef0a875735476ca126371351a2512dde",
+        "remoteVerified": true
+      },
+      {
+        "path": "green.json",
+        "bytes": 537,
+        "sha256": "27a2504211664e93d75485a026230b1c1a850695b35834a7bdffc00dbfe92f2c",
+        "gitBlob": "d68697df1c705d700b5801f6efa9174eb2fd959b",
+        "remoteVerified": true
+      },
+      {
+        "path": "setup.json",
+        "bytes": 2718,
+        "sha256": "e2037dfb5d0ebf603a096eb6adf5597b77f6d000d6beb24d8a67f66b3747c50a",
+        "gitBlob": "25e25f093a47f3faea4352c981c5bb81d21320b4",
+        "remoteVerified": true
+      },
+      {
+        "path": "candidate.patch",
+        "bytes": 7027,
+        "sha256": "d1a9e8f38bca9c5d0b3bc884f2d8efd3b52f9a3aaa1f554ae23aec77b51d93d5",
+        "gitBlob": "cb1dddb2e53610a597564292485bfd1b31326e57",
+        "remoteVerified": true
+      },
+      {
+        "path": "patch-proof.json",
+        "bytes": 1015,
+        "sha256": "cb49107a205009fffee55bf38266c46285258868fb3b7cf76d7ebf3bc6b7aca1",
+        "gitBlob": "f2a22e1b2e3c1646159c1323c4365ba17e3cb63b",
+        "remoteVerified": true
+      }
+    ],
+    "method": "1000-byte base64 chunks, reconstructed byte-for-byte in V8 and verified against VM bytes/SHA256/Git blob IDs.",
+    "noTruncatedDisplayTreatedAsOriginal": true
+  },
+  "privacy": {
+    "accountInputs": "synthetic fixtures only",
+    "productionCredentialsLoaded": false,
+    "credentialPatternHitsInRawRedTap": 0,
+    "publicEligibility": "Source snapshots, synthetic fixture TAP, closed execution metadata and cleanup projections; no provider download URL or credential envelope."
+  },
+  "limits": [
+    "No repository commit/ref/CI was created by this task.",
+    "63 passing tests do not claim P0 deployment or production acceptance.",
+    "Older 51-test evidence, its initial syntax failure and the prior malformed EOF patch remain unchanged; the parent owns the corrected earlier patch.",
+    "This correction's patch has actual git apply forward/reverse checks and byte comparisons, distinct from the earlier LCS-only reconstruction.",
+    "P0 upstream CI failures are independent and are not reclassified by this local driver result."
+  ]
+}

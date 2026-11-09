@@ -1,0 +1,265 @@
+{
+  "schemaVersion": 1,
+  "kind": "acceptance-driver-workspace-implementation-and-validation",
+  "frozenAt": "2026-11-09 10:00:49 UTC",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "authorization": "Parent task: only the two acceptance-driver Workspace adaptations; isolated Node VM <=15 minutes, no production credentials, models, UI/server changes, ref updates or workflows.",
+  "source": {
+    "baseline": {
+      "commit": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "tree": "3e09885ffb34a9c04fc8a7ac5b8b88e3415f7325"
+    },
+    "contract": {
+      "commit": "61f359952fbc8a18de4160926632c58cba2cb432",
+      "tree": "ed46d344055cf47c7ae4802a947d9401cd736021",
+      "deployedOrRuntimeTested": false
+    },
+    "files": [
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "mode": "100644",
+        "before": {
+          "bytes": 59415,
+          "sha256": "1881370b53dc058fe29da04092ee1523b661f04d9077e43b03f8eee2a727da01",
+          "gitBlob": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e"
+        },
+        "after": {
+          "path": "scripts/acceptance/run-observability.mjs",
+          "bytes": 64047,
+          "sha256": "bc541dfafa4d45375ed44fd85d6fd443386e519608443bd1d158ab62949e1892",
+          "gitBlob": "eac86cc7081bd23dc93a8c5d6d3b443772037263"
+        },
+        "addedLines": 80,
+        "removedLines": 9,
+        "roundtrip": true,
+        "trailingWhitespace": false
+      },
+      {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "mode": "100644",
+        "before": {
+          "bytes": 55389,
+          "sha256": "f89faff19cb4a08c6dc6a01378065d73597f20d51990bd4f99175f4a6be604a3",
+          "gitBlob": "e73f32f4b93a1bffc70d9d9ba96f581e47746a9d"
+        },
+        "after": {
+          "path": "scripts/acceptance/run-observability.test.mjs",
+          "bytes": 75066,
+          "sha256": "94cdc3b58b30cc0804b4a34478713c0fca85511aa83385ca8768641cffd4cb90",
+          "gitBlob": "9d1c1c6614dd687a0939c05f2625a813cb6dae62"
+        },
+        "addedLines": 315,
+        "removedLines": 4,
+        "roundtrip": true,
+        "trailingWhitespace": false
+      }
+    ],
+    "patch": {
+      "path": "candidate.patch",
+      "bytes": 32866,
+      "sha256": "c08a7fd735e1e58f8e02b4ad40e7670559d7b13af4ed035442a49499381d0927",
+      "gitBlob": "6df4bd0655179cafbbeaabcb60d305b785a484f9",
+      "remoteVerified": true
+    }
+  },
+  "behavior": {
+    "factory": "Every existing /api/factory/* HTTP request, including read, create, PATCH, approval, cancel and DELETE/restore cleanup, sends the selected and previously verified Personal Workspace in x-mikka-workspace-id. Conflicting existing header, query workspaceId or body workspaceId is refused before fetch. Ordinary session cookies, Origin, redirect:error, server membership and business-target validation remain in force.",
+    "ownerIdle": "Before each existing preparation/restoration mutation gate, read the normal authenticated /api/workspace inventory; validate nonempty, unique typed choices with exactly the selected Personal Workspace; explicitly select each choice for pollThreads and pollTaskRuns; re-read and compare the same ID/kind set after the finite scan. No switchWorkspace mutation is added by the scan.",
+    "bounds": {
+      "maximumWorkspaces": 32,
+      "maximumRowsPerReaderForSuccess": 199,
+      "serverQueryWindowDays": 30,
+      "scanDeadlineMs": 30000,
+      "maximumSuccessfulReadCallsPerScan": 66,
+      "requestTimeout": "min(existing 30 seconds, remaining overall scan deadline)",
+      "requestCountIsNotAPerformanceAcceptance": true
+    },
+    "resultProof": "Both readers must return complete arrays, exact live.ownerId/workspaceId and known status/valid unique run IDs. Threads additionally require a 32-hex version and full positions manifest matching items. Delta/unchanged responses, pagination/truncation flags, >=200 rows, invalid scope, HTTP errors or inventory set changes block.",
+    "timeProof": "Nonempty responses must carry a valid positive server expiry; a known 30-day expiry at/before completion blocks. Scan time cannot go backwards or reach its 30-second deadline. No row is filtered out to make an active list look idle.",
+    "limits": "Authorized active Workspaces and only the original readers' 30-day visible windows are observed. An unpaginated inventory response is complete under the fixed P061 contract. A server that silently violates that contract is not independently proven complete by the driver. This is not an atomic account fence and says nothing about runs older than 30 days or inaccessible Workspaces. Existing account exclusivity and live gates remain required.",
+    "returnedMetadata": [
+      "visibleRunRowsChecked",
+      "visibleRunWorkspacesChecked",
+      "visibleRunWindowDays:30",
+      "workspaceScanAtomic:false"
+    ]
+  },
+  "testEvidence": [
+    {
+      "phase": "baseline-original",
+      "source": [
+        {
+          "path": "scripts/acceptance/run-observability.mjs",
+          "gitBlob": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e"
+        },
+        {
+          "path": "scripts/acceptance/run-observability.test.mjs",
+          "gitBlob": "e73f32f4b93a1bffc70d9d9ba96f581e47746a9d"
+        }
+      ],
+      "testCount": 37,
+      "pass": 37,
+      "fail": 0,
+      "skip": 0,
+      "exit": 0,
+      "log": {
+        "path": "baseline.tap",
+        "bytes": 9582,
+        "sha256": "f6f7b07a31316d2c53127ba3b57d28824524e825ee6daf048fb2784268aa968d",
+        "gitBlob": "499afd0742c1ebd4edc00dd0d2038c05fa1f8ef7",
+        "remoteVerified": true
+      },
+      "execution": {
+        "path": "baseline.json",
+        "bytes": 265,
+        "sha256": "81cf6f937d82fe2dc541c1de93fbc00ecca79215aaecd81aff627f2a0de1089f",
+        "gitBlob": "847284c46c8a8904679811eb027de9c768923adb",
+        "remoteVerified": true
+      }
+    },
+    {
+      "phase": "initial-test-syntax-failure",
+      "driver": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e",
+      "test": {
+        "path": "syntax-v1.test.mjs",
+        "bytes": 75069,
+        "sha256": "4c3b06bda361b9f6e9521bb572b48f42c550c61b9826dfa0ea6fd9851ab8f984",
+        "gitBlob": "f8f1a115b89add264760ddde2cbaf39d8c1ea598",
+        "remoteVerified": true
+      },
+      "testCount": 1,
+      "pass": 0,
+      "fail": 1,
+      "skip": 0,
+      "exit": 1,
+      "classification": "Unexpected ')' in the new mocked RPC fixture. Kept as a test-construction failure, never counted as behavior RED.",
+      "log": {
+        "path": "red.tap",
+        "bytes": 1682,
+        "sha256": "e03f23ec81c5ffc7fd314328cb9df475d41a0a07d387970733a2892736b55f43",
+        "gitBlob": "e70f881672da9718669682c1e95357bec6a891bf",
+        "remoteVerified": true
+      },
+      "execution": {
+        "path": "red.json",
+        "bytes": 582,
+        "sha256": "34d62d317d10d3df05603bd96946626afd02e4fc8fcdf3174bff2078968f83c2",
+        "gitBlob": "3a3cb59d68ac952a02074096b2d1cff41287ab1a",
+        "remoteVerified": true
+      }
+    },
+    {
+      "phase": "behavior-red",
+      "driver": "07f9d947c3ebe64fb94e9c452ddd39eab05f1d7e",
+      "test": "9d1c1c6614dd687a0939c05f2625a813cb6dae62",
+      "testCount": 14,
+      "pass": 1,
+      "fail": 13,
+      "skip": 0,
+      "exit": 1,
+      "classification": "Same corrected test bytes as GREEN; selected only the 14 new behavior groups. Existing malformed-personal selection was already blocked; the remaining 13 groups expose missing Workspace routing/coverage/completeness/deadline behavior.",
+      "log": {
+        "path": "red-behavior.tap",
+        "bytes": 29104,
+        "sha256": "832e51700917b54e6a965a1035e639f9bc7791d03ee3bee1270257c1524a8369",
+        "gitBlob": "47b436ab04554387e7f36846511f72cd34ff6476",
+        "remoteVerified": true
+      },
+      "execution": {
+        "path": "red-behavior.json",
+        "bytes": 594,
+        "sha256": "ca71ae68646d1199eb6c8eb9ac6ef099332055af7ec29e9c9af6ec9cd2d9c797",
+        "gitBlob": "c44750b7e90831642015875c822f43d8729a65b5",
+        "remoteVerified": true
+      }
+    },
+    {
+      "phase": "candidate-full",
+      "source": [
+        {
+          "path": "scripts/acceptance/run-observability.mjs",
+          "gitBlob": "eac86cc7081bd23dc93a8c5d6d3b443772037263",
+          "sha256": "bc541dfafa4d45375ed44fd85d6fd443386e519608443bd1d158ab62949e1892"
+        },
+        {
+          "path": "scripts/acceptance/run-observability.test.mjs",
+          "gitBlob": "9d1c1c6614dd687a0939c05f2625a813cb6dae62",
+          "sha256": "94cdc3b58b30cc0804b4a34478713c0fca85511aa83385ca8768641cffd4cb90"
+        }
+      ],
+      "testCount": 51,
+      "pass": 51,
+      "fail": 0,
+      "skip": 0,
+      "exit": 0,
+      "classification": "37 retained existing cases plus 14 new behavior groups. Uses real Node native test runner, real driver, RPC wire codec, response-cookie-jar and injected in-memory HTTP/live fixture. No real server, Workspace database, production account, browser or model is exercised.",
+      "log": {
+        "path": "green-v1.tap",
+        "bytes": 13311,
+        "sha256": "d65a9277f9e5d868f9daeb5163e15e52c080d85622254bf31a8a19201ab12975",
+        "gitBlob": "c17d8726d828a7e0b93813a082efeecab4a15547",
+        "remoteVerified": true
+      },
+      "execution": {
+        "path": "green-v1.json",
+        "bytes": 521,
+        "sha256": "e2a68e12d33b7fbf4e6f1343f1a2e6e53cd96e09705d9558af73b69ab67089ca",
+        "gitBlob": "2e77c1e17b4efe9eddef19546e07737c7c6bd087",
+        "remoteVerified": true
+      }
+    }
+  ],
+  "original37FixtureAdaptation": {
+    "preserved": "All original 37 user-flow tests and original assertions remain. One existing preparation deep-equality expectation adds three truthful report fields; its prior fields and assertions are retained. One title changes the obsolete owner-wide wording to authorized Workspace visibility.",
+    "additions": "Default mocked poll responses now include the actual P061 live owner/Workspace, 32-hex version and full positions shape; nonempty task rows also include runId. Default statuses and old failure behavior remain. The mock uses the request Workspace header, or prior Personal default if absent, so the old driver actually misses a busy Team in RED.",
+    "hooks": "Two opt-in test fixture callbacks (factoryGate, pollView) support the new behavior groups. Existing calls leave factoryGate absent and pollView identity. Existing submission, approval, cancellation, restoration and cleanup logic/assertions are not weakened.",
+    "noSourceStringAssertions": true
+  },
+  "newBehaviorGroups": [
+    "Team-before-Personal and default-Team selection, successful approval and failed review cancellation, all Factory request/cleanup methods and matched header/query/body.",
+    "400/401/403/404 Factory refusal without implicit Workspace retries; cleanup revocation/mismatch remains incomplete.",
+    "Malformed, foreign or revoked Personal selection blocks before Factory.",
+    "A-idle/B-busy across both reader actions and queued/running/paused/waiting_input statuses.",
+    "All authorized scopes are scanned; counts and 30-day/non-atomic report are explicit.",
+    "Inventory missing/empty/duplicates/unknown scope/foreign identity/pagination/truncation/overflow and HTTP errors fail closed.",
+    "Changed ID/kind inventory after the scan fails closed.",
+    "Both reader saturation/partial/delta/malformed/foreign live scope; missing thread manifest or positions are refused.",
+    "Other Workspace revocation at preparation/restoration remains visible, no overwrite of changed settings.",
+    "Known row expiry at/during scan blocks, no expiry filtering to manufacture idle.",
+    "Overall deadline boundaries, backwards clock, and real AbortSignal delivery to pending requests.",
+    "32 Workspaces and 199 rows remain permitted; no page or argument widening of the server window."
+  ],
+  "verificationBoundary": {
+    "sourceAndInputs": "All nine original VM files recovered in chunks to avoid tool display truncation, then matched byte length/SHA256/Git blob to VM file hashes. Final executable source SHA256s in green-v1.json exactly match remote candidate blobs.",
+    "patch": "LCS edit roundtrip reproduced each candidate exactly; unified patch has context and original modes. No trailing whitespace. No git apply, repository-wide lint/typecheck, required CI or live P0 service claim is made.",
+    "previouslyObservedNative": "The parent reported c0 Native 398<=412 /181<=206; this driver-only patch does not re-run or re-label that evidence and does not prove a future union source.",
+    "skillUse": [
+      "systematic-debugging",
+      "verification-before-completion"
+    ],
+    "optionalVendoredTddFile404": "No TDD file existed at the conventional path; direct actual baseline/RED/GREEN above supplies the required test-first behavioral evidence.",
+    "resources": {
+      "path": "cleanup.safe.json",
+      "bytes": 1210,
+      "sha256": "57a7b088a8f57262b4e0448d225639e354aec6c9d78b10d14d0ac3f9140f357a",
+      "gitBlob": "947a5905fe2b7af378f5ef4687d650763416b619",
+      "remoteVerified": true
+    }
+  },
+  "riskReview": {
+    "alignment": "Two driver defects from P061 source review are addressed without modifying normal product behavior or permissions.",
+    "impact": "Additional reads occur only at existing preparation/restoration idle gates, bounded to 66 reads/30s per scan. Server defaults and live/read timing are unchanged.",
+    "verification": "Actual native Node tests establish driver behavior against source-shaped fixtures; parent independently reviewed P061 response contracts. Full CI and any eventual real production case remain separate.",
+    "rollback": "Only two source files change, with no schema/data migration. Reverting to the old driver would restore its incomplete multi-Workspace idle assumption; do not use such a revert to authorize preparation against P0.",
+    "errorDetection": "Closed errors keep account/session cleanup visible, refuse incomplete scans, preserve uncertain writes and never retry using implicit Workspace authority. Non-atomic races remain bounded by the existing account window rather than a claimed new lock."
+  },
+  "privacy": {
+    "productionDataRead": false,
+    "credentialsLoaded": false,
+    "onlySyntheticFixtureValues": true,
+    "rawToolArgumentsAndPlatformEnvelopesArchived": false,
+    "reportContainsNoInventoryRowsOrWorkspaceNames": true
+  },
+  "conclusion": "Ready for parent source review and later integration; no branch/ref/CI/production action was performed."
+}

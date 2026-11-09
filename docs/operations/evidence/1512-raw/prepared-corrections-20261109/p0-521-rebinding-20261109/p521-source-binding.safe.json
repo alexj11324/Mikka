@@ -1,0 +1,283 @@
+{
+  "version": 1,
+  "kind": "fixed-p521-observability-premerge-binding",
+  "repository": "alexj11324/Mikka",
+  "scope": {
+    "oursCommit": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+    "oursTree": "3e09885ffb34a9c04fc8a7ac5b8b88e3415f7325",
+    "oldP0Commit": "61f359952fbc8a18de4160926632c58cba2cb432",
+    "oldP0Tree": "ed46d344055cf47c7ae4802a947d9401cd736021",
+    "p0Commit": "521db4799a4a85e1955f7dd86a1ad5ccef143cc8",
+    "p0Tree": "d82a34d59bf072348869ef086e24ae0ad5a852ec",
+    "parents": [
+      "5a7686b4bb6bbf1c0abe6ce250e8deeb7e1022d3",
+      "76df3935c8be5af480485c52e445d389e85d8a35"
+    ]
+  },
+  "priorSourceIndex": "f449e443232bed85347e08d6014ec54c25b3a370",
+  "priorReview": "dbd01504940f0ef306da9a3e222ec0d2bf59c88b",
+  "prior428PathIndex": "d7106f37b4bd5e18a0aa272b43976178d6cf4e9b",
+  "completeDeltaFile": "61-to-521-complete-path-index.safe.json",
+  "intersections": [
+    {
+      "path": "apps/api/generated/routes.json",
+      "newP0Blob": "016af99a766db7d863704225d451d9eb3a950bbb",
+      "changedSince61": false,
+      "candidateBlob": "6fbced33e672f3fa0d5e35bed40b63fa103809d5",
+      "candidateContentReusable": true,
+      "mode": "100644"
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "newP0Blob": "f218fd0698bfae6296be7a06c732c26cac412eb7",
+      "changedSince61": false,
+      "candidateBlob": "a0cc13783eb567c256c34e08eaf3f6e9aca157e2",
+      "candidateContentReusable": true,
+      "mode": "100644"
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "newP0Blob": "c69dcfe5f459de0e603651fd510f06cf8d32e75b",
+      "changedSince61": false,
+      "candidateBlob": "dae8798653457afad334c2d909b10b63e9b3956f",
+      "candidateContentReusable": true,
+      "mode": "100644"
+    },
+    {
+      "path": "lib/device-heartbeat.db.test.ts",
+      "newP0Blob": "46c43f5c8bd9d33818f67d1e899f924ac9d267ae",
+      "changedSince61": false,
+      "candidateBlob": "e8f4f35748707364e77c53fa594c166bafc3dae8",
+      "candidateContentReusable": true,
+      "mode": "100644"
+    },
+    {
+      "path": "package.json",
+      "newP0Blob": "3158b34c16d1734861e1f487f3142a98908e5d78",
+      "changedSince61": true,
+      "candidateBlob": "ef6da7b3d6b33220051fef56d7e9e5e024105310",
+      "candidateContentReusable": true,
+      "mode": "100644"
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "newP0Blob": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+      "changedSince61": false,
+      "candidateBlob": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+      "candidateContentReusable": true,
+      "mode": "100755"
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+      "newP0Blob": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+      "changedSince61": false,
+      "candidateBlob": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+      "candidateContentReusable": true,
+      "mode": "100755"
+    },
+    {
+      "path": "workflows/coordinator/steps.ts",
+      "newP0Blob": "5002aebd9ed3df6047ccb3f7a083401c3cad34c3",
+      "changedSince61": false,
+      "candidateBlob": "d500795e9a62631b6c7619c4ffd1df67f137ee54",
+      "candidateContentReusable": true,
+      "mode": "100644"
+    }
+  ],
+  "sourceCandidateContents": [
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "mode": "100644",
+      "bytes": 4726,
+      "sha256": "6119f76aa46cf1fcd93dc9b389859221c206fecba7cedf265af061fd6862270e",
+      "gitBlob": "dae8798653457afad334c2d909b10b63e9b3956f"
+    },
+    {
+      "path": "workflows/coordinator/steps.ts",
+      "mode": "100644",
+      "bytes": 93440,
+      "sha256": "5f577830a5aee9f0acee251b3a406161c8bd4d6a38e9ac7e6aadc5224ba0048d",
+      "gitBlob": "d500795e9a62631b6c7619c4ffd1df67f137ee54"
+    },
+    {
+      "path": "lib/device-heartbeat.db.test.ts",
+      "mode": "100644",
+      "bytes": 21768,
+      "sha256": "2004fa0ffc447ed630142960273495d8b700c68dc74e6903784a146738b54938",
+      "gitBlob": "e8f4f35748707364e77c53fa594c166bafc3dae8"
+    },
+    {
+      "path": "package.json",
+      "mode": "100644",
+      "bytes": 80810,
+      "sha256": "1445883a119e89e8b1aa35e39df9b625efd4d143e226ecf31a881163c1614925",
+      "gitBlob": "ef6da7b3d6b33220051fef56d7e9e5e024105310"
+    },
+    {
+      "path": "apps/api/generated/routes.json",
+      "mode": "100644",
+      "bytes": 76186,
+      "sha256": "8c4862ecf9433574458b3c898aea36a7cdf383f9a2599f1346720c883250ebda",
+      "gitBlob": "6fbced33e672f3fa0d5e35bed40b63fa103809d5"
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "mode": "100644",
+      "bytes": 78570,
+      "sha256": "96af04380e4e962ad2d3844c1e416fa3f1330231f3e36a1888fba7cb5cb312cc",
+      "gitBlob": "a0cc13783eb567c256c34e08eaf3f6e9aca157e2"
+    }
+  ],
+  "patch": {
+    "path": "from-p0-521db479.patch",
+    "checks": [
+      {
+        "path": "apps/desktop/src/renderer/rpc.ts",
+        "mode": "100644",
+        "preimageBlob": "c69dcfe5f459de0e603651fd510f06cf8d32e75b",
+        "candidateBlob": "dae8798653457afad334c2d909b10b63e9b3956f",
+        "forwardExact": true,
+        "reverseExact": true
+      },
+      {
+        "path": "workflows/coordinator/steps.ts",
+        "mode": "100644",
+        "preimageBlob": "5002aebd9ed3df6047ccb3f7a083401c3cad34c3",
+        "candidateBlob": "d500795e9a62631b6c7619c4ffd1df67f137ee54",
+        "forwardExact": true,
+        "reverseExact": true
+      },
+      {
+        "path": "lib/device-heartbeat.db.test.ts",
+        "mode": "100644",
+        "preimageBlob": "46c43f5c8bd9d33818f67d1e899f924ac9d267ae",
+        "candidateBlob": "e8f4f35748707364e77c53fa594c166bafc3dae8",
+        "forwardExact": true,
+        "reverseExact": true
+      },
+      {
+        "path": "package.json",
+        "mode": "100644",
+        "preimageBlob": "3158b34c16d1734861e1f487f3142a98908e5d78",
+        "candidateBlob": "ef6da7b3d6b33220051fef56d7e9e5e024105310",
+        "forwardExact": true,
+        "reverseExact": true
+      },
+      {
+        "path": "apps/api/generated/routes.json",
+        "mode": "100644",
+        "preimageBlob": "016af99a766db7d863704225d451d9eb3a950bbb",
+        "candidateBlob": "6fbced33e672f3fa0d5e35bed40b63fa103809d5",
+        "forwardExact": true,
+        "reverseExact": true
+      },
+      {
+        "path": "apps/api/generated/routes.ts",
+        "mode": "100644",
+        "preimageBlob": "f218fd0698bfae6296be7a06c732c26cac412eb7",
+        "candidateBlob": "a0cc13783eb567c256c34e08eaf3f6e9aca157e2",
+        "forwardExact": true,
+        "reverseExact": true
+      }
+    ],
+    "staleP061PackagePatchRejected": true,
+    "execution": "V8 exact source/patch arithmetic only; no repository checkout, compiler, Node tests, or generator was run",
+    "warning": "Old from-P061 patch retains a stale package preimage and must not be applied to P521. The candidate package blob itself is unchanged."
+  },
+  "package": {
+    "p521Blob": "3158b34c16d1734861e1f487f3142a98908e5d78",
+    "candidateBlob": "ef6da7b3d6b33220051fef56d7e9e5e024105310",
+    "p521TestIssuesEqualsCandidate": true,
+    "onlyRemainingCandidateDeltaFromP521": "test:captures adds the existing ffmpeg installer regression command; all P0 six script values and the main task-thread-pane entry are preserved.",
+    "nonScriptsUnchanged": true
+  },
+  "factoryDefault": {
+    "path": "lib/factory/workspace-reader.ts",
+    "gitBlob": "223806de72153a8e72d05c343205b6e71cf76f02",
+    "noExplicitSelectionOrder": [
+      "valid saved workspace cookie",
+      "personal workspace",
+      "first active choice"
+    ],
+    "explicitSelectionAndPrincipalGuardsPreserved": true,
+    "newSql": false,
+    "fixture": {
+      "path": "tests/factory-workspace-admission.db.test.ts",
+      "gitBlob": "4591fe5afaf179e0fd63df4a0e6cbe4c1c95157d",
+      "sourceAssertions": [
+        "Two Team creation dates precede the Personal workspace",
+        "No-cookie normal session Workspace GET returns Personal",
+        "Normal Factory Profile GET and POST retain Personal workspace binding",
+        "App and workspace pools remain bounded and unexpected network stays zero"
+      ]
+    },
+    "reviewBoundary": "Actual source and fixture inspected; this agent did not execute PG. Parent later relayed owner11/11 PG evidence, which is not converted into an independently observed test result here."
+  },
+  "generated": {
+    "routes": 243,
+    "methods": 315,
+    "methodCounts": {
+      "GET": 155,
+      "OPTIONS": 2,
+      "DELETE": 14,
+      "POST": 124,
+      "PATCH": 14,
+      "PUT": 6
+    },
+    "p0SourceHashChanges": 22,
+    "oursSourceHashChanges": 2,
+    "changedEntryIntersection": 0,
+    "all24SourceInputsUnchangedSince61": true,
+    "generatorBlob": "2431a145d316e10fcdb74a6040efcdea2b6a9f00",
+    "bothGeneratedCandidatesByteReusable": true,
+    "canonicalGeneratorExecuted": false,
+    "checkFlagBoundary": "Parent observed Source CI invoke generate-routes.mjs --check. The fixed generator has no --check branch; actual invocation and flag enforcement are distinct. This receipt only rebinds source bytes, serializer proof and hashes, not a filesystem/AST execution."
+  },
+  "normalMerge": {
+    "fixedDependencyMergeCanBePrepared": true,
+    "wholeP521MustBePreserved": true,
+    "newP521DeltaIntersectsOwned49Only": [
+      "package.json"
+    ],
+    "fullOwnedIntersectionCount": 8,
+    "noNewDriverPathIntersection": true,
+    "scope": "Combine the complete immutable P521 dependency with the complete ours branch; resolve the eight listed intersections using these exact six content objects and unchanged two executable fakes. Recheck the actual combined parents/tree and future main. This receipt is not a commit/ref update or a replacement for combined CI.",
+    "ownerOrder": "Parent owns development-branch merge and final main ordering; no upstream merge or production window is claimed by this agent."
+  },
+  "validation": {
+    "v8ExactPatchArithmetic": true,
+    "runtimeTestsExecuted": 0,
+    "pgExecuted": false,
+    "ciTriggered": false,
+    "originalJobLogsRead": 0,
+    "productionRequests": 0,
+    "newResources": 0,
+    "refsChanged": false,
+    "combinedAcceptanceClaimed": false
+  },
+  "knownBoundary": "The parent reported a real P521 Source test:api providerStarted failure under owner investigation. The local PG installation ENOSPC was not a test RED. Candidate source compatibility does not mark either gate passed.",
+  "publicationScan": {
+    "files": 4,
+    "patterns": [
+      "private key",
+      "provider/GitHub token",
+      "JWT",
+      "email",
+      "credential URL",
+      "Authorization",
+      "signed download query"
+    ],
+    "unreviewedHits": 0,
+    "privateValuesIncluded": false,
+    "acceptedFixtureHit": {
+      "path": "from-p0-521db479.patch",
+      "line": 96,
+      "category": "email-shape",
+      "sourcePath": "lib/device-heartbeat.db.test.ts",
+      "sourceBlob": "e8f4f35748707364e77c53fa594c166bafc3dae8",
+      "exactSourceLineMatched": true,
+      "classification": "SQL concatenation of generated test user identifier with reserved example/invalid fixture domain; no private email or credential value."
+    },
+    "rawFilesAltered": false
+  }
+}

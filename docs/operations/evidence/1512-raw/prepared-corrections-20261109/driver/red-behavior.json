@@ -1,0 +1,13 @@
+{
+  "label": "red-behavior",
+  "exitCode": 1,
+  "bytes": 29104,
+  "durationMs": 1598,
+  "command": [
+    "/vercel/driver-workspace/tools/node-v24.22.2-linux-x64/bin/node",
+    "--test",
+    "--test-reporter=tap",
+    "--test-name-pattern=^(all Factory|Factory authority|Factory cleanup|malformed or foreign|workspace A idle|idle proof|workspace inventory errors|a changed workspace inventory|scoped run reads|fresh authorization failures|the scan rejects|one overall scan deadline|a real request AbortSignal|the finite workspace cap)",
+    "scripts/acceptance/run-observability.test.mjs"
+  ]
+}

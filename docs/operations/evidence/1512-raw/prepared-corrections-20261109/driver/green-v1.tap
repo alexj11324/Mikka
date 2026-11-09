@@ -1,0 +1,316 @@
+TAP version 13
+# Subtest: preflight reads both exact subscription paths without creating profiles, changing settings or submitting tasks
+ok 1 - preflight reads both exact subscription paths without creating profiles, changing settings or submitting tasks
+  ---
+  duration_ms: 71.84815
+  type: 'test'
+  ...
+# Subtest: preflight excludes only a version-bound Factory task proven to belong to another workspace
+ok 2 - preflight excludes only a version-bound Factory task proven to belong to another workspace
+  ---
+  duration_ms: 6.372934
+  type: 'test'
+  ...
+# Subtest: preflight keeps same-workspace, missing and mismatched Factory scope proofs blocked
+ok 3 - preflight keeps same-workspace, missing and mismatched Factory scope proofs blocked
+  ---
+  duration_ms: 42.252672
+  type: 'test'
+  ...
+# Subtest: preflight does not convert current-workspace failed or blocked Factory tasks into terminal tasks
+ok 4 - preflight does not convert current-workspace failed or blocked Factory tasks into terminal tasks
+  ---
+  duration_ms: 7.592539
+  type: 'test'
+  ...
+# Subtest: preflight does not request scope details for already settled Factory tasks
+ok 5 - preflight does not request scope details for already settled Factory tasks
+  ---
+  duration_ms: 15.484505
+  type: 'test'
+  ...
+# Subtest: foreign historical Factory tasks remain untouched while failed owned acceptance still cancels its task
+ok 6 - foreign historical Factory tasks remain untouched while failed owned acceptance still cancels its task
+  ---
+  duration_ms: 20.947079
+  type: 'test'
+  ...
+# Subtest: a default team switches only this login session to its verified personal workspace before reading Coordinator
+ok 7 - a default team switches only this login session to its verified personal workspace before reading Coordinator
+  ---
+  duration_ms: 3.591829
+  type: 'test'
+  ...
+# Subtest: workspace selection rejects ambiguous choices, teams and another account personal membership before switching
+ok 8 - workspace selection rejects ambiguous choices, teams and another account personal membership before switching
+  ---
+  duration_ms: 21.637516
+  type: 'test'
+  ...
+# Subtest: workspace switch acknowledgement and cookie readback failures stop before Coordinator and close the session
+ok 9 - workspace switch acknowledgement and cookie readback failures stop before Coordinator and close the session
+  ---
+  duration_ms: 6.170876
+  type: 'test'
+  ...
+# Subtest: unsafe configuration blocks before any model call and reports only closed failure codes
+ok 10 - unsafe configuration blocks before any model call and reports only closed failure codes
+  ---
+  duration_ms: 6.514274
+  type: 'test'
+  ...
+# Subtest: two executed cases retain exact native receipts, restore model/profile state and never fabricate replay evidence
+ok 11 - two executed cases retain exact native receipts, restore model/profile state and never fabricate replay evidence
+  ---
+  duration_ms: 23.915743
+  type: 'test'
+  ...
+# Subtest: successful terminal runs close only their own machines and retain task evidence
+ok 12 - successful terminal runs close only their own machines and retain task evidence
+  ---
+  duration_ms: 10.294943
+  type: 'test'
+  ...
+# Subtest: a missing machine requires a fresh owned run and an explicit null machine read
+ok 13 - a missing machine requires a fresh owned run and an explicit null machine read
+  ---
+  duration_ms: 16.202725
+  type: 'test'
+  ...
+# Subtest: machine failures never turn a completed task green and do not prevent closing another owned machine
+ok 14 - machine failures never turn a completed task green and do not prevent closing another owned machine
+  ---
+  duration_ms: 113.217846
+  type: 'test'
+  ...
+# Subtest: legacy Factory tasks still require review and verify before the normal deliverable acceptance
+ok 15 - legacy Factory tasks still require review and verify before the normal deliverable acceptance
+  ---
+  duration_ms: 8.534199
+  type: 'test'
+  ...
+# Subtest: missing, failed or stale Factory checks never reach approval, including legacy verify
+ok 16 - missing, failed or stale Factory checks never reach approval, including legacy verify
+  ---
+  duration_ms: 36.797454
+  type: 'test'
+  ...
+# Subtest: deliverable approval requires its receipt, never accepts a repository and never retries a lost response
+ok 17 - deliverable approval requires its receipt, never accepts a repository and never retries a lost response
+  ---
+  duration_ms: 26.795081
+  type: 'test'
+  ...
+# Subtest: uncertain mutation responses never resubmit and still reconcile own temporary settings
+ok 18 - uncertain mutation responses never resubmit and still reconcile own temporary settings
+  ---
+  duration_ms: 7.583082
+  type: 'test'
+  ...
+# Subtest: wrong provider/model and an extra native attempt stop the case without retrying
+ok 19 - wrong provider/model and an extra native attempt stop the case without retrying
+  ---
+  duration_ms: 14.899616
+  type: 'test'
+  ...
+# Subtest: pure source and budget guards reject shared credentials, inherited model choices and retries
+ok 20 - pure source and budget guards reject shared credentials, inherited model choices and retries
+  ---
+  duration_ms: 0.456142
+  type: 'test'
+  ...
+# Subtest: cleanup preserves a concurrent model edit and reports incomplete restoration
+ok 21 - cleanup preserves a concurrent model edit and reports incomplete restoration
+  ---
+  duration_ms: 6.388463
+  type: 'test'
+  ...
+# Subtest: prepare is explicit, requires execution and restores only its acknowledged settings
+ok 22 - prepare is explicit, requires execution and restores only its acknowledged settings
+  ---
+  duration_ms: 28.34077
+  type: 'test'
+  ...
+# Subtest: prepare refuses visible activity in authorized workspaces and inherited model choices without changing settings
+ok 23 - prepare refuses visible activity in authorized workspaces and inherited model choices without changing settings
+  ---
+  duration_ms: 3.09053
+  type: 'test'
+  ...
+# Subtest: a blocked case does not prevent preparation and execution of another available model
+ok 24 - a blocked case does not prevent preparation and execution of another available model
+  ---
+  duration_ms: 16.340273
+  type: 'test'
+  ...
+# Subtest: preparation failures restore acknowledged writes but never guess after a lost response
+ok 25 - preparation failures restore acknowledged writes but never guess after a lost response
+  ---
+  duration_ms: 16.230593
+  type: 'test'
+  ...
+# Subtest: restoration failures and concurrent edits remain visible without overwriting them
+ok 26 - restoration failures and concurrent edits remain visible without overwriting them
+  ---
+  duration_ms: 57.284807
+  type: 'test'
+  ...
+# Subtest: issue inventory follows real opaque cursors beyond 100 rows and rejects a moving scan
+ok 27 - issue inventory follows real opaque cursors beyond 100 rows and rejects a moving scan
+  ---
+  duration_ms: 1.663487
+  type: 'test'
+  ...
+# Subtest: browser submission requires one executed case and does not authenticate on invalid options
+ok 28 - browser submission requires one executed case and does not authenticate on invalid options
+  ---
+  duration_ms: 0.216283
+  type: 'test'
+  ...
+# Subtest: browser mode publishes readiness then observes the real-shaped UI click through push without an API submission
+ok 29 - browser mode publishes readiness then observes the real-shaped UI click through push without an API submission
+  ---
+  duration_ms: 28.424387
+  type: 'test'
+  ...
+# Subtest: browser waiting times out or blocks changed UI text without sending or repeating a task
+ok 30 - browser waiting times out or blocks changed UI text without sending or repeating a task
+  ---
+  duration_ms: 5.533119
+  type: 'test'
+  ...
+# Subtest: live transport waits for actual invalidations, rejects disconnects and keeps capabilities out of reports
+ok 31 - live transport waits for actual invalidations, rejects disconnects and keeps capabilities out of reports
+  ---
+  duration_ms: 2.403049
+  type: 'test'
+  ...
+# Subtest: implicit default preflight requires server absence evidence and never writes a preference
+ok 32 - implicit default preflight requires server absence evidence and never writes a preference
+  ---
+  duration_ms: 3.044604
+  type: 'test'
+  ...
+# Subtest: implicit default restores absence with the stored binding and revision, not the catalogue option
+ok 33 - implicit default restores absence with the stored binding and revision, not the catalogue option
+  ---
+  duration_ms: 6.547173
+  type: 'test'
+  ...
+# Subtest: implicit default never overwrites a preference created after preflight
+ok 34 - implicit default never overwrites a preference created after preflight
+  ---
+  duration_ms: 2.013025
+  type: 'test'
+  ...
+# Subtest: implicit default stops after a lost or incomplete first selection receipt without guessing ownership
+ok 35 - implicit default stops after a lost or incomplete first selection receipt without guessing ownership
+  ---
+  duration_ms: 3.736013
+  type: 'test'
+  ...
+# Subtest: implicit default preserves a same-value concurrent rewrite when the revision no longer matches
+ok 36 - implicit default preserves a same-value concurrent rewrite when the revision no longer matches
+  ---
+  duration_ms: 12.914449
+  type: 'test'
+  ...
+# Subtest: implicit default checks absence once after a lost restoration response and does not repeat deletion
+ok 37 - implicit default checks absence once after a lost restoration response and does not repeat deletion
+  ---
+  duration_ms: 7.159968
+  type: 'test'
+  ...
+# Subtest: all Factory reads, writes, approval and cleanup pin the authorized personal workspace even when a team is listed first
+ok 38 - all Factory reads, writes, approval and cleanup pin the authorized personal workspace even when a team is listed first
+  ---
+  duration_ms: 56.848952
+  type: 'test'
+  ...
+# Subtest: Factory authority refusals remain failures without retrying an implicit workspace
+ok 39 - Factory authority refusals remain failures without retrying an implicit workspace
+  ---
+  duration_ms: 4.54062
+  type: 'test'
+  ...
+# Subtest: Factory cleanup keeps its explicit workspace and exposes revoked authority or mismatch instead of retrying elsewhere
+ok 40 - Factory cleanup keeps its explicit workspace and exposes revoked authority or mismatch instead of retrying elsewhere
+  ---
+  duration_ms: 27.081026
+  type: 'test'
+  ...
+# Subtest: malformed or foreign personal workspace selection stops before any Factory call
+ok 41 - malformed or foreign personal workspace selection stops before any Factory call
+  ---
+  duration_ms: 2.264985
+  type: 'test'
+  ...
+# Subtest: workspace A idle cannot hide workspace B activity in either scoped reader
+ok 42 - workspace A idle cannot hide workspace B activity in either scoped reader
+  ---
+  duration_ms: 12.226108
+  type: 'test'
+  ...
+# Subtest: idle proof covers every authorized workspace but reports only the existing 30-day visible window and is not atomic
+ok 43 - idle proof covers every authorized workspace but reports only the existing 30-day visible window and is not atomic
+  ---
+  duration_ms: 39.867059
+  type: 'test'
+  ...
+# Subtest: workspace inventory errors, missing pages, unknown memberships and the workspace cap fail before changing settings
+ok 44 - workspace inventory errors, missing pages, unknown memberships and the workspace cap fail before changing settings
+  ---
+  duration_ms: 17.982854
+  type: 'test'
+  ...
+# Subtest: a changed workspace inventory cannot turn an incomplete scan into an idle proof
+ok 45 - a changed workspace inventory cannot turn an incomplete scan into an idle proof
+  ---
+  duration_ms: 1.338593
+  type: 'test'
+  ...
+# Subtest: scoped run reads reject saturation, delta or missing rows, malformed data and a foreign scope
+ok 46 - scoped run reads reject saturation, delta or missing rows, malformed data and a foreign scope
+  ---
+  duration_ms: 55.494181
+  type: 'test'
+  ...
+# Subtest: fresh authorization failures in another workspace and during restoration remain visible
+ok 47 - fresh authorization failures in another workspace and during restoration remain visible
+  ---
+  duration_ms: 12.500858
+  type: 'test'
+  ...
+# Subtest: the scan rejects a 30-day row expiry at or during the scan and never filters it away
+ok 48 - the scan rejects a 30-day row expiry at or during the scan and never filters it away
+  ---
+  duration_ms: 4.784769
+  type: 'test'
+  ...
+# Subtest: one overall scan deadline and backwards time fail closed without extending the scan per workspace
+ok 49 - one overall scan deadline and backwards time fail closed without extending the scan per workspace
+  ---
+  duration_ms: 3.541274
+  type: 'test'
+  ...
+# Subtest: a real request AbortSignal expires within the remaining scan deadline and closes the login session
+ok 50 - a real request AbortSignal expires within the remaining scan deadline and closes the login session
+  ---
+  duration_ms: 44.169625
+  type: 'test'
+  ...
+# Subtest: the finite workspace cap and 199-row boundary can succeed without paging or widening the 30-day read
+ok 51 - the finite workspace cap and 199-row boundary can succeed without paging or widening the 30-day read
+  ---
+  duration_ms: 92.38235
+  type: 'test'
+  ...
+1..51
+# tests 51
+# suites 0
+# pass 51
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1208.959701

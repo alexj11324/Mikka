@@ -1,0 +1,433 @@
+{
+  "schemaVersion": 1,
+  "kind": "bounded-await-web-source-and-terminal-log-review",
+  "repository": "alexj11324/Mikka",
+  "preparedAtUTC": "2026-11-09T10:04:58.338Z",
+  "scope": {
+    "issue": 1512,
+    "pr": 1799,
+    "relatedDiscussion": 1804,
+    "source": "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+    "e2bRunId": 42588519491,
+    "attempt": 1,
+    "awaitJobId": 129069965257,
+    "candidateCompatibilityCommit": "c0e94d594f1ecf4f5edc25904912702e61fce86b"
+  },
+  "ownership": {
+    "claimCommentId": 6737241522,
+    "claimURL": "https://github.com/alexj11324/Mikka/pull/1804#issuecomment-6737241522",
+    "priorDiscussionReads": {
+      "pr1804IssueComments": 7,
+      "discussion1752IssueComments": 349,
+      "unclaimedAwaitLogAtClaim": true
+    },
+    "onlyJobLogRead": 129069965257,
+    "jobLogReads": 1,
+    "webJobLogReads": 0,
+    "subscriptionLogReads": 0,
+    "cleanupLogReads": 0,
+    "cleanupReusedPublicProof": {
+      "commentId": 6737012017,
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6737012017",
+      "conclusion": "Three exact private candidates deleted; sandboxes=[]; errors=[]. Attribution to #1505 original reader; not independently downloaded."
+    }
+  },
+  "originalLog": {
+    "path": "await-web-0415-20261109/await-web-129069965257.original.log",
+    "bytes": 13134,
+    "sha256": "437b98816050dec78a2c3fb2d897bfe721f8c6a33953e6ca7e3317ee2c0e3712",
+    "gitBlob": "c09f843b78488950e414ecab393e125e769f69a8",
+    "createdBlob": "c09f843b78488950e414ecab393e125e769f69a8",
+    "evidenceLines": [
+      {
+        "line": 106,
+        "text": "2026-11-09T09:02:19.8383559Z [command]/usr/bin/git log -1 --format=%H"
+      },
+      {
+        "line": 107,
+        "text": "2026-11-09T09:02:19.8408424Z 0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6"
+      },
+      {
+        "line": 133,
+        "text": "2026-11-09T09:02:20.4870685Z ##[group]Run node scripts/release/web-deploy.mjs await-web"
+      },
+      {
+        "line": 143,
+        "text": "2026-11-09T09:42:20.5328002Z Error: webDeploy:matchingWebDeploymentTimedOut"
+      },
+      {
+        "line": 147,
+        "text": "2026-11-09T09:42:20.5331407Z Node.js v24.22.2"
+      },
+      {
+        "line": 148,
+        "text": "2026-11-09T09:42:20.5390138Z ##[error]Process completed with exit code 1."
+      }
+    ],
+    "encoding": "UTF-8 decoded original from GitHub job-log tool; BOM/ANSI/newlines preserved in blob",
+    "privatePlatformEnvelopeExcluded": true,
+    "privacy": {
+      "counts": {
+        "credentialLike": 0,
+        "signedUrl": 0,
+        "bearerValue": 0,
+        "email": 0
+      },
+      "originalBytesUnchanged": true,
+      "credentialValuesAllMasked": true,
+      "privateToolEnvelopeExcluded": true,
+      "rawDecodedOriginalPreserved": true
+    }
+  },
+  "observedFailure": {
+    "code": "webDeploy:matchingWebDeploymentTimedOut",
+    "exitCode": 1,
+    "nodeVersion": "24.22.2",
+    "actualCheckout": "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+    "loggedCommandStart": "2026-11-09T09:02:20.487Z",
+    "loggedError": "2026-11-09T09:42:20.532Z",
+    "loggedElapsedMs": 2400045,
+    "timingPrecision": "Log includes 7 fractional digits; calculations truncate to milliseconds. Logged command start is not a separately logged performance.now function entry.",
+    "directErrorWasNot": [
+      "mainChanged",
+      "matchingWebRunFailed",
+      "matchingWebBuildSkippedOrIncomplete",
+      "githubUnavailable"
+    ],
+    "limitation": "This excludes those direct thrown codes, not every possible transient HTTP/public response or API metadata delay during waiting."
+  },
+  "sourceContract": {
+    "defaultMaxWaitMs": 2400000,
+    "jobTimeoutMinutes": 45,
+    "pollIntervalMs": 10000,
+    "deadlineIsMonotonic": true,
+    "expectedSource": "Exact current main. Rechecked before each loop and after public verification.",
+    "runSelection": "Same public repository/head_repository, exact full SHA, main branch, web-deploy.yml, event push or workflow_dispatch; sort id descending and select only runs[0].",
+    "priorSuccessFallback": false,
+    "requiresLatestRunSuccess": true,
+    "requiresOneDeployJob": true,
+    "requiredSuccessfulSteps": [
+      "Build (runs migrations last, as the Vercel build did)",
+      "Upload the prebuilt output to production",
+      "Verify the public production version before releasing the deployment queue"
+    ],
+    "publicVerification": "Unauthenticated no-store app.aspectlylabs.com/mikka/api/version full build SHA; only after latest run/job/required steps pass.",
+    "overlay": "await-web accepts optional EXPECTED_UI_OVERLAY_SHA but the E2B await job does not set it. Normal Web final verification also invokes hosted-ui.mjs production. No new overlay rule introduced by this review.",
+    "queue": "Both ordinary and refresh Web deploy jobs use web-deploy-production, cancel-in-progress:false, queue:max.",
+    "noLockCycleInReadPaths": "await-web does not acquire Web queue; subscriptions depend on await-web; runtime publish acquires Web queue only after subscriptions.",
+    "noResetAtQueueStart": true,
+    "sourceEvidence": [
+      {
+        "path": ".github/workflows/e2b-official-runtime.yml",
+        "revision": "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+        "url": "https://raw.githubusercontent.com/alexj11324/Mikka/0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6/.github/workflows/e2b-official-runtime.yml",
+        "bytes": 18463,
+        "sha256": "9c13b3e21a58abac5240495beaa08a0fc26e1fffabeb1506d94f030689833ab3",
+        "gitBlob": "be1f902f97e50628fbe26fa55b9dab0160f749be",
+        "lines": {
+          "awaitJob": 145,
+          "subscriptions": 163,
+          "publish": 308
+        }
+      },
+      {
+        "path": ".github/workflows/web-deploy.yml",
+        "revision": "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+        "url": "https://raw.githubusercontent.com/alexj11324/Mikka/0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6/.github/workflows/web-deploy.yml",
+        "bytes": 11619,
+        "sha256": "2916c80cc6a764fe2167ad5dad17be68b309161119bffbcb9001ee26b015e9a1",
+        "gitBlob": "e15741a3ae51a294593eeb2151311378babd8ce4",
+        "lines": {
+          "webQueue": 45,
+          "overlayDispatchInput": 11,
+          "upload": 234,
+          "verify": 250
+        }
+      },
+      {
+        "path": "scripts/release/web-deploy.mjs",
+        "revision": "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+        "url": "https://raw.githubusercontent.com/alexj11324/Mikka/0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6/scripts/release/web-deploy.mjs",
+        "bytes": 19867,
+        "sha256": "e8012d49653ab635ea26d3ba881450860f8c3ead2893d799a98bc395eb65bf9a",
+        "gitBlob": "948caacb60d05c04f21e5d0a55303716192771da",
+        "lines": {
+          "waitFunction": 146,
+          "listExactSourceRuns": 170,
+          "latestRunOnly": 175,
+          "timeout": 211
+        }
+      },
+      {
+        "path": "scripts/release/web-deploy.test.mjs",
+        "revision": "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+        "url": "https://raw.githubusercontent.com/alexj11324/Mikka/0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6/scripts/release/web-deploy.test.mjs",
+        "bytes": 46875,
+        "sha256": "9a2e724afc95feb9c5b7056600316cb6911d409e5b614f1b19ec4b54643862b4",
+        "gitBlob": "bb6f99cafcfca2b6058703105649275b5f3739fa",
+        "lines": {
+          "olderSuccessDoesNotHideLatestFailure": 276,
+          "pendingSharesDeadline": 202,
+          "queueAndNoLockCycle": 396,
+          "sameSourceOverlayWait": 698
+        }
+      }
+    ]
+  },
+  "webTimeline": [
+    {
+      "id": 42588519393,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42588519393",
+      "headSha": "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+      "headBranch": "main",
+      "path": ".github/workflows/web-deploy.yml",
+      "event": "push",
+      "repository": "alexj11324/Mikka",
+      "headRepository": "alexj11324/Mikka",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T08:47:36Z",
+      "runStartedAt": "2026-11-09T08:47:36Z",
+      "updatedAt": "2026-11-09T09:14:28Z",
+      "totalJobs": 1,
+      "jobs": [
+        {
+          "id": 129064088135,
+          "name": "deploy",
+          "headSha": "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+          "status": "completed",
+          "conclusion": "success",
+          "createdAt": "2026-11-09T08:47:36Z",
+          "startedAt": "2026-11-09T08:47:39Z",
+          "completedAt": "2026-11-09T09:14:27Z",
+          "steps": [
+            {
+              "number": 5,
+              "name": "Refuse an obsolete source before release work",
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-11-09T08:48:01Z",
+              "completedAt": "2026-11-09T08:48:01Z"
+            },
+            {
+              "number": 13,
+              "name": "Pin the private UI revision",
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-11-09T08:48:05Z",
+              "completedAt": "2026-11-09T08:48:05Z"
+            },
+            {
+              "number": 24,
+              "name": "Build (runs migrations last, as the Vercel build did)",
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-11-09T08:49:45Z",
+              "completedAt": "2026-11-09T08:56:25Z"
+            },
+            {
+              "number": 27,
+              "name": "Upload the prebuilt output to production",
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-11-09T08:56:27Z",
+              "completedAt": "2026-11-09T09:14:17Z"
+            },
+            {
+              "number": 28,
+              "name": "Verify the public production version before releasing the deployment queue",
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-11-09T09:14:17Z",
+              "completedAt": "2026-11-09T09:14:23Z"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 42588853466,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42588853466",
+      "headSha": "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+      "headBranch": "main",
+      "path": ".github/workflows/web-deploy.yml",
+      "event": "workflow_dispatch",
+      "repository": "alexj11324/Mikka",
+      "headRepository": "alexj11324/Mikka",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T08:50:24Z",
+      "runStartedAt": "2026-11-09T08:50:24Z",
+      "updatedAt": "2026-11-09T09:42:29Z",
+      "totalJobs": 1,
+      "jobs": [
+        {
+          "id": 129065207403,
+          "name": "deploy",
+          "headSha": "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+          "status": "completed",
+          "conclusion": "success",
+          "createdAt": "2026-11-09T08:50:25Z",
+          "startedAt": "2026-11-09T09:14:29Z",
+          "completedAt": "2026-11-09T09:42:28Z",
+          "steps": [
+            {
+              "number": 5,
+              "name": "Refuse an obsolete source before release work",
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-11-09T09:14:42Z",
+              "completedAt": "2026-11-09T09:14:43Z"
+            },
+            {
+              "number": 13,
+              "name": "Pin the private UI revision",
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-11-09T09:14:45Z",
+              "completedAt": "2026-11-09T09:14:45Z"
+            },
+            {
+              "number": 24,
+              "name": "Build (runs migrations last, as the Vercel build did)",
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-11-09T09:17:03Z",
+              "completedAt": "2026-11-09T09:23:44Z"
+            },
+            {
+              "number": 27,
+              "name": "Upload the prebuilt output to production",
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-11-09T09:23:47Z",
+              "completedAt": "2026-11-09T09:42:25Z"
+            },
+            {
+              "number": 28,
+              "name": "Verify the public production version before releasing the deployment queue",
+              "status": "completed",
+              "conclusion": "success",
+              "startedAt": "2026-11-09T09:42:25Z",
+              "completedAt": "2026-11-09T09:42:26Z"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "causalAssessment": {
+    "latestEligibleByActualFinalMetadata": 42588853466,
+    "selectionCalculationScope": "Deterministic projection of the two actually retrieved final run objects using current source predicates. Not a reconstruction of historical loop response payloads.",
+    "newerRunExistedBeforeAwaitCommand": true,
+    "newerRunCreatedAt": "2026-11-09T08:50:24Z",
+    "newerDeployQueuedMs": 1444000,
+    "newerDeployRunMs": 1679000,
+    "newerJobSucceededAfterAwaitErrorMs": 7468,
+    "requiredVerifyCompletedAfterAwaitErrorMs": 5468,
+    "factAtDeadline": "The newer same-source dispatch deploy was still in Upload at 09:42:20.532. Upload completed 09:42:25 and Verify completed 09:42:26. Thus the required latest run evidence was not ready at the deadline.",
+    "earlierSuccess": "First push deploy completed 09:14:27, but source and existing tests explicitly forbid using an older success as a fallback for the latest matching run.",
+    "exactLoopHistoryKnown": false,
+    "excludedClaims": [
+      "Every individual GitHub/public response was healthy",
+      "Every loop selected the same run object",
+      "Only one historical cause can explain every second",
+      "A larger timeout would guarantee future success",
+      "New runtime or subscription acceptance passed"
+    ]
+  },
+  "publicVersionEvidence": {
+    "attribution": "Reused existing independent owner public report; this reviewer did not make production GETs.",
+    "commentId": 6736423357,
+    "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6736423357",
+    "reportedReads": [
+      {
+        "windowUTC": "2026-11-09T09:15:17Z/2026-11-09T09:15:18Z",
+        "status": 200
+      },
+      {
+        "windowUTC": "2026-11-09T09:44:20Z/2026-11-09T09:44:22Z",
+        "status": 200
+      }
+    ],
+    "build": "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+    "overlaySha": "485736e7acfe729dcb9821c093ee774ba110922b",
+    "notSubstituteForLatestRunGate": true
+  },
+  "downstream": {
+    "subscriptions": "skipped",
+    "publish": "skipped",
+    "newRuntimeAccepted": false,
+    "cleanup": "success; original receipt reused from assigned #1505 reader"
+  },
+  "future1512": {
+    "compatibility": [
+      {
+        "path": ".github/workflows/e2b-official-runtime.yml",
+        "revision": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+        "bytes": 18463,
+        "sha256": "9c13b3e21a58abac5240495beaa08a0fc26e1fffabeb1506d94f030689833ab3",
+        "gitBlob": "be1f902f97e50628fbe26fa55b9dab0160f749be",
+        "byteEqualTo0415": true
+      },
+      {
+        "path": ".github/workflows/web-deploy.yml",
+        "revision": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+        "bytes": 11670,
+        "sha256": "790c964833cd3352a5238a7e58162ab5783ddfa8886c68a25afc521ab8b04a22",
+        "gitBlob": "bab7ed46eefd7bd4b6db712e8e141484be9f73ba",
+        "byteEqualTo0415": false
+      },
+      {
+        "path": "scripts/release/web-deploy.mjs",
+        "revision": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+        "bytes": 19867,
+        "sha256": "e8012d49653ab635ea26d3ba881450860f8c3ead2893d799a98bc395eb65bf9a",
+        "gitBlob": "948caacb60d05c04f21e5d0a55303716192771da",
+        "byteEqualTo0415": true
+      }
+    ],
+    "webYamlOnlyDeclaredDelta": {
+      "addition": "FFMPEG_GITHUB_TOKEN: ${{ github.token }}",
+      "reverseRestores0415Bytes": true,
+      "queueAndAwaitContractChanged": false
+    },
+    "finding": "The c0e candidate retains this same finite latest-run mechanism. A newer same-SHA Web dispatch queued behind the first build can consume the await budget and cause the same class of timeout.",
+    "minimalPlan": [
+      "During the actual bounded release window, coordinate one intended public source/private UI overlay pair before the ordinary main push; avoid redundant same-SHA overlay-refresh dispatches while this E2B await gate is active.",
+      "Keep normal exact-source, latest-run, required Build/Upload/Verify and public-version checks unchanged. A legitimate required newer Web run remains authoritative.",
+      "If a real external update occurs, retain actual finite failure and owner cleanup, then let the release owner decide the next ordinary release action from current metadata; no automatic retry or stale-success substitution.",
+      "No source edit or timeout increase is justified by this read-only review. Existing tests for latest failure, pending metadata, finite deadline and source fences remain applicable."
+    ],
+    "productionAccepted": false
+  },
+  "tests": {
+    "sourceReadOnly": true,
+    "testsExecuted": 0,
+    "sourceHash": "9a2e724afc95feb9c5b7056600316cb6911d409e5b614f1b19ec4b54643862b4",
+    "coveredContractsRead": [
+      "latest exact run failure cannot be hidden by an older success",
+      "pending step metadata shares original deadline",
+      "exact-main fences before subsequent reads",
+      "required build/upload/verify evidence cannot be skipped",
+      "wait remains outside publication queue",
+      "private-push exact-source overlay wait"
+    ],
+    "notClaimed": "No new RED/GREEN, CI or official production test was executed by this reviewer."
+  },
+  "operations": {
+    "sourceWrites": 0,
+    "refUpdates": 0,
+    "workflowDispatches": 0,
+    "reruns": 0,
+    "cancellations": 0,
+    "models": 0,
+    "productionGETs": 0,
+    "resourcesCreated": 0,
+    "activeResources": 0,
+    "backgroundPolling": false,
+    "publicComments": "One bounded log-reader claim; one final result reply planned."
+  }
+}
