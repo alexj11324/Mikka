@@ -5702,7 +5702,13 @@
       "editing": "Enter to save · Esc to cancel",
       "deleted": "Deleted “{text}”",
       "learned": "Learnt from your connected apps",
-      "edited": "You corrected it"
+      "edited": "You corrected it",
+      "screenNoMatch": "No memory matches",
+      "screenNoMatchText": "Try other words, or clear the search.",
+      "screenClear": "Clear search",
+      "screenNoMemory": "Nothing open",
+      "screenNoMemoryText": "Pick a memory on the left to correct or delete it.",
+      "screenEmpty": "Nothing here yet"
     },
     "security": {
       "othersDone": "Other devices are signed out",
