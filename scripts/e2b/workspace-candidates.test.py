@@ -328,6 +328,59 @@ class Candidates(unittest.TestCase):
             self.assertEqual(log.value['events'][-1], {'phase': 'ingress', 'detail': 'command', 'command': expected})
         self.assertNotIn(PRIVATE, json.dumps(log.value))
 
+    def test_actual_conservation_rejection_identifies_only_closed_provider_metadata(self):
+        guard = candidates.builder.official_files_guard()
+        original = {'path': '/usr/local/share/e2b', 'kind': 'directory', 'mode': 0o755, 'uid': 0, 'gid': 0}
+        # Exercise the real strict guard, not a hand-written stand-in error.
+        with patch.object(guard, 'entry', return_value={**original, 'mode': 0o777}):
+            with self.assertRaisesRegex(RuntimeError, 'official_files_changed') as rejected:
+                guard.verify({'version': 1, 'entries': [original]})
+        message = '[ready] [stderr]: RuntimeError: ' + str(rejected.exception)
+        for cls in (candidates.BuildDiagnostics, candidates.DebugDiagnostics):
+            with self.subTest(projection=cls.__name__):
+                log = cls() if cls is candidates.DebugDiagnostics else cls({}, self.output, 'claude')
+                log(SimpleNamespace(level='debug', message=message))
+                event = log.value['events'][0]
+                self.assertEqual(event['detail'], 'official_files_changed')
+                self.assertIn('conservation', event)
+                self.assertEqual(event['conservation'], {'observedChanges': 1, 'redactedChanges': 0,
+                    'truncated': False, 'changes': [{'pathCode': 'provider_shared_directory', 'kind': 'directory',
+                        'fields': ['mode'], 'before': {'mode': 0o755}, 'after': {'mode': 0o777},
+                        'contentChanged': False, 'targetChanged': False}]})
+                self.assertNotIn(original['path'], json.dumps(log.value))
+
+    def test_conservation_diagnostics_redact_paths_targets_hashes_and_bound_changes(self):
+        known = {'path': '/usr/local/share/ca-certificates/e2b-ca.crt', 'kind': 'file',
+            'before': {'mode': 0o644, 'sha256': 'a' * 64, 'target': None},
+            'after': {'mode': 0o777, 'sha256': 'b' * 64, 'target': '/' + PRIVATE}}
+        other = {**known, 'path': '/' + PRIVATE}
+        log = candidates.BuildDiagnostics({}, self.output, 'codex')
+        log(SimpleNamespace(level='error', message='RuntimeError: official_files_changed ' + json.dumps([known] * 17 + [other])))
+        self.assertIn('conservation', log.value['events'][0])
+        detail = log.value['events'][0]['conservation']
+        self.assertEqual((detail['observedChanges'], detail['redactedChanges'], detail['truncated']), (18, 1, True))
+        self.assertEqual(len(detail['changes']), 16)
+        self.assertEqual(detail['changes'][0]['pathCode'], 'provider_root_certificate')
+        self.assertTrue(detail['changes'][0]['contentChanged'])
+        self.assertTrue(detail['changes'][0]['targetChanged'])
+        for secret in (PRIVATE, known['path'], 'a' * 64, 'b' * 64):
+            self.assertNotIn(secret, json.dumps(log.value))
+
+    def test_malformed_conservation_metadata_preserves_failure_without_new_claims(self):
+        valid = {'path': '/usr/local/share/e2b', 'kind': 'directory',
+            'before': {'mode': 0o755}, 'after': {'mode': 0o777}}
+        variants = [[], [valid] * 513, [{'path': '/' + PRIVATE}],
+            [{**valid, 'kind': PRIVATE}], [{**valid, 'after': {'mode': PRIVATE}}],
+            [{**valid, 'before': {'mode': True}}], [{**valid, 'after': {'mode': 4096}}],
+            [{**valid, 'before': {'mode': 493, 'credential': PRIVATE}}],
+            [{**valid, 'extra': PRIVATE}], [{**valid, 'after': {}}]]
+        for rows in variants:
+            with self.subTest(rows=str(rows)[:60]):
+                log = candidates.BuildDiagnostics({}, self.output, 'claude')
+                log(SimpleNamespace(level='error', message='RuntimeError: official_files_changed ' + json.dumps(rows)))
+                self.assertEqual(log.value['events'], [{'phase': 'host_failure', 'detail': 'official_files_changed'}])
+                self.assertNotIn(PRIVATE, json.dumps(log.value))
+
     def test_malformed_command_observations_cannot_be_reported_as_real_ingress_evidence(self):
         command = {'family': 'ipv4', 'operation': 'new_chain', 'failureKind': 'exit', 'returnCode': 1,
                    **dict.fromkeys(candidates.INGRESS_COMMAND_FLAGS, False)}

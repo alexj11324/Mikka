@@ -73,6 +73,12 @@ DEBUG_REQUEST_SECONDS = 15
 DEBUG_TOTAL_SECONDS = 90
 DEBUG_RESULT_BYTES = 131_072
 DEBUG_REQUEST_MARKER = b'{"requestStarted":true}\n'
+CONSERVATION_PATH_CODES = {
+    '/usr/local/share/e2b': 'provider_shared_directory',
+    '/usr/local/share/ca-certificates/e2b-ca.crt': 'provider_root_certificate',
+    '/etc/ssl/certs/e2b-ca.pem': 'provider_certificate_reference',
+    '/etc/ssl/certs/1560546e.0': 'provider_hashed_certificate_reference',
+}
 
 
 class CandidateError(Exception):
@@ -144,6 +150,55 @@ def ingress_command(value):
     return result
 
 
+def official_change_diagnostic(message):
+    """Project guard differences without retaining arbitrary paths or bytes.
+
+    A failed ready command is not a successful conservation receipt. Preserve
+    its rejection, plus numeric/type differences at four known provider paths,
+    so a later fix need not guess which existing strict predicate refused it.
+    """
+    prefix = 'RuntimeError: official_files_changed '
+    if not message.startswith(prefix):
+        return None
+    kinds = {'file', 'link', 'directory', 'special'}
+    fields = {'kind', 'sha256', 'mode', 'uid', 'gid', 'target', 'type', 'device'}
+    try:
+        rows = json.loads(message[len(prefix):])
+        if not isinstance(rows, list) or not 0 < len(rows) <= 512:
+            return None
+        changes, redacted = [], 0
+        for row in rows:
+            if (not isinstance(row, dict) or set(row) - {'path', 'kind', 'before', 'after', 'resolvedSha256'}
+                    or not {'path', 'kind', 'before', 'after'}.issubset(row)
+                    or not isinstance(row['path'], str) or row['kind'] not in kinds
+                    or not isinstance(row['before'], dict) or not row['before'] or not isinstance(row['after'], dict)
+                    or row['before'].keys() != row['after'].keys() or set(row['before']) - fields):
+                return None
+            for side in ('before', 'after'):
+                for key, value in row[side].items():
+                    valid = (value is None or
+                             (key == 'kind' and isinstance(value, str) and value in kinds) or
+                             (key == 'sha256' and isinstance(value, str) and re.fullmatch(r'[a-f0-9]{64}', value)) or
+                             (key == 'target' and isinstance(value, str) and len(value) <= 2048) or
+                             (key not in ('kind', 'sha256', 'target') and type(value) is int
+                              and 0 <= value <= (4095 if key == 'mode' else 2**53 - 1)))
+                    if not valid:
+                        return None
+            code = CONSERVATION_PATH_CODES.get(row['path'])
+            if not code:
+                redacted += 1
+                continue
+            if len(changes) < 16:
+                changes.append({'pathCode': code, 'kind': row['kind'], 'fields': sorted(row['before']),
+                    'before': {key: value for key, value in row['before'].items() if key in ('kind', 'mode', 'uid', 'gid')},
+                    'after': {key: value for key, value in row['after'].items() if key in ('kind', 'mode', 'uid', 'gid')},
+                    'contentChanged': 'sha256' in row['before'], 'targetChanged': 'target' in row['before']})
+        return {'observedChanges': len(rows), 'redactedChanges': redacted,
+                'truncated': len(rows) - redacted > len(changes), 'changes': changes}
+    except (ValueError, TypeError, KeyError, RecursionError):
+        return None
+
+
 class BuildDiagnostics:
     """Consume the pinned SDK's public callback; retain no raw log messages.
 
@@ -203,7 +258,9 @@ class BuildDiagnostics:
             failure = re.match(r'(?:ValueError|RuntimeError): ([a-z_]+)(?: |$)', line)
             host_error = failure[1] if failure else line
             if host_error in HOST_ERRORS:
-                self.event({'phase': 'host_failure', 'detail': host_error})
+                detail = official_change_diagnostic(line) if host_error == 'official_files_changed' else None
+                self.event({'phase': 'host_failure', 'detail': host_error,
+                            **({'conservation': detail} if detail is not None else {})})
                 continue
             # These receipts are emitted by the pinned ingress/conservation
             # scripts. Extra fields, arbitrary paths and hashes are discarded.

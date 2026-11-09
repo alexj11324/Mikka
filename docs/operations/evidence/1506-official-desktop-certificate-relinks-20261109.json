@@ -1,0 +1,790 @@
+{
+  "schemaVersion": 1,
+  "run": 42628079564,
+  "attempt": 1,
+  "operator": "08d822da081190364530343bf918bbcc2fbbf624",
+  "source": "111a8dfb8b227ac0441324339ff42e4328ea609a",
+  "artifact": {
+    "id": 13678489689,
+    "zipBytes": 3748,
+    "zipSha256": "3a51e3a158dbba0fb4c84e658215fec84a032fd155a1514845e522eff476fd4f"
+  },
+  "files": [
+    {
+      "name": "codex.json",
+      "bytes": 9146,
+      "sha256": "2cc75b6353f6798eb3b9711090146fd86259797e557003ebae47e445673c62fd",
+      "data": {
+        "buildId": "95ee1c65-5dac-4950-ade4-af02eb21a45c",
+        "buildStarted": true,
+        "cleanup": {
+          "errors": [],
+          "sandbox": {
+            "absenceConfirmedById": true,
+            "id": "ief2bib648u0okshkanj3"
+          },
+          "status": "complete",
+          "templates": [
+            {
+              "kind": "codex",
+              "name": "mikka-1506-official-control-42628079564-1-codex",
+              "status": "absent",
+              "templateId": "8dtnoomwg0zwvgfjyc0t"
+            }
+          ]
+        },
+        "createStarted": true,
+        "identity": {
+          "application": "mikka-1506-official-control",
+          "opsCommit": "08d822da081190364530343bf918bbcc2fbbf624",
+          "ref": "refs/heads/ops/issue1506-e2b-conservation-control-4",
+          "repository": "alexj11324/Mikka",
+          "runAttempt": "1",
+          "runId": "42628079564",
+          "sourceCommit": "111a8dfb8b227ac0441324339ff42e4328ea609a"
+        },
+        "kind": "codex",
+        "name": "mikka-1506-official-control-42628079564-1-codex",
+        "observations": {
+          "before": {
+            "apt": null,
+            "bootId": "a7f85304-1206-4b94-bacb-edb111e355d6",
+            "certificates": [
+              {
+                "path": "/etc/ssl/certs/1560546e.0",
+                "status": "unresolved"
+              },
+              {
+                "path": "/etc/ssl/certs/e2b-ca.pem",
+                "status": "unresolved"
+              }
+            ],
+            "cli": {
+              "claude": {
+                "status": "absent"
+              },
+              "codex": {
+                "canonical": {
+                  "ctimeNs": 1794212111260845376,
+                  "device": 65024,
+                  "gid": 0,
+                  "inode": 523481,
+                  "kind": "file",
+                  "mode": 511,
+                  "mtimeNs": 1794212101681447602,
+                  "path": "/usr/local/lib/node_modules/@openai/codex/bin/codex.js",
+                  "sha256": "e14fc83739c13c1074b12bd1acce4010c893c7f6fbfc1593b4a31d74cabb57af",
+                  "size": 9154,
+                  "status": "present",
+                  "uid": 0
+                },
+                "discovered": {
+                  "ctimeNs": 1794212107665447602,
+                  "device": 65024,
+                  "gid": 0,
+                  "inode": 11733,
+                  "kind": "link",
+                  "mode": 511,
+                  "mtimeNs": 1794212107665447602,
+                  "path": "/usr/local/bin/codex",
+                  "size": 46,
+                  "status": "present",
+                  "target": "../lib/node_modules/@openai/codex/bin/codex.js",
+                  "uid": 0
+                },
+                "status": "observed"
+              }
+            },
+            "kind": "codex",
+            "monotonicNs": 12250900140,
+            "nodes": [
+              {
+                "path": "/etc/ssl/certs/1560546e.0",
+                "status": "absent"
+              },
+              {
+                "path": "/etc/ssl/certs/e2b-ca.pem",
+                "status": "absent"
+              },
+              {
+                "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+                "status": "absent"
+              }
+            ],
+            "phase": "before",
+            "utcNs": 1794231903813386550,
+            "version": 1
+          },
+          "fresh": {
+            "apt": null,
+            "bootId": "814f8ee1-5e13-49c8-8dab-9ae6d6129fe3",
+            "certificates": [
+              {
+                "path": "/etc/ssl/certs/1560546e.0",
+                "status": "unresolved"
+              },
+              {
+                "path": "/etc/ssl/certs/e2b-ca.pem",
+                "status": "unresolved"
+              }
+            ],
+            "cli": {
+              "claude": {
+                "status": "absent"
+              },
+              "codex": {
+                "canonical": {
+                  "ctimeNs": 1794231906613542998,
+                  "device": 65024,
+                  "gid": 0,
+                  "inode": 523481,
+                  "kind": "file",
+                  "mode": 511,
+                  "mtimeNs": 1794212101681447602,
+                  "path": "/usr/local/lib/node_modules/@openai/codex/bin/codex.js",
+                  "sha256": "e14fc83739c13c1074b12bd1acce4010c893c7f6fbfc1593b4a31d74cabb57af",
+                  "size": 9154,
+                  "status": "present",
+                  "uid": 0
+                },
+                "discovered": {
+                  "ctimeNs": 1794212107665447602,
+                  "device": 65024,
+                  "gid": 0,
+                  "inode": 11733,
+                  "kind": "link",
+                  "mode": 511,
+                  "mtimeNs": 1794212107665447602,
+                  "path": "/usr/local/bin/codex",
+                  "size": 46,
+                  "status": "present",
+                  "target": "../lib/node_modules/@openai/codex/bin/codex.js",
+                  "uid": 0
+                },
+                "status": "observed"
+              }
+            },
+            "kind": "codex",
+            "monotonicNs": 6585963992,
+            "nodes": [
+              {
+                "path": "/etc/ssl/certs/1560546e.0",
+                "status": "absent"
+              },
+              {
+                "path": "/etc/ssl/certs/e2b-ca.pem",
+                "status": "absent"
+              },
+              {
+                "ctimeNs": 1794231914954412235,
+                "device": 65024,
+                "gid": 0,
+                "inode": 3020,
+                "kind": "file",
+                "mode": 420,
+                "mtimeNs": 1794231914954412235,
+                "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+                "sha256": "aca6dfe34be5499f55308479809cb236576fe6dc57c991dfed338437879345fa",
+                "size": 595,
+                "status": "present",
+                "uid": 0
+              }
+            ],
+            "phase": "fresh",
+            "utcNs": 1794231915501156620,
+            "version": 1
+          },
+          "pre_finalization": {
+            "apt": null,
+            "bootId": "a7f85304-1206-4b94-bacb-edb111e355d6",
+            "certificates": [
+              {
+                "path": "/etc/ssl/certs/1560546e.0",
+                "status": "unresolved"
+              },
+              {
+                "path": "/etc/ssl/certs/e2b-ca.pem",
+                "status": "unresolved"
+              }
+            ],
+            "cli": {
+              "claude": {
+                "status": "absent"
+              },
+              "codex": {
+                "canonical": {
+                  "ctimeNs": 1794212111260845376,
+                  "device": 65024,
+                  "gid": 0,
+                  "inode": 523481,
+                  "kind": "file",
+                  "mode": 511,
+                  "mtimeNs": 1794212101681447602,
+                  "path": "/usr/local/lib/node_modules/@openai/codex/bin/codex.js",
+                  "sha256": "e14fc83739c13c1074b12bd1acce4010c893c7f6fbfc1593b4a31d74cabb57af",
+                  "size": 9154,
+                  "status": "present",
+                  "uid": 0
+                },
+                "discovered": {
+                  "ctimeNs": 1794212107665447602,
+                  "device": 65024,
+                  "gid": 0,
+                  "inode": 11733,
+                  "kind": "link",
+                  "mode": 511,
+                  "mtimeNs": 1794212107665447602,
+                  "path": "/usr/local/bin/codex",
+                  "size": 46,
+                  "status": "present",
+                  "target": "../lib/node_modules/@openai/codex/bin/codex.js",
+                  "uid": 0
+                },
+                "status": "observed"
+              }
+            },
+            "kind": "codex",
+            "monotonicNs": 12660258601,
+            "nodes": [
+              {
+                "path": "/etc/ssl/certs/1560546e.0",
+                "status": "absent"
+              },
+              {
+                "path": "/etc/ssl/certs/e2b-ca.pem",
+                "status": "absent"
+              },
+              {
+                "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+                "status": "absent"
+              }
+            ],
+            "phase": "pre_finalization",
+            "utcNs": 1794231904466842258,
+            "version": 1
+          },
+          "ready": {
+            "apt": null,
+            "bootId": "814f8ee1-5e13-49c8-8dab-9ae6d6129fe3",
+            "certificates": [
+              {
+                "path": "/etc/ssl/certs/1560546e.0",
+                "status": "unresolved"
+              },
+              {
+                "path": "/etc/ssl/certs/e2b-ca.pem",
+                "status": "unresolved"
+              }
+            ],
+            "cli": {
+              "claude": {
+                "status": "absent"
+              },
+              "codex": {
+                "canonical": {
+                  "ctimeNs": 1794231906613542998,
+                  "device": 65024,
+                  "gid": 0,
+                  "inode": 523481,
+                  "kind": "file",
+                  "mode": 511,
+                  "mtimeNs": 1794212101681447602,
+                  "path": "/usr/local/lib/node_modules/@openai/codex/bin/codex.js",
+                  "sha256": "e14fc83739c13c1074b12bd1acce4010c893c7f6fbfc1593b4a31d74cabb57af",
+                  "size": 9154,
+                  "status": "present",
+                  "uid": 0
+                },
+                "discovered": {
+                  "ctimeNs": 1794212107665447602,
+                  "device": 65024,
+                  "gid": 0,
+                  "inode": 11733,
+                  "kind": "link",
+                  "mode": 511,
+                  "mtimeNs": 1794212107665447602,
+                  "path": "/usr/local/bin/codex",
+                  "size": 46,
+                  "status": "present",
+                  "target": "../lib/node_modules/@openai/codex/bin/codex.js",
+                  "uid": 0
+                },
+                "status": "observed"
+              }
+            },
+            "kind": "codex",
+            "monotonicNs": 1171651428,
+            "nodes": [
+              {
+                "path": "/etc/ssl/certs/1560546e.0",
+                "status": "absent"
+              },
+              {
+                "path": "/etc/ssl/certs/e2b-ca.pem",
+                "status": "absent"
+              },
+              {
+                "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+                "status": "absent"
+              }
+            ],
+            "phase": "ready",
+            "utcNs": 1794231906759169009,
+            "version": 1
+          }
+        },
+        "policyChanged": false,
+        "probe": {
+          "phase": "complete",
+          "status": "observed"
+        },
+        "releaseAccepted": false,
+        "sandboxId": "ief2bib648u0okshkanj3",
+        "targetedOnly": true,
+        "templateId": "8dtnoomwg0zwvgfjyc0t",
+        "version": 1
+      }
+    },
+    {
+      "name": "desktop.json",
+      "bytes": 10892,
+      "sha256": "e3bc33fdff3e1634fbab4440cc75087afb6ace2eb401956774cf4487b027ac09",
+      "data": {
+        "buildId": "190241f5-be1d-43ef-999f-dc76397b25e4",
+        "buildStarted": true,
+        "cleanup": {
+          "errors": [],
+          "sandbox": {
+            "absenceConfirmedById": true,
+            "id": "ianfp393mihg4nwxyt50e"
+          },
+          "status": "complete",
+          "templates": [
+            {
+              "kind": "desktop",
+              "name": "mikka-1506-official-control-42628079564-1-desktop",
+              "status": "absent",
+              "templateId": "z0kyfpyig1td47eqj3gb"
+            }
+          ]
+        },
+        "createStarted": true,
+        "identity": {
+          "application": "mikka-1506-official-control",
+          "opsCommit": "08d822da081190364530343bf918bbcc2fbbf624",
+          "ref": "refs/heads/ops/issue1506-e2b-conservation-control-4",
+          "repository": "alexj11324/Mikka",
+          "runAttempt": "1",
+          "runId": "42628079564",
+          "sourceCommit": "111a8dfb8b227ac0441324339ff42e4328ea609a"
+        },
+        "kind": "desktop",
+        "name": "mikka-1506-official-control-42628079564-1-desktop",
+        "observations": {
+          "before": {
+            "apt": null,
+            "bootId": "50814953-5a4b-4c6b-ac6d-006c43034d61",
+            "certificates": [
+              {
+                "chain": [
+                  "/etc/ssl/certs/1560546e.0"
+                ],
+                "path": "/etc/ssl/certs/1560546e.0",
+                "status": "observed",
+                "terminalPath": "/etc/ssl/certs/1560546e.0",
+                "terminalSha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1"
+              },
+              {
+                "chain": [
+                  "/etc/ssl/certs/e2b-ca.pem"
+                ],
+                "path": "/etc/ssl/certs/e2b-ca.pem",
+                "status": "observed",
+                "terminalPath": "/etc/ssl/certs/e2b-ca.pem",
+                "terminalSha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1"
+              }
+            ],
+            "cli": {
+              "claude": {
+                "status": "absent"
+              },
+              "codex": {
+                "status": "absent"
+              }
+            },
+            "kind": "desktop",
+            "monotonicNs": 12737228454,
+            "nodes": [
+              {
+                "ctimeNs": 1794231893927285651,
+                "device": 23,
+                "gid": 0,
+                "inode": 191,
+                "kind": "file",
+                "mode": 511,
+                "mtimeNs": 1794212573000000000,
+                "path": "/etc/ssl/certs/1560546e.0",
+                "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+                "size": 595,
+                "status": "present",
+                "uid": 0
+              },
+              {
+                "ctimeNs": 1794231893927285651,
+                "device": 23,
+                "gid": 0,
+                "inode": 191,
+                "kind": "file",
+                "mode": 511,
+                "mtimeNs": 1794212573000000000,
+                "path": "/etc/ssl/certs/e2b-ca.pem",
+                "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+                "size": 595,
+                "status": "present",
+                "uid": 0
+              },
+              {
+                "ctimeNs": 1794231896523285651,
+                "device": 65024,
+                "gid": 0,
+                "inode": 3602,
+                "kind": "file",
+                "mode": 511,
+                "mtimeNs": 1794231896523285651,
+                "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+                "sha256": "3d3bf4eda47ee4754c04202fe5ac919ae609f21aa750de1f6bdc91e83c16a686",
+                "size": 599,
+                "status": "present",
+                "uid": 0
+              }
+            ],
+            "phase": "before",
+            "utcNs": 1794231901696958788,
+            "version": 1
+          },
+          "fresh": {
+            "apt": null,
+            "bootId": "a1c080f9-4df6-4532-83ac-1954c9b7fcca",
+            "certificates": [
+              {
+                "chain": [
+                  "/etc/ssl/certs/1560546e.0",
+                  "/etc/ssl/certs/e2b-ca.pem",
+                  "/usr/local/share/ca-certificates/e2b-ca.crt"
+                ],
+                "path": "/etc/ssl/certs/1560546e.0",
+                "status": "observed",
+                "terminalPath": "/usr/local/share/ca-certificates/e2b-ca.crt",
+                "terminalSha256": "ffe5cadf73f8a4b863034daae2fdd9b861fb32049d2b4d4d68e49282f396b40e"
+              },
+              {
+                "chain": [
+                  "/etc/ssl/certs/e2b-ca.pem",
+                  "/usr/local/share/ca-certificates/e2b-ca.crt"
+                ],
+                "path": "/etc/ssl/certs/e2b-ca.pem",
+                "status": "observed",
+                "terminalPath": "/usr/local/share/ca-certificates/e2b-ca.crt",
+                "terminalSha256": "ffe5cadf73f8a4b863034daae2fdd9b861fb32049d2b4d4d68e49282f396b40e"
+              }
+            ],
+            "cli": {
+              "claude": {
+                "status": "absent"
+              },
+              "codex": {
+                "status": "absent"
+              }
+            },
+            "kind": "desktop",
+            "monotonicNs": 19410175326,
+            "nodes": [
+              {
+                "ctimeNs": 1794231920859090741,
+                "device": 23,
+                "gid": 0,
+                "inode": 713,
+                "kind": "link",
+                "mode": 511,
+                "mtimeNs": 1794231920859090741,
+                "path": "/etc/ssl/certs/1560546e.0",
+                "size": 10,
+                "status": "present",
+                "target": "e2b-ca.pem",
+                "uid": 0
+              },
+              {
+                "ctimeNs": 1794231920591088377,
+                "device": 23,
+                "gid": 0,
+                "inode": 654,
+                "kind": "link",
+                "mode": 511,
+                "mtimeNs": 1794231920591088377,
+                "path": "/etc/ssl/certs/e2b-ca.pem",
+                "size": 43,
+                "status": "present",
+                "target": "/usr/local/share/ca-certificates/e2b-ca.crt",
+                "uid": 0
+              },
+              {
+                "ctimeNs": 1794231926164610574,
+                "device": 65024,
+                "gid": 0,
+                "inode": 3602,
+                "kind": "file",
+                "mode": 511,
+                "mtimeNs": 1794231926164610574,
+                "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+                "sha256": "ffe5cadf73f8a4b863034daae2fdd9b861fb32049d2b4d4d68e49282f396b40e",
+                "size": 599,
+                "status": "present",
+                "uid": 0
+              }
+            ],
+            "phase": "fresh",
+            "utcNs": 1794231927590452281,
+            "version": 1
+          },
+          "pre_finalization": {
+            "apt": null,
+            "bootId": "50814953-5a4b-4c6b-ac6d-006c43034d61",
+            "certificates": [
+              {
+                "chain": [
+                  "/etc/ssl/certs/1560546e.0"
+                ],
+                "path": "/etc/ssl/certs/1560546e.0",
+                "status": "observed",
+                "terminalPath": "/etc/ssl/certs/1560546e.0",
+                "terminalSha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1"
+              },
+              {
+                "chain": [
+                  "/etc/ssl/certs/e2b-ca.pem"
+                ],
+                "path": "/etc/ssl/certs/e2b-ca.pem",
+                "status": "observed",
+                "terminalPath": "/etc/ssl/certs/e2b-ca.pem",
+                "terminalSha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1"
+              }
+            ],
+            "cli": {
+              "claude": {
+                "status": "absent"
+              },
+              "codex": {
+                "status": "absent"
+              }
+            },
+            "kind": "desktop",
+            "monotonicNs": 13048119308,
+            "nodes": [
+              {
+                "ctimeNs": 1794231893927285651,
+                "device": 23,
+                "gid": 0,
+                "inode": 191,
+                "kind": "file",
+                "mode": 511,
+                "mtimeNs": 1794212573000000000,
+                "path": "/etc/ssl/certs/1560546e.0",
+                "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+                "size": 595,
+                "status": "present",
+                "uid": 0
+              },
+              {
+                "ctimeNs": 1794231893927285651,
+                "device": 23,
+                "gid": 0,
+                "inode": 191,
+                "kind": "file",
+                "mode": 511,
+                "mtimeNs": 1794212573000000000,
+                "path": "/etc/ssl/certs/e2b-ca.pem",
+                "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+                "size": 595,
+                "status": "present",
+                "uid": 0
+              },
+              {
+                "ctimeNs": 1794231896523285651,
+                "device": 65024,
+                "gid": 0,
+                "inode": 3602,
+                "kind": "file",
+                "mode": 511,
+                "mtimeNs": 1794231896523285651,
+                "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+                "sha256": "3d3bf4eda47ee4754c04202fe5ac919ae609f21aa750de1f6bdc91e83c16a686",
+                "size": 599,
+                "status": "present",
+                "uid": 0
+              }
+            ],
+            "phase": "pre_finalization",
+            "utcNs": 1794231902135077417,
+            "version": 1
+          },
+          "ready": {
+            "apt": null,
+            "bootId": "a1c080f9-4df6-4532-83ac-1954c9b7fcca",
+            "certificates": [
+              {
+                "chain": [
+                  "/etc/ssl/certs/1560546e.0"
+                ],
+                "path": "/etc/ssl/certs/1560546e.0",
+                "status": "observed",
+                "terminalPath": "/etc/ssl/certs/1560546e.0",
+                "terminalSha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1"
+              },
+              {
+                "chain": [
+                  "/etc/ssl/certs/e2b-ca.pem"
+                ],
+                "path": "/etc/ssl/certs/e2b-ca.pem",
+                "status": "observed",
+                "terminalPath": "/etc/ssl/certs/e2b-ca.pem",
+                "terminalSha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1"
+              }
+            ],
+            "cli": {
+              "claude": {
+                "status": "absent"
+              },
+              "codex": {
+                "status": "absent"
+              }
+            },
+            "kind": "desktop",
+            "monotonicNs": 1967676379,
+            "nodes": [
+              {
+                "ctimeNs": 1794231906426375979,
+                "device": 23,
+                "gid": 0,
+                "inode": 191,
+                "kind": "file",
+                "mode": 511,
+                "mtimeNs": 1794212573000000000,
+                "path": "/etc/ssl/certs/1560546e.0",
+                "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+                "size": 595,
+                "status": "present",
+                "uid": 0
+              },
+              {
+                "ctimeNs": 1794231906426375979,
+                "device": 23,
+                "gid": 0,
+                "inode": 191,
+                "kind": "file",
+                "mode": 511,
+                "mtimeNs": 1794212573000000000,
+                "path": "/etc/ssl/certs/e2b-ca.pem",
+                "sha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+                "size": 595,
+                "status": "present",
+                "uid": 0
+              },
+              {
+                "ctimeNs": 1794231907732098076,
+                "device": 65024,
+                "gid": 0,
+                "inode": 3602,
+                "kind": "file",
+                "mode": 511,
+                "mtimeNs": 1794231906546375979,
+                "path": "/usr/local/share/ca-certificates/e2b-ca.crt",
+                "sha256": "3d3bf4eda47ee4754c04202fe5ac919ae609f21aa750de1f6bdc91e83c16a686",
+                "size": 599,
+                "status": "present",
+                "uid": 0
+              }
+            ],
+            "phase": "ready",
+            "utcNs": 1794231907811252175,
+            "version": 1
+          }
+        },
+        "policyChanged": false,
+        "probe": {
+          "phase": "complete",
+          "status": "observed"
+        },
+        "releaseAccepted": false,
+        "sandboxId": "ianfp393mihg4nwxyt50e",
+        "targetedOnly": true,
+        "templateId": "z0kyfpyig1td47eqj3gb",
+        "version": 1
+      }
+    },
+    {
+      "name": "summary.json",
+      "bytes": 1573,
+      "sha256": "c22c05291aca94303304929a980ffa2bbc690de7b7ba41bc10004c185a2e8211",
+      "data": {
+        "budget": {
+          "absoluteDeadline": "2026-11-09T13:58:39Z",
+          "afterObservationDeadlineCleanup": false,
+          "buildObservationSeconds": 600,
+          "cleanupOnlyMaxSeconds": 150,
+          "desktopNoopSeconds": 0,
+          "freshInstances": 2,
+          "overallSeconds": 900,
+          "privateTemplates": 2
+        },
+        "cleanup": {
+          "codex": {
+            "errors": [],
+            "sandbox": {
+              "absenceConfirmedById": true,
+              "id": "ief2bib648u0okshkanj3"
+            },
+            "status": "complete",
+            "templates": [
+              {
+                "kind": "codex",
+                "name": "mikka-1506-official-control-42628079564-1-codex",
+                "status": "absent",
+                "templateId": "8dtnoomwg0zwvgfjyc0t"
+              }
+            ]
+          },
+          "desktop": {
+            "errors": [],
+            "sandbox": {
+              "absenceConfirmedById": true,
+              "id": "ianfp393mihg4nwxyt50e"
+            },
+            "status": "complete",
+            "templates": [
+              {
+                "kind": "desktop",
+                "name": "mikka-1506-official-control-42628079564-1-desktop",
+                "status": "absent",
+                "templateId": "z0kyfpyig1td47eqj3gb"
+              }
+            ]
+          }
+        },
+        "failure": null,
+        "identity": {
+          "application": "mikka-1506-official-control",
+          "opsCommit": "08d822da081190364530343bf918bbcc2fbbf624",
+          "ref": "refs/heads/ops/issue1506-e2b-conservation-control-4",
+          "repository": "alexj11324/Mikka",
+          "runAttempt": "1",
+          "runId": "42628079564",
+          "sourceCommit": "111a8dfb8b227ac0441324339ff42e4328ea609a"
+        },
+        "policyChanged": false,
+        "releaseAccepted": false,
+        "targetedOnly": true,
+        "version": 1
+      }
+    }
+  ]
+}
