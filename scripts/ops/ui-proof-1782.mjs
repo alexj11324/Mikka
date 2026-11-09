@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url'
 
 export const PRODUCT = 'f48ede424f538f34f43b8a63dd674db2c988e944'
 export const PRODUCT_TREE = '4c1f4bbbfdf7ef0870195635f8cc0388cf27218c'
+export const CONTROL_PARENT = '0492ce95054f0ab4e2e19a259818cff18774d093'
 export const OVERLAY = 'b92b0e1d48f75c92d059ee071162b72455e6af90'
 export const BRANCH = 'ops/1782-official-ui-proof-20261109'
 export const DATABASE = 'postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e'
@@ -30,7 +31,7 @@ export function validateInvocation(env, event, actual) {
   assert.equal(event.after, env.GITHUB_SHA)
   assert.equal(event.deleted, false)
   assert.equal(actual.controlHead, env.GITHUB_SHA)
-  assert.deepEqual(actual.controlParents, [PRODUCT])
+  assert.deepEqual(actual.controlParents, [CONTROL_PARENT])
   assert.equal(actual.controlClean, true)
   assert.equal(actual.productHead, PRODUCT)
   assert.equal(actual.productTree, PRODUCT_TREE)
@@ -41,6 +42,32 @@ export function validateInvocation(env, event, actual) {
   assert.ok(!env.MIKKA_CLOUD_BACKEND_URL)
   for (const key of ['DATABASE_URL', 'MIKKA_DATABASE_URL', 'E2E_DATABASE_URL']) assert.equal(env[key], DATABASE)
   return { product: PRODUCT, productTree: PRODUCT_TREE, overlay: OVERLAY, repository: env.GITHUB_REPOSITORY, branch: BRANCH, attempt: 1 }
+}
+
+const FAILURE_PHASES = new Set(['source', 'acquire', 'base_seed', 'extension_seed', 'scope', 'browser',
+  'task_list', 'task_detail', 'project_stale_form', 'source_after'])
+const ACCOUNT_FAILURE_CODES = new Set([
+  'ACCOUNT_POOL_DATABASE_ERROR', 'ACCOUNT_FOOTPRINT_UNPROVEN', 'INVALID_REQUEST', 'STALE_LEASE', 'LEASE_LOST',
+  'LEASE_CLOSED', 'LEASE_ALREADY_COMPLETED', 'TEST_ACCOUNT_SESSION_FAILED',
+  'RESOURCE_TYPE_FORBIDDEN', 'RESOURCE_OWNER_MISMATCH', 'RESOURCE_NOT_OWNED', 'RESOURCE_ALREADY_EXISTS', 'RESOURCE_STILL_PRESENT',
+  'PARITY_FIXTURE_EPOCH_INVALID', 'PARITY_TASK_IDENTITY_INVALID',
+  'PARITY_READ_BASELINE_PRESENT', 'PARITY_READ_OWNERSHIP_UNPROVEN', 'PARITY_READ_CHANGED',
+  'PARITY_DEFAULT_CLOCK_UNPROVEN', 'PARITY_DEFAULT_BASELINE_PRESENT', 'PARITY_DEFAULT_OWNERSHIP_UNPROVEN', 'PARITY_DEFAULT_CHANGED',
+  'PRIVATE_DIRECTORY_UNSAFE', 'PRIVATE_FILE_UNSAFE', 'SECRET_AUDIT_INVALID', 'SECRET_AUDIT_UNREADABLE', 'SECRET_AUDIT_MISSING',
+])
+const PARITY_INSERT_FAILURE = /^PARITY_FIXTURE_INSERT_(mikka_workspaces|mikka_workspace_members|mikka_teams|mikka_team_members|bots|coordinator_bots|issues|issue_versions|mikka_team_issues|devices|agents|agent_runs|run_chunks|artifacts|artifact_versions|artifact_shares|coordinator_messages|conversations|conversation_members|conversation_messages)_([A-Z0-9]{5}|UNKNOWN)$/
+
+/** Preserve only the fixture's existing closed code. Never serialize a message,
+ * stack, SQL, parameter, identity or arbitrary driver property into evidence. */
+export function closedFailure(phase, error) {
+  const kind = ['AssertionError', 'TimeoutError', 'TestAccountError', 'EnvironmentError'].includes(error?.name) ? error.name : 'Error'
+  const result = { phase: FAILURE_PHASES.has(phase) ? phase : 'unknown', kind }
+  if (kind !== 'TestAccountError') return result
+  const code = typeof error.code === 'string' ? error.code : ''
+  if (ACCOUNT_FAILURE_CODES.has(code)) return { ...result, code }
+  const inserted = PARITY_INSERT_FAILURE.exec(code)
+  if (inserted) return { ...result, code: 'PARITY_FIXTURE_INSERT', table: inserted[1], sqlstate: inserted[2] }
+  return { ...result, code: 'unclassified' }
 }
 
 export async function preflight(control, app, env = process.env) {

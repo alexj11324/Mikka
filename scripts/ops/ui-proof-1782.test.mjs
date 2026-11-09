@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { BRANCH, DATABASE, OVERLAY, PRODUCT, PRODUCT_TREE, PUBLIC_TARGETS, REQUIRED_SLOTS, gallery, validateInventory, validateInvocation } from './ui-proof-1782.mjs'
-import { CASES } from './ui-proof-1782-fixtures.mjs'
+import { BRANCH, CONTROL_PARENT, DATABASE, OVERLAY, PRODUCT, PRODUCT_TREE, PUBLIC_TARGETS, REQUIRED_SLOTS, closedFailure, gallery, validateInventory, validateInvocation } from './ui-proof-1782.mjs'
+import { CASES, freshTaskContent } from './ui-proof-1782-fixtures.mjs'
 
 const control = '1234567890abcdef1234567890abcdef12345678'
 function valid() {
@@ -12,7 +12,7 @@ function valid() {
       MIKKA_EDITION: 'cloud',
       DATABASE_URL: DATABASE, MIKKA_DATABASE_URL: DATABASE, E2E_DATABASE_URL: DATABASE },
     event: { repository: { full_name: 'alexj11324/Mikka' }, ref: `refs/heads/${BRANCH}`, after: control, deleted: false },
-    actual: { controlHead: control, controlParents: [PRODUCT], controlClean: true, productHead: PRODUCT, productTree: PRODUCT_TREE, productClean: true },
+    actual: { controlHead: control, controlParents: [CONTROL_PARENT], controlClean: true, productHead: PRODUCT, productTree: PRODUCT_TREE, productClean: true },
   }
 }
 
@@ -41,7 +41,7 @@ for (const [name, section, field, value] of [
   ['event repository mismatch', 'event', 'repository', { full_name: 'foreign/Mikka' }],
   ['controller checkout mismatch', 'actual', 'controlHead', PRODUCT],
   ['controller parent mismatch', 'actual', 'controlParents', [OVERLAY]],
-  ['controller multiple parents', 'actual', 'controlParents', [PRODUCT, OVERLAY]],
+  ['controller multiple parents', 'actual', 'controlParents', [CONTROL_PARENT, OVERLAY]],
   ['dirty controller', 'actual', 'controlClean', false],
   ['product checkout mismatch', 'actual', 'productHead', OVERLAY],
   ['product tree mismatch', 'actual', 'productTree', OVERLAY],
@@ -52,12 +52,65 @@ for (const [name, section, field, value] of [
   assert.throws(() => validateInvocation(values.env, values.event, values.actual), { name: 'AssertionError' })
 })
 
+test('the diagnostic append refuses to adopt the original product as its controller parent', () => {
+  const { env, event, actual } = valid()
+  actual.controlParents = [PRODUCT]
+  assert.throws(() => validateInvocation(env, event, actual), { name: 'AssertionError' })
+})
+
+test('fixture diagnostics distinguish base and extension failures without changing their outcome', () => {
+  const error = Object.assign(new Error('private fixture detail'), { name: 'TestAccountError', code: 'RESOURCE_ALREADY_EXISTS' })
+  for (const phase of ['base_seed', 'extension_seed']) {
+    assert.deepEqual(closedFailure(phase, error), { phase, kind: 'TestAccountError', code: 'RESOURCE_ALREADY_EXISTS' })
+  }
+  assert.equal(error.message, 'private fixture detail')
+})
+
+test('official parity insert diagnostics retain only the finite table and SQLSTATE shape', () => {
+  assert.deepEqual(closedFailure('base_seed', { name: 'TestAccountError', code: 'PARITY_FIXTURE_INSERT_agent_runs_23514',
+    message: 'secret parameter', stack: 'secret stack', detail: 'secret SQL' }),
+  { phase: 'base_seed', kind: 'TestAccountError', code: 'PARITY_FIXTURE_INSERT', table: 'agent_runs', sqlstate: '23514' })
+  assert.deepEqual(closedFailure('base_seed', { name: 'TestAccountError', code: 'PARITY_FIXTURE_INSERT_issues_UNKNOWN' }),
+    { phase: 'base_seed', kind: 'TestAccountError', code: 'PARITY_FIXTURE_INSERT', table: 'issues', sqlstate: 'UNKNOWN' })
+})
+
+test('unknown codes, private fields and foreign table names never become evidence', () => {
+  for (const code of ['secret-token', 'PARITY_FIXTURE_INSERT_private_table_23514', 'PARITY_FIXTURE_INSERT_issues_23514 secret',
+    'PARITY_FIXTURE_INSERT_issues_23514\n', undefined, { message: 'secret-token' }]) {
+    const result = closedFailure('extension_seed', { name: 'TestAccountError', code, message: 'secret-token', stack: 'secret-token', detail: 'secret-token' })
+    assert.deepEqual(result, { phase: 'extension_seed', kind: 'TestAccountError', code: 'unclassified' })
+    assert.ok(!JSON.stringify(result).includes('secret-token'))
+  }
+})
+
+test('a generic error cannot impersonate an account code or emit an unbounded phase', () => {
+  assert.deepEqual(closedFailure('private phase', { name: 'foreign name', code: 'RESOURCE_ALREADY_EXISTS', message: 'secret-token' }),
+    { phase: 'unknown', kind: 'Error' })
+  assert.deepEqual(closedFailure('scope', { name: 'AssertionError', code: 'RESOURCE_ALREADY_EXISTS' }),
+    { phase: 'scope', kind: 'AssertionError' })
+})
+
 test('the finite fixture matrix includes an open Task with a successful attempt', () => {
   assert.equal(CASES.length, 5)
   assert.equal(CASES.filter(row => row.state === 'waiting').length, 1)
   assert.deepEqual(CASES.reduce((counts, row) => ({ ...counts, [row.group]: (counts[row.group] ?? 0) + 1 }), {}), { pending: 3, todo: 1, done: 1 })
   assert.deepEqual(CASES.find(row => row.key === 'open'), { key: 'open', title: 'Follow-up remains open', taskStatus: 'doing', runStatus: 'succeeded', outcome: 'done', group: 'todo', state: 'todo' })
   assert.ok(CASES.every(row => ['succeeded', 'failed'].includes(row.runStatus)))
+})
+
+test('new Task content releases only the inherited number and preserves the original Task', () => {
+  const original = { type: 'doc', attrs: { mikka: { number: 17,
+    assignee: { kind: 'member', id: 'leased-owner', name: 'Test owner', image: null },
+    delegate: null, labels: ['review'], subscriberUserIds: ['leased-owner'], deletedAt: null } },
+  content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Synthetic review' }] }] }
+  const before = structuredClone(original)
+  const fresh = freshTaskContent(original)
+  assert.equal(Object.hasOwn(fresh.attrs.mikka, 'number'), false)
+  assert.deepEqual(original, before)
+  const expected = structuredClone(before); delete expected.attrs.mikka.number
+  assert.deepEqual(fresh, expected)
+  fresh.attrs.mikka.labels.push('new-task-only')
+  assert.deepEqual(original, before, 'the existing Task and its history keep their own metadata and number')
 })
 
 test('gallery escapes labels and links only the supplied local screen files', () => {

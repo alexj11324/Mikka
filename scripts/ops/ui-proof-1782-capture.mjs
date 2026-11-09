@@ -5,7 +5,7 @@ import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { CASES, extendFixtures } from './ui-proof-1782-fixtures.mjs'
-import { DATABASE, PRODUCT, PRODUCT_TREE, OVERLAY, gallery, sourceEvidence } from './ui-proof-1782.mjs'
+import { DATABASE, PRODUCT, PRODUCT_TREE, OVERLAY, closedFailure, gallery, sourceEvidence } from './ui-proof-1782.mjs'
 
 const app = resolve(process.env.MIKKA_TEST_APP_DIR ?? '')
 const output = resolve(process.env.MIKKA_UI_PROOF_OUTPUT ?? '')
@@ -54,15 +54,20 @@ async function rpc(action, args) {
 }
 
 async function assertScope() {
+  const numbers = new Set(), identifiers = new Set()
   for (const row of extension.rows) {
     const result = await rpc('issues.getIssue', [row.id])
     assert.equal(result.issue.id, row.id); assert.equal(result.issue.workspaceId, base.fixture.workspace)
     assert.equal(result.issue.userId, scope.owner.userId); assert.equal(result.issue.status, row.taskStatus)
+    assert.equal(String(result.issue.metadata.number), row.number)
+    assert.equal(result.issue.issuedIdentifier, row.identifier); assert.equal(result.issue.identifier, row.identifier)
+    numbers.add(String(result.issue.metadata.number)); identifiers.add(result.issue.issuedIdentifier)
     assert.equal(result.issue.metadata.assignee.kind, 'member'); assert.equal(result.issue.metadata.assignee.id, scope.owner.userId)
     assert.ok(typeof result.issue.metadata.assignee.name === 'string' && result.issue.metadata.assignee.name.length > 0 && result.issue.metadata.assignee.name.length <= 200)
     humanAssigneeName ??= result.issue.metadata.assignee.name
     assert.equal(result.issue.metadata.assignee.name, humanAssigneeName)
     if (row.key === 'open') {
+      assert.equal(String(result.issue.metadata.number), extension.baseNumber, 'UI_PROOF_BASE_TASK_NUMBER_CHANGED')
       assert.equal(result.issue.metadata.delegate.kind, 'bot'); assert.equal(result.issue.metadata.delegate.id, base.fixture.bot)
       const history = await rpc('agents.pollIssueThreads', [row.id])
       assert.equal(history.threads.length, 1)
@@ -70,6 +75,9 @@ async function assertScope() {
       assert.equal(history.threads[0].outcome, 'done')
     }
   }
+  assert.equal(numbers.size, 5, 'UI_PROOF_DUPLICATE_TASK_NUMBER')
+  assert.equal(identifiers.size, 5, 'UI_PROOF_DUPLICATE_TASK_IDENTIFIER')
+  return { ...extension.identity, normalRpcConfirmed: true }
 }
 
 async function capture(page, name, title, theme, viewport) {
@@ -211,10 +219,12 @@ try {
   phase = 'acquire'
   const started = Date.now()
   scope = await acquireTestAccounts({ runId: `ui1782-${started}`, requestId: `ui1782-${started}`, workerId: 'official-ui-proof-1782', ttlMs: 300_000 })
-  phase = 'seed'
+  phase = 'base_seed'
   base = await createParityFixtures(scope)
+  phase = 'extension_seed'
   extension = await extendFixtures(scope, base.fixture)
-  await assertScope()
+  phase = 'scope'
+  report.fixtureIdentity = await assertScope()
   phase = 'browser'
   browser = await chromium.launch({ headless: true })
   for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
@@ -233,7 +243,7 @@ try {
         await taskList(page, theme, viewport)
         await taskDetail(page, theme, viewport)
         await projectFailure(page, theme, viewport)
-        await assertScope()
+        assert.deepEqual(await assertScope(), report.fixtureIdentity)
       } finally { await context.close() }
     }
   }
@@ -246,7 +256,7 @@ try {
 } catch (error) {
   primaryError = error
   report.result = 'failed'
-  report.failure = { phase, kind: ['AssertionError', 'TimeoutError', 'TestAccountError', 'EnvironmentError'].includes(error.name) ? error.name : 'Error' }
+  report.failure = closedFailure(phase, error)
 } finally {
   async function cleanup(name, action) {
     try { await action(); report.cleanup[name] = true } catch (error) {

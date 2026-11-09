@@ -13,6 +13,14 @@ export const CASES = Object.freeze([
 
 const quote = value => `"${value.replaceAll('"', '""')}"`
 
+export function freshTaskContent(content) {
+  const fresh = structuredClone(content)
+  // A hydrated Task already owns its number. New Tasks must use the existing
+  // database allocator instead of copying that identity into another row.
+  delete fresh.attrs.mikka.number
+  return fresh
+}
+
 export async function extendFixtures(scope, base) {
   const owner = scope.owner.userId
   const workspace = base.workspace
@@ -41,7 +49,7 @@ export async function extendFixtures(scope, base) {
     const entries = Object.entries(values)
     await client.query(`INSERT INTO public.${quote(table)} (${entries.map(([key]) => quote(key)).join(',')}) VALUES (${entries.map((_, index) => `$${index + 1}`).join(',')})`, entries.map(([, value]) => value))
   }
-  let seeded = false
+  let seeded = false, baseNumber, identity
   async function cleanup() {
     await transaction(async client => {
       const existing = (await client.query('SELECT id,"workspaceId","userId",revision,name FROM public.workspace_projects WHERE id=$1 FOR UPDATE', [project.id])).rows
@@ -67,12 +75,15 @@ export async function extendFixtures(scope, base) {
   }
   try {
     await transaction(async client => {
-      const originals = (await client.query('SELECT id,"userId","workspaceId",content FROM public.issues WHERE id=$1 AND "userId"=$2 AND "workspaceId"=$3 FOR UPDATE', [base.issue, owner, workspace])).rows
+      const originals = (await client.query('SELECT id,"userId","workspaceId",number,content FROM public.issues WHERE id=$1 AND "userId"=$2 AND "workspaceId"=$3 FOR UPDATE', [base.issue, owner, workspace])).rows
       assert.equal(originals.length, 1, 'UI_PROOF_BASE_TASK_MISSING')
+      baseNumber = String(originals[0].number)
+      assert.match(baseNumber, /^[1-9][0-9]*$/)
       const content = structuredClone(originals[0].content)
       assert.equal(content.attrs.mikka.assignee.kind, 'member')
       assert.equal(content.attrs.mikka.assignee.id, owner)
       content.attrs.mikka.delegate = null
+      const addedContent = freshTaskContent(content)
       const open = rows.find(row => row.key === 'open')
       const first = new Date(Date.parse(base.epoch) + 60_000).toISOString()
       const delegated = new Date(Date.parse(base.epoch) + 120_000).toISOString()
@@ -82,22 +93,30 @@ export async function extendFixtures(scope, base) {
       const current = (await client.query('SELECT content FROM public.issues WHERE id=$1', [open.id])).rows[0].content
       await insert(client, 'issue_versions', { id: delegationVersion, issueId: open.id, userId: owner, revision: 2, title: open.title, content: JSON.stringify(current), status: open.taskStatus, priority: 'normal', actor_type: 'user', actor_id: owner, createdAt: delegated })
       for (const row of added) {
-        await insert(client, 'issues', { id: row.id, userId: owner, workspaceId: workspace, ownershipState: 'bound', title: row.title, content: JSON.stringify(content), status: row.taskStatus, priority: 'normal', scope: 'workspace', scopeSetBy: 'user', linearSyncBlocked: true, createdAt: first, updatedAt: first })
-        await insert(client, 'issue_versions', { id: row.version, issueId: row.id, userId: owner, revision: 1, title: row.title, content: JSON.stringify(content), status: row.taskStatus, priority: 'normal', actor_type: 'user', actor_id: owner, createdAt: first })
+        await insert(client, 'issues', { id: row.id, userId: owner, workspaceId: workspace, ownershipState: 'bound', title: row.title, content: JSON.stringify(addedContent), status: row.taskStatus, priority: 'normal', scope: 'workspace', scopeSetBy: 'user', linearSyncBlocked: true, createdAt: first, updatedAt: first })
+        await insert(client, 'issue_versions', { id: row.version, issueId: row.id, userId: owner, revision: 1, title: row.title, content: JSON.stringify(addedContent), status: row.taskStatus, priority: 'normal', actor_type: 'user', actor_id: owner, createdAt: first })
         await insert(client, 'mikka_team_issues', { issueId: row.id, teamId: base.team, workspaceId: workspace, userId: owner, createdAt: first })
         await insert(client, 'agent_runs', { id: row.run, userId: owner, workspaceId: workspace, issueId: row.id, agentId: base.agent, botId: base.bot, deviceId: base.device,
           status: row.runStatus, kind: 'implement', prompt: 'Isolated visual acceptance fixture. No execution is dispatched.', lastReply: row.title, lastReplyPart: 'proof-answer', lastReplyAt: first,
           outcome: row.outcome, outcomeDecidedBy: 'decision', outcomeAt: first, startedAt: first, finishedAt: first, createdAt: first, updatedAt: first })
         await insert(client, 'run_chunks', { id: row.chunk, runId: row.run, seq: 1, chunk: JSON.stringify({ type: 'text-delta', id: 'proof-answer', delta: row.title }), createdAt: first })
       }
-      const tasks = (await client.query('SELECT id,"issuedIdentifier",status,"ownershipState","workspaceId","userId" FROM public.issues WHERE id=ANY($1::uuid[]) ORDER BY id', [rows.map(row => row.id)])).rows
+      const tasks = (await client.query('SELECT id,"issuedIdentifier",number,status,"ownershipState","workspaceId","userId" FROM public.issues WHERE id=ANY($1::uuid[]) ORDER BY id', [rows.map(row => row.id)])).rows
       assert.equal(tasks.length, 5, 'UI_PROOF_TASK_COUNT')
+      const numbers = new Set(), identifiers = new Set()
       for (const task of tasks) {
         const row = rows.find(row => row.id === task.id)
         assert.equal(task.userId, owner); assert.equal(task.workspaceId, workspace); assert.equal(task.ownershipState, 'bound'); assert.equal(task.status, row.taskStatus)
         assert.match(task.issuedIdentifier, /\S/)
+        row.number = String(task.number)
+        assert.match(row.number, /^[1-9][0-9]*$/)
+        if (row.key === 'open') assert.equal(row.number, baseNumber, 'UI_PROOF_BASE_TASK_NUMBER_CHANGED')
+        numbers.add(row.number); identifiers.add(task.issuedIdentifier)
         row.identifier = task.issuedIdentifier
       }
+      assert.equal(numbers.size, 5, 'UI_PROOF_DUPLICATE_TASK_NUMBER')
+      assert.equal(identifiers.size, 5, 'UI_PROOF_DUPLICATE_TASK_IDENTIFIER')
+      identity = { taskCount: tasks.length, uniqueOwnerNumbers: numbers.size, uniqueIssuedIdentifiers: identifiers.size, originalTaskNumberPreserved: true }
       const ended = (await client.query('SELECT id,status,outcome,"finishedAt" FROM public.agent_runs WHERE id=ANY($1::uuid[])', [rows.map(row => row.run)])).rows
       assert.equal(ended.length, 5)
       for (const run of ended) {
@@ -116,7 +135,7 @@ export async function extendFixtures(scope, base) {
     })
     seeded = true
     base.issueTitle = rows.find(row => row.key === 'open').title
-    return { rows, project, cleanup,
+    return { rows, baseNumber, identity, project, cleanup,
       advanceProjectRevision: () => transaction(async client => {
         // A real concurrent revision in the local fixture creates a stale form.
         // No HTTP response, component, auth or schema is replaced.
