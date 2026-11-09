@@ -1,0 +1,560 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512-shared-installer-source-and-queue-review",
+  "asOf": "2026-11-09T08:32:02Z",
+  "repository": "alexj11324/Mikka",
+  "own": {
+    "head": "1ffa581f16319381054e0636ae41e6292719a1fe",
+    "actualCiCheckout": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+    "tree": "bc4d584fa651385886e79dc6359b1b43324425d1",
+    "deltaPaths": 33,
+    "nativeStatus": "RED per parent; no merge readiness or source/account window claimed"
+  },
+  "main": {
+    "sha": "89870a876fa436da51598aa7e089d74d0f177001",
+    "tree": "b58192d16f9f5b8a68701cfec66e534463116865",
+    "parents": [
+      "89eae89e9e79422e0a8b4b1346aa1c7fb6470016"
+    ],
+    "mergedPullRequest": 1771,
+    "directOwn33Intersection": [],
+    "changedPaths": [
+      {
+        "path": "apps/mobile/features/tasks/model/task-conversation.ts",
+        "gitBlob": "1d68dd6497db7ee3ca7074ebf06061d05f16fdf1",
+        "status": "modified",
+        "additions": 53,
+        "deletions": 6,
+        "textPatchRead": true
+      },
+      {
+        "path": "apps/mobile/features/tasks/model/task-flow.ts",
+        "gitBlob": "00d1d154050e5e87cdc19d234300123877ee97fe",
+        "status": "added",
+        "additions": 27,
+        "deletions": 0,
+        "textPatchRead": true
+      },
+      {
+        "path": "apps/mobile/features/tasks/screens/task-conversation-screen.tsx",
+        "gitBlob": "cccc9fe967434782b357623ea6a11a26444f29d4",
+        "status": "modified",
+        "additions": 56,
+        "deletions": 8,
+        "textPatchRead": true
+      },
+      {
+        "path": "apps/mobile/features/tasks/screens/task-screen.tsx",
+        "gitBlob": "8e467252a4cf15e39457283f5b20e43f8154b787",
+        "status": "modified",
+        "additions": 13,
+        "deletions": 9,
+        "textPatchRead": true
+      },
+      {
+        "path": "apps/mobile/lib/types.ts",
+        "gitBlob": "9b6c472b2461992761445ad74047d56a09b675a3",
+        "status": "modified",
+        "additions": 6,
+        "deletions": 2,
+        "textPatchRead": true
+      },
+      {
+        "path": "apps/mobile/scripts/tasks-screenshots.mjs",
+        "gitBlob": "4222780b21fdf2927ee9592ef3648e408763c3f2",
+        "status": "modified",
+        "additions": 35,
+        "deletions": 6,
+        "textPatchRead": true
+      },
+      {
+        "path": "apps/mobile/tests/messages.test.mts",
+        "gitBlob": "b2f9dd006c95ded34707994bfc0ae1b0d6d21891",
+        "status": "modified",
+        "additions": 4,
+        "deletions": 1,
+        "textPatchRead": true
+      },
+      {
+        "path": "apps/mobile/tests/task-groups.test.mts",
+        "gitBlob": "c74b2ca09f8c6b1c38f31e2ccce3e452edbdc803",
+        "status": "modified",
+        "additions": 48,
+        "deletions": 4,
+        "textPatchRead": true
+      },
+      {
+        "path": "docs/design/decisions/2026-11-08-2140-task-one-conversation.md",
+        "gitBlob": "5ecbc97b275176091b0cfed5fc68de945c77f4c1",
+        "status": "added",
+        "additions": 13,
+        "deletions": 0,
+        "textPatchRead": true
+      },
+      {
+        "path": "docs/design/task-one-conversation/dark-3-task-before.png",
+        "gitBlob": "aaecdd42c4c2d419463033aee4fb84d38403b17e",
+        "status": "added",
+        "additions": 0,
+        "deletions": 0,
+        "textPatchRead": false
+      },
+      {
+        "path": "docs/design/task-one-conversation/dark-3-task.png",
+        "gitBlob": "4491b682c65f4ed4875062571fb6b0751d9e0c33",
+        "status": "added",
+        "additions": 0,
+        "deletions": 0,
+        "textPatchRead": false
+      },
+      {
+        "path": "docs/design/task-one-conversation/dark-4-conversation-before.png",
+        "gitBlob": "3552472014bc1b670a3e2040375d649d24f1b18f",
+        "status": "added",
+        "additions": 0,
+        "deletions": 0,
+        "textPatchRead": false
+      },
+      {
+        "path": "docs/design/task-one-conversation/dark-4-conversation.png",
+        "gitBlob": "b53ac575c858d598cf2a7362b9b132c46c3b1559",
+        "status": "added",
+        "additions": 0,
+        "deletions": 0,
+        "textPatchRead": false
+      },
+      {
+        "path": "docs/design/task-one-conversation/dark-4b-review-open.png",
+        "gitBlob": "74ae804e111137d204c66136d4807b7fe6cea802",
+        "status": "added",
+        "additions": 0,
+        "deletions": 0,
+        "textPatchRead": false
+      },
+      {
+        "path": "docs/design/task-one-conversation/dark-4c-stage.png",
+        "gitBlob": "d060b13fe7bdf5625a812b1ec25d2435d5f6e428",
+        "status": "added",
+        "additions": 0,
+        "deletions": 0,
+        "textPatchRead": false
+      },
+      {
+        "path": "docs/design/task-one-conversation/light-3-task-before.png",
+        "gitBlob": "79d47e100596e7a4543fb02a890f4289f75d8238",
+        "status": "added",
+        "additions": 0,
+        "deletions": 0,
+        "textPatchRead": false
+      },
+      {
+        "path": "docs/design/task-one-conversation/light-3-task.png",
+        "gitBlob": "cf54823ad28cbd233edcb1c84fab59a319194902",
+        "status": "added",
+        "additions": 0,
+        "deletions": 0,
+        "textPatchRead": false
+      },
+      {
+        "path": "docs/design/task-one-conversation/light-4-conversation-before.png",
+        "gitBlob": "59ce6a8d5ddde64d5463b9ad44ecfc10b11e7d9b",
+        "status": "added",
+        "additions": 0,
+        "deletions": 0,
+        "textPatchRead": false
+      },
+      {
+        "path": "docs/design/task-one-conversation/light-4-conversation.png",
+        "gitBlob": "87c8178b17643694194a0314edfd88e2f9965c2a",
+        "status": "added",
+        "additions": 0,
+        "deletions": 0,
+        "textPatchRead": false
+      },
+      {
+        "path": "docs/design/task-one-conversation/light-4b-review-open.png",
+        "gitBlob": "d1def534fe381c6ddb89a1cc647d91e46ca5ef58",
+        "status": "added",
+        "additions": 0,
+        "deletions": 0,
+        "textPatchRead": false
+      },
+      {
+        "path": "docs/design/task-one-conversation/light-4c-stage.png",
+        "gitBlob": "e3e24a2d7f49922c0e990406c4eb68786f8309c1",
+        "status": "added",
+        "additions": 0,
+        "deletions": 0,
+        "textPatchRead": false
+      },
+      {
+        "path": "messages/en.json",
+        "gitBlob": "b27501a8d69d766df76709418c8811e5aa94e815",
+        "status": "modified",
+        "additions": 13,
+        "deletions": 2,
+        "textPatchRead": true
+      },
+      {
+        "path": "messages/zh-CN.json",
+        "gitBlob": "32cb3ded65d4d6b572b8d647354164ab08f4ee96",
+        "status": "modified",
+        "additions": 13,
+        "deletions": 2,
+        "textPatchRead": true
+      }
+    ],
+    "textPatchesRead": 11,
+    "pngPayloadsRead": 0,
+    "findings": [
+      "All product code changes are under apps/mobile; both shared message files change MobileCore keys.",
+      "TaskScreen groups the existing activity array into Agent runs and changes which run offset a row opens.",
+      "TaskConversationScreen adds local review-card expansion and flow wording; there are no changed hunks in readConversation, useLiveApi/live-key setup, API requests, composer send or Stop.",
+      "No Web/desktop TaskDetail, Native lifecycle/parity measurement, coordinator read, server read-cache, authorization, SQL, worker source, package or lock path is changed.",
+      "This main change does not provide a source explanation or repair for the existing own first-pair Native RED. No remerge or CI resampling was requested or performed."
+    ],
+    "boundary": "Text source interaction review only; PNG bytes and actual mobile behavior were not tested. No claim that a new union tree has passed CI or Native.",
+    "sourceUrl": "https://github.com/alexj11324/Mikka/compare/89eae89e9e79422e0a8b4b1346aa1c7fb6470016...89870a876fa436da51598aa7e089d74d0f177001"
+  },
+  "installer": {
+    "pullRequest": 1810,
+    "fullHead": "b87a1e3a7dc9490528d2a06cfdceb4fa38ecee10",
+    "fullTreeReportedByOwner": "6fa16961ce5a81d83970c426384fbd6685d6091e",
+    "pureSource": "01b302385666dc5b7a1535a335ef1d953c5d12b8",
+    "pureTree": "b179bfeca470ba40809ca186238f811c2829f8c7",
+    "pureParents": [
+      "3f5c53956b45e86b1dfcf9e2accd9c5b047a0e64",
+      "89870a876fa436da51598aa7e089d74d0f177001"
+    ],
+    "compareBase": "89870a876fa436da51598aa7e089d74d0f177001",
+    "actualPureComparePaths": 12,
+    "eligibleInstallerPaths": [
+      {
+        "path": ".github/actions/pnpm-install/action.yml",
+        "gitBlob": "20a5db53847172db9f52ee12c6c0feeec6c48dce",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 0
+      },
+      {
+        "path": ".github/workflows/self-hosted-image.yml",
+        "gitBlob": "46f05f36960559221030e89e1add41ecdfced3b4",
+        "status": "modified",
+        "additions": 3,
+        "deletions": 1
+      },
+      {
+        "path": ".github/workflows/web-deploy.yml",
+        "gitBlob": "bab7ed46eefd7bd4b6db712e8e141484be9f73ba",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 0
+      },
+      {
+        "path": "Dockerfile",
+        "gitBlob": "19054afe4768b3391515c7a3e0f97a0021f123ee",
+        "status": "modified",
+        "additions": 3,
+        "deletions": 1
+      },
+      {
+        "path": "package.json",
+        "gitBlob": "2a8647a5e9075eba8c948b38c3954a5177ea9efd",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 1
+      },
+      {
+        "path": "patches/ffmpeg-static@5.3.0.patch",
+        "gitBlob": "5e27d8d12fbed2d0c2e62083976de11c86d9e1fa",
+        "status": "added",
+        "additions": 592,
+        "deletions": 0
+      },
+      {
+        "path": "pnpm-lock.yaml",
+        "gitBlob": "4b67909739360248e279efa0c3bb7344379e04fe",
+        "status": "modified",
+        "additions": 5,
+        "deletions": 2
+      },
+      {
+        "path": "pnpm-workspace.yaml",
+        "gitBlob": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 0
+      },
+      {
+        "path": "scripts/check-analytics-ssr.mjs",
+        "gitBlob": "0fad928edefbb3b2677450f9f04778ec088a6195",
+        "status": "modified",
+        "additions": 25,
+        "deletions": 7
+      },
+      {
+        "path": "scripts/ffmpeg-install.test.mjs",
+        "gitBlob": "9ce1e3333fd3ddb10ea206f5144cc466611842a1",
+        "status": "added",
+        "additions": 421,
+        "deletions": 0
+      },
+      {
+        "path": "tests/analytics-policy.test.mjs",
+        "gitBlob": "9fc0602f814f3d8e25ba5668f0f174a26f14718b",
+        "status": "modified",
+        "additions": 71,
+        "deletions": 0
+      }
+    ],
+    "excludedMock": {
+      "path": "components/workspace/issue-workspace-settings.test.tsx",
+      "gitBlob": "db3ea66b5755862a86f8d334ec7fbbb1aaeb2e68",
+      "reason": "Out of this integration scope; no mock hunk proposed."
+    },
+    "performancePathsIncluded": 0,
+    "p0PathsIncluded": 0,
+    "directOwn33Intersection": [
+      "tests/analytics-policy.test.mjs"
+    ],
+    "comparisonUrl": "https://github.com/alexj11324/Mikka/compare/89870a876fa436da51598aa7e089d74d0f177001...01b302385666dc5b7a1535a335ef1d953c5d12b8",
+    "changedPatch": {
+      "path": "patches/ffmpeg-static@5.3.0.patch",
+      "bytes": 23338,
+      "sha256": "7c49ecd9c22f1a10a87314ce3d1ab332d9c099736c6b8bd5bb86d4d50238776b",
+      "gitBlob": "5e27d8d12fbed2d0c2e62083976de11c86d9e1fa"
+    },
+    "installerTest": {
+      "path": "scripts/ffmpeg-install.test.mjs",
+      "bytes": 22092,
+      "sha256": "156d860d61cea15a2658f1f26f41256e93cb99549a676ddbf862feefd7cd1e85",
+      "gitBlob": "9ce1e3333fd3ddb10ea206f5144cc466611842a1"
+    },
+    "fixedAssetManifestByteUnchangedFrom4b": true,
+    "newPatchShaMatchesAllFrozenLockReferences": true,
+    "original14TestBodiesBytePreserved": true,
+    "original14PreservationMethod": "Exact source substring comparison; no test execution.",
+    "headerAndCredentialReview": {
+      "explicitVariable": "FFMPEG_GITHUB_TOKEN",
+      "implicitGenericGithubTokenRead": false,
+      "authenticatedRequest": "Only the fixed manifest API asset URL's first request, exact parsed.href, api.github.com HTTPS origin, no query/fragment, redirects===0.",
+      "releaseRequestsAuthenticated": false,
+      "redirects": "Every redirect constructs a fresh header object; all CDN, same-host path/query and loop redirects have no Authorization.",
+      "releaseRedirectToPinnedApiAuthenticated": false,
+      "retryBudget": "No third anonymous fallback after authentication rejection; original two source attempts, 30 seconds each, at most three redirects per source remain.",
+      "diagnostics": "AggregateError retains the two internal causes. Launcher emits only closed source/final-host/phase/status/error fields plus strictly parsed rate-limit/retry-after metadata; no raw error, URL, Location, header map, body or token.",
+      "fourEntrypoints": [
+        "Shared composite action: env only on existing normal frozen pnpm install step.",
+        "Web workflow: env only on existing guarded pinned-install step.",
+        "Dockerfile: optional BuildKit secret env mount, required=false, only during existing pnpm RUN.",
+        "Self-hosted image workflow: existing github.token supplied via docker build --secret env source."
+      ],
+      "persistedTokenArgOrEnvAdded": false,
+      "jobPermissionsChanged": false,
+      "permissionBoundary": "Uses each existing job's token permissions. They are not universally read-only; image already has packages:write. During the pnpm step the environment is available to its allowed lifecycle processes, not a separate credential sandbox.",
+      "crossHostCredentialForwardingFound": false,
+      "codeLevelMustFixFound": false
+    },
+    "tracingAndNativeScope": "Installer/lock/build-provenance changes do not modify trace or Native measuring contracts. They can change build and worker identity and must retain actual source/runtime gates.",
+    "sourceOnlyReady": false,
+    "remainingGate": "New actual Mac installation and image build/root-install acceptance; owner source-bound terminal evidence. Current metadata is not sufficient to declare the shared fix usable."
+  },
+  "analyticsMerge": {
+    "path": "tests/analytics-policy.test.mjs",
+    "newOwnerBlob": "9fc0602f814f3d8e25ba5668f0f174a26f14718b",
+    "newOwnerBlobEqualsPriorReviewedInput": true,
+    "ownBlob": "c904b35e3405353be5a549b0d53e2858e19c3454",
+    "candidate": {
+      "path": "tests/analytics-policy.test.mjs",
+      "bytes": 26926,
+      "sha256": "a6cf1eb935b3bf5aac97ce4101a3b33a09d63b25530dbf43332484d032841dc2",
+      "gitBlob": "f162a894cbada7fada30c63a3a49f4b665574f0f",
+      "lineCount": 406
+    },
+    "candidateRemoteBlob": "f162a894cbada7fada30c63a3a49f4b665574f0f",
+    "candidateBytesChangedThisTask": false,
+    "previousProofReceipt": "40b70a0471f57abf739f90b1a115019aa7476c36",
+    "preserved": "All 19 base declarations plus own Replay bot/browser regression plus owner strict FFmpeg provenance regression; existing fixture lock insertion retained.",
+    "executedTests": 0
+  },
+  "validationEvidence": {
+    "reviewerNewTests": 0,
+    "reviewerOwnerLogOrArtifactDownloads": 0,
+    "oldFullHeadFailure": "e9fa621f18c7809c7f890a5b4670bd580c7424dc actual Mac/root-install and image/root-install FAIL remains.",
+    "publishedDiagnosticSource": {
+      "issue": 1810,
+      "id": 6735280416,
+      "url": "https://github.com/alexj11324/Mikka/pull/1810#issuecomment-6735280416",
+      "createdAt": "2026-11-09T08:10:07Z",
+      "updatedAt": "2026-11-09T08:10:07Z"
+    },
+    "publishedFindings": [
+      "Owner reports original release GETs returned 504 on Linux and Mac; API requests redirected to CDN 200.",
+      "Mac anonymous API response reported remaining=0/limit60; this is an observed risk, not proof of the sole historical 403 cause.",
+      "One authenticated request using the existing Actions credential reached API302 -> CDN200 in 320ms; response-headers diagnostic only, not a complete asset download/installation.",
+      "Owner reports the new installed-package 25/25, SSR20/20 and entry/selection37/37 results with the new source in the current PR body. Reviewer did not reread those raw logs or rerun them."
+    ],
+    "ownerBodySource": "https://github.com/alexj11324/Mikka/pull/1810",
+    "freshCiMetadata": {
+      "id": 42585848140,
+      "headSha": "b87a1e3a7dc9490528d2a06cfdceb4fa38ecee10",
+      "status": "in_progress",
+      "conclusion": null,
+      "attempt": 1,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42585848140"
+    },
+    "actualCiCheckoutForNewInstaller": null,
+    "actualCiCheckoutBoundary": "No raw owner job logs read; new job checkout is not inferred from event head.",
+    "imageJob": {
+      "id": 129056168410,
+      "status": "in_progress",
+      "phase": "Build the public standalone application"
+    },
+    "macJobObservedInThisMainRunList": false
+  },
+  "queue": {
+    "prior89Cleanup": {
+      "owner": 1505,
+      "source": {
+        "issue": 1804,
+        "id": 6735084100,
+        "url": "https://github.com/alexj11324/Mikka/pull/1804#issuecomment-6735084100",
+        "createdAt": "2026-11-09T07:57:28Z",
+        "updatedAt": "2026-11-09T07:57:28Z"
+      },
+      "cleanupJob": 129043491976,
+      "run": 42579094044,
+      "sourceRevision": "89eae89e9e79422e0a8b4b1346aa1c7fb6470016",
+      "ownerReportedOriginalBytes": 29286,
+      "ownerReportedOriginalSha256": "247080365722ae8b63ba50b8dfef8404595c3080a63502ba1f7c5d73de11b673",
+      "actualReceiptAt": "2026-11-09T07:54:34.1286861Z",
+      "candidateResults": [
+        {
+          "kind": "desktop",
+          "id": "qlje4i4o83xmeds4rzfu",
+          "result": "deleted"
+        },
+        {
+          "kind": "claude",
+          "id": "471usd5l1lvwdaak2zp4",
+          "result": "deleted"
+        },
+        {
+          "kind": "codex",
+          "id": "dyi7q2lx25ydw4k9r3ho",
+          "result": "deleted"
+        }
+      ],
+      "sandboxes": [],
+      "errors": [],
+      "subscriptions": "FAIL",
+      "publish": "SKIP",
+      "newRuntimePublished": false,
+      "boundary": "Published precise cleanup receipt read; original log remains with owner. This is not an all-account resource audit."
+    },
+    "prior89SubscriptionFailure": {
+      "source": {
+        "issue": 1804,
+        "id": 6735175396,
+        "url": "https://github.com/alexj11324/Mikka/pull/1804#issuecomment-6735175396",
+        "createdAt": "2026-11-09T08:03:28Z",
+        "updatedAt": "2026-11-09T08:03:28Z"
+      },
+      "claude": "Owner reports complete passed receipt.",
+      "codex": "Succeeded execution with provider/tool/native evidence but replyVerified=false and replyVerifiedAfterTool=false; no invented quota/OAuth/root-cause conclusion."
+    },
+    "issue1503": {
+      "entry": {
+        "issue": 1752,
+        "id": 6735102727,
+        "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6735102727",
+        "createdAt": "2026-11-09T07:58:42Z",
+        "updatedAt": "2026-11-09T07:58:42Z"
+      },
+      "formerWindowStart": "2026-11-09T07:58:15Z",
+      "formerWindowEnd": "2026-11-09T10:28:15Z",
+      "releasedAt": "2026-11-09T08:28:13Z",
+      "release": {
+        "issue": 1752,
+        "id": 6735593147,
+        "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6735593147",
+        "createdAt": "2026-11-09T08:28:14Z",
+        "updatedAt": "2026-11-09T08:28:14Z"
+      },
+      "hold": false,
+      "cleanupBoundary": "Corrected setup42585486907 cancelled before runner/steps; exact canceller succeeded; de94fe0c349a2c4df45ba2cfaf43536a3a2c8086 closed and closure skipped. No new child/share/Task/VM, and prior07:05 readonly child already revoked and disconnected.",
+      "factoryAcceptanceComplete": false
+    },
+    "issue1608": {
+      "requests": [
+        {
+          "issue": 1752,
+          "id": 6735141243,
+          "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6735141243",
+          "createdAt": "2026-11-09T08:01:16Z",
+          "updatedAt": "2026-11-09T08:01:16Z"
+        },
+        {
+          "issue": 1752,
+          "id": 6735302213,
+          "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6735302213",
+          "createdAt": "2026-11-09T08:11:24Z",
+          "updatedAt": "2026-11-09T08:11:24Z"
+        }
+      ],
+      "latestIssueReceipt": {
+        "issue": 1608,
+        "id": 6719993232,
+        "url": "https://github.com/alexj11324/Mikka/issues/1608#issuecomment-6719993232",
+        "createdAt": "2026-11-08T09:48:01Z",
+        "updatedAt": "2026-11-09T08:15:01Z"
+      },
+      "readyP0ReportedSource": "61f359952fbc8a18de4160926632c58cba2cb432",
+      "currentlyClaimedNewWindowObserved": false,
+      "nextSafeBoundary": "Actual898 Web/E2B and candidate cleanup must close, then the owner announces its actual finite entry. Release by1503 is not a reservation made on1608's behalf.",
+      "productionAcmeModelUseObservedInThisReview": false
+    },
+    "currentPublishers": {
+      "web": {
+        "id": 42585048163,
+        "headSha": "89870a876fa436da51598aa7e089d74d0f177001",
+        "status": "in_progress",
+        "conclusion": null,
+        "attempt": 1,
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42585048163"
+      },
+      "e2b": {
+        "id": 42585048193,
+        "headSha": "89870a876fa436da51598aa7e089d74d0f177001",
+        "status": "in_progress",
+        "conclusion": null,
+        "attempt": 1,
+        "url": "https://github.com/alexj11324/Mikka/actions/runs/42585048193"
+      },
+      "e2bPhase": "test/check/build success; await-web in_progress"
+    },
+    "productionServedRevisionIndependentlyProbed": null,
+    "servedVersionBoundary": "Current Git main898 is not treated as proof production has switched; latest published independent production witness in the read comments remains App89.",
+    "noOwnReadinessOrWindowClaim": true
+  },
+  "executionBoundary": {
+    "methods": [
+      "GitHub read-only source/API metadata",
+      "Existing stored exact-source bytes",
+      "Pure V8 text/hash comparisons",
+      "One immutable safe receipt blob upload"
+    ],
+    "externalMessages": 0,
+    "refWrites": 0,
+    "newTests": 0,
+    "workflowDispatches": 0,
+    "reruns": 0,
+    "cancels": 0,
+    "vmDbModelBrowserResources": 0,
+    "ownerRawLogsRead": 0,
+    "ownerArtifactsDownloaded": 0,
+    "upstreamAssetDownloads": 0,
+    "diagnosticReconstructionNote": "An initial local added-file extraction rejected a hash because it filtered nested +++ patch headers. Retaining every outer '+' data line reconstructed the exact remote Git blob. No source or test was executed by that extraction.",
+    "unknownsPreserved": true
+  }
+}

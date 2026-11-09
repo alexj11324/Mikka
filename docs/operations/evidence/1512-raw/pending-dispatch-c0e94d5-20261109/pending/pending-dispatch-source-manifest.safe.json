@@ -1,0 +1,95 @@
+{
+  "baseHead": "1ffa581f16319381054e0636ae41e6292719a1fe",
+  "actualNativeSource": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+  "baseTree": "bc4d584fa651385886e79dc6359b1b43324425d1",
+  "files": [
+    {
+      "path": "lib/swr/read-observer.ts",
+      "mode": "100644",
+      "base": {
+        "bytes": 5786,
+        "sha256": "2c4f60539d1eb8d8e607490268fe065fa03b6f1b27e796fa23f5f35bd670499b",
+        "blob": "2dc3ab5a9934fed5146189fd236b450f0d223920"
+      },
+      "candidate": {
+        "bytes": 8237,
+        "sha256": "c520e2c86ca83fe382e6131eb48b36b813b6b9f8750dc9d3c09e6e0044412cc9",
+        "blob": "69a827369bd71838ba8ac9ffbee928ca70219e76"
+      }
+    },
+    {
+      "path": "components/swr-defaults.tsx",
+      "mode": "100644",
+      "base": {
+        "bytes": 4433,
+        "sha256": "cd77353db8fdc38f6527ea5e00bd1227ecb6c8167350eff254effb3b41e8be33",
+        "blob": "f6be8710182ad68ce0a87f6cac910184bf1d52f3"
+      },
+      "candidate": {
+        "bytes": 4551,
+        "sha256": "847311eb9b775d43bb9f569d6ec395aeb41475a5ed7468e17cd1826b2c73217d",
+        "blob": "9b7a4385896b9aacc69ea898be23636b5a8c62fb"
+      }
+    },
+    {
+      "path": "hooks/use-live-lists.ts",
+      "mode": "100644",
+      "base": {
+        "bytes": 9682,
+        "sha256": "c4c9ea9e785986831df600cfff09fccba1705e7a10e0a886d5d6af21d8463b1a",
+        "blob": "ac60a59be511ec45cc372b8c91c0535861a30931"
+      },
+      "candidate": {
+        "bytes": 9807,
+        "sha256": "da27e73ae937fed876ae463e988d4418292f9976aeb7bc95a89e786ae80e5fab",
+        "blob": "afd0cae59d1b871cbc5175a6de8f2b44f2d036ca"
+      }
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "mode": "100644",
+      "base": {
+        "bytes": 4265,
+        "sha256": "7cadecd350fd73031473a4131edf769c552822a9faf6d26b345e6417dae671c0",
+        "blob": "a9ffaee70d53e2c9c0471b61abbddf80cc244fbe"
+      },
+      "candidate": {
+        "bytes": 4640,
+        "sha256": "bb72e38f117c01dffbf4f9ec7e2309160e9ac0d4bf485aa476132b22b191e48c",
+        "blob": "1dfb20c85e930e3c4b75d4f6e656a04fa9c2ffc5"
+      }
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "mode": "100644",
+      "base": {
+        "bytes": 5988,
+        "sha256": "040d039af2d8abb6aeb9eb4a4d66d357526d8afa6c0afed0e5bbaf80ba7a87c1",
+        "blob": "b72659facb8a5a710fb0c0121e2543add0ad8f33"
+      },
+      "candidate": {
+        "bytes": 6237,
+        "sha256": "a25842776c07816eb8af6a24d62dc9d745ab13fb9cfff513de02673d48926f18",
+        "blob": "67503a9abe7131de3e9bf86629532e015085d4ee"
+      }
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "mode": "100644",
+      "base": {
+        "bytes": 58655,
+        "sha256": "da2c31a515397745e02d3118981751aedc319ac3ea53f01dc22d340c6ed75512",
+        "blob": "f981a61d72fb9c0e153e490f89d7328fb014558e"
+      },
+      "candidate": {
+        "bytes": 75804,
+        "sha256": "9591bf1bd79f47b7c159eadcffa21125a7d06e76bbd33d82fcbbddd25e25af7e",
+        "blob": "a4aec5fe968100f283a8d93b963934430a97fcda"
+      }
+    }
+  ],
+  "refWrites": 0,
+  "fullNativeReruns": 0,
+  "readBatchCanonicalStandaloneExecuted": false,
+  "readBatchCanonicalStandaloneGap": "Original browserModule imports application-plugin -> renderer-transforms requiring full Tailwind/TypeScript/native SWC dependency surface not in this minimal fixture; actual Native queue/codec/MessageChannel and RPC 404 path execute in the React fixture."
+}

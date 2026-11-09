@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "run": 42590712093,
+  "selectionJob": 129071352702,
+  "eventHead": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+  "actualCheckout": {
+    "sha": "9d8aab6986e474ea2df8f62091d97dc5aa992420",
+    "tree": "3e09885ffb34a9c04fc8a7ac5b8b88e3415f7325",
+    "parents": [
+      "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+      "c0e94d594f1ecf4f5edc25904912702e61fce86b"
+    ],
+    "boundFrom": "Original terminal selection job git log -1 plus independent Git commit API"
+  },
+  "raw": {
+    "path": "selection.original.log",
+    "sha": "f15d5cd61b0fb773aac9a4b02246b7c722df626b",
+    "bytes": 966100,
+    "sha256": "a313bb4c87baa85e9b3fe8eba52d80746b70c1e4d042b4ec7bfb3f2417047f34",
+    "job": 129071352702,
+    "run": 42590712093
+  },
+  "extracted": {
+    "path": "selection.safe.json",
+    "sha": "db30d852aee662f01f591884fb8d2c222ebadff9",
+    "bytes": 387694,
+    "sha256": "046925f40a816cde262479ec27884b9c0887ea393b742eb02ed58b9afd7f7e09",
+    "original": {
+      "path": "selection.original.log",
+      "sha": "f15d5cd61b0fb773aac9a4b02246b7c722df626b",
+      "bytes": 966100,
+      "sha256": "a313bb4c87baa85e9b3fe8eba52d80746b70c1e4d042b4ec7bfb3f2417047f34",
+      "job": 129071352702,
+      "run": 42590712093
+    },
+    "actualCheckout": "9d8aab6986e474ea2df8f62091d97dc5aa992420"
+  },
+  "selection": {
+    "full": true,
+    "docsOnly": false,
+    "core": 57,
+    "integration": 29,
+    "dbSuites": 72,
+    "dbMatrix": {
+      "shard": [
+        "1/4",
+        "2/4",
+        "3/4",
+        "4/4"
+      ]
+    },
+    "source": true,
+    "daemon": true,
+    "mobile": true,
+    "desktop": true,
+    "image": true,
+    "analytics": true
+  },
+  "execution": "Selection is not execution completion; integrated jobs remain in progress at checkpoint creation."
+}

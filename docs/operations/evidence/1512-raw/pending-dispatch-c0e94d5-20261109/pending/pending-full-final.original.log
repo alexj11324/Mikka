@@ -1,0 +1,484 @@
+TAP version 13
+# (node:1142) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:1142) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: a committed SWR read after connection readiness covers the pending live flush
+ok 1 - a committed SWR read after connection readiness covers the pending live flush
+  ---
+  duration_ms: 890.943247
+  type: 'test'
+  ...
+# Subtest: a late live subscription shares the committed read from its continuously ready connection
+ok 2 - a late live subscription shares the committed read from its continuously ready connection
+  ---
+  duration_ms: 336.368336
+  type: 'test'
+  ...
+# Subtest: a new unversioned push while unsubscribed invalidates the committed read before a late subscription
+ok 3 - a new unversioned push while unsubscribed invalidates the committed read before a late subscription
+  ---
+  duration_ms: 333.096452
+  type: 'test'
+  ...
+# Subtest: a higher-revision push while unsubscribed invalidates the committed read before a late subscription
+ok 4 - a higher-revision push while unsubscribed invalidates the committed read before a late subscription
+  ---
+  duration_ms: 333.120283
+  type: 'test'
+  ...
+# Subtest: a late subscription cannot reuse a read from without the capability acknowledgement
+ok 5 - a late subscription cannot reuse a read from without the capability acknowledgement
+  ---
+  duration_ms: 330.793034
+  type: 'test'
+  ...
+# Subtest: a late subscription cannot reuse a read from before the capability acknowledgement
+ok 6 - a late subscription cannot reuse a read from before the capability acknowledgement
+  ---
+  duration_ms: 331.141195
+  type: 'test'
+  ...
+# (node:1142) TimeoutNaNWarning: NaN is not a number.
+# Timeout duration was set to 1.
+# Subtest: a committed read from an earlier connection generation cannot cover a late subscription
+ok 7 - a committed read from an earlier connection generation cannot cover a late subscription
+  ---
+  duration_ms: 333.98439
+  type: 'test'
+  ...
+# Subtest: a replaced committed cache object cannot satisfy the pending live flush
+ok 8 - a replaced committed cache object cannot satisfy the pending live flush
+  ---
+  duration_ms: 331.551668
+  type: 'test'
+  ...
+# Subtest: a newer failed SWR read cannot resurrect an earlier committed provenance
+ok 9 - a newer failed SWR read cannot resurrect an earlier committed provenance
+  ---
+  duration_ms: 333.695194
+  type: 'test'
+  ...
+# Subtest: live catch-ups share an ordinary SWR read that starts after both scoped connections open
+ok 10 - live catch-ups share an ordinary SWR read that starts after both scoped connections open
+  ---
+  duration_ms: 652.13144
+  type: 'test'
+  ...
+# Subtest: a SWR read that starts before the live connection opens cannot consume its catch-up
+ok 11 - a SWR read that starts before the live connection opens cannot consume its catch-up
+  ---
+  duration_ms: 327.407692
+  type: 'test'
+  ...
+# Subtest: a new unversioned push during a shared SWR read still gets its trailing read
+ok 12 - a new unversioned push during a shared SWR read still gets its trailing read
+  ---
+  duration_ms: 649.067945
+  type: 'test'
+  ...
+# Subtest: a higher-revision push during a shared SWR read still gets its trailing read
+ok 13 - a higher-revision push during a shared SWR read still gets its trailing read
+  ---
+  duration_ms: 647.922951
+  type: 'test'
+  ...
+# Subtest: a later-started SWR read must still prove every required revision before covering a live push
+ok 14 - a later-started SWR read must still prove every required revision before covering a live push
+  ---
+  duration_ms: 489.297562
+  type: 'test'
+  ...
+# Subtest: a SWR response discarded by an optimistic mutation cannot consume the live catch-up
+ok 15 - a SWR response discarded by an optimistic mutation cannot consume the live catch-up
+  ---
+  duration_ms: 489.384308
+  type: 'test'
+  ...
+# Subtest: a custom comparator retaining an older cache value cannot certify an unversioned live catch-up
+ok 16 - a custom comparator retaining an older cache value cannot certify an unversioned live catch-up
+  ---
+  duration_ms: 490.345343
+  type: 'test'
+  ...
+# Subtest: a shared read cannot replace the revision held when the live obligation began with a lower revision
+ok 17 - a shared read cannot replace the revision held when the live obligation began with a lower revision
+  ---
+  duration_ms: 494.291913
+  type: 'test'
+  ...
+# Subtest: a completed read cannot erase the higher revision still held by the active live subscription
+ok 18 - a completed read cannot erase the higher revision still held by the active live subscription
+  ---
+  duration_ms: 647.786551
+  type: 'test'
+  ...
+# Subtest: an original onSuccess exception remains a SWR error without a shared-read retry
+ok 19 - an original onSuccess exception remains a SWR error without a shared-read retry
+  ---
+  duration_ms: 487.364086
+  type: 'test'
+  ...
+# Subtest: a discarded shared read cannot start another request after the page becomes hidden
+ok 20 - a discarded shared read cannot start another request after the page becomes hidden
+  ---
+  duration_ms: 809.701047
+  type: 'test'
+  ...
+# Subtest: a newer SWR read replaces a shared observation without applying or re-reading the discarded result
+ok 21 - a newer SWR read replaces a shared observation without applying or re-reading the discarded result
+  ---
+  duration_ms: 490.95794
+  type: 'test'
+  ...
+# Subtest: an old cache error cannot be attributed to a superseded read or consume the replacement revision requirement
+ok 22 - an old cache error cannot be attributed to a superseded read or consume the replacement revision requirement
+  ---
+  duration_ms: 648.517037
+  type: 'test'
+  ...
+# Subtest: a shared permission failure keeps SWR error handling and does not start another request
+ok 23 - a shared permission failure keeps SWR error handling and does not start another request
+  ---
+  duration_ms: 488.427832
+  type: 'test'
+  ...
+# Subtest: retiring the owner cache while a shared read is pending neither adopts it nor revalidates the departed scope
+ok 24 - retiring the owner cache while a shared read is pending neither adopts it nor revalidates the departed scope
+  ---
+  duration_ms: 812.638656
+  type: 'test'
+  ...
+# Subtest: resolving the issue home different from the selected workspace preserves its live subscription
+ok 25 - resolving the issue home different from the selected workspace preserves its live subscription
+  ---
+  duration_ms: 648.959962
+  type: 'test'
+  ...
+# Subtest: resolving the issue home equal to the selected workspace preserves its live subscription
+ok 26 - resolving the issue home equal to the selected workspace preserves its live subscription
+  ---
+  duration_ms: 646.997579
+  type: 'test'
+  ...
+# Subtest: an unresolved issue home retains disconnected fallback even when its selected workspace channel is healthy
+ok 27 - an unresolved issue home retains disconnected fallback even when its selected workspace channel is healthy
+  ---
+  duration_ms: 327.431491
+  type: 'test'
+  ...
+# Subtest: real thread hooks require a current presence acknowledgement, update its proof and unregister on exit
+ok 28 - real thread hooks require a current presence acknowledgement, update its proof and unregister on exit
+  ---
+  duration_ms: 492.76124
+  type: 'test'
+  ...
+# Subtest: an older server presence fallback flag remains uncovered on a healthy new live transport
+ok 29 - an older server presence fallback flag remains uncovered on a healthy new live transport
+  ---
+  duration_ms: 327.365265
+  type: 'test'
+  ...
+# Subtest: three acknowledged presence tabs still share one authorized read for the same device-state push
+ok 30 - three acknowledged presence tabs still share one authorized read for the same device-state push
+  ---
+  duration_ms: 2754.883205
+  type: 'test'
+  ...
+# Subtest: a restored issues snapshot sends its existing row proofs and removes rows absent from the authorized delta
+ok 31 - a restored issues snapshot sends its existing row proofs and removes rows absent from the authorized delta
+  ---
+  duration_ms: 326.693749
+  type: 'test'
+  ...
+# Subtest: a restored threads snapshot sends its existing row proofs and removes rows absent from the authorized delta
+ok 32 - a restored threads snapshot sends its existing row proofs and removes rows absent from the authorized delta
+  ---
+  duration_ms: 327.087033
+  type: 'test'
+  ...
+# Subtest: a restored list with partial proofs cannot receive unchanged while rows are missing
+ok 33 - a restored list with partial proofs cannot receive unchanged while rows are missing
+  ---
+  duration_ms: 326.033467
+  type: 'test'
+  ...
+# Subtest: a restored list with missing proofs cannot receive unchanged while rows are missing
+ok 34 - a restored list with missing proofs cannot receive unchanged while rows are missing
+  ---
+  duration_ms: 326.112702
+  type: 'test'
+  ...
+# Subtest: an explicit revoked access response hides a previously visible cached issue list
+ok 35 - an explicit revoked access response hides a previously visible cached issue list
+  ---
+  duration_ms: 677.845467
+  type: 'test'
+  ...
+# Subtest: real list hooks update held revisions after an asynchronous read without losing scoped focus coverage
+ok 36 - real list hooks update held revisions after an asynchronous read without losing scoped focus coverage
+  ---
+  duration_ms: 5052.595321
+  type: 'test'
+  ...
+# Subtest: real shared live hooks reject an older in-flight snapshot and still coalesce matching pushes
+ok 37 - real shared live hooks reject an older in-flight snapshot and still coalesce matching pushes
+  ---
+  duration_ms: 7595.470992
+  type: 'test'
+  ...
+# Subtest: healthy real list hooks stay quiet beyond the old sixty-second interval, and an owner-home event refreshes only its list
+ok 38 - healthy real list hooks stay quiet beyond the old sixty-second interval, and an owner-home event refreshes only its list
+  ---
+  duration_ms: 61942.466405
+  type: 'test'
+  ...
+# Subtest: a late tasks response after the cookie changes cannot populate the old owner's real SWR cache
+ok 39 - a late tasks response after the cookie changes cannot populate the old owner's real SWR cache
+  ---
+  duration_ms: 326.311311
+  type: 'test'
+  ...
+# Subtest: a late bots response after the cookie changes cannot populate the old owner's real SWR cache
+ok 40 - a late bots response after the cookie changes cannot populate the old owner's real SWR cache
+  ---
+  duration_ms: 326.156914
+  type: 'test'
+  ...
+# Subtest: a late issue response cannot replace the selected workspace, and an unresolved read has no adopted SSR rows
+ok 41 - a late issue response cannot replace the selected workspace, and an unresolved read has no adopted SSR rows
+  ---
+  duration_ms: 809.579334
+  type: 'test'
+  ...
+# Subtest: a server-selected replacement workspace is refused under the former issue-list key
+ok 42 - a server-selected replacement workspace is refused under the former issue-list key
+  ---
+  duration_ms: 325.645571
+  type: 'test'
+  ...
+# Subtest: group list GET results are bound to both the authenticated owner and the requested workspace before caching
+ok 43 - group list GET results are bound to both the authenticated owner and the requested workspace before caching
+  ---
+  duration_ms: 326.896748
+  type: 'test'
+  ...
+# Subtest: a delayed Bot roster cannot populate another owner's list key
+ok 44 - a delayed Bot roster cannot populate another owner's list key
+  ---
+  duration_ms: 325.815584
+  type: 'test'
+  ...
+# Subtest: a delayed Bot roster cannot populate another workspace's list key
+ok 45 - a delayed Bot roster cannot populate another workspace's list key
+  ---
+  duration_ms: 326.374664
+  type: 'test'
+  ...
+# Subtest: leaving Settings catches up a roster event that arrived while its read was paused
+ok 46 - leaving Settings catches up a roster event that arrived while its read was paused
+  ---
+  duration_ms: 2747.716888
+  type: 'test'
+  ...
+# Subtest: hidden list views retain a dirty event and catch up once when visible
+ok 47 - hidden list views retain a dirty event and catch up once when visible
+  ---
+  duration_ms: 3079.048283
+  type: 'test'
+  ...
+# Subtest: without an active owned home, the owner-wide list never guesses the Provider workspace
+ok 48 - without an active owned home, the owner-wide list never guesses the Provider workspace
+  ---
+  duration_ms: 324.226657
+  type: 'test'
+  ...
+# Subtest: a server-derived chat lease expiry performs one read without recreating the transport
+ok 49 - a server-derived chat lease expiry performs one read without recreating the transport
+  ---
+  duration_ms: 2277.091867
+  type: 'test'
+  ...
+# Subtest: a completed-list age boundary repaints once without a data read, and a hidden boundary catches up on visibility
+ok 50 - a completed-list age boundary repaints once without a data read, and a hidden boundary catches up on visibility
+  ---
+  duration_ms: 1356.644086
+  type: 'test'
+  ...
+# Subtest: a bot-list push re-reads the bot list only, never a mounted whole Coordinator chat
+ok 51 - a bot-list push re-reads the bot list only, never a mounted whole Coordinator chat
+  ---
+  duration_ms: 2630.063273
+  type: 'test'
+  ...
+# Subtest: native dispatch proof: tasks single HTTP after readiness
+ok 52 - native dispatch proof: tasks single HTTP after readiness
+  ---
+  duration_ms: 343.465479
+  type: 'test'
+  ...
+# {"kind":"native_dispatch_order","action":"task-runs.pollTaskRuns","grouped":false,"beforeReady":false,"phases":["list_fetcher","native_enqueued","live_ready","fetch_dispatch"],"listCalls":1,"physicalCalls":1}
+# Subtest: native dispatch proof: tasks single HTTP before readiness
+ok 53 - native dispatch proof: tasks single HTTP before readiness
+  ---
+  duration_ms: 326.150294
+  type: 'test'
+  ...
+# {"kind":"native_dispatch_order","action":"task-runs.pollTaskRuns","grouped":false,"beforeReady":true,"phases":["list_fetcher","native_enqueued","fetch_dispatch","live_ready","list_fetcher","native_enqueued","fetch_dispatch"],"listCalls":2,"physicalCalls":2}
+# Subtest: native dispatch proof: tasks batch HTTP after readiness
+ok 54 - native dispatch proof: tasks batch HTTP after readiness
+  ---
+  duration_ms: 331.507512
+  type: 'test'
+  ...
+# {"kind":"native_dispatch_order","action":"task-runs.pollTaskRuns","grouped":true,"beforeReady":false,"phases":["list_fetcher","native_enqueued","live_ready","fetch_dispatch"],"listCalls":1,"physicalCalls":1}
+# Subtest: native dispatch proof: tasks batch HTTP before readiness
+ok 55 - native dispatch proof: tasks batch HTTP before readiness
+  ---
+  duration_ms: 328.187504
+  type: 'test'
+  ...
+# {"kind":"native_dispatch_order","action":"task-runs.pollTaskRuns","grouped":true,"beforeReady":true,"phases":["list_fetcher","native_enqueued","fetch_dispatch","live_ready","list_fetcher","native_enqueued","fetch_dispatch"],"listCalls":2,"physicalCalls":2}
+# Subtest: native dispatch proof: bots single HTTP after readiness
+ok 56 - native dispatch proof: bots single HTTP after readiness
+  ---
+  duration_ms: 327.024393
+  type: 'test'
+  ...
+# {"kind":"native_dispatch_order","action":"coordinator.pollBotChatSummaries","grouped":false,"beforeReady":false,"phases":["list_fetcher","native_enqueued","live_ready","fetch_dispatch"],"listCalls":1,"physicalCalls":1}
+# Subtest: native dispatch proof: bots single HTTP before readiness
+ok 57 - native dispatch proof: bots single HTTP before readiness
+  ---
+  duration_ms: 329.168318
+  type: 'test'
+  ...
+# {"kind":"native_dispatch_order","action":"coordinator.pollBotChatSummaries","grouped":false,"beforeReady":true,"phases":["list_fetcher","native_enqueued","fetch_dispatch","live_ready","list_fetcher","native_enqueued","fetch_dispatch"],"listCalls":2,"physicalCalls":2}
+# Subtest: native dispatch proof: bots batch HTTP after readiness
+ok 58 - native dispatch proof: bots batch HTTP after readiness
+  ---
+  duration_ms: 326.469908
+  type: 'test'
+  ...
+# {"kind":"native_dispatch_order","action":"coordinator.pollBotChatSummaries","grouped":true,"beforeReady":false,"phases":["list_fetcher","native_enqueued","live_ready","fetch_dispatch"],"listCalls":1,"physicalCalls":1}
+# Subtest: native dispatch proof: bots batch HTTP before readiness
+ok 59 - native dispatch proof: bots batch HTTP before readiness
+  ---
+  duration_ms: 328.623219
+  type: 'test'
+  ...
+# {"kind":"native_dispatch_order","action":"coordinator.pollBotChatSummaries","grouped":true,"beforeReady":true,"phases":["list_fetcher","native_enqueued","fetch_dispatch","live_ready","list_fetcher","native_enqueued","fetch_dispatch"],"listCalls":2,"physicalCalls":2}
+# Subtest: native dispatch proof: roster single HTTP after readiness
+ok 60 - native dispatch proof: roster single HTTP after readiness
+  ---
+  duration_ms: 326.57384
+  type: 'test'
+  ...
+# {"kind":"native_dispatch_order","action":"bots.pollBots","grouped":false,"beforeReady":false,"phases":["list_fetcher","native_enqueued","live_ready","fetch_dispatch"],"listCalls":1,"physicalCalls":1}
+# Subtest: native dispatch proof: roster single HTTP before readiness
+ok 61 - native dispatch proof: roster single HTTP before readiness
+  ---
+  duration_ms: 326.311378
+  type: 'test'
+  ...
+# {"kind":"native_dispatch_order","action":"bots.pollBots","grouped":false,"beforeReady":true,"phases":["list_fetcher","native_enqueued","fetch_dispatch","live_ready","list_fetcher","native_enqueued","fetch_dispatch"],"listCalls":2,"physicalCalls":2}
+# Subtest: native dispatch proof: roster batch HTTP after readiness
+ok 62 - native dispatch proof: roster batch HTTP after readiness
+  ---
+  duration_ms: 325.918423
+  type: 'test'
+  ...
+# {"kind":"native_dispatch_order","action":"bots.pollBots","grouped":true,"beforeReady":false,"phases":["list_fetcher","native_enqueued","live_ready","fetch_dispatch"],"listCalls":1,"physicalCalls":1}
+# Subtest: native dispatch proof: roster batch HTTP before readiness
+ok 63 - native dispatch proof: roster batch HTTP before readiness
+  ---
+  duration_ms: 326.361549
+  type: 'test'
+  ...
+# {"kind":"native_dispatch_order","action":"bots.pollBots","grouped":true,"beforeReady":true,"phases":["list_fetcher","native_enqueued","fetch_dispatch","live_ready","list_fetcher","native_enqueued","fetch_dispatch"],"listCalls":2,"physicalCalls":2}
+# Subtest: native hydration order: provider-unresolved
+ok 64 - native hydration order: provider-unresolved
+  ---
+  duration_ms: 333.24641
+  type: 'test'
+  ...
+# {"kind":"native_hydration_order","scenario":"provider-unresolved","listCalls":2,"rosterCalls":0,"physicalCalls":2,"phases":[{"event":"storage_activate","at":113861.983278},{"event":"hydration_resume","at":113862.399252},{"event":"fetcher","at":113862.902278,"kind":"bots"},{"event":"enqueue","at":113863.004152,"kind":"bots"},{"event":"dispatch","at":113863.206253,"call":1},{"event":"response","at":113863.265915,"call":1},{"event":"commit","at":113864.082959,"kind":"bots"},{"event":"socket_open","at":113865.199132,"kind":"home"},{"event":"ready","at":113865.299967,"kind":"home"},{"event":"flush","at":113963.98439,"kind":"bot-chats"},{"event":"fetcher","at":113995.09436,"kind":"bots"},{"event":"enqueue","at":113995.224532,"kind":"bots"},{"event":"dispatch","at":113995.364354,"call":2},{"event":"response","at":113995.394238,"call":2},{"event":"commit","at":113995.738553,"kind":"bots"}]}
+# Subtest: native hydration order: provider-hint
+ok 65 - native hydration order: provider-hint
+  ---
+  duration_ms: 332.657267
+  type: 'test'
+  ...
+# {"kind":"native_hydration_order","scenario":"provider-hint","listCalls":2,"rosterCalls":0,"physicalCalls":2,"phases":[{"event":"storage_activate","at":114190.871413},{"event":"hydration_resume","at":114192.758448},{"event":"fetcher","at":114194.575131,"kind":"bots"},{"event":"enqueue","at":114194.662165,"kind":"bots"},{"event":"dispatch","at":114194.758978,"call":1},{"event":"response","at":114194.778383,"call":1},{"event":"commit","at":114195.207406,"kind":"bots"},{"event":"socket_open","at":114195.937085,"kind":"home"},{"event":"ready","at":114197.009524,"kind":"home"},{"event":"flush","at":114296.003175,"kind":"bot-chats"},{"event":"fetcher","at":114327.42618,"kind":"bots"},{"event":"enqueue","at":114327.521064,"kind":"bots"},{"event":"dispatch","at":114327.639002,"call":2},{"event":"response","at":114327.658088,"call":2},{"event":"commit","at":114328.277713,"kind":"bots"}]}
+# Subtest: native hydration order: warm-committed
+ok 66 - native hydration order: warm-committed
+  ---
+  duration_ms: 329.716404
+  type: 'test'
+  ...
+# {"kind":"native_hydration_order","scenario":"warm-committed","listCalls":1,"rosterCalls":1,"physicalCalls":1,"phases":[{"event":"storage_activate","at":114522.868282},{"event":"restore","at":114523.958954,"kind":"bots"},{"event":"hydration_resume","at":114525.096615},{"event":"fetcher","at":114526.382918,"kind":"roster"},{"event":"enqueue","at":114526.469552,"kind":"roster"},{"event":"fetcher","at":114526.484542,"kind":"bots"},{"event":"enqueue","at":114526.493068,"kind":"bots"},{"event":"socket_open","at":114526.544087,"kind":"home"},{"event":"ready","at":114526.63015,"kind":"home"},{"event":"dispatch","at":114526.764949,"call":1},{"event":"response","at":114526.789116,"call":1},{"event":"commit","at":114527.059038,"kind":"other"},{"event":"commit","at":114527.119886,"kind":"bots"},{"event":"flush","at":114626.05262,"kind":"bots"},{"event":"flush","at":114626.123705,"kind":"bot-chats"}]}
+# Subtest: native hydration order: warm-pending-after-ready
+ok 67 - native hydration order: warm-pending-after-ready
+  ---
+  duration_ms: 497.649167
+  type: 'test'
+  ...
+# {"kind":"native_hydration_order","scenario":"warm-pending-after-ready","listCalls":1,"rosterCalls":1,"physicalCalls":1,"phases":[{"event":"storage_activate","at":114854.235729},{"event":"restore","at":114856.455375,"kind":"bots"},{"event":"hydration_resume","at":114856.950764},{"event":"fetcher","at":114857.82943,"kind":"roster"},{"event":"enqueue","at":114857.908918,"kind":"roster"},{"event":"fetcher","at":114857.993958,"kind":"bots"},{"event":"enqueue","at":114858.009641,"kind":"bots"},{"event":"socket_open","at":114858.021421,"kind":"home"},{"event":"ready","at":114858.106147,"kind":"home"},{"event":"dispatch","at":114861.769424,"call":1},{"event":"flush","at":114956.974665,"kind":"bots"},{"event":"flush","at":114957.11,"kind":"bot-chats"},{"event":"response_release","at":115022.670094},{"event":"response","at":115022.772774,"call":1},{"event":"commit","at":115023.727192,"kind":"other"},{"event":"commit","at":115023.81408,"kind":"bots"}]}
+# Subtest: native hydration order: warm-pending-before-ready
+ok 68 - native hydration order: warm-pending-before-ready
+  ---
+  duration_ms: 489.325398
+  type: 'test'
+  ...
+# {"kind":"native_hydration_order","scenario":"warm-pending-before-ready","listCalls":2,"rosterCalls":2,"physicalCalls":3,"phases":[{"event":"storage_activate","at":115350.978766},{"event":"restore","at":115352.136209,"kind":"bots"},{"event":"hydration_resume","at":115352.60681},{"event":"fetcher","at":115353.131993,"kind":"roster"},{"event":"enqueue","at":115353.214195,"kind":"roster"},{"event":"fetcher","at":115353.225595,"kind":"bots"},{"event":"enqueue","at":115353.234095,"kind":"bots"},{"event":"dispatch","at":115354.850492,"call":1},{"event":"socket_open","at":115354.887634,"kind":"home"},{"event":"ready","at":115354.978156,"kind":"home"},{"event":"flush","at":115454.261544,"kind":"bots"},{"event":"flush","at":115454.43107,"kind":"bot-chats"},{"event":"fetcher","at":115454.63072,"kind":"roster"},{"event":"enqueue","at":115454.721498,"kind":"roster"},{"event":"dispatch","at":115454.836959,"call":2},{"event":"response","at":115454.858197,"call":2},{"event":"commit","at":115455.125985,"kind":"other"},{"event":"fetcher","at":115484.999443,"kind":"bots"},{"event":"enqueue","at":115485.110948,"kind":"bots"},{"event":"dispatch","at":115485.236419,"call":3},{"event":"response","at":115485.266314,"call":3},{"event":"commit","at":115485.709826,"kind":"bots"},{"event":"response_release","at":115515.595407},{"event":"response","at":115515.62472,"call":1}]}
+# Subtest: native hydration order: warm-new-home
+ok 69 - native hydration order: warm-new-home
+  ---
+  duration_ms: 341.05107
+  type: 'test'
+  ...
+# {"kind":"native_hydration_order","scenario":"warm-new-home","listCalls":2,"rosterCalls":1,"physicalCalls":2,"phases":[{"event":"storage_activate","at":115840.72789},{"event":"restore","at":115841.473996,"kind":"bots"},{"event":"hydration_resume","at":115841.872882},{"event":"fetcher","at":115842.364174,"kind":"roster"},{"event":"enqueue","at":115842.439708,"kind":"roster"},{"event":"fetcher","at":115842.452653,"kind":"bots"},{"event":"enqueue","at":115842.460097,"kind":"bots"},{"event":"socket_open","at":115842.471667,"kind":"home"},{"event":"ready","at":115842.54752,"kind":"home"},{"event":"dispatch","at":115842.655869,"call":1},{"event":"response","at":115842.686819,"call":1},{"event":"commit","at":115842.898817,"kind":"other"},{"event":"commit","at":115842.956453,"kind":"bots"},{"event":"socket_open","at":115856.907184,"kind":"other"},{"event":"ready","at":115857.054814,"kind":"other"},{"event":"flush","at":115941.455317,"kind":"bots"},{"event":"flush","at":115955.749907,"kind":"bot-chats"},{"event":"fetcher","at":115986.875849,"kind":"bots"},{"event":"enqueue","at":115986.981838,"kind":"bots"},{"event":"dispatch","at":115987.114122,"call":2},{"event":"response","at":115987.132615,"call":2},{"event":"commit","at":115987.410295,"kind":"bots"}]}
+# Subtest: pending dispatch observation: unproven-result
+ok 70 - pending dispatch observation: unproven-result
+  ---
+  duration_ms: 2.273651
+  type: 'test'
+  ...
+# Subtest: pending dispatch observation: repeated-dispatch
+ok 71 - pending dispatch observation: repeated-dispatch
+  ---
+  duration_ms: 1.347087
+  type: 'test'
+  ...
+# Subtest: pending dispatch observation: multiple-captures
+ok 72 - pending dispatch observation: multiple-captures
+  ---
+  duration_ms: 3.536112
+  type: 'test'
+  ...
+# Subtest: pending dispatch observation: superseded-read
+ok 73 - pending dispatch observation: superseded-read
+  ---
+  duration_ms: 1.598929
+  type: 'test'
+  ...
+# Subtest: pending dispatch observation: failed-read
+ok 74 - pending dispatch observation: failed-read
+  ---
+  duration_ms: 4.169274
+  type: 'test'
+  ...
+# Subtest: native pending dispatch: real 404 capability fallback revokes an already awaited hint
+ok 75 - native pending dispatch: real 404 capability fallback revokes an already awaited hint
+  ---
+  duration_ms: 816.656003
+  type: 'test'
+  ...
+# {"kind":"native_real_capability_fallback","physical":5,"logical":{"bots":2,"roster":2},"phases":["enqueue:roster","enqueue:bots","ready","dispatch:1:desktop.readBatch","flush:bots","flush:bot-chats","batch_404","dispatch:2:bots.pollBots","fallback_held:roster","dispatch:3:coordinator.pollBotChatSummaries","fallback_held:bots","enqueue:roster","dispatch:4:bots.pollBots","catchup:roster","response:4","enqueue:bots","dispatch:5:coordinator.pollBotChatSummaries","catchup:bots","response:5","release_fallback","response:2","response:3"]}
+1..75
+# tests 75
+# suites 0
+# pass 75
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 124392.119062

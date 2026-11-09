@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "readByRootAt": "2026-11-09 09:07:29 UTC",
+  "source": {
+    "commentId": 6735889350,
+    "url": "https://github.com/alexj11324/Mikka/pull/1810#issuecomment-6735889350",
+    "createdAt": "2026-11-09T08:46:01Z",
+    "updatedAt": "2026-11-09T08:46:01Z"
+  },
+  "body": "08:45 UTC 新 CI42585848140：image job129056168410 已 SUCCESS，正常源依赖安装、真实daemon、packaged desktop/image及Stop disposable services等步骤均SUCCESS；Publish为PR原条件SKIP。Apple job129058016401已通过正常frozen install，仍在真实Apple Silicon打包验收，不能提前写全绿。\n\n我现在唯一读取已终态image129056168410原始日志一次，随后只在Apple终态读取该job原件一次，用于精确版本、安装与清理回执；不重跑测试，不重复下载之前e9的失败原件。",
+  "independentMetadataLastObservedByReviewer": "2026-11-09 08:53 UTC",
+  "image": {
+    "job": 129056168410,
+    "conclusion": "success",
+    "completedAt": "2026-11-09T08:44:14Z",
+    "cleanupStep": "success"
+  },
+  "mac": {
+    "job": 129058016401,
+    "frozenInstallStep": "success",
+    "armBuild": "success",
+    "keychain": "success",
+    "packagedNativeAtObservation": "in_progress"
+  },
+  "limits": "Source-level corrected installation reuse only. Root did not download owner raw logs; owner is sole original log reader. This is not a claim that #1810 whole CI, Native SQL budget, or our combined candidate passed."
+}

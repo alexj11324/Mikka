@@ -1,0 +1,28 @@
+{
+  "exitCode": 0,
+  "durationSeconds": 9.446,
+  "command": [
+    "/vercel/live-tools/node-v24.22.2-linux-x64/bin/node",
+    "--experimental-test-module-mocks",
+    "--import",
+    "./scripts/server-test.mjs",
+    "--import",
+    "tsx",
+    "--test",
+    "--test-reporter=tap",
+    "--test-name-pattern=^native pending dispatch: real 404",
+    "scripts/use-live-lists.live.test.tsx"
+  ],
+  "logBytes": 1198,
+  "logSHA256": "7755017966d88dbe682047ea5da3640dc35a784770c3c26f190f2dc8e090b185",
+  "summary": [
+    "ok 1 - native pending dispatch: real 404 capability fallback revokes an already awaited hint",
+    "# tests 1",
+    "# pass 1",
+    "# fail 0",
+    "# cancelled 0",
+    "# skipped 0",
+    "# duration_ms 9362.420206"
+  ],
+  "testSHA256": "9591bf1bd79f47b7c159eadcffa21125a7d06e76bbd33d82fcbbddd25e25af7e"
+}

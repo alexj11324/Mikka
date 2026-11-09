@@ -1,0 +1,77 @@
+TAP version 13
+# (node:985) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:985) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: a SWR read that starts before the live connection opens cannot consume its catch-up
+not ok 1 - a SWR read that starts before the live connection opens cannot consume its catch-up
+  ---
+  duration_ms: 704.108556
+  type: 'test'
+  location: '/vercel/live-fixture/scripts/use-live-lists.live.test.tsx:1:14881'
+  failureType: 'testCodeFailure'
+  error: |-
+    the connection gap still needs a later authoritative read
+    
+    1 !== 2
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: 2
+  actual: 1
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/vercel/live-fixture/scripts/use-live-lists.live.test.tsx:279:12)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# Subtest: native hydration order: provider-unresolved
+ok 2 - native hydration order: provider-unresolved
+  ---
+  duration_ms: 368.644917
+  type: 'test'
+  ...
+# {"kind":"native_hydration_order","scenario":"provider-unresolved","listCalls":2,"rosterCalls":0,"physicalCalls":2,"phases":[{"event":"storage_activate","at":1877.720431},{"event":"hydration_resume","at":1879.242752},{"event":"fetcher","at":1884.025537,"kind":"bots"},{"event":"enqueue","at":1884.451453,"kind":"bots"},{"event":"dispatch","at":1886.544007,"call":1},{"event":"response","at":1887.344054,"call":1},{"event":"commit","at":1889.4764,"kind":"bots"},{"event":"socket_open","at":1892.426816,"kind":"home"},{"event":"ready","at":1892.670239,"kind":"home"},{"event":"flush","at":1991.73229,"kind":"bot-chats"},{"event":"fetcher","at":2025.935777,"kind":"bots"},{"event":"enqueue","at":2026.117525,"kind":"bots"},{"event":"dispatch","at":2026.374253,"call":2},{"event":"response","at":2026.409055,"call":2},{"event":"commit","at":2027.24898,"kind":"bots"}]}
+# Subtest: native hydration order: provider-hint
+ok 3 - native hydration order: provider-hint
+  ---
+  duration_ms: 337.044995
+  type: 'test'
+  ...
+# {"kind":"native_hydration_order","scenario":"provider-hint","listCalls":2,"rosterCalls":0,"physicalCalls":2,"phases":[{"event":"storage_activate","at":2223.420636},{"event":"hydration_resume","at":2225.972685},{"event":"fetcher","at":2227.896608,"kind":"bots"},{"event":"enqueue","at":2228.044916,"kind":"bots"},{"event":"dispatch","at":2229.176555,"call":1},{"event":"response","at":2229.209819,"call":1},{"event":"commit","at":2229.884621,"kind":"bots"},{"event":"socket_open","at":2232.536833,"kind":"home"},{"event":"ready","at":2232.840804,"kind":"home"},{"event":"flush","at":2331.463708,"kind":"bot-chats"},{"event":"fetcher","at":2363.116998,"kind":"bots"},{"event":"enqueue","at":2363.352851,"kind":"bots"},{"event":"dispatch","at":2363.529582,"call":2},{"event":"response","at":2363.553105,"call":2},{"event":"commit","at":2363.981968,"kind":"bots"}]}
+# Subtest: native hydration order: warm-committed
+ok 4 - native hydration order: warm-committed
+  ---
+  duration_ms: 343.275599
+  type: 'test'
+  ...
+# {"kind":"native_hydration_order","scenario":"warm-committed","listCalls":1,"rosterCalls":1,"physicalCalls":1,"phases":[{"event":"storage_activate","at":2564.242487},{"event":"restore","at":2568.49884,"kind":"bots"},{"event":"hydration_resume","at":2570.323352},{"event":"fetcher","at":2572.713832,"kind":"roster"},{"event":"enqueue","at":2572.865398,"kind":"roster"},{"event":"fetcher","at":2572.887361,"kind":"bots"},{"event":"enqueue","at":2572.904594,"kind":"bots"},{"event":"socket_open","at":2572.956969,"kind":"home"},{"event":"ready","at":2573.364045,"kind":"home"},{"event":"dispatch","at":2573.913716,"call":1},{"event":"response","at":2573.963006,"call":1},{"event":"commit","at":2574.656057,"kind":"other"},{"event":"commit","at":2574.782831,"kind":"bots"},{"event":"flush","at":2673.105593,"kind":"bots"},{"event":"flush","at":2673.214636,"kind":"bot-chats"}]}
+# Subtest: native hydration order: warm-pending-after-ready
+ok 5 - native hydration order: warm-pending-after-ready
+  ---
+  duration_ms: 496.711524
+  type: 'test'
+  ...
+# {"kind":"native_hydration_order","scenario":"warm-pending-after-ready","listCalls":1,"rosterCalls":1,"physicalCalls":1,"phases":[{"event":"storage_activate","at":2903.992334},{"event":"restore","at":2907.839526,"kind":"bots"},{"event":"hydration_resume","at":2908.644761},{"event":"fetcher","at":2909.343912,"kind":"roster"},{"event":"enqueue","at":2909.455463,"kind":"roster"},{"event":"fetcher","at":2909.47464,"kind":"bots"},{"event":"enqueue","at":2909.491667,"kind":"bots"},{"event":"socket_open","at":2909.504738,"kind":"home"},{"event":"ready","at":2909.670444,"kind":"home"},{"event":"dispatch","at":2909.83459,"call":1},{"event":"flush","at":3008.357354,"kind":"bots"},{"event":"flush","at":3008.477443,"kind":"bot-chats"},{"event":"response_release","at":3070.025941},{"event":"response","at":3070.170078,"call":1},{"event":"commit","at":3071.245498,"kind":"other"},{"event":"commit","at":3071.436388,"kind":"bots"}]}
+# Subtest: native hydration order: warm-pending-before-ready
+ok 6 - native hydration order: warm-pending-before-ready
+  ---
+  duration_ms: 500.339203
+  type: 'test'
+  ...
+# {"kind":"native_hydration_order","scenario":"warm-pending-before-ready","listCalls":2,"rosterCalls":2,"physicalCalls":3,"phases":[{"event":"storage_activate","at":3401.139378},{"event":"restore","at":3403.571804,"kind":"bots"},{"event":"hydration_resume","at":3405.730973},{"event":"fetcher","at":3406.983496,"kind":"roster"},{"event":"enqueue","at":3407.254618,"kind":"roster"},{"event":"fetcher","at":3407.272423,"kind":"bots"},{"event":"enqueue","at":3407.316536,"kind":"bots"},{"event":"dispatch","at":3407.529002,"call":1},{"event":"socket_open","at":3407.7129,"kind":"home"},{"event":"ready","at":3407.895093,"kind":"home"},{"event":"flush","at":3507.687009,"kind":"bots"},{"event":"flush","at":3507.803151,"kind":"bot-chats"},{"event":"response_release","at":3568.285113},{"event":"response","at":3568.327546,"call":1},{"event":"commit","at":3569.359819,"kind":"other"},{"event":"commit","at":3569.492643,"kind":"bots"},{"event":"fetcher","at":3572.386956,"kind":"roster"},{"event":"enqueue","at":3572.541095,"kind":"roster"},{"event":"dispatch","at":3572.905993,"call":2},{"event":"response","at":3573.070714,"call":2},{"event":"commit","at":3573.463868,"kind":"other"},{"event":"fetcher","at":3603.616228,"kind":"bots"},{"event":"enqueue","at":3603.915129,"kind":"bots"},{"event":"dispatch","at":3604.235861,"call":3},{"event":"response","at":3604.267727,"call":3},{"event":"commit","at":3604.830324,"kind":"bots"}]}
+# Subtest: native hydration order: warm-new-home
+ok 7 - native hydration order: warm-new-home
+  ---
+  duration_ms: 345.264545
+  type: 'test'
+  ...
+# {"kind":"native_hydration_order","scenario":"warm-new-home","listCalls":2,"rosterCalls":1,"physicalCalls":2,"phases":[{"event":"storage_activate","at":3901.002733},{"event":"restore","at":3902.607889,"kind":"bots"},{"event":"hydration_resume","at":3904.639165},{"event":"fetcher","at":3905.707261,"kind":"roster"},{"event":"enqueue","at":3905.859285,"kind":"roster"},{"event":"fetcher","at":3905.878081,"kind":"bots"},{"event":"enqueue","at":3905.891884,"kind":"bots"},{"event":"socket_open","at":3905.911242,"kind":"home"},{"event":"ready","at":3906.10298,"kind":"home"},{"event":"dispatch","at":3906.342456,"call":1},{"event":"response","at":3906.389787,"call":1},{"event":"commit","at":3906.975005,"kind":"other"},{"event":"commit","at":3907.065003,"kind":"bots"},{"event":"socket_open","at":3919.624426,"kind":"other"},{"event":"ready","at":3919.840854,"kind":"other"},{"event":"flush","at":4005.195964,"kind":"bots"},{"event":"flush","at":4019.543157,"kind":"bot-chats"},{"event":"fetcher","at":4051.803268,"kind":"bots"},{"event":"enqueue","at":4051.93896,"kind":"bots"},{"event":"dispatch","at":4052.123616,"call":2},{"event":"response","at":4052.143457,"call":2},{"event":"commit","at":4052.555034,"kind":"bots"}]}
+1..7
+# tests 7
+# suites 0
+# pass 6
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 12074.087015

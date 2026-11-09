@@ -1,0 +1,211 @@
+{
+  "schema": "mikka.issue1512.pending-dispatch-installer-composition-review.v1",
+  "scope": "Independent immutable input review only; no combined tree supplied/read, ref mutation, workflow trigger, new resource or local execution.",
+  "source": {
+    "ownBase": "1ffa581f16319381054e0636ae41e6292719a1fe",
+    "actualOwnCiCheckout": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+    "plannedMainBase": "89870a876fa436da51598aa7e089d74d0f177001",
+    "installerPure": "01b302385666dc5b7a1535a335ef1d953c5d12b8",
+    "installerPureTree": "b179bfeca470ba40809ca186238f811c2829f8c7",
+    "installerPreviousDetailedReview": "37cb38b11a484cccd93b5033e5eda44d1535dd7a",
+    "analyticsMergeProof": "40b70a0471f57abf739f90b1a115019aa7476c36",
+    "apiProofReadOnlyReview": "beaf36679d3a62aaa764fcd73a84c2714716e69c"
+  },
+  "conclusion": "No additional code-level must-fix or hidden package dependency found in the exact pending6 + installer11 input composition. This is not combined CI/Native acceptance.",
+  "paths": {
+    "pendingCount": 6,
+    "installerCount": 11,
+    "combinedDeltaCount": 17,
+    "pendingInstallerIntersection": [],
+    "installerExistingOwn33Intersection": [
+      "tests/analytics-policy.test.mjs"
+    ],
+    "pending": [
+      {
+        "path": "apps/desktop/src/renderer/rpc.ts",
+        "bytes": 4640,
+        "sha256": "bb72e38f117c01dffbf4f9ec7e2309160e9ac0d4bf485aa476132b22b191e48c",
+        "gitBlob": "1dfb20c85e930e3c4b75d4f6e656a04fa9c2ffc5"
+      },
+      {
+        "path": "apps/desktop/src/renderer/read-batch.ts",
+        "bytes": 6237,
+        "sha256": "a25842776c07816eb8af6a24d62dc9d745ab13fb9cfff513de02673d48926f18",
+        "gitBlob": "67503a9abe7131de3e9bf86629532e015085d4ee"
+      },
+      {
+        "path": "lib/swr/read-observer.ts",
+        "bytes": 8237,
+        "sha256": "c520e2c86ca83fe382e6131eb48b36b813b6b9f8750dc9d3c09e6e0044412cc9",
+        "gitBlob": "69a827369bd71838ba8ac9ffbee928ca70219e76"
+      },
+      {
+        "path": "components/swr-defaults.tsx",
+        "bytes": 4551,
+        "sha256": "847311eb9b775d43bb9f569d6ec395aeb41475a5ed7468e17cd1826b2c73217d",
+        "gitBlob": "9b7a4385896b9aacc69ea898be23636b5a8c62fb"
+      },
+      {
+        "path": "hooks/use-live-lists.ts",
+        "bytes": 9807,
+        "sha256": "da27e73ae937fed876ae463e988d4418292f9976aeb7bc95a89e786ae80e5fab",
+        "gitBlob": "afd0cae59d1b871cbc5175a6de8f2b44f2d036ca"
+      },
+      {
+        "path": "scripts/use-live-lists.live.test.tsx",
+        "bytes": 75804,
+        "sha256": "9591bf1bd79f47b7c159eadcffa21125a7d06e76bbd33d82fcbbddd25e25af7e",
+        "gitBlob": "a4aec5fe968100f283a8d93b963934430a97fcda"
+      }
+    ],
+    "installer": [
+      {
+        "path": ".github/actions/pnpm-install/action.yml",
+        "sourceBlob": "20a5db53847172db9f52ee12c6c0feeec6c48dce",
+        "combinedBlob": "20a5db53847172db9f52ee12c6c0feeec6c48dce"
+      },
+      {
+        "path": ".github/workflows/self-hosted-image.yml",
+        "sourceBlob": "46f05f36960559221030e89e1add41ecdfced3b4",
+        "combinedBlob": "46f05f36960559221030e89e1add41ecdfced3b4"
+      },
+      {
+        "path": ".github/workflows/web-deploy.yml",
+        "sourceBlob": "bab7ed46eefd7bd4b6db712e8e141484be9f73ba",
+        "combinedBlob": "bab7ed46eefd7bd4b6db712e8e141484be9f73ba"
+      },
+      {
+        "path": "Dockerfile",
+        "sourceBlob": "19054afe4768b3391515c7a3e0f97a0021f123ee",
+        "combinedBlob": "19054afe4768b3391515c7a3e0f97a0021f123ee"
+      },
+      {
+        "path": "package.json",
+        "sourceBlob": "2a8647a5e9075eba8c948b38c3954a5177ea9efd",
+        "combinedBlob": "2a8647a5e9075eba8c948b38c3954a5177ea9efd"
+      },
+      {
+        "path": "patches/ffmpeg-static@5.3.0.patch",
+        "sourceBlob": "5e27d8d12fbed2d0c2e62083976de11c86d9e1fa",
+        "combinedBlob": "5e27d8d12fbed2d0c2e62083976de11c86d9e1fa"
+      },
+      {
+        "path": "pnpm-lock.yaml",
+        "sourceBlob": "4b67909739360248e279efa0c3bb7344379e04fe",
+        "combinedBlob": "4b67909739360248e279efa0c3bb7344379e04fe"
+      },
+      {
+        "path": "pnpm-workspace.yaml",
+        "sourceBlob": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d",
+        "combinedBlob": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d"
+      },
+      {
+        "path": "scripts/check-analytics-ssr.mjs",
+        "sourceBlob": "0fad928edefbb3b2677450f9f04778ec088a6195",
+        "combinedBlob": "0fad928edefbb3b2677450f9f04778ec088a6195"
+      },
+      {
+        "path": "scripts/ffmpeg-install.test.mjs",
+        "sourceBlob": "9ce1e3333fd3ddb10ea206f5144cc466611842a1",
+        "combinedBlob": "9ce1e3333fd3ddb10ea206f5144cc466611842a1"
+      },
+      {
+        "path": "tests/analytics-policy.test.mjs",
+        "sourceBlob": "9fc0602f814f3d8e25ba5668f0f174a26f14718b",
+        "combinedBlob": "f162a894cbada7fada30c63a3a49f4b665574f0f"
+      }
+    ]
+  },
+  "importAndExportChecks": [
+    "read-observer has no external imports. capturePendingReadDispatch, isSnapshotReadFetcher and snapshotReadFetcher are exported by the same candidate observer included with its consumers.",
+    "read-batch's onDispatch stays local request metadata; rpc supplies it only for the original three snapshot RPC actions. No new server API, wire field, RPC whitelist entry, timer or package dependency is required.",
+    "Final test adds only existing imports of authenticated-read-cache, native rpc/read-batch/wire and live telemetry. Existing React/SWR/Happy DOM/tsx/Node test-module-mocks dependencies and script flags remain present.",
+    "check-analytics-ssr newly imports js-yaml; pure package already declares devDependency js-yaml 4.3.2. This remains a build/test verifier dependency, not a newly required production runtime library.",
+    "pnpm-workspace patchedDependencies, package importer, lock snapshot and patch text consistently select ffmpeg-static 5.3.0 with hash 7c49ecd9c22f1a10a87314ce3d1ab332d9c099736c6b8bd5bb86d4d50238776b. No FFmpeg version bump or second installer.",
+    "Pure installer package.json delta only appends scripts/ffmpeg-install.test.mjs to test:captures; it does not delete the existing test:live-lists or test:analytics command."
+  ],
+  "testEntryChecks": [
+    {
+      "task": "ci-integration-7",
+      "command": "pnpm test:live-lists",
+      "includes": "scripts/use-live-lists.live.test.tsx plus existing notification tests",
+      "finalTestBlob": "a4aec5fe968100f283a8d93b963934430a97fcda"
+    },
+    {
+      "task": "ci-integration-18",
+      "command": "pnpm test:captures",
+      "includes": "Existing captures/protocol tests followed by node --test scripts/ffmpeg-install.test.mjs"
+    },
+    {
+      "task": "ci-core-46",
+      "command": "pnpm test:analytics",
+      "includes": "tests/analytics-policy.test.mjs, replay-readiness and trace collector",
+      "mergedTestBlob": "f162a894cbada7fada30c63a3a49f4b665574f0f"
+    },
+    {
+      "runner": "scripts/ci/run-units.mjs",
+      "behavior": "Uses actual CI_UNITS selection and Nx --skip-nx-cache; source declares task reachability, not future selection or completion."
+    }
+  ],
+  "final404SourceReview": {
+    "originalFinalTest": "7854c0f52a0eb906f6c122c440200540e9be5172",
+    "finalTest": "a4aec5fe968100f283a8d93b963934430a97fcda",
+    "delta": "Only appended final test; no removals or previous assertion edits.",
+    "actualSourcePath": "Held real native readBatch after live_ready; both gap flushes wait; actual 404 capability response causes real rpc single fallback; both old fallback responses stay held while revocation wakes catch-ups; asserts 2 logical reads each / 5 physical; late fallback completion neither overwrites fresh values nor starts more work.",
+    "singletonBoundary": "The fallback changes this document's batching capability, so the test is last. Existing per-file runner isolation remains; no global product capability reset was added.",
+    "executionBoundary": "Author reports targeted 1/1 and final full 75/75 actual Node execution. This reviewer checked immutable source, not a new run. Root final raw 75 log independent verification was still pending at this report's handoff; no claim that root or this reviewer reran or already verified that log."
+  },
+  "preservation": {
+    "analytics": "Candidate f162 preserves both original Replay bot/browser closed classification test and owner's frozen FFmpeg provenance test, with unchanged original imports and no duplicate test titles. Prior exact bidirectional byte-preservation proof reused.",
+    "exclusions": [
+      "All 15 owner performance paths remain excluded.",
+      "Excluded installer-owner SuggestionsRefresh mock-only change is not newly required by the 11 installer files; its historical test evidence is not claimed as this candidate's result.",
+      "No API dispatch-proof candidate from the separate read-only report is implemented."
+    ],
+    "mainDelta": "Previously reviewed 89->898 main delta has 23 Mobile/design/locale paths and no overlap with six pending sources or the four exact CI catalogue/runner sources read here.",
+    "originalContracts": "Original full Native windows, SQL/bytes budgets, account/source guards, cleanup and all prior RED results remain unchanged. Existing own33 overlays including fake executable modes must still be preserved by the root's eventual immutable tree construction; this review does not pretend to have checked an unprovided combined tree."
+  },
+  "verification": {
+    "newTests": 0,
+    "newWorkflowRuns": 0,
+    "newResources": 0,
+    "newModels": 0,
+    "refWrites": 0,
+    "immutableReceiptBlobOnly": true,
+    "futureActualSelectionNeeded": true,
+    "futureExactCheckoutAndWholeNativeWindowNeeded": true,
+    "installerMacFullAcceptanceNotEstablishedByThisReview": true
+  },
+  "catalogueSources": [
+    {
+      "path": "package.json",
+      "bytes": 80372,
+      "sha256": "2d8d522d69e4117c391bd1a905c6b4be03a75c9fb5e9a3ad384d4dedc2b20297",
+      "gitBlob": "2a8647a5e9075eba8c948b38c3954a5177ea9efd"
+    },
+    {
+      "path": ".github/workflows/ui-policy.yml",
+      "bytes": 22618,
+      "sha256": "0e62df8a85e4f58a5c790233d7c1a229579db34b137bbc3b644e60f5ae5408d4",
+      "gitBlob": "18e7c54ec507d02b12fd1131b5a8b6112ece2212"
+    },
+    {
+      "path": "scripts/ci/run-units.mjs",
+      "bytes": 1575,
+      "sha256": "4766b742632e01a1bd3bf8dffb22998736bdb5d7d0e4804363681330eea53036",
+      "gitBlob": "21d811ee3dadbc6560cbab70a8cf9b4ba4bd615e"
+    },
+    {
+      "path": "scripts/ci/tasks.json",
+      "bytes": 8913,
+      "sha256": "ddb9f2dca5ba4f1f7bdb5041b31798e56b4d5e173ba605fcab48c3fbe13b0892",
+      "gitBlob": "fe7715fd098982effaf532a9f5330fa83df0532f"
+    },
+    {
+      "path": ".github/workflows/ci-selection.yml",
+      "bytes": 3352,
+      "sha256": "7d8d79b8e58093d7f655dadb0b229b6e7089333802b87b778aaf36a316adfde2",
+      "gitBlob": "5d541b4ff7be9cb365b18b804bbbe7c3db235580"
+    }
+  ]
+}

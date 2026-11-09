@@ -1,0 +1,34 @@
+{
+  "exitCode": 1,
+  "durationSeconds": 11.67,
+  "command": [
+    "/vercel/live-tools/node-v24.22.2-linux-x64/bin/node",
+    "--experimental-test-module-mocks",
+    "--import",
+    "./scripts/server-test.mjs",
+    "--import",
+    "tsx",
+    "--test",
+    "--test-reporter=tap",
+    "--test-name-pattern=^native hydration order:",
+    "scripts/use-live-lists.live.test.tsx"
+  ],
+  "logBytes": 8397,
+  "logSHA256": "3e3bd1886f91b8d3548850d5abf394a85ee5682bcfe5a0d94d5378d3a69cd7c1",
+  "summary": [
+    "ok 1 - native hydration order: provider-unresolved",
+    "ok 2 - native hydration order: provider-hint",
+    "ok 3 - native hydration order: warm-committed",
+    "not ok 4 - native hydration order: warm-pending-after-ready",
+    "ok 5 - native hydration order: warm-pending-before-ready",
+    "ok 6 - native hydration order: warm-new-home",
+    "# tests 6",
+    "# pass 5",
+    "# fail 1",
+    "# cancelled 0",
+    "# skipped 0",
+    "# duration_ms 11628.262233"
+  ],
+  "testSourceSHA256": "d4bbb3ed8af5ef3ad0a11fe246c568ef863eb847d6ac0ca0b688ff10ee6faab7",
+  "runtimeSourceUnmodified": true
+}

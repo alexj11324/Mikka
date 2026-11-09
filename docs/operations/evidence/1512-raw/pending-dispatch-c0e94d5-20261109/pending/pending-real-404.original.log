@@ -1,0 +1,20 @@
+TAP version 13
+# (node:1116) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:1116) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# Subtest: native pending dispatch: real 404 capability fallback revokes an already awaited hint
+ok 1 - native pending dispatch: real 404 capability fallback revokes an already awaited hint
+  ---
+  duration_ms: 1006.421239
+  type: 'test'
+  ...
+# {"kind":"native_real_capability_fallback","physical":5,"logical":{"bots":2,"roster":2},"phases":["enqueue:roster","enqueue:bots","ready","dispatch:1:desktop.readBatch","flush:bots","flush:bot-chats","batch_404","dispatch:2:bots.pollBots","fallback_held:roster","dispatch:3:coordinator.pollBotChatSummaries","fallback_held:bots","enqueue:roster","dispatch:4:bots.pollBots","catchup:roster","response:4","enqueue:bots","dispatch:5:coordinator.pollBotChatSummaries","catchup:bots","response:5","release_fallback","response:2","response:3"]}
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 9362.420206

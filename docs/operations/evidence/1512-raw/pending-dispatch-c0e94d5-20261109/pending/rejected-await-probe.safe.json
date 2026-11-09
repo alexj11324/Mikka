@@ -1,0 +1,36 @@
+{
+  "exitCode": 1,
+  "durationSeconds": 12.162,
+  "command": [
+    "/vercel/live-tools/node-v24.22.2-linux-x64/bin/node",
+    "--experimental-test-module-mocks",
+    "--import",
+    "./scripts/server-test.mjs",
+    "--import",
+    "tsx",
+    "--test",
+    "--test-reporter=tap",
+    "--test-name-pattern=^(native hydration order:|a SWR read that starts before the live connection opens)",
+    "scripts/use-live-lists.live.test.tsx"
+  ],
+  "logBytes": 8341,
+  "logSHA256": "a759b0bd219ce14ab78934ac26a8e06b416b8a6d7f8734e6deb693801228207f",
+  "summary": [
+    "not ok 1 - a SWR read that starts before the live connection opens cannot consume its catch-up",
+    "ok 2 - native hydration order: provider-unresolved",
+    "ok 3 - native hydration order: provider-hint",
+    "ok 4 - native hydration order: warm-committed",
+    "ok 5 - native hydration order: warm-pending-after-ready",
+    "ok 6 - native hydration order: warm-pending-before-ready",
+    "ok 7 - native hydration order: warm-new-home",
+    "# tests 7",
+    "# pass 6",
+    "# fail 1",
+    "# cancelled 0",
+    "# skipped 0",
+    "# duration_ms 12074.087015"
+  ],
+  "probeSHA256": "e0ab5bd3f4edad0c55f0ffc81c7aaa6ec9dffb3b42b1ceaf6154910007b969c5",
+  "baselineRestoredSHA256": "2c4f60539d1eb8d8e607490268fe065fa03b6f1b27e796fa23f5f35bd670499b",
+  "candidateRejected": true
+}

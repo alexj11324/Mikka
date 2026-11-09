@@ -1,0 +1,394 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512-pure1810-single-test-source-merge-review",
+  "preparedAt": "2026-11-09T08:08:19Z",
+  "repository": "alexj11324/Mikka",
+  "status": "candidate_blob_prepared_only_installer_integration_pending",
+  "scope": {
+    "requestedArtifactPath": "tests/analytics-policy.test.mjs",
+    "candidateProductOrInstallerFiles": 0,
+    "candidateTestFiles": 1,
+    "refsChanged": 0,
+    "commitsCreated": 0,
+    "treesCreated": 0,
+    "excluded": "The other six pure7 paths remain owner-maintained inputs; no 15 performance paths, mock path, replacement installer, workflow, or ref was added.",
+    "mode": "Only blob content was created. No tree mode was chosen or changed; later integration must preserve the existing target mode."
+  },
+  "sources": {
+    "baseCommit": "927260894305e066e15a4ad50114abce433e6001",
+    "pure7Commit": "4b6586eee0da9ed3ebba5197140fa36b7ac0e7ed",
+    "pure7Tree": "d41509872d6dd3c978a7ddb7aee416339094c1f3",
+    "pure7Parents": [
+      "927260894305e066e15a4ad50114abce433e6001"
+    ],
+    "compareCommitCount": 1,
+    "ownHead": "1ffa581f16319381054e0636ae41e6292719a1fe",
+    "ownActualCiCheckout": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+    "ownTree": "bc4d584fa651385886e79dc6359b1b43324425d1",
+    "ownDeltaPathCount": 33,
+    "pure7PathCount": 7,
+    "intersection": [
+      "tests/analytics-policy.test.mjs"
+    ],
+    "urls": {
+      "compare": "https://github.com/alexj11324/Mikka/compare/927260894305e066e15a4ad50114abce433e6001...4b6586eee0da9ed3ebba5197140fa36b7ac0e7ed",
+      "ownTest": "https://github.com/alexj11324/Mikka/blob/1ffa581f16319381054e0636ae41e6292719a1fe/tests/analytics-policy.test.mjs",
+      "theirTest": "https://github.com/alexj11324/Mikka/blob/4b6586eee0da9ed3ebba5197140fa36b7ac0e7ed/tests/analytics-policy.test.mjs",
+      "ownerPullRequest": "https://github.com/alexj11324/Mikka/pull/1810"
+    }
+  },
+  "inputTestBytes": {
+    "base": {
+      "bytes": 20826,
+      "sha256": "38fe009f2af0a29abc1bfc6efef821c9cd79b7424c4c5b97d41b06014e10e66f",
+      "gitBlob": "74c4933788dda4e33caca2675738bc223442adda"
+    },
+    "ours": {
+      "bytes": 22455,
+      "sha256": "5caff4e596b385226695ea9d35899b3f21ea34cb95ea4ef160400d0eb77d69e7",
+      "gitBlob": "c904b35e3405353be5a549b0d53e2858e19c3454"
+    },
+    "theirs": {
+      "bytes": 25297,
+      "sha256": "ae3119ef1d7dcb36d61485de4ae3ddf62fa6b8d92529728092f1814cd82dce37",
+      "gitBlob": "9fc0602f814f3d8e25ba5668f0f174a26f14718b"
+    }
+  },
+  "sevenFileDelta": [
+    {
+      "path": "package.json",
+      "newGitBlob": "2a8647a5e9075eba8c948b38c3954a5177ea9efd",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 1,
+      "completePatchRead": true
+    },
+    {
+      "path": "patches/ffmpeg-static@5.3.0.patch",
+      "newGitBlob": "93920939ad2c3b7e3f6d7c41edc899483bb0af5b",
+      "status": "added",
+      "additions": 499,
+      "deletions": 0,
+      "completePatchRead": true
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "newGitBlob": "7a20e3a7b96e8849225b75b690e72e1153f4765d",
+      "status": "modified",
+      "additions": 5,
+      "deletions": 2,
+      "completePatchRead": true
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "newGitBlob": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d",
+      "status": "modified",
+      "additions": 1,
+      "deletions": 0,
+      "completePatchRead": true
+    },
+    {
+      "path": "scripts/check-analytics-ssr.mjs",
+      "newGitBlob": "0fad928edefbb3b2677450f9f04778ec088a6195",
+      "status": "modified",
+      "additions": 25,
+      "deletions": 7,
+      "completePatchRead": true
+    },
+    {
+      "path": "scripts/ffmpeg-install.test.mjs",
+      "newGitBlob": "ae21017d88502022a375319ce954185cf4e6cd0e",
+      "status": "added",
+      "additions": 250,
+      "deletions": 0,
+      "completePatchRead": true
+    },
+    {
+      "path": "tests/analytics-policy.test.mjs",
+      "newGitBlob": "9fc0602f814f3d8e25ba5668f0f174a26f14718b",
+      "status": "modified",
+      "additions": 71,
+      "deletions": 0,
+      "completePatchRead": true
+    }
+  ],
+  "candidate": {
+    "path": "tests/analytics-policy.test.mjs",
+    "bytes": 26926,
+    "sha256": "a6cf1eb935b3bf5aac97ce4101a3b33a09d63b25530dbf43332484d032841dc2",
+    "gitBlob": "f162a894cbada7fada30c63a3a49f4b665574f0f",
+    "createBlobReturnedSha": "f162a894cbada7fada30c63a3a49f4b665574f0f",
+    "remoteShaMatchesComputedGitBlob": true
+  },
+  "mergeProof": {
+    "method": "Pure V8 line-diff and exact string reconstruction using the full fetched base, ours, and theirs contents.",
+    "baseToOurs": [
+      {
+        "oldStart": 68,
+        "added": 23,
+        "removed": 0
+      }
+    ],
+    "baseToTheirs": [
+      {
+        "oldStart": 198,
+        "added": 1,
+        "removed": 0
+      },
+      {
+        "oldStart": 313,
+        "added": 70,
+        "removed": 0
+      }
+    ],
+    "oursToCandidate": [
+      {
+        "oldStart": 221,
+        "newStart": 221,
+        "removed": [],
+        "added": [
+          "  await write('pnpm-lock.yaml', JSON.stringify({ importers: { '.': { dependencies: { 'ffmpeg-static': { specifier: '5.3.0', version: '5.3.0' } } } }, snapshots: { 'ffmpeg-static@5.3.0': {} } }))"
+        ]
+      },
+      {
+        "oldStart": 336,
+        "newStart": 337,
+        "removed": [],
+        "added": [
+          "test('patched FFmpeg provenance accepts only the exact frozen patch hash and original source boundaries', async t => {",
+          "  const { root, built, write } = await analyticsBuildFixture(t)",
+          "  const digest = bytes => createHash('sha256').update(bytes).digest('hex')",
+          "  const patch = '--- a/install.js\\n+++ b/install.js\\n@@ -1 +1 @@\\n-old\\n+bounded\\n'",
+          "  const patchPath = 'patches/ffmpeg-static@5.3.0.patch', patchHash = digest(patch)",
+          "  const lockedVersion = `5.3.0(patch_hash=${patchHash})`",
+          "  const packageDirectory = `node_modules/.pnpm/ffmpeg-static@5.3.0_patch_hash=${patchHash}/node_modules/ffmpeg-static`",
+          "  const lock = {",
+          "    patchedDependencies: { 'ffmpeg-static@5.3.0': { hash: patchHash, path: patchPath } },",
+          "    importers: { '.': { dependencies: { 'ffmpeg-static': { specifier: '5.3.0', version: lockedVersion } } } },",
+          "    snapshots: { [`ffmpeg-static@${lockedVersion}`]: {} },",
+          "  }",
+          "  const writeLock = () => write('pnpm-lock.yaml', JSON.stringify(lock))",
+          "  await write('package.json', JSON.stringify({ dependencies: { 'ffmpeg-static': '5.3.0' } }))",
+          "  await writeLock(); await write(patchPath, patch)",
+          "  await write(`${packageDirectory}/package.json`, JSON.stringify({ name: 'ffmpeg-static', version: '5.3.0' }))",
+          "  const original = Buffer.from('locked executable fixture\\n'), archive = gzipSync(original)",
+          "  await write(`${packageDirectory}/ffmpeg`, original)",
+          "  const publicLink = join(root, 'node_modules/ffmpeg-static')",
+          "  await symlink(join(root, packageDirectory), publicLink, 'dir')",
+          "  const manifest = { version: 1, bytes: original.length, sha256: digest(original), gzipBytes: archive.length, gzipSha256: digest(archive) }",
+          "  const packed = async (path, bytes) => {",
+          "    await write(`.output/${path}`, bytes)",
+          "    built.resources.push({ path, bytes: Buffer.byteLength(bytes), sha256: digest(bytes) })",
+          "  }",
+          "  for (const name of POSTER_LICENSE_FILES) {",
+          "    const bytes = `pinned upstream ${name}\\n`",
+          "    await write(`${packageDirectory}/${name}`, bytes)",
+          "    await packed(`${POSTER_RUNTIME_DIRECTORY}/${name}`, bytes)",
+          "  }",
+          "  await packed(POSTER_BINARY_ARCHIVE, archive)",
+          "  await packed(POSTER_BINARY_MANIFEST, JSON.stringify(manifest))",
+          "  built.posterBinary = manifest",
+          "  assert.equal((await verifyRuntimeResources(root, built)).count, requiredRuntimeResources.length + 6)",
+          "",
+          "  // pnpm hashes patch text after CRLF normalization, not arbitrary store suffixes.",
+          "  await write(patchPath, patch.replaceAll('\\n', '\\r\\n'))",
+          "  assert.equal((await verifyRuntimeResources(root, built)).count, requiredRuntimeResources.length + 6)",
+          "  await write(patchPath, patch + 'changed\\n')",
+          "  await assert.rejects(verifyRuntimeResources(root, built), /FFmpeg patch must match its frozen lock hash/)",
+          "  await write(patchPath, patch)",
+          "",
+          "  lock.importers['.'].dependencies['ffmpeg-static'].version = '5.3.0'",
+          "  await writeLock()",
+          "  await assert.rejects(verifyRuntimeResources(root, built), /FFmpeg resolution must match the frozen lock/)",
+          "  lock.importers['.'].dependencies['ffmpeg-static'].version = lockedVersion",
+          "  await writeLock()",
+          "",
+          "  lock.patchedDependencies['ffmpeg-static@5.3.0'].path = 'patches/unrelated.patch'",
+          "  await writeLock()",
+          "  await assert.rejects(verifyRuntimeResources(root, built), /FFmpeg patch path must be exact/)",
+          "  lock.patchedDependencies['ffmpeg-static@5.3.0'].path = patchPath",
+          "  await writeLock()",
+          "",
+          "  const wrongDirectory = `node_modules/.pnpm/ffmpeg-static@5.3.0_patch_hash=${'0'.repeat(64)}/node_modules/ffmpeg-static`",
+          "  await mkdir(join(root, wrongDirectory), { recursive: true })",
+          "  await rm(publicLink); await symlink(join(root, wrongDirectory), publicLink, 'dir')",
+          "  await assert.rejects(verifyRuntimeResources(root, built), /exact pinned pnpm package/)",
+          "  await rm(publicLink); await symlink(join(root, packageDirectory), publicLink, 'dir')",
+          "",
+          "  await write('saved.patch', patch)",
+          "  await rm(join(root, patchPath)); await symlink(join(root, 'saved.patch'), join(root, patchPath))",
+          "  await assert.rejects(verifyRuntimeResources(root, built), /symlinks/)",
+          "  await rm(join(root, patchPath)); await write(patchPath, patch)",
+          "  await write(`${packageDirectory}/alternate`, original)",
+          "  await rm(join(root, packageDirectory, 'ffmpeg'))",
+          "  await symlink(join(root, packageDirectory, 'alternate'), join(root, packageDirectory, 'ffmpeg'))",
+          "  await assert.rejects(verifyRuntimeResources(root, built), /symlinks/)",
+          "})",
+          ""
+        ]
+      }
+    ],
+    "theirsToCandidate": [
+      {
+        "oldStart": 68,
+        "newStart": 68,
+        "removed": [],
+        "added": [
+          "test('SDK browser classification keeps only bot or browser on normal events and masked Replay', () => {",
+          "  const payload = [{ type: 2, data: { node: { textContent: '***' } } }]",
+          "  for (const event of ['$pageview', '$snapshot']) {",
+          "    for (const browserType of ['bot', 'browser']) {",
+          "      const properties = { $browser_type: browserType, $session_id: 'session', $raw_user_agent: 'PRIVATE_UA_CANARY',",
+          "        userAgent: 'PRIVATE_UA_CANARY', private: 'PRIVATE_CLASSIFICATION_CANARY',",
+          "        ...(event === '$snapshot' ? { $snapshot_data: payload, $snapshot_bytes: 10 } : {}) }",
+          "      const sanitized = sanitizeAnalyticsEvent({ event, properties })",
+          "      assert.deepEqual(sanitized.properties, { $browser_type: browserType, $session_id: 'session',",
+          "        ...(event === '$snapshot' ? { $snapshot_data: payload, $snapshot_bytes: 10 } : {}) })",
+          "      if (event === '$snapshot') assert.equal(sanitized.properties.$snapshot_data, payload)",
+          "      assert.equal(JSON.stringify(sanitized).includes('PRIVATE_'), false)",
+          "    }",
+          "    for (const value of [undefined, null, true, 1, 'BOT', 'human', 'bot ', 'private@example.invalid', 'x'.repeat(4096), { type: 'bot' }]) {",
+          "      const sanitized = sanitizeAnalyticsEvent({ event, properties: { $browser_type: value } })",
+          "      assert.equal(Object.hasOwn(sanitized.properties, '$browser_type'), false)",
+          "      assert.deepEqual(sanitized.properties, {})",
+          "    }",
+          "  }",
+          "  assert.equal(sanitizeAnalyticsEvent({ event: 'unknown', properties: { $browser_type: 'bot' } }), null)",
+          "  assert.equal(sanitizeAnalyticsEvent({ event: 'unknown', get properties() { throw new Error('PRIVATE_CLASSIFICATION_CANARY') } }), null)",
+          "})",
+          ""
+        ]
+      }
+    ],
+    "fromBothOrdersByteIdentical": true,
+    "removingOtherSideAdditionsRestoresExactInput": true,
+    "importsByteIdentical": true,
+    "duplicateTestTitles": [],
+    "testDeclarationCounts": {
+      "base": 19,
+      "ours": 20,
+      "theirs": 20,
+      "candidate": 21
+    },
+    "testDeclarationCountsAreNotExecutedTestResults": true,
+    "newlyRetainedTitles": {
+      "ours": "SDK browser classification keeps only bot or browser on normal events and masked Replay",
+      "theirs": "patched FFmpeg provenance accepts only the exact frozen patch hash and original source boundaries"
+    },
+    "allBaseTestTitles": [
+      "pageviews strip query strings, hashes, document identifiers and unapproved properties",
+      "automatic top-level person mutations are stripped without losing ingestion metadata",
+      "unknown events and raw exception events never pass the allowlist",
+      "masked replay keeps only its transport payload and cannot mutate a person",
+      "all upcoming features fail closed, even if the remote switch is accidentally enabled",
+      "gated features are on only when the remote flag is exactly true",
+      "the 电脑 tab has its own kill switch, apart from the cloud computer rollout flag",
+      "the active Vite web entry initializes PostHog and the shared application mounts its pageview tracker",
+      "analytics acceptance preserves the three real anonymous routes and isolated database restriction",
+      "all non-local browser HTTP and WebSocket requests are blocked before sending analytics",
+      "analytics build proof checks actual packaged bytes, public Vite entry and the synthetic key",
+      "artifact verification rejects escaping and symlinked files instead of accepting their filenames",
+      "generated FFmpeg evidence verifies the pinned pnpm source, real decompression and unchanged symlink boundaries",
+      "runtime separates the desktop shell and still drops other client details",
+      "smoke accounts are recognised only by their +mikka-smoke tag, and the tag survives sanitizing",
+      "the CI AppArmor attachment authorizes only the actual installed headless Chromium path",
+      "the CI AppArmor helper rejects missing and ambiguous installed browser revisions",
+      "the CI AppArmor helper rejects glob syntax, path aliases, and executable symlinks",
+      "the CI AppArmor helper refuses non-executable or non-ELF files"
+    ]
+  },
+  "retainedContracts": {
+    "replay": {
+      "eventKinds": [
+        "$pageview",
+        "$snapshot"
+      ],
+      "acceptedClassification": [
+        "bot",
+        "browser"
+      ],
+      "rejectedValues": "Missing, null, booleans, numbers, other or differently cased/trailing-space strings, email-like/oversized strings, and objects.",
+      "content": "Existing masked Replay payload/session checks and private user-agent canaries are retained. Unknown events still fail closed without evaluating an irrelevant throwing properties getter."
+    },
+    "ffmpeg": {
+      "existingFixture": "The added matching unpatched pnpm lock fixture line is retained in the original generated-FFmpeg test.",
+      "newRegression": "The entire 70-line strict patched-source test is retained at EOF.",
+      "positiveSourceCases": [
+        "Exact frozen patch SHA256 with matching locked importer/snapshot and pnpm store directory",
+        "CRLF-normalized patch bytes"
+      ],
+      "negativeSourceCases": [
+        "Changed patch bytes",
+        "Mismatched lock resolution",
+        "Wrong patch path",
+        "Wrong pnpm store hash directory",
+        "Symlinked patch",
+        "Symlinked executable"
+      ],
+      "existingBoundaries": "Original generated gzip/decompression, source byte equality, forged-source, path-escape and symlink regression code remains byte-preserved."
+    }
+  },
+  "packageLayerReview": {
+    "packageEntry": "test:captures appends the existing-owner scripts/ffmpeg-install.test.mjs entry.",
+    "packagePatch": {
+      "path": "patches/ffmpeg-static@5.3.0.patch",
+      "bytes": 18394,
+      "gitBlob": "93920939ad2c3b7e3f6d7c41edc899483bb0af5b",
+      "sha256": "e67d78d6b10fbf3ba5bd4fc34b13983b4047f91898a43030b5305067ef835641",
+      "crlfNormalizedSha256MatchesFrozenLock": true,
+      "scope": "Upstream install.js delegates to owner-provided mikka-install.js and a fixed asset manifest within the patched ffmpeg-static package."
+    },
+    "observedSourceGuards": [
+      "Pinned ffmpeg-static 5.3.0 / b6.1.1 assets; official release URL followed by one official GitHub API fallback; closed HTTPS redirect hosts.",
+      "Per-attempt deadline, status/encoding checks, compressed and expanded size/hash checks, exclusive staging, atomic rename, and cleanup.",
+      "Binary, README and LICENSE completion is mandatory; existing files are validated and unsupported override paths rejected.",
+      "Analytics resource verification reads the frozen lock and permits only the exact declared fixed patch path/hash, locked resolution/snapshot and matching pnpm directory, while retaining source/file boundary checks."
+    ],
+    "installerTestSourceRead": true,
+    "externalAssetManifestBytesIndependentlyDownloadedOrVerified": false,
+    "actualInstallerExecutionPerformedByReviewer": false,
+    "lockHashSelfConsistencyDoesNotProveInstallationOrRuntimeSuccess": true
+  },
+  "impactReview": {
+    "singleFileMergeMustFixFound": false,
+    "tracing": "The seven-path delta does not edit trace ancestry, sampling, exporters, error retention or LLM generation code.",
+    "replay": "Runtime opt-in and bot/browser projection implementations are not edited by pure7; the candidate preserves our exact classification regression.",
+    "native": "No Native SQL counting window, query counter, threshold, navigation order, account scope, browser single-click contract or daemon poll schedule is changed by pure7.",
+    "build": "Package and lock changes affect normal pnpm installation/build consumers, including image and Native builds. They require subsequent exact-source installation and validation.",
+    "noRuntimeEquivalenceClaim": "No worker hash, runtime artifact equivalence, performance invariance, or new Native pass is inferred from this source review.",
+    "integrationRule": "Only this merged test blob is proposed here. Preserve all other target main/own paths; integrate the other six installer inputs only from the owner's reviewed corrected revision."
+  },
+  "failureAndPending": {
+    "initialBlocker": "Parent reported the actual own image job failed while obtaining the official FFmpeg asset with HTTP 504.",
+    "ownerFullHead": "e9fa621f18c7809c7f890a5b4670bd580c7424dc",
+    "ownerCurrentStatus": "Parent reports actual installation FAIL for this full head; the original owner exclusively owns its logs and diagnosis.",
+    "reviewerReadOwnerFailureLogs": false,
+    "reviewerInferredFailureCause": false,
+    "readyToPublishInstaller": false,
+    "finalPatchAndLock": "Must be taken from the owner's subsequent actual corrected source, then bound to real installation/CI evidence.",
+    "futureRevision": "No new owner head was queried or automatically adopted during this fixed-source task. If its test blob changes, this candidate must be rechecked against that exact new input."
+  },
+  "validationBoundary": {
+    "completed": [
+      "Read full base/ours/theirs test inputs",
+      "Read all seven fixed source deltas",
+      "Recomputed byte counts, SHA256 and Git blob hashes",
+      "Computed one-path intersection",
+      "Verified disjoint insertion merge in both orders and exact inverse preservation",
+      "Verified imports and unique test declarations"
+    ],
+    "notPerformed": [
+      "Node parsing or unit tests",
+      "Installer execution",
+      "External asset/network downloads",
+      "CI dispatch or rerun",
+      "Owner failure log acquisition",
+      "Native or production acceptance",
+      "Database/model/browser/VM creation",
+      "Git ref updates"
+    ],
+    "sourceTextChecksDoNotReplaceActualTests": true,
+    "activeResourcesCreated": 0,
+    "outputSafety": "Receipt contains source hashes, closed path names and bounded review findings only; no credentials, signed URLs, business data or raw API envelopes."
+  }
+}

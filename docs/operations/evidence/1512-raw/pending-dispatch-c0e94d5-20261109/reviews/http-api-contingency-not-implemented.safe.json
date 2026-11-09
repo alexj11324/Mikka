@@ -1,0 +1,337 @@
+{
+  "schema": "mikka.issue1512.http-dispatch-proof-source-review.v1",
+  "scope": "Read-only suitability and attribution review. No source change, test execution, new resource, workflow, model, database or business-data query.",
+  "source": {
+    "repository": "alexj11324/Mikka",
+    "head": "1ffa581f16319381054e0636ae41e6292719a1fe",
+    "actualCiCheckout": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+    "tree": "bc4d584fa651385886e79dc6359b1b43324425d1",
+    "allManifestSourcesFetchedAtExactHead": true,
+    "searchUse": "Current-main code search only located paths; final statements use exact 1ffa bytes."
+  },
+  "callerProvidedObservedSqlDeltas": {
+    "/api/conversations": 5,
+    "/api/approved-writes": 10,
+    "/api/pending-actions": 1,
+    "basis": "Parent's original first-pair scope comparison; no original metrics recomputation in this review.",
+    "notHttpRequestCounts": true,
+    "provedSavings": null
+  },
+  "attribution": {
+    "scopesAreExact": "db-metrics records the original pg.Client.query ordinal/count and exact requestRoute ALS scope. Closed /api/conversations and /api/conversations/[id]/read entries are distinct; do not merge the read-position subroute into the group-list scope.",
+    "conversationsRootProducer": "IssueWorkspace line611 mounts BotList with phoneOnly=fullPage. For section=coordinator, fullPage=false. BotListBody line125 unconditionally calls useLiveGroupList(user.id,workspaceId), subject to non-null workspace. This is a real Coordinator-root producer. The separate IssueWorkspace line145 group-list call requires groupId and a nonmatching openedGroup; it is not enabled by a plain Coordinator page.",
+    "actualOriginalCaller": "unknown: the observed SQL scopes lack HTTP context; no individual extra GET, catch-up, component instance or trigger is proved by these source branches.",
+    "approvedWritesGet": "GET /api/approved-writes returns public feature availability without initializing auth/database/providers. The observed SQL delta cannot be assigned to this GET; exact POST op/list/view/decision frequencies remain unknown.",
+    "sharedScopeRead": "PendingActions and ApprovedWriteActions each call usePersonalApprovalScope. It shares SWR /api/workspace/switcher; personalApprovalWorkspace validates the current owner and selects personal scope. This separate read must not be counted as a proved saving in the three target route deltas."
+  },
+  "candidates": [
+    {
+      "route": "GET /api/conversations?workspaceId",
+      "reader": "BotListBody or enabled IssueWorkspace group branch -> useLiveGroupList -> fetchScopedGroups -> readGroupApi",
+      "swrKey": "['bot-list-groups', ownerId, workspaceId]",
+      "live": "group_list; scope=workspaceId; serialized same SWR key; minIntervalMs=2000",
+      "transformation": "One GET; validate viewerId and workspaceId; return the original conversations array. BotList later combines/sorts display rows after SWR; this does not change the SWR read object.",
+      "completedProof": "Eligible for a narrowly placed captureReadDispatch immediately before this GET and attached only after validation to the exact returned array. No wrapper is required.",
+      "pendingProof": "Not automatically covered by completed proof. If later proposed, explicit snapshot-fetcher opt-in and dispatch notification must preserve the already-reviewed pending revocation/current/commit/revision checks; current three RPC whitelist entries remain unchanged.",
+      "exclusions": [
+        "Legacy fetchGroups has no viewer/workspace response validation and has no located production caller in this bounded search.",
+        "Do not blanket-tag readGroupApi: it also serves group members.",
+        "Group-message before/after pagination, mergeGroupPoll and chronological aggregation are different paths and cannot inherit a single-page proof.",
+        "No generic POST send/stop/create/mark proof."
+      ],
+      "originalDeltaAttribution": "source-compatible producer, not a proved cause of all +5 SQL"
+    },
+    {
+      "route": "GET /api/pending-actions",
+      "reader": "PendingActions -> loadPendingActionPage",
+      "swrKey": "['pending-actions', ownerId, sessionId]",
+      "live": "pending_actions; matching personal workspace; deadline=nextPendingActionDeadline(data)",
+      "transformation": "One GET; require successful response and exact encoded X-Mikka-Viewer; require array body; return {items, requestedAt, observedAt}. Expiry filtering occurs only in rendering.",
+      "completedProof": "Eligible on the final shallow wrapper after all checks, captured immediately before the one fetch. Alternatively carry from that response's own array into that wrapper. Do not move/reset requestedAt or invent observedAt.",
+      "scope": "Owner header is explicit; session identity is in SWR key and provider lifetime, not echoed in this HTTP body. Keep those existing isolation gates. Old owner/session results must never certify a new key.",
+      "exclusions": [
+        "Failed/malformed/mismatched-owner responses remain failures without proof.",
+        "Expiry and same-expiry authoritative reread remain necessary; a response dispatched before the expiry obligation cannot cover it.",
+        "Explicit decide/mutate flow and zero automatic decision behavior remain unchanged."
+      ],
+      "originalDeltaAttribution": "compatible with a single-read candidate; +1 SQL does not prove one redundant HTTP request"
+    },
+    {
+      "route": "GET /api/approved-writes",
+      "reader": "ApprovedWriteActions -> loadApprovedWriteAvailability",
+      "swrKey": "'approved-write-availability'",
+      "live": "included among approved_writes invalidation keys; feature-flag changes explicitly refresh it",
+      "transformation": "Response {enabled} becomes primitive boolean.",
+      "completedProof": "Not directly transferable through current object WeakMap API. Do not use a shared true/false side channel, attach proof to a discarded envelope, or change the public return type merely to claim these SQL savings.",
+      "originalDeltaAttribution": "No product DB initialization in GET; not the +10 SQL source."
+    },
+    {
+      "route": "POST /api/approved-writes op=list",
+      "reader": "ApprovedWriteActions -> useSWRInfinite -> loadUnresolvedWrites",
+      "pageKey": "['approved-writes', viewer, ownerColonSession, previous.nextCursor or '']",
+      "liveKey": "$inf$ key produced by swr/infinite unstable_serialize over first-page key; plus availability key",
+      "transformation": "Each successful page validates viewerId/items/nextCursor/asOf and shallow-adds requestedAt. SWRInfinite creates pages[] and can retain earlier pages; rendering flatMaps pages and copies page observation fields to items. revalidateAll=true is retained. Cursor binds user/session/unresolved mode and asOf on the server.",
+      "completedProof": "A particular successful page can carry its own response proof. That is not proof for the live $inf$ aggregate. Do not carry one/latest page proof onto pages[], especially when another page was cached or dispatched before the gap.",
+      "pendingProof": "No blanket snapshot opt-in for this multi-read aggregate. A safe aggregate scheme would need proof for every page actually committed under the same owner/session/cursor chain, including invalidation of reused pre-gap pages; this is beyond a shallow-wrapper fix and is not proposed for the current candidate.",
+      "exclusions": [
+        "503 approvedWritesDisabled becomes a synthetic empty page: it is not a successful response snapshot proof.",
+        "Do not bypass cursor user/session/asOf validation, skip older pages, narrow list contents, or change revalidateAll.",
+        "Generic request also executes propose/decide; no blanket marking."
+      ],
+      "originalDeltaAttribution": "op=list is a legitimate SQL-producing candidate; original method/op/count attribution remains unknown."
+    },
+    {
+      "route": "POST /api/approved-writes op=view",
+      "reader": "WriteCard only when uncertain or status=running -> readApprovedWrite",
+      "swrKey": "['approved-write-result', ownerColonSession, action, id]",
+      "live": "approved_write id; personal workspace; existing approval deadline",
+      "transformation": "One authenticated read; validate id/action/closed status, shallow-add requestedAt. Server requires human session, same-origin and fresh session; transaction verifies owner/session and reads proposal/ledger without executing a provider effect.",
+      "completedProof": "Structurally eligible for its own validated full-result wrapper, with capture at this specific POST read dispatch. Preserve current key/action/id/session/lifetime gates and final exact committed object. No proof for the decide result or unrelated list pages.",
+      "originalDeltaAttribution": "No source or original HTTP context proves this conditional card branch ran in the first-pair fixture; expected savings unknown."
+    }
+  ],
+  "crossCuttingContract": [
+    "A proof records a lower bound on actual renderer transport dispatch, never server snapshot time or permission authority.",
+    "Capture after URL/body preparation and before actual fetch; completion proof alone does not prevent a flush while an older observer is still waiting for a response.",
+    "The already-reviewed pending mechanism is opt-in only for known single-snapshot fetchers; duplicate capture/notify or supersession revokes and wakes waiters. Do not extend RPC whitelist for HTTP paths.",
+    "Completed proof still requires onSuccess acceptance, exact Object.is committed object, no retained error/supersession, current cache/key/owner/workspace/session/visibility lifetime and all existing revision checks. Missing required revision data cannot be treated as covered.",
+    "A helper's returned value, a server GET, or a completed Promise by itself does not establish that a real new Native window will contain fewer SQL queries."
+  ],
+  "minimalRegressionSuggestions": [
+    {
+      "target": "Group list in scripts/use-live-lists.live.test.tsx or focused existing integration",
+      "positive": "Actual useLiveGroupList + SWRDefaults + PersistentReadCache/hydration: observer starts before ready, real GET dispatch after ready; validated exact array commits and covers that gap without a duplicate GET.",
+      "negative": "Same setup with GET dispatched before ready/hung must perform catch-up; wrong viewer/workspace, scope change and discarded/equal-comparator object must not certify the current key. A Provider-only fixture is a negative control, not proof of middleware behavior."
+    },
+    {
+      "target": "PendingActions existing scripts/pending-actions.live.test.tsx",
+      "positive": "Use the real middleware/provider/hydration and actual loadPendingActionPage; prove only its validated wrapper covers the ready gap and retains requestedAt/observedAt.",
+      "negative": "Wrong-owner/401/malformed array and old session cannot certify; keep the existing slow initial read/same-expiry final authoritative read and assert zero decisions. Its current test render has SWRConfig + LiveProvider but no SWRDefaults, so existing passes alone do not test the proposed optimization."
+    },
+    {
+      "target": "ApprovedWriteActions existing component tests",
+      "positive": "If op=view is later selected, a single validated matching action/id response commits only under that owner/session key; explicit decide count remains unchanged.",
+      "negative": "Real SWRInfinite with at least two pages, one pre-gap/cached page and one post-gap page, must still refresh the aggregate; late old-session pages and disabled synthetic empty response cannot suppress it. Keep lost-decision no-resend and old-session outcome isolation tests."
+    }
+  ],
+  "verification": {
+    "sourceReview": true,
+    "newRuntimeTestsExecuted": 0,
+    "newNativeRuns": 0,
+    "newModels": 0,
+    "newResources": 0,
+    "sourceEdits": 0,
+    "refChanges": 0,
+    "originalRedPreserved": true,
+    "proofOptimizationsImplemented": false
+  },
+  "installerOneTimeObservation": {
+    "observedAt": "2026-11-09T08:53:10Z",
+    "head": "b87a1e3a7dc9490528d2a06cfdceb4fa38ecee10",
+    "pureSource": "01b302385666dc5b7a1535a335ef1d953c5d12b8",
+    "ownerComment": "https://github.com/alexj11324/Mikka/pull/1810#issuecomment-6735889350",
+    "run": {
+      "id": 42585848140,
+      "status": "in_progress",
+      "conclusion": null
+    },
+    "image": {
+      "jobId": 129056168410,
+      "conclusion": "success",
+      "completedAt": "2026-11-09T08:44:14Z",
+      "stopDisposableServices": "success",
+      "publish": "skipped"
+    },
+    "apple": {
+      "jobId": 129058016401,
+      "status": "in_progress",
+      "frozenInstallStep6": "success",
+      "armBuildAndKeychain": "success",
+      "nativeStep17": "in_progress",
+      "overallAcceptance": null
+    },
+    "boundary": "Metadata and owner announcement only; zero peer raw log/artifact reads. Old e9 failures are not rewritten. Installation gate evidence is distinct from full PR/Native/production acceptance."
+  },
+  "sourceManifest": [
+    {
+      "path": "lib/group-messages.ts",
+      "gitBlob": "995cd840ae22e72d76d08268c528f9ce61bd534b",
+      "bytes": 9204,
+      "sha256": "3bb32d4cf2059bce2869d6a810c1ad1d3c7a33387c2109250e301dde7418e251"
+    },
+    {
+      "path": "hooks/use-live-lists.ts",
+      "gitBlob": "ac60a59be511ec45cc372b8c91c0535861a30931",
+      "bytes": 9682,
+      "sha256": "c4c9ea9e785986831df600cfff09fccba1705e7a10e0a886d5d6af21d8463b1a"
+    },
+    {
+      "path": "lib/swr/keys.ts",
+      "gitBlob": "1470b6e51ae3a522ed57ae0937cc90fccb97f079",
+      "bytes": 3688,
+      "sha256": "baf1f5f7504143c8436341cfe23773db2f4e389d437f296199467c745b2e4fd1"
+    },
+    {
+      "path": "components/nav/bot-list.tsx",
+      "gitBlob": "971b28a81a315d30eb0a50bc9db804e2f7eb3ad9",
+      "bytes": 15448,
+      "sha256": "cc6f8700b877fd0d99d9ebd17a411c4c286d379ed4883c9aba339fdef443f681"
+    },
+    {
+      "path": "components/workspace/issue-workspace.tsx",
+      "gitBlob": "b043d5c09d02d5f675cd62d28e40bb8dc38b5060",
+      "bytes": 56571,
+      "sha256": "1729446b75be85a93c009adee62883f617334c1981ffa3464befc9bba0e3e2b8"
+    },
+    {
+      "path": "lib/live/pending-action-cache.ts",
+      "gitBlob": "4b7d1fb72775bf0f6f0e356682b6006cd0010ff4",
+      "bytes": 2184,
+      "sha256": "ec1433dcb6a0d059d6a638d624ab733753599df6704963080ffe24839656fd78"
+    },
+    {
+      "path": "components/coordinator/pending-actions.tsx",
+      "gitBlob": "5bbc469d621346ffcf9e46991fde34d3c024cc53",
+      "bytes": 7165,
+      "sha256": "bb74f90977f83f676a5effe1e9c0d747b8e79bc1679d27ed88be8510c892e723"
+    },
+    {
+      "path": "lib/operations/write-client.ts",
+      "gitBlob": "5df46e4761d32ff32e60966c38577f241227bd7f",
+      "bytes": 3781,
+      "sha256": "0c3249068e54175898d754610cde362d3fa33baaab2730ce967c325bf19b120e"
+    },
+    {
+      "path": "lib/live/approval-cache.ts",
+      "gitBlob": "91e373f74beee7691ea74c04f8edee75f3bcbc9f",
+      "bytes": 3704,
+      "sha256": "65f3cbc75f3e10fef5a93f3093c26c743e4eaa7d13bbe4a2b8c0a9df69bf11b3"
+    },
+    {
+      "path": "components/coordinator/approved-write-actions.tsx",
+      "gitBlob": "dc5a691004f8344162a7d90343ba0c0dffc753dc",
+      "bytes": 10354,
+      "sha256": "f59a16c7f936dd004d83de28f01fd4a0c17427ceaaf94ef3d183cb816054bf55"
+    },
+    {
+      "path": "hooks/use-approval-live.ts",
+      "gitBlob": "0c24b30f7523ec671902f92dd5b1cd5160c3d39a",
+      "bytes": 1813,
+      "sha256": "4f06076c7a0afba633ef9ec79e177fa64b2fb08e739b6b6576ebb658de3a14f0"
+    },
+    {
+      "path": "app/api/conversations/route.ts",
+      "gitBlob": "1b8c25ead7ae3ede7795c43537f8890af1430bdf",
+      "bytes": 291,
+      "sha256": "3d18fce6ff0759821f8482a5a9cf4cdcecaf312e7439c45ba47a10b0bac99118"
+    },
+    {
+      "path": "lib/group-conversations-route.ts",
+      "gitBlob": "253ab5fd1c2383c60a05e0b51a9f88f6a87ad520",
+      "bytes": 6826,
+      "sha256": "53a49536831b6ab4ed137726d00ade55a68687523217937923a338be198628d5"
+    },
+    {
+      "path": "lib/group-conversations-store.ts",
+      "gitBlob": "243079b530d6e189cbd7103e81ed7c2b19636aa6",
+      "bytes": 22566,
+      "sha256": "07ca994337589a23f73336c2b0a074573fba30853f1cb7a82dfed0a93eab0c1e"
+    },
+    {
+      "path": "app/api/pending-actions/route.ts",
+      "gitBlob": "cf225d2ab0f918928bf87baae7b37763acdd9f85",
+      "bytes": 990,
+      "sha256": "eaa1ecacbfda5731507987c914c29672a539f728ad055b23bc24a54594c15ba8"
+    },
+    {
+      "path": "app/api/approved-writes/route.ts",
+      "gitBlob": "305a67e2f9a70b1aeb22b32c97bdf57bd0e0abbe",
+      "bytes": 774,
+      "sha256": "ee03103d1ab4428b074b465be7777982a3421d6e894d006b91eceee0d97baf2b"
+    },
+    {
+      "path": "lib/operations/write-route.ts",
+      "gitBlob": "758e39902f711f36015fdc4177905e15e9dc7986",
+      "bytes": 1329,
+      "sha256": "64e6dab13a1f0ced787bec6673ee2f78fc867d29876de860038afc66def404ee"
+    },
+    {
+      "path": "lib/operations/write-http.ts",
+      "gitBlob": "0838b7de6b02b87fea00b7b7a9d3e89995a76b65",
+      "bytes": 4435,
+      "sha256": "b242ba9cbaf7da3762e36a5d73c108b2c253de7af8d0e4e689aa421b6d8f9afd"
+    },
+    {
+      "path": "lib/operations/write-discovery.ts",
+      "gitBlob": "6182b6fd2761dbbd703dc4e3ee99d0d57b2b667c",
+      "bytes": 5580,
+      "sha256": "649d7b39300d2498d02c03db8000b8f38e5bfdbacd683d3dd1ad87c4926fc9e0"
+    },
+    {
+      "path": "lib/operations/approved-writes.ts",
+      "gitBlob": "94a3be759da61e9d10ef2640fcf2f3a2f86b7e92",
+      "bytes": 22560,
+      "sha256": "2cf9d00436e649f5492ff60445f67c0e0857b80730e5f07de78bcd3db3443af2"
+    },
+    {
+      "path": "components/swr-defaults.tsx",
+      "gitBlob": "f6be8710182ad68ce0a87f6cac910184bf1d52f3",
+      "bytes": 4433,
+      "sha256": "cd77353db8fdc38f6527ea5e00bd1227ecb6c8167350eff254effb3b41e8be33"
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "gitBlob": "2dc3ab5a9934fed5146189fd236b450f0d223920",
+      "bytes": 5786,
+      "sha256": "2c4f60539d1eb8d8e607490268fe065fa03b6f1b27e796fa23f5f35bd670499b"
+    },
+    {
+      "path": "apps/desktop/test/db-metrics.cjs",
+      "gitBlob": "b36f8db3a1d34233a697a676ab9bb86aadd9cfa3",
+      "bytes": 8890,
+      "sha256": "814aa821cdc111c25f4632df5c2fa6abcbe2fa725f23a2ce4a397493f2a5e491"
+    },
+    {
+      "path": "apps/desktop/test/db-query-unattributed-sources.cjs",
+      "gitBlob": "1bda1efd05f3e7ca8a6696cbb926743bdb921f1a",
+      "bytes": 2773,
+      "sha256": "2c6df289f057c4bb63acd4bc2eac33233c785ab57e152e3484bcffbf0065dc5c"
+    },
+    {
+      "path": "scripts/pending-actions.live.test.tsx",
+      "gitBlob": "2e868104d95136e777a95e68b714a515be786e67",
+      "bytes": 9469,
+      "sha256": "f2e4bfaee3fb6f8e389ab8eb4b4a0b1548cf1cee7a4eb9fd7348e1a433f6a972"
+    },
+    {
+      "path": "scripts/approved-write-actions.test.tsx",
+      "gitBlob": "35894c602fbcc5123aee3abc08c79f12924d9a80",
+      "bytes": 16803,
+      "sha256": "ad79c868237d6ba8619f99b2c73d9cdca3b897166741a7ac766d6619a3367fd8"
+    },
+    {
+      "path": "lib/live/pending-action-cache.test.ts",
+      "gitBlob": "581219263abfa92a450263ebc9cd6232afe0b80e",
+      "bytes": 2558,
+      "sha256": "19012c6a8cf31e35856d5129eca7dc7d343c1c531c33e03a551f034f18c61974"
+    },
+    {
+      "path": "lib/live/approval-cache.test.ts",
+      "gitBlob": "0dde12f04abeb95dcb34e1a35ae73bc00b281c15",
+      "bytes": 4425,
+      "sha256": "7c3a7976295917c70e8c69225f5b33435a6ccbc03e81eb231f48edaefe181cc5"
+    },
+    {
+      "path": "lib/operations/write-client.test.ts",
+      "gitBlob": "fe66dae99cabc7002ce14925de3b6e755fd573dd",
+      "bytes": 3856,
+      "sha256": "0b036cd806b37e8ad494ae716c9ff9afea4f93caca627cb77610c8b9751ddb25"
+    },
+    {
+      "path": "hooks/use-live-key.tsx",
+      "gitBlob": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f",
+      "bytes": 8050,
+      "sha256": "5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857"
+    }
+  ]
+}

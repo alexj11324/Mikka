@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "purpose": "isolated Node24 React/SWR hydration and pending-dispatch regression only",
+  "name": "issue1512-live-hydration-20261109-0833",
+  "sessionId": "sbx_cOBEYm5XbjixIFTm6z46Ssw9l7Pl",
+  "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+  "resource": {
+    "vcpus": 1,
+    "memoryMiB": 2048,
+    "persistent": false,
+    "ports": [],
+    "image": "vercel/sandbox/universal@sha256:bbec19cffb43ad724eee446d3bd4476e2993849dc0ff0c9f33356f8365d72219",
+    "platformRuntimeLabel": "node22",
+    "executedNodeVersion": "24.22.2",
+    "networkPolicy": {
+      "mode": "custom",
+      "allowedDomains": [
+        "registry.npmjs.org",
+        "nodejs.org"
+      ]
+    }
+  },
+  "initialTimeoutMs": 900000,
+  "extensionCount": 1,
+  "extensionMs": 300000,
+  "finalTimeoutMs": 1200000,
+  "startedAt": "2026-11-09T08:33:16.924Z",
+  "stoppedAt": "2026-11-09T08:51:35.419Z",
+  "status": "stopped",
+  "durationMs": 1098495,
+  "activeCpuDurationMs": 38948,
+  "networkTransfer": {
+    "ingress": 144333471,
+    "egress": 534217
+  },
+  "deleteToolReturnedResult": true,
+  "exactReadAfterDelete": {
+    "method": "GET",
+    "resume": false,
+    "status": 404,
+    "code": "not_found",
+    "checkedAt": "2026-11-09T08:51:51Z"
+  },
+  "activeOwnedResources": 0,
+  "noZeroCostClaim": true,
+  "modelCalls": 0,
+  "productionAccountActions": 0,
+  "NativeRuns": 0,
+  "refWrites": 0
+}

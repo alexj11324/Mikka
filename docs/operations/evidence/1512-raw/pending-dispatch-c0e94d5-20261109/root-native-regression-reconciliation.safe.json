@@ -1,0 +1,193 @@
+{
+  "evidence": {
+    "index": {
+      "bytes": 12075,
+      "sha256": "202153630e4aa0642f47c215090311fce11d9f4d0d0bfa9de2c6399b114a4d61",
+      "match": true
+    },
+    "fullLog": {
+      "bytes": 27307,
+      "sha256": "95d24b50043bc3151120f72aa9deffea989cc6af02d41ead67f350634a57f202",
+      "match": true
+    },
+    "receipt": {
+      "bytes": 8229,
+      "sha256": "70953232e643f2b66b6afb01c6907df3d8ec36530189fb96b6ccee65c43073df",
+      "match": true
+    },
+    "manifest": {
+      "bytes": 3444,
+      "sha256": "a757e2304b9ac1af33b34395d289ebafed4acca87081af42c6a5b03f08997bd4",
+      "match": true
+    },
+    "patch": {
+      "bytes": 32742,
+      "sha256": "6c3c6f5eda18f0690a39d7c03b0a0163ede38af58a4410c98b0d08905b5c4efe",
+      "match": true
+    },
+    "summary": {
+      "bytes": 5117,
+      "sha256": "e5eb699f97665432e509a1e47ca3ed22ea9da02b3efd4b8e7be82e7b3efbaf4f",
+      "match": true
+    },
+    "cleanup": {
+      "bytes": 1379,
+      "sha256": "d0444ddc96b5894815198aa1138dda5cddf222acad5307e02caaa48ef328c67f",
+      "match": true
+    }
+  },
+  "okCount": 75,
+  "sequential": true,
+  "bad": [],
+  "totals": {
+    "tests": 75,
+    "suites": 0,
+    "pass": 75,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "duration_ms": 124392.119062
+  },
+  "sources": [
+    {
+      "path": "lib/swr/read-observer.ts",
+      "available": true,
+      "match": true,
+      "bytes": 8237
+    },
+    {
+      "path": "components/swr-defaults.tsx",
+      "available": true,
+      "match": true,
+      "bytes": 4551
+    },
+    {
+      "path": "hooks/use-live-lists.ts",
+      "available": true,
+      "match": true,
+      "bytes": 9807
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "available": true,
+      "match": true,
+      "bytes": 4640
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "available": true,
+      "match": true,
+      "bytes": 6237
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "available": true,
+      "match": true,
+      "bytes": 75804
+    }
+  ],
+  "limits": "Source-bound isolated regression only; actual packaged Native first pair remains 183 > 139 RED; formal integrated CI not run yet.",
+  "patchChecks": [
+    {
+      "path": "lib/swr/read-observer.ts",
+      "hunks": 5,
+      "baseSHA256": "2c4f60539d1eb8d8e607490268fe065fa03b6f1b27e796fa23f5f35bd670499b",
+      "candidateSHA256": "c520e2c86ca83fe382e6131eb48b36b813b6b9f8750dc9d3c09e6e0044412cc9",
+      "exact": true
+    },
+    {
+      "path": "components/swr-defaults.tsx",
+      "hunks": 2,
+      "baseSHA256": "cd77353db8fdc38f6527ea5e00bd1227ecb6c8167350eff254effb3b41e8be33",
+      "candidateSHA256": "847311eb9b775d43bb9f569d6ec395aeb41475a5ed7468e17cd1826b2c73217d",
+      "exact": true
+    },
+    {
+      "path": "hooks/use-live-lists.ts",
+      "hunks": 4,
+      "baseSHA256": "c4c9ea9e785986831df600cfff09fccba1705e7a10e0a886d5d6af21d8463b1a",
+      "candidateSHA256": "da27e73ae937fed876ae463e988d4418292f9976aeb7bc95a89e786ae80e5fab",
+      "exact": true
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "hunks": 3,
+      "baseSHA256": "7cadecd350fd73031473a4131edf769c552822a9faf6d26b345e6417dae671c0",
+      "candidateSHA256": "bb72e38f117c01dffbf4f9ec7e2309160e9ac0d4bf485aa476132b22b191e48c",
+      "exact": true
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "hunks": 3,
+      "baseSHA256": "040d039af2d8abb6aeb9eb4a4d66d357526d8afa6c0afed0e5bbaf80ba7a87c1",
+      "candidateSHA256": "a25842776c07816eb8af6a24d62dc9d745ab13fb9cfff513de02673d48926f18",
+      "exact": true
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "hunks": 3,
+      "baseSHA256": "da2c31a515397745e02d3118981751aedc319ac3ea53f01dc22d340c6ed75512",
+      "candidateSHA256": "9591bf1bd79f47b7c159eadcffa21125a7d06e76bbd33d82fcbbddd25e25af7e",
+      "exact": true
+    }
+  ],
+  "diagnosticChecks": {
+    "dispatch": 12,
+    "hydration": 6,
+    "real404": 1,
+    "total": 19,
+    "allMatched": true
+  },
+  "cleanup": {
+    "version": 1,
+    "purpose": "isolated Node24 React/SWR hydration and pending-dispatch regression only",
+    "name": "issue1512-live-hydration-20261109-0833",
+    "sessionId": "sbx_cOBEYm5XbjixIFTm6z46Ssw9l7Pl",
+    "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+    "resource": {
+      "vcpus": 1,
+      "memoryMiB": 2048,
+      "persistent": false,
+      "ports": [],
+      "image": "vercel/sandbox/universal@sha256:bbec19cffb43ad724eee446d3bd4476e2993849dc0ff0c9f33356f8365d72219",
+      "platformRuntimeLabel": "node22",
+      "executedNodeVersion": "24.22.2",
+      "networkPolicy": {
+        "mode": "custom",
+        "allowedDomains": [
+          "registry.npmjs.org",
+          "nodejs.org"
+        ]
+      }
+    },
+    "initialTimeoutMs": 900000,
+    "extensionCount": 1,
+    "extensionMs": 300000,
+    "finalTimeoutMs": 1200000,
+    "startedAt": "2026-11-09T08:33:16.924Z",
+    "stoppedAt": "2026-11-09T08:51:35.419Z",
+    "status": "stopped",
+    "durationMs": 1098495,
+    "activeCpuDurationMs": 38948,
+    "networkTransfer": {
+      "ingress": 144333471,
+      "egress": 534217
+    },
+    "deleteToolReturnedResult": true,
+    "exactReadAfterDelete": {
+      "method": "GET",
+      "resume": false,
+      "status": 404,
+      "code": "not_found",
+      "checkedAt": "2026-11-09T08:51:51Z"
+    },
+    "activeOwnedResources": 0,
+    "noZeroCostClaim": true,
+    "modelCalls": 0,
+    "productionAccountActions": 0,
+    "NativeRuns": 0,
+    "refWrites": 0
+  },
+  "verifiedAt": "2026-11-09 09:04:58 UTC"
+}

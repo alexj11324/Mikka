@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "rootLockPath": "pnpm-lock.yaml",
+  "direct": {
+    "semver": "7.8.5",
+    "zod": "4.6.7",
+    "react": "19.3.1",
+    "react-dom": "19.3.1(react@19.3.1)",
+    "swr": "2.5.1(react@19.3.1)",
+    "next": "16.4.1(@babel/core@7.29.7)(@opentelemetry/api@1.10.0)(@playwright/test@1.64.1)(@types/node@25.9.9)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)",
+    "tsx": "4.23.15",
+    "happy-dom": "15.11.7"
+  },
+  "snapshots": 136,
+  "packages": 136,
+  "errors": [],
+  "omittedUnusedPackages": true,
+  "packageBlocksUnmodified": true,
+  "snapshotBlocksUnmodified": true,
+  "fullOriginalLockSha256": "ddfb2c81f1e50b1b619e4a690dd38c33cc0700352434ed4424eda27c86907277",
+  "minimalPackageSha256": "767696f6bd499f5011ad21c9a73cdaf2efe000de631282a78e51fc717802e224",
+  "prunedLockSha256": "a295262ea12552b2f8be05025135495efd3891a87437a218889fc40e8ff1e2a0",
+  "buildPolicySha256": "3a0307b38251f9230f4afd8fcd03074f443bb5cb9e0cf876acc6d76ae37e2868",
+  "install": "pnpm 10.34.3 install --frozen-lockfile --reporter append-only",
+  "exactNode": "24.22.2",
+  "originalProtocolWorkspaceSourceLinkedLocally": true,
+  "noIntegrityBypass": true,
+  "noIgnoredBuildScriptsOverride": true
+}

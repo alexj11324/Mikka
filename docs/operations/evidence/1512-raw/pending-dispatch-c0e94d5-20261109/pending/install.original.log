@@ -1,0 +1,33 @@
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +79
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+   ╭──────────────────────────────────────────╮
+   │                                          │
+   │   Update available! 10.34.3 → 12.18.0.   │
+   │   Changelog: https://pnpm.io/v/12.18.0   │
+   │     To update, run: pnpm add -g pnpm     │
+   │                                          │
+   ╰──────────────────────────────────────────╯
+
+Progress: resolved 79, reused 0, downloaded 12, added 0
+Progress: resolved 79, reused 0, downloaded 23, added 4
+Progress: resolved 79, reused 0, downloaded 24, added 4
+Progress: resolved 79, reused 0, downloaded 68, added 16
+Progress: resolved 79, reused 0, downloaded 75, added 20
+Progress: resolved 79, reused 0, downloaded 79, added 79, done
+.../esbuild@0.28.2/node_modules/esbuild postinstall$ node install.js
+.../esbuild@0.28.2/node_modules/esbuild postinstall: Done
+
+dependencies:
++ happy-dom 15.11.7
++ next 16.4.1
++ react 19.3.1
++ react-dom 19.3.1
++ semver 7.8.5
++ swr 2.5.1
++ tsx 4.23.15
++ zod 4.6.7
+
+Done in 6.6s using pnpm v10.34.3

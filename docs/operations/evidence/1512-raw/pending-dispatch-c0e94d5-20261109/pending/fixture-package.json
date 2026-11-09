@@ -1,0 +1,19 @@
+{
+  "name": "mikka-live-hydration-fixture",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "24.22.2"
+  },
+  "packageManager": "pnpm@10.34.3",
+  "dependencies": {
+    "semver": "7.8.5",
+    "zod": "4.6.7",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "swr": "2.5.1",
+    "next": "16.4.1",
+    "tsx": "4.23.15",
+    "happy-dom": "15.11.7"
+  }
+}

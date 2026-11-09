@@ -1,0 +1,221 @@
+TAP version 13
+# (node:1011) ExperimentalWarning: Module mocking is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# (node:1011) DeprecationWarning: mock.module(): options.namedExports is deprecated. Use options.exports instead.
+# An update to Bots inside a test was not wrapped in act(...).
+# When testing, code that causes React state updates should be wrapped into act(...):
+# act(() => {
+#   /* fire events that update state */
+# });
+# /* assert on the output */
+# This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+# Subtest: native owner-home hint: cold-after-ready
+not ok 1 - native owner-home hint: cold-after-ready
+  ---
+  duration_ms: 228.335272
+  type: 'test'
+  location: '/vercel/live-fixture/scripts/use-live-lists.live.test.tsx:1:58532'
+  failureType: 'testCodeFailure'
+  error: |-
+    only an unambiguous matching owner hint may route the unresolved subscription
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/vercel/live-fixture/scripts/use-live-lists.live.test.tsx:1183:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3)
+  ...
+# {"kind":"native_owner_home_hint","scenario":"cold-after-ready","calls":0,"tickets":[],"phases":["storage_activate"],"cacheEnabled":true}
+# An update to Bots inside a test was not wrapped in act(...).
+# When testing, code that causes React state updates should be wrapped into act(...):
+# act(() => {
+#   /* fire events that update state */
+# });
+# /* assert on the output */
+# This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+# Subtest: native owner-home hint: cold-before-ready
+not ok 2 - native owner-home hint: cold-before-ready
+  ---
+  duration_ms: 22.726513
+  type: 'test'
+  location: '/vercel/live-fixture/scripts/use-live-lists.live.test.tsx:1:58532'
+  failureType: 'testCodeFailure'
+  error: |-
+    only an unambiguous matching owner hint may route the unresolved subscription
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/vercel/live-fixture/scripts/use-live-lists.live.test.tsx:1183:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# {"kind":"native_owner_home_hint","scenario":"cold-before-ready","calls":0,"tickets":[],"phases":["storage_activate"],"cacheEnabled":true}
+# An update to Bots inside a test was not wrapped in act(...).
+# When testing, code that causes React state updates should be wrapped into act(...):
+# act(() => {
+#   /* fire events that update state */
+# });
+# /* assert on the output */
+# This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+# Subtest: native owner-home hint: returned-null
+not ok 3 - native owner-home hint: returned-null
+  ---
+  duration_ms: 12.427823
+  type: 'test'
+  location: '/vercel/live-fixture/scripts/use-live-lists.live.test.tsx:1:58532'
+  failureType: 'testCodeFailure'
+  error: |-
+    only an unambiguous matching owner hint may route the unresolved subscription
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/vercel/live-fixture/scripts/use-live-lists.live.test.tsx:1183:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# {"kind":"native_owner_home_hint","scenario":"returned-null","calls":0,"tickets":[],"phases":["storage_activate"],"cacheEnabled":true}
+# An update to Bots inside a test was not wrapped in act(...).
+# When testing, code that causes React state updates should be wrapped into act(...):
+# act(() => {
+#   /* fire events that update state */
+# });
+# /* assert on the output */
+# This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+# Subtest: native owner-home hint: returned-new-home
+not ok 4 - native owner-home hint: returned-new-home
+  ---
+  duration_ms: 10.405349
+  type: 'test'
+  location: '/vercel/live-fixture/scripts/use-live-lists.live.test.tsx:1:58532'
+  failureType: 'testCodeFailure'
+  error: |-
+    only an unambiguous matching owner hint may route the unresolved subscription
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/vercel/live-fixture/scripts/use-live-lists.live.test.tsx:1183:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# {"kind":"native_owner_home_hint","scenario":"returned-new-home","calls":0,"tickets":[],"phases":["storage_activate"],"cacheEnabled":true}
+# An update to Bots inside a test was not wrapped in act(...).
+# When testing, code that causes React state updates should be wrapped into act(...):
+# act(() => {
+#   /* fire events that update state */
+# });
+# /* assert on the output */
+# This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+# Subtest: native owner-home hint: owner-mismatch
+not ok 5 - native owner-home hint: owner-mismatch
+  ---
+  duration_ms: 10.258671
+  type: 'test'
+  location: '/vercel/live-fixture/scripts/use-live-lists.live.test.tsx:1:58532'
+  failureType: 'testCodeFailure'
+  error: |-
+    only an unambiguous matching owner hint may route the unresolved subscription
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/vercel/live-fixture/scripts/use-live-lists.live.test.tsx:1183:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# {"kind":"native_owner_home_hint","scenario":"owner-mismatch","calls":0,"tickets":[],"phases":["storage_activate"],"cacheEnabled":true}
+# An update to Bots inside a test was not wrapped in act(...).
+# When testing, code that causes React state updates should be wrapped into act(...):
+# act(() => {
+#   /* fire events that update state */
+# });
+# /* assert on the output */
+# This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+# Subtest: native owner-home hint: denied
+not ok 6 - native owner-home hint: denied
+  ---
+  duration_ms: 8.790267
+  type: 'test'
+  location: '/vercel/live-fixture/scripts/use-live-lists.live.test.tsx:1:58532'
+  failureType: 'testCodeFailure'
+  error: |-
+    only an unambiguous matching owner hint may route the unresolved subscription
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    TestContext.<anonymous> (/vercel/live-fixture/scripts/use-live-lists.live.test.tsx:1183:14)
+    async Test.run (node:internal/test_runner/test:1409:7)
+    async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+  ...
+# {"kind":"native_owner_home_hint","scenario":"denied","calls":0,"tickets":[],"phases":["storage_activate"],"cacheEnabled":true}
+# Subtest: native owner-home hint: hint-owner-mismatch
+ok 7 - native owner-home hint: hint-owner-mismatch
+  ---
+  duration_ms: 329.885936
+  type: 'test'
+  ...
+# {"kind":"native_owner_home_hint","scenario":"hint-owner-mismatch","calls":2,"tickets":["10000000-0000-4000-8000-000000000001"],"phases":["storage_activate","fetcher","enqueue","dispatch:1","response:1","open:home","ready:home","fetcher","enqueue","dispatch:2","response:2"],"cacheEnabled":true}
+# Subtest: native owner-home hint: hint-invalid-id
+ok 8 - native owner-home hint: hint-invalid-id
+  ---
+  duration_ms: 331.304578
+  type: 'test'
+  ...
+# {"kind":"native_owner_home_hint","scenario":"hint-invalid-id","calls":2,"tickets":["10000000-0000-4000-8000-000000000001"],"phases":["storage_activate","fetcher","enqueue","dispatch:1","response:1","open:home","ready:home","fetcher","enqueue","dispatch:2","response:2"],"cacheEnabled":true}
+# Subtest: native owner-home hint: cached-explicit-null
+ok 9 - native owner-home hint: cached-explicit-null
+  ---
+  duration_ms: 329.972899
+  type: 'test'
+  ...
+# {"kind":"native_owner_home_hint","scenario":"cached-explicit-null","calls":2,"tickets":["10000000-0000-4000-8000-000000000001"],"phases":["storage_activate","fetcher","enqueue","dispatch:1","response:1","open:home","ready:home","fetcher","enqueue","dispatch:2","response:2"],"cacheEnabled":true}
+# Subtest: native owner-home hint: cached-owner-mismatch
+ok 10 - native owner-home hint: cached-owner-mismatch
+  ---
+  duration_ms: 330.584139
+  type: 'test'
+  ...
+# {"kind":"native_owner_home_hint","scenario":"cached-owner-mismatch","calls":2,"tickets":["10000000-0000-4000-8000-000000000001"],"phases":["storage_activate","fetcher","enqueue","dispatch:1","response:1","open:home","ready:home","fetcher","enqueue","dispatch:2","response:2"],"cacheEnabled":true}
+1..10
+# tests 10
+# suites 0
+# pass 4
+# fail 6
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 10400.382813

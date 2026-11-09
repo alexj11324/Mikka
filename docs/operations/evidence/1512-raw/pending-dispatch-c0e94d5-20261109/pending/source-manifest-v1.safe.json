@@ -1,0 +1,290 @@
+[
+  {
+    "path": "scripts/server-test.mjs",
+    "bytes": 408,
+    "sha256": "b58352ccee3ea3f88525bbe0acc3b606f3dfbe0f0047d7502b148d13bbf485c5",
+    "source": "1ffa"
+  },
+  {
+    "path": "lib/live/channel.ts",
+    "bytes": 24031,
+    "sha256": "7d1d16e02ea9ca8256812312eafc96c0591cc1df1c6a463e0216e420d37b8ede",
+    "source": "1ffa"
+  },
+  {
+    "path": "lib/live/channels.ts",
+    "bytes": 1580,
+    "sha256": "b54a1ea2cb517ce4135d91423c1999420591f3bfc9487d1a9c11396460a321c8",
+    "source": "1ffa"
+  },
+  {
+    "path": "components/swr-defaults.tsx",
+    "bytes": 4433,
+    "sha256": "cd77353db8fdc38f6527ea5e00bd1227ecb6c8167350eff254effb3b41e8be33",
+    "source": "1ffa"
+  },
+  {
+    "path": "hooks/use-live-key.tsx",
+    "bytes": 8050,
+    "sha256": "5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857",
+    "source": "1ffa"
+  },
+  {
+    "path": "lib/swr/read-observer.ts",
+    "bytes": 5786,
+    "sha256": "2c4f60539d1eb8d8e607490268fe065fa03b6f1b27e796fa23f5f35bd670499b",
+    "source": "1ffa"
+  },
+  {
+    "path": "lib/swr/persistent-cache.ts",
+    "bytes": 10956,
+    "sha256": "d1e1793960a0401fc2e8cb3a9b29e2a894828096e444fc086a6d1ebe5d34df1a",
+    "source": "1ffa"
+  },
+  {
+    "path": "components/authenticated-read-cache.tsx",
+    "bytes": 4539,
+    "sha256": "90dc00b1dfd6ad21a5ffee1774db8b4a5225b8457390fcb73bb74dbcf7ff009c",
+    "source": "1ffa"
+  },
+  {
+    "path": "lib/live/browser-runtime.ts",
+    "bytes": 2455,
+    "sha256": "b640f6de894ec6f94847681567148f35314134455382a2309933f769a6f17c72",
+    "source": "1ffa"
+  },
+  {
+    "path": "hooks/use-live-lists.ts",
+    "bytes": 9682,
+    "sha256": "c4c9ea9e785986831df600cfff09fccba1705e7a10e0a886d5d6af21d8463b1a",
+    "source": "1ffa"
+  },
+  {
+    "path": "lib/live/list-read.ts",
+    "bytes": 3337,
+    "sha256": "7dca0d60ae5aa2bc9f3ed5ca1a2ecc3aba08767df8af26a1d9f666bea7a94fb0",
+    "source": "1ffa"
+  },
+  {
+    "path": "lib/swr/cache-policy.ts",
+    "bytes": 7608,
+    "sha256": "b87b7847e2ea02cf4d25b8d106dc33ba30b2e8b3862d1843a7d6ada4b93e51a0",
+    "source": "1ffa"
+  },
+  {
+    "path": "lib/swr/indexed-db.ts",
+    "bytes": 4513,
+    "sha256": "a0398fe6d422856d4ab42f316b4888b1f775e92f005e29dabf57dd2ef6ed9809",
+    "source": "1ffa"
+  },
+  {
+    "path": "lib/live/revisions.ts",
+    "bytes": 4070,
+    "sha256": "bd2b351ade97a5b0f3f12f43d606ce9f9d8eca9b90de33400be94203d9d76328",
+    "source": "1ffa"
+  },
+  {
+    "path": "lib/live/events.ts",
+    "bytes": 4679,
+    "sha256": "d32a129473bdb1213d9aa17ee578c731ad23e7fe8f29d2fd3f26c233465f48b5",
+    "source": "1ffa"
+  },
+  {
+    "path": "lib/live/presence.ts",
+    "bytes": 4002,
+    "sha256": "03825f69104f2dad83701a6faa6d6ab76326b5dba6f8214249a60eff46249ea0",
+    "source": "1ffa"
+  },
+  {
+    "path": "lib/live/tab-share.ts",
+    "bytes": 7849,
+    "sha256": "38d80a253b7c3f1522cd79366fc03b46a4065ccf7b52a10df5199092664b7b9f",
+    "source": "1ffa"
+  },
+  {
+    "path": "lib/swr/live-focus.ts",
+    "bytes": 1223,
+    "sha256": "1c67e65b189677a11043ca2c6fffcdfcb6edf10ae043e25c42e4c60f4eba8680",
+    "source": "1ffa"
+  },
+  {
+    "path": "lib/swr/retry.ts",
+    "bytes": 2260,
+    "sha256": "23ac4e756571418547fe67d8f42c843fcab6a342783e9f2c336b05527c67c513",
+    "source": "1ffa"
+  },
+  {
+    "path": "lib/cache-read-error.ts",
+    "bytes": 620,
+    "sha256": "2519013a251dc5a6fed4dd2acb837bc09ef50b03a1dc0de87de32f82df8817f1",
+    "source": "1ffa"
+  },
+  {
+    "path": "lib/list-poll.ts",
+    "bytes": 3269,
+    "sha256": "e676c7e623bcf5f99489027c73e2f741f71a263d8f54a81a3d6d7a7f14f930ab",
+    "source": "1ffa"
+  },
+  {
+    "path": "lib/swr/keys.ts",
+    "bytes": 3688,
+    "sha256": "baf1f5f7504143c8436341cfe23773db2f4e389d437f296199467c745b2e4fd1",
+    "source": "1ffa"
+  },
+  {
+    "path": "lib/group-messages.ts",
+    "bytes": 9204,
+    "sha256": "3bb32d4cf2059bce2869d6a810c1ad1d3c7a33387c2109250e301dde7418e251",
+    "source": "1ffa"
+  },
+  {
+    "path": "lib/app-build.ts",
+    "bytes": 5540,
+    "sha256": "3a1d9fa499b9ede523fa8ec48d505a14d324f9232ad28c384e1c97fb3531c54c",
+    "source": "1ffa"
+  },
+  {
+    "path": "lib/base-path.ts",
+    "bytes": 841,
+    "sha256": "a631625b71ab151377ef4bff24efc4729f92415d53e3b2eb6bcb62530a387dc1",
+    "source": "1ffa"
+  },
+  {
+    "path": "hooks/use-list-expiry.ts",
+    "bytes": 1233,
+    "sha256": "455bf63b9f5f0a61c8b9596da7ed612c01bfc17c5d7d18464e32360776231d06",
+    "source": "1ffa"
+  },
+  {
+    "path": "lib/live/telemetry.ts",
+    "bytes": 2564,
+    "sha256": "b9d72ee728f8bcfe68c54dd53106fd3944610b868fb0f31f09c96008b848eea7",
+    "source": "1ffa"
+  },
+  {
+    "path": "lib/web-connection/selection.ts",
+    "bytes": 1135,
+    "sha256": "93a06522eaecc0726d8b19b44c3531972cb953666088bbc85b5e1e54beebe467",
+    "source": "1ffa"
+  },
+  {
+    "path": "apps/desktop/src/renderer/rpc.ts",
+    "bytes": 4265,
+    "sha256": "7cadecd350fd73031473a4131edf769c552822a9faf6d26b345e6417dae671c0",
+    "source": "1ffa"
+  },
+  {
+    "path": "apps/desktop/src/renderer/read-batch.ts",
+    "bytes": 5988,
+    "sha256": "040d039af2d8abb6aeb9eb4a4d66d357526d8afa6c0afed0e5bbaf80ba7a87c1",
+    "source": "1ffa"
+  },
+  {
+    "path": "apps/desktop/src/renderer/host.ts",
+    "bytes": 2017,
+    "sha256": "76dc99193afccd75c5e778f93ae0e1944a13d90d443c0df9d880546c3fa2be15",
+    "source": "1ffa"
+  },
+  {
+    "path": "lib/desktop-rpc/wire.ts",
+    "bytes": 5364,
+    "sha256": "97ed8940c292dbf876294d7d66d392afbf5da0cd7f2c131f642963f735ee4ae3",
+    "source": "1ffa"
+  },
+  {
+    "path": "i18n/navigation.ts",
+    "bytes": 191,
+    "sha256": "828bf6aebd6424e7e665aaeb4f11c32e76bb7c101c0b55df76ba263488ab64b8",
+    "source": "1ffa"
+  },
+  {
+    "path": "packages/protocol/package.json",
+    "bytes": 3103,
+    "sha256": "cc63fa445e0bf6b64966641eaf8d08b3c1dbe4cffe3216f5c3bec3bc68434f70",
+    "source": "1ffa"
+  },
+  {
+    "path": "packages/protocol/src/version.ts",
+    "bytes": 2650,
+    "sha256": "1c0fa22d84ac4dffcb8617ce81ae1a9844ee35d80a2fa4e57d39a4ee06d88194",
+    "source": "1ffa"
+  },
+  {
+    "path": "app/actions/issues.ts",
+    "bytes": 27134,
+    "sha256": "610a5e47fb5115723e44c229fdb4f5b49135bed51b5dc8fb11032a924ebbf399",
+    "source": "1ffa"
+  },
+  {
+    "path": "app/actions/task-runs.ts",
+    "bytes": 13692,
+    "sha256": "4f29acbe6899a1432d4f216cb1f08aeba8672897319106b98848fbfda45767f8",
+    "source": "1ffa"
+  },
+  {
+    "path": "app/actions/coordinator.ts",
+    "bytes": 23196,
+    "sha256": "b70ceec98efa1edfc1074598b2a6cf12b58d4f2539bb351854a562fa43f9d451",
+    "source": "1ffa"
+  },
+  {
+    "path": "app/actions/bots.ts",
+    "bytes": 4487,
+    "sha256": "41e0a4ade7d04d478c67d118ca9f48507f588db1e6d8dd7ca67590ff98011557",
+    "source": "1ffa"
+  },
+  {
+    "path": "apps/desktop/src/renderer/location.ts",
+    "bytes": 5462,
+    "sha256": "ea1acbd410212e5ae80b914ce33399e38186a0337fe29091eadece42d4f9903d",
+    "source": "1ffa"
+  },
+  {
+    "path": "apps/desktop/src/renderer/transport-state.ts",
+    "bytes": 771,
+    "sha256": "34a55a9a5ae921b8f55a1963722ef97a1dd76d34b05b8862ff8a5c52bb3c7583",
+    "source": "1ffa"
+  },
+  {
+    "path": "lib/desktop-rpc/read-batch-contract.ts",
+    "bytes": 1637,
+    "sha256": "cdd915dacd21d2e9555896daeaa5e5c1f5b23a193cb48e0b959507e96e990000",
+    "source": "1ffa"
+  },
+  {
+    "path": "lib/server-pages.ts",
+    "bytes": 1933,
+    "sha256": "f83f035533078d6ffaa0aa1b59373a5cd07d62df8b2df8af3651ee62bcc1095b",
+    "source": "1ffa"
+  },
+  {
+    "path": "tsconfig.json",
+    "bytes": 873,
+    "sha256": "9aa2e6ca4d1c06eaa646e5e2faa1146772545758cf751314f83a8c78618a4fa6",
+    "source": "1ffa"
+  },
+  {
+    "path": "scripts/use-live-lists.live.test.tsx",
+    "bytes": 67107,
+    "sha256": "d4bbb3ed8af5ef3ad0a11fe246c568ef863eb847d6ac0ca0b688ff10ee6faab7",
+    "source": "new-fixture-on-1ffa"
+  },
+  {
+    "path": "package.json",
+    "bytes": 371,
+    "sha256": "767696f6bd499f5011ad21c9a73cdaf2efe000de631282a78e51fc717802e224",
+    "source": "isolated-minimal-dependencies"
+  },
+  {
+    "path": "pnpm-lock.yaml",
+    "bytes": 42407,
+    "sha256": "a295262ea12552b2f8be05025135495efd3891a87437a218889fc40e8ff1e2a0",
+    "source": "pruned-original-lock"
+  },
+  {
+    "path": "pnpm-workspace.yaml",
+    "bytes": 77,
+    "sha256": "3a0307b38251f9230f4afd8fcd03074f443bb5cb9e0cf876acc6d76ae37e2868",
+    "source": "isolated-minimal-build-policy"
+  }
+]

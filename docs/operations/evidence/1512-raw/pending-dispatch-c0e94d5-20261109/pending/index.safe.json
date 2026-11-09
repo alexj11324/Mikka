@@ -1,0 +1,339 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "prefix": "pending-dispatch-20261109",
+  "publication": "immutable Git blobs only; root chooses evidence ref/commit",
+  "base": {
+    "head": "1ffa581f16319381054e0636ae41e6292719a1fe",
+    "tree": "bc4d584fa651385886e79dc6359b1b43324425d1"
+  },
+  "payloadFiles": 39,
+  "payloadBytes": 560303,
+  "evidence": [
+    {
+      "path": "toolchain.safe.json",
+      "bytes": 429,
+      "sha256": "ddefc720720ff8f5ddf9890f5444b5dddedca23b2d446d9a3484a99a0f914147",
+      "blob": "1543f733aedd5784b5cb8093dd89c8fc0499e17e",
+      "mode": "100644"
+    },
+    {
+      "path": "install.safe.json",
+      "bytes": 296,
+      "sha256": "1207b5c2a8e6835a3c86e5cb08f3d48658656dce233f91221fee98eaa21440eb",
+      "blob": "db5ec654d7e947d78ed5e35de1908f07e0b1ab62",
+      "mode": "100644"
+    },
+    {
+      "path": "install.original.log",
+      "bytes": 1377,
+      "sha256": "5e05ff8e28827949eca8c1eaa4fb840ac65c388ccd1a37799bcd9c694a5e2bd5",
+      "blob": "d849aaf9f5c74b8fd3d039eb0405bccf56b4ed61",
+      "mode": "100644"
+    },
+    {
+      "path": "source-manifest-v1.safe.json",
+      "bytes": 8283,
+      "sha256": "31ea240dfccd230b852bd4c8e1aae92e2ad2da8aeeea6fd6a188d707c1ea404a",
+      "blob": "5f8e89edeedd00c3aa8a34bd52fe6d6c0e5a41f2",
+      "mode": "100644"
+    },
+    {
+      "path": "hydration-baseline-v1.safe.json",
+      "bytes": 1095,
+      "sha256": "d00de1a3ac89f514cbcb0b9741136d15902ac3bd478f9ce96462d628d7f3d455",
+      "blob": "941b4237edea04422768865371d700ae30d5c4fd",
+      "mode": "100644"
+    },
+    {
+      "path": "hydration-baseline-v1.original.log",
+      "bytes": 8397,
+      "sha256": "3e3bd1886f91b8d3548850d5abf394a85ee5682bcfe5a0d94d5378d3a69cd7c1",
+      "blob": "5dfa73dd953a51a9fe0c03582bf4ec893323c63d",
+      "mode": "100644"
+    },
+    {
+      "path": "rejected-await-probe.safe.json",
+      "bytes": 1337,
+      "sha256": "ce698a2b2cea3bd51d4e896e6997f91994ec2bfdc3776ee3ed6f72ea13970b22",
+      "blob": "50d71e63be9b7dc017c073c5ac830ebeb19eccec",
+      "mode": "100644"
+    },
+    {
+      "path": "rejected-await-probe.original.log",
+      "bytes": 8341,
+      "sha256": "a759b0bd219ce14ab78934ac26a8e06b416b8a6d7f8734e6deb693801228207f",
+      "blob": "d839f4707c2999e4d7e2e1a595d44573351dcb29",
+      "mode": "100644"
+    },
+    {
+      "path": "owner-home-baseline-v2.safe.json",
+      "bytes": 1312,
+      "sha256": "5dd3b7db179fc75c2c713406a956bbce4f86a52f62e29c10b960d1e89009f35b",
+      "blob": "49ea27f6e8951c5ba4a70e467db7bc42c55e3c91",
+      "mode": "100644"
+    },
+    {
+      "path": "owner-home-baseline-v2.original.log",
+      "bytes": 9768,
+      "sha256": "7e7ddd207972f88a2b77b45b7c085b5a9221a55e7e7fee35b93141fe58079d24",
+      "blob": "00eff24dcfd5781da04988964b92374b18d11134",
+      "mode": "100644"
+    },
+    {
+      "path": "hydration-final-fixture-baseline.safe.json",
+      "bytes": 1084,
+      "sha256": "4060c47f046cabb3e8145abe2eaf87c80194b3beaa35e984c54ad8adc2e38a29",
+      "blob": "7e704f08f04c3e1e05e7e4330b2fd3ab314c4eaf",
+      "mode": "100644"
+    },
+    {
+      "path": "hydration-final-fixture-baseline.original.log",
+      "bytes": 8399,
+      "sha256": "3a9054bc009c6a29d44bd51bf4c167fc62e481c1c8108835c7e99cff9e545abb",
+      "blob": "f5a3e08003fb02b6334ccc1ccd8a8100c05b0ce2",
+      "mode": "100644"
+    },
+    {
+      "path": "pending-candidate-v3.safe.json",
+      "bytes": 4304,
+      "sha256": "4c3e380e0f819cffdfdd88a2dd73c1f71fedbde87640c8922c7145bf20136c26",
+      "blob": "df308969283825aa715fe5211bac028497319542",
+      "mode": "100644"
+    },
+    {
+      "path": "pending-candidate-v3.original.log",
+      "bytes": 16435,
+      "sha256": "835d24f36d50a9309d78ea717a0a587ac32366b233822f32306a0abf02d99cff",
+      "blob": "1ce6e712dba92ee779d9d0d44c11a73e23a8871b",
+      "mode": "100644"
+    },
+    {
+      "path": "pending-full-file.original.log",
+      "bytes": 26531,
+      "sha256": "58be71a6581293e1e4bab0ba0d47a57d3ca1938a15b523c3e401dc397e7e00b6",
+      "blob": "f466178802a8e322a814b037de691126d57c88ac",
+      "mode": "100644"
+    },
+    {
+      "path": "pending-full-file.safe.json",
+      "bytes": 8128,
+      "sha256": "855ef58452a3d38ae1d524b3495d7d9eff73f16bba52c185caa82b31bb568f35",
+      "blob": "a0a3ab4c6097b7e95c1a6985ff12e3788a78778e",
+      "mode": "100644"
+    },
+    {
+      "path": "pending-real-404.original.log",
+      "bytes": 1198,
+      "sha256": "7755017966d88dbe682047ea5da3640dc35a784770c3c26f190f2dc8e090b185",
+      "blob": "f79cf2a8501ee69bd7856136834d1daf40028a3f",
+      "mode": "100644"
+    },
+    {
+      "path": "pending-real-404.safe.json",
+      "bytes": 817,
+      "sha256": "cf947692fca0e5ff056c2e623d1d385ea910fd916c8b3632f77196f8ce8aa60d",
+      "blob": "0b07cd22691f3fe8ce45528c80b3e8715aa502ac",
+      "mode": "100644"
+    },
+    {
+      "path": "pending-full-final.original.log",
+      "bytes": 27307,
+      "sha256": "95d24b50043bc3151120f72aa9deffea989cc6af02d41ead67f350634a57f202",
+      "blob": "723bd808cd9969289765557aef6c684d00bb9e29",
+      "mode": "100644"
+    },
+    {
+      "path": "pending-full-final.safe.json",
+      "bytes": 8229,
+      "sha256": "70953232e643f2b66b6afb01c6907df3d8ec36530189fb96b6ccee65c43073df",
+      "blob": "b0b193a13fc36cbfeb281234724b6b0a9b9cc9a8",
+      "mode": "100644"
+    },
+    {
+      "path": "pending-dispatch-final.patch",
+      "bytes": 32742,
+      "sha256": "6c3c6f5eda18f0690a39d7c03b0a0163ede38af58a4410c98b0d08905b5c4efe",
+      "blob": "18f5c45d57c07089c35e3e9758b37a12850ed879",
+      "mode": "100644"
+    },
+    {
+      "path": "pending-dispatch-source-manifest.safe.json",
+      "bytes": 3444,
+      "sha256": "a757e2304b9ac1af33b34395d289ebafed4acca87081af42c6a5b03f08997bd4",
+      "blob": "801ce38b1810ec197d712674acd838df495a64b3",
+      "mode": "100644"
+    },
+    {
+      "path": "vm-cleanup.safe.json",
+      "bytes": 1379,
+      "sha256": "d0444ddc96b5894815198aa1138dda5cddf222acad5307e02caaa48ef328c67f",
+      "blob": "7fe8995e876fe0373b74e65aede83d5280deadb8",
+      "mode": "100644"
+    },
+    {
+      "path": "review-summary.safe.json",
+      "bytes": 5117,
+      "sha256": "e5eb699f97665432e509a1e47ca3ed22ea9da02b3efd4b8e7be82e7b3efbaf4f",
+      "blob": "b9f362ca74111a824410cf195193df8a2209270a",
+      "mode": "100644"
+    },
+    {
+      "path": "dependency-proof.safe.json",
+      "bytes": 1219,
+      "sha256": "884f1b94639a4f22d7ca34d365b9e86856fe548f3e40406df3322fb9e82f44f4",
+      "blob": "c546e11dcf63ce0ee41f1d0c3035cc2a26283484",
+      "mode": "100644"
+    },
+    {
+      "path": "fixture-package.json",
+      "bytes": 371,
+      "sha256": "767696f6bd499f5011ad21c9a73cdaf2efe000de631282a78e51fc717802e224",
+      "blob": "e14a38dcb6f0ab3784c120a96e47473529e41bec",
+      "mode": "100644"
+    },
+    {
+      "path": "fixture-pnpm-lock.yaml",
+      "bytes": 42407,
+      "sha256": "a295262ea12552b2f8be05025135495efd3891a87437a218889fc40e8ff1e2a0",
+      "blob": "b3f28802d2066d8adbb3083e42c1dc6839550967",
+      "mode": "100644"
+    },
+    {
+      "path": "fixture-pnpm-workspace.yaml",
+      "bytes": 77,
+      "sha256": "3a0307b38251f9230f4afd8fcd03074f443bb5cb9e0cf876acc6d76ae37e2868",
+      "blob": "3601ce7547ae06896b8f19070b773be11f7ab75e",
+      "mode": "100644"
+    },
+    {
+      "path": "experiments/rejected-await-read-observer.ts",
+      "bytes": 5812,
+      "sha256": "e0ab5bd3f4edad0c55f0ffc81c7aaa6ec9dffb3b42b1ceaf6154910007b969c5",
+      "blob": "52f195fff7c8ea711c0753e8801ac56060dbabd3",
+      "mode": "100644"
+    },
+    {
+      "path": "experiments/hydration-fixture-v1.tsx",
+      "bytes": 67107,
+      "sha256": "d4bbb3ed8af5ef3ad0a11fe246c568ef863eb847d6ac0ca0b688ff10ee6faab7",
+      "blob": "32cccec7ee1bc75bdebebe6d5920b5674859b865",
+      "mode": "100644"
+    },
+    {
+      "path": "experiments/pre-404-fixture-v3.tsx",
+      "bytes": 70311,
+      "sha256": "b4fdd77cc73afb59b8c4852b87ec8406583134eb51a367a12faa168b289dda01",
+      "blob": "7854c0f52a0eb906f6c122c440200540e9be5172",
+      "mode": "100644"
+    },
+    {
+      "path": "experiments/owner-home-baseline-fixture-v2.tsx",
+      "bytes": 73416,
+      "sha256": "53bb23109ab404f5774241b3305c7040bc649e0c471b491dd63359b884ba94bd",
+      "blob": "eb3e9d02b547f97fcd912c376849529f25f81ced",
+      "mode": "100644"
+    },
+    {
+      "path": "README.md",
+      "bytes": 4558,
+      "sha256": "17764d8c17257314f661d79dcaa7f14019edc774239df9866906b40adcd7a708",
+      "blob": "8245be0c4cb4bb7ea09f69489d63157b4bd03f04",
+      "mode": "100644"
+    }
+  ],
+  "candidate": [
+    {
+      "path": "candidate/lib/swr/read-observer.ts",
+      "sourcePath": "lib/swr/read-observer.ts",
+      "mode": "100644",
+      "bytes": 8237,
+      "sha256": "c520e2c86ca83fe382e6131eb48b36b813b6b9f8750dc9d3c09e6e0044412cc9",
+      "blob": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+      "base": {
+        "bytes": 5786,
+        "sha256": "2c4f60539d1eb8d8e607490268fe065fa03b6f1b27e796fa23f5f35bd670499b",
+        "blob": "2dc3ab5a9934fed5146189fd236b450f0d223920"
+      }
+    },
+    {
+      "path": "candidate/components/swr-defaults.tsx",
+      "sourcePath": "components/swr-defaults.tsx",
+      "mode": "100644",
+      "bytes": 4551,
+      "sha256": "847311eb9b775d43bb9f569d6ec395aeb41475a5ed7468e17cd1826b2c73217d",
+      "blob": "9b7a4385896b9aacc69ea898be23636b5a8c62fb",
+      "base": {
+        "bytes": 4433,
+        "sha256": "cd77353db8fdc38f6527ea5e00bd1227ecb6c8167350eff254effb3b41e8be33",
+        "blob": "f6be8710182ad68ce0a87f6cac910184bf1d52f3"
+      }
+    },
+    {
+      "path": "candidate/hooks/use-live-lists.ts",
+      "sourcePath": "hooks/use-live-lists.ts",
+      "mode": "100644",
+      "bytes": 9807,
+      "sha256": "da27e73ae937fed876ae463e988d4418292f9976aeb7bc95a89e786ae80e5fab",
+      "blob": "afd0cae59d1b871cbc5175a6de8f2b44f2d036ca",
+      "base": {
+        "bytes": 9682,
+        "sha256": "c4c9ea9e785986831df600cfff09fccba1705e7a10e0a886d5d6af21d8463b1a",
+        "blob": "ac60a59be511ec45cc372b8c91c0535861a30931"
+      }
+    },
+    {
+      "path": "candidate/apps/desktop/src/renderer/rpc.ts",
+      "sourcePath": "apps/desktop/src/renderer/rpc.ts",
+      "mode": "100644",
+      "bytes": 4640,
+      "sha256": "bb72e38f117c01dffbf4f9ec7e2309160e9ac0d4bf485aa476132b22b191e48c",
+      "blob": "1dfb20c85e930e3c4b75d4f6e656a04fa9c2ffc5",
+      "base": {
+        "bytes": 4265,
+        "sha256": "7cadecd350fd73031473a4131edf769c552822a9faf6d26b345e6417dae671c0",
+        "blob": "a9ffaee70d53e2c9c0471b61abbddf80cc244fbe"
+      }
+    },
+    {
+      "path": "candidate/apps/desktop/src/renderer/read-batch.ts",
+      "sourcePath": "apps/desktop/src/renderer/read-batch.ts",
+      "mode": "100644",
+      "bytes": 6237,
+      "sha256": "a25842776c07816eb8af6a24d62dc9d745ab13fb9cfff513de02673d48926f18",
+      "blob": "67503a9abe7131de3e9bf86629532e015085d4ee",
+      "base": {
+        "bytes": 5988,
+        "sha256": "040d039af2d8abb6aeb9eb4a4d66d357526d8afa6c0afed0e5bbaf80ba7a87c1",
+        "blob": "b72659facb8a5a710fb0c0121e2543add0ad8f33"
+      }
+    },
+    {
+      "path": "candidate/scripts/use-live-lists.live.test.tsx",
+      "sourcePath": "scripts/use-live-lists.live.test.tsx",
+      "mode": "100644",
+      "bytes": 75804,
+      "sha256": "9591bf1bd79f47b7c159eadcffa21125a7d06e76bbd33d82fcbbddd25e25af7e",
+      "blob": "a4aec5fe968100f283a8d93b963934430a97fcda",
+      "base": {
+        "bytes": 58655,
+        "sha256": "da2c31a515397745e02d3118981751aedc319ac3ea53f01dc22d340c6ed75512",
+        "blob": "f981a61d72fb9c0e153e490f89d7328fb014558e"
+      }
+    }
+  ],
+  "finalTest": {
+    "tests": 75,
+    "pass": 75,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "exitCode": 0,
+    "logBlob": "723bd808cd9969289765557aef6c684d00bb9e29",
+    "sourceManifestBlob": "801ce38b1810ec197d712674acd838df495a64b3"
+  },
+  "acceptanceBoundary": "Original first Native startup 183 > Hosted 139 remains RED. This is a source-level regression fix, not a new packaged Native or production result.",
+  "cleanupBlob": "7fe8995e876fe0373b74e65aede83d5280deadb8",
+  "activeResources": 0,
+  "refsChanged": 0
+}

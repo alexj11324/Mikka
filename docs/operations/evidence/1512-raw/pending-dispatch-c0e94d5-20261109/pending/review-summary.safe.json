@@ -1,0 +1,165 @@
+{
+  "version": 1,
+  "issue": 1512,
+  "scope": "pending Native dispatch observation during a live flush",
+  "base": {
+    "head": "1ffa581f16319381054e0636ae41e6292719a1fe",
+    "actualNativeCheckout": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+    "tree": "bc4d584fa651385886e79dc6359b1b43324425d1"
+  },
+  "runtimeChanges": {
+    "snapshotFetchers": [
+      "useLiveTaskRunList",
+      "useLiveBotChatList",
+      "useLiveBotRoster"
+    ],
+    "scope": "synchronous invocation after existing hydration await; try/finally restored",
+    "pendingHint": "only decides whether to await that observation; never raises completed began or satisfies revision/commit proof",
+    "revocation": "sticky on multiple capture or repeated notification; Promise.race wakes already-awaited hint; supersession also wakes",
+    "completedProof": "original response WeakMap began > after, exact applied SWR value, original failure identity, current owner/cache/lifetime/visibility/enabled guards and all revision checks",
+    "unchanged": [
+      "snapshot action whitelist",
+      "authorization",
+      "SQL windows and budgets",
+      "Native lifecycle runner",
+      "home/selected workspace routing",
+      "generic before-ready revalidation",
+      "models/provider choices"
+    ]
+  },
+  "tests": {
+    "baselineV1": {
+      "tests": 6,
+      "pass": 5,
+      "fail": 1
+    },
+    "finalPhaseLabelsBaseline": {
+      "tests": 6,
+      "pass": 5,
+      "fail": 1,
+      "log": "hydration-final-fixture-baseline.original.log",
+      "testSha256": "b4fdd77cc73afb59b8c4852b87ec8406583134eb51a367a12faa168b289dda01"
+    },
+    "rejectedUnboundedAwait": {
+      "tests": 7,
+      "pass": 6,
+      "fail": 1,
+      "reason": "blocks a required pre-ready catch-up behind a hung older read",
+      "notCandidate": true
+    },
+    "ownerHomeExperiment": {
+      "tests": 10,
+      "pass": 4,
+      "fail": 6,
+      "reason": "the existing provider has no separate owner-home hint; implementation was not applied or tested",
+      "notCandidate": true
+    },
+    "targeted": {
+      "tests": 35,
+      "pass": 35
+    },
+    "fullBefore404": {
+      "tests": 74,
+      "pass": 74
+    },
+    "real404": {
+      "tests": 1,
+      "pass": 1
+    },
+    "fullFinal": {
+      "tests": 75,
+      "pass": 75,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "exitCode": 0,
+      "durationSeconds": 124.438,
+      "testSha256": "9591bf1bd79f47b7c159eadcffa21125a7d06e76bbd33d82fcbbddd25e25af7e",
+      "logSha256": "95d24b50043bc3151120f72aa9deffea989cc6af02d41ead67f350634a57f202"
+    }
+  },
+  "observedFixtureCounts": [
+    {
+      "kind": "native_hydration_order",
+      "scenario": "provider-unresolved",
+      "summariesCalls": 2,
+      "rosterCalls": 0,
+      "physicalCalls": 2
+    },
+    {
+      "kind": "native_hydration_order",
+      "scenario": "provider-hint",
+      "summariesCalls": 2,
+      "rosterCalls": 0,
+      "physicalCalls": 2
+    },
+    {
+      "kind": "native_hydration_order",
+      "scenario": "warm-committed",
+      "summariesCalls": 1,
+      "rosterCalls": 1,
+      "physicalCalls": 1
+    },
+    {
+      "kind": "native_hydration_order",
+      "scenario": "warm-pending-after-ready",
+      "summariesCalls": 1,
+      "rosterCalls": 1,
+      "physicalCalls": 1
+    },
+    {
+      "kind": "native_hydration_order",
+      "scenario": "warm-pending-before-ready",
+      "summariesCalls": 2,
+      "rosterCalls": 2,
+      "physicalCalls": 3
+    },
+    {
+      "kind": "native_hydration_order",
+      "scenario": "warm-new-home",
+      "summariesCalls": 2,
+      "rosterCalls": 1,
+      "physicalCalls": 2
+    },
+    {
+      "kind": "native_real_capability_fallback",
+      "logical": {
+        "bots": 2,
+        "roster": 2
+      },
+      "physical": 5
+    }
+  ],
+  "diagnosticCorrection": "v1 response event used the mutable total call count; final fixture uses a per-request const. v1 original remains unchanged and the same corrected six cases were rerun against unmodified runtime.",
+  "verificationBoundaries": {
+    "realReactSWRPersistentCacheHydrationNativeQueueCodecMessageChannel": true,
+    "httpSocketStorageBoundariesAreFixtures": true,
+    "fullCanonicalReadBatchStandalone": false,
+    "fullCanonicalReadBatchGap": "Its original frontend test loader imports additional Tailwind, TypeScript and native SWC modules outside this exact minimal fixture. No substituted loader or fake compiler was used.",
+    "fullRepositoryTypecheck": false,
+    "lint": false,
+    "packagedNativeRetested": false,
+    "productionAcceptance": false,
+    "accountOrModelCalls": 0
+  },
+  "originalAcceptance": {
+    "completeLoginNative": 394,
+    "completeLoginHosted": 412,
+    "firstStartupNative": 183,
+    "firstStartupHosted": 139,
+    "status": "RED",
+    "sameOriginalFirstPair": true,
+    "notReplacedByUnitResults": true,
+    "remainingSQLDelta44NotClaimedResolved": true
+  },
+  "privacy": {
+    "existingScannerApplied": true,
+    "credentialShapeHits": 0,
+    "emailHits": 0,
+    "onlyPublicSourceAndSyntheticFixtureData": true
+  },
+  "publication": {
+    "GitBlobsOnly": true,
+    "refsChanged": 0
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "exitCode": 0,
+  "durationSeconds": 6.714,
+  "nodeVersion": "v24.22.2",
+  "pnpmVersion": "10.34.3",
+  "command": [
+    "pnpm",
+    "install",
+    "--frozen-lockfile",
+    "--reporter",
+    "append-only"
+  ],
+  "logSHA256": "5e05ff8e28827949eca8c1eaa4fb840ac65c388ccd1a37799bcd9c694a5e2bd5"
+}

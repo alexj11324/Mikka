@@ -1,0 +1,628 @@
+{
+  "schema": "mikka.issue1512.final-c0e-immutable-source-review.v1",
+  "repository": "alexj11324/Mikka",
+  "checkedObjects": [
+    {
+      "role": "main",
+      "commit": "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+      "tree": "dba5247cc453a7978f4f0dffe637f37e4d9a88f8",
+      "parents": [
+        "89870a876fa436da51598aa7e089d74d0f177001"
+      ]
+    },
+    {
+      "role": "fix",
+      "commit": "9fe4bd62bb726511e4d6f4f63f36b9d2f4895093",
+      "tree": "80429f7b02da2ddcd873bf0625d76d4e71f2f4bd",
+      "parents": [
+        "1ffa581f16319381054e0636ae41e6292719a1fe"
+      ]
+    },
+    {
+      "role": "final ordinary merge",
+      "commit": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+      "tree": "3e09885ffb34a9c04fc8a7ac5b8b88e3415f7325",
+      "parents": [
+        "9fe4bd62bb726511e4d6f4f63f36b9d2f4895093",
+        "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6"
+      ]
+    }
+  ],
+  "method": "Independent Git commit API reads, complete non-truncated recursive Git trees, declared-source manifest comparison by path/type/mode/blob; full five-patch review and exact package text reconstruction in V8. No source/ref mutation, CI, runtime test or VM.",
+  "mainDelta": {
+    "base": "89870a876fa436da51598aa7e089d74d0f177001",
+    "head": "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+    "commits": 1,
+    "pathCount": 5,
+    "compare": "https://github.com/alexj11324/Mikka/compare/89870a876fa436da51598aa7e089d74d0f177001...0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+    "fullPatchesRead": [
+      {
+        "path": "components/workspace/task-detail.tsx",
+        "blob": "c8a757bb818eb83e58d8e75821dbdda4aa7bd903",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 2,
+        "patchSha256": "960f738cfb42c09ebf734f2db9a530381da0c859d34505402c71e00e4c02f40d"
+      },
+      {
+        "path": "components/workspace/task-thread-pane.tsx",
+        "blob": "7709b82a87ab8acc68c1b9fa32dfd29d14c1f2b8",
+        "status": "added",
+        "additions": 29,
+        "deletions": 0,
+        "patchSha256": "7520563132f61d76defb4ecc0076cb8d2a0c073ffdbd3da8b62f551edf72ffb5"
+      },
+      {
+        "path": "package.json",
+        "blob": "ec9951453307dd586dfe058648d9fc762a6665ad",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 1,
+        "patchSha256": "09a2a6dca996b3fa9f98a9aafe8b8a649a318efffe95158278079ce2ff7ea1c4"
+      },
+      {
+        "path": "scripts/task-thread-pane.test.tsx",
+        "blob": "b0e80115a916f3c50af51575b6436d6b04b9abd7",
+        "status": "added",
+        "additions": 52,
+        "deletions": 0,
+        "patchSha256": "0a7499d60da39ddb1ff3a11c7bf7e52f25d6d1c76062b86a87891c5b7c7403b4"
+      },
+      {
+        "path": "scripts/thread-composer.test.tsx",
+        "blob": "050b42cf2a6f9479e843fa82b3001c1f47d86469",
+        "status": "modified",
+        "additions": 3,
+        "deletions": 1,
+        "patchSha256": "4b67e86d792681aacaf15e12dbbb844f20a9b7c82932e467cb817bcfed175bfd"
+      }
+    ],
+    "intersectionWithDeclared17": [
+      "package.json"
+    ],
+    "fourNonPackageFiles": [
+      {
+        "path": "components/workspace/task-detail.tsx",
+        "expected": "c8a757bb818eb83e58d8e75821dbdda4aa7bd903",
+        "actual": "c8a757bb818eb83e58d8e75821dbdda4aa7bd903",
+        "matches": true,
+        "mode": "100644"
+      },
+      {
+        "path": "components/workspace/task-thread-pane.tsx",
+        "expected": "7709b82a87ab8acc68c1b9fa32dfd29d14c1f2b8",
+        "actual": "7709b82a87ab8acc68c1b9fa32dfd29d14c1f2b8",
+        "matches": true,
+        "mode": "100644"
+      },
+      {
+        "path": "scripts/task-thread-pane.test.tsx",
+        "expected": "b0e80115a916f3c50af51575b6436d6b04b9abd7",
+        "actual": "b0e80115a916f3c50af51575b6436d6b04b9abd7",
+        "matches": true,
+        "mode": "100644"
+      },
+      {
+        "path": "scripts/thread-composer.test.tsx",
+        "expected": "050b42cf2a6f9479e843fa82b3001c1f47d86469",
+        "actual": "050b42cf2a6f9479e843fa82b3001c1f47d86469",
+        "matches": true,
+        "mode": "100644"
+      }
+    ],
+    "behavior": "TaskDetail delegates its opened thread to TaskThreadPane. A provided task-conversation slot in chat mode receives issueId/runId/onBack/onOpenThread; acceptance mode and a null slot retain IssueThreadPanel keyed by runId:tab. Public default slot is null. Existing slot props match all supplied fields. No API/auth/SQL implementation is changed by these five paths.",
+    "runtimeBoundary": "Layered joined-conversation rendering may change which existing reads run when a task thread is opened. Source review does not establish equal query counts in that branch. This is not evidence of extra Coordinator-login/first-pair SQL. The new combined Native run remains authoritative.",
+    "testRegistration": "Main's scripts/task-thread-pane.test.tsx remains in test:issues and existing ci-integration-26; composer source-chain assertions move to TaskThreadPane and retain the original composer safety check.",
+    "slot": {
+      "path": "components/slots/task-conversation.tsx",
+      "blob": "1b5fcd79b2ee3b85920309b570ea4e2d03ceda8f",
+      "default": null
+    },
+    "contract": {
+      "path": "components/slots/task-conversation-contract.ts",
+      "blob": "33fcbdd964a90893d2748d7c0999248aa6cddf73"
+    }
+  },
+  "treeConservation": {
+    "mainTruncated": false,
+    "finalTruncated": false,
+    "mainLeaves": 6760,
+    "finalLeaves": 6762,
+    "declaredOverlayPaths": 49,
+    "actualChangedPaths": 49,
+    "modifiedExisting": 47,
+    "newFiles": [
+      "patches/ffmpeg-static@5.3.0.patch",
+      "scripts/ffmpeg-install.test.mjs"
+    ],
+    "deletedFiles": [],
+    "undeclaredChangedPaths": [],
+    "missingDeclaredPaths": [],
+    "identicalRemainingMainLeaves": 6713,
+    "originalOwn33": "All 33 represented; 32 retain original blobs (including separately verified mode-only fake files), analytics test is the previously reviewed lossless union.",
+    "canonicalIndexFormat": "JSON array of [path,mode,type,sha], lexicographically sorted by path, followed by one LF; SHA-256 of UTF-8 bytes.",
+    "mainCanonicalLeafIndexSha256": "0b53184a55a15183d3a5b27f39c4e69514ba4a7843b09d0db1f6355d24bd639b",
+    "finalCanonicalLeafIndexSha256": "77218c50334b851d66fdfded7bf8114f0f466b7aa9dd767cb9221f2aee924aad",
+    "finalModes": "All 49 declared changes have mode100644 except the two explicitly required mode100755 daemon fakes."
+  },
+  "package": {
+    "bytes": 80406,
+    "sha256": "8308c63f5f07119923296df96d9c830d8ceeb231b127e8b8b89790edd64cf7a7",
+    "gitBlob": "785071f84b258c420e97d1c2b1e8afe3b9bd7048",
+    "fromMainEquals": true,
+    "fromInstallerEquals": true,
+    "ordersEqual": true,
+    "baselineReversionEqual": true,
+    "scripts": {
+      "testIssuesHasMainCase": true,
+      "testCapturesHasInstaller": true
+    },
+    "tasksGate": [
+      [
+        "integration-26",
+        {
+          "command": "pnpm test:issues",
+          "kind": "integration",
+          "env": {}
+        }
+      ]
+    ]
+  },
+  "sourceChecks": [
+    {
+      "path": "app/v1/devices/[deviceId]/repos/route.ts",
+      "origin": "own33",
+      "expectedSha": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b",
+      "actualSha": "7ab99bf8f2c0c23951b9a82a0a0e234bd7de230b",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "app/v1/devices/[deviceId]/runs/route.ts",
+      "origin": "own33",
+      "expectedSha": "5a4c4f8486239161b325b9774b3086afe666dfa9",
+      "actualSha": "5a4c4f8486239161b325b9774b3086afe666dfa9",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "apps/api/generated/routes.json",
+      "origin": "own33",
+      "expectedSha": "06017439de4b98555310e13c35c079bca379174f",
+      "actualSha": "06017439de4b98555310e13c35c079bca379174f",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "origin": "own33",
+      "expectedSha": "16fe573dc6d192566f6bf2810b9ba94e186cba82",
+      "actualSha": "16fe573dc6d192566f6bf2810b9ba94e186cba82",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "docs/operations/tracing.md",
+      "origin": "own33",
+      "expectedSha": "a02e4a5100c066d8564902ec287c9c92fee0d20e",
+      "actualSha": "a02e4a5100c066d8564902ec287c9c92fee0d20e",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "instrumentation-client.ts",
+      "origin": "own33",
+      "expectedSha": "9109982d1c3245179b85a42d6969003aec2f5047",
+      "actualSha": "9109982d1c3245179b85a42d6969003aec2f5047",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "lib/analytics-policy.ts",
+      "origin": "own33",
+      "expectedSha": "152b941ff7b05004a7c57a909f776c6268ede106",
+      "actualSha": "152b941ff7b05004a7c57a909f776c6268ede106",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "lib/coordinator/repository-resolution.test.ts",
+      "origin": "own33",
+      "expectedSha": "a5157f09e8022bf9077053686d36aa02760a4e94",
+      "actualSha": "a5157f09e8022bf9077053686d36aa02760a4e94",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "lib/coordinator/repository-resolution.ts",
+      "origin": "own33",
+      "expectedSha": "6826efdd6895fa3f584e35ff2f1edb527cd080fa",
+      "actualSha": "6826efdd6895fa3f584e35ff2f1edb527cd080fa",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "lib/desktop-rpc/read-batch-context.ts",
+      "origin": "own33",
+      "expectedSha": "e32da5e4d7294af3363eb2de4623a52aeb7e4f47",
+      "actualSha": "e32da5e4d7294af3363eb2de4623a52aeb7e4f47",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "lib/device-enrollment.db.test.ts",
+      "origin": "own33",
+      "expectedSha": "071b2243d35cd6fdd97b7be0f17f21728578c537",
+      "actualSha": "071b2243d35cd6fdd97b7be0f17f21728578c537",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "lib/device-enrollment.ts",
+      "origin": "own33",
+      "expectedSha": "8fe53cb39985150e5fc05daa6370121cb5426d53",
+      "actualSha": "8fe53cb39985150e5fc05daa6370121cb5426d53",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "lib/device-heartbeat.db.test.ts",
+      "origin": "own33",
+      "expectedSha": "27bbb720ac8f5bd3716787db62eb11833e9f3530",
+      "actualSha": "27bbb720ac8f5bd3716787db62eb11833e9f3530",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "lib/device-management.ts",
+      "origin": "own33",
+      "expectedSha": "c2243c5732d67b3ff5444196ce3b45e9aca67805",
+      "actualSha": "c2243c5732d67b3ff5444196ce3b45e9aca67805",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "lib/device-unit-fence.db.test.ts",
+      "origin": "own33",
+      "expectedSha": "bc65b3faf494d2fd7c797b68f34d04227df38b7a",
+      "actualSha": "bc65b3faf494d2fd7c797b68f34d04227df38b7a",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "lib/dispatch-timing.ts",
+      "origin": "own33",
+      "expectedSha": "f82563e766f5c0477479b2d487e0f92e60a08b75",
+      "actualSha": "f82563e766f5c0477479b2d487e0f92e60a08b75",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "lib/personal-policy.test.ts",
+      "origin": "own33",
+      "expectedSha": "fef80337b9b5244d2e8565236c6dd96f7d329acd",
+      "actualSha": "fef80337b9b5244d2e8565236c6dd96f7d329acd",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "lib/personal-policy.ts",
+      "origin": "own33",
+      "expectedSha": "dc710f0a16a5e28e5a34d5112a86fab349a2639a",
+      "actualSha": "dc710f0a16a5e28e5a34d5112a86fab349a2639a",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "lib/replay-readiness.ts",
+      "origin": "own33",
+      "expectedSha": "d60598b09201228e23c5ac7a9df00938192f0e67",
+      "actualSha": "d60598b09201228e23c5ac7a9df00938192f0e67",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "lib/tracing/logs.test.ts",
+      "origin": "own33",
+      "expectedSha": "737fa373e4a8333a4a703bf6133f9a533d585460",
+      "actualSha": "737fa373e4a8333a4a703bf6133f9a533d585460",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "lib/tracing/node.ts",
+      "origin": "own33",
+      "expectedSha": "00775a5928228262a66b12b845ee0dc18f6c6047",
+      "actualSha": "00775a5928228262a66b12b845ee0dc18f6c6047",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "origin": "own33",
+      "expectedSha": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+      "actualSha": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+      "mode": "100755",
+      "matches": true,
+      "compareSha": null,
+      "expectedBasis": "Exact main0415 Git tree unchanged blob; compare API supplies null for mode-only change."
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+      "origin": "own33",
+      "expectedSha": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+      "actualSha": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+      "mode": "100755",
+      "matches": true,
+      "compareSha": null,
+      "expectedBasis": "Exact main0415 Git tree unchanged blob; compare API supplies null for mode-only change."
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "origin": "own33",
+      "expectedSha": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+      "actualSha": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "scripts/acceptance/run-observability-browser.test.mjs",
+      "origin": "own33",
+      "expectedSha": "56412efdfe5bc638496b89de56281360b4cbe9b5",
+      "actualSha": "56412efdfe5bc638496b89de56281360b4cbe9b5",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "scripts/acceptance/run-observability.md",
+      "origin": "own33",
+      "expectedSha": "4ca2cf35c1f499b338469556836ae0505649e82a",
+      "actualSha": "4ca2cf35c1f499b338469556836ae0505649e82a",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.mjs",
+      "origin": "own33",
+      "expectedSha": "f36ecf2d08f1bc2754b21be0d47d149871bb67c5",
+      "actualSha": "f36ecf2d08f1bc2754b21be0d47d149871bb67c5",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "origin": "own33",
+      "expectedSha": "628395f91d97a64655afb80117788d70207200c0",
+      "actualSha": "628395f91d97a64655afb80117788d70207200c0",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "tests/analytics-policy.test.mjs",
+      "origin": "installer11",
+      "expectedSha": "f162a894cbada7fada30c63a3a49f4b665574f0f",
+      "actualSha": "f162a894cbada7fada30c63a3a49f4b665574f0f",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "tests/cloud-dispatch-startup.test.ts",
+      "origin": "own33",
+      "expectedSha": "609029dde521868c00ab7eb687394ad5cacd6183",
+      "actualSha": "609029dde521868c00ab7eb687394ad5cacd6183",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "tests/replay-readiness.test.mjs",
+      "origin": "own33",
+      "expectedSha": "58e4706039dafe6901082676f37a3c92da613d43",
+      "actualSha": "58e4706039dafe6901082676f37a3c92da613d43",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "workflows/coordinator/factory-steps.ts",
+      "origin": "own33",
+      "expectedSha": "0e2ecce921c4b56795ad1096f2b1eae987299e95",
+      "actualSha": "0e2ecce921c4b56795ad1096f2b1eae987299e95",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "workflows/coordinator/steps.ts",
+      "origin": "own33",
+      "expectedSha": "8b7a5b06f3d1a9c0ebae03a434095a33fa552894",
+      "actualSha": "8b7a5b06f3d1a9c0ebae03a434095a33fa552894",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "origin": "pending6",
+      "expectedSha": "1dfb20c85e930e3c4b75d4f6e656a04fa9c2ffc5",
+      "actualSha": "1dfb20c85e930e3c4b75d4f6e656a04fa9c2ffc5",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "origin": "pending6",
+      "expectedSha": "67503a9abe7131de3e9bf86629532e015085d4ee",
+      "actualSha": "67503a9abe7131de3e9bf86629532e015085d4ee",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "origin": "pending6",
+      "expectedSha": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+      "actualSha": "69a827369bd71838ba8ac9ffbee928ca70219e76",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "components/swr-defaults.tsx",
+      "origin": "pending6",
+      "expectedSha": "9b7a4385896b9aacc69ea898be23636b5a8c62fb",
+      "actualSha": "9b7a4385896b9aacc69ea898be23636b5a8c62fb",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "hooks/use-live-lists.ts",
+      "origin": "pending6",
+      "expectedSha": "afd0cae59d1b871cbc5175a6de8f2b44f2d036ca",
+      "actualSha": "afd0cae59d1b871cbc5175a6de8f2b44f2d036ca",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "origin": "pending6",
+      "expectedSha": "a4aec5fe968100f283a8d93b963934430a97fcda",
+      "actualSha": "a4aec5fe968100f283a8d93b963934430a97fcda",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": ".github/actions/pnpm-install/action.yml",
+      "origin": "installer11",
+      "expectedSha": "20a5db53847172db9f52ee12c6c0feeec6c48dce",
+      "actualSha": "20a5db53847172db9f52ee12c6c0feeec6c48dce",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": ".github/workflows/self-hosted-image.yml",
+      "origin": "installer11",
+      "expectedSha": "46f05f36960559221030e89e1add41ecdfced3b4",
+      "actualSha": "46f05f36960559221030e89e1add41ecdfced3b4",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": ".github/workflows/web-deploy.yml",
+      "origin": "installer11",
+      "expectedSha": "bab7ed46eefd7bd4b6db712e8e141484be9f73ba",
+      "actualSha": "bab7ed46eefd7bd4b6db712e8e141484be9f73ba",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "Dockerfile",
+      "origin": "installer11",
+      "expectedSha": "19054afe4768b3391515c7a3e0f97a0021f123ee",
+      "actualSha": "19054afe4768b3391515c7a3e0f97a0021f123ee",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "package.json",
+      "origin": "package union",
+      "expectedSha": "785071f84b258c420e97d1c2b1e8afe3b9bd7048",
+      "actualSha": "785071f84b258c420e97d1c2b1e8afe3b9bd7048",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "patches/ffmpeg-static@5.3.0.patch",
+      "origin": "installer11",
+      "expectedSha": "5e27d8d12fbed2d0c2e62083976de11c86d9e1fa",
+      "actualSha": "5e27d8d12fbed2d0c2e62083976de11c86d9e1fa",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "origin": "installer11",
+      "expectedSha": "4b67909739360248e279efa0c3bb7344379e04fe",
+      "actualSha": "4b67909739360248e279efa0c3bb7344379e04fe",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "origin": "installer11",
+      "expectedSha": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d",
+      "actualSha": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "scripts/check-analytics-ssr.mjs",
+      "origin": "installer11",
+      "expectedSha": "0fad928edefbb3b2677450f9f04778ec088a6195",
+      "actualSha": "0fad928edefbb3b2677450f9f04778ec088a6195",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "scripts/ffmpeg-install.test.mjs",
+      "origin": "installer11",
+      "expectedSha": "9ce1e3333fd3ddb10ea206f5144cc466611842a1",
+      "actualSha": "9ce1e3333fd3ddb10ea206f5144cc466611842a1",
+      "mode": "100644",
+      "matches": true
+    }
+  ],
+  "generated": [
+    {
+      "path": "apps/api/generated/routes.json",
+      "origin": "own33",
+      "expectedSha": "06017439de4b98555310e13c35c079bca379174f",
+      "actualSha": "06017439de4b98555310e13c35c079bca379174f",
+      "mode": "100644",
+      "matches": true
+    },
+    {
+      "path": "apps/api/generated/routes.ts",
+      "origin": "own33",
+      "expectedSha": "16fe573dc6d192566f6bf2810b9ba94e186cba82",
+      "actualSha": "16fe573dc6d192566f6bf2810b9ba94e186cba82",
+      "mode": "100644",
+      "matches": true
+    }
+  ],
+  "fakeModes": [
+    {
+      "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "origin": "own33",
+      "expectedSha": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+      "actualSha": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+      "mode": "100755",
+      "matches": true,
+      "compareSha": null,
+      "expectedBasis": "Exact main0415 Git tree unchanged blob; compare API supplies null for mode-only change."
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+      "origin": "own33",
+      "expectedSha": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+      "actualSha": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+      "mode": "100755",
+      "matches": true,
+      "compareSha": null,
+      "expectedBasis": "Exact main0415 Git tree unchanged blob; compare API supplies null for mode-only change."
+    }
+  ],
+  "priorReceipts": {
+    "pendingSixInstallerEleven": "c5ffb15bc0b59ffff7978dcb5ccaf3195ea831ba",
+    "apiReadOnlyCandidate": "beaf36679d3a62aaa764fcd73a84c2714716e69c",
+    "installerDetailedSourceReview": "37cb38b11a484cccd93b5033e5eda44d1535dd7a",
+    "analyticsLosslessMerge": "40b70a0471f57abf739f90b1a115019aa7476c36"
+  },
+  "reviewComputationCorrection": {
+    "initialAssertion": "Generic expected-SHA comparison encountered null SHA on the two mode-only compare entries and reported mismatch.",
+    "disposition": "This was insufficient compare metadata, not a product/tree mismatch. Original null values remain recorded. Complete main/final Git tree entries independently prove the two unchanged blobs and 100644->100755 mode changes; all other47 expected blobs matched on the initial pass.",
+    "overwrittenEvidence": false
+  },
+  "risks": {
+    "alignment": "Preserves current main task-conversation behavior, all original own33 contracts, final pending6 and the exact11 installer inputs with the declared two-file overlap resolutions.",
+    "impact": "Pending read coordination and shared install behavior need actual combined CI/Native validation. No new SQL endpoint, authority, sampling policy, model request or budget/window change was introduced by tree assembly.",
+    "verification": "Exact immutable objects and leaf conservation verified; package both merge orders and inverse baseline agree byte-for-byte. Prior75 is author execution at its frozen six-file input; combined execution remains pending.",
+    "rollback": "Normal descendant/revert ancestry is preserved; no force update, main movement or production action performed by this reviewer.",
+    "detection": "Canonical source/type checks and selected full suites plus original packaged Native windows must bind their actual checkout. Never borrow older head's green status or Browser gate echo as production/browser execution."
+  },
+  "conclusion": "No additional source-level blocker found. Final immutable tree matches the declared integration without hidden extras or dropped main files. This is static source approval only; all new actual CI/Native and production gates remain open."
+}

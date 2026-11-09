@@ -1,0 +1,11 @@
+{
+  "nodeVersion": "24.22.2",
+  "nodeArchiveSHA256": "48cc0e21e048790e54c0cf5749c2725005313d652651c40b7a21feb9697aaf75",
+  "pnpmVersion": "10.34.3",
+  "pnpmIntegrity": "sha512-8sUxsIgp175/A8kK3cJmYV+cVHdGPkvx0nXLJjzp6lfPDVWZEQ2UZJqbs/7Z8LXvzqdKcBa2FTKiTLmth4YMHQ==",
+  "pnpmArchiveSHA256": "1c40544020a2e633068ed43a98eb5c0fed7d64a1c6d6f2382e43df91419dad62",
+  "downloadedFrom": [
+    "nodejs.org",
+    "registry.npmjs.org"
+  ]
+}

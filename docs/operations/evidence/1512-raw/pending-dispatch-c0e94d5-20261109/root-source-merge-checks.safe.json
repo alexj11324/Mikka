@@ -1,0 +1,27 @@
+{
+  "analytics": {
+    "bytes": 26926,
+    "sha256": "a6cf1eb935b3bf5aac97ce4101a3b33a09d63b25530dbf43332484d032841dc2",
+    "mergeMethods": [
+      {
+        "offset": 0,
+        "oursExact": false,
+        "theirsExact": false
+      },
+      {
+        "offset": -1,
+        "oursExact": true,
+        "theirsExact": true
+      }
+    ],
+    "fromBothInputsExact": true,
+    "initialUniqueTextRemovalRejected": "The fixture insertion line was not unique; no source mutation occurred. Exact supplied line offsets reconstruct both directions."
+  },
+  "package": {
+    "bytes": 80406,
+    "sha256": "8308c63f5f07119923296df96d9c830d8ceeb231b127e8b8b89790edd64cf7a7",
+    "fromBothOrdersIdentical": true,
+    "onlyInstallerScriptAgainstMain": true,
+    "retainedMainTaskThreadTest": true
+  }
+}

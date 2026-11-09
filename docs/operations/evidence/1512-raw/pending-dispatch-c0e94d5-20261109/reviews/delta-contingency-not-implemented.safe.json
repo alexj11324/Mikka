@@ -1,0 +1,457 @@
+{
+  "schemaVersion": 1,
+  "kind": "read-only-delta-dispatch-protocol-review",
+  "observedAtUTC": "2026-11-09T08:50:57.996Z",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "head": "1ffa581f16319381054e0636ae41e6292719a1fe",
+  "actualCheckout": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0",
+  "actualTree": "bc4d584fa651385886e79dc6359b1b43324425d1",
+  "execution": {
+    "sourceEdits": 0,
+    "refChanges": 0,
+    "testsRun": 0,
+    "productionQueries": 0,
+    "modelCalls": 0,
+    "resourcesCreated": 0,
+    "logsDownloaded": 0
+  },
+  "decision": {
+    "canCarryForAcceptedProtocolSnapshot": true,
+    "blanketCarryAfterMerge": false,
+    "actualNative44CauseProven": false,
+    "savingsClaim": null,
+    "summary": "合法且实际接纳的 full/delta/unchanged 读模型可以继承该次 RPC 的真实 dispatch 下界；纯对象复制、merge 返回非空或新对象本身不是证明。"
+  },
+  "existingProofContract": {
+    "sources": [
+      "apps/desktop/src/renderer/rpc.ts:29-34,67-68",
+      "apps/desktop/src/renderer/read-batch.ts:5-8,60-72",
+      "lib/swr/read-observer.ts:17-41,46-120",
+      "lib/live/list-read.ts:43-46",
+      "hooks/use-live-key.tsx:95-112"
+    ],
+    "details": [
+      "Native capture 在 encodeArgs 与当前作用域检查之后、实际 fetch 之前；使用同 realm 的单调顺序，不是 Date/performance 接收时间。",
+      "目前仅 task-runs.pollTaskRuns / coordinator.pollBotChatSummaries / bots.pollBots 接受单请求 proof；batch envelope 只向这三类 decoded logical result 转移。",
+      "sync* 的 proof 即使未来在 transport 层标记，也必须由具体 reader 在完成合法性判断后转移到真正返回给 SWR 的规范化快照。",
+      "proof 不上 wire、不落磁盘、不跨 tab；SWR 仍需 onSuccess 接纳、对象实际 committed、未 superseded、无 error，并覆盖当前及 obligation 的 revisions。",
+      "现 carryReadDispatch 注释明确禁止 merged data；若采纳本方案应由其 owner 精确描述允许的 validated protocol reconstruction，不可改成任意 merged 对象可继承。",
+      "该下界只描述本次正常 API/RPC 的 dispatch；singleFlight 可复用较早 leader 的底层 SQL/结果，所以绝不宣称所有底层 SQL 都在此 dispatch 后。leader live.revisions 与 post-flight metadata 授权保持原实现。"
+    ]
+  },
+  "serverContracts": {
+    "chat": {
+      "sources": [
+        "app/actions/coordinator.ts:112-148",
+        "lib/coordinator/store.ts:813-855",
+        "lib/coordinator/chat-poll.ts:13-25,50-82"
+      ],
+      "facts": [
+        "每次重新认证 user/ownBot/模型可用性；continuation/known 先验证和标准化。",
+        "beginOwnerListRead 在 version/transcript 之前。singleFlight key 含 owner/bot/current version/known/完整标准化 continuation；保留 leader 的旧 revision。",
+        "普通 delta 只有 prefix hash 相同、after<=cursor、请求 cursor<=当前 cursor、tail 无 historyBefore 才成立；否则服务器原路径返回 full。",
+        "prefix 是既有最近 200 消息的有界证明；不能声称验证任意已加载历史或重新读取每个正文。",
+        "metadata 在 singleFlight 完成后按当前 requester 对 held+new source/artifact IDs 重新授权；delta 的 metadataRefresh 及 unchanged.metadata 替换旧 maps，删除/失权卡片不会仅因 transcript unchanged 保留。",
+        "toolMetadata repair 额外绑定 baseCursor/prefix/after 并验证 overlay；不合法返回 undefined，客户端一次 full repair。"
+      ]
+    },
+    "issues": {
+      "sources": [
+        "app/actions/issues.ts:81-90,103-168"
+      ],
+      "facts": [
+        "每次重新取当前 user/workspace membership/accessibleTeamScopes/visibility；revision 在数据前，version 覆盖 user/workspace/team IDs/task 和 relation/identifier dependencies。",
+        "unchanged 仅 known===current version。否则每请求重建授权完整 id+version manifest，包含删除、失权、顺序和关联变化。",
+        "singleFlight 只有在该请求身份、role/tokenWorkspace、team scopes、version、known、held positions、完整新 manifest 一致后共享 changed rows；不采用 joiner 的较新 revision。",
+        "客户端先验证返回 live.ownerId 与 selectedWorkspaceId，合并使用请求前捕获的 previous，不借用另一个 workspace/cache 的 rows。"
+      ]
+    },
+    "threads": {
+      "sources": [
+        "app/actions/task-runs.ts:115-190"
+      ],
+      "facts": [
+        "每次重新认证 user；beginOwnerListRead 在 data/version 之前；设备 presence 和 expiry 从本次读取得。",
+        "version 含 owner + 可见投影/等待设备状态。unchanged 同样只在 known===version；否则完整 manifest 与 owner/version/held positions 绑定后才合并 changed rows。",
+        "presenceFallback/live.presence/deadline 必须保留本次服务器值，不能因 dispatch proof 绕过 Worker presence ACK。"
+      ]
+    }
+  },
+  "strictDecisionMatrix": [
+    {
+      "reader": "chat",
+      "branch": "accepted full first response",
+      "canCarry": true,
+      "source": "result wrapper",
+      "conditions": [
+        "owner check 通过",
+        "不是 L39-41 返回较新 current",
+        "full after 未定义，不需要旧 prefix 重建",
+        "消费 response-only repair fields 后仅浅复制该完整 read model"
+      ]
+    },
+    {
+      "reader": "chat",
+      "branch": "accepted ordinary delta",
+      "canCarry": true,
+      "source": "result wrapper",
+      "conditions": [
+        "存在相同 bot 的合法 held 基底",
+        "merged 是实际重建结果，绝非返回原 held",
+        "held cursor===response.baseCursor",
+        "实际合并基底必须 === 本次发送时 original previous，且 continuation.after/cursor/prefix 三个 primitive 与发送时捕获值全部相同；新对象即使 same cursor/prefix 也不给 proof，原对象 in-place 三字段变化同样不给",
+        "沿用 response version/live/metadataRefresh，不合成新 revision"
+      ]
+    },
+    {
+      "reader": "chat",
+      "branch": "accepted unchanged",
+      "canCarry": true,
+      "source": "result wrapper",
+      "conditions": [
+        "本次发送 known 非空且与 response.version/合并基底 version 相同",
+        "mergeChat 真正接纳 response 的 live state 与已重新授权 metadata",
+        "无未恢复的 restoreToolMetadata",
+        "不是因版本不匹配返回原 held",
+        "合并基底仍是本次发送时同一 previous；如有 continuation，其 after/cursor/prefix 三字段仍与发送时捕获值相同；不提升并发替换的基底"
+      ]
+    },
+    {
+      "reader": "chat",
+      "branch": "successful metadata overlay",
+      "canCarry": true,
+      "source": "result wrapper",
+      "conditions": [
+        "现有 cursor/prefix/after/overlay validation 全部成功",
+        "恢复后的对象实际采用本次新 live/metadata",
+        "不在 current changed/overlay late discard 分支",
+        "同一 original previous 引用和发送时 after/cursor/prefix 不变，successful overlay 也不豁免这一 gate"
+      ]
+    },
+    {
+      "reader": "chat",
+      "branch": "bounded full fallback",
+      "canCarry": true,
+      "source": "second full wrapper only",
+      "conditions": [
+        "第二次独立 RPC 成功且 owner 正确",
+        "L52 未返回较新 latest",
+        "full snapshot 被接纳",
+        "绝不继承第一次失败合并的 response proof；第二次无 proof 则最终也无可提升的 dispatch proof"
+      ]
+    },
+    {
+      "reader": "chat",
+      "branch": "retained current/latest/held or unmatched unchanged",
+      "canCarry": false,
+      "source": null,
+      "conditions": [
+        "L39-41、L52、mergeChat L59/L78 返回旧对象",
+        "不添加/覆盖该对象的 proof；即使它过去已有 proof，也不能推进为本次 RPC 时间"
+      ]
+    },
+    {
+      "reader": "chat",
+      "branch": "delta without compatible base; same cursor but different prefix",
+      "canCarry": false,
+      "source": null,
+      "conditions": [
+        "新对象也不够；服务器校验的是发出的 continuation，不是后来替换的 prefix",
+        "只禁 proof 提升，原返回/merge/授权语义保持"
+      ]
+    },
+    {
+      "reader": "issues/threads",
+      "branch": "accepted full",
+      "canCarry": true,
+      "source": "sync result wrapper",
+      "conditions": [
+        "owner（以及 issues selectedWorkspace）校验通过",
+        "采用该响应 items/version/live/positions/presence",
+        "没有把另一个较新 cache 对象作为此 RPC 的输出"
+      ]
+    },
+    {
+      "reader": "issues/threads",
+      "branch": "accepted delta",
+      "canCarry": true,
+      "source": "sync result wrapper",
+      "conditions": [
+        "使用发出 heldListPositions 的同一有效基底",
+        "每个保留行由发送的 id/version 与新 manifest 一致证明，变化行采用本次返回值",
+        "按新 manifest 顺序归并且不保留 manifest 以外的行",
+        "输出确实是该协议重建的规范化快照；缺失/变更的 base 或只返回未验证 held 不得借 proof",
+        "保留服务器 read-before-data revisions 和 presence/deadline",
+        "本次发出的 positions 必须仍描述发送时原 previous.items；并发替换 cache 基底或改变其 items/version/row-proof 基底时不提升 proof，原 merge/返回业务行为不变"
+      ]
+    },
+    {
+      "reader": "issues/threads",
+      "branch": "accepted unchanged",
+      "canCarry": true,
+      "source": "sync result wrapper",
+      "conditions": [
+        "发送的 known===response.version===held version",
+        "known 基于完整且仍有效的 held positions；不能用部分/变异或无 proofs 的缓存冒充完整基底",
+        "采用本次 fresh live/presence；保留行须是被这个 version 确认的快照",
+        "本次发出的 positions 必须仍描述发送时原 previous.items；并发替换 cache 基底或改变其 items/version/row-proof 基底时不提升 proof，原 merge/返回业务行为不变"
+      ]
+    },
+    {
+      "reader": "all",
+      "branch": "error/owner/workspace mismatch, rejected mutation, stale scope",
+      "canCarry": false,
+      "source": null,
+      "conditions": [
+        "继续既有抛错/隐藏/清理行为",
+        "不得仅因 HTTP 200 或 Promise resolved 标记成功",
+        "传递也不能绕过 readFresh 的 commit/revision/lifetime checks"
+      ]
+    }
+  ],
+  "concreteCaution": {
+    "file": "lib/coordinator/chat-read-client.ts:39-43 + lib/coordinator/chat-poll.ts:59-75",
+    "status": "source-derived counterexample; not executed and not observed in the Native run",
+    "sequence": [
+      "发请求时 previous.continuation=(after=1,cursor=2,prefix=C)。",
+      "RPC 未完成时 cache 替换为相同 bot/cursor=2 但 prefix=D 的 current。",
+      "普通 delta 返回 after=1/baseCursor=2，无 toolMetadata/restore；现 L39-41 不排除该 current，mergeChat 仅检查 cursor 后生成新对象。"
+    ],
+    "implication": "merged !== held 是必要但不充分条件。已选保守 gate：held === original previous，且其 continuation.after/cursor/prefix 与发送时 primitive 拷贝完全一致；任何新对象即使相同 cursor/三字段也不 carry。无需修改原 merge 返回语义。"
+  },
+  "existingTestsRead": [
+    {
+      "file": "lib/coordinator/chat-read-client.test.ts",
+      "areas": [
+        "startup hydration + continuation/first metadata reauthorization",
+        "newer cursor write wins",
+        "tool metadata restoration and bounded full repair",
+        "same cursor object/prefix late-overlay discard",
+        "in-place prefix change during fallback",
+        "authRequired/workspaceAccessDenied/botNotFound",
+        "foreign owner"
+      ]
+    },
+    {
+      "file": "lib/coordinator/chat-poll.test.ts",
+      "areas": [
+        "unchanged carries live state while mismatched version keeps newer object",
+        "delta replay overlap/pending removal",
+        "reauthorized maps remove deleted/revoked cards",
+        "singleFlight siblings do not mutate metadata",
+        "overlay prefix/cursor validation"
+      ]
+    },
+    {
+      "file": "lib/coordinator/chat-version.db.test.ts",
+      "areas": [
+        "existing source asserts merged legitimate delta matches full read",
+        "prefix edit/deletion/other bot invalidates to full",
+        "cursor beyond stored data and oversized tail reset"
+      ]
+    },
+    {
+      "file": "lib/list-poll.test.ts",
+      "areas": [
+        "full/unchanged/delta semantics",
+        "authorized manifest order/removal",
+        "invalid cursor and missing held row",
+        "mergeList itself accepts optimistic held data and is not a standalone proof validator"
+      ]
+    },
+    {
+      "file": "scripts/use-live-lists.live.test.tsx",
+      "areas": [
+        "restored issue/thread manifest deletion",
+        "partial/missing row proof forces data recovery",
+        "real React/SWR commit/mutation/comparator/revision/owner/scope/presence checks",
+        "real Native queue/codec/fetch before-vs-after readiness for current three pure snapshot readers"
+      ]
+    }
+  ],
+  "proposedChatReadClientRegressions": {
+    "testFile": "lib/coordinator/chat-read-client.test.ts",
+    "executionStatus": "proposed only; no new test run",
+    "oracle": "用现有 captureReadDispatch 在 mock action 实际 dispatch 时标记 wrapper；调用真实 readCachedCoordinatorChat + observeSWRRead/acceptSWRRead/readFresh，以是否调用普通 revalidate 断言证明是否可用，不导出或偷看 WeakMap。",
+    "positive": [
+      "fetcher 在 barrier 前开始、实际 RPC dispatch 在 barrier 后：accepted full、合法 delta、version-match unchanged（含移除 revoked metadata）、成功 tool overlay 均可在正确 SWR commit 后覆盖 obligation。",
+      "fallback 两个 RPC 分别标记：在第一次之后设置 barrier、第二次真实 dispatch 后接受 full；仅第二个 proof 能覆盖。",
+      "owner/scope/live.revisions 与 response 完全相同，不因 carry 改变业务模型。"
+    ],
+    "negative": [
+      "dispatch 在 barrier 前：即使 response/merge 在 barrier 后完成仍需正常 revalidate。",
+      "current/newer cursor 赢，full repair 遇到 latest 写入赢，unchanged version mismatch 返回原 held：都不能获得本次新 proof。",
+      "普通 delta same cursor/different prefix（对象替换及 in-place prefix）不能仅因产生新 merged 对象而获 proof。",
+      "invalid/missing overlay 触发 full：若 full 未标记，不能偷第一响应的 proof；若 full 失败/foreign owner，则保持原错误。",
+      "delta 无兼容 held base、wrong owner，以及原 response errors：无 proof 提升。",
+      "mutation/comparator 未实际采用返回对象、较新 revision 或未完成 presence ACK 等由既有真实 SWR fixture 持续拦截，不以 helper unit 替代其合同。",
+      "新增 previous 对象内容/同 cursor/同 prefix 完全相同也不给 delta/unchanged proof；用该负例锁定严格 reference gate，防止未来放宽为结构近似。"
+    ],
+    "notes": [
+      "baseline 的合法 accepted response 路径当前均不转移 sync action proof，正向用例应能成为有意义 RED；这里没有声称已运行 RED。",
+      "测试只需要既有离线 fixture；不为该审查新增 PG、生产调用、计时等待或日志计数优化。"
+    ]
+  },
+  "nativeImpactBoundary": {
+    "measuredFirstPair": {
+      "nativeSQL": 183,
+      "hostedSQL": 139,
+      "difference": 44
+    },
+    "observedSecondCalls": {
+      "syncCoordinatorChatSQL": 22,
+      "syncIssueListSQL": 7
+    },
+    "limitation": "29 条只是这些第二调用的实际 SQL 成本；没有每次 dispatch 与 live readiness 原始因果顺序，不能直接推成可节省 29 或本轮 44 已定位/解决。",
+    "frozenIndependentSQLCandidate": "three previously drafted one-snapshot preference files remain unintegrated, untested here; net relative saving only one"
+  },
+  "sources": [
+    {
+      "path": "lib/coordinator/chat-read-client.ts",
+      "blob": "c5588e067ff295cc81b5c3e35ea5307fbd94bf57",
+      "bytes": 4326,
+      "sha256": "428bd4e2529d89c0ba740efbb5e0121f1ae50d9efcedffecaca72dd0dbdd2dd4",
+      "ref": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+    },
+    {
+      "path": "lib/coordinator/chat-read-client.test.ts",
+      "blob": "2356c4b2204583c522487186341eea321921b1d0",
+      "bytes": 10842,
+      "sha256": "c7e41e216a523495e8f3ec09cdfd1c6480cbcbddd2a48489a31614b0d731059d",
+      "ref": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+    },
+    {
+      "path": "lib/coordinator/chat-poll.ts",
+      "blob": "27067f32bff473b2d99825fc9db30b561e9cf23f",
+      "bytes": 5566,
+      "sha256": "b4dc4633540756d8fb3f2d2d440e3ce0caceedf3719d02cca851ba38f722a09c",
+      "ref": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+    },
+    {
+      "path": "lib/coordinator/chat-poll.test.ts",
+      "blob": "9dc8a137b13bb3aa6c3b32d609423fe25514c8f8",
+      "bytes": 9151,
+      "sha256": "3203ab450b4370534f5a6d932d0264ee1158297518d64706146300f78dc12372",
+      "ref": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+    },
+    {
+      "path": "lib/list-poll.ts",
+      "blob": "5dfcf8fff96e66f670513b6471f14338b77cd102",
+      "bytes": 3269,
+      "sha256": "e676c7e623bcf5f99489027c73e2f741f71a263d8f54a81a3d6d7a7f14f930ab",
+      "ref": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+    },
+    {
+      "path": "lib/list-poll.test.ts",
+      "blob": "43363b3281773c491f01c3b2f89efdf010e3f1df",
+      "bytes": 2807,
+      "sha256": "7c12b2f0a57d53828d4aad967cba2aa1ec316e17f5bd30a47eabd75f26d69fac",
+      "ref": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+    },
+    {
+      "path": "hooks/use-live-lists.ts",
+      "blob": "ac60a59be511ec45cc372b8c91c0535861a30931",
+      "bytes": 9682,
+      "sha256": "c4c9ea9e785986831df600cfff09fccba1705e7a10e0a886d5d6af21d8463b1a",
+      "ref": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+    },
+    {
+      "path": "lib/swr/read-observer.ts",
+      "blob": "2dc3ab5a9934fed5146189fd236b450f0d223920",
+      "bytes": 5786,
+      "sha256": "2c4f60539d1eb8d8e607490268fe065fa03b6f1b27e796fa23f5f35bd670499b",
+      "ref": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+    },
+    {
+      "path": "lib/live/list-read.ts",
+      "blob": "0ddc43d2db3680343288bc524f8f2de4d8ed5969",
+      "bytes": 3337,
+      "sha256": "7dca0d60ae5aa2bc9f3ed5ca1a2ecc3aba08767df8af26a1d9f666bea7a94fb0",
+      "ref": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+    },
+    {
+      "path": "apps/desktop/src/renderer/rpc.ts",
+      "blob": "a9ffaee70d53e2c9c0471b61abbddf80cc244fbe",
+      "bytes": 4265,
+      "sha256": "7cadecd350fd73031473a4131edf769c552822a9faf6d26b345e6417dae671c0",
+      "ref": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+    },
+    {
+      "path": "apps/desktop/src/renderer/read-batch.ts",
+      "blob": "b72659facb8a5a710fb0c0121e2543add0ad8f33",
+      "bytes": 5988,
+      "sha256": "040d039af2d8abb6aeb9eb4a4d66d357526d8afa6c0afed0e5bbaf80ba7a87c1",
+      "ref": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+    },
+    {
+      "path": "app/actions/coordinator.ts",
+      "blob": "3cde11bdaab0164d179d51f37efdf1d77ec7e938",
+      "bytes": 23196,
+      "sha256": "b70ceec98efa1edfc1074598b2a6cf12b58d4f2539bb351854a562fa43f9d451",
+      "ref": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+    },
+    {
+      "path": "lib/coordinator/store.ts",
+      "blob": "0198839eeb0ebb522b22a790f08c65b35550584c",
+      "bytes": 74347,
+      "sha256": "cb977de26084965e6860eac8821d11a68a34038ec4379cca679c776cc3c7a641",
+      "ref": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+    },
+    {
+      "path": "app/actions/issues.ts",
+      "blob": "6cefb0dc6e6e895fabad5b8348c7b6de6eba5556",
+      "bytes": 27134,
+      "sha256": "610a5e47fb5115723e44c229fdb4f5b49135bed51b5dc8fb11032a924ebbf399",
+      "ref": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+    },
+    {
+      "path": "app/actions/task-runs.ts",
+      "blob": "ae3974497f8c0573dd9c8d0ec5ba880f5a5c72ef",
+      "bytes": 13692,
+      "sha256": "4f29acbe6899a1432d4f216cb1f08aeba8672897319106b98848fbfda45767f8",
+      "ref": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+    },
+    {
+      "path": "lib/live/revision-read.ts",
+      "blob": "b9779343c98166c8a04292532204b2c92f8c4891",
+      "bytes": 1772,
+      "sha256": "91b23b11e829e217de8c07942a8cc6f2e59c83e1f2828c566354e0348a8219e2",
+      "ref": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+    },
+    {
+      "path": "hooks/use-live-key.tsx",
+      "blob": "00cbfb3541c8403a4a3b4d43199281acee9bdb9f",
+      "bytes": 8050,
+      "sha256": "5e70417507a1a07ad39234cf9695499c80df418414d54f4a3605033637f06857",
+      "ref": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+    },
+    {
+      "path": "lib/swr/cache-policy.ts",
+      "blob": "977431cfdeb11adbe2863794ca7bde010c7842ad",
+      "bytes": 7608,
+      "sha256": "b87b7847e2ea02cf4d25b8d106dc33ba30b2e8b3862d1843a7d6ada4b93e51a0",
+      "ref": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+    },
+    {
+      "path": "scripts/use-live-lists.live.test.tsx",
+      "blob": "f981a61d72fb9c0e153e490f89d7328fb014558e",
+      "bytes": 58655,
+      "sha256": "da2c31a515397745e02d3118981751aedc319ac3ea53f01dc22d340c6ed75512",
+      "ref": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+    },
+    {
+      "path": "lib/coordinator/chat-version.db.test.ts",
+      "blob": "08db1e003690a39516a49b46ca5322cc0c28c18f",
+      "bytes": 27796,
+      "sha256": "09735529b4acc4ac56700049af1eee8b81050bf10eca3ad597e46df8e68b7764",
+      "ref": "c3b547d0e4d20692643fc95a5194b7ee8cf7f5c0"
+    }
+  ],
+  "implementationScope": {
+    "serverChanges": "none; auth, membership, singleFlight, revisions, metadata authorization unchanged",
+    "clientDisposition": "carry only after existing owner/scope guards and selected branch validation; no change to returned business data, retry count, fallback count, or error classification",
+    "proofOrigin": "exact raw action result wrapper returned by this RPC, or full fallback wrapper for second RPC",
+    "listBase": "positions and original previous.items are the request's base; changed base never receives this RPC's proof. Do not certify arbitrary mergeList output or invent row versions."
+  }
+}
