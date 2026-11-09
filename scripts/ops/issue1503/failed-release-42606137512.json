@@ -1,0 +1,167 @@
+{
+  "version": 1,
+  "issue": 1503,
+  "mode": "failed_release_42606137512",
+  "workspaceId": "93f38d33-9447-4eaf-8a46-0d8889165bcd",
+  "smokeUserId": "cL1NXe1mr7WuIS8xWhU37v0p7kNoUMY3",
+  "source": {
+    "workflowRunId": 42606137512,
+    "workflowAttempt": 1,
+    "operatorSha": "8fce8f9885fc5edddbc1733063576fd972ea9611",
+    "appSha": "a2198c8c2f608f7b8169329b9da853067618dba6",
+    "marker": "42606137512-1",
+    "fixtureSha256": "2acdf16ec38352f2164601c087461883a4ad5b6deb4011bdaf3a534725efcaa1"
+  },
+  "historicalAllocations": [
+    {
+      "issueId": "bf272b85-2430-4546-9038-8f3bc6998a5e",
+      "taskId": "caaaed63-8648-49b0-b17b-ff45c005876b",
+      "runId": "9f49787a-a5e4-437f-8432-c594c713a18e",
+      "operationId": "c328c238-dede-421f-9ec7-deb217f12a38",
+      "lookup": "legacy_run_metadata"
+    },
+    {
+      "issueId": "bf272b85-2430-4546-9038-8f3bc6998a5e",
+      "taskId": "caaaed63-8648-49b0-b17b-ff45c005876b",
+      "runId": "e295faed-273c-479f-8c03-9ab9dc2533ee",
+      "operationId": "16ab7e20-71f0-48a8-a143-a526142a68cb",
+      "lookup": "legacy_run_metadata"
+    },
+    {
+      "issueId": "e0582e5d-17cd-44e1-b0af-28fc0aace596",
+      "taskId": "5138410f-0b33-42fb-a55f-60017242a8e2",
+      "runId": "d1f7e459-4576-4994-846f-8afb1ca6492f",
+      "operationId": "68812218-6272-4022-98a1-a91eba5f3822",
+      "lookup": "legacy_run_metadata"
+    },
+    {
+      "issueId": "80f34b1c-4e3a-4d20-b0bd-786d40840bef",
+      "taskId": "8c02fbe0-ce49-4223-8888-10eff99d1a8f",
+      "runId": "d9a4ebfc-b8c6-48ca-8776-a8935863a488",
+      "operationId": "1bb43ed8-277c-46a7-bd2e-001571181ab0",
+      "lookup": "operation_metadata"
+    },
+    {
+      "issueId": "f4298bea-9cb0-4fa2-bbff-0e16c33954af",
+      "taskId": "994ceba4-dc1a-42a6-9c33-29b954fd3ac2",
+      "runId": "6547cb9f-455d-4fe1-8cef-75cdc08e7df0",
+      "operationId": "6b130b2e-f94b-432e-8021-7659502b308e",
+      "lookup": "operation_metadata"
+    },
+    {
+      "issueId": "97c51483-dea3-4ac3-8088-c4a182fb77ed",
+      "taskId": "1f4ee63f-035c-49e1-b2da-0b30ccf414dd",
+      "runId": "8af222c0-8143-439d-8fd1-d1a4d3b43a7c",
+      "operationId": "21638b1c-47b3-489c-8e0d-c19b27bb7aa7",
+      "lookup": "operation_metadata"
+    },
+    {
+      "issueId": "719523d1-b0e5-4b28-823c-485c1e141c5f",
+      "taskId": "a3908404-57c9-453b-8539-7069195fac70",
+      "runId": "ed6723b7-f39f-4cf4-8243-9e5e9a94225f",
+      "operationId": "c6524fbd-4a9e-44d0-9b0d-d24b97b038f7",
+      "lookup": "operation_metadata"
+    },
+    {
+      "issueId": "6fa2a3e8-1f4c-4ef4-9057-1d00fff5d4bf",
+      "taskId": "e1a83dea-fe74-4a90-bf17-6c7ab5260e89",
+      "runId": "4d6b0daf-346b-4e9f-8e71-a767bc6100de",
+      "operationId": "86f9926b-0a15-49a8-9f0d-e279977aa0fa",
+      "lookup": "operation_metadata"
+    },
+    {
+      "issueId": "6fa2a3e8-1f4c-4ef4-9057-1d00fff5d4bf",
+      "taskId": "e1a83dea-fe74-4a90-bf17-6c7ab5260e89",
+      "runId": "4491cf36-8828-4096-8a13-578b7ca3d807",
+      "operationId": "1d773195-07ff-4a75-b6cd-7bda75745f0e",
+      "lookup": "operation_metadata"
+    },
+    {
+      "issueId": "11ba8fa4-9919-4387-8b72-a0e279d41d5f",
+      "taskId": "e722dc29-d451-4e4f-a96c-949c6647f460",
+      "runId": "5ea7dad6-d3bc-4e9c-83fd-967fb58fa85a",
+      "operationId": "999a6cba-584e-443b-888f-54fbb4240e59",
+      "lookup": "operation_metadata"
+    },
+    {
+      "issueId": "4fb0b4ec-3a0f-47b4-a3db-4a37fc7f281c",
+      "taskId": "7fe4108d-8722-411a-9f7f-ebd1391ab54e",
+      "runId": "338b908a-1ada-4791-8cc0-868db7f47afa",
+      "operationId": "f7dd8c0c-0fd7-4ae6-9672-fe4d97090bb2",
+      "lookup": "operation_metadata"
+    },
+    {
+      "issueId": "45b22130-bc9c-4d62-9553-3b7d847e4120",
+      "taskId": "a4f5844c-7c4f-46d9-a304-2cf84598742f",
+      "runId": "032f5180-1a44-42bb-82cd-70b0637b16d4",
+      "operationId": "a101d3c7-31af-49d4-9bdd-3c655db4e389",
+      "lookup": "operation_metadata"
+    },
+    {
+      "issueId": "45b22130-bc9c-4d62-9553-3b7d847e4120",
+      "taskId": "a4f5844c-7c4f-46d9-a304-2cf84598742f",
+      "runId": "4ad9064f-af19-4e1d-bd2c-e835d6c7b159",
+      "operationId": "69684576-232b-4e43-b49e-4375edfc3a13",
+      "lookup": "operation_metadata"
+    },
+    {
+      "issueId": "626ffdfd-f24b-4b35-8682-84167a45ffe5",
+      "taskId": "77927ba7-096d-4ee2-8b20-9ffc7ae9f539",
+      "runId": "5a2fefa4-c7d0-4920-8718-bf8d79cc2e91",
+      "operationId": "6538d7b1-fa88-4429-8773-d0e2035776ba",
+      "lookup": "operation_metadata"
+    },
+    {
+      "issueId": "626ffdfd-f24b-4b35-8682-84167a45ffe5",
+      "taskId": "77927ba7-096d-4ee2-8b20-9ffc7ae9f539",
+      "runId": "e33db713-68e5-4e18-8fe3-ee3e1a210c50",
+      "operationId": "476f458e-c234-433f-9502-4b61af57dd1e",
+      "lookup": "operation_metadata"
+    },
+    {
+      "issueId": "fc33fd19-3482-415c-8e41-2b64b261b27e",
+      "taskId": "337bbcf4-d127-4772-9332-e7ced061c621",
+      "runId": "8d0667f4-02ac-4205-8014-bfec1a920a9d",
+      "operationId": "f391dacd-2b86-4eba-ac15-b408f6bfa8b6",
+      "lookup": "operation_metadata"
+    },
+    {
+      "issueId": "fc33fd19-3482-415c-8e41-2b64b261b27e",
+      "taskId": "337bbcf4-d127-4772-9332-e7ced061c621",
+      "runId": "eee445ca-1eeb-429d-bf8e-8635362ff241",
+      "operationId": "ef484e80-2089-4817-92a3-4d8fdada5e89",
+      "lookup": "operation_metadata"
+    }
+  ],
+  "failedReports": [
+    {
+      "harness": "claude_code",
+      "path": "issue1503-inputs/factory/claude-code-delivery.json",
+      "sha256": "f6ddca13537cb1f2a4e07765931864616f02daf09c98d67dc51cb9da607654ef",
+      "bytes": 7888,
+      "issueId": "9b4f90bf-9268-4e68-8037-0d12950529cb",
+      "taskId": "c687460b-e6a4-44ac-8696-f60d66bf64d3",
+      "runIds": [
+        "0c66bb7d-f166-4deb-81c2-7197c042c6ab",
+        "51f9f9b1-cabd-4530-8147-93c58f9d5ecf"
+      ],
+      "startedAt": "2026-11-09T11:06:16.907Z",
+      "completedAt": "2026-11-09T11:08:49.324Z"
+    },
+    {
+      "harness": "codex",
+      "path": "issue1503-inputs/factory/codex-delivery.json",
+      "sha256": "67626c8ff479d2815f23ac3232f226a5ae5251224c0c9a410af62c8173759925",
+      "bytes": 30166,
+      "issueId": "facee344-3cc3-4919-8708-1462f815fb21",
+      "taskId": "5919985f-c531-4915-b51e-fea3b1702211",
+      "runIds": [
+        "58a0260d-f0fd-4f38-8c29-3acca904bbdd",
+        "6fb2b7dd-ca53-4ba7-8d6c-4526a1de227a",
+        "7970d2af-b75b-4450-89e3-47f0a8a1154a"
+      ],
+      "startedAt": "2026-11-09T11:08:52.863Z",
+      "completedAt": "2026-11-09T11:13:17.885Z"
+    }
+  ]
+}

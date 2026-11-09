@@ -1,5 +1,5 @@
 /** Explicitly authorized #1503 fixture cleanup. Run only after the delivery receipt is saved. */
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { pool, withDatabaseClient } from '../../../lib/db'
 import { workspacePool } from '../../../lib/workspace-db'
@@ -10,12 +10,12 @@ import { ownerSettingsChanged } from '../../../lib/live/lists'
 import { computerGone, computerState, killComputer } from '../../../lib/computer/e2b-provider'
 import { cleanupIssue1503SmokeGitHub, SmokeGitHubSetupError } from '../issue1503-smoke-github.mjs'
 import { smokeSession, SMOKE_ID, OWNER_ID, fail } from './http'
-import { modelOrderCleanupPlan, failedReleaseModelOrderCleanupPlan, sameModelOrder } from './model-order-cleanup'
+import { modelOrderCleanupPlan, failedReleaseModelOrderCleanupPlan, f42606137512ModelOrderCleanupPlan, sameModelOrder } from './model-order-cleanup'
 import { Sandbox } from 'e2b'
 import { e2bApiKey } from '../../../lib/secrets/e2b-runtime'
 import { threadLifecycleProvider } from '../../../lib/cloud-computer/thread-lifecycle-provider'
 import { threadMachineProvider } from '../../../lib/cloud-computer/thread-machines'
-import { loadAllocationScope, loadFailedAllocationScope, allocationTargets, allocationIdentity, findLegacyCreated,
+import { loadAllocationScope, loadFailedAllocationScope, loadF42606137512AllocationScope, F42606137512_RELEASE_MODE, F42606137512_BINDING, allocationTargets, allocationIdentity, findLegacyCreated,
   confirmAllocationAbsence, assertAllocationPostcondition } from './cleanup-allocations.mjs'
 
 const WORKSPACE_ID = '93f38d33-9447-4eaf-8a46-0d8889165bcd'
@@ -23,9 +23,10 @@ const E2B_UPDATED_AT = '2026-11-06T18:21:51.895Z'
 const ACTIVE_RUNS = ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing']
 const HANDOFF_KEY = 'v2/github.com/alexj11324/mikka-handoff'
 const cleanupMode = process.env.MIKKA_1503_CLEANUP_MODE ?? 'final_delivery'
-const failedRelease = cleanupMode === 'failed_release'
+const f42606137512Release = cleanupMode === F42606137512_RELEASE_MODE
+const failedRelease = cleanupMode === 'failed_release' || f42606137512Release
 const report: Record<string, any> = { issue: 1503, phase: failedRelease ? 'failed_release' : 'cleanup',
-  ...(failedRelease ? { acceptancePassed: false, failedWorkflowRunId: 42535538611 } : {}), workspaceId: WORKSPACE_ID,
+  ...(failedRelease ? { acceptancePassed: false, failedWorkflowRunId: f42606137512Release ? 42606137512 : 42535538611 } : {}), workspaceId: WORKSPACE_ID,
   startedAt: new Date().toISOString(), status: 'running', actions: [], retained: [] }
 let session: Awaited<ReturnType<typeof smokeSession>> | undefined
 let stage = 'fixture_state'
@@ -167,7 +168,8 @@ async function restoreModelOrderDefault(failureReports?: any[]) {
   const latest = failureReports ? failureReports[1] : JSON.parse(await readFile(process.env.MIKKA_1503_SUCCESSFUL_DELIVERY_FILE
     ?? 'scripts/ops/issue1503/last-successful-delivery.json', 'utf8'))
   const { original, materialized, currentDefault } = failureReports
-    ? failedReleaseModelOrderCleanupPlan(initial, failureReports) : modelOrderCleanupPlan(initial, latest)
+    ? (f42606137512Release ? f42606137512ModelOrderCleanupPlan(initial, failureReports)
+      : failedReleaseModelOrderCleanupPlan(initial, failureReports)) : modelOrderCleanupPlan(initial, latest)
   const currentView = unwrap(await session!.rpc('model-order.getModelOrder', [WORKSPACE_ID]))
   if (currentView.customized === false) {
     if (!sameModelOrder(currentView, currentDefault)) fail('cleanup_model_order_default_changed')
@@ -219,8 +221,11 @@ async function restoreModelOrderDefault(failureReports?: any[]) {
 }
 
 try {
-  if (!['final_delivery', 'failed_release'].includes(cleanupMode)) fail('cleanup_mode_invalid')
-  const state = JSON.parse(await readFile(process.env.MIKKA_1503_FIXTURE_STATE_FILE ?? 'scripts/ops/issue1503/fixture-state.json', 'utf8'))
+  if (!['final_delivery', 'failed_release', F42606137512_RELEASE_MODE].includes(cleanupMode)) fail('cleanup_mode_invalid')
+  const fixtureBytes = await readFile(process.env.MIKKA_1503_FIXTURE_STATE_FILE ?? 'scripts/ops/issue1503/fixture-state.json')
+  if (f42606137512Release && createHash('sha256').update(fixtureBytes).digest('hex') !== F42606137512_BINDING.fixtureSha256)
+    fail('cleanup_f42606137512_fixture_sha_mismatch')
+  const state = JSON.parse(fixtureBytes.toString('utf8'))
   if (state.issue !== 1503 || state.workspaceId !== WORKSPACE_ID || state.ownerUserId !== OWNER_ID || state.smokeUserId !== SMOKE_ID
     || state.shareBefore?.shared !== false || state.shareBefore?.allowOthers !== false
     || state.e2bChanged !== true || state.e2bSetup?.userId !== SMOKE_ID || state.e2bSetup?.updatedAt !== E2B_UPDATED_AT
@@ -230,7 +235,10 @@ try {
   stage = 'allocation_inputs'
   const allocationConfig = JSON.parse(await readFile(process.env.MIKKA_1503_ALLOCATION_SCOPE_FILE
     ?? 'scripts/ops/issue1503/cleanup-allocation-scope.json', 'utf8'))
-  const allocationScope = failedRelease
+  const allocationScope = f42606137512Release
+    ? await loadF42606137512AllocationScope(allocationConfig, process.env.MIKKA_1503_FAILED_DELIVERY_FILE
+      ?? 'scripts/ops/issue1503/last-failed-delivery.json')
+    : failedRelease
     ? await loadFailedAllocationScope(allocationConfig, process.env.MIKKA_1503_FAILED_DELIVERY_FILE
       ?? 'scripts/ops/issue1503/last-failed-delivery.json')
     : await loadAllocationScope(allocationConfig, process.env.MIKKA_1503_SUCCESSFUL_DELIVERY_FILE
