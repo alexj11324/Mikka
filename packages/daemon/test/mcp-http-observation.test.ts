@@ -6,11 +6,18 @@ import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { afterEach, expect, it, vi } from 'vitest'
-import { MCP_SERVER_SCRIPT, prepareRunContextFiles, RunContext, type RunContextOptions } from '../src/agents/run-context'
+import { MCP_SERVER_SCRIPT, prepareRunContextFiles, RunContext, type RunContextOptions, type McpServerSpec } from '../src/agents/run-context'
 import { McpHttpTimingCollector } from '../src/mcp-http-timing'
 import { startCliTimingCollector } from '../src/official-cli-timing'
 import { runRuntimeTimings } from '../src/run-runtime-timing'
 import { cleanupTempDirs, makeRepo, tempDir } from './helpers'
+import { writeCodexMcpContext } from '../src/codex-mcp-context'
+import { readMcpContext } from '../src/agents/mikka-mcp-context.mjs'
+import { runDecisionCatalogueSchema } from '@mikka/protocol'
+
+// Load the real app claim catalogue without pulling app-only type aliases into the daemon typecheck.
+const claimCatalogueModule = await import(new URL('../../../lib/project-map/mcp-tool.ts', import.meta.url).href)
+const RUN_DECISION_CATALOGUE = runDecisionCatalogueSchema.parse(claimCatalogueModule.RUN_DECISION_CATALOGUE)
 
 afterEach(() => { vi.restoreAllMocks(); cleanupTempDirs() })
 type Rpc = { jsonrpc: string; id: number; method: string; params?: { name?: string; arguments?: unknown } }
@@ -41,9 +48,9 @@ async function backend(respond?: (rpc: Rpc, response: ServerResponse) => void) {
     close: () => new Promise<void>((resolve, reject) => { server.close(error => error ? reject(error) : resolve()); server.closeAllConnections() }) }
 }
 
-function client(url: string, observationUrl: string, extraEnv: Record<string, string> = {}) {
-  const child = spawn(process.execPath, [MCP_SERVER_SCRIPT, '--handoff', join(tempDir(), 'handoff.json')], {
-    env: { PATH: process.env.PATH, MIKKA_DECISION_MCP_URL: url, MIKKA_DECISION_MCP_TOKEN: syntheticToken,
+function client(url: string, observationUrl: string, extraEnv: Record<string, string> = {}, server?: McpServerSpec) {
+  const child = spawn(server?.command ?? process.execPath, server?.args ?? [MCP_SERVER_SCRIPT, '--handoff', join(tempDir(), 'handoff.json')], {
+    env: server ? { PATH: process.env.PATH, ...extraEnv, ...server.env } : { PATH: process.env.PATH, MIKKA_DECISION_MCP_URL: url, MIKKA_DECISION_MCP_TOKEN: syntheticToken,
       MIKKA_MCP_HTTP_OBSERVATION_URL: observationUrl, ...extraEnv }, stdio: ['pipe', 'pipe', 'pipe'],
   })
   const waiting = new Map<number, ReturnType<typeof deferred<Record<string, unknown>>>>()
@@ -55,7 +62,7 @@ function client(url: string, observationUrl: string, extraEnv: Record<string, st
   child.once('error', closing.reject)
   child.once('close', (code, signal) => {
     closing.resolve({ code, signal })
-    for (const pending of waiting.values()) pending.reject(new Error('MCP child closed'))
+    for (const pending of waiting.values()) pending.reject(new Error('MCP child closed: ' + code))
     waiting.clear()
   })
   child.stderr.resume()
@@ -299,3 +306,33 @@ it.each(['claude_code', 'codex'] as const)('puts the host observation URL only i
   expect(ctx.tempEnv()).not.toHaveProperty('MIKKA_DECISION_MCP_CATALOGUE')
   expect(ctx.mcpServer().args.join(' ')).not.toContain('Canonical claim')
 })
+
+it.each(['00-11111111111111111111111111111111-2222222222222222-01', undefined])(
+  'passes the real run trace carrier %s through the late wrapper and observes the exact claim catalogue',
+  async traceparent => {
+    const api = await backend(), observed = receivedEvents(), runId = randomUUID()
+    const run = runRuntimeTimings.begin(runId, 'device', 'codex')
+    const receiver = await startCliTimingCollector({ runId, harness: 'codex', remoteMcpServerCount: 0, decisionCatalogue: RUN_DECISION_CATALOGUE })
+    const privateDir = tempDir()
+    const ctx = new RunContext({ harness: 'codex', worktree: await makeRepo(), runDir: tempDir(), privateDir,
+      machineEnvironment: true, mcpHttpObservationUrl: receiver.mcpHttpObservationUrl,
+      mcp: { url: api.url, token: syntheticToken, decisionCatalogue: RUN_DECISION_CATALOGUE, ...(traceparent ? { traceparent } : {}) } })
+    const spec = ctx.mcpServer()
+    expect(spec.env).toHaveProperty('MIKKA_DECISION_MCP_TRACEPARENT', traceparent ?? '')
+    const bound = writeCodexMcpContext(privateDir, runId, spec)
+    expect(JSON.stringify(bound.server)).not.toContain(syntheticToken)
+    const mcp = client('', '', { MIKKA_DECISION_MCP_TRACEPARENT: '00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01' }, bound.server)
+    try {
+      const listed = await mcp.request('tools/list')
+      expect(listed).toMatchObject({ result: { tools: expect.arrayContaining([RUN_DECISION_CATALOGUE.tool]) } })
+      await observed.until(events => events.some(event => event.type === 'catalogue_ready'))
+      expect(readMcpContext(...bound.server.args.slice(1) as [string, string, string]).env).toEqual(spec.env)
+      expect(api.calls).toEqual([])
+      await mcp.close(); await receiver.close()
+      const receipt = run.finish()!.mcpHttpTiming!
+      const sha256 = createHash('sha256').update(JSON.stringify(RUN_DECISION_CATALOGUE)).digest('hex')
+      expect(receipt).toMatchObject({ version: 3, expectedCatalogueSha256: sha256, observedChildren: 1,
+        rejectedEvents: 0, truncated: false, children: [{ catalogue: { source: 'claim', sha256 } }], requests: [] })
+      expect(JSON.stringify(receipt)).not.toContain(syntheticToken)
+    } finally { await mcp.close(); await receiver.close(); run.close(); bound.close(); await api.close() }
+  })
