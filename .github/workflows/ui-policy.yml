@@ -97,6 +97,13 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
+      - name: Ensure FFmpeg for Factory evidence acceptance regressions
+        timeout-minutes: 5
+        run: |
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
+            sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y ffmpeg
+          fi
       - name: Run selected core tasks through Nx Core
         run: node scripts/ci/run-units.mjs core
         env:
