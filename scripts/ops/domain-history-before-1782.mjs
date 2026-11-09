@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url'
 import { workflowGuard } from './self-hosted-closeout.mjs'
 import { createSessionClient, smokeAcceptanceAccount } from '../acceptance/cloud-startup.mjs'
 
-export const MAIN = '8db16095f46be955df22f42914e0f89b6e5f3d11'
+export const MAIN = '5ba1f9e2359ce714d83cd16fc040f2567c40a6d0'
 export const ORIGIN = 'https://app.aspectlylabs.com'
 const ADMIN_HASH = '0049e13c050f799070a7d1a95bb843f2a0519b5e8732bf6986e2e1613b8941c3'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
@@ -74,14 +74,17 @@ export function candidateInventory(rows, ownerId) {
 }
 
 /** Use the existing relation-picker's real cursor, never fabricate a cursor or
- * search all APP rows. Read at most five authorized pages and retain <=100 IDs. */
+ * search all APP rows. Read at most five authorized pages, then retain the last
+ * <=100 eligible rows in the API's actual order. Main 5ba orders updatedAt DESC,
+ * id DESC; this is a bounded search tail, not a claim about Task creation age. */
 export async function searchCandidates(client, scope, observeInventory = () => {}) {
   check(UUID.test(scope.workspaceId) && typeof scope.ownerId === 'string' && scope.ownerId.length > 0, 'sample_invalid')
-  const ids = new Set(), taskOwners = {}, seenRows = new Set(), seenCursors = new Set()
+  const retained = new Map(), seenRows = new Set(), seenCursors = new Set()
   let cursor = null
   const counts = { pages: 0, returned: 0, own: 0, ownWorkspace: 0, ownPersonal: 0, ownUnknownScope: 0,
     ownScopeOmitted: 0, ownerIdFieldPresent: 0, candidateCount: 0, hasMore: false, pageLimitReached: false,
-    candidateLimitReached: false, pageSize: 50, maxPages: 5, maxCandidates: 100 }
+    candidateLimitReached: false, eligibleCount: 0, discardedEarlierRows: 0, retainedOwn: 0,
+    selection: 'last_100_of_bounded_api_search', pageSize: 50, maxPages: 5, maxCandidates: 100 }
   for (let page = 0; page < 5; page++) {
     const query = new URLSearchParams({ workspaceId: scope.workspaceId, limit: '50', q: '' })
     if (cursor !== null) query.set('cursor', cursor)
@@ -91,18 +94,27 @@ export async function searchCandidates(client, scope, observeInventory = () => {
     const inventory = candidateInventory(result.items, scope.ownerId)
     check(result.items.every(row => !seenRows.has(row.id)), 'sample_invalid')
     for (const row of result.items) seenRows.add(row.id)
-    for (const id of inventory.candidateTaskIds) if (ids.size < 100) { ids.add(id); taskOwners[id] = inventory.taskOwners[id] }
+    // Keep server order within each page; sorting UUIDs here would select a
+    // different boundary. The final UUID list alone is canonicalized below.
+    for (const row of result.items) if (Object.hasOwn(inventory.taskOwners, row.id)) {
+      counts.eligibleCount++; retained.set(row.id, inventory.taskOwners[row.id])
+      if (retained.size > 100) retained.delete(retained.keys().next().value)
+    }
     counts.pages++; counts.returned += result.items.length
     for (const key of ['own', 'ownWorkspace', 'ownPersonal', 'ownUnknownScope', 'ownScopeOmitted', 'ownerIdFieldPresent']) counts[key] += inventory.counts[key]
-    counts.candidateCount = ids.size; counts.hasMore = result.nextCursor !== null
+    counts.candidateCount = retained.size; counts.hasMore = result.nextCursor !== null
     counts.pageLimitReached = counts.pages === 5 && counts.hasMore
-    counts.candidateLimitReached = ids.size === 100 && counts.hasMore
+    counts.candidateLimitReached = counts.eligibleCount > 100
+    counts.discardedEarlierRows = counts.eligibleCount - retained.size
+    counts.retainedOwn = [...retained.values()].filter(owner => owner === scope.ownerId).length
+    // Replay is refused even at the fifth-page boundary; reaching a collection
+    // cap is not permission to accept a repeated opaque server cursor.
+    if (counts.hasMore) check(result.items.length > 0 && !seenCursors.has(result.nextCursor), 'response_invalid')
     observeInventory({ ...counts })
-    if (!counts.hasMore || ids.size === 100) break
-    check(result.items.length > 0 && !seenCursors.has(result.nextCursor), 'response_invalid')
+    if (!counts.hasMore) break
     seenCursors.add(result.nextCursor); cursor = result.nextCursor
   }
-  return { candidateTaskIds: [...ids].sort(), taskOwners, counts }
+  return { candidateTaskIds: [...retained.keys()].sort(), taskOwners: Object.fromEntries(retained), counts }
 }
 
 export async function selectScope(client, email, observeInventory = () => {}) {
@@ -225,6 +237,23 @@ export const SQL = Object.freeze({
       count(*) FILTER (WHERE matches_scope AND published)::int AS published,
       count(*) FILTER (WHERE matches_scope AND ended)::int AS ended,
       count(*) FILTER (WHERE matches_scope AND published AND ended)::int AS historical FROM candidates`,
+  publicationEvidence: `${AUTHORIZED}, receipts AS (
+    SELECT p.status='published' AS published, CASE
+      WHEN p.status IS DISTINCT FROM 'published' THEN 'not_published'
+      WHEN r.id IS NULL THEN 'run_missing'
+      WHEN r."issueId" IS DISTINCT FROM p."issueId" THEN 'issue_mismatch'
+      WHEN r."userId" IS DISTINCT FROM p."userId" THEN 'executor_mismatch'
+      WHEN r."workspaceId" IS NULL THEN 'workspace_null'
+      WHEN r."workspaceId" IS DISTINCT FROM i."workspaceId" THEN 'workspace_different'
+      ELSE 'verified' END AS evidence
+    FROM run_publications p JOIN tasks i ON i.id=p."issueId" LEFT JOIN agent_runs r ON r.id=p."runId"
+  ) SELECT count(*)::int AS receipts, count(*) FILTER (WHERE published)::int AS published,
+    count(*) FILTER (WHERE evidence='run_missing')::int AS "runMissing",
+    count(*) FILTER (WHERE evidence='issue_mismatch')::int AS "issueMismatch",
+    count(*) FILTER (WHERE evidence='executor_mismatch')::int AS "executorMismatch",
+    count(*) FILTER (WHERE evidence='workspace_null')::int AS "workspaceNull",
+    count(*) FILTER (WHERE evidence='workspace_different')::int AS "workspaceDifferent",
+    count(*) FILTER (WHERE evidence='verified')::int AS verified FROM receipts`,
   select: `${AUTHORIZED} SELECT i.id FROM tasks i WHERE ${PUBLISHED} AND ${ENDED}
     ORDER BY EXISTS (SELECT 1 FROM agent_runs r WHERE r."issueId"=i.id AND r."workspaceId"=i."workspaceId"
       AND r.status IN ('succeeded','stopped','failed','cancelled') AND r."agentDefinition"->'projectExecution' IS NOT NULL) DESC,
@@ -298,6 +327,14 @@ export async function snapshot(db, scope, observe = () => {}) {
     const candidateCounts = Object.fromEntries(keys.map(key => [key, binding[key]]))
     observe({ lastReadStage: 'candidate_binding', candidateCounts })
     check(binding.present === scope.candidateTaskIds.length && binding.bound === scope.candidateTaskIds.length, 'database_binding')
+    const publication = (await db.query(SQL.publicationEvidence, candidates)).rows[0]
+    const publicationKeys = ['receipts', 'published', 'runMissing', 'issueMismatch', 'executorMismatch', 'workspaceNull', 'workspaceDifferent', 'verified']
+    check(publication && publicationKeys.every(key => Number.isSafeInteger(publication[key]) && publication[key] >= 0)
+      && publication.published <= publication.receipts
+      && publicationKeys.slice(2).reduce((n, key) => n + publication[key], 0) === publication.published
+      && publication.verified >= binding.published && (publication.verified === 0) === (binding.published === 0), 'database_binding')
+    observe({ publicationCounts: Object.fromEntries(publicationKeys.map(key => [key, publication[key]])),
+      publicationClassification: 'published_receipts_first_failed_guard' })
     const selected = (await db.query(SQL.select, candidates)).rows
     observe({ lastReadStage: 'history_selection', selectedCount: selected.length })
     check(selected.length > 0, 'history_missing')

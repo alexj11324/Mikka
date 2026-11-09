@@ -67,6 +67,8 @@ test('real PG17 validates paired creators, verified publication, tenant-safe his
       assert.equal(result.rows.publication.length, 2); assert.equal(result.rows.run.length, 2)
       assert.equal(observations.find(value => value.readOnly)?.readOnly, true)
       assert.equal(observations.at(-1).transactionRolledBack, true)
+      assert.deepEqual(observations.find(row => row.publicationCounts)?.publicationCounts,
+        { receipts: 2, published: 2, runMissing: 0, issueMismatch: 0, executorMismatch: 0, workspaceNull: 0, workspaceDifferent: 0, verified: 2 })
       assert.equal((await db.query("SELECT current_setting('transaction_read_only') AS value")).rows[0].value, 'off')
       const output = JSON.stringify(result)
       for (const raw of [owner(1), owner(2), 'never-transport-this-definition', 'synthetic-private-branch', 'synthetic-private-repo']) assert.ok(!output.includes(raw))
@@ -100,18 +102,21 @@ test('real PG17 validates paired creators, verified publication, tenant-safe his
       await assert.rejects(snapshot(db, scope), error => error.code === 'database_binding')
       for (const kind of ['select', 'task', 'publication', 'run']) assert.equal((await db.query(SQL[kind], pairsFor(scope))).rows.length, 0)
     })
-    for (const [name, mutation, args] of [
-      ['publication executor conflict', 'UPDATE run_publications SET "userId"=$1 WHERE "runId"=$2', ['wrong-executor', id(101)]],
-      ['publication Task conflict', 'UPDATE run_publications SET "issueId"=$1 WHERE "runId"=$2', [id(2), id(101)]],
-      ['Run tenant absent', 'UPDATE agent_runs SET "workspaceId"=$1 WHERE id=$2', [null, id(101)]],
-      ['Run tenant foreign', 'UPDATE agent_runs SET "workspaceId"=$1 WHERE id=$2', [foreignWorkspace, id(101)]],
-      ['Run absent', 'DELETE FROM agent_runs WHERE id=$1', [id(101)]],
+    for (const [name, mutation, args, bucket] of [
+      ['publication executor conflict', 'UPDATE run_publications SET "userId"=$1 WHERE "runId"=$2', ['wrong-executor', id(101)], 'executorMismatch'],
+      ['publication Task conflict', 'UPDATE run_publications SET "issueId"=$1 WHERE "runId"=$2', [id(2), id(101)], 'issueMismatch'],
+      ['Run tenant absent', 'UPDATE agent_runs SET "workspaceId"=$1 WHERE id=$2', [null, id(101)], 'workspaceNull'],
+      ['Run tenant foreign', 'UPDATE agent_runs SET "workspaceId"=$1 WHERE id=$2', [foreignWorkspace, id(101)], 'workspaceDifferent'],
+      ['Run absent', 'DELETE FROM agent_runs WHERE id=$1', [id(101)], 'runMissing'],
     ]) await t.test(name + ' cannot satisfy or enter published history', async () => {
       await seed(); await db.query(mutation, args)
       const scope = scopeFor(), binding = (await db.query(SQL.binding, pairsFor(scope))).rows[0]
       assert.equal(binding.published, 1); assert.equal(binding.historical, 1)
       assert.deepEqual((await db.query(SQL.select, pairsFor(scope))).rows.map(row => row.id), [id(2)])
       assert.deepEqual((await db.query(SQL.publication, pairsFor(scope))).rows.map(row => row.id), [id(102)])
+      const evidence = (await db.query(SQL.publicationEvidence, pairsFor(scope))).rows[0]
+      assert.deepEqual(evidence, { receipts: 2, published: 2, runMissing: 0, issueMismatch: 0, executorMismatch: 0,
+        workspaceNull: 0, workspaceDifferent: 0, verified: 1, [bucket]: 1 })
       const result = await snapshot(db, scope)
       assert.deepEqual(result.taskIds, [id(2)])
     })
@@ -145,6 +150,8 @@ test('real PG17 validates paired creators, verified publication, tenant-safe his
       await assert.rejects(snapshot(db, scopeFor(), value => observed.push(value)), error => error.code === 'history_missing')
       assert.deepEqual(observed.find(value => value.candidateCounts)?.candidateCounts,
         { present: 2, bound: 2, published: 0, ended: 2, historical: 0 })
+      assert.deepEqual(observed.find(value => value.publicationCounts)?.publicationCounts,
+        { receipts: 2, published: 0, runMissing: 0, issueMismatch: 0, executorMismatch: 0, workspaceNull: 0, workspaceDifferent: 0, verified: 0 })
       assert.equal(observed.at(-1).transactionRolledBack, true)
     })
     await t.test('twelve eligible Tasks still freeze at most ten and every history row belongs to that exact set', async () => {
@@ -154,6 +161,15 @@ test('real PG17 validates paired creators, verified publication, tenant-safe his
         assert.equal(result.rows[kind].length, 10)
         assert.ok(result.rows[kind].every(row => result.taskIds.includes(row.issueId)))
       }
+    })
+    await t.test('publication diagnostics exclude every receipt outside the fixed authorized Task pairs', async () => {
+      await seed(3)
+      await db.query('UPDATE issues SET "workspaceId"=$1 WHERE id=$2', [foreignWorkspace, id(3)])
+      const scope = scopeFor(), counts = (await db.query(SQL.publicationEvidence, pairsFor(scope))).rows[0]
+      assert.equal(counts.receipts, 2); assert.equal(counts.published, 2); assert.equal(counts.verified, 2)
+      scope.taskOwners[id(1)] = 'wrong-creator'
+      const changed = (await db.query(SQL.publicationEvidence, pairsFor(scope))).rows[0]
+      assert.equal(changed.receipts, 1); assert.equal(changed.verified, 1)
     })
   } finally {
     try { if (schemaCreated) await db.query('DROP SCHEMA domain_history_fixture_1782 CASCADE') }

@@ -100,7 +100,7 @@ test('at most ten explicit Task UUIDs, not an arbitrary SQL or all-tenant scan',
   assert.throws(() => projectRows({ ...scope, taskIds: [] }, fixture()))
 })
 
-function database({ readonly = 'on', isolation = 'repeatable read', epic = 0, legacy = 0, failRun = false, bindingOverride,
+function database({ readonly = 'on', isolation = 'repeatable read', epic = 0, legacy = 0, failRun = false, bindingOverride, publicationOverride,
   selected = scope.taskIds.map(value => ({ id: value })) } = {}) {
   const calls = [], rows = fixture()
   return { calls, query: async (sql, args) => {
@@ -110,6 +110,11 @@ function database({ readonly = 'on', isolation = 'repeatable read', epic = 0, le
     if (sql === SQL.binding) {
       assert.deepEqual(args[1], args[0].map(value => scope.taskOwners[value] ?? scope.ownerId)); assert.equal(args[2], scope.workspaceId)
       return { rows: [bindingOverride ?? { present: args[0].length, bound: args[0].length, published: 2, ended: 2, historical: 2 }] }
+    }
+    if (sql === SQL.publicationEvidence) {
+      assert.deepEqual(args[1], args[0].map(value => scope.taskOwners[value] ?? scope.ownerId)); assert.equal(args[2], scope.workspaceId)
+      return { rows: [publicationOverride ?? { receipts: 2, published: bindingOverride?.published ?? 2,
+        runMissing: 0, issueMismatch: 0, executorMismatch: 0, workspaceNull: 0, workspaceDifferent: 0, verified: bindingOverride?.published ?? 2 }] }
     }
     if (sql === SQL.select) {
       assert.deepEqual(args[1], args[0].map(value => scope.taskOwners[value] ?? scope.ownerId)); assert.equal(args[2], scope.workspaceId)
@@ -129,7 +134,7 @@ test('one repeatable read, read-only transaction uses fixed SQL and always rolls
   assert.equal(db.calls[0].sql, 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY')
   assert.equal(db.calls.at(-1).sql, 'ROLLBACK')
   assert.ok(db.calls.every(({ sql }) => !/\b(?:INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|COMMIT)\b/i.test(sql)))
-  assert.equal(db.calls.filter(({ args }) => args).length, 5)
+  assert.equal(db.calls.filter(({ args }) => args).length, 6)
 })
 for (const options of [{ readonly: 'off' }, { isolation: 'read committed' }, { epic: 1 }, { legacy: 1 }, { failRun: true }]) {
   test('fails closed and rolls back for ' + JSON.stringify(options), async () => {
@@ -276,7 +281,7 @@ test('real opaque search pagination retains API-visible Tasks from both creators
   for (const text of ['other-owner', scope.ownerId, 'private-title', 'private-content', 'opaque1', id(101)]) assert.ok(!evidence.includes(text))
 })
 
-test('search stops at five pages or one hundred authorized candidates and declares the finite boundary', async () => {
+test('search stops at five pages while retaining at most one hundred candidates and declares both bounds', async () => {
   for (const own of [false, true]) {
     let calls = 0
     const result = await searchCandidates({ json: async () => {
@@ -284,11 +289,14 @@ test('search stops at five pages or one hundred authorized candidates and declar
       return { items: Array.from({ length: 50 }, (_, i) => ({ id: id(page * 50 + i + 1), ownerId: own ? scope.ownerId : 'other', ...(own ? {} : { scope: 'unknown' }) })),
         nextCursor: 'cursor' + calls, truncated: false }
     } }, scope)
-    assert.equal(calls, own ? 2 : 5)
+    assert.equal(calls, 5)
     assert.equal(result.candidateTaskIds.length, own ? 100 : 0)
     assert.equal(result.counts.hasMore, true)
-    assert.equal(result.counts.pageLimitReached, !own)
+    assert.equal(result.counts.pageLimitReached, true)
     assert.equal(result.counts.candidateLimitReached, own)
+    assert.equal(result.counts.eligibleCount, own ? 250 : 0)
+    assert.equal(result.counts.discardedEarlierRows, own ? 150 : 0)
+    if (own) assert.deepEqual(result.candidateTaskIds, Array.from({ length: 100 }, (_, i) => id(i + 151)))
   }
 })
 
@@ -579,5 +587,64 @@ test('before refuses exact canonical or old-alias Epic identities and reports th
       ledgerDigest: 'c'.repeat(32), canonicalEpicMigrations: counts.epic, legacyEpicMigrations: counts.legacy })
     assert.equal(observed.at(-1).transactionRolledBack, true)
     assert.equal(db.calls.some(value => value.sql === SQL.binding), false)
+  }
+})
+
+test('the finite search tail reaches the 27 previously unread rows and retains exactly the last 100 in server order', async () => {
+  const rows = Array.from({ length: 127 }, (_, index) => ({ id: id(2000 - index),
+    ownerId: index % 3 === 0 ? scope.ownerId : 'authorized-other', title: 'never-record-this-title' }))
+  let calls = 0
+  const result = await searchCandidates({ json: async path => {
+    const cursor = new URL(path, 'https://synthetic.invalid').searchParams.get('cursor')
+    assert.equal(cursor, calls ? 'opaque' + calls : null)
+    const start = calls++ * 50
+    return { items: rows.slice(start, start + 50), nextCursor: calls < 3 ? 'opaque' + calls : null, truncated: false }
+  } }, scope)
+  const expected = rows.slice(-100)
+  assert.equal(calls, 3); assert.equal(result.counts.returned, 127); assert.equal(result.counts.eligibleCount, 127)
+  assert.equal(result.counts.candidateCount, 100); assert.equal(result.counts.discardedEarlierRows, 27)
+  assert.equal(result.counts.hasMore, false); assert.equal(result.counts.pageLimitReached, false)
+  assert.equal(result.counts.candidateLimitReached, true)
+  assert.equal(result.counts.retainedOwn, expected.filter(row => row.ownerId === scope.ownerId).length)
+  assert.equal(result.counts.selection, 'last_100_of_bounded_api_search')
+  assert.deepEqual(result.candidateTaskIds, expected.map(row => row.id).sort())
+  assert.deepEqual(result.taskOwners, Object.fromEntries(expected.map(row => [row.id, row.ownerId])))
+  assert.equal(Object.keys(result.taskOwners).length, 100)
+  const summary = JSON.stringify(result.counts)
+  for (const raw of ['never-record-this-title', 'authorized-other', scope.ownerId, id(1874)]) assert.ok(!summary.includes(raw))
+})
+
+test('a replayed opaque cursor is refused at the candidate limit and at the fifth-page boundary', async () => {
+  for (const replayAt of [2, 5]) {
+    let calls = 0
+    await assert.rejects(searchCandidates({ json: async () => {
+      const page = ++calls
+      return { items: Array.from({ length: 50 }, (_, i) => ({ id: id((page - 1) * 50 + i + 1), ownerId: scope.ownerId })),
+        nextCursor: page === replayAt ? 'cursor1' : 'cursor' + page, truncated: false }
+    } }, scope), error => error.code === 'response_invalid')
+    assert.equal(calls, replayAt)
+  }
+})
+
+test('publication diagnostics preserve only closed counts over the same authorized pairs', async () => {
+  const counts = { receipts: 7, published: 6, runMissing: 1, issueMismatch: 1, executorMismatch: 1,
+    workspaceNull: 0, workspaceDifferent: 1, verified: 2 }
+  const db = database({ publicationOverride: { ...counts, secret: 'never-emit-private-value' } }), observed = []
+  await snapshot(db, scope, value => observed.push(value))
+  const row = observed.find(value => value.publicationCounts)
+  assert.deepEqual(row, { publicationCounts: counts, publicationClassification: 'published_receipts_first_failed_guard' })
+  assert.ok(!JSON.stringify(observed).includes('never-emit-private-value'))
+  assert.deepEqual(db.calls.find(row => row.sql === SQL.publicationEvidence).args,
+    [scope.candidateTaskIds, scope.candidateTaskIds.map(value => scope.taskOwners[value]), scope.workspaceId])
+})
+
+test('inconsistent or negative publication diagnostic counts fail before snapshots and still roll back', async () => {
+  const counts = { receipts: 2, published: 2, runMissing: 0, issueMismatch: 0, executorMismatch: 0,
+    workspaceNull: 0, workspaceDifferent: 0, verified: 2 }
+  for (const change of [{ runMissing: -1 }, { runMissing: 1 }, { receipts: 1 }, { verified: 1, runMissing: 1 }]) {
+    const db = database({ publicationOverride: { ...counts, ...change } }), observed = []
+    await assert.rejects(snapshot(db, scope, value => observed.push(value)), error => error.code === 'database_binding')
+    assert.equal(db.calls.some(row => row.sql === SQL.select), false)
+    assert.equal(observed.at(-1).transactionRolledBack, true)
   }
 })
