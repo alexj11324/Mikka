@@ -346,7 +346,7 @@ def established_nonroot_payload(fixture, evidence, ack_only):
     require(server.rpc('send', size=1), 'sent')
     seed = client.rpc('recv', size=1)
     assert seed.get('received') == 1, 'fixture connection was not usable before policy'
-    evidence['pre_policy_application_roundtrip'] = True
+    evidence['pre_policy_application_data_received'] = True
     fixture.install_policy(verify_live_provider=False)
     attempted = server.rpc('send_more_segment') if ack_only else server.rpc('send', size=256)
     evidence['send_result'] = attempted
@@ -395,7 +395,7 @@ def main(args):
                 row.update(passed=False, kind='assertion', error=str(exc))
             except Exception as exc:
                 infrastructure_error = True
-                row.update(passed=False, kind='harness_or_policy', error=str(exc)[:1600])
+                row.update(passed=False, kind='harness_or_policy', error=str(exc)[:8000])
             rows.append(row)
     passed = all(row['passed'] for row in rows)
     emit({'ok': passed, 'guard': str(Path(args.guard).resolve()),
@@ -429,8 +429,16 @@ if __name__ == '__main__':
             rows = json.loads(run(['nft', '-j', '-n', 'list', 'table', 'inet', guard.TABLE]))['nftables']
             short = [row for row in rows if 'rule' not in row]
             rules = [row for row in rows if 'rule' in row]
-            short.extend(rules[:2] + rules[12:13] + rules[-2:])
-            print(json.dumps({'syntheticPolicyReadback': short}), file=sys.stderr)
+            for offset, family in ((1, 'ipv4'), (12, 'ipv6')):
+                for index, doff in enumerate(range(5, 16)):
+                    actual = dict(rules[offset + index]['rule'])
+                    actual.pop('handle', None)
+                    try:
+                        guard.check_ack_rule(actual, family, ports, doff)
+                    except Exception:
+                        short.append({'failedAck': {'family': family, 'doff': doff, 'rule': actual}})
+                        break
+            print(json.dumps({'ruleCount': len(rules), 'syntheticPolicyReadback': short}), file=sys.stderr)
             raise
     else:
         if not args.guard:
