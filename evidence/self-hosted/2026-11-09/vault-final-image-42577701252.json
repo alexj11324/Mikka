@@ -1,0 +1,80 @@
+{
+  "source": "88b144d52d091d7ff566c63fce6e902e33edc59e",
+  "imageDigest": "sha256:96de4972ea7820dca9d7f03d116f8a4589c662ee6a6db9cb33cf8ad0f89ec98e",
+  "driver": "d28ccdd63dcb562bc5fc476efa27238ada71169f",
+  "started": "2026-11-09T07:12:27.750Z",
+  "stage": "completed",
+  "checks": {
+    "finalImageUnmodified": true,
+    "emailVerified": true,
+    "localEnvelopeEncrypted": true,
+    "listReturnsNoPassword": true,
+    "ownerViewerBeforeLogin": true,
+    "guardedViewerClosed": true,
+    "filledFormEmittedNoFrames": true,
+    "ownerViewerAfterSafeNavigation": true,
+    "realSiteSubmitted": true,
+    "bakedWorkerUsed": true,
+    "normalAgentStop": true,
+    "subagentEventLogsContainNoPlaintext": true,
+    "actualGuardedBroker": true,
+    "agentAutomaticSavedLogin": true,
+    "noModelExecution": true,
+    "logsContainNoPlaintext": true
+  },
+  "cleanup": {
+    "viewers": true,
+    "fixtureLatches": true,
+    "subagent": true,
+    "e2bConfirmedMissing": true,
+    "login": true,
+    "key": true,
+    "session": true,
+    "fixture": true,
+    "site": true,
+    "tunnels": true,
+    "privateFiles": true
+  },
+  "productionOAuth": false,
+  "realE2B": true,
+  "modelCalls": 0,
+  "hostedProductionAcceptance": false,
+  "productionRuntimePairingVerified": false,
+  "fullFinalImageAcceptance": true,
+  "runtimeSetup": {
+    "source": "88b144d52d091d7ff566c63fce6e902e33edc59e",
+    "workerHash": "6ada1d4f809eace6ca84ad0329562f4aacb78452",
+    "configDigest": "sha256:1fb3725678739bf9d448be52ca5ba576ed3e7902b4c9e1240bd5c174f13754b4",
+    "template": "desktop",
+    "operatorConfiguredPins": false,
+    "hostScriptMounts": false,
+    "modelConfigurationAbsent": true
+  },
+  "scope": "real-subagent-workflow-and-in-process-local-kms-broker",
+  "actorHash": "9de082968e4c875c",
+  "workspaceHash": "096301f693e4322c",
+  "screenshot": {
+    "channel": "owner-subagent-viewer",
+    "guardedObservationMs": 750,
+    "postToObservationMs": 0,
+    "guardedFrames": 0,
+    "rawFramesRetained": false,
+    "observerEndpointTested": false
+  },
+  "sandboxHash": "a5e1a27cbeeaa7d5",
+  "machineCount": 1,
+  "subagentEventLogs": {
+    "count": 4,
+    "terminalStopped": true,
+    "containsPlaintext": false
+  },
+  "hostedUsageRows": 0,
+  "site": {
+    "servedLogin": 3,
+    "submitted": 1,
+    "rejected": 0,
+    "authenticatedViews": 1
+  },
+  "status": "passed",
+  "finished": "2026-11-09T07:14:03.617Z"
+}
