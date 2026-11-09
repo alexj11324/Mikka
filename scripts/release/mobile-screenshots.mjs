@@ -13,6 +13,7 @@ const USER = '8f8f435e-0ce2-4bea-965d-afbf508c694f'
 const TASK = 'b633a9e7-5f5a-518b-abcd-99eec3cc558c'
 const ARTIFACTS = ['97766bd2-4916-5144-adba-f7de75c48398', 'ce9a7c8a-f61b-5617-a5a9-78b806b7b1b5', '1ac28503-b5d2-584a-afac-af29b7cfdcc4']
 export const SHOTS = ['01-bots', '02-bot-chat', '03-task', '04-conversation', '05-artifact']
+export const MAESTRO_CHILD_TIMEOUT_MS = 600000
 
 const PHASES = new Set(['source', 'capture', 'cleanup', 'driver-preflight', 'native-driver-preflight', 'simulator-create', 'simulator-boot-initial',
   'simulator-system-locale', 'simulator-boot-localized', 'backend-version-before', 'demo-readback',
@@ -39,10 +40,6 @@ const SIGN_IN_SELECTORS = new Set(['signin-email', 'signin-password', 'signin-su
 
 export function nativeDriverFlow() {
   return 'appId: com.apple.Preferences\n---\n- launchApp\n- assertVisible: Settings\n'
-}
-
-export function nativeFlowTimeout(name) {
-  return name === 'driver-preflight' ? 600000 : 180000
 }
 
 export function nativeFlowDiagnostics(privateDir, name) {
@@ -112,8 +109,8 @@ function nativeFlow(env, device, privateDir, name, flow, credentials = false) {
     try {
       result = spawnSync('maestro', ['--device', device.udid, 'test', '--debug-output', join(privateDir, 'debug'),
         '--test-output-dir', join(privateDir, 'driver-output'), flowPath], {
-        cwd: privateDir, timeout: nativeFlowTimeout(name), stdio: ['ignore', log, log],
-        env: { ...env, MAESTRO_CLI_NO_ANALYTICS: 'true',
+        cwd: privateDir, timeout: MAESTRO_CHILD_TIMEOUT_MS, stdio: ['ignore', log, log],
+        env: { ...env, MAESTRO_CLI_NO_ANALYTICS: 'true', MAESTRO_DRIVER_STARTUP_TIMEOUT: '300000',
           MAESTRO_REVIEW_EMAIL: credentials ? env.APP_STORE_REVIEW_EMAIL : '',
           MAESTRO_REVIEW_PASSWORD: credentials ? env.APP_STORE_REVIEW_PASSWORD : '' },
       })

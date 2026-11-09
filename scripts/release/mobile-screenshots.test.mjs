@@ -6,8 +6,8 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { screenshotIdentity, pngDimensions, loginFlow, workspaceFlow, readFlow, backendVersion,
-  screenshotFailure, screenshotPhase, nativeDriverFlow, nativeFlowDiagnostics, nativeFlowTimeout,
-  driverPreflightIdentity, SHOTS } from './mobile-screenshots.mjs'
+  screenshotFailure, screenshotPhase, nativeDriverFlow, nativeFlowDiagnostics,
+  driverPreflightIdentity, MAESTRO_CHILD_TIMEOUT_MS, SHOTS } from './mobile-screenshots.mjs'
 
 const env = { GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REF: 'refs/heads/main',
   GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_SHA: 'a'.repeat(40), GITHUB_RUN_ID: '123',
@@ -164,13 +164,17 @@ test('stock native driver preflight runs before compilation and reviewer credent
   assert.ok(workflow.indexOf('Build unsigned Release') < workflow.indexOf('Read existing review email'))
 })
 
-test('only the cold stock driver bootstrap gets a longer outer budget', () => {
-  assert.equal(nativeFlowTimeout('driver-preflight'), 600000)
-  for (const flow of ['login', 'workspace', ...SHOTS]) assert.equal(nativeFlowTimeout(flow), 180000)
+test('driver startup fits within the shared outer budget while UI waits retain sixty seconds', () => {
+  assert.equal(MAESTRO_CHILD_TIMEOUT_MS, 600000)
+  for (const flow of [loginFlow(), workspaceFlow(), readFlow('mikka://task/demo', 'Checklist')]) {
+    const timeouts = [...flow.matchAll(/timeout: (\d+)/g)].map(match => Number(match[1]))
+    assert.ok(timeouts.length > 0)
+    assert.ok(timeouts.every(timeout => timeout === 60000))
+  }
   const workflow = readFileSync(new URL('../../.github/workflows/mobile-screenshots.yml', import.meta.url), 'utf8')
   const probe = workflow.slice(workflow.indexOf('\n  driver-preflight:\n'))
   assert.match(probe, /timeout-minutes: 25/)
-  assert.doesNotMatch(workflow, /MAESTRO_DRIVER_STARTUP_TIMEOUT/)
+  assert.match(workflow.slice(0, workflow.indexOf('\n  driver-preflight:\n')), /timeout-minutes: 90/)
 })
 
 test('driver preflight rejects existing credentials and invokes only the stock flow without them', () => {
@@ -183,6 +187,7 @@ test('driver preflight rejects existing credentials and invokes only the stock f
   writeFileSync(join(binaryDir, 'maestro'), `#!/usr/bin/env node
 const fs = require('node:fs')
 fs.writeFileSync(process.env.PROBE_CAPTURE, JSON.stringify({ args: process.argv.slice(2),
+  driverStartupTimeout: process.env.MAESTRO_DRIVER_STARTUP_TIMEOUT,
   credentialsPresent: ['APP_STORE_REVIEW_EMAIL', 'APP_STORE_REVIEW_PASSWORD', 'HOSTED_UI_READ_KEY',
     'MAESTRO_REVIEW_EMAIL', 'MAESTRO_REVIEW_PASSWORD'].some(name => Boolean(process.env[name])) }))
 console.log('FAKE_PRIVATE_DRIVER_OUTPUT')
@@ -208,6 +213,7 @@ console.log('FAKE_PRIVATE_DRIVER_OUTPUT')
     assert.match(readFileSync(join(privateDir, 'driver-preflight.log'), 'utf8'), /FAKE_PRIVATE_DRIVER_OUTPUT/)
     const invocation = JSON.parse(readFileSync(join(directory, 'probe.json'), 'utf8'))
     assert.equal(invocation.credentialsPresent, false)
+    assert.equal(invocation.driverStartupTimeout, '300000')
     assert.equal(invocation.args.at(-1), join(privateDir, 'driver-preflight.yaml'))
   } finally { rmSync(directory, { recursive: true, force: true }) }
 })
