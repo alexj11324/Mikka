@@ -1,11 +1,18 @@
-# Cloud computer: backend handoff
+# Cloud computer backend
 
-Owner split (Alex, 2026-10-24): **Codex builds the backend described here; the
-frontend is built separately** against the API contract in section 5. When the
-design changes, this document is updated, not forked. Revised 2026-10-27:
-separate thread machines and bot web sub-agents (section 2, R-72).
+This document retains the original backend handoff and its proposed frontend
+contract. The implementation has evolved since the 2026-10-27 handoff. Sections
+3–7 retain verification questions and proposed shapes from that work. Resolve
+actual route and storage contracts against `lib/computer/`,
+`lib/cloud-computer/`, `app/api/bots/[botId]/computer/` and
+`packages/protocol/src/computer.ts`.
 
-> Orchestration (models, Agents, runners, scheduling, credentials, billing) follows [`orchestration.md`](orchestration.md); where this document disagrees, that file wins. Mikka hosts no sandboxes: every E2B sandbox here runs on its owner's own E2B key, which is personal and never shared; a team workspace has no E2B key. Where this document says 「workspace」 for a machine, read 「owner in that workspace」 (machines are keyed by workspace and owner, `unattended-sandbox.md`).
+Accepted execution rules are [one task, one machine](decisions/2026-11-06-1800-machine-is-the-execution-boundary.md),
+[additive official templates](decisions/2026-11-03-1430-official-e2b-templates-unchanged.md)
+and the separate [credential exposure boundary](decisions/2026-11-08-0240-credential-exposure-boundary.md).
+[Orchestration](orchestration.md) owns model, machine, scheduling and billing
+rules. E2B sandboxes use their owner's personal E2B key. Bot machines are keyed
+by workspace and owner. A task's cloud machine belongs exclusively to that task.
 
 - Design review page: https://claude.ai/artifact/G8aEuFM4rwvGFeZbPYyVwU
 - Figma: file `zPe5LKycb2XuT1ivCLRw07`, section "云端电脑" (node `102:65`)
@@ -14,10 +21,10 @@ separate thread machines and bot web sub-agents (section 2, R-72).
 
 ## 1. What the user sees
 
-Every bot has "its own computer" (its own desktop on the workspace's one cloud
-machine), the way Grok Bot does it. Bot and thread are defined in
-[glossary.md](glossary.md): the threads (runs) a bot starts use that bot's
-computer. The computer is keyed by `bots.id`, never `agents.id`:
+Every bot has its own desktop on its owner's Bot machine in the workspace.
+Bot and thread are defined in [glossary.md](glossary.md). A Bot uses that
+desktop for its own work. Cloud task runs use their task's separate machine.
+The Bot computer is keyed by `bots.id`, never `agents.id`.
 
 - **电脑 tab (right panel)**: the selected bot's existing `AgentComputer`
   view. The 概览 header shows the bot's avatar and name, not a screen caption
@@ -33,9 +40,9 @@ computer. The computer is keyed by `bots.id`, never `agents.id`:
 - **设置 › 设备** lists only machines the user connected (this Mac, SSH hosts,
   Tailnet machines). Mikka Cloud is never listed there: it runs on the
   person's own E2B key.
-- **添加设备**: a host field plus the hosts found in the user's `~/.ssh/config`
-  and on their Tailnet; 设置 then shows progress through 登录 → 检查主机 →
-  安装 Mikka → 启动服务 → 连接.
+- **连接电脑** opens the daemon installation and sign-in commands described
+  in [daemon-connection.md](daemon-connection.md). Server enrollment retains
+  its separate SSH path.
 
 ## 2. Architecture
 
@@ -49,7 +56,7 @@ workspace (`cloud_machines` primary key `workspaceId`, `ownerId`, migration
 another member's bots never do.
 
 ```
-workspace ──1:1── bot machine (E2B sandbox, Linux)          light, shared
+owner + workspace ──1:1── bot machine (E2B sandbox, Linux)
                     ├─ mikka daemon (device, kind = "cloud")
                     ├─ owner-scoped authentication (never shared across users)
                     ├─ bot A: Xvfb :1 + WM + x11vnc + websockify → noVNC
@@ -59,7 +66,7 @@ workspace ──1:1── bot machine (E2B sandbox, Linux)          light, share
                     ├─ bot B: Xvfb :2 + …
                     └─ cookie sync between one owner's profiles only
 
-cloud thread ──1:1── thread machine (E2B sandbox from the workspace snapshot)
+cloud task ──1:1── task machine (verified official-derived E2B template)
                     ├─ mikka daemon running the coding harness (Claude Code, Codex)
                     ├─ /workspace: the repo at the thread's branch
                     └─ desktop (Xvfb + WM + VNC + Chrome) only when needed
@@ -115,21 +122,27 @@ cloud thread ──1:1── thread machine (E2B sandbox from the workspace snap
   workspace's bot machine. Sites that pin a session to one device may still
   ask again; that is accepted.
 
-### Thread machine (one per cloud thread)
+### Task machine (one per cloud task)
 
-- **One E2B sandbox per thread**, so threads never slow each other down or the
-  bots.
-- **Start:** from a workspace snapshot that holds the repo, dependencies and
-  the preinstalled Agents, so it boots in seconds. Snapshots never hold a
-  login; the run's credentials are injected at start and wiped at the end
-  ([orchestration](orchestration.md) § 6). The thread then checks out its
-  branch. Refresh the snapshot when dependencies change.
-- **Lifecycle:** pause while idle (no charge), resume on the next step, kill
-  when the thread ends. A thread's changes live on its branch; nothing is
-  copied back to the bot machine.
-- **Desktop on demand:** a thread that needs a screen, for example to accept a
-  web change, starts Xvfb, the WM, VNC and Chrome on its own machine. It never
-  moves to another machine, so no data is transferred.
+- **One E2B sandbox per task.** Follow-up runs resume that task's retained
+  machine. Another task never receives it.
+- **Start.** Repository work selects the verified official-derived Claude or
+  Codex template. Non-repository computer work selects desktop. The daemon
+  clones the admitted repository and creates its task worktree. Reusable
+  templates contain no account, task credentials or workspace data.
+- **Credentials.** Supply the selected native CLI authentication and authorized
+  GitHub credential through their normal mechanisms. Other third-party API
+  Secrets follow the separate exposure decision. `taskSecretInjection()`
+  separates ordinary environment and explicitly approved direct values from
+  protected capabilities. See [task Secret delivery](../security/task-secret-delivery.md)
+  for claim, compatibility and deployment evidence boundaries.
+- **Lifecycle.** An open task's machine is paused between runs and resumed for
+  its follow-up. Closed, canceled, duplicate or deleted tasks are retired by
+  the task-machine lifecycle. Retained worktrees and native sessions belong
+  to the task.
+- **Desktop work.** A task that needs a screen uses its own desktop-capable
+  machine. Claim refuses computer work on a device without the required
+  desktop capability. The Bot's desktop remains reserved for Bot work.
 - **Threads on the person's own devices** (their Mac, SSH hosts) are
   unchanged. They cannot see cloud screens; their acceptance runs on that
   device.
@@ -138,10 +151,10 @@ cloud thread ──1:1── thread machine (E2B sandbox from the workspace snap
 
 - **On the same machine:** any process can use a display (`DISPLAY=:N`), and
   any agent can drive a Chrome through its CDP port.
-- **Across machines:** a bot views a thread's screen, or drives its browser,
-  through a port the thread machine exposes (E2B public host). The thread
-  reaches the bot machine the same way. Every such port needs a short-lived
-  signed token, with separate view and control grants, as for the noVNC viewer.
+- **Viewer transport.** Remote viewing uses scoped, short-lived grants. A
+  task requiring a desktop uses its own desktop machine under
+  [0251](decisions/2026-11-02-0251-desktop-runs-get-their-own-machine.md).
+  Its Agent does not drive the Bot's desktop through a cross-machine port.
 - **One driver per screen:** control is `agent | user | idle` plus the holder
   (bot, sub-agent, thread or person). A second driver waits; it does not fail.
 
@@ -155,9 +168,10 @@ cloud thread ──1:1── thread machine (E2B sandbox from the workspace snap
 
 ### The daemon
 
-The daemon is the only thing that talks to our server, exactly like a local
-device (ADR 0016 link, `packages/protocol/src/device.ts`). On each machine it
-registers with `kind: "cloud"`, so the devices UI can exclude it.
+The daemon handles Mikka registration and task lifecycle traffic through
+`packages/protocol/src/device.ts`. Cloud devices register with `kind: "cloud"`
+and stay out of the personal device picker. Official native CLIs connect
+directly to their model providers with the selected authentication.
 
 ### Secrets
 
@@ -174,9 +188,9 @@ platform `E2B_API_KEY` exists only for isolated acceptance.
 
 Only the MIT `cua-driver-rs` (pinned v0.38.0, as in #161) may be used. Do not
 use, copy, bundle or connect to `cua-spacesd`, Cua Spaces, `trycua/*` images or
-`cua-perception` / OmniParser: they are FSL-licensed or out of scope. Build the
-image from a plain Linux base (Xvfb, a light WM, x11vnc, websockify, noVNC,
-Chrome, the mikka daemon, the driver).
+`cua-perception` / OmniParser: they are FSL-licensed or out of scope. Use the
+official-derived E2B template selected for the task and add Mikka software under `/opt/mikka`, preserving original files under the
+[template decision](decisions/2026-11-03-1430-official-e2b-templates-unchanged.md).
 
 ### Reuse from #161
 
@@ -284,8 +298,8 @@ thumbnail, the chat card and the full-window viewer all use `view`.
   thread runs on its own machine (decision
   [0251](decisions/2026-11-02-0251-desktop-runs-get-their-own-machine.md)), so
   a takeover pauses no thread and a thread's claim does not wait for it.
-- `POST /api/bots/:botId/computer/handback` sets `control: "agent"`. A thread
-  an earlier takeover paused resumes.
+- `POST /api/bots/:botId/computer/handback` sets `control: "agent"` and
+  releases the Bot desktop takeover. Task machines retain their own lifecycle.
 - Only one user can hold control at a time. A second takeover gets `409` with
   `controlledBy`.
 
@@ -321,10 +335,9 @@ that they land in the conversation:
   fills a login (above) and `POST /api/bots/:botId/subagents/:id/stop` stops it. The
   bot then reports the outcome as an ordinary chat message.
 
-Workspace-level state changes also need to reach the details page outside a
-run. The app has no realtime channel yet, so add one: an SSE stream at
-`GET /api/computer/events`. Polling `GET .../computer` every 2 s is an
-acceptable first step. The stream carries:
+Workspace-level state changes use the existing scoped live invalidation
+channel (`hooks/use-live-key.tsx`, `lib/live/`). A visible idle page reads only
+after an invalidation. The original proposed event categories were
 
 - `computer.machine`: `{ state }`
 - `computer.control`: `{ botId, control, controlledBy? }`
@@ -369,69 +382,39 @@ section 5 is settled.
 - Sub-agent cap per workspace (proposal: 6) and how many headless contexts one
   bot machine size can hold.
 
-## 8. Per-thread machines
+## 8. Task-machine implementation
 
-Every cloud thread runs on its own thread machine; the Bot's computer serves
-only the Bot. There is no flag. Nothing provisions a machine without the
-owner's own E2B key.
+`lib/cloud-computer/thread-machines.ts` binds a machine to its owner, workspace,
+Bot context, task and admitted repository. `ensureThreadMachine` selects a
+verified template for new work and adopts only the same task's eligible
+retained machine. The task's own E2B key is required. A parent Bot snapshot is
+not a prerequisite.
 
-Prerequisites:
+Claim accepts only the dedicated cloud device for that binding. Computer
+policy applies to computer work, with repository-only work retaining its
+existing authorization. A Bot desktop takeover cannot pause another task's
+claim or execution.
 
-1. The owner has their own E2B key.
-2. `20261029011635_subagents_thread_machines.sql` and
-   `20261029080001_owner_cloud_machines.sql` are applied to the matching
-   database.
-3. A workspace cloud machine exists for the owner, because every thread machine
-   starts from its workspace snapshot.
+When a run ends, the lifecycle can pause and retain an open task's machine.
+Task closure retires it after native-exit and ownership checks. If the provider
+has lost the sandbox, recovery recreates it from its verified template and
+uses the task's persisted branch/checkpoint. A failed wake with a retained
+filesystem reports that failure instead of discarding the task's state.
+Running compute intervals are tracked separately from paused time.
 
-Enqueue writes one `thread_machines` row in `starting`, and `claimCloudRun`
-accepts the run only from that dedicated cloud device. The workspace computer
-policy gates only a claim from a machine with a desktop; a task machine without
-one takes repository tasks under either policy and gets no computer grant.
+Cloud availability uses `cloudComputerRunsEnabled()` and the deployment
+switches in `lib/deployment-switches.ts`. Disabling cloud execution refuses new
+cloud work through those gates. It does not authorize claiming a queued task
+on the Bot's desktop. Existing machine stop, pause and retirement paths still
+own cleanup.
 
-Cost boundaries: one machine per cloud thread; idle pause after 15 minutes, with
-the provider timeout refreshed only while the run is active; a hard end after 12
-hours, a terminal run state, or an explicit `end`.
+Placement and fallback follow [orchestration](orchestration.md) and
+[model-order dispatch](decisions/2026-11-02-1400-model-order-dispatch.md). An
+explicit destination stays pinned. Defaults resolve cloud, then eligible
+servers, then computers through the existing dispatcher. Preserve each run's
+frozen model, Agent and credential selection throughout recovery.
 
-E2B bills per second only while a sandbox is running: "You only pay while a
-sandbox is actively running. Once a sandbox is paused, killed or times out,
-billing stops immediately." Storage is included, and a paused sandbox is kept
-indefinitely, so a paused machine costs nothing and counts only against state,
-never against the compute budget.
-
-There are no Mikka caps on thread machines ([orchestration](orchestration.md)
-§ 5; the 3-per-owner, 20-per-workspace and 60-hour limits were removed with
-C15). The person's own E2B account sets the limit. When it refuses (its
-concurrency cap, quota or key), a bot's `dispatch_run` ends the queued cloud
-run and the thread goes to the person's own device, or returns an error the
-person can act on
-([decision 2026-10-31-2200](decisions/2026-10-31-2200-run-machine-fallback.md)).
-
-A cloud run uses the cloud runtime of the bot that dispatched it, never another
-bot's: a Coordinator run, which has no bot, does not borrow one and goes to the
-person's device or the card instead. Every cloud run freezes its definition
-(Agent, model, credential source) when it is queued, with or without a model in
-the request.
-
-The run-recovery cron also reconciles Bot computers (`cloud_machines`): a row
-that has said running or waking for over an hour is checked with E2B. A sandbox
-E2B no longer has becomes `sleeping` with no sandbox (the next wake creates a
-new one); a paused one becomes `sleeping`. An unusable key changes nothing.
-
-Compute time is still tracked: `runningSince` and `computeSeconds` on
-`thread_machines` record each running interval, and paused time is never
-counted. Each machine still ends after the 12-hour lifecycle.
-
-A sandbox that is gone at the provider (deleted, expired or killed outside
-Mikka) is replaced, not reported: `ensureThreadMachine` resets the row to a new
-operation ID and creates a new sandbox from the thread's workspace snapshot.
-When a cloud run loses its worker mid-run, its lease runs out and the retry gets
-a thread machine of its own on the same bot, continuing from the uploaded
-checkpoint.
-
-Disable by draining first. The flag is read at enqueue and at claim, so turning
-it off while a thread run is still queued sends that run down the Bot-machine
-claim path instead. Let queued thread runs finish or stop them, end their
-machines, then unset the flag. Machines left running keep billing until the
-lifecycle workflow ends them.
-
+For acceptance, record the fixed source, template/worker release, application,
+database, task and sanitized run evidence under [acceptance.md](../acceptance.md).
+Official Claude Code (`claude-haiku-5-5`) and Codex (`gpt-6-luna`) subscription
+paths have independent results. API-key execution does not gate acceptance.

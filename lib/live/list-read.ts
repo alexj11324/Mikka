@@ -1,3 +1,4 @@
+import { carryReadDispatch } from '@/lib/swr/read-observer'
 import { LIVE_ID } from './events'
 import { botKeys, issueKeys } from '@/lib/swr/keys'
 import type { PresenceProof } from './presence'
@@ -41,7 +42,8 @@ export const isBotListKey = (key: unknown) => key === 'bots' || (Array.isArray(k
  * a later render. A cached value retains that same observation. */
 export async function observeListRead<T extends object>(read: () => Promise<T>): Promise<T & { requestedAt: number }> {
   const requestedAt = performance.now()
-  return { ...await read(), requestedAt }
+  const value = await read()
+  return carryReadDispatch(value, { ...value, requestedAt })
 }
 
 export function ownerListWorkspace(read: ObservedList | undefined, ownerId: string): string | null {

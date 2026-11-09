@@ -187,7 +187,13 @@ Alex 决定：
 
 决定草稿：[`docs/design/decisions/2026-11-08-1230-coding-workspace.md`](../design/decisions/2026-11-08-1230-coding-workspace.md)。Epic 草稿：[`2026-11-08-coding-workspace-epic.md`](2026-11-08-coding-workspace-epic.md)。
 
-还没解决的一件事：2026-11-07 的 2045、2230、2300 三个决定文件只在分支 `docs/tasks-only-threads-inside` 上，没进 `main`，但 `components.md` 已经在引用它们。
+调研时记录的分支状态如下。
+
+> 还没解决的一件事：2026-11-07 的 2045、2230、2300 三个决定文件只在分支 `docs/tasks-only-threads-inside` 上，没进 `main`，但 `components.md` 已经在引用它们。
+
+2026-11-08 复核 `main` 的 `420b1ebe1` 时，这三个文件均已存在于
+`docs/design/decisions/`。上面的分支问题属于调研时的记录。1230 决定已接受，
+其 R0–R3 方案优先；下文的外部来源保留调研日期的证据，本次未重新访问。
 
 [^c-keys]: https://www.conductor.build/docs/reference/keyboard-shortcuts
 [^c-review]: https://www.conductor.build/docs/guides/review-and-merge ；https://www.conductor.build/docs/reference/diff-viewer ；changelog https://www.conductor.build/changelog/page/9

@@ -37,7 +37,7 @@ Web 的请求内会话复用绑定同一 Cookie 身份；敏感操作仍通过�
 
 ## 现有路由与 Next 兼容范围
 
-[`generate-routes.mjs`](../../apps/api/scripts/generate-routes.mjs) 通过 TypeScript AST 读取 `app/**/route.ts` 的导出、re-export 与解构 handler，不执行路由模块。当前 [`routes.json`](../../apps/api/generated/routes.json) 为 version 1、basePath `/mikka`，包含 **220 条路由记录**；这是当前源码清单数量，不是 220 条真实 HTTP 验收结论。它记录方法、源文件 hash、动态参数和 `maxDuration`，另有独立 browser RPC 与 OAuth consent 安全投影入口。
+[`generate-routes.mjs`](../../apps/api/scripts/generate-routes.mjs) 通过 TypeScript AST 读取 `app/**/route.ts` 的导出、re-export 与解构 handler，不执行路由模块。当前 [`routes.json`](../../apps/api/generated/routes.json) 为 version 1、basePath `/mikka`，包含 **240 条路由记录**（2026-11-08 源码快照）；每次增删路由后以生成清单为准。此数量只描述源码清单。它记录方法、源文件 hash、动态参数和 `maxDuration`，另有独立 browser RPC 与 OAuth consent 安全投影入口。
 
 Hono 根据静态优先的匹配规则延迟载入原 handler，保留参数、请求体、流和取消信号。未显式实现的 OPTIONS 返回 204 与 Allow；不支持的方法返回 405。HEAD 可选用 GET handler，但仍传入原 HEAD Request，最终取消并移除响应 body；这不保证业务 handler 自己会接受 HEAD。机器接口没有 SPA fallback。页面的 basePath、语言、尾斜杠、旧域名和安全头由 [`http-policy.mjs`](../../apps/api/runtime/http-policy.mjs) 处理。
 
@@ -87,7 +87,7 @@ pnpm dev --host 127.0.0.1 --port 3000
 
 Docker 的公开验收入口使用同一次 Nitro 编译图的 `mikka-docker.mjs`；该 adapter 不自行 listen、不安装信号处理器、`trustProxy=false`。外层已核验环境持有 HTTP/WS 监听与 ingress，严格验证固定 origin/Host 后交给真实 Node request；关闭顺序包含响应结束、官方 waitUntil 和 Nitro close。不能用新起的普通 listener 替代这个环境证明。
 
-## Vercel 构建与生产切换顺序
+## Vercel 构建与生产切换记录
 
 当前 [`web-deploy.yml`](../../.github/workflows/web-deploy.yml) 保留 GitHub runner 上构建并上传 prebuilt 的流程，`vercel.json` 设置 `framework: null`，Git 自动部署关闭。发布从固定 main 提交开始，读既有 Infisical workload identity，拉取现有 production 项目配置；不新建身份或改生产数据位置。
 
@@ -95,7 +95,9 @@ Docker 的公开验收入口使用同一次 Nitro 编译图的 `mikka-docker.mjs
 
 生产环境文件的值采用JSON字符串编码，builder直接使用发布helper已经解析、补值和校验的对象，不能再交给另一种dotenv解码器。环境选择保留旧CLI的合同：非空job值优先，空或缺失才使用文件值；生产、仓库、源提交与deployment身份仍显式固定。完整构建前用原`directDatabaseURL`纯校验两个最终目标，不改写连接串。两类已修复问题的实际诊断和失败尝试见[验收报告](../acceptance/issue-1415/final-report.md#两次受阻的生产发布与已确认的环境根因)，不在运维步骤中重复发布时间线。
 
-正式切换按以下步骤组织并保留证据。Web与Mac可并行构建；桌面发布仍须通过现有来源/后代关系与overlay绑定的Web检查：
+以下步骤保留 Issue #1415 的一次性生产切换流程和 Owner 当时指定的目标。
+迁移已经完成。日常发布按 [Web 部署指南](web-deploy.md) 和当前 workflow 执行。
+Web 与 Mac 可并行构建，桌面发布继续核验来源/后代关系和 overlay 绑定。
 
 1. 固定准备合并的完整commit，完成其功能CI与完整清理；记录PR head、实际checkout/tree和run/job。保留各历史版本证据的范围，不新增已取消的性能或Dev ZIP门槛。
 2. 切换前刷新上一READY生产部署、可回滚状态、Vercel项目framework/build配置、队列入口及未完成run的部署归属；核对主线迁移的向后兼容性。Owner指定的操作回滚目标是 `dpl_A2gvRemMPjimhZTKYY4Rw4SsgLUN`，操作前再次核验其 READY 状态；当时最新部署只是切换前快照，不能擅自代换 Owner 目标。
@@ -109,7 +111,7 @@ Vercel TLS 终止后的 origin 由服务端配置的应用域名和平台 deploy
 
 ## 回滚操作
 
-Owner 指定的操作回滚目标为 **`dpl_A2gvRemMPjimhZTKYY4Rw4SsgLUN`**，来源 `184a375f`；2026-11-06 22:54:07 UTC 最近已核 READY，真正操作前仍须重新核验。`dpl_63kkAf86gNLuztV169tXfDH5qw4h` / main `62281b19` 是切换前正在服务的快照，不是可以擅自替换的回滚目标。
+Issue #1415 切换时，Owner 指定的操作回滚目标为 **`dpl_A2gvRemMPjimhZTKYY4Rw4SsgLUN`**，来源 `184a375f`，2026-11-06 22:54:07 UTC 已核 READY。该记录属于当次切换。后续事故需要核对本次已验收目标、现有部署状态和迁移兼容性，再按 Owner 的当前授权回滚。`dpl_63kkAf86gNLuztV169tXfDH5qw4h` / main `62281b19` 是切换前正在服务的快照，不是可以擅自替换的回滚目标。
 
 回滚单位是上一完整已验收版本及对应运行配置。仓库回滚通过 **revert PR**；不 force-push main、不删 deployment、不改 Neon、不撤销共享凭据，也不运行破坏性的 down migration。
 

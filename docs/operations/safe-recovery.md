@@ -77,7 +77,9 @@ refresh the deletion journal, authenticate again and obtain fresh approvals.
 BYOS/cloud/provider secret references require current-vault reconciliation;
 this tool does not claim that restoring them is safe for immediate use.
 
-Run against the already authorized local fixture:
+Run in cloud Linux against the already authorized isolated fixture. Confirm
+that the existing Docker container owns the expected loopback PostgreSQL port
+before invoking the drill.
 
 ```sh
 OPS_POSTGRES_URL=postgresql://postgres@127.0.0.1:55599/postgres \
@@ -118,5 +120,5 @@ backdates a successful start to make the recovery notification green.
 Each timing report retains its original source SHA. The latest isolated
 restore measurements, the historical backdating defect and the corrected
 real PostgreSQL fault matrix are recorded in
-old-ops-completion-211-214.md. Component evidence
+the historical issue #211–#214 evidence. Component evidence
 does not replace the original authenticated application end-to-end acceptance.

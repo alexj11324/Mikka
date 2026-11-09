@@ -118,3 +118,15 @@ Scope and priorities stay as [#1720](https://github.com/alexj11324/Mikka/issues/
 | iPhone | R2, R2b, R3 |
 
 The rest of #1720 (#1728, #1729, #1730, #1734, #1735) keeps its priorities. When any of it gets a surface, it goes on the review page, never as a new tab on the task panel.
+
+## Implementation evidence boundary (2026-11-08)
+
+This is the accepted specification. Source at `420b1ebe1` contains web review
+DTOs and adapters in `lib/code-review/`, hooks in `hooks/code-review/` and
+native screens in `apps/mobile/features/review/`. The public `review-page`
+and `review-summary` slots render nothing, with `REVIEW_ENABLED=false`; a
+selected UI layer supplies those surfaces. `REVIEW_ENDPOINTS` in
+`lib/code-review/client.ts` explicitly records the API routes as proposed
+pending #1722. These source additions do not establish matching backend,
+GitHub-side effects or native runtime acceptance. Record that evidence on
+the owning implementation issues at their tested revision.

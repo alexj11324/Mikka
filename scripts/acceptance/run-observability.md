@@ -5,6 +5,18 @@ transport. Credentials stay in the GitHub Actions runner. It creates no tokens,
 logs into no model provider, changes no workflow and makes no direct database
 writes.
 
+## Account and workspace scope
+
+This driver uses `ACME_DEMO_EMAIL` / `ACME_DEMO_PASSWORD` from Infisical `prod:/`
+and verifies the account's admin-owned personal workspace. This is the account
+explicitly authorized for [issue #1512](https://github.com/alexj11324/Mikka/issues/1512).
+Its receipts prove only that account's selected workspace and own subscriptions;
+they do not establish shared-team behavior. Other production acceptance uses
+the shared SMOKE account in the Acme Inc. workspace under
+[the acceptance guide](../../docs/acceptance.md#shared-production-acceptance-workspace).
+The driver has not been migrated to that shared-team fixture. Do not substitute
+an account, workspace or subscription within an existing case.
+
 ## Commands
 
 Node 24 is sufficient for the driver and manual-browser helper; no package
@@ -144,7 +156,8 @@ harness, cloud destination, expiresAt, and the code-generated input and Artifact
 bytes. This fixed acceptance input is deliberately public fixture text; it is
 not copied from account messages or settings. The final report omits the text.
 
-Use the independently signed-in browser with the official Cloud backend selected,
+For the CLI's manual-browser path, use an independently signed-in browser with
+the official Cloud backend selected,
 then select the reported workspace. Confirm the backend selection separately:
 `/api/version` always identifies the official browser shell, including when its
 business requests target a selected self-hosted backend. Refresh the page to the
@@ -174,7 +187,7 @@ existing Infisical identity are unchanged.
 
 The helper consumes --runner-browser itself and never forwards it to the driver.
 It requires --execute, --browser-submit, one case, a real GitHub Actions
-workflow_dispatch context, the exact main ref/repository and the matching source SHA. Without this new flag, both the CLI browser
+workflow_dispatch context, the exact main ref/repository and the matching source SHA. Without this flag, both the CLI browser
 path and the helper's existing manual-ready comment remain available.
 
 After validating the exact ready object against fixtureTask, the helper posts
@@ -188,6 +201,12 @@ driver's cookie jar nor sends a task/model request through a separate API.
 A refusal, timeout, ambiguous selection or uncertain click never retries the
 submission. The original driver still observes the actual persisted UI message
 and verifies all task, Factory, native-run and Artifact evidence.
+
+Before the paid click, the actor checks that the active PostHog session has
+loaded its SDK, started recording and observed a sanitized snapshot. It reads
+the session again immediately before submission. It does not force recording,
+allocate a session or change consent. The receipt keeps `uploadAcknowledged`
+unknown. Verify upload and playback through separate PostHog readback.
 
 The actor uses a clean context and the fixed official origin; ordinary responses
 verify its selected backend instead of inferring it from the shell version alone.
@@ -216,7 +235,8 @@ Browser mode does not create requestTrace, traceparent, session IDs or replay ID
 Its real browser request supplies those through normal application instrumentation.
 Use the retained task/run/workflow IDs to find and verify that same browser trace
 and Replay independently. browserReplayVerified remains false in this driver.
-Run the other required model as a separate API case.
+Run the other required model separately, with browser-submit=true when collecting
+its browser correlation evidence too.
 
 Progress reads follow authenticated WebSocket invalidations. The socket renews
 its normal five-minute connection capability and uses keepalive pings; it does

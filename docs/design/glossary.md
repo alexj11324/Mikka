@@ -1,8 +1,8 @@
 # Glossary: bot, thread, chat
 
 This file is the single definition of these words. Specs, designs, issues and
-code comments use them in this sense. When a document disagrees with this
-file, this file wins and the other document gets fixed.
+code comments use them in this sense. Follow the source order in [the design entry point](README.md) when a
+newer accepted decision changes a definition here.
 
 Decided by Alex, 2026-10-24.
 
@@ -12,18 +12,18 @@ Decided by Alex, 2026-10-24.
 | --- | --- | --- | --- | --- |
 | **Bot** | Bot | Chats with people. Does web tasks itself through sub-agents (分身, R-72), each with its own browser, and dispatches real tasks such as coding to threads. The user creates it (Grok Bot style) and can put several bots in a group chat. The Coordinator is a bot too. Stored in its own `bots` table (name, colour, shape) and runs on Mikka's own AI SDK on Vercel; it is not a row in `agents`. | **Bot list** (left column), one row per bot or group chat. | The bot's own name, e.g. "Mikka Frontend". |
 | **Chat** | 对话 | The conversation between a person and the selected bot or group chat. | **Center column**. Header pill = the bot's (or group's) name. | Same as the bot or group. It has no name of its own. |
-| **Thread** | 线程 | Does the work a bot dispatched: a run chain, identified by its root run (`rootRunId`), made of that run and every run that resumes, retries or continues it (`lib/run-chain.ts`; each is a row in `agent_runs`), usually tied to a task. A bot can dispatch many threads at once; it never runs, owns or does a thread. | **Thread list** (right column), plus the thread view and the machine its Agent runs on. | Its own name, about the work, e.g. "#66 群聊前端骨架" or "MIK-11 群聊建表". Never the bot's name. |
+| **Thread** | 线程 | Does the work a bot dispatched: a run chain, identified by its root run (`rootRunId`), made of that run and every run that resumes, retries or continues it (`lib/run-chain.ts`; each is a row in `agent_runs`), usually tied to a task. A bot can dispatch many threads at once; it never runs, owns or does a thread. | Inside its task, in the task conversation and its attempts. Task lists occupy the right column. | Its own name, about the work, e.g. "#66 群聊前端骨架" or "MIK-11 群聊建表". Never the bot's name. |
 
 How they connect: a person chats with a bot (center). The bot dispatches
 real tasks such as coding to threads, which do the work (right). A web task
 stays with the bot: one of its sub-agents (分身) does it in its own browser,
-it shows only as a card in the chat, never in the thread list, and the bot
+it shows only as a card in the chat, outside the task lists, and the bot
 reports the result itself (R-72). A thread is run by an Agent (Claude Code,
 Codex). A bot never runs, owns or does a thread; it only dispatches it, and
 the UI says 「<Bot> 派出的线程」 or 「<Bot> 派出」, never 「<Bot> 的线程」 or
-「所属 Bot」. A thread is never drawn with the bot's avatar; it shows a status icon (decisions
-2026-10-27), except in the right panel's 全部线程, where each row carries
-the 16px mark of the Agent running it (R-50, R-78). A bot does no coding
+「所属 Bot」. A thread is never drawn with the bot's avatar. Task rows show the task's own
+state icon, and attempts show their result icon. The Agent's mark identifies
+the coding Agent where it is named (R-52, R-74, R-78). A bot does no coding
 work itself: an Agent (Claude Code, Codex) runs every thread. A cloud thread runs on its own thread machine,
 not on the dispatching bot's machine (`cloud-computer-backend.md` § 2).
 
@@ -48,12 +48,14 @@ Decision: [2026-11-01-2310](decisions/2026-11-01-2310-personal-and-team-workspac
   the latest message, which may mention a thread, but the row is the bot.
 - The right panel's 概览 header is the selected bot (the same avatar and
   name as its left row), followed by the tabs 详情 / 任务 / PR / 电脑. A
-  thread's name appears only as its row in a thread list, never as that
-  header (Alex, 2026-10-28; `rules.md` R-02, R-50).
+  task's title appears in its task row and detail, never as that
+  bot header (Alex, 2026-10-28; `rules.md` R-02, R-50).
 - Choosing another bot on the left changes the center chat and the right
-  column's thread and computer together.
-- A task (issue, `MIK-xx`) is not a thread. A thread works on a task, and a
-  task can have several threads over time.
+  column's dispatched tasks and computer together.
+- A task (issue, `MIK-xx`) can have several attempts over time. It has one
+  conversation joining those attempts oldest first. Opening an attempt scrolls
+  to its part of that conversation, and the composer addresses the newest
+  attempt ([decision](decisions/2026-11-07-2300-one-conversation-per-task.md)).
 
 ## Other words
 
@@ -72,7 +74,7 @@ Decided by Alex, 2026-10-28.
 ## Words to avoid
 
 - "会话" / "session" / "conversation list" for the left column. The left
-  column is the **bot list** and the right column is the **thread list**.
+  column is the **bot list** and the right column is the **task list**.
 - "会话" for a run (e.g. "打开会话" on a task's run). Say **线程**.
 - 「线程」 as the name of a list or tab. Lists hold tasks (2026-11-07); the right panel's tab is **任务**.
 - A Chinese word for Artifact. Keep **Artifact**.
@@ -96,7 +98,7 @@ Who owns what, in the format of the domain-modeling skill's glossary
 belongs to (DDD: the consistency boundary that owns it). Where a line below
 and the Workspaces table above differ about 密钥与环境, the line below follows
 [2026-11-02-0231](decisions/2026-11-02-0231-workspace-is-the-tenant.md), which
-waits for Alex's confirmation. Bounded contexts, aggregates and the code that
+records the workspace tenancy rules. Bounded contexts, aggregates and the code that
 stores them: [information-architecture.md](information-architecture.md) § 1.
 
 ### People and tenants
@@ -194,8 +196,12 @@ _Avoid_: integration, plugin (a 插件 is the store item, the connection is
 what linking it creates), binding.
 
 **Secret (密钥)**:
-A named value, secret or environment variable, injected into the runs of one
-workspace, or of one repository in it.
+A named value authorized for work in one workspace, or one repository in it.
+Sensitive third-party API values follow the scoped capability boundary in
+[decision 2026-11-08-0240](decisions/2026-11-08-0240-credential-exposure-boundary.md).
+`lib/secrets/runtime.ts` separates ordinary env and explicit direct delivery
+from protected HTTP capabilities, which the claim route seals for the run.
+Deployed protection requires the decision's runtime canaries and evidence.
 _Owner_: the workspace (Secret aggregate).
 _Avoid_: credential (a model credential is the account's), token, 环境变量 as
 a separate thing (an environment variable is a kind of secret).
