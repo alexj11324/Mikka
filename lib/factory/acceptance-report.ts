@@ -165,7 +165,7 @@ export async function syncFactoryAcceptanceArtifact(tx: PoolClient, task: Factor
   const publicCaptureIds = declared.success ? declared.data.map(ref => ref.captureId) : [];
   // Every capture explicitly selected for the PR must also appear here, even
   // when exploratory screenshots would otherwise exhaust the report limit.
-  const { rows: captures } = await tx.query<{ id: string; kind: 'image' | 'video'; title: string; runId: string; contentType: string; size: number; durationMs: number | null }>(`SELECT id,kind,left(title,200) AS title,"runId","contentType",size,"durationMs" FROM run_captures WHERE "userId"=$1 AND "runId"=ANY($2::uuid[]) AND status='ready' ORDER BY CASE WHEN "runId"=$3 AND id=ANY($4::uuid[]) THEN 0 ELSE 1 END,"createdAt",id LIMIT 40`,[task.userId,runIds,source.id,publicCaptureIds]);
+  const { rows: captures } = await tx.query<{ id: string; kind: 'image' | 'video'; title: string; runId: string; contentType: string; size: number; durationMs: number | null }>(`SELECT id,kind,left(title,200) AS title,"runId","contentType",size,"durationMs" FROM run_captures WHERE "userId"=$1 AND "runId"=ANY($2::uuid[]) AND ("issueId" IS NULL OR "issueId"=$5) AND status='ready' ORDER BY CASE WHEN "runId"=$3 AND id=ANY($4::uuid[]) THEN 0 ELSE 1 END,"createdAt",id LIMIT 40`,[task.userId,runIds,source.id,publicCaptureIds,task.issueId]);
   const origin = resolveAppOrigin(process.env);
   const currentCriteria = reportCriteria(source,review ?? null);
   const media: FactoryAcceptanceMedia[] = captures.map(capture => {

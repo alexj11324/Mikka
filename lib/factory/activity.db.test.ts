@@ -11,6 +11,25 @@ import { createFactoryStore } from './store'
 import { readFactoryActivity } from './activity'
 import { handleFactoryActivity } from './activity-http'
 import { observePoolCommits } from '../db/commit-effects'
+import { createRequestDatabaseScope } from '../db'
+import { bindFixtureWorkspaceDatabase } from '../../tests/helpers/workspace-database'
+import { syncFactoryPresentation } from './stage-progress'
+import { authorizeFactoryTaskCapture } from './task-media'
+import { createCaptureDownloads } from '../captures/private-download'
+import { readArtifactContent } from '../artifacts/store'
+import { tokenWorkspace } from '../tokens/principal'
+import { loadIssueDocument, readIssueThreads } from '../linear-sync/document'
+import { captureArtifact, readFactoryArtifact, runCaptureEvidence } from './evidence'
+import type { FactoryEvidence } from './contract'
+import { createFactoryDispatch, defaultFactoryDispatchAdapters, factoryBinding, type FactoryQueue } from './dispatch'
+import { factoryCheckGates } from './checks'
+import { factoryCheckIndependent } from './check-independence'
+import { createFactoryReconciler } from './reconcile'
+import { reconcileFactoryCheck } from './reconcile-check'
+import { createFactoryApprovalGates, createFactoryApprovals, deferPublication } from './approval'
+import { PublicationDeferred } from './publication-operation'
+import { freezeWorkerDefinition } from '../agent-kit/worker'
+import { prepareFactoryPublicationEvidence, withFactoryPublicationEvidence } from '../captures/publication'
 
 const base = process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1') assert.ok(base && disposableDatabase(), 'isolated database is required')
@@ -24,6 +43,8 @@ test('Factory activity: one owner-scoped SQL read model for every run, computer 
   const target = new URL(adminUrl); target.pathname = `/${name}`
   const pool = new Pool({ connectionString: target.toString(), max: 4 })
   observePoolCommits(pool)
+  const application = createRequestDatabaseScope(target.toString())
+  const closeWorkspace = await bindFixtureWorkspaceDatabase(pool)
   try {
     assert.equal((await pool.query('SHOW server_version_num')).rows[0].server_version_num.slice(0, 2), '17')
     const dir = new URL('../../drizzle/', import.meta.url)
@@ -219,7 +240,212 @@ test('Factory activity: one owner-scoped SQL read model for every run, computer 
       await pool.query(`UPDATE factory_candidates SET kind='deliverable',sha=NULL WHERE id=$1`,[candidate])
       assert.equal((await readFactoryActivity(pool,store,owner,done.task.id)).task.endedAt,'2026-11-05T12:00:00.000Z')
     })
+    await t.test('canonical publication retry refuses missing producer media after a real approval and failed publication', async () => application.run(async () => {
+      const f = await fixture(), localDevice = randomUUID(), localAgent = randomUUID(), repo = randomUUID(), sha = 'e'.repeat(40)
+      const repository = 'https://github.com/acme/visual-retry-fixture.git'
+      await pool.query(`INSERT INTO devices(id,"ownerId",name,"lastSeenAt",harnesses)
+        VALUES($1,$2,'Publication retry fixture',now(),'[{"harness":"codex","installed":true}]')`, [localDevice,owner])
+      await pool.query(`INSERT INTO agents(id,"userId","deviceId",name,harness) VALUES($1,$2,$3,'Publication retry fixture','codex')`, [localAgent,owner,localDevice])
+      await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl","verifyCommand") VALUES($1,$2,$3,'/fixture/visual-retry',$4,'node --version')`, [repo,localDevice,owner,repository])
+      const canonical = createFactoryStore(pool,authorize,bot,{independent:factoryCheckIndependent,
+        gates:{...factoryCheckGates,...createFactoryApprovalGates()}})
+      const queue: FactoryQueue = async (tx,userId,input,runtimeBot) => {
+        const runId = randomUUID()
+        await tx.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",status,prompt)
+          VALUES($1,$2,$3,$4,$5,$6,$7,'queued','Isolated PostgreSQL publication retry fixture')`,
+        [runId,userId,input.issueId,input.agentId,localDevice,input.deviceRepoId,runtimeBot])
+        return {runId}
+      }
+      const dispatch = createFactoryDispatch(pool,canonical,queue,{...defaultFactoryDispatchAdapters,
+        freeze:async(tx,task,runId)=>{
+          const {rows:[queued]} = await tx.query('SELECT prompt FROM agent_runs WHERE id=$1',[runId])
+          await tx.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1',[runId,
+            JSON.stringify(freezeWorkerDefinition({harness:'codex',instructions:'Isolated fixture',prompt:queued.prompt,
+              parent:null,executionId:null,readOnly:task.stage==='review'}))])
+        }})
+      const reconcile = createFactoryReconciler(pool,canonical,undefined,{review:reconcileFactoryCheck,verify:reconcileFactoryCheck},bot)
+      const producer = await dispatch(owner,{binding:factoryBinding(f.task),agentId:localAgent,deviceRepoId:repo})
+      const captureId = await capture(f.issueId,producer.runId)
+      await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"=$2,
+        "startedAt"=now()-interval '1 minute',"finishedAt"=clock_timestamp(),report=$3 WHERE id=$1`,
+      [producer.runId,`publication-producer-${producer.runId}`,JSON.stringify({summary:'Synthetic producer observation',publish:{commit:sha},
+        filesChanged:['fixture.txt'],verify:{status:'passed'},criteria:[{text:'Fixture result',passed:true,evidence:'Stored screenshot'}],
+        visualEvidence:[{captureId,publicSafe:true}]})])
+      await reconcile.run(owner,producer.runId)
+      const reviewPending = (await canonical.read(owner,f.task.id)).task
+      assert.equal(reviewPending.stage,'review')
+      assert.equal(reviewPending.status,'pending')
+      const publicReceipt = await prepareFactoryPublicationEvidence(pool,
+        {userId:owner,issueId:f.issueId,runId:producer.runId,sha},'https://evidence.example.invalid')
+      // GitHub acknowledgement is the external fixture boundary. The current
+      // capture, share locks, receipt digest and all Factory transitions are real.
+      await withFactoryPublicationEvidence(pool,publicReceipt,async()=>{
+        await pool.query(`INSERT INTO run_publications("runId","userId","issueId","remoteUrl","remoteKey",status,"pullRequest")
+          VALUES($1,$2,$3,$4,'acme/visual-retry-fixture','published',$5)`,[producer.runId,owner,f.issueId,repository,
+          JSON.stringify({url:'https://github.com/acme/visual-retry-fixture/pull/1',state:'open',evidenceDigest:publicReceipt.digest})])
+      })
+      const reviewer = await dispatch(owner,{binding:factoryBinding(reviewPending),agentId:localAgent,deviceRepoId:repo})
+      await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"=$2,
+        "startedAt"=now()-interval '1 minute',"finishedAt"=clock_timestamp(),report=$3 WHERE id=$1`,
+      [reviewer.runId,`publication-review-${reviewer.runId}`,JSON.stringify({summary:'Synthetic independent review observation',
+        check:{sha,readOnly:true},filesChanged:[],criteria:[{text:'Fixture result',passed:true,evidence:'Checked the producer screenshot'}],
+        verify:{status:'passed',command:'node --version',exitCode:0,timedOut:false,signal:null}})])
+      await reconcile.run(owner,reviewer.runId)
+      const ready = await canonical.read(owner,f.task.id)
+      assert.equal(ready.task.stage,'approval',JSON.stringify(ready.task))
+      assert.equal(ready.task.status,'pending')
+      assert.deepEqual(ready.attempts.filter(a=>a.runId).map(a=>a.status),['passed','passed'])
+      const sessionId = randomUUID()
+      await pool.query(`INSERT INTO "session"(id,"userId",token,"expiresAt","createdAt","updatedAt")
+        VALUES($1,$2,$3,now()+interval '1 hour',now(),now())`,[sessionId,owner,randomUUID()])
+      await pool.query(`INSERT INTO account(id,"accountId","providerId","userId","createdAt","updatedAt")
+        VALUES($1,$2,'github',$3,now(),now())`,[randomUUID(),randomUUID(),owner])
+      const actor = {userId:owner,sessionId}, approvals = createFactoryApprovals(pool,authorize,canonical)
+      const proof = await approvals.evidence(actor,f.task.id)
+      const approval = await approvals.approve(actor,{binding:proof.binding,eventId:randomUUID(),candidate:proof.manifest.candidate,
+        action:'deploy_preview',target:'synthetic-preview',targetEnvironment:'preview'})
+      const publication = (await pool.query('SELECT * FROM factory_publications WHERE "approvalId"=$1',[approval.approvalId])).rows[0]
+      assert.equal(publication.status,'reserved')
+      assert.equal((await canonical.read(owner,f.task.id)).task.stage,'publish')
+      await assert.rejects(()=>deferPublication(pool,publication.id,new PublicationDeferred(publication.id,'failed')),
+        (error:unknown)=>error instanceof PublicationDeferred && error.state==='failed')
+      await pool.query('DELETE FROM run_captures WHERE id=$1',[captureId])
+      const before = await canonical.read(owner,f.task.id)
+      const previous = (await pool.query('SELECT to_jsonb(p) AS value FROM factory_publications p WHERE id=$1',[publication.id])).rows[0].value
+      const eventId = randomUUID(), binding = factoryBinding(before.task)
+      const change = {action:'retry_publication' as const,publicationId:publication.id,reason:'Retry the failed publication after media loss'}
+      const blocked = await canonical.apply(owner,binding,eventId,change)
+      assert.equal(blocked.task.stage,'publish')
+      assert.equal(blocked.task.status,'blocked')
+      assert.equal(blocked.task.candidateId,before.task.candidateId)
+      assert.equal(blocked.task.attemptId,before.task.attemptId)
+      assert.equal(blocked.refusal?.code,'factory_visual_evidence_required')
+      assert.equal(blocked.attempts.length,before.attempts.length,'the retry creates no new approval attempt')
+      assert.deepEqual(blocked.attempts.filter(a=>a.id!==before.task.attemptId),before.attempts.filter(a=>a.id!==before.task.attemptId))
+      assert.deepEqual((await pool.query('SELECT to_jsonb(p) AS value FROM factory_publications p WHERE id=$1',[publication.id])).rows[0].value,previous)
+      assert.equal((await pool.query('SELECT count(*)::int AS n FROM factory_approvals WHERE "taskId"=$1',[f.task.id])).rows[0].n,1)
+      assert.deepEqual(await canonical.apply(owner,binding,eventId,change),blocked,'the failed retry receipt is immutable and idempotent')
+    }))
+
+    await t.test('visual refusal, resumed handoff, activity and private file reads use the same candidate evidence', async () => application.run(async () => {
+      const evidenceTask = await fixture(), producer = await run(evidenceTask,1), reviewer = await run(evidenceTask,2,'review','advance')
+      const candidateId = randomUUID(), sha = 'd'.repeat(40), sessionId = `activity-producer-${producer.runId}`
+      const evidenceStore = createFactoryStore(pool,authorize,bot,{onTransition:syncFactoryPresentation})
+      await pool.query(`UPDATE agent_runs SET "sessionId"=$2,"stopReason"='submitted',report=$3 WHERE id=$1`,
+        [producer.runId,sessionId,JSON.stringify({sourceCommit:sha,summary:'Observed the local API response.',filesChanged:[],
+          criteria:[{criterionId:'api',text:'API response',status:'passed',passed:true,evidence:'Local API returned the expected result.'}],verify:{status:'passed'}})])
+      await pool.query(`UPDATE agent_runs SET "sessionId"=$2,"stopReason"='submitted',report=$3 WHERE id=$1`,
+        [reviewer.runId,`activity-review-${reviewer.runId}`,JSON.stringify({summary:'Reviewed the API observations.',filesChanged:[],criteria:[],verify:{status:'passed'}})])
+      await pool.query(`INSERT INTO factory_candidates(id,"taskId",kind,sha,repository,environment,scope,"runId")
+        VALUES($1,$2,'report',$3,'','fixture',$4,$5)`,[candidateId,evidenceTask.task.id,sha,`issue:${evidenceTask.issueId}`,producer.runId])
+      await pool.query(`UPDATE factory_attempts SET "candidateId"=$2,"sessionId"=$3 WHERE id=$1`,[producer.attemptId,candidateId,sessionId])
+      await pool.query(`UPDATE factory_attempts SET "candidateId"=$2,"sessionId"=$3 WHERE id=$1`,[reviewer.attemptId,candidateId,`activity-review-${reviewer.runId}`])
+      await pool.query('UPDATE factory_tasks SET "candidateId"=$2 WHERE id=$1',[evidenceTask.task.id,candidateId])
+      const initial = (await pool.query<{revision:number}>('SELECT revision FROM factory_tasks WHERE id=$1',[evidenceTask.task.id])).rows[0]
+      const blocked = await evidenceStore.apply(owner,{taskId:evidenceTask.task.id,revision:initial.revision},randomUUID(),
+        {action:'advance',stage:'approval',reason:'Hand over reviewed API observations'})
+      assert.equal(blocked.task.status,'blocked')
+      assert.equal(blocked.refusal?.code,'factory_visual_evidence_required')
+      const refused = await handleFactoryActivity(pool,evidenceStore,{userId:owner,taskId:evidenceTask.task.id})
+      assert.equal(refused.status,200)
+      assert.ok('task' in refused.body)
+      assert.equal(refused.body.task.needsYou?.kind,'blocked')
+      assert.equal(refused.body.task.acceptance,null)
+
+      const wrongIssueCaptureId = await capture(another.issueId,producer.runId)
+      const evidence: FactoryEvidence = { artifact:captureArtifact(wrongIssueCaptureId),kind:'screenshot',runId:producer.runId,
+        sessionId,candidateId,sha,environment:'fixture',recordedAt:new Date().toISOString() }
+      const tx = await pool.connect()
+      try {
+        await tx.query('BEGIN')
+        const task = await evidenceStore.lockTask(tx,owner,evidenceTask.task.id)
+        await assert.rejects(()=>readFactoryArtifact(tx,task,evidence),{code:'factoryArtifactMissing'},
+          'the evidence reader refuses a capture that names another issue')
+        assert.deepEqual(await runCaptureEvidence(tx,{id:producer.runId,userId:owner},evidence),[],
+          'automatic completion collection cannot introduce a misbound capture')
+        await tx.query(`UPDATE factory_tasks SET stage='execute',status='running',"attemptId"=$2 WHERE id=$1`,[task.id,producer.attemptId])
+        await tx.query(`UPDATE factory_attempts SET status='running' WHERE id=$1`,[producer.attemptId])
+        await assert.rejects(()=>evidenceStore.apply(owner,{taskId:task.id,revision:task.revision},randomUUID(),
+          {action:'finish',status:'passed',reason:'Submit a cross-issue capture',evidence:[evidence],output:{}},tx),
+        {code:'factoryArtifactMissing'},'explicit completion evidence must satisfy the same issue boundary')
+      } finally {await tx.query('ROLLBACK');tx.release()}
+      assert.equal((await evidenceStore.resumeEvidenceHandoff(owner,producer.runId))?.task.status,'blocked',
+        'a stored capture naming a different issue cannot satisfy the handoff gate')
+      const screenshotId = await capture(evidenceTask.issueId,producer.runId)
+      const videoId = randomUUID(), video = await readFile(new URL('../../tests/fixtures/factory-visual-evidence.mp4',import.meta.url))
+      await pool.query(`INSERT INTO run_captures(id,"userId","runId","issueId",kind,"contentType",source,status,title,"storageKey","inlineContent",size,sha256,"durationMs")
+        VALUES($1,$2,$3,$4,'video','video/mp4','local','ready','API result recording',$5,$6,$7,$8,1200)`,
+        [videoId,owner,producer.runId,evidenceTask.issueId,`fixture/${videoId}.mp4`,video,video.length,createHash('sha256').update(video).digest('hex')])
+      const resumed = await evidenceStore.resumeEvidenceHandoff(owner,producer.runId)
+      assert.equal(resumed?.task.stage,'approval')
+      assert.equal(resumed?.task.status,'pending')
+      const reader = await pool.connect()
+      try {
+        assert.deepEqual((await runCaptureEvidence(reader,{id:producer.runId,userId:owner},evidence)).map(item=>item.artifact).sort(),
+          [captureArtifact(screenshotId),captureArtifact(videoId)].sort())
+        const source = await readFactoryArtifact(reader,resumed!.task,{...evidence,artifact:captureArtifact(screenshotId),recordedAt:new Date().toISOString()})
+        assert.equal(source.capture?.captureId,screenshotId)
+      } finally {reader.release()}
+      assert.equal(await evidenceStore.resumeEvidenceHandoff(owner,producer.runId),null,'the same evidence event cannot repeat handoff')
+      const response = await handleFactoryActivity(pool,evidenceStore,{userId:owner,taskId:evidenceTask.task.id})
+      assert.equal(response.status,200)
+      assert.ok('artifacts' in response.body)
+      const view = response.body, acceptance = view.task.acceptance
+      assert.ok(acceptance)
+      assert.equal(acceptance.candidateId,candidateId)
+      assert.equal(acceptance.runId,producer.runId)
+      assert.deepEqual(acceptance.media.map(item=>item.captureId).sort(),[screenshotId,videoId].sort(),
+        'a capture misbound to a different issue cannot enter the report or its activity projection')
+      const files = view.artifacts.filter((item): item is Extract<typeof item,{captureId:string}> => 'captureId' in item)
+      assert.deepEqual(files.map(item=>item.captureId).sort(),[screenshotId,videoId].sort())
+      const report = view.artifacts.find(item=>item.kind==='acceptance')
+      assert.ok(report && report.kind==='acceptance')
+      assert.equal(report.artifactId,acceptance.artifactId)
+      assert.equal(report.version,acceptance.version)
+      assert.equal(report.candidateId,candidateId)
+      assert.equal(report.runId,producer.runId)
+      assert.match(report.downloadUrl,new RegExp(`/api/artifacts/${report.artifactId}/versions/${report.version}/download$`))
+      const content = await readArtifactContent({id:owner,[tokenWorkspace]:workspace.id},report.artifactId,report.version)
+      assert.ok(content)
+      assert.ok(content.content.includes(candidateId) && content.content.includes(producer.runId))
+      for (const item of acceptance.media) {
+        assert.ok(content.content.includes(item.url))
+        assert.equal(item.candidateId,candidateId)
+        assert.equal(item.appliesToCurrentCandidate,true)
+      }
+      assert.ok(!content.content.includes(wrongIssueCaptureId))
+      assert.equal(await readArtifactContent({id:other,[tokenWorkspace]:workspace.id},report.artifactId,report.version),null)
+      const unrelatedWorkspace = await seedWorkspace(pool,owner,[{userId:owner,role:'admin'}])
+      assert.equal(await readArtifactContent({id:owner,[tokenWorkspace]:unrelatedWorkspace.id},report.artifactId,report.version),null)
+
+      const download = createCaptureDownloads(pool)
+      for (const file of files) {
+        await authorizeFactoryTaskCapture(pool,evidenceStore,owner,evidenceTask.task.id,file.captureId)
+        const read = await download(new Request(new URL(file.url,'http://127.0.0.1')),owner,file.captureId)
+        assert.ok(read)
+        assert.equal(read.status,200)
+        assert.equal(read.headers.get('content-type'),file.contentType)
+        assert.deepEqual(Buffer.from(await read.arrayBuffer()),file.kind==='video'?video:png)
+      }
+      const recording = files.find(item=>item.kind==='video')!
+      const range = await download(new Request(new URL(recording.url,'http://127.0.0.1'),{headers:{range:'bytes=0-31'}}),owner,videoId)
+      assert.equal(range?.status,206)
+      assert.deepEqual(Buffer.from(await range!.arrayBuffer()),video.subarray(0,32),'the returned recording can seek to its stored bytes')
+      await assert.rejects(()=>authorizeFactoryTaskCapture(pool,evidenceStore,owner,evidenceTask.task.id,wrongIssueCaptureId),{code:'factoryNotFound'})
+      await assert.rejects(()=>authorizeFactoryTaskCapture(pool,evidenceStore,other,evidenceTask.task.id,videoId),{code:'factoryNotFound'})
+      const saved = (await pool.query('SELECT state FROM issue_documents WHERE "issueId"=$1',[evidenceTask.issueId])).rows[0]
+      const document = loadIssueDocument(saved.state,{type:'doc',content:[]})
+      try {
+        const messages = readIssueThreads(document).flatMap(thread=>thread.messages)
+        const handoff = messages.find(message=>message.body.includes(`?artifact=${report.artifactId}`))
+        assert.ok(handoff)
+        for (const item of acceptance.media) assert.ok(handoff.body.includes(item.url))
+        assert.ok(!handoff.body.includes(wrongIssueCaptureId))
+      } finally {document.destroy()}
+    }))
   } finally {
+    await application.close()
+    await closeWorkspace()
     await pool.end()
     await dropTestDatabase(admin,name)
     await admin.end()

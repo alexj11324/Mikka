@@ -7,6 +7,7 @@ import { mock, test } from 'node:test'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { connectGitHub, githubAppStub } from './support/github-app-stub'
+import { addFactoryPublicationEvidence, addFactoryVisualEvidence } from './helpers/factory-visual-evidence'
 
 mock.module(new URL('../lib/coordinator/decide.ts', import.meta.url).href, { namedExports: { invokeDecision: async () => null } })
 
@@ -103,7 +104,12 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
       verify: check ? { status: 'passed', command, exitCode: 0, signal: null, timedOut: false, output: 'passed' } : { status: 'not_run' },
       ...(check ? { check: { sha, readOnly: true }, criteria: [{ text: 'Tax rounds to the cent', passed: true, evidence: 'The fixture command passed.', command, exitCode: 0 }] } : { publish: { commit: sha, pushed: true, branch: 'mikka/fixture', remote: 'origin' } }),
     })])
+    if (!check) await addFactoryVisualEvidence(pool, id)
     await runtime.reconcile.run(userId, id)
+    if (!check) {
+      const { rows: [task] } = await pool.query('SELECT t.id FROM factory_tasks t JOIN factory_candidates c ON c.id=t."candidateId" WHERE c."runId"=$1', [id])
+      await addFactoryPublicationEvidence(pool, task.id)
+    }
   }
   await finish(dispatched.runId!, false)
   const current = async () => (await pool.query(`SELECT t.id,t.route,t.stage,t.status,a."runId",r.kind,r."baseBranch",r."agentDefinition" FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" LEFT JOIN agent_runs r ON r.id=a."runId" WHERE t."userId"=$1`, [userId])).rows[0]

@@ -89,6 +89,34 @@ const assignment = (runId: string) => ({
 })
 
 describe("HttpServerLink", () => {
+  it.each(['begin', 'resume', 'send', 'complete'] as const)('cancels the capture %s transport with the final flush deadline', async stage => {
+    let entered!: () => void, release!: (response: Response) => void
+    const started = new Promise<void>(resolve => { entered = resolve })
+    let transportSignal: AbortSignal | null | undefined
+    const fetcher: typeof fetch = async (_url, init) => {
+      transportSignal = init?.signal
+      entered()
+      return new Promise<Response>((resolve, reject) => {
+        release = resolve
+        transportSignal?.addEventListener('abort', () => reject(transportSignal!.reason), { once: true })
+      })
+    }
+    const link = new HttpServerLink('http://server.test', fetcher), deadline = new AbortController()
+    const captureId = '00000000-0000-4000-8000-000000000001'
+    const operation = stage === 'begin'
+      ? link.beginCapture('run-1', { captureId, title: 'Evidence', contentType: 'image/png', size: 1, sha256: 'a'.repeat(64) }, deadline.signal)
+      : stage === 'resume' ? link.resumeCapture('run-1', captureId, deadline.signal)
+        : stage === 'send' ? link.sendCapture('run-1', captureId, { target: 'server' }, new Uint8Array([0]), 'image/png', deadline.signal)
+          : link.completeCapture('run-1', captureId, deadline.signal)
+    const result = operation.then(() => undefined, error => error)
+    try {
+      await started
+      deadline.abort(new Error('Capture finalization deadline exceeded'))
+      expect(transportSignal?.aborted).toBe(true)
+      expect(await result).toBeInstanceOf(ServerUnreachableError)
+    } finally { release(new Response(null, { status: 204 })); await result }
+  })
+
   it('returns the authoritative checkpoint receipt through the authenticated upload', async () => {
     const checkpoint = { baseCommit: 'a'.repeat(40), patch: 'H4sIAAAAAAAAAwMAAAAAAAAAAAA=', files: 0, takenAt: '2099-01-01T00:00:00.000Z' }
     const receipt = { runId: 'run-1', takenAt: '2026-01-02T03:04:05.678Z' }

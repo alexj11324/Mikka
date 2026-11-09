@@ -1,6 +1,6 @@
 import { execFile, spawn } from "node:child_process"
 import { createHash } from "node:crypto"
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, truncateSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { createInterface } from "node:readline"
 import { promisify } from "node:util"
@@ -272,6 +272,83 @@ describe("capture upload", () => {
     await Promise.all([first, afterEnd])
     expect({ begins, sends, completes }).toEqual({ begins: 1, sends: 1, completes: 1 })
     expect(readdirSync(dir)).toEqual([])
+  })
+
+  it('cancels an existing background upload and drains it before the final flush fails', async () => {
+    const dir = tempDir('capture-deadline-'), pending = tempDir('capture-deadline-pending-')
+    queue(dir, ids[0], 'png', PNG)
+    let release!: () => void, entered!: () => void, uploadSignal: AbortSignal | undefined
+    const uploading = new Promise<void>(resolve => { entered = resolve })
+    const cleanup = new Promise<void>(resolve => { release = resolve })
+    let completes = 0
+    const link: Link = {
+      beginCapture: async () => ({ captureId: ids[0], upload: { target: 'server' } }),
+      sendCapture: async (_runId, _captureId, _upload, _bytes, _contentType, signal) => {
+        uploadSignal = signal
+        entered()
+        // Even a transport that takes time to unwind cannot publish afterward.
+        await cleanup
+      },
+      completeCapture: async () => { completes++; return {} as never },
+    }
+    const uploader = new CaptureUploader(() => dir, link, log, pending)
+    const background = uploader.flush('run-1')
+    await uploading
+    const deadline = new AbortController(), reason = new Error('Capture finalization deadline exceeded')
+    let finalSettled = false
+    const final = uploader.flush('run-1', false, deadline.signal)
+      .then(() => ({ error: undefined }), error => ({ error }))
+      .finally(() => { finalSettled = true })
+    try {
+      deadline.abort(reason)
+      expect(uploadSignal?.aborted).toBe(true)
+      await Promise.resolve()
+      expect(finalSettled).toBe(false)
+      release()
+      expect(await final).toEqual({ error: reason })
+      await background
+      expect(completes).toBe(0)
+      expect(readdirSync(dir)).toHaveLength(2)
+      expect(existsSync(join(pending, 'run-1', 'blocked.json'))).toBe(false)
+    } finally { release(); await Promise.all([background, final]) }
+  })
+
+  it('reports an incomplete final flush when the server cannot accept the evidence', async () => {
+    const dir = tempDir('capture-final-failure-'), pending = tempDir('capture-final-failure-pending-')
+    queue(dir, ids[0], 'png', PNG)
+    const { link } = fakeLink(() => new ServerUnreachableError('offline'))
+    const uploader = new CaptureUploader(() => dir, link, log, pending)
+    await expect(uploader.flush('run-1', false, new AbortController().signal)).rejects.toThrow('Capture upload incomplete')
+    expect(readdirSync(dir)).toHaveLength(2)
+    expect(existsSync(join(pending, 'run-1', 'blocked.json'))).toBe(false)
+  })
+
+  it('cancels real oversized-video preparation before it can reserve an upload after the final deadline', async () => {
+    const dir = tempDir('capture-prepare-deadline-'), pending = tempDir('capture-prepare-deadline-pending-')
+    const source = join(dir, `${ids[0]}.mp4`)
+    const original = await video(source)
+    // A valid sparse free atom makes preparation long enough to observe without
+    // replacing FFmpeg or the file pipeline with a mock.
+    const atomSize = 200_000_001, header = Buffer.alloc(8)
+    header.writeUInt32BE(atomSize); header.write('free', 4)
+    appendFileSync(source, header)
+    truncateSync(source, original.length + atomSize)
+    writeFileSync(join(dir, `${ids[0]}.json`), JSON.stringify({ title: 'Recorded execution' }))
+    const { link, sent } = fakeLink()
+    const uploader = new CaptureUploader(() => dir, link, log, pending)
+    const background = uploader.flush('run-1'), pendingDir = join(pending, 'run-1')
+    const deadline = new AbortController(), reason = new Error('Capture finalization deadline exceeded')
+    try {
+      await waitFor(() => existsSync(pendingDir) && readdirSync(pendingDir).some(name => name.startsWith('.capture-process-')), 15_000, 1)
+      const final = uploader.flush('run-1', false, deadline.signal)
+      const rejected = expect(final).rejects.toBe(reason)
+      deadline.abort(reason)
+      await rejected
+      await background
+      expect(sent).toEqual([])
+      expect(existsSync(source)).toBe(true)
+      expect(readdirSync(pendingDir)).toEqual([])
+    } finally { deadline.abort(reason); await background }
   })
 
   it("retains the file and stops retries when authorization is denied", async () => {

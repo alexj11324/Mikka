@@ -44,10 +44,11 @@ export async function hasFactoryVisualEvidence(tx: PoolClient, task: Pick<Factor
     if (!recovered || recovered.sessionId !== producer.sessionId) return false;
   }
   const { rowCount } = await tx.query(`SELECT id FROM run_captures WHERE "runId"=$1 AND "userId"=$2 AND status='ready'
+    AND ("issueId" IS NULL OR "issueId"=$5)
     AND ((kind='image' AND "contentType" IN ('image/png','image/jpeg','image/webp') AND size BETWEEN 1 AND $3)
       OR (kind='video' AND "contentType" IN ('video/mp4','video/webm') AND size BETWEEN 1 AND $4))
     AND sha256 ~ '^[a-f0-9]{64}$' AND (NULLIF("storageKey",'') IS NOT NULL OR octet_length("inlineContent")=size)
-    LIMIT 1 FOR SHARE`, [producer.runId, task.userId, CAPTURE_MAX_BYTES.image, CAPTURE_MAX_BYTES.video]);
+    LIMIT 1 FOR SHARE`, [producer.runId, task.userId, CAPTURE_MAX_BYTES.image, CAPTURE_MAX_BYTES.video, task.issueId]);
   return rowCount === 1;
 }
 
@@ -199,8 +200,8 @@ export async function readFactoryArtifact(
       rows: [row],
     } = await tx.query(
       `SELECT id,kind,"contentType",title,size,"durationMs","updatedAt" FROM run_captures
-        WHERE id=$1 AND "runId"=$2 AND "userId"=$3 AND status='ready' FOR SHARE`,
-      [ref.artifact.slice(CAPTURE_PREFIX.length), run.id, task.userId],
+        WHERE id=$1 AND "runId"=$2 AND "userId"=$3 AND ("issueId" IS NULL OR "issueId"=$4) AND status='ready' FOR SHARE`,
+      [ref.artifact.slice(CAPTURE_PREFIX.length), run.id, task.userId, task.issueId],
     );
     if (!row)
       throw new FactoryError("factoryArtifactMissing");
@@ -259,7 +260,10 @@ export async function runCaptureEvidence(
 ): Promise<FactoryEvidence[]> {
   if (room <= 0) return [];
   const { rows } = await tx.query(
-    `SELECT id,kind,"updatedAt" FROM run_captures WHERE "runId"=$1 AND "userId"=$2 AND status='ready' ORDER BY "createdAt",id LIMIT $3`,
+    `SELECT c.id,c.kind,c."updatedAt" FROM run_captures c
+      JOIN agent_runs r ON r.id=c."runId" AND r."userId"=c."userId"
+      WHERE c."runId"=$1 AND c."userId"=$2 AND (c."issueId" IS NULL OR c."issueId"=r."issueId") AND c.status='ready'
+      ORDER BY c."createdAt",c.id LIMIT $3`,
     [run.id, run.userId, room],
   );
   return rows.map((row) => ({

@@ -106,6 +106,36 @@ documentation-only push can still rebuild and revalidate the unpublished worker.
 and task-owner E2B billing apply. See
 [Alex's preservation clarification](../../docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md).
 
+## Factory visual evidence acceptance
+
+`factory-visual-evidence-acceptance.yml` performs the finite production
+acceptance for #1783. Successful Web and E2B completion events enter a read-only
+selector. It requires PR #1789's exact merge commit, current main, the serving
+Web build, the completed matching runtime release and an active #1752 window
+bound to the PR's final head. Web finishing while E2B is still publishing
+declines selection; the E2B completion event supplies the next opportunity.
+Unrelated deployments do not start model work.
+
+Inside the existing `production-smoke-owner-acceptance` queue, the job checks
+these bindings again before reading only `SMOKE_OWNER_EMAIL` and
+`SMOKE_OWNER_PASSWORD` through the existing Infisical OIDC identity. Each
+official subscription runs an ordinary Factory task in the shared team
+workspace: a real submission without captures must persist a blocked visual
+evidence gate, and a continuation with a real recording and screenshot must
+reach independent review and owner acceptance. The driver downloads the
+versioned report and each capture through the task activity and report URLs,
+compares their bytes, and decodes the media with FFmpeg. Its own temporary
+profiles and runtime resources are cleaned up; the task and its artifacts
+remain available for inspection.
+
+The two subscription cases report independently. A failed case or cleanup
+keeps the workflow red even when the other case succeeds. A retry reuses only
+the successful native case step from the same source and exact run attempt;
+it never treats selection, a skipped step or a failed case as acceptance.
+Automatic attempts are bounded to two per subscription, with an explicit
+dispatch allowing a third. Safe receipts, actual media and reports are
+retained as workflow artifacts; credentials and raw task logs are excluded.
+
 ## GitHub branch protection (separate repository setting)
 
 Keep required status checks enabled. Disable **Require branches to be up to

@@ -798,9 +798,12 @@ export function createFactoryStore(
         if (!run) {
           // A denied completion recovery must not fall through to a fresh producer.
           if (task.stage === 'execute' && task.status === 'blocked') {
-            const { rowCount } = await tx.query(`SELECT 1 FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId"
+            const { rows: [attempt] } = await tx.query<FactoryAttempt>(`SELECT a.* FROM factory_attempts a JOIN agent_runs r ON r.id=a."runId"
               WHERE a.id=$1 AND a."taskId"=$2 AND a.output->'watchdog'->>'reasonCode'='recovery_exhausted' AND r.status='succeeded'`, [task.attemptId,task.id]);
-            if (rowCount) fail('factoryCompletionRecoveryUnavailable');
+            // A consumed completion can itself be refused for missing media.
+            // Its exact host receipt permits the ordinary evidence retry to
+            // create a fresh producer; an unqualified recovery still fails closed.
+            if (attempt && !await retryingEvidenceBlockedExecution(tx, task, attempt)) fail('factoryCompletionRecoveryUnavailable');
           }
           return null;
         }
@@ -1291,8 +1294,9 @@ export function createFactoryStore(
                 if (captureId && (evidence.kind === "screenshot" || evidence.kind === "video")) {
                   // The run's own ready capture of the stated kind; no other run's file.
                   const { rows } = await tx.query(
-                    `SELECT id FROM run_captures WHERE id=$1 AND "runId"=$2 AND "userId"=$3 AND status='ready' AND kind=$4`,
-                    [captureId, run.id, task.userId, evidence.kind === "video" ? "video" : "image"],
+                    `SELECT id FROM run_captures WHERE id=$1 AND "runId"=$2 AND "userId"=$3 AND status='ready' AND kind=$4
+                      AND ("issueId" IS NULL OR "issueId"=$5)`,
+                    [captureId, run.id, task.userId, evidence.kind === "video" ? "video" : "image", task.issueId],
                   );
                   if (!rows.length) fail("factoryArtifactMissing");
                   continue;
@@ -1325,6 +1329,11 @@ export function createFactoryStore(
             task.status = 'blocked';
             task.reason = factoryEvidenceBlockReason(FACTORY_VISUAL_EVIDENCE_REQUIRED);
             finishedOutput.evidenceGate = { code: FACTORY_VISUAL_EVIDENCE_REQUIRED, candidateId: task.candidateId, sourceEventId: task.sourceEventId, eventId };
+            // Recovery retains the historical attempt's status, session and
+            // submitted evidence. Append only the host refusal so the committed
+            // snapshot returns 409 and a later ordinary retry has its exact fence.
+            if (recovering) await tx.query(`UPDATE factory_attempts SET output=COALESCE(output,'{}'::jsonb)||jsonb_build_object('evidenceGate',$2::jsonb) WHERE id=$1`,
+              [attempt.id, JSON.stringify(finishedOutput.evidenceGate)]);
           }
           if (task.status === 'passed' && !change.evidence.length) fail('factoryEvidenceRequired');
           if (!recovering) await tx.query(

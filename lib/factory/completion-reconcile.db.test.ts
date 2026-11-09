@@ -191,6 +191,67 @@ test("run completion enters review without the Coordinator; replays do not advan
     });
     process.env.MIKKA_FACTORY_ROUTING_ENABLED = "1"; process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED = "1";
 
+    await t.test('Owner completion retry cannot hand off a submitted producer without its visual evidence', async () => {
+      const f = await exhaustedCompletion();
+      await pool.query('DELETE FROM run_captures WHERE "runId"=$1', [f.runId]);
+      const before = await history(f.task.id, f.runId, f.task.attemptId);
+      let completedDispatches = 0;
+      const human = createFactoryHumanStore(pool, () => store, async (_tx, _store, task) => {
+        completedDispatches++;
+        assert.equal(task.stage, 'execute');
+        assert.equal(task.status, 'blocked', 'completion recovery must not dispatch the next stage');
+        return undefined;
+      });
+      const response = await handleFactory(human, f.request);
+      assert.equal(response.status, 409);
+      assert.ok(response.body && typeof response.body === 'object' && 'error' in response.body);
+      assert.equal(response.body.error, 'factory_visual_evidence_required');
+      const blocked = await store.read('owner', f.task.id);
+      assert.equal(blocked.task.stage, 'execute');
+      assert.equal(blocked.task.status, 'blocked');
+      assert.equal(blocked.task.attemptId, f.task.attemptId);
+      assert.equal(blocked.refusal?.code, 'factory_visual_evidence_required');
+      assert.equal(blocked.candidates.length, 1);
+      assert.equal(blocked.candidates[0].runId, f.runId);
+      assert.equal(blocked.attempts.length, 1);
+      assert.equal(blocked.attempts.filter(a => ['review', 'approval', 'publish'].includes(a.stage)).length, 0);
+      const gate = blocked.attempts[0].output.evidenceGate;
+      assert.deepEqual(gate, { code: 'factory_visual_evidence_required', candidateId: blocked.task.candidateId,
+        sourceEventId: blocked.task.sourceEventId, eventId: factoryEventId('run-completion', f.runId) });
+      const refusedHistory = { ...before, attempt: { ...before.attempt, output: { ...before.attempt.output, evidenceGate: gate } } };
+      assert.deepEqual(await history(f.task.id, f.runId, f.task.attemptId), refusedHistory,
+        'only the host refusal is appended; the successful run, session, evidence and exhausted result stay unchanged');
+      const receipt = (await pool.query('SELECT request,result FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2',
+        [f.task.id, f.request.body.eventId])).rows[0];
+      assert.equal(receipt.request.kind, 'owner_completion_recovery');
+      assert.equal(receipt.result.task.status, 'blocked');
+      assert.equal(receipt.result.refusal?.code, 'factory_visual_evidence_required');
+      assert.equal(completedDispatches, 1);
+      assert.deepEqual(await handleFactory(human, f.request), response, 'refused completion recovery replays without another dispatch');
+      assert.equal(completedDispatches, 1);
+      const retry = await handleFactory(human, { ...f.request, body: { ...f.request.body,
+        binding: { taskId: blocked.task.id, revision: blocked.task.revision }, eventId: randomUUID(), reason: 'Record and submit the missing visual evidence' } });
+      assert.equal(retry.status, 200);
+      const pending = (await store.read('owner', f.task.id)).task;
+      assert.equal(pending.stage, 'execute');
+      assert.equal(pending.status, 'pending');
+      assert.equal(pending.candidateId, null, 'the replacement producer must create its own candidate');
+      assert.notEqual(pending.attemptId, f.task.attemptId);
+      const producer = await dispatch('owner', { binding: factoryBinding(pending), agentId, deviceRepoId: repoId });
+      assert.notEqual(producer.runId, f.runId);
+      const queued = (await pool.query('SELECT status,"sessionId",report FROM agent_runs WHERE id=$1', [producer.runId])).rows[0];
+      assert.deepEqual(queued, { status: 'queued', sessionId: null, report: null });
+      const restarted = await store.read('owner', f.task.id);
+      assert.equal(restarted.task.stage, 'execute');
+      assert.equal(restarted.task.status, 'running');
+      assert.equal(restarted.task.candidateId, null);
+      assert.equal(restarted.attempts.length, 2);
+      assert.ok(restarted.attempts.every(attempt => attempt.stage === 'execute'));
+      assert.deepEqual(await history(f.task.id, f.runId, f.task.attemptId), refusedHistory);
+      assert.deepEqual(await handleFactory(human, f.request), response, 'the old refusal remains replayable after a fresh producer starts');
+      assert.equal(completedDispatches, 1);
+    });
+
     await t.test('Profile Decision refusal preserves the submitted candidate, isolates Coordinator sweeps and retries only the unstarted check', async () => {
       const currentStore = createCurrentFactoryStore(pool, authorize, null, { independent: factoryCheckIndependent,
         gates: { ...factoryCheckGates, ...createFactoryApprovalGates() } });

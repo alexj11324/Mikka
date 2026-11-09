@@ -256,6 +256,43 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
       assert.deepEqual(await f.historical(), before)
     })
 
+    await t.test('Owner snapshot retry refuses missing producer media before creating a candidate or handing off', async () => {
+      const f = await fixture(true)
+      await pool.query('DELETE FROM run_captures WHERE "runId"=$1', [f.producerRunId])
+      const before = await f.historical()
+      const service = f.human()
+      const response = await handleFactory(service, f.request)
+      assert.equal(response.status, 409)
+      assert.ok(response.body && typeof response.body === 'object' && 'error' in response.body)
+      assert.equal(response.body.error, 'factory_visual_evidence_required')
+      const blocked = await f.store.read('owner', f.task.id)
+      assert.equal(blocked.task.stage, 'review')
+      assert.equal(blocked.task.status, 'blocked')
+      assert.equal(blocked.task.candidateId, f.oldCandidateId)
+      assert.equal(blocked.task.attemptId, f.oldReviewAttemptId)
+      assert.equal(blocked.candidates.length, 1)
+      assert.equal(blocked.attempts.filter(a => a.stage === 'approval').length, 0)
+      assert.equal(blocked.refusal?.code, 'factory_visual_evidence_required')
+      const current = blocked.attempts.find(a => a.id === f.oldReviewAttemptId)!
+      assert.deepEqual(current.output.evidenceGate, { code: 'factory_visual_evidence_required', candidateId: f.oldCandidateId })
+      const after = await f.historical()
+      for (const key of ['runs', 'questions', 'candidate', 'receipts'] as const) assert.deepEqual(after[key], before[key])
+      assert.deepEqual(after.attempts.filter(a => a.row.id !== f.oldReviewAttemptId), before.attempts.filter(a => a.row.id !== f.oldReviewAttemptId))
+      const previousAttempt = before.attempts.find(a => a.row.id === f.oldReviewAttemptId)!.row
+      const blockedAttempt = after.attempts.find(a => a.row.id === f.oldReviewAttemptId)!.row
+      assert.deepEqual(blockedAttempt, { ...previousAttempt, output: { ...previousAttempt.output, evidenceGate: current.output.evidenceGate } },
+        'only the current attempt receives the refusal; its prior result remains unchanged')
+      const receipt = (await pool.query('SELECT request,result FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [f.task.id, f.request.body.eventId])).rows[0]
+      assert.equal(receipt.request.kind, 'owner_deliverable_snapshot_recovery')
+      assert.equal(receipt.result.snapshotRecovery, undefined)
+      assert.equal(receipt.result.task.status, 'blocked')
+      assert.deepEqual(f.counts(), { observedCount: 1, releaseCount: 1, dispatchCount: 0, startCount: 0 })
+      const machine = (await pool.query('SELECT state,"workerLeaseId","workerLeaseUntil" FROM thread_machines WHERE "runId"=$1', [f.oldReviewId])).rows[0]
+      assert.deepEqual(machine, { state: 'paused', workerLeaseId: null, workerLeaseUntil: null })
+      assert.deepEqual(await handleFactory(service, f.request), response, 'the refused retry replays without another VM observation')
+      assert.deepEqual(f.counts(), { observedCount: 1, releaseCount: 1, dispatchCount: 0, startCount: 0 })
+    })
+
     await t.test('Owner Retry uses the original producer, makes one immutable receipt and independent candidate, and reaches real approval gates', async () => {
       const f = await fixture(), before = await f.historical()
       assert.equal(await resolveFactoryCandidateSha(pool, f.task, { id: f.oldCandidateId, kind: 'deliverable' }, null), null, 'an old baseline/checkpoint alone supplies no delivery SHA')

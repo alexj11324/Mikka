@@ -380,6 +380,94 @@ test('run result publication commits one owner-scoped result through retries and
       assert.equal(await receipt(f), undefined)
     })
 
+    for (const outcome of ['ready', 'failed'] as const) await t.test(`completion waits for its recording to become ${outcome} before the Factory evidence gate`, async () => {
+      const captures = await import('../lib/captures/store')
+      const { screenCaptures } = await import('../lib/captures/screen')
+      const { createFactoryStore } = await import('../lib/factory/store')
+      const f = await fixture({ approved: true }), stranger = await fixture()
+      const sessionId = randomUUID(), entered = deferred(), release = deferred()
+      await pool.query('UPDATE agent_runs SET "sessionId"=$2,"startedAt"=clock_timestamp() WHERE id=$1', [f.runId, sessionId])
+      await prepareRunPublication(assignment(f), f.remoteUrl)
+      const slot = await captures.openRecording({ userId: f.userId, runId: f.runId, issueId: f.issueId, botId: null },
+        { title: 'Synthetic completion-order recording', display: 1, stopsAt: new Date(Date.now() + 60_000) })
+      assert.ok(slot)
+      await captures.markRecordingStarted(slot.id)
+      const bytes = await readFile(new URL('./fixtures/factory-visual-evidence.mp4', import.meta.url))
+      const originalStop = screenCaptures.stopRunRecordings
+      let stops = 0, pending: ReturnType<typeof persistRunCompletion> | undefined
+      screenCaptures.stopRunRecordings = async runIds => {
+        assert.deepEqual(runIds, [f.runId])
+        stops++
+        const recording = await captures.currentRecording(f.runId)
+        assert.ok(recording)
+        const result = await captures.withRecordingFinalization(recording, async current => {
+          entered.resolve()
+          await release.promise
+          if (outcome === 'failed') throw new Error('Synthetic recording finalization failure')
+          return captures.finishRecording(current, { bytes, durationMs: 200, steps: [] })
+        })
+        assert.equal('error' in result, outcome === 'failed')
+      }
+      try {
+        assert.equal(await persistRunCompletion(stranger.userId, f.runId, completion(f)), null)
+        assert.equal(await persistRunCompletion(f.userId, f.runId, completion(f), stranger.deviceId), null)
+        assert.equal(stops, 0, 'wrong owner or device cannot stop the recording')
+        pending = persistRunCompletion(f.userId, f.runId, completion(f), f.deviceId)
+        await Promise.race([entered.promise, pending.then(() => { throw new Error('Completion escaped before recording finalization') })])
+        assert.deepEqual((await pool.query('SELECT status,report,"finishedAt" FROM agent_runs WHERE id=$1', [f.runId])).rows[0],
+          { status: 'running', report: null, finishedAt: null })
+        assert.deepEqual(await counts(f), { versions: 0, events: 0 }, 'terminal effects do not race an unfinished recording')
+        assert.equal((await receipt(f)).status, 'assigned')
+        assert.equal((await pool.query('SELECT "revokedAt" FROM run_tokens WHERE "runId"=$1', [f.runId])).rows.every(row => row.revokedAt === null), true)
+        release.resolve()
+        assert.equal((await pending)?.publicationPending, true)
+        assert.equal(stops, 1)
+      } finally {
+        release.resolve()
+        try { await pending } finally { screenCaptures.stopRunRecordings = originalStop }
+      }
+      const saved = (await pool.query(`SELECT c.status,c."updatedAt"<=r."finishedAt" AS "finishedBeforeRun"
+        FROM run_captures c JOIN agent_runs r ON r.id=c."runId" WHERE c.id=$1`, [slot.id])).rows[0]
+      assert.deepEqual(saved, { status: outcome, finishedBeforeRun: true })
+      const stored = await captures.readCapture(f.userId, slot.id)
+      if (outcome === 'ready') { assert.ok(stored); assert.deepEqual(Buffer.from(stored.bytes), bytes) }
+      else assert.equal(stored, null, 'failed finalization is never a readable visual capture')
+
+      // Bind the terminal producer to a real Factory candidate after completion,
+      // as the publication fixtures below do. This keeps the test free of queue
+      // adapters while exercising the production transactional evidence gate.
+      const taskId = randomUUID(), attemptId = randomUUID(), candidateId = randomUUID(), sourceEventId = randomUUID()
+      const environment = `device:${f.deviceId}`
+      const tx = await pool.connect()
+      try {
+        await tx.query('BEGIN')
+        await tx.query(`INSERT INTO coordinator_events(id,"userId","issueId",kind,"dedupeKey",payload)
+          VALUES($1::uuid,$2,$3,'user_message',$1::text,'{"text":"Synthetic recording-order task"}')`, [sourceEventId, f.userId, f.issueId])
+        await tx.query(`INSERT INTO factory_tasks(id,"userId","workspaceId","issueId","sourceEventId",route,stage,status,"attemptId",reason)
+          VALUES($1,$2,$3,$4,$5,'{"flowVersion":2}','execute','running',$6,'Recording-order fixture')`,
+          [taskId, f.userId, f.workspaceId, f.issueId, sourceEventId, attemptId])
+        await tx.query(`INSERT INTO factory_candidates(id,"taskId",sha,repository,environment,scope,"runId")
+          VALUES($1,$2,$3,$4,$5,$6,$7)`, [candidateId, taskId, 'a'.repeat(40), f.remoteKey, environment, `issue:${f.issueId}`, f.runId])
+        await tx.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,"candidateId","runId","sessionId",reason)
+          VALUES($1,$2,'execute',1,1,'running',$3,$4,$5,'Recording-order fixture')`, [attemptId, taskId, candidateId, f.runId, sessionId])
+        await tx.query('UPDATE factory_tasks SET "candidateId"=$2 WHERE id=$1', [taskId, candidateId])
+        await tx.query('COMMIT')
+      } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
+      const store = createFactoryStore(pool, async (userId, issueId, client) =>
+        (await client.query('SELECT id FROM issues WHERE id=$1 AND "userId"=$2', [issueId, userId])).rowCount === 1, null, {})
+      const before = await store.read(f.userId, taskId)
+      const result = await store.apply(f.userId, { taskId, revision: before.task.revision }, randomUUID(), {
+        action: 'finish', status: 'passed', reason: 'Evaluate persisted producer after recording finalization',
+        evidence: [{ artifact: `run-report:${f.runId}`, kind: 'report', runId: f.runId, sessionId, candidateId,
+          sha: 'a'.repeat(40), environment, recordedAt: new Date().toISOString() }], output: { runId: f.runId },
+      })
+      assert.equal(result.task.stage, 'execute')
+      assert.equal(result.task.status, outcome === 'ready' ? 'passed' : 'blocked')
+      assert.equal(result.refusal?.code, outcome === 'failed' ? 'factory_visual_evidence_required' : undefined)
+      assert.equal((await store.read(f.userId, taskId)).task.status, result.task.status, 'the gate outcome commits durably')
+      assert.equal(result.attempts.some(attempt => attempt.stage === 'approval'), false)
+    })
+
     await t.test('concurrent completions and workers create one PR, one history row, and one chat event', async () => {
       const f = await fixture({ approved: true })
       const pinned = await prepareRunPublication(assignment(f), f.remoteUrl)

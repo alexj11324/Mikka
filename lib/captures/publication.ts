@@ -12,7 +12,11 @@ type Query = Pick<PoolClient, 'query'>
 type Identity = { userId: string; issueId: string; runId: string; sha: string }
 type Current = Identity & { taskId: string; candidateId: string; visualEvidence: unknown }
 type Capture = { id: string; kind: 'image' | 'video'; contentType: PublicCapture['contentType']; size: number; durationMs: number | null; sha256: string }
-const rejected = () => new PublicationError('factory_public_evidence_required')
+const rejected = (cause?: unknown) => {
+  const error = new PublicationError('factory_public_evidence_required')
+  if (cause !== undefined) error.cause = cause
+  return error
+}
 const hashToken = (value: string) => createHash('sha256').update(value).digest('hex')
 const receiptId = (runId: string) => factoryEventId('pr-visual-evidence', runId)
 const sameIdentity = (receipt: PublicationEvidence, current: Current) =>
@@ -54,10 +58,10 @@ async function validateReceipt(tx: Query, receipt: PublicationEvidence, current:
     if (!token) throw rejected()
     const { rows } = await tx.query(`SELECT c.id FROM run_captures c
       JOIN run_capture_shares s ON s."captureId"=c.id AND s."createdBy"=$3 AND s."tokenHash"=$4 AND s."revokedAt" IS NULL
-      WHERE c.id=$1 AND c."runId"=$2 AND c."userId"=$3 AND c.status='ready'
+      WHERE c.id=$1 AND c."runId"=$2 AND c."userId"=$3 AND c.status='ready' AND (c."issueId" IS NULL OR c."issueId"=$10)
         AND c.kind=$5 AND c."contentType"=$6 AND c.sha256=$7 AND c.size=$8
         AND c."durationMs" IS NOT DISTINCT FROM $9 ${lock ? 'FOR SHARE OF c,s' : ''}`,
-    [capture.captureId, receipt.runId, receipt.userId, hashToken(token), capture.kind, capture.contentType, capture.sha256, capture.size, capture.durationMs])
+    [capture.captureId, receipt.runId, receipt.userId, hashToken(token), capture.kind, capture.contentType, capture.sha256, capture.size, capture.durationMs, receipt.issueId])
     if (rows.length !== 1) throw rejected()
   }
 }
@@ -84,8 +88,8 @@ export async function prepareFactoryPublicationEvidence(pool: Pick<Pool, 'connec
     if (!origin || !declarations.length || new Set(declarations.map(ref => ref.captureId)).size !== declarations.length) throw rejected()
     const captureIds = declarations.map(ref => ref.captureId).sort()
     const { rows } = await tx.query<Capture>(`SELECT id,kind,"contentType",size,"durationMs",sha256 FROM run_captures
-      WHERE id=ANY($1::uuid[]) AND "runId"=$2 AND "userId"=$3 AND status='ready' ORDER BY id FOR SHARE`,
-    [captureIds, identity.runId, identity.userId])
+      WHERE id=ANY($1::uuid[]) AND "runId"=$2 AND "userId"=$3 AND ("issueId" IS NULL OR "issueId"=$4) AND status='ready' ORDER BY id FOR SHARE`,
+    [captureIds, identity.runId, identity.userId, identity.issueId])
     if (rows.length !== captureIds.length) throw rejected()
     const captures: PublicCapture[] = []
     for (const row of rows) {
@@ -94,7 +98,7 @@ export async function prepareFactoryPublicationEvidence(pool: Pick<Pool, 'connec
       const token = `mkc_${randomBytes(24).toString('base64url')}`
       let url: string
       try { url = new URL(withBasePath(`/api/captures/shared/${token}`), origin).href }
-      catch { throw rejected() }
+      catch (error) { throw rejected(error) }
       if (!publicCaptureToken(url)) throw rejected()
       const capture: PublicCapture = { captureId: row.id, kind: row.kind, contentType: row.contentType,
         size: row.size, durationMs: row.durationMs, sha256: row.sha256, url }

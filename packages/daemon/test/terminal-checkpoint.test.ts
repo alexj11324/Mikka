@@ -1,15 +1,16 @@
-import { readFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, readFileSync, readdirSync, truncateSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { gunzipSync } from 'node:zlib'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { RunCheckpoint, RunCheckpointReceipt, RunCompletion, StopReason } from '@mikka/protocol'
 import type { AgentAdapter, AgentEvent, ExitEvent, StartOptions } from '../src/adapters/types'
+import { CaptureUploader } from '../src/captures'
 import { createLogger } from '../src/log'
 import type { OutboxItem } from '../src/outbox'
 import { RunJournal } from '../src/runs/journal'
 import { RunSupervisor, type SupervisorDeps } from '../src/runs/supervisor'
 import { WorktreeManager } from '../src/worktrees'
-import { cleanupTempDirs, makeRepo, tempDir } from './helpers'
+import { cleanupTempDirs, makeRepo, tempDir, waitFor } from './helpers'
 
 afterEach(() => { vi.restoreAllMocks(); cleanupTempDirs() })
 
@@ -20,7 +21,7 @@ function deferred<T = void>() {
 }
 
 async function fixture(exit: ExitEvent = { type: 'exit', outcome: 'succeeded', stopReason: 'asked_human' },
-  events?: () => AsyncIterable<AgentEvent>, finishing?: Pick<SupervisorDeps, 'captures'>) {
+  events?: () => AsyncIterable<AgentEvent>, finishing?: Pick<SupervisorDeps, 'captures' | 'publisher'>) {
   const root = tempDir(), repo = await makeRepo(), runId = 'terminal-run'
   const journal = new RunJournal(join(root, 'journal.json'))
   const entered = deferred<StartOptions>(), release = deferred()
@@ -187,6 +188,79 @@ it('does not certify retirement when capture upload fails after the CLI exits', 
     // Preserve the workspace even though the remaining artifact is not durable.
     expect(f.save).toHaveBeenCalledOnce()
   } finally { f.release.resolve(); await f.supervisor.stop() }
+})
+
+it('cancels capture work at the final deadline and waits for cleanup before reporting completion', async () => {
+  const uploading = deferred(), cleanup = deferred()
+  let uploadSignal: AbortSignal | undefined
+  let expire: (() => void) | undefined
+  const schedule = setTimeout
+  const f = await fixture(undefined, undefined, { captures: { async flush(_runId, _existingOnly, signal) {
+    uploadSignal = signal
+    uploading.resolve()
+    await cleanup.promise
+    signal?.throwIfAborted()
+  } } })
+  try {
+    await f.entered.promise
+    // Capture only the final budget; git and the run's other I/O keep real timers.
+    const timer = vi.spyOn(globalThis, 'setTimeout').mockImplementation((callback, delay, ...args) => {
+      if (delay === 60_000) expire = () => callback(...args)
+      return schedule(callback, delay, ...args)
+    })
+    f.release.resolve()
+    await uploading.promise
+    expect(expire).toBeDefined()
+    expire!()
+    await Promise.resolve()
+    expect(uploadSignal?.aborted).toBe(true)
+    expect(f.completion()).toBeUndefined()
+    expect(f.save).not.toHaveBeenCalled()
+    timer.mockRestore()
+    cleanup.resolve()
+    await f.supervisor.idle()
+    expect(f.completion()?.stopReason).toBe('error')
+    expect(f.completion()?.report.summary).toBe('Capture finalization deadline exceeded')
+    expect(f.completion()?.report.safePoint).toBeUndefined()
+  } finally { f.release.resolve(); cleanup.resolve(); await f.supervisor.stop() }
+})
+
+it('drains real video preparation after report failure before an error completion can close the upload fence', async () => {
+  const dir = tempDir('capture-report-error-'), pending = tempDir('capture-report-error-pending-')
+  const id = '00000000-0000-4000-8000-000000000001', source = join(dir, `${id}.mp4`)
+  const bytes = readFileSync(new URL('../../../tests/fixtures/factory-visual-evidence.mp4', import.meta.url))
+  writeFileSync(source, bytes)
+  const atomSize = 200_000_001, header = Buffer.alloc(8)
+  header.writeUInt32BE(atomSize); header.write('free', 4)
+  appendFileSync(source, header); truncateSync(source, bytes.length + atomSize)
+  writeFileSync(join(dir, `${id}.json`), JSON.stringify({ title: 'Synthetic cancellation fixture' }))
+  const begin = vi.fn(async () => ({ captureId: id, upload: { target: 'server' as const } }))
+  const uploader = new CaptureUploader(() => dir, {
+    beginCapture: begin, sendCapture: async () => undefined, completeCapture: async () => ({} as never),
+  }, createLogger({ level: 'silent' }), pending)
+  const flush = vi.spyOn(uploader, 'flush'), pendingDir = join(pending, 'terminal-run')
+  const snapshot = vi.fn(async () => { throw new Error('Report snapshot failed') })
+  const f = await fixture(undefined, async function* () {
+    yield { type: 'chunk', chunk: { type: 'tool-output-available', toolCallId: 'capture', output: 'queued' } }
+    await waitFor(() => existsSync(pendingDir) && readdirSync(pendingDir).some(name => name.startsWith('.capture-process-')), 15_000, 1)
+    yield { type: 'exit', outcome: 'succeeded', stopReason: 'submitted' }
+  }, { captures: uploader, publisher: { snapshot, publish: async () => { throw new Error('Unexpected publication') } } })
+  try {
+    await f.entered.promise
+    f.release.resolve()
+    await f.supervisor.idle()
+    await flush.mock.results[0]?.value
+    expect(snapshot).toHaveBeenCalledOnce()
+    expect(f.completion()?.stopReason).toBe('error')
+    expect(f.completion()?.report.summary).toBe('Report snapshot failed')
+    expect(f.completion()?.report.safePoint).toBeUndefined()
+    expect(begin).not.toHaveBeenCalled()
+    expect(existsSync(source)).toBe(true)
+    expect(readdirSync(pendingDir)).toEqual([])
+  } finally {
+    f.release.resolve(); await f.supervisor.stop()
+    await Promise.all(flush.mock.results.map(result => result.value?.catch(() => undefined)))
+  }
 })
 
 it('does not certify a session detached after ignoring cancellation', async () => {

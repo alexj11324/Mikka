@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import type { Metafile } from 'esbuild'
 import { afterAll, beforeAll, expect, it } from 'vitest'
+import { CAPTURE_TOOLCHAIN, CAPTURE_TOOLS_ROOT } from '../src/agents/capture-video.mjs'
 
 const root = mkdtempSync(join(tmpdir(), 'mikka-probe-bundle-'))
 const source = join(root, 'releases', 'fixture', 'source')
@@ -140,6 +141,12 @@ it('only the actual notice-capable worker builder emits its release capability',
     process.env.MIKKA_CLOUD_WORKER_BUILD_SHA = workerSha
     const built = await buildCloudWorker(capabilityOut)
     expect(Object.keys(built.inputs)).toContain('src/cloud-registration.ts')
+    expect(Object.keys(built.inputs)).toContain('src/agents/capture-video.mjs')
+    // The compiled worker selects the same immutable pair as the standalone
+    // helper copied to the computer VM, rather than assuming a system PATH.
+    const workerBundle = readFileSync(join(capabilityOut, 'cloud-worker.js'), 'utf8')
+    expect(workerBundle).toContain(CAPTURE_TOOLS_ROOT)
+    expect(workerBundle).toContain(CAPTURE_TOOLCHAIN.id)
     expect(JSON.parse(readFileSync(capability, 'utf8'))).toEqual({ registrationNoticeVersion: 1, workerSha })
     expect(statSync(capability).mode & 0o777).toBe(0o444)
     // A legacy installer does not supply this identity. The new builder must

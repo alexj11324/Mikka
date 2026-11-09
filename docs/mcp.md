@@ -177,14 +177,22 @@ the full timeline. Inputs can be up to 1 GB; final MP4s remain at most 100 MB an
 one hour for local captures (cloud recordings keep their existing 300-second
 limit). Oversized output is recompressed with a bitrate budget and smaller
 frame size, never truncated to fit. Processing failure publishes no ready file.
-Local daemons need `ffmpeg` and `ffprobe` on PATH. Cloud processing runs in the
-existing computer, not the web server. No second media store is introduced.
+Local daemons need `ffmpeg` and `ffprobe` on PATH. Official cloud runtimes install
+the paired tools under a versioned `/opt/mikka/runtime/capture-tools` directory
+on both initial installation and worker staging. The source pins the upstream
+asset IDs, compressed bytes and executable SHA-256 digests; installation verifies
+them and leaves official files and system PATH unchanged. Both the daemon and
+the standalone computer helper use that private pair. Cloud processing runs in
+the existing computer, not the web server. No second media store is introduced.
 
 `submit_capture` returns a stable `{captureId,status:"queued"}` before upload;
 queued is not ready. The daemon drains captures before submitting completion,
 and cloud completion awaits recording finalization. Independent application
 instances serialize finalization through PostgreSQL so a second stop cannot
 discard another instance's input or mark its valid output failed.
+The terminal deadline cancels and drains hashing, processing and upload through
+one abort signal. A failed publication retains its queue for recovery and cannot
+be reported as a completed capture checkpoint.
 
 Before PR publication, inspect the captured pixels for credentials and personal
 data. Existing title, step and report masking does not redact pixels. Use safe
@@ -200,5 +208,9 @@ The host adds a managed `## Visual verification` block to the PR, preserving
 human text and the final Mikka issue marker. The acceptance Artifact and task
 conversation keep authenticated capture URLs. `FactoryFlowView.acceptance.media`
 carries `captureId`, `kind`, `contentType`, `size`, `durationMs`, `url` and candidate
-metadata for the existing clients' inline image/video rendering. The backend
-contract does not change the client renderer or grant automatic merge authority.
+metadata for the existing clients' inline image/video rendering. The task's
+[activity snapshot](factory/task-activity-v1.md) supplies its state and historical
+submissions together. Clients identify a submission by task and activity item ID,
+read media through its task media URL, and download reports at their submitted
+Artifact version. Display titles and the Artifact's latest version are not
+submission identities. These evidence reads grant no automatic merge authority.

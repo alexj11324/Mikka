@@ -12,6 +12,7 @@ import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/wo
 import { connectGitHub, githubAppStub, recordPushGrant } from './support/github-app-stub'
 import { fakeThreadMachines } from './support/thread-machine-fake'
 import { isolateCoordinatorWakes } from './support/coordinator-wake'
+import { addFactoryVisualEvidence } from './helpers/factory-visual-evidence'
 
 mock.module('next-intl/server',{namedExports:{getLocale:async()=> 'en',getTranslations:async()=> (key:string)=> key}})
 mock.module('next/headers',{namedExports:{cookies:async()=>({get:()=>undefined}),headers:async()=>new Headers()}})
@@ -514,7 +515,8 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
       const client = await appPool.connect()
       try {
         await client.query('BEGIN')
-        await client.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"='producer-session',report=$2,"finishedAt"=clock_timestamp() WHERE id=$1`, [producer.runId, JSON.stringify({ sourceCommit:'a'.repeat(40), deliverableCommit:'b'.repeat(40), verify:{status:'not_run'} })])
+        await client.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"='producer-session',report=$2,"startedAt"=COALESCE("startedAt",clock_timestamp()-interval '1 second'),"finishedAt"=clock_timestamp() WHERE id=$1`, [producer.runId, JSON.stringify({ sourceCommit:'a'.repeat(40), deliverableCommit:'b'.repeat(40), verify:{status:'not_run'} })])
+        await addFactoryVisualEvidence(client, producer.runId)
         const candidate = await runtime.store.apply(personState.id, factoryBinding(task), randomUUID(), { action:'candidate',runId:producer.runId,
           candidate:{kind:'deliverable',sha:null,repository:source.repoPath,environment:`device:${source.deviceId}`,scope:`issue:${issueId}`} }, client)
         const finished = await runtime.store.apply(personState.id, factoryBinding(candidate.task), randomUUID(), { action:'finish',status:'passed',reason:'Synthetic completed delivery',output:{runId:producer.runId},
@@ -592,6 +594,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
       const assignment = check ? await factoryCheckAssignment(pool as never, personState.id, runId) : null
       if (assignment) { assert.equal(assignment.factoryCheck.reportOnly, true); assert.equal(assignment.baseBranch, sha, 'the checker inspects the actual delivery snapshot, not the original source commit') }
       await pool.query(`UPDATE agent_runs SET status='running',"sessionId"=$2,"startedAt"=clock_timestamp()-interval '1 second' WHERE id=$1`, [runId, `desktop-${runId}`])
+      if (!check) await addFactoryVisualEvidence(pool, runId)
       const { persistRunCompletion } = await import('../lib/run-publications')
       await persistRunCompletion(personState.id, runId, { stopReason:'submitted', report: {
         sourceCommit: assignment ? assignment.baseBranch : 'a'.repeat(40), ...(!check ? { deliverableCommit: sha } : {}), summary: 'Inspected the desktop delivery and its evidence.', filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null,

@@ -153,7 +153,7 @@ export interface SupervisorDeps {
   baseRef: (assignment: RunAssignment) => Promise<string>
   log: Logger
   /** Uploads what the run's agent queued with `submit_capture` (`captures.ts`). */
-  captures?: { flush(runId: string): Promise<void> }
+  captures?: { flush(runId: string, existingOnly?: boolean, signal?: AbortSignal): Promise<void> }
   revalidateSkillAssignment?:(assignment:RunAssignment)=>Promise<SkillReceiptRevalidation>
   /** Watchdog: no progress for this long stops the run (`timeout`). */
   stallMs?: number
@@ -1149,14 +1149,20 @@ export class RunSupervisor {
     })
   }
 
-  /** Waits for the run's capture uploads, but never longer than a minute. */
-  private async flushCaptures(runId: string): Promise<boolean> {
+  /** One minute for preparation and upload; cancellation drains before the terminal event. */
+  private async flushCaptures(runId: string, signal: AbortSignal): Promise<boolean> {
     if (!this.deps.captures) return true
-    let timer: NodeJS.Timeout | undefined
-    return Promise.race([
-      this.deps.captures.flush(runId).then(() => true),
-      new Promise<boolean>((resolve) => { timer = setTimeout(() => resolve(false), 60_000) }),
-    ]).finally(() => clearTimeout(timer))
+    const deadline = new AbortController()
+    const finishing = AbortSignal.any([signal, deadline.signal])
+    const timer = setTimeout(() => deadline.abort(new Error('Capture finalization deadline exceeded')), 60_000)
+    try {
+      await this.deps.captures.flush(runId, false, finishing)
+      finishing.throwIfAborted()
+      return true
+    } catch (error) {
+      if (signal.aborted) return false
+      throw error
+    } finally { clearTimeout(timer) }
   }
 
   /** Only the local lease and pushed stop state govern host finishing work. */
@@ -1412,9 +1418,14 @@ export class RunSupervisor {
       .catch(async (error: unknown) => {
         run.repositoryPreparing?.refuseEffects(error)
         run.repositoryPreparing?.abort.abort()
-        // Start both drains before joining: a native preparation can still
+        // A failed report/verify bypasses the normal final flush. Cancel and
+        // drain earlier capture work before its terminal event closes uploads.
+        // Start the independent drains together: native preparation can still
         // be waiting on its mailbox while the Git child is being reaped.
-        await Promise.all([run.repositoryPreparing?.done.catch(() => undefined), this.closePrepared(run)])
+        await Promise.all([run.repositoryPreparing?.done.catch(() => undefined), this.closePrepared(run),
+          Promise.resolve().then(() => this.deps.captures?.flush(runId, false,
+            AbortSignal.abort(new Error('Capture finalization cancelled')))).catch(() => undefined),
+        ])
         run.runtimeTiming?.finishing()
         const message = error instanceof Error ? error.message : String(error)
         this.deps.log.error({ run_id: runId, err: this.logError(runId, error) }, "run failed")
@@ -1979,7 +1990,7 @@ export class RunSupervisor {
           stopReason = stopReasonOf(event, run, assignment)
         }
         // Captures go up before the run reports its end; a stopping daemon does not wait for them.
-        const capturesSaved = !this.stopping && await this.flushCaptures(runId)
+        const capturesSaved = !this.stopping && await this.flushCaptures(runId, finishingSignal)
         stopReason = stopReasonOf(event, run, assignment)
         const checkpoint = await this.saveTerminalCheckpoint(runId, run, capturesSaved)
         if (stopReason === "provider_failure" || stopReason === "quota_exhausted") report = { ...report, providerCheckpoint: checkpoint.checkpoint }

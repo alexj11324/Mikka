@@ -13,6 +13,27 @@ import { promisify } from 'node:util'
 const execute = promisify(execFile)
 export const CAPTURE_RAW_MAX_BYTES = 1_000_000_000
 export const CAPTURE_VIDEO_MAX_BYTES = 100_000_000
+// Reuse ffmpeg-static@5.3.0's upstream release, including its matching ffprobe.
+// The tag is b6.1.1; these Linux assets actually report 7.0.2-static. Pin their
+// bytes, not the tag's display name. This module is also copied by itself into
+// computer VMs, so the immutable private path must not need another JS file.
+export const CAPTURE_TOOLCHAIN = {
+  id: 'ffmpeg-static-b6.1.1-linux-x64-e7e7fb30477f-4f231a1960d8',
+  release: 'https://github.com/eugeneware/ffmpeg-static/releases/tag/b6.1.1',
+  version: '7.0.2-static',
+  assets: {
+    ffmpeg: { assetId: 316528626, gzip: true, downloadBytes: 29354986, downloadSha256: 'bfe8a8fc511530457b528c48d77b5737527b504a3797a9bc4866aeca69c2dffa',
+      bytes: 79826272, sha256: 'e7e7fb30477f717e6f55f9180a70386c62677ef8a4d4d1a5d948f4098aa3eb99' },
+    ffprobe: { assetId: 316529539, gzip: true, downloadBytes: 29276839, downloadSha256: '25d9b6ccb05e3d9de9e04e31e2506d8dd7f9f0418981965ac6df12e8d3afd067',
+      bytes: 79665792, sha256: '4f231a1960d83e403d08f7971e271707bec278a9ae18e21b8b5b03186668450d' },
+    LICENSE: { assetId: 316529924, gzip: false, downloadBytes: 35147, downloadSha256: '8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903',
+      bytes: 35147, sha256: '8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903' },
+    README: { assetId: 316529927, gzip: false, downloadBytes: 2235, downloadSha256: '72f4b1b06d419d22ace6e7cc75f06826f90737345aa0b1736158929f4aacc537',
+      bytes: 2235, sha256: '72f4b1b06d419d22ace6e7cc75f06826f90737345aa0b1736158929f4aacc537' },
+  },
+}
+export const CAPTURE_TOOLS_ROOT = '/opt/mikka/runtime/capture-tools'
+export const CAPTURE_TOOLS_DIRECTORY = `${CAPTURE_TOOLS_ROOT}/${CAPTURE_TOOLCHAIN.id}`
 const MAX_STEPS = 200
 const MAX_DURATION_MS = 3_600_000
 const PADDING_BEFORE_MS = 1_000
@@ -20,6 +41,23 @@ const PADDING_AFTER_MS = 1_500
 
 export class CaptureVideoError extends Error {
   constructor(code, options) { super(code, options); this.name = 'CaptureVideoError'; this.code = code }
+}
+
+/** Ordinary local daemons retain their documented PATH dependency. An
+ * installed private runtime is complete, root-owned and not task-writable;
+ * never silently mix one private binary with another found on PATH. */
+export async function captureVideoBinaries({ directory = CAPTURE_TOOLS_DIRECTORY, ownerId = 0 } = {}) {
+  const info = await lstat(directory).catch(error => { if (error.code === 'ENOENT') return null; throw error })
+  if (!info) return { ffmpeg: 'ffmpeg', ffprobe: 'ffprobe' }
+  try {
+    if (!info.isDirectory() || info.uid !== ownerId || (info.mode & 0o022)) throw new Error('Private capture tools directory is unsafe')
+    const binaries = { ffmpeg: join(directory, 'ffmpeg'), ffprobe: join(directory, 'ffprobe') }
+    for (const path of Object.values(binaries)) {
+      const binary = await lstat(path)
+      if (!binary.isFile() || binary.uid !== ownerId || (binary.mode & 0o022) || !(binary.mode & 0o111)) throw new Error('Private capture tool is unsafe')
+    }
+    return binaries
+  } catch (error) { throw new CaptureVideoError('captureVideoDependencyUnavailable', { cause: error }) }
 }
 
 /** atMs is the action's completion point; durationMs is actual execution time. */
@@ -73,7 +111,8 @@ export function remapRecordingSteps(rawSteps, windows, durationMs) {
   return normalizeRecordingSteps(rawSteps).map(step => ({ ...step, atMs: point(step.atMs) }))
 }
 
-async function snapshot(source, destination) {
+async function snapshot(source, destination, signal) {
+  signal?.throwIfAborted()
   const handle = await open(source, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
   try {
     const info = await handle.stat()
@@ -85,7 +124,7 @@ async function snapshot(source, destination) {
     if (!mp4 && !webm) throw new CaptureVideoError('captureVideoInputInvalid')
     const hash = createHash('sha256'), stream = handle.createReadStream({ autoClose: false, start: 0, end: info.size - 1 })
     stream.on('data', bytes => hash.update(bytes))
-    await pipeline(stream, createWriteStream(destination, { flags: 'wx', mode: 0o600 }))
+    await pipeline(stream, createWriteStream(destination, { flags: 'wx', mode: 0o600 }), { signal })
     if ((await stat(destination)).size !== info.size) throw new CaptureVideoError('captureVideoInputChanged')
     return { size: info.size, sha256: hash.digest('hex') }
   } finally { await handle.close() }
@@ -105,6 +144,7 @@ export async function processCaptureVideo(input, output, options = {}) {
     throw new CaptureVideoError('captureVideoOptionsInvalid')
   const steps = normalizeRecordingSteps(options.steps)
   const deadline = Date.now() + Math.min(options.timeoutMs ?? 90_000, 180_000)
+  const binaries = await captureVideoBinaries()
   await mkdir(dirname(output), { recursive: true, mode: 0o700 })
   const temporary = await mkdtemp(join(dirname(output), '.capture-process-'))
   await chmod(temporary, 0o700)
@@ -113,10 +153,11 @@ export async function processCaptureVideo(input, output, options = {}) {
     const remaining = deadline - Date.now()
     if (remaining <= 0) throw new CaptureVideoError('captureVideoProcessingTimeout')
     try { return await execute(binary, args, { timeout: remaining, maxBuffer: 256 * 1024, signal: options.signal, windowsHide: true }) }
-    catch (error) { throw new CaptureVideoError('captureVideoProcessingFailed', { cause: error }) }
+    catch (error) { throw new CaptureVideoError(['ENOENT', 'EACCES', 'ENOEXEC'].includes(error.code)
+      ? 'captureVideoDependencyUnavailable' : 'captureVideoProcessingFailed', { cause: error }) }
   }
   const probe = async path => {
-    const { stdout } = await run('ffprobe', ['-v', 'error', '-protocol_whitelist', 'file,pipe', '-format_whitelist', 'mov,matroska,webm',
+    const { stdout } = await run(binaries.ffprobe, ['-v', 'error', '-protocol_whitelist', 'file,pipe', '-format_whitelist', 'mov,matroska,webm',
       '-select_streams', 'v:0', '-show_entries', 'format=duration:stream=width,height,duration,nb_frames', '-of', 'json', path])
     let value
     try { value = JSON.parse(stdout) } catch (error) { throw new CaptureVideoError('captureVideoProbeInvalid', { cause: error }) }
@@ -128,7 +169,7 @@ export async function processCaptureVideo(input, output, options = {}) {
   }
   try {
     const source = join(temporary, 'source.video')
-    const originalFile = await snapshot(input, source)
+    const originalFile = await snapshot(input, source, options.signal)
     const original = await probe(source)
     const windows = recordingWindows(original.durationMs, steps)
     const retainedMs = windows.reduce((total, window) => total + window.endMs - window.startMs, 0)
@@ -136,7 +177,7 @@ export async function processCaptureVideo(input, output, options = {}) {
     const base = ['-y', '-nostdin', '-hide_banner', '-loglevel', 'error', '-threads', '2', '-filter_complex_threads', '1',
       '-protocol_whitelist', 'file,pipe', '-format_whitelist', 'mov,matroska,webm', '-i', source]
     const encode = async (width, fps, rate, pass) => {
-      await run('ffmpeg', [...base, '-filter_complex', videoFilter(windows, width, fps), '-map', '[out]',
+      await run(binaries.ffmpeg, [...base, '-filter_complex', videoFilter(windows, width, fps), '-map', '[out]',
         '-map_metadata', '-1', '-map_chapters', '-1', '-an', '-sn', '-dn', '-c:v', 'libx264', '-preset', 'veryfast',
         '-threads', '2', '-pix_fmt', 'yuv420p', ...(rate ? ['-b:v', `${rate}k`, '-pass', String(pass), '-passlogfile', join(temporary, 'pass')] : ['-crf', '28']),
         ...(pass === 1 ? ['-f', 'null', devNull] : ['-movflags', '+faststart', result])])
@@ -162,6 +203,7 @@ export async function processCaptureVideo(input, output, options = {}) {
     await chmod(result, 0o600)
     // Never follow an existing destination link.
     if (await lstat(output).catch(() => null)) throw new CaptureVideoError('captureVideoOutputExists')
+    options.signal?.throwIfAborted()
     await rename(result, output)
     return { durationMs: measured.durationMs, size, steps: remapRecordingSteps(steps, windows, measured.durationMs),
       processing: { version: 1, originalDurationMs: original.durationMs, originalSize: originalFile.size, originalSha256: originalFile.sha256, trimmedMs: original.durationMs - retainedMs,

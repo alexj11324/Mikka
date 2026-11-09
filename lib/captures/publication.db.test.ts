@@ -19,6 +19,7 @@ import { observePoolCommits } from '../db/commit-effects'
 import { coordinatorWakeTransport } from '../coordinator/wake-after-commit'
 import { assertFactoryPublicationEvidence, factoryPublicationEvidenceReady, prepareFactoryPublicationEvidence, withFactoryPublicationEvidence } from './publication'
 import { publicCaptureToken } from './publication-contract'
+import { seedWorkspace } from '../../tests/support/workspace-admin-db'
 
 const connection = process.env.E2E_DATABASE_URL
 if (connection) {
@@ -58,7 +59,8 @@ test('Factory public capture receipts bind the current producer and the acknowle
     await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,'Fixture','capture-publication@example.invalid',true,now(),now())`, [userId])
     await pool.query(`INSERT INTO devices(id,"ownerId",name) VALUES($1,$2,'Fixture computer')`, [deviceId,userId])
     await pool.query(`INSERT INTO agents(id,"userId","deviceId",name,harness) VALUES($1,$2,$3,'Fixture agent','codex')`, [agentId,userId,deviceId])
-    await pool.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,'Factory')`, [botId,userId,randomUUID()])
+    const workspace = await seedWorkspace(pool,userId,[{userId,role:'admin'}])
+    await pool.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,'Factory')`, [botId,userId,workspace.id])
     const videoBytes = await readFile(new URL('../../tests/fixtures/factory-visual-evidence.mp4', import.meta.url))
     const fixture = async (declaration: 'safe' | 'missing' | 'false' = 'safe'): Promise<Fixture> => {
       const f: Fixture = { taskId:randomUUID(),candidateId:randomUUID(),attemptId:randomUUID(),issueId:randomUUID(),runId:randomUUID(),captureId:randomUUID(),sourceEventId:randomUUID(),userId,sha }
@@ -70,7 +72,7 @@ test('Factory public capture receipts bind the current producer and the acknowle
         criteria:[{text:'The real request succeeds',passed:true,evidence:`run-capture:${f.captureId}`}],
         ...(declaration === 'missing' ? {} : {visualEvidence:[{captureId:f.captureId,publicSafe:declaration === 'safe'}]}) }
       await inTransaction(async tx => {
-        await tx.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Backend evidence','{"type":"doc","content":[]}','todo','normal')`, [f.issueId,userId])
+        await tx.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId") VALUES($1,$2,'Backend evidence','{"type":"doc","content":[]}','todo','normal',$3)`, [f.issueId,userId,workspace.id])
         await tx.query(`INSERT INTO agent_runs(id,"userId","issueId","agentId","deviceId",status,"stopReason","sessionId",prompt,report,"startedAt","finishedAt")
           VALUES($1,$2,$3,$4,$5,'succeeded','submitted','fixture-session','Verify backend',$6,now()-interval '1 minute',now())`, [f.runId,userId,f.issueId,agentId,deviceId,JSON.stringify(report)])
         await tx.query(`INSERT INTO factory_tasks(id,"userId","issueId","sourceEventId","botId",route,stage,status,"attemptId",reason)
@@ -132,6 +134,31 @@ test('Factory public capture receipts bind the current producer and the acknowle
       await pool.query(`UPDATE agent_runs SET report=jsonb_set(report,'{visualEvidence}',$2::jsonb) WHERE id=$1`, [current.runId,JSON.stringify([{captureId:current.captureId,publicSafe:true}])])
       await pool.query(`UPDATE run_captures SET status='failed' WHERE id=$1`, [current.captureId])
       await assert.rejects(prepare(current), refusal)
+    })
+
+    await t.test('a conflicting capture issue blocks preparation, saved receipt replay and the GitHub write', async () => {
+      const current = await fixture(), foreign = await fixture()
+      await pool.query('UPDATE run_captures SET "issueId"=$2 WHERE id=$1',[current.captureId,foreign.issueId])
+      await assert.rejects(prepare(current),refusal)
+      assert.equal(await shareCount(current),0,'preparation cannot share a capture naming another issue')
+      assert.equal((await pool.query('SELECT count(*) FROM factory_events WHERE "taskId"=$1',[current.taskId])).rows[0].count,'0')
+      await pool.query('UPDATE run_captures SET "issueId"=$2 WHERE id=$1',[current.captureId,current.issueId])
+      const receipt = await prepare(current)
+      await pool.query(`UPDATE run_publications SET status='published',"pullRequest"=$2 WHERE "runId"=$1`,
+        [current.runId,JSON.stringify({url:'https://github.com/owner/repo/pull/77',evidenceDigest:receipt.digest})])
+      assert.equal(await factoryPublicationEvidenceReady(pool,await task(current)),true)
+      await pool.query('UPDATE run_captures SET "issueId"=$2 WHERE id=$1',[current.captureId,foreign.issueId])
+      await assert.rejects(prepare(current),refusal,'a saved receipt does not waive the current capture issue check')
+      let written = false
+      await assert.rejects(withFactoryPublicationEvidence(pool,receipt,async()=>{written=true}),refusal)
+      assert.equal(written,false)
+      assert.equal(await factoryPublicationEvidenceReady(pool,await task(current)),false)
+      assert.equal(await shareCount(current),1,'refusal neither issues another share nor rewrites the old receipt')
+      // NULL is the existing legacy representation: the authenticated producer
+      // run still supplies its issue. A conflicting explicit binding is denied.
+      await pool.query('UPDATE run_captures SET "issueId"=NULL WHERE id=$1',[current.captureId])
+      assert.deepEqual(await prepare(current),receipt)
+      assert.equal(await factoryPublicationEvidenceReady(pool,await task(current)),true)
     })
 
     await t.test('revocation is serialized with GitHub writes and is never silently reissued', async () => {

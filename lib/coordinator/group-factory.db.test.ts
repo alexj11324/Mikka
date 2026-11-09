@@ -1,4 +1,5 @@
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
+import { addFactoryPublicationEvidence, addFactoryVisualEvidence } from '../../tests/helpers/factory-visual-evidence'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
@@ -219,9 +220,11 @@ for(const flowVersion of [2,1] as const)for(const kind of ['deliverable','reposi
         state=await store.apply(userId,binding(state.task),randomUUID(),{action:'candidate',runId,candidate:kind==='deliverable'?{kind,sha:null,repository:'none',environment:'fixture-deliverable',scope:'standalone file'}:{sha:sha!,repository:'fixture/repository',environment:'fixture-deliverable',scope:'repository changes'}})
       }
       await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"finishedAt"=clock_timestamp(),report=$2 WHERE id=$1`,[runId,JSON.stringify({summary:'Synthetic upstream evidence; no real Harness run',sourceCommit:'a'.repeat(40),publish:{commit:sha},verify:{status:'passed'}})])
+      if(stage==='execute')await addFactoryVisualEvidence(pool,runId)
       const recordedAt=(await pool.query("SELECT clock_timestamp()+interval '1 second' AS at")).rows[0].at.toISOString()
       const evidence:FactoryEvidence={artifact:`run-report:${runId}`,kind:'report',runId,sessionId,candidateId:state.task.candidateId,sha,environment:'fixture-deliverable',recordedAt}
       state=await store.apply(userId,binding(state.task),randomUUID(),{action:'finish',status:'passed',reason:'Synthetic independent upstream evidence',evidence:[evidence],output:{}})
+      if(stage==='execute'&&kind==='repository')await addFactoryPublicationEvidence(pool,state.task.id,{url:'https://github.com/fixture/repository/pull/1'})
       state=await store.apply(userId,binding(state.task),randomUUID(),{action:'advance',stage:stage==='execute'?'review':stage==='review'&&flowVersion===1?'verify':'approval',reason:'Proceed through real store'})
     }
     assert.equal(state.attempts.filter(attempt=>attempt.stage==='review').length,1)
@@ -249,7 +252,6 @@ for(const flowVersion of [2,1] as const)for(const kind of ['deliverable','reposi
     const pending=(await pool.query(`SELECT body FROM conversation_messages WHERE "authorType"='bot'`)).rows[0]
     assert.match(pending.body,locale==='en'?/required human acceptance/:/仍需/);assert.doesNotMatch(pending.body,/任务已完成|Task completed:/)
     await assert.rejects(store.apply(userId,binding(state.task),randomUUID(),{action:'finish',status:'passed',reason:'Forged acceptance must not pass',evidence:state.attempts.flatMap(attempt=>attempt.evidence) as FactoryEvidence[],output:{deliverableAcceptanceId:randomUUID()}}),/factoryConsumerGateRequired/)
-    if(kind==='repository')await pool.query(`INSERT INTO run_publications("runId","userId","issueId","remoteUrl","remoteKey","pullRequest") VALUES($1,$2,$3,'https://github.com/fixture/repository','fixture/repository',$4)`,[producerRun,userId,issueId,JSON.stringify({url:'https://github.com/fixture/repository/pull/1',state:'open'})])
     let mergeCalls=0
     const merges=createFactoryMerges(pool,authorize,store,{pullRequest:async()=>{assert.equal(kind,'repository');return{state:'open',merged:false,headSha:sha!,mergeableState:'clean',mergeCommitSha:null}},mergeMethods:async()=>['squash'],merge:async()=>{assert.equal(kind,'repository');mergeCalls++;return{merged:true,mergeCommitSha:'b'.repeat(40)}}})
     const request={binding:binding(state.task),eventId:randomUUID()}

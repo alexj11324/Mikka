@@ -739,6 +739,24 @@ with fixture.root_file_metadata():
             self.assertEqual({file.name for file in Path(context).iterdir()}, {*bt.BOOTSTRAP_FILES, 'instance-bootstrap.sh', 'source-sha'})
 
 class WorkerHash(unittest.TestCase):
+    def test_capture_tool_pins_and_installer_change_the_canonical_worker_identity(self):
+        with tempfile.TemporaryDirectory() as temp:
+            git = lambda *args: subprocess.run(['git', '-c', 'user.email=t@t', '-c', 'user.name=t', *args], cwd=temp, check=True, capture_output=True)
+            root = Path(temp)
+            helper = root / 'packages/daemon/src/agents/capture-video.mjs'
+            installer = root / 'packages/daemon/scripts/install-capture-tools.mjs'
+            helper.parent.mkdir(parents=True); installer.parent.mkdir(parents=True)
+            helper.write_text('const binarySha256 = "first"')
+            installer.write_text('verify compressed and binary hashes')
+            git('init', '-q'); git('add', '.'); git('commit', '-qm', 'pinned tools')
+            with patch.object(bt, 'ROOT', root):
+                original = bt.worker_hash('HEAD')
+                helper.write_text('const binarySha256 = "second"'); git('commit', '-qam', 'updated pin')
+                changed_pin = bt.worker_hash('HEAD')
+                self.assertNotEqual(original, changed_pin)
+                installer.write_text('changed installer'); git('commit', '-qam', 'updated installer')
+                self.assertNotEqual(changed_pin, bt.worker_hash('HEAD'))
+
     def test_changes_only_with_what_the_template_packages(self):
         import subprocess, tempfile
         with tempfile.TemporaryDirectory() as temp:
