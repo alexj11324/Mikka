@@ -107,8 +107,8 @@ function Chip({ icon, label }: { icon: ReactNode; label: string }) {
 
 /**
  * One entry of 活动 on the timeline (Alex 2026-11-08: a task is one conversation). An Agent's runs in a row are one
- * row, 「Codex」 with its latest run's result (2026-11-07-2230) and date; a change of Agent starts a row with that
- * Agent's own name, 「Claude Code」, never a 「换」 verb (as Warp labels runs). A row opens the task's conversation at its first run; a replaced thread and the creation are lines.
+ * row, 「Codex」 with its latest run's result (2026-11-07-2230) and date; a switch to another Agent starts a row
+ * 「换 Claude Code」. A row opens the task's conversation at its first run; a replaced thread and the creation are lines.
  */
 function ActivityRow({ item, first, last, onOpen }: { item: ActivityEntry; first: boolean; last: boolean; onOpen?: () => void }) {
   const latest = item.kind === 'agent' ? item.run.attempts.at(-1)! : null

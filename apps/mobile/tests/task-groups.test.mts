@@ -101,16 +101,16 @@ test('a task\'s attempts read as one conversation, oldest first, each keeping on
   assert.deepEqual(conversationSegments([{ kind: 'created', by: null, createdAt: '' }], new Map()), [])
 })
 
-// Alex 2026-11-09: a task is one conversation; no 「尝试」 and no numbering, a label only where the Agent changed.
-test('runs with the same Agent read as one; where the Agent changed, a label with the next Agent\'s name and no verb', () => {
+// Alex 2026-11-09: a task is one conversation; no 「尝试」 and no numbering, a divider only where the Agent changed.
+test('runs with the same Agent read as one; a divider only where the Agent changed, naming the Agent that did not get through', () => {
   const run = (runId: string, n: number, harness: string, extra = {}) => ({ kind: 'attempt' as const, runId, n, group: 'resolved' as const, harness, createdAt: '', failed: false, ...extra })
   const r1 = run('r1', 1, 'codex'), r2 = run('r2', 2, 'codex'), r3 = run('r3', 3, 'codex', { failed: true, state: 'failed' }), r4 = run('r4', 4, 'claude_code'), r5 = run('r5', 5, 'cursor')
   // Same Agent: nothing between them, however many runs (follow-ups, waiting for a reply).
   assert.equal(boundary(r1, r2), null)
-  // The Agent changed after a failure: only the next Agent's name; the failure is the run before's own result.
-  assert.deepEqual(boundary(r3, r4), { kind: 'agent', text: 'Claude Code', harness: 'claude_code' })
+  // The Agent changed after a failure: the one that failed is named, nothing is numbered.
+  assert.deepEqual(boundary(r3, r4), { kind: 'switch', text: mobileMessages.MobileCore.conversation.switchedAfterFailure.replace('{previous}', 'Codex').replace('{agent}', 'Claude Code') })
   // The Agent changed without a failure.
-  assert.deepEqual(boundary(r4, r5), { kind: 'agent', text: 'Cursor', harness: 'cursor' })
+  assert.deepEqual(boundary(r4, r5), { kind: 'switch', text: mobileMessages.MobileCore.conversation.switched.replace('{agent}', 'Cursor') })
 })
 
 // 2026-11-04-2200: verification belongs to 实现, and 审阅 is its own result card; only a fix is marked inline.
@@ -144,7 +144,7 @@ test('活动 merges an Agent\'s runs in a row into one row; a switch starts 「�
   // The server sends 活动 newest first.
   const activity = [run('r4', 4, 'claude_code'), run('r3', 3, 'codex'), run('r2', 2, 'codex'), run('r1', 1, 'codex'), { kind: 'created' as const, by: 'Coordinator', createdAt: '2026-11-05T09:00:00.000Z' }]
   const entries = activityEntries(activity)
-  assert.deepEqual(entries.map(entry => entry.kind === 'agent' ? [agentRunTitle(entry), entry.run.attempts.map(item => item.runId)] : entry.kind), ['created', ['Codex', ['r1', 'r2', 'r3']], ['Claude Code', ['r4']]])
+  assert.deepEqual(entries.map(entry => entry.kind === 'agent' ? [agentRunTitle(entry), entry.run.attempts.map(item => item.runId)] : entry.kind), ['created', ['Codex', ['r1', 'r2', 'r3']], [mobileMessages.MobileCore.conversation.switchedTo.replace('{agent}', 'Claude Code'), ['r4']]])
 })
 
 // Alex 2026-11-08: the folded steps row opens to each command and tool call, labelled as Codex does.

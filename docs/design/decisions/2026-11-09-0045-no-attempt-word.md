@@ -26,5 +26,5 @@ Alex rejected 「换 Codex」, 「换 Codex 继续」 and 「X 没跑通 · 换 
 
 - 活动 rows: the Agent's mark (R-74, R-78) and its display name as the Agents list shows it (`harnessName`), then the run result (glossary: Run result). No 「换」 verb.
 - In the conversation, where the Agent changes: a section label with the next Agent's mark and name only. No verb and no reason; how the run before ended is already that run's own result.
-- iOS draws the same labels with the Agent's name. It has no Agent marks yet; they follow when the app gains them.
-- `Shell.panel.task.switch`, `switchAfterFailure`, `switchRow` and `MobileCore.conversation.switched`, `switchedAfterFailure`, `switchedTo` are removed, with the unused 尝试 keys `Shell.panel.task.attempt`, `divider`, `dividerOutcome`, `replaced` and `result.replaced`.
+- iOS draws the same labels with its `AgentName` component and removes `MobileCore.conversation.switched`, `switchedAfterFailure` and `switchedTo` (#1815).
+- On the web, `Shell.panel.task.switch`, `switchAfterFailure` and `switchRow` are removed, with the unused 尝试 keys `Shell.panel.task.attempt`, `divider`, `dividerOutcome`, `replaced` and `result.replaced`.
