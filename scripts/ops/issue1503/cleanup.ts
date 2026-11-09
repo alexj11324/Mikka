@@ -84,7 +84,7 @@ async function inventory() {
       'state',m.state,'pending',(m."workerLeaseId" IS NOT NULL OR m."workerLeaseUntil" IS NOT NULL),
       'runOwnerId',r."userId",'runIssueId',r."issueId",'runStatus',r.status,'runFinishedAt',r."finishedAt",
       'runLeaseLive',COALESCE(r."leaseExpiresAt">now(),false),
-      'legacyTerminalAtMatches',COALESCE(r."finishedAt"='2026-11-06T19:56:45.867Z'::timestamptz,false)))
+      'legacyTerminalAtMatches',COALESCE(r."finishedAt"='2026-11-06T19:56:45.867476Z'::timestamptz,false)))
       FROM thread_machines m LEFT JOIN agent_runs r ON r.id=m."runId"
       WHERE m."workspaceId"=$1), '[]') AS threads,
     COALESCE((SELECT jsonb_agg(jsonb_build_object('ownerId',"ownerId",'sandboxId',"sandboxId",'state',state,

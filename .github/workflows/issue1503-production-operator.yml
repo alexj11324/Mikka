@@ -20,7 +20,7 @@ jobs:
       group: web-deploy-production
       cancel-in-progress: false
       queue: max
-    timeout-minutes: 15
+    timeout-minutes: 10
     env:
       MIKKA_EDITION: cloud
       MIKKA_1503_CLEANUP_MODE: failed_release
