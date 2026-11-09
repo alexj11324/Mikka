@@ -1,4 +1,4 @@
-# Activation review draft only; not executed here. Absolute production-entry deadline: 2026-11-09T03:15:00Z.
+# Disabled review draft. Root must separately review activation; no production work has run.
 name: Issue 1505 read-only Smoke GitHub repair
 on:
   push:
@@ -15,12 +15,12 @@ concurrency:
   queue: max
 jobs:
   prepare:
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1505-smoke-github-readonly-20261109' && github.run_attempt == 1
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
       MIKKA_EDITION: cloud
-      MIKKA_GITHUB_REPAIR_GO: 'root-reviewed-1505-github-readonly-v1'
+      MIKKA_GITHUB_REPAIR_GO: ''
     permissions:
       contents: read
       id-token: write
@@ -33,10 +33,6 @@ jobs:
         run: |
           python3 - <<'PY'
           import hashlib,json,os,pathlib,subprocess
-          from datetime import datetime, timezone
-          deadline = datetime.fromisoformat('2026-11-09T03:15:00+00:00')
-          if datetime.now(timezone.utc) >= deadline:
-              raise SystemExit('issue1505_github_activation_expired')
           root=pathlib.Path('.')
           assert os.environ.get('MIKKA_GITHUB_REPAIR_GO')=='root-reviewed-1505-github-readonly-v1'
           assert os.environ.get('GITHUB_REPOSITORY')=='alexj11324/Mikka'
@@ -59,14 +55,6 @@ jobs:
         with:
           node-version: 24
       - run: corepack enable && corepack prepare pnpm@10.34.3 --activate && pnpm install --frozen-lockfile
-      - name: Refuse expired entry before obtaining runner secrets
-        run: |
-          python3 - <<'PY'
-          from datetime import datetime, timezone
-          deadline = datetime.fromisoformat('2026-11-09T03:15:00+00:00')
-          if datetime.now(timezone.utc) >= deadline:
-              raise SystemExit('issue1505_github_activation_expired')
-          PY
       - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
           method: oidc
@@ -124,14 +112,7 @@ jobs:
           include-imports: false
 
       - name: Prepare only a new scoped read-only child and use normal repository access
-        run: |
-          python3 - <<'PY'
-          from datetime import datetime, timezone
-          deadline = datetime.fromisoformat('2026-11-09T03:15:00+00:00')
-          if datetime.now(timezone.utc) >= deadline:
-              raise SystemExit('issue1505_github_activation_expired')
-          PY
-          node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1505/github-readonly-runner.mjs --prepare
+        run: node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1505/github-readonly-runner.mjs --prepare
         env:
           NODE_ENV: production
           VERCEL_ENV: production
