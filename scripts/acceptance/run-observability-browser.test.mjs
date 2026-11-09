@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
+import { runInNewContext } from 'node:vm'
 import { runObservabilityWorkflow } from './run-observability-workflow.mjs'
 import { startObservabilityBrowser, ObservabilityBrowserError } from './run-observability-browser.mjs'
 import { CASES, fixtureTask, ORIGIN } from './run-observability.mjs'
@@ -34,7 +35,7 @@ function browserFixture(input, options = {}) {
   const calls = [], reports = [], emitter = new EventEmitter(), login = deferred(), navigation = deferred()
   const state = { url: HOME + '/sign-in', signedIn: false, selected: options.switchWorkspace ? otherWorkspace : workspaceId,
     pageClosed: false, contextClosed: false, browserClosed: false, submissionSent: 0, submitAttempts: 0,
-    signOuts: 0, versions: 0, pendingClick: null, navigationWaits: 0 }
+    signOuts: 0, versions: 0, pendingClick: null, navigationWaits: 0, replayHandlesDisposed: 0 }
   const response = (url, value, status = 200) => ({
     url: () => url, status: () => status, request: () => ({ method: () => 'POST', resourceType: () => 'fetch' }),
     body: async () => Buffer.from(JSON.stringify(value)), finished: async () => null, dispose: async () => {},
@@ -134,7 +135,35 @@ function browserFixture(input, options = {}) {
     }
     return value
   }
+  const healthyReplay = { version: 1, sdkLoaded: true, sessionId: '12345678-1234-4234-8234-123456789abc',
+    recordingStarted: true, snapshotObserved: true, sessionObservedAt: input.now() - 5,
+    snapshotObservedAt: input.now() - 2, observedAt: input.now() }
+  let replayState = Object.hasOwn(options, 'replayState') ? options.replayState : healthyReplay
+  const browserContext = options.missingReplayBridge ? {} : { __mikkaReplayReadiness() {
+    if (options.replayThrows) throw new Error(CANARY)
+    return replayState
+  } }
+  const replayCall = fn => {
+    const result = runInNewContext('(' + fn.toString() + ')()', browserContext)
+    return result ? structuredClone(result) : null
+  }
   const page = {
+    async waitForFunction(fn, arg, config) {
+      calls.push({ type: 'replayWait', timeout: config.timeout, polling: config.polling })
+      assert.equal(arg, undefined)
+      assert.equal(config.timeout > 0 && config.timeout <= 30_000, true)
+      assert.equal(config.polling, 'raf')
+      options.replayEntered?.resolve()
+      if (options.replayWait) await options.replayWait.promise
+      const value = replayCall(fn)
+      if (!value) throw new Error(CANARY)
+      return { async jsonValue() { return value }, async dispose() { state.replayHandlesDisposed++ } }
+    },
+    async evaluate(fn) {
+      calls.push({ type: 'replayEvaluate' })
+      if (Object.hasOwn(options, 'finalReplayState')) replayState = options.finalReplayState
+      return replayCall(fn)
+    },
     on: (event, handler) => emitter.on(event, handler),
     url: () => state.url,
     async goto(url) { calls.push({ type: 'goto', url }); state.url = options.foreignSignIn ? 'https://synthetic-server.invalid/sign-in' : url },
@@ -377,3 +406,68 @@ test('the actual workflow awaits actual actor session cleanup with no progress t
   assert.equal(f.reports.at(-1).cleanup.anonymousAfterLogout, true)
   for (const value of [progressToken, EMAIL, PASSWORD]) assert.equal(output.join('').includes(value), false)
 })
+
+test('Replay becomes ready before the one paid click and reports no upload acknowledgement', async () => {
+  const entered = deferred(), ready = deferred()
+  const f = browserFixture(inputs(), { replayEntered: entered, replayWait: ready })
+  const starting = startObservabilityBrowser(f.args)
+  await entered.promise
+  assert.equal(f.state.submitAttempts, 0)
+  ready.resolve()
+  const handle = await starting
+  assert.equal(f.state.submitAttempts, 1)
+  assert.equal(f.state.replayHandlesDisposed, 1)
+  assert.equal(f.reports[0].replay.sessionId, '12345678-1234-4234-8234-123456789abc')
+  assert.equal(f.reports[0].replay.snapshotObserved, true)
+  assert.equal(f.reports[0].replay.uploadAcknowledged, null)
+  await handle.close()
+})
+
+for (const [kind, override] of [
+  ['missing bridge', { missingReplayBridge: true }],
+  ['SDK exception', { replayThrows: true }],
+  ['no SDK', { replayState: { sdkLoaded: false } }],
+  ['unstarted recording', { replayState: { recordingStarted: false } }],
+  ['no snapshot', { replayState: { snapshotObserved: false } }],
+  ['malformed true', { replayState: { recordingStarted: 'true' } }],
+  ['invalid session', { replayState: { sessionId: CANARY } }],
+  ['last-moment session change', { finalReplayState: { sessionId: workspaceId } }],
+]) {
+  test('Replay ' + kind + ' fails closed before paid submission and cleans owned resources', async () => {
+    const input = inputs()
+    const base = { version: 1, sdkLoaded: true, sessionId: '12345678-1234-4234-8234-123456789abc',
+      recordingStarted: true, snapshotObserved: true, sessionObservedAt: input.now() - 5,
+      snapshotObservedAt: input.now() - 2, observedAt: input.now(), privateExtra: CANARY }
+    const options = { ...override }
+    for (const key of ['replayState', 'finalReplayState']) if (Object.hasOwn(options, key)) options[key] = { ...base, ...options[key] }
+    const f = browserFixture(input, options)
+    await assert.rejects(startObservabilityBrowser(f.args), error => {
+      safeFailure(error, f.reports); assert.equal(error.code, 'browser_replay_unready'); return true
+    })
+    assert.equal(f.state.submitAttempts, 0)
+    assert.equal(f.state.submissionSent, 0)
+    assert.equal(f.reports.at(-1).submitClicks, 0)
+    assert.equal(f.reports.at(-1).submissionOutcome, 'not_attempted')
+    assert.equal(f.state.signOuts, 1)
+    assert.equal(f.calls.find(call => call.type === 'api' && call.path.endsWith('/sign-out')).pageClosed, true)
+    assert.equal(f.reports.at(-1).cleanup.status, 'closed')
+  })
+}
+
+for (const kind of ['abort', 'timeout']) {
+  test('Replay pending ' + kind + ' cannot submit after a late ready result', async () => {
+    const input = inputs(), entered = deferred(), ready = deferred()
+    const f = browserFixture(input, { replayEntered: entered, replayWait: ready, fastTimers: kind === 'timeout' })
+    const starting = startObservabilityBrowser(f.args)
+    await entered.promise
+    if (kind === 'abort') input.controller.abort()
+    await assert.rejects(starting, error => { safeFailure(error, f.reports); return true })
+    ready.resolve()
+    await settle()
+    assert.equal(f.state.submitAttempts, 0)
+    assert.equal(f.state.submissionSent, 0)
+    assert.equal(f.state.pageClosed && f.state.contextClosed && f.state.browserClosed, true)
+    assert.equal(f.state.signOuts, 1)
+    assert.equal(f.calls.find(call => call.type === 'api' && call.path.endsWith('/sign-out')).pageClosed, true)
+  })
+}
