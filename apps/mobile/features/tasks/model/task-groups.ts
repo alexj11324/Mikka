@@ -1,3 +1,4 @@
+import { mobileMessages } from '@/lib/messages'
 import type { Task, TaskGroup, TaskReason, TaskState, ThreadGroup } from '@/lib/types'
 
 /**
@@ -6,10 +7,10 @@ import type { Task, TaskGroup, TaskReason, TaskState, ThreadGroup } from '@/lib/
  * nothing running, 已完成 done or cancelled (folded by default).
  */
 export const TASK_GROUPS: { id: TaskGroup; title: string }[] = [
-  { id: 'pending', title: '等待你' },
-  { id: 'running', title: '进行中' },
-  { id: 'todo', title: '待办' },
-  { id: 'done', title: '已完成' },
+  { id: 'pending', title: mobileMessages.MobileCore.groups.pending },
+  { id: 'running', title: mobileMessages.MobileCore.groups.running },
+  { id: 'todo', title: mobileMessages.MobileCore.groups.todo },
+  { id: 'done', title: mobileMessages.MobileCore.groups.done },
 ]
 
 const CLOSED = new Set(['done', 'canceled', 'duplicate'])
@@ -42,13 +43,13 @@ export type RowState = { state: TaskState | null; reason: string | null }
 /** The grey line's words for the API's reason codes; the app owns the wording. */
 export function reasonWord(reason: TaskReason, blockedBy?: string | null): string {
   switch (reason) {
-    case 'needs_input': return '等你回复'
-    case 'approval': return '等你确认'
-    case 'pr_review': return '待审阅'
-    case 'blocked': return '受阻'
-    case 'quota': return '额度用完'
-    case 'blocked_by': return blockedBy ? `等 ${blockedBy}` : '等其他任务'
-    case 'flagged': return '已标记受阻'
+    case 'needs_input': return mobileMessages.MobileCore.reasons.needs_input
+    case 'approval': return mobileMessages.MobileCore.reasons.approval
+    case 'pr_review': return mobileMessages.MobileCore.reasons.pr_review
+    case 'blocked': return mobileMessages.MobileCore.reasons.blocked
+    case 'quota': return mobileMessages.MobileCore.reasons.quota
+    case 'blocked_by': return blockedBy ? mobileMessages.MobileCore.reasons.blocked_by.replace('{task}', blockedBy) : mobileMessages.MobileCore.reasons.otherTask
+    case 'flagged': return mobileMessages.MobileCore.reasons.flagged
   }
 }
 
@@ -64,13 +65,13 @@ const ATTEMPT_STATES = new Set<string>(['waiting', 'failed', 'blocked', 'running
 export function rowState(task: Pick<Task, 'group' | 'status' | 'blocked' | 'state' | 'reason' | 'blockedBy'>): RowState {
   if (task.state !== undefined && task.state !== null) {
     const state = ATTEMPT_STATES.has(task.state) ? task.state as TaskState : null
-    return { state, reason: state === 'failed' ? '失败' : task.reason ? reasonWord(task.reason, task.blockedBy) : null }
+    return { state, reason: state === 'failed' ? mobileMessages.MobileCore.states.failed : task.reason ? reasonWord(task.reason, task.blockedBy) : null }
   }
   const block = task.blocked ?? null
   const elsewhere = block?.reason === 'dependency' ? reasonWord('blocked_by', block.blocker) : block?.reason === 'flagged' ? reasonWord('flagged') : null
   const group = groupOf(task)
   if (group === 'pending' && !elsewhere) {
-    if (block?.reason === 'failed') return { state: 'failed', reason: '失败' }
+    if (block?.reason === 'failed') return { state: 'failed', reason: mobileMessages.MobileCore.states.failed }
     // 受阻 is its own state (quota, login, key, a device offline): the octagon, not the hand.
     if (block?.reason === 'quota') return { state: 'blocked', reason: reasonWord('quota') }
     if (block?.reason === 'run') return { state: 'blocked', reason: reasonWord('blocked') }
@@ -99,7 +100,7 @@ export function attemptState(attempt: { group?: ThreadGroup; failed?: boolean; s
 }
 
 /** An attempt's result in words. */
-export const ATTEMPT_WORD: Record<AttemptResult, string> = { running: '运行中', paused: '等你回复', done: '完成', failed: '失败', blocked: '受阻' }
+export const ATTEMPT_WORD: Record<AttemptResult, string> = mobileMessages.MobileCore.attempts
 
 export type TaskFilter = 'all' | TaskGroup
 

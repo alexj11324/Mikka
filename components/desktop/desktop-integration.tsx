@@ -1,17 +1,12 @@
 'use client'
 
-import { settingsKeys } from '@/lib/swr/keys'
 import { useEffect, useRef } from 'react'
 import { useRouter } from '@/i18n/navigation'
-import useSWR from 'swr'
 
 import { listDevices } from '@/app/actions/agents'
 import { localSetupAction, localSetupNeedsOwnership } from '@/lib/local-device-setup'
-import type { getPreferences } from '@/app/actions/preferences'
-import { settingsRead } from '@/lib/settings-read'
 import { chooseDesktopNotifications } from '@/app/actions/desktop-notifications'
 import { desktopRunUpdate, type DesktopRun } from '@/lib/platform/desktop-notifications'
-import { pushAllowed } from '@/lib/push-allowed'
 import { usePlatform } from '@/lib/platform/use-platform'
 import { openAppLink } from '@/components/workspace/workspace-navigation'
 import { useLiveTaskRunList } from '@/hooks/use-live-lists'
@@ -35,9 +30,6 @@ export function DesktopIntegration({ userId }: { userId: string }) {
   // task_run_list on the owner's home channel; a lease running out is its read deadline. No timer reads it.
   const runs = useLiveTaskRunList(userId, desktop)
   const data = runs.data?.items
-  // Same key as Settings › 通知, so a change there applies here at once.
-  const { data: preferences } = useSWR(desktop ? settingsKeys.preferences() : null, () => settingsRead<Awaited<ReturnType<typeof getPreferences>>>('preferences'), { shouldRetryOnError: false })
-  const finished = preferences !== undefined && pushAllowed(preferences, ['finished'])
   const previous = useRef<Map<string, DesktopRun['status']> | null>(null)
   const lifetime = useRef(0)
 
@@ -51,7 +43,10 @@ export function DesktopIntegration({ userId }: { userId: string }) {
     const bridge = window.mikka
     if (!bridge) return
 
-    const update = desktopRunUpdate(previous.current, data, Date.now(), finished)
+    // The launch baseline needs no notification preferences. Only an actual
+    // completion asks the server to check the person's current switch, before
+    // its decision; a client cache cannot keep an old on/off setting alive.
+    const update = desktopRunUpdate(previous.current, data, Date.now(), true)
     previous.current = update.next
     void bridge.notifications.setBadge(update.badge).catch(() => {})
     if (!update.notifications.length) return
@@ -65,7 +60,7 @@ export function DesktopIntegration({ userId }: { userId: string }) {
         for (const notification of update.notifications) if (show.has(notification.id)) void bridge.notifications.show(notification).catch(() => {})
       })
       .catch(() => {})
-  }, [data, desktop, finished])
+  }, [data, desktop])
 
   useEffect(() => {
     if (!desktop) return

@@ -169,8 +169,8 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
     });
 
     async function successor(task: Awaited<ReturnType<typeof prepared>>['task']) {
-      await pool.query(`INSERT INTO factory_tasks (id,"userId","issueId","attemptId",revision,stage,status,"createdAt")
-        SELECT $2,"userId","issueId",$3,1,'execute','pending',"createdAt"+interval '1 second' FROM factory_tasks WHERE id=$1`,
+      await pool.query(`INSERT INTO factory_tasks (id,"userId","issueId","workspaceId","attemptId",revision,stage,status,"createdAt")
+        SELECT $2,"userId","issueId","workspaceId",$3,1,'execute','pending',"createdAt"+interval '1 second' FROM factory_tasks WHERE id=$1`,
       [task.id, randomUUID(), randomUUID()]);
     }
 
@@ -201,14 +201,14 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
           CREATE TABLE workspace_projects (id uuid PRIMARY KEY,"userId" text NOT NULL,"issueIds" jsonb NOT NULL DEFAULT '[]'::jsonb);
           CREATE TABLE mikka_team_projects ("projectId" uuid NOT NULL,"workspaceId" uuid NOT NULL,PRIMARY KEY("projectId","workspaceId"));
         `);
-        const home = randomUUID();
+        const home = f.workspaceId;
         await pool.query(`INSERT INTO mikka_workspaces VALUES ($1,$2,'personal')`, [home, actor.userId]);
         await pool.query(`INSERT INTO mikka_workspace_members VALUES ($1,$2,'active')`, [home, actor.userId]);
         const x = await preparedDeliverable();
         const parent = randomUUID(), blocked = randomUUID();
         for (const [id, metadata] of [[parent, {}], [blocked, { blockedByIds: [x.task.issueId] }]] as const) {
-          await pool.query(`INSERT INTO issues(id,"userId",title,content,revision) VALUES($1,$2,'Connected fixture',$3,1)`,
-            [id, actor.userId, JSON.stringify({ type: 'doc', attrs: { mikka: metadata }, content: [] })]);
+          await pool.query(`INSERT INTO issues(id,"userId","workspaceId","ownershipState",title,content,revision) VALUES($1,$2,$4,'bound','Connected fixture',$3,1)`,
+            [id, actor.userId, JSON.stringify({ type: 'doc', attrs: { mikka: metadata }, content: [] }), home]);
         }
         await pool.query(`UPDATE issues SET content=$2 WHERE id=$1`, [x.task.issueId,
           JSON.stringify({ type: 'doc', attrs: { mikka: { parentId: parent } }, content: [] })]);
@@ -424,8 +424,8 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
       const x = await prepared();
       const { rows: [producer] } = await pool.query('SELECT "runId" FROM factory_attempts WHERE "taskId"=$1 AND stage=\'execute\'', [x.task.id]);
       const runId = producer.runId as string, deviceId = randomUUID(), tokenId = randomUUID(), sandboxId = `fixture-pr-${runId}`;
-      const { rows: [home] } = await pool.query('SELECT id FROM mikka_workspaces WHERE "userId"=$1 AND kind=\'personal\' LIMIT 1', [actor.userId]);
-      const workspaceId = home?.id ?? randomUUID(), machineActor = { userId: actor.userId, workspaceId };
+      const workspaceId = f.workspaceId, machineActor = { userId: actor.userId, workspaceId };
+      const { rows: [home] } = await pool.query('SELECT id FROM mikka_workspaces WHERE id=$1 AND "userId"=$2 AND kind=\'personal\'', [workspaceId, actor.userId]);
       if (!home) {
         await pool.query('INSERT INTO mikka_workspaces VALUES ($1,$2,\'personal\')', [workspaceId, actor.userId]);
         await pool.query('INSERT INTO mikka_workspace_members VALUES ($1,$2,\'active\')', [workspaceId, actor.userId]);

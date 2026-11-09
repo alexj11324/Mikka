@@ -51,16 +51,16 @@ export async function factory194Fixture(connectionString: string) {
   });
   observePoolCommits(pool);
   await pool.query(`
-    CREATE TABLE issues (id uuid PRIMARY KEY,"userId" text,title text,content jsonb,revision integer,status text NOT NULL DEFAULT 'todo',scope text NOT NULL DEFAULT 'personal',"scopeVersion" integer NOT NULL DEFAULT 1);
+    CREATE TABLE issues (id uuid PRIMARY KEY,"userId" text,"workspaceId" uuid,"ownershipState" text NOT NULL DEFAULT 'pending',title text,content jsonb,revision integer,status text NOT NULL DEFAULT 'todo',scope text NOT NULL DEFAULT 'personal',"scopeVersion" integer NOT NULL DEFAULT 1);
     CREATE TABLE coordinator_events (id uuid PRIMARY KEY,"userId" text,"botId" uuid,"issueId" uuid,kind text,payload jsonb);
     CREATE TABLE "session" (id text PRIMARY KEY,"userId" text,"expiresAt" timestamptz);
     CREATE TABLE account (id text,"userId" text,"providerId" text);
     CREATE TABLE "user" (id text PRIMARY KEY,name text);
-    CREATE TABLE factory_tasks (id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"attemptId" uuid,"candidateId" uuid,revision integer,stage text,status text,"botId" uuid,"sourceEventId" uuid,"scopeVersion" integer,reason text NOT NULL DEFAULT '');
+    CREATE TABLE factory_tasks (id uuid PRIMARY KEY,"userId" text,"workspaceId" uuid,"issueId" uuid,"attemptId" uuid,"candidateId" uuid,revision integer,stage text,status text,"botId" uuid,"sourceEventId" uuid,"scopeVersion" integer,reason text NOT NULL DEFAULT '');
     CREATE TABLE factory_candidates (id uuid PRIMARY KEY,"taskId" uuid,sha text,repository text,environment text,scope text,"runId" uuid,kind text NOT NULL DEFAULT 'repository',UNIQUE("taskId",id));
     CREATE TABLE factory_attempts (id uuid PRIMARY KEY,"taskId" uuid,"candidateId" uuid,stage text,position integer,"runId" uuid,"sessionId" text,status text,evidence jsonb,output jsonb,"finishedAt" timestamptz,UNIQUE("taskId",id));
     CREATE TABLE factory_events ("taskId" uuid,"eventId" uuid,request jsonb NOT NULL DEFAULT '{}',result jsonb NOT NULL DEFAULT '{}',PRIMARY KEY("taskId","eventId"));
-    CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"sessionId" text,status text,"stopRequestedAt" timestamptz,report jsonb,"startedAt" timestamptz,"finishedAt" timestamptz,"stopReason" text);
+    CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text,"workspaceId" uuid,"issueId" uuid,"sessionId" text,status text,"stopRequestedAt" timestamptz,report jsonb,"startedAt" timestamptz,"finishedAt" timestamptz,"stopReason" text);
     ALTER TABLE agent_runs ADD COLUMN "deviceId" uuid, ADD COLUMN "agentDefinition" jsonb, ADD COLUMN "leaseExpiresAt" timestamptz, ADD COLUMN kind text NOT NULL DEFAULT 'implement', ADD COLUMN "botId" uuid, ADD COLUMN "questionContinuation" jsonb;
     CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,enabled boolean);
     CREATE TABLE run_tokens (id uuid PRIMARY KEY,"runId" uuid,"userId" text,"tokenHash" text,"revokedAt" timestamptz,"expiresAt" timestamptz);
@@ -80,6 +80,7 @@ export async function factory194Fixture(connectionString: string) {
     userId: "synthetic-owner",
     sessionId: "synthetic-browser-session",
   };
+  const workspaceId = randomUUID();
   await pool.query(
     `INSERT INTO "session" VALUES ($1,$2,now()+interval '1 hour');`,
     [actor.sessionId, actor.userId],
@@ -225,9 +226,10 @@ export async function factory194Fixture(connectionString: string) {
   /** `capture`: the verify run also took a screenshot, referenced as run capture evidence (A3). */
   async function prepare(executionActor: FactoryActor = actor, options: { capture?: boolean; visual?: boolean; publication?: boolean } = {}) {
     let captureId: string | null = null;
-    const task: FactoryTask = {
+    const task: FactoryTask & { workspaceId: string } = {
       id: randomUUID(),
       userId: actor.userId,
+      workspaceId,
       issueId: randomUUID(),
       attemptId: randomUUID(),
       candidateId: randomUUID(),
@@ -242,7 +244,7 @@ export async function factory194Fixture(connectionString: string) {
       scope: "synthetic upstream approval contract",
     };
     const sourceEventId = randomUUID();
-    await pool.query('INSERT INTO issues (id,"userId",title,content,revision) VALUES($1,$2,$3,$4,1)', [
+    await pool.query('INSERT INTO issues (id,"userId",title,content,revision,"workspaceId","ownershipState") VALUES($1,$2,$3,$4,1,$5,\'bound\')', [
       task.issueId,
       task.userId,
       "Synthetic publication task",
@@ -255,6 +257,7 @@ export async function factory194Fixture(connectionString: string) {
           },
         ],
       }),
+      workspaceId,
     ]);
     await pool.query(
       "INSERT INTO coordinator_events VALUES($1,$2,NULL,$3,'user_message',$4)",
@@ -266,7 +269,7 @@ export async function factory194Fixture(connectionString: string) {
       ],
     );
     await pool.query(
-      'INSERT INTO factory_tasks (id,"userId","issueId","attemptId","candidateId",revision,stage,status,"sourceEventId") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+      'INSERT INTO factory_tasks (id,"userId","issueId","attemptId","candidateId",revision,stage,status,"sourceEventId","workspaceId") VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
       [
         task.id,
         task.userId,
@@ -277,6 +280,7 @@ export async function factory194Fixture(connectionString: string) {
         task.stage,
         task.status,
         sourceEventId,
+        workspaceId,
       ],
     );
     await pool.query(
@@ -306,7 +310,7 @@ export async function factory194Fixture(connectionString: string) {
         recordedAt,
       };
       await pool.query(
-        `INSERT INTO agent_runs (id,"userId","issueId","sessionId",status,"stopRequestedAt",report,"startedAt","finishedAt","stopReason") VALUES ($1,$2,$3,$4,'succeeded',NULL,$5,$6,$6,'submitted')`,
+        `INSERT INTO agent_runs (id,"userId","issueId","sessionId",status,"stopRequestedAt",report,"startedAt","finishedAt","stopReason","workspaceId") VALUES ($1,$2,$3,$4,'succeeded',NULL,$5,$6,$6,'submitted',$7)`,
         [
           runId,
           task.userId,
@@ -318,6 +322,7 @@ export async function factory194Fixture(connectionString: string) {
             verify: { status: "passed" },
           }),
           recordedAt,
+          workspaceId,
         ],
       );
       const evidenceList: Record<string, unknown>[] = [evidence];
@@ -387,6 +392,7 @@ export async function factory194Fixture(connectionString: string) {
     approvalRequestForHuman,
     pool,
     actor,
+    workspaceId,
     provider,
     adapter,
     service,

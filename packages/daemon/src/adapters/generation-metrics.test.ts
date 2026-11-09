@@ -43,6 +43,37 @@ it('uses Codex last-request usage, ignores resume history and deduplicates total
   }
 })
 
+it('closes an official aborted Claude response once and leaves final output usage unknown', () => {
+  const captured: GenerationMetrics[] = []
+  const tracker = new ClaudeGenerationMetrics(value => captured.push(value))
+  tracker.observe({ type: 'stream_event', event: { type: 'message_start', message: { id: 'msg_abort', model: 'claude-haiku-5-5',
+    usage: { input_tokens: 5, output_tokens: 1, cache_read_input_tokens: 3, cache_creation_input_tokens: 2 } } } })
+  const interrupted = { type: 'assistant', aborted: true, message: { id: 'msg_abort', model: 'claude-haiku-5-5', stop_reason: null,
+    content: [{ text: 'PRIVATE_PARTIAL' }], usage: { input_tokens: 5, output_tokens: 1 } } }
+  tracker.observe(interrupted)
+  tracker.observe(interrupted)
+  tracker.observe({ type: 'stream_event', event: { type: 'message_stop' } })
+  tracker.observe({ type: 'assistant', message: { ...interrupted.message, stop_reason: 'end_turn' } })
+  tracker.fail()
+  expect(captured).toHaveLength(1)
+  expect(captured[0]).toMatchObject({ inputTokens: 10, cacheReadTokens: 3, cacheWriteTokens: 2, outcome: 'error' })
+  for (const key of ['outputTokens', 'ttftMs', 'latencyMs', 'totalCostUsd'] as const) expect(captured[0][key]).toBeUndefined()
+  expect(JSON.stringify(captured)).not.toContain('PRIVATE')
+})
+
+it('accepts only the official aborted boolean without turning ordinary partial assistant blocks into generations', () => {
+  const captured: GenerationMetrics[] = []
+  const tracker = new ClaudeGenerationMetrics(value => captured.push(value))
+  const message = { id: 'msg_no_stream', model: 'claude-haiku-5-5', stop_reason: null, usage: { output_tokens: 1 } }
+  for (const aborted of [undefined, false, 'true']) tracker.observe({ type: 'assistant', aborted, message })
+  expect(captured).toHaveLength(0)
+  tracker.observe({ type: 'assistant', aborted: true, message })
+  tracker.fail()
+  expect(captured).toHaveLength(1)
+  expect(captured[0]).toMatchObject({ model: 'claude-haiku-5-5', outcome: 'error' })
+  for (const key of ['inputTokens', 'outputTokens', 'ttftMs', 'latencyMs', 'totalCostUsd'] as const) expect(captured[0][key]).toBeUndefined()
+})
+
 it('preserves Codex 0.163 cache writes per request without adding them to inclusive input or inventing unknowns', () => {
   const captured: GenerationMetrics[] = []
   const tracker = new CodexGenerationMetrics(value => captured.push(value))

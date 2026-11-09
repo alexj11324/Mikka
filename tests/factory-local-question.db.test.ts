@@ -74,7 +74,7 @@ test('a local Factory question preserves the original Profile, worker definition
     VALUES ($1,$2,$3,$4,$5,1,'codex_cli',$6)`, [bindingId, owner, workspace.id, agentId, connectionId, model])
   await pool.query(`INSERT INTO byos_bindings(id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId")
     VALUES ($1,$2,$3,'catalogue',$4,1,'codex_cpa',$5)`, [randomUUID(), owner, workspace.id, connectionId, model])
-  const issueId = await seedIssue(pool, owner)
+  const issueId = await seedIssue(pool, owner, workspace.id)
   await pool.query('UPDATE issues SET content=$2::jsonb WHERE id=$1',
     [issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 1256 } } })])
   const profileScope = { ownerId: owner, workspaceId: workspace.id, botId: null }
@@ -283,7 +283,7 @@ test('a local Factory question preserves the original Profile, worker definition
     const { chatBotId } = await import('../lib/coordinator/coordinator-bot')
     const { factoryRuntimeForBot } = await import('../lib/factory/runtime')
     const botId = await chatBotId(owner, null, workspace.id)
-    const scopedIssueId = await seedIssue(pool, owner)
+    const scopedIssueId = await seedIssue(pool, owner, workspace.id)
     await pool.query('UPDATE issues SET content=$2::jsonb WHERE id=$1',
       [scopedIssueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 1256001 } } })])
     const admitted = await queueTaskRun(owner, { issueId: scopedIssueId, agentId, repo: 'octo/repo',

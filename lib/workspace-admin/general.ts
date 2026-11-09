@@ -142,16 +142,15 @@ export async function transferWorkspaceOwnership(actorId: string, workspaceId: s
 export interface WorkspaceDeletionImpact { bots: number; tasks: number; teams: number; purchasedPoints: number }
 
 export async function workspaceDeletionImpact(actorId: string, workspaceId: string): Promise<WorkspaceDeletionImpact> {
-  const { teamCount, taskCount } = await workspaceDb.transaction(async tx => {
+  return workspaceDb.transaction(async tx => {
     await requireWorkspace(tx, workspaceId, actorId, true)
     const [teamRow] = await tx.select({ n: sql<number>`count(*)::int` }).from(teams).where(eq(teams.workspaceId, workspaceId))
-    const [taskRow] = await tx.select({ n: sql<number>`count(distinct ${teamIssues.issueId})::int` }).from(teamIssues).where(eq(teamIssues.workspaceId, workspaceId))
-    return { teamCount: teamRow?.n ?? 0, taskCount: taskRow?.n ?? 0 }
+    const [taskRow] = await db.select({ n: sql<number>`count(*)::int` }).from(issues).where(eq(issues.workspaceId, workspaceId))
+    const [botRow] = await db.select({ n: sql<number>`count(*)::int` }).from(bots).where(eq(bots.workspaceId, workspaceId))
+    const [pointRow] = await db.select({ n: sql<number>`coalesce(sum(${workspaceCreditGrants.points}), 0)::int` }).from(workspaceCreditGrants)
+      .where(and(eq(workspaceCreditGrants.workspaceId, workspaceId), eq(workspaceCreditGrants.bucket, 'purchased')))
+    return { bots: botRow?.n ?? 0, tasks: taskRow?.n ?? 0, teams: teamRow?.n ?? 0, purchasedPoints: pointRow?.n ?? 0 }
   })
-  const [botRow] = await db.select({ n: sql<number>`count(*)::int` }).from(bots).where(eq(bots.workspaceId, workspaceId))
-  const [pointRow] = await db.select({ n: sql<number>`coalesce(sum(${workspaceCreditGrants.points}), 0)::int` }).from(workspaceCreditGrants)
-    .where(and(eq(workspaceCreditGrants.workspaceId, workspaceId), eq(workspaceCreditGrants.bucket, 'purchased')))
-  return { bots: botRow?.n ?? 0, tasks: taskCount, teams: teamCount, purchasedPoints: pointRow?.n ?? 0 }
 }
 
 /** /w/<slug> fallback: the current slug of the workspace that used to have this one, for its active members. */
@@ -185,9 +184,10 @@ const rawQuery = (tx: MainTransaction) => ({
  * subscriptions in byos_*, Linear and GitHub connections, which are per
  * person) is left alone.
  */
-async function deleteAppData(tx: MainTransaction, workspaceId: string, teamIds: string[], issueIds: string[]) {
+async function deleteAppData(tx: MainTransaction, workspaceId: string, teamIds: string[]) {
   const [billing] = await tx.select({ status: workspaceBilling.status }).from(workspaceBilling).where(eq(workspaceBilling.workspaceId, workspaceId)).for('update').limit(1)
   if (billing?.status && (BILLING_LIVE_STATUSES as readonly string[]).includes(billing.status)) throw new WorkspaceError('workspaceHasActiveSubscription')
+  const issueIds = (await tx.select({ id: issues.id }).from(issues).where(eq(issues.workspaceId, workspaceId)).orderBy(issues.id).for('update')).map(row => row.id)
   const botRows = await tx.select({ id: bots.id }).from(bots).where(eq(bots.workspaceId, workspaceId)).for('update')
   const botIds = botRows.map(row => row.id)
   const runOwners = botIds.length || issueIds.length ? await tx.selectDistinct({ userId: agentRuns.userId }).from(agentRuns)
@@ -202,6 +202,11 @@ async function deleteAppData(tx: MainTransaction, workspaceId: string, teamIds: 
   }
   let tasks = 0
   if (issueIds.length) {
+    // These historical task tables have neither a tenant column nor an issue FK.
+    // Delete only children of the persisted tenant rows locked above.
+    await tx.execute(sql`delete from issue_documents where "issueId" in ${issueIds}`)
+    await tx.execute(sql`delete from issue_versions where "issueId" in ${issueIds}`)
+    await tx.execute(sql`delete from issue_members where "issueId" in ${issueIds}`)
     tasks = (await tx.delete(issues).where(inArray(issues.id, issueIds)).returning({ id: issues.id })).length
   }
   if (teamIds.length) {
@@ -247,14 +252,13 @@ export async function deleteWorkspaceData(actorId: string, workspaceId: string, 
     const before = await workspaceListScopesBeforeChange(tx, workspaceId)
     const teamRows = await tx.select({ id: teams.id }).from(teams).where(eq(teams.workspaceId, workspaceId)).for('update')
     const teamIds = teamRows.map(row => row.id)
-    const issueRows = await tx.select({ id: teamIssues.issueId }).from(teamIssues).where(eq(teamIssues.workspaceId, workspaceId))
     const projectRows = await tx.select({ id: teamProjects.projectId }).from(teamProjects).where(eq(teamProjects.workspaceId, workspaceId))
     const projectIds = [...new Set(projectRows.map(row => row.id))]
     // The machines' sandboxes are killed before their rows go, so no refused deletion may follow: the billing check runs first too.
     const [billing] = await db.select({ status: workspaceBilling.status }).from(workspaceBilling).where(eq(workspaceBilling.workspaceId, workspaceId)).limit(1)
     if (billing?.status && (BILLING_LIVE_STATUSES as readonly string[]).includes(billing.status)) throw new WorkspaceError('workspaceHasActiveSubscription')
     await teardownWorkspaceMachines(pool, workspaceId)
-    const app = await db.transaction(main => deleteAppData(main, workspaceId, teamIds, issueRows.map(row => row.id)))
+    const app = await db.transaction(main => deleteAppData(main, workspaceId, teamIds))
 
     await tx.delete(teamIssueCreateReceipts).where(eq(teamIssueCreateReceipts.workspaceId, workspaceId))
     await tx.delete(teamIssuePromotionReceipts).where(eq(teamIssuePromotionReceipts.workspaceId, workspaceId))

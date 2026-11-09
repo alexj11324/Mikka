@@ -10,14 +10,19 @@ on:
       - 'apps/mobile/app.json'
       - 'apps/mobile/app.config.ts'
       - 'apps/mobile/eas.json'
+      - '.easignore'
   workflow_dispatch:
     inputs:
+      overlay_sha:
+        description: Exact reviewed hosted UI commit for a new official build
+        type: string
+        default: c34b3adf07240afebae725b2af599cfbc69c4f42
       submit:
         description: Submit this exact completed build to TestFlight
         type: boolean
         default: true
       existing_build_id:
-        description: Existing completed EAS build to submit without rebuilding (requires expected_commit)
+        description: Completed production-profile EAS build to submit without rebuilding (requires expected_commit)
         type: string
         default: ''
       expected_commit:
@@ -36,13 +41,17 @@ concurrency:
 jobs:
   release:
     name: EAS iOS build and TestFlight
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main'
+    if: >-
+      github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' &&
+      github.repository_id == '1427517699' && github.repository_owner_id == '183887963'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
       contents: read
       actions: read
       id-token: write
+    env:
+      OVERLAY_SHA: ${{ inputs.overlay_sha || 'c34b3adf07240afebae725b2af599cfbc69c4f42' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -65,7 +74,35 @@ jobs:
           EXPECTED_BUILD_COMMIT: ${{ inputs.expected_commit }}
         run: node scripts/release/mobile-native.mjs source
       - name: Verify production credential delivery boundaries
-        run: node --test scripts/mobile-ota-credentials.test.mjs scripts/release/apple-credentials.test.mjs
+        run: node --test scripts/mobile-ota-credentials.test.mjs scripts/release/apple-credentials.test.mjs scripts/release/mobile-native.test.mjs
+      - name: Validate the official UI pin before credential access
+        if: steps.source.outputs.build_id == ''
+        run: node -e "if (!/^[a-f0-9]{40}$/.test(process.env.OVERLAY_SHA || '')) process.exit(1)"
+      - name: Read existing HOSTED_UI_READ_KEY through OIDC
+        if: steps.source.outputs.build_id == ''
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: HOSTED_UI_READ_KEY
+          recursive: false
+          include-imports: false
+      - name: Check out the exact official UI
+        if: steps.source.outputs.build_id == ''
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: alexj11324/mikka-hosted-ui
+          ref: ${{ env.OVERLAY_SHA }}
+          ssh-key: ${{ env.HOSTED_UI_READ_KEY }}
+          path: .hosted-ui
+          persist-credentials: false
+      - name: Clear the checkout key before packaging
+        if: steps.source.outputs.build_id == ''
+        run: echo 'HOSTED_UI_READ_KEY=' >> "$GITHUB_ENV"
       - name: Read existing EXPO_TOKEN through OIDC
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
@@ -121,10 +158,19 @@ jobs:
       - name: Require the existing App Store Connect credential inputs
         if: github.event_name == 'push' || inputs.submit
         run: node scripts/release/mobile-native.mjs credentials
+      - name: Inspect the official source upload without building
+        if: steps.source.outputs.build_id == ''
+        working-directory: apps/mobile
+        env:
+          CI: '1'
+        run: npx -y eas-cli@27.2.0 build:inspect --platform ios --profile hosted-production --stage archive --output "$RUNNER_TEMP/mikka-eas-archive"
+      - name: Require the complete protected UI in the EAS archive
+        if: steps.source.outputs.build_id == ''
+        run: node scripts/release/mobile-native.mjs archive
       - name: Build iOS with existing signing credentials
         if: steps.source.outputs.build_id == ''
         working-directory: apps/mobile
-        run: npx -y eas-cli@27.2.0 build --platform ios --profile production --non-interactive --freeze-credentials --wait --json > "$RUNNER_TEMP/mikka-native-build.json"
+        run: npx -y eas-cli@27.2.0 build --platform ios --profile hosted-production --non-interactive --freeze-credentials --wait --json > "$RUNNER_TEMP/mikka-native-build.json"
       - name: Read the existing completed build without rebuilding
         if: steps.source.outputs.build_id != ''
         working-directory: apps/mobile
@@ -135,6 +181,8 @@ jobs:
         id: build
         env:
           NATIVE_SOURCE_SHA: ${{ steps.source.outputs.commit }}
+          # shortcut: existing-build recovery accepts production, add original hosted archive proof when hosted recovery is needed.
+          NATIVE_BUILD_PROFILE: ${{ steps.source.outputs.build_id == '' && 'hosted-production' || 'production' }}
           EXISTING_BUILD_ID: ${{ steps.source.outputs.build_id }}
         run: node scripts/release/mobile-native.mjs verify
       - name: Submit this build to TestFlight

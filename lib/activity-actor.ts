@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
+import type { EnterprisePrincipal } from './enterprise/principal'
 
 // Who caused an issue_versions row. Always decided on the server from the
 // verified session, MCP token or job that is running; never read from input.
@@ -11,7 +12,7 @@ export const agentActor = (agentId: string | null): ActivityActor => ({ actorTyp
 export const systemActor = (source: string | null = null): ActivityActor => ({ actorType: 'system', actorId: source })
 
 /** `tokenWorkspaceId`: the workspace a personal access token is pinned to, when an API route acts for its owner. */
-type ActingContext = { userId: string; actor?: ActivityActor; tokenWorkspaceId?: string }
+type ActingContext = { userId: string; actor?: ActivityActor; tokenWorkspaceId?: string; enterprisePrincipal?: EnterprisePrincipal }
 export const actingContext = new AsyncLocalStorage<ActingContext>()
 
 /**

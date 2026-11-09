@@ -16,6 +16,12 @@
       "pnpm": "10.34.3",
       "channel": "preview",
       "distribution": "internal"
+    },
+    "hosted-production": {
+      "extends": "production",
+      "env": {
+        "MIKKA_MOBILE_OVERLAY_DIR": ".hosted-ui/mobile"
+      }
     }
   },
   "submit": {

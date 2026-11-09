@@ -1,13 +1,77 @@
 import assert from 'node:assert/strict'
 import test, { mock } from 'node:test'
 import type { Pool } from 'pg'
+import { PgDialect } from 'drizzle-orm/pg-core'
 
 const sourceEventId = '00000000-0000-4000-8000-000000000001'
 const taskId = '00000000-0000-4000-8000-000000000002'
 const runId = '00000000-0000-4000-8000-000000000003'
+const workspaceId = '00000000-0000-4000-8000-000000000004'
 let status = 'running'
 const task = () => ({ id: taskId, userId: 'owner', botId: null, issueId: 'issue',
   sourceEventId, stage: 'execute', status, route: { flowVersion: 2 } })
+
+// Replay composition keeps the real background/Task Workspace guards. Only
+// their closed DB projections and unrelated session/notification IO are fixtures;
+// lock waits and persisted revocation are exercised by the PostgreSQL suites.
+const dialect = new PgDialect()
+const tableName = (table: Record<symbol, unknown>) => table[Object.getOwnPropertySymbols(table).find(key => key.description === 'drizzle:Name')!]
+let workspaceProbe: { memberAllowed: boolean; persistedWorkspaceId: string | null; active: boolean; locks: string[] }
+function workspaceSelect(columns: Record<string, unknown>) {
+  let table: unknown, condition: ReturnType<PgDialect['sqlToQuery']>, organizationJoin = false
+  const query = {
+    from(value: Record<symbol, unknown>) { table = tableName(value); return query },
+    leftJoin(value: Record<symbol, unknown>, predicate: Parameters<PgDialect['sqlToQuery']>[0]) {
+      assert.equal(table, 'mikka_workspace_members')
+      assert.equal(tableName(value), 'mikka_organization_workspaces')
+      const join = dialect.sqlToQuery(predicate)
+      assert.equal(join.sql, '"mikka_organization_workspaces"."workspaceId" = "mikka_workspace_members"."workspaceId"')
+      assert.deepEqual(join.params, [])
+      assert.deepEqual(Object.keys(columns), ['id', 'organizationId'])
+      organizationJoin = true
+      return query
+    },
+    where(value: Parameters<PgDialect['sqlToQuery']>[0]) { condition = dialect.sqlToQuery(value); return query },
+    async for(mode: string, options?: { of?: Record<symbol, unknown> }) {
+      assert.equal(workspaceProbe.active, true)
+      assert.equal(mode, 'share')
+      if (table === 'mikka_workspaces') {
+        assert.deepEqual(Object.keys(columns), ['id', 'kind', 'ownerId'])
+        assert.deepEqual(condition.params, [workspaceId])
+        workspaceProbe.locks.push('workspace')
+        return [{ id: workspaceId, kind: 'team', ownerId: 'owner' }]
+      }
+      assert.equal(table, 'mikka_workspace_members')
+      assert.deepEqual(condition.params, [workspaceId, 'owner', 'active'])
+      assert.equal(workspaceProbe.locks.at(-1), 'workspace')
+      if (organizationJoin) {
+        assert.ok(options?.of)
+        assert.equal(tableName(options.of), 'mikka_workspace_members')
+      } else {
+        assert.deepEqual(Object.keys(columns), ['id'])
+        assert.equal(options, undefined)
+      }
+      workspaceProbe.locks.push('member')
+      return workspaceProbe.memberAllowed ? [{ id: 'owner', ...(organizationJoin ? { organizationId: null } : {}) }] : []
+    },
+  }
+  return query
+}
+mock.module('../workspace-db.ts', { namedExports: {
+  workspaceDb: { select: workspaceSelect, transaction: async <T>(work: (tx: { select: typeof workspaceSelect }) => Promise<T>) => {
+    assert.equal(workspaceProbe.active, false)
+    workspaceProbe.active = true
+    try { return await work({ select: workspaceSelect }) } finally { workspaceProbe.active = false }
+  } },
+} })
+mock.module('../db/request-scope.ts', { namedExports: { inDatabaseTransaction: () => false } })
+mock.module('../db/index.ts', { namedExports: {
+  db: {}, pool: { query: async () => assert.fail('Replay fixture must not open an unrelated APP query') },
+} })
+mock.module('../session.ts', { namedExports: { getSession: async () => assert.fail('Owner replay must not look up a new browser session') } })
+mock.module('../request-log.ts', { namedExports: { noteLogUser: () => {} } })
+mock.module('../run-control.ts', { namedExports: { stopOwnedRun: async () => assert.fail('Accepted replay must not stop the current executor') } })
+mock.module('../run-completion-effects.ts', { namedExports: { afterRunEnded: async () => assert.fail('Accepted replay must not invoke completion or reconciliation') } })
 
 mock.module('../live/factory.ts', { namedExports: { factoryChanged: async () => {} } })
 mock.module('../device-gateway-notify.ts', { namedExports: { runControlChanged: () => {} } })
@@ -20,6 +84,7 @@ mock.module('./runtime.ts', { namedExports: { factoryRuntimeForBot: () => ({ sto
 const { continueActiveFactoryRequest } = await import('./request-epoch')
 
 function fixture(allowEventWrite = false) {
+  workspaceProbe = { memberAllowed: true, persistedWorkspaceId: workspaceId, active: false, locks: [] }
   const writes: string[] = [], boundaries: string[] = []
   let released = false
   const client = {
@@ -36,8 +101,23 @@ function fixture(allowEventWrite = false) {
     release() { released = true },
   }
   const pool = {
-    query: async () => ({ rows: [{ id: taskId, botId: null, issueId: 'issue' }] }),
-    connect: async () => client,
+    async query(sql: string, params: unknown[]) {
+      if (sql.startsWith('SELECT t.id,t."botId",t."issueId" FROM factory_attempts a')) {
+        assert.deepEqual(params, [runId, 'owner'])
+        return { rows: [{ id: taskId, botId: null, issueId: 'issue' }] }
+      }
+      assert.ok(sql.startsWith('SELECT t."workspaceId" FROM factory_tasks t'))
+      assert.ok(sql.includes('JOIN issues i ON i.id=t."issueId" AND i."ownershipState"=\'bound\' AND i."workspaceId"=t."workspaceId"'))
+      assert.ok(sql.includes('WHERE t.id=$1 AND t."userId"=$2'))
+      assert.deepEqual(params, [taskId, 'owner', false, null])
+      return { rows: [{ workspaceId: workspaceProbe.persistedWorkspaceId }] }
+    },
+    async connect() {
+      assert.equal(workspaceProbe.active, true, 'APP checkout follows the real Workspace lease')
+      assert.deepEqual(workspaceProbe.locks, ['workspace', 'member'])
+      assert.equal(workspaceProbe.memberAllowed, true)
+      return client
+    },
   } as unknown as Pool
   return { pool, writes, boundaries, released: () => released }
 }
@@ -50,6 +130,8 @@ test('forwarding the already accepted owner event keeps the current executor and
   assert.deepEqual(f.writes, [])
   assert.deepEqual(f.boundaries, ['BEGIN', 'COMMIT'])
   assert.equal(f.released(), true)
+  assert.deepEqual(workspaceProbe.locks, ['workspace', 'member'])
+  assert.equal(workspaceProbe.active, false)
 })
 
 test('replaying an accepted event cannot resume a cancelled or revoked task', async () => {
@@ -58,5 +140,19 @@ test('replaying an accepted event cannot resume a cancelled or revoked task', as
     await assert.rejects(continueActiveFactoryRequest(f.pool, 'owner', runId, 'Original request', sourceEventId), { code: 'factoryStopped' })
     assert.equal(f.boundaries.at(-1), 'ROLLBACK')
     assert.equal(f.released(), true)
+  }
+})
+
+test('an accepted event still requires persisted tenant ownership and active membership', async () => {
+  for (const missing of ['tenant', 'membership'] as const) {
+    const f = fixture()
+    status = 'running'
+    if (missing === 'tenant') workspaceProbe.persistedWorkspaceId = null
+    else workspaceProbe.memberAllowed = false
+    await assert.rejects(continueActiveFactoryRequest(f.pool, 'owner', runId, 'Original request', sourceEventId), { code: 'factoryNotFound' })
+    assert.deepEqual(f.writes, [])
+    assert.deepEqual(f.boundaries, [], 'refusal happens before any APP transaction')
+    assert.equal(f.released(), false)
+    assert.equal(workspaceProbe.active, false)
   }
 })

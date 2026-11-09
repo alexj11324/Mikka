@@ -1,0 +1,112 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+# Also a symlink of that name (a link is not a directory, so the slash form misses it).
+node_modules
+
+# next.js
+/.next/
+/.output/
+/apps/frontend/dist/
+/apps/api/generated/spa.ts
+/out/
+
+# production
+/build
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files
+.env*
+!.env.example
+
+# vercel
+.vercel
+
+# private temporary test credentials and sessions
+/.cache/e2e/
+/.cache/mvp-retained/
+/.cache/dev-local/
+/.cache/dev-runtime/
+/playwright-mvp-report/
+/mvp-test-results/
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# browser test artifacts
+/playwright-report/
+/test-results/
+/playwright-performance-report/
+/playwright-report-smoke/
+/performance-results/
+/blob-report/
+
+# Workflow SDK local world
+/.workflow-data/
+/.swc
+
+# Pinned CPA checkout and worker build artifacts.
+/packages/subscription-worker/.upstream/
+/packages/subscription-worker/.cache/
+/packages/subscription-worker/bin/
+/packages/daemon/dist/
+/packages/daemon/.retained-build-*/
+/packages/daemon/.retained-package-test-*/
+# Electron shell build output and packaged apps.
+/apps/desktop/dist/
+/apps/desktop/release/
+/apps/desktop/release-dev/
+/apps/desktop/release-acceptance/
+/.cache/desktop-evidence/
+/.cache/desktop-runtime/
+# Generated standalone credential broker bundles.
+/services/credential-broker/dist/
+/services/credential-broker/public/
+
+# Private chat-attachment acceptance state and generated screenshots.
+/.cache/attachments/
+
+# hosted UI layer checkout (docs/ui-overlay.md)
+/.hosted-ui/
+
+# Nx Core local graph/task state
+.nx/
+
+# EAS replaces all nested .gitignore files. Preserve the mobile and e2b exclusions.
+/apps/mobile/.expo/
+/apps/mobile/dist/
+/apps/mobile/expo-env.d.ts
+/apps/mobile/ios/
+/apps/mobile/android/
+/scripts/e2b/__pycache__/
+/scripts/e2b/*.pyc
+
+# Official CI uploads the pinned private layer, including its shared dependencies.
+!/.hosted-ui/
+!/.hosted-ui/**
+
+# Keep credentials, repository metadata, generated outputs and evidence off Expo.
+.git
+.env*
+node_modules/
+docs/
+*.map
+*.pem
+*.key
+*.p8
+*.p12
+id_rsa*
+id_ed25519*
+credentials.json
+/mobile-native-report/
+/.hosted-ui/.next/
+/.hosted-ui/.output/
+/.hosted-ui/dist/
+/.hosted-ui/build/
+/.hosted-ui/out/

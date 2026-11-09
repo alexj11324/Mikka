@@ -343,6 +343,11 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
   // conversation or credential is ever written to the handoff or worktree.
   const decisionMcpUrl = config.decisionUrl
   const decisionMcpToken = config.decisionToken
+  // Match protocol/trace-context's W3C validator in this dependency-free child.
+  // Only the host-bound carrier is used; env and tool arguments cannot replace it.
+  const parent = config.decisionTraceparent
+  const decisionTraceparent = typeof parent === 'string' && /^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$/.test(parent)
+    && parent.slice(3, 35) !== '0'.repeat(32) && parent.slice(36, 52) !== '0'.repeat(16) ? parent : undefined
   const decisionMcpAvailable = Boolean(decisionMcpUrl && /^mkw_[A-Za-z0-9_-]{43}$/.test(decisionMcpToken ?? ''))
   let decisionRpcId = 0
   async function decisionRpc(operation, method, params) {
@@ -357,7 +362,8 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
     try {
       response = await fetch(decisionMcpUrl, {
         method: 'POST', redirect: 'error', signal: AbortSignal.any([lifetime.signal, AbortSignal.timeout(20_000)]),
-        headers: { authorization: 'Bearer ' + decisionMcpToken, 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'mcp-protocol-version': '2025-06-18' },
+        headers: { authorization: 'Bearer ' + decisionMcpToken, 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'mcp-protocol-version': '2025-06-18',
+          ...(decisionTraceparent ? { traceparent: decisionTraceparent } : {}) },
         body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
       })
       observed.headers(response.status)

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { after, before, mock, test } from 'node:test'
 import { readFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
+import { measured } from '../tests/helpers/read-metrics'
 import { Pool } from 'pg'
 import { createRequestDatabaseScope } from './db/request-scope'
 import { mintDeviceEnrollment, consumeDeviceEnrollment } from './device-enrollment'
@@ -57,6 +58,34 @@ test('desktop account context reads only the current browser owner\'s active loc
     browserOwner = 'desktop-b'
     assert.deepEqual(await (await GET(request())).json(), { ownerId: 'desktop-b', deviceIds: [foreign] })
   } finally { browserOwner = null }
+}))
+
+test('local setup owner view retains fresh session checks without reading unused devices', () => run(async () => {
+  const { GET } = await import('../app/api/devices/enrollment/route')
+  const request = (query = '?view=owner') => new Request('http://localhost/mikka/api/devices/enrollment' + query)
+  const previousOwner = browserOwner
+  try {
+    browserOwner = null
+    assert.equal((await GET(request())).status, 401)
+    for (const owner of ['setup-owner-a', 'setup-owner-b', 'setup-owner-a']) {
+      browserOwner = owner; freshSessionRead = false
+      const read = await measured(async () => {
+        const response = await GET(request())
+        assert.equal(response.status, 200)
+        assert.equal(response.headers.get('Cache-Control'), 'private, no-store')
+        return response.json()
+      })
+      assert.deepEqual(read.value, { ownerId: owner })
+      assert.equal(freshSessionRead, true, 'owner admission still requests the current database session')
+      assert.equal(read.statements, 0, 'the mocked auth boundary adds no SQL and the owner view does not query devices')
+      const full = await measured(async () => (await GET(request(''))).json())
+      assert.deepEqual(full.value, { ownerId: owner, deviceIds: [] })
+      assert.equal(full.statements, 1, 'the default verification view still reads current ownership from real Postgres')
+    }
+    browserOwner = null
+    assert.equal((await GET(request())).status, 401, 'a previous identity cannot survive sign-out')
+    for (const query of ['?view=', '?view=devices', '?view=owner&view=owner']) assert.equal((await GET(request(query))).status, 400)
+  } finally { browserOwner = previousOwner }
 }))
 
 test('owner token pagination preserves microsecond ordering and rejects foreign or malformed anchors', () => run(async () => {

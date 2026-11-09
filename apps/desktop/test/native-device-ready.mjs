@@ -130,7 +130,7 @@ export async function waitForNativeDevice(target, { scope, profile, record, time
   assert.ok(typeof profile === 'string' && isAbsolute(profile) && resolve(profile) === profile, 'NATIVE_DEVICE_EXACT_PROFILE_REQUIRED')
   assert.ok(Number.isFinite(timeout) && timeout > 0 && timeout <= 480_000, 'NATIVE_DEVICE_WAIT_BOUND_REQUIRED')
   const started = now()
-  const evidence = { mode: ['bundled', 'hosted'].includes(target.mode) ? target.mode : 'other', ready: false, deadlineMs: timeout, elapsedMs: 0, reads: 0, transitions: [], overflow: false, failure: null }
+  const evidence = { mode: ['bundled', 'hosted'].includes(target.mode) ? target.mode : 'other', ready: false, deadlineMs: timeout, elapsedMs: 0, reads: 0, navigationInterruptions: 0, transitions: [], overflow: false, failure: null }
   record?.(evidence)
   let previous
   try {
@@ -138,7 +138,18 @@ export async function waitForNativeDevice(target, { scope, profile, record, time
       await scope.assertActive()
       const remaining = timeout - (now() - started)
       if (remaining <= 0) break
-      const state = await bounded(snapshot(), Math.min(5000, remaining))
+      let state
+      try { state = await bounded(snapshot(), Math.min(5000, remaining)) }
+      catch (error) {
+        // A real reload may destroy this read's document. Retry only that
+        // exact interruption on an open page, within the original deadline.
+        if (!(error instanceof Error) || error.name !== 'Error'
+          || error.message !== 'page.evaluate: Execution context was destroyed, most likely because of a navigation'
+          || error.code !== undefined || error.cause !== undefined || target.page?.isClosed?.() !== false) throw error
+        evidence.navigationInterruptions++
+        await delay(Math.min(250, Math.max(0, timeout - (now() - started))))
+        continue
+      }
       evidence.reads++
       const key = JSON.stringify(state)
       if (key !== previous) {

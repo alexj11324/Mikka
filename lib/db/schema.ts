@@ -1,7 +1,7 @@
 import type { ExecutionIdentity } from '../execution-identity'
 import type { WorkerDefinitionSnapshot } from '../agent-kit/worker'
 import type { SendKey } from '../send-key'
-import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, type AnyPgColumn } from 'drizzle-orm/pg-core'
+import { pgTable, text, uuid, varchar, jsonb, bigint, integer, real, date, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, check, foreignKey, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
 import type { HarnessInfo } from '@mikka/protocol/harness'
@@ -31,6 +31,11 @@ export const issueDocuments = pgTable('issue_documents', {
 
 export const issues = pgTable('issues', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  /** Immutable tenant. NULL is reserved for quarantined historical records. */
+  workspaceId: uuid('workspaceId'),
+  ownershipState: text('ownershipState').$type<'bound' | 'pending'>().notNull().default('pending'),
+  /** Provider policy is independent of tenant membership and the legacy scope label. */
+  linearSyncPolicy: text('linearSyncPolicy').$type<'disabled' | 'explicit'>().notNull().default('disabled'),
   title: varchar('title', { length: 200 }).notNull(),
   /**
    * A short title the small model wrote once when the task was created (lib/short-title.ts), and the title it was
@@ -39,17 +44,17 @@ export const issues = pgTable('issues', {
   shortTitle: varchar('shortTitle', { length: 60 }), shortTitleFrom: varchar('shortTitleFrom', { length: 200 }),
   content: jsonb('content').$type<JSONContent>().notNull(),
   status: text('status').notNull(), priority: text('priority').notNull(),
-  // Workspace issues sync with Linear; personal ones never leave Mikka (MIK-46).
+  // Compatibility label only. workspaceId is the tenant; provider bindings control sync.
   scope: text('scope').$type<'workspace' | 'personal'>().notNull().default('personal'),
   scopeVersion: integer('scopeVersion').notNull().default(1),
   linearSyncBlocked: boolean('linearSyncBlocked').notNull().default(false),
-  // The agent judges scope at creation; a person's change wins and teaches the next judgment (MIK-47).
+  // Retained for historical receipts. New tasks never infer a tenant from content.
   scopeSetBy: text('scopeSetBy').$type<'agent' | 'user'>().notNull().default('agent'),
   scopeConfidence: real('scopeConfidence'),
   revision: integer('revision').notNull().default(1),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [index('issues_owner_updated_idx').on(table.userId, table.updatedAt.desc())])
+}, table => [index('issues_owner_updated_idx').on(table.userId, table.updatedAt.desc()), index('issues_workspace_updated_idx').on(table.workspaceId, table.updatedAt.desc())])
 export const teamIssueCreateRequests = pgTable('team_issue_create_requests', {
   requestId: uuid('requestId').primaryKey(), ownerId: text('ownerId').notNull(),
   issueId: uuid('issueId').notNull().unique(), teamId: uuid('teamId').notNull(),
@@ -188,10 +193,12 @@ export const linearConnections = pgTable('linear_connections', {
 })
 export const linearTeamSyncs = pgTable('linear_team_syncs', {
   id: uuid('id').primaryKey(), ownerId: text('ownerId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  /** Explicit provider binding; legacy rows need a verified workspace choice. */
+  workspaceId: uuid('workspaceId'),
   linearTeamId: text('linearTeamId').notNull().unique(), linearTeamKey: text('linearTeamKey').notNull(), linearTeamName: text('linearTeamName').notNull(),
   active: boolean('active').notNull().default(true), lastError: text('lastError'), lastErrorAt: timestamp('lastErrorAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(), updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [index('linear_team_syncs_owner_idx').on(table.ownerId, table.active), uniqueIndex('linear_team_syncs_one_active_per_owner_key').on(table.ownerId).where(sql`${table.active}`)])
+}, table => [index('linear_team_syncs_owner_idx').on(table.ownerId, table.active), uniqueIndex('linear_team_syncs_one_active_per_workspace_key').on(table.ownerId, table.workspaceId).where(sql`${table.active} and ${table.workspaceId} is not null`)])
 /** One immutable remote identity per workspace scope generation. Reservation
  * commits before provider IO, so an ambiguous response is retried with this ID. */
 export const linearIssuePublications = pgTable('linear_issue_publications', {
@@ -356,6 +363,8 @@ export const agentRuns = pgTable('agent_runs', {
   /** Immutable execution provenance; old rows remain unrecorded. */
   agentDefinition: jsonb('agentDefinition').$type<WorkerDefinitionSnapshot | null>(),
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  /** Immutable thread tenant, retained if a Bot/provenance link is removed. */
+  workspaceId: uuid('workspaceId'),
   issueId: uuid('issueId').references(() => issues.id, { onDelete: 'cascade' }),
   agentId: uuid('agentId').notNull().references(() => agents.id, { onDelete: 'cascade' }),
   /** The bot that started this thread, the Coordinator included; null for an MCP client's run. */
@@ -415,6 +424,25 @@ export const agentRuns = pgTable('agent_runs', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('agent_runs_device_status_idx').on(table.deviceId, table.status), index('agent_runs_issue_idx').on(table.issueId, table.createdAt), index('agent_runs_bot_created_idx').on(table.botId, table.createdAt.desc()).where(sql`${table.botId} is not null`), uniqueIndex('agent_runs_user_dispatch_key').on(table.userId, table.dispatchKey).where(sql`${table.dispatchKey} is not null`), index('agent_runs_retry_of_idx').on(table.retryOf).where(sql`${table.retryOf} is not null`), index('agent_runs_continues_run_idx').on(table.continuesRunId).where(sql`${table.continuesRunId} is not null`)])
 
+/** Confirmed VM running intervals; mutable thread-machine custody is separate. */
+export const threadMachineSessions = pgTable('thread_machine_sessions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  runId: uuid('runId').notNull().references(() => agentRuns.id, { onDelete: 'cascade' }),
+  ownerId: text('ownerId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  workspaceId: uuid('workspaceId').notNull(), botId: uuid('botId'), sandboxId: text('sandboxId').notNull(),
+  startedAt: timestamp('startedAt', { withTimezone: true }).notNull(),
+  endedAt: timestamp('endedAt', { withTimezone: true }),
+  reason: text('reason').$type<'paused' | 'retired' | 'provider_missing' | 'transferred' | 'replaced' | 'scope_changed'>(),
+  source: text('source').$type<'running_since' | 'observed' | 'running_since_backfill'>().notNull(),
+}, table => [
+  uniqueIndex('thread_machine_sessions_open_run').on(table.runId).where(sql`${table.endedAt} IS NULL`),
+  index('thread_machine_sessions_scope_run').on(table.ownerId, table.workspaceId, table.runId, table.startedAt, table.id),
+  check('thread_machine_sessions_reason_check', sql`${table.reason} IN ('paused','retired','provider_missing','transferred','replaced','scope_changed')`),
+  check('thread_machine_sessions_source_check', sql`${table.source} IN ('running_since','observed','running_since_backfill')`),
+  check('thread_machine_sessions_check', sql`${table.endedAt} IS NULL OR ${table.endedAt}>=${table.startedAt}`),
+  check('thread_machine_sessions_check1', sql`(${table.endedAt} IS NULL)=(${table.reason} IS NULL)`),
+])
+
 /** A verified owner/repository binding. Installation tokens are never stored. */
 /** Plugins → GitHub connection, separate from the login identity; one GitHub account may serve many users. Tokens are sealed like Better Auth's. */
 export const githubConnections = pgTable('github_connections', {
@@ -439,7 +467,8 @@ export const githubRepositoryInstallations = pgTable('github_repository_installa
 /** Server-issued publication assignment and durable completion receipt (ADR 0024). */
 export const runPublications = pgTable('run_publications', {
   runId: uuid('runId').primaryKey().references(() => agentRuns.id, { onDelete: 'cascade' }),
-  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  /** Historical actor, as on agent_runs; deleting an account cannot erase a kept task's publication receipt. */
+  userId: text('userId').notNull(),
   issueId: uuid('issueId').notNull().references(() => issues.id, { onDelete: 'cascade' }),
   scopeVersion: integer('scopeVersion'), issueTitle: text('issueTitle'),
   remoteUrl: text('remoteUrl').notNull(), remoteKey: text('remoteKey').notNull(),
@@ -567,6 +596,22 @@ export const coordinatorSessions = pgTable('coordinator_sessions', {
   lastErrorAt: timestamp('lastErrorAt', { withTimezone: true }),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('coordinator_sessions_chat_key').on(table.userId, table.botId).nullsNotDistinct()])
+
+/** First inbox and run settings are committed together, before preparation.
+ * Replays still check the current chat lease and fresh execution authority. */
+export const coordinatorStartupReceipts = pgTable('coordinator_startup_receipts', {
+  userId: text('userId').notNull(), botId: uuid('botId').notNull(), holder: text('holder').notNull(),
+  round: integer('round').notNull(), version: integer('version').notNull().default(1),
+  settings: jsonb('settings').$type<import('@/lib/coordinator/startup-receipt').StoredCoordinatorStartupSettings>().notNull(),
+  inbox: jsonb('inbox').$type<import('@/lib/coordinator/startup-receipt').StoredCoordinatorStartupInbox>().notNull(),
+}, table => [
+  primaryKey({ columns: [table.userId, table.botId, table.holder, table.round] }),
+  foreignKey({ columns: [table.userId, table.botId], foreignColumns: [coordinatorSessions.userId, coordinatorSessions.botId] }).onDelete('cascade'),
+  check('coordinator_startup_receipts_round_check', sql`${table.round} = 0`),
+  check('coordinator_startup_receipts_version_check', sql`${table.version} = 1`),
+  check('coordinator_startup_receipts_settings_check', sql`jsonb_typeof(${table.settings}) = 'object'`),
+  check('coordinator_startup_receipts_inbox_check', sql`jsonb_typeof(${table.inbox}) = 'object'`),
+])
 
 // --- Suggestions (MIK-41) ---------------------------------------------------
 //
@@ -930,6 +975,8 @@ export type ArtifactKind = (typeof ARTIFACT_KINDS)[number]
 
 export const artifacts = pgTable('artifacts', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  /** Immutable tenant; unresolved legacy artifacts remain quarantined. */
+  workspaceId: uuid('workspaceId'),
   kind: text('kind').$type<ArtifactKind>().notNull(),
   title: varchar('title', { length: 200 }).notNull(),
   /** The run that made it; null when an agent outside a run (OAuth) sent it. */
@@ -1005,6 +1052,19 @@ export const runCaptures = pgTable('run_captures', {
   uniqueIndex('run_captures_recording_key').on(table.runId).where(sql`${table.status} = 'recording'`),
 ])
 
+/** A private poster derived from one immutable recording, with the same access boundary. */
+export const runCapturePosters = pgTable('run_capture_posters', {
+  captureId: uuid('captureId').primaryKey().references(() => runCaptures.id, { onDelete: 'cascade' }),
+  captureSha256: text('captureSha256').notNull(),
+  storageKey: text('storageKey').notNull(), inlineContent: bytea('inlineContent'),
+  size: integer('size').notNull(), sha256: text('sha256').notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [
+  check('run_capture_posters_captureSha256_check', sql`${table.captureSha256} ~ '^[a-f0-9]{64}$'`),
+  check('run_capture_posters_size_check', sql`${table.size}>0 AND ${table.size}<=256000`),
+  check('run_capture_posters_sha256_check', sql`${table.sha256} ~ '^[a-f0-9]{64}$'`),
+])
+
 /** A recording's timeline (Figma 13): what the agent did, in its own words, and when. */
 export const runCaptureSteps = pgTable('run_capture_steps', {
   id: uuid('id').primaryKey(),
@@ -1054,6 +1114,7 @@ export const pendingActions = pgTable('pending_actions', {
 // Factory #192 uses existing issues, Coordinator events and Harness runs.
 export const factoryTasks = pgTable('factory_tasks', {
   id: uuid('id').primaryKey(), userId: text('userId').notNull(),
+  workspaceId: uuid('workspaceId'),
   botId: uuid('botId'),
   issueId: uuid('issueId').notNull().references(() => issues.id, { onDelete: 'cascade' }),
   scopeVersion: integer('scopeVersion'),
@@ -1121,6 +1182,8 @@ export const nativeCoordinatorTools = pgTable('native_coordinator_tools', {
 export const mobilePushTokens = pgTable('mobile_push_tokens', {
   id: uuid('id').primaryKey(),
   userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  // Native session provenance; historical NULL tokens require registration.
+  sessionId: text('sessionId'),
   token: text('token').notNull(),
   platform: text('platform').notNull(),
   deviceName: text('deviceName'),

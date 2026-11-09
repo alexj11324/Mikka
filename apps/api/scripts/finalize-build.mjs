@@ -1,12 +1,17 @@
 import { createHash } from 'node:crypto'
-import { cp, lstat, mkdir, readFile, readdir, realpath, writeFile } from 'node:fs/promises'
+import { cp, lstat, mkdir, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, relative, resolve, sep } from 'node:path'
+import { promisify } from 'node:util'
+import { gzip } from 'node:zlib'
 import { build } from 'esbuild'
+import { POSTER_BINARY_ARCHIVE, POSTER_BINARY_MANIFEST, POSTER_BINARY_MAX_BYTES, POSTER_BINARY_RESOURCE,
+  POSTER_LICENSE_FILES, POSTER_RUNTIME_DIRECTORY } from '../../../lib/captures/poster-binary.mjs'
 import { configuredDeploymentId } from '../../../lib/deployment-id.mjs'
 import { nodeRuntimePackages } from '../build-contract.mjs'
 import { cloudServiceRewrite } from '../cloud-service-rewrite.mjs'
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
+const compress = promisify(gzip)
 const within = (root, path) => path === root || path.startsWith(`${root}${sep}`)
 
 /** Compile app-owned tracing only; the actual pg/OTel packages stay external. */
@@ -82,13 +87,33 @@ export async function finalizeBuild({ root, output, preset, revision }) {
     const bytes = await readFile(source)
     return { path, bytes: bytes.length, sha256: hash(bytes) }
   }))
+  const binary = await readFile(join(root, POSTER_BINARY_RESOURCE))
+  if (!binary.length || binary.length > POSTER_BINARY_MAX_BYTES) throw new Error('API_POSTER_BINARY_SIZE_INVALID')
+  const compressed = await compress(binary, { level: 9 })
+  if (compressed.length > POSTER_BINARY_MAX_BYTES) throw new Error('API_POSTER_BINARY_SIZE_INVALID')
+  const posterBinary = { version: 1, bytes: binary.length, sha256: hash(binary), gzipBytes: compressed.length, gzipSha256: hash(compressed) }
+  const generated = new Map([[POSTER_BINARY_ARCHIVE, compressed], [POSTER_BINARY_MANIFEST, Buffer.from(`${JSON.stringify(posterBinary)}\n`)]])
+  for (const name of POSTER_LICENSE_FILES) generated.set(`${POSTER_RUNTIME_DIRECTORY}/${name}`,
+    await readFile(join(root, dirname(POSTER_BINARY_RESOURCE), name)))
+  for (const [path, bytes] of generated) resources.push({ path, bytes: bytes.length, sha256: hash(bytes) })
+  async function copyResources(destinationRoot) {
+    // Remove any traced/raw copy (or package symlink). Generated resources live
+    // outside node_modules so Docker retains its server/node_modules symlink.
+    await rm(join(destinationRoot, dirname(POSTER_BINARY_RESOURCE)), { recursive: true, force: true })
+    for (const resource of resources) {
+      const destination = join(destinationRoot, resource.path)
+      await mkdir(dirname(destination), { recursive: true })
+      if (generated.has(resource.path)) await writeFile(destination, generated.get(resource.path))
+      else await cp(join(root, resource.path), destination, { preserveTimestamps: true })
+    }
+  }
   const evidence = { version: 1, revision, preset, node: process.version,
     basePath: '/mikka',
     appBuild: process.env.NEXT_PUBLIC_MIKKA_BUILD || process.env.VERCEL_DEPLOYMENT_ID || revision,
     testDeploymentSha: process.env.MIKKA_TEST_DEPLOYMENT_SHA ?? '',
     lockSha256: hash(await readFile(join(root, 'pnpm-lock.yaml'))),
     routesSha256: hash(await readFile(join(root, 'apps/api/generated/routes.json'))),
-    tracingSha256: hash(tracing), resources, functions: [] }
+    tracingSha256: hash(tracing), posterBinary, resources, functions: [] }
   if (evidence.testDeploymentSha && evidence.testDeploymentSha !== revision) throw new Error('API_TEST_BUILD_SHA_MISMATCH')
   if (preset === 'vercel') {
     const path = join(output, 'config.json')
@@ -101,11 +126,7 @@ export async function finalizeBuild({ root, output, preset, revision }) {
     if (deploymentId) config.deploymentId = deploymentId
     for (const directory of await functionDirectories(join(output, 'functions'))) {
       const contract = await wrapFunction(directory, tracing)
-      for (const resource of resources) {
-        const destination = join(directory, resource.path)
-        await mkdir(dirname(destination), { recursive: true })
-        await cp(join(root, resource.path), destination, { preserveTimestamps: true })
-      }
+      await copyResources(directory)
       evidence.functions.push({ path: relative(output, directory), ...contract })
     }
     await writeFile(path, `${JSON.stringify(config, null, 2)}\n`)
@@ -121,11 +142,7 @@ export async function finalizeBuild({ root, output, preset, revision }) {
       entrySha256: hash(dockerEntry), applicationSha256: hash(dockerApplication), trustProxy: false }
     // Node deployments are self-contained too. Existing process.cwd() resource
     // paths are retained when starting from this output directory.
-    for (const resource of resources) {
-      const destination = join(output, resource.path)
-      await mkdir(dirname(destination), { recursive: true })
-      await cp(join(root, resource.path), destination, { preserveTimestamps: true })
-    }
+    await copyResources(output)
   } else throw new Error('API_BUILD_PRESET_UNSUPPORTED')
   await writeFile(join(output, 'mikka-build.json'), `${JSON.stringify(evidence, null, 2)}\n`)
   return evidence

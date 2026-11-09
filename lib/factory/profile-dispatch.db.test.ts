@@ -100,7 +100,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
     const ownerId = await seedUser(pool, 'profile-stage')
     const { id: workspaceId } = await seedWorkspace(pool, ownerId, [{ userId: ownerId, role: 'admin' }])
     await pool.query("UPDATE mikka_workspaces SET kind='personal' WHERE id=$1", [workspaceId])
-    const botId = await seedBot(pool, workspaceId, ownerId), issueId = await seedIssue(pool, ownerId)
+    const botId = await seedBot(pool, workspaceId, ownerId), issueId = await seedIssue(pool, ownerId, workspaceId)
     const scope = { ownerId, workspaceId, botId }, actor = { userId: ownerId, workspaceId }
     const submissionId = randomUUID()
     const submitted = profileId ? await (await import('../coordinator-submission')).recordPersonalSubmission(modules[0].db, ownerId, 'Create a checked deliverable', { botId, submissionId, profileId }) : null
@@ -1183,7 +1183,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
   }[quotaResult], async t => {
     const slowPreparation = quotaResult !== 'fresh'
     const f = await fixture(false, false), beforeDecisions = decisionCounts()
-    const chatBotId = await seedBot(pool, f.workspaceId, f.ownerId), issueId = await seedIssue(pool, f.ownerId), sourceEventId = randomUUID()
+    const chatBotId = await seedBot(pool, f.workspaceId, f.ownerId), issueId = await seedIssue(pool, f.ownerId, f.workspaceId), sourceEventId = randomUUID()
     await pool.query(`INSERT INTO coordinator_events (id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES ($1::uuid,$2,$3,$4,'user_message',$1::text,'{"text":"Run the explicit Codex task"}')`, [sourceEventId, f.ownerId, chatBotId, issueId])
     await pool.query('UPDATE model_order_settings SET "preferredHarness"=\'claude_code\' WHERE "ownerId"=$1 AND "workspaceId"=$2', [f.ownerId, f.workspaceId])
     await pool.query('UPDATE model_order_entries SET position=position+100 WHERE "ownerId"=$1 AND "workspaceId"=$2', [f.ownerId, f.workspaceId])
@@ -1482,6 +1482,12 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
   await t.test('spec question claim rejects missing receipts, stale epochs, changed targets and revoked subscriptions without consuming the run', async t => {
     const f = await planQuestionFixture()
     await f.expireQuota()
+    // A different real origin in the same tenant gets past the database's
+    // lineage boundary, so this still exercises the exact question receipt.
+    const differentOrigin = randomUUID()
+    await pool.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","botId","workspaceId",status,"finishedAt")
+      SELECT $1,"userId","issueId","agentId","deviceId","botId","workspaceId",'succeeded',now() FROM agent_runs WHERE id=$2`,
+      [differentOrigin, f.first.runId])
     const receipt = (await pool.query('SELECT request,result FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [f.task.id, f.receiptId])).rows[0]
     const attempt = (await pool.query('SELECT output FROM factory_attempts WHERE id=$1', [f.resumed.task.attemptId])).rows[0]
     const change = (sql: string, values: unknown[], undo: string, previous: unknown[]) => async () => {
@@ -1492,7 +1498,7 @@ test('real PG: independent cross-Harness Profile stages and recorded cloud runti
       ['missing host receipt', change('DELETE FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [f.task.id, f.receiptId], 'INSERT INTO factory_events ("taskId","eventId",request,result) VALUES ($1,$2,$3,$4)', [f.task.id, f.receiptId, JSON.stringify(receipt.request), JSON.stringify(receipt.result)])],
       ['receipt owner mismatch', change('UPDATE factory_events SET result=$3 WHERE "taskId"=$1 AND "eventId"=$2', [f.task.id, f.receiptId, JSON.stringify({ ...receipt.result, task: { ...receipt.result.task, userId: 'foreign-owner' } })], 'UPDATE factory_events SET result=$3 WHERE "taskId"=$1 AND "eventId"=$2', [f.task.id, f.receiptId, JSON.stringify(receipt.result)])],
       ['stale request epoch', change('UPDATE factory_attempts SET output=$2 WHERE id=$1', [f.resumed.task.attemptId, JSON.stringify({ ...attempt.output, requestEpoch: randomUUID() })], 'UPDATE factory_attempts SET output=$2 WHERE id=$1', [f.resumed.task.attemptId, JSON.stringify(attempt.output)])],
-      ['different question origin', change('UPDATE agent_runs SET "questionContinuation"=$2 WHERE id=$1', [f.child.id, JSON.stringify({ ...f.child.questionContinuation, originRunId: randomUUID() })], 'UPDATE agent_runs SET "questionContinuation"=$2 WHERE id=$1', [f.child.id, JSON.stringify(f.child.questionContinuation)])],
+      ['different question origin', change('UPDATE agent_runs SET "questionContinuation"=$2 WHERE id=$1', [f.child.id, JSON.stringify({ ...f.child.questionContinuation, originRunId: differentOrigin })], 'UPDATE agent_runs SET "questionContinuation"=$2 WHERE id=$1', [f.child.id, JSON.stringify(f.child.questionContinuation)])],
       ['writable plan', change('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.child.id, JSON.stringify({ ...f.child.agentDefinition, readOnly: false })], 'UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.child.id, JSON.stringify(f.child.agentDefinition)])],
       ['different model', change('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.child.id, JSON.stringify({ ...f.child.agentDefinition, model: 'changed-model' })], 'UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.child.id, JSON.stringify(f.child.agentDefinition)])],
       ['different Profile snapshot', change('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.child.id, JSON.stringify({ ...f.child.agentDefinition, agentProfile: { ...f.child.agentDefinition.agentProfile, digest: 'changed-role' } })], 'UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.child.id, JSON.stringify(f.child.agentDefinition)])],

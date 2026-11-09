@@ -43,9 +43,12 @@ mock.module('swr', { defaultExport: (key: string | null) => {
   if (refreshFails) throw new Error('list unavailable')
   return list?.data
 } }) } })
+// The report's CI checks row reads the review summary (its own SWR and live keys); these tests cover the flow, not that row.
+mock.module(new URL('../hooks/code-review/use-review-summary.ts', import.meta.url).href, { namedExports: { useReviewSummary: () => ({ data: undefined }) } })
 mock.module('next-intl', { namedExports: { useTranslations: translationsFor, useFormatter: () => ({
   dateTime: (value: Date, options: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', ...options }).format(value),
-}) } })
+  relativeTime: () => '',
+}), useNow: () => new Date('2026-11-05T01:00:00.000Z') } })
 mock.module(new URL('../components/workspace/issue-thread-panel.tsx', import.meta.url).href, { namedExports: { IssueThreadPanel: () => null } })
 // The report's diff rows use @pierre/diffs, which registers a web component on import; they draw only in a browser.
 mock.module(new URL('../components/workspace/thread-changes.tsx', import.meta.url).href, { namedExports: {

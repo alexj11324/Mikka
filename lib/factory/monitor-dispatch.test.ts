@@ -1,5 +1,6 @@
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
 import { addFactoryPublicationEvidence, addFactoryVisualEvidence } from '../../tests/helpers/factory-visual-evidence';
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -195,8 +196,8 @@ test(
       const fixture = async () => {
         const issueId = randomUUID();
         await pool.query(
-          `INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,'owner','Monitor dispatch fixture','{}','todo','normal')`,
-          [issueId],
+          `INSERT INTO issues (id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,'owner','Monitor dispatch fixture','{}','todo','normal',$2,'bound')`,
+          [issueId, await seedFixtureWorkspace(pool, 'owner')],
         );
         const state = await store.route("owner", {
           issueId,

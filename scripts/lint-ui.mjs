@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
-import { auditSource, auditCss, isComponentLibrarySource } from './ui-policy.mjs'
+import { auditSource, auditCss, isComponentLibrarySource, exemptAsShipped } from './ui-policy.mjs'
 import { auditInteractions } from './interaction-policy.mjs'
 import { auditSettingsSurface } from './settings-policy.mjs'
 import { auditIconButtons } from './icon-button-policy.mjs'
@@ -17,7 +17,7 @@ if (config.style !== policy.style || config.iconLibrary !== policy.iconLibrary.r
 const businessFiles = files.filter(file => !isComponentLibrarySource(file, policy))
 for (const file of businessFiles) {
   const text = readFileSync(file, 'utf8')
-  diagnostics.push(...(file.endsWith('.css') ? auditCss(file, text, policy) : auditSource(file, text, policy)))
+  diagnostics.push(...exemptAsShipped(file, file.endsWith('.css') ? auditCss(file, text, policy) : auditSource(file, text, policy), policy))
   if (!file.endsWith('.css')) diagnostics.push(...auditBasePath(file, text))
   if (/\.[jt]sx$/.test(file)) diagnostics.push(...auditSettingsSurface(file, text), ...auditSplitPanes(file, text))
 }

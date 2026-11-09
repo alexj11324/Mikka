@@ -130,3 +130,98 @@ test('launchd bootstrap diagnostics retain only a bounded numeric code', async (
     for (const text of ['private', 'credential', 'arguments', 'Input/output', 'Permission']) assert.equal(JSON.stringify(value).includes(text), false)
   }
 })
+
+
+const navigationMessage = 'page.evaluate: Execution context was destroyed, most likely because of a navigation'
+const openHostedPage = { mode: 'hosted', page: { isClosed: () => false } }
+const isolatedReadinessOptions = {
+  profile: '/owned/profile', timeout: 1000,
+  metadata: async () => ({ status: 'unavailable', reason: 'fixture-no-probe' }),
+  environment: async () => ({ available: false, reason: 'fixture-no-probe' }),
+}
+
+test('one destroyed navigation context requires new leased snapshots and the unchanged ready predicate', async () => {
+  let at = 0, checks = 0, attempts = 0, evidence
+  const offline = await snapshot({ ...raw, device: { ...raw.device, signedIn: false } })
+  const ready = await snapshot()
+  await waitForNativeDevice(openHostedPage, {
+    ...isolatedReadinessOptions, now: () => at, delay: async ms => { at += ms },
+    scope: { assertActive: async () => { checks++ } }, record: value => { evidence = value },
+    snapshot: async () => {
+      attempts++
+      if (attempts === 1) throw new Error(navigationMessage)
+      return attempts === 2 ? offline : ready
+    },
+  })
+  assert.equal(evidence.ready, true)
+  assert.equal(checks, 3)
+  assert.equal(attempts, 3)
+  assert.equal(evidence.reads, 2)
+  assert.equal(evidence.navigationInterruptions, 1)
+  assert.equal(evidence.transitions.length, 2)
+  assert.equal(evidence.transitions[0].device.signedIn, false, 'a navigation interruption cannot manufacture authenticated readiness')
+  assert.equal(evidence.elapsedMs, 500)
+  assert.equal(evidence.deadlineMs, 1000)
+})
+
+test('repeated destroyed navigation contexts exhaust the original deadline without passing readiness', async () => {
+  let at = 0, checks = 0, attempts = 0, evidence
+  await assert.rejects(waitForNativeDevice(openHostedPage, {
+    ...isolatedReadinessOptions, now: () => at, delay: async ms => { at += ms },
+    scope: { assertActive: async () => { checks++ } }, record: value => { evidence = value },
+    snapshot: async () => { attempts++; throw new Error(navigationMessage) },
+  }), { message: 'PARITY_NATIVE_DEVICE_NOT_READY' })
+  assert.equal(evidence.ready, false)
+  assert.equal(evidence.failure, 'deadline')
+  assert.equal(evidence.deadlineMs, 1000)
+  assert.equal(evidence.elapsedMs, 1000)
+  assert.equal(evidence.reads, 0)
+  assert.equal(evidence.navigationInterruptions, 4)
+  assert.equal(checks, 4)
+  assert.equal(attempts, 4)
+})
+
+test('navigation handling preserves permanent, closed-page and authentication failures verbatim', async t => {
+  const cases = [
+    ['permanent read failure', new Error('NATIVE_DEVICE_READ_TIMEOUT'), openHostedPage],
+    ['closed page error', new Error('page.evaluate: Target page, context or browser has been closed'), openHostedPage],
+    ['page already closed', new Error(navigationMessage), { mode: 'hosted', page: { isClosed: () => true } }],
+    ['page openness unavailable', new Error(navigationMessage), { mode: 'hosted' }],
+    ['authentication failure', new Error('AUTH_FAILURE'), openHostedPage],
+    ['authentication code retains authority', Object.assign(new Error(navigationMessage), { code: 'authRequired' }), openHostedPage],
+    ['authentication cause retains authority', new Error(navigationMessage, { cause: new Error('AUTH_FAILURE') }), openHostedPage],
+    ['different exception kind', new TypeError(navigationMessage), openHostedPage],
+  ]
+  for (const [name, failure, target] of cases) await t.test(name, async () => {
+    let checks = 0, attempts = 0, delays = 0, evidence
+    await assert.rejects(waitForNativeDevice(target, {
+      ...isolatedReadinessOptions, now: () => 0, delay: async () => { delays++ },
+      scope: { assertActive: async () => { checks++ } }, record: value => { evidence = value },
+      snapshot: async () => { attempts++; throw failure },
+    }), error => error === failure)
+    assert.equal(evidence.ready, false)
+    assert.equal(evidence.reads, 0)
+    assert.equal(evidence.navigationInterruptions ?? 0, 0)
+    assert.equal(checks, 1)
+    assert.equal(attempts, 1)
+    assert.equal(delays, 0)
+  })
+})
+
+test('a navigation interruption never bypasses the next fresh lease check', async () => {
+  let at = 0, checks = 0, attempts = 0, evidence
+  const failure = new Error('LEASE_LOST')
+  await assert.rejects(waitForNativeDevice(openHostedPage, {
+    ...isolatedReadinessOptions, now: () => at, delay: async ms => { at += ms },
+    scope: { assertActive: async () => { if (++checks === 2) throw failure } },
+    record: value => { evidence = value },
+    snapshot: async () => { attempts++; throw new Error(navigationMessage) },
+  }), error => error === failure)
+  assert.equal(evidence.ready, false)
+  assert.equal(evidence.reads, 0)
+  assert.equal(evidence.navigationInterruptions, 1)
+  assert.equal(evidence.elapsedMs, 250)
+  assert.equal(checks, 2)
+  assert.equal(attempts, 1)
+})
+

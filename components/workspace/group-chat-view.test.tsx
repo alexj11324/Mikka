@@ -27,7 +27,7 @@ mock.module(new URL('../../lib/hooks/view-state.tsx', import.meta.url).href, { n
 } })
 mock.module(new URL('../coordinator/chat-composer.tsx', import.meta.url).href, { namedExports: { ChatComposer: () => null } })
 mock.module(new URL('../nav/conversation-pill.tsx', import.meta.url).href, { namedExports: { ConversationPill: () => null } })
-mock.module(new URL('../nav/group-avatar.tsx', import.meta.url).href, { namedExports: { GroupAvatar: () => null, groupMembersKey: (id: string) => ['group-members', id], useGroupMembers: () => ({ data: [] }) } })
+mock.module(new URL('../nav/group-avatar.tsx', import.meta.url).href, { namedExports: { GroupAvatar: () => null, groupMembersKey: (id: string) => ['group-members', id], memberAvatar: (member: { id: string }) => ({ id: member.id }), useGroupMembers: () => ({ data: [] }) } })
 mock.module(new URL('../nav/letter-avatar.tsx', import.meta.url).href, { namedExports: { LetterAvatar: () => null } })
 mock.module(new URL('../nav/bot-avatar.tsx', import.meta.url).href, { namedExports: { BotAvatar: () => null } })
 mock.module(new URL('./message-reactions.tsx', import.meta.url).href, { namedExports: { MessageReactions: () => null, useMessageReactions: () => ({}) } })

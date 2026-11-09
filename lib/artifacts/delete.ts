@@ -5,6 +5,8 @@ import { artifacts, artifactVersions } from '@/lib/db/schema'
 import { withAccountWrite } from '@/lib/account/write-guard'
 import { deleteArtifactObject } from '@/lib/artifacts/storage'
 import { artifactChanged } from '@/lib/live/artifacts'
+import { artifactWorkspace, type ArtifactReader } from './access'
+import { taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
 
 /**
  * Deletes one of the person's own artifacts (资料库, R-51): the row, and with it
@@ -15,19 +17,22 @@ import { artifactChanged } from '@/lib/live/artifacts'
  * removal fails stays recorded, so account deletion still finds it. False when it
  * is not theirs or no longer exists.
  */
-export async function deleteOwnArtifact(userId: string, artifactId: string): Promise<boolean> {
-  const retired = await withAccountWrite(userId, async () => {
+export async function deleteOwnArtifact(reader: ArtifactReader, artifactId: string): Promise<boolean> {
+  const workspaceId = await artifactWorkspace(reader, artifactId)
+  if (!workspaceId) return false
+  const { userId } = taskReaderScope(reader)
+  const retired = await withTaskWorkspace(reader, workspaceId, () => withAccountWrite(userId, async () => {
     const [own] = await db.select({ id: artifacts.id, issueId: artifacts.issueId }).from(artifacts)
-      .where(and(eq(artifacts.id, artifactId), eq(artifacts.userId, userId))).limit(1).for('update')
+      .where(and(eq(artifacts.id, artifactId), eq(artifacts.userId, userId), eq(artifacts.workspaceId, workspaceId))).limit(1).for('update')
     if (!own) return null
     const keys = (await db.select({ key: artifactVersions.storageKey }).from(artifactVersions)
       .where(and(eq(artifactVersions.artifactId, own.id), isNotNull(artifactVersions.storageKey), isNull(artifactVersions.inlineContent)))).map(row => row.key!)
     for (const key of keys) await db.execute(sql`insert into account_storage_retirements("userId","storageKey") values(${userId},${key}) on conflict do nothing`)
     await db.delete(artifacts).where(and(eq(artifacts.id, own.id), eq(artifacts.userId, userId)))
-    await artifactChanged(db, userId, own.id)
+    await artifactChanged(db, userId, own.id, workspaceId)
     if (own.issueId) await (await import('@/lib/live/project-map')).projectMapIssueChanged(db, own.issueId)
     return keys
-  })
+  }))
   if (!retired) return false
   for (const key of retired) {
     try {

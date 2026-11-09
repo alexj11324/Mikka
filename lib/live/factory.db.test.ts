@@ -21,25 +21,25 @@ test('real PG: committed invalidations, savepoint rollback, and canonical owner/
   const pool = new Pool({ connectionString, options: `-c search_path=${schema}`, max: 4 })
   observePoolCommits(pool)
   try {
-    await pool.query(`CREATE TABLE issues (id uuid PRIMARY KEY, scope text NOT NULL);
+    await pool.query(`CREATE TABLE issues (id uuid PRIMARY KEY,"userId" text,"workspaceId" uuid,"ownershipState" text NOT NULL,scope text NOT NULL);
       CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
-      CREATE TABLE factory_tasks (id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"botId" uuid,status text);
+      CREATE TABLE factory_tasks (id uuid PRIMARY KEY,"userId" text,"issueId" uuid,"botId" uuid,"workspaceId" uuid,status text);
       CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY,"userId" text,kind text);
       CREATE TABLE mikka_workspace_members ("workspaceId" uuid,"userId" text,status text);
       CREATE TABLE mikka_team_issues ("issueId" uuid PRIMARY KEY,"workspaceId" uuid);`)
     const personal = randomUUID(), a = randomUUID(), b = randomUUID()
     await pool.query(`INSERT INTO mikka_workspaces VALUES ($1,'owner','personal'),($2,'owner','team'),($3,'owner','team')`, [personal, a, b])
     await pool.query(`INSERT INTO mikka_workspace_members VALUES ($1,'owner','active'),($2,'owner','active'),($3,'owner','active'),($2,'peer','active')`, [personal, a, b])
-    async function fixture(owner: string, workspaceId: string | null, scope = 'workspace') {
-      const id = randomUUID(), issueId = randomUUID(), botId = workspaceId ? randomUUID() : null
-      await pool.query('INSERT INTO issues VALUES ($1,$2)', [issueId, scope])
+    async function fixture(owner: string, workspaceId: string | null, scope = 'workspace', withBot = true) {
+      const id = randomUUID(), issueId = randomUUID(), botId = workspaceId && withBot ? randomUUID() : null
+      await pool.query('INSERT INTO issues VALUES ($1,$2,$3,$4,$5)', [issueId, owner, workspaceId, workspaceId ? 'bound' : 'pending', scope])
       if (botId) await pool.query('INSERT INTO bots VALUES ($1,$2,$3)', [botId, owner, workspaceId])
-      await pool.query(`INSERT INTO factory_tasks VALUES ($1,$2,$3,$4,'pending')`, [id, owner, issueId, botId])
+      await pool.query(`INSERT INTO factory_tasks VALUES ($1,$2,$3,$4,$5,'pending')`, [id, owner, issueId, botId, workspaceId])
       return { id, issueId, botId }
     }
     const one = await fixture('owner', a), two = await fixture('owner', b), peer = await fixture('peer', a)
-    const legacy = await fixture('owner', null, 'personal'), team = await fixture('owner', null)
-    await pool.query('INSERT INTO mikka_team_issues VALUES ($1,$2)', [team.issueId, a])
+    const legacy = await fixture('owner', null, 'personal'), team = await fixture('owner', a, 'workspace', false)
+    await pool.query('INSERT INTO mikka_team_issues VALUES ($1,$2)', [legacy.issueId, a])
 
     await t.test('same-owner different-workspace and same-workspace different-owner targets stay separate', async () => {
       const first = await factoryLiveScopes(pool, pool, one.id, 'owner')
@@ -50,8 +50,8 @@ test('real PG: committed invalidations, savepoint rollback, and canonical owner/
       assert.deepEqual(third?.task, { ownerId: 'peer', workspaceId: a })
       assert.equal(new Set([first!, second!, third!].map(target => liveChannelId(target.task))).size, 3)
       assert.equal(await factoryLiveScopes(pool, pool, peer.id, 'owner'), null)
-      assert.deepEqual((await factoryLiveTargets(pool, pool, one.id, 'owner'))[0].events, [{ kind: 'factory_task', id: one.id }])
-      assert.equal((await factoryLiveScopes(pool, pool, legacy.id, 'owner'))?.task.workspaceId, personal)
+      assert.deepEqual((await factoryLiveTargets(pool, pool, one.id, 'owner'))[0].events, [{ kind: 'factory_task', id: one.id }, { kind: 'factory_issue', id: one.issueId }])
+      assert.equal(await factoryLiveScopes(pool, pool, legacy.id, 'owner'), null, 'a legacy personal scope and Team link cannot repair unresolved ownership at read time')
       assert.equal((await factoryLiveScopes(pool, pool, team.id, 'owner'))?.task.workspaceId, a)
     })
 
@@ -65,24 +65,34 @@ test('real PG: committed invalidations, savepoint rollback, and canonical owner/
       await pool.query(`UPDATE bots SET "ownerId"='owner' WHERE id=$1`, [one.botId])
     })
 
-    await t.test('personal issue lists and Bot task details keep their distinct canonical scopes when viewed from another workspace', async () => {
+    await t.test('task and issue keys share the stored tenant even when legacy scope or page selection differs', async () => {
       const emptyIssue = randomUUID()
-      await pool.query(`INSERT INTO issues VALUES ($1,'personal')`, [emptyIssue])
+      await pool.query(`INSERT INTO issues VALUES ($1,'owner',$2,'bound','personal')`, [emptyIssue, personal])
       assert.deepEqual(await factoryIssueLiveScope(pool, pool, emptyIssue, 'owner'), { ownerId: 'owner', workspaceId: personal }, 'the list can subscribe before its first Factory task exists')
       const task = await fixture('owner', a, 'personal')
       const scopes = await factoryLiveScopes(pool, pool, task.id, 'owner')
       assert.deepEqual(scopes?.task, { ownerId: 'owner', workspaceId: a })
-      assert.deepEqual(scopes?.issue, { ownerId: 'owner', workspaceId: personal })
+      assert.deepEqual(scopes?.issue, { ownerId: 'owner', workspaceId: a })
       const targets = await factoryLiveTargets(pool, pool, task.id, 'owner')
       assert.deepEqual(targets, [
-        { scope: { ownerId: 'owner', workspaceId: a }, events: [{ kind: 'factory_task', id: task.id }] },
-        { scope: { ownerId: 'owner', workspaceId: personal }, events: [{ kind: 'factory_issue', id: task.issueId }] },
+        { scope: { ownerId: 'owner', workspaceId: a }, events: [{ kind: 'factory_task', id: task.id }, { kind: 'factory_issue', id: task.issueId }] },
       ])
       assert.equal(targets.some(target => target.scope.workspaceId === b), false, 'the currently selected unrelated workspace is not a publish target')
       assert.deepEqual(await factoryLiveTargets(pool, pool, team.id, 'owner'), [{
         scope: { ownerId: 'owner', workspaceId: a },
         events: [{ kind: 'factory_task', id: team.id }, { kind: 'factory_issue', id: team.issueId }],
       }], 'a shared canonical scope needs one push')
+      assert.equal((await pool.query('SELECT 1 FROM mikka_team_issues WHERE "issueId"=$1', [team.issueId])).rowCount, 0, 'a shared task needs no Team link to publish in its tenant')
+      // This minimal schema deliberately permits malformed historical rows so
+      // the read-side agreement check is exercised independently of triggers.
+      await pool.query('UPDATE factory_tasks SET "workspaceId"=$2 WHERE id=$1', [task.id, b])
+      assert.deepEqual(await factoryLiveTargets(pool, pool, task.id, 'owner'), [])
+      await pool.query('UPDATE factory_tasks SET "workspaceId"=$2 WHERE id=$1', [task.id, a])
+      await pool.query('UPDATE bots SET "workspaceId"=$2 WHERE id=$1', [task.botId, b])
+      assert.deepEqual(await factoryLiveTargets(pool, pool, task.id, 'owner'), [])
+      await pool.query(`INSERT INTO mikka_workspace_members VALUES ($1,'peer','active')`, [personal])
+      const wrongPersonalOwner = await fixture('peer', personal, 'personal', false)
+      assert.deepEqual(await factoryLiveTargets(pool, pool, wrongPersonalOwner.id, 'peer'), [], 'an accidental membership never grants another account\'s personal tenant')
     })
 
     await t.test('outer COMMIT is visible to a separate connection before a queued effect runs', async () => {

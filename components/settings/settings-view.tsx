@@ -34,6 +34,7 @@ import { pushSettingsHistory } from '@/lib/settings-navigation'
 import type { RailDestination } from '@/components/nav/icon-rail'
 import { prefetchSettingsSection } from '@/lib/settings-prefetch'
 import { FieldError } from '@/components/ui/field'
+import { toast } from 'sonner'
 
 export type { SettingsSectionId as SettingsSection } from '@/lib/settings-sections'
 
@@ -75,9 +76,11 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
   const unavailableBilling = workspace?.edition === 'community' && requestedSection === 'billing'
   useEffect(() => {
     if (!teamOnly && !unavailableBilling) return
+    // Say why the page asked for is not the one shown (UI audit settings2-06); one toast, however often the effect runs.
+    if (teamOnly) toast(t('teamOnlyNotice'), { id: 'settings-team-only' })
     if (activeSection) router.replace(settingsHref('preferences', workspaceId ?? workspace?.workspace.id))
     else setSection('preferences')
-  }, [teamOnly, unavailableBilling, activeSection, router, workspaceId, workspace?.workspace.id])
+  }, [teamOnly, unavailableBilling, activeSection, router, workspaceId, workspace?.workspace.id, t])
   const { cache, mutate } = useSWRConfig()
   // Settings opened without ?workspace= still has one: the default the API resolved.
   const resolvedWorkspaceId = workspaceId ?? workspace?.workspace.id

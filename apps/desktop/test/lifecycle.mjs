@@ -27,6 +27,7 @@ import { waitForNativeDevice } from './native-device-ready.mjs'
 import { continueInSystemBrowser } from './browser-handoff.mjs'
 import { nativeLifecycleFailure, observeNativeNavigation, waitForBundledDocument } from './native-document.mjs'
 import { createLifecycleQueryCounter, queryCountDelta } from './lifecycle-query-counts.mjs'
+import { selectWorkspaceMenuItem } from './parity-page-ready.mjs'
 
 const root = fileURLToPath(new URL('../../..', import.meta.url))
 const environment = await loadEnvironment()
@@ -155,7 +156,7 @@ async function selectFixture(page) {
   await page.waitForFunction(() => document.documentElement.lang === 'en' || document.documentElement.lang === 'zh-CN')
   const locale = await page.evaluate(() => document.documentElement.lang)
   await page.getByRole('button', { name: menuNames[locale], exact: true }).first().click()
-  await page.getByRole('menuitem', { name: fixtures.fixture.workspaceName, exact: true }).click()
+  await selectWorkspaceMenuItem(page, page.getByRole('menuitem', { name: fixtures.fixture.workspaceName, exact: true }))
   await usable(page)
   return locale
 }

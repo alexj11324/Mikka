@@ -1,4 +1,6 @@
 import { factoryEventId } from "./event-id";
+import { readIssueMetadata } from "../issue-metadata";
+import type { JSONContent } from "@tiptap/core";
 import { factoryNextStage, factoryReviewPerformed } from './flow'
 import { checkFactoryRepairBudget } from './check-recovery-evidence'
 import { assertQuestionExecutionRetry } from './questions/execution-continuation'
@@ -86,6 +88,7 @@ export interface FactoryTask {
   userId: string;
   botId: string | null;
   issueId: string;
+  workspaceId?: string | null;
   scopeVersion: number | null;
   sourceEventId: string;
   route: z.infer<typeof routeSchema> & { flowVersion?: 2 };
@@ -183,10 +186,15 @@ export interface FactorySnapshot {
   /** The transition was refused after its blocked state was committed. */
   refusal?: { code: string };
 }
+/** A store-owned issue snapshot from the same APP transaction. GETs use MVCC;
+ * write callers lock their own rows. This replaces a second issue read, never
+ * the current membership check. */
+export type FactoryLockedIssue = FactoryIssueScope & { id: string; deleted: boolean };
 export type FactoryAuthorize = (
   userId: string,
   issueId: string,
   tx: PoolClient,
+  lockedIssue?: Readonly<FactoryLockedIssue>,
 ) => Promise<boolean>;
 const completionRecoveryAuthority = Symbol('owner-completion-recovery');
 type CompletionRecoveryAuthority = { [completionRecoveryAuthority]: true; tx: PoolClient; userId: string; taskId: string; attemptId: string; sourceEventId: string; runId: string; sessionId: string };
@@ -293,7 +301,7 @@ export function createFactoryStore(
     return task;
   }
   async function lockedIssue(tx: PoolClient, issueId: string, lock = true) {
-    const { rows: [issue] } = await tx.query<FactoryIssueScope>(lock ? 'SELECT "userId",scope,"scopeVersion" FROM issues WHERE id=$1 FOR SHARE' : 'SELECT "userId",scope,"scopeVersion" FROM issues WHERE id=$1', [issueId]);
+    const { rows: [issue] } = await tx.query<FactoryIssueScope>(lock ? 'SELECT "userId",scope,"scopeVersion","workspaceId","ownershipState" FROM issues WHERE id=$1 FOR SHARE' : 'SELECT "userId",scope,"scopeVersion","workspaceId","ownershipState" FROM issues WHERE id=$1', [issueId]);
     return issue;
   }
   async function snapshot(
@@ -437,11 +445,19 @@ export function createFactoryStore(
     uuid(issueId);
     return transaction(async (tx) => {
       if (publicFlow) await tx.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
-      const issue = await lockedIssue(tx, issueId, false);
-      if (!issue || !(await authorize(userId, issueId, tx))) fail("factoryNotFound");
+      const { rows: [issue] } = await tx.query<FactoryLockedIssue & { content: JSONContent }>(
+        `SELECT id,"userId",scope,"scopeVersion","workspaceId","ownershipState",
+          jsonb_build_object('type','doc','attrs',content->'attrs') AS content,
+          coalesce(content->'attrs'->'mikka',content->'attrs'->'orvilo')->>'deletedAt' IS NOT NULL AS deleted
+          FROM issues WHERE id=$1`, [issueId],
+      );
+      // Preserve both halves of issueForUser's deletion check, including a
+      // JSON-null mikka key whose legacy orvilo metadata still has a tombstone.
+      if (issue) issue.deleted ||= Boolean(readIssueMetadata(issue.content).deletedAt);
+      if (!issue || !(await authorize(userId, issueId, tx, issue))) fail("factoryNotFound");
       // The newest 50 count every task of the issue; the issue's current scope then decides which are listed.
       const { rows } = await tx.query<FactoryTask & { isSkillCandidate: boolean; candidateRunId: string | null; candidateSha: string | null; publication: PublicationRow | null; inScope: boolean }>(
-        'SELECT t.*, c."runId" AS "candidateRunId", c.sha AS "candidateSha", (SELECT json_build_object(\'id\',p.id,\'approvalId\',p."approvalId",\'status\',p.status,\'action\',p.action,\'target\',p.target,\'createdAt\',p."createdAt",\'finishedAt\',p."finishedAt") FROM factory_publications p WHERE p."taskId"=t.id AND p."candidateId"=t."candidateId" ORDER BY p."createdAt" DESC,p.id DESC LIMIT 1) AS publication, EXISTS (SELECT 1 FROM improvement_skill_candidates s WHERE s."factoryTaskId"=t.id AND s."candidateId"=t."candidateId" AND s."userId"=t."userId") AS "isSkillCandidate", (i."userId"=$1 OR (i.scope=\'workspace\' AND t."scopeVersion"=i."scopeVersion")) AS "inScope" FROM factory_tasks t JOIN issues i ON i.id=t."issueId" LEFT JOIN factory_candidates c ON c.id=t."candidateId" AND c."taskId"=t.id WHERE t."userId"=$1 AND t."issueId"=$2 AND ($4::boolean OR (t."botId" IS NOT DISTINCT FROM $3::uuid AND (i."userId"=$1 OR (i.scope=\'workspace\' AND t."scopeVersion"=i."scopeVersion")))) ORDER BY t."updatedAt" DESC,t.id DESC LIMIT 50',
+        'SELECT t.*, c."runId" AS "candidateRunId", c.sha AS "candidateSha", (SELECT json_build_object(\'id\',p.id,\'approvalId\',p."approvalId",\'status\',p.status,\'action\',p.action,\'target\',p.target,\'createdAt\',p."createdAt",\'finishedAt\',p."finishedAt") FROM factory_publications p WHERE p."taskId"=t.id AND p."candidateId"=t."candidateId" ORDER BY p."createdAt" DESC,p.id DESC LIMIT 1) AS publication, EXISTS (SELECT 1 FROM improvement_skill_candidates s WHERE s."factoryTaskId"=t.id AND s."candidateId"=t."candidateId" AND s."userId"=t."userId") AS "isSkillCandidate", (i."ownershipState"=\'bound\' AND t."workspaceId"=i."workspaceId") AS "inScope" FROM factory_tasks t JOIN issues i ON i.id=t."issueId" LEFT JOIN factory_candidates c ON c.id=t."candidateId" AND c."taskId"=t.id WHERE t."userId"=$1 AND t."issueId"=$2 AND ($4::boolean OR (t."botId" IS NOT DISTINCT FROM $3::uuid AND (i."ownershipState"=\'bound\' AND t."workspaceId"=i."workspaceId"))) ORDER BY t."updatedAt" DESC,t.id DESC LIMIT 50',
         [userId, issueId, botId, anyBot],
       );
       const listed = rows.filter(row => row.inScope && factoryScopeAllows(row, issue));
@@ -526,7 +542,7 @@ export function createFactoryStore(
           [userId, route.issueId, route.sourceEventId],
         );
         const issue = await lockedIssue(tx, route.issueId);
-        if (!issue || !(await authorize(userId, route.issueId, tx))) fail("factoryNotFound");
+        if (!issue || issue.ownershipState !== 'bound' || !issue.workspaceId || !(await authorize(userId, route.issueId, tx))) fail("factoryNotFound");
         if (prior && !factoryScopeAllows(prior, issue)) fail("factoryNotFound");
         const source = await allowedSource(tx, userId, route.sourceEventId, route.issueId, true, botId, true);
         if (!source) fail("factorySourceMismatch");
@@ -548,6 +564,7 @@ export function createFactoryStore(
           userId,
           botId,
           issueId: route.issueId,
+          workspaceId: issue.workspaceId,
           scopeVersion: issue.scopeVersion,
           sourceEventId: route.sourceEventId,
           route: { ...route, flowVersion: 2 },
@@ -559,7 +576,7 @@ export function createFactoryStore(
           reason: route.rationale,
         };
         await tx.query(
-          `INSERT INTO factory_tasks (id,"userId","issueId","sourceEventId",route,stage,status,revision,"attemptId",reason,"botId","scopeVersion") VALUES ($1,$2,$3,$4,$5,$6,$7,1,$8,$9,$10,$11)`,
+          `INSERT INTO factory_tasks (id,"userId","issueId","sourceEventId",route,stage,status,revision,"attemptId",reason,"botId","scopeVersion","workspaceId") VALUES ($1,$2,$3,$4,$5,$6,$7,1,$8,$9,$10,$11,$12)`,
           [
             task.id,
             userId,
@@ -572,6 +589,7 @@ export function createFactoryStore(
             task.reason,
             botId,
             task.scopeVersion,
+            task.workspaceId,
           ],
         );
         await tx.query(

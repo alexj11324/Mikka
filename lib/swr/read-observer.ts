@@ -19,6 +19,28 @@ let order = 0
  * a conservative boundary even when those steps delay the actual request. */
 export const readBoundary = () => ++order
 
+// A proof names only an actual response object. Nothing is added to the wire or
+// persisted, and no response is retained separately from its existing owner.
+const dispatched = new WeakMap<object, number>()
+
+/** Capture immediately before fetch, after encoding/queueing. This is a lower
+ * bound on transport dispatch, not the instant bytes reached the server. */
+export function captureReadDispatch() {
+  const began = readBoundary()
+  return <T>(value: T): T => {
+    if (value !== null && typeof value === 'object') dispatched.set(value, began)
+    return value
+  }
+}
+
+/** Preserve one result's proof through a shallow wrapper or batch projection.
+ * Callers must not attach it to merged data or a different logical read. */
+export function carryReadDispatch<T>(source: unknown, value: T): T {
+  const began = source !== null && typeof source === 'object' ? dispatched.get(source) : undefined
+  if (began !== undefined && value !== null && typeof value === 'object') dispatched.set(value, began)
+  return value
+}
+
 /** Keep only the latest actual read per cache/key. A completed proof weakly
  * names the object already in SWR; it retains no separate response value. */
 export function observeSWRRead<T>(cache: Cache, key: string, fetcher: () => T | Promise<T>): Promise<T> {
@@ -54,6 +76,8 @@ export function observeSWRRead<T>(cache: Cache, key: string, fetcher: () => T | 
   }
   void promise.then(value => {
     read.received = true; read.value = value
+    const sent = value !== null && typeof value === 'object' ? dispatched.get(value) : undefined
+    if (sent !== undefined && sent > read.began) read.began = sent
     queueMicrotask(() => {
       // Only this read's original callback failure belongs to it. A retained
       // cache.error can instead be from an older, unrelated request.

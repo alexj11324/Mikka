@@ -1,4 +1,5 @@
 import type { RepositoryGitTiming, RepositoryTimingObserver } from '../repository-git-timing'
+import { toolDuration } from '../tool-duration'
 import { captureRunFailure, failureFrom, type RunFailure } from "@mikka/protocol/run-failure"
 import { DAEMON_VERSION } from "../paths"
 import { runCriterion, reviewVerdict, runVisualEvidence } from "@mikka/protocol/run"
@@ -1557,15 +1558,16 @@ export class RunSupervisor {
     run.github = await this.deps.prepareRunGitHub?.(assignment, preparationSignal,
       (name, value) => this.addCredential(runId, name, value))
     run.secretBridge = await startTaskSecretBridge({ current: () => assignment.taskSecrets, signal: run.abort.signal })
+    const traceContext = daemonTracer.capture()
     const baseOptions = {
-      traceContext: daemonTracer.capture(),
+      traceContext,
       // The owner's own GitHub credential reaches every run that was sent one (decision 2026-11-02-1600).
       github: assignment.github && (assignment.github.token || assignment.mcp || run.github)
         ? { ...assignment.github, runToken: assignment.mcp?.token, issueId: assignment.issueId } : undefined,
       githubEnvironment: run.github?.env,
       onCredential: (name: string, value: string) => this.addCredential(runId, name, value),
       apps: runApps(assignment.mcp),
-      mcp: runMcp(assignment.mcp),
+      mcp: runMcp(assignment.mcp, traceContext),
       runId,
       requireSessionResume: assignment.requireSessionResume,
       kind: assignment.kind,
@@ -1876,6 +1878,7 @@ export class RunSupervisor {
     if (run.cancelRequested) await this.requestCancel(runId, run)
 
     const iterator = session.events()[Symbol.asyncIterator]()
+    const timedToolChunk = toolDuration()
     const aborted = abortPromise(run.abort.signal)
     try {
       for (;;) {
@@ -1909,7 +1912,7 @@ export class RunSupervisor {
             // A tool call ended, perhaps submit_capture: upload in the background.
             void this.deps.captures?.flush(runId)
           }
-          this.emit(runId, event.chunk)
+          this.emit(runId, timedToolChunk(event.chunk))
           continue
         }
         run.sessionEnded = true

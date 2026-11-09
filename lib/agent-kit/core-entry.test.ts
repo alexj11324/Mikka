@@ -4,6 +4,7 @@ import { runFailureSchema } from '@mikka/protocol/run-failure'
 import { makeSnapshot } from './definition'
 import { DEFAULT_AGENT_DEFINITION } from './builtin'
 import type { AgentExecution } from './store'
+import type { CoordinatorStartupReceipt, CoordinatorStartupSettingsCandidate } from '../coordinator/startup-receipt'
 
 const owner='synthetic-owner',bot='10000000-0000-4000-8000-000000000001'
 const calls: {name:string;args:unknown[]}[]=[]
@@ -42,6 +43,35 @@ let onStartRejected=()=>{}
 let onPreparationRejected=()=>{}
 let onStartWritten=()=>{}
 const persistedExecutions=new Map<string,{id:string;status:'running'|'completed'|'failed'}>()
+let startupReceipt:CoordinatorStartupReceipt|null=null
+let startupKind:'ready'|'inbox-only'|'not-held'|'lost'='ready'
+let startupTakeError:Error|null=null, startupCleanupError:Error|null=null
+let startupTakeGate:Promise<void>|null=null
+let onStartupTaking=()=>{}
+let legacySettingsReads=0,legacyInboxReads=0,prepareTurnCalls=0
+stub('../coordinator/store.ts',{
+  takeStartupInbox:async(userId:string,holder:string,botId:string,candidate:CoordinatorStartupSettingsCandidate)=>{
+    assert.deepEqual([userId,botId,holder],[owner,bot,'synthetic-workflow'])
+    record('startupTake')();onStartupTaking()
+    if(startupTakeGate)await startupTakeGate
+    if(startupTakeError)throw startupTakeError
+    const inbox={held:startupKind!=='not-held',added:inboxHasEvents?1:0,handoffOnly:false,handoffMatterIds:[],telegramTargets:[],pushEvents:[],pushHidesText:false}
+    if(startupKind==='not-held')return {kind:'not-held',inbox}
+    if(startupKind==='inbox-only'){
+      inboxTaken=true
+      record('inboxOnlyCommitted')()
+      await deliverEarlyStop('inbox')
+      return {kind:'inbox-only',settings:{...candidate,coordinator:false},inbox}
+    }
+    const replayed=Boolean(startupReceipt)
+    startupReceipt??={settings:{...candidate,coordinator:false},inbox}
+    inboxTaken=true
+    record('receiptCommitted')()
+    await deliverEarlyStop('inbox')
+    return {kind:startupKind,...startupReceipt,replayed:startupKind==='lost'||replayed}
+  },
+  recoverStartupInbox:async(...args:unknown[])=>{record('recoverStartup')(...args);return startupReceipt},
+})
 mock.module('workflow',{namedExports:{getWorkflowMetadata:()=>({workflowRunId:'synthetic-workflow'}),getWritable:()=>writable,
   createHook:()=>({[Symbol.asyncIterator]:()=>({next:()=>new Promise(resolve=>{stopNow=()=>resolve({value:{},done:false})})})})}})
 stub('../coordinator/model.ts',{COORDINATOR_MODEL:'current-default',coordinatorStep:()=>({}),turnWarning:(_reason:string,text:string)=>text})
@@ -99,6 +129,7 @@ stub('../../workflows/coordinator/agent-kit-steps.ts',{
   },
   failAgentPreparation:async(...args:unknown[])=>{
     record('finishPreparation')(...args)
+    if(startupCleanupError)throw startupCleanupError
     const row=persistedExecutions.get(`${args[2]}:${args[3]}`)
     if(row)row.status='failed'
   },
@@ -111,8 +142,10 @@ let preparedPrompt:Record<string,unknown>|null=null
 let contextMs:{execution:number;personal:number;github:number}|undefined
 const preparePrompt=async(...args:unknown[])=>{record('prompt')(...args);return preparedPrompt ?? {prompt:'synthetic request'}}
 stub('../../workflows/coordinator/steps.ts',{
-  turnSettings:async()=>{await deliverEarlyStop('settings');return {computerEnabled:false,mailboxEnabled,writeEnabled:false,agentKitEnabled:kitSetting,switches,coordinator:false,runtime:{harness:'ai_sdk'}}},
+  turnSettings:async()=>{legacySettingsReads++;await deliverEarlyStop('settings');return {computerEnabled:false,mailboxEnabled,writeEnabled:false,agentKitEnabled:kitSetting,switches,coordinator:false,runtime:{harness:'ai_sdk'}}},
+  hostedStartupSettings:async()=>{record('startupSettings')();await deliverEarlyStop('settings');return {computerEnabled:false,mailboxEnabled,writeEnabled:false,agentKitEnabled:Boolean(kitSetting),switches,runtime:{harness:'ai_sdk'}}},
   prepareTurn:async(userId:string,botId:string,holder:string,input:{snapshot?:unknown;executionId?:string;mailboxEnabled:boolean;runtime:unknown}) => {
+    prepareTurnCalls++
     if(preparationError){onPreparationRejected();throw preparationError}
     const mailboxTools=input.mailboxEnabled ? await mailboxCatalogue(userId,botId,input.executionId) : []
     if (input.runtime) await noteQuotaSwitch(userId,holder,input.runtime,botId)
@@ -126,7 +159,7 @@ stub('../../workflows/coordinator/steps.ts',{
   isCoordinatorChat:async()=>false,
   mailboxToolsEnabled:async()=>mailboxEnabled,
   mailboxCatalogue,
-  takeInbox:async()=>{await deliverEarlyStop('inbox');const added=inboxHasEvents&&(!inboxTaken || extraInbox);if(inboxTaken)extraInbox=false;inboxTaken=true;return {held:inboxHeld,added,handoffOnly:false,handoffMatterIds:[],telegramTargets:[],...(taskEventId ? {taskEventId} : {})}},
+  takeInbox:async()=>{legacyInboxReads++;await deliverEarlyStop('inbox');const added=inboxHasEvents&&(!inboxTaken || extraInbox);if(inboxTaken)extraInbox=false;inboxTaken=true;return {held:inboxHeld,added,handoffOnly:false,handoffMatterIds:[],telegramTargets:[],...(taskEventId ? {taskEventId} : {})}},
   releaseLease:async()=>{record('release')();return false},
   preparePrompt,
   appendMessages:async(...args:unknown[])=>{record('append')(...args);return 3},
@@ -143,6 +176,7 @@ stub('../../workflows/coordinator/steps.ts',{
   markStopped:async(...args:unknown[])=>{record('stream')(args[0],{type:'coordinator-turn-stopped',id:args[2]});record('stoppedText')(...args.slice(1));return !calls.some(c=>c.name==='hosted') ? '' : stopDuringTool ? 'Creating it.' : 'The task is'},
   settleAttention:async()=>{throw new Error('unexpected attention action')},
   telegramReplyThreads:async()=>{throw new Error('unexpected external message')},
+  noticeTurnFailure:async(...args:unknown[])=>{record('notice')(...args)},
   sendTelegramChunk:async()=>{throw new Error('unexpected external message')},
   failTurn:async(...args:unknown[])=>{record('failed')(...args);if(args[4]&&receiptPersistenceError)throw receiptPersistenceError},
 })
@@ -152,6 +186,7 @@ function reset(harness?:string){
   calls.length=0;stopDuringTurn=false;stopDuringTool=false;stopAt=null;extraInbox=false;inboxTaken=false;mailboxEnabled=false;taskEventId=undefined;hostedError=null;hostedCompleted=[];receiptPersistenceError=null
   contextMs=undefined
   preparationError=null;streamStartError=null;beginGate=null;startGate=null;onBeginCommitted=()=>{};onStartRejected=()=>{};onPreparationRejected=()=>{};onStartWritten=()=>{};persistedExecutions.clear()
+  startupReceipt=null;startupKind='ready';startupTakeError=null;startupCleanupError=null;startupTakeGate=null;onStartupTaking=()=>{};legacySettingsReads=0;legacyInboxReads=0;prepareTurnCalls=0
   inboxHeld=true;inboxHasEvents=true
   kitSetting=Boolean(harness)
   execution=harness?{id:'10000000-0000-4000-8000-000000000002',status:'running',snapshot:makeSnapshot('10000000-0000-4000-8000-000000000003',1,DEFAULT_AGENT_DEFINITION,'saved host',{harness,model:'saved-model'})}:null
@@ -490,4 +525,188 @@ test('a rejected receipt still releases the failed lease once and retains both f
     assert.equal(calls.filter(call=>call.name==='hosted').length,1)
     assert.equal(calls.some(call=>call.name==='append'),false)
   }finally{hostedError=null;hostedCompleted=[];receiptPersistenceError=null}
+})
+
+test('new hosted startup prepares once after the receipt commit and keeps the old entry opt-in',async()=>{
+  reset('ai_sdk')
+  await coordinatorTurn(owner,bot,1)
+  assert.equal(legacySettingsReads,0)
+  assert.equal(calls.filter(call=>call.name==='startupTake').length,1)
+  assert.equal(calls.filter(call=>call.name==='begin').length,1)
+  assert.equal(calls.filter(call=>call.name==='prompt').length,1)
+  assert.equal(calls.filter(call=>call.name==='stream'&&(call.args[1] as {type:string}).type==='coordinator-turn-start').length,1)
+  assert.ok(calls.findIndex(call=>call.name==='receiptCommitted')<calls.findIndex(call=>call.name==='begin'))
+  const timing=calls.find(call=>call.name==='timing')!.args[0] as {phaseMs:Record<string,number>;storeTimingOrigin:string}
+  assert.equal(timing.storeTimingOrigin,'startup_checkpoint')
+  assert.equal(typeof timing.phaseMs.startup,'number')
+  assert.equal('agentPreparation' in timing.phaseMs,false)
+  assert.equal('inbox' in timing.phaseMs,false)
+  reset('ai_sdk')
+  await coordinatorTurn(owner,bot)
+  assert.equal(legacySettingsReads,1)
+  assert.equal(calls.some(call=>call.name==='startupTake'||call.name==='startupSettings'),false)
+})
+
+test('no execution or stream starts while the new inbox transaction has not returned',async()=>{
+  reset('ai_sdk')
+  let release=()=>{}
+  startupTakeGate=new Promise<void>(resolve=>{release=resolve})
+  const taking=new Promise<void>(resolve=>{onStartupTaking=resolve})
+  const result=coordinatorTurn(owner,bot,1)
+  try {
+    await taking
+    assert.equal(calls.some(call=>['begin','prompt','stream','hosted'].includes(call.name)),false)
+    release();await result
+    assert.equal(calls.filter(call=>call.name==='hosted').length,1)
+  } finally { release();await result }
+})
+
+test('a precommit startup error cannot begin an execution or publish a stream marker',async()=>{
+  reset('ai_sdk');startupTakeError=new Error('synthetic_precommit_failure')
+  await assert.rejects(coordinatorTurn(owner,bot,1),error=>error===startupTakeError)
+  assert.equal(startupReceipt,null)
+  assert.equal(calls.some(call=>['begin','prompt','stream','hosted','notice'].includes(call.name)),false)
+  assert.equal(calls.filter(call=>call.name==='recoverStartup').length,1)
+  assert.equal(calls.filter(call=>call.name==='failed').length,1)
+})
+
+test('terminal startup preparation preserves its error and recovered inbox when execution cleanup also fails',async()=>{
+  reset('ai_sdk')
+  class TerminalRefusal extends Error {}
+  preparationError=new TerminalRefusal('synthetic_subscription_refusal')
+  startupCleanupError=new Error('synthetic_cleanup_unavailable')
+  await assert.rejects(coordinatorTurn(owner,bot,1),error=>error===preparationError&&error instanceof TerminalRefusal)
+  assert.ok(startupReceipt)
+  assert.equal(calls.filter(call=>call.name==='startupTake').length,1,'cleanup must never retake a newer inbox')
+  assert.deepEqual(calls.find(call=>call.name==='recoverStartup')?.args,[owner,'synthetic-workflow',bot])
+  assert.deepEqual(calls.find(call=>call.name==='finishPreparation')?.args,[owner,bot,'synthetic-workflow',0])
+  assert.equal(calls.filter(call=>call.name==='notice').length,1)
+  assert.equal(calls.filter(call=>call.name==='failed').length,1,'failTurn still owns the old holder guard and wake path')
+  assert.equal(calls.some(call=>call.name==='hosted'||call.name==='append'),false)
+})
+
+test('new startup stream failure waits for a late execution commit before original-key cleanup',async()=>{
+  reset('ai_sdk');streamStartError=new Error('synthetic_startup_stream_failed')
+  const error=streamStartError
+  let releaseBegin=()=>{}
+  beginGate=new Promise<void>(resolve=>{releaseBegin=resolve})
+  const rejected=new Promise<void>(resolve=>{onStartRejected=resolve})
+  let settled=false
+  const result=coordinatorTurn(owner,bot,1).then(()=>{settled=true;return undefined},caught=>{settled=true;return caught})
+  try {
+    await rejected;await new Promise<void>(resolve=>setImmediate(resolve))
+    assert.equal(settled,false)
+    assert.equal(calls.some(call=>call.name==='recoverStartup'||call.name==='failed'),false)
+    releaseBegin()
+    assert.equal(await result,error)
+    assert.equal(persistedExecutions.get('synthetic-workflow:0')?.status,'failed')
+    assert.ok(calls.findIndex(call=>call.name==='begun')<calls.findIndex(call=>call.name==='finishPreparation'))
+  } finally { releaseBegin();await result }
+})
+
+test('new startup preparation failure settles the writer before terminal cleanup',async()=>{
+  reset('ai_sdk');preparationError=new Error('synthetic_startup_prepare_failed')
+  const error=preparationError
+  let releaseWriter=()=>{}
+  startGate=new Promise<void>(resolve=>{releaseWriter=resolve})
+  const rejected=new Promise<void>(resolve=>{onPreparationRejected=resolve})
+  const result=coordinatorTurn(owner,bot,1).then(()=>undefined,caught=>caught)
+  try {
+    await rejected;await new Promise<void>(resolve=>setImmediate(resolve))
+    assert.equal(calls.some(call=>call.name==='recoverStartup'||call.name==='failed'),false)
+    releaseWriter()
+    assert.equal(await result,error)
+    assert.ok(calls.findIndex(call=>call.name==='startWritten')<calls.findIndex(call=>call.name==='failed'))
+    assert.equal(persistedExecutions.get('synthetic-workflow:0')?.status,'failed')
+  } finally { releaseWriter();await result }
+})
+
+test('a lost startup receipt closes its old execution without releasing or failing a new holder',async()=>{
+  reset('ai_sdk');startupKind='lost'
+  persistedExecutions.set('synthetic-workflow:0',{id:execution!.id,status:'running'})
+  await coordinatorTurn(owner,bot,1)
+  assert.deepEqual(calls.find(call=>call.name==='finishPreparation')?.args,[owner,bot,'synthetic-workflow',0])
+  assert.equal(persistedExecutions.get('synthetic-workflow:0')?.status,'failed')
+  assert.equal(calls.some(call=>['begin','stream','hosted','release','failed','notice'].includes(call.name)),false)
+})
+
+for(const stage of ['settings','inbox','begin','prepare'] as const)test(`new startup preserves Stop during ${stage} before any model or tool call`,async()=>{
+  reset('ai_sdk');stopAt=stage
+  await coordinatorTurn(owner,bot,1)
+  assert.equal(calls.some(call=>call.name==='hosted'||call.name==='tools'),false)
+  assert.deepEqual(calls.find(call=>call.name==='append')?.args,[owner,'synthetic-workflow',[{role:'assistant',content:''}],null,bot,'synthetic-workflow:0',true])
+  assert.equal(calls.some(call=>call.name==='failed'),false)
+})
+
+test('new empty and never-held startup do not open an execution or publish a start',async()=>{
+  for(const kind of ['ready','not-held'] as const){
+    reset('ai_sdk');startupKind=kind;inboxHasEvents=false
+    await coordinatorTurn(owner,bot,1)
+    assert.equal(calls.some(call=>['begin','prompt','stream','hosted','finishPreparation'].includes(call.name)),false)
+    assert.equal(calls.filter(call=>call.name==='release').length,kind==='ready'?1:0)
+  }
+})
+
+
+test('inbox-only startup returns its complete checkpoint without beginning preparation or a stream',async()=>{
+  const {prepareCoordinatorStartup}=await import('../../workflows/coordinator/startup-preparation')
+  for(const enabled of [true,false]){
+    reset(enabled?'ai_sdk':undefined);startupKind='inbox-only'
+    const result=await prepareCoordinatorStartup(owner,bot,'synthetic-workflow',writable)
+    assert.deepEqual(result,{kind:'inbox-only',settings:{computerEnabled:false,mailboxEnabled:false,writeEnabled:false,agentKitEnabled:enabled,switches,coordinator:false,runtime:{harness:'ai_sdk'}},inbox:{held:true,added:1,handoffOnly:false,handoffMatterIds:[],telegramTargets:[],pushEvents:[],pushHidesText:false}})
+    assert.equal('replayed' in result,false)
+    assert.equal('preparation' in result,false)
+    assert.equal(startupReceipt,null)
+    assert.deepEqual(calls.map(call=>call.name),['startupSettings','startupTake','inboxOnlyCommitted'])
+    assert.equal(prepareTurnCalls,0)
+    assert.equal(legacySettingsReads,0);assert.equal(legacyInboxReads,0)
+  }
+})
+
+test('inbox-only workflow uses its first inbox once and prepares later at the existing hosted boundary',async()=>{
+  for(const enabled of [true,false]){
+    reset(enabled?'ai_sdk':undefined);startupKind='inbox-only'
+    onStartWritten=()=>{
+      assert.equal(legacySettingsReads,0,'the returned startup settings are not read again')
+      assert.equal(legacyInboxReads,0,'round zero uses its committed inbox without another take')
+    }
+    await coordinatorTurn(owner,bot,1)
+    assert.equal(startupReceipt,null)
+    assert.equal(legacySettingsReads,0)
+    assert.equal(legacyInboxReads,1,'only the ordinary empty next-round take follows completion')
+    assert.equal(calls.filter(call=>call.name==='startupTake').length,1)
+    assert.equal(calls.filter(call=>call.name==='receiptCommitted').length,0)
+    assert.equal(calls.filter(call=>call.name==='frozenBegin').length,1)
+    assert.equal(calls.filter(call=>call.name==='begin').length,enabled?1:0)
+    assert.equal(prepareTurnCalls,1)
+    assert.equal(calls.filter(call=>call.name==='prompt').length,1)
+    assert.equal(calls.filter(call=>call.name==='hosted').length,1)
+    assert.equal(calls.find(call=>call.name==='prompt')?.args[2],enabled?execution!.snapshot:undefined)
+    const starts=calls.filter(call=>call.name==='stream'&&(call.args[1] as {type:string}).type==='coordinator-turn-start')
+    assert.equal(starts.length,1)
+    assert.deepEqual(starts[0].args,[writable,{type:'coordinator-turn-start',id:'synthetic-workflow:0',quietEligible:false,modelStream:'scoped-v1'}])
+    const committed=calls.findIndex(call=>call.name==='inboxOnlyCommitted')
+    assert.ok(committed<calls.findIndex(call=>call.name==='frozenBegin'))
+    assert.ok(committed<calls.indexOf(starts[0]))
+    const timing=calls.find(call=>call.name==='timing')!.args[0] as {phaseMs:Record<string,number>}
+    assert.equal(typeof timing.phaseMs.startup,'number')
+    assert.equal(typeof timing.phaseMs.agentPreparation,'number','preparation retains its later Workflow checkpoint')
+    if(!enabled)assert.equal(typeof timing.phaseMs.prepare,'number','disabled kit retains the separate prompt preparation fallback')
+    assert.equal('settings' in timing.phaseMs,false)
+    assert.equal('inbox' in timing.phaseMs,false)
+    assert.equal(calls.some(call=>call.name==='failed'||call.name==='recoverStartup'),false)
+  }
+})
+
+for(const stage of ['settings','inbox','begin','prepare'] as const)test(`inbox-only startup preserves Stop during ${stage} before any model or tool call`,async()=>{
+  reset('ai_sdk');startupKind='inbox-only';stopAt=stage
+  onStartWritten=()=>{assert.equal(legacySettingsReads,0);assert.equal(legacyInboxReads,0)}
+  await coordinatorTurn(owner,bot,1)
+  assert.equal(calls.some(call=>call.name==='hosted'||call.name==='tools'),false)
+  assert.equal(startupReceipt,null)
+  assert.equal(legacySettingsReads,0)
+  assert.equal(calls.filter(call=>call.name==='startupTake').length,1)
+  assert.deepEqual(calls.find(call=>call.name==='append')?.args,[owner,'synthetic-workflow',[{role:'assistant',content:''}],null,bot,'synthetic-workflow:0',true])
+  assert.deepEqual(calls.filter(call=>call.name==='stream').map(call=>(call.args[1] as {type:string}).type),['coordinator-turn-start','coordinator-turn-stopped','coordinator-turn-committed'])
+  assert.equal(calls.some(call=>call.name==='failed'||call.name==='recoverStartup'),false)
 })

@@ -247,8 +247,11 @@ export function prepareRunContextFiles(options: RunContextOptions) {
 }
 
 function decisionMcpEnvironment(mcp: RunContextOptions['mcp']): Record<string, string> {
-  return mcp ? { MIKKA_DECISION_MCP_URL: mcp.url, MIKKA_DECISION_MCP_TOKEN: mcp.token,
-    ...(mcp.decisionCatalogue ? { MIKKA_DECISION_MCP_CATALOGUE: JSON.stringify(mcp.decisionCatalogue) } : {}) } : {}
+  // Override any inherited parent even when this run has no tracing carrier.
+  return { MIKKA_DECISION_MCP_TRACEPARENT: mcp?.traceparent ?? '', ...(mcp ? {
+    MIKKA_DECISION_MCP_URL: mcp.url, MIKKA_DECISION_MCP_TOKEN: mcp.token,
+    ...(mcp.decisionCatalogue ? { MIKKA_DECISION_MCP_CATALOGUE: JSON.stringify(mcp.decisionCatalogue) } : {}),
+  } : {}) }
 }
 
 function runMcpServer(options: RunContextOptions, files: Pick<RunContext, 'worktree' | 'handoffFile' | 'capturesDir' | 'tmpDir'>): McpServerSpec {
@@ -282,7 +285,7 @@ export function runMcpBackendContext(options: RunContextOptions, files: Pick<Run
     ...(options.factoryCheck && (!options.factoryCheck.reportOnly || options.factoryCheck.inferCommand) ? {
       factoryVerify: { cwd: files.worktree, command: options.verifyCommand ?? null, infer: options.factoryCheck.inferCommand },
     } : {}),
-    ...(options.mcp ? { decisionUrl: options.mcp.url, decisionToken: options.mcp.token,
+    ...(options.mcp ? { decisionUrl: options.mcp.url, decisionToken: options.mcp.token, decisionTraceparent: options.mcp.traceparent,
       ...(options.mcp.decisionCatalogue ? { decisionCatalogue: JSON.stringify(options.mcp.decisionCatalogue) } : {}) } : {}),
     ...(options.mcpHttpObservationUrl ? { observationUrl: options.mcpHttpObservationUrl } : {}),
     env,

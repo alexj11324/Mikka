@@ -1,6 +1,7 @@
 import { observePoolCommits } from '../db/commit-effects';
 import { addFactoryVisualEvidence, addFactoryPublicationEvidence } from '../../tests/helpers/factory-visual-evidence';
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -166,8 +167,8 @@ test(
         [actor.userId],
       );
       await pool.query(
-        `INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,$2,'Approval fixture','{}','todo','normal')`,
-        [issueId, actor.userId],
+        `INSERT INTO issues (id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,$2,'Approval fixture','{}','todo','normal',$3,'bound')`,
+        [issueId, actor.userId, await seedFixtureWorkspace(pool, actor.userId)],
       );
       await pool.query(
         `INSERT INTO agents (id,"userId",name,harness) VALUES ($1,$2,'Fixture upstream','codex')`,

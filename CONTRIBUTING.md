@@ -106,7 +106,7 @@ cannot.
    [selection, trust and fallback rules](docs/ci/incremental.md).
 3. **Ordinary acceptance uses API and CLI.** Acceptance runs locally through
    the API and the CLI (`pnpm test:local-loop`), and UI changes are checked
-   with screenshots of a local production build (`pnpm build`, `pnpm start`). `browser-gate.yml` only keeps the protected
+   with screenshots of a local production build of the official UI (`pnpm build`, `pnpm start`, with `mikka-hosted-ui`). `browser-gate.yml` only keeps the protected
    check name "Browser tests (before merge)" and passes at once. The specs
    under `tests/e2e/` stay as retained fixtures. The general browser suite is
    retired. Targeted Desktop, Analytics and self-hosted jobs retain their
@@ -131,6 +131,17 @@ Mikka's own strategy, money or brand. When they agree, follow them and record
 which products in the PR. Details:
 `docs/design/decisions/2026-11-01-0400-research-before-asking-alex.md`.
 
+### One UI
+
+Mikka has one UI ([decision](docs/design/decisions/2026-11-08-2133-one-ui.md)).
+Fix a page where its code lives today: in this repository or in the private
+`mikka-hosted-ui`. Don't add a slot or move code only to make a fix possible.
+Paid component source (BoardUI Pro, affectUI, beUI Pro) never enters this
+repository or its image; official builds bring it in. The build without it
+only has to compile, so there is no separate open-source look to design,
+screenshot or review. Official apps connect to Mikka Cloud or any self-hosted
+server.
+
 ### UI changes: Figma, then skill review, then code
 
 A change a person can see is drawn in Figma first, reviewed with the
@@ -138,6 +149,10 @@ A change a person can see is drawn in Figma first, reviewed with the
 remains, confirmed by Alex, and only then implemented. The PR shows the built
 screen next to the confirmed frames; green CI alone does not make it
 mergeable. Details: `docs/design/decisions/2026-11-01-0330-ui-figma-and-skill-review-before-code.md`.
+A paid block or component (BoardUI Pro, affectUI, beUI Pro) is not redrawn or
+skill-reviewed for look: it is used as shipped, and its PR attaches a
+side-by-side of the library demo and our use
+(`docs/design/decisions/2026-11-09-0050-paid-blocks-as-shipped.md`).
 
 ### Test logins: never ask for a password
 

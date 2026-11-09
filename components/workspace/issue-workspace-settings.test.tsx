@@ -54,6 +54,8 @@ let releaseChunk: () => void
 const delayedDynamic: typeof dynamic = (loader, options) => dynamic(async () => { await chunkReady; return loader() }, options)
 mock.module('next/dynamic', { defaultExport: delayedDynamic })
 for (const [file, names] of [
+  // The real app-frame slot also exports an unused rail; its account menu is outside this shell-state fixture.
+  ['../workspace-menu.tsx', ['WorkspaceMenu']],
   ['../nav/bot-list.tsx', ['BotList']], ['../nav/new-bot-dialog.tsx', ['NewBotDialog']],
   ['../onboarding/onboarding.tsx', ['Onboarding']], ['../teams/team-home.tsx', ['TeamHome']],
   ['./issue-list.tsx', ['IssueList']], ['./board-page.tsx', ['BoardPage']],

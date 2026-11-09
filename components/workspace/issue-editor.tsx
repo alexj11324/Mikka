@@ -160,7 +160,8 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
       <div className={cn('min-w-0 [--frame-panel-header-px:--spacing(2)] [--frame-panel-header-py:--spacing(2)]', layout === 'description' ? '[&>[role=toolbar]]:rounded-lg [&>[role=toolbar]]:border' : layout === 'issue' ? '' : 'rounded-lg border')}>
         {layout !== 'issue' && <FormattingToolbar editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} />}
         <div ref={pageRef} className="relative min-w-0">
-          <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn('min-h-28 py-2', layout === 'description' ? 'px-4 sm:pl-16' : layout === 'issue' ? 'px-0' : 'px-4 sm:px-10', RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE)} />
+          {/* On the task page the description is as tall as what it says (one line at least), not a fixed 112px block (UI audit task-20). */}
+          <RichTextContent editor={editor} onLinkShortcut={openLink} className={cn('py-2', layout === 'issue' ? 'min-h-10' : 'min-h-28', layout === 'description' ? 'px-4 sm:pl-16' : layout === 'issue' ? 'px-0' : 'px-4 sm:px-10', RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE)} />
           {editor && <><RichTextFormatBubble editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /><RichTextLinkBubble editor={editor} onEdit={openLink} /><RichTextTableBubble editor={editor} onDeleteTable={() => setDeleteTableOpen(true)} /><RichTextBlockGutter editor={editor} editable={editable} scrollerRef={pageRef} gap={layout === 'description' ? 12 : undefined} onDeleteTable={() => setDeleteTableOpen(true)} /></>}
         </div>
       </div>

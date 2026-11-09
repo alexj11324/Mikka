@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
@@ -63,7 +64,7 @@ test('PG: group delegation has one Task/Thread, requester scope, replay receipt,
       async executionBot(){return{botId:executionBot,reporterOwnerId:'reporter-owner',repository:null}},
       async create(userId,eventId,title){
         const event=(await client.query('SELECT * FROM coordinator_events WHERE id=$1',[eventId])).rows[0]
-        assert.equal(event.userId,userId);assert.equal(event.botId,null);assert.equal(event.kind,'user_message')
+        assert.equal(event.userId,userId);assert.equal(event.botId,executionBot);assert.equal(event.kind,'user_message')
         if(event.issueId)return event.issueId
         const issueId=randomUUID();await client.query('INSERT INTO issues VALUES($1,$2,$3)',[issueId,title,userId]);await client.query('UPDATE coordinator_events SET "issueId"=$2 WHERE id=$1',[eventId,issueId]);return issueId
       },
@@ -193,9 +194,10 @@ for(const flowVersion of [2,1] as const)for(const kind of ['deliverable','reposi
     const actor={userId,sessionId:'accepted-fixture-session'}
     await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,'Fixture','group-acceptance@example.invalid',true,now(),now())`,[userId])
     await pool.query(`INSERT INTO "session"(id,"userId",token,"expiresAt","createdAt","updatedAt") VALUES($1,$2,'fixture-only-no-real-login',now()+interval '1 hour',now(),now())`,[actor.sessionId,userId])
+    await seedFixtureWorkspace(pool,userId,'team',workspaceId)
     await pool.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,'Reporter')`,[botId,userId,workspaceId])
     await pool.query(`INSERT INTO agents(id,"userId",name,harness) VALUES($1,$2,'Synthetic execution','codex')`,[agentId,userId])
-    await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority) VALUES($1,$2,'Standalone deliverable','{}','todo','normal')`,[issueId,userId])
+    await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority) VALUES($1,$2,$3,'Standalone deliverable','{}','todo','normal')`,[issueId,userId,workspaceId])
     await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES($1::uuid,$2,$3,$4,'user_message',$1::uuid::text,'{"text":"Produce the standalone deliverable"}')`,[sourceEventId,userId,botId,issueId])
     const authorize=async(owner:string,issue:string,tx:import('pg').PoolClient)=>(await tx.query('SELECT 1 FROM issues WHERE id=$1 AND "userId"=$2',[issue,owner])).rowCount===1
     const gates=createFactoryApprovalGates()

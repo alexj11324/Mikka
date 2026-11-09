@@ -257,11 +257,12 @@ function ChoiceCard({ title, description, options, task }: { title: string; desc
 /**
  * One lettered row of a choice card: the library's Item, left-aligned, its letter a Kbd. It looks the same whether it
  * answers, opens a setup page or a dialog; `render` decides which (the shared Button, a link, or a plain row once
- * answered). Item's look wins over the bare Button's sizing. Hover and picked use QuestionnaireChoice's own tones.
+ * answered). Item's look wins over the bare Button's sizing. Open rows sit on the page surface, a step above the reply
+ * they are in, so they read as the thing to press in both themes (UI audit chat-07).
  */
 function ChoiceRow({ letter, label, selected, answered, end, render }: { letter: string; label: string; selected: boolean; answered: boolean; end: ReactNode; render: ReactElement }) {
   return <Item size="sm" variant="outline" data-choice={selected ? 'picked' : answered ? 'other' : 'open'} render={render}
-    className={cn('h-auto justify-start text-left whitespace-normal disabled:opacity-100', !answered && 'cursor-pointer hover:bg-muted/50 disabled:cursor-default disabled:hover:bg-transparent', selected && 'border-primary/40 bg-muted', answered && !selected && 'text-muted-foreground')}>
+    className={cn('h-auto justify-start text-left whitespace-normal disabled:opacity-100', !answered && 'cursor-pointer bg-background shadow-xs hover:bg-muted disabled:cursor-default disabled:hover:bg-background', selected && 'border-primary/40 bg-muted', answered && !selected && 'text-muted-foreground')}>
     <ItemMedia><Kbd>{letter}</Kbd></ItemMedia>
     <ItemContent><ItemTitle className={cn('line-clamp-none font-normal', selected && 'font-medium')}>{label}</ItemTitle></ItemContent>
     {end && <ItemActions className="text-muted-foreground [&_svg]:size-4">{end}</ItemActions>}

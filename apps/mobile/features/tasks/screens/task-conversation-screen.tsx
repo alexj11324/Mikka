@@ -1,13 +1,16 @@
-import { useCallback, useRef, useState } from 'react'
+import { mobileMessages } from '@/lib/messages'
+import { useCallback, useRef, useState, type ReactNode } from 'react'
 import { Platform, Pressable, StyleSheet, View } from 'react-native'
 import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Check } from 'lucide-react-native'
+import { ChevronDown, ChevronRight, ScanSearch } from 'lucide-react-native'
 import { BotBubble, MyBubble } from '@/components/chat'
 import { Spinner } from '@/components/icons'
 import { Markdown } from '@/components/Markdown'
 import { NavBar, underBar } from '@/components/NavBar'
+import { useScrolledUnderBar } from '@/components/BarBackdrop'
+import { ThreadSteps } from '@/features/tasks/components/thread-steps'
 import { OfflineBanner } from '@/components/OfflineBanner'
 import { ReadNotice } from '@/components/ReadNotice'
 import { StopFailed } from '@/components/StopFailed'
@@ -24,7 +27,8 @@ import type { TaskDetail, ThreadDetail, ThreadItem } from '@/lib/types'
 import { useLiveApi } from '@/lib/useApi'
 import { useStop } from '@/lib/useStop'
 import { colors } from '@/lib/theme'
-import { conversationSegments, currentAgent, dividerText, type Attempt } from '../model/task-conversation'
+import { boundary, conversationSegments, currentAgent, reviewRun, type Attempt } from '../model/task-conversation'
+import { STAGE_WORD, stageLine, verdictWord, type TaskFlow } from '../model/task-flow'
 
 type Conversation = { detail: TaskDetail; threads: Record<string, ThreadDetail> }
 
@@ -37,8 +41,9 @@ async function readConversation(id: string): Promise<Conversation> {
 }
 
 /**
- * A task's one conversation (Alex 2026-11-07): every attempt's messages in order, oldest at the top, with a line
- * between attempts (「第 1 次尝试失败 · 换 Claude Code 再试」). The bar is ← and the task's title over the current
+ * A task's one conversation (Alex 2026-11-07, 2026-11-08): every run's messages in order, oldest at the top. A line
+ * only where the task switched Agent (「换 Codex 继续」, 「Claude Code 没跑通 · 换 Codex 继续」); a small marker
+ * where a factory stage started (「独立审查」); same-Agent runs otherwise read as one. The bar is ← and the task's title over the current
  * Agent; the composer, 停止 and a quota pause act on the newest attempt. It updates on the task's and the newest
  * attempt's live keys.
  */
@@ -46,6 +51,7 @@ export function TaskConversationScreen() {
   const { id, attempt } = useLocalSearchParams<{ id: string; attempt?: string }>()
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  const bar = useScrolledUnderBar()
   const home = useHome().data
   // Stable: useLiveApi reads again whenever its reader changes.
   const read = useCallback(() => readConversation(id), [id])
@@ -97,6 +103,7 @@ export function TaskConversationScreen() {
   return (
     <View style={styles.screen}>
       <NavBar
+        scrolled={bar.scrolled}
         back={() => (router.canGoBack() ? router.back() : router.replace(`/task/${id}`))}
         titleView={task ? (
           <View style={styles.titleBox}>
@@ -105,15 +112,21 @@ export function TaskConversationScreen() {
           </View>
         ) : undefined}
       />
-      <KeyboardChatScrollView ref={scroller as never} onContentSizeChange={place} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
+      <KeyboardChatScrollView onScroll={bar.onScroll} scrollEventThrottle={16} ref={scroller as never} onContentSizeChange={place} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
         {!data && !error ? <View style={styles.center}><Spinner /></View> : null}
-        <ReadNotice error={error} hasData={Boolean(data)} label="对话" onRetry={reload} />
-        {data && !segments.length ? <Text style={styles.empty}>还没有尝试</Text> : null}
+        <ReadNotice error={error} hasData={Boolean(data)} label={mobileMessages.Coordinator.conversation} onRetry={reload} />
+        {/* A factory task's one stage, and what it needs from you (2026-11-04-2200); nothing without a flow. */}
+        {stageLine(data?.detail.task.flow) ? <Text style={styles.stageLine}>{stageLine(data?.detail.task.flow)}</Text> : null}
+        {data && !segments.length ? <Text style={styles.empty}>{mobileMessages.MobileCore.notStarted}</Text> : null}
         {segments.map((segment, index) => (
           <View key={segment.attempt.runId} style={styles.segment}
             onLayout={event => { offsets.current.set(segment.attempt.runId, event.nativeEvent.layout.y); place() }}>
-            {index > 0 ? <Divider text={dividerText(segments[index - 1]!.attempt, segment.attempt)} /> : null}
-            {segment.items.map((item, at) => <Item key={item.id} item={item} live={Boolean(live?.active) && index === segments.length - 1 && at === segment.items.length - 1} />)}
+            {index > 0 ? <Boundary at={boundary(segments[index - 1]!.attempt, segment.attempt)} /> : null}
+            {reviewRun(segment.attempt)
+              ? <ReviewCard flow={data?.detail.task.flow} running={Boolean(live?.active) && index === segments.length - 1}>
+                {segment.items.map((item, at) => <Item key={item.id} item={item} live={Boolean(live?.active) && index === segments.length - 1 && at === segment.items.length - 1} />)}
+              </ReviewCard>
+              : segment.items.map((item, at) => <Item key={item.id} item={item} live={Boolean(live?.active) && index === segments.length - 1 && at === segment.items.length - 1} />)}
             {/* A failed attempt's cause stays inside it, in words, with the raw code under 详情 (2026-11-05-0330). */}
             {segment.error && !(index === segments.length - 1 && live?.active) && !segment.items.some(item => item.kind === 'error') ? <AttemptError raw={segment.error} /> : null}
           </View>
@@ -124,7 +137,7 @@ export function TaskConversationScreen() {
       </KeyboardChatScrollView>
       <OfflineBanner top={insets.top + 66} />
       {/* R-10: the conversation ends in the composer; a message to an ended attempt runs it again (R-81). */}
-      {live && newest ? <Composer placeholder="给这个任务发消息" onSend={send} disabled={sending} attach attachmentScope={{ kind: 'thread', id: newest }}
+      {live && newest ? <Composer placeholder={mobileMessages.MobileCore.messageTask} onSend={send} disabled={sending} attach attachmentScope={{ kind: 'thread', id: newest }}
         onStop={composerStops(live) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
     </View>
   )
@@ -133,12 +146,7 @@ export function TaskConversationScreen() {
 function Item({ item, live }: { item: ThreadItem; live: boolean }) {
   switch (item.kind) {
     case 'steps':
-      return (
-        <View style={styles.step}>
-          {live ? <Spinner size={14} /> : <Check size={15} color={colors.secondary} strokeWidth={2.2} />}
-          <Text style={styles.stepText}>{item.count} 步</Text>
-        </View>
-      )
+      return <ThreadSteps steps={item.steps} count={item.count} live={live} />
     case 'agent': return <View style={styles.message}><BotBubble><Markdown text={item.text} /></BotBubble></View>
     case 'error': return <AttemptError raw={item.text} />
     case 'person': return <View style={styles.message}><MyBubble text={item.text} /></View>
@@ -153,14 +161,46 @@ function AttemptError({ raw }: { raw: string }) {
     <View style={styles.cause}>
       <Text style={styles.causeLine}>{line}</Text>
       <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen(value => !value)} hitSlop={8}>
-        <Text style={styles.detailsToggle}>详情</Text>
+        <Text style={styles.detailsToggle}>{mobileMessages.IssueThreads.errorDetails}</Text>
       </Pressable>
       {open ? <Text selectable style={styles.details}>{raw}</Text> : null}
     </View>
   )
 }
 
-/** The line between two attempts, as the chat's event lines are drawn: centred grey words between hairlines. */
+/**
+ * The factory's review, run once per task (2026-11-04-2200), as one result card rather than its full text: 「审阅」
+ * and its verdict (通过 / 需要修改 / 需要你判断, from the task's flow), which opens to the reviewer's transcript.
+ */
+function ReviewCard({ flow, running, children }: { flow: TaskFlow | null | undefined; running: boolean; children: ReactNode }) {
+  const [open, setOpen] = useState(false)
+  const verdict = running ? mobileMessages.MobileCore.groups.running : verdictWord(flow)
+  const Chevron = open ? ChevronDown : ChevronRight
+  return (
+    <View style={styles.review}>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} accessibilityLabel={[STAGE_WORD.review, verdict].filter(Boolean).join(' · ')}
+        onPress={() => setOpen(value => !value)} style={({ pressed }) => [styles.reviewHead, pressed && { opacity: 0.6 }]}>
+        {running ? <Spinner size={16} /> : <ScanSearch size={18} color={flow?.review?.verdict === 'passed' ? colors.success : flow?.review?.verdict ? colors.orange : colors.secondary} strokeWidth={2} />}
+        <Text style={styles.reviewTitle}>{STAGE_WORD.review}</Text>
+        {verdict ? <Text style={[styles.reviewVerdict, flow?.review?.verdict === 'passed' ? { color: colors.success } : flow?.review?.verdict ? { color: colors.orange } : null]}>{verdict}</Text> : null}
+        <View style={{ flex: 1 }} />
+        <Chevron size={16} color={colors.tertiary} strokeWidth={2.2} />
+      </Pressable>
+      {open ? <View style={styles.reviewBody}>{children}</View> : null}
+    </View>
+  )
+}
+
+/**
+ * Between two runs of the task's one conversation: a centred line where the task switched Agent (「换 Claude Code 继续」),
+ * a small marker where a factory stage started (「独立审查」), nothing otherwise.
+ */
+function Boundary({ at }: { at: ReturnType<typeof boundary> }) {
+  if (!at) return null
+  return at.kind === 'switch' ? <Divider text={at.text} /> : <Text style={styles.stage}>{at.text}</Text>
+}
+
+/** The line where the Agent changed, as the chat's event lines are drawn: centred grey words between hairlines. */
 function Divider({ text }: { text: string }) {
   return (
     <View style={styles.divider} accessibilityRole="header">
@@ -172,6 +212,13 @@ function Divider({ text }: { text: string }) {
 }
 
 const styles = StyleSheet.create({
+  stageLine: { alignSelf: 'center', fontSize: 13, fontWeight: '600', color: colors.secondary, marginBottom: 4 },
+  review: { borderRadius: 18, borderCurve: 'continuous', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.separator, paddingHorizontal: 14, paddingVertical: 4 },
+  reviewHead: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 },
+  reviewTitle: { fontSize: 16, fontWeight: '600', color: colors.text },
+  reviewVerdict: { fontSize: 15, color: colors.secondary },
+  reviewBody: { gap: 12, paddingBottom: 10 },
+  stage: { alignSelf: 'center', fontSize: 12, fontWeight: '500', color: colors.secondary, paddingHorizontal: 10, paddingVertical: 3, marginVertical: 4 },
   screen: { flex: 1, backgroundColor: colors.page },
   titleBox: { alignItems: 'center', maxWidth: 260 },
   title: { fontSize: 16, fontWeight: '600' },
@@ -180,8 +227,6 @@ const styles = StyleSheet.create({
   center: { paddingTop: 40, alignItems: 'center' },
   empty: { paddingTop: 40, textAlign: 'center', fontSize: 15, color: colors.secondary },
   message: { marginVertical: 4 },
-  step: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 26 },
-  stepText: { fontSize: 14, color: colors.secondary },
   error: { fontSize: 14, color: colors.danger, marginVertical: 4 },
   segment: { gap: 4 },
   cause: { gap: 4, marginVertical: 4 },

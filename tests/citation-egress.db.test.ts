@@ -1,3 +1,4 @@
+import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { Socket } from 'node:net'
@@ -38,11 +39,12 @@ test('a chat\'s cited runs show the same name, summary and task without reading 
   try {
     await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,false,now(),now())', [owner, `${owner}@example.invalid`])
     await pool.query('insert into agents(id,"userId",name,harness) values($1,$2,$3,$4)', [agent, owner, 'Fixture bot', 'codex'])
-    await pool.query('insert into issues(id,"userId",title,content,status,priority) values($1,$2,$3,$4,$5,$6)', [issueId, owner, 'Login task', JSON.stringify(body), 'doing', 'normal'])
-    const identity = { requester: owner, executionPrincipal: owner, outputOwner: owner, notes: filler }
+    await pool.query('insert into issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState") values($1,$2,$3,$4,$5,$6,$7,\'bound\')', [issueId, owner, 'Login task', JSON.stringify(body), 'doing', 'normal', await seedFixtureWorkspace(pool, owner)])
+    const workspaceId = await seedFixtureWorkspace(pool, owner)
+    const identity = { requester: owner, executionPrincipal: owner, outputOwner: owner, workspaceId, notes: filler }
     for (const [index, id] of runs.entries()) {
-      await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status,prompt,report,error,"agentDefinition") values($1,$2,$3,$4,$5,$6,$7,$8,$9)',
-        [id, owner, index === 3 ? null : issueId, agent, 'succeeded', prompts[index], reports[index] === null ? null : JSON.stringify(reports[index]), errors[index], JSON.stringify({ harness: 'codex', executionIdentity: identity })])
+      await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status,prompt,report,error,"agentDefinition","workspaceId") values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',
+        [id, owner, index === 3 ? null : issueId, agent, 'succeeded', prompts[index], reports[index] === null ? null : JSON.stringify(reports[index]), errors[index], JSON.stringify({ harness: 'codex', executionIdentity: identity }), workspaceId])
     }
     const full = new Map((await visibleRuns(owner, { runIds: runs, limit: runs.length })).map(run => [run.id, run]))
     const task = await issueForUser(owner, issueId)
@@ -58,7 +60,7 @@ test('a chat\'s cited runs show the same name, summary and task without reading 
       const run = full.get(id)!
       assert.equal(source.name, threadName(prompts[index], run.agentName), `run ${index}: the same name as from its whole prompt`)
       assert.equal(source.summary, runSummaryText(run), `run ${index}: the same summary as from its whole report`)
-      assert.deepEqual(source.issue, index === 3 ? null : { id: issueId, title: task.title, number: 12, identifier: source.issue?.identifier ?? null })
+      assert.deepEqual(source.issue, index === 3 ? null : { id: issueId, title: task.title, number: 12, identifier: source.issue?.identifier ?? null, status: 'doing' })
       assert.deepEqual(source.pullRequests, index === 3 ? [] : readIssueMetadata(task.content).pullRequests)
     }
     assert.equal((sources[runs[0]] as { name: string }).name, 'Fix the login bug that drops a session when the token refre…')
@@ -78,6 +80,8 @@ test('a chat\'s cited runs show the same name, summary and task without reading 
     await pool.query('delete from agent_runs where "userId"=$1', [owner])
     await pool.query('delete from agents where id=$1', [agent])
     await pool.query('delete from issues where id=$1', [issueId])
+    await pool.query('delete from mikka_workspace_members where "userId"=$1', [owner])
+    await pool.query('delete from mikka_workspaces where "userId"=$1', [owner])
     await pool.query('delete from "user" where id=$1', [owner])
     await pool.end()
   }

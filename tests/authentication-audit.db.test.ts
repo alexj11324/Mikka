@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict'
-import { randomBytes, randomUUID } from 'node:crypto'
+import { createHash, generateKeyPairSync, randomBytes, randomUUID, sign } from 'node:crypto'
 import test, { mock } from 'node:test'
 import { Pool } from 'pg'
 import { dbUrl, seedWorkspace } from './support/workspace-admin-db'
 import { TestAccountPool } from '../scripts/test-accounts/pool.mjs'
+import { authAppleOptions, requireAppleSignInNonce } from '../lib/auth-config'
 import { SESSION_OPTIONS } from '../lib/fresh-session'
 import { DESKTOP_SESSION_CACHE_HEADER, desktopSessionCacheAfter, validDesktopSessionCache } from '../lib/desktop-rpc/session-cache'
 
-// Real Better Auth and PostgreSQL. Only Next's request cookie-store port is
-// explicit fixture IO; no provider, mailbox or OAuth flow is invoked.
+// Real Better Auth and PostgreSQL. Next's cookie store and Apple's public-key
+// endpoint are fixture IO; Apple tokens are signed locally.
 test('authentication writes tenant-bound durable intent and withholds every new credential when audit fails', { skip: !dbUrl }, async t => {
   const database = new Pool({ connectionString: dbUrl, max: 5 })
   assert.ok((await database.query("SELECT to_regclass('workspace_audit_outbox') AS name")).rows[0].name, 'tracked workspace migrations must be applied by normal setup')
@@ -19,9 +20,10 @@ test('authentication writes tenant-bound durable intent and withholds every new 
   ])
   const origin = 'http://localhost:3187', password = `fixture-${randomBytes(20).toString('hex')}`, email = `audit-login-${randomUUID()}@example.invalid`
   const auth = betterAuth({ baseURL: origin, basePath: '/mikka/api/auth', database, secret: randomBytes(32).toString('hex'),
+    socialProviders: { apple: authAppleOptions({ MIKKA_EDITION: 'cloud' })! },
     emailAndPassword: { enabled: true }, trustedOrigins: [origin], logger: { disabled: true }, plugins: [nextCookies()],
     session: SESSION_OPTIONS,
-    hooks: { after: createAuthMiddleware(async ctx => { await auditAuthentication(ctx); desktopSessionCacheAfter(ctx) }) },
+    hooks: { before: createAuthMiddleware(async ctx => { requireAppleSignInNonce(ctx) }), after: createAuthMiddleware(async ctx => { await auditAuthentication(ctx); desktopSessionCacheAfter(ctx) }) },
   })
   const created = await auth.api.signUpEmail({ body: { name: 'Audit Login Fixture', email, password } })
   const userId = created.user.id, workspaces: string[] = []
@@ -130,5 +132,54 @@ test('authentication writes tenant-bound durable intent and withholds every new 
     try { await cleanup.query('BEGIN'); await TestAccountPool.prototype.cleanupLoginAudit(cleanup, [{ id: nextSession.id, owner_id: userId }]); await cleanup.query('COMMIT') }
     catch (error) { await cleanup.query('ROLLBACK'); throw error } finally { cleanup.release() }
     assert.equal(await fingerprint(), before)
+  })
+  await t.test('native Apple sign-in commits OAuth audit and withholds the session on audit failure', async native => {
+    await (await auth.$context).internalAdapter.updateUser(userId, { emailVerified: true })
+    const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
+    const jwk = { ...publicKey.export({ format: 'jwk' }), kid: 'native-audit-fixture', alg: 'RS256' }
+    native.mock.method(globalThis, 'fetch', async (input: unknown) => {
+      assert.equal(String(input), 'https://appleid.apple.com/auth/keys')
+      return Response.json({ keys: [jwk] })
+    })
+    const hash = (value: string) => createHash('sha256').update(value).digest('hex')
+    const nonce = `${randomBytes(32).toString('hex')}.${hash(`${origin}/mikka/api/auth`)}`
+    const header = Buffer.from(JSON.stringify({ alg: 'RS256', kid: jwk.kid })).toString('base64url')
+    const payload = Buffer.from(JSON.stringify({ sub: `apple-audit-${userId}`, email, email_verified: true,
+      nonce: hash(nonce), iss: 'https://appleid.apple.com', aud: 'com.aspectlylabs.mikka',
+      iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 300 })).toString('base64url')
+    const unsigned = `${header}.${payload}`
+    const token = `${unsigned}.${sign('RSA-SHA256', Buffer.from(unsigned), privateKey).toString('base64url')}`
+    const postNative = () => auth.handler(new Request(`${origin}/mikka/api/auth/sign-in/social`, {
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-skip-oauth-proxy': 'true' },
+      body: JSON.stringify({ provider: 'apple', idToken: { token, nonce } }),
+    }))
+    const beforeEvents = (await events()).length
+    const response = await postNative()
+    assert.equal(response.status, 200)
+    const body = await response.json()
+    // Query by the new session, since the outbox sorts by workspace before id.
+    const session = (await database.query('SELECT id FROM session WHERE token=$1', [body.token])).rows[0]
+    const nativeEvents = (await events()).filter(row => row.payload?.targetId === session.id)
+    assert.equal((await events()).length - beforeEvents, 2)
+    assert.equal(nativeEvents.length, 2)
+    assert.ok(nativeEvents.every(row => row.payload.action === 'auth.signed_in' && row.payload.metadata.method === 'oauth'))
+    assert.equal(JSON.stringify(nativeEvents).includes(token), false)
+    const name = `auth_native_audit_${randomUUID().replaceAll('-', '')}`
+    const sessions = () => database.query('SELECT count(*)::int AS n FROM session WHERE "userId"=$1', [userId]).then(result => result.rows[0].n)
+    const beforeSessions = await sessions(), beforeFailure = (await events()).length
+    await database.query(`ALTER TABLE workspace_audit_outbox ADD CONSTRAINT ${name} CHECK("workspaceId"<>'${workspaces[0]}'::uuid) NOT VALID`)
+    try {
+      cookieWrites.length = 0
+      const denied = await postNative()
+      assert.equal(denied.status, 503)
+      const withheld = await denied.json()
+      assert.equal(withheld.code, 'AUTH_AUDIT_UNAVAILABLE')
+      assert.equal(Object.hasOwn(withheld, 'token'), false)
+      assert.equal(denied.headers.getSetCookie().length, 0)
+      assert.equal(denied.headers.has(DESKTOP_SESSION_CACHE_HEADER), false)
+      assert.equal(cookieWrites.length, 0)
+      assert.equal(await sessions(), beforeSessions)
+      assert.equal((await events()).length, beforeFailure)
+    } finally { await database.query(`ALTER TABLE workspace_audit_outbox DROP CONSTRAINT ${name}`) }
   })
 })

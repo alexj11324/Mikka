@@ -179,3 +179,58 @@ test('a revision rises once per publish across its fan-out and a reader sees the
     if (previous.secret === undefined) delete process.env.DEVICE_GATEWAY_PUSH_SECRET; else process.env.DEVICE_GATEWAY_PUSH_SECRET = previous.secret
   }
 })
+
+test('prepared owner-list revisions share one PostgreSQL read without duplicate team refs or rows', { skip: !enabled }, async t => {
+  const { pool } = await import('../lib/db')
+  const { workspacePool } = await import('../lib/workspace-db')
+  const { ownerLiveReadScope } = await import('../lib/live/owner-scope')
+  const { readBatchOwnerRevisions, withReadBatchContext } = await import('../lib/desktop-rpc/read-batch-context')
+  const { bumpLiveRevisions } = await import('../lib/live/revisions')
+  const owner = `batch-revision-${randomUUID()}`, homeId = randomUUID(), teamId = randomUUID()
+  await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,false,now(),now())', [owner, `${owner}@example.invalid`])
+  await workspacePool.query(`insert into mikka_workspaces(id,"userId",name,kind) values($1,$2,'Personal','personal')`, [homeId, owner])
+  await workspacePool.query(`insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,$2,$3,'admin')`, [homeId, owner, `${owner}@example.invalid`])
+  await workspacePool.query(`insert into mikka_workspaces(id,"userId",name,kind) values($1,$2,'Shared','team')`, [teamId, owner])
+  await workspacePool.query(`insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,$2,$3,'admin')`, [teamId, owner, `${owner}@example.invalid`])
+  const kinds = ['task_run_list', 'thread_list', 'bot_chat_list'] as const
+  const plan = ['task-runs.pollTaskRuns', 'task-runs.syncThreadList', 'coordinator.pollBotChatSummaries', 'issues.syncIssueList'] as const
+  await bumpLiveRevisions(pool, [...kinds.map(kind => ({ kind, id: homeId })), { kind: 'issue_list', id: homeId }, { kind: 'issue_list', id: teamId }])
+  const measure = async (selected: string, planned: boolean) => {
+    const statements: { refs: number; rows: number; rowJsonBytes: number }[] = []
+    let homeQueries = 0
+    const homes = { query: async (sql: string, values: string[]) => {
+      homeQueries++; return workspacePool.query(sql, values)
+    } } as unknown as Parameters<typeof ownerLiveReadScope>[0]
+    const database = { query: async (sql: string, values: string[][]) => {
+      const result = await pool.query(sql, values)
+      statements.push({ refs: values[0].length, rows: result.rows.length, rowJsonBytes: Buffer.byteLength(JSON.stringify(result.rows)) })
+      return result
+    } } as unknown as Parameters<typeof readBatchOwnerRevisions>[0]
+    const read = async (kind: typeof kinds[number] | 'issue_list', selected?: string) => {
+      const home = await ownerLiveReadScope(homes, owner)
+      assert.ok(home)
+      return readBatchOwnerRevisions(database, [{ kind, id: homeId }, ...selected ? [{ kind: 'issue_list' as const, id: selected }] : []], home)
+    }
+    const values = await withReadBatchContext(async () => {
+      const early = await Promise.all(kinds.map(kind => read(kind)))
+      // Same legal readiness order as an issue reader's workspace resolution.
+      return [...early, await read('issue_list', selected)]
+    }, planned ? plan : [])
+    return { statements, values, homeQueries }
+  }
+  for (const selected of [homeId, teamId]) {
+    const before = await measure(selected, false), after = await measure(selected, true)
+    assert.deepEqual(after.values, before.values)
+    assert.equal(before.homeQueries, 1); assert.equal(after.homeQueries, 1)
+    assert.equal(before.statements.length, 2)
+    assert.equal(after.statements.length, selected === homeId ? 1 : 2)
+    const expected = selected === homeId ? 4 : 5
+    for (const sample of [before, after]) {
+      assert.equal(sample.statements.reduce((sum, row) => sum + row.refs, 0), expected)
+      assert.equal(sample.statements.reduce((sum, row) => sum + row.rows, 0), expected)
+    }
+    assert.ok(after.statements.reduce((sum, row) => sum + row.rowJsonBytes, 0) <= before.statements.reduce((sum, row) => sum + row.rowJsonBytes, 0))
+    t.diagnostic(JSON.stringify({ scope: selected === homeId ? 'personal' : 'team-key', before: before.statements, after: after.statements,
+      byteMeaning: 'UTF-8 JSON of actual pg result rows, not transport/TLS bytes' }))
+  }
+})

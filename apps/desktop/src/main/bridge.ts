@@ -28,6 +28,7 @@ export interface BridgeOptions {
   localDevice(): Promise<LocalDevice>
   pickRepo?(): Promise<import('@mikka/protocol/bridge').PickRepoResult>
   localAccount(): Promise<LocalDeviceAccount>
+  localOwner(): Promise<Pick<LocalDeviceAccount, 'ownerId'>>
   quota(): Promise<QuotaSnapshotReport>
   notifications: NotificationCenter
   consumePendingClick(): string | null
@@ -58,7 +59,7 @@ export function registerBridge(options: BridgeOptions, sshInstaller?: SshInstall
     if (current.ownerId !== ownerId) throw new Error('Signed-in account changed')
     return current.deviceIds.includes(deviceId)
   })
-  const local = localSetupController(installer, options.localAccount)
+  const local = localSetupController(installer, options.localOwner)
   handle(IPC.sshHosts, () => installer.hosts())
   handle(IPC.sshState, () => installer.state())
   handle(IPC.sshLocal, () => local.install())

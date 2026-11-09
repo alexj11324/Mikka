@@ -1,6 +1,7 @@
 import { addFactoryVisualEvidence } from '../../tests/helpers/factory-visual-evidence';
 import { observePoolCommits } from '../db/commit-effects';
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
+import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { factoryTestLifecycle } from "../../tests/helpers/factory-test-authority";
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
@@ -100,9 +101,11 @@ test(
         agentId = randomUUID();
       const issueBody = "Describe the fixture change and its acceptance criterion";
       const instructions = "Keep the fixture plan within the original issue scope";
+      const workspaceId = await seedFixtureWorkspace(pool, 'owner');
+      const otherWorkspaceId = await seedFixtureWorkspace(pool, 'other');
       await pool.query(
-        `INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,'owner','Factory test',$3,'todo','normal'),($2,'other','Foreign issue','{}','todo','normal')`,
-        [issueId, otherIssueId, JSON.stringify({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: issueBody }] }] })],
+        `INSERT INTO issues (id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,'owner','Factory test',$3,'todo','normal',$4,'bound'),($2,'other','Foreign issue','{}','todo','normal',$5,'bound')`,
+        [issueId, otherIssueId, JSON.stringify({ type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: issueBody }] }] }), workspaceId, otherWorkspaceId],
       );
       await pool.query(
         `INSERT INTO agents (id,"userId",name,harness,instructions) VALUES ($1,'owner','Factory fixture','codex',$2)`,
@@ -268,8 +271,8 @@ test(
         ]) {
           const fixtureIssue = randomUUID();
           await pool.query(
-            `INSERT INTO issues (id,"userId",title,content,status,priority) VALUES ($1,'owner','Claim fixture','{}','todo','normal')`,
-            [fixtureIssue],
+            `INSERT INTO issues (id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,'owner','Claim fixture','{}','todo','normal',$2,'bound')`,
+            [fixtureIssue, workspaceId],
           );
           const initial = await route({
             issueId: fixtureIssue,

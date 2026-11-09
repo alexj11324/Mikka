@@ -8,6 +8,7 @@ import type { ChatView } from './store'
 
 const owner = 'projection-version-owner'
 const botId = '70000000-0000-4000-8000-000000000001'
+const workspaceId = '70000000-0000-4000-8000-000000000002'
 const prefixHash = 'a'.repeat(32)
 const storedHash = 'b'.repeat(32)
 const createdAt = '2026-11-08T00:00:00.000Z'
@@ -24,6 +25,10 @@ const reads: string[] = []
 // this adapter neither implements nor imports the new projection hash.
 const database = drizzle(async (query, params) => {
   reads.push(query)
+  if (query.startsWith('select "workspaceId" from "bots"')) {
+    assert.deepEqual(params, [botId, owner, 1])
+    return { rows: [[workspaceId]] }
+  }
   if (query.includes('"chat_prefix"')) {
     return { rows: [query.includes("jsonb_agg(jsonb_build_object('position'") ? [prefixHash, []] : [prefixHash]] }
   }
@@ -40,6 +45,14 @@ const database = drizzle(async (query, params) => {
 
 const unused = () => { throw new Error('unexpected_projection_version_dependency') }
 mock.module('@/lib/db', { namedExports: { db: database } })
+// Keep the real chatReader and tenant check; this transport models only this
+// owner's active Personal Workspace, alongside the existing opaque chat rows.
+const workspaceDatabase = drizzle(async (query, params) => {
+  assert.match(query, /from "mikka_workspaces" inner join "mikka_workspace_members"/)
+  assert.deepEqual(params, [owner, 'active', workspaceId, 'team', 'personal', owner])
+  return { rows: [[workspaceId, 'personal', null]] }
+})
+mock.module('@/lib/workspace-db', { namedExports: { workspaceDb: workspaceDatabase } })
 for (const [path, exports] of [
   ['./run-completion-observation', { runCompletionObservations: unused }],
   ['@/lib/agent-runs', { visibleRuns: unused }],
@@ -55,7 +68,7 @@ for (const [path, exports] of [
   ['./triage', { eventsForInbox: unused, isolateTaskRequest: unused }],
   ['@/lib/task-identifier-server', { taskIdentifiers: unused }],
   ['@/lib/artifacts/store', { artifactSummaries: async () => ({}) }],
-  ['@/lib/preferences', { readPreferences: unused }],
+  ['@/lib/preferences', { readPreferences: unused, readCoordinatorPromptPreferences: unused }],
   ['./triage-batch', { TRIAGE_RETRY_COOLDOWN_MS: 60_000 }],
   ['@/lib/schedules/store', { scheduledInbox: unused }],
   ['../live/chats', { botChatChanged: unused }],

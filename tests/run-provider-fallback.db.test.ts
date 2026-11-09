@@ -11,7 +11,7 @@ import { MODEL_CREDENTIAL_HEADER, RECOVERY_WORKTREE_HEADER, REPO_ORIGIN_HEADER, 
 import type { ProviderFailure } from '@mikka/protocol/provider-failure'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { emptyRunReport } from '@mikka/protocol/run'
-import { dbUrl, seedBot, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
+import { dbUrl, seedBot, seedIssue, seedPersonalWorkspace, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { recordPushGrant } from './support/github-app-stub'
 import { ALLOWED_MODEL, codexWithModel, seedAllowedModel } from './support/allowed-model'
 import type { DecisionAnswer } from '../lib/coordinator/decision'
@@ -118,8 +118,8 @@ test('provider failure continues the same task through its authorized preferred 
     const stored = (await order.readOrder(pool, scope(p))).entries
     await order.changeOrder(pool, scope(p), { kind: 'reorder', ids: entries.map(item => stored.find(candidate => entryKey(candidate) === entryKey(item))!.id) })
   }
-  const task = async (ownerId: string) => {
-    const issueId = await seedIssue(pool, ownerId)
+  const task = async (person: Person) => {
+    const issueId = await seedIssue(pool, person.id, person.workspaceId)
     await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: Math.floor(Math.random() * 1e6) + 1 } } })])
     return issueId
   }
@@ -129,7 +129,7 @@ test('provider failure continues the same task through its authorized preferred 
     const selected = await chooseLocalRunModel(pool, scope(p), { id: p.agents[harness], deviceId: p.deviceId, harness }, options.asked)
     assert.ok(!('error' in selected), JSON.stringify(selected))
     const { runId } = await queueRun(p.id, {
-      issueId: await task(p.id), agentId: p.agents[harness], repo: p.remote, ...selected,
+      issueId: await task(p), agentId: p.agents[harness], repo: p.remote, ...selected,
       ...(options.pinned ? { pinnedDeviceId: p.deviceId } : {}),
     }, p.botId)
     // Device lifecycle fields are the only run fields seeded after admission.
@@ -160,7 +160,7 @@ test('provider failure continues the same task through its authorized preferred 
       modelDispatch: { mode: 'preference' as const, location: 'local' as const, entry: target.entry, routing: target.routing } }
   }
   const routedRunning = async (p: Person, model: string) => {
-    const issueId = await task(p.id)
+    const issueId = await task(p)
     const selected = await routedSelection(p, model, issueId)
     const { runId } = await queueRun(p.id, { issueId, agentId: p.agents.claude_code, repo: p.remote, ...selected }, p.botId)
     await pool.query(`UPDATE agent_runs SET status='running',"sessionId"=$2,"worktreePath"=$3,
@@ -202,7 +202,7 @@ test('provider failure continues the same task through its authorized preferred 
       import('../lib/factory/automatic-dispatch'), import('../lib/factory/reconcile'), import('../lib/factory/checks'),
       import('../lib/factory/check-independence'), import('../lib/device-repositories'),
     ])
-    const p = await person(label), issueId = await task(p.id), epoch = randomUUID()
+    const p = await person(label), issueId = await task(p), epoch = randomUUID()
     const harness = options.subscription ? 'codex' : 'claude_code'
     const light = options.subscription ? 'gpt-6-luna' : 'claude-haiku-5-5'
     const standard = options.subscription ? 'gpt-6-sol' : 'claude-sonnet-5-5'
@@ -290,7 +290,7 @@ test('provider failure continues the same task through its authorized preferred 
       import('../lib/factory/automatic-dispatch'), import('../lib/factory/reconcile'), import('../lib/factory/checks'), import('../lib/factory/check-independence'),
       import('../lib/factory/profile-admission'), import('../lib/factory/profile-native-session'), import('../lib/device-repositories'), import('../lib/agent-kit/worker-digest'),
     ])
-    const p = await person(`automatic-routing-${failure}`), issueId = await task(p.id), epoch = randomUUID()
+    const p = await person(`automatic-routing-${failure}`), issueId = await task(p), epoch = randomUUID()
     const credential = await addKey(p.id, 'anthropic', ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'])
     await preferences(p, ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'].map(model => entry('claude_code', model, credential.id)))
     const profile = await new AgentProfileStore(pool).create(scope(p), { name: `Frozen ${failure} role`, roles: ['implementation'],
@@ -787,8 +787,7 @@ test('provider failure continues the same task through its authorized preferred 
     // before recoverProviderFailure. No provider call or worker success is faked.
     const interrupted = async (label: string, kind: 'preference' | 'picked' = 'preference') => {
       const setup = await twoModels(label)
-      const home = await seedWorkspace(pool, setup.p.id, [{ userId: setup.p.id, role: 'admin' }])
-      await pool.query(`UPDATE mikka_workspaces SET kind='personal' WHERE id=$1`, [home.id])
+      const home = await seedPersonalWorkspace(pool, setup.p.id)
       const runId = await running(setup.p, 'claude_code', kind === 'picked' ? { asked: 'fixture-claude-a' } : {})
       const source = await row(runId)
       await pool.query(`UPDATE agent_runs SET status='failed',"stopReason"='provider_failure',"finishedAt"=now(),report=$2 WHERE id=$1`,
@@ -796,9 +795,10 @@ test('provider failure continues the same task through its authorized preferred 
       await drain(); sent.length = 0
       const { runLiveTargets } = await import('../lib/live/panels')
       assert.deepEqual(await runLiveTargets(appPool, workspacePool, runId, 'run'), [{
-        scope: { ownerId: setup.p.id, workspaceId: home.id }, events: [{ kind: 'run', id: runId }],
-      }], 'the personal issue has the same authorized home channel as a normally registered owner')
-      return { ...setup, runId, homeId: home.id }
+        scope: { ownerId: setup.p.id, workspaceId: setup.p.workspaceId }, events: [{ kind: 'run', id: runId }],
+      }], 'the run keeps the task workspace channel even when its owner also has a personal home')
+      assert.notEqual(setup.p.workspaceId, home)
+      return { ...setup, runId, homeId: setup.p.workspaceId }
     }
     const assertSent = async (p: Person, homeId: string, runId: string, state: string) => {
       assert.equal((await row(runId)).report.modelFallback.state, state, 'independent connection sees the committed receipt')
@@ -807,7 +807,7 @@ test('provider failure continues the same task through its authorized preferred 
       await drain()
       // The continuation's own writer also wakes its new run, whose key names its parent.
       const delivered = sent.splice(0), path = `/v1/live/${liveChannelId({ ownerId: p.id, workspaceId: homeId })}/push`
-      assert.ok(delivered.every(value => value.path === path && value.events.every(event => event.kind === 'run')), 'only the owner’s home receives run keys')
+      assert.ok(delivered.every(value => value.path === path && value.events.every(event => event.kind === 'run')), 'only the task workspace receives run keys')
       assert.ok(delivered.some(value => value.events.some(event => event.id === runId)), 'the existing thread is woken')
       await recoverProviderFailure(pool, p.id, runId)
       assert.equal(scheduled.length, 0, 'a replay cannot notify an unchanged receipt')

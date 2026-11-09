@@ -26,6 +26,8 @@ test(
       options: `-c search_path=${schema}`,
     });
     try {
+      // Install the existing points fixture before the first menu import.
+      mock.module(new URL("./points-fallback.ts", import.meta.url).href, { namedExports: { hostedPointsRefusal: async () => null, pointsFallback: async () => null, hostedPointsHere: async () => ({ points: 98, trialLeft: 0 }) } });
       await pool.query(`CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES ('alice'),('bob');
       CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,kind text,"removedAt" timestamptz,"lastSeenAt" timestamptz,enabled boolean,"autoSchedule" boolean,"deviceType" text,name text,harnesses jsonb,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"archivedAt" timestamptz);
@@ -55,6 +57,7 @@ test(
       );
       await pool.query(migration);
       await pool.query(migration);
+      await pool.query(await readFile(new URL("../drizzle/20261101001200_bot_model_hosted_choice.sql", import.meta.url), "utf8"));
       // Un-sharing also stops runs on the owner's API keys (lib/model-api-key-runs.ts).
       await pool.query(
         await readFile(new URL("../drizzle/20261101021000_model_api_keys.sql", import.meta.url), "utf8"),
@@ -105,6 +108,60 @@ test(
         "dynamic-model",
       );
       assert.equal((await settings.botModels(bob)).length, 0);
+
+      // Temporary picks never overwrite a preference; the receipt names the stored clone.
+      const temporaryBot = randomUUID();
+      await pool.query("INSERT INTO bots VALUES ($1,$2,$3)", [temporaryBot, alice.ownerId, alice.workspaceId]);
+      await assert.rejects(settings.setTemporaryBotModel(bob, temporaryBot, binding), { code: "botNotFound" });
+      await assert.rejects(settings.setTemporaryBotModel(other, temporaryBot, binding), { code: "botNotFound" });
+      const temporary = await settings.setTemporaryBotModel(alice, temporaryBot, binding);
+      assert.ok(temporary);
+      assert.notEqual(temporary.bindingId, binding);
+      assert.match(temporary.revision, /^[0-9]+$/);
+      const savedTemporary = (await pool.query('SELECT "bindingId",xmin::text AS revision FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3',
+        [alice.ownerId, alice.workspaceId, temporaryBot])).rows[0];
+      assert.deepEqual(savedTemporary, temporary);
+      assert.equal(await settings.setTemporaryBotModel(alice, temporaryBot, binding), null);
+      const conflictingBinding = randomUUID();
+      await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision","modelId",route) VALUES ($1::uuid,'alice',$2,$1::text,$3,1,'conflict-model','codex_cpa')`,
+        [conflictingBinding, alice.workspaceId, connection]);
+      const countBeforeConflict = (await pool.query('SELECT count(*)::int AS count FROM byos_bindings')).rows[0].count;
+      assert.equal(await settings.setTemporaryBotModel(alice, temporaryBot, conflictingBinding), null);
+      assert.equal((await pool.query('SELECT count(*)::int AS count FROM byos_bindings')).rows[0].count, countBeforeConflict, 'a clone created before the conflict is rolled back');
+      assert.deepEqual((await pool.query('SELECT "bindingId",xmin::text AS revision FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3',
+        [alice.ownerId, alice.workspaceId, temporaryBot])).rows[0], temporary);
+      await pool.query('DELETE FROM byos_bindings WHERE id=$1', [conflictingBinding]);
+      assert.equal(await settings.restoreTemporaryBotModel(bob, temporaryBot, temporary), false);
+      assert.equal(await settings.restoreTemporaryBotModel(other, temporaryBot, temporary), false);
+      assert.equal(await settings.restoreTemporaryBotModel(alice, bot, temporary), false);
+      assert.equal(await settings.restoreTemporaryBotModel(alice, temporaryBot, { ...temporary, bindingId: binding }), false);
+      assert.equal(await settings.restoreTemporaryBotModel(alice, temporaryBot, { ...temporary, revision: String(Number(temporary.revision) + 1) }), false);
+      assert.equal(await settings.restoreTemporaryBotModel(alice, temporaryBot, temporary), true);
+      assert.equal(await settings.restoreTemporaryBotModel(alice, temporaryBot, temporary), false);
+
+      const sameValue = await settings.setTemporaryBotModel(alice, temporaryBot, binding);
+      assert.ok(sameValue);
+      const rewritten = (await pool.query('UPDATE bot_model_choices SET "bindingId"="bindingId" WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3 RETURNING xmin::text AS revision',
+        [alice.ownerId, alice.workspaceId, temporaryBot])).rows[0];
+      assert.notEqual(rewritten.revision, sameValue.revision);
+      assert.equal(await settings.restoreTemporaryBotModel(alice, temporaryBot, sameValue), false, 'same value is a different committed row version');
+      const temporaryApiKey = randomUUID();
+      await pool.query('INSERT INTO model_api_keys (id,"ownerId",provider,protocol,ciphertext,iv,"keyVersion",last4) VALUES ($1,$2,\'custom\',\'openai\',\'fixture_ciphertext\',\'fixture_iv\',1,\'0000\')',
+        [temporaryApiKey, alice.ownerId]);
+      const apiKeyRewrite = (await pool.query('UPDATE bot_model_choices SET "bindingId"=NULL,"apiKeyId"=$4,"apiKeyModel"=\'fixture-model\' WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3 RETURNING xmin::text AS revision',
+        [alice.ownerId, alice.workspaceId, temporaryBot, temporaryApiKey])).rows[0];
+      assert.equal(await settings.restoreTemporaryBotModel(alice, temporaryBot, { ...sameValue, revision: apiKeyRewrite.revision }), false, 'an API-key replacement is never cleared');
+      await pool.query('DELETE FROM model_api_keys WHERE id=$1', [temporaryApiKey]);
+      await pool.query('DELETE FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3', [alice.ownerId, alice.workspaceId, temporaryBot]);
+      const racing = await Promise.all([
+        settings.setTemporaryBotModel(alice, temporaryBot, binding),
+        settings.setTemporaryBotModel(alice, temporaryBot, binding),
+      ]);
+      assert.equal(racing.filter(Boolean).length, 1);
+      assert.equal(racing.filter(value => value === null).length, 1);
+      const winner = racing.find(value => value !== null)!;
+      assert.equal(await settings.restoreTemporaryBotModel(alice, temporaryBot, winner), true);
+      assert.equal((await pool.query('SELECT 1 FROM bot_model_choices WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "botKey"=$3', [alice.ownerId, alice.workspaceId, temporaryBot])).rowCount, 0);
 
       await assert.rejects(settings.setBotModel(bob, bot, binding));
       await assert.rejects(settings.setBotModel(other, bot, binding));
@@ -184,8 +241,6 @@ test(
       });
       stub("./db/index.ts", { pool });
       stub("./workspace-db.ts", { workspaceDb: drizzle(pool) });
-      // Points and their fallback have their own tests (lib/bot-model-selection.test.ts, lib/points-fallback.db.test.ts): here Mikka 默认 has points.
-      stub("./points-fallback.ts", { hostedPointsRefusal: async () => null, pointsFallback: async () => null, hostedPointsHere: async () => ({ points: 98, trialLeft: 0 }) });
       const actions = await import("../app/actions/execution-settings");
       const { freezeBotModel } = await import('./bot-model-selection');
       const { SubscriptionRepository } = await import('./subscription-repository');

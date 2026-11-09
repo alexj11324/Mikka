@@ -5,14 +5,14 @@ import { useViewScroll } from '@/lib/hooks/view-state'
 import dynamic from 'next/dynamic'
 import useSWR, { useSWRConfig } from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
-import { RotateCw } from 'lucide-react'
+import { Lightbulb, RotateCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { sendSuggestion } from '@/app/actions/coordinator'
 import { coordinatorChatKey } from '@/components/coordinator/coordinator-chat'
 import { ConversationPill } from '@/components/nav/conversation-pill'
 import { CoordinatorAvatar } from '@/components/nav/bot-avatar'
 import { Button } from '@/components/ui/button'
-import { Empty, EmptyDescription, EmptyHeader } from '@/components/ui/empty'
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { WorkspaceContentLoading } from '@/components/workspace/workspace-loading'
@@ -40,6 +40,20 @@ const fetchJson = async <T,>(url: string): Promise<T> => {
 }
 
 
+/** The suggestions list's SWR key: the person's time zone and language decide the cards' wording. */
+function useSuggestionsKey() {
+  const locale = useLocale()
+  const timeZone = typeof Intl === 'undefined' ? 'UTC' : Intl.DateTimeFormat().resolvedOptions().timeZone
+  return withBasePath(`/api/suggestions?tz=${encodeURIComponent(timeZone)}&locale=${encodeURIComponent(locale)}`)
+}
+
+/** Re-reads the suggestions: beside the title on wide screens, among the phone header's actions otherwise. */
+export function SuggestionsRefresh({ phoneHidden = false }: { phoneHidden?: boolean }) {
+  const t = useTranslations('SuggestionsPage')
+  const { isValidating, mutate } = useSWR(useSuggestionsKey(), fetchJson<SuggestionsView>)
+  return <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn(phoneHidden && 'max-md:hidden')} aria-label={t('refresh')} disabled={isValidating} onClick={() => { void mutate().then(() => toast.success(t('refreshed')), () => toast.error(t('refreshFailed'))) }} />}><RotateCw data-icon="inline-start" className={cn(isValidating && 'animate-spin')} /></TooltipTrigger><TooltipContent>{t('refresh')}</TooltipContent></Tooltip>
+}
+
 /**
  * 建议 (rail, Figma F8 `420:5831`): the cards on the left, the Coordinator's
  * chat on the right, half and half. Tapping a card sends it to the
@@ -52,10 +66,8 @@ export function SuggestionFeed({ onOpenIssue, onConnect, onSent }: { onOpenIssue
   const tNav = useTranslations('Nav')
   const tCommon = useTranslations('Common')
   const actionError = useActionError()
-  const locale = useLocale()
-  const timeZone = typeof Intl === 'undefined' ? 'UTC' : Intl.DateTimeFormat().resolvedOptions().timeZone
   const { mutate: mutateAll } = useSWRConfig()
-  const { data, error, isValidating, mutate } = useSWR(withBasePath(`/api/suggestions?tz=${encodeURIComponent(timeZone)}&locale=${encodeURIComponent(locale)}`), fetchJson<SuggestionsView>)
+  const { data, error, mutate } = useSWR(useSuggestionsKey(), fetchJson<SuggestionsView>)
   const empty = !!data && !data.groups.some(group => group.items.length)
   // 「连接应用」 only for someone with no app connected yet; an unknown answer shows nothing.
   const { data: connections } = useSWR(empty ? withBasePath('/api/integrations/composio') : null, fetchJson<Connections>, { revalidateOnFocus: false, shouldRetryOnError: false })
@@ -81,10 +93,10 @@ export function SuggestionFeed({ onOpenIssue, onConnect, onSent }: { onOpenIssue
   // min-w-0 on both halves: one long unbroken line in a card must not widen its half and push the chat off screen.
   return <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-x-clip md:flex-row">
     <section aria-labelledby="suggestions-title" className="flex min-h-0 min-w-0 flex-1 flex-col md:basis-1/2">
-      {/* Phones name the page in the header bar above (R-40); the refresh button sits at that bar's right end, so no row is left holding it alone. */}
-      <header className="flex items-center justify-between gap-3 px-6 pt-6 pb-4 max-md:absolute max-md:top-0 max-md:right-0 max-md:z-10 max-md:h-12 max-md:p-0 max-md:pr-4">
+      {/* Phones name the page in the header bar above, and its refresh sits among that bar's actions (SuggestionsRefresh), so nothing here sits on top of them. */}
+      <header className="flex items-center justify-between gap-3 px-6 pt-6 pb-4 max-md:p-0">
         <h1 id="suggestions-title" className="text-2xl font-semibold max-md:sr-only">{t('title')}</h1>
-        <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('refresh')} disabled={isValidating} onClick={() => { void mutate().then(() => toast.success(t('refreshed')), () => toast.error(t('refreshFailed'))) }} />}><RotateCw data-icon="inline-start" className={cn(isValidating && 'animate-spin')} /></TooltipTrigger><TooltipContent>{t('refresh')}</TooltipContent></Tooltip>
+        <SuggestionsRefresh phoneHidden />
       </header>
       <div ref={scroll} className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-6 pb-6 max-md:pt-2">
         {error && <InlineLoadError message={t('loadError')} retryLabel={t('retry')} onRetry={() => { void mutate() }} />}
@@ -94,7 +106,8 @@ export function SuggestionFeed({ onOpenIssue, onConnect, onSent }: { onOpenIssue
           className={cn(CARD_FRAME, 'h-auto w-full justify-start hover:bg-muted/40', sending === item.id && 'opacity-60')}>
           <SuggestionCardBody card={item} />
         </Button>)}
-        {data && !items.length && <Empty className="flex-1"><EmptyHeader><EmptyDescription>{t('empty')}</EmptyDescription></EmptyHeader>{noConnection && <Button variant="secondary" className="rounded-full" onClick={onConnect}>{t('connect')}</Button>}</Empty>}
+        {/* Empty: the rail's own icon and the state as a title, in the upper third, with the one way on (R-40: no explainer). */}
+        {data && !items.length && <Empty className="flex-1 justify-start pt-[12vh]"><EmptyHeader><EmptyMedia variant="icon"><Lightbulb /></EmptyMedia><EmptyTitle>{t('empty')}</EmptyTitle></EmptyHeader>{noConnection && <Button onClick={onConnect}>{t('connect')}</Button>}</Empty>}
       </div>
     </section>
     {/* Half and half until the line between them is dragged (decision 2026-11-01-1310). */}

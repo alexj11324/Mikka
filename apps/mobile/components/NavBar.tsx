@@ -6,6 +6,7 @@ import { BackButton, Header, RoundButton } from '@/components/ui'
 import { Text } from '@/components/Text'
 import { colors, font } from '@/lib/theme'
 import { WebBarMenu } from '@/components/WebBarMenu'
+import { BarBackdrop } from '@/components/BarBackdrop'
 import { navBarOptions, needsTopFade } from '@/components/nav-bar-options'
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 
@@ -74,7 +75,7 @@ const webItem = (item: BarItem) => 'view' in item
  * material or hairline (Comma, Alex 2026-11-08): content fades out under the top
  * edge, by the system's soft scroll edge on iOS 26 and `TopFade` below it.
  */
-export function NavBar({ title, titleView, left, right, back, large, topTitle, search, background = colors.page, fade = true, sheet }: {
+export function NavBar({ title, titleView, left, right, back, large, topTitle, search, background = colors.page, fade = true, sheet, scrolled }: {
   title?: string
   /** A tab's root (Bot, 任务, 建议, 设置, 搜索): one title, the system's, centred in the bar's row; the buttons grouped
    * on the right; nothing on the left (Alex 2026-11-08, after 「Bot」 showed twice). */
@@ -91,6 +92,9 @@ export function NavBar({ title, titleView, left, right, back, large, topTitle, s
   fade?: boolean
   /** A form sheet: closed by its own ✕ or ✓ and by swiping down, so no back button beside them. */
   sheet?: boolean
+  /** A conversation scrolling under the bar (useScrolledUnderBar): the bar gets its material backdrop (BarBackdrop)
+   * once content is under it, on every iOS version, instead of relying on the system's soft edge alone. */
+  scrolled?: boolean
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -138,7 +142,8 @@ export function NavBar({ title, titleView, left, right, back, large, topTitle, s
       }} />
       {!topTitle && lefts.length ? <Stack.Toolbar placement="left">{lefts.map(nativeItem)}</Stack.Toolbar> : null}
       {rights.length ? <Stack.Toolbar placement="right">{rights.map(nativeItem)}</Stack.Toolbar> : null}
-      {fade && needsTopFade(Platform.OS, Platform.Version) ? <TopFade color={background} /> : null}
+      {scrolled !== undefined ? <BarBackdrop visible={scrolled} />
+        : fade && needsTopFade(Platform.OS, Platform.Version) ? <TopFade color={background} /> : null}
     </>
   )
 }
