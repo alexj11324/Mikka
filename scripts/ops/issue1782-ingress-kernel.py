@@ -5,6 +5,10 @@ This script creates and removes its own network namespaces and veth pair. It doe
 not alter the host ruleset. Policy and the strict readback verifier come from the
 supplied workspace-ingress.py. No credentials or external network are needed.
 
+Includes explicit preexisting-socket policy behavior fixtures, separate from
+production prepare()/provider discovery. Every behavior fixture retains exact
+rule readback verification.
+
 Exit 0: all required cases passed; 1: a behavioral assertion failed;
 exit 2: prerequisite, harness, policy-installation, or verification error.
 
@@ -91,18 +95,33 @@ def worker(role, address, port, uid, marked):
                 elif op == 'accept':
                     conn, _ = sock.accept()
                     conn.settimeout(3)
+                    conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
                     result = {'accepted': True}
                 elif op == 'send':
                     conn.sendall(b'x' * req['size'])
                     result = {'sent': req['size']}
+                elif op == 'send_more_segment':
+                    segment = conn.getsockopt(socket.IPPROTO_TCP, socket.TCP_MAXSEG)
+                    if segment < 256:
+                        raise RuntimeError('fixture TCP_MAXSEG unexpectedly small')
+                    # A full segment with MSG_MORE does not require a PSH flag.
+                    # The observer must confirm an actual ACK-only data packet.
+                    sent = conn.send(b'x' * segment, socket.MSG_MORE)
+                    result = {'sent': sent, 'segment': segment}
                 elif op == 'recv':
                     total = 0
-                    while total < req['size']:
-                        chunk = conn.recv(req['size'] - total)
-                        if not chunk:
-                            break
-                        total += len(chunk)
-                    result = {'received': total}
+                    read_error = None
+                    try:
+                        while total < req['size']:
+                            chunk = conn.recv(req['size'] - total)
+                            if not chunk:
+                                break
+                            total += len(chunk)
+                    except OSError as exc:
+                        read_error = type(exc).__name__
+                    # Retain partial progress: a timeout must never conceal a
+                    # few leaked bytes in the negative data-plane cases.
+                    result = {'received': total, 'read_error': read_error}
                 elif op == 'info':
                     info = conn.getsockopt(socket.IPPROTO_TCP, socket.TCP_INFO, 256)
                     if len(info) < 128:
@@ -164,13 +183,14 @@ class Worker:
 
 
 class Fixture:
-    def __init__(self, guard_path, ipv6, marked):
+    def __init__(self, guard_path, ipv6, marked, defer_policy=False):
         suffix = uuid.uuid4().hex[:8]
         self.server_ns, self.client_ns = 'mks-' + suffix, 'mkc-' + suffix
         self.server_if, self.client_if = 'mks' + suffix, 'mkc' + suffix
         self.namespaces = []
         self.workers = []
         self.guard_path, self.ipv6, self.marked = guard_path, ipv6, marked
+        self.defer_policy = defer_policy
         self.server_address = 'fd17:82::1' if ipv6 else '10.178.2.1'
         self.client_address = 'fd17:82::2' if ipv6 else '10.178.2.2'
 
@@ -193,16 +213,26 @@ class Fixture:
                 run(args)
                 run(['ip', '-n', namespace, 'link', 'set', interface, 'up'])
             self.provider = self.server(PROVIDER_PORT, marked=self.marked)
-            guard = load_guard(self.guard_path)
-            run(['ip', 'netns', 'exec', self.server_ns, 'nft', '-f', '-'],
-                guard.policy([PROVIDER_PORT]))
-            run(['ip', 'netns', 'exec', self.server_ns, sys.executable, SCRIPT,
-                 '--verify-guard', self.guard_path])
-            self.install_observers()
+            if not self.defer_policy:
+                self.install_policy(verify_live_provider=True)
             return self
         except BaseException:
             self.close()
             raise
+
+    def install_policy(self, verify_live_provider):
+        guard = load_guard(self.guard_path)
+        run(['ip', 'netns', 'exec', self.server_ns, 'nft', '-f', '-'],
+            guard.policy([PROVIDER_PORT]))
+        args = ['ip', 'netns', 'exec', self.server_ns, sys.executable, SCRIPT,
+                '--verify-guard', self.guard_path]
+        if not verify_live_provider:
+            # This is an explicitly scoped policy behavior fixture: establish a
+            # synthetic unprivileged socket before applying the already-declared
+            # policy. It does not call or weaken production prepare()/discovery.
+            args.append('--behavior-fixture-known-ports')
+        run(args)
+        self.install_observers()
 
     def install_observers(self):
         # These accept-policy observer chains never change the guard's verdict.
@@ -212,7 +242,9 @@ class Fixture:
                          f'{{ type filter hook output priority {priority}; policy accept; }}')
             prefix = f'add rule inet mikka_test_observe {chain} oifname != "lo" meta l4proto tcp tcp sport {PROVIDER_PORT}'
             for kind, condition in [('root', ' meta skuid 0'),
-                                    ('nonroot', ' meta skuid != 0'), ('all', '')]:
+                                    ('nonroot', ' meta skuid != 0'), ('all', ''),
+                                    ('nonroot_long', ' meta skuid != 0 meta length > 120'),
+                                    ('nonroot_ack_long', ' meta skuid != 0 tcp flags == ack meta length > 120')]:
                 lines.append(prefix + condition + f' counter comment "{chain}_{kind}"')
         run(['ip', 'netns', 'exec', self.server_ns, 'nft', '-f', '-'], '\n'.join(lines) + '\n')
 
@@ -303,6 +335,35 @@ def forbidden_listener(fixture, evidence, provider_port, uid):
     evidence['application_connection_denied'] = True
 
 
+def established_nonroot_payload(fixture, evidence, ack_only):
+    evidence['scope'] = ('synthetic nonroot connection established before raw policy installation; '
+                         'strict readback verified; production prepare unchanged')
+    fixture.provider.close()
+    server = fixture.server(PROVIDER_PORT, uid=1000, marked=False)
+    client = fixture.client()
+    require(client.rpc('connect', address=fixture.server_address, port=PROVIDER_PORT), 'connected')
+    require(server.rpc('accept'), 'accepted')
+    require(server.rpc('send', size=1), 'sent')
+    seed = client.rpc('recv', size=1)
+    assert seed.get('received') == 1, 'fixture connection was not usable before policy'
+    evidence['pre_policy_application_roundtrip'] = True
+    fixture.install_policy(verify_live_provider=False)
+    attempted = server.rpc('send_more_segment') if ack_only else server.rpc('send', size=256)
+    evidence['send_result'] = attempted
+    receive_size = attempted.get('segment', 256) if ack_only else 256
+    received = client.rpc('recv', size=receive_size)
+    evidence['receive_result'] = received
+    observed = fixture.observe()
+    evidence['observed'] = observed
+    assert observed['before_nonroot_long'] > 0, 'fixture_did_not_emit_nonroot_data_packet'
+    if ack_only:
+        assert observed['before_nonroot_ack_long'] > 0, 'fixture_did_not_emit_ACK_only_with_payload'
+        assert observed['after_nonroot_ack_long'] == 0, 'ACK_only_payload_passed_guard'
+    assert observed['after_nonroot_long'] == 0, 'nonroot_payload_passed_guard'
+    assert received.get('received') == 0, 'nonroot_application_data_was_received'
+    evidence['application_data_denied'] = True
+
+
 def main(args):
     required = ('ip', 'nft')
     missing = [name for name in required if shutil.which(name) is None]
@@ -321,10 +382,13 @@ def main(args):
                 ('root_provider_preaccept_ack', provider_before_accept),
                 ('nonroot_rebound_provider_denied', lambda f, e: forbidden_listener(f, e, True, 1000)),
                 ('nonroot_dev_listener_denied', lambda f, e: forbidden_listener(f, e, False, 1000)),
-                ('root_dev_listener_denied', lambda f, e: forbidden_listener(f, e, False, 0))):
+                ('root_dev_listener_denied', lambda f, e: forbidden_listener(f, e, False, 0)),
+                ('established_nonroot_data_denied', lambda f, e: established_nonroot_payload(f, e, False)),
+                ('established_nonroot_ACK_payload_denied', lambda f, e: established_nonroot_payload(f, e, True))):
             row = {'case': name, 'family': 'ipv6' if ipv6 else 'ipv4', 'evidence': {}}
             try:
-                with Fixture(str(Path(args.guard).resolve()), ipv6, args.mark_provider_listener) as fixture:
+                with Fixture(str(Path(args.guard).resolve()), ipv6, args.mark_provider_listener,
+                             defer_policy=name.startswith('established_nonroot_')) as fixture:
                     operation(fixture, row['evidence'])
                 row['passed'] = True
             except AssertionError as exc:
@@ -350,25 +414,23 @@ if __name__ == '__main__':
     parser.add_argument('--port', type=int, default=0)
     parser.add_argument('--uid', type=int, default=0)
     parser.add_argument('--verify-guard')
+    parser.add_argument('--behavior-fixture-known-ports', action='store_true')
     args = parser.parse_args()
     if args.worker:
         worker(args.worker, args.address, args.port, args.uid, args.mark_provider_listener)
     elif args.verify_guard:
         guard = load_guard(args.verify_guard)
-        ports = guard.provider_ports()
+        ports = [PROVIDER_PORT] if args.behavior_fixture_known_ports else guard.provider_ports()
         if ports != [PROVIDER_PORT]:
             raise RuntimeError('fixture provider discovery mismatch')
         try:
             guard.check_rules(shutil.which('nft'), ports)
         except Exception:
             rows = json.loads(run(['nft', '-j', '-n', 'list', 'table', 'inet', guard.TABLE]))['nftables']
-            for row in rows:
-                expressions = row.get('rule', {}).get('expr', [])
-                for expr in expressions:
-                    right = expr.get('match', {}).get('right')
-                    if isinstance(right, dict) and isinstance(right.get('set'), list) and len(right['set']) > 3:
-                        right['set'] = {'count': len(right['set']), 'first': right['set'][:2], 'last': right['set'][-1:]}
-            print(json.dumps({'syntheticPolicyReadback': rows}), file=sys.stderr)
+            short = [row for row in rows if 'rule' not in row]
+            rules = [row for row in rows if 'rule' in row]
+            short.extend(rules[:2] + rules[12:13] + rules[-2:])
+            print(json.dumps({'syntheticPolicyReadback': short}), file=sys.stderr)
             raise
     else:
         if not args.guard:
