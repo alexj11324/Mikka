@@ -54,11 +54,18 @@ jobs:
       - run: pnpm install --frozen-lockfile --filter @mikka/mobile...
       - run: pnpm --filter @mikka/mobile typecheck
       - name: Install pinned native UI driver
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p "$RUNNER_TEMP/mikka-maestro"
           cd "$RUNNER_TEMP/mikka-maestro"
-          curl -fsSLO https://github.com/mobile-dev-inc/maestro/releases/download/cli-2.12.1/maestro.zip
-          curl -fsSLO https://github.com/mobile-dev-inc/maestro/releases/download/cli-2.12.1/checksums_sha256.txt
+          if gh release download cli-2.12.1 --repo mobile-dev-inc/Maestro --pattern maestro.zip --pattern checksums_sha256.txt > download.log 2>&1; then
+            :
+          else
+            status=$?
+            echo "::error::Pinned Maestro asset download failed (exit $status)."
+            exit "$status"
+          fi
           shasum -a 256 -c checksums_sha256.txt
           unzip -q maestro.zip
           echo "$RUNNER_TEMP/mikka-maestro/maestro/bin" >> "$GITHUB_PATH"
@@ -149,11 +156,18 @@ jobs:
         with:
           node-version: 24
       - name: Install pinned native UI driver
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p "$RUNNER_TEMP/mikka-maestro"
           cd "$RUNNER_TEMP/mikka-maestro"
-          curl -fsSLO https://github.com/mobile-dev-inc/maestro/releases/download/cli-2.12.1/maestro.zip
-          curl -fsSLO https://github.com/mobile-dev-inc/maestro/releases/download/cli-2.12.1/checksums_sha256.txt
+          if gh release download cli-2.12.1 --repo mobile-dev-inc/Maestro --pattern maestro.zip --pattern checksums_sha256.txt > download.log 2>&1; then
+            :
+          else
+            status=$?
+            echo "::error::Pinned Maestro asset download failed (exit $status)."
+            exit "$status"
+          fi
           shasum -a 256 -c checksums_sha256.txt
           unzip -q maestro.zip
           echo "$RUNNER_TEMP/mikka-maestro/maestro/bin" >> "$GITHUB_PATH"

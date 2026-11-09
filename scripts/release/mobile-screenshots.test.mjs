@@ -235,11 +235,20 @@ test('read-only branch preflight validates CI identity while screenshot identity
   assert.match(probe, /startsWith\(github\.ref, 'refs\/heads\/'\)/)
   assert.match(probe, /permissions:\n      contents: read\n/)
   assert.match(probe, /ref: \$\{\{ github\.sha \}\}/)
-  assert.match(probe, /cli-2\.12\.1\/maestro\.zip/)
+  assert.match(probe, /gh release download cli-2\.12\.1 --repo mobile-dev-inc\/Maestro --pattern maestro\.zip --pattern checksums_sha256\.txt/)
   assert.match(probe, /shasum -a 256 -c checksums_sha256\.txt/)
   assert.match(probe, /mobile-screenshots-build\.sh --preflight-only/)
   assert.match(probe, /if: always\(\)\n        run: node scripts\/release\/mobile-screenshots\.mjs cleanup/)
   assert.doesNotMatch(probe, /id-token|Infisical|secrets\.|environment:|APP_STORE|HOSTED_UI|OVERLAY|upload-artifact|pnpm|GITHUB_REF:/)
+})
+
+test('both pinned installers use the official CLI with read-only token delivery and private download logs', () => {
+  const workflow = readFileSync(new URL('../../.github/workflows/mobile-screenshots.yml', import.meta.url), 'utf8')
+  const download = /gh release download cli-2\.12\.1 --repo mobile-dev-inc\/Maestro --pattern maestro\.zip --pattern checksums_sha256\.txt > download\.log 2>&1/g
+  assert.equal([...workflow.matchAll(download)].length, 2)
+  assert.equal([...workflow.matchAll(/GH_TOKEN: \$\{\{ github\.token \}\}/g)].length, 2)
+  assert.equal([...workflow.matchAll(/shasum -a 256 -c checksums_sha256\.txt/g)].length, 2)
+  assert.doesNotMatch(workflow, /location-trusted|GH_DEBUG|--retry|echo.*GH_TOKEN|GH_TOKEN=.*GITHUB_ENV/)
 })
 
 test('pinned Maestro command reports project only closed command metadata and fixed failure reasons', () => {
