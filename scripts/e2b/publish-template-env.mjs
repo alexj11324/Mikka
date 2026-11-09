@@ -68,6 +68,7 @@ export function assertConservation(proof, kind) {
   for (const change of final.providerChanges) {
     const fields = Object.keys(change?.before ?? {}), allowed = rules[change?.path]
     if (paths.has(change?.path) || !fields.length || !allowed
+      || (allowed._kind !== undefined && change.kind !== allowed._kind)
       || !isDeepStrictEqual(fields.sort(), Object.keys(change?.after ?? {}).sort())) fail(`runtime_release_conservation_invalid ${kind}`)
     paths.add(change.path)
     const certificate = allowed._certificate
