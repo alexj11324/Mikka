@@ -20,10 +20,10 @@ export interface DesktopRunUpdate {
 /**
  * Compares two polls of the task-run list. `previous === null` is the launch
  * baseline: it seeds the map and badge but never replays old work. Later
- * snapshots list a transition into 等你 or failed, and into succeeded when
- * `finished` is on (the person's 线程完成 switch, which phone pushes follow
- * too). These are candidates only: whether each one raises a system
- * notification is the Decisions API's answer (desktopNotifyQuestions).
+ * snapshots list a transition into 等你 or failed, and optionally succeeded.
+ * These are candidates only: chooseDesktopNotifications checks the person's
+ * current 线程完成 switch for a completion, then asks the Decisions API whether
+ * each eligible candidate raises a system notification (desktopNotifyQuestions).
  */
 export function desktopRunUpdate(previous: Map<string, DesktopRun['status']> | null, runs: readonly DesktopRun[], stamp = Date.now(), finished = false): DesktopRunUpdate {
   const badge = runs.filter(run => run.status === 'waiting_input').length
@@ -52,8 +52,8 @@ export function desktopRunUpdate(previous: Map<string, DesktopRun['status']> | n
 
 // Whether a run's transition interrupts the person with a system notification
 // is the Decisions API's answer (Alex, 2026-11-01: 「全部交给 Decision API」),
-// one predicate per candidate. The person's 线程完成 switch already filtered
-// the candidates; no answer shows nothing (the Dock badge still counts 等你).
+// one predicate per candidate. The server checks the person's current 线程完成
+// switch before asking; no answer shows nothing (the Dock badge still counts 等你).
 
 export interface DesktopCandidate { id: string; kind: DesktopNotification['kind']; title: string; agent: string }
 
