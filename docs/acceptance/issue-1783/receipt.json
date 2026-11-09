@@ -1,0 +1,61 @@
+{
+  "codeCommit": "d2db55689a9309495ed6688a1df0e6099fd830fc",
+  "startedAt": "2026-11-08T23:58:00Z",
+  "finishedAt": "2026-11-08T23:58:35Z",
+  "exitCode": 0,
+  "environment": {
+    "os": "cloud Linux",
+    "database": "isolated loopback PostgreSQL 17",
+    "display": "Xvfb X11 1440x900",
+    "capture": "FFmpeg x11grab",
+    "externalGitHub": "mocked boundary; real DB and publication code"
+  },
+  "video": {
+    "durationMs": 39600,
+    "size": 2563447,
+    "steps": [
+      {
+        "atMs": 35125,
+        "label": "Run real PostgreSQL evidence acceptance",
+        "source": "action",
+        "durationMs": 34856
+      }
+    ],
+    "processing": {
+      "version": 1,
+      "originalDurationMs": 39600,
+      "originalSize": 23295798,
+      "originalSha256": "2e82b9e31bcdca112a17006f0df4f63e1f098d9fd2b7f54aec8531a076fd72e8",
+      "trimmedMs": 0,
+      "retainedMs": 39600,
+      "windows": [
+        {
+          "startMs": 0,
+          "endMs": 39600
+        }
+      ],
+      "width": 1280,
+      "height": 800
+    }
+  },
+  "tests": {
+    "total": 116,
+    "passed": 116,
+    "failed": 0,
+    "skipped": 0
+  },
+  "files": {
+    "acceptance.mp4": {
+      "size": 2563447,
+      "sha256": "d4c4116d104dd4be75e56d06ec382e710df2c7c836642897d715f8ac53ea3aa6"
+    },
+    "acceptance.png": {
+      "size": 153007,
+      "sha256": "af87e6c348a8f10f9b79642a13b1d491912e275492c0c4cb683521f1de775289"
+    },
+    "test-output.txt": {
+      "size": 23650,
+      "sha256": "37a2a7d3cfbba30d708f226e3798c21a5609814ae15e4cd273c8290d633acb7e"
+    }
+  }
+}
