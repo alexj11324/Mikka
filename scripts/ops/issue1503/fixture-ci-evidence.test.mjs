@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { pathToFileURL, fileURLToPath } from 'node:url'
 import vm from 'node:vm'
@@ -253,4 +254,146 @@ test('caught transport, decode, JSON and URL failures retain private causes behi
   const unauthorized = { status: 403, ok: false, body: { async cancel() { throw cancellationCause } } }
   await assert.rejects(ci.createFixtureGithubReader('offline-sensitive-token', async () => unauthorized)('/pulls/' + prNumber),
     unchangedMessage('issue1503_ci_read_unauthorized', cancellationCause))
+})
+
+const implementationLabel = 'Run a small command that reads the file and verifies these requirements.'
+function implementationFixture(candidateSha = head, expectedState = 'initial') {
+  const expectedText = 'Factory delivery acceptance #1503\nCase: offline\nState: ' + expectedState + '\n'
+  const filePath = 'docs/issue-1503/offline.txt', command = 'node exact-fixture-check'
+  const selected = { taskId: '20000000-0000-4000-8000-000000000001',
+    producerRunId: '20000000-0000-4000-8000-000000000002', candidateSha, expectedBranch: branch,
+    command, filePath, expectedText, expectedState }
+  const artifact = { raw: { publish: { pushed: true, branch, commit: candidateSha, remote: 'origin' },
+    verify: { status: 'passed', command, exitCode: 0, timedOut: false, signal: null,
+      output: JSON.stringify({ issue: 1503, files: [{ path: filePath, state: expectedState,
+        bytes: Buffer.byteLength(expectedText), sha256: createHash('sha256').update(expectedText).digest('hex') }] }) } } }
+  return { selected, artifact }
+}
+async function implementationEvidence(input = implementationFixture(), calls = []) {
+  return ci.collectFixtureImplementationEvidence(async path => {
+    calls.push(path)
+    assert.equal(path, '/api/factory/tasks/' + input.selected.taskId + '/approval?artifact='
+      + encodeURIComponent('run-report:' + input.selected.producerRunId))
+    return structuredClone(input.artifact)
+  }, input.selected)
+}
+function commandCriteria() {
+  const criteria = actualShapeCriteria()
+  criteria.splice(3, 0, { text: implementationLabel, passed: false, status: 'unverified',
+    reason: 'The read-only reviewer inspected the file but cannot run the producer command.' })
+  return criteria
+}
+function commandTask(criteria = commandCriteria()) {
+  const value = taskState(criteria), selected = implementationFixture().selected
+  value.state.task.id = selected.taskId
+  value.state.candidates[0].runId = selected.producerRunId
+  return value
+}
+test('implementation command: F186 fixed label requires a fresh bound daemon observation and preserves review facts', async () => {
+  const external = await evidence(fixtures()), implementation = await implementationEvidence()
+  const { state, attempt } = commandTask(), before = structuredClone(state.checks[0].criteria)
+  assert.equal(driver.matchedCheckEvidence(state, [attempt], external, implementation.receipt).length, 1)
+  assert.deepEqual(state.checks[0].criteria, before)
+  const covered = ci.reviewCriteriaEvidence(before, head, external, {
+    requireExplicitStatus: true, implementationReceipt: implementation.receipt }).covered
+  assert.deepEqual(covered.map(item => item.criterion),
+    ['repository_validator', 'validator_tests', 'implementation_file_command', 'exact_head_checks'])
+  const command = covered.find(item => item.criterion === 'implementation_file_command')
+  assert.equal(command.producerRunId, implementationFixture().selected.producerRunId)
+  assert.equal(command.candidateSha, head)
+  assert.equal(command.fileSha256, implementation.verifiedContent.sha256)
+  assert.equal(command.commandSha256, implementation.verifiedContent.commandSha256)
+})
+test('implementation command: the collector makes one exact artifact read and emits frozen metadata', async () => {
+  const calls = [], result = await implementationEvidence(implementationFixture(), calls)
+  assert.equal(calls.length, 1)
+  assert.ok(Object.isFrozen(result.receipt))
+  assert.equal(result.receipt.taskId, implementationFixture().selected.taskId)
+  assert.equal(result.receipt.producerRunId, implementationFixture().selected.producerRunId)
+  assert.equal(result.receipt.command, undefined)
+  assert.equal(result.receipt.output, undefined)
+  assert.equal(result.receipt.expectedText, undefined)
+  assert.throws(() => { result.receipt.candidateSha = base }, TypeError)
+})
+test('implementation command: missing, copied, wrong-task, wrong-run and wrong-head evidence cannot authorize the criterion', async () => {
+  const external = await evidence(fixtures()), implementation = await implementationEvidence()
+  for (const receipt of [null, {}, JSON.parse(JSON.stringify(implementation.receipt))]) {
+    const { state, attempt } = commandTask()
+    assert.throws(() => driver.matchedCheckEvidence(state, [attempt], external, receipt),
+      /issue1503_verification_criteria_missing/)
+  }
+  for (const mutate of [
+    s => { s.task.id = '20000000-0000-4000-8000-000000000009' },
+    s => { s.candidates[0].runId = '20000000-0000-4000-8000-000000000009' },
+  ]) {
+    const { state, attempt } = commandTask(); mutate(state)
+    assert.throws(() => driver.matchedCheckEvidence(state, [attempt], external, implementation.receipt),
+      /issue1503_verification_criteria_missing/)
+  }
+  const otherHead = await implementationEvidence(implementationFixture(base))
+  const current = commandTask()
+  assert.throws(() => driver.matchedCheckEvidence(current.state, [current.attempt], external, otherHead.receipt),
+    /issue1503_verification_criteria_missing/, 'matching task/run and valid current CI cannot authorize another implementation head')
+  assert.equal(ci.reviewCriteriaEvidence(commandCriteria(), base, external,
+    { implementationReceipt: implementation.receipt }), null)
+})
+test('implementation command: exact daemon success, publication and file bytes remain mandatory', async () => {
+  const mutations = [
+    x => { x.artifact.raw.publish.commit = base },
+    x => { x.artifact.raw.publish.branch = 'mikka/other' },
+    x => { x.artifact.raw.publish.pushed = false },
+    x => { x.artifact.raw.publish.remote = 'other' },
+    x => { x.artifact.raw.verify.command = 'node different-command' },
+    x => { x.artifact.raw.verify.exitCode = 1 },
+    x => { x.artifact.raw.verify.status = 'not_run' },
+    x => { x.artifact.raw.verify.timedOut = true },
+    x => { x.artifact.raw.verify.signal = 'SIGTERM' },
+    x => { x.selected.expectedText += 'unexpected' },
+    x => { x.selected.expectedState = 'revised' },
+    x => { x.artifact.raw.verify.output = '{"issue":1503,"files":[]}' },
+  ]
+  for (const mutate of mutations) {
+    const value = implementationFixture(); mutate(value)
+    await assert.rejects(implementationEvidence(value), /^Error: issue1503_(?:publication_report_mismatch|implementation_command_verification_missing|implementation_file_bytes_mismatch)$/)
+  }
+  let reads = 0
+  const invalid = implementationFixture().selected; invalid.producerRunId = '../other'
+  await assert.rejects(ci.collectFixtureImplementationEvidence(async () => { reads++; return null }, invalid),
+    /issue1503_ci_implementation_binding_invalid/)
+  assert.equal(reads, 0)
+})
+test('implementation command: unknown, failed, duplicate and missing-reason requirements remain rejected', async () => {
+  const external = await evidence(fixtures()), implementation = await implementationEvidence()
+  for (const mutate of [
+    c => { c[3].text += ' and an unrelated deployment' },
+    c => { c[3].text = [implementationLabel] },
+    c => { c[3].status = 'failed' },
+    c => { delete c[3].reason },
+    c => { c[3].reason = ' '.repeat(10) },
+    c => { c[3].reason = 'x'.repeat(2001) },
+    c => { c.push({ ...c[3] }) },
+    c => { c.push({ text: 'Only the requested file changed', passed: false, status: 'unverified', reason: 'Not observed' }) },
+  ]) {
+    const { state, attempt } = commandTask(); mutate(state.checks[0].criteria)
+    assert.throws(() => driver.matchedCheckEvidence(state, [attempt], external, implementation.receipt),
+      /issue1503_verification_criteria_missing/)
+  }
+  const { state, attempt } = commandTask()
+  assert.throws(() => driver.matchedCheckEvidence(state, [attempt], null, implementation.receipt),
+    /issue1503_verification_criteria_missing/, 'daemon evidence cannot substitute for the three GitHub CI requirements')
+  state.task.route.flowVersion = 1
+  assert.throws(() => driver.matchedCheckEvidence(state, [attempt], external, implementation.receipt),
+    /issue1503_verification_criteria_missing/, 'legacy verification requirements stay unchanged')
+})
+test('implementation command: a historical review retains only its initial producer proof', async () => {
+  const external = await evidence(fixtures()), initial = await implementationEvidence()
+  const repairedInput = implementationFixture(base, 'revised')
+  repairedInput.selected.producerRunId = '20000000-0000-4000-8000-000000000003'
+  const repaired = await implementationEvidence(repairedInput)
+  const { state, attempt } = commandTask()
+  state.task.candidateId = '20000000-0000-4000-8000-000000000004'
+  state.candidates.push({ id: state.task.candidateId, sha: base, runId: repairedInput.selected.producerRunId })
+  assert.equal(driver.matchedCheckEvidence(state, [attempt], external, initial.receipt).length, 1)
+  assert.throws(() => driver.matchedCheckEvidence(state, [attempt], external, repaired.receipt),
+    /issue1503_verification_criteria_missing/)
 })

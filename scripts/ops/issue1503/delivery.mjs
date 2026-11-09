@@ -14,7 +14,8 @@ import { ACTION_ERROR_CODES } from '../../../lib/action-result.ts'
 import { explicitNewTaskArguments, explicitNewTaskComplete, explicitNewTaskEvidence, explicitNewTaskCleanupReceipts } from './explicit-submission.mjs'
 import { codexQuestionConfirmation, confirmationQuestionReference, confirmationRunEvidence, confirmationAnswerReceipt } from './question-confirmation.mjs'
 import { createOwnVmDiagnostic } from './own-vm-diagnostic.mjs'
-import { createFixtureGithubReader, collectFixtureCiEvidence, reviewCriteriaEvidence } from './fixture-ci-evidence.mjs'
+import { createFixtureGithubReader, collectFixtureCiEvidence, collectFixtureImplementationEvidence, reviewCriteriaEvidence, verifiedFileBytes } from './fixture-ci-evidence.mjs'
+export { verifiedFileBytes } from './fixture-ci-evidence.mjs'
 
 const uuid = value => typeof value === 'string' && /^[a-f\d]{8}-(?:[a-f\d]{4}-){3}[a-f\d]{12}$/i.test(value)
 const sha = value => typeof value === 'string' && /^[a-f\d]{40}$/.test(value)
@@ -88,7 +89,7 @@ export function repositoryVerifyCommand(specifications, requiredPath) {
 }
 
 /** Empty/missing/duplicated projections cannot stand in for completed checks. */
-export function matchedCheckEvidence(state, passed, externalCi = null) {
+export function matchedCheckEvidence(state, passed, externalCi = null, implementationReceipt = null) {
   check(passed.length > 0 && Array.isArray(state.checks), 'verification_checks_missing')
   const selected = state.checks.filter(item => passed.some(attempt => attempt.id === item.attemptId))
   check(selected.length === passed.length && new Set(selected.map(item => item.attemptId)).size === passed.length, 'verification_checks_missing')
@@ -97,8 +98,11 @@ export function matchedCheckEvidence(state, passed, externalCi = null) {
     const candidate = state.candidates.find(value => value.id === attempt.candidateId)
     check(candidate && sha(candidate.sha) && uuid(attempt.runId) && item.status === 'passed' && item.stage === attempt.stage
       && item.runId === attempt.runId && item.candidateId === attempt.candidateId && item.candidateSha === candidate.sha, 'verification_check_binding_mismatch')
-    const coverage = reviewCriteriaEvidence(item.criteria, candidate.sha,
-      state.task.route?.flowVersion === 2 && item.stage === 'review' ? externalCi : null, { requireExplicitStatus: true })
+    const v2Review = state.task.route?.flowVersion === 2 && item.stage === 'review'
+    const implementation = v2Review && implementationReceipt?.taskId === state.task.id
+      && implementationReceipt?.producerRunId === candidate.runId ? implementationReceipt : null
+    const coverage = reviewCriteriaEvidence(item.criteria, candidate.sha, v2Review ? externalCi : null,
+      { requireExplicitStatus: true, implementationReceipt: implementation })
     check(coverage, 'verification_criteria_missing')
     // V2 review permits report-only evidence. A configured repository command
     // may also run; actual artifact observations remain independently required.
@@ -106,18 +110,6 @@ export function matchedCheckEvidence(state, passed, externalCi = null) {
       && nonempty(item.verify.command) && item.verify.exitCode === 0, 'independent_command_verification_missing')
     return item
   })
-}
-
-export function verifiedFileBytes(report, command, filePath, expectedText, expectedState) {
-  const verify = report?.verify
-  check(verify?.status === 'passed' && verify.command === command && verify.exitCode === 0
-    && verify.timedOut === false && verify.signal === null, 'implementation_command_verification_missing')
-  let receipt
-  try { receipt = JSON.parse(verify.output?.trim().split('\n').at(-1)) } catch {}
-  const matches = receipt?.issue === 1503 && Array.isArray(receipt.files) ? receipt.files.filter(item => item.path === filePath) : []
-  check(matches.length === 1 && matches[0].state === expectedState && matches[0].bytes === Buffer.byteLength(expectedText)
-    && matches[0].sha256 === digest(expectedText), 'implementation_file_bytes_mismatch')
-  return { ...matches[0], source: 'daemon_verify', commandSha256: digest(command) }
 }
 
 function artifactToolValues(value, depth = 0) {
@@ -657,10 +649,15 @@ export async function runDeliveryAcceptance(env = process.env) {
         // V2 has one review. A repaired head must not inherit a false claim
         // that its SHA was independently reviewed. Its implementation must
         // instead provide fresh, successful verification of the new content.
+        const { artifact, verifiedContent, receipt: implementationVerification } = await collectFixtureImplementationEvidence(json, {
+          taskId: state.task.id, producerRunId: candidate.runId, candidateSha: candidate.sha, expectedBranch: activeCase.expectedBranch,
+          command: verifyCommand, filePath: activeCase.filePath, expectedText, expectedState: label === 'initial' ? 'initial' : 'revised' })
+        const publish = artifact.raw.publish
         const externalCi = await collectFixtureCiEvidence(readFixtureCi, { candidateSha: candidate.sha,
           pullRequestUrl: state.delivery.pullRequest.url, expectedBranch: activeCase.expectedBranch })
         const reviewCi = historicalReview ? activeCase.initial.externalCi : externalCi
-        const verification = matchedCheckEvidence(state, passed, reviewCi)
+        const reviewImplementation = historicalReview ? activeCase.initial.implementationVerification : implementationVerification
+        const verification = matchedCheckEvidence(state, passed, reviewCi, reviewImplementation)
         for (const runId of [...new Set(state.attempts.map(item => item.runId).filter(uuid))]) {
           if (activeCase.runs.some(item => item.runId === runId)) continue
           const evidence = await json(`/api/runs/${runId}/evidence`)
@@ -679,7 +676,6 @@ export async function runDeliveryAcceptance(env = process.env) {
             profileId: evidence.run.agentProfile?.profileId, profileVersion: evidence.run.agentProfile?.version,
             ...(submissionMode === 'explicit_new_task' ? { profileSource: evidence.run.agentProfile.source, runtimeKind: evidence.run.executionIdentity.billingAccount.runtime.kind } : {}) })
         }
-        const artifact = await json(`/api/factory/tasks/${state.task.id}/approval?artifact=${encodeURIComponent(`run-report:${candidate.runId}`)}`)
         const reviewArtifacts = []
         for (const verified of verification) {
           if (historicalReview) {
@@ -693,7 +689,8 @@ export async function runDeliveryAcceptance(env = process.env) {
           const checked = await json(`/api/factory/tasks/${state.task.id}/approval?artifact=${encodeURIComponent(artifactRef)}`)
           const raw = checked.raw
           const criteriaEvidence = reviewCriteriaEvidence(raw?.criteria, verified.candidateSha,
-            flowVersion === 2 && verified.stage === 'review' ? reviewCi : null)
+            flowVersion === 2 && verified.stage === 'review' ? reviewCi : null,
+            { implementationReceipt: flowVersion === 2 && verified.stage === 'review' ? reviewImplementation : null })
           check(raw?.check?.sha === verified.candidateSha && raw.check.readOnly === true && Array.isArray(raw.filesChanged)
             && raw.filesChanged.length === 0 && criteriaEvidence, 'independent_report_evidence_missing')
           let observations = [], repositoryObservations = []
@@ -711,9 +708,6 @@ export async function runDeliveryAcceptance(env = process.env) {
               reasonSha256: nonempty(item.reason) ? digest(item.reason) : null })),
             externalVerification: criteriaEvidence.covered })
         }
-        const publish = artifact.raw?.publish
-        check(publish?.pushed === true && publish.branch === activeCase.expectedBranch && publish.commit === candidate.sha && publish.remote === 'origin', 'publication_report_mismatch')
-        const verifiedContent = verifiedFileBytes(artifact.raw, verifyCommand, activeCase.filePath, expectedText, label === 'initial' ? 'initial' : 'revised')
         const actualVerifyCommands = [{ command: verifyCommand, commandSha256: digest(verifyCommand), exitCode: 0, source: 'daemon_verify' }]
         const changes = await rpc('agents.getThreadChanges', [issue.id, candidate.runId])
         check(changes.state === 'ready' && changes.changes.files.length === 1 && changes.changes.files[0].path === activeCase.filePath, 'unexpected_file_changes')
@@ -723,7 +717,7 @@ export async function runDeliveryAcceptance(env = process.env) {
         if (file.status === 'added') check(newLines.map(line => line.text).join('\n') + '\n' === expectedText, 'file_content_mismatch')
         const item = { candidateId: candidate.id, candidateSha: candidate.sha, runId: candidate.runId, pullRequestUrl: state.delivery.pullRequest.url,
           branch: publish.branch, expectedFileSha256: digest(expectedText), checkpointSha256: digest(JSON.stringify(file)),
-          flowVersion, actualVerifyCommands, verifiedContent, reviewArtifacts, externalCi, reviewAppliesToCurrentCandidate: !historicalReview,
+          flowVersion, actualVerifyCommands, verifiedContent, implementationVerification, reviewArtifacts, externalCi, reviewAppliesToCurrentCandidate: !historicalReview,
           reviewAttemptCount: state.attempts.filter(item => item.stage === 'review' && item.runId).length,
           verification: verification.map(item => ({ attemptId: item.attemptId, runId: item.runId, stage: item.stage,
             candidateId: item.candidateId, candidateSha: item.candidateSha, status: item.status,
@@ -732,7 +726,8 @@ export async function runDeliveryAcceptance(env = process.env) {
               evidenceSha256: nonempty(criterion.evidence) ? digest(criterion.evidence) : null,
               reasonSha256: nonempty(criterion.reason) ? digest(criterion.reason) : null, exitCode: criterion.exitCode })),
             externalVerification: reviewCriteriaEvidence(item.criteria, item.candidateSha,
-              flowVersion === 2 && item.stage === 'review' ? reviewCi : null, { requireExplicitStatus: true }).covered })),
+              flowVersion === 2 && item.stage === 'review' ? reviewCi : null,
+              { requireExplicitStatus: true, implementationReceipt: flowVersion === 2 && item.stage === 'review' ? reviewImplementation : null }).covered })),
           checks: passed.map(check => ({ attemptId: check.id, runId: check.runId, stage: check.stage, candidateId: check.candidateId,
             candidateSha: state.candidates.find(item => item.id === check.candidateId)?.sha ?? null })) }
         activeCase[label] = item; await checkpoint(); return item
