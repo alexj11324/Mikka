@@ -124,16 +124,20 @@ export async function openRunPullRequest(options: Options & {
   const writeToken = access.token
   const marker = `<!-- mikka-issue:${options.issueId} -->`
   const write = <T>(operation: () => Promise<T>) => options.withWrite ? options.withWrite(operation) : operation()
-  const result = async (raw: unknown): Promise<PublishedPullRequest> => {
+  const verified = (raw: unknown) => {
     const pr = parse(prSchema, raw)
-    const lines = pr.additions !== undefined && pr.deletions !== undefined ? { additions: pr.additions, deletions: pr.deletions } : {}
     if (pr.head.ref !== options.branch || pr.head.repo?.id !== binding.repositoryId || pr.base.repo.id !== binding.repositoryId || !pr.body?.trimEnd().endsWith(marker)) throw new PublicationError('pull_request_conflict')
     if (pr.head.sha && pr.head.sha.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
     const expected = `https://github.com/${access.owner}/${access.repo}/pull/${pr.number}`
     if (pr.html_url.toLowerCase() !== expected.toLowerCase()) throw new PublicationError('github_request_failed')
+    return pr
+  }
+  const result = async (pr: ReturnType<typeof verified>, readChecks = true): Promise<PublishedPullRequest> => {
+    const lines = pr.additions !== undefined && pr.deletions !== undefined ? { additions: pr.additions, deletions: pr.deletions } : {}
     const review: Partial<PublishedPullRequest> = pr.head.sha ? { branch: pr.head.ref, headSha: pr.head.sha.toLowerCase(),
       ...(pr.changed_files === undefined ? {} : { changedFiles: pr.changed_files }) } : {}
-    if (pr.head.sha) {
+    if (!readChecks) review.reviewChecks = null
+    else if (pr.head.sha) {
       try { review.reviewChecks = await readReviewChecks(p => request(p, access.token), path, pr.head.sha) }
       catch (error) {
         // Optional review metadata cannot turn a successfully opened PR into a
@@ -157,6 +161,23 @@ export async function openRunPullRequest(options: Options & {
     }
     return { url: pr.html_url, ...(pr.title ? { title: pr.title } : {}), state: pr.merged_at ? 'merged' : pr.state === 'closed' ? 'closed' : pr.draft ? 'draft' : 'open', ...lines, ...review }
   }
+  const enriched = async (raw: unknown): Promise<PublishedPullRequest> => {
+    // The original POST/list is already a complete authority receipt. Never
+    // use optional details to rescue a wrong branch, repository or task marker.
+    const original = verified(raw)
+    let detail: unknown
+    try { detail = await request(`${path}/pulls/${original.number}`, writeToken) }
+    catch (error) {
+      // One bounded enrichment attempt, not another PR creation/recovery loop.
+      // Retain known fields from the verified receipt; omitted counts/checks
+      // remain unknown. This fallback cannot swallow contradictory JSON below.
+      if (!(error instanceof PublicationError)) throw error
+      return result(original, false)
+    }
+    const resolved = verified(detail)
+    if (resolved.number !== original.number || (original.node_id && resolved.node_id && original.node_id !== resolved.node_id)) throw new PublicationError('pull_request_conflict')
+    return result(resolved)
+  }
   const find = async () => {
     const query = new URLSearchParams({ state: 'all', head: `${access.owner}:${options.branch}`, per_page: '100', sort: 'created', direction: 'desc' })
     const rows = parse(z.array(prSchema), await request(`${path}/pulls?${query}`, writeToken))
@@ -166,23 +187,26 @@ export async function openRunPullRequest(options: Options & {
     if (!own) throw new PublicationError('pull_request_conflict')
     // A list omits additions/deletions/changed_files. Resolve that one already
     // bound PR during ingestion, never from the inbox/flow read route.
-    return result(await request(`${path}/pulls/${own.number}`, writeToken))
+    return enriched(own)
   }
   const existing = await find()
   if (existing) return existing
   if (options.allowCreate === false) throw new PublicationError('pull_request_limit')
+  let created: z.infer<typeof prSchema>
   try {
-    const created = parse(prSchema, await write(() => request(`${path}/pulls`, writeToken, { method: 'POST', body: {
+    created = parse(prSchema, await write(() => request(`${path}/pulls`, writeToken, { method: 'POST', body: {
       title: `${options.identifier}: ${options.title}`.slice(0, 256),
       head: options.branch, base: options.baseBranch ?? binding.defaultBranch,
       ...(options.draft ? { draft: true } : {}),
       body: `${pullRequestBody(undefined, { key: options.identifier, title: options.title, summary: options.summary })}${options.draft ? '\n\nVerification was not run: no repository verification command is configured. This draft needs human review.' : ''}\n\n${marker}`,
     } })))
-    return await result(await request(`${path}/pulls/${created.number}`, writeToken))
   } catch (error) {
     // A timeout or 422 may mean GitHub accepted another concurrent attempt.
     const created = await find()
     if (created) return created
     throw error
   }
+  // A successful POST's conflicts, draft mutation and optional enrichment are
+  // not ambiguous POST outcomes and must never be retried through find().
+  return enriched(created)
 }
