@@ -17,7 +17,7 @@ concurrency:
   queue: max
 jobs:
   prepare:
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/ops/1505-smoke-github-readonly-20261109' && github.run_attempt == 1
+    if: false
     runs-on: ubuntu-latest
     concurrency:
       group: web-deploy-production
@@ -26,7 +26,7 @@ jobs:
     timeout-minutes: 15
     env:
       MIKKA_EDITION: cloud
-      MIKKA_GITHUB_REPAIR_GO: 'root-reviewed-1505-github-trusted-v4'
+      MIKKA_GITHUB_REPAIR_GO: ''
     permissions:
       contents: read
       id-token: write
