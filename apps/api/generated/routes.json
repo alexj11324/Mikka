@@ -1130,7 +1130,7 @@
         "DELETE",
         "GET"
       ],
-      "sourceHash": "78a314ec72094637728d50de942797e7277ca5856a2754352b9af7d552665c2f"
+      "sourceHash": "9c6bb28f214f11a436c46a6ef88b56fd0cb6273f3ee4b4fb99ef45008a8efcae"
     },
     {
       "path": "/mikka/api/integrations/github/connect",
