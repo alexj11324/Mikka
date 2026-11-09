@@ -1,0 +1,85 @@
+name: Issue 1782 read-only domain history before
+on:
+  push:
+    branches: [ops/self-hosted-vault-closeout-20261108]
+permissions:
+  contents: read
+jobs:
+  domain_history_before:
+    name: Read-only authorized APP history before batch 1782
+    if: github.repository == 'alexj11324/Mikka' && github.actor == 'alexj11324' && github.ref == 'refs/heads/ops/self-hosted-vault-closeout-20261108' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    concurrency:
+      group: production-smoke-owner-acceptance
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      DOMAIN_HISTORY_DEPENDENCIES: ${{ runner.temp }}/domain-history-dependencies
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Verify fixed read-only contract before any production credential
+        timeout-minutes: 1
+        run: |
+          node --test scripts/ops/domain-history-before-1782.test.mjs
+          node scripts/ops/domain-history-before-1782.mjs check
+      - name: Install only the bounded PostgreSQL driver outside checkout
+        timeout-minutes: 2
+        run: npm install --prefix "$DOMAIN_HISTORY_DEPENDENCIES" --ignore-scripts --no-audit --no-fund pg@8.16.3
+      - name: Read only the shared account email from existing OIDC
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_EMAIL
+          recursive: false
+          include-imports: false
+      - name: Read only the shared account password from existing OIDC
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_PASSWORD
+          recursive: false
+          include-imports: false
+      - name: Read only APP database binding from existing OIDC
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /vercel
+          secret-name: MIKKA_DATABASE_URL
+          recursive: false
+          include-imports: false
+      - name: Capture only authorized historical UUIDs and immutable digests
+        timeout-minutes: 3
+        run: node scripts/ops/domain-history-before-1782.mjs capture
+      - name: Retain only closed before evidence and its digest receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: domain-history-before-1782-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/domain-history-before-1782/*.json
+          retention-days: 14
+          if-no-files-found: warn

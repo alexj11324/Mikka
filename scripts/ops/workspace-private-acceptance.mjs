@@ -9,14 +9,14 @@ import { pathToFileURL } from 'node:url'
 import { assertOpsContext } from './self-hosted-ingress-probe.mjs'
 
 export const P0 = Object.freeze({
-  source: 'eb02785e496ddf4cf55fa7799392841ff824bc70',
-  tree: 'f71bef14f38f7af0c7650b3527e5f49f131ea173',
-  workerSha: '0c458522caf8b2b1cada4d165f087d0601bea3b8',
+  source: '98a47306abf3f098e9186da5d0c969dc8dc01335',
+  tree: 'c2331709a9c32ec0718543a452e5553ba2186c16',
+  workerSha: '7bc7ec86ec6a9e932cd2074420f0d7ff40aadbfd',
   sdks: { nodeMajor: '24', pnpm: '10.34.3', javascriptE2b: '2.61.0', pythonE2b: '2.62.0', next: '16.4.1' },
   files: {
-    'package.json': '4800a1000222526f3373b84ad077c3b71953ef2add9142f285ebea40b54e5357',
-    'pnpm-lock.yaml': 'c45db74b59cc73d6c5fab0858f6656ee7bf5ec1bf99f5ac5c0a94c8a1885a363',
-    'pnpm-workspace.yaml': '8977ce9916b92a015e0f4dad1d45bcf51c9427637a5988fcdc585a1a21a0301e',
+    'package.json': '1bf7002857836cc44937ddb5216eeb12547fc7c71f7d15d813fc324abb11d813',
+    'pnpm-lock.yaml': 'ddfb2c81f1e50b1b619e4a690dd38c33cc0700352434ed4424eda27c86907277',
+    'pnpm-workspace.yaml': 'e8529ab36b3014adf400dfc4b82082b86f84aeadafe686f890b1b26ac2f7e117',
     'scripts/e2b/workspace-candidates.py': '3ffa20bf4c23f6111505eedb5e1e7f439c7e7b5e006a2e602d3aa993d950b766',
     'scripts/e2b/workspace-candidates.test.py': 'd144801b19bd8f2c337acfdaeda88cca1eee49456a26c025cac01b755ee53c55',
     'scripts/e2b/build-template.py': '13cb14ce95cb6499aae40e69f779de1790fb590e2e781834d423aed08b0438a4',
@@ -32,7 +32,7 @@ export const P0 = Object.freeze({
     'scripts/e2b/workspace-terminal-acceptance.test.mjs': '971003d90739338112ae83838abc218811818600dcebe7fdbdd46b5e2214dce3',
     'scripts/e2b/fixtures/preview-frameworks/package.json': 'e0cf3ad9d36941898385fc4e149c65be9a1081d8685b4d0b03e92e547cae964d',
     'scripts/e2b/fixtures/preview-frameworks/package-lock.json': '9c123244b4ea44b3a59b92615e25b9780463135eab9f573b7342ad4df7468ef6',
-    'packages/daemon/scripts/workspace-ingress.py': 'e56ef2aa5cc34fdd8ac8572a05614093b29c2c06cfc4eab139959fdc3c42fc49',
+    'packages/daemon/scripts/workspace-ingress.py': '24e02e301c7287e288347e18c90486a09f5b82802158a49efb9672f13c734e7b',
   },
 })
 // Copied only from the verified, closed creation journal in this exact artifact.
