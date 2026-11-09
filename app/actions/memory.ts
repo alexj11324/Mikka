@@ -9,6 +9,7 @@ import { clearFacts, correctFact } from '@/lib/profile/store'
 import { addMemoryFact, mayCorrectMemoryFact, readMemoryView, removeMemoryFact, reviewMemoryFact, setMemoryFactScope, undoMemoryFact } from '@/lib/profile/memory'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { USER_FACT_KINDS } from '@/lib/profile/kinds'
+import { withTaskWorkspace } from '@/lib/task-workspace'
 
 // 记忆 (R-73): the signed-in person's own facts only; nothing here takes
 // another person. Scope uses the authenticated workspace selection and checks
@@ -19,7 +20,7 @@ import { USER_FACT_KINDS } from '@/lib/profile/kinds'
 export async function getMemory() {
   const user = await requireUser()
   const [preferences, context] = await Promise.all([readPreferences(user.id), loadWorkspaceContext(undefined, user)])
-  return { enabled: preferences.memoryEnabled, ...await readMemoryView(user.id, context.workspace.id, context.choices) }
+  return { enabled: preferences.memoryEnabled, ...await readMemoryView(user, context.workspace.id, context.choices) }
 }
 
 export async function setMemory(enabled: boolean) {
@@ -38,7 +39,7 @@ export async function clearMemory(): Promise<ActionResult<{ removed: number }>> 
 export async function removeFact(id: string) {
   const user = await requireUser()
   const context = await loadWorkspaceContext(undefined, user)
-  return removeMemoryFact(user.id, context.workspace.id, z.uuid().parse(id))
+  return removeMemoryFact(user, context.workspace.id, z.uuid().parse(id))
 }
 
 export async function updateFact(id: string, subject: string) {
@@ -46,8 +47,10 @@ export async function updateFact(id: string, subject: string) {
   const context = await loadWorkspaceContext(undefined, user)
   const factId = z.uuid().parse(id)
   const normalized = z.string().trim().min(1).max(200).parse(subject)
-  if (!await mayCorrectMemoryFact(user.id, context.workspace.id, factId, normalized)) return false
-  return correctFact(user.id, factId, normalized)
+  return withTaskWorkspace(user, context.workspace.id, async () => {
+    if (!await mayCorrectMemoryFact(user, context.workspace.id, factId, normalized)) return false
+    return correctFact(user.id, factId, normalized)
+  })
 }
 
 const scopeSchema = z.discriminatedUnion('kind', [
@@ -65,23 +68,23 @@ export async function addFact(input: { requestId: string; kind: (typeof USER_FAC
     scope: scopeSchema.default({ kind: 'global', ids: [] }),
   }).parse(input)
   const context = await loadWorkspaceContext(undefined, user)
-  return addMemoryFact(user.id, context.workspace.id, parsed)
+  return addMemoryFact(user, context.workspace.id, parsed)
 }
 
 export async function reviewFact(id: string, decision: 'approve' | 'reject') {
   const user = await requireUser()
   const context = await loadWorkspaceContext(undefined, user)
-  return reviewMemoryFact(user.id, context.workspace.id, z.uuid().parse(id), z.enum(['approve', 'reject']).parse(decision))
+  return reviewMemoryFact(user, context.workspace.id, z.uuid().parse(id), z.enum(['approve', 'reject']).parse(decision))
 }
 
 export async function setFactScope(id: string, scope: import('@/lib/profile/memory').MemoryScope) {
   const user = await requireUser()
   const context = await loadWorkspaceContext(undefined, user)
-  return setMemoryFactScope(user.id, context.workspace.id, z.uuid().parse(id), scopeSchema.parse(scope))
+  return setMemoryFactScope(user, context.workspace.id, z.uuid().parse(id), scopeSchema.parse(scope))
 }
 
 export async function undoRemoveFact(id: string) {
   const user = await requireUser()
   const context = await loadWorkspaceContext(undefined, user)
-  return undoMemoryFact(user.id, context.workspace.id, z.uuid().parse(id))
+  return undoMemoryFact(user, context.workspace.id, z.uuid().parse(id))
 }

@@ -99,7 +99,33 @@ interface SuggestionSourceView { app: 'gmail' | 'googlecalendar' | 'notion' | 's
 
 ### `getMemory()`
 
-Unchanged, except that it also returns `total`, the number of active facts. `facts` still lists at most 500. It throws `authRequired` without a session (`requireUser`), as before.
+Returns `enabled`, `total`, `facts`, `pending`, `undoable` and `scopeOptions` for the
+signed-in person and the selected authorized workspace. `total` counts approved,
+active facts; `facts` and `pending` each list at most 500. Each item includes its
+review status, source, scope, usage and allowed actions. It throws `authRequired`
+without a session.
+
+`usedCount` and `recentUses` cover currently readable targets in the selected
+workspace, not an aggregate of hidden workspaces. Thread targets must still
+belong to that person and workspace; task targets need canonical bound ownership
+and must not be deleted. A global fact does not expose another workspace's bot or
+task identifiers. A known source kind may have `id: null` and `url: null` when its
+locator cannot be authorized. Thread references are checked against the current
+bot owner and workspace. No decision or file locator is inferred from legacy
+text or an arbitrary URL; historical facts with no trusted source remain `null`.
+
+The action passes the original session or token principal to the canonical
+workspace admission helpers. Membership and projects use `DATABASE_URL` through
+`workspaceDb` / `projectDb`; person-owned facts, undo snapshots and usage use
+`MIKKA_DATABASE_URL`. A pinned token cannot choose another workspace or its
+owner's unrelated personal projects. Admission remains held through a scoped
+read or write, including the application's fact transaction.
+
+`memory.addFact`, `memory.reviewFact`, `memory.setFactScope` and
+`memory.undoRemoveFact` are registered in the shared browser/Desktop RPC registry.
+Their strict schemas accept no client owner. Manual inserts require a UUID
+`requestId`; scope is `global` with no IDs, or `workspaces` / `projects` with one
+to 50 authorized UUIDs. Deletion offers a two-minute owner-only undo window.
 
 ### `clearMemory(): Promise<ActionResult<{ removed: number }>>`
 
