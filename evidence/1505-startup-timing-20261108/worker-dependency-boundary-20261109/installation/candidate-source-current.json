@@ -1,0 +1,17 @@
+[
+  {
+    "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+    "bytes": 12114,
+    "sha256": "bada7b22a750386a49824057751150526d59eb9c5056d5dd9d09531e6cf68455"
+  },
+  {
+    "path": "packages/daemon/scripts/prepare-worker-install.py",
+    "bytes": 4990,
+    "sha256": "c6c4d4ff4a2b4dba37a458f632565267fb7feb648f5b0e23113e9ccfbc504119"
+  },
+  {
+    "path": "packages/daemon/scripts/prepare-worker-install.test.py",
+    "bytes": 5141,
+    "sha256": "41719c914bb212d0052d1d893d4da228b1656bd5f63e8777175bc3525eb640c1"
+  }
+]

@@ -1,0 +1,22 @@
+{
+  "before": {
+    "sdkRelative": "install/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk-linux-x64@0.3.305/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/claude",
+    "pinoRelative": "install/node_modules/.pnpm/pino@10.4.0/node_modules/pino/pino.js",
+    "esbuildRelative": "install/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js"
+  },
+  "after": {
+    "sdkRelative": "install/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk-linux-x64@0.3.305/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/claude",
+    "pinoRelative": "install/node_modules/.pnpm/pino@10.4.0/node_modules/pino/pino.js",
+    "esbuildRelative": "install/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js"
+  },
+  "equal": true,
+  "ordinaryUser": "nobody",
+  "ordinaryUserExit": 0,
+  "movedRelease": "/vercel/ops-1505/worker-dependency-boundary-024/actual-release-moved",
+  "symlinks": {
+    "packages/config": "../../../install/packages/config/node_modules",
+    "packages/protocol": "../../../install/packages/protocol/node_modules",
+    "packages/daemon": "../../../install/packages/daemon/node_modules"
+  },
+  "initialRunnerFailure": "runuser requires privileged parent; initial log retained, no product fix"
+}

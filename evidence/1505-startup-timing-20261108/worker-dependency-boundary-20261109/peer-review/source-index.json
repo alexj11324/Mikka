@@ -1,0 +1,85 @@
+{
+  "source": "02401458a7fe26e00ce4caa653084c7f9680696d",
+  "tree": "0013159d8dd0e1155b84d81907f19f4e1283cff7",
+  "files": [
+    {
+      "path": "package.json",
+      "blob": "4d4d856e9f90ea102c4e42cf42114e9d5daad731",
+      "bytes": 80325,
+      "sha256": "e677d9ca43c64d5050c38e880a7d4745c838086e0ed16f83990106f4b1f5e39a"
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "blob": "cc47ee1a48b9585e06c87e0f5ed6f14211601c0c",
+      "bytes": 661,
+      "sha256": "e8529ab36b3014adf400dfc4b82082b86f84aeadafe686f890b1b26ac2f7e117"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "blob": "a7a956ac98dfcf7de9ebfe508853b8475fd10106",
+      "bytes": 978174,
+      "sha256": "ddfb2c81f1e50b1b619e4a690dd38c33cc0700352434ed4424eda27c86907277"
+    },
+    {
+      "path": "scripts/e2b/build-template.py",
+      "blob": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+      "bytes": 55730,
+      "sha256": "0adb53fbdd6cbcd61f1d1804aee3e2df1538997c0724556062f2741c5ac1cdb1"
+    },
+    {
+      "path": "packages/daemon/package.json",
+      "blob": "a91bbe26794e858d2e66a7eca0b6839b12d6a6f1",
+      "bytes": 2857,
+      "sha256": "11d2828499ff46ddf10ae2eb6653b400ae3863c012b1c979c66a53560120ec30"
+    },
+    {
+      "path": "packages/protocol/package.json",
+      "blob": "52a7ed583d756b1575697556e29a6f65438d2410",
+      "bytes": 3103,
+      "sha256": "cc63fa445e0bf6b64966641eaf8d08b3c1dbe4cffe3216f5c3bec3bc68434f70"
+    },
+    {
+      "path": "packages/config/package.json",
+      "blob": "b9da3bae256e23ad88e98e4402c7dd17402fd679",
+      "bytes": 551,
+      "sha256": "98a26a92c9808833716ec5c18647535cad77c8171a650414192ef3d55fd572cc"
+    },
+    {
+      "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+      "blob": "27c2146b45054c3eb5510afc94ea7ee9696dcb87",
+      "bytes": 11661,
+      "sha256": "6740900ce8fe7367a8e2f980b13556b2ddb3a7d9fbadb49d5eff1482fcbf25f0"
+    },
+    {
+      "path": "packages/daemon/scripts/build-cloud-worker.mjs",
+      "blob": "ce864dcd4c83ccce8c1435463f407623e1091694",
+      "bytes": 3086,
+      "sha256": "6b8fe0248d563979955a7061316b3cc9b7610ade531d213859800deeae355012"
+    },
+    {
+      "path": "/vercel/.cache/node/corepack/v1/pnpm/10.34.3/dist/pnpm.cjs",
+      "version": "10.34.3",
+      "bytes": 8620315,
+      "sha256": "24c71dfd4d0597aefb37457b68b77ef2c5b778b83ecd87d8b62bbd6b7d5ed591",
+      "evidence": "already installed exact pnpm distribution; no new download"
+    },
+    {
+      "path": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/scripts/prepare-worker-install.py",
+      "bytes": 4990,
+      "sha256": "c6c4d4ff4a2b4dba37a458f632565267fb7feb648f5b0e23113e9ccfbc504119",
+      "status": "author stable local candidate, not a frozen commit"
+    },
+    {
+      "path": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+      "bytes": 12114,
+      "sha256": "bada7b22a750386a49824057751150526d59eb9c5056d5dd9d09531e6cf68455",
+      "status": "author stable local candidate, not a frozen commit"
+    },
+    {
+      "path": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/scripts/prepare-worker-install.test.py",
+      "bytes": 5141,
+      "sha256": "41719c914bb212d0052d1d893d4da228b1656bd5f63e8777175bc3525eb640c1",
+      "status": "author stable local candidate, not a frozen commit"
+    }
+  ]
+}

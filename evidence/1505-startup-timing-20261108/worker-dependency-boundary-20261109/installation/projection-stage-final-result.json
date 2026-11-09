@@ -1,0 +1,6 @@
+{
+  "exit": 0,
+  "testSha256": "95980c1364ae98169eb3f9a2caa69af9861ed492c81eae9b9ff37a20536be1b1",
+  "tail": ".....\n----------------------------------------------------------------------\nRan 5 tests in 0.010s\n\nOK\n",
+  "rootPnpmAdditionalConfigFiles": []
+}

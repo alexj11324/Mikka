@@ -1,0 +1,257 @@
+{
+  "verifiedAt": "2026-11-09T06:21:06.046Z",
+  "workerHash": "cd10b53c37242736be3bb91b841f2220772a1681",
+  "canonicalCandidateHashClaimed": true,
+  "head": "e73f12c072786786883ba932689fc00cc8e2ea71",
+  "tree": "a1c4bfbc53e08307e9f3461c18c31a5f58131048",
+  "cwd": "/vercel/Mikka-e2b-worker-dependency-boundary",
+  "dependencyRelease": "/vercel/ops-1505/worker-dependency-boundary-024/actual-release-moved",
+  "cliRelative": "install/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk-linux-x64@0.3.305/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/claude",
+  "cliReadableExecutable": true,
+  "pinoRelative": "install/node_modules/.pnpm/pino@10.4.0/node_modules/pino/pino.js",
+  "esbuildRelative": "install/node_modules/.pnpm/esbuild@0.28.2/node_modules/esbuild/lib/main.js",
+  "outputs": [
+    {
+      "path": "cloud-worker.js",
+      "bytes": 3838404,
+      "sha256": "fea271f8b4f5495928e6d133327c0a42290de70f46975a69db6b398c3520512c",
+      "mode": "644"
+    },
+    {
+      "path": "cloud-model-probe.js",
+      "bytes": 776956,
+      "sha256": "5c3c5ad432c397ee5089382ce8ee02bfe2ee89bb27515b5f24a8e83778b55a8f",
+      "mode": "644"
+    }
+  ],
+  "copiedResources": [
+    {
+      "source": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/src/agents/native-container.mjs",
+      "output": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/dist/cloud/agents/native-container.mjs",
+      "bytes": 7519,
+      "sha256": "e6607be55865b7af5ad037dc088f02b396d387451380a102d3d02e31bc39c931",
+      "mode": "644"
+    },
+    {
+      "source": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/src/computer/proxy.mjs",
+      "output": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/dist/cloud/computer/proxy.mjs",
+      "bytes": 4706,
+      "sha256": "4bb14100a6dc9ae22f26a17ce71040691833c974e75e09c5ea11c5cdf9212df2",
+      "mode": "644"
+    },
+    {
+      "source": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/src/computer/driver.mjs",
+      "output": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/dist/cloud/computer/driver.mjs",
+      "bytes": 14698,
+      "sha256": "239524e27f8f2c337f41a204b10426a4e1784917637bfc1dbef57b8ee1c11813",
+      "mode": "644"
+    },
+    {
+      "source": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/src/agents/mikka-mcp.mjs",
+      "output": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/dist/cloud/mikka-mcp.mjs",
+      "bytes": 2621,
+      "sha256": "1b73d39ba0a9705b2ac2e85d730dbc7f838b6a4c968c77bfcd1f194847445a21",
+      "mode": "644"
+    },
+    {
+      "source": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/src/agents/mikka-mcp-context.mjs",
+      "output": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/dist/cloud/mikka-mcp-context.mjs",
+      "bytes": 2781,
+      "sha256": "bed5e23a0a3e72d73864594aa126a8240c8a1baba4a186c29a7df74e4ea243ce",
+      "mode": "644"
+    },
+    {
+      "source": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/src/agents/mikka-mcp-backend.mjs",
+      "output": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/dist/cloud/mikka-mcp-backend.mjs",
+      "bytes": 50533,
+      "sha256": "96a0c7551fffd1d6bdd0386f9aa2ea8d37613dd969a244d2caf562a0594b13a9",
+      "mode": "644"
+    },
+    {
+      "source": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/src/agents/mikka-mcp-worker.mjs",
+      "output": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/dist/cloud/mikka-mcp-worker.mjs",
+      "bytes": 1753,
+      "sha256": "4062acb492715b5a3b603a58290c1479b23fc0f0bbc8dece7cd0b95a075c9eb5",
+      "mode": "644"
+    },
+    {
+      "source": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/src/agents/capture-copy.mjs",
+      "output": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/dist/cloud/capture-copy.mjs",
+      "bytes": 1017,
+      "sha256": "05d1dff404e882f50c0798fae19dff7634af31044a06be48ea695d29d596b267",
+      "mode": "644"
+    },
+    {
+      "source": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/src/agents/github-credentials.mjs",
+      "output": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/dist/cloud/github-credentials.mjs",
+      "bytes": 10970,
+      "sha256": "2583147edfa54c7c8180e111b9ca8d5e25daa4dbef9d17b924d81527a25829f0",
+      "mode": "644"
+    }
+  ],
+  "fixtures": [
+    {
+      "path": "ask.jsonl",
+      "bytes": 548,
+      "sha256": "d6f8ee41929b1ddb40f0f8c4c291605f0002985022d84eaf9d4ffdd3475ba603",
+      "mode": "644"
+    },
+    {
+      "path": "blocked-question.jsonl",
+      "bytes": 357,
+      "sha256": "1a359b47e2721f2150fb2600a0df0074a8e5d27c84c90680f8de35ec878cc931",
+      "mode": "644"
+    },
+    {
+      "path": "check-pass.jsonl",
+      "bytes": 369,
+      "sha256": "634e4bc2daf17b9530c41710e35ceb71d65abe4e0b39a3d68c018e49887774c8",
+      "mode": "644"
+    },
+    {
+      "path": "crash.jsonl",
+      "bytes": 460,
+      "sha256": "78c534722c94e1703415253aa32a9d83e894821cf2cdc21b5d9b123a0becb893",
+      "mode": "644"
+    },
+    {
+      "path": "failure.jsonl",
+      "bytes": 668,
+      "sha256": "93db4d580666e23830532d867424ad04ee0b7c86a6851a67af29de7a7f96bfd6",
+      "mode": "644"
+    },
+    {
+      "path": "long-running.jsonl",
+      "bytes": 4953,
+      "sha256": "e3a21c98402dc78fb73e5b44b51b9df7f169d12aeddf9f77e2baf40528a27c42",
+      "mode": "644"
+    },
+    {
+      "path": "plan.jsonl",
+      "bytes": 2361,
+      "sha256": "86e5681f2aad82629db9e8a4dd7bb6dcee11c008118277d47dcf0d94c8483110",
+      "mode": "644"
+    },
+    {
+      "path": "quota-exhausted.jsonl",
+      "bytes": 407,
+      "sha256": "d32b9fc7c6778db3cfa1612e80318fa09aef66eb827c1acee271b598ab4ef2fe",
+      "mode": "644"
+    },
+    {
+      "path": "quota.jsonl",
+      "bytes": 594,
+      "sha256": "ed8e1f7e0f67f5691552925f22d76ce3a4f0f806167fc21b2ee944e2679e68ba",
+      "mode": "644"
+    },
+    {
+      "path": "run-tests.jsonl",
+      "bytes": 491,
+      "sha256": "864b7a98ba4db9362cfb1e9c63f668bd11d6a92a04151236a546a8f84241be14",
+      "mode": "644"
+    },
+    {
+      "path": "secret-output.jsonl",
+      "bytes": 905,
+      "sha256": "c1f7f2f4662de535c6fccf651a04de6fbcc5747b736a33050b2461a7cd15e608",
+      "mode": "644"
+    },
+    {
+      "path": "self-verify.jsonl",
+      "bytes": 469,
+      "sha256": "9a0753d56d8ac86ec13a2952a0e061364fb0ed52164c02e121e115de461fccb0",
+      "mode": "644"
+    },
+    {
+      "path": "stall.jsonl",
+      "bytes": 460,
+      "sha256": "c15a9748dfa2be624a8f7f923a2ff552ee54fa2ae6ee7b48dd761a7eb28c5c89",
+      "mode": "644"
+    },
+    {
+      "path": "success-edit.jsonl",
+      "bytes": 1604,
+      "sha256": "8e28f1fd5dcb221b73bffe7f037b448b930b06bedf3aad07fe9727f38d02a4c6",
+      "mode": "644"
+    },
+    {
+      "path": "turn-ended.jsonl",
+      "bytes": 1509,
+      "sha256": "160ec211936c7ce162f36c40cfdca8cb5627770b9a46f5c2c74ed20534e84d2d",
+      "mode": "644"
+    },
+    {
+      "path": "verify-fails.jsonl",
+      "bytes": 602,
+      "sha256": "6539c10e3656136422ed00d30373510c37cf0a2a841782edbc0878c7488e6941",
+      "mode": "644"
+    }
+  ],
+  "syntax": [
+    {
+      "path": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/dist/cloud/cloud-worker.js",
+      "exitCode": 0
+    },
+    {
+      "path": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/dist/cloud/cloud-model-probe.js",
+      "exitCode": 0
+    },
+    {
+      "path": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/dist/cloud/agents/native-container.mjs",
+      "exitCode": 0
+    },
+    {
+      "path": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/dist/cloud/computer/proxy.mjs",
+      "exitCode": 0
+    },
+    {
+      "path": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/dist/cloud/computer/driver.mjs",
+      "exitCode": 0
+    },
+    {
+      "path": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/dist/cloud/mikka-mcp.mjs",
+      "exitCode": 0
+    },
+    {
+      "path": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/dist/cloud/mikka-mcp-context.mjs",
+      "exitCode": 0
+    },
+    {
+      "path": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/dist/cloud/mikka-mcp-backend.mjs",
+      "exitCode": 0
+    },
+    {
+      "path": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/dist/cloud/mikka-mcp-worker.mjs",
+      "exitCode": 0
+    },
+    {
+      "path": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/dist/cloud/capture-copy.mjs",
+      "exitCode": 0
+    },
+    {
+      "path": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/dist/cloud/github-credentials.mjs",
+      "exitCode": 0
+    },
+    {
+      "path": "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/dist/cloud/bootstrap-broker.mjs",
+      "exitCode": 0
+    }
+  ],
+  "broker": {
+    "bytes": 10545,
+    "sha256": "30ffad53c9708a9839c8106a1ff15c289c2ffa20b4a07bb33348d6806b0b0460",
+    "mode": "444",
+    "exactSourceMatch": true
+  },
+  "capability": {
+    "bytes": 87,
+    "sha256": "e41439f549378e5f85a764ed50d9ab93c9da41334420c8df3b6d7dc09bd5cb6c",
+    "mode": "444"
+  },
+  "noModels": true,
+  "noE2B": true,
+  "limitations": [
+    "Local Node 24.22.1, template Node 24.19.0",
+    "Actual template/CLI conservation/native subscription gates not executed"
+  ]
+}

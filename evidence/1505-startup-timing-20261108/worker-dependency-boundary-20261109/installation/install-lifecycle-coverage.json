@@ -1,0 +1,23 @@
+{
+  "runtimeNode": "v24.22.1",
+  "pnpm": "10.34.3",
+  "templateNode": "24.19.0",
+  "lifecycleLines": [
+    "Scope: 3 of 4 workspace projects",
+    ".../esbuild@0.28.2/node_modules/esbuild postinstall$ node install.js",
+    ".../esbuild@0.28.2/node_modules/esbuild postinstall: Done",
+    "Done in 12.2s using pnpm v10.34.3"
+  ],
+  "ignoreScripts": false,
+  "emptyOwnStore": true,
+  "ffmpegInstalled": false,
+  "scriptPolicyUnchanged": true,
+  "scope": "3 of 4 projects (three original worker importers plus empty private root)",
+  "originalRootConfigAbsent": [
+    ".npmrc",
+    ".pnpmfile.cjs",
+    ".pnpmfile.mjs",
+    "pnpmfile.cjs",
+    "pnpmfile.js"
+  ]
+}

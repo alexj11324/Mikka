@@ -1,0 +1,39 @@
+{
+  "baseCommit": "02401458a7fe26e00ce4caa653084c7f9680696d",
+  "baseTree": "0013159d8dd0e1155b84d81907f19f4e1283cff7",
+  "worktree": "/vercel/Mikka-e2b-worker-dependency-boundary",
+  "committed": false,
+  "remoteWrites": 0,
+  "files": [
+    {
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "bytes": 18539,
+      "sha256": "000ac0db12662e23d78d8becc51d36ac6aeebb94e23e7d459c382fa83476e5af",
+      "gitBlob": "40fec295ab9cb92557f66df1594d5b42f7b0371f"
+    },
+    {
+      "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+      "bytes": 12114,
+      "sha256": "bada7b22a750386a49824057751150526d59eb9c5056d5dd9d09531e6cf68455",
+      "gitBlob": "c0172bb8a2d0d4adde7e89991fce36c97b8f8460"
+    },
+    {
+      "path": "packages/daemon/scripts/prepare-worker-install.py",
+      "bytes": 4990,
+      "sha256": "c6c4d4ff4a2b4dba37a458f632565267fb7feb648f5b0e23113e9ccfbc504119",
+      "gitBlob": "ba5f5ee5cc8356781e7c53e6ef5a7e77b7f8573f"
+    },
+    {
+      "path": "packages/daemon/scripts/prepare-worker-install.test.py",
+      "bytes": 5659,
+      "sha256": "95980c1364ae98169eb3f9a2caa69af9861ed492c81eae9b9ff37a20536be1b1",
+      "gitBlob": "cfffaf6cac62d01e075b0fcb08a41f8b40c5f540"
+    }
+  ],
+  "diff": {
+    "path": "/vercel/ops-1505/worker-dependency-boundary-024/candidate-product.diff",
+    "bytes": 13779,
+    "sha256": "a3f6cc52115d38555863b9c3dcb67f3b4c66804153e2cf114bbcb7d4ac10b230"
+  },
+  "rootOwnedAdrExcludedFromProductDiff": true
+}

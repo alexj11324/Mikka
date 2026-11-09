@@ -1,0 +1,9 @@
+{
+  "path": "/vercel/Mikka-e2b-worker-dependency-boundary/docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+  "beforeBytes": 85182,
+  "beforeSha256": "97821bf2a4459f029927609e01de8d8443e0bd051667e04f033741f65bb2936c",
+  "afterBytes": 86629,
+  "afterSha256": "1139ba855ee7fe3055027bdc18751b3d7d2bf44a0a07e18cf7fab29ff2304bd4",
+  "onlyInsertion": true,
+  "state": "proposed behavior; actual isolated build validation pending"
+}

@@ -1,0 +1,55 @@
+F.FEE
+======================================================================
+ERROR: test_only_importers_are_projected (__main__.WorkerInstallTests.test_only_importers_are_projected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/scripts/prepare-worker-install.test.py", line 63, in test_only_importers_are_projected
+    projected = INSTALL.project_lock(LOCK)
+  File "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/scripts/prepare-worker-install.py", line 34, in project_lock
+    raise ValueError("Duplicate lockfile importer")
+ValueError: Duplicate lockfile importer
+
+======================================================================
+ERROR: test_sources_settings_and_lifecycle_stay_intact (__main__.WorkerInstallTests.test_sources_settings_and_lifecycle_stay_intact)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/scripts/prepare-worker-install.test.py", line 98, in test_sources_settings_and_lifecycle_stay_intact
+    INSTALL.prepare(source, destination)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/scripts/prepare-worker-install.py", line 61, in prepare
+    projected_lock = project_lock(lock_raw.decode()).encode()
+                     ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/scripts/prepare-worker-install.py", line 34, in project_lock
+    raise ValueError("Duplicate lockfile importer")
+ValueError: Duplicate lockfile importer
+
+======================================================================
+FAIL: test_additional_workspace_dependency_refuses (__main__.WorkerInstallTests.test_additional_workspace_dependency_refuses)
+----------------------------------------------------------------------
+ValueError: Duplicate lockfile importer
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/scripts/prepare-worker-install.test.py", line 76, in test_additional_workspace_dependency_refuses
+    with self.assertRaisesRegex(ValueError, "outside"):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: "outside" does not match "Duplicate lockfile importer"
+
+======================================================================
+FAIL: test_missing_importer_refuses (__main__.WorkerInstallTests.test_missing_importer_refuses)
+----------------------------------------------------------------------
+ValueError: Duplicate lockfile importer
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/vercel/Mikka-e2b-worker-dependency-boundary/packages/daemon/scripts/prepare-worker-install.test.py", line 72, in test_missing_importer_refuses
+    with self.assertRaisesRegex(ValueError, "Missing"):
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: "Missing" does not match "Duplicate lockfile importer"
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.006s
+
+FAILED (failures=2, errors=2)

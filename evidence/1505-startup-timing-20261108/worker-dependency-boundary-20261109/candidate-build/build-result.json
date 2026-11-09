@@ -1,0 +1,50 @@
+{
+  "head": "e73f12c072786786883ba932689fc00cc8e2ea71",
+  "tree": "a1c4bfbc53e08307e9f3461c18c31a5f58131048",
+  "workerHash": "cd10b53c37242736be3bb91b841f2220772a1681",
+  "buildExit": 0,
+  "elapsedSeconds": 0.696,
+  "sourceConservation": [
+    {
+      "path": "package.json",
+      "bytes": 80325,
+      "sha256": "e677d9ca43c64d5050c38e880a7d4745c838086e0ed16f83990106f4b1f5e39a",
+      "equalToActualInstalledASource": true
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "bytes": 978174,
+      "sha256": "ddfb2c81f1e50b1b619e4a690dd38c33cc0700352434ed4424eda27c86907277",
+      "equalToActualInstalledASource": true
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "bytes": 661,
+      "sha256": "e8529ab36b3014adf400dfc4b82082b86f84aeadafe686f890b1b26ac2f7e117",
+      "equalToActualInstalledASource": true
+    },
+    {
+      "path": "packages/config/package.json",
+      "bytes": 551,
+      "sha256": "98a26a92c9808833716ec5c18647535cad77c8171a650414192ef3d55fd572cc",
+      "equalToActualInstalledASource": true
+    },
+    {
+      "path": "packages/protocol/package.json",
+      "bytes": 3103,
+      "sha256": "cc63fa445e0bf6b64966641eaf8d08b3c1dbe4cffe3216f5c3bec3bc68434f70",
+      "equalToActualInstalledASource": true
+    },
+    {
+      "path": "packages/daemon/package.json",
+      "bytes": 2857,
+      "sha256": "11d2828499ff46ddf10ae2eb6653b400ae3863c012b1c979c66a53560120ec30",
+      "equalToActualInstalledASource": true
+    }
+  ],
+  "dependencyRelease": "/vercel/ops-1505/worker-dependency-boundary-024/actual-release-moved",
+  "dependencyInstallReceipt": "/vercel/ops-1505/worker-dependency-boundary-024/actual-install-result.json",
+  "dependencyInstallReceiptSha256": "b1cbc61e116bff7c276a8e2df07a7ee81b91c540c3a63eccb4ecf31f8dcfe9b8",
+  "reinstalled": false,
+  "originalAMarkerArtifactsUntouched": true
+}

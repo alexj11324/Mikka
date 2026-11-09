@@ -1,0 +1,108 @@
+{
+  "scope": "read-only design and narrow source peer; exact A024 plus stable author candidate",
+  "source": "02401458a7fe26e00ce4caa653084c7f9680696d",
+  "sourceTree": "0013159d8dd0e1155b84d81907f19f4e1283cff7",
+  "disposition": "No current source-level blocker in the bounded importer projection candidate; actual build and stage-rename validation belong to author and are not claimed here.",
+  "candidateProductIdentities": [
+    {
+      "path": "packages/daemon/scripts/prepare-worker-install.py",
+      "bytes": 4990,
+      "sha256": "c6c4d4ff4a2b4dba37a458f632565267fb7feb648f5b0e23113e9ccfbc504119"
+    },
+    {
+      "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+      "bytes": 12114,
+      "sha256": "bada7b22a750386a49824057751150526d59eb9c5056d5dd9d09531e6cf68455"
+    }
+  ],
+  "rejectedAlternative": {
+    "command": "per-package --ignore-workspace --lockfile-dir ORIGINAL_ROOT install --frozen-lockfile",
+    "reason": "Actual A024 loses workspace settings and reports ERR_PNPM_LOCKFILE_CONFIG_MISMATCH",
+    "evidenceOwner": "template_prebuild; its exact A024 result files were reported, not redownloaded or rerun by this reviewer",
+    "evidencePrefix": "/vercel/ops-1505/worker-dependency-boundary-024/actual-ignore-config"
+  },
+  "config": {
+    "rootPackageKeys": [
+      "packageManager",
+      "engines",
+      "pnpm"
+    ],
+    "workspaceFile": "copied byte-for-byte",
+    "workspacePolicies": [
+      "overrides",
+      "patchedDependencies",
+      "allowBuilds",
+      "minimumReleaseAge",
+      "minimumReleaseAgeExclude",
+      "pmOnFail"
+    ],
+    "patchDirectory": "copied without reinterpretation",
+    "sourceNpmrcOrPnpmfilePresent": false,
+    "packageManifestAndSources": "all three full package source directories copied, including dev/peer/optional dependency metadata and lifecycle scripts"
+  },
+  "frozenImplementation": {
+    "version": "10.34.3",
+    "path": "/vercel/.cache/node/corepack/v1/pnpm/10.34.3/dist/pnpm.cjs",
+    "configWorkspaceReadLines": "19077–19106",
+    "lockManifestValidationAndNoResolutionLines": "174380–174491",
+    "selectedImporterHeadlessFilterLines": "165879–165880",
+    "dependencyWalkerLines": "159275–159300",
+    "conclusion": "With valid frozen settings/manifests, headless uses selected importer graph and existing snapshots; retained unused package records do not install every package. Missing dependency/integrity errors under frozen=true throw rather than fall back to resolution."
+  },
+  "lockProof": "lock-projection-comparison.json",
+  "peerContextBoundary": {
+    "daemonVitest": "OTel1.9.0 / @types-node24.19.2",
+    "protocolVitest": "OTel1.10.0 / @types-node25.9.9",
+    "keptLockedOptionalPeers": [
+      "happy-dom15.11.7",
+      "yaml2.9.0"
+    ],
+    "configPeers": {
+      "eslint": "^10",
+      "typescript": "^6"
+    },
+    "rule": "Keep exact importer and snapshot bytes; excluding root application importer is not permission to re-resolve or strip formerly root-supplied peer snapshots."
+  },
+  "parserBoundary": {
+    "existingBuildTemplate": "lock_projection is a custom hash representation, not an installable YAML writer",
+    "normalParserAvailability": "pnpm distribution bundles js-yaml privately; no independent yaml/js-yaml package was found in the checked pnpm and npm paths before dependency installation",
+    "approvedNarrowApproach": "Only recognize generated importer block boundaries; preserve outside bytes; reject duplicate/missing selected importers and workspace links outside the exact closure; let the unchanged pnpm frozen parser validate the complete derived file",
+    "notProposed": [
+      "extract/evaluate internal pnpm bundle modules",
+      "new broad parser/dependency installation",
+      "rewrite the original Git lock",
+      "implement a new transitive package graph resolver"
+    ]
+  },
+  "lifecycleAndStage": {
+    "workspace": "mikka_release/worker-install retained with release",
+    "links": "os.path.relpath, no absolute .stage path",
+    "build": "unchanged original source/packages/daemon/scripts/build-cloud-worker.mjs",
+    "buildTool": "esbuild is an existing daemon devDependency",
+    "externalRuntime": [
+      "@anthropic-ai/claude-agent-sdk",
+      "pino"
+    ],
+    "sdkIdentity": "createRequire(original daemon package) traverses retained module link; realpath remains under same release for original cli-finalize relocation",
+    "sourceProtection": "original Git manifests and lock remain unchanged; only new untracked node_modules links are added"
+  },
+  "requiredAuthorValidationRemainingAtReview": [
+    "real actual-source frozen install with original lifecycle policies and unchanged derived-lock digest",
+    "original cloud build and actual SDK/native asset resolution",
+    "same-tree stage directory rename followed by source-linked imports/bundle entry checks",
+    "new full worker_hash and normal official CLI conservation/release gates"
+  ],
+  "workerHashBoundary": "Equal dependency projection is not equal worker_hash: new helper and edited bootstrap are in WORKER_PATHS, so final W must be recalculated.",
+  "actions": {
+    "pureProjectionComparisons": 1,
+    "dependencyInstalls": 0,
+    "productTests": 0,
+    "builds": 0,
+    "networkDownloads": 0,
+    "productionRequests": 0,
+    "secretsRead": 0,
+    "models": 0,
+    "refsWritten": 0,
+    "productEdits": 0
+  }
+}

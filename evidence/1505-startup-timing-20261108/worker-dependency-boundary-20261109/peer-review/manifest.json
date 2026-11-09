@@ -1,0 +1,32 @@
+{
+  "schema": "issue1505-dependency-projection-readonly-review.v1",
+  "createdAt": "2026-11-09T06:16:38.849628+00:00",
+  "status": "FROZEN_STATIC_REVIEW_AUTHOR_RUNTIME_VALIDATION_PENDING",
+  "source": "02401458a7fe26e00ce4caa653084c7f9680696d",
+  "files": [
+    {
+      "path": "review.md",
+      "bytes": 4784,
+      "sha256": "7b2e07b1074a14a881fbc8529c84417213e9941b1be08a0aabc1b8c8cb55cc7c"
+    },
+    {
+      "path": "review.json",
+      "bytes": 5367,
+      "sha256": "f14e83fdbc9d5379a6ae6a30e46cbf0ffe7fa182c14f0ec46a1ad13cb9612b15"
+    },
+    {
+      "path": "source-index.json",
+      "bytes": 3350,
+      "sha256": "66d3f8a5921246bdfe256782fc370d50cdee6a49356d77aa37d22eab1d8067f8"
+    },
+    {
+      "path": "lock-projection-comparison.json",
+      "bytes": 1369,
+      "sha256": "a92fd9f4fcc6e4bbcf8c0022087d455cb3610ec2676b7be17a3473dd301d94ea"
+    }
+  ],
+  "filesExcludingManifest": 4,
+  "totalBytesExcludingManifest": 14870,
+  "sourceEdited": false,
+  "newNetworkOrProductionActions": false
+}

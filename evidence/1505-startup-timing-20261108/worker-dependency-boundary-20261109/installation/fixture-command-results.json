@@ -1,0 +1,37 @@
+[
+  {
+    "label": "lockfile",
+    "exit": 0,
+    "elapsedMs": 561,
+    "stdoutBytes": 181,
+    "stderrBytes": 0
+  },
+  {
+    "label": "baseline-filter",
+    "exit": 0,
+    "elapsedMs": 569,
+    "stdoutBytes": 1341,
+    "stderrBytes": 0
+  },
+  {
+    "label": "candidate-nonrecursive-config",
+    "exit": 0,
+    "elapsedMs": 552,
+    "stdoutBytes": 1173,
+    "stderrBytes": 0
+  },
+  {
+    "label": "candidate-nonrecursive-protocol",
+    "exit": 0,
+    "elapsedMs": 559,
+    "stdoutBytes": 923,
+    "stderrBytes": 0
+  },
+  {
+    "label": "candidate-nonrecursive-daemon",
+    "exit": 0,
+    "elapsedMs": 542,
+    "stdoutBytes": 923,
+    "stderrBytes": 0
+  }
+]

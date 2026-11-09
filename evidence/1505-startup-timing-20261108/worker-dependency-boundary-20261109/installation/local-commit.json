@@ -1,0 +1,18 @@
+{
+  "at": "2026-11-09T06:19:17.692820+00:00",
+  "commit": "e73f12c072786786883ba932689fc00cc8e2ea71",
+  "tree": "a1c4bfbc53e08307e9f3461c18c31a5f58131048",
+  "parents": [
+    "e73f12c072786786883ba932689fc00cc8e2ea71",
+    "02401458a7fe26e00ce4caa653084c7f9680696d"
+  ],
+  "status": "",
+  "commitOutput": "[root/issue1505-worker-dependency-install-20261109 e73f12c072] fix: isolate cloud worker dependency installation\n 5 files changed, 278 insertions(+), 1 deletion(-)\n create mode 100644 packages/daemon/scripts/prepare-worker-install.py\n create mode 100644 packages/daemon/scripts/prepare-worker-install.test.py\n",
+  "files": [
+    ".github/workflows/e2b-official-runtime.yml",
+    "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+    "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+    "packages/daemon/scripts/prepare-worker-install.py",
+    "packages/daemon/scripts/prepare-worker-install.test.py"
+  ]
+}

@@ -1,0 +1,34 @@
+[
+  {
+    "name": "build-resource-verification",
+    "exit": 0,
+    "elapsedSeconds": 0.771,
+    "stdoutSha256": "f53ea9a711adc933cf6c3d18effd2310892f8c30d7c74f9af04f9bf435fc0de6",
+    "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tail": "{\"entries\":2,\"resources\":9,\"fixtures\":16,\"syntax\":12,\"cliRelative\":\"install/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk-linux-x64@0.3.305/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/claude\",\"pinoRelative\":\"install/node_modules/.pnpm/pino@10.4.0/node_modules/pino/pino.js\",\"sha256\":\"2ed4d17be8570c4f6a84869c727dd0b5ff4264b45079111808f92b83233c9a4f\"}\n"
+  },
+  {
+    "name": "projection-unit-final",
+    "exit": 0,
+    "elapsedSeconds": 0.116,
+    "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSha256": "4c979c0d06f0e9e2109df48cae7f69ac5d403754045b4cfe404fe744e7390b47",
+    "tail": ".....\n----------------------------------------------------------------------\nRan 5 tests in 0.011s\n\nOK\n"
+  },
+  {
+    "name": "build-template-tests",
+    "exit": 0,
+    "elapsedSeconds": 1.163,
+    "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSha256": "a49acf56ef8127548f73ab693fdfbe47300a9ff0b31f8cf132512eafe54b1a6a",
+    "tail": "sonReceived\":true}\n{\"event\":\"mikka_model_probe_failed\",\"kind\":\"claude\",\"stage\":\"receipt_validate\",\"error\":\"reports_invalid\",\"bytes\":{\"workerIdentity\":41,\"manifest\":325,\"receipt\":1021},\"elapsedMs\":1,\"receiptJsonReceived\":true}\n{\"event\":\"mikka_model_probe_failed\",\"kind\":\"claude\",\"stage\":\"receipt_validate\",\"error\":\"reports_invalid\",\"bytes\":{\"workerIdentity\":41,\"manifest\":325,\"receipt\":1066},\"elapsedMs\":2,\"receiptJsonReceived\":true}\n..................\n----------------------------------------------------------------------\nRan 32 tests in 0.943s\n\nOK\n"
+  },
+  {
+    "name": "bootstrap-syntax-final",
+    "exit": 0,
+    "elapsedSeconds": 0.002,
+    "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tail": ""
+  }
+]

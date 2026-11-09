@@ -1,0 +1,8 @@
+{
+  "source": "02401458a7fe26e00ce4caa653084c7f9680696d",
+  "worktree": "/vercel/Mikka-e2b-worker-dependency-boundary",
+  "exit": 1,
+  "stdoutTail": "\u2009ERR_PNPM_LOCKFILE_CONFIG_MISMATCH\u2009 Cannot proceed with the frozen installation. The current \"overrides\" configuration doesn't match the value found in the lockfile\n\nUpdate your lockfile using \"pnpm install --no-frozen-lockfile\"\n",
+  "stderrTail": "",
+  "trackedStatus": ""
+}

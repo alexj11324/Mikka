@@ -1,0 +1,18 @@
+../..                                    | Progress: resolved 1, reused 0, downloaded 0, added 0
+../..                                    |   +1 +
+../..                                    | Progress: resolved 1, reused 0, downloaded 1, added 1, done
+
+dependencies:
++ runtime-only 1.0.0
+
+devDependencies:
++ @mikka/config 1.0.0 <- ../config
+
+╭ Warning ─────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│   Ignored build scripts: runtime-only@file:tarballs/runtime-only.tgz.        │
+│   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+│   to run scripts.                                                            │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+Done in 556ms using pnpm v10.34.3

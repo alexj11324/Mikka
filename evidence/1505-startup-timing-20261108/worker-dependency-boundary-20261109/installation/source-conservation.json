@@ -1,0 +1,42 @@
+{
+  "base": "02401458a7fe26e00ce4caa653084c7f9680696d",
+  "files": [
+    {
+      "path": "package.json",
+      "bytes": 80325,
+      "sha256": "e677d9ca43c64d5050c38e880a7d4745c838086e0ed16f83990106f4b1f5e39a",
+      "sourceEqual": true
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "bytes": 978174,
+      "sha256": "ddfb2c81f1e50b1b619e4a690dd38c33cc0700352434ed4424eda27c86907277",
+      "sourceEqual": true
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "bytes": 661,
+      "sha256": "e8529ab36b3014adf400dfc4b82082b86f84aeadafe686f890b1b26ac2f7e117",
+      "sourceEqual": true
+    },
+    {
+      "path": "packages/config/package.json",
+      "bytes": 551,
+      "sha256": "98a26a92c9808833716ec5c18647535cad77c8171a650414192ef3d55fd572cc",
+      "sourceEqual": true
+    },
+    {
+      "path": "packages/protocol/package.json",
+      "bytes": 3103,
+      "sha256": "cc63fa445e0bf6b64966641eaf8d08b3c1dbe4cffe3216f5c3bec3bc68434f70",
+      "sourceEqual": true
+    },
+    {
+      "path": "packages/daemon/package.json",
+      "bytes": 2857,
+      "sha256": "11d2828499ff46ddf10ae2eb6653b400ae3863c012b1c979c66a53560120ec30",
+      "sourceEqual": true
+    }
+  ],
+  "pnpmCompiledCliSha256": "24c71dfd4d0597aefb37457b68b77ef2c5b778b83ecd87d8b62bbd6b7d5ed591"
+}

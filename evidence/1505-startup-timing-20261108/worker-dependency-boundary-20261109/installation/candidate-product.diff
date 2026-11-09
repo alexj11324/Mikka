@@ -1,0 +1,296 @@
+diff --git a/.github/workflows/e2b-official-runtime.yml b/.github/workflows/e2b-official-runtime.yml
+index be1f902f97..40fec295ab 100644
+--- a/.github/workflows/e2b-official-runtime.yml
++++ b/.github/workflows/e2b-official-runtime.yml
+@@ -80,6 +80,7 @@ jobs:
+           ln -s "$GITHUB_WORKSPACE/packages/protocol" node_modules/@mikka/protocol
+       - run: node --import tsx --test scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/acceptance/cloud-startup-report.test.mjs
+       - run: python3 scripts/e2b/build-template.test.py
++      - run: python3 packages/daemon/scripts/prepare-worker-install.test.py
+       - run: python3 scripts/e2b/official-files.test.py
+       - run: python3 scripts/e2b/cleanup-template-candidates.test.py
+       - run: python3 -m py_compile scripts/e2b/validate-official-instances.py
+diff --git a/packages/daemon/scripts/official-e2b-instance-bootstrap.sh b/packages/daemon/scripts/official-e2b-instance-bootstrap.sh
+index 27c2146b45..c0172bb8a2 100644
+--- a/packages/daemon/scripts/official-e2b-instance-bootstrap.sh
++++ b/packages/daemon/scripts/official-e2b-instance-bootstrap.sh
+@@ -87,7 +87,16 @@ mikka_phase_done gh
+ fi
+ export PATH=/opt/mikka/runtime/node/bin:$PATH
+ cd "$mikka_release/source"
+-env HOME=/opt/mikka/runtime/bootstrap-home COREPACK_HOME=/opt/mikka/runtime/corepack corepack pnpm install --filter @mikka/daemon... --frozen-lockfile
++# pnpm 10 also installs the root importer of a filtered shared-lock workspace.
++# Keep the fetched source intact and install only the worker's locked importers.
++mikka_install="$mikka_release/worker-install"
++(
++  umask 022
++  python3 packages/daemon/scripts/prepare-worker-install.py "$mikka_release/source" "$mikka_install"
++  cd "$mikka_install"
++  env HOME=/opt/mikka/runtime/bootstrap-home COREPACK_HOME=/opt/mikka/runtime/corepack corepack pnpm install --filter @mikka/daemon... --frozen-lockfile
++)
++python3 packages/daemon/scripts/prepare-worker-install.py "$mikka_release/source" "$mikka_install" --link
+ mikka_phase_done dependencies
+ MIKKA_CLOUD_WORKER_BUILD_SHA="$mikka_sha" node packages/daemon/scripts/build-cloud-worker.mjs
+ mikka_phase_done build
+diff --git a/packages/daemon/scripts/prepare-worker-install.py b/packages/daemon/scripts/prepare-worker-install.py
+new file mode 100644
+index 0000000000..ba5f5ee5cc
+--- /dev/null
++++ b/packages/daemon/scripts/prepare-worker-install.py
+@@ -0,0 +1,114 @@
++"""Prepare a private worker install without the web application's root importer.
++
++The fetched Git checkout and its lockfile stay intact. pnpm receives the same
++workspace settings, package sources and locked package/snapshot records; only
++unselected workspace importers and the web root's dependencies are omitted.
++"""
++import argparse
++import hashlib
++import json
++import os
++import posixpath
++import re
++import shutil
++from pathlib import Path
++
++PROJECTS = ("packages/config", "packages/protocol", "packages/daemon")
++ROOT_KEYS = ("packageManager", "engines", "pnpm")
++
++
++def project_lock(raw):
++    lines = raw.splitlines(keepends=True)
++    starts = [i for i, line in enumerate(lines) if line.rstrip("\r\n") == "importers:"]
++    if len(starts) != 1:
++        raise ValueError("Expected one lockfile importers section")
++    start = starts[0] + 1
++    end = next((i for i in range(start, len(lines))
++                if lines[i].strip() and not lines[i][0].isspace()
++                and not lines[i].startswith("#")), len(lines))
++    blocks, name = {}, None
++    for line in lines[start:end]:
++        match = re.fullmatch(r"  (\S.*?):(?:[ \t]*\{\})?[ \t]*(?:\r?\n)?", line)
++        if match:
++            name = match.group(1).strip("'\"")
++            if name in blocks:
++                raise ValueError("Duplicate lockfile importer")
++            blocks[name] = []
++        if name is not None:
++            blocks[name].append(line)
++    if any(name not in blocks for name in (".", *PROJECTS)):
++        raise ValueError("Missing worker lockfile importer")
++    for name in PROJECTS:
++        for line in blocks[name]:
++            match = re.fullmatch(r"\s+version: ['\"]?link:([^'\"\s]+)['\"]?\s*", line)
++            if match and posixpath.normpath(posixpath.join(name, match.group(1))) not in PROJECTS:
++                raise ValueError("Worker workspace dependency outside the install closure")
++    return "".join(lines[:start]) + "  .: {}\n\n" + "".join(
++        "".join(blocks[name]) for name in PROJECTS
++    ) + "".join(lines[end:])
++
++
++def digest(raw):
++    return hashlib.sha256(raw).hexdigest()
++
++
++def prepare(source, destination):
++    source, destination = source.resolve(), destination.resolve()
++    if source == destination or destination.exists():
++        raise ValueError("Worker install destination must be new")
++    root_raw = (source / "package.json").read_bytes()
++    root = json.loads(root_raw)
++    lock_raw = (source / "pnpm-lock.yaml").read_bytes()
++    projected_lock = project_lock(lock_raw.decode()).encode()
++    workspace_raw = (source / "pnpm-workspace.yaml").read_bytes()
++    manifest = {"private": True, **{key: root[key] for key in ROOT_KEYS if key in root}}
++    destination.mkdir(parents=True)
++    (destination / "package.json").write_text(json.dumps(manifest, indent=2) + "\n")
++    (destination / "pnpm-lock.yaml").write_bytes(projected_lock)
++    (destination / "pnpm-workspace.yaml").write_bytes(workspace_raw)
++    for name in PROJECTS:
++        shutil.copytree(source / name, destination / name, symlinks=True,
++                        ignore=shutil.ignore_patterns("node_modules", "__pycache__"))
++    if (source / "patches").exists():
++        shutil.copytree(source / "patches", destination / "patches", symlinks=True)
++    receipt = {
++        "version": 1,
++        "importers": [".", *PROJECTS],
++        "sourcePackageSha256": digest(root_raw),
++        "sourceLockSha256": digest(lock_raw),
++        "installLockSha256": digest(projected_lock),
++        "workspaceSha256": digest(workspace_raw),
++    }
++    (destination / "worker-install-projection.json").write_text(json.dumps(receipt, indent=2) + "\n")
++    return receipt
++
++
++def link_modules(source, destination):
++    source, destination = source.resolve(), destination.resolve()
++    receipt = json.loads((destination / "worker-install-projection.json").read_text())
++    if digest((source / "pnpm-lock.yaml").read_bytes()) != receipt["sourceLockSha256"]:
++        raise ValueError("Source lockfile changed")
++    if digest((destination / "pnpm-lock.yaml").read_bytes()) != receipt["installLockSha256"]:
++        raise ValueError("Frozen install lockfile changed")
++    paths = [(source / name / "node_modules", destination / name / "node_modules") for name in PROJECTS]
++    for target, installed in paths:
++        if target.exists() or target.is_symlink() or not installed.is_dir():
++            raise ValueError("Worker module link is not a fresh installed directory")
++    for target, installed in paths:
++        target.symlink_to(os.path.relpath(installed, target.parent), target_is_directory=True)
++
++
++def main():
++    parser = argparse.ArgumentParser()
++    parser.add_argument("source", type=Path)
++    parser.add_argument("destination", type=Path)
++    parser.add_argument("--link", action="store_true")
++    args = parser.parse_args()
++    if args.link:
++        link_modules(args.source, args.destination)
++    else:
++        print(json.dumps(prepare(args.source, args.destination), separators=(",", ":")))
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/packages/daemon/scripts/prepare-worker-install.test.py b/packages/daemon/scripts/prepare-worker-install.test.py
+new file mode 100644
+index 0000000000..cfffaf6cac
+--- /dev/null
++++ b/packages/daemon/scripts/prepare-worker-install.test.py
+@@ -0,0 +1,136 @@
++import importlib.util
++import json
++import tempfile
++import unittest
++from pathlib import Path
++
++SPEC = importlib.util.spec_from_file_location("worker_install", Path(__file__).with_name("prepare-worker-install.py"))
++INSTALL = importlib.util.module_from_spec(SPEC)
++SPEC.loader.exec_module(INSTALL)
++LOCK = """lockfileVersion: '9.0'
++
++settings:
++  autoInstallPeers: true
++
++overrides:
++  web-only: 1.0.0
++
++importers:
++
++  .:
++    dependencies:
++      web-only:
++        specifier: 1.0.0
++        version: 1.0.0
++
++  packages/daemon:
++    dependencies:
++      '@mikka/protocol':
++        specifier: workspace:*
++        version: link:../protocol
++    devDependencies:
++      '@mikka/config':
++        specifier: workspace:*
++        version: link:../config
++      esbuild:
++        specifier: 0.28.2
++        version: 0.28.2
++
++  packages/protocol: {}
++
++  packages/config: {}
++
++  apps/desktop: {}
++
++packages:
++
++  esbuild@0.28.2:
++    resolution: {integrity: unchanged}
++
++  web-only@1.0.0:
++    resolution: {integrity: unchanged}
++
++snapshots:
++
++  esbuild@0.28.2: {}
++
++  web-only@1.0.0: {}
++"""
++
++
++class WorkerInstallTests(unittest.TestCase):
++    def test_only_importers_are_projected(self):
++        projected = INSTALL.project_lock(LOCK)
++        self.assertIn("  .: {}", projected)
++        self.assertNotIn("  apps/desktop:", projected)
++        self.assertNotIn("specifier: 1.0.0", projected)
++        self.assertIn("specifier: 0.28.2", projected)
++        self.assertEqual(projected.split("packages:\n", 1)[1], LOCK.split("packages:\n", 1)[1])
++        self.assertEqual(projected.split("importers:\n", 1)[0], LOCK.split("importers:\n", 1)[0])
++
++    def test_missing_importer_refuses(self):
++        with self.assertRaisesRegex(ValueError, "Missing"):
++            INSTALL.project_lock(LOCK.replace("  packages/config: {}", "  packages/other: {}"))
++
++    def test_additional_workspace_dependency_refuses(self):
++        with self.assertRaisesRegex(ValueError, "outside"):
++            INSTALL.project_lock(LOCK.replace("link:../protocol", "link:../unreviewed"))
++
++    def test_sources_settings_and_lifecycle_stay_intact(self):
++        with tempfile.TemporaryDirectory() as temporary:
++            stage = Path(temporary) / "stage"
++            source, destination = stage / "source", stage / "install"
++            source.mkdir(parents=True)
++            root = {"packageManager": "pnpm@10.34.3", "engines": {"node": "24.x"},
++                    "pnpm": {"overrides": {"kept": "1.0.0"}}, "dependencies": {"web-only": "1.0.0"},
++                    "scripts": {"postinstall": "web-only-command"}}
++            (source / "package.json").write_text(json.dumps(root))
++            (source / "pnpm-lock.yaml").write_text(LOCK)
++            settings = b"packages:\n  - packages/*\nallowBuilds:\n  esbuild: true\n"
++            (source / "pnpm-workspace.yaml").write_bytes(settings)
++            for name in INSTALL.PROJECTS:
++                path = source / name
++                path.mkdir(parents=True)
++                (path / "package.json").write_text('{"scripts":{"postinstall":"normal-script"},"devDependencies":{"tool":"1.0.0"}}')
++                (path / "source.ts").write_text("export const unchanged = true\n")
++            (source / "patches").mkdir()
++            (source / "patches/fixed.patch").write_text("original patch\n")
++            originals = {p.relative_to(source): p.read_bytes() for p in source.rglob("*") if p.is_file()}
++            INSTALL.prepare(source, destination)
++            self.assertEqual(originals, {p.relative_to(source): p.read_bytes() for p in source.rglob("*") if p.is_file()})
++            self.assertEqual((destination / "pnpm-workspace.yaml").read_bytes(), settings)
++            self.assertEqual(json.loads((destination / "package.json").read_text()),
++                             {"private": True, **{key: root[key] for key in INSTALL.ROOT_KEYS}})
++            for name in INSTALL.PROJECTS:
++                self.assertEqual((source / name / "package.json").read_bytes(), (destination / name / "package.json").read_bytes())
++                (destination / name / "node_modules").mkdir()
++                (destination / name / "node_modules/runtime.txt").write_text("installed runtime")
++            INSTALL.link_modules(source, destination)
++            for name in INSTALL.PROJECTS:
++                self.assertEqual((source / name / "node_modules").resolve(), destination / name / "node_modules")
++            with self.assertRaisesRegex(ValueError, "fresh"):
++                INSTALL.link_modules(source, destination)
++            final = stage.with_name("final")
++            stage.rename(final)
++            for name in INSTALL.PROJECTS:
++                linked = final / "source" / name / "node_modules"
++                self.assertEqual(linked.resolve(strict=True), final / "install" / name / "node_modules")
++                self.assertEqual((linked / "runtime.txt").read_text(), "installed runtime")
++
++    def test_changed_frozen_lock_refuses_link(self):
++        with tempfile.TemporaryDirectory() as temporary:
++            source, destination = Path(temporary) / "source", Path(temporary) / "install"
++            source.mkdir()
++            destination.mkdir()
++            (source / "pnpm-lock.yaml").write_text(LOCK)
++            (destination / "pnpm-lock.yaml").write_text(LOCK + "# changed\n")
++            (destination / "worker-install-projection.json").write_text(json.dumps({
++                "sourceLockSha256": INSTALL.digest(LOCK.encode()),
++                "installLockSha256": INSTALL.digest(LOCK.encode()),
++            }))
++            with self.assertRaisesRegex(ValueError, "Frozen"):
++                INSTALL.link_modules(source, destination)
++
++
++if __name__ == "__main__":
++    unittest.main()

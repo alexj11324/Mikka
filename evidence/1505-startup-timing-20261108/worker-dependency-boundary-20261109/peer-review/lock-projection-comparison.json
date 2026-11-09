@@ -1,0 +1,41 @@
+{
+  "source": "02401458a7fe26e00ce4caa653084c7f9680696d",
+  "helperSha256": "c6c4d4ff4a2b4dba37a458f632565267fb7feb648f5b0e23113e9ccfbc504119",
+  "sourceLockBytes": 978174,
+  "sourceLockSha256": "ddfb2c81f1e50b1b619e4a690dd38c33cc0700352434ed4424eda27c86907277",
+  "projectedLockBytes": 943429,
+  "projectedLockSha256": "fe0c5bea7ddad61bcbfaf22dab256de27853544495d3b51930cf0be8e34873cc",
+  "importersBefore": [
+    ".",
+    "apps/desktop",
+    "apps/frontend",
+    "apps/mobile",
+    "packages/config",
+    "packages/daemon",
+    "packages/protocol"
+  ],
+  "importersAfter": [
+    ".",
+    "packages/config",
+    "packages/protocol",
+    "packages/daemon"
+  ],
+  "rootImporterEmpty": true,
+  "selectedImporterBlocksEqual": {
+    "packages/config": true,
+    "packages/protocol": true,
+    "packages/daemon": true
+  },
+  "nonImporterSectionsEqual": {
+    "lockfileVersion": true,
+    "settings": true,
+    "overrides": true,
+    "patchedDependencies": true,
+    "packages": true,
+    "snapshots": true
+  },
+  "canonicalProjectionBefore": "5fcda28bf43db78880c6a41a112988a622cf59ae22d39db041adffef68be7571",
+  "canonicalProjectionAfter": "5fcda28bf43db78880c6a41a112988a622cf59ae22d39db041adffef68be7571",
+  "canonicalProjectionBytesEqual": true,
+  "executed": "Only original pure text projection functions. No pnpm install, package lifecycle, source write or network."
+}

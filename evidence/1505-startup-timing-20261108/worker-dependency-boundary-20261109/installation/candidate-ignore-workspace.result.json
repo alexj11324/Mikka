@@ -1,0 +1,66 @@
+{
+  "results": [
+    {
+      "project": "config",
+      "args": [
+        "--dir",
+        "/vercel/ops-1505/worker-dependency-boundary-024/candidate-ignore-workspace/packages/config",
+        "--ignore-workspace",
+        "--lockfile-dir",
+        "/vercel/ops-1505/worker-dependency-boundary-024/candidate-ignore-workspace",
+        "install",
+        "--frozen-lockfile",
+        "--offline",
+        "--store-dir",
+        "/vercel/ops-1505/worker-dependency-boundary-024/fixture-store"
+      ],
+      "exit": 0,
+      "seconds": 0.545,
+      "stdoutTail": "\nDone in 493ms using pnpm v10.34.3\n",
+      "stderrTail": ""
+    },
+    {
+      "project": "protocol",
+      "args": [
+        "--dir",
+        "/vercel/ops-1505/worker-dependency-boundary-024/candidate-ignore-workspace/packages/protocol",
+        "--ignore-workspace",
+        "--lockfile-dir",
+        "/vercel/ops-1505/worker-dependency-boundary-024/candidate-ignore-workspace",
+        "install",
+        "--frozen-lockfile",
+        "--offline",
+        "--store-dir",
+        "/vercel/ops-1505/worker-dependency-boundary-024/fixture-store"
+      ],
+      "exit": 0,
+      "seconds": 0.598,
+      "stdoutTail": "| Progress: resolved 1, reused 0, downloaded 0, added 0\n../..                                    |   +1 +\n../..                                    | Progress: resolved 1, reused 0, downloaded 1, added 1, done\n\ndependencies:\n+ runtime-only 1.0.0\n\ndevDependencies:\n+ @mikka/config 1.0.0 <- ../config\n\n\u256d Warning \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502                                                                              \u2502\n\u2502   Ignored build scripts: runtime-only@file:tarballs/runtime-only.tgz.        \u2502\n\u2502   Run \"pnpm approve-builds\" to pick which dependencies should be allowed     \u2502\n\u2502   to run scripts.                                                            \u2502\n\u2502                                                                              \u2502\n\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\nDone in 556ms using pnpm v10.34.3\n",
+      "stderrTail": ""
+    },
+    {
+      "project": "daemon",
+      "args": [
+        "--dir",
+        "/vercel/ops-1505/worker-dependency-boundary-024/candidate-ignore-workspace/packages/daemon",
+        "--ignore-workspace",
+        "--lockfile-dir",
+        "/vercel/ops-1505/worker-dependency-boundary-024/candidate-ignore-workspace",
+        "install",
+        "--frozen-lockfile",
+        "--offline",
+        "--store-dir",
+        "/vercel/ops-1505/worker-dependency-boundary-024/fixture-store"
+      ],
+      "exit": 0,
+      "seconds": 0.561,
+      "stdoutTail": "                             | Progress: resolved 1, reused 0, downloaded 1, added 1, done\n\ndependencies:\n+ @mikka/protocol 1.0.0 <- ../protocol\n\ndevDependencies:\n+ @mikka/config 1.0.0 <- ../config\n+ build-only 1.0.0\n\n\u256d Warning \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256e\n\u2502                                                                              \u2502\n\u2502   Ignored build scripts: build-only@file:tarballs/build-only.tgz,            \u2502\n\u2502   runtime-only@file:tarballs/runtime-only.tgz.                               \u2502\n\u2502   Run \"pnpm approve-builds\" to pick which dependencies should be allowed     \u2502\n\u2502   to run scripts.                                                            \u2502\n\u2502                                                                              \u2502\n\u2570\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u256f\nDone in 516ms using pnpm v10.34.3\n",
+      "stderrTail": ""
+    }
+  ],
+  "rootDependencyLinked": false,
+  "daemonDevLinked": true,
+  "protocolRuntimeLinked": true,
+  "lifecycle": [],
+  "lockUnchanged": true
+}

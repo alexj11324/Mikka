@@ -1,0 +1,9 @@
+{
+  "case": "baseline-filter",
+  "allCommandsSucceeded": true,
+  "rootDependencyLinked": true,
+  "lifecycle": [],
+  "daemonDevDependencyLinked": true,
+  "protocolRuntimeDependencyLinked": true,
+  "lockUnchanged": true
+}

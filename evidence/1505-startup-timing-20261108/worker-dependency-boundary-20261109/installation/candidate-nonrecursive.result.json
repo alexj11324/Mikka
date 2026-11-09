@@ -1,0 +1,9 @@
+{
+  "case": "candidate-nonrecursive",
+  "allCommandsSucceeded": true,
+  "rootDependencyLinked": true,
+  "lifecycle": [],
+  "daemonDevDependencyLinked": false,
+  "protocolRuntimeDependencyLinked": false,
+  "lockUnchanged": true
+}

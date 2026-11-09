@@ -1,0 +1,29 @@
+{
+  "exit": 0,
+  "elapsedSeconds": 0.65,
+  "cwd": "/vercel/ops-1505/worker-dependency-boundary-024/actual-release/source",
+  "baseWorkerHashTestMarker": "6ada1d4f809eace6ca84ad0329562f4aacb78452",
+  "markerLimitation": "Base A canonical hash supplied only as build test marker; candidate not committed/published; no canonical candidate/runtime proof claimed.",
+  "tail": "",
+  "ffmpegInstalled": false,
+  "installedPackageDirectories": 358,
+  "directLinks": {
+    "packages/config": {
+      "expected": 5,
+      "missing": []
+    },
+    "packages/protocol": {
+      "expected": 6,
+      "missing": []
+    },
+    "packages/daemon": {
+      "expected": 26,
+      "missing": []
+    }
+  },
+  "relativeLinks": {
+    "packages/config": "../../../install/packages/config/node_modules",
+    "packages/protocol": "../../../install/packages/protocol/node_modules",
+    "packages/daemon": "../../../install/packages/daemon/node_modules"
+  }
+}

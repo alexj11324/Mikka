@@ -1,0 +1,15 @@
+Scope: 3 of 4 workspace projects
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+.                                        |   +3 +
+Progress: resolved 3, reused 0, downloaded 3, added 3, done
+╭ Warning ─────────────────────────────────────────────────────────────────────╮
+│                                                                              │
+│   Ignored build scripts: build-only@file:tarballs/build-only.tgz,            │
+│   root-only@file:tarballs/root-only.tgz,                                     │
+│   runtime-only@file:tarballs/runtime-only.tgz.                               │
+│   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+│   to run scripts.                                                            │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+Done in 532ms using pnpm v10.34.3

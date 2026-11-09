@@ -1,0 +1,24 @@
+{
+  "command": [
+    "/usr/local/bin/node",
+    "/vercel/.cache/node/corepack/v1/pnpm/10.34.3/bin/pnpm.cjs",
+    "install",
+    "--filter",
+    "@mikka/daemon...",
+    "--frozen-lockfile",
+    "--store-dir",
+    "/vercel/ops-1505/worker-dependency-boundary-024/actual-store"
+  ],
+  "cwd": "/vercel/ops-1505/worker-dependency-boundary-024/actual-release/install",
+  "envKeys": [
+    "PATH",
+    "HOME",
+    "CI"
+  ],
+  "startedAt": "2026-11-09T06:11:37Z",
+  "originalLockSha256": "fe0c5bea7ddad61bcbfaf22dab256de27853544495d3b51930cf0be8e34873cc",
+  "exit": 0,
+  "elapsedSeconds": 12.306,
+  "lockUnchanged": true,
+  "finishedAt": "2026-11-09T06:11:49Z"
+}
