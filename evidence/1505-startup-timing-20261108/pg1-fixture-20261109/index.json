@@ -1,0 +1,507 @@
+{
+  "status": "FROZEN_TEXT_EVIDENCE_INCREMENT",
+  "createdAt": "2026-11-09T04:52:30.065755+00:00",
+  "parent": "50800dd16172e54aa5c6550b9d6543fb03dc8484",
+  "baseTree": "0171e70eaf1508b3fc785350c029ba12b8facbf4",
+  "prefix": "evidence/1505-startup-timing-20261108/pg1-fixture-20261109/",
+  "members": [
+    {
+      "path": "ci-new9ef/pg1-first-failure-source-review.json",
+      "sourcePath": "/vercel/ops-1505/ci-new9ef/pg1-first-failure-source-review.json",
+      "bytes": 11315,
+      "sha256": "4f37205dcdcb24ef7f1a9968ab08672d8dc4728dfe151860cd57d5fd4b720187",
+      "gitBlob": "7c4ea5e15f3a44595257f2e6c71ddde7f441fab0"
+    },
+    {
+      "path": "ci-new9ef/pg1.log",
+      "sourcePath": "/vercel/ops-1505/ci-new9ef/pg1.log",
+      "bytes": 1039176,
+      "sha256": "70d05f01ed4f7daf6c0ccf9ca26a30c9012157088429c464ccee026f0c303593",
+      "gitBlob": "530203066a2cec6a58a8a8390e7249457774e410"
+    },
+    {
+      "path": "ci-new9ef/round-01.json",
+      "sourcePath": "/vercel/ops-1505/ci-new9ef/round-01.json",
+      "bytes": 57041,
+      "sha256": "12e543cb5494938907fa59d2622e9267ce4e6efebb449fbf08e5ea1cc4a81d37",
+      "gitBlob": "2ea30fd6808c343e311c1d25fe4e5054af175fdd"
+    },
+    {
+      "path": "ci-new9ef/terminal-summary.json",
+      "sourcePath": "/vercel/ops-1505/ci-new9ef/terminal-summary.json",
+      "bytes": 79417,
+      "sha256": "d1a4508dfd948e93596a25d2a13338f74de2120654ba83993eeec2a7d2f7f6f5",
+      "gitBlob": "e1c0e61cfe389863d108e3804c245afecf6cd557"
+    },
+    {
+      "path": "ci-pg1-fixture-repair/candidate.json",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-fixture-repair/candidate.json",
+      "bytes": 676,
+      "sha256": "9539add5465d80f67eadb3a445be079ac64c37a920ff3d316c2e67cf9b06098d",
+      "gitBlob": "6ed09859165559d1cfd82e87c8e66df599c07b8e"
+    },
+    {
+      "path": "ci-pg1-fixture-repair/commit-retry.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-fixture-repair/commit-retry.log",
+      "bytes": 149,
+      "sha256": "3a23c174bff0d83343313b22167632085573775229d470cbf63afd4a0d8b9808",
+      "gitBlob": "aa1947bf03132281fe262860b14ff7eed022e1ca"
+    },
+    {
+      "path": "ci-pg1-fixture-repair/commit.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-fixture-repair/commit.log",
+      "bytes": 337,
+      "sha256": "21785104849f63587e6f3a303f6f9990fe7dc030444a22cb64e6b3701132428d",
+      "gitBlob": "ab9d7607e97bbc44538d7fdef89dd140f157dffa"
+    },
+    {
+      "path": "ci-pg1-fixture-repair/environment.json",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-fixture-repair/environment.json",
+      "bytes": 641,
+      "sha256": "66399db34950ba0ed3130e8eea6aec9870eaf0323157a8c3ab79406f01e01eea",
+      "gitBlob": "4428e4fe34179a731d48f307fb035cb2665885dd"
+    },
+    {
+      "path": "ci-pg1-fixture-repair/launch.json",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-fixture-repair/launch.json",
+      "bytes": 211,
+      "sha256": "04aee9b6271f4c57212daa7aec71f0bb5826253be7598cf9bb412363fea2702b",
+      "gitBlob": "3b63f37483933a0f341b1c453e37c81c41d1a6c3"
+    },
+    {
+      "path": "ci-pg1-fixture-repair/lint.json",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-fixture-repair/lint.json",
+      "bytes": 324,
+      "sha256": "06d0df097a7c1bdfb773f3c77542c9226e093831d446518a6d2008d09ff5065d",
+      "gitBlob": "9a19dce56b6cb742c8b9ba5e0cd8df5382ce358e"
+    },
+    {
+      "path": "ci-pg1-fixture-repair/lint.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-fixture-repair/lint.log",
+      "bytes": 88,
+      "sha256": "5e48f741da8d053286af3f472c9cdfc0b814e4caba49fd7878d39e479d85e584",
+      "gitBlob": "dc339a2c5e549561832345cc3b8ec11fdb6c8f26"
+    },
+    {
+      "path": "ci-pg1-fixture-repair/local-commit.json",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-fixture-repair/local-commit.json",
+      "bytes": 902,
+      "sha256": "e0cbc5aa3861e31ff254d314230ee95cdc31b67861c317c71d2f272f71aa9c6e",
+      "gitBlob": "3ccfa0fc75efd29f51d5b03a9c4ef2c914682c3c"
+    },
+    {
+      "path": "ci-pg1-fixture-repair/pg17-test.json",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-fixture-repair/pg17-test.json",
+      "bytes": 752,
+      "sha256": "d0a18852acdc6fcea6589f8ac3e84925c410dc6ce72b5272a9e8d43d5df147b6",
+      "gitBlob": "160198733779a5fb24811330414a9a4fd41ea17e"
+    },
+    {
+      "path": "ci-pg1-fixture-repair/pg17-test.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-fixture-repair/pg17-test.log",
+      "bytes": 12713,
+      "sha256": "594bb38cc1dc7698927e04a6d062d93f2483524da30490413b668355c25142db",
+      "gitBlob": "d59623023f50a97e336708357a5f87f17a203c6f"
+    },
+    {
+      "path": "ci-pg1-fixture-repair/run-pg17-test.py",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-fixture-repair/run-pg17-test.py",
+      "bytes": 1825,
+      "sha256": "2fc0889c4a4aea229365e90c7a174c7faa7863c49516e23797ed9f1e1f3391b9",
+      "gitBlob": "7fc8db52e1aeb858639839953c92606a194a1cd3"
+    },
+    {
+      "path": "ci-pg1-fixture-repair/wrapper.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-fixture-repair/wrapper.log",
+      "bytes": 682,
+      "sha256": "2ff2c3c9ee4db54e994fea89fc54c9fd852f2c46548f19e25ba87fe73406a70a",
+      "gitBlob": "d25a8e4209f9982c086ac62b495669f9df89eed4"
+    },
+    {
+      "path": "ci-pg1-fixture-repair-peer/manifest.json",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-fixture-repair-peer/manifest.json",
+      "bytes": 180,
+      "sha256": "371d3c4ba4488cf7d8983cd873e634c72bd9183343e30a56955fbd0aeb70b31d",
+      "gitBlob": "8a2dc0219d8094fe94a220fdd517f1e912c38e4c"
+    },
+    {
+      "path": "ci-pg1-fixture-repair-peer/review.json",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-fixture-repair-peer/review.json",
+      "bytes": 4405,
+      "sha256": "9f7d0309ff34611d7d77bb4241999bd50f5dbba31f61268490c540ab41be58f8",
+      "gitBlob": "434fe4b88936bfd781eb1c3fa70a65ca91c6a88d"
+    },
+    {
+      "path": "ci-pg1-local-db/README.md",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/README.md",
+      "bytes": 2215,
+      "sha256": "16c717382a905699ae08e3c6c3433e5faacfc915a5900c950f1877455e46421a",
+      "gitBlob": "cca368a2a4762c630405dc5f311a4ab08dc8e198"
+    },
+    {
+      "path": "ci-pg1-local-db/installation.json",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/installation.json",
+      "bytes": 2983,
+      "sha256": "08df8069cecc240462a627879302aead931003f248ee02d171149eec7e6c43ea",
+      "gitBlob": "34ac68db5d776ba45769881232b05f7a399f2356"
+    },
+    {
+      "path": "ci-pg1-local-db/instance.json",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/instance.json",
+      "bytes": 3294,
+      "sha256": "29d492ea3f750901262b3fa5f2bf213c9fa9d9a265eda8f2ecb6615f2c085b88",
+      "gitBlob": "9c5ef6486f49c55bce47e68e0238905bcabcd632"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/createdb.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/createdb.log",
+      "bytes": 55,
+      "sha256": "88cb46494b3249cb7cc354338357ec6718eae891e2a2bbf86715ce129869ecff",
+      "gitBlob": "35e70365356f9cf25d51ce2a1124dcf4ee4117f0"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/extract-postgresql-17.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/extract-postgresql-17.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/extract-postgresql-client-17.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/extract-postgresql-client-17.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/failure-stop.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/failure-stop.log",
+      "bytes": 56,
+      "sha256": "ca19178a35ab4153b75b494963b66ce8243e1b94c173107c87b44d09db23652d",
+      "gitBlob": "bdc448af42aa24144e661f647c52557f2e0d9b3c"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/initdb.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/initdb.log",
+      "bytes": 903,
+      "sha256": "45b9908d1e16b2d0257e9fa2d952015d69437d064ccf41b5dbe53cd111be1094",
+      "gitBlob": "ada1ef0ba58425a60a9826a899bf3b3561f3827d"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/installation-first-attempt.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/installation-first-attempt.log",
+      "bytes": 464,
+      "sha256": "9a09220186befc33c263ef9491d6cfd542d9db5b00ceff4eeffde9aa38b1812c",
+      "gitBlob": "b73a3d165de6cc6962bc9ca2ffe434176c21c1be"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/key-dearmor.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/key-dearmor.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/key-inspect.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/key-inspect.log",
+      "bytes": 360,
+      "sha256": "caeecf73df0e4d8d8b2a72b7588e7333e2da6d79d89c119262e66a020bfca962",
+      "gitBlob": "ab8f77900271f569c936036fb0541751aabeacf6"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/ldd-createdb.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/ldd-createdb.log",
+      "bytes": 1362,
+      "sha256": "77accc8b92a6f0f0230f6ddebff831a17fbbda91982b10700b62c6a73c76f973",
+      "gitBlob": "22a214220d6c43babc7f85f2e4abad5c18676da3"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/ldd-final-libLLVM.so.21.1.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/ldd-final-libLLVM.so.21.1.log",
+      "bytes": 996,
+      "sha256": "f7ed69050946bb6bf7080de0323b6c50bf161a3cd767c594438beccd34f251e2",
+      "gitBlob": "deaf8c6975ca44173c2fbba5f063de4e7d7b611a"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/ldd-final-llvmjit.so.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/ldd-final-llvmjit.so.log",
+      "bytes": 1119,
+      "sha256": "c3d05bd645065784fd8dbd4c48a5409194e42e27cc8c5e3295f0a33dbb739689",
+      "gitBlob": "9620e44663684b41df9585654c95d3d0a179543b"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/ldd-initdb.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/ldd-initdb.log",
+      "bytes": 1759,
+      "sha256": "da6e4027c8cfee586c324ba59b34820b737ba7174e09d83310971f6fd1dbd054",
+      "gitBlob": "34b691174d054cfb6cf20eae094f7e9c41285207"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/ldd-llvmjit.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/ldd-llvmjit.log",
+      "bytes": 420,
+      "sha256": "29ecef5461d45b5f46ee401a010f257734cc0a3b9ca86d01a8b1ed571344a29d",
+      "gitBlob": "d2c9f3278fbdad7449c982f67db512b9c24131af"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/ldd-pg_ctl.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/ldd-pg_ctl.log",
+      "bytes": 159,
+      "sha256": "37815c78cd656e4f33c6075905bf29b02186a60d374faedd27a0112af3f95c42",
+      "gitBlob": "a02d404e5f59c6829be9346df0d4804ed53f894c"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/ldd-postgres.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/ldd-postgres.log",
+      "bytes": 2324,
+      "sha256": "69c6355466a1e875f6478f780830285cefd4c84462a2d16329faec793270064c",
+      "gitBlob": "a1964bae592714254192cc3fbec72486b368cab2"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/ldd-psql.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/ldd-psql.log",
+      "bytes": 1597,
+      "sha256": "767e071ff57a9a49e98f8838452e29c2b7156abb45015bf93c826c91046df2c2",
+      "gitBlob": "e2293c286648a6009d2284ca1b2e24bfe397d1b7"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/llvm-download.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/llvm-download.log",
+      "bytes": 137,
+      "sha256": "1167034ab2f43585b346794b92922a557d7986fd6358e54049b2450822ae60a7",
+      "gitBlob": "79116c1740ecab0fb80294bfece1fa964da7109c"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/llvm-extract.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/llvm-extract.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "gitBlob": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/readiness-final.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/readiness-final.log",
+      "bytes": 452,
+      "sha256": "3eea58c108df87f414dd3f357a18fd21f668b03c24a899cbb83fb7e42d508498",
+      "gitBlob": "bc0aa235d5331fe189d5b04323c68b5e3b74ce0f"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/readiness.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/readiness.log",
+      "bytes": 507,
+      "sha256": "6a58352e6645ab068ec5cf32cfb5bdfe397ed0436f803a883b56937e8a4a4487",
+      "gitBlob": "6ff91b8009ec10f56153a13703931e6e53b3cd9b"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/repository-signature.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/repository-signature.log",
+      "bytes": 183,
+      "sha256": "0e93c52ddd3ef18ade0348ccaa59d21b71bb7c32adcdea830272ab73b770fae7",
+      "gitBlob": "86dc5736dd966309d57e3c300da4d39d1c617ab7"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/start-final.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/start-final.log",
+      "bytes": 52,
+      "sha256": "66afd0411ccc09366e99fdd99b85f21899c8d2d064f5835126859618802153ad",
+      "gitBlob": "0fb0b9795fb4884c3f9d88d91ebb6492510e4ee5"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/start.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/start.log",
+      "bytes": 52,
+      "sha256": "66afd0411ccc09366e99fdd99b85f21899c8d2d064f5835126859618802153ad",
+      "gitBlob": "0fb0b9795fb4884c3f9d88d91ebb6492510e4ee5"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/status-final.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/status-final.log",
+      "bytes": 160,
+      "sha256": "54270307ffc1f57380caf5589a99c296574a735d6dc3c14becb8e4848e53a02c",
+      "gitBlob": "005f500e24eabc053101ea5f2aed1dd8e89e3dfa"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/version-createdb.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/version-createdb.log",
+      "bytes": 57,
+      "sha256": "71a6aa2077a1410c317b29af52b92e88f6738bf48d08fca036dda8a251041f51",
+      "gitBlob": "3827b8ff2bb316ccbc7db4c843c4be04ea362f13"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/version-initdb.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/version-initdb.log",
+      "bytes": 55,
+      "sha256": "5828b71474279673b16a9807419bbaeede2cdb74e9fd4740b428022ac7934b1a",
+      "gitBlob": "6f08d231605a94323ec3a481a8f57d3220f63adf"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/version-pg_ctl.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/version-pg_ctl.log",
+      "bytes": 55,
+      "sha256": "f6777cd6b9e13bf526df896de7b924f5adcfbfee3879595fef1b4bfccd50fd0e",
+      "gitBlob": "9a5846d1a6ec5a6bfb84d40a13e2e7c301b95069"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/version-postgres.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/version-postgres.log",
+      "bytes": 57,
+      "sha256": "d34776b4d136aa360a19c675e83adf2bed1420bef81212f6a1065758b286b291",
+      "gitBlob": "63db71f9e0d067c3e584a636de9d0ea511711a23"
+    },
+    {
+      "path": "ci-pg1-local-db/logs/version-psql.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/version-psql.log",
+      "bytes": 53,
+      "sha256": "b797cc9322233fab6133c331b322d0b3dae67f0a55aa311ad4ecb0650912cd61",
+      "gitBlob": "714deb3a2a7dd090154a4e0481208c0a7b4c9dc4"
+    },
+    {
+      "path": "ci-pg1-local-db/provisioning-manifest.json",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/provisioning-manifest.json",
+      "bytes": 6429,
+      "sha256": "0a94b289bd4629562747b1199cef71c9e147af6a5c43eeba55a621723be9999b",
+      "gitBlob": "f3c15536d1c4cc00695b0b276181afec50152ba3"
+    },
+    {
+      "path": "ci-pg1-local-db/stop.json",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/stop.json",
+      "bytes": 347,
+      "sha256": "ab9bc1974d436f91040af98c5f8546d9a70aa7ef2add76f81f4606e221e86b99",
+      "gitBlob": "3e82e93292fe8a37abab47d04e4d52813373a85a"
+    },
+    {
+      "path": "ci-pg1-local-db/stop.log",
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/stop.log",
+      "bytes": 56,
+      "sha256": "ca19178a35ab4153b75b494963b66ce8243e1b94c173107c87b44d09db23652d",
+      "gitBlob": "bdc448af42aa24144e661f647c52557f2e0d9b3c"
+    },
+    {
+      "path": "release-queue-snapshot-20261109-0442/manifest.json",
+      "sourcePath": "/vercel/ops-1505/release-queue-snapshot-20261109-0442/manifest.json",
+      "bytes": 191,
+      "sha256": "0db9e65baa15694667130a72833847f563f3b5692d25abd29fff66eec7bfd884",
+      "gitBlob": "ede016dcf7e1f07c8afc322e026f5e37976425d4"
+    },
+    {
+      "path": "release-queue-snapshot-20261109-0442/snapshot.json",
+      "sourcePath": "/vercel/ops-1505/release-queue-snapshot-20261109-0442/snapshot.json",
+      "bytes": 53074,
+      "sha256": "bca748a3329c58dc5b75b2e1c358580e733c2d410308d04caeb2cee95e832c02",
+      "gitBlob": "6319dadd8ed212a2cb2f18822fcc8a6542b52dac"
+    },
+    {
+      "path": "pr1788-d72-integration-readonly-review/manifest.json",
+      "sourcePath": "/vercel/ops-1505/pr1788-d72-integration-readonly-review/manifest.json",
+      "bytes": 575,
+      "sha256": "2b697bbc34127ea954ec531ee4105d9de3960cb79fd73de981cf9c188b864581",
+      "gitBlob": "e73a24cf0fc256b7619acb65b1fce9bbbea17a28"
+    },
+    {
+      "path": "pr1788-d72-integration-readonly-review/review.md",
+      "sourcePath": "/vercel/ops-1505/pr1788-d72-integration-readonly-review/review.md",
+      "bytes": 4002,
+      "sha256": "0b24fa698393ca2b1e56923b70e59c888de22766f38b338b7a7070d8048b4ab7",
+      "gitBlob": "75b64d94c5db3effdd02d096433e391789c9fd7d"
+    },
+    {
+      "path": "pr1788-d72-integration-readonly-review/source-index.json",
+      "sourcePath": "/vercel/ops-1505/pr1788-d72-integration-readonly-review/source-index.json",
+      "bytes": 15397,
+      "sha256": "323f288814a549d25d9046471fe2134300b1637407de536be28b021c7a9c3fbf",
+      "gitBlob": "76da3d67f0edb820428401a30ff4ea3ba45ab6e6"
+    },
+    {
+      "path": "README.md",
+      "sourcePath": "new archive explanation",
+      "bytes": 2490,
+      "sha256": "af73c5b716dc5b6d1d320a89556f3b5d7804d493db21541d506bf073189773b9",
+      "gitBlob": "271d34cb4e7dd2acb987509abdc81366ec7ae788"
+    }
+  ],
+  "excluded": [
+    {
+      "sourcePath": "/vercel/ops-1505/ci-pg1-fixture-repair/before.ts",
+      "path": "ci-pg1-fixture-repair/before.ts",
+      "bytes": 21641,
+      "sha256": "a4d8ea02812b3914546301df2672e4fdc63bfd9263c36c2bc5df8d3d6a5e0bb0",
+      "reason": "not in explicit archive allowlist; Git-backed source delta or local provisioning helper/config excluded"
+    },
+    {
+      "sourcePath": "/vercel/ops-1505/ci-pg1-fixture-repair/fixture.diff",
+      "path": "ci-pg1-fixture-repair/fixture.diff",
+      "bytes": 4395,
+      "sha256": "cc2e2e46761b14a3eb2155a0be4cd53185b7bfe9baf60e9ae4a4f0102924fcf4",
+      "reason": "not in explicit archive allowlist; Git-backed source delta or local provisioning helper/config excluded"
+    },
+    {
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/bootstrap.py",
+      "path": "ci-pg1-local-db/bootstrap.py",
+      "bytes": 3381,
+      "sha256": "5088f0f133b4b695299e181c27fe5601caa0bc61221741624e9c4dfe5cc7845c",
+      "reason": "not in explicit archive allowlist; Git-backed source delta or local provisioning helper/config excluded"
+    },
+    {
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/installation-inspection.json",
+      "path": "ci-pg1-local-db/installation-inspection.json",
+      "bytes": 2444,
+      "sha256": "4073948f3565e6e4a244deb158d31cdad5faa647ecdb3cf2b25b3d4c03ec7774",
+      "reason": "not in explicit archive allowlist; Git-backed source delta or local provisioning helper/config excluded"
+    },
+    {
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/client.pgpass",
+      "path": "ci-pg1-local-db/client.pgpass",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "reason": "not in explicit archive allowlist; Git-backed source delta or local provisioning helper/config excluded"
+    },
+    {
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/bootstrap-first.py",
+      "path": "ci-pg1-local-db/bootstrap-first.py",
+      "bytes": 3270,
+      "sha256": "82cc605de0d648dd275bce6b8a8c005614612d4b3dc5e883dff3e3adac30ec15",
+      "reason": "not in explicit archive allowlist; Git-backed source delta or local provisioning helper/config excluded"
+    },
+    {
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/data/pg_hba.conf",
+      "path": "ci-pg1-local-db/data/pg_hba.conf",
+      "bytes": 108,
+      "sha256": "834dc55b4a8f98fd6af53447719345977b2938c5504dae3e219af3ce1e580db2",
+      "reason": "not selected from provisioning manifest; original manifest remains unchanged",
+      "identitySource": "original provisioning manifest"
+    },
+    {
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/llvm-package-metadata.log",
+      "path": "ci-pg1-local-db/logs/llvm-package-metadata.log",
+      "bytes": 1681,
+      "sha256": "11dbf6821c9f564a77eb5a79d5bd8310dddf4b41cc7cd241a0d9d76555296448",
+      "reason": "not selected from provisioning manifest; original manifest remains unchanged",
+      "identitySource": "original provisioning manifest"
+    },
+    {
+      "sourcePath": "/vercel/ops-1505/ci-pg1-local-db/logs/llvm-policy.log",
+      "path": "ci-pg1-local-db/logs/llvm-policy.log",
+      "bytes": 180,
+      "sha256": "36eff553e59ebd84b2f3eb92dc8040d0b76f450e34ff339bbbb7c685d2184f9a",
+      "reason": "not selected from provisioning manifest; original manifest remains unchanged",
+      "identitySource": "original provisioning manifest"
+    },
+    {
+      "path": "ci-pg1-local-db/{downloads,runtime,data,socket}",
+      "reason": "package binaries, signed package indexes, database and live runtime excluded; no recursive reads or copy",
+      "identitySource": "directory exclusion"
+    }
+  ],
+  "secretScan": {
+    "scope": "explicit allowlist only",
+    "unresolved": [],
+    "reviewedFalsePositive": {
+      "path": "ci-pg1-fixture-repair-peer/review.json",
+      "jsonPath": "$.diff",
+      "disposition": "path/bytes/SHA object only, no patch body"
+    }
+  },
+  "sourceBeforeAfterVerified": true,
+  "noProductOrRefMutation": true,
+  "newTestsRunForArchive": 0
+}

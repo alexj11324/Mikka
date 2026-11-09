@@ -1,0 +1,87 @@
+{
+  "createdAt": "2026-11-09T04:40:49.858570+00:00",
+  "purpose": "isolated local CI PG1 fixture regression; provisioner has not run tests",
+  "connectionUrl": "postgresql://mikka_1505_pg1@127.0.0.1:55485/mikka_1505_pg1_e2e",
+  "server": {
+    "version": "PostgreSQL 17.11 (Ubuntu 17.11-1.pgdg26.04+2) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 15.2.0-16ubuntu1) 15.2.0, 64-bit",
+    "serverVersion": "17.11 (Ubuntu 17.11-1.pgdg26.04+2)",
+    "database": "mikka_1505_pg1_e2e",
+    "user": "mikka_1505_pg1",
+    "listenAddresses": "127.0.0.1",
+    "port": 55485,
+    "dataDirectory": "/vercel/ops-1505/ci-pg1-local-db/data",
+    "socketDirectory": "/vercel/ops-1505/ci-pg1-local-db/socket",
+    "superuser": true
+  },
+  "commands": [
+    [
+      "/vercel/ops-1505/ci-pg1-local-db/runtime/usr/lib/postgresql/17/bin/pg_ctl",
+      "-D",
+      "/vercel/ops-1505/ci-pg1-local-db/data",
+      "-l",
+      "/vercel/ops-1505/ci-pg1-local-db/logs/server.log",
+      "-w",
+      "-t",
+      "30",
+      "start"
+    ],
+    [
+      "/vercel/ops-1505/ci-pg1-local-db/runtime/usr/lib/postgresql/17/bin/psql",
+      "-X",
+      "-w",
+      "-h",
+      "127.0.0.1",
+      "-p",
+      "55485",
+      "-U",
+      "mikka_1505_pg1",
+      "-d",
+      "mikka_1505_pg1_e2e",
+      "-A",
+      "-t",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-c",
+      "SELECT json_build_object('version',version(),'serverVersion',current_setting('server_version'),'database',current_database(),'user',current_user,'listenAddresses',current_setting('listen_addresses'),'port',inet_server_port(),'dataDirectory',current_setting('data_directory'),'socketDirectory',current_setting('unix_socket_directories'),'superuser',(SELECT rolsuper FROM pg_roles WHERE rolname=current_user))"
+    ],
+    [
+      "/vercel/ops-1505/ci-pg1-local-db/runtime/usr/lib/postgresql/17/bin/pg_ctl",
+      "-D",
+      "/vercel/ops-1505/ci-pg1-local-db/data",
+      "status"
+    ]
+  ],
+  "status": "pg_ctl: server is running (PID: 12541)\n/vercel/ops-1505/ci-pg1-local-db/runtime/usr/lib/postgresql/17/bin/postgres \"-D\" \"/vercel/ops-1505/ci-pg1-local-db/data\"\n",
+  "startCommand": [
+    "env",
+    "LD_LIBRARY_PATH=/vercel/ops-1505/ci-pg1-local-db/runtime/usr/lib/x86_64-linux-gnu",
+    "/vercel/ops-1505/ci-pg1-local-db/runtime/usr/lib/postgresql/17/bin/pg_ctl",
+    "-D",
+    "/vercel/ops-1505/ci-pg1-local-db/data",
+    "-l",
+    "/vercel/ops-1505/ci-pg1-local-db/logs/server.log",
+    "-w",
+    "-t",
+    "30",
+    "start"
+  ],
+  "stopCommand": [
+    "/vercel/ops-1505/ci-pg1-local-db/runtime/usr/lib/postgresql/17/bin/pg_ctl",
+    "-D",
+    "/vercel/ops-1505/ci-pg1-local-db/data",
+    "-m",
+    "fast",
+    "-w",
+    "-t",
+    "30",
+    "stop"
+  ],
+  "freshBootstrapCommand": [
+    "python3",
+    "/vercel/ops-1505/ci-pg1-local-db/bootstrap.py"
+  ],
+  "freshBootstrapGuard": "Refuses existing data directory; completed initialization must not be rerun",
+  "existingSystemServicesTouched": false,
+  "productionCredentialsOrDatabaseUsed": false,
+  "bootstrapFirstFailure": "Readiness JSON parser included libpq warning that /dev/null is not a plain pgpass file. DB initialization/create succeeded; failure handler stopped only this instance. Corrected to empty0600 task-owned pgpass; restarted existing dedicated data, no reinitialization."
+}

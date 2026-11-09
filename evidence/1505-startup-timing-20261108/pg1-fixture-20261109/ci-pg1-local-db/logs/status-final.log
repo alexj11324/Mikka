@@ -1,0 +1,2 @@
+pg_ctl: server is running (PID: 12541)
+/vercel/ops-1505/ci-pg1-local-db/runtime/usr/lib/postgresql/17/bin/postgres "-D" "/vercel/ops-1505/ci-pg1-local-db/data"

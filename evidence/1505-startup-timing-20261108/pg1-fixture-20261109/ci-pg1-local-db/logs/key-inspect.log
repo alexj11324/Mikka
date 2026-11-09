@@ -1,0 +1,6 @@
+gpg: directory '/vercel/.gnupg' created
+gpg: keybox '/vercel/.gnupg/pubring.kbx' created
+gpg: /vercel/.gnupg/trustdb.gpg: trustdb created
+pub:-:4096:1:7FCC7D46ACCC4CF8:1318537154:::-:::scSC::::::23::0:
+fpr:::::::::B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8:
+uid:-::::1483540543::690A171644E1C59F7E5E68775492644846BBC421::PostgreSQL Debian Repository::::::::::0:

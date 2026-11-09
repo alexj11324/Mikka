@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "status": "frozen",
+  "scope": "static source integration review only",
+  "members": [
+    {
+      "path": "review.md",
+      "bytes": 4002,
+      "sha256": "0b24fa698393ca2b1e56923b70e59c888de22766f38b338b7a7070d8048b4ab7"
+    },
+    {
+      "path": "source-index.json",
+      "bytes": 15397,
+      "sha256": "323f288814a549d25d9046471fe2134300b1637407de536be28b021c7a9c3fbf"
+    }
+  ],
+  "sourceCopiesOrPatches": false,
+  "preHandoffCorrection": "Removed an unnecessary counted description; all 32 exact path records and conclusions unchanged."
+}

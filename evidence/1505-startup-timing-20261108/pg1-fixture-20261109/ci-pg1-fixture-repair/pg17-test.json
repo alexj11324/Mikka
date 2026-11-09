@@ -1,0 +1,27 @@
+{
+  "command": [
+    "node",
+    "--experimental-test-module-mocks",
+    "--import",
+    "./tests/support/server-only.mjs",
+    "--import",
+    "tsx",
+    "--test",
+    "lib/factory/run-end-paths.db.test.ts"
+  ],
+  "startedAt": "2026-11-09T04:41:23.462823+00:00",
+  "sourceSha256": "19f3cb3c3e34a4d2d142fbb1c1d7e3dc1820093816eab5a41c2220df78626545",
+  "postgres": "17.11",
+  "requiredDb": true,
+  "databaseHost": "127.0.0.1",
+  "databasePort": 55485,
+  "productionRequests": 0,
+  "timeout": false,
+  "nodePid": 12611,
+  "finishedAt": "2026-11-09T04:41:36.297082+00:00",
+  "seconds": 12.834293520999381,
+  "exitCode": 0,
+  "logBytes": 12713,
+  "logSha256": "594bb38cc1dc7698927e04a6d062d93f2483524da30490413b668355c25142db",
+  "sourceUnchanged": true
+}

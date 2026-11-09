@@ -1,0 +1,17 @@
+{
+  "stoppedAt": "2026-11-09T04:42:32.915461+00:00",
+  "exitCode": 0,
+  "portClosed": true,
+  "postmasterPidFileAbsent": true,
+  "command": [
+    "/vercel/ops-1505/ci-pg1-local-db/runtime/usr/lib/postgresql/17/bin/pg_ctl",
+    "-D",
+    "/vercel/ops-1505/ci-pg1-local-db/data",
+    "-m",
+    "fast",
+    "-w",
+    "-t",
+    "30",
+    "stop"
+  ]
+}

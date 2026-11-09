@@ -1,0 +1,402 @@
+{
+  "schemaVersion": 1,
+  "kind": "narrow-read-only-integration-review",
+  "recordedAt": "2026-11-09T04:47:43.345940+00:00",
+  "sources": {
+    "old": {
+      "commit": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+      "tree": "72f1661362ceaefde626fa7402116ae8f8ad7417"
+    },
+    "newMain": {
+      "commit": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "tree": "d5ce228157f12aa0d40d25e4640e465cb8054de0"
+    },
+    "reviewedLocalCandidate": {
+      "commit": "d6835377c820db7d1d4e704afed2c58cdfaec789",
+      "tree": "91c499c8049ee3450a584f2e09306023b4f1010c",
+      "remoteSameTree": "9ef8cb26d5f131da1fc05a9644c9d7b9e9015cc8"
+    }
+  },
+  "incomingPaths": [
+    ".github/workflows/ui-policy.yml",
+    "app/api/factory/tasks/[taskId]/activity/route.ts",
+    "app/api/factory/tasks/[taskId]/media/[captureId]/poster/route.ts",
+    "app/api/factory/tasks/[taskId]/media/[captureId]/route.ts",
+    "app/v1/runs/[runId]/events/route.ts",
+    "apps/api/compat/server.ts",
+    "apps/api/generated/routes.json",
+    "apps/api/generated/routes.ts",
+    "apps/api/scripts/finalize-build.mjs",
+    "apps/api/scripts/finalize-build.test.mjs",
+    "apps/api/src/fast-response.test.ts",
+    "docs/factory/1276-flow-v2.md",
+    "docs/factory/task-activity-v1.md",
+    "drizzle/20261109010001_thread_machine_sessions.sql",
+    "drizzle/20261109010002_capture_posters.sql",
+    "lib/account/delete.ts",
+    "lib/account/deletion-jobs.db.test.ts",
+    "lib/account/deletion-restore.db.test.ts",
+    "lib/artifacts/store.ts",
+    "lib/captures/poster-binary.d.mts",
+    "lib/captures/poster-binary.mjs",
+    "lib/captures/poster-store.ts",
+    "lib/captures/poster.test.ts",
+    "lib/captures/poster.ts",
+    "lib/captures/private-download.ts",
+    "lib/captures/store.ts",
+    "lib/cloud-computer/retained-deliverable.test.ts",
+    "lib/cloud-computer/retained-deliverable.ts",
+    "lib/cloud-computer/thread-lifecycle.test.ts",
+    "lib/cloud-computer/thread-lifecycle.ts",
+    "lib/cloud-computer/thread-machine-sessions.db.test.ts",
+    "lib/cloud-computer/thread-machine-sessions.ts",
+    "lib/cloud-computer/thread-machine-stop.db.test.ts",
+    "lib/cloud-computer/thread-machines.ts",
+    "lib/cloud-computer/thread-question-recovery.test.ts",
+    "lib/cloud-computer/thread-worker-logs.test.ts",
+    "lib/computer/claim.ts",
+    "lib/db/schema.ts",
+    "lib/factory/activity-artifacts.db.test.ts",
+    "lib/factory/activity-artifacts.ts",
+    "lib/factory/activity-http.ts",
+    "lib/factory/activity-live.ts",
+    "lib/factory/activity.db.test.ts",
+    "lib/factory/activity.ts",
+    "lib/factory/attempt-view.test.ts",
+    "lib/factory/attempt-view.ts",
+    "lib/factory/deliverable-recovery.db.test.ts",
+    "lib/factory/spec-artifact-backfill.ts",
+    "lib/factory/spec-artifact.db.test.ts",
+    "lib/factory/spec-artifact.test.ts",
+    "lib/factory/spec-artifact.ts",
+    "lib/factory/stage-progress.ts",
+    "lib/factory/task-media-route.ts",
+    "lib/factory/task-media.db.test.ts",
+    "lib/factory/task-media.ts",
+    "lib/live/notification-context.db.test.ts",
+    "lib/run-completion-effects.test.ts",
+    "lib/run-completion-effects.ts",
+    "lib/secrets/run-events.ts",
+    "package.json",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    "scripts/check-analytics-ssr.mjs",
+    "scripts/ci/tasks.json",
+    "scripts/ops/backfill-factory-spec-artifacts.ts",
+    "scripts/run-db-tests.mjs",
+    "scripts/run-db-tests.test.mjs",
+    "tests/analytics-policy.test.mjs",
+    "tests/factory-activity-http.db.test.ts",
+    "tests/factory-pat-scope.db.test.ts",
+    "tests/fixtures/factory-activity-http-network.mjs"
+  ],
+  "candidatePaths": [
+    "lib/agent-kit/tool-defaults-compat.test.ts",
+    "packages/daemon/src/agents/mikka-mcp-context.mjs",
+    "packages/daemon/src/subscription-hosted-runner.ts",
+    "packages/daemon/src/tracing.test.ts",
+    "packages/daemon/src/tracing.ts",
+    "packages/daemon/test/anonymous-codex-hosted.test.ts",
+    "packages/daemon/test/codex-mcp-context.test.ts",
+    "packages/daemon/test/mcp-http-observation.test.ts",
+    "workflows/coordinator/factory-tools.ts",
+    "workflows/coordinator/tools.ts"
+  ],
+  "plusFixturePath": "lib/factory/run-end-paths.db.test.ts",
+  "intersection": [],
+  "sourceIndex": [
+    {
+      "path": "AGENTS.md",
+      "oldBlob": "9fb491b174d3be8947347fce396a7042967b3b3b",
+      "newBlob": "9fb491b174d3be8947347fce396a7042967b3b3b",
+      "same": true,
+      "newBytes": 22701,
+      "newSha256": "79b4e29734325c8129ffadad312d756e82db293086b80dc5c03ef0b08f54b34b"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "oldBlob": "3c38da3b2a68d84187498532e8f49cf8c4bf32fa",
+      "newBlob": "3c38da3b2a68d84187498532e8f49cf8c4bf32fa",
+      "same": true,
+      "newBytes": 12693,
+      "newSha256": "026ca951cd34feb25a06ba606af8d0d7325c46a01adbb64086cc7e30301dd8f5"
+    },
+    {
+      "path": "lib/factory/store.ts",
+      "oldBlob": "5627c86ca458738f3ca74a698c25963829e1a8bf",
+      "newBlob": "5627c86ca458738f3ca74a698c25963829e1a8bf",
+      "same": true,
+      "newBytes": 83276,
+      "newSha256": "1829c3ecdeda8b5ac8f3d5db97d9c708a6681c4519dc97b8978d8f368b264bc7"
+    },
+    {
+      "path": "lib/factory/dispatch.ts",
+      "oldBlob": "94b6dcd9bc77d62da17e9982a05a5c5407b06b0c",
+      "newBlob": "94b6dcd9bc77d62da17e9982a05a5c5407b06b0c",
+      "same": true,
+      "newBytes": 10207,
+      "newSha256": "63354374a5964aa49ac7c8dc90d1ec5c2e43fc54e3a3bf5388bad513731353eb"
+    },
+    {
+      "path": "lib/factory/contract.ts",
+      "oldBlob": "2f0931e2c4136a7c9a02af8e5d73619116afcbfc",
+      "newBlob": "2f0931e2c4136a7c9a02af8e5d73619116afcbfc",
+      "same": true,
+      "newBytes": 5566,
+      "newSha256": "f95319a337dbecf9822e7c60add4703a9bea28b02b8c60f78c2a433c5f4d5858"
+    },
+    {
+      "path": "lib/factory/run-end-paths.db.test.ts",
+      "oldBlob": "23597148d360504680c71db62e4b5fc9fd9460ca",
+      "newBlob": "23597148d360504680c71db62e4b5fc9fd9460ca",
+      "same": true,
+      "newBytes": 21641,
+      "newSha256": "a4d8ea02812b3914546301df2672e4fdc63bfd9263c36c2bc5df8d3d6a5e0bb0"
+    },
+    {
+      "path": "packages/daemon/src/agents/run-context.ts",
+      "oldBlob": "61fec2db18195fd8d77a4686b7ab8c4aeedcbe6f",
+      "newBlob": "61fec2db18195fd8d77a4686b7ab8c4aeedcbe6f",
+      "same": true,
+      "newBytes": 30602,
+      "newSha256": "3948a2e3dcdef7b5bf8614de738665bf8a639c6a2ba1d36719988cf0802e19b3"
+    },
+    {
+      "path": "packages/daemon/src/codex-mcp-context.ts",
+      "oldBlob": "beb35030e17a70a219ec9878701df7726bd4fddf",
+      "newBlob": "beb35030e17a70a219ec9878701df7726bd4fddf",
+      "same": true,
+      "newBytes": 1888,
+      "newSha256": "d5a84df216bc4445f8e77eaa50a05b3bd5101ec1b5a49bb99d8d10f7e3ff4d6f"
+    },
+    {
+      "path": "packages/daemon/src/agents/mikka-mcp-backend.mjs",
+      "oldBlob": "308c9ed7ab78b636876fd661b55d36dd61b478d2",
+      "newBlob": "308c9ed7ab78b636876fd661b55d36dd61b478d2",
+      "same": true,
+      "newBytes": 50533,
+      "newSha256": "96a0c7551fffd1d6bdd0386f9aa2ea8d37613dd969a244d2caf562a0594b13a9"
+    },
+    {
+      "path": "lib/project-map/mcp-tool.ts",
+      "oldBlob": "e6e0f558026ec3f2fb7d2a4b74c349463a3d3d95",
+      "newBlob": "e6e0f558026ec3f2fb7d2a4b74c349463a3d3d95",
+      "same": true,
+      "newBytes": 1335,
+      "newSha256": "7f92c54e0cce0f4bdd3f847bc7d0ec511ea4ef3c849beab99f9a259d3b092bc6"
+    },
+    {
+      "path": "lib/project-map/contracts.ts",
+      "oldBlob": "e1a9709b67c41d319f54db5e1203941c49b724c9",
+      "newBlob": "e1a9709b67c41d319f54db5e1203941c49b724c9",
+      "same": true,
+      "newBytes": 5778,
+      "newSha256": "69052563e41de7c95383de1a403e346f19c023b8c1da751bf4116134aa2acf9f"
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.mjs",
+      "oldBlob": "1bca723b8110625b48127a1d28ade9ecf0e153de",
+      "newBlob": "1bca723b8110625b48127a1d28ade9ecf0e153de",
+      "same": true,
+      "newBytes": 83254,
+      "newSha256": "e3ae3c84925100ac0c79a2b0d7dac70933312acd2e235fef5f2fe9d572da65b2"
+    },
+    {
+      "path": "workflows/coordinator/tools.ts",
+      "oldBlob": "16455d96572667cd232752dca2e58f46007685b3",
+      "newBlob": "16455d96572667cd232752dca2e58f46007685b3",
+      "same": true,
+      "newBytes": 35841,
+      "newSha256": "1c2d1f0601517211cb52e0828c3be303d0ecf1d385bd6dba0353721fa7c249ee"
+    },
+    {
+      "path": "lib/computer/claim.ts",
+      "oldBlob": "3c2127a8e1a6bc4528149d5c54edfaab53e8e437",
+      "newBlob": "017ed032ab974743e12eb6e6d3310bda20a87f27",
+      "same": false,
+      "newBytes": 7569,
+      "newSha256": "63f36e721f73ffd1ca54795513714518c1ff5918998f46d4e00f1390f1b0e6fa"
+    },
+    {
+      "path": "lib/run-completion-effects.ts",
+      "oldBlob": "d96a35a3abf7fe6ddcca4e1f27a2af7af840ad85",
+      "newBlob": "26ce33aa8613723457fdbb2e4a6f3033eb6bee95",
+      "same": false,
+      "newBytes": 9930,
+      "newSha256": "81011e38d1f99bfc05676f8b630de7cdff6822de57fd3fb2adedcb7ed2b68764"
+    },
+    {
+      "path": "lib/factory/activity-live.ts",
+      "oldBlob": null,
+      "newBlob": "574f0e07e1e7e20663f8f257ffc27a4a8cad1258",
+      "same": false,
+      "newBytes": 1131,
+      "newSha256": "217b2357c413381550001c983269c6e0dea0c3d158dd5a1fb62ecfa23fe6a6cb"
+    },
+    {
+      "path": "app/v1/runs/[runId]/events/route.ts",
+      "oldBlob": "48727800396313dfc55f807b7f876e721b269205",
+      "newBlob": "931ce04d1ddf51a3fccc940d9e9fabc2ac8ec1d4",
+      "same": false,
+      "newBytes": 3010,
+      "newSha256": "0a1326bfdb882a5627d075e6e789f0ea3f2d39edc07d323ad431b62c6efe7c6c"
+    },
+    {
+      "path": "lib/secrets/run-events.ts",
+      "oldBlob": "864b665217a5ef771103a023fe41d7a44ef46f83",
+      "newBlob": "c409d22e38802c5fe59ef1989b88127213fbb942",
+      "same": false,
+      "newBytes": 3664,
+      "newSha256": "2ea3628bc79a2e1367ae928dbdfaefa228562229cbe6ed2464f025ad9ca86c64"
+    },
+    {
+      "path": "lib/cloud-computer/thread-machines.ts",
+      "oldBlob": "2d7e635e8a7dc305ecf2cae4095969df52a7735f",
+      "newBlob": "9d2cb49a991f7ab0bf89718aabc08fe78b78b66e",
+      "same": false,
+      "newBytes": 105207,
+      "newSha256": "7ea633fcbb55fae1e4006b57552074bef791d02bee4148691b695cf4c671c79b"
+    },
+    {
+      "path": "lib/cloud-computer/thread-lifecycle.ts",
+      "oldBlob": "5f6ad08b7f4ce63ec87f53ba58f243b38a72a2c7",
+      "newBlob": "7ed83281a5ac156952a046a39dfaa7adca1f0257",
+      "same": false,
+      "newBytes": 29785,
+      "newSha256": "4be6ad2d0844f95ec8409690ef89bbb0f196b8120c48ccc026974bd71bb11b32"
+    },
+    {
+      "path": "lib/cloud-computer/retained-deliverable.ts",
+      "oldBlob": "a72e919c7d35f17508b57f030312ac9e8ff19c8e",
+      "newBlob": "6a8084944cad4ad27fa774358de2e1ae595e0e6b",
+      "same": false,
+      "newBytes": 14912,
+      "newSha256": "734e6a05f3d885ea1daa471e729cb62e37d796af5f134fb96c672fc4f7374813"
+    },
+    {
+      "path": "lib/cloud-computer/thread-machine-sessions.ts",
+      "oldBlob": null,
+      "newBlob": "3871b721ae42e373d837508e528830dcafea6cdc",
+      "same": false,
+      "newBytes": 5502,
+      "newSha256": "dafc0273ba7726a180caa64fd6e63eb42c7244b0b4005d9ba9d9e880cf2587e6"
+    },
+    {
+      "path": "lib/factory/stage-progress.ts",
+      "oldBlob": "e6e91a0b5452c2172d3fcd4be3b0667c80eaf18d",
+      "newBlob": "628806aaeeb78c1dd8708f393d75f86d6bf7cc46",
+      "same": false,
+      "newBytes": 5147,
+      "newSha256": "45f119ea7478dd8220a8cbad9bb190b0fb60044459e08c67c96c02125d577ad3"
+    },
+    {
+      "path": "lib/factory/spec-artifact.ts",
+      "oldBlob": null,
+      "newBlob": "250b2394c7b4be4ea71e78999112bff1ed5a7d3c",
+      "same": false,
+      "newBytes": 8632,
+      "newSha256": "103cc4d8b9431530a0263b6c8d669a3c56e4b1c2f9f40a6e9df4f46ed4137fa6"
+    },
+    {
+      "path": "drizzle/20261109010001_thread_machine_sessions.sql",
+      "oldBlob": null,
+      "newBlob": "0851b0042ed19afcbafcbeeb8090a750983dc3c5",
+      "same": false,
+      "newBytes": 5391,
+      "newSha256": "ada5d8bbd11cca9593f1584677f90f13b21e971fb872ce687b3d79f9ad8d16b4"
+    },
+    {
+      "path": "drizzle/20261109010002_capture_posters.sql",
+      "oldBlob": null,
+      "newBlob": "265385fedf7600a3491bead7735e7c12c6c649b3",
+      "same": false,
+      "newBytes": 585,
+      "newSha256": "a4b8042c9a54eb5bb2faffeb53b18321f7bd054da4030b5ab22f965b7fbdee79"
+    },
+    {
+      "path": "package.json",
+      "oldBlob": "bf33dc9f177f4635f9cb55b8e9eddc894b2aa43c",
+      "newBlob": "4d4d856e9f90ea102c4e42cf42114e9d5daad731",
+      "same": false,
+      "newBytes": 80325,
+      "newSha256": "e677d9ca43c64d5050c38e880a7d4745c838086e0ed16f83990106f4b1f5e39a"
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "oldBlob": "e51af63418cc3c508a4525727f7bd92409e90ee8",
+      "newBlob": "a7a956ac98dfcf7de9ebfe508853b8475fd10106",
+      "same": false,
+      "newBytes": 978174,
+      "newSha256": "ddfb2c81f1e50b1b619e4a690dd38c33cc0700352434ed4424eda27c86907277"
+    },
+    {
+      "path": "pnpm-workspace.yaml",
+      "oldBlob": "bec66a3f1d621df47d05019100129a0abcc779a2",
+      "newBlob": "cc47ee1a48b9585e06c87e0f5ed6f14211601c0c",
+      "same": false,
+      "newBytes": 661,
+      "newSha256": "e8529ab36b3014adf400dfc4b82082b86f84aeadafe686f890b1b26ac2f7e117"
+    },
+    {
+      "path": "scripts/run-db-tests.mjs",
+      "oldBlob": "4eb02a43a5295534fe118a39ede22d0ba542263d",
+      "newBlob": "2d797fb4603f4e668b56439e7dea11d6065dbd46",
+      "same": false,
+      "newBytes": 37271,
+      "newSha256": "7f54e6d9c241f6c60056f2c1c1d2f9b82c398638c4e31713894ce7c8168286f3"
+    },
+    {
+      "path": ".github/workflows/ui-policy.yml",
+      "oldBlob": "b2fb1b4d5a7459a6662ae5192c20e5ef79dd8421",
+      "newBlob": "18e7c54ec507d02b12fd1131b5a8b6112ece2212",
+      "same": false,
+      "newBytes": 22618,
+      "newSha256": "0e62df8a85e4f58a5c790233d7c1a229579db34b137bbc3b644e60f5ae5408d4"
+    },
+    {
+      "path": ".github/workflows/ci-selection.yml",
+      "oldBlob": "5d541b4ff7be9cb365b18b804bbbe7c3db235580",
+      "newBlob": "5d541b4ff7be9cb365b18b804bbbe7c3db235580",
+      "same": true,
+      "newBytes": 3352,
+      "newSha256": "7d8d79b8e58093d7f655dadb0b229b6e7089333802b87b778aaf36a316adfde2"
+    }
+  ],
+  "fixture": {
+    "path": "lib/factory/run-end-paths.db.test.ts",
+    "bytes": 21850,
+    "sha256": "19f3cb3c3e34a4d2d142fbb1c1d7e3dc1820093816eab5a41c2220df78626545",
+    "blob": "4e56f2101969c5c57403017880aca69dce83aad2",
+    "testStatus": "Root reports PG17 12/12; not rerun by this review"
+  },
+  "rootReportedActualCiCombination": {
+    "commit": "ca9a2a0f133fafc12a4aa4668dd6e2654395e84d",
+    "tree": "13fa2d9337fe66c6c8e194c704c36e44c171f2ea",
+    "parents": [
+      "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "b7be7cc15f6b59dd11ae1c286640553432376fe6"
+    ],
+    "ciRun": 42563364604,
+    "provenance": "Root direct Git API verification supplied in task; no duplicate API request",
+    "conclusion": "in progress/not claimed PASS"
+  },
+  "actions": {
+    "productEdits": 0,
+    "refWrites": 0,
+    "tests": 0,
+    "databaseCalls": 0,
+    "productionCalls": 0,
+    "newResources": 0,
+    "exactPublicGitFetch": {
+      "commit": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "exit": 0,
+      "beforeAfterRefsEqual": true
+    }
+  },
+  "limitations": [
+    "No full security audit or all-new-feature review",
+    "No merge-tree simulation",
+    "No claim of d72 combined CI or whole-Task budget PASS",
+    "P0/Team five botId forwarding hunks must remain"
+  ]
+}

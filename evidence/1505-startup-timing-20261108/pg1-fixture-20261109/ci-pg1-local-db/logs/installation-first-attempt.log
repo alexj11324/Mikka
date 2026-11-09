@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "<string>", line 38, in <module>
+    assert len(records)==2,[(r['Package'],r['Version']) for r in records]
+           ^^^^^^^^^^^^^^^
+AssertionError: [('postgresql-17', '17.11-1.pgdg26.04+2'), ('postgresql-17', '17.10-1.pgdg26.04+1'), ('postgresql-17', '17.9-1.pgdg26.04+2'), ('postgresql-client-17', '17.11-1.pgdg26.04+2'), ('postgresql-client-17', '17.10-1.pgdg26.04+1'), ('postgresql-client-17', '17.9-1.pgdg26.04+2')]

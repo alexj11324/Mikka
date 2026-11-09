@@ -1,0 +1,30 @@
+{
+  "createdAt": "2026-11-09T04:42:50.283070+00:00",
+  "localCommit": "842f3ba43ab5f2b25ef4ad2a1fa9313b579d3962",
+  "tree": "1071c59db542fa8cf86b4dc4d253d992b6d043ef",
+  "parents": [
+    "d6835377c820db7d1d4e704afed2c58cdfaec789"
+  ],
+  "sourceBlob": "4e56f2101969c5c57403017880aca69dce83aad2",
+  "trackedClean": true,
+  "testResultSha256": "d0a18852acdc6fcea6589f8ac3e84925c410dc6ce72b5272a9e8d43d5df147b6",
+  "initialCommitFailurePreserved": "commit.log",
+  "identityFromExistingLocalParent": true,
+  "localDbStopped": {
+    "stoppedAt": "2026-11-09T04:42:32.915461+00:00",
+    "exitCode": 0,
+    "portClosed": true,
+    "postmasterPidFileAbsent": true,
+    "command": [
+      "/vercel/ops-1505/ci-pg1-local-db/runtime/usr/lib/postgresql/17/bin/pg_ctl",
+      "-D",
+      "/vercel/ops-1505/ci-pg1-local-db/data",
+      "-m",
+      "fast",
+      "-w",
+      "-t",
+      "30",
+      "stop"
+    ]
+  }
+}

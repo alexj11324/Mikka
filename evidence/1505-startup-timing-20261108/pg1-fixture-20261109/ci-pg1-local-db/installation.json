@@ -1,0 +1,47 @@
+{
+  "source": "official PGDG resolute-pgdg amd64 signed repository",
+  "repository": "https://apt.postgresql.org/pub/repos/apt/",
+  "signingFingerprint": "B97B0AFCAA1A47F044F244A07FCC7D46ACCC4CF8",
+  "packages": [
+    {
+      "Package": "postgresql-17",
+      "Version": "17.11-1.pgdg26.04+2",
+      "Architecture": "amd64",
+      "Filename": "pool/main/p/postgresql-17/postgresql-17_17.11-1.pgdg26.04+2_amd64.deb",
+      "Size": "17039248",
+      "SHA256": "4b2abeefb22fdfb35b2d3dffd26305c07e61f7f9cc22007197819ccac2044585",
+      "Depends": "locales | locales-all, postgresql-client-17, postgresql-common (>= 252~), ssl-cert, tzdata, debconf (>= 0.5) | debconf-2.0, libc6 (>= 2.43), libgcc-s1 (>= 3.3.1), libgssapi-krb5-2 (>= 1.14+dfsg), libicu78 (>= 78.1-1~), libldap2 (>= 2.6.2), libllvm21 (>= 1:21.1.0), liblz4-1 (>= 0.0~r130), libpam0g (>= 0.99.7.1), libpq5 (>= 17~~), libselinux1 (>= 3.1~), libssl3t64 (>= 3.4.0), libstdc++6 (>= 5.2), libsystemd0, libuuid1 (>= 2.16), libxml2-16 (>= 2.14.1), libxslt1.1 (>= 1.1.25), libzstd1 (>= 1.5.5), zlib1g (>= 1:1.1.4)"
+    },
+    {
+      "Package": "postgresql-client-17",
+      "Version": "17.11-1.pgdg26.04+2",
+      "Architecture": "amd64",
+      "Filename": "pool/main/p/postgresql-17/postgresql-client-17_17.11-1.pgdg26.04+2_amd64.deb",
+      "Size": "2055892",
+      "SHA256": "4186946d180be3637c18eace5ef9b3f17be8a9bd840fdc774cca5d3c7dbfa816",
+      "Depends": "libpq5 (>= 17.11), postgresql-client-common (>= 182~), sensible-utils, libc6 (>= 2.38), liblz4-1 (>= 0.0~r127), libreadline8t64 (>= 6.0), libssl3t64 (>= 3.0.0), libzstd1 (>= 1.5.5), zlib1g (>= 1:1.1.4)"
+    }
+  ],
+  "binaries": {
+    "postgres": "postgres (PostgreSQL) 17.11 (Ubuntu 17.11-1.pgdg26.04+2)",
+    "initdb": "initdb (PostgreSQL) 17.11 (Ubuntu 17.11-1.pgdg26.04+2)",
+    "pg_ctl": "pg_ctl (PostgreSQL) 17.11 (Ubuntu 17.11-1.pgdg26.04+2)",
+    "psql": "psql (PostgreSQL) 17.11 (Ubuntu 17.11-1.pgdg26.04+2)",
+    "createdb": "createdb (PostgreSQL) 17.11 (Ubuntu 17.11-1.pgdg26.04+2)"
+  },
+  "missingLibraries": {},
+  "prefix": "/vercel/ops-1505/ci-pg1-local-db/runtime",
+  "method": "verified official .deb extraction into isolated prefix; no package maintainer scripts or system service changes",
+  "firstAttempt": "retained assertion: repository lists 3 supported minor versions; no package downloaded/cluster started in first attempt",
+  "uid": 1000,
+  "additionalLibrary": {
+    "Package": "libllvm21",
+    "Version": "1:21.1.8-6ubuntu1",
+    "Filename": "pool/main/l/llvm-toolchain-21/libllvm21_21.1.8-6ubuntu1_amd64.deb",
+    "Size": "30710558",
+    "SHA256": "9e758998dcb4aa27abbe64f2dee7bc490d9eb0721afa334a82a2b1bf6c7648f9",
+    "Depends": "libc6 (>= 2.38), libedit2 (>= 2.11-20080614-0), libffi8 (>= 3.4), libgcc-s1 (>= 4.3), libstdc++6 (>= 12), libxml2-16 (>= 2.14.1), libzstd1 (>= 1.5.5), zlib1g (>= 1:1.2.0)"
+  },
+  "libraryPath": "/vercel/ops-1505/ci-pg1-local-db/runtime/usr/lib/x86_64-linux-gnu",
+  "systemPackagesInstalledOrChanged": false
+}

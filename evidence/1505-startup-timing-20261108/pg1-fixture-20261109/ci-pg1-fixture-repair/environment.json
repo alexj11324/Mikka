@@ -1,0 +1,21 @@
+{
+  "createdAt": "2026-11-09T04:40:21.993868+00:00",
+  "node": "v24.22.1",
+  "pnpm": "10.34.3",
+  "lockSha256": "c45db74b59cc73d6c5fab0858f6656ee7bf5ec1bf99f5ac5c0a94c8a1885a363",
+  "sourceSha256": "19f3cb3c3e34a4d2d142fbb1c1d7e3dc1820093816eab5a41c2220df78626545",
+  "originalCiRun": 42560334051,
+  "originalCiJob": 128975374245,
+  "intendedCommand": [
+    "node",
+    "--experimental-test-module-mocks",
+    "--import",
+    "./tests/support/server-only.mjs",
+    "--import",
+    "tsx",
+    "--test",
+    "lib/factory/run-end-paths.db.test.ts"
+  ],
+  "databaseSetup": "awaiting isolated official PostgreSQL 17",
+  "productionRequests": 0
+}

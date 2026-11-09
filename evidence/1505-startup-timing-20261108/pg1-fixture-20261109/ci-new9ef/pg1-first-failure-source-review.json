@@ -1,0 +1,200 @@
+{
+  "schemaVersion": 1,
+  "scope": "PR1788 exact9ef PG1 first failure; source-only follow-up; no reproduction or CI rerun",
+  "recordedAt": "2026-11-09 04:30:58 UTC",
+  "ci": {
+    "repository": "alexj11324/Mikka",
+    "workflowRunId": 42560334051,
+    "attempt": 1,
+    "jobId": 128975374245,
+    "step": 15,
+    "stepName": "Required DB suites (temporary Postgres 17, no skips)",
+    "head": "9ef8cb26d5f131da1fc05a9644c9d7b9e9015cc8",
+    "actualCheckout": "e07def85b7d1eead61a662430d0f27a386be5fb5",
+    "checkoutLogLines": [
+      247,
+      248
+    ],
+    "tree": "91c499c8049ee3450a584f2e09306023b4f1010c",
+    "syntheticParents": [
+      "0e4118020311ae8f9083d0d21cfb990be0282f25",
+      "9ef8cb26d5f131da1fc05a9644c9d7b9e9015cc8"
+    ],
+    "treeParentsProvenance": "Parent root independent immutable Git readback; actual checkout independently present in this job raw log"
+  },
+  "log": {
+    "path": "/vercel/ops-1505/ci-new9ef/pg1.log",
+    "characters": 1034042,
+    "utf8Bytes": 1039176,
+    "sha256": "70d05f01ed4f7daf6c0ccf9ca26a30c9012157088429c464ccee026f0c303593",
+    "source": "exact decoded GitHub job log string encoded as UTF-8; one fetch",
+    "jobId": 128975374245,
+    "fetchCount": 1,
+    "unaltered": true
+  },
+  "failure": {
+    "command": "pnpm test:factory-routing-db",
+    "test": "stopping a queued run ends it as stopped and finalizes the task (no daemon ack)",
+    "group": "cancel and thread end reach a terminal run, then afterRunEnded finalizes the Factory task",
+    "errorName": "FactoryError",
+    "errorCode": "factorySourceMismatch",
+    "detail": null,
+    "firstEmissionAt": "2026-11-09T04:15:16.7394263Z",
+    "firstEmissionLine": 4535,
+    "stackLines": [
+      5408,
+      5423
+    ],
+    "stack": [
+      "2026-11-09T04:15:30.5433285Z [db-runner test:factory-routing-db stdout] test at lib/factory/run-end-paths.db.test.ts:1:6670",
+      "2026-11-09T04:15:30.5434066Z [db-runner test:factory-routing-db stdout] ✖ stopping a queued run ends it as stopped and finalizes the task (no daemon ack) (46.936178ms)",
+      "2026-11-09T04:15:30.5434701Z [db-runner test:factory-routing-db stdout]   Error [FactoryError]: factorySourceMismatch",
+      "2026-11-09T04:15:30.5435363Z [db-runner test:factory-routing-db stdout]       at fail (/home/runner/work/Mikka/Mikka/lib/factory/store.ts:209:9)",
+      "2026-11-09T04:15:30.5436075Z [db-runner test:factory-routing-db stdout]       at <anonymous> (/home/runner/work/Mikka/Mikka/lib/factory/store.ts:464:22)",
+      "2026-11-09T04:15:30.5436805Z [db-runner test:factory-routing-db stdout]       at process.processTicksAndRejections (node:internal/process/task_queues:104:5)",
+      "2026-11-09T04:15:30.5437772Z [db-runner test:factory-routing-db stdout]       at async transaction (/home/runner/work/Mikka/Mikka/lib/factory/store.ts:235:22)",
+      "2026-11-09T04:15:30.5438557Z [db-runner test:factory-routing-db stdout]       at async runningTask (/home/runner/work/Mikka/Mikka/lib/factory/run-end-paths.db.test.ts:63:17)",
+      "2026-11-09T04:15:30.5439439Z [db-runner test:factory-routing-db stdout]       at async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/lib/factory/run-end-paths.db.test.ts:86:17)",
+      "2026-11-09T04:15:30.5440884Z [db-runner test:factory-routing-db stdout]       at async Test.run (node:internal/test_runner/test:1409:7)",
+      "2026-11-09T04:15:30.5441713Z [db-runner test:factory-routing-db stdout]       at async TestContext.<anonymous> (/home/runner/work/Mikka/Mikka/lib/factory/run-end-paths.db.test.ts:85:5)",
+      "2026-11-09T04:15:30.5442416Z [db-runner test:factory-routing-db stdout]       at async Test.run (node:internal/test_runner/test:1409:7)",
+      "2026-11-09T04:15:30.5443092Z [db-runner test:factory-routing-db stdout]       at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {",
+      "2026-11-09T04:15:30.5443678Z [db-runner test:factory-routing-db stdout]     code: 'factorySourceMismatch',",
+      "2026-11-09T04:15:30.5444277Z [db-runner test:factory-routing-db stdout]     detail: undefined",
+      "2026-11-09T04:15:30.5444642Z [db-runner test:factory-routing-db stdout]   }"
+    ],
+    "failedAt": "runningTask fixture route at lib/factory/run-end-paths.db.test.ts:63, invoked by queued-stop case line86; before queued UPDATE line87 and requestRunStop line88",
+    "testSummary": {
+      "tests": 278,
+      "pass": 276,
+      "fail": 2,
+      "skip": 0,
+      "cancelled": 0,
+      "failureAccounting": "one child failure plus its parent group, not two independent failing test causes"
+    },
+    "suiteExit": 1,
+    "buildFailure": "dependent selected-DB-shards aggregate; build log not fetched",
+    "exactPackageScript": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test lib/factory/agent-profile.db.test.ts lib/factory/routing.db.test.ts lib/factory/task-dispatch.db.test.ts tests/factory-admission.db.test.ts lib/factory/list.db.test.ts lib/factory/completion-reconcile.db.test.ts lib/factory/deliverable-recovery.db.test.ts lib/factory/repository-selection.db.test.ts lib/factory/run-end-paths.db.test.ts lib/factory/dispatch-http.db.test.ts lib/factory/route-http.db.test.ts lib/cloud-computer/thread-machine-stop.db.test.ts tests/run-chain.db.test.ts lib/factory/publication-failed.db.test.ts lib/factory/dispatch-recovery.db.test.ts lib/factory/task-detail.db.test.ts lib/factory/questions/ask-user.db.test.ts lib/factory/monitor-sweep.db.test.ts && node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test tests/factory-policy-denials.db.test.ts"
+  },
+  "guard": {
+    "source": "lib/factory/store.ts:245-261,463-464",
+    "storeBotId": "null from explicit fixture argument; createFactoryStore:216-223",
+    "requirements": [
+      "event id exact",
+      "userId owner",
+      "kind user_message",
+      "event.botId IS NOT DISTINCT FROM store botId",
+      "event.issueId NULL or same issue",
+      "non-null bot must belong to user"
+    ],
+    "fixtureSource": "run-end-paths.db.test.ts:60-63 inserts random source id with userId owner/kind user_message and omits botId/issueId",
+    "conclusion": "The inserted NULL-bot/NULL-issue source satisfies the guard if unchanged; NULL alone is not a defect."
+  },
+  "reachableRace": {
+    "confidence": "concrete source path; actual CI row transition not directly observed",
+    "chain": [
+      "Prior successful cancel case awaits persistRunCompletion at run-end-paths.db.test.ts:76.",
+      "run-publications.ts:122 records completion event; coordinator-event-store.ts:27 registers wakeCoordinatorAfterCommit.",
+      "db/commit-effects.ts:16 does not await effect completion; coordinator/wake-after-commit.ts:30-32 schedules afterJob(orRun:true).",
+      "background.ts:43-51 schedules or starts asynchronous work without joining; completion return does not prove wake finished.",
+      "coordinator/wake.ts:65 resolves coordinatorBot before coordinatorEnabled checks.",
+      "coordinator/coordinator-bot.ts:61-68 performs default legacy backfill.",
+      "moveExecutionRows:200 locks NULL-bot source events;243-244 can bind eligible selected events to the Coordinator Bot.",
+      "If this selects the next fixture's new source after its INSERT and before route's source lock, source.botId changes while the test store remains NULL; the unchanged guard correctly rejects."
+    ],
+    "notObserved": [
+      "actual failed source row botId at route time",
+      "the exact background wake schedule in CI"
+    ],
+    "minimalRepairDirection": "Make this run-end lifecycle fixture use a stable owned Bot and matching issue/source/run/task scope; preserve allowedSource/final fences and original queued-stop assertions. No sleeps or guard weakening."
+  },
+  "limits": {
+    "noNewTests": true,
+    "noDatabase": true,
+    "noProductEdits": true,
+    "noCIWrite": true,
+    "noExtraLogsArtifacts": true,
+    "oldFailurePreserved": true,
+    "actualCICauseNotClaimedBeyondObservedError": true,
+    "knownUpstreamRepair": "not yet established from current narrow read"
+  },
+  "source": {
+    "localCommit": "d6835377c820db7d1d4e704afed2c58cdfaec789",
+    "actualTree": "91c499c8049ee3450a584f2e09306023b4f1010c",
+    "base": "0e4118020311ae8f9083d0d21cfb990be0282f25",
+    "files": [
+      {
+        "path": "lib/factory/store.ts",
+        "blob": "5627c86ca458738f3ca74a698c25963829e1a8bf",
+        "bytes": 83276,
+        "sha256": "1829c3ecdeda8b5ac8f3d5db97d9c708a6681c4519dc97b8978d8f368b264bc7",
+        "main0eBlob": "5627c86ca458738f3ca74a698c25963829e1a8bf",
+        "byteEqualMain0e": true
+      },
+      {
+        "path": "lib/factory/run-end-paths.db.test.ts",
+        "blob": "23597148d360504680c71db62e4b5fc9fd9460ca",
+        "bytes": 21641,
+        "sha256": "a4d8ea02812b3914546301df2672e4fdc63bfd9263c36c2bc5df8d3d6a5e0bb0",
+        "main0eBlob": "23597148d360504680c71db62e4b5fc9fd9460ca",
+        "byteEqualMain0e": true
+      },
+      {
+        "path": "lib/run-publications.ts",
+        "blob": "5cf697fe417d558039db584571670f315a71e851",
+        "bytes": 30299,
+        "sha256": "a1dc239d243e5752f782a0d3483187602b79a489230be62b898d1eab35991213",
+        "main0eBlob": "5cf697fe417d558039db584571670f315a71e851",
+        "byteEqualMain0e": true
+      },
+      {
+        "path": "lib/coordinator-event-store.ts",
+        "blob": "3a2d8fb3b13b3b447230cc51f3a9f94eebc7a1aa",
+        "bytes": 1768,
+        "sha256": "a0f1892c6927d87207772ef9c6dab0ccf807cd4e7fd05c39443362209096b8d2",
+        "main0eBlob": "3a2d8fb3b13b3b447230cc51f3a9f94eebc7a1aa",
+        "byteEqualMain0e": true
+      },
+      {
+        "path": "lib/coordinator/wake-after-commit.ts",
+        "blob": "32049055d34d149dabf7a4e8179998ffbd88f924",
+        "bytes": 2290,
+        "sha256": "f5313189e9b675b829f3d0f61ed5dcdb3d483e06acea8f5fff2557666b0654f8",
+        "main0eBlob": "32049055d34d149dabf7a4e8179998ffbd88f924",
+        "byteEqualMain0e": true
+      },
+      {
+        "path": "lib/db/commit-effects.ts",
+        "blob": "5f55d0c87e886422398b6767d62cd5a4cea718a6",
+        "bytes": 6982,
+        "sha256": "83e00e079304c5cce58d142e6af39763c0c331944d84bf5b1fc30b3f88f8bc9a",
+        "main0eBlob": "5f55d0c87e886422398b6767d62cd5a4cea718a6",
+        "byteEqualMain0e": true
+      },
+      {
+        "path": "lib/background.ts",
+        "blob": "c5cfbf01c9fd6f725f1c2a806ef9f59af57ee8e0",
+        "bytes": 2955,
+        "sha256": "73937274e1c23817cef7eaacf0da24feb4d724b25fd9d562f4cd683869050310",
+        "main0eBlob": "c5cfbf01c9fd6f725f1c2a806ef9f59af57ee8e0",
+        "byteEqualMain0e": true
+      },
+      {
+        "path": "lib/coordinator/wake.ts",
+        "blob": "7c7f86098b104c57f434d08fdd384ce748db7fc9",
+        "bytes": 8328,
+        "sha256": "7630a102ddb5cfed7859d50e799fd8db0d2bd4e697bc21a78a6fe1b6abf8704f",
+        "main0eBlob": "7c7f86098b104c57f434d08fdd384ce748db7fc9",
+        "byteEqualMain0e": true
+      },
+      {
+        "path": "lib/coordinator/coordinator-bot.ts",
+        "blob": "561752eef3ab1d5a439d39d61be8da7a41ed0a45",
+        "bytes": 21237,
+        "sha256": "fa1ae6aaf4f8271bb620e97d90ed425a9727026d8861675d67dab2930fccb238",
+        "main0eBlob": "561752eef3ab1d5a439d39d61be8da7a41ed0a45",
+        "byteEqualMain0e": true
+      }
+    ]
+  }
+}

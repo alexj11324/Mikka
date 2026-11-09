@@ -1,0 +1,1252 @@
+{
+  "schemaVersion": 1,
+  "task": "One-round publication-queue fact snapshot; no scheduling decision",
+  "startedAt": "2026-11-09 04:42:10 UTC",
+  "lastMetadataReadAt": "2026-11-09 04:43:31 UTC",
+  "nonAtomic": true,
+  "mainFromPRBase": "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+  "prs": [
+    {
+      "pr": 1636,
+      "url": "https://github.com/alexj11324/Mikka/pull/1636",
+      "head": "bd7796488eed8cef4f12d15fc7f6b0316979bedc",
+      "tree": "3acfec70d60784c619cf2c10809553b2fd92d2f1",
+      "parents": [
+        "8ccf22d05b78e5bb95c1cd7df053259900c6a140"
+      ],
+      "base": {
+        "ref": "main",
+        "shaReturned": "d72a1982bf503b34ad4bc31ab6211cfe018af483"
+      },
+      "state": "open",
+      "merged": false,
+      "draft": false,
+      "mergeable": true,
+      "mergeableState": "blocked",
+      "observedAt": "2026-11-09 04:42:11 UTC",
+      "checks": {
+        "observedAt": "2026-11-09 04:42:28 UTC",
+        "total": 46,
+        "received": 46,
+        "counts": {
+          "queued": 1,
+          "skipped": 10,
+          "success": 32,
+          "in_progress": 3
+        },
+        "allHeadsMatch": true,
+        "nonterminalOrFailed": [
+          {
+            "id": 128984101816,
+            "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+            "status": "queued",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:42:11Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42562639625/job/128984101816"
+          },
+          {
+            "id": 128982784561,
+            "name": "image-checks / image",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:37:16Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42562639625/job/128982784561"
+          },
+          {
+            "id": 128982741137,
+            "name": "analytics-checks / Analytics SSR (full)",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:37:06Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42562639625/job/128982741137"
+          },
+          {
+            "id": 128982509656,
+            "name": "Database checks (3/4)",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:36:16Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42562639625/job/128982509656"
+          }
+        ]
+      },
+      "runs": {
+        "observedAt": "2026-11-09 04:42:28 UTC",
+        "total": 13,
+        "received": 13,
+        "counts": {
+          "success": 12,
+          "queued": 1
+        },
+        "items": [
+          {
+            "id": 42562639563,
+            "name": "Browser gate",
+            "path": ".github/workflows/browser-gate.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "bd7796488eed8cef4f12d15fc7f6b0316979bedc",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:35:08Z",
+            "updatedAt": "2026-11-09T04:35:14Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42562639563"
+          },
+          {
+            "id": 42562639529,
+            "name": "E2B additive runtime release",
+            "path": ".github/workflows/e2b-official-runtime.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "bd7796488eed8cef4f12d15fc7f6b0316979bedc",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:35:08Z",
+            "updatedAt": "2026-11-09T04:35:26Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42562639529"
+          },
+          {
+            "id": 42562639464,
+            "name": "Read cache production acceptance",
+            "path": ".github/workflows/read-cache-production.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "bd7796488eed8cef4f12d15fc7f6b0316979bedc",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:35:08Z",
+            "updatedAt": "2026-11-09T04:36:04Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42562639464"
+          },
+          {
+            "id": 42562639449,
+            "name": "Workspace governance acceptance",
+            "path": ".github/workflows/workspace-governance-acceptance.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "bd7796488eed8cef4f12d15fc7f6b0316979bedc",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:35:08Z",
+            "updatedAt": "2026-11-09T04:36:48Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42562639449"
+          },
+          {
+            "id": 42562639439,
+            "name": "Unattended sandbox acceptance",
+            "path": ".github/workflows/unattended-sandbox.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "bd7796488eed8cef4f12d15fc7f6b0316979bedc",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:35:08Z",
+            "updatedAt": "2026-11-09T04:37:45Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42562639439"
+          },
+          {
+            "id": 42562639465,
+            "name": "Device gateway",
+            "path": ".github/workflows/device-gateway.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "bd7796488eed8cef4f12d15fc7f6b0316979bedc",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:35:08Z",
+            "updatedAt": "2026-11-09T04:37:30Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42562639465"
+          },
+          {
+            "id": 42562639596,
+            "name": "Cloud computer backend",
+            "path": ".github/workflows/cloud-computer.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "bd7796488eed8cef4f12d15fc7f6b0316979bedc",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:35:08Z",
+            "updatedAt": "2026-11-09T04:38:16Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42562639596"
+          },
+          {
+            "id": 42562639515,
+            "name": "Read cache API acceptance",
+            "path": ".github/workflows/read-cache.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "bd7796488eed8cef4f12d15fc7f6b0316979bedc",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:35:08Z",
+            "updatedAt": "2026-11-09T04:39:20Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42562639515"
+          },
+          {
+            "id": 42562639555,
+            "name": "E2B subscription custody",
+            "path": ".github/workflows/e2b-byos.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "bd7796488eed8cef4f12d15fc7f6b0316979bedc",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:35:08Z",
+            "updatedAt": "2026-11-09T04:39:49Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42562639555"
+          },
+          {
+            "id": 42562639516,
+            "name": "SSH device backend",
+            "path": ".github/workflows/ssh-device-backend.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "bd7796488eed8cef4f12d15fc7f6b0316979bedc",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:35:08Z",
+            "updatedAt": "2026-11-09T04:41:22Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42562639516"
+          },
+          {
+            "id": 42562639505,
+            "name": "Local device Node 22",
+            "path": ".github/workflows/local-device-node22.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "bd7796488eed8cef4f12d15fc7f6b0316979bedc",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:35:08Z",
+            "updatedAt": "2026-11-09T04:41:45Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42562639505"
+          },
+          {
+            "id": 42562639450,
+            "name": "Site search read contract",
+            "path": ".github/workflows/site-search.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "bd7796488eed8cef4f12d15fc7f6b0316979bedc",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:35:08Z",
+            "updatedAt": "2026-11-09T04:41:46Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42562639450"
+          },
+          {
+            "id": 42562639625,
+            "name": "CI",
+            "path": ".github/workflows/ui-policy.yml",
+            "event": "pull_request",
+            "status": "queued",
+            "conclusion": null,
+            "head": "bd7796488eed8cef4f12d15fc7f6b0316979bedc",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:35:08Z",
+            "updatedAt": "2026-11-09T04:42:11Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42562639625"
+          }
+        ]
+      },
+      "comments": {
+        "url": "https://api.github.com/repos/alexj11324/Mikka/issues/1636/comments?per_page=100&since=2026-11-09T00%3A00%3A00Z",
+        "observedAt": "2026-11-09 04:42:28 UTC",
+        "since": "2026-11-09T00:00:00Z",
+        "received": 15,
+        "paginationComplete": true,
+        "index": [
+          {
+            "id": 6730057422,
+            "url": "https://github.com/alexj11324/Mikka/pull/1636#issuecomment-6730057422",
+            "createdAt": "2026-11-09T01:27:28Z",
+            "updatedAt": "2026-11-09T01:27:28Z",
+            "title": "### actual01a 合流独立只读核对：唯一fixture冲突及最小保留意图"
+          },
+          {
+            "id": 6730262365,
+            "url": "https://github.com/alexj11324/Mikka/pull/1636#issuecomment-6730262365",
+            "createdAt": "2026-11-09T01:44:31Z",
+            "updatedAt": "2026-11-09T01:48:55Z",
+            "title": "### #1790 可选合流的两处源码预览已核完"
+          },
+          {
+            "id": 6730319224,
+            "url": "https://github.com/alexj11324/Mikka/pull/1636#issuecomment-6730319224",
+            "createdAt": "2026-11-09T01:49:24Z",
+            "updatedAt": "2026-11-09T01:49:24Z",
+            "title": "### 新P0 923cb5a 的静态合流闭合与真实HTTP红项"
+          },
+          {
+            "id": 6730369593,
+            "url": "https://github.com/alexj11324/Mikka/pull/1636#issuecomment-6730369593",
+            "createdAt": "2026-11-09T01:53:51Z",
+            "updatedAt": "2026-11-09T02:00:36Z",
+            "title": "### exact 923cb5 的两条生成索引与实际源码不一致"
+          },
+          {
+            "id": 6730565845,
+            "url": "https://github.com/alexj11324/Mikka/pull/1636#issuecomment-6730565845",
+            "createdAt": "2026-11-09T02:10:25Z",
+            "updatedAt": "2026-11-09T02:10:25Z",
+            "title": "### Actual 1d1261 × P0 5c604：独立静态核对，无需仅为追 main 重开 P0"
+          },
+          {
+            "id": 6730735624,
+            "url": "https://github.com/alexj11324/Mikka/pull/1636#issuecomment-6730735624",
+            "createdAt": "2026-11-09T02:23:36Z",
+            "updatedAt": "2026-11-09T02:23:36Z",
+            "title": "### 当前5c完整CI已闭合（2026-11-09 02:23 UTC）"
+          },
+          {
+            "id": 6730938552,
+            "url": "https://github.com/alexj11324/Mikka/pull/1636#issuecomment-6730938552",
+            "createdAt": "2026-11-09T02:40:29Z",
+            "updatedAt": "2026-11-09T03:00:01Z",
+            "title": "### 新实际失败补充：P0+1d也有同一auth启动计数前置，请纳入最终组合判断"
+          },
+          {
+            "id": 6731169896,
+            "url": "https://github.com/alexj11324/Mikka/pull/1636#issuecomment-6731169896",
+            "createdAt": "2026-11-09T02:59:34Z",
+            "updatedAt": "2026-11-09T02:59:34Z",
+            "title": "### P0 已纳入必要 webhook 初始化修正与最新 main（02:59 UTC）"
+          },
+          {
+            "id": 6731593752,
+            "url": "https://github.com/alexj11324/Mikka/pull/1636#issuecomment-6731593752",
+            "createdAt": "2026-11-09T03:34:16Z",
+            "updatedAt": "2026-11-09T03:39:18Z",
+            "title": "### 当前 main 0e 的实际冲突（只读确认，非新增生产窗口）"
+          },
+          {
+            "id": 6731691740,
+            "url": "https://github.com/alexj11324/Mikka/pull/1636#issuecomment-6731691740",
+            "createdAt": "2026-11-09T03:42:21Z",
+            "updatedAt": "2026-11-09T03:42:21Z",
+            "title": "补充一条可能影响后续实际 runtime 发布的**已确认源码协议不兼容**，供原 #1608/#1636 owner 在准备0e组合时协调，未增加生产 hold："
+          },
+          {
+            "id": 6731789911,
+            "url": "https://github.com/alexj11324/Mikka/pull/1636#issuecomment-6731789911",
+            "createdAt": "2026-11-09T03:50:39Z",
+            "updatedAt": "2026-11-09T03:50:39Z",
+            "title": "### main0e 与 P0 的两处具体夹具交集（源审，未冒称新组合CI失败）"
+          },
+          {
+            "id": 6732127750,
+            "url": "https://github.com/alexj11324/Mikka/pull/1636#issuecomment-6732127750",
+            "createdAt": "2026-11-09T04:18:24Z",
+            "updatedAt": "2026-11-09T04:18:24Z",
+            "title": "### 新实际main d72与可引用的runtime协议修复（只读交接，不占窗口）"
+          },
+          {
+            "id": 6732146002,
+            "url": "https://github.com/alexj11324/Mikka/pull/1636#issuecomment-6732146002",
+            "createdAt": "2026-11-09T04:19:49Z",
+            "updatedAt": "2026-11-09T04:19:49Z",
+            "title": "#1793 右栏后端已合入实际main；P0合流时的权限适配交接"
+          },
+          {
+            "id": 6732258931,
+            "url": "https://github.com/alexj11324/Mikka/pull/1636#issuecomment-6732258931",
+            "createdAt": "2026-11-09T04:28:51Z",
+            "updatedAt": "2026-11-09T04:36:05Z",
+            "title": "### actual d72 → P0 的已确认适配点（限定源码审查，未运行新组合）"
+          },
+          {
+            "id": 6732392149,
+            "url": "https://github.com/alexj11324/Mikka/pull/1636#issuecomment-6732392149",
+            "createdAt": "2026-11-09T04:39:51Z",
+            "updatedAt": "2026-11-09T04:39:51Z",
+            "title": "### 当前bd仍缺已确认的TRACEPARENT协议修复，需要明确最小后继"
+          }
+        ]
+      }
+    },
+    {
+      "pr": 1640,
+      "url": "https://github.com/alexj11324/Mikka/pull/1640",
+      "head": "3a727f8f238b03a3636c5dcdd12e59c066057c48",
+      "tree": "dc0ad3282fafddc7b87a91167162e8ecd82d5c7a",
+      "parents": [
+        "1c58358798c87f69703057408757c4201f60b758",
+        "bd7796488eed8cef4f12d15fc7f6b0316979bedc"
+      ],
+      "base": {
+        "ref": "feat/workspace-governance-1608",
+        "shaReturned": "bd7796488eed8cef4f12d15fc7f6b0316979bedc"
+      },
+      "state": "open",
+      "merged": false,
+      "draft": false,
+      "mergeable": true,
+      "mergeableState": "unstable",
+      "observedAt": "2026-11-09 04:42:11 UTC",
+      "checks": {
+        "observedAt": "2026-11-09 04:42:28 UTC",
+        "total": 43,
+        "received": 43,
+        "counts": {
+          "skipped": 8,
+          "in_progress": 20,
+          "queued": 2,
+          "success": 13
+        },
+        "allHeadsMatch": true,
+        "nonterminalOrFailed": [
+          {
+            "id": 128983939686,
+            "name": "analytics-checks / Analytics SSR (full)",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:41:35Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42563033564/job/128983939686"
+          },
+          {
+            "id": 128983936032,
+            "name": "image-checks / image",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:41:34Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42563033564/job/128983936032"
+          },
+          {
+            "id": 128983903435,
+            "name": "desktop-checks / checks",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:41:27Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42563033564/job/128983903435"
+          },
+          {
+            "id": 128983903306,
+            "name": "desktop-checks / icon",
+            "status": "queued",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:41:25Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42563033564/job/128983903306"
+          },
+          {
+            "id": 128983903294,
+            "name": "desktop-checks / smoke",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:41:27Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42563033564/job/128983903294"
+          },
+          {
+            "id": 128983695298,
+            "name": "macos-arm (18.20.8)",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:42:13Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42563033514/job/128983695298"
+          },
+          {
+            "id": 128983695290,
+            "name": "macos-arm (22.22.1)",
+            "status": "queued",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:40:38Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42563033514/job/128983695290"
+          },
+          {
+            "id": 128983682984,
+            "name": "Database checks (3/4)",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:40:38Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42563033564/job/128983682984"
+          },
+          {
+            "id": 128983682943,
+            "name": "Database checks (4/4)",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:40:38Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42563033564/job/128983682943"
+          },
+          {
+            "id": 128983682895,
+            "name": "Core unit checks",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:40:37Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42563033564/job/128983682895"
+          },
+          {
+            "id": 128983682890,
+            "name": "Daemon checks",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:40:37Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42563033564/job/128983682890"
+          },
+          {
+            "id": 128983682882,
+            "name": "Database checks (1/4)",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:40:37Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42563033564/job/128983682882"
+          },
+          {
+            "id": 128983682870,
+            "name": "Database checks (2/4)",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:40:37Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42563033564/job/128983682870"
+          },
+          {
+            "id": 128983682859,
+            "name": "Source checks",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:40:38Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42563033564/job/128983682859"
+          },
+          {
+            "id": 128983682839,
+            "name": "Integration unit checks",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:40:37Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42563033564/job/128983682839"
+          },
+          {
+            "id": 128983413191,
+            "name": "Local driver (macOS permissions, nonblocking)",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:42:01Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42563033649/job/128983413191"
+          },
+          {
+            "id": 128983413162,
+            "name": "backend",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:39:37Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42563033649/job/128983413162"
+          },
+          {
+            "id": 128983412751,
+            "name": "Read cache API and CLI",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:39:37Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42563033402/job/128983412751"
+          },
+          {
+            "id": 128983412338,
+            "name": "node22-unit",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:39:37Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42563033514/job/128983412338"
+          },
+          {
+            "id": 128983411915,
+            "name": "custody",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:39:37Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42563033521/job/128983411915"
+          },
+          {
+            "id": 128983411911,
+            "name": "site-search",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:39:37Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42563033386/job/128983411911"
+          },
+          {
+            "id": 128983411873,
+            "name": "ssh",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:39:37Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42563033399/job/128983411873"
+          }
+        ]
+      },
+      "runs": {
+        "observedAt": "2026-11-09 04:42:28 UTC",
+        "total": 13,
+        "received": 13,
+        "counts": {
+          "in_progress": 5,
+          "success": 6,
+          "queued": 2
+        },
+        "items": [
+          {
+            "id": 42563033386,
+            "name": "Site search read contract",
+            "path": ".github/workflows/site-search.yml",
+            "event": "pull_request",
+            "status": "in_progress",
+            "conclusion": null,
+            "head": "3a727f8f238b03a3636c5dcdd12e59c066057c48",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:39:35Z",
+            "updatedAt": "2026-11-09T04:39:38Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42563033386"
+          },
+          {
+            "id": 42563033402,
+            "name": "Read cache API acceptance",
+            "path": ".github/workflows/read-cache.yml",
+            "event": "pull_request",
+            "status": "in_progress",
+            "conclusion": null,
+            "head": "3a727f8f238b03a3636c5dcdd12e59c066057c48",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:39:35Z",
+            "updatedAt": "2026-11-09T04:39:38Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42563033402"
+          },
+          {
+            "id": 42563033521,
+            "name": "E2B subscription custody",
+            "path": ".github/workflows/e2b-byos.yml",
+            "event": "pull_request",
+            "status": "in_progress",
+            "conclusion": null,
+            "head": "3a727f8f238b03a3636c5dcdd12e59c066057c48",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:39:35Z",
+            "updatedAt": "2026-11-09T04:39:38Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42563033521"
+          },
+          {
+            "id": 42563033399,
+            "name": "SSH device backend",
+            "path": ".github/workflows/ssh-device-backend.yml",
+            "event": "pull_request",
+            "status": "in_progress",
+            "conclusion": null,
+            "head": "3a727f8f238b03a3636c5dcdd12e59c066057c48",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:39:35Z",
+            "updatedAt": "2026-11-09T04:39:38Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42563033399"
+          },
+          {
+            "id": 42563033451,
+            "name": "Browser gate",
+            "path": ".github/workflows/browser-gate.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "3a727f8f238b03a3636c5dcdd12e59c066057c48",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:39:35Z",
+            "updatedAt": "2026-11-09T04:39:41Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42563033451"
+          },
+          {
+            "id": 42563033532,
+            "name": "E2B additive runtime release",
+            "path": ".github/workflows/e2b-official-runtime.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "3a727f8f238b03a3636c5dcdd12e59c066057c48",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:39:35Z",
+            "updatedAt": "2026-11-09T04:39:58Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42563033532"
+          },
+          {
+            "id": 42563033514,
+            "name": "Local device Node 22",
+            "path": ".github/workflows/local-device-node22.yml",
+            "event": "pull_request",
+            "status": "queued",
+            "conclusion": null,
+            "head": "3a727f8f238b03a3636c5dcdd12e59c066057c48",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:39:35Z",
+            "updatedAt": "2026-11-09T04:40:39Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42563033514"
+          },
+          {
+            "id": 42563033533,
+            "name": "Workspace governance acceptance",
+            "path": ".github/workflows/workspace-governance-acceptance.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "3a727f8f238b03a3636c5dcdd12e59c066057c48",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:39:35Z",
+            "updatedAt": "2026-11-09T04:41:07Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42563033533"
+          },
+          {
+            "id": 42563033564,
+            "name": "CI",
+            "path": ".github/workflows/ui-policy.yml",
+            "event": "pull_request",
+            "status": "queued",
+            "conclusion": null,
+            "head": "3a727f8f238b03a3636c5dcdd12e59c066057c48",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:39:35Z",
+            "updatedAt": "2026-11-09T04:41:25Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42563033564"
+          },
+          {
+            "id": 42563033676,
+            "name": "Unattended sandbox acceptance",
+            "path": ".github/workflows/unattended-sandbox.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "3a727f8f238b03a3636c5dcdd12e59c066057c48",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:39:35Z",
+            "updatedAt": "2026-11-09T04:41:48Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42563033676"
+          },
+          {
+            "id": 42563033495,
+            "name": "Device gateway",
+            "path": ".github/workflows/device-gateway.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "3a727f8f238b03a3636c5dcdd12e59c066057c48",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:39:35Z",
+            "updatedAt": "2026-11-09T04:41:57Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42563033495"
+          },
+          {
+            "id": 42563033541,
+            "name": "Mobile OTA update",
+            "path": ".github/workflows/mobile-update.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "3a727f8f238b03a3636c5dcdd12e59c066057c48",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:39:35Z",
+            "updatedAt": "2026-11-09T04:42:04Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42563033541"
+          },
+          {
+            "id": 42563033649,
+            "name": "Cloud computer backend",
+            "path": ".github/workflows/cloud-computer.yml",
+            "event": "pull_request",
+            "status": "in_progress",
+            "conclusion": null,
+            "head": "3a727f8f238b03a3636c5dcdd12e59c066057c48",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:39:35Z",
+            "updatedAt": "2026-11-09T04:42:02Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42563033649"
+          }
+        ]
+      },
+      "comments": {
+        "url": "https://api.github.com/repos/alexj11324/Mikka/issues/1640/comments?per_page=100&since=2026-11-09T00%3A00%3A00Z",
+        "observedAt": "2026-11-09 04:42:28 UTC",
+        "since": "2026-11-09T00:00:00Z",
+        "received": 5,
+        "paginationComplete": true,
+        "index": [
+          {
+            "id": 6730352454,
+            "url": "https://github.com/alexj11324/Mikka/pull/1640#issuecomment-6730352454",
+            "createdAt": "2026-11-09T01:52:20Z",
+            "updatedAt": "2026-11-09T02:40:37Z",
+            "title": "### #1562 / #1758：为 Team 必需追主线时提供可选普通合流，不改变阶段顺序"
+          },
+          {
+            "id": 6730813292,
+            "url": "https://github.com/alexj11324/Mikka/pull/1640#issuecomment-6730813292",
+            "createdAt": "2026-11-09T02:30:05Z",
+            "updatedAt": "2026-11-09T02:30:05Z",
+            "title": "### 新2cc组合的实际PG4失败，请原reader收口"
+          },
+          {
+            "id": 6730877786,
+            "url": "https://github.com/alexj11324/Mikka/pull/1640#issuecomment-6730877786",
+            "createdAt": "2026-11-09T02:35:30Z",
+            "updatedAt": "2026-11-09T02:35:30Z",
+            "title": "### 逐请求SQL预算的初始化边界修正"
+          },
+          {
+            "id": 6731235887,
+            "url": "https://github.com/alexj11324/Mikka/pull/1640#issuecomment-6731235887",
+            "createdAt": "2026-11-09T03:05:12Z",
+            "updatedAt": "2026-11-09T03:05:12Z",
+            "title": "### 实际7093合流独立核对完成"
+          },
+          {
+            "id": 6731832737,
+            "url": "https://github.com/alexj11324/Mikka/pull/1640#issuecomment-6731832737",
+            "createdAt": "2026-11-09T03:54:22Z",
+            "updatedAt": "2026-11-09T04:07:04Z",
+            "title": "### 实际378合流复核：两处冲突保留正确；新增PG夹具还需补工作区"
+          }
+        ]
+      }
+    },
+    {
+      "pr": 1642,
+      "url": "https://github.com/alexj11324/Mikka/pull/1642",
+      "head": "ad59872e81a653de4c07779903bc80c97e5a212a",
+      "tree": "0343b9f415d310a0e230aa6db41f453eef84378b",
+      "parents": [
+        "5467b60c06b0a2aff6bd7881f5408f619bcf119c"
+      ],
+      "base": {
+        "ref": "feat/team-entitlements-1608",
+        "shaReturned": "1c58358798c87f69703057408757c4201f60b758"
+      },
+      "state": "open",
+      "merged": false,
+      "draft": false,
+      "mergeable": false,
+      "mergeableState": "dirty",
+      "observedAt": "2026-11-09 04:42:11 UTC",
+      "checks": {
+        "observedAt": "2026-11-09 04:42:28 UTC",
+        "total": 41,
+        "received": 41,
+        "counts": {
+          "in_progress": 1,
+          "success": 30,
+          "skipped": 8,
+          "failure": 2
+        },
+        "allHeadsMatch": true,
+        "nonterminalOrFailed": [
+          {
+            "id": 128979438749,
+            "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T04:27:31Z",
+            "completedAt": null,
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42560860248/job/128979438749"
+          },
+          {
+            "id": 128977500059,
+            "name": "Integration unit checks",
+            "status": "completed",
+            "conclusion": "failure",
+            "startedAt": "2026-11-09T04:18:44Z",
+            "completedAt": "2026-11-09T04:19:40Z",
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42560860248/job/128977500059"
+          },
+          {
+            "id": 128977500046,
+            "name": "Core unit checks",
+            "status": "completed",
+            "conclusion": "failure",
+            "startedAt": "2026-11-09T04:18:44Z",
+            "completedAt": "2026-11-09T04:19:48Z",
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42560860248/job/128977500046"
+          }
+        ]
+      },
+      "runs": {
+        "observedAt": "2026-11-09 04:42:28 UTC",
+        "total": 11,
+        "received": 11,
+        "counts": {
+          "success": 10,
+          "in_progress": 1
+        },
+        "items": [
+          {
+            "id": 42560860878,
+            "name": "Site search read contract",
+            "path": ".github/workflows/site-search.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "ad59872e81a653de4c07779903bc80c97e5a212a",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:16:08Z",
+            "updatedAt": "2026-11-09T04:23:57Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42560860878"
+          },
+          {
+            "id": 42560860175,
+            "name": "Device gateway",
+            "path": ".github/workflows/device-gateway.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "ad59872e81a653de4c07779903bc80c97e5a212a",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:16:07Z",
+            "updatedAt": "2026-11-09T04:19:46Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42560860175"
+          },
+          {
+            "id": 42560860217,
+            "name": "Cloud computer backend",
+            "path": ".github/workflows/cloud-computer.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "ad59872e81a653de4c07779903bc80c97e5a212a",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:16:07Z",
+            "updatedAt": "2026-11-09T04:20:13Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42560860217"
+          },
+          {
+            "id": 42560860189,
+            "name": "Read cache API acceptance",
+            "path": ".github/workflows/read-cache.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "ad59872e81a653de4c07779903bc80c97e5a212a",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:16:07Z",
+            "updatedAt": "2026-11-09T04:20:13Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42560860189"
+          },
+          {
+            "id": 42560860142,
+            "name": "E2B subscription custody",
+            "path": ".github/workflows/e2b-byos.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "ad59872e81a653de4c07779903bc80c97e5a212a",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:16:07Z",
+            "updatedAt": "2026-11-09T04:21:56Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42560860142"
+          },
+          {
+            "id": 42560860158,
+            "name": "E2B additive runtime release",
+            "path": ".github/workflows/e2b-official-runtime.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "ad59872e81a653de4c07779903bc80c97e5a212a",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:16:07Z",
+            "updatedAt": "2026-11-09T04:17:31Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42560860158"
+          },
+          {
+            "id": 42560860148,
+            "name": "Unattended sandbox acceptance",
+            "path": ".github/workflows/unattended-sandbox.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "ad59872e81a653de4c07779903bc80c97e5a212a",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:16:07Z",
+            "updatedAt": "2026-11-09T04:18:44Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42560860148"
+          },
+          {
+            "id": 42560860206,
+            "name": "Workspace governance acceptance",
+            "path": ".github/workflows/workspace-governance-acceptance.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "ad59872e81a653de4c07779903bc80c97e5a212a",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:16:07Z",
+            "updatedAt": "2026-11-09T04:18:37Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42560860206"
+          },
+          {
+            "id": 42560860135,
+            "name": "SSH device backend",
+            "path": ".github/workflows/ssh-device-backend.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "ad59872e81a653de4c07779903bc80c97e5a212a",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:16:07Z",
+            "updatedAt": "2026-11-09T04:22:15Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42560860135"
+          },
+          {
+            "id": 42560860248,
+            "name": "CI",
+            "path": ".github/workflows/ui-policy.yml",
+            "event": "pull_request",
+            "status": "in_progress",
+            "conclusion": null,
+            "head": "ad59872e81a653de4c07779903bc80c97e5a212a",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:16:07Z",
+            "updatedAt": "2026-11-09T04:27:32Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42560860248"
+          },
+          {
+            "id": 42560860163,
+            "name": "Browser gate",
+            "path": ".github/workflows/browser-gate.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "ad59872e81a653de4c07779903bc80c97e5a212a",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:16:07Z",
+            "updatedAt": "2026-11-09T04:16:45Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42560860163"
+          }
+        ]
+      },
+      "comments": {
+        "url": "https://api.github.com/repos/alexj11324/Mikka/issues/1642/comments?per_page=100&since=2026-11-09T00%3A00%3A00Z",
+        "observedAt": "2026-11-09 04:42:28 UTC",
+        "since": "2026-11-09T00:00:00Z",
+        "received": 3,
+        "paginationComplete": true,
+        "index": [
+          {
+            "id": 6730677209,
+            "url": "https://github.com/alexj11324/Mikka/pull/1642#issuecomment-6730677209",
+            "createdAt": "2026-11-09T02:19:01Z",
+            "updatedAt": "2026-11-09T02:19:01Z",
+            "title": "### 实际8ab的Apple × Enterprise认证合流：独立窄审完成"
+          },
+          {
+            "id": 6731800173,
+            "url": "https://github.com/alexj11324/Mikka/pull/1642#issuecomment-6731800173",
+            "createdAt": "2026-11-09T03:51:33Z",
+            "updatedAt": "2026-11-09T03:51:33Z",
+            "title": "### 当前864原生验收真实失败（2026-11-09 03:51:32 UTC）"
+          },
+          {
+            "id": 6732176388,
+            "url": "https://github.com/alexj11324/Mikka/pull/1642#issuecomment-6732176388",
+            "createdAt": "2026-11-09T04:22:12Z",
+            "updatedAt": "2026-11-09T04:22:12Z",
+            "title": "### ad598 导航修正的限定源码复核"
+          }
+        ]
+      }
+    },
+    {
+      "pr": 1753,
+      "url": "https://github.com/alexj11324/Mikka/pull/1753",
+      "head": "2f1fa9b8e4ae403e86b42f1a65790708d9e0ff2e",
+      "tree": "bba449a8d843c6eae80461c5ce54ba704c721580",
+      "parents": [
+        "81b073ea87f2efba4ec3bb4fcec11dc1a1dea93b",
+        "ad59872e81a653de4c07779903bc80c97e5a212a"
+      ],
+      "base": {
+        "ref": "feat/enterprise-v1-1608",
+        "shaReturned": "ad59872e81a653de4c07779903bc80c97e5a212a"
+      },
+      "state": "open",
+      "merged": false,
+      "draft": false,
+      "mergeable": true,
+      "mergeableState": "unstable",
+      "observedAt": "2026-11-09 04:42:11 UTC",
+      "checks": {
+        "observedAt": "2026-11-09 04:42:28 UTC",
+        "total": 25,
+        "received": 25,
+        "counts": {
+          "failure": 3,
+          "success": 21,
+          "skipped": 1
+        },
+        "allHeadsMatch": true,
+        "nonterminalOrFailed": [
+          {
+            "id": 128984049231,
+            "name": "UI policy (strict)",
+            "status": "completed",
+            "conclusion": "failure",
+            "startedAt": "2026-11-09T04:42:01Z",
+            "completedAt": "2026-11-09T04:42:12Z",
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42560919858/job/128984049231"
+          },
+          {
+            "id": 128977550725,
+            "name": "Integration unit checks",
+            "status": "completed",
+            "conclusion": "failure",
+            "startedAt": "2026-11-09T04:20:01Z",
+            "completedAt": "2026-11-09T04:20:55Z",
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42560919858/job/128977550725"
+          },
+          {
+            "id": 128977550475,
+            "name": "Core unit checks",
+            "status": "completed",
+            "conclusion": "failure",
+            "startedAt": "2026-11-09T04:19:10Z",
+            "completedAt": "2026-11-09T04:20:24Z",
+            "detailsUrl": "https://github.com/alexj11324/Mikka/actions/runs/42560919858/job/128977550475"
+          }
+        ]
+      },
+      "runs": {
+        "observedAt": "2026-11-09 04:42:28 UTC",
+        "total": 3,
+        "received": 3,
+        "counts": {
+          "success": 2,
+          "failure": 1
+        },
+        "items": [
+          {
+            "id": 42560919821,
+            "name": "Browser gate",
+            "path": ".github/workflows/browser-gate.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "2f1fa9b8e4ae403e86b42f1a65790708d9e0ff2e",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:16:44Z",
+            "updatedAt": "2026-11-09T04:17:43Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42560919821"
+          },
+          {
+            "id": 42560919889,
+            "name": "Workspace governance acceptance",
+            "path": ".github/workflows/workspace-governance-acceptance.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "success",
+            "head": "2f1fa9b8e4ae403e86b42f1a65790708d9e0ff2e",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:16:44Z",
+            "updatedAt": "2026-11-09T04:18:34Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42560919889"
+          },
+          {
+            "id": 42560919858,
+            "name": "CI",
+            "path": ".github/workflows/ui-policy.yml",
+            "event": "pull_request",
+            "status": "completed",
+            "conclusion": "failure",
+            "head": "2f1fa9b8e4ae403e86b42f1a65790708d9e0ff2e",
+            "attempt": 1,
+            "createdAt": "2026-11-09T04:16:44Z",
+            "updatedAt": "2026-11-09T04:42:12Z",
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/42560919858"
+          }
+        ]
+      },
+      "comments": {
+        "url": "https://api.github.com/repos/alexj11324/Mikka/issues/1753/comments?per_page=100&since=2026-11-09T00%3A00%3A00Z",
+        "observedAt": "2026-11-09 04:42:28 UTC",
+        "since": "2026-11-09T00:00:00Z",
+        "received": 0,
+        "paginationComplete": true,
+        "index": []
+      }
+    }
+  ],
+  "p0Integration": {
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/8ccf22d05b78e5bb95c1cd7df053259900c6a140",
+    "observedAt": "2026-11-09 04:43:31 UTC",
+    "sha": "8ccf22d05b78e5bb95c1cd7df053259900c6a140",
+    "parents": [
+      "1ddcd09ae2d751488c361c3c2ce14b673597849c",
+      "d72a1982bf503b34ad4bc31ab6211cfe018af483",
+      "2f29d8cf3473cc8450e7a77f51c17079f72c25d4"
+    ],
+    "tree": "40a902da8c510d133f9b85418503619bdfba1432",
+    "conclusion": "P0 bd779's sole parent8cc is a normal3-parent merge including actual main d72. Team3a directly merges P0bd779."
+  },
+  "coordination": {
+    "url": "https://api.github.com/repos/alexj11324/Mikka/issues/1752/comments?per_page=100&since=2026-11-09T04%3A30%3A00Z",
+    "observedAt": "2026-11-09 04:42:11 UTC",
+    "since": "2026-11-09T04:30:00Z",
+    "received": 1,
+    "paginationComplete": true,
+    "comments": [
+      {
+        "id": 6732274946,
+        "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6732274946",
+        "createdAt": "2026-11-09T04:30:10Z",
+        "updatedAt": "2026-11-09T04:30:10Z",
+        "author": "alexj11324",
+        "body": "#1503 / #1790：实际候选就绪记录与新的最小协议修复（无生产 hold）\n\n原 exact head `8e83bd7d836c8c7d46ab478839112b5946a7d82d` 已于04:12:19完成全套CI，19 checks=16 success+3条件skip，image业务及最终服务清理均成功。主干随后实际进入#1794的 `d72a1982` 发布窗口，尊重04:14–05:29的原上限及实际提前释放回执。\n\n已正常合流 `8e→d72`，无冲突，保留1794所有69个非生成路径及两个索引的新增路由；243/243 route sourceHash已正确，没有重复生成索引。四个原修复文件保持精确原字节。\n\n按#1505在[6732078911](https://github.com/alexj11324/Mikka/issues/1752#issuecomment-6732078911)开放的具体复用范围，本方正在采用 `9ef8cb26` 的**1个reader文件+2个真实producer/writer/wrapper回归测试文件**，解决已坐实的TRACEPARENT闭式reader不兼容，避免本任务下一次自动发布再提交已知坏协议。未知key、私有文件、身份/权限、collector规则保持原样；不带#1788其余7文件、Factory metadata或P0/Team功能，也不将9ef整条父链冒充已合。新组合会有自己的针对性验证和新head CI，当前仍未推新head/触发生产。\n\nSmoke readonly child 的实际维护artifact元数据已读回：run42553844998 / artifact13646865930 / `issue1505-github-readonly-receipt`，未读取原件、未撤销或改写连接。现有cleanup CLI要求真实 `ops/1505-smoke-github-readonly-20261109` ref，原0315 prepare入口已关闭；后续实际交接会保持原真实receipt/hash与正常provider/CAS合同，不伪造ref/issue/状态。当前原readonly分支仍closed `4dff7043`，没有新增账号窗口占用。\n\n源码与CI进展见[1790/6732185198](https://github.com/alexj11324/Mikka/pull/1790#issuecomment-6732185198)。本条不改变任何正在运行的发布/消费者，也不预先占用下一窗口。"
+      }
+    ]
+  },
+  "interpretation": {
+    "agreedSequence": [
+      1636,
+      1640,
+      1642,
+      1753
+    ],
+    "allFourUnmerged": true,
+    "actualWindow": "The current#1794 04:14–05:29UTC window is reiterated by#1752 comment6732274946; no later release claim occurs in the single returned04:30+ increment.",
+    "holdFinding": "No newly activated production hold found for these four phases in the current PR bodies,23 PR comments updated since00:00, and the single#1752 increment. Ordered future phases are plans, not four existing production holds.",
+    "p0": "Exactbd779 actualnewCI42562639625 remains nonterminal; current public comment6732392149 says the confirmed TRACEPARENT fix is still absent. This snapshot does not independently re-read the source.",
+    "team": "Exact3a727 directly mergesbd779 and has newCI42563033564; do not reuse prior1c results as newhead results.",
+    "enterprise": "Exactad598 CI42560860248 has Core+Integration failures. PR body attributes invalidUnitSelection to trusted-main newd72 inventory versus this older source; no raw log was read here. mergeable=false/dirty. BaseSHA returned1c is older than the concurrently observed currentTeamhead3a; preserve thatAPI discrepancy rather than treating it as currentmerge-tree proof.",
+    "saml": "Exact2f1 CI42560919858 is terminalfailure; Core+Integration+strict failed. No rawlog/rootcause duplication.",
+    "metadataLimit": "GitHub workflow/check/pr snapshots are separate responses, not an atomic transaction. A workflow can reportqueued while some of its jobs have started. mergeable=true is not a mergeGO; its mergeable_state and checks remain independently relevant.",
+    "productionLimit": "PR workflow conclusions, including conditional E2B success/skips, are not live runtime publication/subscription/formal acceptance. ExistingEnterprise864 quarantined/RUN_DIRTY is described initsPRbody as an isolatedCI account, not Acme sharedproduction.",
+    "noDecision": "This report does not assign a next window, override1794's active window, or authorize a merge."
+  },
+  "actions": {
+    "metadataRequests": 22,
+    "rawLogDownloads": 0,
+    "artifactDownloads": 0,
+    "tests": 0,
+    "productionAccountCalls": 0,
+    "vmCreation": 0,
+    "refWrites": 0,
+    "commentWrites": 0,
+    "secondPoll": false
+  },
+  "rawEvidenceStorePrefix": "releaseQueue0442_",
+  "notes": "Each fetched result and exact JSONcontent is preserved in functions store under the request key; this file contains the closed operational projection and source URLs."
+}

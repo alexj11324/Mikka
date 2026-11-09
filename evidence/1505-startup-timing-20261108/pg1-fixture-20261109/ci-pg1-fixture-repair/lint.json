@@ -1,0 +1,13 @@
+{
+  "command": [
+    "/vercel/ops-1505/source-checks-7c014579/bin/pnpm",
+    "exec",
+    "oxlint",
+    "--deny-warnings",
+    "lib/factory/run-end-paths.db.test.ts"
+  ],
+  "startedAt": "2026-11-09T04:39:02.260064+00:00",
+  "finishedAt": "2026-11-09T04:39:02.675049+00:00",
+  "seconds": 0.4150138680006421,
+  "exitCode": 0
+}

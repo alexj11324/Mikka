@@ -1,0 +1,115 @@
+2026-11-09T04:41:27.769Z WARN [Better Auth]: [better-auth] Base URL is not set. Set the baseURL option or BETTER_AUTH_URL env, or use a dynamic baseURL with allowedHosts for multi-host setups. Without it the origin is derived from the incoming request, and callbacks and redirects may not work correctly.
+▶ cancel and thread end reach a terminal run, then afterRunEnded finalizes the Factory task
+  ✔ cancel: the stop request alone is not an end; the daemon's stopped write finalizes the task (229.078231ms)
+  ✔ stopping a queued run ends it as stopped and finalizes the task (no daemon ack) (80.526989ms)
+  ✔ a queued cloud run with a thread machine binding only records the stop request (25.816921ms)
+  ✔ stop on an ended earlier attempt reaches the queued latest: stopped, and afterRunEnded runs under the latest's own runId (BE-18) (61.262243ms)
+thread_machine_lifecycle {
+  run: '65ffda24be67',
+  task: null,
+  vm: null,
+  epoch: 1,
+  phase: 'retired',
+  reason: 'unknown',
+  owner: 'run-recovery',
+  deadline: null,
+  computeSeconds: 0,
+  computeSource: 'database_estimate',
+  provider: 'not_observed',
+  observedAt: 1794199290491
+}
+  ✔ ending a thread machine stops a Factory run and finalizes its task (124.208425ms)
+{"event":"thread_runtime_start_failed","runId":"5bc5bfb6-2266-4c8f-9a10-5f0c2d8df6f6","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"msg":"cloud_startup_timing","runIdHash":"3ff0e0109cf33edd","stage":"cloud.thread.phases","phases":[{"phase":"admission","startedAt":1794199290523,"endedAt":1794199290526,"ms":3}]}
+{"msg":"cloud_startup_timing","runIdHash":"3ff0e0109cf33edd","stage":"cloud.thread.ensure","startedAt":1794199290521,"endedAt":1794199290526,"ms":5}
+{"event":"thread_runtime_start_failed","runId":"5bc5bfb6-2266-4c8f-9a10-5f0c2d8df6f6","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"msg":"cloud_startup_timing","runIdHash":"3ff0e0109cf33edd","stage":"cloud.thread.phases","phases":[{"phase":"admission","startedAt":1794199290523,"endedAt":1794199290534,"ms":11}]}
+{"msg":"cloud_startup_timing","runIdHash":"3ff0e0109cf33edd","stage":"cloud.thread.ensure","startedAt":1794199290522,"endedAt":1794199290535,"ms":13}
+thread_machine_lifecycle {
+  run: 'e6c70fd925d0',
+  task: null,
+  vm: null,
+  epoch: 1,
+  phase: 'retired',
+  reason: 'unknown',
+  owner: 'run-recovery',
+  deadline: null,
+  computeSeconds: 0,
+  computeSource: 'database_estimate',
+  provider: 'not_observed',
+  observedAt: 1794199290594
+}
+{"event":"thread_runtime_start_failed","runId":"5bc5bfb6-2266-4c8f-9a10-5f0c2d8df6f6","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"msg":"cloud_startup_timing","runIdHash":"3ff0e0109cf33edd","stage":"cloud.thread.phases","phases":[{"phase":"admission","startedAt":1794199290610,"endedAt":1794199290612,"ms":2}]}
+{"msg":"cloud_startup_timing","runIdHash":"3ff0e0109cf33edd","stage":"cloud.thread.ensure","startedAt":1794199290610,"endedAt":1794199290612,"ms":2}
+  ✔ an unclaimed cloud startup failure is recoverable infrastructure failure, with machine=true (140.672144ms)
+{"event":"thread_runtime_start_failed","runId":"ca887451-a45d-4db8-9054-73a68c78a558","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"msg":"cloud_startup_timing","runIdHash":"5546e5fb2ca50202","stage":"cloud.thread.phases","phases":[{"phase":"admission","startedAt":1794199290650,"endedAt":1794199290652,"ms":2}]}
+{"msg":"cloud_startup_timing","runIdHash":"5546e5fb2ca50202","stage":"cloud.thread.ensure","startedAt":1794199290650,"endedAt":1794199290652,"ms":2}
+{"event":"thread_runtime_start_failed","runId":"ca887451-a45d-4db8-9054-73a68c78a558","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"msg":"cloud_startup_timing","runIdHash":"5546e5fb2ca50202","stage":"cloud.thread.phases","phases":[{"phase":"admission","startedAt":1794199290650,"endedAt":1794199290659,"ms":9}]}
+{"msg":"cloud_startup_timing","runIdHash":"5546e5fb2ca50202","stage":"cloud.thread.ensure","startedAt":1794199290650,"endedAt":1794199290660,"ms":10}
+{"event":"thread_runtime_start_failed","runId":"ca887451-a45d-4db8-9054-73a68c78a558","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"msg":"cloud_startup_timing","runIdHash":"5546e5fb2ca50202","stage":"cloud.thread.phases","phases":[{"phase":"admission","startedAt":1794199290734,"endedAt":1794199290736,"ms":2}]}
+{"msg":"cloud_startup_timing","runIdHash":"5546e5fb2ca50202","stage":"cloud.thread.ensure","startedAt":1794199290733,"endedAt":1794199290736,"ms":3}
+  ✔ an unclaimed cloud startup failure is recoverable infrastructure failure, with machine=false (131.195506ms)
+{"event":"thread_runtime_start_failed","runId":"97aa5d09-64e6-4660-b3a2-4bedddd9002b","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"msg":"cloud_startup_timing","runIdHash":"ed919db61e346a84","stage":"cloud.thread.phases","phases":[{"phase":"admission","startedAt":1794199290793,"endedAt":1794199290796,"ms":3}]}
+{"msg":"cloud_startup_timing","runIdHash":"ed919db61e346a84","stage":"cloud.thread.ensure","startedAt":1794199290793,"endedAt":1794199290796,"ms":3}
+{"event":"thread_runtime_start_failed","runId":"a01ed394-6348-4a94-9d4d-9f5638a4da6e","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"msg":"cloud_startup_timing","runIdHash":"21b1ec9192eb501d","stage":"cloud.thread.phases","phases":[{"phase":"admission","startedAt":1794199290828,"endedAt":1794199290830,"ms":2}]}
+{"msg":"cloud_startup_timing","runIdHash":"21b1ec9192eb501d","stage":"cloud.thread.ensure","startedAt":1794199290828,"endedAt":1794199290830,"ms":2}
+{"event":"thread_runtime_start_failed","runId":"e9db2a6a-b642-48b0-8b4d-8b9b473c5f95","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"msg":"cloud_startup_timing","runIdHash":"04ad10ffc9169430","stage":"cloud.thread.phases","phases":[{"phase":"admission","startedAt":1794199290855,"endedAt":1794199290857,"ms":2}]}
+{"msg":"cloud_startup_timing","runIdHash":"04ad10ffc9169430","stage":"cloud.thread.ensure","startedAt":1794199290855,"endedAt":1794199290857,"ms":2}
+{"event":"thread_runtime_start_failed","runId":"a86f2461-7a32-4c6e-a32d-83f20fb10a3d","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"msg":"cloud_startup_timing","runIdHash":"f257a3f5f0e091f0","stage":"cloud.thread.phases","phases":[{"phase":"admission","startedAt":1794199290879,"endedAt":1794199290881,"ms":2}]}
+{"msg":"cloud_startup_timing","runIdHash":"f257a3f5f0e091f0","stage":"cloud.thread.ensure","startedAt":1794199290879,"endedAt":1794199290881,"ms":2}
+{"event":"thread_runtime_start_failed","runId":"70816cc1-7c23-48cd-b07a-62380c4e34f7","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"msg":"cloud_startup_timing","runIdHash":"b5d312e09ef33048","stage":"cloud.thread.phases","phases":[{"phase":"admission","startedAt":1794199290902,"endedAt":1794199290903,"ms":1}]}
+{"msg":"cloud_startup_timing","runIdHash":"b5d312e09ef33048","stage":"cloud.thread.ensure","startedAt":1794199290902,"endedAt":1794199290904,"ms":2}
+  ✔ a startup-error cleanup cannot overwrite a claimed run, a live lease, or another workspace (146.779463ms)
+thread_machine_lifecycle {
+  run: '6d69efb50b7d',
+  task: null,
+  vm: null,
+  epoch: 1,
+  phase: 'retired',
+  reason: 'unknown',
+  owner: 'run-recovery',
+  deadline: null,
+  computeSeconds: 0,
+  computeSource: 'database_estimate',
+  provider: 'not_observed',
+  observedAt: 1794199290966
+}
+{"event":"thread_runtime_start_failed","runId":"63c17273-059e-4edd-9310-8e26d64d3a5b","phase":"admission","errorClass":"Error","errorCode":"unknown","status":404}
+{"msg":"cloud_startup_timing","runIdHash":"a5e0013173273bbb","stage":"cloud.thread.phases","phases":[{"phase":"admission","startedAt":1794199290967,"endedAt":1794199290969,"ms":2}]}
+{"msg":"cloud_startup_timing","runIdHash":"a5e0013173273bbb","stage":"cloud.thread.ensure","startedAt":1794199290967,"endedAt":1794199290969,"ms":2}
+  ✔ a real Owner stop stays cancelled when a late cloud-start failure arrives (61.989741ms)
+{"event":"thread_runtime_start_failed","runId":"99170dd7-ed7b-4ef0-99fa-2acddec4fdfd","phase":"connect","errorClass":"Error","errorCode":"unknown","status":503}
+{"msg":"cloud_startup_timing","runIdHash":"f356f3471278863b","stage":"cloud.thread.phases","phases":[{"phase":"admission","startedAt":1794199290993,"endedAt":1794199290996,"ms":3},{"phase":"execution_identity","startedAt":1794199290996,"endedAt":1794199290996,"ms":0},{"phase":"admission","startedAt":1794199290996,"endedAt":1794199290996,"ms":0},{"phase":"admission","startedAt":1794199290996,"endedAt":1794199291000,"ms":4},{"phase":"connect","startedAt":1794199291000,"endedAt":1794199291001,"ms":1}]}
+{"msg":"cloud_startup_timing","runIdHash":"f356f3471278863b","stage":"cloud.thread.ensure","startedAt":1794199290993,"endedAt":1794199291001,"ms":8}
+  ✔ a real provider-start failure can settle only its own committed provisioning lease (106.893451ms)
+{"event":"thread_runtime_start_failed","runId":"914c29a1-92a3-4dd5-b506-2293089c6850","phase":"connect","errorClass":"Error","errorCode":"unknown","status":503}
+{"msg":"cloud_startup_timing","runIdHash":"42385d9c60b9e1a9","stage":"cloud.thread.phases","phases":[{"phase":"admission","startedAt":1794199291100,"endedAt":1794199291102,"ms":2},{"phase":"execution_identity","startedAt":1794199291102,"endedAt":1794199291102,"ms":0},{"phase":"admission","startedAt":1794199291102,"endedAt":1794199291102,"ms":0},{"phase":"admission","startedAt":1794199291102,"endedAt":1794199291106,"ms":4},{"phase":"connect","startedAt":1794199291106,"endedAt":1794199291106,"ms":0}]}
+{"msg":"cloud_startup_timing","runIdHash":"42385d9c60b9e1a9","stage":"cloud.thread.ensure","startedAt":1794199291100,"endedAt":1794199291106,"ms":6}
+{"event":"thread_runtime_start_failed","runId":"93bf534a-4c77-4dbc-9cd2-c4a2c9a75191","phase":"connect","errorClass":"Error","errorCode":"unknown","status":503}
+{"msg":"cloud_startup_timing","runIdHash":"8f3982ae9d4ae899","stage":"cloud.thread.phases","phases":[{"phase":"admission","startedAt":1794199291130,"endedAt":1794199291132,"ms":2},{"phase":"execution_identity","startedAt":1794199291132,"endedAt":1794199291132,"ms":0},{"phase":"admission","startedAt":1794199291132,"endedAt":1794199291132,"ms":0},{"phase":"admission","startedAt":1794199291132,"endedAt":1794199291136,"ms":4},{"phase":"connect","startedAt":1794199291136,"endedAt":1794199291136,"ms":0}]}
+{"msg":"cloud_startup_timing","runIdHash":"8f3982ae9d4ae899","stage":"cloud.thread.ensure","startedAt":1794199291130,"endedAt":1794199291137,"ms":7}
+{"event":"thread_runtime_start_failed","runId":"0c9bffcd-63a8-4aaf-a17a-96ee292daae3","phase":"connect","errorClass":"Error","errorCode":"unknown","status":503}
+{"msg":"cloud_startup_timing","runIdHash":"d65d17e74b0d32b2","stage":"cloud.thread.phases","phases":[{"phase":"admission","startedAt":1794199291162,"endedAt":1794199291164,"ms":2},{"phase":"execution_identity","startedAt":1794199291164,"endedAt":1794199291164,"ms":0},{"phase":"admission","startedAt":1794199291164,"endedAt":1794199291164,"ms":0},{"phase":"admission","startedAt":1794199291164,"endedAt":1794199291167,"ms":3},{"phase":"connect","startedAt":1794199291167,"endedAt":1794199291168,"ms":1}]}
+{"msg":"cloud_startup_timing","runIdHash":"d65d17e74b0d32b2","stage":"cloud.thread.ensure","startedAt":1794199291162,"endedAt":1794199291168,"ms":6}
+{"event":"thread_runtime_start_failed","runId":"d9dfe502-48b5-4b86-aeb1-6f21fc62784a","phase":"connect","errorClass":"Error","errorCode":"unknown","status":503}
+{"msg":"cloud_startup_timing","runIdHash":"709cd90f31215387","stage":"cloud.thread.phases","phases":[{"phase":"admission","startedAt":1794199291190,"endedAt":1794199291191,"ms":1},{"phase":"execution_identity","startedAt":1794199291191,"endedAt":1794199291191,"ms":0},{"phase":"admission","startedAt":1794199291191,"endedAt":1794199291192,"ms":1},{"phase":"admission","startedAt":1794199291192,"endedAt":1794199291196,"ms":4},{"phase":"connect","startedAt":1794199291196,"endedAt":1794199291196,"ms":0}]}
+{"msg":"cloud_startup_timing","runIdHash":"709cd90f31215387","stage":"cloud.thread.ensure","startedAt":1794199291190,"endedAt":1794199291196,"ms":6}
+  ✔ a captured startup failure cannot overtake a replaced lease, successful provisioning, claim or Owner stop (126.072615ms)
+✔ cancel and thread end reach a terminal run, then afterRunEnded finalizes the Factory task (7388.35395ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 12771.443492

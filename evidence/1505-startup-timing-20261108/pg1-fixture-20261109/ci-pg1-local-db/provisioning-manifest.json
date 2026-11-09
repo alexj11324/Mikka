@@ -1,0 +1,209 @@
+{
+  "kind": "ISOLATED_LOCAL_PG17_PROVISIONING",
+  "createdAt": "2026-11-09T04:41:45.712462+00:00",
+  "majorVersion": 17,
+  "actualVersion": "17.11 (Ubuntu 17.11-1.pgdg26.04+2)",
+  "port": 55485,
+  "database": "mikka_1505_pg1_e2e",
+  "role": "mikka_1505_pg1",
+  "files": [
+    {
+      "path": "installation.json",
+      "bytes": 2983,
+      "sha256": "08df8069cecc240462a627879302aead931003f248ee02d171149eec7e6c43ea"
+    },
+    {
+      "path": "installation-inspection.json",
+      "bytes": 2444,
+      "sha256": "4073948f3565e6e4a244deb158d31cdad5faa647ecdb3cf2b25b3d4c03ec7774"
+    },
+    {
+      "path": "instance.json",
+      "bytes": 3294,
+      "sha256": "29d492ea3f750901262b3fa5f2bf213c9fa9d9a265eda8f2ecb6615f2c085b88"
+    },
+    {
+      "path": "bootstrap.py",
+      "bytes": 3381,
+      "sha256": "5088f0f133b4b695299e181c27fe5601caa0bc61221741624e9c4dfe5cc7845c"
+    },
+    {
+      "path": "bootstrap-first.py",
+      "bytes": 3270,
+      "sha256": "82cc605de0d648dd275bce6b8a8c005614612d4b3dc5e883dff3e3adac30ec15"
+    },
+    {
+      "path": "data/pg_hba.conf",
+      "bytes": 108,
+      "sha256": "834dc55b4a8f98fd6af53447719345977b2938c5504dae3e219af3ce1e580db2"
+    },
+    {
+      "path": "logs/createdb.log",
+      "bytes": 55,
+      "sha256": "88cb46494b3249cb7cc354338357ec6718eae891e2a2bbf86715ce129869ecff"
+    },
+    {
+      "path": "logs/extract-postgresql-17.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "logs/extract-postgresql-client-17.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "logs/failure-stop.log",
+      "bytes": 56,
+      "sha256": "ca19178a35ab4153b75b494963b66ce8243e1b94c173107c87b44d09db23652d"
+    },
+    {
+      "path": "logs/initdb.log",
+      "bytes": 903,
+      "sha256": "45b9908d1e16b2d0257e9fa2d952015d69437d064ccf41b5dbe53cd111be1094"
+    },
+    {
+      "path": "logs/installation-first-attempt.log",
+      "bytes": 464,
+      "sha256": "9a09220186befc33c263ef9491d6cfd542d9db5b00ceff4eeffde9aa38b1812c"
+    },
+    {
+      "path": "logs/key-dearmor.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "logs/key-inspect.log",
+      "bytes": 360,
+      "sha256": "caeecf73df0e4d8d8b2a72b7588e7333e2da6d79d89c119262e66a020bfca962"
+    },
+    {
+      "path": "logs/ldd-createdb.log",
+      "bytes": 1362,
+      "sha256": "77accc8b92a6f0f0230f6ddebff831a17fbbda91982b10700b62c6a73c76f973"
+    },
+    {
+      "path": "logs/ldd-final-libLLVM.so.21.1.log",
+      "bytes": 996,
+      "sha256": "f7ed69050946bb6bf7080de0323b6c50bf161a3cd767c594438beccd34f251e2"
+    },
+    {
+      "path": "logs/ldd-final-llvmjit.so.log",
+      "bytes": 1119,
+      "sha256": "c3d05bd645065784fd8dbd4c48a5409194e42e27cc8c5e3295f0a33dbb739689"
+    },
+    {
+      "path": "logs/ldd-initdb.log",
+      "bytes": 1759,
+      "sha256": "da6e4027c8cfee586c324ba59b34820b737ba7174e09d83310971f6fd1dbd054"
+    },
+    {
+      "path": "logs/ldd-llvmjit.log",
+      "bytes": 420,
+      "sha256": "29ecef5461d45b5f46ee401a010f257734cc0a3b9ca86d01a8b1ed571344a29d"
+    },
+    {
+      "path": "logs/ldd-pg_ctl.log",
+      "bytes": 159,
+      "sha256": "37815c78cd656e4f33c6075905bf29b02186a60d374faedd27a0112af3f95c42"
+    },
+    {
+      "path": "logs/ldd-postgres.log",
+      "bytes": 2324,
+      "sha256": "69c6355466a1e875f6478f780830285cefd4c84462a2d16329faec793270064c"
+    },
+    {
+      "path": "logs/ldd-psql.log",
+      "bytes": 1597,
+      "sha256": "767e071ff57a9a49e98f8838452e29c2b7156abb45015bf93c826c91046df2c2"
+    },
+    {
+      "path": "logs/llvm-download.log",
+      "bytes": 137,
+      "sha256": "1167034ab2f43585b346794b92922a557d7986fd6358e54049b2450822ae60a7"
+    },
+    {
+      "path": "logs/llvm-extract.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "logs/llvm-package-metadata.log",
+      "bytes": 1681,
+      "sha256": "11dbf6821c9f564a77eb5a79d5bd8310dddf4b41cc7cd241a0d9d76555296448"
+    },
+    {
+      "path": "logs/llvm-policy.log",
+      "bytes": 180,
+      "sha256": "36eff553e59ebd84b2f3eb92dc8040d0b76f450e34ff339bbbb7c685d2184f9a"
+    },
+    {
+      "path": "logs/readiness-final.log",
+      "bytes": 452,
+      "sha256": "3eea58c108df87f414dd3f357a18fd21f668b03c24a899cbb83fb7e42d508498"
+    },
+    {
+      "path": "logs/readiness.log",
+      "bytes": 507,
+      "sha256": "6a58352e6645ab068ec5cf32cfb5bdfe397ed0436f803a883b56937e8a4a4487"
+    },
+    {
+      "path": "logs/repository-signature.log",
+      "bytes": 183,
+      "sha256": "0e93c52ddd3ef18ade0348ccaa59d21b71bb7c32adcdea830272ab73b770fae7"
+    },
+    {
+      "path": "logs/start-final.log",
+      "bytes": 52,
+      "sha256": "66afd0411ccc09366e99fdd99b85f21899c8d2d064f5835126859618802153ad"
+    },
+    {
+      "path": "logs/start.log",
+      "bytes": 52,
+      "sha256": "66afd0411ccc09366e99fdd99b85f21899c8d2d064f5835126859618802153ad"
+    },
+    {
+      "path": "logs/status-final.log",
+      "bytes": 160,
+      "sha256": "54270307ffc1f57380caf5589a99c296574a735d6dc3c14becb8e4848e53a02c"
+    },
+    {
+      "path": "logs/version-createdb.log",
+      "bytes": 57,
+      "sha256": "71a6aa2077a1410c317b29af52b92e88f6738bf48d08fca036dda8a251041f51"
+    },
+    {
+      "path": "logs/version-initdb.log",
+      "bytes": 55,
+      "sha256": "5828b71474279673b16a9807419bbaeede2cdb74e9fd4740b428022ac7934b1a"
+    },
+    {
+      "path": "logs/version-pg_ctl.log",
+      "bytes": 55,
+      "sha256": "f6777cd6b9e13bf526df896de7b924f5adcfbfee3879595fef1b4bfccd50fd0e"
+    },
+    {
+      "path": "logs/version-postgres.log",
+      "bytes": 57,
+      "sha256": "d34776b4d136aa360a19c675e83adf2bed1420bef81212f6a1065758b286b291"
+    },
+    {
+      "path": "logs/version-psql.log",
+      "bytes": 53,
+      "sha256": "b797cc9322233fab6133c331b322d0b3dae67f0a55aa311ad4ecb0650912cd61"
+    },
+    {
+      "path": "README.md",
+      "bytes": 2215,
+      "sha256": "16c717382a905699ae08e3c6c3433e5faacfc915a5900c950f1877455e46421a"
+    }
+  ],
+  "excludedMutable": [
+    "data directory except pg_hba.conf identity",
+    "logs/server.log"
+  ],
+  "testsRunByProvisioner": 0,
+  "productionReads": 0,
+  "systemClusterChanges": 0,
+  "cleanupOwner": "root after single fixture regression"
+}

@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-11-09 04:38:46 UTC",
+  "scope": "Independent static review of root's stable owned-Bot run-end lifecycle fixture repair; no test execution",
+  "conclusion": "No static blocker; actual PG regression remains separately owned by root",
+  "base": "d6835377c820db7d1d4e704afed2c58cdfaec789",
+  "candidate": {
+    "candidatePath": "/vercel/mikka-1505-factory-id-semantics/lib/factory/run-end-paths.db.test.ts",
+    "base": "d6835377c820db7d1d4e704afed2c58cdfaec789",
+    "sourceBytes": 21850,
+    "sourceSha256": "19f3cb3c3e34a4d2d142fbb1c1d7e3dc1820093816eab5a41c2220df78626545",
+    "sourceGitBlob": "4e56f2101969c5c57403017880aca69dce83aad2",
+    "baseBlob": "23597148d360504680c71db62e4b5fc9fd9460ca",
+    "reverseChangeExactlyRestoresBase": true,
+    "trackedChangedPaths": [
+      "lib/factory/run-end-paths.db.test.ts"
+    ],
+    "numstat": "7\t5\tlib/factory/run-end-paths.db.test.ts",
+    "oldAssertions": 73,
+    "newAssertions": 74,
+    "testCasesUnchanged": true
+  },
+  "diff": {
+    "path": "/vercel/ops-1505/ci-pg1-fixture-repair/fixture.diff",
+    "bytes": 4395,
+    "sha256": "cc2e2e46761b14a3eb2155a0be4cd53185b7bfe9baf60e9ae4a4f0102924fcf4"
+  },
+  "findings": [
+    {
+      "subject": "Issue scope",
+      "sources": [
+        "lib/factory/scope.ts:1-9",
+        "lib/factory/store.ts:288-290"
+      ],
+      "result": "Factory issue authority uses owner or workspace/scopeVersion; locked projection has no issue.botId. Extra issues.botId mutation is unnecessary."
+    },
+    {
+      "subject": "Source scope",
+      "sources": [
+        "lib/factory/store.ts:245-261,463-464"
+      ],
+      "result": "Explicit source botId matches the existing owned cloudBotId and explicit issueId matches the route. The same original source guard now also verifies the Bot owner. No authorization predicate is removed."
+    },
+    {
+      "subject": "Run consistency",
+      "sources": [
+        "lib/factory/run-end-paths.db.test.ts:existing queue callback",
+        "lib/factory/dispatch.ts:106-107",
+        "lib/factory/run-scope.ts"
+      ],
+      "result": "The pre-existing queue callback writes the store-supplied Bot to agent_runs; dispatch already enforces matching task/run Bot or original owned-workspace cloud mapping. Added in-memory task.botId assertion checks intended fixed identity without new SQL."
+    },
+    {
+      "subject": "Cloud fixture state",
+      "sources": [
+        "lib/factory/run-end-paths.db.test.ts:original132-139"
+      ],
+      "result": "Same workspace and Bot INSERTs moved earlier, not duplicated. No parent machine/provider/snapshot creation is added; existing machine state setup, queuedCloudTask and computer_run_bindings remain unchanged."
+    },
+    {
+      "subject": "BE18 earlier attempt",
+      "sources": [
+        "lib/agent-runs.ts:477-493",
+        "lib/run-chain.ts:49-51"
+      ],
+      "result": "Original synthetic origin run and its NULL Bot remain unchanged. Chain ownership is same user+issue; no new Bot condition is imposed on this separate continuation case."
+    },
+    {
+      "subject": "Conservation",
+      "result": "Reversing only moved block/comment, store argument, source INSERT and new assertion restores the full original test byte-for-byte. All original cases and73 assertions preserved; one new assertion. Only this tracked file changed relative to d683."
+    },
+    {
+      "subject": "Race coverage boundary",
+      "result": "The lifecycle fixture now uses a stable owned Bot instead of participating in legacy NULL-Bot adoption. Product backfill/allowedSource stays intact. Source establishes the race can occur, but CI did not directly trace the original failed row transition."
+    }
+  ],
+  "validationBoundary": {
+    "peerRanTests": false,
+    "peerStartedDB": false,
+    "peerEditedProduct": false,
+    "peerReadNetwork": false,
+    "ciFailurePreserved": true,
+    "newCandidateNotCIValidated": true,
+    "sourceOnlyStatementCount": "The two setup INSERTs were moved, not added. Event INSERT gains explicit fields; test wire bytes were not measured.",
+    "remaining": "Root's one original full DB test-file run must supply actual regression result; no peer duplicate run."
+  },
+  "priorFailureReceipt": {
+    "path": "/vercel/ops-1505/ci-new9ef/pg1-first-failure-source-review.json",
+    "sha256": "4f37205dcdcb24ef7f1a9968ab08672d8dc4728dfe151860cd57d5fd4b720187"
+  }
+}
