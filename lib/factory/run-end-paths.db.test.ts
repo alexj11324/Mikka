@@ -46,12 +46,15 @@ test("cancel and thread end reach a terminal run, then afterRunEnded finalizes t
 
     await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','Fixture','runend@example.invalid',true,now(),now())`);
     const deviceId = randomUUID(), agentId = randomUUID(), repoId = randomUUID(), workspaceId = await seedFixtureWorkspace(pool, 'owner', 'team');
+    // Keep fixture sources out of the Coordinator's legacy null-Bot backfill.
+    const cloudBotId = randomUUID();
+    await pool.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,'owner',$2,'Startup fixture')`, [cloudBotId, workspaceId]);
     await pool.query(`INSERT INTO devices (id,"ownerId",name,"lastSeenAt",harnesses) VALUES ($1,'owner','Disposable',now(),'[{"harness":"codex","installed":true}]')`, [deviceId]);
     await pool.query(`INSERT INTO agents (id,"userId",name,harness,"deviceId") VALUES ($1,'owner','Fixture','codex',$2)`, [agentId, deviceId]);
     await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,'owner','/fixture/repo')`, [repoId, deviceId]);
     const authorize = async (user: string, issue: string, tx: PoolClient) =>
       (await tx.query('SELECT id FROM issues WHERE id=$1 AND "userId"=$2', [issue, user])).rowCount === 1;
-    const store = createFactoryStore(pool, authorize, null, { independent: factoryCheckIndependent });
+    const store = createFactoryStore(pool, authorize, cloudBotId, { independent: factoryCheckIndependent });
     const dispatch = createFactoryDispatch(pool, store, async (tx, userId, input, botId) => {
       const runId = randomUUID();
       await tx.query(`INSERT INTO agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId","botId",status,prompt) VALUES ($1,$2,$3,$4,$5,$6,$7,'queued','Fixture')`, [runId, userId, input.issueId, input.agentId, deviceId, input.deviceRepoId, botId]);
@@ -60,8 +63,9 @@ test("cancel and thread end reach a terminal run, then afterRunEnded finalizes t
     const runningTask = async () => {
       const issueId = randomUUID(), src = randomUUID();
       await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState",scope) VALUES ($1,'owner','Fixture','{"type":"doc","content":[]}','todo','normal',$2,'bound','workspace')`, [issueId, workspaceId]);
-      await pool.query(`INSERT INTO coordinator_events (id,"userId",kind,"dedupeKey",payload) VALUES ($1,'owner','user_message',$2,'{"text":"synthetic"}')`, [src, src]);
+      await pool.query(`INSERT INTO coordinator_events (id,"userId","botId","issueId",kind,"dedupeKey",payload) VALUES ($1,'owner',$3,$4,'user_message',$2,'{"text":"synthetic"}')`, [src, src, cloudBotId, issueId]);
       const r = await store.route("owner", { issueId, sourceEventId: src, eventId: randomUUID(), rationale: "Task requested", missingInformation: [], missingPermissions: [], needsSpec: false });
+      assert.equal(r.task.botId, cloudBotId, "the task keeps its source Bot");
       const run = await dispatch("owner", { binding: factoryBinding(r.task), agentId, deviceRepoId: repoId });
       await pool.query(`UPDATE agent_runs SET status='running',"startedAt"=now() WHERE id=$1`, [run.runId]);
       return { taskId: r.task.id, runId: run.runId };
@@ -130,8 +134,6 @@ test("cancel and thread end reach a terminal run, then afterRunEnded finalizes t
 
     // No parent cloud machine is provisioned: ensureThreadMachine fails
     // before provider I/O, reproducing an admitted but unclaimed startup error.
-    const cloudBotId = randomUUID();
-    await pool.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,'owner',$2,'Startup fixture')`, [cloudBotId, workspaceId]);
     const queuedCloudTask = async (machine = true) => {
       const f = await runningTask();
       await pool.query(`UPDATE agent_runs SET status='queued',"startedAt"=NULL,"agentDefinition"="agentDefinition" || '{"model":"gpt-6-luna"}'::jsonb WHERE id=$1`, [f.runId]);
