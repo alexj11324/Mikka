@@ -15,7 +15,7 @@ const marker = (patch = {}) => '<!-- mikka-inbox-1820 ' + JSON.stringify({ state
 function metadata(options = {}) {
   const calls = [], env = { MIKKA_ACCEPTANCE_TARGET_MODE: CORE_MODE, GITHUB_REPOSITORY: repository.full_name,
     GITHUB_REPOSITORY_OWNER: 'alexj11324', GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_run',
-    GITHUB_SHA: SOURCE, GITHUB_RUN_ID: '17', GITHUB_RUN_ATTEMPT: '1', GH_TOKEN: 'synthetic-metadata-token',
+    GITHUB_SHA: SOURCE, GITHUB_RUN_ID: '17', GITHUB_RUN_ATTEMPT: String(options.attempt ?? 1), GH_TOKEN: 'synthetic-metadata-token',
     GITHUB_WORKFLOW_REF: repository.full_name + '/' + CORE_WORKFLOW + '@refs/heads/main' }
   for (const key of ['SMOKE_OWNER_EMAIL', 'SMOKE_OWNER_PASSWORD', 'INFISICAL_CLIENT_SECRET'])
     Object.defineProperty(env, key, { get() { return assert.fail('selection cannot read ' + key) } })
@@ -52,7 +52,7 @@ function metadata(options = {}) {
       const number = Number(path.slice(8)); assert.ok(CORE_ISSUES.includes(number))
       return Response.json({ number, url: url.href, repository_url: API, state: number === 1820 && !options.closed ? 'open' : 'closed' })
     }
-    if (path === '/actions/runs/17') return Response.json({ id: 17, run_attempt: 1, repository, head_repository: repository,
+    if (path === '/actions/runs/17') return Response.json({ id: 17, run_attempt: options.attempt ?? 1, repository, head_repository: repository,
       url: url.href, path: CORE_WORKFLOW, event: 'workflow_run', head_branch: 'main', head_sha: SOURCE,
       status: 'in_progress', conclusion: null })
     if (path === '/git/ref/heads/main') return Response.json({ ref: 'refs/heads/main', object: { type: 'commit', sha: options.main ?? SOURCE } })
@@ -164,4 +164,15 @@ test('fixture selection emits only closed public metadata and pins its source', 
     const proof = await metadata({ marker }).select()
     assert.equal(proof.selected, false); assert.equal(proof.reason, 'window_not_active')
   }
+})
+
+test('cleanup selection pins an exact earlier attempt journal and forbids new fixture metadata', async () => {
+  const recovery = { schema: 1, purpose: 'mikka1820-journal-recovery', runId: 17, attempt: 1, jobId: 91, journalSha256: 'e'.repeat(64) }
+  const f = metadata({ attempt: 2, marker: { phase: 'cleanup', recovery } }), selected = await f.select()
+  assert.equal(selected.selected, true); assert.deepEqual(selected.window.recovery, recovery); assert.equal(selected.window.fixture, null)
+  for (const marker of [{ phase: 'cleanup' }, { phase: 'cleanup', recovery: { ...recovery, token: 'private' } },
+    { phase: 'inventory', recovery }, { phase: 'cleanup', recovery, fixture: {} }])
+    assert.equal((await metadata({ attempt: 2, marker }).select()).selected, false)
+  for (const patch of [{ attempt: 2 }, { runId: 18 }])
+    await assert.rejects(metadata({ attempt: 2, marker: { phase: 'cleanup', recovery: { ...recovery, ...patch } } }).select(), /inbox_window_invalid/)
 })

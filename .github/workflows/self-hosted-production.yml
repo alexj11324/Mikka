@@ -33,7 +33,7 @@ jobs:
       - uses: ./.github/actions/pnpm-install
         with:
           ffmpeg-github-token: ${{ github.token }}
-      - run: node --import tsx --test scripts/acceptance/self-hosted-production.test.mjs scripts/ops/production-mobile-daemon.test.mjs scripts/acceptance/inbox-production.test.mjs scripts/acceptance/inbox-production-target.test.mjs
+      - run: node --import tsx --test scripts/acceptance/self-hosted-production.test.mjs scripts/ops/production-mobile-daemon.test.mjs scripts/acceptance/inbox-production.test.mjs scripts/acceptance/inbox-production-target.test.mjs scripts/acceptance/inbox-production-recovery.test.mjs
 
   acceptance:
     name: Core production API and gateway acceptance
@@ -115,6 +115,8 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: self-hosted-production-${{ github.run_id }}-${{ github.run_attempt }}
-          path: self-hosted-production-report/*.json
+          path: |
+            self-hosted-production-report/*.json
+            self-hosted-production-report/inbox-journal.jsonl
           if-no-files-found: ignore
           retention-days: 14

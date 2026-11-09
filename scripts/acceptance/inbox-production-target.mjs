@@ -2,6 +2,7 @@
 // This read-only selection runs before the existing Infisical account step.
 import { createHash } from 'node:crypto'
 import { coreProductionGuard, attestCoreProduction, assertCoreProductionTarget, CoreProductionError } from './self-hosted-production-target.mjs'
+import { inboxRecoveryReference } from './inbox-production-recovery.mjs'
 
 export const INBOX_PR = 1822
 export const INBOX_BRANCH = 'feat/inbox-1820'
@@ -61,14 +62,20 @@ export function inboxWindowProof(comment, { headSha, sourceSha, now = Date.now()
   check(Number.isFinite(starts) && Number.isFinite(expires) && starts <= now && expires > now
     && expires - starts > 0 && expires - starts <= 120 * 60_000, 'inbox_window_invalid', 'time')
   const phase = marker.phase ?? 'inventory'
-  check(['inventory', 'fixture'].includes(phase) && (phase !== 'inventory' || marker.fixture === undefined), 'inbox_window_invalid', 'marker')
+  check(['inventory', 'fixture', 'cleanup'].includes(phase) && (phase === 'fixture' || marker.fixture === undefined)
+    && (phase === 'cleanup' || marker.recovery === undefined), 'inbox_window_invalid', 'marker')
   const fixture = phase === 'fixture' ? fixtureMetadata(marker.fixture) : null
+  let recovery = null
+  if (phase === 'cleanup') {
+    try { recovery = inboxRecoveryReference(marker.recovery) }
+    catch { throw new InboxSelectionError('inbox_window_invalid', 'marker') }
+  }
   check(!fixture || fixture.applicationSha === sourceSha, 'inbox_window_invalid', 'marker')
   const markerSha256 = digest(matches[0][0])
   check(!expected || expected.markerSha256 === markerSha256 && expected.headSha === headSha && expected.sourceSha === sourceSha,
     'inbox_window_invalid', 'marker')
   return { commentId: comment.id, branch: INBOX_BRANCH, headSha, sourceSha,
-    startsAt: marker.startsAt, expiresAt: marker.expiresAt, markerSha256, phase, fixture }
+    startsAt: marker.startsAt, expiresAt: marker.expiresAt, markerSha256, phase, fixture, recovery }
 }
 
 export async function readInboxWindow(read, { headSha, sourceSha, now = Date.now, expected } = {}) {
@@ -149,5 +156,7 @@ export async function selectInboxProduction({ env = process.env, event, attestat
     throw error
   }
   check(Date.parse(window.expiresAt) > now(), 'inbox_window_invalid', 'time')
+  if (window.phase === 'cleanup') check(window.recovery.runId === guard.driverRunId
+    && window.recovery.attempt < guard.driverRunAttempt, 'inbox_window_invalid', 'marker')
   return { ...empty('exact_pr_merge_and_active_window'), selected: true, status: 'selected', headSha: pr.head.sha, window, attestation: target }
 }

@@ -3,11 +3,13 @@ import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { InboxSelectionError } from './inbox-production-target.mjs'
-import { inboxLiveSocket, runInboxProduction, verifyInboxFixture } from './inbox-production.mjs'
+import { InboxRecoveryError, inboxBindingJournal } from './inbox-production-recovery.mjs'
+import { inboxLiveSocket, inboxProductionExitCode, runInboxProduction, verifyInboxFixture } from './inbox-production.mjs'
 
 const SHA = 'a'.repeat(40), NOW = Date.parse('2026-11-09T22:00:00.000Z')
 const OWNER = 'private-owner-canary', EMAIL = 'fixture+mikka-smoke@example.invalid'
 const PASSWORD = 'private-password-canary', COOKIE = 'private-cookie-canary'
+const OLD_SESSION = 'private-old-session-canary', OLD_TOKEN = 'private-old-session-token-canary-32', OTHER_SESSION = 'private-unrelated-session-canary'
 const TEAM = '10000000-0000-4000-8000-000000000001', HOME = '10000000-0000-4000-8000-000000000002'
 const ITEM = '20000000-0000-4000-8000-000000000001', HISTORICAL = '20000000-0000-4000-8000-000000000002'
 const ISSUE = '30000000-0000-4000-8000-000000000001', TASK_PR = '40000000-0000-4000-8000-000000000001'
@@ -37,6 +39,15 @@ class Socket extends EventTarget {
 function fixture(options = {}) {
   const calls = [], receipts = [], history = [], mutations = [], sockets = []
   let clock = NOW, loggedIn = false, selected = HOME, snoozedUntil = null, rejectedAt = null, due = false, versionReads = 0
+  let oldSessionPresent = options.originalSessionAbsent !== true
+  if (options.recovery) {
+    selected = TEAM
+    if (options.recovery === 'snoozed') snoozedUntil = new Date(NOW + 120_000).toISOString()
+    if (options.recovery === 'done') {
+      rejectedAt = new Date(NOW - 60_000).toISOString()
+      history.push({ id: '60000000-0000-4000-8000-000000000001', action: 'rejected', actorId: OWNER, at: rejectedAt, runId: null })
+    }
+  }
   const keys = (at = clock) => { clock = at; for (const socket of sockets) for (const kind of ['issue_list', 'pending_actions']) socket.frame({ kind, id: HOME }) }
   const row = (id = ITEM, done = false) => ({ id, type: 'suggestion', source: 'github', title: id === HISTORICAL ? 'existing private title canary' : 'action title changed by model',
     ownerId: OWNER, issueId: null, runId: null, reason: null, pending: id === HISTORICAL || rejectedAt === null, canReply: false,
@@ -70,6 +81,16 @@ function fixture(options = {}) {
     if (path === '/api/auth/get-session') return response(loggedIn && headers.get('cookie')?.includes(COOKIE)
       ? { user: { id: OWNER, email: EMAIL }, session: { id: 'private-session-canary' } } : null)
     assert.ok(loggedIn && headers.get('cookie')?.includes(COOKIE))
+    if (path === '/api/auth/list-sessions') return response([
+      { id: 'private-session-canary', userId: OWNER, token: 'private-current-session-token-canary' },
+      { id: OTHER_SESSION, userId: OWNER, token: 'private-unrelated-session-token-canary' },
+      ...(oldSessionPresent ? [{ id: OLD_SESSION, userId: OWNER, token: OLD_TOKEN }] : []),
+    ])
+    if (path === '/api/auth/revoke-session') {
+      assert.equal(body.token, OLD_TOKEN); assert.equal(receipts[0]?.state, 'recovery_bound_before_cleanup')
+      if (!options.ignoreOldSessionRevoke) oldSessionPresent = false
+      return response({ status: true })
+    }
     if (path === '/api/auth/sign-out') { if (!options.ignoreLogout) loggedIn = false; return response({ success: true }, 200, { 'set-cookie': 'session=; Path=/; Max-Age=0' }) }
     if (path === '/api/rpc') {
       assert.equal(body.action, 'workspace.switchWorkspace'); assert.ok([TEAM, HOME].includes(body.args[0])); selected = body.args[0]
@@ -102,6 +123,7 @@ function fixture(options = {}) {
           if (tab === 'snoozed' && snoozedUntil) items = [row()]
           if (tab === 'done') items = history.map(completion => ({ ...row(ITEM, true), completion }))
         }
+        if (options.recoveryMissing) items = items.filter(item => item.id !== ITEM)
         const result = response({ items, nextCursor: null, historySince: new Date(NOW - 600_000).toISOString(), historyBackfilled: false,
           live: { workspaceId: workspace, keys: ['issue_list', 'pending_actions'] } })
         if (due && tab === 'snoozed' && items.length) {
@@ -113,6 +135,7 @@ function fixture(options = {}) {
         return result
       }
       assert.equal(method, 'POST'); assert.equal(body.id, ITEM); assert.equal(body.workspaceId, HOME); assert.equal(body.type, 'suggestion')
+      assert.ok(['bound_before_mutation', 'recovery_bound_before_cleanup'].includes(receipts[0]?.state), 'a completed journal write must precede every fixture mutation')
       mutations.push(body.action)
       if (options.cleanupFailure && mutations.length > 8 && body.action === 'reject') return response({ error: 'inboxConflict', raw: PASSWORD, cookie: COOKIE }, 500)
       let changed = false
@@ -130,25 +153,38 @@ function fixture(options = {}) {
     }
     assert.fail('Unexpected API path ' + path)
   }
-  const args = { env: { SMOKE_OWNER_EMAIL: EMAIL, SMOKE_OWNER_PASSWORD: PASSWORD, GITHUB_RUN_ID: '123', GITHUB_RUN_ATTEMPT: '1' },
+  const reference = { schema: 1, purpose: 'mikka1820-journal-recovery', runId: 123, attempt: 1, jobId: 71, journalSha256: 'e'.repeat(64) }
+  const args = { env: { SMOKE_OWNER_EMAIL: EMAIL, SMOKE_OWNER_PASSWORD: PASSWORD, GITHUB_RUN_ID: '123', GITHUB_RUN_ATTEMPT: options.recovery ? '2' : '1' },
     event: {}, attestation: {}, fetchImpl, now: () => clock,
     selectTarget: async ({ assertTarget }) => {
       if (options.windowLost && mutations.length) throw new InboxSelectionError('inbox_window_invalid', 'marker')
       return { purpose: 'inbox-1820-production-selection', selected: true, applicationSha: SHA, headSha: 'b'.repeat(40),
-        window: { commentId: 5, markerSha256: 'c'.repeat(64), phase: options.inventoryOnly ? 'inventory' : 'fixture',
-          expiresAt: new Date(NOW + 1200_000).toISOString(), fixture: options.inventoryOnly ? null : fixtureManifest() },
+        driverRunId: 123, driverRunAttempt: options.recovery ? 2 : 1,
+        window: { commentId: 5, markerSha256: 'c'.repeat(64), phase: options.recovery ? 'cleanup' : options.inventoryOnly ? 'inventory' : 'fixture',
+          expiresAt: new Date(NOW + 1200_000).toISOString(), fixture: options.inventoryOnly || options.recovery ? null : fixtureManifest(),
+          recovery: options.recovery ? reference : null },
         attestation: await assertTarget({}) }
     },
     assertTarget: async () => ({ status: 'ready', applicationSha: SHA, driverRunId: 123, openIssues: [1820] }),
     selectTeam: async (client, { ownerId }, remember) => { assert.equal(ownerId, OWNER); remember(HOME); await client.rpc('workspace.switchWorkspace', [TEAM]); return { workspaceId: TEAM } },
     socketFactory: () => { const socket = new Socket(); sockets.push(socket); return socket },
+    readRecovery: async () => {
+      if (options.recoveryProofFailure) throw new InboxRecoveryError('recovery_log_invalid')
+      return { reference, proof: { source: 'completed_github_job_log', originalAttempt: 1, journalSha256: reference.journalSha256 },
+        journal: inboxBindingJournal({ schema: 1, purpose: 'mikka1820-exact-suggestion', applicationSha: SHA, headSha: 'b'.repeat(40),
+          driverRunId: 123, driverAttempt: 1, window: { commentId: 4, markerSha256: 'd'.repeat(64) }, ownerHash: hash(options.recoveryForeignOwner ? 'other-owner' : OWNER),
+          workspaceId: HOME, suggestionId: ITEM, originalWorkspaceId: HOME, selectedWorkspaceId: TEAM, sessionIdHash: hash(OLD_SESSION),
+          priorSessionIdHashes: [], recoveryOf: null, nonce: NONCE, sourceUrl: SOURCE, occurredAt: sourceComment().created_at,
+          action: 'reply', required: false, externalSourceClosed: true, sourceEventId: 91, sourceIssueNumber: 73,
+          state: 'bound_before_mutation', observedAt: new Date(NOW - 30_000).toISOString() }) }
+    },
     writeReceipt: async value => { if (options.receiptFailure) throw new Error(PASSWORD); receipts.push(structuredClone(value)) } }
-  return { args, calls, receipts, mutations, history, sockets, state: () => ({ loggedIn, selected, snoozedUntil, rejectedAt }) }
+  return { args, calls, receipts, mutations, history, sockets, state: () => ({ loggedIn, selected, snoozedUntil, rejectedAt, oldSessionPresent }) }
 }
 
 function noLeaks(report) {
   const text = JSON.stringify(report)
-  for (const secret of [OWNER, EMAIL, PASSWORD, COOKIE, 'private-session-canary', 'existing private title canary', 'private-branch-canary'])
+  for (const secret of [OWNER, EMAIL, PASSWORD, COOKIE, OLD_SESSION, OLD_TOKEN, OTHER_SESSION, 'private-session-canary', 'existing private title canary', 'private-branch-canary'])
     assert.equal(text.includes(secret), false, 'closed receipt must not contain ' + secret)
 }
 
@@ -170,9 +206,47 @@ test('withdrawn release authority stops new business but finishes only the journ
   noLeaks(report)
 })
 
+test('recovery handles pending, snoozed and already rejected exact objects without new fixtures, suggestions wakeups or acceptance credit', async () => {
+  for (const state of ['pending', 'snoozed', 'done']) {
+    const f = fixture({ recovery: state, windowLost: true }), report = await runInboxProduction(f.args)
+    assert.equal(report.status, 'cleanup_passed', JSON.stringify(report.failure ?? report.cleanup.failures))
+    assert.equal(inboxProductionExitCode(report), 2, 'cleanup success cannot turn incomplete business acceptance green')
+    assert.equal(report.completeAcceptance, false); assert.equal(report.recovery.priorState, state)
+    assert.deepEqual(f.mutations, ['reopen', 'reject']); assert.equal(f.receipts[0].state, 'recovery_bound_before_cleanup')
+    assert.deepEqual(f.receipts[0].priorSessionIdHashes, [hash(OLD_SESSION)])
+    assert.equal(report.cleanup.originalSessionsRevoked, 1); assert.equal(f.state().oldSessionPresent, false)
+    assert.equal(report.cleanup.workspaceRestored, true); assert.equal(f.state().selected, HOME)
+    assert.equal(report.cleanup.originalCookieRejected, true); assert.equal(f.sockets.length, 0)
+    assert.equal(f.calls.some(call => ['/api/suggestions', '/api/integrations/github', '/api/issues/search', '/api/live/ticket'].includes(call.path)), false)
+    noLeaks(report); noLeaks(f.receipts)
+  }
+})
+
+test('missing original proof rejects before sign-in; foreign ownership, missing object or unwritten new journal cannot authorize recovery writes', async () => {
+  const absent = fixture({ recovery: 'snoozed', recoveryProofFailure: true }), first = await runInboxProduction(absent.args)
+  assert.equal(first.failure.code, 'recovery_log_invalid'); assert.equal(absent.calls.some(call => call.path.startsWith('/api/auth/')), false)
+  for (const options of [{ recoveryForeignOwner: true }, { recoveryMissing: true }, { receiptFailure: true }]) {
+    const f = fixture({ recovery: 'snoozed', ...options }), report = await runInboxProduction(f.args)
+    assert.equal(report.status, 'failed'); assert.equal(report.completeAcceptance, false); assert.equal(f.mutations.length, 0)
+    assert.equal(f.calls.some(call => ['/api/rpc', '/api/auth/revoke-session'].includes(call.path)), false)
+    assert.equal(report.cleanup.originalCookieRejected, true); noLeaks(report)
+  }
+})
+
+test('original session absence is exact and a false revoke success cannot hide a remaining session', async () => {
+  const absent = fixture({ recovery: 'done', originalSessionAbsent: true }), passed = await runInboxProduction(absent.args)
+  assert.equal(passed.status, 'cleanup_passed'); assert.equal(passed.recovery.originalSessionsAbsent, 1)
+  assert.equal(absent.calls.some(call => call.path === '/api/auth/revoke-session'), false)
+  const present = fixture({ recovery: 'snoozed', ignoreOldSessionRevoke: true }), failed = await runInboxProduction(present.args)
+  assert.equal(failed.status, 'failed'); assert.equal(failed.cleanup.status, 'failed')
+  assert.equal(failed.cleanup.failures[0].step, 'original_sessions'); assert.equal(failed.cleanup.originalCookieRejected, true)
+  noLeaks(passed); noLeaks(failed)
+})
+
 test('inventory reads real owner metadata without suggestions side effects or historical mutations', async () => {
   const f = fixture({ inventoryOnly: true }), report = await runInboxProduction(f.args)
   assert.equal(report.status, 'partial'); assert.equal(report.completeAcceptance, false); assert.equal(report.apiStatus, 'passed')
+  assert.equal(inboxProductionExitCode(report), 2)
   assert.equal(report.coverage.cachedReviewSummary, 'handoff_complete_snapshot_readback'); assert.equal(report.coverage.noPrNull, 'normal_owner_flow_null')
   assert.equal(report.inventory.github.recipients[0].id, '42')
   assert.equal(f.calls.some(call => call.path === '/api/suggestions'), false); assert.equal(f.mutations.length, 0)
@@ -183,6 +257,7 @@ test('inventory reads real owner metadata without suggestions side effects or hi
 test('exact owned source runs transitions, duplicates, real push boundary and receipt readbacks, then cleans', async () => {
   const f = fixture(), report = await runInboxProduction(f.args)
   assert.equal(report.status, 'passed', JSON.stringify(report.failure)); assert.equal(report.completeAcceptance, true)
+  assert.equal(inboxProductionExitCode(report), 0)
   assert.equal(report.checks.suggestionsReadMayWriteBriefingAndTriggers, true)
   assert.equal(report.coverage.snoozeExpiryPush, 'due_timer_push_and_single_readback')
   assert.equal(report.cleanup.ownSuggestionDismissed, true); assert.equal(report.cleanup.immutableReceiptsRetained, 2)

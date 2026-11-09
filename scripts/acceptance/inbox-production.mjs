@@ -10,6 +10,7 @@ import { pathToFileURL } from 'node:url'
 import { createSessionClient, smokeAcceptanceAccount, selectAcceptanceTeam, restoreAcceptanceWorkspace } from './cloud-startup.mjs'
 import { assertCoreProductionTarget, attestCoreProduction, CORE_ORIGIN } from './self-hosted-production-target.mjs'
 import { selectInboxProduction, inboxSelectionFailure } from './inbox-production-target.mjs'
+import { inboxBindingJournal, inboxJournalEnvelope, INBOX_JOURNAL_PREFIX, inboxRecoveryFailure, readInboxRecovery } from './inbox-production-recovery.mjs'
 import { liveInvalidation, liveReadiness } from '../../lib/live/events.ts'
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
@@ -20,7 +21,7 @@ const GATEWAYS = new Set(['wss://mikka-gateway.aspectlylabs.com', 'wss://mikka-d
 const LIVE_KEYS = ['issue_list', 'pending_actions']
 const CODES = new Set(['target_refused', 'build_changed', 'identity_failed', 'response_invalid', 'unexpected_status',
   'fixture_binding_failed', 'fixture_unavailable', 'fixture_expired', 'inventory_incomplete', 'command_mismatch',
-  'receipt_mismatch', 'live_invalid', 'live_disconnected', 'live_timeout', 'cleanup_failed', 'request_failed', 'receipt_failed'])
+  'receipt_mismatch', 'live_invalid', 'live_disconnected', 'live_timeout', 'cleanup_failed', 'request_failed', 'receipt_failed', 'recovery_scope_invalid'])
 const BODY_CODES = new Set(['authRequired', 'originNotAllowed', 'workspaceAccessDenied', 'inboxNotFound', 'inboxConflict',
   'inboxInvalid', 'factoryNotFound', 'factoryHumanRequired', 'factoryUnavailable', 'githubUnavailable',
   'githubNotConnected', 'githubNotConfigured', 'githubAccessDenied', 'cloud_access_denied'])
@@ -43,7 +44,7 @@ function selectionError(error) {
   }
   return null
 }
-const failure = error => inboxSelectionFailure(selectionError(error)) ?? ({ code: CODES.has(error?.message) ? error.message : 'request_failed',
+const failure = error => inboxSelectionFailure(selectionError(error)) ?? inboxRecoveryFailure(error) ?? ({ code: CODES.has(error?.message) ? error.message : 'request_failed',
   ...(Number.isInteger(error?.status) ? { httpStatus: error.status } : {}),
   ...(error instanceof ProbeError && error.body ? { body: error.body } : {}) })
 async function responseJson(response) {
@@ -220,7 +221,7 @@ function reviewSummary(flow) {
 export async function runInboxProduction({ env = process.env, event, attestation, selection, fetchImpl = fetch,
   selectTarget = selectInboxProduction,
   assertTarget = assertCoreProductionTarget, selectTeam = selectAcceptanceTeam, restoreWorkspace = restoreAcceptanceWorkspace,
-  now = Date.now, socketFactory, writeReceipt = async () => {} } = {}) {
+  now = Date.now, socketFactory, readRecovery = readInboxRecovery, writeReceipt = async () => { throw new ProbeError('receipt_failed') } } = {}) {
   const report = { schema: 1, kind: 'mikka1820-production-api', status: 'failed', completeAcceptance: false,
     startedAt: new Date(now()).toISOString(), checks: {}, responses: [], inventory: {}, cleanup: { failures: [] },
     coverage: { inboxRead: 'not_exercised', rejectUndo: 'not_exercised', snoozeReopen: 'not_exercised',
@@ -230,7 +231,9 @@ export async function runInboxProduction({ env = process.env, event, attestation
       'The owner API retains completion history; cleanup dismisses only the exact disposable suggestion and leaves its receipt.'] }
   let client, account, ownerId, source, originalWorkspaceId, originalCookie = '', personalWorkspaceId, signInAttempted = false
   let suggestionId, boundFixture, live, phase = 'target', deadline, closing = false, bindingJournaled = false
-  let selected, fixture
+  let selected, fixture, recovery, selectedWorkspaceId, sessionIdHash, identitySessionId
+  let priorSessionIdHashes = []
+  const recoverySessions = [], recoveryTokens = new Set()
   const cleanupWriteAllowed = (path, init) => {
     if (init.method !== 'POST' || typeof init.body !== 'string' || init.body.length > 4096) return false
     let body; try { body = JSON.parse(init.body) } catch { return false }
@@ -238,8 +241,11 @@ export async function runInboxProduction({ env = process.env, event, attestation
     const keys = Object.keys(body).sort().join(',')
     if (path === '/mikka/api/auth/sign-out') return keys === ''
     if (!ownerId) return false
+    if (path === '/mikka/api/auth/revoke-session') return bindingJournaled && Boolean(recovery)
+      && keys === 'token' && recoveryTokens.has(body.token)
     if (path === '/mikka/api/rpc') return keys === 'action,args,version' && body.version === 1
       && body.action === 'workspace.switchWorkspace' && UUID.test(originalWorkspaceId ?? '')
+      && (!recovery || bindingJournaled)
       && Array.isArray(body.args) && body.args.length === 1 && body.args[0] === originalWorkspaceId
     return path === '/mikka/api/inbox' && bindingJournaled && Boolean(boundFixture)
       && keys === 'action,id,type,workspaceId' && body.workspaceId === personalWorkspaceId
@@ -305,11 +311,14 @@ export async function runInboxProduction({ env = process.env, event, attestation
     check(typeof result.body?.changed === 'boolean' && (expectedChanged === null || result.body.changed === expectedChanged), 'command_mismatch')
   }
   const checkpoint = async state => {
-    try { await writeReceipt({ schema: 1, purpose: 'mikka1820-exact-suggestion', applicationSha: source,
+    try { await writeReceipt(inboxBindingJournal({ schema: 1, purpose: 'mikka1820-exact-suggestion', applicationSha: source,
+      headSha: selected.headSha, window: { commentId: selected.window.commentId, markerSha256: selected.window.markerSha256 },
       driverRunId: Number(env.GITHUB_RUN_ID), driverAttempt: Number(env.GITHUB_RUN_ATTEMPT), ownerHash: digest(ownerId),
-      workspaceId: personalWorkspaceId, suggestionId, ...boundFixture, state, observedAt: new Date(now()).toISOString() }) }
+      workspaceId: personalWorkspaceId, suggestionId, originalWorkspaceId, selectedWorkspaceId, sessionIdHash,
+      priorSessionIdHashes, recoveryOf: recovery?.reference ?? null,
+      ...boundFixture, state, observedAt: new Date(now()).toISOString() })) }
     catch { throw new ProbeError('receipt_failed') }
-    if (state === 'bound_before_mutation') bindingJournaled = true
+    if (['bound_before_mutation', 'recovery_bound_before_cleanup'].includes(state)) bindingJournaled = true
   }
   const githubRead = async path => {
     check(/^\/repos\/alexj11324\/Mikka-handoff\/issues\/(?:[1-9]\d*|(?:events|comments)\/[1-9]\d*)$/.test(path)
@@ -337,6 +346,11 @@ export async function runInboxProduction({ env = process.env, event, attestation
     fixture = selected.window.phase === 'fixture' ? selected.window.fixture : undefined
     deadline = Date.now() + 240_000
     await lease()
+    if (selected.window.phase === 'cleanup') {
+      phase = 'recovery_proof'
+      recovery = await readRecovery({ reference: selected.window.recovery, selected, env, fetchImpl: boundedFetch, now })
+      report.recovery = { ...recovery.proof, reference: recovery.reference }
+    }
     account = smokeAcceptanceAccount(env)
     client = createSessionClient(CORE_ORIGIN, async (url, init) => {
       const targetUrl = new URL(url), headers = new Headers(init.headers)
@@ -358,141 +372,182 @@ export async function runInboxProduction({ env = process.env, event, attestation
     check(identity?.user?.email?.toLowerCase() === account.email.toLowerCase() && typeof identity.user.id === 'string'
       && identity.user.id && typeof identity.session?.id === 'string' && originalCookie, 'identity_failed')
     ownerId = identity.user.id; report.inventory.ownerHash = digest(ownerId)
-    const teamSelection = await selectTeam(client, { ownerId }, value => { originalWorkspaceId = value })
-    const settings = await read('workspace', '/api/workspace')
-    check(settings?.currentUserId === ownerId && settings.workspace?.id === teamSelection.workspaceId
-      && settings.workspace.kind === 'team' && Array.isArray(settings.choices), 'identity_failed')
-    const choices = settings.choices
-    check(choices.every(row => UUID.test(row.id ?? '') && ['personal', 'team'].includes(row.kind))
-      && new Set(choices.map(row => row.id)).size === choices.length, 'identity_failed')
-    const homes = choices.filter(row => row.kind === 'personal')
-    check(homes.length === 1, 'identity_failed'); personalWorkspaceId = homes[0].id
-    report.inventory.personalWorkspaceId = personalWorkspaceId
-    report.inventory.fixtureRequest = { schema: 1, purpose: 'mikka1820-owner-github-fixture', nonce: randomUUID(),
-      applicationSha: source, inventoryRunId: Number(env.GITHUB_RUN_ID), inventoryRunAttempt: Number(env.GITHUB_RUN_ATTEMPT),
-      ownerHash: digest(ownerId), workspaceId: personalWorkspaceId, createdAt: new Date(now()).toISOString(),
-      expiresAt: new Date(now() + 6 * 60 * 60_000).toISOString() }
-    report.inventory.workspaceCount = choices.length; report.inventory.workspaces = []
-    const scopes = [homes[0], ...choices.filter(row => row.id !== personalWorkspaceId)].slice(0, 32)
-    report.inventory.workspaceDiscoveryComplete = scopes.length === choices.length
-    for (const [index, workspace] of scopes.entries()) {
-      const observation = { kind: workspace.kind, selectedTeam: workspace.id === teamSelection.workspaceId, tabs: {} }
-      for (const tab of ['pending', 'snoozed', 'done']) {
-        const page = await pages(workspace.id, tab, `inventory_${index}_${tab}`)
-        observation.tabs[tab] = { count: page.items.length, suggestions: page.items.filter(item => item.type === 'suggestion').length,
-          tasks: page.items.filter(item => item.type === 'task').length, complete: page.complete, pages: page.pages, historySince: page.historySince }
+    identitySessionId = identity.session.id; sessionIdHash = digest(identitySessionId)
+    if (recovery) {
+      phase = 'recovery_scope'
+      const original = recovery.journal, settings = await read('recovery_workspace', '/api/workspace')
+      check(original.ownerHash === digest(ownerId) && original.sessionIdHash !== sessionIdHash
+        && settings?.currentUserId === ownerId && Array.isArray(settings.choices)
+        && settings.choices.filter(row => row.kind === 'personal' && row.id === original.workspaceId).length === 1
+        && [original.originalWorkspaceId, original.selectedWorkspaceId].every(id => settings.choices.some(row => row.id === id))
+        && [original.originalWorkspaceId, original.selectedWorkspaceId].includes(settings.workspace?.id), 'recovery_scope_invalid')
+      personalWorkspaceId = original.workspaceId; originalWorkspaceId = original.originalWorkspaceId
+      selectedWorkspaceId = original.selectedWorkspaceId; suggestionId = original.suggestionId
+      boundFixture = Object.fromEntries(['nonce', 'sourceUrl', 'occurredAt', 'action', 'required', 'externalSourceClosed',
+        'sourceEventId', 'sourceIssueNumber'].map(key => [key, original[key]]))
+      priorSessionIdHashes = [...new Set([original.sessionIdHash, ...original.priorSessionIdHashes])].sort()
+      check(priorSessionIdHashes.length <= 8 && !priorSessionIdHashes.includes(sessionIdHash), 'recovery_scope_invalid')
+      const sessions = await read('recovery_sessions', '/api/auth/list-sessions')
+      check(Array.isArray(sessions) && sessions.length <= 100
+        && sessions.every(row => row?.userId === ownerId && typeof row.id === 'string' && row.id.length > 0 && row.id.length <= 512), 'recovery_scope_invalid')
+      for (const sessionHash of priorSessionIdHashes) {
+        const matches = sessions.filter(row => typeof row?.id === 'string' && digest(row.id) === sessionHash)
+        check(matches.length <= 1, 'recovery_scope_invalid')
+        if (!matches.length) continue
+        const old = matches[0]
+        check(old.userId === ownerId && old.id !== identitySessionId && typeof old.token === 'string'
+          && old.token.length >= 32 && old.token.length <= 512, 'recovery_scope_invalid')
+        recoverySessions.push({ id: old.id, token: old.token }); recoveryTokens.add(old.token)
       }
-      report.inventory.workspaces.push(observation)
-    }
-    report.coverage.inboxRead = 'normal_owner_all_tabs'
-    const accounts = await read('linked_accounts', '/api/auth/list-accounts')
-    check(Array.isArray(accounts) && accounts.every(row => typeof row?.providerId === 'string'
-      && (row.userId === undefined || row.userId === ownerId)), 'identity_failed')
-    const recipientIds = new Set(accounts.filter(row => row.providerId === 'github' && /^[1-9]\d*$/.test(row.accountId ?? '')).map(row => row.accountId))
-    const integration = await request('github_connection', '/api/integrations/github', {}, [200, 401, 403, 409, 502, 503])
-    const connection = integration.body
-    check(connection?.viewerId === ownerId, 'identity_failed')
-    check(connection.githubAccountId === undefined || connection.githubAccountId === null
-      || /^[1-9]\d{0,15}$/.test(connection.githubAccountId), 'identity_failed')
-    report.inventory.github = { httpStatus: integration.status, connected: connection.connected === true,
-      configured: connection.configured === true, installed: connection.installed === true,
-      testRepositoryAuthorized: connection.repositories?.some(row => row.fullName === REPOSITORY) === true,
-      source: connection.source === 'cloud' ? 'cloud' : 'local', recipients: [...recipientIds].map(id => ({ id, source: 'sign_in' })) }
-    if (connection.connected === true && typeof connection.githubAccountId === 'string' && /^[1-9]\d{0,15}$/.test(connection.githubAccountId)) {
-      recipientIds.add(connection.githubAccountId)
-      report.inventory.github.recipients.push({ id: connection.githubAccountId, source: 'verified_integration' })
-    } else if (connection.connected === true && typeof connection.login === 'string' && /^[a-zA-Z0-9-]{1,39}$/.test(connection.login)) {
-      const githubUser = await githubRead('/users/' + connection.login)
-      check(positive(githubUser?.id) && githubUser.login?.toLowerCase() === connection.login.toLowerCase(), 'identity_failed')
-      recipientIds.add(String(githubUser.id))
-      report.inventory.github.recipients.push({ id: String(githubUser.id), source: 'plugin' })
-    }
-
-    // Existing read-only task discovery. No model run, publication, approval,
-    // GitHub resynchronization or task mutation is requested here.
-    report.inventory.factory = { issuesRead: 0, tasksRead: 0, denied: 0, complete: false, summaries: [] }
-    const issues = await read('recent_team_issues', '/api/issues/search?' + new URLSearchParams({ workspaceId: teamSelection.workspaceId, limit: '50' }))
-    check(Array.isArray(issues?.items) && (issues.nextCursor === null || typeof issues.nextCursor === 'string'))
-    report.inventory.factory.complete = issues.nextCursor === null && issues.items.length <= 20
-    for (const [index, issue] of issues.items.slice(0, 20).entries()) {
-      check(UUID.test(issue?.id ?? ''))
-      const list = await request('factory_tasks_' + index, '/api/factory/tasks?issueId=' + issue.id, {}, [200, 404])
-      report.inventory.factory.issuesRead++
-      if (list.status === 404) { report.inventory.factory.denied++; continue }
-      check(list.body?.issueId === issue.id && Array.isArray(list.body.tasks))
-      if (list.body.tasks.length > 5) report.inventory.factory.complete = false
-      for (const [taskIndex, task] of list.body.tasks.slice(0, 5).entries()) {
-        check(UUID.test(task?.id ?? ''))
-        const path = `/api/factory/tasks/${task.id}/flow`
-        const flow = await read(`factory_flow_${index}_${taskIndex}`, path)
-        check(flow?.id === task.id && flow.issueId === issue.id, 'fixture_binding_failed')
-        const observed = reviewSummary(flow); report.inventory.factory.tasksRead++
-        if (observed.kind === 'no_pr') report.coverage.noPrNull = 'normal_owner_flow_null'
-        else if (observed.complete && observed.handoff) {
-          const readback = reviewSummary(await read(`factory_readback_${index}_${taskIndex}`, path))
-          observed.sameReadback = readback.kind === 'pr' && readback.revision === observed.revision && readback.summaryDigest === observed.summaryDigest
-          if (observed.sameReadback) report.coverage.cachedReviewSummary = 'handoff_complete_snapshot_readback'
+      const [pending, snoozed, done] = await Promise.all(['pending', 'snoozed', 'done'].map(tab => ownItems(tab, 'recovery_' + tab)))
+      check(pending.length + snoozed.length <= 1 && pending.length + snoozed.length + done.length > 0
+        && [...pending, ...snoozed].every(row => row.pending && row.actions.includes('reject'))
+        && done.every(row => row.completion.action === 'rejected' && row.completion.actorId === ownerId), 'recovery_scope_invalid')
+      // This fresh window grants recovery, not another business probe. Record
+      // its exact scope before any cleanup write; finally then finishes it even
+      // if the new window expires while a response is in flight.
+      await lease(); await checkpoint('recovery_bound_before_cleanup')
+      report.recovery.originalSessionsAbsent = priorSessionIdHashes.length - recoverySessions.length
+      report.recovery.priorState = snoozed.length ? 'snoozed' : pending.length ? 'pending' : 'done'
+      report.apiStatus = 'cleanup_ready'
+    } else {
+      const teamSelection = await selectTeam(client, { ownerId }, value => { originalWorkspaceId = value })
+      selectedWorkspaceId = teamSelection.workspaceId
+      const settings = await read('workspace', '/api/workspace')
+      check(settings?.currentUserId === ownerId && settings.workspace?.id === teamSelection.workspaceId
+        && settings.workspace.kind === 'team' && Array.isArray(settings.choices), 'identity_failed')
+      const choices = settings.choices
+      check(choices.every(row => UUID.test(row.id ?? '') && ['personal', 'team'].includes(row.kind))
+        && new Set(choices.map(row => row.id)).size === choices.length, 'identity_failed')
+      const homes = choices.filter(row => row.kind === 'personal')
+      check(homes.length === 1, 'identity_failed'); personalWorkspaceId = homes[0].id
+      report.inventory.personalWorkspaceId = personalWorkspaceId
+      report.inventory.fixtureRequest = { schema: 1, purpose: 'mikka1820-owner-github-fixture', nonce: randomUUID(),
+        applicationSha: source, inventoryRunId: Number(env.GITHUB_RUN_ID), inventoryRunAttempt: Number(env.GITHUB_RUN_ATTEMPT),
+        ownerHash: digest(ownerId), workspaceId: personalWorkspaceId, createdAt: new Date(now()).toISOString(),
+        expiresAt: new Date(now() + 6 * 60 * 60_000).toISOString() }
+      report.inventory.workspaceCount = choices.length; report.inventory.workspaces = []
+      const scopes = [homes[0], ...choices.filter(row => row.id !== personalWorkspaceId)].slice(0, 32)
+      report.inventory.workspaceDiscoveryComplete = scopes.length === choices.length
+      for (const [index, workspace] of scopes.entries()) {
+        const observation = { kind: workspace.kind, selectedTeam: workspace.id === teamSelection.workspaceId, tabs: {} }
+        for (const tab of ['pending', 'snoozed', 'done']) {
+          const page = await pages(workspace.id, tab, `inventory_${index}_${tab}`)
+          observation.tabs[tab] = { count: page.items.length, suggestions: page.items.filter(item => item.type === 'suggestion').length,
+            tasks: page.items.filter(item => item.type === 'task').length, complete: page.complete, pages: page.pages, historySince: page.historySince }
         }
-        report.inventory.factory.summaries.push(observed)
+        report.inventory.workspaces.push(observation)
       }
+      report.coverage.inboxRead = 'normal_owner_all_tabs'
+      const accounts = await read('linked_accounts', '/api/auth/list-accounts')
+      check(Array.isArray(accounts) && accounts.every(row => typeof row?.providerId === 'string'
+        && (row.userId === undefined || row.userId === ownerId)), 'identity_failed')
+      const recipientIds = new Set(accounts.filter(row => row.providerId === 'github' && /^[1-9]\d*$/.test(row.accountId ?? '')).map(row => row.accountId))
+      const integration = await request('github_connection', '/api/integrations/github', {}, [200, 401, 403, 409, 502, 503])
+      const connection = integration.body
+      check(connection?.viewerId === ownerId, 'identity_failed')
+      check(connection.githubAccountId === undefined || connection.githubAccountId === null
+        || /^[1-9]\d{0,15}$/.test(connection.githubAccountId), 'identity_failed')
+      report.inventory.github = { httpStatus: integration.status, connected: connection.connected === true,
+        configured: connection.configured === true, installed: connection.installed === true,
+        testRepositoryAuthorized: connection.repositories?.some(row => row.fullName === REPOSITORY) === true,
+        source: connection.source === 'cloud' ? 'cloud' : 'local', recipients: [...recipientIds].map(id => ({ id, source: 'sign_in' })) }
+      if (connection.connected === true && typeof connection.githubAccountId === 'string' && /^[1-9]\d{0,15}$/.test(connection.githubAccountId)) {
+        recipientIds.add(connection.githubAccountId)
+        report.inventory.github.recipients.push({ id: connection.githubAccountId, source: 'verified_integration' })
+      } else if (connection.connected === true && typeof connection.login === 'string' && /^[a-zA-Z0-9-]{1,39}$/.test(connection.login)) {
+        const githubUser = await githubRead('/users/' + connection.login)
+        check(positive(githubUser?.id) && githubUser.login?.toLowerCase() === connection.login.toLowerCase(), 'identity_failed')
+        recipientIds.add(String(githubUser.id))
+        report.inventory.github.recipients.push({ id: String(githubUser.id), source: 'plugin' })
+      }
+
+      // Existing read-only task discovery. No model run, publication, approval,
+      // GitHub resynchronization or task mutation is requested here.
+      report.inventory.factory = { issuesRead: 0, tasksRead: 0, denied: 0, complete: false, summaries: [] }
+      const issues = await read('recent_team_issues', '/api/issues/search?' + new URLSearchParams({ workspaceId: teamSelection.workspaceId, limit: '50' }))
+      check(Array.isArray(issues?.items) && (issues.nextCursor === null || typeof issues.nextCursor === 'string'))
+      report.inventory.factory.complete = issues.nextCursor === null && issues.items.length <= 20
+      for (const [index, issue] of issues.items.slice(0, 20).entries()) {
+        check(UUID.test(issue?.id ?? ''))
+        const list = await request('factory_tasks_' + index, '/api/factory/tasks?issueId=' + issue.id, {}, [200, 404])
+        report.inventory.factory.issuesRead++
+        if (list.status === 404) { report.inventory.factory.denied++; continue }
+        check(list.body?.issueId === issue.id && Array.isArray(list.body.tasks))
+        if (list.body.tasks.length > 5) report.inventory.factory.complete = false
+        for (const [taskIndex, task] of list.body.tasks.slice(0, 5).entries()) {
+          check(UUID.test(task?.id ?? ''))
+          const path = `/api/factory/tasks/${task.id}/flow`
+          const flow = await read(`factory_flow_${index}_${taskIndex}`, path)
+          check(flow?.id === task.id && flow.issueId === issue.id, 'fixture_binding_failed')
+          const observed = reviewSummary(flow); report.inventory.factory.tasksRead++
+          if (observed.kind === 'no_pr') report.coverage.noPrNull = 'normal_owner_flow_null'
+          else if (observed.complete && observed.handoff) {
+            const readback = reviewSummary(await read(`factory_readback_${index}_${taskIndex}`, path))
+            observed.sameReadback = readback.kind === 'pr' && readback.revision === observed.revision && readback.summaryDigest === observed.summaryDigest
+            if (observed.sameReadback) report.coverage.cachedReviewSummary = 'handoff_complete_snapshot_readback'
+          }
+          report.inventory.factory.summaries.push(observed)
+        }
+      }
+      if (fixture) {
+        phase = 'fixture_source'
+        boundFixture = await verifyInboxFixture(fixture, { ownerId, personalWorkspaceId, recipientIds, githubRead, now,
+          applicationSha: source, driverRunId: Number(env.GITHUB_RUN_ID), driverRunAttempt: Number(env.GITHUB_RUN_ATTEMPT) })
+        // This existing product endpoint can write today's briefing and restore
+        // Composio triggers. It is deliberately excluded from inventory, and is
+        // used once only after this exact new external event is verified.
+        report.checks.suggestionsReadMayWriteBriefingAndTriggers = true
+        await lease()
+        const suggestions = await read('fixture_suggestions', '/api/suggestions')
+        check(Array.isArray(suggestions?.groups) && Array.isArray(suggestions.inProgress))
+        const matches = suggestions.groups.flatMap(group => Array.isArray(group?.items) ? group.items : []).filter(item => item.source === 'github'
+          && item.url === boundFixture.sourceUrl && item.action === boundFixture.action && item.required === boundFixture.required
+          && item.occurredAt === boundFixture.occurredAt)
+        check(matches.length === 1 && UUID.test(matches[0].id ?? ''), 'fixture_unavailable')
+        check(!suggestions.inProgress.some(item => item.id === matches[0].id), 'fixture_binding_failed')
+        suggestionId = matches[0].id
+        const [pending] = await ownItems('pending', 'fixture_pending')
+        check(pending?.pending === true && pending.rejectedAt === null && pending.snoozedUntil === null
+          && ['reject', 'snooze'].every(action => pending.actions.includes(action)), 'fixture_binding_failed')
+        check((await ownItems('done', 'fixture_history_before')).length === 0, 'fixture_binding_failed')
+        await checkpoint('bound_before_mutation')
+        report.checks.fixture = { suggestionId, ...boundFixture }
+        live = inboxLiveSocket(await read('live_ticket', '/api/live/ticket?workspace=' + personalWorkspaceId), { ownerId, workspaceId: personalWorkspaceId, now, socketFactory })
+        await live.ready()
+        const until = new Date(now() + 120_000).toISOString(), snoozePush = live.expect()
+        await command('snooze', true, until); await snoozePush(); await command('snooze', false, until, 'snooze_duplicate')
+        check((await ownItems('pending', 'pending_after_snooze')).length === 0, 'command_mismatch')
+        const [snoozed] = await ownItems('snoozed', 'snoozed_readback')
+        check(snoozed?.snoozedUntil === until && snoozed.actions.includes('reopen'), 'command_mismatch')
+        const reopenPush = live.expect()
+        await command('reopen', true); await reopenPush(); await command('reopen', false, undefined, 'reopen_duplicate')
+        check((await ownItems('snoozed', 'snoozed_after_reopen')).length === 0 && (await ownItems('pending', 'pending_after_reopen')).length === 1, 'command_mismatch')
+        report.coverage.snoozeReopen = 'transition_idempotence_and_readback'
+        const dueAt = now() + 20_000, due = new Date(dueAt).toISOString(), expiryPush = live.expect({ after: dueAt, timeout: 55_000 })
+        await command('snooze', true, due, 'snooze_due')
+        check((await ownItems('snoozed', 'due_before_expiry'))[0]?.snoozedUntil === due, 'command_mismatch')
+        report.checks.expiryPush = await expiryPush()
+        check((await ownItems('snoozed', 'snoozed_after_expiry')).length === 0 && (await ownItems('pending', 'pending_after_expiry')).length === 1, 'command_mismatch')
+        report.coverage.snoozeExpiryPush = 'due_timer_push_and_single_readback'; report.checks.dueAt = due
+        const rejectedAfter = now(), rejectPush = live.expect()
+        await command('reject', true); await rejectPush(); await command('reject', false, undefined, 'reject_duplicate')
+        check((await ownItems('pending', 'pending_after_reject')).length === 0, 'command_mismatch')
+        const receipts = await ownItems('done', 'done_reject')
+        check(receipts.length === 1 && receipts[0].completion.action === 'rejected' && receipts[0].completion.actorId === ownerId
+          && receipts[0].rejectedBy === ownerId && iso(receipts[0].rejectedAt) && Date.parse(receipts[0].completion.at) >= rejectedAfter - 2_000
+          && receipts[0].actions.includes('undo_reject'), 'receipt_mismatch')
+        const receiptId = receipts[0].completion.id, undoPush = live.expect()
+        await command('undo_reject', true); await undoPush(); await command('undo_reject', false, undefined, 'undo_duplicate')
+        const restored = await ownItems('pending', 'pending_after_undo'), history = await ownItems('done', 'done_after_undo')
+        check(restored.length === 1 && restored[0].rejectedAt === null && restored[0].rejectedBy === null
+          && history.length === 1 && history[0].completion.id === receiptId, 'receipt_mismatch')
+        report.coverage.rejectUndo = 'transition_idempotence_and_readback'; report.coverage.doneReceipt = 'actor_time_single_receipt_retained_after_undo'
+        report.checks.completion = { id: receiptId, at: receipts[0].completion.at, action: 'rejected', actorMatchesOwner: true }
+        await checkpoint('business_checks_passed')
+      } else report.inventory.fixture = 'not_supplied_no_mutation'
+      await pin('after'); report.apiStatus = 'passed'; report.status = 'partial'
     }
-    if (fixture) {
-      phase = 'fixture_source'
-      boundFixture = await verifyInboxFixture(fixture, { ownerId, personalWorkspaceId, recipientIds, githubRead, now,
-        applicationSha: source, driverRunId: Number(env.GITHUB_RUN_ID), driverRunAttempt: Number(env.GITHUB_RUN_ATTEMPT) })
-      // This existing product endpoint can write today's briefing and restore
-      // Composio triggers. It is deliberately excluded from inventory, and is
-      // used once only after this exact new external event is verified.
-      report.checks.suggestionsReadMayWriteBriefingAndTriggers = true
-      await lease()
-      const suggestions = await read('fixture_suggestions', '/api/suggestions')
-      check(Array.isArray(suggestions?.groups) && Array.isArray(suggestions.inProgress))
-      const matches = suggestions.groups.flatMap(group => Array.isArray(group?.items) ? group.items : []).filter(item => item.source === 'github'
-        && item.url === boundFixture.sourceUrl && item.action === boundFixture.action && item.required === boundFixture.required
-        && item.occurredAt === boundFixture.occurredAt)
-      check(matches.length === 1 && UUID.test(matches[0].id ?? ''), 'fixture_unavailable')
-      check(!suggestions.inProgress.some(item => item.id === matches[0].id), 'fixture_binding_failed')
-      suggestionId = matches[0].id
-      const [pending] = await ownItems('pending', 'fixture_pending')
-      check(pending?.pending === true && pending.rejectedAt === null && pending.snoozedUntil === null
-        && ['reject', 'snooze'].every(action => pending.actions.includes(action)), 'fixture_binding_failed')
-      check((await ownItems('done', 'fixture_history_before')).length === 0, 'fixture_binding_failed')
-      await checkpoint('bound_before_mutation')
-      report.checks.fixture = { suggestionId, ...boundFixture }
-      live = inboxLiveSocket(await read('live_ticket', '/api/live/ticket?workspace=' + personalWorkspaceId), { ownerId, workspaceId: personalWorkspaceId, now, socketFactory })
-      await live.ready()
-      const until = new Date(now() + 120_000).toISOString(), snoozePush = live.expect()
-      await command('snooze', true, until); await snoozePush(); await command('snooze', false, until, 'snooze_duplicate')
-      check((await ownItems('pending', 'pending_after_snooze')).length === 0, 'command_mismatch')
-      const [snoozed] = await ownItems('snoozed', 'snoozed_readback')
-      check(snoozed?.snoozedUntil === until && snoozed.actions.includes('reopen'), 'command_mismatch')
-      const reopenPush = live.expect()
-      await command('reopen', true); await reopenPush(); await command('reopen', false, undefined, 'reopen_duplicate')
-      check((await ownItems('snoozed', 'snoozed_after_reopen')).length === 0 && (await ownItems('pending', 'pending_after_reopen')).length === 1, 'command_mismatch')
-      report.coverage.snoozeReopen = 'transition_idempotence_and_readback'
-      const dueAt = now() + 20_000, due = new Date(dueAt).toISOString(), expiryPush = live.expect({ after: dueAt, timeout: 55_000 })
-      await command('snooze', true, due, 'snooze_due')
-      check((await ownItems('snoozed', 'due_before_expiry'))[0]?.snoozedUntil === due, 'command_mismatch')
-      report.checks.expiryPush = await expiryPush()
-      check((await ownItems('snoozed', 'snoozed_after_expiry')).length === 0 && (await ownItems('pending', 'pending_after_expiry')).length === 1, 'command_mismatch')
-      report.coverage.snoozeExpiryPush = 'due_timer_push_and_single_readback'; report.checks.dueAt = due
-      const rejectedAfter = now(), rejectPush = live.expect()
-      await command('reject', true); await rejectPush(); await command('reject', false, undefined, 'reject_duplicate')
-      check((await ownItems('pending', 'pending_after_reject')).length === 0, 'command_mismatch')
-      const receipts = await ownItems('done', 'done_reject')
-      check(receipts.length === 1 && receipts[0].completion.action === 'rejected' && receipts[0].completion.actorId === ownerId
-        && receipts[0].rejectedBy === ownerId && iso(receipts[0].rejectedAt) && Date.parse(receipts[0].completion.at) >= rejectedAfter - 2_000
-        && receipts[0].actions.includes('undo_reject'), 'receipt_mismatch')
-      const receiptId = receipts[0].completion.id, undoPush = live.expect()
-      await command('undo_reject', true); await undoPush(); await command('undo_reject', false, undefined, 'undo_duplicate')
-      const restored = await ownItems('pending', 'pending_after_undo'), history = await ownItems('done', 'done_after_undo')
-      check(restored.length === 1 && restored[0].rejectedAt === null && restored[0].rejectedBy === null
-        && history.length === 1 && history[0].completion.id === receiptId, 'receipt_mismatch')
-      report.coverage.rejectUndo = 'transition_idempotence_and_readback'; report.coverage.doneReceipt = 'actor_time_single_receipt_retained_after_undo'
-      report.checks.completion = { id: receiptId, at: receipts[0].completion.at, action: 'rejected', actorMatchesOwner: true }
-      await checkpoint('business_checks_passed')
-    } else report.inventory.fixture = 'not_supplied_no_mutation'
-    await pin('after'); report.apiStatus = 'passed'; report.status = 'partial'
   } catch (error) { report.failure = { step: phase, ...failure(error) } }
   finally {
     closing = true
@@ -511,7 +566,24 @@ export async function runInboxProduction({ env = process.env, event, attestation
       await checkpoint('cleaned')
     })
     if (live) await clean('live_socket', async () => { await live.close(); report.cleanup.liveClosed = true })
-    if (client && ownerId && originalWorkspaceId) await clean('workspace_restore', async () => {
+    if (client && recovery && bindingJournaled) await clean('original_sessions', async () => {
+      let revoked = 0
+      for (const old of recoverySessions) {
+        const result = await read('recovery_revoke_session', '/api/auth/list-sessions')
+        check(Array.isArray(result) && result.length <= 100, 'cleanup_failed')
+        const current = result.filter(row => row?.id === old.id)
+        check(current.length <= 1 && current.every(row => row.userId === ownerId && row.id !== identitySessionId && row.token === old.token), 'cleanup_failed')
+        if (current.length) {
+          const result = await request('recovery_revoke_session', '/api/auth/revoke-session', post({ token: old.token }))
+          check(result.body?.status === true, 'cleanup_failed')
+        }
+        const remaining = await read('recovery_session_readback', '/api/auth/list-sessions')
+        check(Array.isArray(remaining) && remaining.length <= 100 && !remaining.some(row => row?.id === old.id || row?.token === old.token), 'cleanup_failed')
+        revoked++; recoveryTokens.delete(old.token); old.token = ''
+      }
+      report.cleanup.originalSessionsRevoked = revoked
+    })
+    if (client && ownerId && originalWorkspaceId && (!recovery || bindingJournaled)) await clean('workspace_restore', async () => {
       await restoreWorkspace(client, ownerId, originalWorkspaceId); report.cleanup.workspaceRestored = true
     })
     if (client && signInAttempted) {
@@ -526,7 +598,8 @@ export async function runInboxProduction({ env = process.env, event, attestation
         report.cleanup.originalCookieRejected = true
       })
     }
-    client?.clear(); originalCookie = ''; if (account) { account.email = ''; account.password = '' }
+    client?.clear(); originalCookie = ''; recoveryTokens.clear(); recoverySessions.forEach(row => { row.token = ''; row.id = '' })
+    if (account) { account.email = ''; account.password = '' }
     if (source) await clean('closing_build', () => pin('closing'))
     report.cleanup.status = report.cleanup.failures.length ? 'failed' : 'passed'
     if (report.cleanup.failures.length) report.status = 'failed'
@@ -534,9 +607,16 @@ export async function runInboxProduction({ env = process.env, event, attestation
       report.completeAcceptance = Object.values(report.coverage).every(value => !['not_exercised', 'not_observed'].includes(value))
       report.status = report.completeAcceptance ? 'passed' : 'partial'
     }
+    if (report.apiStatus === 'cleanup_ready' && report.cleanup.status === 'passed') report.status = 'cleanup_passed'
     report.finishedAt = new Date(now()).toISOString()
   }
   return report
+}
+
+export function inboxProductionExitCode(report, selecting = false) {
+  if (selecting) return ['selected', 'not_selected'].includes(report.status) ? 0 : 1
+  if (report.status === 'not_selected' || report.status === 'passed' && report.completeAcceptance === true) return 0
+  return ['partial', 'cleanup_passed'].includes(report.status) ? 2 : 1
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
@@ -552,7 +632,15 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     else {
       const selection = JSON.parse(await readFile(directory + '/inbox-selection.json', 'utf8'))
       report = await runInboxProduction({ event, attestation, selection,
-        writeReceipt: value => writeFile(directory + '/inbox-fixture.json', JSON.stringify(value, null, 2) + '\n', { mode: 0o600 }) })
+        writeReceipt: async value => {
+          const envelope = inboxJournalEnvelope(value), line = JSON.stringify(envelope)
+          await appendFile(directory + '/inbox-journal.jsonl', line + '\n', { mode: 0o600 })
+          await writeFile(directory + '/inbox-fixture.json', JSON.stringify(envelope, null, 2) + '\n', { mode: 0o600 })
+          // Wait for the local stream flush before the first write. A later
+          // recovery independently requires the completed remote job log; this
+          // does not claim that artifact upload or remote persistence succeeded.
+          await new Promise((resolve, reject) => process.stdout.write(INBOX_JOURNAL_PREFIX + line + '\n', error => error ? reject(error) : resolve()))
+        } })
     }
   } catch (error) { report = { kind: 'mikka1820-production-api', status: 'failed', completeAcceptance: false,
     failure: inboxSelectionFailure(error) ?? { code: 'target_refused' } } }
@@ -562,6 +650,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     'selected=' + (report.selected === true) + '\ncore_required=' + coreRequired + '\n')
   if (process.env.GITHUB_STEP_SUMMARY) await appendFile(process.env.GITHUB_STEP_SUMMARY,
     '## Inbox production ' + (selecting ? 'selection' : 'API receipt') + '\n\nMissing fixture or summary coverage remains incomplete.\n\n```json\n' + text + '```\n')
-  process.exitCode = selecting ? ['selected', 'not_selected'].includes(report.status) ? 0 : 1
-    : ['passed', 'not_selected'].includes(report.status) ? 0 : report.status === 'partial' ? 2 : 1
+  process.exitCode = inboxProductionExitCode(report, selecting)
 }
