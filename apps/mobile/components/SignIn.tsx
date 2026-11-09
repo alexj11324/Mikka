@@ -2,7 +2,8 @@ import { useEffect, useState, useSyncExternalStore } from 'react'
 import * as AppleAuthentication from 'expo-apple-authentication'
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, useColorScheme, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { BotAvatar, SourceIcon, Spinner } from '@/components/icons'
+import { SourceIcon, Spinner } from '@/components/icons'
+import { MikkaMark } from '@/components/MikkaMark'
 import { Text } from '@/components/Text'
 import { authClient } from '@/lib/auth'
 import { forgetAppleCredential, signInWithApple } from '@/lib/apple-auth'
@@ -75,7 +76,7 @@ export function SignIn() {
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
       <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={[styles.body, { paddingTop: insets.top + 80, paddingBottom: insets.bottom + 24 }]}>
       <View style={styles.brand}>
-        <BotAvatar size={56} />
+        <MikkaMark />
         <Text style={styles.title}>Mikka</Text>
       </View>
       <ServerSelection choosing={choosing} setChoosing={setChoosing} disabled={busy} />
