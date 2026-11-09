@@ -136,13 +136,11 @@ try {
   assert.equal(probed.server.name, 'Acceptance self-hosted')
   // Main may reload before evaluate replies; bind selection to its next completed document.
   await selectBundledServer(page, selfHosted.url, selfHosted.url)
-  await page.waitForFunction(url => window.mikka?.app.serverUrl === url, selfHosted.url)
   await page.waitForFunction(() => document.body.innerText.trim().length > 30)
   for (let attempt = 0; attempt < 100 && selfHosted.configReads() === 0; attempt++) await new Promise(done => setTimeout(done, 100))
   assert.ok(selfHosted.configReads() > 0, 'the signed-out page must read the chosen server')
   await page.screenshot({ path: join(output, 'bundled-sign-in-self-hosted.png'), animations: 'disabled' })
   await selectBundledServer(page, null, builtIn)
-  await page.waitForFunction(url => window.mikka?.app.serverUrl === url, builtIn)
   await page.waitForFunction(() => document.body.innerText.trim().length > 30)
   check('server choice: probe states, probed-only selection, the page follows the chosen server and returns')
   browser = await chromium.launch({ headless: true })

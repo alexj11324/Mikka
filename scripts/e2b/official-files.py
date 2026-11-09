@@ -196,6 +196,10 @@ def finalization_policy(kind):
 
 def permitted_provider_change(change, rules):
     allowed = rules.get(change['path'], {})
+    # Reserved rule metadata keeps kind protected in the stable receipt.
+    expected_kind = allowed.get('_kind')
+    if expected_kind is not None and change.get('kind') != expected_kind:
+        return False
     certificate = allowed.get('_certificate')
     if certificate:
         if (change.get('kind') != 'file' or change['before'].get('kind') != 'file' or change['after'].get('kind') != 'link'
