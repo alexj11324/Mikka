@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "reviewer": "queued_source_compat",
+  "kind": "fixed-source blob inventory only",
+  "baseline": "a2198c8c2f608f7b8169329b9da853067618dba6",
+  "ownHead": "37ffccac0e76bd32885178eef9a300dedcb9315f",
+  "candidateHeads": {
+    "1636": "521db4799a4a85e1955f7dd86a1ad5ccef143cc8",
+    "1810": "bf4833c9010e7adff6dded6c348824d5e99554c0"
+  },
+  "productPaths": [
+    {
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "baselineAndBothCandidates": "be1f902f97e50628fbe26fa55b9dab0160f749be",
+      "ownHead": "40fec295ab9cb92557f66df1594d5b42f7b0371f",
+      "commonMode": "100644",
+      "candidateChangesInThisPath": false
+    },
+    {
+      "path": "docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md",
+      "baselineAndBothCandidates": "7cfc7e5ac68e66870fa741174361df51324a7566",
+      "ownHead": "c9559eeede51bfb540d2e46d1d97a7f821b43bc4",
+      "commonMode": "100644",
+      "candidateChangesInThisPath": false
+    },
+    {
+      "path": "packages/daemon/scripts/official-e2b-instance-bootstrap.sh",
+      "baselineAndBothCandidates": "27c2146b45054c3eb5510afc94ea7ee9696dcb87",
+      "ownHead": "c0172bb8a2d0d4adde7e89991fce36c97b8f8460",
+      "commonMode": "100644",
+      "candidateChangesInThisPath": false
+    },
+    {
+      "path": "packages/daemon/scripts/prepare-worker-install.py",
+      "baselineAndBothCandidates": null,
+      "ownHead": "ba5f5ee5cc8356781e7c53e6ef5a7e77b7f8573f",
+      "commonMode": null,
+      "candidateChangesInThisPath": false
+    },
+    {
+      "path": "packages/daemon/scripts/prepare-worker-install.test.py",
+      "baselineAndBothCandidates": null,
+      "ownHead": "cfffaf6cac62d01e075b0fcb08a41f8b40c5f540",
+      "commonMode": null,
+      "candidateChangesInThisPath": false
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.mjs",
+      "baselineAndBothCandidates": "1bca723b8110625b48127a1d28ade9ecf0e153de",
+      "ownHead": "5b5dd2d6b06f5b26f2c04db31cbc99a1b265ce63",
+      "commonMode": "100644",
+      "candidateChangesInThisPath": false
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.test.mjs",
+      "baselineAndBothCandidates": "6b57f0699db92b2c55b5add63efc23db1f403b0c",
+      "ownHead": "9101b030d59dfb552f96aea05d30cbfe5163417a",
+      "commonMode": "100644",
+      "candidateChangesInThisPath": false
+    }
+  ],
+  "refreshDependencies": [
+    {
+      "path": "lib/github/connection.ts",
+      "blob": "0f52b15c03af1199490e6852401fe2d49db06f30",
+      "sameInAllFourHeads": true
+    },
+    {
+      "path": "lib/db/index.ts",
+      "blob": "f3278426bc9f07a04e41f1160ecd9cf9278dac2d",
+      "sameInAllFourHeads": true
+    },
+    {
+      "path": "lib/db/request-scope.ts",
+      "blob": "b3445c20e6be5061bcbfe0fe56903b8dd767dfd3",
+      "sameInAllFourHeads": true
+    }
+  ],
+  "conclusions": [
+    "No changed path intersection within the seven specified product paths for either candidate relative to a219.",
+    "The two new Python filenames are absent in main and both candidates, so no add/add collision.",
+    "Three specified normal Owner refresh dependencies have identical blobs in all four fixed sources."
+  ],
+  "limits": [
+    "These candidates were not merged or deployed by this review.",
+    "No combined install/build/runtime/SQL or full-tree behavior claim.",
+    "No rebase, new CI run, code modification or gate added.",
+    "Actual handoff still requires current main, real overlap/writer/account/mergeability checks."
+  ],
+  "tests": 0,
+  "productionReads": 0,
+  "rawActionsLogsRead": 0,
+  "artifactsRead": 0,
+  "credentials": 0,
+  "models": 0,
+  "vm": 0
+}
