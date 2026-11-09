@@ -65,7 +65,8 @@ export function useAgentCitations() {
 function ChipHead({ icon, title }: { icon: ReactNode; title: string }) {
   const [first = '', ...rest] = Array.from(title)
   return <InlineCitationLabel>
-    <span data-slot="chip-head" className="whitespace-nowrap [&>[role=img]]:mr-1 [&>[role=img]]:inline-flex [&>[role=img]]:align-[-0.125em] [&>svg]:mr-1 [&>svg]:inline [&>svg]:align-[-0.125em]">{icon}{first}</span>{rest.join('')}
+    {/* The icon sits in an inline box: a reset that makes `svg` a block cannot drop it onto its own line. */}
+    <span data-slot="chip-head" className="whitespace-nowrap"><span data-slot="chip-icon" className="me-1 inline-flex align-[-0.125em]">{icon}</span>{first}</span>{rest.join('')}
   </InlineCitationLabel>
 }
 
