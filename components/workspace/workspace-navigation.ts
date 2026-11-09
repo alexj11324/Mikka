@@ -1,3 +1,4 @@
+import { taskArtifactTarget, type TaskArtifactRef } from '@/lib/task-artifact-target'
 import { pushSettingsHistory } from '@/lib/settings-navigation'
 
 /**
@@ -395,4 +396,12 @@ export function openArtifact(id: string) {
 /** Closes the Artifact window; the page under it is as it was. */
 export function closeArtifact() {
   navigate({ artifact: null })
+}
+
+/** Opens a task's artifact where it lives (lib/task-artifact-target.ts): the Artifact window, or a new tab for a pull request or media. */
+export function openTaskArtifact(item: TaskArtifactRef | null | undefined) {
+  const target = taskArtifactTarget(item)
+  if (target?.kind === 'artifact') openArtifact(target.id)
+  else if (target?.kind === 'link') window.open(target.url, '_blank', 'noopener,noreferrer')
+  return target !== null
 }

@@ -4628,7 +4628,9 @@
       "all": "All",
       "documents": "Documents",
       "pages": "Web pages"
-    },
+    ,
+      "pullRequests": "Pull requests",
+      "media": "Screenshots and recordings"},
     "columns": {
       "name": "Name",
       "source": "Source",
@@ -4640,7 +4642,7 @@
     "empty": "No artifacts yet",
     "threadEntry": "Artifact · {count}",
     "folders": {
-      "sub": "Documents and pages the Bots and Agents handed over in tasks, by task.",
+      "sub": "Documents, pages, pull requests and screenshots the Bots and Agents handed over in tasks, by task.",
       "folders": "By task",
       "search": "Search tasks…",
       "noMatch": "No task matches “{query}”.",
