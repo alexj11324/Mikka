@@ -544,7 +544,7 @@ test('local task Secret claim, child egress, recovery and withdrawal use the rea
     assert.deepEqual((await pool.query<{ runId: string; latestVersion: number }>('SELECT "runId","latestVersion" FROM artifacts WHERE id=$1', [first.artifactId])).rows[0],
       { runId, latestVersion: 3 }, 'creator and latest pointer cannot replace per-version submission provenance')
     const captureOwner = { userId: owner, runId: claimed.runId, issueId: claimedTask, botId }
-    const recording = await captures.openRecording(captureOwner, { title: 'Controlled evidence bytes', display: 0, stopsAt: new Date(Date.now() + 60_000) })
+    const recording = await captures.openRecording(captureOwner, { title: 'Controlled evidence bytes', display: 1, stopsAt: new Date(Date.now() + 60_000) })
     assert.ok(recording)
     await captures.markRecordingStarted(recording.id)
     assert.equal(await captures.recordStep(captureOwner, { label: synthetic[1], source: 'mark' }), true)
