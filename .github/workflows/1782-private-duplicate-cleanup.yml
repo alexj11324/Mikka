@@ -1,0 +1,38 @@
+name: Cancel one unstarted private duplicate for 1782
+on:
+  push:
+    branches: [ops/1782-private-duplicate-cleanup-20261109]
+permissions:
+  contents: read
+concurrency:
+  group: ops-1782-private-duplicate-cleanup-20261109
+  cancel-in-progress: false
+jobs:
+  cancel_pending_duplicate:
+    if: github.repository == 'alexj11324/Mikka' && github.actor == 'alexj11324' && github.ref == 'refs/heads/ops/1782-private-duplicate-cleanup-20261109'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Verify exact pending identity and request cancellation once
+        timeout-minutes: 2
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/ops/1782-private-duplicate-cleanup.mjs
+      - name: Preserve only the closed cancellation receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: private-duplicate-cancellation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/1782-private-duplicate-cleanup/receipt.json
+          if-no-files-found: error
+          retention-days: 7
