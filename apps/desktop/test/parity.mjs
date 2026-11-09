@@ -19,7 +19,7 @@ import { captureNativeResources } from './native-resources.mjs'
 import { captureGeneratedWorkspaceName } from './generated-workspace-name.mjs'
 import { assertNativeViewport, assertViewportPng, setNativeViewport } from './native-viewport.mjs'
 import { authDiagnosticRoute, nativeDiagnosticFailure, readNativeAuthDiagnostics, startNativeAuthDiagnostics, stopNativeAuthDiagnostics } from './native-auth-diagnostics.mjs'
-import { observeReads, pageReadRequirements, pageReady, readActionIds } from './parity-page-ready.mjs'
+import { observeReads, pageReadRequirements, pageReady, readActionIds, selectParityWorkspace } from './parity-page-ready.mjs'
 import { settingsReadRequirements, settingsReady } from './parity-settings-ready.mjs'
 import { waitForNativeDevice } from './native-device-ready.mjs'
 import { continueInSystemBrowser } from './browser-handoff.mjs'
@@ -275,10 +275,7 @@ async function authenticateBundled(bundled) {
 
 async function selectFixtureWorkspace(target) {
   await go(target)
-  await target.page.getByRole('button', { name: messages.Nav.workspaceMenu, exact: true }).first().click()
-  await target.page.getByRole('menuitem', { name: fixtures.fixture.workspaceName, exact: false }).click()
-  await target.page.waitForURL(url => url.pathname === `${environment.basePath}/en` || url.pathname === `${environment.basePath}/en/`)
-  await target.page.getByRole('button', { name: messages.Nav.workspaceMenu, exact: true }).first().waitFor()
+  await selectParityWorkspace(target.page, { menuName: messages.Nav.workspaceMenu, workspaceName: fixtures.fixture.workspaceName, basePath: environment.basePath })
   await coordinatorReady(target.page)
 }
 

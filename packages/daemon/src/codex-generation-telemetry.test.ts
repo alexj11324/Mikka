@@ -52,6 +52,57 @@ it('matches exact native request ancestry across reversed batches and excludes t
   expect(JSON.stringify({ events, receipt, attributes: codexGenerationReceiptAttributes(receipt) })).not.toContain('PRIVATE')
 })
 
+it('keeps an official completed response with no usage, including duplicate reversed exports, without numeric matching', () => {
+  const events: GenerationMetrics[] = []
+  const collector = new CodexGenerationCollector(value => events.push(value))
+  const records = request()
+  const completed = records.find(item => item.name === 'completed')!
+  completed.attributes = completed.attributes.filter(attribute => !attribute.key.startsWith('gen_ai.usage.'))
+  collector.accept(batch(records.toReversed()))
+  collector.accept(batch(records))
+  const receipt = collector.finish(true)
+  expect(events).toHaveLength(1)
+  expect(events[0]).toMatchObject({ startedAt: epoch, endedAt: epoch + 500, latencyMs: 500, ttftMs: 150, outcome: 'ok' })
+  for (const key of ['inputTokens', 'outputTokens', 'cacheReadTokens', 'cacheWriteTokens', 'totalCostUsd'] as const) expect(events[0][key]).toBeUndefined()
+  expect(receipt).toMatchObject({ nativeGenerations: 1, fallbackGenerations: 0, matchedFallbacks: 0, incompleteRequests: 0, flush: 'not_confirmed' })
+  expect(collector.finish()).toBe(receipt)
+})
+
+it('prefers a complete usage tuple over an empty replay before or after its receiving span arrives', () => {
+  for (const emptyFirst of [false, true]) for (const receivingLast of [false, true]) {
+    const events: GenerationMetrics[] = []
+    const collector = new CodexGenerationCollector(value => events.push(value))
+    const records = request(), full = records.find(item => item.name === 'completed')!
+    const empty = { ...full, attributes: full.attributes.filter(attribute => !attribute.key.startsWith('gen_ai.usage.')) }
+    const received = records.find(item => item.name === 'receiving' && item.parentSpanId === full.spanId)!
+    collector.observeFallback(fallback(), 'thread_1')
+    collector.accept(batch(records.filter(item => item !== full && item !== received).toReversed()))
+    for (const completed of emptyFirst ? [empty, full] : [full, empty]) {
+      collector.accept(batch(receivingLast ? [completed] : [received, completed]))
+    }
+    if (receivingLast) collector.accept(batch([received]))
+    const receipt = collector.finish(true)
+    expect(events).toHaveLength(1)
+    expect(events[0]).toMatchObject(usage)
+    expect(receipt).toMatchObject({ nativeGenerations: 1, fallbackGenerations: 0, matchedFallbacks: 1, incompleteRequests: 0 })
+  }
+})
+
+it('does not turn invalid usage scalars or unreadable attribute lists into an absent usage tuple', () => {
+  for (const attributes of [undefined, {}, Array.from({ length: 129 }, () => ({ key: 'other', value: { stringValue: 'unused' } })),
+    Object.keys(usage).map((_, index) => ({ key: ['gen_ai.usage.input_tokens', 'gen_ai.usage.output_tokens',
+      'gen_ai.usage.cache_read.input_tokens', 'gen_ai.usage.cache_write.input_tokens'][index], value: { intValue: '-1' } })),
+    [{ key: 'gen_ai.usage.input_tokens', value: { boolValue: false } }],
+  ]) {
+    const events: GenerationMetrics[] = []
+    const collector = new CodexGenerationCollector(value => events.push(value))
+    const records: unknown[] = request().map(item => item.name === 'completed' ? { ...item, attributes } : item)
+    collector.accept(batch(records))
+    expect(collector.finish()).toMatchObject({ nativeGenerations: 0, fallbackGenerations: 0, incompleteRequests: 1 })
+    expect(events).toHaveLength(0)
+  }
+})
+
 it('projects only known native reasoning effort variants from the same completed handler', () => {
   const known = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra', 'persistent']
   for (const effort of [...known, 'default', 'custom-effort', 'PRIVATE_EFFORT', 'sk-private']) {
