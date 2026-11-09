@@ -1,0 +1,32 @@
+[
+  {
+    "path": "readonly-prepare-209926a-20261109/job-129167978484.log",
+    "bytes": 56020,
+    "sha256": "4ac740af94836160ebf949bc48af86ac4cefb7978ff76c145361bba1bbefa11f",
+    "gitBlob": "1b3c26a0af636ebc8e8b08edb5bec6b341a36729"
+  },
+  {
+    "path": "readonly-prepare-209926a-20261109/report-extracted-from-original.json",
+    "bytes": 1207,
+    "sha256": "8dc16129282938d5359b7f3e4ee6124bde081df43286a4a8b46c6f42a9b0a577",
+    "gitBlob": "e627b6b2cdf2e5ebd37fb94154ccae92ab18f801"
+  },
+  {
+    "path": "readonly-prepare-209926a-20261109/artifact-metadata-only.json",
+    "bytes": 872,
+    "sha256": "663372aa77b4c91a789f33ff6fafc26f4ab73d0613a7e0614178afc021a80bec",
+    "gitBlob": "c0e4147fbd6a590e9827a85f222169b5bb2c5297"
+  },
+  {
+    "path": "readonly-prepare-209926a-20261109/closure-readback.json",
+    "bytes": 21030,
+    "sha256": "d3e12e33f27bb42a0225607252de886c3de9489843a554a8495d54b9962b3597",
+    "gitBlob": "cf15be600a1b631e4dc340e1f22743545600c473"
+  },
+  {
+    "path": "readonly-prepare-209926a-20261109/README.md",
+    "bytes": 2151,
+    "sha256": "1ab33b4c9a73cf9ea68c8dbc0f051a9583b86109cc397c52cbe2c7e64bf024d0",
+    "gitBlob": "25517dfcaa6fd21911b45fc60d0be6cdde2f65ae"
+  }
+]

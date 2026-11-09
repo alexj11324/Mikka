@@ -1,0 +1,705 @@
+﻿2026-11-09T12:45:03.4546850Z Current runner version: '2.338.2'
+2026-11-09T12:45:03.4569244Z ##[group]Runner Image Provisioner
+2026-11-09T12:45:03.4569971Z Hosted Compute Agent
+2026-11-09T12:45:03.4570789Z Version: 20261028.624
+2026-11-09T12:45:03.4571372Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+2026-11-09T12:45:03.4572026Z Build Date: 2026-10-28T21:51:42Z
+2026-11-09T12:45:03.4572652Z Worker ID: {c079f232-9d6d-4064-a5a8-840915d8f387}
+2026-11-09T12:45:03.4573241Z Region: centralus
+2026-11-09T12:45:03.4573878Z Cloud: Azure
+2026-11-09T12:45:03.4574348Z ##[endgroup]
+2026-11-09T12:45:03.4575596Z ##[group]Operating System
+2026-11-09T12:45:03.4576168Z Ubuntu
+2026-11-09T12:45:03.4576636Z 24.04.5
+2026-11-09T12:45:03.4577117Z LTS
+2026-11-09T12:45:03.4577606Z ##[endgroup]
+2026-11-09T12:45:03.4578103Z ##[group]Runner Image
+2026-11-09T12:45:03.4578677Z Image: ubuntu-24.04
+2026-11-09T12:45:03.4579166Z Version: 20261101.360.1
+2026-11-09T12:45:03.4580291Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261101.360/images/ubuntu/Ubuntu2404-Readme.md
+2026-11-09T12:45:03.4581867Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261101.360
+2026-11-09T12:45:03.4582715Z ##[endgroup]
+2026-11-09T12:45:03.4583634Z ##[group]GITHUB_TOKEN Permissions
+2026-11-09T12:45:03.4585547Z Contents: read
+2026-11-09T12:45:03.4586052Z Metadata: read
+2026-11-09T12:45:03.4586595Z ##[endgroup]
+2026-11-09T12:45:03.4588337Z Secret source: Actions
+2026-11-09T12:45:03.4589217Z Cache mode: write
+2026-11-09T12:45:03.4590037Z Prepare workflow directory
+2026-11-09T12:45:03.4904450Z Prepare all required actions
+2026-11-09T12:45:03.4944843Z Getting action download info
+2026-11-09T12:45:03.7444117Z Download action repository 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-11-09T12:45:03.8175578Z Download action repository 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-11-09T12:45:03.9505645Z Download action repository 'Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d' (SHA:d2e351f16c6ca20d17c85e6c992e04bdeb64e87d)
+2026-11-09T12:45:04.3493762Z Download action repository 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-11-09T12:45:04.5990185Z Complete job name: prepare
+2026-11-09T12:45:04.6786856Z ##[group]Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+2026-11-09T12:45:04.6787661Z with:
+2026-11-09T12:45:04.6788046Z   ref: 209926afed03da2049d95099f879cc71bb8b8f68
+2026-11-09T12:45:04.6788531Z   persist-credentials: false
+2026-11-09T12:45:04.6788928Z   fetch-depth: 2
+2026-11-09T12:45:04.6789286Z   repository: alexj11324/Mikka
+2026-11-09T12:45:04.6792616Z   token: ***
+2026-11-09T12:45:04.6792971Z   ssh-strict: true
+2026-11-09T12:45:04.6793342Z   ssh-user: git
+2026-11-09T12:45:04.6793681Z   clean: true
+2026-11-09T12:45:04.6794039Z   sparse-checkout-cone-mode: true
+2026-11-09T12:45:04.6794465Z   fetch-tags: false
+2026-11-09T12:45:04.6794854Z   show-progress: true
+2026-11-09T12:45:04.6795210Z   lfs: false
+2026-11-09T12:45:04.6795539Z   submodules: false
+2026-11-09T12:45:04.6795899Z   set-safe-directory: true
+2026-11-09T12:45:04.6796305Z   allow-unsafe-pr-checkout: false
+2026-11-09T12:45:04.6796856Z env:
+2026-11-09T12:45:04.6797181Z   MIKKA_EDITION: cloud
+2026-11-09T12:45:04.6797693Z   MIKKA_GITHUB_REPAIR_GO: root-reviewed-1505-github-trusted-v4
+2026-11-09T12:45:04.6798220Z ##[endgroup]
+2026-11-09T12:45:04.9329711Z Syncing repository: alexj11324/Mikka
+2026-11-09T12:45:04.9331901Z ##[group]Getting Git version info
+2026-11-09T12:45:04.9332498Z Working directory is '/home/runner/work/Mikka/Mikka'
+2026-11-09T12:45:04.9333595Z [command]/usr/bin/git version
+2026-11-09T12:45:04.9405145Z git version 2.56.0
+2026-11-09T12:45:04.9422391Z ##[endgroup]
+2026-11-09T12:45:04.9435026Z Temporarily overriding HOME='/home/runner/work/_temp/5d2306bc-1b36-4a27-ba22-abb232cb7d65' before making global git config changes
+2026-11-09T12:45:04.9437488Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T12:45:04.9439590Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T12:45:04.9490018Z Deleting the contents of '/home/runner/work/Mikka/Mikka'
+2026-11-09T12:45:04.9493478Z ##[group]Initializing the repository
+2026-11-09T12:45:04.9496589Z [command]/usr/bin/git init /home/runner/work/Mikka/Mikka
+2026-11-09T12:45:04.9604801Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-09T12:45:04.9606617Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-09T12:45:04.9608189Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-09T12:45:04.9609488Z hint: call:
+2026-11-09T12:45:04.9610440Z hint:
+2026-11-09T12:45:04.9611311Z hint: 	git config --global init.defaultBranch <name>
+2026-11-09T12:45:04.9611880Z hint:
+2026-11-09T12:45:04.9612408Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-09T12:45:04.9613299Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-09T12:45:04.9614342Z hint:
+2026-11-09T12:45:04.9614911Z hint: 	git branch -m <name>
+2026-11-09T12:45:04.9615561Z hint:
+2026-11-09T12:45:04.9616415Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-09T12:45:04.9617766Z Initialized empty Git repository in /home/runner/work/Mikka/Mikka/.git/
+2026-11-09T12:45:04.9629886Z [command]/usr/bin/git remote add origin https://github.com/alexj11324/Mikka
+2026-11-09T12:45:04.9712916Z ##[endgroup]
+2026-11-09T12:45:04.9713720Z ##[group]Disabling automatic garbage collection
+2026-11-09T12:45:04.9717737Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-09T12:45:04.9752083Z ##[endgroup]
+2026-11-09T12:45:04.9752762Z ##[group]Setting up auth
+2026-11-09T12:45:04.9759504Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T12:45:04.9797165Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T12:45:05.0167737Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T12:45:05.0205386Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T12:45:05.0415354Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T12:45:05.0454713Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T12:45:05.0674363Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-09T12:45:05.0714380Z ##[endgroup]
+2026-11-09T12:45:05.0715277Z ##[group]Fetching the repository
+2026-11-09T12:45:05.0724060Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=2 origin 209926afed03da2049d95099f879cc71bb8b8f68
+2026-11-09T12:45:09.2897281Z From https://github.com/alexj11324/Mikka
+2026-11-09T12:45:09.2897916Z  * branch            209926afed03da2049d95099f879cc71bb8b8f68 -> FETCH_HEAD
+2026-11-09T12:45:09.2899822Z ##[endgroup]
+2026-11-09T12:45:09.2900952Z ##[group]Determining the checkout info
+2026-11-09T12:45:09.2902655Z ##[endgroup]
+2026-11-09T12:45:09.2907347Z [command]/usr/bin/git sparse-checkout disable
+2026-11-09T12:45:09.2960850Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-09T12:45:09.2993369Z ##[group]Checking out the ref
+2026-11-09T12:45:09.2996348Z [command]/usr/bin/git checkout --progress --force 209926afed03da2049d95099f879cc71bb8b8f68
+2026-11-09T12:45:09.8630629Z Note: switching to '209926afed03da2049d95099f879cc71bb8b8f68'.
+2026-11-09T12:45:09.8631628Z 
+2026-11-09T12:45:09.8631909Z You are in 'detached HEAD' state. You can look around, make experimental
+2026-11-09T12:45:09.8632651Z changes and commit them, and you can discard any commits you make in this
+2026-11-09T12:45:09.8633260Z state without impacting any branches by switching back to a branch.
+2026-11-09T12:45:09.8633645Z 
+2026-11-09T12:45:09.8633927Z If you want to create a new branch to retain commits you create, you may
+2026-11-09T12:45:09.8634518Z do so (now or later) by using -c with the switch command. Example:
+2026-11-09T12:45:09.8634851Z 
+2026-11-09T12:45:09.8634987Z   git switch -c <new-branch-name>
+2026-11-09T12:45:09.8635214Z 
+2026-11-09T12:45:09.8635355Z Or undo this operation with:
+2026-11-09T12:45:09.8635559Z 
+2026-11-09T12:45:09.8635672Z   git switch -
+2026-11-09T12:45:09.8635847Z 
+2026-11-09T12:45:09.8636130Z Turn off this advice by setting config variable advice.detachedHead to false
+2026-11-09T12:45:09.8636528Z 
+2026-11-09T12:45:09.8636789Z HEAD is now at 209926a ops: prepare one fresh readonly Smoke GitHub connection
+2026-11-09T12:45:09.8652190Z ##[endgroup]
+2026-11-09T12:45:09.8700806Z [command]/usr/bin/git log -1 --format=%H
+2026-11-09T12:45:09.8729594Z 209926afed03da2049d95099f879cc71bb8b8f68
+2026-11-09T12:45:09.8737571Z ##[group]Removing auth
+2026-11-09T12:45:09.8741278Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T12:45:09.8774737Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T12:45:09.8989090Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T12:45:09.9020650Z http.https://github.com/.extraheader
+2026-11-09T12:45:09.9027178Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-09T12:45:09.9064027Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T12:45:09.9277372Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T12:45:09.9314406Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T12:45:09.9525593Z ##[endgroup]
+2026-11-09T12:45:09.9760457Z ##[group]Run python3 - <<'PY'
+2026-11-09T12:45:09.9761036Z [36;1mpython3 - <<'PY'[0m
+2026-11-09T12:45:09.9761347Z [36;1mimport datetime,hashlib,json,os,pathlib,subprocess[0m
+2026-11-09T12:45:09.9761660Z [36;1mroot=pathlib.Path('.')[0m
+2026-11-09T12:45:09.9762036Z [36;1massert os.environ.get('MIKKA_GITHUB_REPAIR_GO')=='root-reviewed-1505-github-trusted-v4'[0m
+2026-11-09T12:45:09.9762468Z [36;1massert os.environ.get('GITHUB_REPOSITORY')=='alexj11324/Mikka'[0m
+2026-11-09T12:45:09.9762799Z [36;1massert os.environ.get('GITHUB_RUN_ATTEMPT')=='1'[0m
+2026-11-09T12:45:09.9763214Z [36;1massert os.environ.get('GITHUB_REF')=='refs/heads/ops/1505-smoke-github-readonly-20261109'[0m
+2026-11-09T12:45:09.9763770Z [36;1massert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T13:05:00+00:00')[0m
+2026-11-09T12:45:09.9764303Z [36;1mdef git(*args): return subprocess.check_output(['git',*args],text=True).strip()[0m
+2026-11-09T12:45:09.9764738Z [36;1massert git('rev-parse','HEAD')==os.environ['GITHUB_SHA'][0m
+2026-11-09T12:45:09.9765326Z [36;1massert git('rev-list','--parents','-n','1','HEAD').split()[1:]==['e78fccffd9dd878edd490b113ea80efcff1525e7','e41f41369b7944143fda5269a799e00aed5b6dd3'][0m
+2026-11-09T12:45:09.9766041Z [36;1massert git('rev-parse','e78fccffd9dd878edd490b113ea80efcff1525e7^{tree}')=='48b0d459ca1c9087e8abab29e7c3ccf9428fbbcc'[0m
+2026-11-09T12:45:09.9767994Z [36;1mexpected={"scripts/ops/issue1505/github-readonly-provider.mjs":"11b100e92c24d91b98200c18eea9a50a9c6a09ac3e3d5ece1166bbcc559f8937","scripts/ops/issue1505/github-readonly-helper.mjs":"9655772777836a8b1a806b1021409ff9b1f7163db51490f25eeda166f6599be7","scripts/ops/issue1505/github-readonly-store.mjs":"1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5","scripts/ops/issue1505/github-readonly-runner.mjs":"e7178ba5338e27ceaa03700fcbf6fdb8adcbf137601ee6245c2980a5b3b1f25a","scripts/ops/issue1505/github-readonly.test.mjs":"e16c13cf488a682cde1666ab002e4cac957912a1887ef1b087822887885f770d"}[0m
+2026-11-09T12:45:09.9770045Z [36;1mallowed=set(expected)|{'.github/workflows/issue1505-smoke-github-readonly.yml'}[0m
+2026-11-09T12:45:09.9770777Z [36;1massert set(git('diff','--name-only','e78fccffd9dd878edd490b113ea80efcff1525e7','HEAD').splitlines())==allowed[0m
+2026-11-09T12:45:09.9771373Z [36;1mraw=git('diff','--raw','--no-renames','--abbrev=40','e78fccffd9dd878edd490b113ea80efcff1525e7','HEAD').splitlines()[0m
+2026-11-09T12:45:09.9771806Z [36;1mentries=[line.split('\t',1) for line in raw][0m
+2026-11-09T12:45:09.9772149Z [36;1massert len(entries)==len(allowed) and all(len(entry)==2 for entry in entries)[0m
+2026-11-09T12:45:09.9772522Z [36;1massert {entry[1] for entry in entries}==allowed[0m
+2026-11-09T12:45:09.9772789Z [36;1mfor header,path in entries:[0m
+2026-11-09T12:45:09.9773011Z [36;1m    fields=header.split()[0m
+2026-11-09T12:45:09.9773360Z [36;1m    assert len(fields)==5 and fields[0]==':000000' and fields[1]=='100644' and fields[4]=='A',path[0m
+2026-11-09T12:45:09.9773741Z [36;1massert not git('diff','--name-only','HEAD')[0m
+2026-11-09T12:45:09.9774004Z [36;1mfor path,want in expected.items():[0m
+2026-11-09T12:45:09.9774327Z [36;1m    assert hashlib.sha256((root/path).read_bytes()).hexdigest()==want,path[0m
+2026-11-09T12:45:09.9774651Z [36;1mimport json,os,urllib.request[0m
+2026-11-09T12:45:09.9774943Z [36;1mclass NoRedirect(urllib.request.HTTPRedirectHandler):[0m
+2026-11-09T12:45:09.9775314Z [36;1m    def redirect_request(self,req,fp,code,msg,headers,newurl): return None[0m
+2026-11-09T12:45:09.9775821Z [36;1mrequest=urllib.request.Request('https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/main',[0m
+2026-11-09T12:45:09.9776366Z [36;1m    headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})[0m
+2026-11-09T12:45:09.9776860Z [36;1mwith urllib.request.build_opener(NoRedirect).open(request,timeout=20) as response:[0m
+2026-11-09T12:45:09.9777365Z [36;1m    assert response.status==200[0m
+2026-11-09T12:45:09.9777676Z [36;1m    actual=json.load(response)[0m
+2026-11-09T12:45:09.9778065Z [36;1massert actual['object']['sha']=='e78fccffd9dd878edd490b113ea80efcff1525e7','main_changed'[0m
+2026-11-09T12:45:09.9778620Z [36;1massert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T13:05:00+00:00')[0m
+2026-11-09T12:45:09.9779369Z [36;1mprint(json.dumps({'status':'passed','source':os.environ['GITHUB_SHA'],'base':'e78fccffd9dd878edd490b113ea80efcff1525e7','files':len(expected),'productDelta':False}))[0m
+2026-11-09T12:45:09.9779901Z [36;1mPY[0m
+2026-11-09T12:45:09.9800689Z shell: /usr/bin/bash -e {0}
+2026-11-09T12:45:09.9800922Z env:
+2026-11-09T12:45:09.9801096Z   MIKKA_EDITION: cloud
+2026-11-09T12:45:09.9801360Z   MIKKA_GITHUB_REPAIR_GO: root-reviewed-1505-github-trusted-v4
+2026-11-09T12:45:09.9803737Z   GH_TOKEN: ***
+2026-11-09T12:45:09.9803924Z ##[endgroup]
+2026-11-09T12:45:10.6200474Z {"status": "passed", "source": "209926afed03da2049d95099f879cc71bb8b8f68", "base": "e78fccffd9dd878edd490b113ea80efcff1525e7", "files": 5, "productDelta": false}
+2026-11-09T12:45:10.6367974Z ##[group]Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+2026-11-09T12:45:10.6368300Z with:
+2026-11-09T12:45:10.6368467Z   node-version: 24
+2026-11-09T12:45:10.6368642Z   always-auth: false
+2026-11-09T12:45:10.6368825Z   check-latest: false
+2026-11-09T12:45:10.6371239Z   token: ***
+2026-11-09T12:45:10.6371409Z env:
+2026-11-09T12:45:10.6371566Z   MIKKA_EDITION: cloud
+2026-11-09T12:45:10.6371820Z   MIKKA_GITHUB_REPAIR_GO: root-reviewed-1505-github-trusted-v4
+2026-11-09T12:45:10.6372275Z ##[endgroup]
+2026-11-09T12:45:10.7551427Z Found in cache @ /opt/hostedtoolcache/node/24.22.2/x64
+2026-11-09T12:45:10.7554742Z (node:2231) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T12:45:10.7555262Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T12:45:10.7557176Z ##[group]Environment details
+2026-11-09T12:45:11.1600284Z node: v24.22.2
+2026-11-09T12:45:11.1601007Z npm: 11.19.1
+2026-11-09T12:45:11.1601585Z yarn: 1.22.22
+2026-11-09T12:45:11.1602273Z ##[endgroup]
+2026-11-09T12:45:11.1714490Z ##[group]Run node --test scripts/ops/issue1505/github-readonly.test.mjs
+2026-11-09T12:45:11.1714902Z [36;1mnode --test scripts/ops/issue1505/github-readonly.test.mjs[0m
+2026-11-09T12:45:11.1739431Z shell: /usr/bin/bash -e {0}
+2026-11-09T12:45:11.1739643Z env:
+2026-11-09T12:45:11.1739814Z   MIKKA_EDITION: cloud
+2026-11-09T12:45:11.1740080Z   MIKKA_GITHUB_REPAIR_GO: root-reviewed-1505-github-trusted-v4
+2026-11-09T12:45:11.1740382Z ##[endgroup]
+2026-11-09T12:45:11.3560963Z ✔ fresh child requests exactly two read permissions; role push=true is not token authority (81.106546ms)
+2026-11-09T12:45:11.3581868Z ✔ provider rejects write permission (1.334641ms)
+2026-11-09T12:45:11.3582690Z ✔ provider rejects extra permission (0.836732ms)
+2026-11-09T12:45:11.3583418Z ✔ provider rejects all repositories (0.762402ms)
+2026-11-09T12:45:11.3584141Z ✔ provider rejects wrong App (0.776943ms)
+2026-11-09T12:45:11.3585665Z ✔ provider rejects wrong principal (0.236391ms)
+2026-11-09T12:45:11.3586734Z ✔ provider rejects wrong repository (0.482376ms)
+2026-11-09T12:45:11.3588952Z ✔ provider rejects expired child (0.871734ms)
+2026-11-09T12:45:11.3600292Z ✔ provider rejects same source child (1.463733ms)
+2026-11-09T12:45:11.3601092Z ✔ provider rejects unexpected OAuth scope (0.721521ms)
+2026-11-09T12:45:11.3602003Z ✔ successful repair uses normal readback, retains new child and emits no secrets (0.978031ms)
+2026-11-09T12:45:11.3603082Z ✔ existing connection fails before obtaining Owner source or minting (0.257652ms)
+2026-11-09T12:45:11.3604138Z ✔ a failed post-resolution Owner source stops minting (0.219877ms)
+2026-11-09T12:45:11.3605067Z ✔ precommit refusal revokes only the newly minted token (0.312063ms)
+2026-11-09T12:45:11.3606128Z ✔ ambiguous COMMIT preserves safe recovery state and never blindly revokes (0.403058ms)
+2026-11-09T12:45:11.3607191Z ✔ readback failure cleans only the known installed child (0.516597ms)
+2026-11-09T12:45:11.3608249Z ✔ foreign connection blocks cleanup without revoking or deleting it (0.188269ms)
+2026-11-09T12:45:11.3609078Z ✔ changed App rejects cleanup before reading a token (0.135531ms)
+2026-11-09T12:45:11.3609887Z ✔ wrong state principal rejects cleanup before storage/provider IO (0.162822ms)
+2026-11-09T12:45:11.3611017Z ✔ normal repository readback must match exact GitHub subject and installation (0.151095ms)
+2026-11-09T12:45:11.3612106Z ✔ store holds Owner lock, rechecks vacancy and uses normal scoped-client save before COMMIT (0.864513ms)
+2026-11-09T12:45:11.3613133Z ✔ store concurrent existing Smoke row refuses before save and rolls back (0.28982ms)
+2026-11-09T12:45:11.3613919Z ✔ store changed Owner refuses before saving child (0.166637ms)
+2026-11-09T12:45:11.3614804Z ✔ store failed COMMIT retains checkpoint, closes broken client, does not delete row (0.247648ms)
+2026-11-09T12:45:11.3616422Z ✔ runner default disabled fails before loading any credential or application dependency (0.564768ms)
+2026-11-09T12:45:11.3618508Z ✔ runner exact execution guard rejects rerun, foreign repo, branch and missing GO (0.151535ms)
+2026-11-09T12:45:11.3621507Z ✔ lost mint response records unknown outcome and performs no retry or speculative revocation (0.25639ms)
+2026-11-09T12:45:11.3623098Z ✔ normal repository readback binds only provider-verified public App ID and restores its environment (0.171595ms)
+2026-11-09T12:45:11.3627111Z ✔ normal repository readback rejects conflicting App configuration and restores after failure (0.144995ms)
+2026-11-09T12:45:11.3629888Z ✔ closed diagnostics reject identifier-shaped foreign messages and preserve only listed codes (0.176342ms)
+2026-11-09T12:45:11.3632398Z ✔ an expired original Owner source resolves under its lock and only the committed reread reaches the child provider (0.752236ms)
+2026-11-09T12:45:11.3633881Z ✔ refusal at identity never resolves Owner credentials or mints (0.172326ms)
+2026-11-09T12:45:11.3636122Z ✔ refusal at idle never resolves Owner credentials or mints (0.10152ms)
+2026-11-09T12:45:11.3638773Z ✔ refusal at assertVacant never resolves Owner credentials or mints (0.082562ms)
+2026-11-09T12:45:11.3640336Z ✔ the locked Owner identity and finite dates are checked before any normal getter (0.373645ms)
+2026-11-09T12:45:11.3642222Z ✔ an unpersisted refresh intent stops before the getter (0.172897ms)
+2026-11-09T12:45:11.3644408Z ✔ getterError preserves possible refresh evidence without mint, retry or Owner revocation (0.251524ms)
+2026-11-09T12:45:11.3646209Z ✔ commitError preserves possible refresh evidence without mint, retry or Owner revocation (0.128121ms)
+2026-11-09T12:45:11.3648283Z ✔ cleanup never resolves or refreshes an Owner connection (0.15487ms)
+2026-11-09T12:45:11.3759188Z ℹ tests 39
+2026-11-09T12:45:11.3759478Z ℹ suites 0
+2026-11-09T12:45:11.3759743Z ℹ pass 39
+2026-11-09T12:45:11.3759987Z ℹ fail 0
+2026-11-09T12:45:11.3760171Z ℹ cancelled 0
+2026-11-09T12:45:11.3761148Z ℹ skipped 0
+2026-11-09T12:45:11.3761428Z ℹ todo 0
+2026-11-09T12:45:11.3810188Z ℹ duration_ms 170.341168
+2026-11-09T12:45:11.3842406Z ##[group]Run corepack enable && corepack prepare pnpm@10.34.3 --activate && pnpm install --frozen-lockfile
+2026-11-09T12:45:11.3842986Z [36;1mcorepack enable && corepack prepare pnpm@10.34.3 --activate && pnpm install --frozen-lockfile[0m
+2026-11-09T12:45:11.3861870Z shell: /usr/bin/bash -e {0}
+2026-11-09T12:45:11.3862077Z env:
+2026-11-09T12:45:11.3862243Z   MIKKA_EDITION: cloud
+2026-11-09T12:45:11.3862503Z   MIKKA_GITHUB_REPAIR_GO: root-reviewed-1505-github-trusted-v4
+2026-11-09T12:45:11.3862805Z ##[endgroup]
+2026-11-09T12:45:11.5042906Z Preparing pnpm@10.34.3 for immediate activation...
+2026-11-09T12:45:12.5882120Z Scope: all 7 workspace projects
+2026-11-09T12:45:12.6733089Z Lockfile is up to date, resolution step is skipped
+2026-11-09T12:45:12.7481197Z Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-09T12:45:12.8619494Z Packages: +2184
+2026-11-09T12:45:12.8619996Z ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+2026-11-09T12:45:13.7488504Z Progress: resolved 2184, reused 0, downloaded 47, added 13
+2026-11-09T12:45:14.7522505Z Progress: resolved 2184, reused 0, downloaded 223, added 214
+2026-11-09T12:45:15.7514184Z Progress: resolved 2184, reused 0, downloaded 407, added 409
+2026-11-09T12:45:16.7520994Z Progress: resolved 2184, reused 0, downloaded 436, added 421
+2026-11-09T12:45:17.7523556Z Progress: resolved 2184, reused 0, downloaded 527, added 507
+2026-11-09T12:45:18.7537511Z Progress: resolved 2184, reused 0, downloaded 578, added 557
+2026-11-09T12:45:19.7572327Z Progress: resolved 2184, reused 0, downloaded 720, added 735
+2026-11-09T12:45:20.7561666Z Progress: resolved 2184, reused 0, downloaded 817, added 851
+2026-11-09T12:45:21.7571907Z Progress: resolved 2184, reused 0, downloaded 887, added 931
+2026-11-09T12:45:22.7604299Z Progress: resolved 2184, reused 0, downloaded 1014, added 1066
+2026-11-09T12:45:23.7605843Z Progress: resolved 2184, reused 0, downloaded 1039, added 1080
+2026-11-09T12:45:24.7603384Z Progress: resolved 2184, reused 0, downloaded 1045, added 1080
+2026-11-09T12:45:25.7604010Z Progress: resolved 2184, reused 0, downloaded 1088, added 1105
+2026-11-09T12:45:26.7613526Z Progress: resolved 2184, reused 0, downloaded 1177, added 1155
+2026-11-09T12:45:27.7616099Z Progress: resolved 2184, reused 0, downloaded 1213, added 1183
+2026-11-09T12:45:28.7625928Z Progress: resolved 2184, reused 0, downloaded 1323, added 1394
+2026-11-09T12:45:29.7634046Z Progress: resolved 2184, reused 0, downloaded 1452, added 1505
+2026-11-09T12:45:30.7771993Z Progress: resolved 2184, reused 0, downloaded 1503, added 1531
+2026-11-09T12:45:31.7690795Z Progress: resolved 2184, reused 0, downloaded 1524, added 1541
+2026-11-09T12:45:32.7685561Z Progress: resolved 2184, reused 0, downloaded 1627, added 1612
+2026-11-09T12:45:33.7692550Z Progress: resolved 2184, reused 0, downloaded 1697, added 1680
+2026-11-09T12:45:34.7695294Z Progress: resolved 2184, reused 0, downloaded 1802, added 1739
+2026-11-09T12:45:35.7703339Z Progress: resolved 2184, reused 0, downloaded 1837, added 1772
+2026-11-09T12:45:36.7742679Z Progress: resolved 2184, reused 0, downloaded 1848, added 1776
+2026-11-09T12:45:37.7738681Z Progress: resolved 2184, reused 0, downloaded 1864, added 1781
+2026-11-09T12:45:38.7738524Z Progress: resolved 2184, reused 0, downloaded 1904, added 1853
+2026-11-09T12:45:39.7810946Z Progress: resolved 2184, reused 0, downloaded 1943, added 1909
+2026-11-09T12:45:40.7811970Z Progress: resolved 2184, reused 0, downloaded 2014, added 1946
+2026-11-09T12:45:41.7789205Z Progress: resolved 2184, reused 0, downloaded 2069, added 2010
+2026-11-09T12:45:42.7794723Z Progress: resolved 2184, reused 0, downloaded 2106, added 2030
+2026-11-09T12:45:43.7802753Z Progress: resolved 2184, reused 0, downloaded 2107, added 2183
+2026-11-09T12:45:43.8563518Z Progress: resolved 2184, reused 0, downloaded 2108, added 2184, done
+2026-11-09T12:45:44.5425144Z .../node_modules/@swc/core postinstall$ node postinstall.js
+2026-11-09T12:45:44.6034289Z .../node_modules/ffmpeg-static install$ node install.js
+2026-11-09T12:45:44.7802341Z .../esbuild@0.28.2/node_modules/esbuild postinstall$ node install.js
+2026-11-09T12:45:44.7831567Z .../node_modules/@parcel/watcher install$ node scripts/build-from-source.js
+2026-11-09T12:45:44.8436288Z .../node_modules/@swc/core postinstall$ node postinstall.js
+2026-11-09T12:45:44.9529998Z .../node_modules/@swc/core postinstall: Done
+2026-11-09T12:45:44.9554045Z .../node_modules/@parcel/watcher install: Done
+2026-11-09T12:45:44.9569303Z .../esbuild@0.28.2/node_modules/esbuild postinstall: Done
+2026-11-09T12:45:45.1887559Z .../node_modules/@swc/core postinstall: Done
+2026-11-09T12:45:45.7753051Z .../node_modules/ffmpeg-static install: Done
+2026-11-09T12:45:46.6593212Z  WARN  Failed to create bin at /home/runner/work/Mikka/Mikka/apps/desktop/node_modules/.bin/mikka. ENOENT: no such file or directory, open '/home/runner/work/Mikka/Mikka/packages/daemon/dist/mikka.js'
+2026-11-09T12:45:47.1354903Z 
+2026-11-09T12:45:47.1355443Z dependencies:
+2026-11-09T12:45:47.1355823Z + @ai-sdk/gateway 4.0.121
+2026-11-09T12:45:47.1356141Z + @ai-sdk/mcp 2.0.81
+2026-11-09T12:45:47.1356434Z + @ai-sdk/openai 4.0.99
+2026-11-09T12:45:47.1356799Z + @ai-sdk/openai-compatible 3.0.75
+2026-11-09T12:45:47.1357139Z + @ai-sdk/react 4.0.152
+2026-11-09T12:45:47.1357430Z + @ai-sdk/workflow 2.0.80
+2026-11-09T12:45:47.1357710Z + @base-ui/react 1.9.0
+2026-11-09T12:45:47.1358006Z + @better-auth/core 1.7.12
+2026-11-09T12:45:47.1358297Z + @better-auth/expo 1.7.12
+2026-11-09T12:45:47.1358770Z + @better-auth/oauth-provider 1.7.12
+2026-11-09T12:45:47.1359138Z + @chat-adapter/slack 4.43.0
+2026-11-09T12:45:47.1359497Z + @chat-adapter/state-pg 4.43.0
+2026-11-09T12:45:47.1359862Z + @chat-adapter/telegram 4.43.0
+2026-11-09T12:45:47.1360176Z + @composio/core 0.26.0
+2026-11-09T12:45:47.1360465Z + @dnd-kit/core 6.3.1
+2026-11-09T12:45:47.1360995Z + @dnd-kit/sortable 10.0.0
+2026-11-09T12:45:47.1361307Z + @dnd-kit/utilities 3.2.2
+2026-11-09T12:45:47.1361594Z + @e965/xlsx 0.20.3
+2026-11-09T12:45:47.1361853Z + @floating-ui/dom 1.8.0
+2026-11-09T12:45:47.1362213Z + @formatjs/intl-localematcher 0.8.14
+2026-11-09T12:45:47.1362559Z + @heroui/react 3.2.6
+2026-11-09T12:45:47.1362858Z + @heroui/styles 3.2.6
+2026-11-09T12:45:47.1363153Z + @internationalized/date 3.12.4
+2026-11-09T12:45:47.1363532Z + @mikka/protocol 0.0.1 <- packages/protocol
+2026-11-09T12:45:47.1363906Z + @modelcontextprotocol/server 2.3.1
+2026-11-09T12:45:47.1364258Z + @norbert_bodziony/bloub 0.4.1
+2026-11-09T12:45:47.1364808Z + @novnc/novnc 1.6.0
+2026-11-09T12:45:47.1365066Z + @opentelemetry/api 1.10.0
+2026-11-09T12:45:47.1365394Z + @opentelemetry/api-logs 0.223.0
+2026-11-09T12:45:47.1365697Z + @opentelemetry/core 2.12.0
+2026-11-09T12:45:47.1366067Z + @opentelemetry/exporter-logs-otlp-proto 0.223.0
+2026-11-09T12:45:47.1366567Z + @opentelemetry/exporter-trace-otlp-proto 0.223.0
+2026-11-09T12:45:47.1367127Z + @opentelemetry/instrumentation 0.223.0
+2026-11-09T12:45:47.1367549Z + @opentelemetry/instrumentation-pg 0.76.0
+2026-11-09T12:45:47.1367951Z + @opentelemetry/resources 2.12.0
+2026-11-09T12:45:47.1368324Z + @opentelemetry/sdk-logs 0.223.0
+2026-11-09T12:45:47.1368719Z + @opentelemetry/sdk-trace-base 2.12.0
+2026-11-09T12:45:47.1369153Z + @opentelemetry/sdk-trace-node 2.12.0
+2026-11-09T12:45:47.1369626Z + @opentelemetry/semantic-conventions 1.43.0
+2026-11-09T12:45:47.1370043Z + @openuidev/lang-core 1.0.1
+2026-11-09T12:45:47.1370388Z + @openuidev/react-lang 1.0.1
+2026-11-09T12:45:47.1370927Z + @openuidev/react-ui 0.18.1
+2026-11-09T12:45:47.1371263Z + @pierre/diffs 1.6.4
+2026-11-09T12:45:47.1371564Z + @shadcn/react 0.3.1
+2026-11-09T12:45:47.1371868Z + @solidjs/web 2.0.0-rc.0
+2026-11-09T12:45:47.1372188Z + @stripe/stripe-js 10.1.0
+2026-11-09T12:45:47.1372553Z + @tanstack/react-virtual 3.14.18
+2026-11-09T12:45:47.1372886Z + @tiptap/core 3.32.0
+2026-11-09T12:45:47.1373252Z + @tiptap/extension-collaboration 3.32.0
+2026-11-09T12:45:47.1373734Z + @tiptap/extension-collaboration-caret 3.32.0
+2026-11-09T12:45:47.1374197Z + @tiptap/extension-highlight 3.32.0
+2026-11-09T12:45:47.1374848Z + @tiptap/extension-list 3.32.0
+2026-11-09T12:45:47.1375251Z + @tiptap/extension-mention 3.32.0
+2026-11-09T12:45:47.1375658Z + @tiptap/extension-table 3.32.0
+2026-11-09T12:45:47.1376068Z + @tiptap/extension-text-align 3.32.0
+2026-11-09T12:45:47.1376435Z + @tiptap/extensions 3.32.0
+2026-11-09T12:45:47.1376764Z + @tiptap/pm 3.32.0
+2026-11-09T12:45:47.1377067Z + @tiptap/react 3.32.0
+2026-11-09T12:45:47.1377389Z + @tiptap/starter-kit 3.32.0
+2026-11-09T12:45:47.1377743Z + @tiptap/suggestion 3.32.0
+2026-11-09T12:45:47.1378078Z + @tiptap/y-tiptap 3.0.10
+2026-11-09T12:45:47.1378403Z + @vercel/analytics 1.3.1
+2026-11-09T12:45:47.1378727Z + @vercel/functions 3.10.2
+2026-11-09T12:45:47.1379049Z + @vercel/oidc 4.0.2
+2026-11-09T12:45:47.1379366Z + @workflow/serde 5.0.0
+2026-11-09T12:45:47.1379710Z + @workflow/world-local 5.1.2
+2026-11-09T12:45:47.1380015Z + ai 7.0.148
+2026-11-09T12:45:47.1380288Z + aws4fetch 1.0.20
+2026-11-09T12:45:47.1380780Z + beautiful-mermaid 1.1.3
+2026-11-09T12:45:47.1381100Z + better-auth 1.7.12
+2026-11-09T12:45:47.1381370Z + chat 4.43.0
+2026-11-09T12:45:47.1381704Z + class-variance-authority 0.7.1
+2026-11-09T12:45:47.1382032Z + clsx 2.1.1
+2026-11-09T12:45:47.1382287Z + cmdk 1.1.1
+2026-11-09T12:45:47.1382540Z + cn 0.5.0
+2026-11-09T12:45:47.1382804Z + cookie 1.1.1
+2026-11-09T12:45:47.1383073Z + date-fns 4.1.0
+2026-11-09T12:45:47.1383325Z + diff 8.0.2
+2026-11-09T12:45:47.1383589Z + dompurify 3.4.17
+2026-11-09T12:45:47.1383877Z + drizzle-orm 0.45.4
+2026-11-09T12:45:47.1384158Z + e2b 2.61.0
+2026-11-09T12:45:47.1384441Z + embla-carousel-react 8.5.1
+2026-11-09T12:45:47.1384751Z + fflate 0.8.3
+2026-11-09T12:45:47.1385024Z + ffmpeg-static 5.3.0
+2026-11-09T12:45:47.1385314Z + file-type 22.3.0
+2026-11-09T12:45:47.1385577Z + h3 2.0.8
+2026-11-09T12:45:47.1385839Z + hono 4.13.13
+2026-11-09T12:45:47.1386130Z + input-otp 1.4.1
+2026-11-09T12:45:47.1386415Z + katex 0.16.47
+2026-11-09T12:45:47.1386622Z + lucide-react 1.60.0
+2026-11-09T12:45:47.1386813Z + mcp-handler 2.3.0
+2026-11-09T12:45:47.1386989Z + mermaid 12.2.0
+2026-11-09T12:45:47.1387170Z + motion 14.5.0
+2026-11-09T12:45:47.1387362Z + music-metadata 12.3.4
+2026-11-09T12:45:47.1387559Z + negotiator 1.1.0
+2026-11-09T12:45:47.1387737Z + next 16.4.1
+2026-11-09T12:45:47.1387910Z + next-intl 4.14.9
+2026-11-09T12:45:47.1388091Z + next-themes 0.4.6
+2026-11-09T12:45:47.1388271Z + nodemailer 10.3.1
+2026-11-09T12:45:47.1388450Z + officeparser 8.5.0
+2026-11-09T12:45:47.1388627Z + pg 8.23.1
+2026-11-09T12:45:47.1388799Z + posthog-js 1.438.13
+2026-11-09T12:45:47.1389166Z + posthog-node 5.55.2
+2026-11-09T12:45:47.1389337Z + react 19.3.1
+2026-11-09T12:45:47.1389523Z + react-day-picker 9.8.0
+2026-11-09T12:45:47.1389717Z + react-dom 19.3.1
+2026-11-09T12:45:47.1389920Z + react-markdown 10.1.0
+2026-11-09T12:45:47.1390142Z + react-resizable-panels 4.14.7
+2026-11-09T12:45:47.1390394Z + react-syntax-highlighter 16.1.1
+2026-11-09T12:45:47.1390814Z + recharts 3.10.1
+2026-11-09T12:45:47.1390997Z + rehype-katex 7.0.1
+2026-11-09T12:45:47.1391176Z + remark-gfm 4.0.1
+2026-11-09T12:45:47.1391363Z + remark-math 6.0.0
+2026-11-09T12:45:47.1391552Z + shadcn 4.22.1
+2026-11-09T12:45:47.1391728Z + sharp 0.35.5
+2026-11-09T12:45:47.1391903Z + shiki 4.5.0
+2026-11-09T12:45:47.1392085Z + solid-js 2.0.0-rc.0
+2026-11-09T12:45:47.1392263Z + sonner 1.7.4
+2026-11-09T12:45:47.1392426Z + srvx 1.0.8
+2026-11-09T12:45:47.1392589Z + swr 2.5.1
+2026-11-09T12:45:47.1392762Z + tailwind-merge 3.7.0
+2026-11-09T12:45:47.1392953Z + tw-animate-css 1.4.0
+2026-11-09T12:45:47.1393142Z + undici 7.24.5
+2026-11-09T12:45:47.1393323Z + unstorage 2.0.0-beta.0
+2026-11-09T12:45:47.1393516Z + use-intl 4.14.9
+2026-11-09T12:45:47.1393682Z + vaul 1.1.2
+2026-11-09T12:45:47.1393842Z + workflow 5.2.3
+2026-11-09T12:45:47.1394020Z + y-protocols 1.0.7
+2026-11-09T12:45:47.1394195Z + yjs 13.6.33
+2026-11-09T12:45:47.1394355Z + zod 4.6.7
+2026-11-09T12:45:47.1394442Z 
+2026-11-09T12:45:47.1394525Z devDependencies:
+2026-11-09T12:45:47.1394720Z + @playwright/test 1.64.1
+2026-11-09T12:45:47.1394932Z + @tailwindcss/postcss 4.3.3
+2026-11-09T12:45:47.1395260Z + @types/node 25.9.9
+2026-11-09T12:45:47.1395450Z + @types/pg 8.23.1
+2026-11-09T12:45:47.1395643Z + @types/react 19.3.0
+2026-11-09T12:45:47.1395831Z + @types/react-dom 19.3.0
+2026-11-09T12:45:47.1396071Z + @types/react-syntax-highlighter 15.5.13
+2026-11-09T12:45:47.1396364Z + @typescript/native-preview 7.0.0-dev.20260707.2
+2026-11-09T12:45:47.1396603Z + esbuild 0.28.2
+2026-11-09T12:45:47.1396788Z + fake-indexeddb 6.2.4
+2026-11-09T12:45:47.1396976Z + happy-dom 15.11.7
+2026-11-09T12:45:47.1397147Z + js-yaml 4.3.2
+2026-11-09T12:45:47.1397320Z + nitro 3.0.261103-rc
+2026-11-09T12:45:47.1397492Z + nx 24.0.5
+2026-11-09T12:45:47.1397647Z + oxlint 1.89.0
+2026-11-09T12:45:47.1397808Z + postcss 8.5.31
+2026-11-09T12:45:47.1397977Z + prettier 3.9.10
+2026-11-09T12:45:47.1398200Z + prettier-plugin-tailwindcss 0.7.4
+2026-11-09T12:45:47.1398417Z + rolldown 1.3.0
+2026-11-09T12:45:47.1398590Z + tailwindcss 4.3.3
+2026-11-09T12:45:47.1398775Z + tsrs 0.20.1-ts7.1.0-beta
+2026-11-09T12:45:47.1398956Z + tsx 4.23.15
+2026-11-09T12:45:47.1399130Z + typescript 5.9.3
+2026-11-09T12:45:47.1399314Z + wrangler 4.152.0
+2026-11-09T12:45:47.1399407Z 
+2026-11-09T12:45:47.3511442Z  WARN  Failed to create bin at /home/runner/work/Mikka/Mikka/apps/desktop/node_modules/.bin/mikka. ENOENT: no such file or directory, open '/home/runner/work/Mikka/Mikka/apps/desktop/node_modules/@mikka/daemon/dist/mikka.js'
+2026-11-09T12:45:47.4331425Z ╭ Warning ─────────────────────────────────────────────────────────────────────╮
+2026-11-09T12:45:47.4331965Z │                                                                              │
+2026-11-09T12:45:47.4332455Z │   Ignored build scripts: @openuidev/lang-core@1.0.1, cbor-extract@2.2.2,     │
+2026-11-09T12:45:47.4332979Z │   core-js@3.51.0, electron-winstaller@5.4.0, nx@24.0.5,                      │
+2026-11-09T12:45:47.4333474Z │   tesseract.js@7.0.0, workerd@1.20261019.1.                                  │
+2026-11-09T12:45:47.4333982Z │   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+2026-11-09T12:45:47.4334471Z │   to run scripts.                                                            │
+2026-11-09T12:45:47.4334863Z │                                                                              │
+2026-11-09T12:45:47.4335281Z ╰──────────────────────────────────────────────────────────────────────────────╯
+2026-11-09T12:45:47.4778289Z Done in 35.2s using pnpm v10.34.3
+2026-11-09T12:45:47.5977356Z ##[group]Run python3 - <<'PY'
+2026-11-09T12:45:47.5977809Z [36;1mpython3 - <<'PY'[0m
+2026-11-09T12:45:47.5978009Z [36;1mimport datetime[0m
+2026-11-09T12:45:47.5978435Z [36;1massert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T13:05:00+00:00')[0m
+2026-11-09T12:45:47.5978889Z [36;1mimport json,os,urllib.request[0m
+2026-11-09T12:45:47.5979185Z [36;1mclass NoRedirect(urllib.request.HTTPRedirectHandler):[0m
+2026-11-09T12:45:47.5979576Z [36;1m    def redirect_request(self,req,fp,code,msg,headers,newurl): return None[0m
+2026-11-09T12:45:47.5980089Z [36;1mrequest=urllib.request.Request('https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/main',[0m
+2026-11-09T12:45:47.5980882Z [36;1m    headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})[0m
+2026-11-09T12:45:47.5981640Z [36;1mwith urllib.request.build_opener(NoRedirect).open(request,timeout=20) as response:[0m
+2026-11-09T12:45:47.5982194Z [36;1m    assert response.status==200[0m
+2026-11-09T12:45:47.5982521Z [36;1m    actual=json.load(response)[0m
+2026-11-09T12:45:47.5983052Z [36;1massert actual['object']['sha']=='e78fccffd9dd878edd490b113ea80efcff1525e7','main_changed'[0m
+2026-11-09T12:45:47.5983779Z [36;1massert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T13:05:00+00:00')[0m
+2026-11-09T12:45:47.5984200Z [36;1mPY[0m
+2026-11-09T12:45:47.6002893Z shell: /usr/bin/bash -e {0}
+2026-11-09T12:45:47.6003103Z env:
+2026-11-09T12:45:47.6003269Z   MIKKA_EDITION: cloud
+2026-11-09T12:45:47.6003520Z   MIKKA_GITHUB_REPAIR_GO: root-reviewed-1505-github-trusted-v4
+2026-11-09T12:45:47.6005800Z   GH_TOKEN: ***
+2026-11-09T12:45:47.6005986Z ##[endgroup]
+2026-11-09T12:45:48.0451777Z ##[group]Run Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+2026-11-09T12:45:48.0452120Z with:
+2026-11-09T12:45:48.0452284Z   method: oidc
+2026-11-09T12:45:48.0452490Z   identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+2026-11-09T12:45:48.0452745Z   oidc-audience: mikka-infisical
+2026-11-09T12:45:48.0452992Z   project-id: 89850d6a-f020-4936-863e-df77380dfe40
+2026-11-09T12:45:48.0453219Z   env-slug: prod
+2026-11-09T12:45:48.0453403Z   secret-path: /neon
+2026-11-09T12:45:48.0453590Z   secret-name: DATABASE_URL
+2026-11-09T12:45:48.0453784Z   recursive: false
+2026-11-09T12:45:48.0453963Z   include-imports: false
+2026-11-09T12:45:48.0454175Z   domain: https://app.infisical.com
+2026-11-09T12:45:48.0454391Z   export-type: env
+2026-11-09T12:45:48.0454566Z   file-output-path: /.env
+2026-11-09T12:45:48.0454752Z env:
+2026-11-09T12:45:48.0454925Z   MIKKA_EDITION: cloud
+2026-11-09T12:45:48.0455169Z   MIKKA_GITHUB_REPAIR_GO: root-reviewed-1505-github-trusted-v4
+2026-11-09T12:45:48.0455473Z ##[endgroup]
+2026-11-09T12:45:48.4544638Z (node:2375) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T12:45:48.4545836Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T12:45:48.9093458Z Injected secrets as environment variables
+2026-11-09T12:45:48.9376939Z ##[group]Run Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+2026-11-09T12:45:48.9377303Z with:
+2026-11-09T12:45:48.9377477Z   method: oidc
+2026-11-09T12:45:48.9377696Z   identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+2026-11-09T12:45:48.9377963Z   oidc-audience: mikka-infisical
+2026-11-09T12:45:48.9378213Z   project-id: 89850d6a-f020-4936-863e-df77380dfe40
+2026-11-09T12:45:48.9378457Z   env-slug: prod
+2026-11-09T12:45:48.9378639Z   secret-path: /vercel
+2026-11-09T12:45:48.9378847Z   secret-name: MIKKA_DATABASE_URL
+2026-11-09T12:45:48.9379060Z   recursive: false
+2026-11-09T12:45:48.9379245Z   include-imports: false
+2026-11-09T12:45:48.9379470Z   domain: https://app.infisical.com
+2026-11-09T12:45:48.9379703Z   export-type: env
+2026-11-09T12:45:48.9379890Z   file-output-path: /.env
+2026-11-09T12:45:48.9380081Z env:
+2026-11-09T12:45:48.9380475Z   MIKKA_EDITION: cloud
+2026-11-09T12:45:48.9380864Z   MIKKA_GITHUB_REPAIR_GO: root-reviewed-1505-github-trusted-v4
+2026-11-09T12:45:48.9381783Z   DATABASE_URL: ***
+2026-11-09T12:45:48.9381977Z ##[endgroup]
+2026-11-09T12:45:49.1878205Z (node:2387) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T12:45:49.1879684Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T12:45:49.5511692Z Injected secrets as environment variables
+2026-11-09T12:45:49.6448129Z ##[group]Run Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+2026-11-09T12:45:49.6448520Z with:
+2026-11-09T12:45:49.6448716Z   method: oidc
+2026-11-09T12:45:49.6448934Z   identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+2026-11-09T12:45:49.6449197Z   oidc-audience: mikka-infisical
+2026-11-09T12:45:49.6449456Z   project-id: 89850d6a-f020-4936-863e-df77380dfe40
+2026-11-09T12:45:49.6449724Z   env-slug: prod
+2026-11-09T12:45:49.6449908Z   secret-path: /vercel
+2026-11-09T12:45:49.6450113Z   secret-name: BETTER_AUTH_SECRET
+2026-11-09T12:45:49.6450321Z   recursive: false
+2026-11-09T12:45:49.6450597Z   include-imports: false
+2026-11-09T12:45:49.6450826Z   domain: https://app.infisical.com
+2026-11-09T12:45:49.6451048Z   export-type: env
+2026-11-09T12:45:49.6451229Z   file-output-path: /.env
+2026-11-09T12:45:49.6451425Z env:
+2026-11-09T12:45:49.6451586Z   MIKKA_EDITION: cloud
+2026-11-09T12:45:49.6451834Z   MIKKA_GITHUB_REPAIR_GO: root-reviewed-1505-github-trusted-v4
+2026-11-09T12:45:49.6453164Z   DATABASE_URL: ***
+2026-11-09T12:45:49.6453795Z   MIKKA_DATABASE_URL: ***
+2026-11-09T12:45:49.6454001Z ##[endgroup]
+2026-11-09T12:45:49.9212636Z (node:2399) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T12:45:49.9213946Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T12:45:50.1897457Z Injected secrets as environment variables
+2026-11-09T12:45:50.2133218Z ##[group]Run Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+2026-11-09T12:45:50.2133770Z with:
+2026-11-09T12:45:50.2134020Z   method: oidc
+2026-11-09T12:45:50.2134349Z   identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+2026-11-09T12:45:50.2134756Z   oidc-audience: mikka-infisical
+2026-11-09T12:45:50.2135133Z   project-id: 89850d6a-f020-4936-863e-df77380dfe40
+2026-11-09T12:45:50.2135511Z   env-slug: prod
+2026-11-09T12:45:50.2135794Z   secret-path: /vercel
+2026-11-09T12:45:50.2136090Z   secret-name: GITHUB_CLIENT_ID
+2026-11-09T12:45:50.2136414Z   recursive: false
+2026-11-09T12:45:50.2136693Z   include-imports: false
+2026-11-09T12:45:50.2137035Z   domain: https://app.infisical.com
+2026-11-09T12:45:50.2137380Z   export-type: env
+2026-11-09T12:45:50.2137670Z   file-output-path: /.env
+2026-11-09T12:45:50.2137985Z env:
+2026-11-09T12:45:50.2138238Z   MIKKA_EDITION: cloud
+2026-11-09T12:45:50.2138628Z   MIKKA_GITHUB_REPAIR_GO: root-reviewed-1505-github-trusted-v4
+2026-11-09T12:45:50.2139924Z   DATABASE_URL: ***
+2026-11-09T12:45:50.2140973Z   MIKKA_DATABASE_URL: ***
+2026-11-09T12:45:50.2141371Z   BETTER_AUTH_SECRET: ***
+2026-11-09T12:45:50.2141663Z ##[endgroup]
+2026-11-09T12:45:50.4435752Z (node:2411) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T12:45:50.4436925Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T12:45:50.7083289Z Injected secrets as environment variables
+2026-11-09T12:45:50.7813395Z ##[group]Run Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+2026-11-09T12:45:50.7813747Z with:
+2026-11-09T12:45:50.7813936Z   method: oidc
+2026-11-09T12:45:50.7814323Z   identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+2026-11-09T12:45:50.7814595Z   oidc-audience: mikka-infisical
+2026-11-09T12:45:50.7814853Z   project-id: 89850d6a-f020-4936-863e-df77380dfe40
+2026-11-09T12:45:50.7815105Z   env-slug: prod
+2026-11-09T12:45:50.7815295Z   secret-path: /vercel
+2026-11-09T12:45:50.7815508Z   secret-name: GITHUB_CLIENT_SECRET
+2026-11-09T12:45:50.7815732Z   recursive: false
+2026-11-09T12:45:50.7815937Z   include-imports: false
+2026-11-09T12:45:50.7816164Z   domain: https://app.infisical.com
+2026-11-09T12:45:50.7816387Z   export-type: env
+2026-11-09T12:45:50.7816580Z   file-output-path: /.env
+2026-11-09T12:45:50.7816786Z env:
+2026-11-09T12:45:50.7816963Z   MIKKA_EDITION: cloud
+2026-11-09T12:45:50.7817224Z   MIKKA_GITHUB_REPAIR_GO: root-reviewed-1505-github-trusted-v4
+2026-11-09T12:45:50.7818125Z   DATABASE_URL: ***
+2026-11-09T12:45:50.7818767Z   MIKKA_DATABASE_URL: ***
+2026-11-09T12:45:50.7819068Z   BETTER_AUTH_SECRET: ***
+2026-11-09T12:45:50.7819292Z   GITHUB_CLIENT_ID: ***
+2026-11-09T12:45:50.7819501Z ##[endgroup]
+2026-11-09T12:45:51.0633267Z (node:2423) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T12:45:51.0634795Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T12:45:51.4101686Z Injected secrets as environment variables
+2026-11-09T12:45:51.4486637Z ##[group]Run python3 - <<'PY'
+2026-11-09T12:45:51.4486933Z [36;1mpython3 - <<'PY'[0m
+2026-11-09T12:45:51.4487169Z [36;1mimport datetime[0m
+2026-11-09T12:45:51.4487607Z [36;1massert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T13:05:00+00:00')[0m
+2026-11-09T12:45:51.4488214Z [36;1mimport json,os,urllib.request[0m
+2026-11-09T12:45:51.4488692Z [36;1mclass NoRedirect(urllib.request.HTTPRedirectHandler):[0m
+2026-11-09T12:45:51.4489346Z [36;1m    def redirect_request(self,req,fp,code,msg,headers,newurl): return None[0m
+2026-11-09T12:45:51.4490150Z [36;1mrequest=urllib.request.Request('https://api.github.com/repos/alexj11324/Mikka/git/ref/heads/main',[0m
+2026-11-09T12:45:51.4490924Z [36;1m    headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json'})[0m
+2026-11-09T12:45:51.4491454Z [36;1mwith urllib.request.build_opener(NoRedirect).open(request,timeout=20) as response:[0m
+2026-11-09T12:45:51.4491874Z [36;1m    assert response.status==200[0m
+2026-11-09T12:45:51.4492133Z [36;1m    actual=json.load(response)[0m
+2026-11-09T12:45:51.4492516Z [36;1massert actual['object']['sha']=='e78fccffd9dd878edd490b113ea80efcff1525e7','main_changed'[0m
+2026-11-09T12:45:51.4493102Z [36;1massert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T13:05:00+00:00')[0m
+2026-11-09T12:45:51.4493537Z [36;1mPY[0m
+2026-11-09T12:45:51.4493967Z [36;1mnode --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1505/github-readonly-runner.mjs --prepare[0m
+2026-11-09T12:45:51.4513581Z shell: /usr/bin/bash -e {0}
+2026-11-09T12:45:51.4513820Z env:
+2026-11-09T12:45:51.4514010Z   MIKKA_EDITION: cloud
+2026-11-09T12:45:51.4514291Z   MIKKA_GITHUB_REPAIR_GO: root-reviewed-1505-github-trusted-v4
+2026-11-09T12:45:51.4515150Z   DATABASE_URL: ***
+2026-11-09T12:45:51.4515839Z   MIKKA_DATABASE_URL: ***
+2026-11-09T12:45:51.4516148Z   BETTER_AUTH_SECRET: ***
+2026-11-09T12:45:51.4516392Z   GITHUB_CLIENT_ID: ***
+2026-11-09T12:45:51.4516663Z   GITHUB_CLIENT_SECRET: ***
+2026-11-09T12:45:51.4518798Z   GH_TOKEN: ***
+2026-11-09T12:45:51.4519012Z   NODE_ENV: production
+2026-11-09T12:45:51.4519237Z   VERCEL_ENV: production
+2026-11-09T12:45:51.4519490Z   BETTER_AUTH_URL: https://app.aspectlylabs.com
+2026-11-09T12:45:51.4519799Z   NEXT_PUBLIC_APP_URL: https://app.aspectlylabs.com
+2026-11-09T12:45:51.4520079Z ##[endgroup]
+2026-11-09T12:45:53.5428770Z (node:2437) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+2026-11-09T12:45:53.5431124Z In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+2026-11-09T12:45:53.5431883Z 
+2026-11-09T12:45:53.5432072Z To prepare for this change:
+2026-11-09T12:45:53.5432628Z - If you want the current behavior, explicitly use 'sslmode=verify-full'
+2026-11-09T12:45:53.5433624Z - If you want libpq compatibility now, use 'uselibpqcompat=true&***'
+2026-11-09T12:45:53.5433991Z 
+2026-11-09T12:45:53.5434471Z See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+2026-11-09T12:45:53.5435269Z (Use `node --trace-warnings ...` to show where the warning was created)
+2026-11-09T12:45:57.7483881Z {"version":1,"issue":1505,"operation":"prepare","status":"incomplete","stage":"mint_request","startedAt":"2026-11-09T12:45:53.526Z","changed":false,"ownerRefreshAttempted":true,"mintAttempted":true,"ownerTokenResolution":{"minimumValidityMs":660000,"status":"committed","actualRefresh":"not_independently_observed","beforeUpdatedAt":"2026-11-09T10:59:38.653Z","beforeExpiresAt":"2026-11-09T18:59:38.652Z","afterUpdatedAt":"2026-11-09T10:59:38.653Z","afterExpiresAt":"2026-11-09T18:59:38.652Z","persistedMetadataChanged":false},"ownerSourceBaseline":"after_normal_token_resolution","ownerProviderExpiresAt":"2026-11-09T18:59:38.000Z","mintOutcome":"received","mintedTokenSha256":"28e5e928181d57de99b2dc65ace9e0020efd3209589af8552f6eeee976b4cf81","code":"issue1505_github_provider_http","newChildRevocation":{"kind":"delete_token","status":204},"completedAt":"2026-11-09T12:45:57.745Z"}
+2026-11-09T12:45:57.8234070Z ##[error]Process completed with exit code 1.
+2026-11-09T12:45:57.8308214Z ##[group]Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+2026-11-09T12:45:57.8308577Z with:
+2026-11-09T12:45:57.8308816Z   name: issue1505-github-readonly-fresh-42619584651-1
+2026-11-09T12:45:57.8309124Z   path: issue1505-github-readonly-report/*.json
+2026-11-09T12:45:57.8309424Z   if-no-files-found: warn
+2026-11-09T12:45:57.8309648Z   retention-days: 14
+2026-11-09T12:45:57.8309859Z   compression-level: 6
+2026-11-09T12:45:57.8310059Z   overwrite: false
+2026-11-09T12:45:57.8310276Z   include-hidden-files: false
+2026-11-09T12:45:57.8310729Z env:
+2026-11-09T12:45:57.8310943Z   MIKKA_EDITION: cloud
+2026-11-09T12:45:57.8311216Z   MIKKA_GITHUB_REPAIR_GO: root-reviewed-1505-github-trusted-v4
+2026-11-09T12:45:57.8312080Z   DATABASE_URL: ***
+2026-11-09T12:45:57.8312740Z   MIKKA_DATABASE_URL: ***
+2026-11-09T12:45:57.8313074Z   BETTER_AUTH_SECRET: ***
+2026-11-09T12:45:57.8313320Z   GITHUB_CLIENT_ID: ***
+2026-11-09T12:45:57.8313598Z   GITHUB_CLIENT_SECRET: ***
+2026-11-09T12:45:57.8313848Z ##[endgroup]
+2026-11-09T12:45:57.9703951Z (node:2459) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T12:45:57.9704633Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T12:45:57.9728135Z With the provided path, there will be 1 file uploaded
+2026-11-09T12:45:57.9741639Z Artifact name is valid!
+2026-11-09T12:45:57.9745327Z Root directory input is valid!
+2026-11-09T12:45:58.2862722Z Beginning upload of artifact content to blob storage
+2026-11-09T12:45:58.3004764Z (node:2459) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T12:45:58.4632402Z Uploaded bytes 609
+2026-11-09T12:45:58.5256379Z Finished uploading artifact content to blob storage!
+2026-11-09T12:45:58.5257443Z SHA256 digest of uploaded artifact zip is 15fc994c6330a7af543bc328c9d58d0649adb1a2a37bac8525af87f980624964
+2026-11-09T12:45:58.5258204Z Finalizing artifact upload
+2026-11-09T12:45:58.9634553Z Artifact issue1505-github-readonly-fresh-42619584651-1.zip successfully finalized. Artifact ID 13674945658
+2026-11-09T12:45:58.9636458Z Artifact issue1505-github-readonly-fresh-42619584651-1 has been successfully uploaded! Final size is 609 bytes. Artifact ID is 13674945658
+2026-11-09T12:45:58.9640772Z Artifact download URL: https://github.com/alexj11324/Mikka/actions/runs/42619584651/artifacts/13674945658
+2026-11-09T12:45:58.9826908Z Post job cleanup.
+2026-11-09T12:45:59.0525768Z [command]/usr/bin/git version
+2026-11-09T12:45:59.0569728Z git version 2.56.0
+2026-11-09T12:45:59.0601480Z Temporarily overriding HOME='/home/runner/work/_temp/46f1b7e3-210d-4b89-9a14-2d98888754f7' before making global git config changes
+2026-11-09T12:45:59.0602649Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T12:45:59.0606664Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T12:45:59.0644087Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T12:45:59.0677974Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T12:45:59.0918076Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T12:45:59.0951735Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T12:45:59.1202675Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T12:45:59.1248709Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T12:45:59.1623590Z Cleaning up orphan processes
+2026-11-09T12:45:59.1930315Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020, actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

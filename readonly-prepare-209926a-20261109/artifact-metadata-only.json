@@ -1,0 +1,23 @@
+{
+  "artifacts": [
+    {
+      "id": 13674945658,
+      "name": "issue1505-github-readonly-fresh-42619584651-1",
+      "size_in_bytes": 609,
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13674945658",
+      "archive_download_url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13674945658/zip",
+      "expired": false,
+      "created_at": "2026-11-09T12:45:58Z",
+      "expires_at": "2026-11-23T12:45:57Z",
+      "updated_at": "2026-11-09T12:45:58Z",
+      "digest": "sha256:15fc994c6330a7af543bc328c9d58d0649adb1a2a37bac8525af87f980624964",
+      "workflow_run": {
+        "id": 42619584651,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "ops/1505-smoke-github-readonly-20261109",
+        "head_sha": "209926afed03da2049d95099f879cc71bb8b8f68"
+      }
+    }
+  ]
+}

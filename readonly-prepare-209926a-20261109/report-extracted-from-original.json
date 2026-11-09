@@ -1,0 +1,36 @@
+[
+  {
+    "at": "2026-11-09T12:45:57.7483881Z",
+    "value": {
+      "version": 1,
+      "issue": 1505,
+      "operation": "prepare",
+      "status": "incomplete",
+      "stage": "mint_request",
+      "startedAt": "2026-11-09T12:45:53.526Z",
+      "changed": false,
+      "ownerRefreshAttempted": true,
+      "mintAttempted": true,
+      "ownerTokenResolution": {
+        "minimumValidityMs": 660000,
+        "status": "committed",
+        "actualRefresh": "not_independently_observed",
+        "beforeUpdatedAt": "2026-11-09T10:59:38.653Z",
+        "beforeExpiresAt": "2026-11-09T18:59:38.652Z",
+        "afterUpdatedAt": "2026-11-09T10:59:38.653Z",
+        "afterExpiresAt": "2026-11-09T18:59:38.652Z",
+        "persistedMetadataChanged": false
+      },
+      "ownerSourceBaseline": "after_normal_token_resolution",
+      "ownerProviderExpiresAt": "2026-11-09T18:59:38.000Z",
+      "mintOutcome": "received",
+      "mintedTokenSha256": "28e5e928181d57de99b2dc65ace9e0020efd3209589af8552f6eeee976b4cf81",
+      "code": "issue1505_github_provider_http",
+      "newChildRevocation": {
+        "kind": "delete_token",
+        "status": 204
+      },
+      "completedAt": "2026-11-09T12:45:57.745Z"
+    }
+  }
+]
