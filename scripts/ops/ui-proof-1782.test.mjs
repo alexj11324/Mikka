@@ -172,3 +172,9 @@ test('a desktop inventory, duplicate sources, server code and omitted save RPC a
     assert.throws(() => validateInventory(value, selectedInputs), { name: 'AssertionError' })
   }
 })
+
+test('activity and historical-attempt failures remain separate closed phases', () => {
+  for (const phase of ['task_detail_activity', 'task_detail_history']) {
+    assert.deepEqual(closedFailure(phase, { name: 'Error', message: 'private DOM or locator' }), { phase, kind: 'Error' })
+  }
+})

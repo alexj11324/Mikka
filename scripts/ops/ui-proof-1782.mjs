@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url'
 
 export const PRODUCT = '0b598d264e45925bbec8ebc1284ab2ccf17e451d'
 export const PRODUCT_TREE = '798ac44d8374d80647ab46f757645e492def6f3c'
-export const CONTROL_PARENT = 'd8dd601eb97533bd3825e3063cc1f8c99a747a13'
+export const CONTROL_PARENT = '8bcb402fad8a117e8a7c85f999faaf085eeeacaf'
 export const OVERLAY = 'b92b0e1d48f75c92d059ee071162b72455e6af90'
 export const BRANCH = 'ops/1782-official-ui-proof-20261109'
 export const DATABASE = 'postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e'
@@ -47,7 +47,7 @@ export function validateInvocation(env, event, actual) {
 const FAILURE_PHASES = new Set(['source', 'acquire', 'workspace_name_baseline', 'base_seed', 'extension_seed', 'scope', 'browser',
   'browser_launch', 'browser_context', 'browser_home', 'workspace_menu', 'workspace_sidebar', 'workspace_selection',
   'workspace_navigation', 'workspace_ready', 'theme_persist', 'theme_reload', 'theme_ready',
-  'task_list', 'task_detail', 'project_stale_form', 'source_after',
+  'task_list', 'task_detail', 'task_detail_activity', 'task_detail_history', 'project_stale_form', 'source_after',
   'cleanup_browser', 'cleanup_extension', 'cleanup_base', 'cleanup_workspaceName', 'cleanup_lease'])
 const ACCOUNT_FAILURE_CODES = new Set([
   'ACCOUNT_POOL_DATABASE_ERROR', 'ACCOUNT_FOOTPRINT_UNPROVEN', 'INVALID_REQUEST', 'STALE_LEASE', 'LEASE_LOST',
@@ -110,6 +110,14 @@ export async function selectOfficialWorkspace(page, { workspaceName, basePath, o
   await selected.waitFor({ state: 'attached' })
   assert.equal(await selected.count(), 1)
   assert.equal(await selected.textContent(), workspaceName)
+}
+
+/** The property summary and activity event intentionally share their wording.
+ * Select the actual named activity section so one cannot stand in for the other. */
+export function taskActivityLocators(task, { label, delegated }) {
+  const region = task.getByRole('region', { name: label, exact: true })
+  return { region, delegation: region.getByText(delegated, { exact: false }),
+    result: region.locator('[data-run-result="done"]') }
 }
 
 export function validateWorkspaceNameCleanup(value) {

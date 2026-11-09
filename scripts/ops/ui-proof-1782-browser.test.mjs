@@ -4,11 +4,11 @@ import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
 import { pathToFileURL } from 'node:url'
-import { selectOfficialWorkspace } from './ui-proof-1782.mjs'
+import { selectOfficialWorkspace, taskActivityLocators } from './ui-proof-1782.mjs'
 
 const app = resolve(process.env.MIKKA_TEST_APP_DIR)
 const require = createRequire(join(app, 'package.json'))
-const { chromium } = require('@playwright/test')
+const { chromium, expect } = require('@playwright/test')
 const { selectParityWorkspace } = await import(pathToFileURL(join(app, 'apps/desktop/test/parity-page-ready.mjs')).href)
 
 // A small owned HTML fixture exercises actual Chromium visibility, radio-menu
@@ -76,3 +76,35 @@ for (const [name, narrow, selected] of [['wide', false, false], ['narrow', true,
     })
   })
 }
+
+test('duplicate delegation copy reproduces the unscoped failure and the activity region remains required', { timeout: 20_000 }, async () => {
+  const browser = await chromium.launch({ headless: true })
+  try {
+    const page = await browser.newPage()
+    // These are the public IssueDetailProperties / IssueActivity semantics,
+    // with only owned text. This does not replace the production capture.
+    await page.setContent(`<style>.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}</style>
+      <main role="region" aria-label="Proof task">
+      <aside id="issue-properties"><span class="sr-only">Delegated to Ada</span><span>Ada</span></aside>
+      <section aria-label="Task activity"><h2>Activity</h2>
+        <div><span>Test owner</span><span data-event>Delegated to Ada</span></div>
+        <span data-run-result="done">Done</span>
+      </section></main>`)
+    const task = page.getByRole('region', { name: 'Proof task', exact: true })
+    const previous = task.getByText('Delegated to Ada', { exact: false })
+    assert.equal(await previous.count(), 2)
+    await assert.rejects(expect(previous).toBeVisible(), /strict mode violation/)
+    const activity = taskActivityLocators(task, { label: 'Task activity', delegated: 'Delegated to Ada' })
+    await expect(activity.region).toHaveCount(1)
+    await expect(activity.delegation).toHaveCount(1)
+    await expect(activity.delegation).toBeVisible()
+    await expect(activity.result).toHaveCount(1)
+    await expect(activity.result).toBeVisible()
+    await page.locator('[data-event]').evaluate(node => node.remove())
+    assert.equal(await previous.count(), 1)
+    await expect(activity.delegation).toHaveCount(0)
+    await page.locator('section').evaluate(node => node.remove())
+    await expect(activity.region).toHaveCount(0)
+    await expect(activity.result).toHaveCount(0)
+  } finally { await browser.close() }
+})

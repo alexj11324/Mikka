@@ -5,7 +5,7 @@ import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { CASES, extendFixtures } from './ui-proof-1782-fixtures.mjs'
-import { DATABASE, PRODUCT, PRODUCT_TREE, OVERLAY, closedFailure, gallery, selectOfficialWorkspace, sourceEvidence } from './ui-proof-1782.mjs'
+import { DATABASE, PRODUCT, PRODUCT_TREE, OVERLAY, closedFailure, gallery, selectOfficialWorkspace, sourceEvidence, taskActivityLocators } from './ui-proof-1782.mjs'
 
 const app = resolve(process.env.MIKKA_TEST_APP_DIR ?? '')
 const output = resolve(process.env.MIKKA_UI_PROOF_OUTPUT ?? '')
@@ -156,10 +156,14 @@ async function taskDetail(page, theme, viewport) {
   await expect(properties.getByText(base.fixture.botName, { exact: true })).toBeVisible()
   await properties.scrollIntoViewIfNeeded()
   await capture(page, 'human-and-delegate', 'Human assignee and separate Agent Delegate', theme, viewport)
+  phase = 'task_detail_activity'
   const delegated = messages.Workspace.activity.delegated.replace('{name}', base.fixture.botName)
-  const activity = task.getByText(delegated, { exact: false })
-  await expect(activity).toBeVisible()
-  const result = task.locator('[data-run-result="done"]')
+  const activity = taskActivityLocators(task, { label: messages.Workspace.activity.label, delegated })
+  await expect(activity.region).toHaveCount(1)
+  await expect(activity.delegation).toHaveCount(1)
+  await expect(activity.delegation).toBeVisible()
+  phase = 'task_detail_history'
+  const result = activity.result
   await expect(result).toHaveCount(1)
   await expect(result).toBeVisible()
   await result.scrollIntoViewIfNeeded()
