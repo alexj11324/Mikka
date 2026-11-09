@@ -9,9 +9,9 @@ import { pathToFileURL } from 'node:url'
 import { assertOpsContext } from './self-hosted-ingress-probe.mjs'
 
 export const P0 = Object.freeze({
-  source: '623a1afd8715433a58c3e88ce88f8fbcc29d1761',
-  tree: '193c7c1a101a56a889f7b22eb615e903981942af',
-  workerSha: 'b73441d96b118a18e418b9425c1032074edfcc9c',
+  source: 'f845bd90fee2b34a53677d868c45b906a46375ef',
+  tree: 'c6eacfac0fef543c48f68a8a8a9f395cd0f6b263',
+  workerSha: '42b1cbd54279363f0492ac4300570e3a0e62890f',
   sdks: { nodeMajor: '24', pnpm: '10.34.3', javascriptE2b: '2.61.0', pythonE2b: '2.62.0', next: '16.4.1' },
   files: {
     'package.json': '306d928ed8f02dad3cbd9fa3b8cf7a6f18ed1c342394a8013a0bfc35ec0dc5e4',
@@ -22,7 +22,7 @@ export const P0 = Object.freeze({
     'scripts/e2b/build-template.py': '3927d62d13683aab6fc44b869dfccf2b3d76aa5804bfb47b9399838b9667d325',
     'scripts/e2b/build-template.test.py': '10154108d0f34948aabaaf902a12a9f47e63c05d69345b266234935293fce7c1',
     'scripts/e2b/official-files.py': '66911624af52df59ef715eb105af9a3025bacf12460105fadc7f87e4d2dd63b5',
-    'scripts/e2b/official-files.test.py': 'a02db5389d866cadcbfa743bad6eaecaefb6b1effbfb0bc863a9287d59849b84',
+    'scripts/e2b/official-files.test.py': '01c31d24a17ed3d0745ed5f0ba24327d11c2e4222a466ca26584c5f7674827b4',
     'scripts/e2b/cleanup-template-candidates.py': '893b0d50f30f4b21f92f155aee97965e12f84fd0e21ea0ada3dfb3a00392533d',
     'scripts/e2b/cleanup-template-candidates.test.py': '826a489c570a788ea018b6a6ce786fd3e71b41dc8d514cfd8a09e516f8bf84f1',
     'scripts/e2b/workspace-ingress-acceptance.mjs': '2d8739516b3ada59925589bb8f2da18f8b80985273d3820f1b3c11d5ba0468ea',
