@@ -1,0 +1,24 @@
+{
+  "runId": 42573554116,
+  "nativeLogFetches": 1,
+  "uiLogFetches": 1,
+  "nativeArtifactDownloadCalls": 1,
+  "packageArtifactDownloadCalls": 1,
+  "downloadReferenceRefreshes": 0,
+  "previousArtifactsDownloaded": 0,
+  "materializationUsesExistingFileReferences": true,
+  "vmCreatedBeforeDownloadReferences": true,
+  "downloadUrlsExcluded": true,
+  "initialCwdProbe": {
+    "failed": true,
+    "status": 400,
+    "code": "command_failed",
+    "reason": "cwd /vercel/sandbox did not yet exist",
+    "correction": "Use platform-reported /vercel and create analysis directory",
+    "correctedExitCode": 0
+  },
+  "materializeCommandId": "cmd_8cc86e636c89492fb85f46759c69",
+  "materializeExitCode": 0,
+  "ciRerun": false,
+  "modelsInvoked": 0
+}

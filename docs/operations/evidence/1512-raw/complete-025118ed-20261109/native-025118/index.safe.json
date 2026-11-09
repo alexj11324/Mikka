@@ -1,0 +1,313 @@
+{
+  "version": 1,
+  "scope": "Original Native and UI strict acceptance artifacts for CI 42573554116",
+  "recommendedRelativePrefix": "native-025118",
+  "runId": 42573554116,
+  "nativeJobId": 129018381654,
+  "uiStrictJobId": 129023603140,
+  "source": {
+    "sha": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+    "tree": "6da320a6f476624ba2e61ca7a1f5c704a3fdae25",
+    "parents": [
+      "927260894305e066e15a4ad50114abce433e6001",
+      "025118ed953ab80803ac3ba9548c3a309c5c69b4"
+    ],
+    "nativeCheckout": [
+      {
+        "line": 155,
+        "revision": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+        "timestamp": "2026-11-09T06:38:39.1499480Z"
+      }
+    ],
+    "uiCheckout": [
+      {
+        "line": 164,
+        "revision": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+        "timestamp": "2026-11-09T06:54:42.7854351Z"
+      }
+    ],
+    "head": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+    "headTree": "6da320a6f476624ba2e61ca7a1f5c704a3fdae25",
+    "treeMatchesHead": true
+  },
+  "originalArtifacts": [
+    {
+      "kind": "native",
+      "artifactId": 13654599951,
+      "name": "desktop-native-evidence-0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+      "filename": "native-025118-original.zip",
+      "bytes": 14649873,
+      "sha256": "da4219f1ae87ea0ada64c38e51e14c198d0d8bbcc253d12d228798da287dc9c0",
+      "createdAt": "2026-11-09T06:54:29Z",
+      "expired": false
+    },
+    {
+      "kind": "package",
+      "artifactId": 13655540757,
+      "name": "desktop-package-evidence-0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+      "filename": "package-025118-original.zip",
+      "bytes": 1595,
+      "sha256": "58b95d7d87ffec04c29d339c37a7ed911c42d4d0ec6ad611fd18e3bf5f3292c8",
+      "createdAt": "2026-11-09T06:54:26Z",
+      "expired": false
+    }
+  ],
+  "payloadFileCount": 25,
+  "totalPayloadBytes": 1534841,
+  "files": [
+    {
+      "path": "action-counts-vs-f886.safe.json",
+      "mode": "100644",
+      "bytes": 251667,
+      "sha256": "6766e4cd5091eb30f556131cf533d2ee3a83b1c5c849ddbaf6a5b083b67f87cc",
+      "blob": "1afc4bf060b174ef95728eef46c3a90aca91df61"
+    },
+    {
+      "path": "arithmetic.safe.json",
+      "mode": "100644",
+      "bytes": 20506,
+      "sha256": "5dc59b141bf12bd9da05df9205c6569e2ab58954af271c3040f2add8b03faeef",
+      "blob": "e01a9e92dd801ab223762a327cec49d26e44192c"
+    },
+    {
+      "path": "cleanup-package.safe.json",
+      "mode": "100644",
+      "bytes": 10092,
+      "sha256": "bbf34aa4fe72b9e49705be58696b5f50ec4b58c299153d516674f45ae9ec36f1",
+      "blob": "48d2f3dc32eb71c5bea29e1d88a0ab061f75c947"
+    },
+    {
+      "path": "download-recovery.safe.json",
+      "mode": "100644",
+      "bytes": 739,
+      "sha256": "a6291fb032bfd1488ccbc341b1fc8eb799743a43145c9b00b56c9bf54e07c112",
+      "blob": "1910a61ee0152519fbc07e33b0b011e5945161dc"
+    },
+    {
+      "path": "export-recovery.safe.json",
+      "mode": "100644",
+      "bytes": 579,
+      "sha256": "e444f623379305857daf6cad4de0837887620c3b6127b6fbe2b5ad15cca303d4",
+      "blob": "ffdc9a6be76b6057f4c610b3041026c38fdfbfba"
+    },
+    {
+      "path": "first-read.safe.json",
+      "mode": "100644",
+      "bytes": 1588,
+      "sha256": "b3c779fbc4a68bac0fec7a3097ae35884970a92c6810c24a5446ff953a24c249",
+      "blob": "80a414eb8ed57c4c24dabc1708ac2ec4b7d42941"
+    },
+    {
+      "path": "job-129018381654.original.log",
+      "mode": "100644",
+      "bytes": 249769,
+      "sha256": "46a01ce46e3f0e38537ada708ec34357d6e9eac1339a95ae49479918d3ee2278",
+      "blob": "005bb83b1bfad58e307c4d11548ad5c9cd47492b"
+    },
+    {
+      "path": "job-129023603140.original.log",
+      "mode": "100644",
+      "bytes": 14087,
+      "sha256": "80b6092cfbca1dc291911088be8b65b5ce57cba2212875d120e65299312e6acb",
+      "blob": "7180982471426e5b332a248ac08d5677e539ebe1"
+    },
+    {
+      "path": "logs-metadata.safe.json",
+      "mode": "100644",
+      "bytes": 1495,
+      "sha256": "af82e95f254e8fdf6400a0ef2bb379316a865566f24fd14725a8681d760808a5",
+      "blob": "6d476fc27631240781b257261a615194e3bf6c7c"
+    },
+    {
+      "path": "original-files-manifest.safe.json",
+      "mode": "100644",
+      "bytes": 85349,
+      "sha256": "72d4f39bc8bd56f029c6a2b90bd8c18c805d27681329d732eb50508f9964a871",
+      "blob": "d29dc857d44a6c5289885f9f2b3fd79927520c40"
+    },
+    {
+      "path": "original/lifecycle.json",
+      "mode": "100644",
+      "bytes": 686588,
+      "sha256": "644ccb4beeab4c68b910c5d9df088f2b5ec1ea1f7a0352cd3238cae3d3aeb5a4",
+      "blob": "d7246ea45ec8df8cf3b9f3d31b4893f1f67d161d"
+    },
+    {
+      "path": "original/mac-acceptance-package.json",
+      "mode": "100644",
+      "bytes": 957,
+      "sha256": "e332396c3fdfe72a8266e718bdd3a34ea52edd850e0ae450338b10714115392e",
+      "blob": "e10d9c9fe0535e81837f82a49a21d686aa7036ab"
+    },
+    {
+      "path": "original/native-crypto.json",
+      "mode": "100644",
+      "bytes": 2868,
+      "sha256": "69ca0834e0c3e54dd8d5bf6788988e2b7d30f0e6e729ff023312a905efada1bf",
+      "blob": "c8690604746b37f6df3ba39ad8497f172c16aa62"
+    },
+    {
+      "path": "original/parity.json",
+      "mode": "100644",
+      "bytes": 117076,
+      "sha256": "f1200331729ec0b5f84332a665e162fdb05eacc0b8b76a0df7f144c65a15015d",
+      "blob": "7a00852a497a50f273127a61fcad234f4005faaf"
+    },
+    {
+      "path": "original/smoke.json",
+      "mode": "100644",
+      "bytes": 3105,
+      "sha256": "74c9b358da351a84fd42b9afa70f216adbc918ca2a20e70b16a0f76c6a99efe3",
+      "blob": "2f38c5d47f2ebf21876d26d84c8895cd2e5e2ba8"
+    },
+    {
+      "path": "privacy-scan.safe.json",
+      "mode": "100644",
+      "bytes": 4519,
+      "sha256": "d766aa667576be0b8ccdde08f721723fa323bf1d95da691406c67515fbdee62f",
+      "blob": "82f58037d6c028236d1251467657ada5688a4676"
+    },
+    {
+      "path": "README.md",
+      "mode": "100644",
+      "bytes": 6629,
+      "sha256": "60b762133c3bb2a4a9054b719cfaf335e091035e3dea7ddf3e4e728884d0d744",
+      "blob": "660705a474a39e59c579ff6bb8c6e38ad56121d4"
+    },
+    {
+      "path": "rpc-diagnostics.safe.json",
+      "mode": "100644",
+      "bytes": 41656,
+      "sha256": "b6ed0d2d1d9b04c413d01855955196fbafa362b2a6a0adf7d8016056b8d28654",
+      "blob": "91e16538822fac08aa19d803c7d2684bca5ea083"
+    },
+    {
+      "path": "source-contract.safe.json",
+      "mode": "100644",
+      "bytes": 2703,
+      "sha256": "867705c60977b818db036c1641b3e3f521590d949a071fd11455eaaf1edff670",
+      "blob": "8f0b6d12e18e554c139d458793de3078b866f1b2"
+    },
+    {
+      "path": "terminal-jobs.safe.json",
+      "mode": "100644",
+      "bytes": 9029,
+      "sha256": "6bebfb4716d08d03cd43f44bdf7bce94d5de0e37b0a3483b7b89af53f46159ff",
+      "blob": "908b32ddc8f5b7f4a7abfd51d8707e2043eda849"
+    },
+    {
+      "path": "verification-run.safe.json",
+      "mode": "100644",
+      "bytes": 1252,
+      "sha256": "96446de295238000cdce5ae2611efe59d3a5fb5195594df8b2f9d85940ce0890",
+      "blob": "a7da6245f52f16a47bbb58f8b2e65b3167a51df0"
+    },
+    {
+      "path": "verify-artifact-download.py",
+      "mode": "100644",
+      "bytes": 2785,
+      "sha256": "c881ba875aed8243ff078c5725dc3889573fc9120da8c762dcbfce3729f55bfa",
+      "blob": "7bf254c839e7a9cc21d8edd18f258e89ddd10db1"
+    },
+    {
+      "path": "verify-native-originals.py",
+      "mode": "100644",
+      "bytes": 15871,
+      "sha256": "35a61d5895f2e599c1251ab1161c2462debbf95933c13d9f0bf72a61d017bbb6",
+      "blob": "2d49b5fc88d32e40fc27b677cdc38faa35b4b5b5"
+    },
+    {
+      "path": "vm-cleanup.safe.json",
+      "mode": "100644",
+      "bytes": 1993,
+      "sha256": "571c7041b03d52d1b5847044831739dbcfa2a12b2b591cfc2097b656f7c6d378",
+      "blob": "172895fe9f3f6d793e1bf94a46977d8635635a57"
+    },
+    {
+      "path": "worker-source.safe.json",
+      "mode": "100644",
+      "bytes": 1939,
+      "sha256": "fc8469817459a7f6b34d8d66f3a52fba4560fa921718d1cd078308eac55e092d",
+      "blob": "456d9d21b2196ea69e7ca6dfd6f3ce7a805d3f63"
+    }
+  ],
+  "originalPreservation": {
+    "rawJsonFiles": 5,
+    "extractedPathsHashed": 310,
+    "nativePaths": 308,
+    "packagePaths": 2,
+    "rawJsonBytesUnmodified": true,
+    "rawLogUtf8BomAnsiPreserved": true,
+    "zipApiBytesDigestAndIntegrityVerified": true,
+    "downloadUrlsExcluded": true,
+    "privatePlatformMetadataExcluded": true
+  },
+  "arithmetic": {
+    "nativeFullLogin": 361,
+    "webFullLogin": 412,
+    "bundledFirstStartup": 179,
+    "hostedFirstStartup": 201,
+    "records": 24,
+    "checkpoints": 12,
+    "segments": 8,
+    "totals": 4,
+    "operationBuckets": 17,
+    "sourceBuckets": 78,
+    "queryOrdinals": 1153,
+    "backgroundExcluded": 0,
+    "unknownReadings": 0,
+    "diagnosticStatus": "incomplete",
+    "diagnosticUnknownsPreserved": true,
+    "overflow": false
+  },
+  "rpcBoundaries": {
+    "nativeLoginPhysicalStarts": 14,
+    "nativeLoginLogicalStarts": 36,
+    "webLoginStarts": 35,
+    "bundledFirstStartupPhysicalStarts": 6,
+    "bundledFirstStartupLogicalStarts": 19,
+    "hostedFirstStartupStarts": 18,
+    "nativeLoginCrossesEnd": 1,
+    "hostedFirstStartupCrossesEnd": 1,
+    "completionsObservedLater": true,
+    "noActionCountEquivalenceClaim": true
+  },
+  "cleanupBoundaries": {
+    "lifecycleWorkspaceNameRestored": false,
+    "smokeWorkspaceNameRestored": false,
+    "parityWorkspaceNameRestored": true,
+    "lifecycleOwnerPeerBefore": [
+      false,
+      false
+    ],
+    "smokeOwnerPeerBefore": [
+      true,
+      true
+    ],
+    "allOwnerPeerAfter": true
+  },
+  "resources": {
+    "created": 1,
+    "active": 0,
+    "stopped": true,
+    "deleted": true,
+    "exactNamedReadStatus": 404,
+    "timeoutExtended": false,
+    "durationMs": 219102,
+    "activeCpuMs": 8798,
+    "ingressBytes": 14946886,
+    "egressBytes": 361965,
+    "costCalculated": false
+  },
+  "limits": {
+    "eachOwnedLogFetchedOnce": true,
+    "eachRequiredArtifactDownloadedOnce": true,
+    "noCiRerun": true,
+    "noModelsInvoked": true,
+    "noRepoRefChanged": true,
+    "noProductionAcceptanceClaim": true,
+    "noReplayPlaybackClaim": true,
+    "noIssueClosureClaim": true,
+    "indexSelfExcludedFromPayloadCount": true
+  }
+}

@@ -1,0 +1,158 @@
+{
+  "noMatchedValuesPrinted": true,
+  "scope": "Public decoded payload and original log strings only; raw ZIPs/platform metadata/download references excluded",
+  "patterns": [
+    "private-key",
+    "github-token",
+    "provider-key",
+    "jwt",
+    "email",
+    "credential-url",
+    "authorization",
+    "signed-download-query"
+  ],
+  "files": [
+    {
+      "path": "arithmetic.safe.json",
+      "sha256": "5dc59b141bf12bd9da05df9205c6569e2ab58954af271c3040f2add8b03faeef",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "cleanup-package.safe.json",
+      "sha256": "bbf34aa4fe72b9e49705be58696b5f50ec4b58c299153d516674f45ae9ec36f1",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "download-recovery.safe.json",
+      "sha256": "a6291fb032bfd1488ccbc341b1fc8eb799743a43145c9b00b56c9bf54e07c112",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "first-read.safe.json",
+      "sha256": "b3c779fbc4a68bac0fec7a3097ae35884970a92c6810c24a5446ff953a24c249",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "logs-metadata.safe.json",
+      "sha256": "af82e95f254e8fdf6400a0ef2bb379316a865566f24fd14725a8681d760808a5",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "original/lifecycle.json",
+      "sha256": "644ccb4beeab4c68b910c5d9df088f2b5ec1ea1f7a0352cd3238cae3d3aeb5a4",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "original/mac-acceptance-package.json",
+      "sha256": "e332396c3fdfe72a8266e718bdd3a34ea52edd850e0ae450338b10714115392e",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "original/native-crypto.json",
+      "sha256": "69ca0834e0c3e54dd8d5bf6788988e2b7d30f0e6e729ff023312a905efada1bf",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "original/parity.json",
+      "sha256": "f1200331729ec0b5f84332a665e162fdb05eacc0b8b76a0df7f144c65a15015d",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "original/smoke.json",
+      "sha256": "74c9b358da351a84fd42b9afa70f216adbc918ca2a20e70b16a0f76c6a99efe3",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "original-files-manifest.safe.json",
+      "sha256": "72d4f39bc8bd56f029c6a2b90bd8c18c805d27681329d732eb50508f9964a871",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "rpc-diagnostics.safe.json",
+      "sha256": "b6ed0d2d1d9b04c413d01855955196fbafa362b2a6a0adf7d8016056b8d28654",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "source-contract.safe.json",
+      "sha256": "867705c60977b818db036c1641b3e3f521590d949a071fd11455eaaf1edff670",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "terminal-jobs.safe.json",
+      "sha256": "6bebfb4716d08d03cd43f44bdf7bce94d5de0e37b0a3483b7b89af53f46159ff",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "verification-run.safe.json",
+      "sha256": "96446de295238000cdce5ae2611efe59d3a5fb5195594df8b2f9d85940ce0890",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "verify-artifact-download.py",
+      "sha256": "c881ba875aed8243ff078c5725dc3889573fc9120da8c762dcbfce3729f55bfa",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "verify-native-originals.py",
+      "sha256": "35a61d5895f2e599c1251ab1161c2462debbf95933c13d9f0bf72a61d017bbb6",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "worker-source.safe.json",
+      "sha256": "fc8469817459a7f6b34d8d66f3a52fba4560fa921718d1cd078308eac55e092d",
+      "findings": [],
+      "unresolved": 0
+    }
+  ],
+  "additionalFiles": [
+    {
+      "path": "action-counts-vs-f886.safe.json",
+      "findings": []
+    },
+    {
+      "path": "export-recovery.safe.json",
+      "findings": []
+    },
+    {
+      "path": "vm-cleanup.safe.json",
+      "findings": []
+    },
+    {
+      "path": "README.md",
+      "findings": []
+    }
+  ],
+  "logs": [
+    {
+      "path": "job-129018381654.original.log",
+      "sha256": "46a01ce46e3f0e38537ada708ec34357d6e9eac1339a95ae49479918d3ee2278",
+      "findings": [],
+      "unresolved": 0
+    },
+    {
+      "path": "job-129023603140.original.log",
+      "sha256": "80b6092cfbca1dc291911088be8b65b5ce57cba2212875d120e65299312e6acb",
+      "findings": [],
+      "unresolved": 0
+    }
+  ],
+  "unresolved": 0,
+  "limit": "Pattern screening is an explicit publication review aid, not proof of absence of every possible private value."
+}

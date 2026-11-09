@@ -1,0 +1,3886 @@
+{
+  "schemaVersion": 1,
+  "kind": "companion-workflow-source-and-terminal-review",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequest": 1799,
+  "requestedHead": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+  "actualCheckoutForThirteenJobs": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+  "tree": "6da320a6f476624ba2e61ca7a1f5c704a3fdae25",
+  "treeProvenance": "Root source binding and shared hash-verified selection 981090e57913693c7dcd610e4ff24e2418043c0a, already referenced in the PG receipt/CP21. No new source API lookup or old green substitution was used.",
+  "decision": "all_assigned_workflows_terminal_success_with_original_skips_nonblocking_and_evidence_limits_preserved",
+  "workflows": [
+    {
+      "key": "browser-gate",
+      "id": 42573553966,
+      "path": ".github/workflows/browser-gate.yml",
+      "name": "Browser gate",
+      "event": "pull_request",
+      "headSha": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "actualReadJobIds": [
+        129016130549
+      ],
+      "skippedJobs": [],
+      "assessment": {
+        "key": "browser-gate",
+        "meaning": "Existing echo-only compatibility gate. No checkout and no browser tests.",
+        "evidence": {
+          "browserTestsExecuted": false
+        }
+      }
+    },
+    {
+      "key": "e2b-additive",
+      "id": 42573554109,
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "name": "E2B additive runtime release",
+      "event": "pull_request",
+      "headSha": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "actualReadJobIds": [
+        129016131220
+      ],
+      "skippedJobs": [
+        {
+          "id": 129016229559,
+          "name": "check",
+          "status": "completed",
+          "conclusion": "skipped",
+          "steps": 0,
+          "logReadCount": 0
+        },
+        {
+          "id": 129016230032,
+          "name": "validate",
+          "status": "completed",
+          "conclusion": "skipped",
+          "steps": 0,
+          "logReadCount": 0
+        },
+        {
+          "id": 129016230222,
+          "name": "await-web",
+          "status": "completed",
+          "conclusion": "skipped",
+          "steps": 0,
+          "logReadCount": 0
+        },
+        {
+          "id": 129016230427,
+          "name": "publish",
+          "status": "completed",
+          "conclusion": "skipped",
+          "steps": 0,
+          "logReadCount": 0
+        },
+        {
+          "id": 129016230434,
+          "name": "subscriptions",
+          "status": "completed",
+          "conclusion": "skipped",
+          "steps": 0,
+          "logReadCount": 0
+        },
+        {
+          "id": 129016230611,
+          "name": "cleanup",
+          "status": "completed",
+          "conclusion": "skipped",
+          "steps": 0,
+          "logReadCount": 0
+        }
+      ],
+      "assessment": {
+        "key": "e2b-additive",
+        "meaning": "PR offline gate tests and syntax checks only; release branch is skipped by original event/main conditions.",
+        "evidence": {
+          "nodeTestsPass": 195,
+          "pythonPass": [
+            32,
+            22,
+            16
+          ],
+          "pyCompile": true,
+          "bashSyntax": true,
+          "releaseJobsExecuted": false
+        }
+      }
+    },
+    {
+      "key": "unattended",
+      "id": 42573554014,
+      "path": ".github/workflows/unattended-sandbox.yml",
+      "name": "Unattended sandbox acceptance",
+      "event": "pull_request",
+      "headSha": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "actualReadJobIds": [
+        129016131016
+      ],
+      "skippedJobs": [],
+      "assessment": {
+        "key": "unattended",
+        "meaning": "Isolated unattended contract tests and local real Chromium guard/visual tests; not PostHog Replay or production acceptance.",
+        "evidence": {
+          "nodeTestsPass": 41,
+          "vitestPass": [
+            23,
+            27
+          ],
+          "pythonPass": [
+            7,
+            3
+          ],
+          "localVisualEvidencePathPrinted": true,
+          "visualArtifactsDownloadedByReviewer": false
+        }
+      }
+    },
+    {
+      "key": "cloud-backend",
+      "id": 42573553993,
+      "path": ".github/workflows/cloud-computer.yml",
+      "name": "Cloud computer backend",
+      "event": "pull_request",
+      "headSha": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "actualReadJobIds": [
+        129016130612,
+        129016130908,
+        129016130924
+      ],
+      "skippedJobs": [],
+      "assessment": {
+        "key": "cloud-backend",
+        "meaning": "Backend type/lint/contract tests plus actual isolated Linux Xvfb and macOS screenshot/input/click tests. macOS remains continue-on-error.",
+        "evidence": {
+          "backendNodePass": 61,
+          "backendVitestPass": 3,
+          "backendPythonPass": 1,
+          "linuxDriverPass": 1,
+          "macDriverPass": 1,
+          "macNonblocking": true,
+          "recordedImagesViewedByReviewer": false
+        }
+      }
+    },
+    {
+      "key": "read-cache",
+      "id": 42573553977,
+      "path": ".github/workflows/read-cache.yml",
+      "name": "Read cache API acceptance",
+      "event": "pull_request",
+      "headSha": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "actualReadJobIds": [
+        129016130715
+      ],
+      "skippedJobs": [],
+      "assessment": {
+        "key": "read-cache",
+        "meaning": "Compiled local production-mode Nitro application, real loopback HTTP read contract, fixture cleanup and evidence audit; no browser/model execution.",
+        "evidence": {
+          "nodeTestsPass": 31,
+          "httpReadRecords": 35,
+          "status": "pass",
+          "fixtureCleanup": "succeeded",
+          "lease": "released-clean",
+          "retainedDirectChildren": 0,
+          "serverMode": "production",
+          "serverRuntime": "nitro",
+          "businessRequestWrites": false,
+          "modelExecution": false,
+          "browserExecution": false
+        }
+      }
+    },
+    {
+      "key": "e2b-custody",
+      "id": 42573554039,
+      "path": ".github/workflows/e2b-byos.yml",
+      "name": "E2B subscription custody",
+      "event": "pull_request",
+      "headSha": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "actualReadJobIds": [
+        129016130805
+      ],
+      "skippedJobs": [],
+      "assessment": {
+        "key": "e2b-custody",
+        "meaning": "Subscription custody unit/worker tests, not an official cloud release or paid production sample.",
+        "evidence": {
+          "nodeTestsPass": [
+            126,
+            4
+          ],
+          "vitestPass": [
+            42,
+            45
+          ],
+          "goPackagePassed": "github.com/alexj11324/Mikka/subscription-worker",
+          "goTestCountNotInferred": true
+        }
+      }
+    },
+    {
+      "key": "node22",
+      "id": 42573553967,
+      "path": ".github/workflows/local-device-node22.yml",
+      "name": "Local device Node 22",
+      "event": "pull_request",
+      "headSha": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "actualReadJobIds": [
+        129016130623,
+        129016130849,
+        129016500469,
+        129016500536
+      ],
+      "skippedJobs": [],
+      "assessment": {
+        "key": "node22",
+        "meaning": "Builds tested daemon package, runs daemon/installer under actual Node22, exercises real Apple Silicon npm/LaunchAgent fixtures and expected Node18 refusal.",
+        "evidence": {
+          "unitNodeVersion": "22.22.1",
+          "vitestFilesPass": 138,
+          "vitestFilesSkip": 1,
+          "vitestTestsPass": 1574,
+          "vitestTestsSkip": 2,
+          "additionalNodePass": [
+            45,
+            4,
+            7,
+            4,
+            23
+          ],
+          "node18Result": "check/node_required",
+          "node18NpmStarted": false,
+          "node22Result": "installed/launchagent/online/reconnect",
+          "node22Registrations": 2,
+          "node22Heartbeats": 2,
+          "node22Enrollments": 1,
+          "productionDeviceOrRelease": false
+        }
+      }
+    },
+    {
+      "key": "site-search",
+      "id": 42573553973,
+      "path": ".github/workflows/site-search.yml",
+      "name": "Site search read contract",
+      "event": "pull_request",
+      "headSha": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "actualReadJobIds": [
+        129016130694
+      ],
+      "skippedJobs": [],
+      "assessment": {
+        "key": "site-search",
+        "meaning": "Local compiled HTTP API/Better Auth/PG regression with two separate temporary PG services. Playwright's chromium project label does not mean a browser was opened.",
+        "evidence": {
+          "nodeTestsPass": 284,
+          "httpApiTestsPass": 7,
+          "distinctDatabaseServices": true,
+          "productionAcceptance": false
+        }
+      }
+    },
+    {
+      "key": "ssh",
+      "id": 42573553970,
+      "path": ".github/workflows/ssh-device-backend.yml",
+      "name": "SSH device backend",
+      "event": "pull_request",
+      "headSha": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+      "runAttempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "actualReadJobIds": [
+        129016130338
+      ],
+      "skippedJobs": [],
+      "assessment": {
+        "key": "ssh",
+        "meaning": "Desktop and enrollment tests, then actual packaged daemon through an isolated Docker SSH/systemd fixture.",
+        "evidence": {
+          "nodeTestsPass": [
+            156,
+            280,
+            13,
+            1
+          ],
+          "vitestPass": 50,
+          "realSshSystemdTestPassed": true,
+          "productionDeviceOrRelease": false
+        }
+      }
+    }
+  ],
+  "jobs": [
+    {
+      "id": 129016130549,
+      "runId": 42573553966,
+      "workflow": "browser-gate",
+      "name": "Browser tests (before merge)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T06:31:31Z",
+      "completedAt": "2026-11-09T06:31:33Z",
+      "checkout": [],
+      "checkoutBoundary": "No checkout step, echo only; metadata head is not executable source proof.",
+      "original": {
+        "bytes": 2193,
+        "sha256": "71be7b2e8069abd11571a12c5f1d62b783e487ac69375adda24ff55a51a9dbc9",
+        "gitBlob": "bb617cc13981162e4c1faebf04ae8f9141d92c03",
+        "reviewerReadCount": 1,
+        "wholeTeamReadCount": 1,
+        "transport": "original decoded GitHub log; UTF-8 identity retains BOM and ANSI"
+      },
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run echo \"Browser tests are not run in CI (decision 2026-11-01-1520).\"",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "summaries": [],
+      "nodeCounts": {},
+      "nodeTotals": {},
+      "cleanup": [],
+      "orphanCleanupLine": 36,
+      "errorMarkers": [],
+      "warnings": {
+        "maxListenersExceededCount": 0,
+        "unsupportedEngineCount": 0,
+        "actionRuntimeDeprecation": false
+      }
+    },
+    {
+      "id": 129016131220,
+      "runId": 42573554109,
+      "workflow": "e2b-additive",
+      "name": "test",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T06:31:31Z",
+      "completedAt": "2026-11-09T06:31:47Z",
+      "checkout": [
+        {
+          "line": 122,
+          "sha": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02"
+        }
+      ],
+      "checkoutBoundary": "Actual git log -1 output proves the recorded checkout.",
+      "original": {
+        "bytes": 50840,
+        "sha256": "5104bdb176c2d7a1f0345c038edda4254de178d2dbbe9487f8dddf5c00d810a0",
+        "gitBlob": "d6ff9796a88eb4b1949e858df61347ee63a0976e",
+        "reviewerReadCount": 1,
+        "wholeTeamReadCount": 1,
+        "transport": "original decoded GitHub log; UTF-8 identity retains BOM and ANSI"
+      },
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Install only the offline gate test dependencies",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run node --import tsx --test scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/acceptance/cloud-startup-report.test.mjs",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Run python3 scripts/e2b/build-template.test.py",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Run python3 scripts/e2b/official-files.test.py",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Run python3 scripts/e2b/cleanup-template-candidates.test.py",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Run python3 -m py_compile scripts/e2b/validate-official-instances.py",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Run bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh scripts/e2b/start-prebuilt.sh",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 19,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 20,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 21,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "summaries": [
+        {
+          "line": 361,
+          "text": "ℹ tests 195"
+        },
+        {
+          "line": 362,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 363,
+          "text": "ℹ pass 195"
+        },
+        {
+          "line": 364,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 365,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 366,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 367,
+          "text": "ℹ todo 0"
+        },
+        {
+          "line": 403,
+          "text": "Ran 32 tests in 0.618s"
+        },
+        {
+          "line": 412,
+          "text": "Ran 22 tests in 0.235s"
+        },
+        {
+          "line": 421,
+          "text": "Ran 16 tests in 0.009s"
+        }
+      ],
+      "nodeCounts": {
+        "tests": [
+          195
+        ],
+        "pass": [
+          195
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "nodeTotals": {
+        "tests": 195,
+        "pass": 195,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "cleanup": [],
+      "orphanCleanupLine": 447,
+      "errorMarkers": [],
+      "warnings": {
+        "maxListenersExceededCount": 0,
+        "unsupportedEngineCount": 0,
+        "actionRuntimeDeprecation": true
+      }
+    },
+    {
+      "id": 129016131016,
+      "runId": 42573554014,
+      "workflow": "unattended",
+      "name": "runtime",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T06:31:32Z",
+      "completedAt": "2026-11-09T06:33:39Z",
+      "checkout": [
+        {
+          "line": 122,
+          "sha": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02"
+        }
+      ],
+      "checkoutBoundary": "Actual git log -1 output proves the recorded checkout.",
+      "original": {
+        "bytes": 71698,
+        "sha256": "8c957bcf29b1ea0fe5e3c5d520811c32697bebaad485c3d5d897a687ce7a511f",
+        "gitBlob": "b0255d280933208896545dbb39fecbaf923e2220",
+        "reviewerReadCount": 1,
+        "wholeTeamReadCount": 1,
+        "transport": "original decoded GitHub log; UTF-8 identity retains BOM and ANSI"
+      },
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Visual model, scoped policy and network contracts",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Install isolated browser acceptance dependencies",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Real Chromium observation, action, replay and credential guards",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 14,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 15,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 16,
+          "name": "Post Run actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 17,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "summaries": [
+        {
+          "line": 453,
+          "text": "ℹ tests 41"
+        },
+        {
+          "line": 454,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 455,
+          "text": "ℹ pass 41"
+        },
+        {
+          "line": 456,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 457,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 458,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 459,
+          "text": "ℹ todo 0"
+        },
+        {
+          "line": 466,
+          "text": " Test Files  1 passed (1)"
+        },
+        {
+          "line": 467,
+          "text": "      Tests  23 passed (23)"
+        },
+        {
+          "line": 477,
+          "text": " Test Files  2 passed (2)"
+        },
+        {
+          "line": 478,
+          "text": "      Tests  27 passed (27)"
+        },
+        {
+          "line": 783,
+          "text": "Ran 7 tests in 10.723s"
+        },
+        {
+          "line": 788,
+          "text": "Ran 3 tests in 3.448s"
+        }
+      ],
+      "nodeCounts": {
+        "tests": [
+          41
+        ],
+        "pass": [
+          41
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "nodeTotals": {
+        "tests": 41,
+        "pass": 41,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "cleanup": [],
+      "orphanCleanupLine": 810,
+      "errorMarkers": [],
+      "warnings": {
+        "maxListenersExceededCount": 0,
+        "unsupportedEngineCount": 0,
+        "actionRuntimeDeprecation": true
+      }
+    },
+    {
+      "id": 129016130612,
+      "runId": 42573553993,
+      "workflow": "cloud-backend",
+      "name": "Local driver (Linux Xvfb)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T06:31:31Z",
+      "completedAt": "2026-11-09T06:31:55Z",
+      "checkout": [
+        {
+          "line": 125,
+          "sha": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02"
+        }
+      ],
+      "checkoutBoundary": "Actual git log -1 output proves the recorded checkout.",
+      "original": {
+        "bytes": 27004,
+        "sha256": "5c8869dd1e19cbf4b02b562cae13bb9f1654a59fea89138218238ba780b168f7",
+        "gitBlob": "f509394e56a0505f1bdbe1fde00dbb650f38a9b5",
+        "reviewerReadCount": 1,
+        "wholeTeamReadCount": 1,
+        "transport": "original decoded GitHub log; UTF-8 identity retains BOM and ANSI"
+      },
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Install isolated X11 and pinned MIT driver",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Real default-allow driver through the run broker",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "summaries": [
+        {
+          "line": 285,
+          "text": "ℹ tests 1"
+        },
+        {
+          "line": 286,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 287,
+          "text": "ℹ pass 1"
+        },
+        {
+          "line": 288,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 289,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 290,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 291,
+          "text": "ℹ todo 0"
+        }
+      ],
+      "nodeCounts": {
+        "tests": [
+          1
+        ],
+        "pass": [
+          1
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "nodeTotals": {
+        "tests": 1,
+        "pass": 1,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "cleanup": [],
+      "orphanCleanupLine": 335,
+      "errorMarkers": [],
+      "warnings": {
+        "maxListenersExceededCount": 0,
+        "unsupportedEngineCount": 0,
+        "actionRuntimeDeprecation": true
+      }
+    },
+    {
+      "id": 129016130908,
+      "runId": 42573553993,
+      "workflow": "cloud-backend",
+      "name": "Local driver (macOS permissions, nonblocking)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T06:31:32Z",
+      "completedAt": "2026-11-09T06:32:14Z",
+      "checkout": [
+        {
+          "line": 148,
+          "sha": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02"
+        }
+      ],
+      "checkoutBoundary": "Actual git log -1 output proves the recorded checkout.",
+      "original": {
+        "bytes": 20594,
+        "sha256": "85057a0c422025388ab140c2d58f599214957a2c142dd673f76007497ba99a8b",
+        "gitBlob": "84bcc85b8e5defa10f1c6eeade8b2c32fdb869d5",
+        "reviewerReadCount": 1,
+        "wholeTeamReadCount": 1,
+        "transport": "original decoded GitHub log; UTF-8 identity retains BOM and ANSI"
+      },
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Install the pinned MIT standalone driver",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Observe native screenshot, input and click through the run broker",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "summaries": [
+        {
+          "line": 201,
+          "text": "ℹ tests 1"
+        },
+        {
+          "line": 202,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 203,
+          "text": "ℹ pass 1"
+        },
+        {
+          "line": 204,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 205,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 206,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 207,
+          "text": "ℹ todo 0"
+        }
+      ],
+      "nodeCounts": {
+        "tests": [
+          1
+        ],
+        "pass": [
+          1
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "nodeTotals": {
+        "tests": 1,
+        "pass": 1,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "cleanup": [],
+      "orphanCleanupLine": 252,
+      "errorMarkers": [],
+      "warnings": {
+        "maxListenersExceededCount": 0,
+        "unsupportedEngineCount": 0,
+        "actionRuntimeDeprecation": true
+      }
+    },
+    {
+      "id": 129016130924,
+      "runId": 42573553993,
+      "workflow": "cloud-backend",
+      "name": "backend",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T06:31:32Z",
+      "completedAt": "2026-11-09T06:34:26Z",
+      "checkout": [
+        {
+          "line": 235,
+          "sha": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02"
+        }
+      ],
+      "checkoutBoundary": "Actual git log -1 output proves the recorded checkout.",
+      "original": {
+        "bytes": 70885,
+        "sha256": "a2507d51a9c863190c55c8694fecb5504e069280bf0dd25c05d1141285ec8af3",
+        "gitBlob": "56124b1a37225eb826ccf19f5a52f7fe3eb03532",
+        "reviewerReadCount": 1,
+        "wholeTeamReadCount": 1,
+        "transport": "original decoded GitHub log; UTF-8 identity retains BOM and ANSI"
+      },
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Run pnpm typecheck",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Run pnpm exec oxlint --deny-warnings lib/computer app/api/bots",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Run pnpm --filter @mikka/protocol exec vitest run src/computer.test.ts",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Run node --import ./scripts/server-test.mjs --import tsx --test lib/computer/handler.test.ts lib/computer/policy-route.test.ts lib/computer/permission.test.ts lib/computer/local-authority.test.mjs",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Run node --import ./scripts/server-test.mjs --import tsx --test lib/cua/local-review.test.ts",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Run node --test packages/daemon/src/computer/broker.test.mjs packages/daemon/src/computer/driver.test.mjs",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "Run python3 scripts/e2b/lease-driver.test.py",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 14,
+          "name": "Run node --import ./scripts/server-test.mjs --import tsx --test packages/daemon/src/computer/web-review.node.ts",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 15,
+          "name": "Run node --import ./scripts/server-test.mjs --import tsx --test lib/computer/store.db.test.ts",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 16,
+          "name": "Run node --import ./scripts/server-test.mjs --import tsx --test lib/computer/local-reviews.db.test.ts",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 17,
+          "name": "Run node --test tests/device-computer-migration.test.mjs",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 18,
+          "name": "Run node --test tests/computer-policy-default-allow-migration.test.mjs",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 19,
+          "name": "Run node --test packages/daemon/src/computer/local-grant.test.mjs",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 20,
+          "name": "Run cd packages/daemon && node --import tsx --test test/local-computer-adapters.node-test.ts test/local-computer-daemon.node-test.ts",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 37,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 38,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 39,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 40,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 41,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "summaries": [
+        {
+          "line": 522,
+          "text": " Test Files  1 passed (1)"
+        },
+        {
+          "line": 523,
+          "text": "      Tests  3 passed (3)"
+        },
+        {
+          "line": 551,
+          "text": "ℹ tests 15"
+        },
+        {
+          "line": 552,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 553,
+          "text": "ℹ pass 15"
+        },
+        {
+          "line": 554,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 555,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 556,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 557,
+          "text": "ℹ todo 0"
+        },
+        {
+          "line": 568,
+          "text": "ℹ tests 2"
+        },
+        {
+          "line": 569,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 570,
+          "text": "ℹ pass 2"
+        },
+        {
+          "line": 571,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 572,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 573,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 574,
+          "text": "ℹ todo 0"
+        },
+        {
+          "line": 615,
+          "text": "ℹ tests 32"
+        },
+        {
+          "line": 616,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 617,
+          "text": "ℹ pass 32"
+        },
+        {
+          "line": 618,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 619,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 620,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 621,
+          "text": "ℹ todo 0"
+        },
+        {
+          "line": 632,
+          "text": "Ran 1 test in 0.010s"
+        },
+        {
+          "line": 645,
+          "text": "ℹ tests 3"
+        },
+        {
+          "line": 646,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 647,
+          "text": "ℹ pass 3"
+        },
+        {
+          "line": 648,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 649,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 650,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 651,
+          "text": "ℹ todo 0"
+        },
+        {
+          "line": 672,
+          "text": "ℹ tests 1"
+        },
+        {
+          "line": 673,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 674,
+          "text": "ℹ pass 1"
+        },
+        {
+          "line": 675,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 676,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 677,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 678,
+          "text": "ℹ todo 0"
+        },
+        {
+          "line": 690,
+          "text": "ℹ tests 1"
+        },
+        {
+          "line": 691,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 692,
+          "text": "ℹ pass 1"
+        },
+        {
+          "line": 693,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 694,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 695,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 696,
+          "text": "ℹ todo 0"
+        },
+        {
+          "line": 707,
+          "text": "ℹ tests 1"
+        },
+        {
+          "line": 708,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 709,
+          "text": "ℹ pass 1"
+        },
+        {
+          "line": 710,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 711,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 712,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 713,
+          "text": "ℹ todo 0"
+        },
+        {
+          "line": 724,
+          "text": "ℹ tests 1"
+        },
+        {
+          "line": 725,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 726,
+          "text": "ℹ pass 1"
+        },
+        {
+          "line": 727,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 728,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 729,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 730,
+          "text": "ℹ todo 0"
+        },
+        {
+          "line": 740,
+          "text": "ℹ tests 1"
+        },
+        {
+          "line": 741,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 742,
+          "text": "ℹ pass 1"
+        },
+        {
+          "line": 743,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 744,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 745,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 746,
+          "text": "ℹ todo 0"
+        },
+        {
+          "line": 767,
+          "text": "ℹ tests 4"
+        },
+        {
+          "line": 768,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 769,
+          "text": "ℹ pass 4"
+        },
+        {
+          "line": 770,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 771,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 772,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 773,
+          "text": "ℹ todo 0"
+        }
+      ],
+      "nodeCounts": {
+        "tests": [
+          15,
+          2,
+          32,
+          3,
+          1,
+          1,
+          1,
+          1,
+          1,
+          4
+        ],
+        "pass": [
+          15,
+          2,
+          32,
+          3,
+          1,
+          1,
+          1,
+          1,
+          1,
+          4
+        ],
+        "fail": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "nodeTotals": {
+        "tests": 61,
+        "pass": 61,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "cleanup": [
+        {
+          "type": "container",
+          "id": "67b4f35ffa3470a1f5b36110e14d8d57fa4e6823aa3275179c28180ca2eed75a",
+          "commandLine": 899,
+          "successEcho": true,
+          "outputLine": 900
+        },
+        {
+          "type": "network",
+          "id": "github_network_5167e71e950a4f5ca414cf9ee5c662b0",
+          "commandLine": 902,
+          "successEcho": true,
+          "outputLine": 903
+        }
+      ],
+      "orphanCleanupLine": 904,
+      "errorMarkers": [],
+      "warnings": {
+        "maxListenersExceededCount": 0,
+        "unsupportedEngineCount": 0,
+        "actionRuntimeDeprecation": true
+      }
+    },
+    {
+      "id": 129016130715,
+      "runId": 42573553977,
+      "workflow": "read-cache",
+      "name": "Read cache API and CLI",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T06:31:31Z",
+      "completedAt": "2026-11-09T06:35:07Z",
+      "checkout": [
+        {
+          "line": 245,
+          "sha": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02"
+        }
+      ],
+      "checkoutBoundary": "Actual git log -1 output proves the recorded checkout.",
+      "original": {
+        "bytes": 232898,
+        "sha256": "b9b8d4b2ca662331f0ffddfd75992359f296b4aef4ea22676e07ba5f8cadaf49",
+        "gitBlob": "18b2ac63981adb8371ad16e6902c894e3770a8de",
+        "reviewerReadCount": 1,
+        "wholeTeamReadCount": 1,
+        "transport": "original decoded GitHub log; UTF-8 identity retains BOM and ANSI"
+      },
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Verify the bounded read-only driver",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Generate ephemeral test-only authentication secret",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Run pnpm test:e2e:setup",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Bind the isolated database and application to this checkout",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Build this isolated application for production-mode acceptance",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Accept real incremental Server Actions and Settings GET",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Check the public evidence for authentication material",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Retain only the aggregate acceptance summary",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 22,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 23,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 24,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 25,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "summaries": [
+        {
+          "line": 706,
+          "text": "ℹ tests 31"
+        },
+        {
+          "line": 707,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 708,
+          "text": "ℹ pass 31"
+        },
+        {
+          "line": 709,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 710,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 711,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 712,
+          "text": "ℹ todo 0"
+        }
+      ],
+      "nodeCounts": {
+        "tests": [
+          31
+        ],
+        "pass": [
+          31
+        ],
+        "fail": [
+          0
+        ],
+        "cancelled": [
+          0
+        ],
+        "skipped": [
+          0
+        ],
+        "todo": [
+          0
+        ]
+      },
+      "nodeTotals": {
+        "tests": 31,
+        "pass": 31,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "cleanup": [
+        {
+          "type": "container",
+          "id": "9f8d1d0f3e1ea8386c3c3e8c9a9a1dd26a7d3a55ff3134e029ee23aae179eaa7",
+          "commandLine": 2561,
+          "successEcho": true,
+          "outputLine": 2562
+        },
+        {
+          "type": "network",
+          "id": "github_network_ff8ff5851e174d11b598b83e3ceae33b",
+          "commandLine": 2564,
+          "successEcho": true,
+          "outputLine": 2565
+        }
+      ],
+      "orphanCleanupLine": 2566,
+      "errorMarkers": [],
+      "warnings": {
+        "maxListenersExceededCount": 0,
+        "unsupportedEngineCount": 0,
+        "actionRuntimeDeprecation": true
+      }
+    },
+    {
+      "id": 129016130805,
+      "runId": 42573554039,
+      "workflow": "e2b-custody",
+      "name": "custody",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T06:31:32Z",
+      "completedAt": "2026-11-09T06:36:19Z",
+      "checkout": [
+        {
+          "line": 125,
+          "sha": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02"
+        }
+      ],
+      "checkoutBoundary": "Actual git log -1 output proves the recorded checkout.",
+      "original": {
+        "bytes": 215825,
+        "sha256": "bd044ad89851ab5a29e8fc44456b9df11dc34c1ae00cb07e7a34bfe24e264ec8",
+        "gitBlob": "a9b4f21ca69d0d19f25bb022ad193c7b165c8c94",
+        "reviewerReadCount": 1,
+        "wholeTeamReadCount": 1,
+        "transport": "original decoded GitHub log; UTF-8 identity retains BOM and ANSI"
+      },
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm test:byos",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Run pnpm --filter @mikka/protocol exec vitest run src/subscription.test.ts",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Run pnpm --filter @mikka/daemon exec vitest run test/subscription-hosted-runner.test.ts",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Run pnpm test:byos-worker",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 16,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 17,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 18,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 19,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "summaries": [
+        {
+          "line": 567,
+          "text": "ℹ tests 126"
+        },
+        {
+          "line": 568,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 569,
+          "text": "ℹ pass 126"
+        },
+        {
+          "line": 570,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 571,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 572,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 573,
+          "text": "ℹ todo 0"
+        },
+        {
+          "line": 587,
+          "text": " Test Files  1 passed (1)"
+        },
+        {
+          "line": 588,
+          "text": "      Tests  42 passed (42)"
+        },
+        {
+          "line": 608,
+          "text": " Test Files  1 passed (1)"
+        },
+        {
+          "line": 609,
+          "text": "      Tests  45 passed (45)"
+        },
+        {
+          "line": 1806,
+          "text": "ℹ tests 4"
+        },
+        {
+          "line": 1807,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 1808,
+          "text": "ℹ pass 4"
+        },
+        {
+          "line": 1809,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 1810,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 1811,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 1812,
+          "text": "ℹ todo 0"
+        }
+      ],
+      "nodeCounts": {
+        "tests": [
+          126,
+          4
+        ],
+        "pass": [
+          126,
+          4
+        ],
+        "fail": [
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0
+        ]
+      },
+      "nodeTotals": {
+        "tests": 130,
+        "pass": 130,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "cleanup": [],
+      "orphanCleanupLine": 1837,
+      "errorMarkers": [],
+      "warnings": {
+        "maxListenersExceededCount": 3,
+        "unsupportedEngineCount": 0,
+        "actionRuntimeDeprecation": true
+      }
+    },
+    {
+      "id": 129016130623,
+      "runId": 42573553967,
+      "workflow": "node22",
+      "name": "package",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T06:31:31Z",
+      "completedAt": "2026-11-09T06:32:37Z",
+      "checkout": [
+        {
+          "line": 124,
+          "sha": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02"
+        }
+      ],
+      "checkoutBoundary": "Actual git log -1 output proves the recorded checkout.",
+      "original": {
+        "bytes": 35851,
+        "sha256": "9eb8edf77a8ce2b6f3d12da1f1827e8c208973a52bdb2d01a3a9ce278e6cdfc8",
+        "gitBlob": "0e3e30c4f56a794237f981c2667eb3bea00ab4ad",
+        "reviewerReadCount": 1,
+        "wholeTeamReadCount": 1,
+        "transport": "original decoded GitHub log; UTF-8 identity retains BOM and ANSI"
+      },
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Build the tested daemon package",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 14,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 15,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "summaries": [],
+      "nodeCounts": {},
+      "nodeTotals": {},
+      "cleanup": [],
+      "orphanCleanupLine": 496,
+      "errorMarkers": [],
+      "warnings": {
+        "maxListenersExceededCount": 0,
+        "unsupportedEngineCount": 0,
+        "actionRuntimeDeprecation": true
+      }
+    },
+    {
+      "id": 129016130849,
+      "runId": 42573553967,
+      "workflow": "node22",
+      "name": "node22-unit",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T06:31:31Z",
+      "completedAt": "2026-11-09T06:34:33Z",
+      "checkout": [
+        {
+          "line": 123,
+          "sha": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02"
+        }
+      ],
+      "checkoutBoundary": "Actual git log -1 output proves the recorded checkout.",
+      "original": {
+        "bytes": 127979,
+        "sha256": "d20da2400bce359693a2ffcc1b9f73bfd2642a2238cb022624972a59d410be59",
+        "gitBlob": "5027b8041cb650dab496164d2a556a94cb4f5fc1",
+        "reviewerReadCount": 1,
+        "wholeTeamReadCount": 1,
+        "transport": "original decoded GitHub log; UTF-8 identity retains BOM and ANSI"
+      },
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Daemon and installer on real Node 22",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 14,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 15,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "summaries": [
+        {
+          "line": 813,
+          "text": " Test Files  138 passed | 1 skipped (139)"
+        },
+        {
+          "line": 814,
+          "text": "      Tests  1574 passed | 2 skipped (1576)"
+        },
+        {
+          "line": 1098,
+          "text": "# tests 45"
+        },
+        {
+          "line": 1099,
+          "text": "# suites 0"
+        },
+        {
+          "line": 1100,
+          "text": "# pass 45"
+        },
+        {
+          "line": 1101,
+          "text": "# fail 0"
+        },
+        {
+          "line": 1102,
+          "text": "# cancelled 0"
+        },
+        {
+          "line": 1103,
+          "text": "# skipped 0"
+        },
+        {
+          "line": 1104,
+          "text": "# todo 0"
+        },
+        {
+          "line": 1137,
+          "text": "# tests 4"
+        },
+        {
+          "line": 1138,
+          "text": "# suites 0"
+        },
+        {
+          "line": 1139,
+          "text": "# pass 4"
+        },
+        {
+          "line": 1140,
+          "text": "# fail 0"
+        },
+        {
+          "line": 1141,
+          "text": "# cancelled 0"
+        },
+        {
+          "line": 1142,
+          "text": "# skipped 0"
+        },
+        {
+          "line": 1143,
+          "text": "# todo 0"
+        },
+        {
+          "line": 1194,
+          "text": "# tests 7"
+        },
+        {
+          "line": 1195,
+          "text": "# suites 0"
+        },
+        {
+          "line": 1196,
+          "text": "# pass 7"
+        },
+        {
+          "line": 1197,
+          "text": "# fail 0"
+        },
+        {
+          "line": 1198,
+          "text": "# cancelled 0"
+        },
+        {
+          "line": 1199,
+          "text": "# skipped 0"
+        },
+        {
+          "line": 1200,
+          "text": "# todo 0"
+        },
+        {
+          "line": 1233,
+          "text": "# tests 4"
+        },
+        {
+          "line": 1234,
+          "text": "# suites 0"
+        },
+        {
+          "line": 1235,
+          "text": "# pass 4"
+        },
+        {
+          "line": 1236,
+          "text": "# fail 0"
+        },
+        {
+          "line": 1237,
+          "text": "# cancelled 0"
+        },
+        {
+          "line": 1238,
+          "text": "# skipped 0"
+        },
+        {
+          "line": 1239,
+          "text": "# todo 0"
+        },
+        {
+          "line": 1381,
+          "text": "# tests 23"
+        },
+        {
+          "line": 1382,
+          "text": "# suites 0"
+        },
+        {
+          "line": 1383,
+          "text": "# pass 23"
+        },
+        {
+          "line": 1384,
+          "text": "# fail 0"
+        },
+        {
+          "line": 1385,
+          "text": "# cancelled 0"
+        },
+        {
+          "line": 1386,
+          "text": "# skipped 0"
+        },
+        {
+          "line": 1387,
+          "text": "# todo 0"
+        }
+      ],
+      "nodeCounts": {
+        "tests": [
+          45,
+          4,
+          7,
+          4,
+          23
+        ],
+        "pass": [
+          45,
+          4,
+          7,
+          4,
+          23
+        ],
+        "fail": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "nodeTotals": {
+        "tests": 83,
+        "pass": 83,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "cleanup": [],
+      "orphanCleanupLine": 1412,
+      "errorMarkers": [],
+      "warnings": {
+        "maxListenersExceededCount": 56,
+        "unsupportedEngineCount": 5,
+        "actionRuntimeDeprecation": true
+      }
+    },
+    {
+      "id": 129016500469,
+      "runId": 42573553967,
+      "workflow": "node22",
+      "name": "macos-arm (18.20.8)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T06:32:40Z",
+      "completedAt": "2026-11-09T06:36:43Z",
+      "checkout": [
+        {
+          "line": 157,
+          "sha": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02"
+        }
+      ],
+      "checkoutBoundary": "Actual git log -1 output proves the recorded checkout.",
+      "original": {
+        "bytes": 47990,
+        "sha256": "9c41b75621c6a5759c0b06575af454db4320533cb5bf8112e76f8474bf370f40",
+        "gitBlob": "0be7a29cf08ede158fb0f368d93d05e3f5d96acb",
+        "reviewerReadCount": 1,
+        "wholeTeamReadCount": 1,
+        "transport": "original decoded GitHub log; UTF-8 identity retains BOM and ANSI"
+      },
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Real npm, LaunchAgent, enrollment and reconnect",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 15,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 16,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 17,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 18,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 19,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "summaries": [],
+      "nodeCounts": {},
+      "nodeTotals": {},
+      "cleanup": [],
+      "orphanCleanupLine": 618,
+      "errorMarkers": [],
+      "warnings": {
+        "maxListenersExceededCount": 0,
+        "unsupportedEngineCount": 0,
+        "actionRuntimeDeprecation": true
+      }
+    },
+    {
+      "id": 129016500536,
+      "runId": 42573553967,
+      "workflow": "node22",
+      "name": "macos-arm (22.22.1)",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T06:33:06Z",
+      "completedAt": "2026-11-09T06:36:53Z",
+      "checkout": [
+        {
+          "line": 174,
+          "sha": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02"
+        }
+      ],
+      "checkoutBoundary": "Actual git log -1 output proves the recorded checkout.",
+      "original": {
+        "bytes": 47476,
+        "sha256": "96e35f7369acace9f65f44b294701d85959f13eea991badd8ec535b6b5b30351",
+        "gitBlob": "197c7679bffefa44af11bd522d672229b937f6a7",
+        "reviewerReadCount": 1,
+        "wholeTeamReadCount": 1,
+        "transport": "original decoded GitHub log; UTF-8 identity retains BOM and ANSI"
+      },
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Real npm, LaunchAgent, enrollment and reconnect",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 15,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 16,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 17,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 18,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 19,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "summaries": [],
+      "nodeCounts": {},
+      "nodeTotals": {},
+      "cleanup": [],
+      "orphanCleanupLine": 615,
+      "errorMarkers": [],
+      "warnings": {
+        "maxListenersExceededCount": 0,
+        "unsupportedEngineCount": 0,
+        "actionRuntimeDeprecation": true
+      }
+    },
+    {
+      "id": 129016130694,
+      "runId": 42573553973,
+      "workflow": "site-search",
+      "name": "site-search",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T06:31:31Z",
+      "completedAt": "2026-11-09T06:37:17Z",
+      "checkout": [
+        {
+          "line": 263,
+          "sha": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02"
+        }
+      ],
+      "checkoutBoundary": "Actual git log -1 output proves the recorded checkout.",
+      "original": {
+        "bytes": 299406,
+        "sha256": "222c927e3e9e90efb804e8c204ce36b5fc8ed868cfe4a18e793f3b19a8a399bd",
+        "gitBlob": "2bdae4f705935c8d003260b61d6f24f3852ea07c",
+        "reviewerReadCount": 1,
+        "wholeTeamReadCount": 1,
+        "transport": "original decoded GitHub log; UTF-8 identity retains BOM and ANSI"
+      },
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Run pnpm test:integrations",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Run node apps/api/scripts/generate-routes.mjs --check && pnpm typecheck && pnpm lint",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Provision only the isolated application test database from existing schema",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 10,
+          "name": "Provision only the separate workspace test database from existing schema",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm build",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 12,
+          "name": "Real compiled HTTP, Better Auth and PG title read regression (HTTP API only, no browser, no providers)",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 13,
+          "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 23,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 24,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 25,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 26,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 27,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "summaries": [
+        {
+          "line": 700,
+          "text": "ℹ tests 97"
+        },
+        {
+          "line": 701,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 702,
+          "text": "ℹ pass 97"
+        },
+        {
+          "line": 703,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 704,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 705,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 706,
+          "text": "ℹ todo 0"
+        },
+        {
+          "line": 721,
+          "text": "ℹ tests 9"
+        },
+        {
+          "line": 722,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 723,
+          "text": "ℹ pass 9"
+        },
+        {
+          "line": 724,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 725,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 726,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 727,
+          "text": "ℹ todo 0"
+        },
+        {
+          "line": 819,
+          "text": "ℹ tests 71"
+        },
+        {
+          "line": 820,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 821,
+          "text": "ℹ pass 71"
+        },
+        {
+          "line": 822,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 823,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 824,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 825,
+          "text": "ℹ todo 0"
+        },
+        {
+          "line": 855,
+          "text": "ℹ tests 14"
+        },
+        {
+          "line": 856,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 857,
+          "text": "ℹ pass 14"
+        },
+        {
+          "line": 858,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 859,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 860,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 861,
+          "text": "ℹ todo 0"
+        },
+        {
+          "line": 894,
+          "text": "ℹ tests 21"
+        },
+        {
+          "line": 895,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 896,
+          "text": "ℹ pass 21"
+        },
+        {
+          "line": 897,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 898,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 899,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 900,
+          "text": "ℹ todo 0"
+        },
+        {
+          "line": 911,
+          "text": "ℹ tests 6"
+        },
+        {
+          "line": 912,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 913,
+          "text": "ℹ pass 6"
+        },
+        {
+          "line": 914,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 915,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 916,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 917,
+          "text": "ℹ todo 0"
+        },
+        {
+          "line": 927,
+          "text": "ℹ tests 4"
+        },
+        {
+          "line": 928,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 929,
+          "text": "ℹ pass 4"
+        },
+        {
+          "line": 930,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 931,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 932,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 933,
+          "text": "ℹ todo 0"
+        },
+        {
+          "line": 949,
+          "text": "ℹ tests 7"
+        },
+        {
+          "line": 950,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 951,
+          "text": "ℹ pass 7"
+        },
+        {
+          "line": 952,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 953,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 954,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 955,
+          "text": "ℹ todo 0"
+        },
+        {
+          "line": 1062,
+          "text": "ℹ tests 55"
+        },
+        {
+          "line": 1063,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 1064,
+          "text": "ℹ pass 55"
+        },
+        {
+          "line": 1065,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 1066,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 1067,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 1068,
+          "text": "ℹ todo 0"
+        }
+      ],
+      "nodeCounts": {
+        "tests": [
+          97,
+          9,
+          71,
+          14,
+          21,
+          6,
+          4,
+          7,
+          55
+        ],
+        "pass": [
+          97,
+          9,
+          71,
+          14,
+          21,
+          6,
+          4,
+          7,
+          55
+        ],
+        "fail": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "nodeTotals": {
+        "tests": 284,
+        "pass": 284,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "cleanup": [
+        {
+          "type": "container",
+          "id": "5a33e2b0e380854f10003dabe6d55931c909f8434fce776429b77b22b8c6f761",
+          "commandLine": 3140,
+          "successEcho": true,
+          "outputLine": 3141
+        },
+        {
+          "type": "container",
+          "id": "6bf9b5b8cf83a9f7901f62b7ed5c81d6929f9f1f5f79afc39790d229b5b93d25",
+          "commandLine": 3202,
+          "successEcho": true,
+          "outputLine": 3203
+        },
+        {
+          "type": "network",
+          "id": "github_network_f62b8834b63d4044bb101c6a758c1700",
+          "commandLine": 3205,
+          "successEcho": true,
+          "outputLine": 3206
+        }
+      ],
+      "orphanCleanupLine": 3207,
+      "errorMarkers": [],
+      "warnings": {
+        "maxListenersExceededCount": 0,
+        "unsupportedEngineCount": 0,
+        "actionRuntimeDeprecation": true
+      }
+    },
+    {
+      "id": 129016130338,
+      "runId": 42573553970,
+      "workflow": "ssh",
+      "name": "ssh",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T06:31:31Z",
+      "completedAt": "2026-11-09T06:37:28Z",
+      "checkout": [
+        {
+          "line": 231,
+          "sha": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02"
+        }
+      ],
+      "checkoutBoundary": "Actual git log -1 output proves the recorded checkout.",
+      "original": {
+        "bytes": 158900,
+        "sha256": "902facceaf39cae010f8db4d0aae739dd6d5e8da0c5c78b2be52c176c01033a6",
+        "gitBlob": "58f84c9a3a68872c24b5d944a644af2e46c0954f",
+        "reviewerReadCount": 1,
+        "wholeTeamReadCount": 1,
+        "transport": "original decoded GitHub log; UTF-8 identity retains BOM and ANSI"
+      },
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 2,
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 4,
+          "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 5,
+          "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 6,
+          "name": "Run pnpm install --frozen-lockfile",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 7,
+          "name": "Desktop state-machine and service tests",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 8,
+          "name": "Enrollment and command isolation against PostgreSQL",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 9,
+          "name": "Packaged daemon over real SSH and systemd through the preload IPC",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 15,
+          "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 16,
+          "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 17,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 18,
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "number": 19,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ],
+      "summaries": [
+        {
+          "line": 658,
+          "text": "ℹ tests 156"
+        },
+        {
+          "line": 659,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 660,
+          "text": "ℹ pass 156"
+        },
+        {
+          "line": 661,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 662,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 663,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 664,
+          "text": "ℹ todo 0"
+        },
+        {
+          "line": 967,
+          "text": "ℹ tests 280"
+        },
+        {
+          "line": 968,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 969,
+          "text": "ℹ pass 280"
+        },
+        {
+          "line": 970,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 971,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 972,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 973,
+          "text": "ℹ todo 0"
+        },
+        {
+          "line": 990,
+          "text": " Test Files  5 passed (5)"
+        },
+        {
+          "line": 991,
+          "text": "      Tests  50 passed (50)"
+        },
+        {
+          "line": 1028,
+          "text": "ℹ tests 13"
+        },
+        {
+          "line": 1029,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 1030,
+          "text": "ℹ pass 13"
+        },
+        {
+          "line": 1031,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 1032,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 1033,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 1034,
+          "text": "ℹ todo 0"
+        },
+        {
+          "line": 1493,
+          "text": "ℹ tests 1"
+        },
+        {
+          "line": 1494,
+          "text": "ℹ suites 0"
+        },
+        {
+          "line": 1495,
+          "text": "ℹ pass 1"
+        },
+        {
+          "line": 1496,
+          "text": "ℹ fail 0"
+        },
+        {
+          "line": 1497,
+          "text": "ℹ cancelled 0"
+        },
+        {
+          "line": 1498,
+          "text": "ℹ skipped 0"
+        },
+        {
+          "line": 1499,
+          "text": "ℹ todo 0"
+        }
+      ],
+      "nodeCounts": {
+        "tests": [
+          156,
+          280,
+          13,
+          1
+        ],
+        "pass": [
+          156,
+          280,
+          13,
+          1
+        ],
+        "fail": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "cancelled": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "skipped": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "todo": [
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "nodeTotals": {
+        "tests": 450,
+        "pass": 450,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "cleanup": [
+        {
+          "type": "container",
+          "id": "0cc25c5edf351a9d503aa46a74666fe96e9814efae647ee8fa3a8e4aa11ed780",
+          "commandLine": 1670,
+          "successEcho": true,
+          "outputLine": 1671
+        },
+        {
+          "type": "network",
+          "id": "github_network_906b21f9e45d41899899669ee75ab023",
+          "commandLine": 1673,
+          "successEcho": true,
+          "outputLine": 1674
+        }
+      ],
+      "orphanCleanupLine": 1675,
+      "errorMarkers": [],
+      "warnings": {
+        "maxListenersExceededCount": 0,
+        "unsupportedEngineCount": 0,
+        "actionRuntimeDeprecation": true
+      }
+    }
+  ],
+  "conservation": {
+    "workflowCount": 9,
+    "assignedLogCount": 14,
+    "actualLogReads": 14,
+    "checkoutCount": 13,
+    "allActualCheckoutsEqual": true,
+    "echoOnlyJobs": 1,
+    "skippedReleaseJobs": 6,
+    "skippedJobLogsRead": 0,
+    "failedActualJobCount": 0,
+    "otherLogsRead": 0,
+    "limits": "Node22's two skipped tests and one disabled real-agents file are not reclassified as executed. Counts are per emitted test-runner summary; no claim is made that cases across workflows are unique."
+  },
+  "conditionalSemantics": {
+    "actualCheckout": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+    "additive": {
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "gitBlob": "be1f902f97e50628fbe26fa55b9dab0160f749be",
+      "entryGuard": "github.repository == 'alexj11324/Mikka' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'",
+      "entryGuardLine": 91,
+      "cleanupGuardLine": 323,
+      "skippedJobIds": [
+        129016229559,
+        129016230032,
+        129016230222,
+        129016230427,
+        129016230434,
+        129016230611
+      ]
+    },
+    "cloudMac": {
+      "path": ".github/workflows/cloud-computer.yml",
+      "gitBlob": "ea4a582550a5b61c222444dd0b67d87a1426dab9",
+      "continueOnError": true,
+      "line": 111,
+      "actualResult": "1/1 passed, screenshot/type/click through actual local driver reported successful"
+    },
+    "node22": {
+      "adapter": {
+        "path": "packages/daemon/test/adapters.test.ts",
+        "gitBlob": "c594202c9db5a0fa8a1c19fb731125d309abc61d",
+        "guard": "harness === \"cursor\"",
+        "lines": [
+          501,
+          515
+        ],
+        "count": 2
+      },
+      "realAgents": {
+        "path": "packages/daemon/test/real-agents.test.ts",
+        "gitBlob": "6153fb4ead3ffc55d8c31451d27608da05300f1f",
+        "guard": "HARNESSES.length === 0",
+        "selectionEnv": "MIKKA_REAL_AGENTS",
+        "lines": [
+          21,
+          81,
+          175
+        ],
+        "actualFileOutcome": "0 tests; file skipped"
+      },
+      "actualVitest": {
+        "filesPassed": 138,
+        "filesSkipped": 1,
+        "testsPassed": 1574,
+        "testsSkipped": 2
+      },
+      "node18": {
+        "result": "check/node_required",
+        "npmStarted": false,
+        "registrations": 0,
+        "heartbeats": 0,
+        "enrollments": 0
+      },
+      "node22": {
+        "result": "installed/launchagent/online/reconnect",
+        "npmStarted": true,
+        "registrations": 2,
+        "heartbeats": 2,
+        "enrollments": 1
+      },
+      "boundaries": "Node18 is an expected rejection proof, not an installation success. Mac reports refer to isolated fixture endpoints, not a production device or release."
+    }
+  },
+  "exactSources": [
+    {
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "gitBlob": "be1f902f97e50628fbe26fa55b9dab0160f749be"
+    },
+    {
+      "path": ".github/workflows/cloud-computer.yml",
+      "gitBlob": "ea4a582550a5b61c222444dd0b67d87a1426dab9"
+    },
+    {
+      "path": ".github/workflows/local-device-node22.yml",
+      "gitBlob": "d195f389292e1a84967fd9864063ac536b91bbaf"
+    },
+    {
+      "path": "packages/daemon/test/adapters.test.ts",
+      "gitBlob": "c594202c9db5a0fa8a1c19fb731125d309abc61d"
+    },
+    {
+      "path": "packages/daemon/test/real-agents.test.ts",
+      "gitBlob": "6153fb4ead3ffc55d8c31451d27608da05300f1f"
+    },
+    {
+      "path": "scripts/acceptance/local-installer-macos.ts",
+      "gitBlob": "858b521f583e605340adc7be0685de17de2c60a8"
+    },
+    {
+      "path": "tests/ssh-install/run.mjs",
+      "gitBlob": "48f23b583a69bd97a9cdc23360ee45e2f91bdf13"
+    },
+    {
+      "path": "packages/daemon/src/computer/xvfb.test.mjs",
+      "gitBlob": "6a03f148416b2135ea89ac88faa6a9b381f55e7f"
+    }
+  ],
+  "notableObservedResults": {
+    "readCache": {
+      "line": 2401,
+      "jobId": 129016130715,
+      "status": "pass",
+      "environment": {
+        "origin": "http://localhost:3137",
+        "deploymentSha": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02"
+      },
+      "readCount": 35,
+      "fixtureCounts": {
+        "issues": 3,
+        "threads": 3,
+        "chatMessages": 12,
+        "activityVersions": 3
+      },
+      "boundaries": {
+        "businessRequestWrites": false,
+        "modelExecution": false,
+        "browserExecution": false
+      },
+      "cleanup": {
+        "fixtures": "succeeded",
+        "lease": "released-clean"
+      },
+      "serverMode": "production",
+      "serverRuntime": "nitro",
+      "retainedDirectChildren": 0,
+      "ownedRuntimeErrors": [],
+      "auditResult": "passed",
+      "auditResultLines": [
+        2426,
+        2433
+      ],
+      "limit": "Local isolated compiled HTTP acceptance; no production deployment, browser Replay or model call."
+    },
+    "localDrivers": {
+      "linux": {
+        "jobId": 129016130612,
+        "observedMessageLine": 283,
+        "tests": 1,
+        "pass": 1
+      },
+      "mac": {
+        "jobId": 129016130908,
+        "observedMessageLine": 199,
+        "tests": 1,
+        "pass": 1,
+        "continueOnError": true
+      },
+      "observed": "real screenshot, typed application text and click successful through default-allow MCP broker; no human review",
+      "limit": "Reviewer read the original test output and source; screenshot artifacts were not downloaded or visually inspected."
+    },
+    "siteSearch": {
+      "jobId": 129016130694,
+      "httpTests": 7,
+      "runnerSummaryLine": 3017,
+      "twoDistinctTemporaryDatabasesLine": 3001,
+      "limit": "HTTP API tests run under a Playwright project named chromium; not a browser execution or a production test."
+    },
+    "node22": {
+      "unitVersion": [
+        {
+          "line": 409,
+          "text": "v22.22.1"
+        }
+      ],
+      "node18": {
+        "jobId": 129016500469,
+        "line": 568,
+        "result": "check/node_required",
+        "npmStarted": false,
+        "registrations": 0,
+        "heartbeats": 0,
+        "enrollments": 0
+      },
+      "node22Mac": {
+        "jobId": 129016500536,
+        "line": 565,
+        "result": "installed/launchagent/online/reconnect",
+        "npmStarted": true,
+        "registrations": 2,
+        "heartbeats": 2,
+        "enrollments": 1
+      },
+      "package": {
+        "jobId": 129016130623,
+        "version": "0.0.1",
+        "filename": "aspectlylabs-mikka-0.0.1.tgz",
+        "npmReportedSha1": "38b7da156fb0003ea58f378d5dae8b5bafe4543c",
+        "publishedOfficialRelease": false,
+        "tarballDownloadedByReviewer": false
+      }
+    },
+    "custodyGo": {
+      "jobId": 129016130805,
+      "passLines": [
+        1706,
+        1707
+      ],
+      "package": "github.com/alexj11324/Mikka/subscription-worker",
+      "countNotInferred": true
+    }
+  },
+  "cleanup": {
+    "explicitServiceCleanup": {
+      "containers": 5,
+      "networks": 4,
+      "perJob": [
+        {
+          "jobId": 129016130549,
+          "services": 0,
+          "networks": 0,
+          "allDeleteEchoes": true
+        },
+        {
+          "jobId": 129016131220,
+          "services": 0,
+          "networks": 0,
+          "allDeleteEchoes": true
+        },
+        {
+          "jobId": 129016131016,
+          "services": 0,
+          "networks": 0,
+          "allDeleteEchoes": true
+        },
+        {
+          "jobId": 129016130612,
+          "services": 0,
+          "networks": 0,
+          "allDeleteEchoes": true
+        },
+        {
+          "jobId": 129016130908,
+          "services": 0,
+          "networks": 0,
+          "allDeleteEchoes": true
+        },
+        {
+          "jobId": 129016130924,
+          "services": 1,
+          "networks": 1,
+          "allDeleteEchoes": true
+        },
+        {
+          "jobId": 129016130715,
+          "services": 1,
+          "networks": 1,
+          "allDeleteEchoes": true
+        },
+        {
+          "jobId": 129016130805,
+          "services": 0,
+          "networks": 0,
+          "allDeleteEchoes": true
+        },
+        {
+          "jobId": 129016130623,
+          "services": 0,
+          "networks": 0,
+          "allDeleteEchoes": true
+        },
+        {
+          "jobId": 129016130849,
+          "services": 0,
+          "networks": 0,
+          "allDeleteEchoes": true
+        },
+        {
+          "jobId": 129016500469,
+          "services": 0,
+          "networks": 0,
+          "allDeleteEchoes": true
+        },
+        {
+          "jobId": 129016500536,
+          "services": 0,
+          "networks": 0,
+          "allDeleteEchoes": true
+        },
+        {
+          "jobId": 129016130694,
+          "services": 2,
+          "networks": 1,
+          "allDeleteEchoes": true
+        },
+        {
+          "jobId": 129016130338,
+          "services": 1,
+          "networks": 1,
+          "allDeleteEchoes": true
+        }
+      ],
+      "localResourceBoundary": "Service container/network removal is proven by explicit command and matching echo. Mac LaunchAgent bootout and SSH stop have catch-and-continue branches in their harnesses; report actual emitted stop evidence separately and do not infer a fully audited cleanup solely from job success."
+    },
+    "readCache": {
+      "fixtures": "succeeded",
+      "lease": "released-clean",
+      "retainedDirectChildren": 0
+    },
+    "macInstaller": {
+      "sourceBlob": "858b521f583e605340adc7be0685de17de2c60a8",
+      "finallyLines": [
+        158,
+        164
+      ],
+      "serverAndFixtureCleanupAwaited": true,
+      "launchAgentBootoutCaught": true,
+      "launchAgentBootoutObserved": null
+    },
+    "sshFixture": {
+      "sourceBlob": "48f23b583a69bd97a9cdc23360ee45e2f91bdf13",
+      "startedWithDockerRmFlag": true,
+      "stopInFinally": true,
+      "stopErrorsCaught": true,
+      "separateStopResultObserved": null,
+      "limit": "The five confirmed service-container removals do not count this test-owned SSH fixture as an independently confirmed removal."
+    },
+    "localComputer": {
+      "sourceBlob": "6a03f148416b2135ea89ac88faa6a9b381f55e7f",
+      "testAfterHooks": "broker/lines close; dialog, proxy, terminal and Xvfb kill; fixture directory removal",
+      "separateProcessExitReceiptsObserved": false
+    },
+    "unattended": {
+      "visualEvidencePathRetainedInJob": true,
+      "separateBrowserExitReceiptObserved": false
+    },
+    "jobPostCleanup": "All 14 original logs contain GitHub orphan-process cleanup. This is not promoted to independent proof of every test-owned resource's final state."
+  },
+  "warningsBoundary": "Node22 compatibility run retains its unsupported Node24 package-engine warning and MaxListenersExceededWarning entries. These are observed warnings with successful job/test conclusions; no new cause or fix is inferred here. Original action-runtime deprecation notices are also preserved.",
+  "privacy": {
+    "receipt": "privacy-review.safe.json",
+    "patternCandidates": 1,
+    "unresolved": 0,
+    "resolution": "Only an email-regex false positive in a systemd unit filename; no matched value copied into this receipt.",
+    "rawMaskedLogsUnchanged": true
+  },
+  "limitations": [
+    "No main deployment, official daemon release, E2B publication, paid model use, production Replay, tracing ingestion or final issue acceptance is established by this package.",
+    "The Browser gate deliberately runs only its existing echo. No checkout or browser result is attributed to it.",
+    "E2B release check/validate/await-web/publish/subscriptions/cleanup jobs were originally skipped on the PR event; none were executed, retried or read as logs.",
+    "All source and counts bind to this actual checkout; previous f886/1fa green runs are not used as current execution.",
+    "Native, main-CI PG, Source/Core/Integration, UI strict and other unassigned logs were not read in this task.",
+    "The review covers logs and the bounded condition/cleanup sources only. Companion artifacts such as images, tarballs or reports were not downloaded."
+  ],
+  "resources": {
+    "newReviewerVMs": 0,
+    "newReviewerDatabases": 0,
+    "newBrowsers": 0,
+    "newModels": 0,
+    "workflowsTriggered": 0,
+    "reruns": 0,
+    "cancels": 0,
+    "refsChanged": 0,
+    "activeOwnedReviewerResources": 0
+  }
+}

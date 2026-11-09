@@ -1,0 +1,59 @@
+{
+  "purpose": "Decode and verify previously completed GitHub Native artifacts only; this VM is not the Native execution source",
+  "createdAfterArtifactsReady": true,
+  "sessionId": "sbx_I8NfMqo8dX6A68iBgcJS9OWzDoAw",
+  "name": "issue1512-native-025118-20261109",
+  "image": "vercel/sandbox/universal@sha256:bbec19cffb43ad724eee446d3bd4476e2993849dc0ff0c9f33356f8365d72219",
+  "architecture": "amd64",
+  "region": "iad1",
+  "vcpus": 1,
+  "memoryMiB": 2048,
+  "timeoutMs": 900000,
+  "persistent": false,
+  "exposedPorts": [],
+  "networkPolicy": {
+    "mode": "custom",
+    "allowedDomains": [
+      "*.blob.core.windows.net",
+      "*.amazonaws.com",
+      "*.oaiusercontent.com",
+      "chatgpt.com"
+    ]
+  },
+  "startedAt": "2026-11-09T06:55:49.811Z",
+  "stoppedAt": "2026-11-09T06:59:28.913Z",
+  "actualDurationMs": 219102,
+  "actualActiveCpuMs": 8798,
+  "actualNetworkBytes": {
+    "ingress": 14946886,
+    "egress": 361965
+  },
+  "stopped": true,
+  "deleteSucceeded": true,
+  "exactNameFinalRead": {
+    "resume": false,
+    "status": 404,
+    "code": "not_found"
+  },
+  "timeoutExtended": false,
+  "otherVmCreated": false,
+  "modelsInvoked": 0,
+  "ciRunsStarted": 0,
+  "repoRefsChanged": false,
+  "cost": "Not calculated; measured resource duration, active CPU and transfer are reported without claiming zero cost.",
+  "remainingActiveOwnedResources": 0,
+  "recoveryBeforeStop": {
+    "files": 18,
+    "jsonBytes": 1344354,
+    "jsonSha256": "8aa24730cccb0e9b02ba2bb00d00d204ef7c7f5f1b133fc52690cea67e86fed0",
+    "gzipBytes": 172431,
+    "gzipSha256": "1813b5fc6e62a7c4747551d5c76019e3a50552192d41e28248ace1530e9eba63",
+    "chunkBytes": 1455,
+    "chunks": 119,
+    "allChunksRecovered": true,
+    "gzipCrcAndISizeVerified": true,
+    "bundleShaVerified": true,
+    "allFileHashesAndGitBlobsVerified": true,
+    "initialV8HashAdapterError": "TypedArray lacks push; converted preserved cached bytes to plain Array before revalidating; no bytes or source changed; no repeat read"
+  }
+}

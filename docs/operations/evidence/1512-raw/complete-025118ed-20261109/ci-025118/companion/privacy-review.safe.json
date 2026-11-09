@@ -1,0 +1,30 @@
+{
+  "categories": [
+    "private-key-header",
+    "provider-token-shaped",
+    "aws-key-shaped",
+    "email-shaped",
+    "authorization-bearer-shaped",
+    "credential-url-shaped"
+  ],
+  "findings": [
+    {
+      "workflow": "ssh",
+      "jobId": 129016130338,
+      "line": 1276,
+      "category": "email-shaped",
+      "length": 18,
+      "valueSha256": "07b42a2c7c98a6c3ba6d31c65ad4dca3e83410fbdeaeffa9f7db670d00ec84d2",
+      "resolution": "false positive: a systemd instantiated service filename in a Debian package installation symlink message; not an email address or personal data",
+      "rawContextLine": 1276
+    }
+  ],
+  "method": "Pattern-assisted review of already-public, platform-masked decoded GitHub logs; values are not included in this receipt.",
+  "sourceBoundary": "No production/business data or credential lookup performed.",
+  "unresolvedCandidates": 0,
+  "platformMaskingBoundary": "Original GitHub masking retained. Pattern-assisted review is bounded and does not prove universal absence of sensitive strings; no actual credential or personal-data candidate remained.",
+  "actualCheckout": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+  "originalLogCount": 14,
+  "rawBytes": 1409539,
+  "credentialHandling": "GitHub masking remains exactly as received. No tokens, signed artifact links, private API envelopes or new credential lookups are added."
+}

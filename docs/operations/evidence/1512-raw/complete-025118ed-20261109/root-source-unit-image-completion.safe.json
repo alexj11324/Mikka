@@ -1,0 +1,329 @@
+{
+  "schemaVersion": 1,
+  "kind": "root-source-unit-image-completion",
+  "issue": 1512,
+  "head": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+  "actualCheckout": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+  "tree": "6da320a6f476624ba2e61ca7a1f5c704a3fdae25",
+  "priorCheckpoint": "https://github.com/alexj11324/Mikka/blob/fe81d04de2c6938b5dc866312b0f3163b69d2b7a/docs/operations/evidence/1512-raw/replay-opt-in-025118ed-20261109/index.safe.json",
+  "unitTargetConservation": {
+    "core": 57,
+    "integration": 29,
+    "missing": [],
+    "extra": [],
+    "duplicateCore": 0,
+    "duplicateIntegration": 0,
+    "source": "actual original terminal NX lines versus formal current selection",
+    "oldSourceReused": false
+  },
+  "daemon": {
+    "files": {
+      "pass": 138,
+      "skipped": 1,
+      "total": 139
+    },
+    "tests": {
+      "pass": 1574,
+      "skipped": 2,
+      "total": 1576
+    },
+    "source": "actual job129016429683 stdout",
+    "original": {
+      "bytes": 114172,
+      "sha256": "632bcf035d09de8e1ae7a031db28fffe7215fb70ac4f395f3aa0c3787560b5a3",
+      "downloadCount": 1
+    },
+    "checkout": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+    "oldSourceReused": false
+  },
+  "image": {
+    "schemaVersion": 1,
+    "jobId": 129016731808,
+    "conclusion": "success",
+    "actualCheckout": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+    "original": {
+      "bytes": 358269,
+      "sha256": "d2ecc04db346973871fb7c5c2bf6366444c166f5dc32b0682e552e84e29dc897",
+      "downloadCount": 1
+    },
+    "receipts": [
+      {
+        "status": "passed",
+        "edition": "community",
+        "revision": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+        "origin": "http://localhost:3000",
+        "desktopDiscovery": true,
+        "serverInfo": true,
+        "communityUI": false
+      },
+      {
+        "kind": "isolated-self-hosted-services",
+        "revision": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+        "origin": "http://localhost:3000",
+        "provider": "synthetic-openai-compatible",
+        "synthetic": true,
+        "productionAcceptance": false,
+        "checks": {
+          "mailpit": {
+            "verificationReceived": true,
+            "passwordResetReceived": true,
+            "configuredSender": true,
+            "verifiedSignIn": true
+          },
+          "officialWeb": {
+            "transport": "actual-http",
+            "protocol": "v1",
+            "discovery": true,
+            "corsPreflight": true,
+            "bearerOnly": true,
+            "explicitSameOriginReturn": true,
+            "independentSession": true,
+            "fragmentCodeOnly": true,
+            "replayRejected": true,
+            "sessionRpc": true,
+            "maliciousOriginRejected": true,
+            "visualAcceptance": false,
+            "workspaceRead": true,
+            "attachmentUploadAndDownload": true,
+            "messageSubmitted": true,
+            "messageReplyRead": true,
+            "replyProvider": "synthetic-openai-compatible",
+            "revokeImmediate": true,
+            "sourceCookieSurvives": true,
+            "bearerBoundLive": true,
+            "liveClosedOnRevoke": true
+          },
+          "live": {
+            "applications": 2,
+            "sharedPostgres": true,
+            "cloudflare": false,
+            "businessMutationReceivedAcrossReplicas": true
+          },
+          "minio": {
+            "applicationUpload": true,
+            "privateObject": true,
+            "presignedDownload": true,
+            "bytesVerified": true
+          },
+          "chat": {
+            "messages": 31,
+            "replies": 31,
+            "provider": "synthetic-openai-compatible",
+            "synthetic": true,
+            "hostedUsageRows": 0,
+            "subscriptionAcceptance": false
+          }
+        },
+        "status": "passed",
+        "stage": "complete",
+        "chatProgress": {
+          "confirmedReplies": 31
+        }
+      },
+      {
+        "kind": "isolated-source-daemon",
+        "revision": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+        "origin": "http://localhost:3000",
+        "status": "passed",
+        "checks": {
+          "target": true,
+          "enrollment": true,
+          "realProcess": true,
+          "heartbeat": true,
+          "builtinGatewayPong": true,
+          "ownerDeviceOnline": true,
+          "builtinPresenceReady": true,
+          "builtinPresenceAck": true
+        },
+        "cleanup": {
+          "credentialRevoked": true,
+          "revokedCredentialRefused": true,
+          "daemonUnregistered": true,
+          "revocationCheckedOnNextSync": true,
+          "deviceRemoved": true,
+          "sessionClosed": true,
+          "privateFilesRemoved": true
+        },
+        "taskCompletion": false,
+        "subscriptionAcceptance": false,
+        "modelRequests": false,
+        "process": {
+          "pid": 27493,
+          "daemonVersion": "0.0.1",
+          "protocolVersion": 3
+        }
+      },
+      {
+        "status": "passed",
+        "checks": [
+          "real_community_discovery_and_explicit_server_selection",
+          "normal_email_login_and_authenticated_remote_rpc",
+          "actual_builtin_live_ticket_and_socket",
+          "real_chat_submission_and_fixture_reply_over_live_invalidations",
+          "normal_first_run_dismissed_and_reply_visible",
+          "sign_out_and_return_to_bundled_default_server"
+        ],
+        "cleanup": {
+          "session": true,
+          "electron": true,
+          "daemon": true,
+          "privateFile": true
+        }
+      },
+      {
+        "status": "passed",
+        "edition": "community",
+        "revision": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+        "origin": "http://localhost:3000",
+        "desktopDiscovery": true,
+        "serverInfo": true,
+        "communityUI": false
+      },
+      {
+        "status": "passed",
+        "edition": "community",
+        "revision": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+        "origin": "http://localhost:3000",
+        "desktopDiscovery": true,
+        "serverInfo": true,
+        "communityUI": true
+      },
+      {
+        "status": "passed",
+        "edition": "community",
+        "revision": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+        "origin": "http://localhost:3000",
+        "desktopDiscovery": true,
+        "serverInfo": true,
+        "communityUI": false
+      }
+    ],
+    "cleanup": {
+      "counts": {
+        "containers": 6,
+        "volumes": 3,
+        "networks": 1
+      },
+      "actualRemovedLines": [
+        "2026-11-09T06:49:49.5659779Z  Container mikka-selfhost-ci-app-replica-1  Removed",
+        "2026-11-09T06:50:08.5010883Z  Container mikka-selfhost-ci-app-1  Removed",
+        "2026-11-09T06:50:08.6295658Z  Container mikka-selfhost-ci-model-1  Removed",
+        "2026-11-09T06:50:08.6380966Z  Container mikka-selfhost-ci-minio-1  Removed",
+        "2026-11-09T06:50:08.6742789Z  Container mikka-selfhost-ci-postgres-1  Removed",
+        "2026-11-09T06:50:08.8893574Z  Container mikka-selfhost-ci-mailpit-1  Removed",
+        "2026-11-09T06:50:08.9620737Z  Network mikka-selfhost-ci_default  Removed",
+        "2026-11-09T06:50:09.1675506Z  Volume mikka-selfhost-ci_postgres-data  Removed",
+        "2026-11-09T06:50:09.1682349Z  Volume mikka-selfhost-ci_replica-data  Removed",
+        "2026-11-09T06:50:09.5110077Z  Volume mikka-selfhost-ci_app-data  Removed"
+      ]
+    },
+    "productionPublishedByThisPR": false,
+    "subscriptionAcceptance": false,
+    "realACMECase": false
+  },
+  "source": {
+    "jobId": 129016429612,
+    "conclusion": "success",
+    "original": {
+      "bytes": 133520,
+      "sha256": "c09c2e65b77357a2e0e11ca843f0acb959e5db9d5b9721cb4bec86ec063e8b1b",
+      "lines": 1736
+    },
+    "canonicalGenerator": "node apps/api/scripts/generate-routes.mjs --check",
+    "commands": [
+      "pnpm check:cloud-boundary",
+      "pnpm lint:code",
+      "pnpm lint:runtime",
+      "pnpm test:api",
+      "pnpm --filter @mikka/frontend test",
+      "pnpm typecheck",
+      "pnpm --filter @mikka/protocol typecheck",
+      "pnpm --filter @mikka/mobile typecheck",
+      "pnpm --silent lint:ui --json"
+    ]
+  },
+  "logsInCheckpoint21": [
+    {
+      "path": "ci/job-129016131517.original.log",
+      "bytes": 563713,
+      "sha256": "989576b859a3214f44ed84dc08eb819cd441ce7fa32ab24e4618ff1f268516d5",
+      "gitBlobSha": "53f65ae48b53a2f5dd3494a4aaa26da474e2d3ff",
+      "mode": "100644"
+    },
+    {
+      "path": "ci/job-129016429612.original.log",
+      "bytes": 133520,
+      "sha256": "c09c2e65b77357a2e0e11ca843f0acb959e5db9d5b9721cb4bec86ec063e8b1b",
+      "gitBlobSha": "22f2b551585e02db7e7288c0bb6d6939cbfbbda0",
+      "mode": "100644"
+    },
+    {
+      "path": "ci/job-129016429666.original.log",
+      "bytes": 647529,
+      "sha256": "c8d1227fed05d09254efd983f2eb99fc1e5a97e0028a7c1ce0b5335b2d8002af",
+      "gitBlobSha": "d131546485339c5f49fa6c6e9d2132c46187b1ae",
+      "mode": "100644"
+    },
+    {
+      "path": "ci/job-129016429683.original.log",
+      "bytes": 114172,
+      "sha256": "632bcf035d09de8e1ae7a031db28fffe7215fb70ac4f395f3aa0c3787560b5a3",
+      "gitBlobSha": "76cc501c24d48355befe212efa8251f417febf3b",
+      "mode": "100644"
+    },
+    {
+      "path": "ci/job-129016728982.original.log",
+      "bytes": 102759,
+      "sha256": "512f61da2013af2a80d9a6ca439022a49547df7c31739c6c368958c4dc165043",
+      "gitBlobSha": "178bace4830b2a8e7d828191f0cab03bfff8a8b4",
+      "mode": "100644"
+    },
+    {
+      "path": "ci/job-129016728990.original.log",
+      "bytes": 16599,
+      "sha256": "dfb5ae6d0ab36f79ee97694f97e0eb0be3d4e91b8c925673f829ad0d70cd3871",
+      "gitBlobSha": "87870766046888c659cd89d9ecc3c88889d9fae8",
+      "mode": "100644"
+    },
+    {
+      "path": "ci/job-129016729069.original.log",
+      "bytes": 309923,
+      "sha256": "aa3653713a7d05a477aee09930318e24b9297c6e3b9537c201eff382782bee0b",
+      "gitBlobSha": "be960b80225ee1892cf606daa19b3b6a524b2936",
+      "mode": "100644"
+    },
+    {
+      "path": "ci/job-129016749438.redacted.log",
+      "bytes": 226637,
+      "sha256": "bc4a5d9fffcebc61c4a2df8d5eca76e38623966e7cb6e03d33e4532a57947f52",
+      "gitBlobSha": "cab4dbf77649699d15ad3727915e2c6c4c69723f",
+      "mode": "100644"
+    },
+    {
+      "path": "ci/job-129016429779.original.log",
+      "bytes": 1002072,
+      "sha256": "0ded6c2d82bf47b50f137efb727a084b382f4af1dc96f3d56b224dc6c760b1d9",
+      "gitBlobSha": "d10f312c981eababfa032da66bd3e9413d584548",
+      "mode": "100644"
+    }
+  ],
+  "readAccounting": {
+    "rootDownloadedJobs": [
+      129016131517,
+      129016429612,
+      129016429666,
+      129016429683,
+      129016728982,
+      129016728990,
+      129016729069,
+      129016749438,
+      129016429779,
+      129018515769,
+      129016731808
+    ],
+    "rootReadsPerListedJob": 1,
+    "aggregateTeamReads": 2,
+    "aggregateArchivalCopy": "CP21/ci-025118/pg/pg-aggregate.original.log"
+  },
+  "productionAccepted": false
+}

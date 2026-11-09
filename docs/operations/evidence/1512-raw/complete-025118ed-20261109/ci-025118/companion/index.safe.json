@@ -1,0 +1,330 @@
+{
+  "schemaVersion": 1,
+  "kind": "companion-workflow-originals-and-review-index",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "pullRequest": 1799,
+  "prHead": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+  "actualCheckoutFor13Jobs": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+  "tree": "6da320a6f476624ba2e61ca7a1f5c704a3fdae25",
+  "checkoutException": {
+    "jobId": 129016130549,
+    "reason": "Browser gate is echo-only; no checkout and no browser test."
+  },
+  "suggestedPrefix": "ci-025118/companion",
+  "files": [
+    {
+      "path": "ci-025118/companion/browser-gate-129016130549.original.log",
+      "kind": "original-decoded-job-log",
+      "workflow": "browser-gate",
+      "runId": 42573553966,
+      "jobId": 129016130549,
+      "bytes": 2193,
+      "sha256": "71be7b2e8069abd11571a12c5f1d62b783e487ac69375adda24ff55a51a9dbc9",
+      "gitBlob": "bb617cc13981162e4c1faebf04ae8f9141d92c03",
+      "reviewerReads": 1,
+      "wholeTeamReads": 1
+    },
+    {
+      "path": "ci-025118/companion/e2b-additive-129016131220.original.log",
+      "kind": "original-decoded-job-log",
+      "workflow": "e2b-additive",
+      "runId": 42573554109,
+      "jobId": 129016131220,
+      "bytes": 50840,
+      "sha256": "5104bdb176c2d7a1f0345c038edda4254de178d2dbbe9487f8dddf5c00d810a0",
+      "gitBlob": "d6ff9796a88eb4b1949e858df61347ee63a0976e",
+      "reviewerReads": 1,
+      "wholeTeamReads": 1
+    },
+    {
+      "path": "ci-025118/companion/unattended-129016131016.original.log",
+      "kind": "original-decoded-job-log",
+      "workflow": "unattended",
+      "runId": 42573554014,
+      "jobId": 129016131016,
+      "bytes": 71698,
+      "sha256": "8c957bcf29b1ea0fe5e3c5d520811c32697bebaad485c3d5d897a687ce7a511f",
+      "gitBlob": "b0255d280933208896545dbb39fecbaf923e2220",
+      "reviewerReads": 1,
+      "wholeTeamReads": 1
+    },
+    {
+      "path": "ci-025118/companion/cloud-backend-129016130612.original.log",
+      "kind": "original-decoded-job-log",
+      "workflow": "cloud-backend",
+      "runId": 42573553993,
+      "jobId": 129016130612,
+      "bytes": 27004,
+      "sha256": "5c8869dd1e19cbf4b02b562cae13bb9f1654a59fea89138218238ba780b168f7",
+      "gitBlob": "f509394e56a0505f1bdbe1fde00dbb650f38a9b5",
+      "reviewerReads": 1,
+      "wholeTeamReads": 1
+    },
+    {
+      "path": "ci-025118/companion/cloud-backend-129016130908.original.log",
+      "kind": "original-decoded-job-log",
+      "workflow": "cloud-backend",
+      "runId": 42573553993,
+      "jobId": 129016130908,
+      "bytes": 20594,
+      "sha256": "85057a0c422025388ab140c2d58f599214957a2c142dd673f76007497ba99a8b",
+      "gitBlob": "84bcc85b8e5defa10f1c6eeade8b2c32fdb869d5",
+      "reviewerReads": 1,
+      "wholeTeamReads": 1
+    },
+    {
+      "path": "ci-025118/companion/cloud-backend-129016130924.original.log",
+      "kind": "original-decoded-job-log",
+      "workflow": "cloud-backend",
+      "runId": 42573553993,
+      "jobId": 129016130924,
+      "bytes": 70885,
+      "sha256": "a2507d51a9c863190c55c8694fecb5504e069280bf0dd25c05d1141285ec8af3",
+      "gitBlob": "56124b1a37225eb826ccf19f5a52f7fe3eb03532",
+      "reviewerReads": 1,
+      "wholeTeamReads": 1
+    },
+    {
+      "path": "ci-025118/companion/read-cache-129016130715.original.log",
+      "kind": "original-decoded-job-log",
+      "workflow": "read-cache",
+      "runId": 42573553977,
+      "jobId": 129016130715,
+      "bytes": 232898,
+      "sha256": "b9b8d4b2ca662331f0ffddfd75992359f296b4aef4ea22676e07ba5f8cadaf49",
+      "gitBlob": "18b2ac63981adb8371ad16e6902c894e3770a8de",
+      "reviewerReads": 1,
+      "wholeTeamReads": 1
+    },
+    {
+      "path": "ci-025118/companion/e2b-custody-129016130805.original.log",
+      "kind": "original-decoded-job-log",
+      "workflow": "e2b-custody",
+      "runId": 42573554039,
+      "jobId": 129016130805,
+      "bytes": 215825,
+      "sha256": "bd044ad89851ab5a29e8fc44456b9df11dc34c1ae00cb07e7a34bfe24e264ec8",
+      "gitBlob": "a9b4f21ca69d0d19f25bb022ad193c7b165c8c94",
+      "reviewerReads": 1,
+      "wholeTeamReads": 1
+    },
+    {
+      "path": "ci-025118/companion/node22-129016130623.original.log",
+      "kind": "original-decoded-job-log",
+      "workflow": "node22",
+      "runId": 42573553967,
+      "jobId": 129016130623,
+      "bytes": 35851,
+      "sha256": "9eb8edf77a8ce2b6f3d12da1f1827e8c208973a52bdb2d01a3a9ce278e6cdfc8",
+      "gitBlob": "0e3e30c4f56a794237f981c2667eb3bea00ab4ad",
+      "reviewerReads": 1,
+      "wholeTeamReads": 1
+    },
+    {
+      "path": "ci-025118/companion/node22-129016130849.original.log",
+      "kind": "original-decoded-job-log",
+      "workflow": "node22",
+      "runId": 42573553967,
+      "jobId": 129016130849,
+      "bytes": 127979,
+      "sha256": "d20da2400bce359693a2ffcc1b9f73bfd2642a2238cb022624972a59d410be59",
+      "gitBlob": "5027b8041cb650dab496164d2a556a94cb4f5fc1",
+      "reviewerReads": 1,
+      "wholeTeamReads": 1
+    },
+    {
+      "path": "ci-025118/companion/node22-129016500469.original.log",
+      "kind": "original-decoded-job-log",
+      "workflow": "node22",
+      "runId": 42573553967,
+      "jobId": 129016500469,
+      "bytes": 47990,
+      "sha256": "9c41b75621c6a5759c0b06575af454db4320533cb5bf8112e76f8474bf370f40",
+      "gitBlob": "0be7a29cf08ede158fb0f368d93d05e3f5d96acb",
+      "reviewerReads": 1,
+      "wholeTeamReads": 1
+    },
+    {
+      "path": "ci-025118/companion/node22-129016500536.original.log",
+      "kind": "original-decoded-job-log",
+      "workflow": "node22",
+      "runId": 42573553967,
+      "jobId": 129016500536,
+      "bytes": 47476,
+      "sha256": "96e35f7369acace9f65f44b294701d85959f13eea991badd8ec535b6b5b30351",
+      "gitBlob": "197c7679bffefa44af11bd522d672229b937f6a7",
+      "reviewerReads": 1,
+      "wholeTeamReads": 1
+    },
+    {
+      "path": "ci-025118/companion/site-search-129016130694.original.log",
+      "kind": "original-decoded-job-log",
+      "workflow": "site-search",
+      "runId": 42573553973,
+      "jobId": 129016130694,
+      "bytes": 299406,
+      "sha256": "222c927e3e9e90efb804e8c204ce36b5fc8ed868cfe4a18e793f3b19a8a399bd",
+      "gitBlob": "2bdae4f705935c8d003260b61d6f24f3852ea07c",
+      "reviewerReads": 1,
+      "wholeTeamReads": 1
+    },
+    {
+      "path": "ci-025118/companion/ssh-129016130338.original.log",
+      "kind": "original-decoded-job-log",
+      "workflow": "ssh",
+      "runId": 42573553970,
+      "jobId": 129016130338,
+      "bytes": 158900,
+      "sha256": "902facceaf39cae010f8db4d0aae739dd6d5e8da0c5c78b2be52c176c01033a6",
+      "gitBlob": "58f84c9a3a68872c24b5d944a644af2e46c0954f",
+      "reviewerReads": 1,
+      "wholeTeamReads": 1
+    },
+    {
+      "path": "ci-025118/companion/companion-terminal-review.safe.json",
+      "bytes": 101650,
+      "sha256": "1d83ebec0998ea4028be39e258131a56f9abca1c65d9a7d3bece60e9d628c1db",
+      "gitBlob": "9372e6484c128031cf64e1952f73e00d7b79997d",
+      "kind": "safe-review-receipt"
+    },
+    {
+      "path": "ci-025118/companion/privacy-review.safe.json",
+      "bytes": 1375,
+      "sha256": "e52daf3f3c323bea089ee0e6fdff75a0700fdfdb724f98e8c0a91717a4388ab2",
+      "gitBlob": "ea92b844c9e5636ec9c710e186580941df083ee5",
+      "kind": "safe-review-receipt"
+    }
+  ],
+  "filesExcludingIndex": 16,
+  "bytesExcludingIndex": 1512564,
+  "workflows": [
+    {
+      "key": "browser-gate",
+      "runId": 42573553966,
+      "status": "completed",
+      "conclusion": "success",
+      "actualJobIds": [
+        129016130549
+      ],
+      "skippedJobIds": []
+    },
+    {
+      "key": "e2b-additive",
+      "runId": 42573554109,
+      "status": "completed",
+      "conclusion": "success",
+      "actualJobIds": [
+        129016131220
+      ],
+      "skippedJobIds": [
+        129016229559,
+        129016230032,
+        129016230222,
+        129016230427,
+        129016230434,
+        129016230611
+      ]
+    },
+    {
+      "key": "unattended",
+      "runId": 42573554014,
+      "status": "completed",
+      "conclusion": "success",
+      "actualJobIds": [
+        129016131016
+      ],
+      "skippedJobIds": []
+    },
+    {
+      "key": "cloud-backend",
+      "runId": 42573553993,
+      "status": "completed",
+      "conclusion": "success",
+      "actualJobIds": [
+        129016130612,
+        129016130908,
+        129016130924
+      ],
+      "skippedJobIds": []
+    },
+    {
+      "key": "read-cache",
+      "runId": 42573553977,
+      "status": "completed",
+      "conclusion": "success",
+      "actualJobIds": [
+        129016130715
+      ],
+      "skippedJobIds": []
+    },
+    {
+      "key": "e2b-custody",
+      "runId": 42573554039,
+      "status": "completed",
+      "conclusion": "success",
+      "actualJobIds": [
+        129016130805
+      ],
+      "skippedJobIds": []
+    },
+    {
+      "key": "node22",
+      "runId": 42573553967,
+      "status": "completed",
+      "conclusion": "success",
+      "actualJobIds": [
+        129016130623,
+        129016130849,
+        129016500469,
+        129016500536
+      ],
+      "skippedJobIds": []
+    },
+    {
+      "key": "site-search",
+      "runId": 42573553973,
+      "status": "completed",
+      "conclusion": "success",
+      "actualJobIds": [
+        129016130694
+      ],
+      "skippedJobIds": []
+    },
+    {
+      "key": "ssh",
+      "runId": 42573553970,
+      "status": "completed",
+      "conclusion": "success",
+      "actualJobIds": [
+        129016130338
+      ],
+      "skippedJobIds": []
+    }
+  ],
+  "semanticLimits": [
+    "All nine workflow conclusions are success, with their original semantics; this is not a production acceptance verdict.",
+    "Browser gate executes only an echo and has no checkout.",
+    "Six E2B release jobs are skipped by the original PR event/main conditions; their logs were not requested.",
+    "Node22 has 1574 Vitest tests passed, two original Cursor conditional skips, and a disabled 0-test real-agent file; its additional 83 Node tests pass.",
+    "Node18 macOS scenario proves expected node_required refusal; Node22 macOS scenario proves fixture install/LaunchAgent/reconnect.",
+    "Cloud macOS actual screenshot/input/click test passes but remains nonblocking by continue-on-error.",
+    "Five service containers and four networks have explicit successful removal echoes. Best-effort macOS bootout and SSH fixture stop have no independent final-state receipt; unknown stays unknown.",
+    "Read cache reports fixture cleanup succeeded, lease released-clean and zero retained direct children for its isolated Nitro process.",
+    "No Native, other main-CI, UI-strict or unassigned logs were fetched."
+  ],
+  "rawIntegrity": "Exactly one decoded-log fetch per assigned job. Raw decoded strings retain original BOM/ANSI; no normalization was applied to archived content. No binary ZIP, compression or image-inspection claim is made.",
+  "privacy": "Already-public GitHub masked logs, with one resolved email-pattern false positive for a systemd unit filename. No raw API envelope, signed download link or new credential value is included.",
+  "publication": "All listed immutable blobs were created and their remote SHA matched local calculation. Root owns subsequent evidence-branch publication; this task changed no ref.",
+  "resources": {
+    "newVMs": 0,
+    "newDatabases": 0,
+    "newBrowsers": 0,
+    "newModels": 0,
+    "workflowTriggers": 0,
+    "reruns": 0,
+    "cancels": 0,
+    "refsChanged": 0,
+    "activeOwnedResources": 0
+  }
+}

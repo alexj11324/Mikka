@@ -1,0 +1,57 @@
+{
+  "summary": {
+    "verified": true,
+    "totals": {
+      "webLogin": 412,
+      "nativeLogin": 361,
+      "startup-bundled": 179,
+      "startup-hosted": 201
+    },
+    "records": 24,
+    "checkpoints": 12,
+    "buckets": [
+      17,
+      78
+    ],
+    "diagnosticsStatus": "incomplete",
+    "projectedQueries": 1153,
+    "overflow": false,
+    "unknowns": {
+      "nativeLogin": {
+        "context": 91,
+        "statement": 118
+      },
+      "webLogin": {
+        "context": 87,
+        "statement": 139
+      },
+      "startup-bundled": {
+        "context": 53,
+        "statement": 70
+      },
+      "startup-hosted": {
+        "context": 48,
+        "statement": 79
+      }
+    },
+    "cleanupAfter": {
+      "lifecycle": {
+        "owner": true,
+        "peer": true
+      },
+      "smoke": {
+        "owner": true,
+        "peer": true
+      }
+    },
+    "nativeFiles": 308
+  },
+  "commandId": "cmd_a189b1ed495e4a8186e6ac3a95ec",
+  "exitCode": 0,
+  "vmPurpose": "original artifact analysis only, not Native execution",
+  "requiredEnvironment": {
+    "FORENSIC_ROOT": "/vercel/sandbox/native-025118",
+    "FORENSIC_REVISION": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+    "FORENSIC_TREE": "6da320a6f476624ba2e61ca7a1f5c704a3fdae25"
+  }
+}

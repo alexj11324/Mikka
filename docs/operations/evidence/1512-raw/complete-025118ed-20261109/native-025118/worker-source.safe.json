@@ -1,0 +1,72 @@
+{
+  "actualRevision": "0b2b8a5296fa9ccda2a7f9921c26c2ff9b93ba02",
+  "life": [
+    {
+      "mode": "bundled",
+      "ready": true,
+      "navigationInterruptions": 0,
+      "daemon": {
+        "source": "local_daemon_hello",
+        "status": "connected",
+        "daemonVersion": "0.0.551",
+        "protocolVersion": 3
+      },
+      "environmentService": {
+        "platform": "darwin",
+        "definition": "file",
+        "profile": "matches",
+        "dev": true,
+        "installedVersion": "0.0.551",
+        "installedRevision": "facb389f6cc06c453e9135bb60ada1b0f302e0d9"
+      },
+      "profileMatches": true,
+      "overrideMatches": true
+    },
+    {
+      "mode": "hosted",
+      "ready": true,
+      "navigationInterruptions": 0,
+      "daemon": {
+        "source": "local_daemon_hello",
+        "status": "connected",
+        "daemonVersion": "0.0.551",
+        "protocolVersion": 3
+      },
+      "environmentService": {
+        "platform": "darwin",
+        "definition": "file",
+        "profile": "matches",
+        "dev": true,
+        "installedVersion": "0.0.551",
+        "installedRevision": "facb389f6cc06c453e9135bb60ada1b0f302e0d9"
+      },
+      "profileMatches": true,
+      "overrideMatches": true
+    }
+  ],
+  "parity": [
+    {
+      "mode": "bundled",
+      "service": {
+        "platform": "darwin",
+        "definition": "file",
+        "profile": "matches",
+        "dev": true,
+        "installedVersion": "0.0.551",
+        "installedRevision": "facb389f6cc06c453e9135bb60ada1b0f302e0d9"
+      }
+    },
+    {
+      "mode": "hosted",
+      "service": {
+        "platform": "darwin",
+        "definition": "file",
+        "profile": "matches",
+        "dev": true,
+        "installedVersion": "0.0.551",
+        "installedRevision": "facb389f6cc06c453e9135bb60ada1b0f302e0d9"
+      }
+    }
+  ],
+  "limit": "Installed revision/version are original observations, not inferred from application revision."
+}

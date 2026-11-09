@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "issue": 1512,
+  "kind": "read-only-main854-compatibility",
+  "currentCandidate": "025118ed953ab80803ac3ba9548c3a309c5c69b4",
+  "candidateBaseMain": "927260894305e066e15a4ad50114abce433e6001",
+  "actualNewMain": "854583566f4f55fc15490a240c3e38a2c1fd16b6",
+  "newMainTree": "d11a9eeac6f3c2952d6b9dbcc3f4002e579e96f8",
+  "mainParents": [
+    "927260894305e066e15a4ad50114abce433e6001"
+  ],
+  "sourcePR": 1773,
+  "mergedAt": "2026-11-09T06:47:40Z",
+  "deltaPaths": [
+    {
+      "path": "apps/desktop/test/parity.mjs",
+      "sha": "71157e93057ca19159a054fd4d41c9c0e0650fca",
+      "status": "modified",
+      "changes": 9
+    },
+    {
+      "path": "apps/mobile/lib/types.ts",
+      "sha": "fc8dc81faa75d5a6b2891d8e0a2dc2e53674c356",
+      "status": "modified",
+      "changes": 5
+    },
+    {
+      "path": "lib/issue-run-conversation.test.ts",
+      "sha": "842219414e398ea18a5b06109d049fff8e57d86c",
+      "status": "modified",
+      "changes": 63
+    },
+    {
+      "path": "lib/issue-run-conversation.ts",
+      "sha": "31c4326aec0eb9a8e1fa33238894e362e0f8b1f7",
+      "status": "modified",
+      "changes": 27
+    },
+    {
+      "path": "packages/daemon/src/chunks.ts",
+      "sha": "b0e5b7e58a10fb95cf986e80a1d04b99fcdee52f",
+      "status": "modified",
+      "changes": 5
+    },
+    {
+      "path": "packages/daemon/src/runs/supervisor.test.ts",
+      "sha": "3b3b06dff505d2449a531c2637f73f79db924713",
+      "status": "modified",
+      "changes": 20
+    },
+    {
+      "path": "packages/daemon/src/runs/supervisor.ts",
+      "sha": "3367adf7b454b4b044d09858fa2e55ef24ae1195",
+      "status": "modified",
+      "changes": 4
+    },
+    {
+      "path": "packages/daemon/src/tool-duration.test.ts",
+      "sha": "e2ca7e45b629c9232f3249e3ba82b065dfea5b4b",
+      "status": "added",
+      "changes": 26
+    },
+    {
+      "path": "packages/daemon/src/tool-duration.ts",
+      "sha": "c16c3c18dca3a2de441047e63d48853f06f9d7f3",
+      "status": "added",
+      "changes": 20
+    },
+    {
+      "path": "tests/secret-masking.db.test.ts",
+      "sha": "75e7eb93e92ec2ae906bd9c977841d0f2e7d3bee",
+      "status": "modified",
+      "changes": 25
+    }
+  ],
+  "overlapWithOwned33": [],
+  "sourceFindings": [
+    "The new per-session helper adds a measured monotonic toolDurationMs to tool result chunks before the existing emit/masking/outbox pipeline. It does not alter model-generation telemetry events, traceparent propagation, PostHog emitters or flush.",
+    "The projection exposes optional already-masked tool output and the measured duration; no additional product SQL/network/polling is added by these source changes.",
+    "Desktop parity changes the idempotent theme preference write from evaluate to document-aware waitForFunction. It does not change lifecycle/query-count runner files, authentication, budget windows or first-start pairing.",
+    "This review is source compatibility only. Current candidate CI still checks the 0b/025 tree based on main927; no new main code is claimed executed by those jobs."
+  ],
+  "action": {
+    "branchUpdated": false,
+    "workflowRerun": false,
+    "mainWritten": false,
+    "mergeNotPerformed": true,
+    "activeMainPublishersMustFinish": true
+  },
+  "futureMergeRule": "Preserve all actual main changes in a normal merge; refresh source/writer/account state at actual readiness. Do not change a frozen candidate merely because unrelated main moved."
+}

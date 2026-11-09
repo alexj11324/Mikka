@@ -1,0 +1,169 @@
+{
+  "schemaVersion": 1,
+  "kind": "posthog-replay-bot-server-and-list-boundary-documentation-review",
+  "preparedAtUTC": "2026-11-09T06:58:31.980Z",
+  "projectId": 670821,
+  "question": "Whether automated sessions opted in at SDK level are separately dropped or hidden by Replay because $browser_type is bot; exact actual-ID metadata/list/render interface.",
+  "conclusions": {
+    "sdk": {
+      "status": "documented; existing implementation not re-reviewed",
+      "meaning": "opt_out_useragent_filter=true captures matching user-agent traffic and classifies $browser_type as bot or browser instead of client-side dropping.",
+      "url": "https://posthog.com/docs/web-analytics/troubleshooting"
+    },
+    "replayServerBotDiscard": {
+      "status": "unknown",
+      "reason": "Two bounded official docs searches and current official replay diagnostic/traffic-classification skills did not document whether Replay ingestion or rasterization separately rejects $browser_type=bot. No current bot session was queried or rendered. Absence of a documented rejection is not evidence of universal admission."
+    },
+    "replayListBotDefault": {
+      "status": "unknown",
+      "known": "Official Replay list metadata documents date/property/test-user filters and a default-filtered home list. It does not document a mandatory bot exclusion or expose an include_bots control.",
+      "notInferred": "Web/Product Analytics traffic-classification defaults cannot establish Replay server or playlist behavior."
+    },
+    "exactGet": {
+      "tool": "session-recording-get",
+      "notTool": "session-recordings-get",
+      "required": [
+        "id"
+      ],
+      "schemaProperties": [
+        "id"
+      ],
+      "botOrListArguments": [],
+      "template": "call session-recording-get {\"id\":\"<ACTUAL_SESSION_UUID_FROM_BROWSER_RECEIPT>\"} --json",
+      "semantics": "Official missing-recordings skill: metadata means a recording exists; found:false/reason:recording_not_found is a normal exact lookup miss in the active project. Other errors such as permission/project failures do not establish absence. An event session ID or SDK ready flag alone does not guarantee a stored recording."
+    },
+    "boundedList": {
+      "tool": "query-session-recordings-list",
+      "template": {
+        "session_ids": [
+          "<ACTUAL_CLAUDE_SESSION_UUID>",
+          "<ACTUAL_CODEX_SESSION_UUID>"
+        ],
+        "date_from": "<ACTUAL_FIXED_UTC_FROM>",
+        "date_to": "<ACTUAL_FIXED_UTC_TO>",
+        "filter_test_accounts": false,
+        "limit": 2
+      },
+      "schemaDefaultTestAccountFilter": false,
+      "toolRecommendedDefaultUsage": true,
+      "reasonForExplicitFalse": "Owned acceptance sessions are test traffic; false avoids excluding them through the query's internal/test filter. This is a query argument, not a project/consent/recording setting change.",
+      "botOverrideParameter": "none exposed",
+      "propertiesFilter": "omitted; no bot=browser or human-only filter",
+      "pagination": "has_next and next_cursor; no query executed"
+    },
+    "playlist": {
+      "tool": "session-recording-playlist-get",
+      "required": [
+        "short_id"
+      ],
+      "result": "Playlist metadata including stored filters/type/counts, not playback or exact session retrieval.",
+      "requirement": "No playlist membership/create/update needed for exact recording get or inline scan.",
+      "unknown": "Actual saved/default playlist filters were not read."
+    },
+    "links": {
+      "officialTemplate": "{posthog_base_url}/replay/{id}",
+      "avoid": "/replay/home?sessionRecordingId={id}",
+      "reason": "List tool metadata says the home path retains default list filtering and does not open the recording.",
+      "restMetadataTemplate": "GET /api/projects/670821/session_recordings/<ACTUAL_SESSION_UUID>/",
+      "newBrowserAuth": false
+    },
+    "render": {
+      "tool": "vision-scanners-inline-scan",
+      "schemaSourceStore": "gapReview:replayMeta:detail:0",
+      "input": "Exact session_ids plus previously frozen closed classifier prompt/config/model.",
+      "extraBotOrTestAccountFilters": "none in inspected schema",
+      "playlistRequired": false,
+      "executed": false,
+      "proof": "SDK acceptance, metadata existence, HTTP200 and snapshot/blob download do not prove visual playback. Actual recording rasterization and the scoped observation terminal/result still must be inspected. A no_recording/ineligible/failed result remains a real limitation, not automatically attributed to bot filtering."
+    }
+  },
+  "sources": [
+    {
+      "command": "learn posthog:diagnosing-missing-recordings",
+      "storeKey": "replayBotBoundary20261109:meta:learn posthog:diagnosing-missing-recordings",
+      "observedAtUTC": "2026-11-09T06:56:32.341Z",
+      "responseBytes": 8657,
+      "responseSha256": "e176788c618f253734337914300a76bde14d7d25f377b7c70484d8cf17688b9a",
+      "projectDataRead": false
+    },
+    {
+      "command": "learn posthog:filtering-bot-traffic",
+      "storeKey": "replayBotBoundary20261109:meta:learn posthog:filtering-bot-traffic",
+      "observedAtUTC": "2026-11-09T06:56:23.789Z",
+      "responseBytes": 12759,
+      "responseSha256": "27837f9f352e76702e8e51aef2cc5ae0eb909a5a888d13db4d867b8c61826fa9",
+      "projectDataRead": false
+    },
+    {
+      "command": "info session-recording-get",
+      "storeKey": "replayBotBoundary20261109:meta:info session-recording-get",
+      "observedAtUTC": "2026-11-09T06:56:28.103Z",
+      "responseBytes": 2320,
+      "responseSha256": "abf0e4394c347cb30aef593e3255cf8d83e11daf9b2ebc58cbebebe4fb48a6cf",
+      "projectDataRead": false
+    },
+    {
+      "command": "info query-session-recordings-list",
+      "storeKey": "replayBotBoundary20261109:meta:info query-session-recordings-list",
+      "observedAtUTC": "2026-11-09T06:56:19.564Z",
+      "responseBytes": 36698,
+      "responseSha256": "4945b4098c6adfcaa01c300e8d9f141f459f8d07900fd75830b4ded3ff81e011",
+      "projectDataRead": false
+    },
+    {
+      "command": "info session-recording-playlist-get",
+      "storeKey": "replayBotBoundary20261109:meta:info session-recording-playlist-get",
+      "observedAtUTC": "2026-11-09T06:57:25.505Z",
+      "responseBytes": 611,
+      "responseSha256": "45c5e28536dc3e27307c95442725f7565e8ba1f42922d61765b5bda56ef1fb87",
+      "projectDataRead": false
+    },
+    {
+      "command": "call docs-search {\"query\":\"For session replay recorded by automated browsers with JavaScript opt_out_useragent_filter=true and $browser_type='bot', does PostHog filter the recording server-side or hide it by default in recordings lists/playlists? How do exact session ID retrieval and rendering differ from the list, and are filter_test_accounts, include_bots, or other explicit parameters required?\"} --json",
+      "storeKey": "replayBotBoundary20261109:meta:call docs-search {\"query\":\"For session replay recorded by automated browsers with JavaScript opt_out_useragent_filter=true and $browser_type='bot', does PostHog filter the recording server-side or hide it by default in recordings lists/playlists? How do exact session ID retrieval and rendering differ from the list, and are filter_test_accounts, include_bots, or other explicit parameters required?\"} --json",
+      "observedAtUTC": "2026-11-09T06:56:15.303Z",
+      "responseBytes": 10365,
+      "responseSha256": "2531d0430aa8d82226595b00bfc683a9f43c342a2bbd112a9ae0c2c6265bb915",
+      "projectDataRead": false
+    },
+    {
+      "command": "call docs-search {\"query\":\"Does PostHog Session Replay ingestion or the recordings list automatically exclude recordings with $browser_type = bot after opt_out_useragent_filter is true? Please find session replay-specific documentation about bot traffic, default list filters, duration or activity filters, and direct recording ID access, rather than Web Analytics defaults.\"} --json",
+      "storeKey": "replayBotBoundary20261109:meta:call docs-search {\"query\":\"Does PostHog Session Replay ingestion or the recordings list automatically exclude recordings with $browser_type = bot after opt_out_useragent_filter is true? Please find session replay-specific documentation about bot traffic, default list filters, duration or activity filters, and direct recording ID access, rather than Web Analytics defaults.\"} --json",
+      "observedAtUTC": "2026-11-09T06:57:21.093Z",
+      "responseBytes": 14379,
+      "responseSha256": "1fbb6d16c8d9fec2b98f4ad11dc440ee6ff32288fc1e36986e19c6fe5d51f6c1",
+      "projectDataRead": false
+    }
+  ],
+  "officialURLs": [
+    "https://posthog.com/docs/web-analytics/troubleshooting",
+    "https://posthog.com/docs/session-replay/surfaces/mcp",
+    "https://posthog.com/docs/api/replay",
+    "https://posthog.com/docs/session-replay/troubleshooting",
+    "https://posthog.com/docs/session-replay/how-to-watch-recordings"
+  ],
+  "ignoredSearchResults": [
+    "Outdated community/forum discussion",
+    "Closed GitHub feature request user claims"
+  ],
+  "knowledgeAvailability": {
+    "businessKnowledgeToolEnabled": false,
+    "attempts": 1,
+    "expandedSearch": false
+  },
+  "operations": {
+    "documentationSearchCalls": 2,
+    "recordingMetadataCalls": 0,
+    "recordingListCalls": 0,
+    "playlistDataCalls": 0,
+    "eventQueries": 0,
+    "snapshotReads": 0,
+    "modelOrVisionCalls": 0,
+    "browserCalls": 0,
+    "projectOrConsentOrBotSettingsWrites": 0,
+    "resources": 0,
+    "backgroundPolling": false,
+    "sourceEdits": 0
+  },
+  "finalDisposition": "No additional mandatory setting or invented bot override can be justified by inspected official contract; use real-ID get and bounded list only after actual case, then existing authorized render recipe. Server bot admission remains unknown until actual evidence."
+}
