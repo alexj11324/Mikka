@@ -1,5 +1,5 @@
 name: Issue 1506 FFmpeg origin diagnostic
-run-name: Issue 1506 bounded FFmpeg HTTP diagnosis
+run-name: Issue 1506 fixed API authenticated diagnosis
 on:
   push:
     branches:
@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-latest, macos-26]
+        runner: [macos-26]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -126,19 +126,13 @@ jobs:
             return row;
           }
           (async () => {
-            console.log(JSON.stringify({ kind: 'diagnostic_start', workflowSha: process.env.GITHUB_SHA,
-              sourceBase: 'e9fa621f18c7809c7f890a5b4670bd580c7424dc', platform: os.platform(), arch: os.arch(),
-              fixedAsset: selected.name, requestBudget: 'one release attempt and one API attempt; at most one conditional API-origin auth probe',
+            console.log(JSON.stringify({ kind: 'auth_diagnostic_start', workflowSha: process.env.GITHUB_SHA,
+              sourceBase: 'e9fa621f18c7809c7f890a5b4670bd580c7424dc', precedingDiagnosticRun: 42583267142,
+              platform: os.platform(), arch: os.arch(), fixedAsset: selected.name,
+              requestBudget: 'one authenticated attempt at the fixed API endpoint; no anonymous baseline request',
               productionActions: 0, modelCalls: 0, installation: false }));
-            const release = await probe('release', releaseUrl);
-            console.log(JSON.stringify({ kind: 'origin_result', ...release }));
-            const api = await probe('api', apiUrl);
+            const api = await probe('api_existing_actions_token', apiUrl, true);
             console.log(JSON.stringify({ kind: 'origin_result', ...api }));
-            const finalHop = api.hops.at(-1);
-            if (api.result === 'http_error' && finalHop?.origin === 'api' &&
-                [403, 429].includes(finalHop.status)) {
-              console.log(JSON.stringify({ kind: 'origin_result', ...await probe('api_existing_actions_token', apiUrl, true) }));
-            }
-            console.log(JSON.stringify({ kind: 'diagnostic_completed', installationVerified: false }));
+            console.log(JSON.stringify({ kind: 'auth_diagnostic_completed', installationVerified: false }));
           })().catch(() => { console.error('diagnostic_setup_failed'); process.exitCode = 1; });
           NODE
