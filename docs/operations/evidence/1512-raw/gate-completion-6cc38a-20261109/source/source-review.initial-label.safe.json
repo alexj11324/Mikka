@@ -1,0 +1,234 @@
+{
+  "schemaVersion": 1,
+  "repository": "alexj11324/Mikka",
+  "runId": 42653081708,
+  "attempt": 1,
+  "jobId": 129285073547,
+  "jobName": "Source policies and types",
+  "metadata": {
+    "status": "completed",
+    "conclusion": "success",
+    "startedAt": "2026-11-09T16:19:01Z",
+    "completedAt": "2026-11-09T16:22:32Z",
+    "provider": "acceptance_review metadata owner"
+  },
+  "eventHead": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+  "actualCheckout": "16dcb17d4d20c32ffbc3f4d3e40b05a594d340f6",
+  "tree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+  "sourceBinding": "80fc5ed0f94ba26ed38736af8c8562d8cfaf0b77",
+  "raw": {
+    "jobId": 129285073547,
+    "runId": 42653081708,
+    "attempt": 1,
+    "bytes": 138127,
+    "sha256": "b2678e3e83a2e0a44ca04c03e51ba9cee7e0d488e095380b7bb631af5e102ae5",
+    "gitBlob": "cb4bb7f2db770381a4c3cf31dc199ae3a2db238f",
+    "readsByThisAgent": 1
+  },
+  "runtime": {
+    "node": "v24.22.2",
+    "pnpm": "10.34.3",
+    "npm": "11.19.1",
+    "install": "pnpm install --frozen-lockfile"
+  },
+  "suites": [
+    {
+      "summaryStartLine": 660,
+      "tests": 46,
+      "suites": 0,
+      "pass": 46,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 5628.695243,
+      "label": "cloud-boundary policy"
+    },
+    {
+      "summaryStartLine": 691,
+      "tests": 7,
+      "suites": 0,
+      "pass": 7,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 90.591855,
+      "label": "mobile OTA and Apple credential guards"
+    },
+    {
+      "summaryStartLine": 744,
+      "tests": 29,
+      "suites": 0,
+      "pass": 29,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 552.635042,
+      "label": "acceptance/shared-account operational guards"
+    },
+    {
+      "summaryStartLine": 850,
+      "tests": 63,
+      "suites": 0,
+      "pass": 63,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 591.704059,
+      "label": "migrations (not run-observability driver)"
+    },
+    {
+      "summaryStartLine": 1026,
+      "tests": 102,
+      "suites": 0,
+      "pass": 102,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 6843.939744,
+      "label": "API TypeScript tests"
+    },
+    {
+      "summaryStartLine": 1500,
+      "tests": 69,
+      "suites": 0,
+      "pass": 69,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 16087.110487,
+      "label": "API/build-contract Node TAP tests"
+    },
+    {
+      "summaryStartLine": 1598,
+      "tests": 45,
+      "suites": 0,
+      "pass": 45,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "duration_ms": 35027.033565,
+      "label": "frontend scripts"
+    }
+  ],
+  "totals": {
+    "tests": 361,
+    "pass": 361,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "nonTestCommands": [
+    {
+      "command": "node scripts/ci/shadow.mjs",
+      "line": 493
+    },
+    {
+      "command": "oxlint --deny-warnings",
+      "line": 770,
+      "files": 4023,
+      "warnings": 0,
+      "errors": 0
+    },
+    {
+      "command": "node scripts/check-migrations.mjs",
+      "line": 776,
+      "migrations": 261
+    },
+    {
+      "command": "node scripts/check-factory.mjs",
+      "line": 860
+    },
+    {
+      "command": "node apps/api/scripts/generate-routes.mjs --check",
+      "line": 863,
+      "routes": 243,
+      "methods": 315
+    },
+    {
+      "command": "oxlint --no-ignore --deny-warnings [runtime paths]",
+      "line": 898,
+      "files": 89,
+      "warnings": 0,
+      "errors": 0
+    },
+    {
+      "command": "tsrs --noEmit && tsrs --noEmit -p apps/api/tsconfig.json && frontend tsc",
+      "line": 1625,
+      "heapMiB": 4096
+    },
+    {
+      "command": "protocol tsgo --noEmit -p tsconfig.json",
+      "line": 1649
+    },
+    {
+      "command": "mobile tsc --noEmit -p tsconfig.json",
+      "line": 1669
+    },
+    {
+      "command": "pnpm --silent lint:ui --json",
+      "line": 1671,
+      "reported": {
+        "businessStyleFiles": 3225,
+        "interactionFiles": 532,
+        "libraryFilesExcludedFromStyleOnly": 287,
+        "errors": 0,
+        "upstreamVerification": false
+      }
+    }
+  ],
+  "cleanup": {
+    "observed": [
+      "Post job cleanup",
+      "git extraheader unset",
+      "Cleaning up orphan processes"
+    ],
+    "rawEndLines": [
+      1752,
+      1776
+    ],
+    "providerDeletionProof": false,
+    "note": "Runner cleanup markers only; no provider resources were created by this reader."
+  },
+  "artifacts": {
+    "uiPolicyAudit": {
+      "id": 13690159310,
+      "bytes": 231,
+      "uploaded": true,
+      "downloadedByThisAgent": false
+    }
+  },
+  "boundaries": [
+    "63 is the migration suite, not the acceptance driver.",
+    "No claim that an echo/selection or this source job proves Native, browser, provider or production acceptance.",
+    "Node action deprecation warnings remain in the original log."
+  ],
+  "privacy": {
+    "githubMaskingRetained": true,
+    "closedPatternHits": {
+      "private_key": 0,
+      "github_token": 0,
+      "posthog_key": 0,
+      "aws_key": 0,
+      "nonmasked_bearer": 0,
+      "signed_url": 0,
+      "email": 0
+    },
+    "knownBuildSecret": "A fixed public CI fixture appears in the workflow env; no actual credential read.",
+    "scope": "Bounded pattern scan, not exhaustive audit."
+  },
+  "activity": {
+    "originalLogFetches": 1,
+    "retries": 0,
+    "testsTriggered": 0,
+    "resources": 0,
+    "refs": 0
+  }
+}

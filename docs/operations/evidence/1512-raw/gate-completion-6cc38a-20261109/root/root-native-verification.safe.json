@@ -1,0 +1,224 @@
+{
+  "schemaVersion": 1,
+  "case": "issue1512 6cc root independent Native original verification",
+  "verifiedAt": "2026-11-09T17:06:00Z",
+  "source": {
+    "head": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+    "actualCheckout": "16dcb17d4d20c32ffbc3f4d3e40b05a594d340f6",
+    "tree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace"
+  },
+  "originalReads": "Reused immutable Git blobs from unique original reader. No second job-log fetch or artifact ZIP download.",
+  "hashChecks": [
+    {
+      "name": "lifecycle",
+      "path": "native-6cc38a/original/lifecycle.json",
+      "gitBlob": "62402049a440f8475c427102ec797bc3a6e265d8",
+      "bytes": 709144,
+      "sha256": "d00e4cb3d295f67791e8c7ab08bcdc1f97a06b46739654688e83e3413dcf5277",
+      "matched": true
+    },
+    {
+      "name": "smoke",
+      "path": "native-6cc38a/original/smoke.json",
+      "gitBlob": "540c9baeb0bc33f2e59f624342c47b3078d62e6b",
+      "bytes": 3144,
+      "sha256": "7e4017db79d24db1c68d54f2dd54407ead92e489d0db8fd45bd1b91df3dd3fb1",
+      "matched": true
+    },
+    {
+      "name": "parity",
+      "path": "native-6cc38a/original/parity.json",
+      "gitBlob": "8b7a92f20e89babd26b10386c1cf8f038fb01e3a",
+      "bytes": 117075,
+      "sha256": "50c7c148d8f1e44fdc69edea798b5c8a2f1447a31d26a7d23bcfa0ca5e5d3247",
+      "matched": true
+    },
+    {
+      "name": "crypto",
+      "path": "native-6cc38a/original/native-crypto.json",
+      "gitBlob": "6af97368c7373ee566620b318760a866cde76796",
+      "bytes": 2868,
+      "sha256": "f2fd2b032447996ef75a470dc11c0e27ee05d47e0c8ac91b6688032871e53418",
+      "matched": true
+    },
+    {
+      "name": "package",
+      "path": "native-6cc38a/original/mac-acceptance-package.json",
+      "gitBlob": "f5029585ea00aa86121ce380a6f4dc1b52c293fa",
+      "bytes": 957,
+      "sha256": "7bfb993e4c174341923f802c58ecf27f78f6d622d67c05e671a580e839c742dc",
+      "matched": true
+    },
+    {
+      "name": "vmCleanup",
+      "path": "native-6cc38a/vm-cleanup.safe.json",
+      "gitBlob": "887dfd2ecda07514176f786321df6d3b586f1347",
+      "bytes": 1534,
+      "sha256": "2e155638b30ab98b4363eeb246842412d7ec8e5505553dc237c303ddfd7ffa12",
+      "matched": true
+    },
+    {
+      "name": "arithmetic",
+      "path": "native-6cc38a/arithmetic.safe.json",
+      "gitBlob": "3c5a7cfe9ffad1b416cf5462741599f2c21ba83e",
+      "bytes": 26650,
+      "sha256": "729835fbf336a052e4db6650346da56824cc5be96b710b7615ab3b2b7017274f",
+      "matched": true
+    }
+  ],
+  "verifier": {
+    "sourceSha256": "6f449af71d045a7187970644eb21464cfb4b1eb41f2e840df3fa46d098a65971",
+    "arithmetic": {
+      "records": 24,
+      "checkpoints": 12,
+      "segments": 8,
+      "bucketCells": 2280,
+      "ordinalRows": 1293,
+      "errors": []
+    },
+    "peerEquality": [
+      {
+        "field": "arithmetic",
+        "equal": true
+      },
+      {
+        "field": "windows",
+        "equal": true
+      },
+      {
+        "field": "scope",
+        "equal": true
+      },
+      {
+        "field": "exclusions",
+        "equal": true
+      },
+      {
+        "field": "background",
+        "equal": true
+      },
+      {
+        "field": "boundary",
+        "equal": true
+      },
+      {
+        "field": "login",
+        "equal": true
+      },
+      {
+        "field": "startup",
+        "equal": true
+      },
+      {
+        "field": "cold",
+        "equal": true
+      },
+      {
+        "field": "parity",
+        "equal": true
+      },
+      {
+        "field": "crypto",
+        "equal": true
+      },
+      {
+        "field": "smoke",
+        "equal": true
+      },
+      {
+        "field": "cleanup",
+        "equal": true
+      },
+      {
+        "field": "nativeSetup",
+        "equal": true
+      },
+      {
+        "field": "limitations",
+        "equal": true
+      }
+    ]
+  },
+  "results": {
+    "fullLogin": {
+      "native": 425,
+      "web": 435,
+      "passed": true
+    },
+    "firstStartup": {
+      "pair": 1,
+      "native": 213,
+      "hosted": 220,
+      "passed": true
+    },
+    "coldMedians": {
+      "nativeMs": 2618.43,
+      "hostedMs": 2218.84,
+      "nativeSlower": true,
+      "threshold": null
+    },
+    "diagnosticsIncomplete": true,
+    "unknownFineAttributionPreserved": true,
+    "lifecycleWorkspaceRestored": false,
+    "lifecycleWorkspacePhase": "unchanged",
+    "lifecycleSealedBefore": false,
+    "lifecycleSealedAfter": true,
+    "smokeSealedBefore": true,
+    "smokeSealedAfter": true,
+    "rootViewedParityPixels": false
+  },
+  "cleanup": {
+    "schemaVersion": 1,
+    "purpose": "artifact byte recovery only; no Native execution or production request",
+    "sessionId": "sbx_W4aVD48P5J2ufpWVdkAnVZYg4oeg",
+    "name": "issue1512-native-6cc-42653081708",
+    "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+    "configuration": {
+      "image": "vercel/sandbox/universal@sha256:bbec19cffb43ad724eee446d3bd4476e2993849dc0ff0c9f33356f8365d72219",
+      "persistent": false,
+      "vcpus": 1,
+      "memoryMiB": 2048,
+      "timeoutMs": 900000,
+      "region": "iad1",
+      "architecture": "amd64",
+      "ports": [],
+      "networkPolicy": {
+        "mode": "custom",
+        "allowedDomains": [
+          "*.blob.core.windows.net",
+          "*.amazonaws.com",
+          "*.oaiusercontent.com",
+          "chatgpt.com"
+        ]
+      }
+    },
+    "createdAt": 1794242912469,
+    "startedAt": 1794242912507,
+    "requestedStopAt": 1794243150371,
+    "stoppedAt": 1794243150643,
+    "status": "stopped",
+    "durationMs": 238136,
+    "activeCpuDurationMs": 10003,
+    "networkTransfer": {
+      "ingress": 14867942,
+      "egress": 313470
+    },
+    "deleteReturnedWithoutError": true,
+    "postDeleteExactRead": {
+      "operation": "GET /v2/sandboxes/{name}",
+      "name": "issue1512-native-6cc-42653081708",
+      "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+      "resume": false,
+      "status": 404,
+      "code": "not_found"
+    },
+    "extensions": 0,
+    "resourcesRemaining": 0,
+    "cost": {
+      "billedAmount": null,
+      "currency": null,
+      "reason": "No billing invoice read; actual duration, CPU and transfer retained. No zero-cost claim."
+    }
+  },
+  "productionAcceptance": false
+}

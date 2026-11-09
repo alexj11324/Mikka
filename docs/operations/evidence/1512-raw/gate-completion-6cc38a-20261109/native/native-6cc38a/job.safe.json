@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 1,
+  "runId": 42653081708,
+  "attempt": 1,
+  "jobId": 129290330575,
+  "head": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+  "checkout": "16dcb17d4d20c32ffbc3f4d3e40b05a594d340f6",
+  "tree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+  "lifecycleOriginal": {
+    "path": "native-6cc38a/original/lifecycle.json",
+    "kind": "exact-original-JSON",
+    "mode": "100644",
+    "bytes": 709144,
+    "sha256": "d00e4cb3d295f67791e8c7ab08bcdc1f97a06b46739654688e83e3413dcf5277",
+    "gitBlob": "62402049a440f8475c427102ec797bc3a6e265d8",
+    "remoteConfirmed": true
+  },
+  "officialTerminal": {
+    "source": "acceptance_review official jobs snapshot",
+    "observedAt": "2026-11-09T16:47:55Z",
+    "id": 129290330575,
+    "runId": 42653081708,
+    "attempt": 1,
+    "head": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+    "status": "completed",
+    "conclusion": "success",
+    "startedAt": "2026-11-09T16:27:50Z",
+    "completedAt": "2026-11-09T16:46:01Z",
+    "stepsCompleted": 26,
+    "failedSteps": 0
+  },
+  "terminalSteps": [
+    {
+      "name": "Set up job",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 1
+    },
+    {
+      "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 2
+    },
+    {
+      "name": "Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 3
+    },
+    {
+      "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 4
+    },
+    {
+      "name": "Run test \"$(uname -m)\" = arm64",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 5
+    },
+    {
+      "name": "Run pnpm install --frozen-lockfile",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 6
+    },
+    {
+      "name": "Keep setup-node 24 in the native installer login shell",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 7
+    },
+    {
+      "name": "Prepare the pinned native Electron and builder checksum cache",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 8
+    },
+    {
+      "name": "Run pnpm exec playwright install chromium",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 9
+    },
+    {
+      "name": "Start an independent local PostgreSQL",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 10
+    },
+    {
+      "name": "Generate ephemeral test-only auth secret",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 11
+    },
+    {
+      "name": "Run pnpm migrate && pnpm test:e2e:setup",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 12
+    },
+    {
+      "name": "Build the production API for the native ARM64 runtime",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 13
+    },
+    {
+      "name": "Select Xcode 26",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 14
+    },
+    {
+      "name": "Package an inspector-enabled harness input",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 15
+    },
+    {
+      "name": "Real Keychain encryption across three independent packaged processes",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 16
+    },
+    {
+      "name": "Real packaged Apple Silicon native acceptance",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 17
+    },
+    {
+      "name": "Keep final package integrity evidence",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 18
+    },
+    {
+      "name": "Audit closed package and crypto reports",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 19
+    },
+    {
+      "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 20
+    },
+    {
+      "name": "Audit native evidence",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 21
+    },
+    {
+      "name": "Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 22
+    },
+    {
+      "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 42
+    },
+    {
+      "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 43
+    },
+    {
+      "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 44
+    },
+    {
+      "name": "Complete job",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 45
+    }
+  ],
+  "originalLog": {
+    "bytes": 254493,
+    "sha256": "68f6cda7bb85e00147d2162ddc5a2e4a71519c4552ec76cc57edc83b51085ed6",
+    "gitBlob": "10a96af2151c97e8274a42953d2b28be47605cc1",
+    "preservesOriginalDecodedUtf8": true,
+    "fetchCount": 1
+  },
+  "artifactIds": [
+    13691963476,
+    13691838702
+  ],
+  "otherJobOriginalsRead": 0,
+  "rerunsTriggered": 0
+}

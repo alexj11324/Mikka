@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "case": "Actual R7 failure is separate from green source CI",
+  "source": "8db16095f46be955df22f42914e0f89b6e5f3d11",
+  "tree": "18b539c3541594cfa540d1e178985f00d03ab4fc",
+  "runId": 42656120803,
+  "attempt": 1,
+  "status": "completed",
+  "conclusion": "failure",
+  "completedAt": "2026-11-09T16:47:38Z",
+  "blockedAt": "Claude fresh official-file conservation",
+  "observedPublicDifference": {
+    "baselineKind": "file",
+    "baselineSha256": "4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1",
+    "freshLinks": [
+      {
+        "path": "/etc/ssl/certs/1560546e.0",
+        "target": "e2b-ca.pem"
+      },
+      {
+        "path": "/etc/ssl/certs/e2b-ca.pem",
+        "target": "/usr/local/share/ca-certificates/e2b-ca.crt"
+      }
+    ],
+    "completeStatAndRootReceipt": null
+  },
+  "jobBoundaries": {
+    "build": 129295381232,
+    "cleanup": 129302561228,
+    "awaitWeb": "skipped",
+    "subscriptions": "skipped",
+    "publish": "skipped"
+  },
+  "publicOwnerReports": [
+    {
+      "id": 6745930838,
+      "url": "https://github.com/alexj11324/Mikka/pull/1810#issuecomment-6745930838",
+      "createdAt": "2026-11-09T16:52:06Z",
+      "body": "## 合并后实际生产 R7：FAIL，原有效运行环境保留\n\n#1810 已按普通merge进入main `8db16095f46be955df22f42914e0f89b6e5f3d11`。实际 [R7 42656120803/A1](https://github.com/alexj11324/Mikka/actions/runs/42656120803) 于16:47:38 UTC终态FAILURE，不能以PR绿CI代替生产通过。\n\n具体阻断是 **Claude fresh官方文件守恒**：两项before均为普通文件、SHA256 `4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1`；fresh `/etc/ssl/certs/1560546e.0` 成为 `e2b-ca.pem` 链接，`/etc/ssl/certs/e2b-ca.pem` 成为 `/usr/local/share/ca-certificates/e2b-ca.crt` 的绝对链接。Desktop/Codex实际到达fresh_receipt；整批并未产出完整候选报告，subscriptions/await-web/publish均SKIPPED。现有Desktop精确例外不会自动推广给Claude；单凭差异行也不能证明全部stat/权限/根证书守恒。\n\n三候选 desktop `n99qla16094awz9hi96a`、claude `fnkuicnm0se382i6oqbf`、codex `rcqb3mdtngcc3qaivrlw` 均已deleted。最终cleanup job129302561228 SUCCESS；root唯一读取并核实artifact **13693725870**：ZIP355B/SHA `539880e6608216762a9ed9b46d4b5519dac2848559d83b8c03028fe483905cfa`，receipt504B/SHA `b1c7291d6f92ffa39ba65c4c95bc5b6f3f43ad340a3d0f4b7adedb0630dbdef6`，本run三个精确名字absent、sandboxes为空、errors为空。原raw完整保留，其他owner无需重复读取。\n\n本方只读child的精确撤销入口已激活71d8445a，仍需实际回执与关闭；Web42656120344仍在upload。收尾后明确交接#1834团队live scope后端修复，不先发已知频道错误的六条消息。新自然六轮仍0，#1506仍OPEN；R7失败不凭空增加普通Coordinator六轮的E2B前置。"
+    },
+    {
+      "id": 6745940808,
+      "url": "https://github.com/alexj11324/Mikka/pull/1805#issuecomment-6745940808",
+      "createdAt": "2026-11-09T16:52:30Z",
+      "body": "#1810 已普通合并并跑完本轮唯一正式 R7；实际结果见 [#1810/6745930838](https://github.com/alexj11324/Mikka/pull/1810#issuecomment-6745930838)。本次 **42656120803/A1 FAIL 在 Claude fresh 两条CA file→symlink**，Desktop/Codex到fresh_receipt，subs/publish均SKIP。三候选均deleted，最终artifact13693725870原字节已由本方root唯一核实：三个精确名字absent、sandboxes/errors均空。\n\n这组Claude绝对链接目标不在已有Desktop精确例外内。本方不会由两条差异直接推广豁免；现先对照已有完整控制，只有缺少的Claude原始before/fresh stat/root/target证据才值得一个有期限、精确清理的控制。请把这个实际新失败纳入你共享runtime修复后续，勿重复抓本run raw/artifact或同版本重跑R7。我可转交所需完整解析；当前没有给后续控制预约source或Smoke窗口。\n\n本方优先完成已激活的child撤销、#1834部署接续及原Coordinator六轮；这个E2B发布失败不额外阻塞本来不使用E2B的六轮。#1506新六轮0，#1810的Web仍在上传，实际窗口/释放以#1752更新为准。"
+    }
+  ],
+  "originals": {
+    "reader": "original #1810 release owner",
+    "rootRedownloads": 0,
+    "fullTransferPending": true
+  },
+  "acceptance": {
+    "productionCasesAccepted": 0,
+    "sourceCIIsNotRuntimeOrProductionAcceptance": true
+  },
+  "notes": [
+    "Current R7 failure is Claude relink, not an assumed repeat of the historical Codex mode failure.",
+    "Desktop evidence is not silently generalized to Claude.",
+    "No unchanged R7 retry or relaxed policy was performed by this checkpoint."
+  ]
+}

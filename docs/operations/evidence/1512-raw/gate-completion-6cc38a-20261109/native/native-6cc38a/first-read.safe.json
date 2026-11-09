@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "runId": 42653081708,
+  "attempt": 1,
+  "jobId": 129290330575,
+  "head": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+  "checkout": "16dcb17d4d20c32ffbc3f4d3e40b05a594d340f6",
+  "tree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+  "lifecycleOriginal": {
+    "path": "native-6cc38a/original/lifecycle.json",
+    "kind": "exact-original-JSON",
+    "mode": "100644",
+    "bytes": 709144,
+    "sha256": "d00e4cb3d295f67791e8c7ab08bcdc1f97a06b46739654688e83e3413dcf5277",
+    "gitBlob": "62402049a440f8475c427102ec797bc3a6e265d8",
+    "remoteConfirmed": true
+  },
+  "initialRecoverySummary": {
+    "revision": "16dcb17d4d20c32ffbc3f4d3e40b05a594d340f6",
+    "result": "passed",
+    "windows": {
+      "webLogin": {
+        "queries": 435,
+        "pair": null,
+        "segments": [
+          19,
+          0,
+          416
+        ]
+      },
+      "nativeLogin": {
+        "queries": 425,
+        "pair": null,
+        "segments": [
+          19,
+          15,
+          391
+        ]
+      },
+      "startup-bundled": {
+        "queries": 213,
+        "pair": 1,
+        "segments": [
+          213
+        ]
+      },
+      "startup-hosted": {
+        "queries": 220,
+        "pair": 1,
+        "segments": [
+          220
+        ]
+      }
+    },
+    "missingSelectedOriginals": [],
+    "bundle": {
+      "path": "/vercel/sandbox/native-6cc/originals.bundle.json.gz",
+      "gzipBytes": 139022,
+      "gzipSha256": "80fd0aa2dbbca09907cb4584dbf50e7074123396822eb02df1a41540186f3018",
+      "jsonBytes": 1193479,
+      "jsonSha256": "959035d8b57a0646ede9842334b9c2175cd45d005cfa1cddb3dbd7af59154f47",
+      "chunkBytes": 1455,
+      "chunks": 96
+    },
+    "archives": [
+      {
+        "id": 13691963476,
+        "bytes": 14609848,
+        "sha256": "80ac3291bd4fb7d3fb114ee3ed6135a909841befc92c09677bb32f39c204686b",
+        "fileCount": 308
+      },
+      {
+        "id": 13691838702,
+        "bytes": 1595,
+        "sha256": "3600d610be8fd6588e5b081a199d9ce35cb387139f4b5fe95a63d3ab5447c21e",
+        "fileCount": 2
+      }
+    ]
+  },
+  "laterFullVerification": {
+    "errors": [],
+    "arithmetic": {
+      "records": 24,
+      "checkpoints": 12,
+      "segments": 8,
+      "bucketCells": 2280,
+      "ordinalRows": 1293,
+      "errors": []
+    },
+    "budgetResult": "passed",
+    "allRawWindowsRetained": true
+  },
+  "initialNumbersWereProvisionalUntilOriginalsAndVerifierCompleted": true
+}

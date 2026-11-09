@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "runId": 42653081708,
+  "attempt": 1,
+  "jobId": 129290330575,
+  "head": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+  "checkout": "16dcb17d4d20c32ffbc3f4d3e40b05a594d340f6",
+  "tree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+  "lifecycleOriginal": {
+    "path": "native-6cc38a/original/lifecycle.json",
+    "kind": "exact-original-JSON",
+    "mode": "100644",
+    "bytes": 709144,
+    "sha256": "d00e4cb3d295f67791e8c7ab08bcdc1f97a06b46739654688e83e3413dcf5277",
+    "gitBlob": "62402049a440f8475c427102ec797bc3a6e265d8",
+    "remoteConfirmed": true
+  },
+  "execution": "pure V8, no new test/CI/model/native execution",
+  "originalHashVerification": "Python raw bytes SHA256/Git blob ID, then independently reassembled V8 original bytes SHA256/Git blob ID",
+  "utilitySource": {
+    "bytes": 13782,
+    "sha256": "d2e81a0ff31f9c8c19c4efe0e0d0fb16ef0196124fe8eb2221994f64690b35ae",
+    "blob": "5cc66fff9c158dcdd23c5dacf4e84f0ef6f89128"
+  },
+  "verifierFunction": "utility:verifyNativeOriginals",
+  "result": {
+    "records": 24,
+    "checkpoints": 12,
+    "segments": 8,
+    "bucketCells": 2280,
+    "ordinalRows": 1293,
+    "errors": []
+  },
+  "firstPairRule": {
+    "samples": "first pair only from the unchanged five-pair lifecycle sequence",
+    "clients": "bundled Electron and the preserved hosted Web renderer in the same compiled Electron shell",
+    "sessionCache": "same retained authenticated app profile/workspace; normal profile and OS caches, no purge",
+    "backend": "same primary API and fixed source; server is already warm",
+    "performanceThreshold": "none"
+  },
+  "diagnosticUnknownsPreserved": true,
+  "rootIndependentRecalculation": "Parent will independently read the same lifecycle Git blob; not claimed by this receipt"
+}

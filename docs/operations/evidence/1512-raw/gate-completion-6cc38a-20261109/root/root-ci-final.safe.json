@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512.root_ci_metadata_verification",
+  "checkedAt": "2026-11-09 16:54:47 UTC",
+  "head": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+  "runId": 42653081708,
+  "attempt": 1,
+  "actualCheckout": "16dcb17d4d20c32ffbc3f4d3e40b05a594d340f6",
+  "tree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+  "workflows": 15,
+  "allWorkflowsSuccessful": true,
+  "uniqueActionJobs": 50,
+  "actionSuccess": 40,
+  "actionConditionalSkip": 10,
+  "checks": 51,
+  "checkSuccess": 41,
+  "checkSkip": 10,
+  "externalCheck": {
+    "id": 129284451640,
+    "name": "GitGuardian Security Checks",
+    "conclusion": "success"
+  },
+  "jobCheckSuiteAndTimingMismatches": 0,
+  "allSourceBound": true,
+  "allAttempt1": true,
+  "skipStepsAllZero": true,
+  "skipTimestampAnomalies": [
+    {
+      "id": 129285161493,
+      "startedAt": "2026-11-09T16:17:55Z",
+      "completedAt": "2026-11-09T16:17:54Z"
+    }
+  ],
+  "metadataIndex": {
+    "gitBlob": "1cb43378c6814abe0c2cc6975dc1d2edfe3368a4",
+    "bytes": 4735,
+    "sha256": "ba72fea9d1f49850b6c63639ea6af2b4c3e3ce42e5677e245992dd706b61816d"
+  },
+  "currentSyntheticHasSameTree": true,
+  "currentSyntheticExecuted": false,
+  "nativeOriginalArithmetic": "separate proof pending",
+  "productionCases": 0,
+  "runtimeR7": "42656120803 build failed; no subscriptions or publish"
+}

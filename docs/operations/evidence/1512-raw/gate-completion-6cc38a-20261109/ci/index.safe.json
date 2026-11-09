@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512.ci_6cc_final_metadata_index",
+  "repository": "alexj11324/Mikka",
+  "head": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+  "tree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+  "actualCheckout": "16dcb17d4d20c32ffbc3f4d3e40b05a594d340f6",
+  "actualParents": [
+    "e189d7652fd2fce48b77a3697abf5bb177d8ebd1",
+    "6cc38aca620d16b25eebe0c8787747885a2cceb1"
+  ],
+  "observedFinalAt": "2026-11-09 16:47:55 UTC",
+  "frozenAt": "2026-11-09 16:51:51 UTC",
+  "status": "all_current_head_ci_terminal_success_with_recorded_skips",
+  "results": {
+    "workflows": {
+      "total": 15,
+      "success": 15,
+      "failure": 0,
+      "pending": 0,
+      "allAttempt1": true
+    },
+    "actionsJobs": {
+      "total": 50,
+      "success": 40,
+      "skipped": 10,
+      "failure": 0,
+      "pending": 0
+    },
+    "checks": {
+      "total": 51,
+      "success": 41,
+      "skipped": 10,
+      "failure": 0,
+      "pending": 0,
+      "actions": 50,
+      "external": 1
+    },
+    "commitStatuses": 0,
+    "mainCi": {
+      "runId": 42653081708,
+      "attempt": 1,
+      "jobTotal": 22,
+      "success": 21,
+      "skipped": 1
+    },
+    "native": {
+      "jobId": 129290330575,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T16:27:50Z",
+      "completedAt": "2026-11-09T16:46:01Z",
+      "budget": null,
+      "originals": null
+    },
+    "strict": {
+      "jobId": 129301824329,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T16:46:03Z",
+      "completedAt": "2026-11-09T16:46:13Z"
+    }
+  },
+  "coverage": {
+    "completePagination": true,
+    "runPages": 1,
+    "jobPages": 15,
+    "checkPages": 1,
+    "filter": "all",
+    "noMixedHeadOrSuite": true,
+    "noMissingActionCheck": true,
+    "noFieldMismatch": true,
+    "oldResultsCounted": false,
+    "skipCount": 10
+  },
+  "sourceEvidence": {
+    "changesBindingBlob": "80fc5ed0f94ba26ed38736af8c8562d8cfaf0b77",
+    "reader": "/root/current_source_review",
+    "actualCheckoutNotHint": true,
+    "currentSyntheticEquivalenceProof": "812f776635aeb3436834a42712b74ef97eedbe7c",
+    "unexecutedCurrentHint": "0bb80be7d79ca559d073b5d944cba1a02c03070c",
+    "sameProductTree": true
+  },
+  "historicalBoundary": {
+    "old932CompletionIndex": "0ac2c44f7728953591bbdf7aadb0a14df80bff75",
+    "old932Attempt1IntegrationAndStrictFailuresNotErased": true,
+    "old8cResultsNotReused": true,
+    "current6ccRerunRequests": 0,
+    "current6ccNativeExecutions": "one observed attempt1 job; its actual run details belong to the unique Native reader"
+  },
+  "originalReadLedger": {
+    "rawJobLogs": 0,
+    "zipDownloads": 0,
+    "artifacts": 0,
+    "otherOwnerRawEvidence": 0,
+    "onlySafeSourceBindingReceiptRead": true,
+    "sourceOriginalOwner": "/root/current_source_review",
+    "integrationStrictOriginalOwner": "/root",
+    "nativeOriginalOwner": "/root/native_6180_review"
+  },
+  "acceptanceBoundary": {
+    "nativeBudgetUnknownHere": true,
+    "nativeCleanupUnknownHere": true,
+    "productionAcceptance": null,
+    "runtimeR7Readiness": null,
+    "reason": "CI metadata is fully green; it does not prove production/ACME/PostHog/Replay/Logs or the separately observed R7 runtime release. Native original evidence is deliberately not duplicated."
+  },
+  "payloadCount": 3,
+  "payloadBytes": 255669,
+  "payloads": [
+    {
+      "path": "workflows-jobs-final.json",
+      "blob": "5ad0a911a1c0afa39833b9ee350cf609a9afb38e",
+      "bytes": 213642,
+      "sha256": "c8fc296129b89a3ff65ba59e33bf7cb0a0065748df4394cb50d4da7cfbfef7a7",
+      "readbackExact": true
+    },
+    {
+      "path": "checks-final.json",
+      "blob": "b18f775e5d1ff9600661680ba1e51302fa9ca987",
+      "bytes": 28726,
+      "sha256": "853504bab71ad6fc1a613bd30375bad21c61e27261d18adfb0c5c4087f2dc5e6",
+      "readbackExact": true
+    },
+    {
+      "path": "coverage-source-final.json",
+      "blob": "51dcaf17594041726b76e76ac8e78a9e2004a00e",
+      "bytes": 13301,
+      "sha256": "5b7ae1fdbeae7551e75cfb129259dff92ca86b62f047bba53ad1ef21b1708d93",
+      "readbackExact": true
+    }
+  ],
+  "privacy": {
+    "projection": "Run/job/check IDs, public source URLs, names, steps, statuses/times and source bindings only; no output logs, secrets, account data or signed URLs.",
+    "patternCounts": {
+      "email": 0,
+      "githubToken": 0,
+      "privateKey": 0,
+      "authorizationValue": 0,
+      "signedDownloadUrl": 0
+    },
+    "originalSourceValuesPreserved": true
+  },
+  "activity": {
+    "modelCalls": 0,
+    "productionCalls": 0,
+    "resourcesCreated": 0,
+    "reruns": 0,
+    "cancellations": 0,
+    "sourceChanges": 0,
+    "refUpdates": 0,
+    "unreferencedEvidenceBlobsOnly": true
+  }
+}

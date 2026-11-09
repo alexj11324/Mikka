@@ -1,0 +1,426 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512.ci_6cc_terminal_coverage",
+  "repository": "alexj11324/Mikka",
+  "head": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+  "tree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+  "status": "ci_terminal_success_with_conditional_skips",
+  "observedAt": "2026-11-09 16:50:31 UTC",
+  "coverage": {
+    "runs": 15,
+    "jobs": 50,
+    "uniqueJobIds": 50,
+    "checks": 51,
+    "uniqueCheckIds": 51,
+    "actionChecks": 50,
+    "externalChecks": [
+      {
+        "id": 129284451640,
+        "name": "GitGuardian Security Checks",
+        "suite": 115523410063,
+        "status": "completed",
+        "conclusion": "success",
+        "head": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+        "url": "https://dashboard.gitguardian.com"
+      }
+    ],
+    "fieldMismatches": [],
+    "unexpectedHeads": [],
+    "missingChecks": [],
+    "runAttempts": [
+      1
+    ],
+    "jobAttempts": [
+      1
+    ],
+    "jobStates": {
+      "success": 40,
+      "skipped": 10
+    },
+    "checkStates": {
+      "success": 41,
+      "skipped": 10
+    },
+    "skips": [
+      {
+        "id": 129284492595,
+        "name": "validate",
+        "runId": 42653081532,
+        "head": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+        "runAttempt": 1,
+        "startedAt": "2026-11-09T16:16:48Z",
+        "completedAt": "2026-11-09T16:16:48Z",
+        "steps": 0
+      },
+      {
+        "id": 129284492759,
+        "name": "check",
+        "runId": 42653081532,
+        "head": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+        "runAttempt": 1,
+        "startedAt": "2026-11-09T16:16:48Z",
+        "completedAt": "2026-11-09T16:16:48Z",
+        "steps": 0
+      },
+      {
+        "id": 129284493579,
+        "name": "await-web",
+        "runId": 42653081532,
+        "head": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+        "runAttempt": 1,
+        "startedAt": "2026-11-09T16:16:48Z",
+        "completedAt": "2026-11-09T16:16:48Z",
+        "steps": 0
+      },
+      {
+        "id": 129284494806,
+        "name": "subscriptions",
+        "runId": 42653081532,
+        "head": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+        "runAttempt": 1,
+        "startedAt": "2026-11-09T16:16:48Z",
+        "completedAt": "2026-11-09T16:16:48Z",
+        "steps": 0
+      },
+      {
+        "id": 129284495586,
+        "name": "publish",
+        "runId": 42653081532,
+        "head": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+        "runAttempt": 1,
+        "startedAt": "2026-11-09T16:16:48Z",
+        "completedAt": "2026-11-09T16:16:48Z",
+        "steps": 0
+      },
+      {
+        "id": 129284497543,
+        "name": "cleanup",
+        "runId": 42653081532,
+        "head": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+        "runAttempt": 1,
+        "startedAt": "2026-11-09T16:16:48Z",
+        "completedAt": "2026-11-09T16:16:48Z",
+        "steps": 0
+      },
+      {
+        "id": 129284930735,
+        "name": "Read cache production reads",
+        "runId": 42653081530,
+        "head": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+        "runAttempt": 1,
+        "startedAt": "2026-11-09T16:17:31Z",
+        "completedAt": "2026-11-09T16:17:31Z",
+        "steps": 0
+      },
+      {
+        "id": 129284931025,
+        "name": "Issue 1415 production reads and managed reminder",
+        "runId": 42653081530,
+        "head": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+        "runAttempt": 1,
+        "startedAt": "2026-11-09T16:17:31Z",
+        "completedAt": "2026-11-09T16:17:31Z",
+        "steps": 0
+      },
+      {
+        "id": 129285161493,
+        "name": "Core production API and gateway acceptance",
+        "runId": 42653081605,
+        "head": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+        "runAttempt": 1,
+        "startedAt": "2026-11-09T16:17:55Z",
+        "completedAt": "2026-11-09T16:17:54Z",
+        "steps": 0
+      },
+      {
+        "id": 129285075838,
+        "name": "Cloud credential access (OIDC)",
+        "runId": 42653081708,
+        "head": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+        "runAttempt": 1,
+        "startedAt": "2026-11-09T16:17:46Z",
+        "completedAt": "2026-11-09T16:17:46Z",
+        "steps": 0
+      }
+    ]
+  },
+  "source": {
+    "receiptBlob": "80fc5ed0f94ba26ed38736af8c8562d8cfaf0b77",
+    "receiptBytes": 3946,
+    "receiptSha256": "8125d2bcb4f59b13fb3dd221384f2fcb45e10be1fff3bcfb47e49da84ce42a1c",
+    "actualCheckout": "16dcb17d4d20c32ffbc3f4d3e40b05a594d340f6",
+    "tree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+    "orderedParents": [
+      "e189d7652fd2fce48b77a3697abf5bb177d8ebd1",
+      "6cc38aca620d16b25eebe0c8787747885a2cceb1"
+    ],
+    "reader": "/root/current_source_review",
+    "originalChangesLogReadByThisReader": false,
+    "selectionCounts": {
+      "unitTasks": 86,
+      "core": 57,
+      "integration": 29,
+      "dbSuites": 72
+    },
+    "flags": {
+      "full": true,
+      "docs_only": false,
+      "source": true,
+      "daemon": true,
+      "mobile": true,
+      "desktop": true,
+      "image": true,
+      "analytics": true
+    }
+  },
+  "prSnapshot": {
+    "observedAt": "2026-11-09 16:49:19 UTC",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/pulls/1799",
+    "head": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+    "baseSnapshot": "76537e4c2996f717cbd19589e1efae328028aa4a",
+    "state": "open",
+    "merged": false,
+    "mergeable": true,
+    "mergeCommitHint": "0bb80be7d79ca559d073b5d944cba1a02c03070c"
+  },
+  "sourceHintBoundary": "The current PR merge_commit_sha hint may move as base changes. The actual execution remains bound to16dcb17d4d20c32ffbc3f4d3e40b05a594d340f6/tree9628e365 by the unique Changes-log reader. No current hint substitutes for that executed source.",
+  "attemptBoundary": {
+    "allWorkflowAttempts": [
+      1
+    ],
+    "allJobAttempts": [
+      1
+    ],
+    "rerunRequestsByThisReader": 0,
+    "carryForwardFromOtherHeads": false,
+    "oldHeadsNotCounted": [
+      "932bd1549942bc2a8d040c7281a37fbe851c8eb0",
+      "8c423db291f8121980267cd48a24e428c992f618"
+    ],
+    "old932CompletionIndex": "0ac2c44f7728953591bbdf7aadb0a14df80bff75",
+    "old932HistoricalFailuresPreservedElsewhere": true
+  },
+  "mainCi": {
+    "runId": 42653081708,
+    "runAttempt": 1,
+    "jobTotal": 22,
+    "success": 21,
+    "skipped": 1,
+    "integrationJob": 129285073630,
+    "strictJob": 129301824329,
+    "nativeJob": 129290330575
+  },
+  "skippedBoundary": "All10 skipped jobs have0 steps. They remain skipped, not successful production execution. The cloud-core skipped job129285161493 has API started16:17:55/completed16:17:54 and is preserved without correcting or inferring execution.",
+  "originalReaderOwnership": {
+    "ChangesSourceCore": "/root/current_source_review",
+    "IntegrationAndStrict": "/root",
+    "NativeLogsAndArtifacts": "/root/native_6180_review",
+    "thisReader": "metadata only; no job original log or artifact read"
+  },
+  "nativeBoundary": {
+    "jobTerminalSuccess": true,
+    "actualBudgetResult": null,
+    "artifactValidation": null,
+    "resourceCleanup": null,
+    "explanation": "Native raw-budget, all-checkpoint and cleanup evidence are independently owned; job success does not populate these unknowns."
+  },
+  "productionBoundary": {
+    "issue1512Acceptance": null,
+    "runtimeR7Ready": null,
+    "explanation": "This PR CI snapshot does not prove a production release, ACME model run, PostHog/Replay/Logs result or runtime readiness. Root reported a separate R7 build failure; no R7 original was read or reclassified here."
+  },
+  "metadataPollTimeline": [
+    {
+      "observedAt": "2026-11-09 16:25:31 UTC",
+      "total": 19,
+      "deltas": [
+        {
+          "id": 129285073496,
+          "name": "Database checks (3/4)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-09T16:19:05Z",
+          "completed_at": "2026-11-09T16:25:04Z",
+          "failedSteps": []
+        },
+        {
+          "id": 129285073630,
+          "name": "Integration unit checks",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-09T16:20:06Z",
+          "completed_at": "2026-11-09T16:25:24Z",
+          "failedSteps": []
+        },
+        {
+          "id": 129289407843,
+          "name": "Production build and browser interactions",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-11-09T16:25:04Z",
+          "completed_at": null,
+          "failedSteps": []
+        }
+      ]
+    },
+    {
+      "observedAt": "2026-11-09 16:26:53 UTC",
+      "total": 21,
+      "deltas": [
+        {
+          "id": 129285073849,
+          "name": "Core unit checks",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-09T16:20:10Z",
+          "completed_at": "2026-11-09T16:26:35Z",
+          "failedSteps": []
+        },
+        {
+          "id": 129285832250,
+          "name": "desktop-checks / smoke",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-09T16:20:18Z",
+          "completed_at": "2026-11-09T16:26:35Z",
+          "failedSteps": []
+        },
+        {
+          "id": 129287003229,
+          "name": "analytics-checks / Analytics SSR (full)",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-09T16:21:08Z",
+          "completed_at": "2026-11-09T16:26:09Z",
+          "failedSteps": []
+        },
+        {
+          "id": 129289407843,
+          "name": "Production build and browser interactions",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-09T16:25:48Z",
+          "completed_at": "2026-11-09T16:25:57Z",
+          "failedSteps": []
+        },
+        {
+          "id": 129290071916,
+          "name": "analytics-checks / analytics-ssr",
+          "status": "completed",
+          "conclusion": "success",
+          "started_at": "2026-11-09T16:26:11Z",
+          "completed_at": "2026-11-09T16:26:14Z",
+          "failedSteps": []
+        },
+        {
+          "id": 129290330575,
+          "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "queued",
+          "conclusion": null,
+          "started_at": "2026-11-09T16:26:35Z",
+          "completed_at": null,
+          "failedSteps": []
+        }
+      ]
+    },
+    {
+      "observedAt": "2026-11-09 16:28:44 UTC",
+      "total": 21,
+      "deltas": [
+        {
+          "id": 129290330575,
+          "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+          "status": "in_progress",
+          "conclusion": null,
+          "startedAt": "2026-11-09T16:27:50Z",
+          "completedAt": null
+        }
+      ]
+    },
+    {
+      "observedAt": "2026-11-09 16:30:26 UTC",
+      "total": 21,
+      "deltas": []
+    },
+    {
+      "observedAt": "2026-11-09 16:31:55 UTC",
+      "total": 21,
+      "deltas": []
+    },
+    {
+      "observedAt": "2026-11-09 16:33:40 UTC",
+      "total": 21,
+      "deltas": []
+    },
+    {
+      "observedAt": "2026-11-09 16:35:22 UTC",
+      "total": 21,
+      "deltas": []
+    },
+    {
+      "observedAt": "2026-11-09 16:36:43 UTC",
+      "total": 21,
+      "deltas": []
+    },
+    {
+      "observedAt": "2026-11-09 16:38:24 UTC",
+      "total": 21,
+      "deltas": [
+        {
+          "id": 129285967375,
+          "name": "image-checks / image",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T16:19:26Z",
+          "completedAt": "2026-11-09T16:38:03Z",
+          "failedSteps": []
+        }
+      ]
+    }
+  ],
+  "transportBoundary": {
+    "unavailableStandaloneJobMetadataRoute": true,
+    "fallback": "existing run jobs endpoint",
+    "productFailureInferred": false
+  },
+  "activity": {
+    "rawJobLogReads": 0,
+    "artifactDownloads": 0,
+    "modelCalls": 0,
+    "productionCalls": 0,
+    "resourcesCreated": 0,
+    "reruns": 0,
+    "cancellations": 0,
+    "refUpdates": 0
+  },
+  "currentBaseEquivalentSourceProof": {
+    "reader": "/root",
+    "receiptBlob": "812f776635aeb3436834a42712b74ef97eedbe7c",
+    "receiptBytes": 1116,
+    "receiptSha256": "f83b174c64932e85971d99bdd858ca256be5b708ac6a1fe2c28b5db62e5cc553",
+    "actualMain": {
+      "commit": "8db16095f46be955df22f42914e0f89b6e5f3d11",
+      "tree": "18b539c3541594cfa540d1e178985f00d03ab4fc",
+      "parents": [
+        "e189d7652fd2fce48b77a3697abf5bb177d8ebd1",
+        "8c423db291f8121980267cd48a24e428c992f618"
+      ],
+      "mergedAt": "2026-11-09T16:34:17Z"
+    },
+    "currentSyntheticHint": {
+      "commit": "0bb80be7d79ca559d073b5d944cba1a02c03070c",
+      "parents": [
+        "8db16095f46be955df22f42914e0f89b6e5f3d11",
+        "6cc38aca620d16b25eebe0c8787747885a2cceb1"
+      ],
+      "tree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+      "executed": false
+    },
+    "boundary": "Root independently read Git metadata16:37:13. The new hint has the same exact product tree but was not run; no new push or rerun is claimed. Current actual CI remains16dcb."
+  },
+  "uniqueOriginalReceiptReferences": {
+    "strictRawBlob": "9b9af31b886bc543cea9f08a5c08674d618e614f",
+    "reader": "/root",
+    "thisReaderDownloaded": false
+  }
+}

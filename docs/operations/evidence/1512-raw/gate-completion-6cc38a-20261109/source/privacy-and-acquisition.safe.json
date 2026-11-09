@@ -1,0 +1,171 @@
+{
+  "schemaVersion": 1,
+  "repository": "alexj11324/Mikka",
+  "runId": 42653081708,
+  "attempt": 1,
+  "eventHead": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+  "actualCheckout": "16dcb17d4d20c32ffbc3f4d3e40b05a594d340f6",
+  "tree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+  "owner": "/root/current_source_review",
+  "jobs": [
+    {
+      "kind": "changes",
+      "jobId": 129284298722,
+      "originalCallsByThisAgent": 1,
+      "retries": 0,
+      "raw": {
+        "jobId": 129284298722,
+        "runId": 42653081708,
+        "attempt": 1,
+        "bytes": 974368,
+        "sha256": "60d89ab351f490c263bcb544b18f8201529c2f6870313486751c6d8097762173",
+        "gitBlob": "5f32f4c15b255f148d970cfa9f63fedc4d28dfd2",
+        "readsByThisAgent": 1,
+        "source": "public GitHub decoded workflow-job log"
+      },
+      "terminalBeforeFetch": true
+    },
+    {
+      "kind": "source",
+      "jobId": 129285073547,
+      "originalCallsByThisAgent": 1,
+      "retries": 0,
+      "raw": {
+        "jobId": 129285073547,
+        "runId": 42653081708,
+        "attempt": 1,
+        "bytes": 138127,
+        "sha256": "b2678e3e83a2e0a44ca04c03e51ba9cee7e0d488e095380b7bb631af5e102ae5",
+        "gitBlob": "cb4bb7f2db770381a4c3cf31dc199ae3a2db238f",
+        "readsByThisAgent": 1
+      },
+      "terminalBeforeFetch": true
+    },
+    {
+      "kind": "core",
+      "jobId": 129285073849,
+      "originalCallsByThisAgent": 1,
+      "retries": 0,
+      "raw": {
+        "jobId": 129285073849,
+        "runId": 42653081708,
+        "attempt": 1,
+        "bytes": 1021274,
+        "sha256": "8ba1341bc51ed045df77736ff1cf4fb43aae1f96ce22432fec9958363a9e2171",
+        "gitBlob": "307a913d9431d297b77677765e73af0111da1757",
+        "readsByThisAgent": 1
+      },
+      "terminalBeforeFetch": true
+    }
+  ],
+  "method": "GitHub connector returns decoded original log text; UTF-8 bytes (including existing newline/BOM/ANSI where present) were hashed and stored without editing. Parsing strips formatting into separate in-memory views.",
+  "privacy": {
+    "masking": "GitHub masking retained exactly as served; no additional raw-log mutation.",
+    "scans": {
+      "changes": {
+        "private_key": 0,
+        "github_token": 0,
+        "posthog_key": 0,
+        "aws_key": 0,
+        "nonmasked_bearer": 0,
+        "signed_url": 0,
+        "email": 8
+      },
+      "source": {
+        "private_key": 0,
+        "github_token": 0,
+        "posthog_key": 0,
+        "aws_key": 0,
+        "nonmasked_bearer": 0,
+        "signed_url": 0,
+        "email": 0
+      },
+      "core": {
+        "private_key": 0,
+        "github_token": 0,
+        "posthog_key": 0,
+        "aws_key": 0,
+        "nonmasked_bearer": 0,
+        "signed_url": 0,
+        "email": 0
+      }
+    },
+    "resolvedChangesEmailCandidates": [
+      {
+        "offset": 560027,
+        "path": "patches/ffmpeg-static@5.3.0.patch",
+        "pathGitBlob": "5e27d8d12fbed2d0c2e62083976de11c86d9e1fa",
+        "classification": "repository_path_version_separator_false_positive"
+      },
+      {
+        "offset": 615176,
+        "path": "apps/mobile/assets/tabs/bot-fill@2x.png",
+        "pathGitBlob": "5bf29550a76df67e166abcd01631d3cbe63ccad0",
+        "classification": "repository_path_version_separator_false_positive"
+      },
+      {
+        "offset": 615259,
+        "path": "apps/mobile/assets/tabs/bot-fill@3x.png",
+        "pathGitBlob": "fa0887b50bd1714180ad8dab7b363900bd11a214",
+        "classification": "repository_path_version_separator_false_positive"
+      },
+      {
+        "offset": 615417,
+        "path": "apps/mobile/assets/tabs/bot@2x.png",
+        "pathGitBlob": "01bac289a7b4354597edbe347c211a1acaf979de",
+        "classification": "repository_path_version_separator_false_positive"
+      },
+      {
+        "offset": 615495,
+        "path": "apps/mobile/assets/tabs/bot@3x.png",
+        "pathGitBlob": "db945a843d8cbbac766b7b5f62d913838f7b507f",
+        "classification": "repository_path_version_separator_false_positive"
+      },
+      {
+        "offset": 726968,
+        "path": "docs/design/devices-copy/devices-dark@2x.png",
+        "pathGitBlob": "a66e54fb200304e015141ea8974f237b0e09b520",
+        "classification": "repository_path_version_separator_false_positive"
+      },
+      {
+        "offset": 727056,
+        "path": "docs/design/devices-copy/devices-light@2x.png",
+        "pathGitBlob": "2dea97e3cdc3255288ea6abd33b283757ac64ed9",
+        "classification": "repository_path_version_separator_false_positive"
+      },
+      {
+        "offset": 911017,
+        "path": "patches/@novnc__novnc@1.6.0.patch",
+        "pathGitBlob": "7eda74881659d35007d87eb3fc8f1f308ee02589",
+        "classification": "repository_path_version_separator_false_positive"
+      }
+    ],
+    "unresolved": [],
+    "bounds": "Closed pattern checks plus identified false-positive review, not exhaustive content/security audit; fixed public CI build-secret fixture is not a production credential."
+  },
+  "corrections": [
+    {
+      "original": "6030eeeaec202e7461237b5b69b2400eec0122de",
+      "corrected": "145ee7896376bb6917182293bd595d9b23cfc030",
+      "reason": "Derived jobName corrected from descriptive label to exact raw Complete job name: Source checks. Raw source and all test results unchanged."
+    }
+  ],
+  "resources": {
+    "readerCreatedVMs": 0,
+    "readerCreatedDatabases": 0,
+    "readerModelCalls": 0,
+    "readerProductionAccountCalls": 0,
+    "readerStartedTests": 0,
+    "readerWorkflowActions": 0,
+    "readerRefChanges": 0,
+    "runnerCleanupBoundary": "Raw logs show normal post-job git/header/orphan-process cleanup. No provider deletion is inferred from those markers."
+  },
+  "notRead": [
+    "Integration logs",
+    "database shard logs",
+    "Native logs or ZIPs",
+    "companion workflow logs",
+    "old 932 or 486 workflow originals"
+  ],
+  "scope": "Only these three new job logs plus source-only Git API data. Other gates are owned and reported separately."
+}

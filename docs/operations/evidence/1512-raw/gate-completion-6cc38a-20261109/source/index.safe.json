@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512.ci_source_core_bundle",
+  "repository": "alexj11324/Mikka",
+  "prefix": "ci-6cc38aca",
+  "runId": 42653081708,
+  "attempt": 1,
+  "eventHead": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+  "actualCheckout": "16dcb17d4d20c32ffbc3f4d3e40b05a594d340f6",
+  "tree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+  "orderedParents": [
+    "e189d7652fd2fce48b77a3697abf5bb177d8ebd1",
+    "6cc38aca620d16b25eebe0c8787747885a2cceb1"
+  ],
+  "summary": {
+    "changes": {
+      "job": 129284298722,
+      "conclusion": "success",
+      "full": true,
+      "coreTargets": 57,
+      "integrationTargets": 29,
+      "dbSuites": 72
+    },
+    "source": {
+      "job": 129285073547,
+      "conclusion": "success",
+      "tests": 361,
+      "passed": 361,
+      "failed": 0,
+      "skipped": 0,
+      "migrationsSubset": 63,
+      "driverSubsetClaim": false
+    },
+    "core": {
+      "job": 129285073849,
+      "conclusion": "success",
+      "selectedAndExecutedTargets": 57,
+      "missingTargets": 0,
+      "unexpectedTargets": 0,
+      "duplicateTargets": 0,
+      "nxCacheReused": false,
+      "driverCasesExactlyOncePass": 74,
+      "driverOriginalCases": 63,
+      "driverAddedCases": 11,
+      "mixedReporterAggregate": null
+    }
+  },
+  "files": [
+    {
+      "path": "changes.original.log",
+      "bytes": 974368,
+      "sha256": "60d89ab351f490c263bcb544b18f8201529c2f6870313486751c6d8097762173",
+      "gitBlob": "5f32f4c15b255f148d970cfa9f63fedc4d28dfd2"
+    },
+    {
+      "path": "selection.original.json",
+      "bytes": 390127,
+      "sha256": "180ccdb5306f07705b99774d553a482302d90849cc253fe99b163972814e654d",
+      "gitBlob": "74d46f10fbb6ef907f76e1d0f695a02b8218ea6a"
+    },
+    {
+      "path": "source-binding.safe.json",
+      "bytes": 3946,
+      "sha256": "8125d2bcb4f59b13fb3dd221384f2fcb45e10be1fff3bcfb47e49da84ce42a1c",
+      "gitBlob": "80fc5ed0f94ba26ed38736af8c8562d8cfaf0b77"
+    },
+    {
+      "path": "source.original.log",
+      "bytes": 138127,
+      "sha256": "b2678e3e83a2e0a44ca04c03e51ba9cee7e0d488e095380b7bb631af5e102ae5",
+      "gitBlob": "cb4bb7f2db770381a4c3cf31dc199ae3a2db238f"
+    },
+    {
+      "path": "source-review.initial-label.safe.json",
+      "bytes": 5626,
+      "sha256": "1b22aa5d96d9b7b2245bc0aae2654b6591e7ca268ac04266dee839b658782856",
+      "gitBlob": "6030eeeaec202e7461237b5b69b2400eec0122de"
+    },
+    {
+      "path": "source-review.safe.json",
+      "bytes": 5907,
+      "sha256": "a8f61f041071dba97344a0ac8a30e5a662346d30247ec84fc2bbbdb27df6210a",
+      "gitBlob": "145ee7896376bb6917182293bd595d9b23cfc030"
+    },
+    {
+      "path": "core.original.log",
+      "bytes": 1021274,
+      "sha256": "8ba1341bc51ed045df77736ff1cf4fb43aae1f96ce22432fec9958363a9e2171",
+      "gitBlob": "307a913d9431d297b77677765e73af0111da1757"
+    },
+    {
+      "path": "core-target-ledger.safe.json",
+      "bytes": 78867,
+      "sha256": "49c80b2b994cfd26a2572bdef4558db45388d68e0c0838cf13e21dd6079412c9",
+      "gitBlob": "0f5b53429e5b6578876f1b58b6496288a84807ec"
+    },
+    {
+      "path": "core-review.safe.json",
+      "bytes": 3859,
+      "sha256": "63530278e3b9856320d70c8ee6cefeaf98a50353d91b945e555fe1d4dd180e47",
+      "gitBlob": "37fd1789f7882c39b1d9d1a5180397ec736f883d"
+    },
+    {
+      "path": "privacy-and-acquisition.safe.json",
+      "bytes": 5974,
+      "sha256": "6b57e592c2263f138d3f9a97d5d1482dfd6bb2809a5dc073e50c64eeb56db88f",
+      "gitBlob": "ee0806498c37f93122ecb92b773976ee0efd83e4"
+    }
+  ],
+  "payloadFiles": 10,
+  "payloadBytes": 2628075,
+  "limits": [
+    "These three terminal jobs do not establish whole-CI, Native, provider or production success.",
+    "Core driver cases are exact individual matches in a combined invocation, not a standalone reporter total.",
+    "Historical 932/86f8 and Native486 A2 evidence is not reused as this execution.",
+    "Source initial derived title mistake is retained with explicit correction.",
+    "No local filesystem, VM, production account, model call or workflow mutation was used."
+  ]
+}

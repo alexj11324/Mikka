@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "purpose": "artifact byte recovery only; no Native execution or production request",
+  "sessionId": "sbx_W4aVD48P5J2ufpWVdkAnVZYg4oeg",
+  "name": "issue1512-native-6cc-42653081708",
+  "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+  "configuration": {
+    "image": "vercel/sandbox/universal@sha256:bbec19cffb43ad724eee446d3bd4476e2993849dc0ff0c9f33356f8365d72219",
+    "persistent": false,
+    "vcpus": 1,
+    "memoryMiB": 2048,
+    "timeoutMs": 900000,
+    "region": "iad1",
+    "architecture": "amd64",
+    "ports": [],
+    "networkPolicy": {
+      "mode": "custom",
+      "allowedDomains": [
+        "*.blob.core.windows.net",
+        "*.amazonaws.com",
+        "*.oaiusercontent.com",
+        "chatgpt.com"
+      ]
+    }
+  },
+  "createdAt": 1794242912469,
+  "startedAt": 1794242912507,
+  "requestedStopAt": 1794243150371,
+  "stoppedAt": 1794243150643,
+  "status": "stopped",
+  "durationMs": 238136,
+  "activeCpuDurationMs": 10003,
+  "networkTransfer": {
+    "ingress": 14867942,
+    "egress": 313470
+  },
+  "deleteReturnedWithoutError": true,
+  "postDeleteExactRead": {
+    "operation": "GET /v2/sandboxes/{name}",
+    "name": "issue1512-native-6cc-42653081708",
+    "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+    "resume": false,
+    "status": 404,
+    "code": "not_found"
+  },
+  "extensions": 0,
+  "resourcesRemaining": 0,
+  "cost": {
+    "billedAmount": null,
+    "currency": null,
+    "reason": "No billing invoice read; actual duration, CPU and transfer retained. No zero-cost claim."
+  }
+}

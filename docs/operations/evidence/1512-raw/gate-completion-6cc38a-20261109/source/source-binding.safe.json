@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "repository": "alexj11324/Mikka",
+  "runId": 42653081708,
+  "attempt": 1,
+  "eventHead": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+  "actualCheckout": "16dcb17d4d20c32ffbc3f4d3e40b05a594d340f6",
+  "tree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+  "orderedParents": [
+    "e189d7652fd2fce48b77a3697abf5bb177d8ebd1",
+    "6cc38aca620d16b25eebe0c8787747885a2cceb1"
+  ],
+  "evidence": {
+    "jobId": 129284298722,
+    "checkoutLines": [
+      2566,
+      2569
+    ],
+    "raw": {
+      "jobId": 129284298722,
+      "runId": 42653081708,
+      "attempt": 1,
+      "bytes": 974368,
+      "sha256": "60d89ab351f490c263bcb544b18f8201529c2f6870313486751c6d8097762173",
+      "gitBlob": "5f32f4c15b255f148d970cfa9f63fedc4d28dfd2",
+      "readsByThisAgent": 1,
+      "source": "public GitHub decoded workflow-job log"
+    },
+    "selection": {
+      "bytes": 390127,
+      "sha256": "180ccdb5306f07705b99774d553a482302d90849cc253fe99b163972814e654d",
+      "gitBlob": "74d46f10fbb6ef907f76e1d0f695a02b8218ea6a"
+    },
+    "selectionLineRange": {
+      "start": 2663,
+      "end": 10349
+    }
+  },
+  "selectionCounts": {
+    "unitTasks": 86,
+    "core": 57,
+    "integration": 29,
+    "dbSuites": 72
+  },
+  "flags": {
+    "full": true,
+    "docs_only": false,
+    "source": true,
+    "daemon": true,
+    "mobile": true,
+    "desktop": true,
+    "image": true,
+    "analytics": true
+  },
+  "executionBoundary": "Changes selects targets; it does not prove any selected target completed.",
+  "previousBindingNotReused": "932/86f8 and earlier Native A2 executions are separate evidence.",
+  "privacy": {
+    "githubMasking": "The public GitHub log contains masked values as served; decoded text preserved.",
+    "closedPatternSecretHits": 0,
+    "emailFalsePositives": [
+      {
+        "offset": 560027,
+        "path": "patches/ffmpeg-static@5.3.0.patch",
+        "pathGitBlob": "5e27d8d12fbed2d0c2e62083976de11c86d9e1fa",
+        "classification": "repository_path_version_separator_false_positive"
+      },
+      {
+        "offset": 615176,
+        "path": "apps/mobile/assets/tabs/bot-fill@2x.png",
+        "pathGitBlob": "5bf29550a76df67e166abcd01631d3cbe63ccad0",
+        "classification": "repository_path_version_separator_false_positive"
+      },
+      {
+        "offset": 615259,
+        "path": "apps/mobile/assets/tabs/bot-fill@3x.png",
+        "pathGitBlob": "fa0887b50bd1714180ad8dab7b363900bd11a214",
+        "classification": "repository_path_version_separator_false_positive"
+      },
+      {
+        "offset": 615417,
+        "path": "apps/mobile/assets/tabs/bot@2x.png",
+        "pathGitBlob": "01bac289a7b4354597edbe347c211a1acaf979de",
+        "classification": "repository_path_version_separator_false_positive"
+      },
+      {
+        "offset": 615495,
+        "path": "apps/mobile/assets/tabs/bot@3x.png",
+        "pathGitBlob": "db945a843d8cbbac766b7b5f62d913838f7b507f",
+        "classification": "repository_path_version_separator_false_positive"
+      },
+      {
+        "offset": 726968,
+        "path": "docs/design/devices-copy/devices-dark@2x.png",
+        "pathGitBlob": "a66e54fb200304e015141ea8974f237b0e09b520",
+        "classification": "repository_path_version_separator_false_positive"
+      },
+      {
+        "offset": 727056,
+        "path": "docs/design/devices-copy/devices-light@2x.png",
+        "pathGitBlob": "2dea97e3cdc3255288ea6abd33b283757ac64ed9",
+        "classification": "repository_path_version_separator_false_positive"
+      },
+      {
+        "offset": 911017,
+        "path": "patches/@novnc__novnc@1.6.0.patch",
+        "pathGitBlob": "7eda74881659d35007d87eb3fc8f1f308ee02589",
+        "classification": "repository_path_version_separator_false_positive"
+      }
+    ],
+    "completeness": "Bounded scan, not a claim of exhaustive secret detection."
+  },
+  "activity": {
+    "jobLogFetches": 1,
+    "testsTriggered": 0,
+    "resources": 0,
+    "refUpdates": 0
+  }
+}

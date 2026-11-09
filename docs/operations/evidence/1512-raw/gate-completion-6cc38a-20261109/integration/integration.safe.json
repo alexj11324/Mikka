@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "kind": "issue1512.integration_natural_success",
+  "checkedAt": "2026-11-09 16:27:26 UTC",
+  "head": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+  "checkout": "16dcb17d4d20c32ffbc3f4d3e40b05a594d340f6",
+  "tree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+  "runId": 42653081708,
+  "attempt": 1,
+  "jobId": 129285073630,
+  "terminal": "success",
+  "startedAt": "2026-11-09T16:20:06Z",
+  "completedAt": "2026-11-09T16:25:24Z",
+  "original": {
+    "jobId": 129285073630,
+    "runId": 42653081708,
+    "attempt": 1,
+    "head": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+    "readAt": "2026-11-09 16:26:06 UTC",
+    "bytes": 674779,
+    "sha256": "e7c043d6d06ed778636bcc1452b27c893b29b54cbee2a0e7f76a4a4cbe1e7383",
+    "lines": 5018,
+    "originalReader": "/root",
+    "originalReadCount": 1,
+    "gitBlob": "73aa4d28a43d93114b542acd914af0ad8ec0ec04"
+  },
+  "actualTargets": [
+    "integration-2",
+    "integration-3",
+    "integration-4",
+    "integration-5",
+    "integration-6",
+    "integration-7",
+    "integration-8",
+    "integration-9",
+    "integration-10",
+    "integration-11",
+    "integration-12",
+    "integration-13",
+    "integration-14",
+    "integration-15",
+    "integration-16",
+    "integration-17",
+    "integration-18",
+    "integration-19",
+    "integration-20",
+    "integration-21",
+    "integration-22",
+    "integration-23",
+    "integration-24",
+    "integration-25",
+    "integration-26",
+    "integration-27",
+    "integration-28",
+    "integration-29",
+    "integration-factory-activity"
+  ],
+  "expectedTargetsMatch": true,
+  "allTargetSuccessLine": " NX   Successfully ran targets integration-2, integration-3, integration-4, integration-5, integration-6, integration-7, integration-8, integration-9, integration-10, integration-11, integration-12, integration-13, integration-14, integration-15, integration-16, integration-17, integration-18, integration-19, integration-20, integration-21, integration-22, integration-23, integration-24, integration-25, integration-26, integration-27, integration-28, integration-29, integration-factory-activity for project ci-tasks",
+  "nxCache": "skipped --skip-nx-cache",
+  "node": "24.22.2",
+  "pnpm": "10.34.3",
+  "teamImportContract": {
+    "teamImportContract": true,
+    "dynamicImportOccurrences": 26,
+    "uniqueModules": 24,
+    "scenarios": 22,
+    "realAuthExports": [
+      "MOBILE_APP_ORIGIN",
+      "auth",
+      "authBaseURL",
+      "githubEnabled",
+      "githubSignInEnabled",
+      "googleEnabled",
+      "oauthCallbackBaseURL"
+    ],
+    "deniedConnections": 1,
+    "nativeTransportAttempts": 0,
+    "nativeSqlSubmissions": 0
+  },
+  "testDurationMs": 14641.96102,
+  "scopeLoaderDurationMs": 23719.166751,
+  "secretShapeScan": [
+    {
+      "label": "github",
+      "count": 0
+    },
+    {
+      "label": "providerKey",
+      "count": 0
+    },
+    {
+      "label": "signedQuery",
+      "count": 0
+    }
+  ],
+  "retryRequests": 0,
+  "sourceOrDeadlineChanges": 0,
+  "limitations": [
+    "Natural success of this source and job only. Historical932 first timeout remains a real failure; this does not retroactively diagnose its exact phase.",
+    "Expected offline boundary/connection-refused error text is present in the successful test log; no claim of a wholly error-free log.",
+    "The 53 test scope block is a combined test script, not 53 team-import tests.",
+    "No production account, model or PostHog acceptance is proved by Integration."
+  ]
+}

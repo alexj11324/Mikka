@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 1,
+  "runId": 42653081708,
+  "attempt": 1,
+  "jobId": 129290330575,
+  "head": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+  "checkout": "16dcb17d4d20c32ffbc3f4d3e40b05a594d340f6",
+  "tree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+  "lifecycleOriginal": {
+    "path": "native-6cc38a/original/lifecycle.json",
+    "kind": "exact-original-JSON",
+    "mode": "100644",
+    "bytes": 709144,
+    "sha256": "d00e4cb3d295f67791e8c7ab08bcdc1f97a06b46739654688e83e3413dcf5277",
+    "gitBlob": "62402049a440f8475c427102ec797bc3a6e265d8",
+    "remoteConfirmed": true
+  },
+  "artifacts": [
+    {
+      "id": 13691963476,
+      "name": "desktop-native-evidence-16dcb17d4d20c32ffbc3f4d3e40b05a594d340f6",
+      "bytes": 14609848,
+      "digest": "sha256:80ac3291bd4fb7d3fb114ee3ed6135a909841befc92c09677bb32f39c204686b",
+      "createdAt": "2026-11-09T16:45:56Z",
+      "expiresAt": "2026-11-16T16:45:54Z",
+      "expired": false,
+      "workflowRun": {
+        "id": 42653081708,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "fix/1512-daemon-fixture-executable-20261109",
+        "head_sha": "6cc38aca620d16b25eebe0c8787747885a2cceb1"
+      }
+    },
+    {
+      "id": 13691838702,
+      "name": "desktop-package-evidence-16dcb17d4d20c32ffbc3f4d3e40b05a594d340f6",
+      "bytes": 1595,
+      "digest": "sha256:3600d610be8fd6588e5b081a199d9ce35cb387139f4b5fe95a63d3ab5447c21e",
+      "createdAt": "2026-11-09T16:45:53Z",
+      "expiresAt": "2026-11-16T16:45:52Z",
+      "expired": false,
+      "workflowRun": {
+        "id": 42653081708,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "fix/1512-daemon-fixture-executable-20261109",
+        "head_sha": "6cc38aca620d16b25eebe0c8787747885a2cceb1"
+      }
+    }
+  ],
+  "verifiedZipArchives": [
+    {
+      "artifactId": 13691963476,
+      "name": "desktop-native-evidence-16dcb17d4d20c32ffbc3f4d3e40b05a594d340f6",
+      "kind": "native",
+      "bytes": 14609848,
+      "sha256": "80ac3291bd4fb7d3fb114ee3ed6135a909841befc92c09677bb32f39c204686b",
+      "apiSize": 14609848,
+      "apiDigest": "sha256:80ac3291bd4fb7d3fb114ee3ed6135a909841befc92c09677bb32f39c204686b",
+      "zipFile": "13691963476.original.zip",
+      "zipTestPassed": true,
+      "fileCount": 308
+    },
+    {
+      "artifactId": 13691838702,
+      "name": "desktop-package-evidence-16dcb17d4d20c32ffbc3f4d3e40b05a594d340f6",
+      "kind": "package",
+      "bytes": 1595,
+      "sha256": "3600d610be8fd6588e5b081a199d9ce35cb387139f4b5fe95a63d3ab5447c21e",
+      "apiSize": 1595,
+      "apiDigest": "sha256:3600d610be8fd6588e5b081a199d9ce35cb387139f4b5fe95a63d3ab5447c21e",
+      "zipFile": "13691838702.original.zip",
+      "zipTestPassed": true,
+      "fileCount": 2
+    }
+  ],
+  "fileCount": 310,
+  "totalUncompressedEntryBytes": 18264843,
+  "selectedOriginals": [
+    {
+      "name": "lifecycle.json",
+      "bytes": 709144,
+      "sha256": "d00e4cb3d295f67791e8c7ab08bcdc1f97a06b46739654688e83e3413dcf5277",
+      "gitBlob": "62402049a440f8475c427102ec797bc3a6e265d8",
+      "artifactId": 13691963476
+    },
+    {
+      "name": "parity.json",
+      "bytes": 117075,
+      "sha256": "50c7c148d8f1e44fdc69edea798b5c8a2f1447a31d26a7d23bcfa0ca5e5d3247",
+      "gitBlob": "8b7a92f20e89babd26b10386c1cf8f038fb01e3a",
+      "artifactId": 13691963476
+    },
+    {
+      "name": "smoke.json",
+      "bytes": 3144,
+      "sha256": "7e4017db79d24db1c68d54f2dd54407ead92e489d0db8fd45bd1b91df3dd3fb1",
+      "gitBlob": "540c9baeb0bc33f2e59f624342c47b3078d62e6b",
+      "artifactId": 13691963476
+    },
+    {
+      "name": "mac-acceptance-package.json",
+      "bytes": 957,
+      "sha256": "7bfb993e4c174341923f802c58ecf27f78f6d622d67c05e671a580e839c742dc",
+      "gitBlob": "f5029585ea00aa86121ce380a6f4dc1b52c293fa",
+      "artifactId": 13691838702
+    },
+    {
+      "name": "native-crypto.json",
+      "bytes": 2868,
+      "sha256": "f2fd2b032447996ef75a470dc11c0e27ee05d47e0c8ac91b6688032871e53418",
+      "gitBlob": "6af97368c7373ee566620b318760a866cde76796",
+      "artifactId": 13691838702
+    }
+  ],
+  "bundleIntegrity": {
+    "gzipBytes": 139022,
+    "gzipSha256": "80fd0aa2dbbca09907cb4584dbf50e7074123396822eb02df1a41540186f3018",
+    "jsonBytes": 1193479,
+    "jsonSha256": "959035d8b57a0646ede9842334b9c2175cd45d005cfa1cddb3dbd7af59154f47",
+    "chunks": 96,
+    "allChunksVerified": true
+  },
+  "downloadCounts": {
+    "githubArtifactEndpointPerArtifact": 1,
+    "fileReferenceHttpReadPerArtifact": 1,
+    "referenceRefreshes": 0
+  },
+  "privateReferencesExcluded": true,
+  "originalZipStorage": {
+    "githubActionsArtifactIds": [
+      13691963476,
+      13691838702
+    ],
+    "temporaryVmBytesDeletedAfterVerifiedOriginalPublication": true,
+    "rawZipsNotAddedToPublicGitPayload": true
+  },
+  "reassembly": {
+    "firstInMemoryAttempt": "Array.concat did not flatten typed-array chunks; no original bytes changed or re-downloaded",
+    "correction": "Array.from for each existing chunk, then exact gzip and decompressed JSON byte/hash verification",
+    "finalAllHashesMatch": true
+  }
+}

@@ -1,0 +1,141 @@
+{
+  "schemaVersion": 1,
+  "runId": 42653081708,
+  "attempt": 1,
+  "jobId": 129290330575,
+  "head": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+  "checkout": "16dcb17d4d20c32ffbc3f4d3e40b05a594d340f6",
+  "tree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+  "lifecycleOriginal": {
+    "path": "native-6cc38a/original/lifecycle.json",
+    "kind": "exact-original-JSON",
+    "mode": "100644",
+    "bytes": 709144,
+    "sha256": "d00e4cb3d295f67791e8c7ab08bcdc1f97a06b46739654688e83e3413dcf5277",
+    "gitBlob": "62402049a440f8475c427102ec797bc3a6e265d8",
+    "remoteConfirmed": true
+  },
+  "reads": [
+    {
+      "type": "metadata",
+      "key": "run",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42653081708"
+    },
+    {
+      "type": "metadata",
+      "key": "jobs",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42653081708/jobs?filter=latest&per_page=100"
+    },
+    {
+      "kind": "metadata",
+      "resource": "jobs",
+      "runId": 42653081708,
+      "at": "2026-11-09T16:22:40Z"
+    },
+    {
+      "kind": "metadata",
+      "resource": "job",
+      "jobId": 129290330575,
+      "observedAt": "2026-11-09 16:28:49 UTC",
+      "outcome": "rejected_before_data",
+      "errorCode": "INVALID_ARGUMENT",
+      "retried": false
+    },
+    {
+      "kind": "metadata",
+      "resource": "job_steps",
+      "jobId": 129290330575,
+      "observedAt": "2026-11-09 16:30:22 UTC"
+    },
+    {
+      "kind": "metadata",
+      "resource": "job_steps",
+      "jobId": 129290330575,
+      "observedAt": "2026-11-09 16:32:20 UTC"
+    },
+    {
+      "kind": "metadata",
+      "resource": "job_steps",
+      "jobId": 129290330575,
+      "observedAt": "2026-11-09 16:35:15 UTC"
+    },
+    {
+      "kind": "metadata",
+      "resource": "job_steps",
+      "jobId": 129290330575,
+      "observedAt": "2026-11-09 16:38:13 UTC"
+    },
+    {
+      "kind": "metadata",
+      "resource": "job_steps",
+      "jobId": 129290330575,
+      "observedAt": "2026-11-09 16:41:49 UTC"
+    },
+    {
+      "kind": "metadata",
+      "resource": "job_steps",
+      "jobId": 129290330575,
+      "observedAt": "2026-11-09 16:44:41 UTC"
+    },
+    {
+      "kind": "metadata",
+      "resource": "job_steps",
+      "jobId": 129290330575,
+      "observedAt": "2026-11-09 16:47:31 UTC"
+    },
+    {
+      "kind": "metadata",
+      "resource": "run_artifacts",
+      "runId": 42653081708,
+      "observedAt": "2026-11-09 16:47:56 UTC"
+    },
+    {
+      "kind": "original_log",
+      "jobId": 129290330575,
+      "fetchCount": 1,
+      "observedAt": "2026-11-09 16:48:18 UTC",
+      "bytes": 254493,
+      "sha256": "68f6cda7bb85e00147d2162ddc5a2e4a71519c4552ec76cc57edc83b51085ed6",
+      "gitBlob": "10a96af2151c97e8274a42953d2b28be47605cc1",
+      "preservesOriginalDecodedUtf8": true
+    },
+    {
+      "kind": "artifact_download",
+      "artifactId": 13691963476,
+      "githubDownloadCount": 1,
+      "reason": "first_terminal_original_read"
+    },
+    {
+      "kind": "artifact_download",
+      "artifactId": 13691838702,
+      "githubDownloadCount": 1,
+      "reason": "first_terminal_original_read"
+    }
+  ],
+  "counts": {
+    "nativeJobOriginalLog": 1,
+    "nativeArtifactDownload": 1,
+    "packageArtifactDownload": 1,
+    "otherJobOriginalLogs": 0,
+    "oldArtifactsRedownloaded": 0,
+    "originalFileReferenceHttpReads": 2,
+    "originalsBundleChunks": 96,
+    "chunkRereads": 0,
+    "referenceRefreshes": 0,
+    "sourceCommitMetadataReads": 1,
+    "vmCreate": 1,
+    "vmStop": 1,
+    "vmDelete": 1,
+    "vmExactGetAfterDelete": 1,
+    "ciRerun": 0,
+    "modelCalls": 0,
+    "productionRequests": 0,
+    "gitRefChanges": 0
+  },
+  "endpointFailurePreserved": {
+    "url": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/129290330575",
+    "errorCode": "INVALID_ARGUMENT",
+    "action": "No retry; use authorised run jobs metadata only at necessary phase."
+  },
+  "allSignedUrlsExcluded": true
+}

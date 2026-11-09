@@ -1,0 +1,5515 @@
+{
+  "version": 1,
+  "mode": "desktop",
+  "appRevision": "16dcb17d4d20c32ffbc3f4d3e40b05a594d340f6",
+  "harnessRevision": "16dcb17d4d20c32ffbc3f4d3e40b05a594d340f6",
+  "harnessSha256": "595f222d7ad053d785068fe632a842e5a0e10217a6b65352e0b5bc581149c061",
+  "environmentId": "local-0102f08b-3c66-4495-8f87-b38d0b70e126",
+  "database": "mikka_e2e",
+  "origin": "http://localhost:3000",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "colorThreshold": 0,
+  "maximumChangedRatio": 0.001,
+  "timeZone": "UTC",
+  "captureClock": {
+    "method": "playwright_set_fixed_time",
+    "wallTime": "2026-11-09T16:37:55.627Z",
+    "timers": "running",
+    "scope": "parity-renderer-only"
+  },
+  "nativeViewports": [
+    {
+      "mode": "hosted",
+      "method": "playwright_cdp_layout_viewport",
+      "requested": {
+        "width": 1440,
+        "height": 900
+      },
+      "layout": {
+        "width": 1440,
+        "height": 900,
+        "deviceScaleFactor": 1,
+        "visualWidth": 1440,
+        "visualHeight": 900,
+        "visualScale": 1
+      },
+      "native": {
+        "content": {
+          "width": 1440,
+          "height": 677
+        },
+        "display": {
+          "width": 1024,
+          "height": 768,
+          "scaleFactor": 1
+        },
+        "zoomFactor": 1
+      },
+      "timeZone": {
+        "method": "cdp_timezone_override",
+        "actual": "UTC"
+      }
+    },
+    {
+      "mode": "bundled",
+      "method": "playwright_cdp_layout_viewport",
+      "requested": {
+        "width": 1440,
+        "height": 900
+      },
+      "layout": {
+        "width": 1440,
+        "height": 900,
+        "deviceScaleFactor": 1,
+        "visualWidth": 1440,
+        "visualHeight": 900,
+        "visualScale": 1
+      },
+      "native": {
+        "content": {
+          "width": 1440,
+          "height": 677
+        },
+        "display": {
+          "width": 1024,
+          "height": 768,
+          "scaleFactor": 1
+        },
+        "zoomFactor": 1
+      },
+      "timeZone": {
+        "method": "cdp_timezone_override",
+        "actual": "UTC"
+      }
+    },
+    {
+      "mode": "hosted",
+      "method": "playwright_cdp_layout_viewport",
+      "requested": {
+        "width": 1440,
+        "height": 900
+      },
+      "layout": {
+        "width": 1440,
+        "height": 900,
+        "deviceScaleFactor": 1,
+        "visualWidth": 1440,
+        "visualHeight": 900,
+        "visualScale": 1
+      },
+      "native": {
+        "content": {
+          "width": 1440,
+          "height": 677
+        },
+        "display": {
+          "width": 1024,
+          "height": 768,
+          "scaleFactor": 1
+        },
+        "zoomFactor": 1
+      },
+      "timeZone": {
+        "method": "cdp_timezone_override",
+        "actual": "UTC"
+      }
+    }
+  ],
+  "themes": [
+    "light",
+    "dark"
+  ],
+  "masksAllowed": [
+    "avatars",
+    "timestamps"
+  ],
+  "excludedDesktopOnly": [
+    "data-desktop-only: server row, Settings › 服务器"
+  ],
+  "startedAt": "2026-11-09T16:37:55.627Z",
+  "screens": [
+    {
+      "name": "sign-in",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "shared-markdown",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 51,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0.00003935185185185185,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "shared-html",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "shared-missing",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "sign-in",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "shared-markdown",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 51,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0.00003935185185185185,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "shared-html",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "shared-missing",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "workspace-link",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "coordinator-details",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "coordinator-threads",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "coordinator-prs",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "coordinator-computer",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "bot-details",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 661.078125,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 125,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 661.078125,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 125,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "bot-threads",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 661.078125,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 125,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 661.078125,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 125,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "bot-prs",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 661.078125,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 125,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 661.078125,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 125,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "bot-computer",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 661.078125,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 125,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 661.078125,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 125,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "group",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 629.21875,
+          "y": 66,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1221.5,
+          "y": 124,
+          "width": 40,
+          "height": 40
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1086,
+          "y": 260,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 1086,
+          "y": 292,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 1086,
+          "y": 324,
+          "width": 16,
+          "height": 16
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 629.21875,
+          "y": 66,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1221.5,
+          "y": 124,
+          "width": 40,
+          "height": 40
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1086,
+          "y": 260,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 1086,
+          "y": 292,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 1086,
+          "y": 324,
+          "width": 16,
+          "height": 16
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "task",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1218,
+          "y": 214,
+          "width": 20,
+          "height": 20
+        },
+        {
+          "kind": "avatar",
+          "x": 1239,
+          "y": 246,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 404,
+          "y": 392,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "time",
+          "x": 620.734375,
+          "y": 394,
+          "width": 81.9375,
+          "height": 18
+        },
+        {
+          "kind": "time",
+          "x": 919.078125,
+          "y": 436,
+          "width": 75.921875,
+          "height": 18
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1218,
+          "y": 214,
+          "width": 20,
+          "height": 20
+        },
+        {
+          "kind": "avatar",
+          "x": 1239,
+          "y": 246,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 404,
+          "y": 392,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "time",
+          "x": 620.734375,
+          "y": 394,
+          "width": 81.9375,
+          "height": 18
+        },
+        {
+          "kind": "time",
+          "x": 919.078125,
+          "y": 436,
+          "width": 75.921875,
+          "height": 18
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "task-thread",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 7,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0.000005401234567901234,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 356,
+          "y": 392,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "time",
+          "x": 572.734375,
+          "y": 394,
+          "width": 81.9375,
+          "height": 18
+        },
+        {
+          "kind": "time",
+          "x": 855.078125,
+          "y": 436,
+          "width": 75.921875,
+          "height": 18
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 356,
+          "y": 392,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "time",
+          "x": 572.734375,
+          "y": 394,
+          "width": 81.9375,
+          "height": 18
+        },
+        {
+          "kind": "time",
+          "x": 855.078125,
+          "y": 436,
+          "width": 75.921875,
+          "height": 18
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "all-threads",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "bot-thread-list",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 661.078125,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 661.078125,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "thread",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 661.078125,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 661.078125,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "board",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 1185.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 645,
+          "y": 157,
+          "width": 18,
+          "height": 18
+        },
+        {
+          "kind": "avatar",
+          "x": 632,
+          "y": 158,
+          "width": 16,
+          "height": 16
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 1185.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 645,
+          "y": 157,
+          "width": 18,
+          "height": 18
+        },
+        {
+          "kind": "avatar",
+          "x": 632,
+          "y": 158,
+          "width": 16,
+          "height": 16
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "list",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 1185.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 928,
+          "y": 157,
+          "width": 18,
+          "height": 18
+        },
+        {
+          "kind": "time",
+          "x": 972,
+          "y": 157,
+          "width": 64,
+          "height": 18
+        },
+        {
+          "kind": "avatar",
+          "x": 915,
+          "y": 158,
+          "width": 16,
+          "height": 16
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 1185.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 928,
+          "y": 157,
+          "width": 18,
+          "height": 18
+        },
+        {
+          "kind": "time",
+          "x": 972,
+          "y": 157,
+          "width": 64,
+          "height": 18
+        },
+        {
+          "kind": "avatar",
+          "x": 915,
+          "y": 158,
+          "width": 16,
+          "height": 16
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "projects",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 2,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0.0000015432098765432098,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "team-home",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 1072.5,
+          "y": 180,
+          "width": 28,
+          "height": 28
+        },
+        {
+          "kind": "avatar",
+          "x": 1108.5,
+          "y": 180,
+          "width": 28,
+          "height": 28
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 1072.5,
+          "y": 180,
+          "width": 28,
+          "height": 28
+        },
+        {
+          "kind": "avatar",
+          "x": 1108.5,
+          "y": 180,
+          "width": 28,
+          "height": 28
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "team-tasks",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 1185.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 928,
+          "y": 157,
+          "width": 18,
+          "height": 18
+        },
+        {
+          "kind": "time",
+          "x": 972,
+          "y": 157,
+          "width": 64,
+          "height": 18
+        },
+        {
+          "kind": "avatar",
+          "x": 915,
+          "y": 158,
+          "width": 16,
+          "height": 16
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 1185.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 928,
+          "y": 157,
+          "width": 18,
+          "height": 18
+        },
+        {
+          "kind": "time",
+          "x": 972,
+          "y": 157,
+          "width": 64,
+          "height": 18
+        },
+        {
+          "kind": "avatar",
+          "x": 915,
+          "y": 158,
+          "width": 16,
+          "height": 16
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "team-projects",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "plugins",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "suggestions",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 1026.859375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 1026.859375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "artifact-library",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "time",
+          "x": 1285.734375,
+          "y": 126,
+          "width": 78.265625,
+          "height": 16
+        },
+        {
+          "kind": "time",
+          "x": 1285.734375,
+          "y": 178,
+          "width": 78.265625,
+          "height": 16
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "time",
+          "x": 1285.734375,
+          "y": 126,
+          "width": 78.265625,
+          "height": 16
+        },
+        {
+          "kind": "time",
+          "x": 1285.734375,
+          "y": 178,
+          "width": 78.265625,
+          "height": 16
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "artifact-markdown",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "artifact-html",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 5,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0.000003858024691358025,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "new-task",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 641.5,
+          "y": 352,
+          "width": 16,
+          "height": 16
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 641.5,
+          "y": 352,
+          "width": 16,
+          "height": 16
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-members",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 536.5,
+          "y": 308,
+          "width": 28,
+          "height": 28
+        },
+        {
+          "kind": "avatar",
+          "x": 536.5,
+          "y": 368,
+          "width": 28,
+          "height": 28
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 536.5,
+          "y": 308,
+          "width": 28,
+          "height": 28
+        },
+        {
+          "kind": "avatar",
+          "x": 536.5,
+          "y": 368,
+          "width": 28,
+          "height": 28
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-preferences",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-memory",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 4,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0.0000030864197530864196,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-account",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 1059.984375,
+          "y": 203,
+          "width": 40,
+          "height": 40
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 1059.984375,
+          "y": 203,
+          "width": 40,
+          "height": 40
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-teams",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-notifications",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-security",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-connections",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-models",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-logins",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 4,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0.0000030864197530864196,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-privacy",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-computers",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 4,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0.0000030864197530864196,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-general",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 1085.984375,
+          "y": 179,
+          "width": 32,
+          "height": 32
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 1085.984375,
+          "y": 179,
+          "width": 32,
+          "height": 32
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-permissions",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-secrets",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-audit",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-usage",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 549.5,
+          "y": 549,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 549.5,
+          "y": 585,
+          "width": 16,
+          "height": 16
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 549.5,
+          "y": 549,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 549.5,
+          "y": 585,
+          "width": 16,
+          "height": 16
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-billing",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 4,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0.0000030864197530864196,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "workspace-link",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "coordinator-details",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "coordinator-threads",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "coordinator-prs",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "coordinator-computer",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "bot-details",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 661.078125,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 125,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 661.078125,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 125,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "bot-threads",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 661.078125,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 125,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 661.078125,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 125,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "bot-prs",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 661.078125,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 125,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 661.078125,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 125,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "bot-computer",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 661.078125,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 125,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 661.078125,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 125,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "group",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 629.21875,
+          "y": 66,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1221.5,
+          "y": 124,
+          "width": 40,
+          "height": 40
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1086,
+          "y": 260,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 1086,
+          "y": 292,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 1086,
+          "y": 324,
+          "width": 16,
+          "height": 16
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 629.21875,
+          "y": 66,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1221.5,
+          "y": 124,
+          "width": 40,
+          "height": 40
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1086,
+          "y": 260,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 1086,
+          "y": 292,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 1086,
+          "y": 324,
+          "width": 16,
+          "height": 16
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "task",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1218,
+          "y": 214,
+          "width": 20,
+          "height": 20
+        },
+        {
+          "kind": "avatar",
+          "x": 1239,
+          "y": 246,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 404,
+          "y": 392,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "time",
+          "x": 620.734375,
+          "y": 394,
+          "width": 81.9375,
+          "height": 18
+        },
+        {
+          "kind": "time",
+          "x": 919.078125,
+          "y": 436,
+          "width": 75.921875,
+          "height": 18
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1218,
+          "y": 214,
+          "width": 20,
+          "height": 20
+        },
+        {
+          "kind": "avatar",
+          "x": 1239,
+          "y": 246,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 404,
+          "y": 392,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "time",
+          "x": 620.734375,
+          "y": 394,
+          "width": 81.9375,
+          "height": 18
+        },
+        {
+          "kind": "time",
+          "x": 919.078125,
+          "y": 436,
+          "width": 75.921875,
+          "height": 18
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "task-thread",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 8,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0.000006172839506172839,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 356,
+          "y": 392,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "time",
+          "x": 572.734375,
+          "y": 394,
+          "width": 81.9375,
+          "height": 18
+        },
+        {
+          "kind": "time",
+          "x": 855.078125,
+          "y": 436,
+          "width": 75.921875,
+          "height": 18
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 356,
+          "y": 392,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "time",
+          "x": 572.734375,
+          "y": 394,
+          "width": 81.9375,
+          "height": 18
+        },
+        {
+          "kind": "time",
+          "x": 855.078125,
+          "y": 436,
+          "width": 75.921875,
+          "height": 18
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "all-threads",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "bot-thread-list",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 661.078125,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 661.078125,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "thread",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 661.078125,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 661.078125,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "board",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 25,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0.000019290123456790123,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 1185.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 645,
+          "y": 157,
+          "width": 18,
+          "height": 18
+        },
+        {
+          "kind": "avatar",
+          "x": 632,
+          "y": 158,
+          "width": 16,
+          "height": 16
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 1185.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 645,
+          "y": 157,
+          "width": 18,
+          "height": 18
+        },
+        {
+          "kind": "avatar",
+          "x": 632,
+          "y": 158,
+          "width": 16,
+          "height": 16
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "list",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 1185.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 928,
+          "y": 157,
+          "width": 18,
+          "height": 18
+        },
+        {
+          "kind": "time",
+          "x": 972,
+          "y": 157,
+          "width": 64,
+          "height": 18
+        },
+        {
+          "kind": "avatar",
+          "x": 915,
+          "y": 158,
+          "width": 16,
+          "height": 16
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 1185.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 928,
+          "y": 157,
+          "width": 18,
+          "height": 18
+        },
+        {
+          "kind": "time",
+          "x": 972,
+          "y": 157,
+          "width": 64,
+          "height": 18
+        },
+        {
+          "kind": "avatar",
+          "x": 915,
+          "y": 158,
+          "width": 16,
+          "height": 16
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "projects",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 2,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0.0000015432098765432098,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "team-home",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 1072.5,
+          "y": 180,
+          "width": 28,
+          "height": 28
+        },
+        {
+          "kind": "avatar",
+          "x": 1108.5,
+          "y": 180,
+          "width": 28,
+          "height": 28
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 1072.5,
+          "y": 180,
+          "width": 28,
+          "height": 28
+        },
+        {
+          "kind": "avatar",
+          "x": 1108.5,
+          "y": 180,
+          "width": 28,
+          "height": 28
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "team-tasks",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 1185.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 928,
+          "y": 157,
+          "width": 18,
+          "height": 18
+        },
+        {
+          "kind": "time",
+          "x": 972,
+          "y": 157,
+          "width": 64,
+          "height": 18
+        },
+        {
+          "kind": "avatar",
+          "x": 915,
+          "y": 158,
+          "width": 16,
+          "height": 16
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 1185.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 928,
+          "y": 157,
+          "width": 18,
+          "height": 18
+        },
+        {
+          "kind": "time",
+          "x": 972,
+          "y": 157,
+          "width": 64,
+          "height": 18
+        },
+        {
+          "kind": "avatar",
+          "x": 915,
+          "y": 158,
+          "width": 16,
+          "height": 16
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "team-projects",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 2,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0.0000015432098765432098,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "plugins",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "suggestions",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 1026.859375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 1026.859375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "artifact-library",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "time",
+          "x": 1285.734375,
+          "y": 126,
+          "width": 78.265625,
+          "height": 16
+        },
+        {
+          "kind": "time",
+          "x": 1285.734375,
+          "y": 178,
+          "width": 78.265625,
+          "height": 16
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "time",
+          "x": 1285.734375,
+          "y": 126,
+          "width": 78.265625,
+          "height": 16
+        },
+        {
+          "kind": "time",
+          "x": 1285.734375,
+          "y": 178,
+          "width": 78.265625,
+          "height": 16
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "artifact-markdown",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "artifact-html",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 4,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0.0000030864197530864196,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "new-task",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 641.5,
+          "y": 352,
+          "width": 16,
+          "height": 16
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 636.109375,
+          "y": 63,
+          "width": 22,
+          "height": 22
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 102.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 1206,
+          "y": 124,
+          "width": 72,
+          "height": 72
+        },
+        {
+          "kind": "avatar",
+          "x": 95,
+          "y": 168,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 86,
+          "y": 210.5,
+          "width": 34,
+          "height": 34
+        },
+        {
+          "kind": "avatar",
+          "x": 641.5,
+          "y": 352,
+          "width": 16,
+          "height": 16
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-members",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 1,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 7.716049382716049e-7,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 536.5,
+          "y": 308,
+          "width": 28,
+          "height": 28
+        },
+        {
+          "kind": "avatar",
+          "x": 536.5,
+          "y": 368,
+          "width": 28,
+          "height": 28
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 536.5,
+          "y": 308,
+          "width": 28,
+          "height": 28
+        },
+        {
+          "kind": "avatar",
+          "x": 536.5,
+          "y": 368,
+          "width": 28,
+          "height": 28
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-preferences",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 4,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0.0000030864197530864196,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-memory",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 5,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0.000003858024691358025,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-account",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 1059.984375,
+          "y": 203,
+          "width": 40,
+          "height": 40
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 1059.984375,
+          "y": 203,
+          "width": 40,
+          "height": 40
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-teams",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 4,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0.0000030864197530864196,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-notifications",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 4,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0.0000030864197530864196,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-security",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 1,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 7.716049382716049e-7,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-connections",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-models",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-logins",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 4,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0.0000030864197530864196,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-privacy",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-computers",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-general",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 1,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 7.716049382716049e-7,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 1085.984375,
+          "y": 179,
+          "width": 32,
+          "height": 32
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 1085.984375,
+          "y": 179,
+          "width": 32,
+          "height": 32
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-permissions",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-secrets",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-audit",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-usage",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 4,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0.0000030864197530864196,
+      "maximumRatio": 0.001,
+      "masks": [
+        {
+          "kind": "avatar",
+          "x": 549.5,
+          "y": 549,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 549.5,
+          "y": 585,
+          "width": 16,
+          "height": 16
+        }
+      ],
+      "afterMasks": [
+        {
+          "kind": "avatar",
+          "x": 549.5,
+          "y": 549,
+          "width": 16,
+          "height": 16
+        },
+        {
+          "kind": "avatar",
+          "x": 549.5,
+          "y": 585,
+          "width": 16,
+          "height": 16
+        }
+      ],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "settings-billing",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "offline",
+      "theme": "light",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    },
+    {
+      "name": "offline",
+      "theme": "dark",
+      "width": 1440,
+      "height": 900,
+      "changedPixels": 0,
+      "totalPixels": 1296000,
+      "comparedPixels": 1296000,
+      "excludedIdentityPixels": 0,
+      "changedRatio": 0,
+      "maximumRatio": 0.001,
+      "masks": [],
+      "afterMasks": [],
+      "maskGeometryMatches": true,
+      "passed": true
+    }
+  ],
+  "fixtureEpoch": "2026-11-09T00:00:00.000Z",
+  "requiredScreens": [
+    "sign-in",
+    "shared-markdown",
+    "shared-html",
+    "shared-missing",
+    "workspace-link",
+    "coordinator-details",
+    "coordinator-threads",
+    "coordinator-prs",
+    "coordinator-computer",
+    "bot-details",
+    "bot-threads",
+    "bot-prs",
+    "bot-computer",
+    "group",
+    "task",
+    "task-thread",
+    "all-threads",
+    "bot-thread-list",
+    "thread",
+    "board",
+    "list",
+    "projects",
+    "team-home",
+    "team-tasks",
+    "team-projects",
+    "plugins",
+    "suggestions",
+    "artifact-library",
+    "artifact-markdown",
+    "artifact-html",
+    "new-task",
+    "settings-members",
+    "settings-preferences",
+    "settings-memory",
+    "settings-account",
+    "settings-teams",
+    "settings-notifications",
+    "settings-security",
+    "settings-connections",
+    "settings-models",
+    "settings-logins",
+    "settings-privacy",
+    "settings-computers",
+    "settings-general",
+    "settings-permissions",
+    "settings-secrets",
+    "settings-audit",
+    "settings-usage",
+    "settings-billing",
+    "offline"
+  ],
+  "nativeModeOrder": [
+    "hosted-anonymous",
+    "bundled-anonymous",
+    "bundled-authenticated",
+    "hosted-authenticated"
+  ],
+  "nativeProfiles": 1,
+  "nativeDeviceChecks": [
+    {
+      "mode": "bundled",
+      "ready": true,
+      "deadlineMs": 480000,
+      "elapsedMs": 38218,
+      "reads": 143,
+      "navigationInterruptions": 0,
+      "transitions": [
+        {
+          "elapsedMs": 296,
+          "bridge": {
+            "device": true,
+            "installer": true
+          },
+          "device": {
+            "read": "fulfilled",
+            "status": "offline",
+            "deviceIdPresent": false,
+            "signedIn": false,
+            "server": null
+          },
+          "installer": {
+            "read": "fulfilled",
+            "present": true,
+            "status": "running",
+            "step": "install",
+            "target": "this-computer",
+            "reason": "none",
+            "bootstrapErrorCode": null,
+            "retryable": false
+          }
+        },
+        {
+          "elapsedMs": 33732,
+          "bridge": {
+            "device": true,
+            "installer": true
+          },
+          "device": {
+            "read": "fulfilled",
+            "status": "offline",
+            "deviceIdPresent": false,
+            "signedIn": false,
+            "server": null
+          },
+          "installer": {
+            "read": "fulfilled",
+            "present": true,
+            "status": "running",
+            "step": "service",
+            "target": "this-computer",
+            "reason": "none",
+            "bootstrapErrorCode": null,
+            "retryable": false
+          }
+        },
+        {
+          "elapsedMs": 34776,
+          "bridge": {
+            "device": true,
+            "installer": true
+          },
+          "device": {
+            "read": "fulfilled",
+            "status": "offline",
+            "deviceIdPresent": false,
+            "signedIn": false,
+            "server": null
+          },
+          "installer": {
+            "read": "fulfilled",
+            "present": true,
+            "status": "running",
+            "step": "connect",
+            "target": "this-computer",
+            "reason": "none",
+            "bootstrapErrorCode": null,
+            "retryable": false
+          }
+        },
+        {
+          "elapsedMs": 35975,
+          "bridge": {
+            "device": true,
+            "installer": true
+          },
+          "device": {
+            "read": "fulfilled",
+            "status": "online",
+            "deviceIdPresent": false,
+            "signedIn": false,
+            "server": "unregistered"
+          },
+          "installer": {
+            "read": "fulfilled",
+            "present": true,
+            "status": "running",
+            "step": "connect",
+            "target": "this-computer",
+            "reason": "none",
+            "bootstrapErrorCode": null,
+            "retryable": false
+          }
+        },
+        {
+          "elapsedMs": 36863,
+          "bridge": {
+            "device": true,
+            "installer": true
+          },
+          "device": {
+            "read": "fulfilled",
+            "status": "online",
+            "deviceIdPresent": false,
+            "signedIn": true,
+            "server": "unregistered"
+          },
+          "installer": {
+            "read": "fulfilled",
+            "present": true,
+            "status": "running",
+            "step": "connect",
+            "target": "this-computer",
+            "reason": "none",
+            "bootstrapErrorCode": null,
+            "retryable": false
+          }
+        },
+        {
+          "elapsedMs": 37417,
+          "bridge": {
+            "device": true,
+            "installer": true
+          },
+          "device": {
+            "read": "fulfilled",
+            "status": "online",
+            "deviceIdPresent": true,
+            "signedIn": true,
+            "server": "unregistered"
+          },
+          "installer": {
+            "read": "fulfilled",
+            "present": true,
+            "status": "running",
+            "step": "connect",
+            "target": "this-computer",
+            "reason": "none",
+            "bootstrapErrorCode": null,
+            "retryable": false
+          }
+        },
+        {
+          "elapsedMs": 37957,
+          "bridge": {
+            "device": true,
+            "installer": true
+          },
+          "device": {
+            "read": "fulfilled",
+            "status": "online",
+            "deviceIdPresent": true,
+            "signedIn": true,
+            "server": "online"
+          },
+          "installer": {
+            "read": "fulfilled",
+            "present": true,
+            "status": "running",
+            "step": "connect",
+            "target": "this-computer",
+            "reason": "none",
+            "bootstrapErrorCode": null,
+            "retryable": false
+          }
+        },
+        {
+          "elapsedMs": 38218,
+          "bridge": {
+            "device": true,
+            "installer": true
+          },
+          "device": {
+            "read": "fulfilled",
+            "status": "online",
+            "deviceIdPresent": true,
+            "signedIn": true,
+            "server": "online"
+          },
+          "installer": {
+            "read": "fulfilled",
+            "present": true,
+            "status": "online",
+            "step": "connect",
+            "target": "this-computer",
+            "reason": "none",
+            "bootstrapErrorCode": null,
+            "retryable": false
+          }
+        }
+      ],
+      "overflow": false,
+      "failure": null,
+      "daemon": {
+        "source": "local_daemon_hello",
+        "status": "connected",
+        "daemonVersion": "0.0.562",
+        "protocolVersion": 3
+      },
+      "environment": {
+        "available": true,
+        "profileMatches": true,
+        "overrideMatches": true,
+        "files": {
+          "daemon.sock": "socket",
+          "daemon.secret": "file",
+          "daemon.pid": "file",
+          "daemon.lock": "directory",
+          "device.json": "file"
+        },
+        "service": {
+          "platform": "darwin",
+          "definition": "file",
+          "profile": "matches",
+          "dev": true,
+          "installedVersion": "0.0.562",
+          "installedRevision": "111a8dfb8b227ac0441324339ff42e4328ea609a"
+        }
+      }
+    },
+    {
+      "mode": "hosted",
+      "ready": true,
+      "deadlineMs": 480000,
+      "elapsedMs": 35,
+      "reads": 1,
+      "navigationInterruptions": 0,
+      "transitions": [
+        {
+          "elapsedMs": 35,
+          "bridge": {
+            "device": true,
+            "installer": true
+          },
+          "device": {
+            "read": "fulfilled",
+            "status": "online",
+            "deviceIdPresent": true,
+            "signedIn": true,
+            "server": "online"
+          },
+          "installer": {
+            "read": "fulfilled",
+            "present": false,
+            "status": "absent",
+            "step": "absent",
+            "target": "absent",
+            "reason": "none",
+            "bootstrapErrorCode": null,
+            "retryable": false
+          }
+        }
+      ],
+      "overflow": false,
+      "failure": null,
+      "daemon": {
+        "source": "local_daemon_hello",
+        "status": "connected",
+        "daemonVersion": "0.0.562",
+        "protocolVersion": 3
+      },
+      "environment": {
+        "available": true,
+        "profileMatches": true,
+        "overrideMatches": true,
+        "files": {
+          "daemon.sock": "socket",
+          "daemon.secret": "file",
+          "daemon.pid": "file",
+          "daemon.lock": "directory",
+          "device.json": "file"
+        },
+        "service": {
+          "platform": "darwin",
+          "definition": "file",
+          "profile": "matches",
+          "dev": true,
+          "installedVersion": "0.0.562",
+          "installedRevision": "111a8dfb8b227ac0441324339ff42e4328ea609a"
+        }
+      }
+    }
+  ],
+  "nativeCleanup": {
+    "cleaned": true,
+    "counts": {
+      "desktop_auth_requests": 1,
+      "device_token_devices": 1,
+      "device_management_commands": 0,
+      "device_repos": 0,
+      "agents": 2,
+      "device_tokens": 1,
+      "device_enrollments": 0,
+      "devices": 1
+    }
+  },
+  "workspaceNameCleanup": {
+    "captured": true,
+    "phase": "restored",
+    "restored": true,
+    "initialName": {
+      "en": false,
+      "zhCN": true
+    },
+    "initialOwnerMatchesSealedBaseline": false,
+    "beforeName": {
+      "en": true,
+      "zhCN": false
+    },
+    "peerMatchesSealedBaseline": true,
+    "onlyGeneratedNameDifference": true,
+    "afterName": {
+      "en": false,
+      "zhCN": true
+    },
+    "ownerMatchesSealedBaseline": true
+  },
+  "result": "passed",
+  "cleanup": "passed",
+  "finishedAt": "2026-11-09T16:44:23.476Z",
+  "pageErrors": []
+}

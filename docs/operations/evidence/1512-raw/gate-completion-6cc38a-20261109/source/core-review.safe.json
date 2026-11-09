@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "repository": "alexj11324/Mikka",
+  "runId": 42653081708,
+  "attempt": 1,
+  "jobId": 129285073849,
+  "jobName": "Core unit checks",
+  "jobNameEvidenceLine": 32,
+  "metadata": {
+    "status": "completed",
+    "conclusion": "success",
+    "startedAt": "2026-11-09T16:20:10Z",
+    "completedAt": "2026-11-09T16:26:35Z",
+    "provider": "acceptance_review metadata owner"
+  },
+  "eventHead": "6cc38aca620d16b25eebe0c8787747885a2cceb1",
+  "actualCheckout": "16dcb17d4d20c32ffbc3f4d3e40b05a594d340f6",
+  "tree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+  "sourceBinding": "80fc5ed0f94ba26ed38736af8c8562d8cfaf0b77",
+  "checkoutEvidenceLines": [
+    131,
+    132
+  ],
+  "raw": {
+    "jobId": 129285073849,
+    "runId": 42653081708,
+    "attempt": 1,
+    "bytes": 1021274,
+    "sha256": "8ba1341bc51ed045df77736ff1cf4fb43aae1f96ce22432fec9958363a9e2171",
+    "gitBlob": "307a913d9431d297b77677765e73af0111da1757",
+    "readsByThisAgent": 1
+  },
+  "runtime": {
+    "node": "v24.22.2",
+    "pnpm": "10.34.3",
+    "install": "pnpm install --frozen-lockfile"
+  },
+  "targetReconciliation": {
+    "selected": 57,
+    "observed": 57,
+    "uniqueObserved": 57,
+    "missing": [],
+    "unexpected": [],
+    "duplicates": [],
+    "summaryCount": 57,
+    "summaryLine": 7851,
+    "summaryMissing": [],
+    "summaryUnexpected": [],
+    "nxCacheLine": 7855
+  },
+  "command": {
+    "entry": "node scripts/ci/run-units.mjs core",
+    "line": 501,
+    "nxCache": "Skipped (--skip-nx-cache)",
+    "nxCacheEvidenceLine": 7855,
+    "meaning": "Nx cache was disabled; all 57 selected target headings and final success target list match exactly."
+  },
+  "driver": {
+    "actualPassedExactlyOnce": 74,
+    "originalCases": 63,
+    "addedCases": 11,
+    "source": [
+      {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ebbf83b8d39c5471f9daaf0ed9bf0dfa758214e4"
+      },
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "104075571c73b97a985458f206dba310e4894490"
+      },
+      {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "2e3c8c7aad0594df165caf8f798c72034b3d484f"
+      }
+    ],
+    "target": "ci-tasks:core-53",
+    "script": "test:dev-local",
+    "commandLine": 6532,
+    "caseLines": [
+      6614,
+      6700
+    ],
+    "standaloneFileSummary": false
+  },
+  "reporterBoundary": {
+    "nodeSummaryGroups": 92,
+    "nonzeroFailedCancelledSkippedTodoSummaries": [],
+    "overallMixedReporterTestCount": null
+  },
+  "cleanup": {
+    "observed": [
+      "Post job cleanup",
+      "git extraheader unset",
+      "Cleaning up orphan processes"
+    ],
+    "evidenceLines": [
+      7864,
+      7886
+    ],
+    "providerDeletionProof": false,
+    "readerResources": 0
+  },
+  "warnings": "Original Node action and runtime deprecation warnings remain unchanged in raw log.",
+  "privacy": {
+    "githubMaskingRetained": true,
+    "closedPatternHits": {
+      "private_key": 0,
+      "github_token": 0,
+      "posthog_key": 0,
+      "aws_key": 0,
+      "nonmasked_bearer": 0,
+      "signed_url": 0,
+      "email": 0
+    },
+    "knownBuildSecret": "Fixed public CI fixture only; no production credential read.",
+    "scope": "Bounded scan; not exhaustive secret audit."
+  },
+  "boundaries": [
+    "This is a new execution bound to 6cc/16dcb/tree9628, not 932/86f8 or Native486 A2.",
+    "No Integration, database, Native, browser or production pass is inferred from this Core job.",
+    "Source job's 63-case migration suite is distinct from this driver's original63+11 cases."
+  ],
+  "activity": {
+    "originalLogFetches": 1,
+    "retries": 0,
+    "testsTriggered": 0,
+    "resources": 0,
+    "refUpdates": 0
+  }
+}

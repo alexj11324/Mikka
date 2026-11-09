@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-11-09 16:37:13 UTC",
+  "actualUpstreamMerge": {
+    "sha": "8db16095f46be955df22f42914e0f89b6e5f3d11",
+    "tree": "18b539c3541594cfa540d1e178985f00d03ab4fc",
+    "parents": [
+      "e189d7652fd2fce48b77a3697abf5bb177d8ebd1",
+      "8c423db291f8121980267cd48a24e428c992f618"
+    ],
+    "mergedAt": "2026-11-09T16:34:17Z",
+    "ownerMerged": true
+  },
+  "newSynthetic": {
+    "sha": "0bb80be7d79ca559d073b5d944cba1a02c03070c",
+    "tree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+    "parents": [
+      "8db16095f46be955df22f42914e0f89b6e5f3d11",
+      "6cc38aca620d16b25eebe0c8787747885a2cceb1"
+    ]
+  },
+  "actualCI": {
+    "run": 42653081708,
+    "attempt": 1,
+    "checkout": "16dcb17d4d20c32ffbc3f4d3e40b05a594d340f6",
+    "tree": "9628e365dede1eaf6b45bab3ad35dfce11fbdace",
+    "completion": "pending Native/strict"
+  },
+  "exactSameWholeTree": true,
+  "newSyntheticExecutionClaimed": false,
+  "additionalPushOrCIRequested": false,
+  "actualRuntimeRelease": {
+    "run": 42656120803,
+    "status": "in_progress",
+    "pass": false
+  },
+  "ownMainMerge": false
+}
