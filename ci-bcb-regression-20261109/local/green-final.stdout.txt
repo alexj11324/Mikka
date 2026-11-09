@@ -1,0 +1,48 @@
+✔ cost selection requires a concrete Secret path and all exact-attempt publication jobs (3.54862ms)
+✔ artifact identity binds repository, source, run, attempt, expiry, size and immutable GitHub endpoints (1.959554ms)
+✔ release report identity, both real subscription pins and computed worker hash are mandatory (2.659095ms)
+✔ ZIP parsing reads only one bounded release.json and never extracts arbitrary archive paths (1037.5805ms)
+✔ artifact download authenticates only the fixed API, does not forward tokens, and verifies exact archive bytes (55.721316ms)
+✔ driver accepts automatic execution only with exact source/attempt/artifact/worker attestation and both models (1.9102ms)
+✔ live release verification rejects missing/duplicate artifacts and a rerun or moving main during the check (8.16169ms)
+✔ the actual pre-checkout script permits current official release or exact manual main (175.536665ms)
+✔ the actual pre-checkout script refuses fork, PR, wrong workflow/attempt/source and exhausted receiver retry (837.350477ms)
+✔ every OIDC read is directly preceded by source/attempt/public-build attestation and credentials stay scoped (0.763127ms)
+✔ the actual Factory job condition never turns preflight or a single-model manual request into writes (5.090587ms)
+✔ Factory uses only the original ACME credentials and real execute path, with fresh guards at both OIDC reads (0.826251ms)
+✔ the existing Factory wrapper executes without a progress token, browser, GitHub request or credential alias (4.701131ms)
+✔ real CI CLI binds artifact bytes then refuses changed source/attempt/public build before credentials (1167.328318ms)
+✔ default is read-only preflight; execute requires exact main and worker/template pins (6.196949ms)
+✔ a production canary request returns the concrete review plan before any account or provider access (6.707355ms)
+✔ native scope fixes the repository, branch prefix, model harness and public fixture origin (0.916847ms)
+✔ the exact native launcher verifies bundle bytes and never includes the synthetic canary or sealing key (1.813524ms)
+✔ only the exact native tool input/output pair can supply a receipt; model prose and other runs cannot (4.021831ms)
+✔ receipt projection drops arbitrary credentials/URLs and refuses unconfirmed cleanup, leaked canaries and changed versions (3.232716ms)
+✔ normal cloud execution completes without opt-in diagnostic receipts and keeps its native proofs (23.730696ms)
+✔ optional diagnostics cannot replace a successful native tool, post-tool reply, matching terminal run or external proof (39.562098ms)
+✔ invalid, truncated and failed optional runtime diagnostics never supply an authorization census (5.577728ms)
+✔ only an official release attestation references its candidate census, without claiming measurements for native cases (2.022117ms)
+✔ the finite canary scan returns counts and booleans, never matching or unrelated file/environment values (39.916231ms)
+✔ native Git exercises clone/fetch/push/draft-PR and verifies close/delete without a main write (9.517946ms)
+✔ ambiguous PR creation preserves remote evidence; changed heads or actors never authorize cleanup (24.413813ms)
+✔ normal task cleanup preserves the issue when external Git cleanup needs recovery, without changing its default (0.88587ms)
+✔ the bundled real egress and bridge source resolves without SQL/auth dependencies or secret configuration (132.777069ms)
+✔ the real local fixture binds one run, returns only sealed grants, and rejects expired, wrong-policy and rotated capabilities (78.273188ms)
+✔ fixture cleanup refuses a mismatched provider identity, and setup failure attempts cleanup on its own VM only (2.681808ms)
+✔ workflow reuses existing OIDC scopes and serial owner lane, with no GitHub write or production-canary switch (6.596419ms)
+✔ failures remain closed codes even when an exception carries a credential in message or cause (0.314403ms)
+✔ 预览分区 Cookie 保持 HttpOnly、Secure 和 SameSite=None (17.136912ms)
+✔ 验收恢复需要用户授权，且不改用不安全的客户端会话 (8.018946ms)
+✔ Safari 授权必须在点击调用栈内发生，授权完成后才导航 (1.293543ms)
+✔ Safari 拒绝授权时不重定向、不再次创建访客会话 (0.669195ms)
+✔ 不支持 Storage Access 的内嵌浏览器应使用独立入口而不是重复失败 (0.404327ms)
+✔ 独立标签页直接建立第一方会话，无需第三方授权 (0.352479ms)
+✔ the installed SDK calls a protected third-party JSON endpoint in real children before and after grant renewal (827.432514ms)
+ℹ tests 40
+ℹ suites 0
+ℹ pass 40
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3843.2357

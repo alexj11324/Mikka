@@ -1,0 +1,36 @@
+{
+  "observedAt": "2026-11-09T15:07:15Z",
+  "attribution": "root forwarded the CI monitor metadata; monitor did not read logs or artifacts",
+  "oldRun": {
+    "runId": 42637842262,
+    "runAttempt": 1,
+    "headSha": "bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb",
+    "status": "completed",
+    "conclusion": "cancelled",
+    "updatedAt": "2026-11-09T15:01:40Z",
+    "integrationJob": {
+      "id": 129231163760,
+      "conclusion": "failure",
+      "failedStepNumber": 4,
+      "failedStepName": "Run selected integration tasks through Nx Core",
+      "failedStepCompletedAt": "2026-11-09T14:51:48Z"
+    },
+    "reportedCancelledGroups": [
+      "image",
+      "Desktop packaged",
+      "UI strict"
+    ],
+    "otherGroupsReportedAs": "success or skipped; not relabelled as all green",
+    "contextReportedByRoot": "terminal state after a normal push of the new PR head"
+  },
+  "newRun": {
+    "runId": 42640371114,
+    "runAttempt": 1,
+    "headSha": "4c2efa6e9c57af88168c2d57039982ae29a9b54e",
+    "failureObservedAtSnapshot": false,
+    "integrationJobId": 129241331485,
+    "integrationAtSnapshot": "waiting to run; no actual test result reported",
+    "fullCiPassedClaimed": false
+  },
+  "scope": "metadata follow-up only, not a new test run or replacement for the original failing job log"
+}

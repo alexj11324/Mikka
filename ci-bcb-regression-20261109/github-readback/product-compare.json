@@ -1,0 +1,283 @@
+{
+  "url": "https://api.github.com/repos/alexj11324/Mikka/compare/bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb...4c2efa6e9c57af88168c2d57039982ae29a9b54e",
+  "html_url": "https://github.com/alexj11324/Mikka/compare/bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb...4c2efa6e9c57af88168c2d57039982ae29a9b54e",
+  "permalink_url": "https://github.com/alexj11324/Mikka/compare/alexj11324:bcb7ea6...alexj11324:4c2efa6",
+  "diff_url": "https://github.com/alexj11324/Mikka/compare/bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb...4c2efa6e9c57af88168c2d57039982ae29a9b54e.diff",
+  "patch_url": "https://github.com/alexj11324/Mikka/compare/bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb...4c2efa6e9c57af88168c2d57039982ae29a9b54e.patch",
+  "base_commit": {
+    "sha": "bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb",
+    "node_id": "C_kwDOVRYxA9oAKGJjYjdlYTY5NWEwN2U0NzllZjJjNmZkNTIzMzJhNmYwOThkMWYxZmI",
+    "commit": {
+      "author": {
+        "name": "Zhixuan Jiang",
+        "email": "zhixuanj@andrew.cmu.edu",
+        "date": "2026-11-09T14:43:43Z"
+      },
+      "committer": {
+        "name": "Zhixuan Jiang",
+        "email": "zhixuanj@andrew.cmu.edu",
+        "date": "2026-11-09T14:43:43Z"
+      },
+      "message": "fix: combine verified runtime conservation and tool outcome gates",
+      "tree": {
+        "sha": "6748ac1196b68773b198ae5a690db4122a287fcb",
+        "url": "https://api.github.com/repos/alexj11324/Mikka/git/trees/6748ac1196b68773b198ae5a690db4122a287fcb"
+      },
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb",
+      "comment_count": 0,
+      "verification": {
+        "verified": false,
+        "reason": "unsigned",
+        "signature": null,
+        "payload": null,
+        "verified_at": null
+      }
+    },
+    "url": "https://api.github.com/repos/alexj11324/Mikka/commits/bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb",
+    "html_url": "https://github.com/alexj11324/Mikka/commit/bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb",
+    "comments_url": "https://api.github.com/repos/alexj11324/Mikka/commits/bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb/comments",
+    "author": {
+      "login": "alexj11324",
+      "id": 183887963,
+      "node_id": "U_kgDOCvXoWw",
+      "avatar_url": "https://avatars.githubusercontent.com/u/183887963?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/alexj11324",
+      "html_url": "https://github.com/alexj11324",
+      "followers_url": "https://api.github.com/users/alexj11324/followers",
+      "following_url": "https://api.github.com/users/alexj11324/following{/other_user}",
+      "gists_url": "https://api.github.com/users/alexj11324/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/alexj11324/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/alexj11324/subscriptions",
+      "organizations_url": "https://api.github.com/users/alexj11324/orgs",
+      "repos_url": "https://api.github.com/users/alexj11324/repos",
+      "events_url": "https://api.github.com/users/alexj11324/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/alexj11324/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "committer": {
+      "login": "alexj11324",
+      "id": 183887963,
+      "node_id": "U_kgDOCvXoWw",
+      "avatar_url": "https://avatars.githubusercontent.com/u/183887963?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/alexj11324",
+      "html_url": "https://github.com/alexj11324",
+      "followers_url": "https://api.github.com/users/alexj11324/followers",
+      "following_url": "https://api.github.com/users/alexj11324/following{/other_user}",
+      "gists_url": "https://api.github.com/users/alexj11324/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/alexj11324/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/alexj11324/subscriptions",
+      "organizations_url": "https://api.github.com/users/alexj11324/orgs",
+      "repos_url": "https://api.github.com/users/alexj11324/repos",
+      "events_url": "https://api.github.com/users/alexj11324/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/alexj11324/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "parents": [
+      {
+        "sha": "b7c5018597f293222488cc0a245a1e2d134a21c2",
+        "url": "https://api.github.com/repos/alexj11324/Mikka/commits/b7c5018597f293222488cc0a245a1e2d134a21c2",
+        "html_url": "https://github.com/alexj11324/Mikka/commit/b7c5018597f293222488cc0a245a1e2d134a21c2"
+      },
+      {
+        "sha": "4bff6e5c00bdd43153aaca2d350b675b8df0e179",
+        "url": "https://api.github.com/repos/alexj11324/Mikka/commits/4bff6e5c00bdd43153aaca2d350b675b8df0e179",
+        "html_url": "https://github.com/alexj11324/Mikka/commit/4bff6e5c00bdd43153aaca2d350b675b8df0e179"
+      }
+    ]
+  },
+  "merge_base_commit": {
+    "sha": "bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb",
+    "node_id": "C_kwDOVRYxA9oAKGJjYjdlYTY5NWEwN2U0NzllZjJjNmZkNTIzMzJhNmYwOThkMWYxZmI",
+    "commit": {
+      "author": {
+        "name": "Zhixuan Jiang",
+        "email": "zhixuanj@andrew.cmu.edu",
+        "date": "2026-11-09T14:43:43Z"
+      },
+      "committer": {
+        "name": "Zhixuan Jiang",
+        "email": "zhixuanj@andrew.cmu.edu",
+        "date": "2026-11-09T14:43:43Z"
+      },
+      "message": "fix: combine verified runtime conservation and tool outcome gates",
+      "tree": {
+        "sha": "6748ac1196b68773b198ae5a690db4122a287fcb",
+        "url": "https://api.github.com/repos/alexj11324/Mikka/git/trees/6748ac1196b68773b198ae5a690db4122a287fcb"
+      },
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb",
+      "comment_count": 0,
+      "verification": {
+        "verified": false,
+        "reason": "unsigned",
+        "signature": null,
+        "payload": null,
+        "verified_at": null
+      }
+    },
+    "url": "https://api.github.com/repos/alexj11324/Mikka/commits/bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb",
+    "html_url": "https://github.com/alexj11324/Mikka/commit/bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb",
+    "comments_url": "https://api.github.com/repos/alexj11324/Mikka/commits/bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb/comments",
+    "author": {
+      "login": "alexj11324",
+      "id": 183887963,
+      "node_id": "U_kgDOCvXoWw",
+      "avatar_url": "https://avatars.githubusercontent.com/u/183887963?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/alexj11324",
+      "html_url": "https://github.com/alexj11324",
+      "followers_url": "https://api.github.com/users/alexj11324/followers",
+      "following_url": "https://api.github.com/users/alexj11324/following{/other_user}",
+      "gists_url": "https://api.github.com/users/alexj11324/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/alexj11324/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/alexj11324/subscriptions",
+      "organizations_url": "https://api.github.com/users/alexj11324/orgs",
+      "repos_url": "https://api.github.com/users/alexj11324/repos",
+      "events_url": "https://api.github.com/users/alexj11324/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/alexj11324/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "committer": {
+      "login": "alexj11324",
+      "id": 183887963,
+      "node_id": "U_kgDOCvXoWw",
+      "avatar_url": "https://avatars.githubusercontent.com/u/183887963?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/alexj11324",
+      "html_url": "https://github.com/alexj11324",
+      "followers_url": "https://api.github.com/users/alexj11324/followers",
+      "following_url": "https://api.github.com/users/alexj11324/following{/other_user}",
+      "gists_url": "https://api.github.com/users/alexj11324/gists{/gist_id}",
+      "starred_url": "https://api.github.com/users/alexj11324/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/alexj11324/subscriptions",
+      "organizations_url": "https://api.github.com/users/alexj11324/orgs",
+      "repos_url": "https://api.github.com/users/alexj11324/repos",
+      "events_url": "https://api.github.com/users/alexj11324/events{/privacy}",
+      "received_events_url": "https://api.github.com/users/alexj11324/received_events",
+      "type": "User",
+      "user_view_type": "public",
+      "site_admin": false
+    },
+    "parents": [
+      {
+        "sha": "b7c5018597f293222488cc0a245a1e2d134a21c2",
+        "url": "https://api.github.com/repos/alexj11324/Mikka/commits/b7c5018597f293222488cc0a245a1e2d134a21c2",
+        "html_url": "https://github.com/alexj11324/Mikka/commit/b7c5018597f293222488cc0a245a1e2d134a21c2"
+      },
+      {
+        "sha": "4bff6e5c00bdd43153aaca2d350b675b8df0e179",
+        "url": "https://api.github.com/repos/alexj11324/Mikka/commits/4bff6e5c00bdd43153aaca2d350b675b8df0e179",
+        "html_url": "https://github.com/alexj11324/Mikka/commit/4bff6e5c00bdd43153aaca2d350b675b8df0e179"
+      }
+    ]
+  },
+  "status": "ahead",
+  "ahead_by": 1,
+  "behind_by": 0,
+  "total_commits": 1,
+  "commits": [
+    {
+      "sha": "4c2efa6e9c57af88168c2d57039982ae29a9b54e",
+      "node_id": "C_kwDOVRYxA9oAKDRjMmVmYTZlOWM1N2FmODgxNjhjMmQ1NzAzOTk4MmFlMjlhOWI1NGU",
+      "commit": {
+        "author": {
+          "name": "Zhixuan Jiang",
+          "email": "zhixuanj@andrew.cmu.edu",
+          "date": "2026-11-09T15:00:25Z"
+        },
+        "committer": {
+          "name": "Zhixuan Jiang",
+          "email": "zhixuanj@andrew.cmu.edu",
+          "date": "2026-11-09T15:00:25Z"
+        },
+        "message": "test: use native Codex command outcomes in secrets fixture",
+        "tree": {
+          "sha": "00ce4e05bb696a492183f361e4ada67eb9627e30",
+          "url": "https://api.github.com/repos/alexj11324/Mikka/git/trees/00ce4e05bb696a492183f361e4ada67eb9627e30"
+        },
+        "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/4c2efa6e9c57af88168c2d57039982ae29a9b54e",
+        "comment_count": 0,
+        "verification": {
+          "verified": false,
+          "reason": "unsigned",
+          "signature": null,
+          "payload": null,
+          "verified_at": null
+        }
+      },
+      "url": "https://api.github.com/repos/alexj11324/Mikka/commits/4c2efa6e9c57af88168c2d57039982ae29a9b54e",
+      "html_url": "https://github.com/alexj11324/Mikka/commit/4c2efa6e9c57af88168c2d57039982ae29a9b54e",
+      "comments_url": "https://api.github.com/repos/alexj11324/Mikka/commits/4c2efa6e9c57af88168c2d57039982ae29a9b54e/comments",
+      "author": {
+        "login": "alexj11324",
+        "id": 183887963,
+        "node_id": "U_kgDOCvXoWw",
+        "avatar_url": "https://avatars.githubusercontent.com/u/183887963?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/alexj11324",
+        "html_url": "https://github.com/alexj11324",
+        "followers_url": "https://api.github.com/users/alexj11324/followers",
+        "following_url": "https://api.github.com/users/alexj11324/following{/other_user}",
+        "gists_url": "https://api.github.com/users/alexj11324/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/alexj11324/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/alexj11324/subscriptions",
+        "organizations_url": "https://api.github.com/users/alexj11324/orgs",
+        "repos_url": "https://api.github.com/users/alexj11324/repos",
+        "events_url": "https://api.github.com/users/alexj11324/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/alexj11324/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "committer": {
+        "login": "alexj11324",
+        "id": 183887963,
+        "node_id": "U_kgDOCvXoWw",
+        "avatar_url": "https://avatars.githubusercontent.com/u/183887963?v=4",
+        "gravatar_id": "",
+        "url": "https://api.github.com/users/alexj11324",
+        "html_url": "https://github.com/alexj11324",
+        "followers_url": "https://api.github.com/users/alexj11324/followers",
+        "following_url": "https://api.github.com/users/alexj11324/following{/other_user}",
+        "gists_url": "https://api.github.com/users/alexj11324/gists{/gist_id}",
+        "starred_url": "https://api.github.com/users/alexj11324/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/alexj11324/subscriptions",
+        "organizations_url": "https://api.github.com/users/alexj11324/orgs",
+        "repos_url": "https://api.github.com/users/alexj11324/repos",
+        "events_url": "https://api.github.com/users/alexj11324/events{/privacy}",
+        "received_events_url": "https://api.github.com/users/alexj11324/received_events",
+        "type": "User",
+        "user_view_type": "public",
+        "site_admin": false
+      },
+      "parents": [
+        {
+          "sha": "bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb",
+          "url": "https://api.github.com/repos/alexj11324/Mikka/commits/bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb",
+          "html_url": "https://github.com/alexj11324/Mikka/commit/bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "sha": "b0e809572a9f89f087d8bdb4b572858db8c2dcdf",
+      "filename": "scripts/acceptance/task-secrets.test.mjs",
+      "status": "modified",
+      "additions": 8,
+      "deletions": 3,
+      "changes": 11,
+      "blob_url": "https://github.com/alexj11324/Mikka/blob/4c2efa6e9c57af88168c2d57039982ae29a9b54e/scripts%2Facceptance%2Ftask-secrets.test.mjs",
+      "raw_url": "https://github.com/alexj11324/Mikka/raw/4c2efa6e9c57af88168c2d57039982ae29a9b54e/scripts%2Facceptance%2Ftask-secrets.test.mjs",
+      "contents_url": "https://api.github.com/repos/alexj11324/Mikka/contents/scripts%2Facceptance%2Ftask-secrets.test.mjs?ref=4c2efa6e9c57af88168c2d57039982ae29a9b54e",
+      "patch": "@@ -73,7 +73,8 @@ function goodReceipt() {\n }\n function toolPair(value, command) {\n   return { chunks: [{ chunk: { type: 'tool-input-available', toolCallId: `${runId}:tool1`, toolName: 'bash', input: { command } } },\n-    { chunk: { type: 'tool-output-available', toolCallId: `${runId}:tool1`, output: `MIKKA_1712_NATIVE ${JSON.stringify(value)}\\n` } }] }\n+    { chunk: { type: 'tool-output-available', toolCallId: `${runId}:tool1`,\n+      output: { exitCode: 0, output: `MIKKA_1712_NATIVE ${JSON.stringify(value)}\\n` } } }] }\n }\n \n test('only the exact native tool input/output pair can supply a receipt; model prose and other runs cannot', () => {\n@@ -220,9 +221,13 @@ test('normal cloud execution completes without opt-in diagnostic receipts and ke\n   assert.deepEqual(report.authorizationCensus, { source: 'unavailable', reason: 'release_attestation_not_supplied', taskCases: 'not_measured' })\n })\n \n-test('optional diagnostics cannot replace the native tool, post-tool reply, matching terminal run or external proof', async () => {\n+test('optional diagnostics cannot replace a successful native tool, post-tool reply, matching terminal run or external proof', async () => {\n   const changes = {\n     missingTool: detail => { detail.chunks = detail.chunks.filter(item => !item.chunk.type.startsWith('tool-')) },\n+    failedNativeExit: detail => { detail.chunks.find(item => item.chunk.type === 'tool-output-available').chunk.output.exitCode = 1 },\n+    unknownNativeExit: detail => { detail.chunks.find(item => item.chunk.type === 'tool-output-available').chunk.output.exitCode = null },\n+    missingNativeExit: detail => { delete detail.chunks.find(item => item.chunk.type === 'tool-output-available').chunk.output.exitCode },\n+    stringNativeExit: detail => { detail.chunks.find(item => item.chunk.type === 'tool-output-available').chunk.output.exitCode = '0' },\n     missingReply: detail => { detail.chunks = detail.chunks.filter(item => item.chunk.type !== 'text-delta') },\n     replyBeforeTool: detail => { detail.chunks.splice(1, 0, detail.chunks.pop()) },\n     notTerminal: detail => { detail.thread.status = 'running' },\n@@ -231,7 +236,7 @@ test('optional diagnostics cannot replace the native tool, post-tool reply, matc\n     succeeded: detail => { detail.thread.status = 'succeeded' },\n     completed: detail => { detail.thread.status = 'completed' },\n     foreignTerminal: detail => { detail.thread.id = caseId },\n-    missingNativeProof: detail => { detail.chunks.find(item => item.chunk.type === 'tool-output-available').chunk.output = 'done' },\n+    missingNativeProof: detail => { detail.chunks.find(item => item.chunk.type === 'tool-output-available').chunk.output = { exitCode: 0, output: 'done' } },\n     missingAgentStart: detail => { detail.chunks.shift() },\n   }\n   for (const [name, change] of Object.entries(changes)) {"
+    }
+  ]
+}

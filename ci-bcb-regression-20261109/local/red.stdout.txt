@@ -1,0 +1,69 @@
+✔ cost selection requires a concrete Secret path and all exact-attempt publication jobs (3.532887ms)
+✔ artifact identity binds repository, source, run, attempt, expiry, size and immutable GitHub endpoints (2.37006ms)
+✔ release report identity, both real subscription pins and computed worker hash are mandatory (2.955701ms)
+✔ ZIP parsing reads only one bounded release.json and never extracts arbitrary archive paths (745.136915ms)
+✔ artifact download authenticates only the fixed API, does not forward tokens, and verifies exact archive bytes (43.529372ms)
+✔ driver accepts automatic execution only with exact source/attempt/artifact/worker attestation and both models (2.138773ms)
+✔ live release verification rejects missing/duplicate artifacts and a rerun or moving main during the check (8.499118ms)
+✔ the actual pre-checkout script permits current official release or exact manual main (144.168424ms)
+✔ the actual pre-checkout script refuses fork, PR, wrong workflow/attempt/source and exhausted receiver retry (704.661111ms)
+✔ every OIDC read is directly preceded by source/attempt/public-build attestation and credentials stay scoped (0.809716ms)
+✔ the actual Factory job condition never turns preflight or a single-model manual request into writes (5.356447ms)
+✔ Factory uses only the original ACME credentials and real execute path, with fresh guards at both OIDC reads (1.02502ms)
+✔ the existing Factory wrapper executes without a progress token, browser, GitHub request or credential alias (4.501713ms)
+✔ real CI CLI binds artifact bytes then refuses changed source/attempt/public build before credentials (1139.700279ms)
+✔ default is read-only preflight; execute requires exact main and worker/template pins (1.932433ms)
+✔ a production canary request returns the concrete review plan before any account or provider access (1.72436ms)
+✔ native scope fixes the repository, branch prefix, model harness and public fixture origin (0.678159ms)
+✔ the exact native launcher verifies bundle bytes and never includes the synthetic canary or sealing key (0.404498ms)
+✔ only the exact native tool input/output pair can supply a receipt; model prose and other runs cannot (1.739943ms)
+✔ receipt projection drops arbitrary credentials/URLs and refuses unconfirmed cleanup, leaked canaries and changed versions (2.90881ms)
+✖ normal cloud execution completes without opt-in diagnostic receipts and keeps its native proofs (13.159662ms)
+✔ optional diagnostics cannot replace the native tool, post-tool reply, matching terminal run or external proof (13.444457ms)
+✔ invalid, truncated and failed optional runtime diagnostics never supply an authorization census (3.505326ms)
+✔ only an official release attestation references its candidate census, without claiming measurements for native cases (1.239943ms)
+✔ the finite canary scan returns counts and booleans, never matching or unrelated file/environment values (20.814318ms)
+✔ native Git exercises clone/fetch/push/draft-PR and verifies close/delete without a main write (5.094093ms)
+✔ ambiguous PR creation preserves remote evidence; changed heads or actors never authorize cleanup (11.120366ms)
+✔ normal task cleanup preserves the issue when external Git cleanup needs recovery, without changing its default (0.640351ms)
+✔ the bundled real egress and bridge source resolves without SQL/auth dependencies or secret configuration (95.278781ms)
+✔ the real local fixture binds one run, returns only sealed grants, and rejects expired, wrong-policy and rotated capabilities (84.069762ms)
+✔ fixture cleanup refuses a mismatched provider identity, and setup failure attempts cleanup on its own VM only (1.874156ms)
+✔ workflow reuses existing OIDC scopes and serial owner lane, with no GitHub write or production-canary switch (15.762138ms)
+✔ failures remain closed codes even when an exception carries a credential in message or cause (0.40659ms)
+✔ 预览分区 Cookie 保持 HttpOnly、Secure 和 SameSite=None (20.844152ms)
+✔ 验收恢复需要用户授权，且不改用不安全的客户端会话 (12.045896ms)
+✔ Safari 授权必须在点击调用栈内发生，授权完成后才导航 (1.286713ms)
+✔ Safari 拒绝授权时不重定向、不再次创建访客会话 (0.681514ms)
+✔ 不支持 Storage Access 的内嵌浏览器应使用独立入口而不是重复失败 (0.229224ms)
+✔ 独立标签页直接建立第一方会话，无需第三方授权 (0.201283ms)
+✔ the installed SDK calls a protected third-party JSON endpoint in real children before and after grant renewal (542.160379ms)
+ℹ tests 40
+ℹ suites 0
+ℹ pass 39
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3394.210632
+
+✖ failing tests:
+
+test at scripts/acceptance/task-secrets.test.mjs:209:1
+✖ normal cloud execution completes without opt-in diagnostic receipts and keeps its native proofs (13.159662ms)
+  AssertionError [ERR_ASSERTION]: {"version":1,"issue":1712,"sourceCommit":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","origin":"https://app.aspectlylabs.com","startedAt":"2026-11-09T14:58:05.487Z","mode":"execute","status":"blocked","productionCanary":{"executed":false,"requiresSeparateReview":true,"changes":["create_one_owner_private_synthetic_protected_secret","configure_fixture_https_method_path_policy","create_optional_separately_acknowledged_synthetic_direct_control","rotate_only_own_fixture_value","delete_only_created_fixture_ids"],"impact":"effective_secret_changes_stop_the_owners_active_runs_including_other_workspaces","prerequisites":["owner_idle","serialized_acceptance","exact_served_build_and_worker","explicit_approval_of_these_production_writes"],"cleanup":"stop_and_retire_owned_test_runs_then_delete_only_recorded_synthetic_secret_ids_and_verify_absence","excluded":["vault_changes","real_credential_rotation","permission_changes","shared_secret_changes"]},"productionStoreMutated":false,"externalEvidenceStillRequired":["production_claim_store_canary","PostHog_canary_absence","screenshots_checkpoints_templates","Factory_full_acceptance"],"authorizationCensus":{"source":"unavailable","reason":"release_attestation_not_supplied","taskCases":"not_measured"},"cases":[{"caseId":"6078b0ee-8f9e-4ca7-9854-98ef3fe89562","sampleId":"6078b0ee-8f9e-4ca7-9854-98ef3fe89562","harness":"codex","requestedModel":"gpt-6-luna","title":"测试 1712 6078b0ee-8f9e-4ca7-9854-98ef3fe89562 codex","sourceCommit":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","workerSha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","workerSourceCommit":"cccccccccccccccccccccccccccccccccccccccc","requireReply":true,"minToolCalls":1,"requireReplyAfterTool":true,"requireRuntimeReceipt":false,"requireTerminal":true,"runtimeDiagnostics":{"enabledByDriver":false,"required":false,"executionGateUsed":false,"authorizationCensusUsed":false,"status":"not_observed"},"stages":[{"stage":"agent_start","ms":10,"ok":true}],"status":"blocked","cleanup":{"status":"passed","errors":[],"factoryCancelled":true,"runStopped_22222222-2222-4222-8222-222222222222":true,"machines":[{"runId":"22222222-2222-4222-8222-222222222222","requestedAt":"2026-11-09T14:58:05.498Z","outcome":"ended","state":"ended","finishedAt":"2026-11-09T14:58:05.498Z"}],"machineEnded_22222222-2222-4222-8222-222222222222":true,"machineViews":[{"runId":"22222222-2222-4222-8222-222222222222","observedAt":"2026-11-09T14:58:05.498Z","kind":"cloud","state":"ended","sandboxIdHash":null}],"machineVerified_22222222-2222-4222-8222-222222222222":true,"taskDeleted":true},"remoteCleanupTarget":{"repository":"alexj11324/Mikka-handoff","branch":"acceptance/1712/6078b0ee-8f9e-4ca7-9854-98ef3fe89562/codex","mergeAuthorized":false,"status":"verified_closed_and_branch_absent"},"commandSha256":"69f9c77d937b7ec609e2aad637e09b5992276a323084595b920fea08cdc2e981","profileId":"00000000-0000-4000-8000-000000000003","issueId":"00000000-0000-4000-8000-000000000004","requestTraceId":"0000000000000000ace42ae0a07db609","messageSubmittedAt":"2026-11-09T14:58:05.494Z","dispatchObservedAt":"2026-11-09T14:58:05.495Z","runId":"22222222-2222-4222-8222-222222222222","runIdHash":"b454f82c5857ebab","placement":{"kind":"cloud"},"dispatchReturnedAt":"2026-11-09T14:58:05.495Z","coordinatorStopped":true,"execution":{"harness":"codex","model":"gpt-6-luna","credentialType":"subscription","deviceId":"00000000-0000-4000-8000-000000000005","subscriptionRoute":"codex_cli","identity":{"version":1,"requesterHash":"8d7fb59264488de0","executionPrincipalHash":"8d7fb59264488de0","model":"subscription","runtime":"e2b","subscriptionAccess":["workspace_share"]},"sharedScope":{"verified":true,"requesterHash":"8d7fb59264488de0","payerHash":"f3beaa3ad11919ba","workspaceHash":"d4632d75c4b4e459d9879dd105fe69e6d3d1ad7e72affa150a044995445338a8","connectionHash":"a8353ed0bde97e78","bindingHash":"a8353ed0bde97e78","connectionRevision":"1","profileVersion":1,"profileDigest":"6666666666666666666666666666666666666666666666666666666666666666","access":"workspace_share"}},"toolCalls":[{"toolCallHash":"e1e2e705d58a1bc5","startedAt":null,"outcome":"ok","completedAt":null}],"startupTimingStatus":"unavailable","preparationTimingStatus":"unavailable","agentStart":{"storedAt":null,"observedAt":"2026-11-09T14:58:05.497Z"},"firstProviderChunk":{"type":"tool-input-available","storedAt":null,"observedAt":"2026-11-09T14:58:05.497Z"},"replyVerified":true,"replyVerifiedAfterTool":false,"lastStatus":"stopped","native":{"version":1,"caseId":"6078b0ee-8f9e-4ca7-9854-98ef3fe89562","runId":"22222222-2222-4222-8222-222222222222","harness":"codex","status":"passed","nativeToolCallHash":"e1e2e705d58a1bc5","commandSha256":"69f9c77d937b7ec609e2aad637e09b5992276a323084595b920fea08cdc2e981","runtime":{"workerSha":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","sourceCommit":"cccccccccccccccccccccccccccccccccccccccc","node":"v24.0.0"},"before":{"matched":false,"truncated":false,"files":10,"bytes":1000,"unavailable":0,"scope":"own_environment_parent_process_runtime_homes_worktree_bounded_scan"},"after":{"matched":false,"truncated":false,"files":10,"bytes":1000,"unavailable":0,"scope":"own_environment_parent_process_runtime_homes_worktree_bounded_scan"},"github":{"branch":"acceptance/1712/6078b0ee-8f9e-4ca7-9854-98ef3fe89562/codex","filename":"acceptance-1712-6078b0ee-8f9e-4ca7-9854-98ef3fe89562.txt","cleanup":true,"commit":"1111111111111111111111111111111111111111","defaultBranchBefore":"2222222222222222222222222222222222222222","defaultBranchAfter":"2222222222222222222222222222222222222222","draftPrNumber":3,"fileSha256":"4444444444444444444444444444444444444444444444444444444444444444","fileBytes":100,"githubActorHash":"5555555555555555","times":{"cloneMs":1,"fetchMs":2,"pushMs":3,"draftPrMs":4}},"http":{"scope":"isolated_key_and_canary_real_egress_and_bridge_code","client":"node_fetch_base_url_dummy_key","samples":10,"baseline":"same_fixture_public_unauthenticated_https_route","productionClaimTested":false,"productionStoreRotationTested":false,"statuses":{"method":403,"path":403,"echo":502,"redirect":502,"origin":403,"authOverride":403,"expired":410,"crossRun":403,"rotatedKey":401},"direct":{"p50Ms":1,"p95Ms":2},"protected":{"p50Ms":3,"p95Ms":4}}},"machine":{"template":"released-codex","sandboxIdHash":"3e01fc3b8f975b83"},"failure":"startup_ended_before_execution_proof"}],"cleanup":{"errors":[],"workspaceRestored":true,"sessionClosed":true},"ownerHash":"8d7fb59264488de0","team":{"teamWorkspaceConfirmed":true,"teamWorkspaceHash":"d4632d75c4b4e459d9879dd105fe69e6d3d1ad7e72affa150a044995445338a8","teamSelectionBasis":"unique-active-admin-identity-match","teamOwnerAttribution":"AGENTS.md-and-owner-comment-1504-6691409495","teamAdminMembershipVerified":true},"visibleIssueCount":0,"preflight":{"ownerVisibleRunsIdle":true,"fallbackDisabled":true,"githubRepositoryVisible":true,"existingPreferencesChanged":false},"fixture":{"scope":"synthetic-test-transport","cleanup":{"status":"passed"}},"bot":{"id":"00000000-0000-4000-8000-000000000002","retention":"dedicated_test_bot_no_delete_api"},"finishedAt":"2026-11-09T14:58:05.499Z"}
+  + actual - expected
+  
+  + 'blocked'
+  - 'scoped_external_acceptance_passed'
+  
+      at TestContext.<anonymous> (file:///workspace/scratch/263e36984c81/Mikka-1505/scripts/acceptance/task-secrets.test.mjs:211:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: 'blocked',
+    expected: 'scoped_external_acceptance_passed',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }

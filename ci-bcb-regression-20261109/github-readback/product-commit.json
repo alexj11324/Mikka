@@ -1,0 +1,35 @@
+{
+  "sha": "4c2efa6e9c57af88168c2d57039982ae29a9b54e",
+  "node_id": "C_kwDOVRYxA9oAKDRjMmVmYTZlOWM1N2FmODgxNjhjMmQ1NzAzOTk4MmFlMjlhOWI1NGU",
+  "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/4c2efa6e9c57af88168c2d57039982ae29a9b54e",
+  "html_url": "https://github.com/alexj11324/Mikka/commit/4c2efa6e9c57af88168c2d57039982ae29a9b54e",
+  "author": {
+    "name": "Zhixuan Jiang",
+    "email": "zhixuanj@andrew.cmu.edu",
+    "date": "2026-11-09T15:00:25Z"
+  },
+  "committer": {
+    "name": "Zhixuan Jiang",
+    "email": "zhixuanj@andrew.cmu.edu",
+    "date": "2026-11-09T15:00:25Z"
+  },
+  "tree": {
+    "sha": "00ce4e05bb696a492183f361e4ada67eb9627e30",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/trees/00ce4e05bb696a492183f361e4ada67eb9627e30"
+  },
+  "message": "test: use native Codex command outcomes in secrets fixture",
+  "parents": [
+    {
+      "sha": "bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb",
+      "html_url": "https://github.com/alexj11324/Mikka/commit/bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb"
+    }
+  ],
+  "verification": {
+    "verified": false,
+    "reason": "unsigned",
+    "signature": null,
+    "payload": null,
+    "verified_at": null
+  }
+}

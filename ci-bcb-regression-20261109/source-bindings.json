@@ -1,0 +1,68 @@
+{
+  "repository": "alexj11324/Mikka",
+  "evidenceParent": "db35b84328b3a73032c206892051e2acb9fd8c1d",
+  "evidenceBaseTree": "310c8a2d5774f1710cab9865f108a30ced18ebb2",
+  "baseline": {
+    "commit": "bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb",
+    "tree": "6748ac1196b68773b198ae5a690db4122a287fcb",
+    "fixture": {
+      "path": "scripts/acceptance/task-secrets.test.mjs",
+      "bytes": 34196,
+      "sha256": "314f587fff7faa8b68da9b2174c60f031d945e055d4ae62fb06aafda4fa5ffb4",
+      "gitBlob": "0ce4f154b8ec73ec0a9dd42902f073a3b83ba66f"
+    },
+    "url": "https://github.com/alexj11324/Mikka/blob/bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb/scripts/acceptance/task-secrets.test.mjs"
+  },
+  "fixtureFix": {
+    "commit": "4c2efa6e9c57af88168c2d57039982ae29a9b54e",
+    "tree": "00ce4e05bb696a492183f361e4ada67eb9627e30",
+    "soleParent": "bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb",
+    "onlyChangedPath": "scripts/acceptance/task-secrets.test.mjs",
+    "additions": 8,
+    "deletions": 3,
+    "fixture": {
+      "path": "scripts/acceptance/task-secrets.test.mjs",
+      "bytes": 34811,
+      "sha256": "a054629c3239e7ac3da5a31c61f34afdedd30d335375deb3de824acb5e35b93d",
+      "gitBlob": "b0e809572a9f89f087d8bdb4b572858db8c2dcdf"
+    },
+    "gitHubCommitAndCompareReadbackVerified": true,
+    "localFixtureMatchesRemoteBlob": true,
+    "url": "https://github.com/alexj11324/Mikka/commit/4c2efa6e9c57af88168c2d57039982ae29a9b54e",
+    "rootReportedPublication": {
+      "normalFastForward": true,
+      "reportedAt": "2026-11-09T15:01:00Z",
+      "timePrecision": "minute",
+      "pr": 1805,
+      "newCiTriggered": true,
+      "newCiResultClaimed": false,
+      "attribution": "root message; the product commit is no longer described as unreferenced"
+    }
+  },
+  "patch": {
+    "path": "source/fixture-fix.patch",
+    "bytes": 3073,
+    "sha256": "366fde1c61f4dbcf2e0883b5af289fdeeb7997d9e6a635f62d71111c4fd92b99",
+    "gitBlob": "a65b934c26ab82dead1d2eeb42c7b9e098db5159"
+  },
+  "intermediateGreen": {
+    "snapshotSaved": false,
+    "reconstructedForArchive": false,
+    "rootReportedDifferenceFromFinal": "only missingNativeProof output was still the string 'done'"
+  },
+  "rootLocalNormalization": {
+    "rawRecord": "root-verification/local-final-checkout-and-worker-hash.json",
+    "fetchThenStageWriteTreeDetachClean": true,
+    "tree": "00ce4e05bb696a492183f361e4ada67eb9627e30",
+    "workerHashes": {
+      "bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb": "330b07a15ab6b5b0670d798736062ec1d053694e",
+      "4c2efa6e9c57af88168c2d57039982ae29a9b54e": "330b07a15ab6b5b0670d798736062ec1d053694e"
+    },
+    "workerHashComputationAttribution": "root report: build-template.py --worker-hash --source-ref for each fixed source; original outputs preserved",
+    "meaning": "this test-only fixture change does not change the candidate worker fingerprint",
+    "actualPublishedWorkerProof": false,
+    "eligibleAsFormalExpectedWorkerPinByItself": false
+  },
+  "codeChangedByArchivist": false,
+  "refsChangedByArchivist": false
+}

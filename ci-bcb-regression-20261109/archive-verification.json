@@ -1,0 +1,28 @@
+{
+  "createdAt": "2026-11-09T15:08:47.927695+00:00",
+  "purpose": "preserve existing failure and bounded regression evidence",
+  "inputDirectory": "/workspace/scratch/263e36984c81/ci-bcb-regression-1505",
+  "sourceDirectory": "/workspace/scratch/263e36984c81/Mikka-1505",
+  "allOriginalBytesCopiedExactly": true,
+  "originalLogExpectedBytesAndSha256Matched": true,
+  "allNineLocalOutputAndResultFilesCopiedExactly": true,
+  "finalFixtureExpectedBytesSha256AndGitBlobMatched": true,
+  "productCommitAndCompareReadback": "verified via fixed GitHub API objects before archiving",
+  "sourcePatchDerivedFrom": "read-only git diff against exact bcb, final working file matched 4c2 blob",
+  "newTestCommandsRun": 0,
+  "newVmCreated": false,
+  "newProductionReads": 0,
+  "newModelRequests": 0,
+  "gitHubRawLogsOrArtifactDownloads": 0,
+  "productEditsByArchivist": 0,
+  "refsChangedByArchivist": 0,
+  "metadataApiLimitation": "generic github_fetch did not allow the standalone actions/jobs endpoint; no logs were redownloaded; exact job/run metadata supplied by root",
+  "claimsNotMade": [
+    "new complete CI success",
+    "production subscription acceptance",
+    "actual canary execution",
+    "full Factory acceptance",
+    "five-second production startup",
+    "fresh scope activated"
+  ]
+}

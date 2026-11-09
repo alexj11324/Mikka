@@ -1,0 +1,21 @@
+{
+  "repository": "alexj11324/Mikka",
+  "workflowRunId": 42637842262,
+  "runAttempt": 1,
+  "headSha": "bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb",
+  "jobId": 129231163760,
+  "name": "Integration unit checks",
+  "startedAt": "2026-11-09T14:46:43Z",
+  "completedAt": "2026-11-09T14:51:52Z",
+  "conclusion": "failure",
+  "failedNxTarget": "integration-16",
+  "failedTest": "scripts/acceptance/task-secrets.test.mjs:209:1",
+  "nodeVersion": "v24.22.2",
+  "localReproductionNodeVersion": "v24.22.1",
+  "originalLog": {
+    "bytes": 670017,
+    "sha256": "969cf789cece66ab88416c6b0a14dba7324c7ee8f48e5602dd0ffc3be66e591f",
+    "lines": 4974
+  },
+  "readCountByRoot": 1
+}

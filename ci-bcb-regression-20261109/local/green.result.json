@@ -1,0 +1,18 @@
+{
+  "sourceBase": "bcb7ea695a07e479ef2c6fd52332a6f098d1f1fb",
+  "changedFiles": [
+    "scripts/acceptance/task-secrets.test.mjs"
+  ],
+  "args": [
+    "node",
+    "--import",
+    "tsx",
+    "--test",
+    "tests/acceptance.test.mjs",
+    "scripts/acceptance/task-secrets.test.mjs",
+    "scripts/acceptance/task-secrets-ci.test.mjs",
+    "tests/task-secret-sdk.test.ts"
+  ],
+  "exitCode": 0,
+  "durationSeconds": 3.4925811290740967
+}
