@@ -1,0 +1,24 @@
+{
+  "artifactId": 13655911206,
+  "run": 42576948008,
+  "source": "af78045a57d58516fbfe5604255251a91faeb6ed",
+  "zipBytes": 1920,
+  "zipSha256": "f8dce5e9dba3d6ef461616dcb0c36f70e7ce1a16b08fb8d48e404586721fbfd9",
+  "files": [
+    {
+      "name": "cleanup-original-child.json",
+      "bytes": 321,
+      "sha256": "c93269e1a6c62c72f6b582b1905201464c7d419dbba38b58ba345e0ce2b50a4c"
+    },
+    {
+      "name": "original-child-input.json",
+      "bytes": 1691,
+      "sha256": "4d68933de480e7a56ee9b83606708ea80fdc533a507ba22d4118b2320eb7aaec"
+    },
+    {
+      "name": "receipt.json",
+      "bytes": 1691,
+      "sha256": "f81a81a6e668f45daa01af217fba5e5bf294888e969c25c5efa4323507f47d26"
+    }
+  ]
+}

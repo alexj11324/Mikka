@@ -1,0 +1,87 @@
+{
+  "schema": "issue1505-readonly-renewal.v1",
+  "run": 42576948008,
+  "attempt": 1,
+  "source": "af78045a57d58516fbfe5604255251a91faeb6ed",
+  "parent": "4dff704382a5f91fdc3146826fe1cb1e39fa4fb7",
+  "workflowBlob": "52c329bdfadb83e4540f110e3495d17abd21e4d4",
+  "job": 129026686977,
+  "jobCompletedAt": "2026-11-09T07:05:34Z",
+  "status": "success",
+  "rawLog": {
+    "job": 129026686977,
+    "run": 42576948008,
+    "attempt": 1,
+    "bytes": 389026,
+    "sha256": "d92eb13a46e014a0f437622a0a2abe080c4e4e32454501996cf8765b09f0f80a",
+    "readCount": 1
+  },
+  "rawLogLimitedScan": [
+    {
+      "name": "github-token",
+      "count": 0
+    },
+    {
+      "name": "private-key",
+      "count": 0
+    },
+    {
+      "name": "signed-url",
+      "count": 0
+    }
+  ],
+  "artifact": {
+    "id": 13655911206,
+    "name": "issue1505-github-readonly-renewal-receipts",
+    "size_in_bytes": 1920,
+    "url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13655911206",
+    "archive_download_url": "https://api.github.com/repos/alexj11324/Mikka/actions/artifacts/13655911206/zip",
+    "expired": false,
+    "created_at": "2026-11-09T07:05:31Z",
+    "expires_at": "2026-11-12T07:05:30Z",
+    "updated_at": "2026-11-09T07:05:31Z",
+    "digest": "sha256:f8dce5e9dba3d6ef461616dcb0c36f70e7ce1a16b08fb8d48e404586721fbfd9",
+    "workflow_run": {
+      "id": 42576948008,
+      "repository_id": 1427517699,
+      "head_repository_id": 1427517699,
+      "head_branch": "ops/1505-smoke-github-readonly-20261109",
+      "head_sha": "af78045a57d58516fbfe5604255251a91faeb6ed"
+    }
+  },
+  "zipActuallyDownloadedAndVerified": true,
+  "threeJsonFilesReadFromActualZip": true,
+  "logAppClientIdWasMasked": true,
+  "clientIdTakenOnlyFromActualArtifact": true,
+  "oldReceiptSha256": "4d68933de480e7a56ee9b83606708ea80fdc533a507ba22d4118b2320eb7aaec",
+  "newReceiptSha256": "f81a81a6e668f45daa01af217fba5e5bf294888e969c25c5efa4323507f47d26",
+  "closure": {
+    "commit": "286ae62b4a5c3147bc99452973584637ca310464",
+    "readbackVerified": true,
+    "run": 42577319322,
+    "result": "skipped",
+    "if": false,
+    "go": ""
+  },
+  "receiptVm": {
+    "id": "sbx_3S8aVhDVVTdmEmZY03H57e39vHKS",
+    "status": "stopped",
+    "stoppedAt": "2026-11-09T07:10:24.329Z",
+    "durationMs": 104642
+  },
+  "deadlineBoundary": {
+    "entryDeadline": "2026-11-09T07:07:00Z",
+    "checkedAtSourceAndBeforeCredentialsAndBeforeCleanup": true,
+    "notCheckedBetweenCleanupAndPrepare": true,
+    "notGlobalKillTimer": true,
+    "actualPrepareCompletedBeforeDeadline": true
+  },
+  "production": {
+    "models": 0,
+    "businessTasks": 0,
+    "newE2bVms": 0,
+    "newFormalSamples": 0,
+    "ownerRefreshAttempted": false,
+    "ownerConnectionUnchanged": true
+  }
+}

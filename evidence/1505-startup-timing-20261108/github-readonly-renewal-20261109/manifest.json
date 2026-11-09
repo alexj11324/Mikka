@@ -1,0 +1,53 @@
+{
+  "schema": "issue1505-readonly-renewal-manifest.v1",
+  "files": [
+    {
+      "path": "terminal-job.log",
+      "bytes": 389026,
+      "sha256": "d92eb13a46e014a0f437622a0a2abe080c4e4e32454501996cf8765b09f0f80a",
+      "gitBlob": "92eb3304df31bc745f29435de83d305f22b0522f"
+    },
+    {
+      "path": "receipt.json",
+      "bytes": 1691,
+      "sha256": "f81a81a6e668f45daa01af217fba5e5bf294888e969c25c5efa4323507f47d26",
+      "gitBlob": "5a248cd7c3d015d5a453bc9f4c5f41647883c2a8"
+    },
+    {
+      "path": "cleanup-original-child.json",
+      "bytes": 321,
+      "sha256": "c93269e1a6c62c72f6b582b1905201464c7d419dbba38b58ba345e0ce2b50a4c",
+      "gitBlob": "f79fce573116fecc25e0a4d9e2f9bc918ccb63aa"
+    },
+    {
+      "path": "original-child-input.json",
+      "bytes": 1691,
+      "sha256": "4d68933de480e7a56ee9b83606708ea80fdc533a507ba22d4118b2320eb7aaec",
+      "gitBlob": "d54c64b04be3929aeed98c2748dd0528e17d9ad2"
+    },
+    {
+      "path": "artifact-manifest.json",
+      "bytes": 698,
+      "sha256": "d1d2bbd9757a79f3e0c79e3e2959a7626ea54766e81d7a87b4a7f20d18bcf43e",
+      "gitBlob": "6a137a55afaad1113c2b1cdda7d25f124f5749da"
+    },
+    {
+      "path": "metadata.json",
+      "bytes": 2735,
+      "sha256": "8bb22866f547ba118c56b9b65dd443e3b7bd2039090e9fe15190d7fbd67fa72c",
+      "gitBlob": "70e6c4fcb03240ad23ea1b79303ba4f4f11b40f8"
+    },
+    {
+      "path": "README.md",
+      "bytes": 1597,
+      "sha256": "9d83278dabefda01339bc93e213aca9c3c0b8e684aedbef625d4818952904ec7",
+      "gitBlob": "8210d95f2c2f26855c3671b5c99f7fa6c88bf2c5"
+    },
+    {
+      "path": "artifact.zip",
+      "bytes": 1920,
+      "sha256": "f8dce5e9dba3d6ef461616dcb0c36f70e7ce1a16b08fb8d48e404586721fbfd9",
+      "gitBlob": "baa8a733a036c09c5f26675aff821e276e6666ad"
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "issue": 1505,
+  "operation": "prepare",
+  "status": "passed",
+  "stage": "normal_repository_readback",
+  "startedAt": "2026-11-09T03:00:03.304Z",
+  "changed": true,
+  "ownerRefreshAttempted": false,
+  "mintAttempted": true,
+  "ownerProviderExpiresAt": "2026-11-09T07:19:45.000Z",
+  "mintOutcome": "received",
+  "mintedTokenSha256": "5c40a52b822aeb0b48c2b12f6e31c77aef9d5db3139cccb0ae258fa7cc413e01",
+  "minted": {
+    "tokenSha256": "5c40a52b822aeb0b48c2b12f6e31c77aef9d5db3139cccb0ae258fa7cc413e01",
+    "providerExpiresAt": "2026-11-09T11:00:06.000Z",
+    "appId": "4840908",
+    "repositoryId": "1436202099",
+    "installationId": "173164679",
+    "permissions": {
+      "metadata": "read",
+      "contents": "read"
+    },
+    "mintScopeConfirmed": true,
+    "checkTokenScopeConfirmed": false
+  },
+  "state": {
+    "version": 1,
+    "issue": 1505,
+    "userId": "cL1NXe1mr7WuIS8xWhU37v0p7kNoUMY3",
+    "ownerUserId": "XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ",
+    "githubAccountId": "183887963",
+    "githubLogin": "alexj11324",
+    "repository": "alexj11324/Mikka-handoff",
+    "appId": "4840908",
+    "appClientId": "Iv23limn1G88pOO6pvyJ",
+    "repositoryId": "1436202099",
+    "installationId": "173164679",
+    "tokenSha256": "5c40a52b822aeb0b48c2b12f6e31c77aef9d5db3139cccb0ae258fa7cc413e01",
+    "providerExpiresAt": "2026-11-09T11:00:06.000Z",
+    "connectionExpiresAt": "2026-11-09T06:59:59.266Z",
+    "connectionUpdatedAt": "2026-11-09T03:00:09.267Z"
+  },
+  "readback": {
+    "connected": true,
+    "samePrincipal": true,
+    "repositoryAccessible": true,
+    "sameAppInstallation": true
+  },
+  "ownerUnchanged": true,
+  "completedAt": "2026-11-09T03:00:10.610Z"
+}
