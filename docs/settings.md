@@ -1,7 +1,9 @@
 # Settings surface
 
 Each section is a small heading over one card of rows, as in
-Comma's 「模型与 API」 (decision 2026-10-30).
+Comma's 「模型与 API」 (decision 2026-10-30). This is the open-source default
+settings surface; the hosted settings are affectUI screens used as shipped
+([2026-11-09-0050](design/decisions/2026-11-09-0050-paid-blocks-as-shipped.md)).
 `components/settings/primitives.tsx` owns the shapes; product code only
 supplies content.
 

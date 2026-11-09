@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { uuid } from 'expo'
 import { Spinner } from '@/components/icons'
 import { ListTopFade } from '@/components/NavBar'
+import { useScrolledUnderBar } from '@/components/BarBackdrop'
 import { runIcon } from '@/lib/thread-icon'
 import { Arrival, BotBubble, EventLine, MessageActions, MessageRow, MyBubble, OutgoingBubble, Reactions, ThreadCard, TimeSeparator, useChatPhotos } from '@/components/chat'
 import { myReaction, toggled, withMine } from '@/lib/reactions'
@@ -72,6 +73,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
   const insets = useSafeAreaInsets()
   const list = useRef<ChatListHandle>(null)
   const [atLatest, setAtLatest] = useState(true)
+  const underBar = useScrolledUnderBar()
   const photos = useChatPhotos()
   // The composer floats over the end of the list; the list leaves room for it.
   const [composerHeight, setComposerHeight] = useState(90)
@@ -321,7 +323,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
   return (
     <View style={styles.screen}>
       {/* Back is the system's (and its edge swipe); the title pill opens the bot's page, ⋯ its tasks and its page. */}
-      <ChatHeader name={name} color={color} shape={shape} botId={ownBotId} coordinator={self === 'coordinator'} tasks={tasks.data ? menuTasks(tasks.data.tasks, ownBotId) : null} onTask={id => router.push(`/task/${id}`)}
+      <ChatHeader scrolled={underBar.scrolled} name={name} color={color} shape={shape} botId={ownBotId} coordinator={self === 'coordinator'} tasks={tasks.data ? menuTasks(tasks.data.tasks, ownBotId) : null} onTask={id => router.push(`/task/${id}`)}
         onAllTasks={() => router.push(`/bots/${self}/tasks`)} onInfo={() => router.push(`/bots/${self}/info`)} />
       {/* The message list comes first, so the iOS bar finds it and blurs what scrolls under (scroll-edge effect). */}
       <View style={{ flex: 1, overflow: 'hidden' }}
@@ -332,7 +334,7 @@ export function ChatScreen({ botId, name, color, shape, draft, focus, compose, c
           if (down && endsSelection(down, { x: event.nativeEvent.pageX, y: event.nativeEvent.pageY, at: Date.now() }, selectionRect.current)) setSelection(null)
         } : undefined}>
         {/* The system scroll: momentum, and a bounce at both ends even while the chat is shorter than the screen. */}
-        <ChatMessageList ref={list} testID="bot-chat-scroll" data={items} scrollEnabled bottomInset={composerHeight} onAtLatestChange={setAtLatest}
+        <ChatMessageList ref={list} testID="bot-chat-scroll" data={items} scrollEnabled onScrollUnderBar={underBar.onScroll} bottomInset={composerHeight} onAtLatestChange={setAtLatest}
           keyOf={item => item.pending ? `pending-${item.position}` : String(item.position)} renderItem={renderItem} anchorIndex={anchorIndex}
           onStartReached={data?.historyBefore ? () => void loadOlder() : undefined}
           header={loadingOlder ? <View style={styles.older}><Spinner size={16} /></View> : null}
