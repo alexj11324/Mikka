@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "checkpoint": 47,
+  "parentCheckpointCommit": "b29f818f9c655b438f47eb0f652d59a1fba63a04",
+  "prefix": "docs/operations/evidence/1512-raw/upstream-1839-preparation-20261109",
+  "payloadFileCount": 1,
+  "payloadBytes": 179816,
+  "indexAndReadmeExcludedFromPayload": true,
+  "productionCases": 0,
+  "ownedActiveResources": 0,
+  "files": [
+    {
+      "path": "source-overlap.safe.json",
+      "mode": "100644",
+      "bytes": 179816,
+      "sha256": "d6363b9efd3d735073bf5e510c1cafb47280051c4edbc07a86a38cc25a4c28f2",
+      "gitBlob": "914e3641f3dd590b7c651558504ebba34712fab6"
+    }
+  ]
+}

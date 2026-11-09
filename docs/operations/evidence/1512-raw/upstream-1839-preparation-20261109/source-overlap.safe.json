@@ -1,0 +1,5816 @@
+{
+  "schema": "mikka.issue1512.pr1839.read-only-integration-preparation.v1",
+  "observedAtUtc": "2026-11-09 21:07:17 UTC",
+  "status": "PASS_CURRENT_FIXED_SOURCE_DISJOINT; FUTURE_1505_COMPATIBILITY_SOURCE_UNKNOWN; NO_MERGE_OR_RUNTIME_EXECUTED",
+  "scope": {
+    "repository": "alexj11324/Mikka",
+    "issue": 1512,
+    "dependencyPr": 1839,
+    "commonBase": "7848e79df9c5af67e526aeed1c828858db392066",
+    "ownFixedCommit": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+    "dependencyFixedCommit": "205d26db8f8435ab18ce74d1b14c9669550098e4",
+    "observedMain": "12458fe22e1217f644e8b28f82ab856211e73b72"
+  },
+  "pullRequest": {
+    "url": "https://github.com/alexj11324/Mikka/pull/1839",
+    "number": 1839,
+    "title": "fix(daemon): require local Mikka MCP before Codex turns",
+    "state": "open",
+    "merged": false,
+    "draft": false,
+    "baseRef": "main",
+    "recordedBaseSha": "7848e79df9c5af67e526aeed1c828858db392066",
+    "headRef": "fix/1503-codex-required-mikka-mcp",
+    "headSha": "205d26db8f8435ab18ce74d1b14c9669550098e4",
+    "commits": 1,
+    "changed_files": 3,
+    "additions": 6,
+    "deletions": 2,
+    "updated_at": "2026-11-09T21:01:05Z",
+    "mergeableProviderValue": true,
+    "syntheticMergeSha": "7cbcc09c5a8e88635c334308f7ac0996089e65de",
+    "syntheticMergeNotUsed": true
+  },
+  "directHeadRef": {
+    "ref": "refs/heads/fix/1503-codex-required-mikka-mcp",
+    "node_id": "REF_kwDOVRYxA9oALHJlZnMvaGVhZHMvZml4LzE1MDMtY29kZXgtcmVxdWlyZWQtbWlra2EtbWNw",
+    "url": "https://api.github.com/repos/alexj11324/Mikka/git/refs/heads/fix/1503-codex-required-mikka-mcp",
+    "object": {
+      "sha": "205d26db8f8435ab18ce74d1b14c9669550098e4",
+      "type": "commit",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/git/commits/205d26db8f8435ab18ce74d1b14c9669550098e4"
+    }
+  },
+  "commits": {
+    "dependency": {
+      "sha": "205d26db8f8435ab18ce74d1b14c9669550098e4",
+      "tree": "bc9ee26434149707781001decacfd3de565e5c63",
+      "parents": [
+        "7848e79df9c5af67e526aeed1c828858db392066"
+      ],
+      "message": "fix(daemon): require local Mikka MCP before Codex turns\n\nWait for the local hand-in server before new and resumed Codex turns, including warm adoption.\n\nRefs #1503"
+    },
+    "own": {
+      "sha": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+      "tree": "e7c7c6ad66acd729278393711c10eeed67c6d7ac",
+      "parents": [
+        "5a0c90774b8c48fc390ea05cf782bbc9cbe79a62",
+        "7848e79df9c5af67e526aeed1c828858db392066"
+      ],
+      "message": "Merge main into Coordinator backfill correction\n\nInclude the actual main merge of PR #1835 at 7848e79 while retaining the reviewed Coordinator empty-legacy backfill source and corrected PostgreSQL fixtures from 5a0c907. Preserve all main changes, the existing Native read corrections, and the unchanged Native measurement harness."
+    },
+    "main": {
+      "sha": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "tree": "3f804659ce05591aefb6d080ea873ba88e32ad46",
+      "parents": [
+        "7848e79df9c5af67e526aeed1c828858db392066",
+        "e3f163ad7945fd338403e6c49af815c541f71c0b"
+      ],
+      "message": "Merge pull request #1838 from alexj11324/docs/readme-bilingual-1837\n\ndocs: simplify English and Chinese READMEs"
+    }
+  },
+  "directGitTreeDiffs": {
+    "baseToDependency": [
+      {
+        "path": "packages/daemon/src/adapters/codex.ts",
+        "before": {
+          "path": "codex.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e85815a955eaff56d7ac389c9d9722c64607345d",
+          "size": 51844
+        },
+        "after": {
+          "path": "codex.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "1c8ca694b2f3eec633fb71440970170485957703",
+          "size": 51989
+        }
+      },
+      {
+        "path": "packages/daemon/src/anonymous-codex-spare.ts",
+        "before": {
+          "path": "anonymous-codex-spare.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "00f476c51799a68c4af5edc38d9a62c91aeea545",
+          "size": 11991
+        },
+        "after": {
+          "path": "anonymous-codex-spare.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "6a314f68d9b2214ab22363d16f4b808a0f1bf88b",
+          "size": 12014
+        }
+      },
+      {
+        "path": "packages/daemon/test/anonymous-codex-hosted.test.ts",
+        "before": {
+          "path": "anonymous-codex-hosted.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "42cb76e8bcaa71490d3a8febb2f1af63342faa2c",
+          "size": 13467
+        },
+        "after": {
+          "path": "anonymous-codex-hosted.test.ts",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "82367fad169531bdbc1213c9de0f392df63d2830",
+          "size": 13589
+        }
+      }
+    ],
+    "baseToMain": [
+      {
+        "path": "README.md",
+        "before": {
+          "path": "README.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "3e6889be962b2ba6c7063f94297d5a30376db3ca",
+          "size": 29903
+        },
+        "after": {
+          "path": "README.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "d59106749f60229439efc9593aea2077bfc1367f",
+          "size": 7761
+        }
+      },
+      {
+        "path": "README.zh-CN.md",
+        "before": {
+          "path": "README.zh-CN.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "74d25464bc7e41d119cea2b1efad8fee8358bca1",
+          "size": 29283
+        },
+        "after": {
+          "path": "README.zh-CN.md",
+          "mode": "100644",
+          "type": "blob",
+          "sha": "842bad68e1a1470b90f4daa90f505494e7656f6b",
+          "size": 7590
+        }
+      }
+    ]
+  },
+  "fetchedFileIdentities": [
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "ref": "7848e79df9c5af67e526aeed1c828858db392066",
+      "bytes": 51844,
+      "sha256": "81a9cd38c8a82440e1dc4afe64cffe2d20078a91a3a4c6004b7718943c35bf00",
+      "gitBlob": "e85815a955eaff56d7ac389c9d9722c64607345d"
+    },
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "ref": "205d26db8f8435ab18ce74d1b14c9669550098e4",
+      "bytes": 51989,
+      "sha256": "3e2ae1b6e0771a95255c3f93c2250483c1e112a81cbfcb39b57500502e269e41",
+      "gitBlob": "1c8ca694b2f3eec633fb71440970170485957703"
+    },
+    {
+      "path": "packages/daemon/src/anonymous-codex-spare.ts",
+      "ref": "7848e79df9c5af67e526aeed1c828858db392066",
+      "bytes": 11991,
+      "sha256": "b7fac1b0fadd1374377ba27b9fe62d60a70a746218fe029237acf870855d6035",
+      "gitBlob": "00f476c51799a68c4af5edc38d9a62c91aeea545"
+    },
+    {
+      "path": "packages/daemon/src/anonymous-codex-spare.ts",
+      "ref": "205d26db8f8435ab18ce74d1b14c9669550098e4",
+      "bytes": 12014,
+      "sha256": "abb1ea435e2f0fc1cf47c38cf36b46482ef6eeb0fe91c1c4c31f2f05c84269eb",
+      "gitBlob": "6a314f68d9b2214ab22363d16f4b808a0f1bf88b"
+    },
+    {
+      "path": "packages/daemon/test/anonymous-codex-hosted.test.ts",
+      "ref": "7848e79df9c5af67e526aeed1c828858db392066",
+      "bytes": 13467,
+      "sha256": "3730a8b054fe913d8075dc510c188c66d2cfcadb51f8868beca2e633a3d824d0",
+      "gitBlob": "42cb76e8bcaa71490d3a8febb2f1af63342faa2c"
+    },
+    {
+      "path": "packages/daemon/test/anonymous-codex-hosted.test.ts",
+      "ref": "205d26db8f8435ab18ce74d1b14c9669550098e4",
+      "bytes": 13589,
+      "sha256": "a38cd6c57ab7cd3135a1d59ddb1d0f04ef7b8cb6d488a55221513df51dc3b8ee",
+      "gitBlob": "82367fad169531bdbc1213c9de0f392df63d2830"
+    }
+  ],
+  "exactFullFileReverseChecks": [
+    {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "edits": [
+        {
+          "from": "      // Hand-in tools must be ready before the first turn, including native resume.\n      \"-c\", `mcp_servers.${MCP_SERVER_NAME}.required=true`,\n",
+          "to": "",
+          "exactOccurrences": 1,
+          "newLine": 480
+        }
+      ],
+      "fullFileReverseEqualsBase": true,
+      "contentMatchesTreeLeaves": true
+    },
+    {
+      "path": "packages/daemon/src/anonymous-codex-spare.ts",
+      "edits": [
+        {
+          "from": "threadConfig: { mcp_servers: { mikka: { ...context.server, required: true } } }",
+          "to": "threadConfig: { mcp_servers: { mikka: context.server } }",
+          "exactOccurrences": 1,
+          "newLine": 189
+        }
+      ],
+      "fullFileReverseEqualsBase": true,
+      "contentMatchesTreeLeaves": true
+    },
+    {
+      "path": "packages/daemon/test/anonymous-codex-hosted.test.ts",
+      "edits": [
+        {
+          "from": ", argv: process.argv",
+          "to": "",
+          "exactOccurrences": 1,
+          "newLine": 33
+        },
+        {
+          "from": "    expect(mcp.required).toBe(true)\n",
+          "to": "",
+          "exactOccurrences": 1,
+          "newLine": 84
+        },
+        {
+          "from": "  expect(login.argv).toContain('mcp_servers.mikka.required=true')\n",
+          "to": "",
+          "exactOccurrences": 1,
+          "newLine": 143
+        }
+      ],
+      "fullFileReverseEqualsBase": true,
+      "contentMatchesTreeLeaves": true
+    }
+  ],
+  "ownCompare": {
+    "base": "7848e79df9c5af67e526aeed1c828858db392066",
+    "head": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+    "status": "ahead",
+    "ahead_by": 29,
+    "behind_by": 0,
+    "merge_base": "7848e79df9c5af67e526aeed1c828858db392066",
+    "files": [
+      {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 0
+      },
+      {
+        "path": "app/actions/coordinator.ts",
+        "status": "modified",
+        "additions": 3,
+        "deletions": 2
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/repos/route.ts",
+        "status": "modified",
+        "additions": 9,
+        "deletions": 6
+      },
+      {
+        "path": "app/v1/devices/[deviceId]/runs/route.ts",
+        "status": "modified",
+        "additions": 9,
+        "deletions": 12
+      },
+      {
+        "path": "apps/api/generated/routes.json",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 2
+      },
+      {
+        "path": "apps/api/generated/routes.ts",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 2
+      },
+      {
+        "path": "apps/desktop/src/renderer/read-batch.ts",
+        "status": "modified",
+        "additions": 11,
+        "deletions": 5
+      },
+      {
+        "path": "apps/desktop/src/renderer/rpc.ts",
+        "status": "modified",
+        "additions": 7,
+        "deletions": 2
+      },
+      {
+        "path": "components/swr-defaults.tsx",
+        "status": "modified",
+        "additions": 4,
+        "deletions": 3
+      },
+      {
+        "path": "components/workspace/issue-workspace.tsx",
+        "status": "modified",
+        "additions": 3,
+        "deletions": 2
+      },
+      {
+        "path": "docs/operations/tracing.md",
+        "status": "modified",
+        "additions": 57,
+        "deletions": 8
+      },
+      {
+        "path": "hooks/use-live-lists.ts",
+        "status": "modified",
+        "additions": 7,
+        "deletions": 6
+      },
+      {
+        "path": "instrumentation-client.ts",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 1
+      },
+      {
+        "path": "lib/analytics-policy.ts",
+        "status": "modified",
+        "additions": 5,
+        "deletions": 4
+      },
+      {
+        "path": "lib/coordinator/coordinator-bot.ts",
+        "status": "modified",
+        "additions": 38,
+        "deletions": 3
+      },
+      {
+        "path": "lib/coordinator/repository-resolution.test.ts",
+        "status": "modified",
+        "additions": 82,
+        "deletions": 0
+      },
+      {
+        "path": "lib/coordinator/repository-resolution.ts",
+        "status": "modified",
+        "additions": 6,
+        "deletions": 2
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-context.test.ts",
+        "status": "modified",
+        "additions": 130,
+        "deletions": 0
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-context.ts",
+        "status": "modified",
+        "additions": 53,
+        "deletions": 6
+      },
+      {
+        "path": "lib/desktop-rpc/read-batch-contract.ts",
+        "status": "modified",
+        "additions": 13,
+        "deletions": 0
+      },
+      {
+        "path": "lib/device-enrollment.db.test.ts",
+        "status": "modified",
+        "additions": 53,
+        "deletions": 0
+      },
+      {
+        "path": "lib/device-enrollment.ts",
+        "status": "modified",
+        "additions": 6,
+        "deletions": 11
+      },
+      {
+        "path": "lib/device-heartbeat.db.test.ts",
+        "status": "modified",
+        "additions": 73,
+        "deletions": 0
+      },
+      {
+        "path": "lib/device-management.ts",
+        "status": "modified",
+        "additions": 9,
+        "deletions": 0
+      },
+      {
+        "path": "lib/device-unit-fence.db.test.ts",
+        "status": "modified",
+        "additions": 13,
+        "deletions": 6
+      },
+      {
+        "path": "lib/dispatch-timing.ts",
+        "status": "modified",
+        "additions": 25,
+        "deletions": 3
+      },
+      {
+        "path": "lib/live/revision-read.ts",
+        "status": "modified",
+        "additions": 6,
+        "deletions": 2
+      },
+      {
+        "path": "lib/personal-policy.test.ts",
+        "status": "modified",
+        "additions": 336,
+        "deletions": 1
+      },
+      {
+        "path": "lib/personal-policy.ts",
+        "status": "modified",
+        "additions": 5,
+        "deletions": 2
+      },
+      {
+        "path": "lib/replay-readiness.ts",
+        "status": "modified",
+        "additions": 12,
+        "deletions": 0
+      },
+      {
+        "path": "lib/swr/read-observer.ts",
+        "status": "modified",
+        "additions": 65,
+        "deletions": 6
+      },
+      {
+        "path": "lib/tracing/logs.test.ts",
+        "status": "modified",
+        "additions": 135,
+        "deletions": 2
+      },
+      {
+        "path": "lib/tracing/node.ts",
+        "status": "modified",
+        "additions": 3,
+        "deletions": 1
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.mjs",
+        "status": "modified",
+        "additions": 7,
+        "deletions": 0
+      },
+      {
+        "path": "scripts/acceptance/run-observability-browser.test.mjs",
+        "status": "modified",
+        "additions": 54,
+        "deletions": 0
+      },
+      {
+        "path": "scripts/acceptance/run-observability.md",
+        "status": "modified",
+        "additions": 12,
+        "deletions": 2
+      },
+      {
+        "path": "scripts/acceptance/run-observability.mjs",
+        "status": "modified",
+        "additions": 180,
+        "deletions": 21
+      },
+      {
+        "path": "scripts/acceptance/run-observability.test.mjs",
+        "status": "modified",
+        "additions": 649,
+        "deletions": 4
+      },
+      {
+        "path": "scripts/e2b/validate-template-subscriptions.mjs",
+        "status": "modified",
+        "additions": 31,
+        "deletions": 0
+      },
+      {
+        "path": "scripts/e2b/validate-template-subscriptions.test.mjs",
+        "status": "modified",
+        "additions": 135,
+        "deletions": 0
+      },
+      {
+        "path": "scripts/use-live-lists.live.test.tsx",
+        "status": "modified",
+        "additions": 486,
+        "deletions": 0
+      },
+      {
+        "path": "tests/analytics-policy.test.mjs",
+        "status": "modified",
+        "additions": 23,
+        "deletions": 0
+      },
+      {
+        "path": "tests/cloud-dispatch-startup.test.ts",
+        "status": "modified",
+        "additions": 55,
+        "deletions": 4
+      },
+      {
+        "path": "tests/coordinator-bot.db.test.ts",
+        "status": "modified",
+        "additions": 316,
+        "deletions": 0
+      },
+      {
+        "path": "tests/live-revision-reads.db.test.ts",
+        "status": "modified",
+        "additions": 40,
+        "deletions": 0
+      },
+      {
+        "path": "tests/replay-readiness.test.mjs",
+        "status": "modified",
+        "additions": 21,
+        "deletions": 3
+      },
+      {
+        "path": "workflows/coordinator/factory-steps.ts",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 1
+      },
+      {
+        "path": "workflows/coordinator/steps.ts",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 1
+      }
+    ]
+  },
+  "intersections": {
+    "ownChangedCount": 48,
+    "ownCompareTooLarge": null,
+    "ownStatus": "ahead",
+    "ownAhead": 29,
+    "ownBehind": 0,
+    "ownVsPrIntersection": [],
+    "ownVsMainIntersection": [],
+    "prVsMainIntersection": []
+  },
+  "structuralDisjointProof": [
+    {
+      "path": "packages",
+      "base": {
+        "path": "packages",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "db151222120ed732ba0146071027170434d9fc66"
+      },
+      "own": {
+        "path": "packages",
+        "mode": "040000",
+        "type": "tree",
+        "sha": "db151222120ed732ba0146071027170434d9fc66"
+      },
+      "unchanged": true
+    },
+    {
+      "path": "README.md",
+      "base": {
+        "path": "README.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3e6889be962b2ba6c7063f94297d5a30376db3ca",
+        "size": 29903
+      },
+      "own": {
+        "path": "README.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3e6889be962b2ba6c7063f94297d5a30376db3ca",
+        "size": 29903
+      },
+      "unchanged": true
+    },
+    {
+      "path": "README.zh-CN.md",
+      "base": {
+        "path": "README.zh-CN.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "74d25464bc7e41d119cea2b1efad8fee8358bca1",
+        "size": 29283
+      },
+      "own": {
+        "path": "README.zh-CN.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "74d25464bc7e41d119cea2b1efad8fee8358bca1",
+        "size": 29283
+      },
+      "unchanged": true
+    }
+  ],
+  "treeVerification": {
+    "method": "Nonrecursive Git tree listings; require nontruncated; reconstruct canonical raw tree bytes and SHA1; recurse only changed tree entries. Equal subtree object IDs preserve every descendant leaf.",
+    "verifier": "function verifyTree(t,utf8,sha1){\n if(t.truncated||!Array.isArray(t.tree))throw Error(\"truncated/missing tree\");\n const encoded=t.tree.map(e=>({e,key:utf8(e.path+(e.type===\"tree\"?\"/\":\"\"))})).sort((a,b)=>{const n=Math.min(a.key.length,b.key.length);for(let i=0;i<n;i++)if(a.key[i]!==b.key[i])return a.key[i]-b.key[i];return a.key.length-b.key.length});\n let b=[];for(const {e} of encoded){b.push(...utf8(e.mode.replace(/^0+/,\"\")+\" \"+e.path+\"\\0\"));for(let i=0;i<40;i+=2)b.push(parseInt(e.sha.slice(i,i+2),16));}\n const actual=sha1(utf8(\"tree \"+b.length+\"\\0\").concat(b));if(actual!==t.sha)throw Error(\"tree SHA mismatch \"+t.sha+\" != \"+actual);\n return {sha:t.sha,verified:true,entries:t.tree.map(({path,mode,type,sha,size})=>({path,mode,type,sha,...(size===undefined?{}:{size})}))};\n}",
+    "trees": [
+      {
+        "sha": "87b4344eebdc24b12ffdafa9101d0c9f51ad6b70",
+        "verified": true,
+        "entries": [
+          {
+            "path": ".claude",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "e21fc0e2209acd63c8f818b1712bd896baf801dd"
+          },
+          {
+            "path": ".dockerignore",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7fb8c6a19335532b08762b6566d184bde8312d33",
+            "size": 282
+          },
+          {
+            "path": ".easignore",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "09d92b094e7b14f94fad216e65036908acc653af",
+            "size": 2279
+          },
+          {
+            "path": ".env.example",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3a1fff980bc72d2c74fd0e241ff3dbd66273061b",
+            "size": 3038
+          },
+          {
+            "path": ".gitguardian.yaml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a12cf279894bd869f973a1a69a1774be01b7c4ce",
+            "size": 194
+          },
+          {
+            "path": ".github",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "7cefda8f02d61c8df27b0d0974aca7b6c40f8bdc"
+          },
+          {
+            "path": ".gitignore",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "27d64aa76f6e8e9dfe509e74280aac5681e32f4b",
+            "size": 1632
+          },
+          {
+            "path": ".infisical.yaml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d89fe45858d277ff9679377ff84e3b11e2d67fe0",
+            "size": 177
+          },
+          {
+            "path": ".node-version",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a45fd52cc5891570d6299fab38643103c3955474",
+            "size": 3
+          },
+          {
+            "path": ".nvmrc",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a45fd52cc5891570d6299fab38643103c3955474",
+            "size": 3
+          },
+          {
+            "path": ".oxlintrc.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "42edbae82af95c335d45f316c494091950b1b82e",
+            "size": 899
+          },
+          {
+            "path": "AGENTS.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fa963e4d0a342002661c58772d370484e8af740a",
+            "size": 22984
+          },
+          {
+            "path": "CONTRIBUTING.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "768523980c14db13055f22a68c7e9c5960013508",
+            "size": 12955
+          },
+          {
+            "path": "Dockerfile",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "19054afe4768b3391515c7a3e0f97a0021f123ee",
+            "size": 2403
+          },
+          {
+            "path": "LICENSE",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fe6b9036ba1818c79c15f802a586a9711ece2b97",
+            "size": 34524
+          },
+          {
+            "path": "NOTICE",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3e8d14949c9f588ef8f48ebc92743624cf7bfe16",
+            "size": 506
+          },
+          {
+            "path": "README.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3e6889be962b2ba6c7063f94297d5a30376db3ca",
+            "size": 29903
+          },
+          {
+            "path": "README.zh-CN.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "74d25464bc7e41d119cea2b1efad8fee8358bca1",
+            "size": 29283
+          },
+          {
+            "path": "REVIEW.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6a6164fe3dd966f9f25d8b047b7a6829c69eddda",
+            "size": 600
+          },
+          {
+            "path": "agents",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "3b11a6ffffd3d4e930e8c15b3dfac2fdc7c0951d"
+          },
+          {
+            "path": "app",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "0ba5a0b490eed420d5d2fd630b1fbb726a8eae47"
+          },
+          {
+            "path": "apps",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "4559f7c0d17fd4ba9a7b5a80f152b0fb9e91598f"
+          },
+          {
+            "path": "cloudflare",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "ce6cb3e7cb3f811a12b4be27c9a13077f8ab14fb"
+          },
+          {
+            "path": "components.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f89fbf0207ba23999253bbe355f72a6c94ef9ed9",
+            "size": 675
+          },
+          {
+            "path": "components",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "515e02308f0d28d16dbc3b1e4a0b2515c5111606"
+          },
+          {
+            "path": "config",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "795d845b7c40a12d8a5ac0e1d79e7e6973e318cd"
+          },
+          {
+            "path": "docker-compose.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1d8eddb49bb2970fd334b0d0bf844872c07ad921",
+            "size": 1477
+          },
+          {
+            "path": "docs",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "b1fc06bc11683162958963801045e837fc14dbff"
+          },
+          {
+            "path": "drizzle",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "089ac301ba560a22c10a67687a6479efb035782a"
+          },
+          {
+            "path": "factory.yaml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "15dfbac9e161f9273ebfd41f02e4f83d033ecfc3",
+            "size": 605
+          },
+          {
+            "path": "hooks",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "71d25dedb5a21fdedbed3ecbcb7e8751d99c9320"
+          },
+          {
+            "path": "i18n",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "e39376e27bf1264d013b42cc3c06aa8ca553b720"
+          },
+          {
+            "path": "instrumentation-client.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "649ac94ae8f45203782a2a99aad0cc3e4c42f27a",
+            "size": 2360
+          },
+          {
+            "path": "instrumentation.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e6635a158cc7f502f84cca60a2154605260646e4",
+            "size": 602
+          },
+          {
+            "path": "lib",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "b9cd1d8f53dee05c4ad9bd5f27588eac5e484cb8"
+          },
+          {
+            "path": "messages",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "58cc0c46acd1bbd956a719ef004456ce3c5c3f37"
+          },
+          {
+            "path": "next.config.mjs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ea140d37801b388a9e1fd47524aa24d11a745edc",
+            "size": 8872
+          },
+          {
+            "path": "nitro.config.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a2e4db83246f61a129071df04fcd6bc02b2ecff4",
+            "size": 208
+          },
+          {
+            "path": "nx.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a54eac05ef05864c7b842abac8ac3cd47ae610a9",
+            "size": 622
+          },
+          {
+            "path": "package.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d",
+            "size": 80877
+          },
+          {
+            "path": "packages",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "db151222120ed732ba0146071027170434d9fc66"
+          },
+          {
+            "path": "patches",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "56ec44ccab41876f1e7a28741d7241ab72c2df1a"
+          },
+          {
+            "path": "playwright.config.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "687061743ff90625594b310da7aee44569d66398",
+            "size": 1819
+          },
+          {
+            "path": "playwright.mvp.config.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b4c07f2bd560f2ddc5c8e5f7427b6c776df1305d",
+            "size": 1237
+          },
+          {
+            "path": "playwright.smoke.config.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "53ed2986178296a643f1f45311b2237632b035d5",
+            "size": 1240
+          },
+          {
+            "path": "pnpm-lock.yaml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "539cb8567feb617add97c41bd45be96bc50c5a8a",
+            "size": 978765
+          },
+          {
+            "path": "pnpm-workspace.yaml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d",
+            "size": 718
+          },
+          {
+            "path": "postcss.config.mjs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a869506ee48c89838ee770863c5d99ba97eeb930",
+            "size": 144
+          },
+          {
+            "path": "proxy.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b9063c16600b2054a097d679f2ea6d885bf2adf3",
+            "size": 1844
+          },
+          {
+            "path": "public",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "612630e5efd843e3f5344681d2616effc94af811"
+          },
+          {
+            "path": "scripts",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "f407f965fc586c45229279ffe83fae0cb9bc5020"
+          },
+          {
+            "path": "services",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "84858d8738d817d69f8f0a196f5ec179b45d6e7a"
+          },
+          {
+            "path": "tasks",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "768e08040d996b8fb619385114f91db6d9fb567b"
+          },
+          {
+            "path": "tests",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "e69c275b09d34efb0585dbc83b828e6b01591045"
+          },
+          {
+            "path": "tsconfig.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "48293d8237e1804840ec535a18bd5d1c7630eea6",
+            "size": 873
+          },
+          {
+            "path": "types",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "ec5a0feaa8a3ec51349558d3c40e1779b27e6458"
+          },
+          {
+            "path": "ui-policy.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f7aa7e6c6932e9cc82ec2af96a8a930eedd89173",
+            "size": 2001
+          },
+          {
+            "path": "vercel.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6bd2eed0f291014978f62871ed87eecdce73090b",
+            "size": 357
+          },
+          {
+            "path": "workflows",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "ebd893e45157dd63ac893b12a779182c898562be"
+          }
+        ]
+      },
+      {
+        "sha": "bc9ee26434149707781001decacfd3de565e5c63",
+        "verified": true,
+        "entries": [
+          {
+            "path": ".claude",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "e21fc0e2209acd63c8f818b1712bd896baf801dd"
+          },
+          {
+            "path": ".dockerignore",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7fb8c6a19335532b08762b6566d184bde8312d33",
+            "size": 282
+          },
+          {
+            "path": ".easignore",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "09d92b094e7b14f94fad216e65036908acc653af",
+            "size": 2279
+          },
+          {
+            "path": ".env.example",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3a1fff980bc72d2c74fd0e241ff3dbd66273061b",
+            "size": 3038
+          },
+          {
+            "path": ".gitguardian.yaml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a12cf279894bd869f973a1a69a1774be01b7c4ce",
+            "size": 194
+          },
+          {
+            "path": ".github",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "7cefda8f02d61c8df27b0d0974aca7b6c40f8bdc"
+          },
+          {
+            "path": ".gitignore",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "27d64aa76f6e8e9dfe509e74280aac5681e32f4b",
+            "size": 1632
+          },
+          {
+            "path": ".infisical.yaml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d89fe45858d277ff9679377ff84e3b11e2d67fe0",
+            "size": 177
+          },
+          {
+            "path": ".node-version",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a45fd52cc5891570d6299fab38643103c3955474",
+            "size": 3
+          },
+          {
+            "path": ".nvmrc",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a45fd52cc5891570d6299fab38643103c3955474",
+            "size": 3
+          },
+          {
+            "path": ".oxlintrc.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "42edbae82af95c335d45f316c494091950b1b82e",
+            "size": 899
+          },
+          {
+            "path": "AGENTS.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fa963e4d0a342002661c58772d370484e8af740a",
+            "size": 22984
+          },
+          {
+            "path": "CONTRIBUTING.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "768523980c14db13055f22a68c7e9c5960013508",
+            "size": 12955
+          },
+          {
+            "path": "Dockerfile",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "19054afe4768b3391515c7a3e0f97a0021f123ee",
+            "size": 2403
+          },
+          {
+            "path": "LICENSE",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fe6b9036ba1818c79c15f802a586a9711ece2b97",
+            "size": 34524
+          },
+          {
+            "path": "NOTICE",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3e8d14949c9f588ef8f48ebc92743624cf7bfe16",
+            "size": 506
+          },
+          {
+            "path": "README.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3e6889be962b2ba6c7063f94297d5a30376db3ca",
+            "size": 29903
+          },
+          {
+            "path": "README.zh-CN.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "74d25464bc7e41d119cea2b1efad8fee8358bca1",
+            "size": 29283
+          },
+          {
+            "path": "REVIEW.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6a6164fe3dd966f9f25d8b047b7a6829c69eddda",
+            "size": 600
+          },
+          {
+            "path": "agents",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "3b11a6ffffd3d4e930e8c15b3dfac2fdc7c0951d"
+          },
+          {
+            "path": "app",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "0ba5a0b490eed420d5d2fd630b1fbb726a8eae47"
+          },
+          {
+            "path": "apps",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "4559f7c0d17fd4ba9a7b5a80f152b0fb9e91598f"
+          },
+          {
+            "path": "cloudflare",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "ce6cb3e7cb3f811a12b4be27c9a13077f8ab14fb"
+          },
+          {
+            "path": "components.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f89fbf0207ba23999253bbe355f72a6c94ef9ed9",
+            "size": 675
+          },
+          {
+            "path": "components",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "515e02308f0d28d16dbc3b1e4a0b2515c5111606"
+          },
+          {
+            "path": "config",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "795d845b7c40a12d8a5ac0e1d79e7e6973e318cd"
+          },
+          {
+            "path": "docker-compose.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1d8eddb49bb2970fd334b0d0bf844872c07ad921",
+            "size": 1477
+          },
+          {
+            "path": "docs",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "b1fc06bc11683162958963801045e837fc14dbff"
+          },
+          {
+            "path": "drizzle",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "089ac301ba560a22c10a67687a6479efb035782a"
+          },
+          {
+            "path": "factory.yaml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "15dfbac9e161f9273ebfd41f02e4f83d033ecfc3",
+            "size": 605
+          },
+          {
+            "path": "hooks",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "71d25dedb5a21fdedbed3ecbcb7e8751d99c9320"
+          },
+          {
+            "path": "i18n",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "e39376e27bf1264d013b42cc3c06aa8ca553b720"
+          },
+          {
+            "path": "instrumentation-client.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "649ac94ae8f45203782a2a99aad0cc3e4c42f27a",
+            "size": 2360
+          },
+          {
+            "path": "instrumentation.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e6635a158cc7f502f84cca60a2154605260646e4",
+            "size": 602
+          },
+          {
+            "path": "lib",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "b9cd1d8f53dee05c4ad9bd5f27588eac5e484cb8"
+          },
+          {
+            "path": "messages",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "58cc0c46acd1bbd956a719ef004456ce3c5c3f37"
+          },
+          {
+            "path": "next.config.mjs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ea140d37801b388a9e1fd47524aa24d11a745edc",
+            "size": 8872
+          },
+          {
+            "path": "nitro.config.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a2e4db83246f61a129071df04fcd6bc02b2ecff4",
+            "size": 208
+          },
+          {
+            "path": "nx.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a54eac05ef05864c7b842abac8ac3cd47ae610a9",
+            "size": 622
+          },
+          {
+            "path": "package.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d",
+            "size": 80877
+          },
+          {
+            "path": "packages",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "6a96a5e710d2ea39e73765d24b7aeecc4972e39a"
+          },
+          {
+            "path": "patches",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "56ec44ccab41876f1e7a28741d7241ab72c2df1a"
+          },
+          {
+            "path": "playwright.config.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "687061743ff90625594b310da7aee44569d66398",
+            "size": 1819
+          },
+          {
+            "path": "playwright.mvp.config.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b4c07f2bd560f2ddc5c8e5f7427b6c776df1305d",
+            "size": 1237
+          },
+          {
+            "path": "playwright.smoke.config.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "53ed2986178296a643f1f45311b2237632b035d5",
+            "size": 1240
+          },
+          {
+            "path": "pnpm-lock.yaml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "539cb8567feb617add97c41bd45be96bc50c5a8a",
+            "size": 978765
+          },
+          {
+            "path": "pnpm-workspace.yaml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d",
+            "size": 718
+          },
+          {
+            "path": "postcss.config.mjs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a869506ee48c89838ee770863c5d99ba97eeb930",
+            "size": 144
+          },
+          {
+            "path": "proxy.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b9063c16600b2054a097d679f2ea6d885bf2adf3",
+            "size": 1844
+          },
+          {
+            "path": "public",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "612630e5efd843e3f5344681d2616effc94af811"
+          },
+          {
+            "path": "scripts",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "f407f965fc586c45229279ffe83fae0cb9bc5020"
+          },
+          {
+            "path": "services",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "84858d8738d817d69f8f0a196f5ec179b45d6e7a"
+          },
+          {
+            "path": "tasks",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "768e08040d996b8fb619385114f91db6d9fb567b"
+          },
+          {
+            "path": "tests",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "e69c275b09d34efb0585dbc83b828e6b01591045"
+          },
+          {
+            "path": "tsconfig.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "48293d8237e1804840ec535a18bd5d1c7630eea6",
+            "size": 873
+          },
+          {
+            "path": "types",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "ec5a0feaa8a3ec51349558d3c40e1779b27e6458"
+          },
+          {
+            "path": "ui-policy.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f7aa7e6c6932e9cc82ec2af96a8a930eedd89173",
+            "size": 2001
+          },
+          {
+            "path": "vercel.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6bd2eed0f291014978f62871ed87eecdce73090b",
+            "size": 357
+          },
+          {
+            "path": "workflows",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "ebd893e45157dd63ac893b12a779182c898562be"
+          }
+        ]
+      },
+      {
+        "sha": "3f804659ce05591aefb6d080ea873ba88e32ad46",
+        "verified": true,
+        "entries": [
+          {
+            "path": ".claude",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "e21fc0e2209acd63c8f818b1712bd896baf801dd"
+          },
+          {
+            "path": ".dockerignore",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7fb8c6a19335532b08762b6566d184bde8312d33",
+            "size": 282
+          },
+          {
+            "path": ".easignore",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "09d92b094e7b14f94fad216e65036908acc653af",
+            "size": 2279
+          },
+          {
+            "path": ".env.example",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3a1fff980bc72d2c74fd0e241ff3dbd66273061b",
+            "size": 3038
+          },
+          {
+            "path": ".gitguardian.yaml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a12cf279894bd869f973a1a69a1774be01b7c4ce",
+            "size": 194
+          },
+          {
+            "path": ".github",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "7cefda8f02d61c8df27b0d0974aca7b6c40f8bdc"
+          },
+          {
+            "path": ".gitignore",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "27d64aa76f6e8e9dfe509e74280aac5681e32f4b",
+            "size": 1632
+          },
+          {
+            "path": ".infisical.yaml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d89fe45858d277ff9679377ff84e3b11e2d67fe0",
+            "size": 177
+          },
+          {
+            "path": ".node-version",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a45fd52cc5891570d6299fab38643103c3955474",
+            "size": 3
+          },
+          {
+            "path": ".nvmrc",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a45fd52cc5891570d6299fab38643103c3955474",
+            "size": 3
+          },
+          {
+            "path": ".oxlintrc.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "42edbae82af95c335d45f316c494091950b1b82e",
+            "size": 899
+          },
+          {
+            "path": "AGENTS.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fa963e4d0a342002661c58772d370484e8af740a",
+            "size": 22984
+          },
+          {
+            "path": "CONTRIBUTING.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "768523980c14db13055f22a68c7e9c5960013508",
+            "size": 12955
+          },
+          {
+            "path": "Dockerfile",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "19054afe4768b3391515c7a3e0f97a0021f123ee",
+            "size": 2403
+          },
+          {
+            "path": "LICENSE",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fe6b9036ba1818c79c15f802a586a9711ece2b97",
+            "size": 34524
+          },
+          {
+            "path": "NOTICE",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3e8d14949c9f588ef8f48ebc92743624cf7bfe16",
+            "size": 506
+          },
+          {
+            "path": "README.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d59106749f60229439efc9593aea2077bfc1367f",
+            "size": 7761
+          },
+          {
+            "path": "README.zh-CN.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "842bad68e1a1470b90f4daa90f505494e7656f6b",
+            "size": 7590
+          },
+          {
+            "path": "REVIEW.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6a6164fe3dd966f9f25d8b047b7a6829c69eddda",
+            "size": 600
+          },
+          {
+            "path": "agents",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "3b11a6ffffd3d4e930e8c15b3dfac2fdc7c0951d"
+          },
+          {
+            "path": "app",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "0ba5a0b490eed420d5d2fd630b1fbb726a8eae47"
+          },
+          {
+            "path": "apps",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "4559f7c0d17fd4ba9a7b5a80f152b0fb9e91598f"
+          },
+          {
+            "path": "cloudflare",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "ce6cb3e7cb3f811a12b4be27c9a13077f8ab14fb"
+          },
+          {
+            "path": "components.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f89fbf0207ba23999253bbe355f72a6c94ef9ed9",
+            "size": 675
+          },
+          {
+            "path": "components",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "515e02308f0d28d16dbc3b1e4a0b2515c5111606"
+          },
+          {
+            "path": "config",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "795d845b7c40a12d8a5ac0e1d79e7e6973e318cd"
+          },
+          {
+            "path": "docker-compose.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1d8eddb49bb2970fd334b0d0bf844872c07ad921",
+            "size": 1477
+          },
+          {
+            "path": "docs",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "b1fc06bc11683162958963801045e837fc14dbff"
+          },
+          {
+            "path": "drizzle",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "089ac301ba560a22c10a67687a6479efb035782a"
+          },
+          {
+            "path": "factory.yaml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "15dfbac9e161f9273ebfd41f02e4f83d033ecfc3",
+            "size": 605
+          },
+          {
+            "path": "hooks",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "71d25dedb5a21fdedbed3ecbcb7e8751d99c9320"
+          },
+          {
+            "path": "i18n",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "e39376e27bf1264d013b42cc3c06aa8ca553b720"
+          },
+          {
+            "path": "instrumentation-client.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "649ac94ae8f45203782a2a99aad0cc3e4c42f27a",
+            "size": 2360
+          },
+          {
+            "path": "instrumentation.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e6635a158cc7f502f84cca60a2154605260646e4",
+            "size": 602
+          },
+          {
+            "path": "lib",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "b9cd1d8f53dee05c4ad9bd5f27588eac5e484cb8"
+          },
+          {
+            "path": "messages",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "58cc0c46acd1bbd956a719ef004456ce3c5c3f37"
+          },
+          {
+            "path": "next.config.mjs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ea140d37801b388a9e1fd47524aa24d11a745edc",
+            "size": 8872
+          },
+          {
+            "path": "nitro.config.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a2e4db83246f61a129071df04fcd6bc02b2ecff4",
+            "size": 208
+          },
+          {
+            "path": "nx.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a54eac05ef05864c7b842abac8ac3cd47ae610a9",
+            "size": 622
+          },
+          {
+            "path": "package.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d",
+            "size": 80877
+          },
+          {
+            "path": "packages",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "db151222120ed732ba0146071027170434d9fc66"
+          },
+          {
+            "path": "patches",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "56ec44ccab41876f1e7a28741d7241ab72c2df1a"
+          },
+          {
+            "path": "playwright.config.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "687061743ff90625594b310da7aee44569d66398",
+            "size": 1819
+          },
+          {
+            "path": "playwright.mvp.config.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b4c07f2bd560f2ddc5c8e5f7427b6c776df1305d",
+            "size": 1237
+          },
+          {
+            "path": "playwright.smoke.config.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "53ed2986178296a643f1f45311b2237632b035d5",
+            "size": 1240
+          },
+          {
+            "path": "pnpm-lock.yaml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "539cb8567feb617add97c41bd45be96bc50c5a8a",
+            "size": 978765
+          },
+          {
+            "path": "pnpm-workspace.yaml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d",
+            "size": 718
+          },
+          {
+            "path": "postcss.config.mjs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a869506ee48c89838ee770863c5d99ba97eeb930",
+            "size": 144
+          },
+          {
+            "path": "proxy.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b9063c16600b2054a097d679f2ea6d885bf2adf3",
+            "size": 1844
+          },
+          {
+            "path": "public",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "612630e5efd843e3f5344681d2616effc94af811"
+          },
+          {
+            "path": "scripts",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "f407f965fc586c45229279ffe83fae0cb9bc5020"
+          },
+          {
+            "path": "services",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "84858d8738d817d69f8f0a196f5ec179b45d6e7a"
+          },
+          {
+            "path": "tasks",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "768e08040d996b8fb619385114f91db6d9fb567b"
+          },
+          {
+            "path": "tests",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "e69c275b09d34efb0585dbc83b828e6b01591045"
+          },
+          {
+            "path": "tsconfig.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "48293d8237e1804840ec535a18bd5d1c7630eea6",
+            "size": 873
+          },
+          {
+            "path": "types",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "ec5a0feaa8a3ec51349558d3c40e1779b27e6458"
+          },
+          {
+            "path": "ui-policy.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f7aa7e6c6932e9cc82ec2af96a8a930eedd89173",
+            "size": 2001
+          },
+          {
+            "path": "vercel.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6bd2eed0f291014978f62871ed87eecdce73090b",
+            "size": 357
+          },
+          {
+            "path": "workflows",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "ebd893e45157dd63ac893b12a779182c898562be"
+          }
+        ]
+      },
+      {
+        "sha": "e7c7c6ad66acd729278393711c10eeed67c6d7ac",
+        "verified": true,
+        "entries": [
+          {
+            "path": ".claude",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "e21fc0e2209acd63c8f818b1712bd896baf801dd"
+          },
+          {
+            "path": ".dockerignore",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7fb8c6a19335532b08762b6566d184bde8312d33",
+            "size": 282
+          },
+          {
+            "path": ".easignore",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "09d92b094e7b14f94fad216e65036908acc653af",
+            "size": 2279
+          },
+          {
+            "path": ".env.example",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3a1fff980bc72d2c74fd0e241ff3dbd66273061b",
+            "size": 3038
+          },
+          {
+            "path": ".gitguardian.yaml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a12cf279894bd869f973a1a69a1774be01b7c4ce",
+            "size": 194
+          },
+          {
+            "path": ".github",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "791744c5decbe95589bba65191b3663ffeb05215"
+          },
+          {
+            "path": ".gitignore",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "27d64aa76f6e8e9dfe509e74280aac5681e32f4b",
+            "size": 1632
+          },
+          {
+            "path": ".infisical.yaml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d89fe45858d277ff9679377ff84e3b11e2d67fe0",
+            "size": 177
+          },
+          {
+            "path": ".node-version",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a45fd52cc5891570d6299fab38643103c3955474",
+            "size": 3
+          },
+          {
+            "path": ".nvmrc",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a45fd52cc5891570d6299fab38643103c3955474",
+            "size": 3
+          },
+          {
+            "path": ".oxlintrc.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "42edbae82af95c335d45f316c494091950b1b82e",
+            "size": 899
+          },
+          {
+            "path": "AGENTS.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fa963e4d0a342002661c58772d370484e8af740a",
+            "size": 22984
+          },
+          {
+            "path": "CONTRIBUTING.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "768523980c14db13055f22a68c7e9c5960013508",
+            "size": 12955
+          },
+          {
+            "path": "Dockerfile",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "19054afe4768b3391515c7a3e0f97a0021f123ee",
+            "size": 2403
+          },
+          {
+            "path": "LICENSE",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fe6b9036ba1818c79c15f802a586a9711ece2b97",
+            "size": 34524
+          },
+          {
+            "path": "NOTICE",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3e8d14949c9f588ef8f48ebc92743624cf7bfe16",
+            "size": 506
+          },
+          {
+            "path": "README.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3e6889be962b2ba6c7063f94297d5a30376db3ca",
+            "size": 29903
+          },
+          {
+            "path": "README.zh-CN.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "74d25464bc7e41d119cea2b1efad8fee8358bca1",
+            "size": 29283
+          },
+          {
+            "path": "REVIEW.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6a6164fe3dd966f9f25d8b047b7a6829c69eddda",
+            "size": 600
+          },
+          {
+            "path": "agents",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "3b11a6ffffd3d4e930e8c15b3dfac2fdc7c0951d"
+          },
+          {
+            "path": "app",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "51ad6e9cf47d72340486233c35c7110ad9addb4d"
+          },
+          {
+            "path": "apps",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "df84aa5b4ca013fdc2465d400e8e096e36b28a8d"
+          },
+          {
+            "path": "cloudflare",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "ce6cb3e7cb3f811a12b4be27c9a13077f8ab14fb"
+          },
+          {
+            "path": "components.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f89fbf0207ba23999253bbe355f72a6c94ef9ed9",
+            "size": 675
+          },
+          {
+            "path": "components",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "b4dfcf9ce580f2fec84a1d2fe9d8f2cdc6244774"
+          },
+          {
+            "path": "config",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "795d845b7c40a12d8a5ac0e1d79e7e6973e318cd"
+          },
+          {
+            "path": "docker-compose.yml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1d8eddb49bb2970fd334b0d0bf844872c07ad921",
+            "size": 1477
+          },
+          {
+            "path": "docs",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "2baf27bac92fa9a14bfec1df9250422935826fed"
+          },
+          {
+            "path": "drizzle",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "089ac301ba560a22c10a67687a6479efb035782a"
+          },
+          {
+            "path": "factory.yaml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "15dfbac9e161f9273ebfd41f02e4f83d033ecfc3",
+            "size": 605
+          },
+          {
+            "path": "hooks",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "66babe102c1441e0baea7dec08930d09c74740d5"
+          },
+          {
+            "path": "i18n",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "e39376e27bf1264d013b42cc3c06aa8ca553b720"
+          },
+          {
+            "path": "instrumentation-client.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "9109982d1c3245179b85a42d6969003aec2f5047",
+            "size": 2442
+          },
+          {
+            "path": "instrumentation.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e6635a158cc7f502f84cca60a2154605260646e4",
+            "size": 602
+          },
+          {
+            "path": "lib",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "3e5b7226ce1dfa4d094ac3ded904cfbc0ad31743"
+          },
+          {
+            "path": "messages",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "58cc0c46acd1bbd956a719ef004456ce3c5c3f37"
+          },
+          {
+            "path": "next.config.mjs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ea140d37801b388a9e1fd47524aa24d11a745edc",
+            "size": 8872
+          },
+          {
+            "path": "nitro.config.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a2e4db83246f61a129071df04fcd6bc02b2ecff4",
+            "size": 208
+          },
+          {
+            "path": "nx.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a54eac05ef05864c7b842abac8ac3cd47ae610a9",
+            "size": 622
+          },
+          {
+            "path": "package.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "72a2f3f8c7ac2a1e3ff098dfb5a772e42669a87d",
+            "size": 80877
+          },
+          {
+            "path": "packages",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "db151222120ed732ba0146071027170434d9fc66"
+          },
+          {
+            "path": "patches",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "56ec44ccab41876f1e7a28741d7241ab72c2df1a"
+          },
+          {
+            "path": "playwright.config.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "687061743ff90625594b310da7aee44569d66398",
+            "size": 1819
+          },
+          {
+            "path": "playwright.mvp.config.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b4c07f2bd560f2ddc5c8e5f7427b6c776df1305d",
+            "size": 1237
+          },
+          {
+            "path": "playwright.smoke.config.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "53ed2986178296a643f1f45311b2237632b035d5",
+            "size": 1240
+          },
+          {
+            "path": "pnpm-lock.yaml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "539cb8567feb617add97c41bd45be96bc50c5a8a",
+            "size": 978765
+          },
+          {
+            "path": "pnpm-workspace.yaml",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6d9e660acbcc3c800549c4a3502ef5b1433a6a4d",
+            "size": 718
+          },
+          {
+            "path": "postcss.config.mjs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a869506ee48c89838ee770863c5d99ba97eeb930",
+            "size": 144
+          },
+          {
+            "path": "proxy.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b9063c16600b2054a097d679f2ea6d885bf2adf3",
+            "size": 1844
+          },
+          {
+            "path": "public",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "612630e5efd843e3f5344681d2616effc94af811"
+          },
+          {
+            "path": "scripts",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "46329e2264a040156696d0516ae9cba05894a252"
+          },
+          {
+            "path": "services",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "84858d8738d817d69f8f0a196f5ec179b45d6e7a"
+          },
+          {
+            "path": "tasks",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "768e08040d996b8fb619385114f91db6d9fb567b"
+          },
+          {
+            "path": "tests",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "d4e50031d32db21fe912f48a087d442be2024e42"
+          },
+          {
+            "path": "tsconfig.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "48293d8237e1804840ec535a18bd5d1c7630eea6",
+            "size": 873
+          },
+          {
+            "path": "types",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "ec5a0feaa8a3ec51349558d3c40e1779b27e6458"
+          },
+          {
+            "path": "ui-policy.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f7aa7e6c6932e9cc82ec2af96a8a930eedd89173",
+            "size": 2001
+          },
+          {
+            "path": "vercel.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6bd2eed0f291014978f62871ed87eecdce73090b",
+            "size": 357
+          },
+          {
+            "path": "workflows",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "0e4f125026d4dc227a7af6ad0a9dd9503b69738c"
+          }
+        ]
+      },
+      {
+        "sha": "6a96a5e710d2ea39e73765d24b7aeecc4972e39a",
+        "verified": true,
+        "entries": [
+          {
+            "path": "config",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "1f9cc584ac6d509d02112f53e0609af455e62ff4"
+          },
+          {
+            "path": "daemon",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "112c27251ac06863983f1ef9f4f74882e92af815"
+          },
+          {
+            "path": "protocol",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "79e9742fe7f571df75241876f837a52b0e26ecf4"
+          },
+          {
+            "path": "subscription-worker",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "8c65c8f30e763e8c79875fbbe6ed2d681ba2d49e"
+          }
+        ]
+      },
+      {
+        "sha": "db151222120ed732ba0146071027170434d9fc66",
+        "verified": true,
+        "entries": [
+          {
+            "path": "config",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "1f9cc584ac6d509d02112f53e0609af455e62ff4"
+          },
+          {
+            "path": "daemon",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "62332d7b3c0d21ab5f1d0aaf228aea807dc76b2d"
+          },
+          {
+            "path": "protocol",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "79e9742fe7f571df75241876f837a52b0e26ecf4"
+          },
+          {
+            "path": "subscription-worker",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "8c65c8f30e763e8c79875fbbe6ed2d681ba2d49e"
+          }
+        ]
+      },
+      {
+        "sha": "62332d7b3c0d21ab5f1d0aaf228aea807dc76b2d",
+        "verified": true,
+        "entries": [
+          {
+            "path": "README.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e9704d8fa37f6e6000f3ed6fca220ed87af6f20e",
+            "size": 5696
+          },
+          {
+            "path": "THIRD_PARTY_NOTICES.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ab572d51fff2545ebbfe39989bd1d2c43363f346",
+            "size": 3350
+          },
+          {
+            "path": "bin",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "be11df826289328c263cf834dd2d8f847774cfd2"
+          },
+          {
+            "path": "fixtures",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "62b89f25360bebafeed6ce79b3fac53f71279352"
+          },
+          {
+            "path": "harness",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "81b0f2fc3a5f14fb17e95ffd9ad890db92d77533"
+          },
+          {
+            "path": "package.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a91bbe26794e858d2e66a7eca0b6839b12d6a6f1",
+            "size": 2857
+          },
+          {
+            "path": "scripts",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "6cc02a8f5fddbb5dd46f4a89576d860c94b8cfd9"
+          },
+          {
+            "path": "src",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "23a4c87ccca0df22d3a1cf44b24a5093c62c22e6"
+          },
+          {
+            "path": "test",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "be7b54d3de1261bc57d15a1c61a0d7665a5afc29"
+          },
+          {
+            "path": "tsconfig.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a1c3ffed7d17fd64f273b6ba6e6098e915d7312d",
+            "size": 259
+          },
+          {
+            "path": "vitest.config.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fe90bc45619c133938927bf8fd955aa0058daf17",
+            "size": 316
+          }
+        ]
+      },
+      {
+        "sha": "112c27251ac06863983f1ef9f4f74882e92af815",
+        "verified": true,
+        "entries": [
+          {
+            "path": "README.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e9704d8fa37f6e6000f3ed6fca220ed87af6f20e",
+            "size": 5696
+          },
+          {
+            "path": "THIRD_PARTY_NOTICES.md",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ab572d51fff2545ebbfe39989bd1d2c43363f346",
+            "size": 3350
+          },
+          {
+            "path": "bin",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "be11df826289328c263cf834dd2d8f847774cfd2"
+          },
+          {
+            "path": "fixtures",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "62b89f25360bebafeed6ce79b3fac53f71279352"
+          },
+          {
+            "path": "harness",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "81b0f2fc3a5f14fb17e95ffd9ad890db92d77533"
+          },
+          {
+            "path": "package.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a91bbe26794e858d2e66a7eca0b6839b12d6a6f1",
+            "size": 2857
+          },
+          {
+            "path": "scripts",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "6cc02a8f5fddbb5dd46f4a89576d860c94b8cfd9"
+          },
+          {
+            "path": "src",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "74f2f38289a86f02110858230ce62587d012814a"
+          },
+          {
+            "path": "test",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "d11b928260e8bc304761e956319948b2d808bdea"
+          },
+          {
+            "path": "tsconfig.json",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a1c3ffed7d17fd64f273b6ba6e6098e915d7312d",
+            "size": 259
+          },
+          {
+            "path": "vitest.config.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fe90bc45619c133938927bf8fd955aa0058daf17",
+            "size": 316
+          }
+        ]
+      },
+      {
+        "sha": "74f2f38289a86f02110858230ce62587d012814a",
+        "verified": true,
+        "entries": [
+          {
+            "path": "adapters",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "3885ffaa27853e2a96635eeb0acc86a7400ed0d8"
+          },
+          {
+            "path": "agents",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "062544f538dde3aa9e98a309a434e7c7683f2219"
+          },
+          {
+            "path": "anonymous-claude-spare.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "39ef017d27cd0c7395abfffe99913a7e509ff3d3",
+            "size": 15331
+          },
+          {
+            "path": "anonymous-codex-spare.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6a314f68d9b2214ab22363d16f4b808a0f1bf88b",
+            "size": 12014
+          },
+          {
+            "path": "api-key-broker.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "0afeb81712523e4d2d0d185fdb3675cf4e72f339",
+            "size": 5988
+          },
+          {
+            "path": "auto-update.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8c476363d1933178d69619358ff2bef57f570fc1",
+            "size": 4500
+          },
+          {
+            "path": "captures.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "5af9ce09d15c20d13e12f6b9299c4e1ea117c4eb",
+            "size": 7630
+          },
+          {
+            "path": "chunks.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b0e5b7e58a10fb95cf986e80a1d04b99fcdee52f",
+            "size": 3791
+          },
+          {
+            "path": "cli.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "0be92f49ab119d6bc10ccfe25286acb1efffe6fd",
+            "size": 10817
+          },
+          {
+            "path": "cloud-bootstrap-broker.mjs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "15c6637c31e308ffca83d35ff9623fc67f120233",
+            "size": 10763
+          },
+          {
+            "path": "cloud-bootstrap.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "887f668ae7e20c0cb457b5fc4f116b4fecb552fe",
+            "size": 9208
+          },
+          {
+            "path": "cloud-model-probe.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "92fa342ba673e1ba9ca5d0091c51443de1fa44e8",
+            "size": 3219
+          },
+          {
+            "path": "cloud-model-receipt.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3caff6c7e5ebddd4998fcad65201fda4367afc5b",
+            "size": 3263
+          },
+          {
+            "path": "cloud-registration.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b4870fb638b6acbcb73596c764137b8980417756",
+            "size": 558
+          },
+          {
+            "path": "codex-generation-telemetry.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "2464d4164da37b6b4355e4338bf039875cf9fd9e",
+            "size": 18277
+          },
+          {
+            "path": "codex-generation-telemetry.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ddf484c21b5ac4bdbe75d5ad8f404ad814710e10",
+            "size": 19801
+          },
+          {
+            "path": "codex-mcp-context.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "beb35030e17a70a219ec9878701df7726bd4fddf",
+            "size": 1888
+          },
+          {
+            "path": "codex-startup-config.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c7724a698dc12e2e301461941eead3a5bec16177",
+            "size": 10468
+          },
+          {
+            "path": "computer",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "2c628c5b579d4b29b717c3b5502064a417249af6"
+          },
+          {
+            "path": "coordinator",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "2d33b8848cf0ada1412dc021c21e43bc4ce6083f"
+          },
+          {
+            "path": "credential-globs.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "caf7eff4133053f99714465c6f2b02e9041bfdc6",
+            "size": 2813
+          },
+          {
+            "path": "decision-judgments.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "339c5929db4321aab717f88562ac4b906030ce13",
+            "size": 1942
+          },
+          {
+            "path": "device-gateway.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "190f0e367ad538df5fc54d9eefcda52994a6a5b3",
+            "size": 4566
+          },
+          {
+            "path": "device-type.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "78460053a6731f4aea4331f31bcb3b8cf5c54f61",
+            "size": 956
+          },
+          {
+            "path": "device-work-signal.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "0bc49ef43678f5b949313a6af465fbeb6a51d72f",
+            "size": 2249
+          },
+          {
+            "path": "env.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ab3e0923b67853acbd0020c4b3494903d64ec852",
+            "size": 3665
+          },
+          {
+            "path": "env.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6bc2d7673a9feebecb786f62ad2d25e790d075d9",
+            "size": 1981
+          },
+          {
+            "path": "errors.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "07fd88caa07a46a791498f86adeb12d7e5e1daa9",
+            "size": 2271
+          },
+          {
+            "path": "fs-browse.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "528e8d9138cccd3b262ba7320fda6a560c7bcca5",
+            "size": 4423
+          },
+          {
+            "path": "fs-util.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "eccea99eb0c04aa5a4875d461022e326b88b84ab",
+            "size": 1020
+          },
+          {
+            "path": "harness-install.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "19e85b2db4c7be7ff5ecf08d2a505ec14fc02a1f",
+            "size": 9655
+          },
+          {
+            "path": "harness-install.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d754f2e9fac09c54b1521727a5075d65b8c236c2",
+            "size": 489
+          },
+          {
+            "path": "harnesses.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "cf81f5881c56e8c9c4f18e250ae224f7c0aa4afd",
+            "size": 2368
+          },
+          {
+            "path": "harnesses.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a4cd61c6633931a8306d86e54c40665a7a1441f6",
+            "size": 2424
+          },
+          {
+            "path": "hosted-binaries.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e903326b507946fd35e7f8c17c170e4218a017b8",
+            "size": 6461
+          },
+          {
+            "path": "hosted-binaries.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "79d9ac7da4d33316263339b71f82461ade761e2c",
+            "size": 4394
+          },
+          {
+            "path": "hosted-cli-prefetch.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d3136a1667e96faed8e19cc5952f1c06d8bb2fcb",
+            "size": 5805
+          },
+          {
+            "path": "ids.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a9da396c969ae052ba8c7967a9a314a8c3cb8a1c",
+            "size": 835
+          },
+          {
+            "path": "lock.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "752e2d2a170eda4bc11a078abccd6fd278f793be",
+            "size": 4327
+          },
+          {
+            "path": "log.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "43b3050782448f67d0cbe0a9a2e18f2370e73382",
+            "size": 1050
+          },
+          {
+            "path": "log.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7a4e5e2a5da5015d0caa1b14d509c933ff86f844",
+            "size": 2311
+          },
+          {
+            "path": "login.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6b13333c0b1f4f4f4af90c4d4bf940f89389fbe4",
+            "size": 5869
+          },
+          {
+            "path": "main.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "abe9cf6dc0dd634fb76458b0a192f76258d32b43",
+            "size": 95949
+          },
+          {
+            "path": "mcp-http-timing.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "065ec67cafe2bfa59080e3a5d8b2c520224fea10",
+            "size": 9472
+          },
+          {
+            "path": "mcp-http-timing.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "348935cc2784567eef99dd8af85868c6438f5de4",
+            "size": 9646
+          },
+          {
+            "path": "model-probe.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "bbc427d089a8eada65549c6548f3d9550e7b1c68",
+            "size": 7977
+          },
+          {
+            "path": "official-cli-timing.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b00fd6b69d3da0ca4d1b679e65265e533f7b2e75",
+            "size": 9985
+          },
+          {
+            "path": "official-cli-timing.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8a48352489f3455e0c8b74a532b7adbb09f5c835",
+            "size": 13166
+          },
+          {
+            "path": "outbox.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a1cc853d316676eecf3c840fd6e38c0f6978c51b",
+            "size": 6634
+          },
+          {
+            "path": "outbox.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "764b3cfae981dd2ba3f19616ce5782bbb9fcc67a",
+            "size": 9829
+          },
+          {
+            "path": "path-search.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b275652c194487a81f185678c3c6eb16e6e307c7",
+            "size": 1078
+          },
+          {
+            "path": "paths.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3d9a8043e63e63a43044e2517ef03ab359341b9b",
+            "size": 2445
+          },
+          {
+            "path": "permissions.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "4c11b5d5e6e4fb857ebf245323165a163887857b",
+            "size": 11842
+          },
+          {
+            "path": "permissions.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fc612dfef206662434f95020e9ce2da6a4707157",
+            "size": 9508
+          },
+          {
+            "path": "process-group.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d2192f3de3693b37946797da81f184860001615e",
+            "size": 1122
+          },
+          {
+            "path": "quota",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "ca941774248f0b835bdcf3931c18da1869752d98"
+          },
+          {
+            "path": "repositories.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "bebf3f981b9c09cc456edbc5eaf741e0e1e58408",
+            "size": 12263
+          },
+          {
+            "path": "repository-git-timing.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "629034e9f747a0cda8d3a7b2792183ba79fc36c6",
+            "size": 2473
+          },
+          {
+            "path": "rpc",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "368a029badc0d8c38a957dc6e08a9823ebd58f88"
+          },
+          {
+            "path": "run-isolation.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "138fbf39b2e304a4647f7b32f5177569aa5df2f2",
+            "size": 8126
+          },
+          {
+            "path": "run-mailbox.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "0371266111af0a53c125d54897852d45fb6ebc27",
+            "size": 9018
+          },
+          {
+            "path": "run-repository.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7b810d1e4a9ac73808dd14e681f586d6f76a69e3",
+            "size": 2567
+          },
+          {
+            "path": "run-runtime-timing.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "51aa0a6591be4d7f05aa5541c9d45d83339691d3",
+            "size": 11272
+          },
+          {
+            "path": "run-runtime-timing.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "9332e6e8b732dd06b41fa47518a9f0b1253d1ca5",
+            "size": 14461
+          },
+          {
+            "path": "run-scratch.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d9020b4a7f152cbc1a720e9e55c410334cdecb4a",
+            "size": 622
+          },
+          {
+            "path": "runs",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "aeb84085d01ae4c57d455b35940a91b3df43505c"
+          },
+          {
+            "path": "secret-mask.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "18034ae5ad837b56632ae70834dcfec5eb50af17",
+            "size": 10248
+          },
+          {
+            "path": "secret-mask.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "44cc6c3450a750cd7ac12dd3fe08507fc7d61bb2",
+            "size": 8681
+          },
+          {
+            "path": "server-decision.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "5fe6835973c6ca79690eada9004545f34642af80",
+            "size": 2561
+          },
+          {
+            "path": "server-link-http.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8cbbce8d8706f07b6b5e075dbc4a6d738af285ef",
+            "size": 27701
+          },
+          {
+            "path": "server-link.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "34f271c0def0008d7e9120e37098d4167f951578",
+            "size": 21117
+          },
+          {
+            "path": "service.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "277fae47e47d1ce4a2061838b1f08f457b7b3355",
+            "size": 6054
+          },
+          {
+            "path": "subscription-access-ready.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1124946c71e80b16dee7a67603a670b91a9fe082",
+            "size": 5858
+          },
+          {
+            "path": "subscription-credentials.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e5d7cf7b6e78206f6ba789de850ae7770c700d5f",
+            "size": 5320
+          },
+          {
+            "path": "subscription-hosted-runner.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "62a2d8edd244293b511a00da618849638a943ac0",
+            "size": 26481
+          },
+          {
+            "path": "subscription-launcher.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "35d242f8ad58a623c4f9bb59b0f5bc12febce4b3",
+            "size": 6092
+          },
+          {
+            "path": "subscription-local-runner.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "2e1da8423e1c160e8b277b8be2add26b12c57b41",
+            "size": 8997
+          },
+          {
+            "path": "subscription-local-runner.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6d96bade81dd631d5b5068cd1f272d64bcb7bc91",
+            "size": 6184
+          },
+          {
+            "path": "subscription-native-broker.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "2192561dc4aef519d226acc82b8af3a666818d53",
+            "size": 4837
+          },
+          {
+            "path": "subscription-preflight.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b51c5b1de83de18161e17bff61e93c5e34cf2a23",
+            "size": 3298
+          },
+          {
+            "path": "subscription-quota.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "535a7a7a230f8a84bce34c4d46f42ca5cc0b553d",
+            "size": 1022
+          },
+          {
+            "path": "subscription-worker-client.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e8cf0150fc8ce0962a55ec9723b441abbfb41c02",
+            "size": 17361
+          },
+          {
+            "path": "subscription-worker-timing.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a81384d2249da654d52f63d0c426d41d9145636e",
+            "size": 7219
+          },
+          {
+            "path": "subscription-worker-timing.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "622a0d39f562ff326dc42a4bd7af16b3d1c3d3e0",
+            "size": 9712
+          },
+          {
+            "path": "subscription.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "18338cd3b3fdf5a57a30263a2f0c7319d5f30df1",
+            "size": 2662
+          },
+          {
+            "path": "task-env.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7b097f5e72b54f0a54d4b165b917631eac97e841",
+            "size": 2151
+          },
+          {
+            "path": "task-env.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "cf4970f88fd504592e1c7564f0a1360fe2fa320f",
+            "size": 2701
+          },
+          {
+            "path": "task-secret-bridge.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "4be31ba07bba23de80840cff590a05a1a1a3503d",
+            "size": 17823
+          },
+          {
+            "path": "task-secret-bridge.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7d1f931e7e311b9abaa48a3a06ad19e7ed5be6fb",
+            "size": 10583
+          },
+          {
+            "path": "tool-duration.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e2ca7e45b629c9232f3249e3ba82b065dfea5b4b",
+            "size": 1545
+          },
+          {
+            "path": "tool-duration.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c16c3c18dca3a2de441047e63d48853f06f9d7f3",
+            "size": 1022
+          },
+          {
+            "path": "tracing-ai.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6f7d7414fb07809880603dc4c20f6525616219ab",
+            "size": 6925
+          },
+          {
+            "path": "tracing-logs.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e8da68cec5d9976ed404e4494ba59037c9b4966e",
+            "size": 3897
+          },
+          {
+            "path": "tracing-sampling.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a8633f4aeb9211e1f580137d71abb6e9037fb9de",
+            "size": 8410
+          },
+          {
+            "path": "tracing-sampling.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "06d2c47f82853e5d0630dc79feda2d8d0eafe8d3",
+            "size": 7079
+          },
+          {
+            "path": "tracing.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "2c1bdc5fc6896cbe1c1fd54054b98d1845535196",
+            "size": 25860
+          },
+          {
+            "path": "tracing.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "0eed0277c933b0d2457909851bab458a482c184d",
+            "size": 27723
+          },
+          {
+            "path": "trusted-endpoint.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c9171cd5ae653b43b095ed26fe4f550f1ea49ed8",
+            "size": 425
+          },
+          {
+            "path": "worktrees.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ee09f23b355b6ed9d8960502a8cdb53fa9b493b7",
+            "size": 15236
+          }
+        ]
+      },
+      {
+        "sha": "d11b928260e8bc304761e956319948b2d808bdea",
+        "verified": true,
+        "entries": [
+          {
+            "path": "adapter-runtime-model.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a6cf54fc1d544a76c0b8ea2090325c762fe94105",
+            "size": 3854
+          },
+          {
+            "path": "adapters.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c594202c9db5a0fa8a1c19fb731125d309abc61d",
+            "size": 24586
+          },
+          {
+            "path": "agents.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a97e549c984fdd71546ca1500486dc9e94f2a044",
+            "size": 57496
+          },
+          {
+            "path": "anonymous-claude-spare.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "263185786d249ea601a0c9de6b0a7df0e49d40ed",
+            "size": 24644
+          },
+          {
+            "path": "anonymous-codex-hosted.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "82367fad169531bdbc1213c9de0f392df63d2830",
+            "size": 13589
+          },
+          {
+            "path": "anonymous-codex-spare.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6a2e49857783a337e6be23ee53680b66e4f8a0bd",
+            "size": 14630
+          },
+          {
+            "path": "auto-update.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "48a75e0423deaf0336fa42dd8f96c50b97e60b97",
+            "size": 15178
+          },
+          {
+            "path": "candidate-bootstrap.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a4cc8dfcbde688b96fb4a9e937056c092eed0262",
+            "size": 9022
+          },
+          {
+            "path": "capture-copy.node-test.mjs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ca2661f8d87fc3e897d3be3cffe5f6b0457c63db",
+            "size": 1118
+          },
+          {
+            "path": "captures.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ed0659c9a828c6c239f6dd6a4c9505b5d36e7828",
+            "size": 14905
+          },
+          {
+            "path": "chat-files-http.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "4141c56d4f2e4add226fd7594f122f8f62c32501",
+            "size": 3280
+          },
+          {
+            "path": "chat-files.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "03f301a0fd7a14fa9fd8725c7d0232d74987c697",
+            "size": 3110
+          },
+          {
+            "path": "checkpoint-recovery.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "49cb2b876095df809b1495fc8b876a1974df5ff9",
+            "size": 4432
+          },
+          {
+            "path": "claude-chunks.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d671d1794b5b58ece9020b9772182aad9b33fe61",
+            "size": 1001
+          },
+          {
+            "path": "claude-generation-abort.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c9fb96f579fda0c1aa3372756074a1a90713204a",
+            "size": 4286
+          },
+          {
+            "path": "claude-prewarm-adapter.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "9b9173f52679bb524d6eb4472164c00d8fd87448",
+            "size": 9150
+          },
+          {
+            "path": "claude-prewarm.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "dddc01a02e3baf9c546891ce112aeb6dfef671c9",
+            "size": 11368
+          },
+          {
+            "path": "claude-resume.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b79bb1c4ab98d2f87a23096e808c09426a72d95e",
+            "size": 2601
+          },
+          {
+            "path": "claude-subscription.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "52544fcd53a2b3358e3a71c7490e966418ab3476",
+            "size": 16608
+          },
+          {
+            "path": "cli-startup-login.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ce4ef8c1cc61767fa84c267528e0dc33a6f05190",
+            "size": 7262
+          },
+          {
+            "path": "cloud-anonymous-hint.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "0f76ab735ab88c21a1acb576a9186e9a2675553a",
+            "size": 3583
+          },
+          {
+            "path": "cloud-bootstrap.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "96a5453786386f62b25f5c7b4a844fa1403c4573",
+            "size": 7074
+          },
+          {
+            "path": "cloud-model-preload.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "742ab443405a88de8d0f952dadfc21fc0456f760",
+            "size": 14512
+          },
+          {
+            "path": "cloud-model-probe-bundle.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3bace312b668a27bf7216a32b7ed1bb94612cada",
+            "size": 8567
+          },
+          {
+            "path": "cloud-registration.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "00f80b2471ba461baa12e52c8b40424ff401ef57",
+            "size": 3593
+          },
+          {
+            "path": "codex-contract.node-test.mts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a3806f8f12a600af3ac5d60016c693b0ef8a2753",
+            "size": 2468
+          },
+          {
+            "path": "codex-generation-completion.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "76449ff682615ebd14a533422194946e75441d74",
+            "size": 4020
+          },
+          {
+            "path": "codex-generation-wiring.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "9732fdec477481e961e96404393459ca38f22fd9",
+            "size": 3810
+          },
+          {
+            "path": "codex-item-chunks.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7a72cbdf6ae495a62ec2b9684ce9889f69635893",
+            "size": 2834
+          },
+          {
+            "path": "codex-mailbox-resume.node-test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7d40937784ca75dffc01a9ee2cf4cb3948c4ecf5",
+            "size": 15132
+          },
+          {
+            "path": "codex-mcp-context.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b3b755f024c0a1531df3a4b1d849b3b70c145806",
+            "size": 5195
+          },
+          {
+            "path": "codex-startup-config.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "36089f8f5383aa49b3e251b51410b9864642943a",
+            "size": 8982
+          },
+          {
+            "path": "codex-subscription.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "4e695285660b475102649d90fbabf12a6948b0c2",
+            "size": 14866
+          },
+          {
+            "path": "commands-polling.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f3bf151903c524afda7e0e2fb37e0c3d4762db18",
+            "size": 26574
+          },
+          {
+            "path": "commands.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8c4730239770b852d3c9b0b95c182e450f4bed43",
+            "size": 10253
+          },
+          {
+            "path": "computer-review-lifecycle.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "985ce1cfd300033fc4caaf07de0cba0d1ecf8964",
+            "size": 3666
+          },
+          {
+            "path": "credential-journal.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "05c04932d873aa40d9b6af40bae9751fd200b6f1",
+            "size": 4793
+          },
+          {
+            "path": "device-file.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "61727b380514e50644906bfad9ff1c0f5e1d10ea",
+            "size": 862
+          },
+          {
+            "path": "device-gateway-reliability.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "2fcec0166e368818b054cb1352b193d75c055ed4",
+            "size": 19051
+          },
+          {
+            "path": "device-gateway.node-test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "018e37bf3d8be1f4adfc9b0feac69bb1b70f2e4c",
+            "size": 1321
+          },
+          {
+            "path": "dispatch-link.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "0eeb5ad8d11435ce1566ca6afeab03cc89288569",
+            "size": 2292
+          },
+          {
+            "path": "factory-check.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "88f60a944d9e3ef70d7d5663cea017a8e8e5c4e8",
+            "size": 5924
+          },
+          {
+            "path": "fakes",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "fed76966734f5953de365783a3fb25f69c8384a5"
+          },
+          {
+            "path": "fixtures",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "a7659c01cca66e124731a40b9b858056be5bf13a"
+          },
+          {
+            "path": "fs-browse.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f23db74a933cf9d442d706ddafce64c98e8c6fab",
+            "size": 2814
+          },
+          {
+            "path": "fs-polling.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d7528c2363c2c6de170a2d07b20528a8c24b2066",
+            "size": 7538
+          },
+          {
+            "path": "git-prepared-token.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "802048c0cc12e244182c59e1c69291b51104bb0e",
+            "size": 13083
+          },
+          {
+            "path": "github-credentials.node-test.mjs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d53e5a74f65fe6994f63d908e24dfcb4ec16d0ae",
+            "size": 6339
+          },
+          {
+            "path": "github-receipt-concurrency.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "109885e36eaf645dc833dde932146809dc387957",
+            "size": 8228
+          },
+          {
+            "path": "github-runtime.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b883b231111716bfb74cd974448f17c2a178de83",
+            "size": 19271
+          },
+          {
+            "path": "hardening.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d4c57a52ebede43906c6c1642cb511304815113c",
+            "size": 13849
+          },
+          {
+            "path": "helpers.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d29b149f18f74474508c0f672544f6f4b4759476",
+            "size": 2074
+          },
+          {
+            "path": "hosted-cli-prefetch-lifecycle.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "79331e40785b8b45f9b2776d6dfb8c3dabd25613",
+            "size": 6675
+          },
+          {
+            "path": "hosted-cli-prefetch.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1d3df9f8d4075ae622065655d2bd08ae428ef5cf",
+            "size": 10809
+          },
+          {
+            "path": "hosted-command.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "218472f58b4b521b45bfedcb95bc697b07f7dc6f",
+            "size": 4787
+          },
+          {
+            "path": "initial-run-hint.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "100127bc999f0d724e966982472c27ccd9a0fa1e",
+            "size": 21390
+          },
+          {
+            "path": "kill.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "192dac534272607213418927900a22b4aa3cd279",
+            "size": 2653
+          },
+          {
+            "path": "local-computer-adapters.node-test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e1320e3e795ff944bca9cd7730ca1e39b4286dc9",
+            "size": 2659
+          },
+          {
+            "path": "local-computer-daemon.node-test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "600f7ba4cc946e1ec80725a56e7c509e83b0cf5f",
+            "size": 4781
+          },
+          {
+            "path": "local-git-origin.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7029c700dc9df43c6d8a096182947510466551ec",
+            "size": 9904
+          },
+          {
+            "path": "local-github.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ca3bfaa36a495a7ca8f37f96b22099073c68be68",
+            "size": 14246
+          },
+          {
+            "path": "machine-github.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c9773d7804cfc6ec732ed947cc4164ca02afd855",
+            "size": 3810
+          },
+          {
+            "path": "mailbox-catalogue.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c599e9f1aedd7855c940e8569eab9f47cb373f63",
+            "size": 6103
+          },
+          {
+            "path": "mailbox-notices.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "15d10ddc97892e4c644b6ebcf0497aac14fee26e",
+            "size": 2670
+          },
+          {
+            "path": "mailbox-preparation.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "237ac3bbf95937a4d577e4bc1f8254e0f02d9683",
+            "size": 13503
+          },
+          {
+            "path": "mcp-http-observation.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c569b06d61ed84855db3c5921f1a6dba05774477",
+            "size": 22837
+          },
+          {
+            "path": "mikka-mcp-backend.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b290001cdb08ce9064902cb6f0b858fd8c477565",
+            "size": 17484
+          },
+          {
+            "path": "mikka-mcp-bridge.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "81dc17cc151b67b155ab062148d3639112f3ed39",
+            "size": 11020
+          },
+          {
+            "path": "model-probe.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "25ebc1052bf0c7d450c233768bc83a6d9ff06488",
+            "size": 12417
+          },
+          {
+            "path": "native-companion.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fa9d25f764d99b37302f2a455926277694cc4770",
+            "size": 1510
+          },
+          {
+            "path": "package-runtime.mjs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "299bd9487988c8df8756b20dc8e17a943c28e9b8",
+            "size": 3944
+          },
+          {
+            "path": "package.test.mjs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ec82d375371303bb44567b5f5ccd6d28933babe8",
+            "size": 8202
+          },
+          {
+            "path": "policy-distribution.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "81515b74e520a3b0266bfe84b09e21c872dbc2ca",
+            "size": 10849
+          },
+          {
+            "path": "policy-repository.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6cd4c1b50003e406e43fcfedb0fe518eece3eddf",
+            "size": 14852
+          },
+          {
+            "path": "prewarm-preparation.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1de0ebd2c6bcc246282e94d5f41a2adac27d77da",
+            "size": 13799
+          },
+          {
+            "path": "prewarm-timing.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3a55ab20dae3953679351cbf645148a1c3593688",
+            "size": 6898
+          },
+          {
+            "path": "project-decisions.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8f3c58b4adaf8698428a4caf38e11288907110dc",
+            "size": 10477
+          },
+          {
+            "path": "provider-failure-adapters.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f458ee16244d35fbbf895b4a27c5968bfdf0729c",
+            "size": 10125
+          },
+          {
+            "path": "provider-failure-runs.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f78a556376a956e6c97550fc15f7d9d904bf6055",
+            "size": 14706
+          },
+          {
+            "path": "provider-failure.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8d64c2dc79f276e122228cd373d40446dfef4458",
+            "size": 7633
+          },
+          {
+            "path": "publication-cancel.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "36c8c56cc3179459b7a98fe24800c60e0d6548d2",
+            "size": 10355
+          },
+          {
+            "path": "quota-exhausted-runs.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "23a237a2cc1776bf5163f4303fc0eee4b8651c5b",
+            "size": 3030
+          },
+          {
+            "path": "quota.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "131c8daac9c4b23ec80a4e7ba0cd60d86d5e684a",
+            "size": 2460
+          },
+          {
+            "path": "real-agents.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6153fb4ead3ffc55d8c31451d27608da05300f1f",
+            "size": 12154
+          },
+          {
+            "path": "registration-login.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "0fbe8a0714941ba7c7d3b0b9eeec65da40bc367a",
+            "size": 1111
+          },
+          {
+            "path": "release.node-test.mjs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "23a8f892397042c3caef46fa59073523ddc3377c",
+            "size": 5510
+          },
+          {
+            "path": "repositories.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "481fe9921576228e6dd8da5ff5cacebd90ea805d",
+            "size": 22705
+          },
+          {
+            "path": "repository-cancel.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a9e4da697b86f06e52bd2e01764fb22f81c73f59",
+            "size": 2241
+          },
+          {
+            "path": "repository-git-timing.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ce608f2016a90e6ea706bd89a951b239f6ded3e1",
+            "size": 4360
+          },
+          {
+            "path": "repository-identity-pure.node-test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "06a9d5a6fea8bc47071cd67ce52ea86c2589e019",
+            "size": 2581
+          },
+          {
+            "path": "retain-resources.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e1f8f19262a944317bb4a2e51905a5eaa5c660a1",
+            "size": 1139
+          },
+          {
+            "path": "rpc.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ac7aad42b06a6fa3fbb140c58553a7373e7d5811",
+            "size": 4565
+          },
+          {
+            "path": "run-control-monitor.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "46a9bd956ea178de4a075735d1f4af167dcf6f1b",
+            "size": 10256
+          },
+          {
+            "path": "run-diagnostics.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b5256c5cf9d02fc780e717ff058ca8417dc7e1ed",
+            "size": 6024
+          },
+          {
+            "path": "run-mailbox.node-test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ddb91440292341e0bc68e28e64b192f4b01bdc48",
+            "size": 26096
+          },
+          {
+            "path": "run-model-credential.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a6c6f83c82d21235592b2844d0189907afedaabe",
+            "size": 7892
+          },
+          {
+            "path": "runs.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "cd5cc6618128a134541e4844de4f5b35a2a6c4a4",
+            "size": 63318
+          },
+          {
+            "path": "server-link-http.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ffd385549bbdc28ff76ba1593be314932e80db37",
+            "size": 29545
+          },
+          {
+            "path": "service.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "eae448c2b24c426465c78ea3de2df40ae3080b02",
+            "size": 5655
+          },
+          {
+            "path": "skill-mounts.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c088448b4056724d5c09ff8f66b357d363cb5fae",
+            "size": 17640
+          },
+          {
+            "path": "skills.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "55a0f950f8f44a7638b88f48f91eff120e572b69",
+            "size": 3438
+          },
+          {
+            "path": "subscription-access-ready.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "085441e12bbdefb4558a21f4e6d1d421c861b413",
+            "size": 5434
+          },
+          {
+            "path": "subscription-credentials.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "60dc55ceba02c261b96e1a245cc1308234e47621",
+            "size": 5379
+          },
+          {
+            "path": "subscription-hosted-runner.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "2aa4fe5c190c8e80876d8661e3068a7eb7a75848",
+            "size": 22918
+          },
+          {
+            "path": "subscription-launcher.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7c69e16e5070c1f3ab284f063b5f1e964ccb4976",
+            "size": 3460
+          },
+          {
+            "path": "subscription-native-broker.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "72dc26e620653969abeb6259abaf617526121ccf",
+            "size": 9213
+          },
+          {
+            "path": "subscription-preflight.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "73d3293de5ac6ae1580bca693c7f9e0cd4ace93a",
+            "size": 12164
+          },
+          {
+            "path": "subscription-question-resume.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "35b68d1ea6871517efabd55268cf8a3109441543",
+            "size": 26499
+          },
+          {
+            "path": "subscription-quota.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "5240a67dda59f1e0ab02b509b41a55919c91e143",
+            "size": 1368
+          },
+          {
+            "path": "subscription-worker-client.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b9f95e2f0367de766ec513e03410a108fe7fe9b1",
+            "size": 23387
+          },
+          {
+            "path": "subscription.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "281a3ba77f191240059c4e06cb3390dee3dd1cc7",
+            "size": 6554
+          },
+          {
+            "path": "task-secret-child.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d24b9d39944873703db5d4b91fc74b44701f139e",
+            "size": 12483
+          },
+          {
+            "path": "terminal-checkpoint.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1615ef8c1645dc35fc7aa39be44e8158431da922",
+            "size": 10522
+          },
+          {
+            "path": "tool-approval-admission.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d0d3889c62518643a0fb7f11230a019c405ba86b",
+            "size": 1484
+          },
+          {
+            "path": "tool-approval-claude.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b3f08441b0ccda012d71796567a0f0db8e3be143",
+            "size": 1931
+          },
+          {
+            "path": "tool-approval-codex.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "35a356fddd4159a5d30fe18d13b379569bbf07f0",
+            "size": 7756
+          },
+          {
+            "path": "tool-approval-liveness.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fa513f21e32ab7d013346aacff7fc2ae6234e0d4",
+            "size": 8892
+          },
+          {
+            "path": "trusted-endpoint.node-test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "62736bad09dc07e0b9d12bda66f6582da55f687b",
+            "size": 1432
+          },
+          {
+            "path": "verify-artifacts.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e9b18cc5708fc4a5eb3bec64b50db7fbf2482ae4",
+            "size": 1709
+          },
+          {
+            "path": "verify.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d831be90d5735921ac16172143b956c3772bc907",
+            "size": 4837
+          },
+          {
+            "path": "worktrees.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d7ddce9f5217817fa402d1244712e18605b37a6d",
+            "size": 8631
+          }
+        ]
+      },
+      {
+        "sha": "be7b54d3de1261bc57d15a1c61a0d7665a5afc29",
+        "verified": true,
+        "entries": [
+          {
+            "path": "adapter-runtime-model.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a6cf54fc1d544a76c0b8ea2090325c762fe94105",
+            "size": 3854
+          },
+          {
+            "path": "adapters.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c594202c9db5a0fa8a1c19fb731125d309abc61d",
+            "size": 24586
+          },
+          {
+            "path": "agents.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a97e549c984fdd71546ca1500486dc9e94f2a044",
+            "size": 57496
+          },
+          {
+            "path": "anonymous-claude-spare.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "263185786d249ea601a0c9de6b0a7df0e49d40ed",
+            "size": 24644
+          },
+          {
+            "path": "anonymous-codex-hosted.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "42cb76e8bcaa71490d3a8febb2f1af63342faa2c",
+            "size": 13467
+          },
+          {
+            "path": "anonymous-codex-spare.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6a2e49857783a337e6be23ee53680b66e4f8a0bd",
+            "size": 14630
+          },
+          {
+            "path": "auto-update.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "48a75e0423deaf0336fa42dd8f96c50b97e60b97",
+            "size": 15178
+          },
+          {
+            "path": "candidate-bootstrap.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a4cc8dfcbde688b96fb4a9e937056c092eed0262",
+            "size": 9022
+          },
+          {
+            "path": "capture-copy.node-test.mjs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ca2661f8d87fc3e897d3be3cffe5f6b0457c63db",
+            "size": 1118
+          },
+          {
+            "path": "captures.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ed0659c9a828c6c239f6dd6a4c9505b5d36e7828",
+            "size": 14905
+          },
+          {
+            "path": "chat-files-http.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "4141c56d4f2e4add226fd7594f122f8f62c32501",
+            "size": 3280
+          },
+          {
+            "path": "chat-files.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "03f301a0fd7a14fa9fd8725c7d0232d74987c697",
+            "size": 3110
+          },
+          {
+            "path": "checkpoint-recovery.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "49cb2b876095df809b1495fc8b876a1974df5ff9",
+            "size": 4432
+          },
+          {
+            "path": "claude-chunks.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d671d1794b5b58ece9020b9772182aad9b33fe61",
+            "size": 1001
+          },
+          {
+            "path": "claude-generation-abort.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c9fb96f579fda0c1aa3372756074a1a90713204a",
+            "size": 4286
+          },
+          {
+            "path": "claude-prewarm-adapter.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "9b9173f52679bb524d6eb4472164c00d8fd87448",
+            "size": 9150
+          },
+          {
+            "path": "claude-prewarm.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "dddc01a02e3baf9c546891ce112aeb6dfef671c9",
+            "size": 11368
+          },
+          {
+            "path": "claude-resume.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b79bb1c4ab98d2f87a23096e808c09426a72d95e",
+            "size": 2601
+          },
+          {
+            "path": "claude-subscription.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "52544fcd53a2b3358e3a71c7490e966418ab3476",
+            "size": 16608
+          },
+          {
+            "path": "cli-startup-login.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ce4ef8c1cc61767fa84c267528e0dc33a6f05190",
+            "size": 7262
+          },
+          {
+            "path": "cloud-anonymous-hint.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "0f76ab735ab88c21a1acb576a9186e9a2675553a",
+            "size": 3583
+          },
+          {
+            "path": "cloud-bootstrap.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "96a5453786386f62b25f5c7b4a844fa1403c4573",
+            "size": 7074
+          },
+          {
+            "path": "cloud-model-preload.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "742ab443405a88de8d0f952dadfc21fc0456f760",
+            "size": 14512
+          },
+          {
+            "path": "cloud-model-probe-bundle.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3bace312b668a27bf7216a32b7ed1bb94612cada",
+            "size": 8567
+          },
+          {
+            "path": "cloud-registration.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "00f80b2471ba461baa12e52c8b40424ff401ef57",
+            "size": 3593
+          },
+          {
+            "path": "codex-contract.node-test.mts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a3806f8f12a600af3ac5d60016c693b0ef8a2753",
+            "size": 2468
+          },
+          {
+            "path": "codex-generation-completion.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "76449ff682615ebd14a533422194946e75441d74",
+            "size": 4020
+          },
+          {
+            "path": "codex-generation-wiring.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "9732fdec477481e961e96404393459ca38f22fd9",
+            "size": 3810
+          },
+          {
+            "path": "codex-item-chunks.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7a72cbdf6ae495a62ec2b9684ce9889f69635893",
+            "size": 2834
+          },
+          {
+            "path": "codex-mailbox-resume.node-test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7d40937784ca75dffc01a9ee2cf4cb3948c4ecf5",
+            "size": 15132
+          },
+          {
+            "path": "codex-mcp-context.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b3b755f024c0a1531df3a4b1d849b3b70c145806",
+            "size": 5195
+          },
+          {
+            "path": "codex-startup-config.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "36089f8f5383aa49b3e251b51410b9864642943a",
+            "size": 8982
+          },
+          {
+            "path": "codex-subscription.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "4e695285660b475102649d90fbabf12a6948b0c2",
+            "size": 14866
+          },
+          {
+            "path": "commands-polling.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f3bf151903c524afda7e0e2fb37e0c3d4762db18",
+            "size": 26574
+          },
+          {
+            "path": "commands.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8c4730239770b852d3c9b0b95c182e450f4bed43",
+            "size": 10253
+          },
+          {
+            "path": "computer-review-lifecycle.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "985ce1cfd300033fc4caaf07de0cba0d1ecf8964",
+            "size": 3666
+          },
+          {
+            "path": "credential-journal.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "05c04932d873aa40d9b6af40bae9751fd200b6f1",
+            "size": 4793
+          },
+          {
+            "path": "device-file.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "61727b380514e50644906bfad9ff1c0f5e1d10ea",
+            "size": 862
+          },
+          {
+            "path": "device-gateway-reliability.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "2fcec0166e368818b054cb1352b193d75c055ed4",
+            "size": 19051
+          },
+          {
+            "path": "device-gateway.node-test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "018e37bf3d8be1f4adfc9b0feac69bb1b70f2e4c",
+            "size": 1321
+          },
+          {
+            "path": "dispatch-link.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "0eeb5ad8d11435ce1566ca6afeab03cc89288569",
+            "size": 2292
+          },
+          {
+            "path": "factory-check.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "88f60a944d9e3ef70d7d5663cea017a8e8e5c4e8",
+            "size": 5924
+          },
+          {
+            "path": "fakes",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "fed76966734f5953de365783a3fb25f69c8384a5"
+          },
+          {
+            "path": "fixtures",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "a7659c01cca66e124731a40b9b858056be5bf13a"
+          },
+          {
+            "path": "fs-browse.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f23db74a933cf9d442d706ddafce64c98e8c6fab",
+            "size": 2814
+          },
+          {
+            "path": "fs-polling.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d7528c2363c2c6de170a2d07b20528a8c24b2066",
+            "size": 7538
+          },
+          {
+            "path": "git-prepared-token.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "802048c0cc12e244182c59e1c69291b51104bb0e",
+            "size": 13083
+          },
+          {
+            "path": "github-credentials.node-test.mjs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d53e5a74f65fe6994f63d908e24dfcb4ec16d0ae",
+            "size": 6339
+          },
+          {
+            "path": "github-receipt-concurrency.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "109885e36eaf645dc833dde932146809dc387957",
+            "size": 8228
+          },
+          {
+            "path": "github-runtime.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b883b231111716bfb74cd974448f17c2a178de83",
+            "size": 19271
+          },
+          {
+            "path": "hardening.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d4c57a52ebede43906c6c1642cb511304815113c",
+            "size": 13849
+          },
+          {
+            "path": "helpers.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d29b149f18f74474508c0f672544f6f4b4759476",
+            "size": 2074
+          },
+          {
+            "path": "hosted-cli-prefetch-lifecycle.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "79331e40785b8b45f9b2776d6dfb8c3dabd25613",
+            "size": 6675
+          },
+          {
+            "path": "hosted-cli-prefetch.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1d3df9f8d4075ae622065655d2bd08ae428ef5cf",
+            "size": 10809
+          },
+          {
+            "path": "hosted-command.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "218472f58b4b521b45bfedcb95bc697b07f7dc6f",
+            "size": 4787
+          },
+          {
+            "path": "initial-run-hint.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "100127bc999f0d724e966982472c27ccd9a0fa1e",
+            "size": 21390
+          },
+          {
+            "path": "kill.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "192dac534272607213418927900a22b4aa3cd279",
+            "size": 2653
+          },
+          {
+            "path": "local-computer-adapters.node-test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e1320e3e795ff944bca9cd7730ca1e39b4286dc9",
+            "size": 2659
+          },
+          {
+            "path": "local-computer-daemon.node-test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "600f7ba4cc946e1ec80725a56e7c509e83b0cf5f",
+            "size": 4781
+          },
+          {
+            "path": "local-git-origin.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7029c700dc9df43c6d8a096182947510466551ec",
+            "size": 9904
+          },
+          {
+            "path": "local-github.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ca3bfaa36a495a7ca8f37f96b22099073c68be68",
+            "size": 14246
+          },
+          {
+            "path": "machine-github.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c9773d7804cfc6ec732ed947cc4164ca02afd855",
+            "size": 3810
+          },
+          {
+            "path": "mailbox-catalogue.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c599e9f1aedd7855c940e8569eab9f47cb373f63",
+            "size": 6103
+          },
+          {
+            "path": "mailbox-notices.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "15d10ddc97892e4c644b6ebcf0497aac14fee26e",
+            "size": 2670
+          },
+          {
+            "path": "mailbox-preparation.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "237ac3bbf95937a4d577e4bc1f8254e0f02d9683",
+            "size": 13503
+          },
+          {
+            "path": "mcp-http-observation.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c569b06d61ed84855db3c5921f1a6dba05774477",
+            "size": 22837
+          },
+          {
+            "path": "mikka-mcp-backend.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b290001cdb08ce9064902cb6f0b858fd8c477565",
+            "size": 17484
+          },
+          {
+            "path": "mikka-mcp-bridge.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "81dc17cc151b67b155ab062148d3639112f3ed39",
+            "size": 11020
+          },
+          {
+            "path": "model-probe.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "25ebc1052bf0c7d450c233768bc83a6d9ff06488",
+            "size": 12417
+          },
+          {
+            "path": "native-companion.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fa9d25f764d99b37302f2a455926277694cc4770",
+            "size": 1510
+          },
+          {
+            "path": "package-runtime.mjs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "299bd9487988c8df8756b20dc8e17a943c28e9b8",
+            "size": 3944
+          },
+          {
+            "path": "package.test.mjs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ec82d375371303bb44567b5f5ccd6d28933babe8",
+            "size": 8202
+          },
+          {
+            "path": "policy-distribution.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "81515b74e520a3b0266bfe84b09e21c872dbc2ca",
+            "size": 10849
+          },
+          {
+            "path": "policy-repository.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6cd4c1b50003e406e43fcfedb0fe518eece3eddf",
+            "size": 14852
+          },
+          {
+            "path": "prewarm-preparation.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1de0ebd2c6bcc246282e94d5f41a2adac27d77da",
+            "size": 13799
+          },
+          {
+            "path": "prewarm-timing.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3a55ab20dae3953679351cbf645148a1c3593688",
+            "size": 6898
+          },
+          {
+            "path": "project-decisions.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8f3c58b4adaf8698428a4caf38e11288907110dc",
+            "size": 10477
+          },
+          {
+            "path": "provider-failure-adapters.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f458ee16244d35fbbf895b4a27c5968bfdf0729c",
+            "size": 10125
+          },
+          {
+            "path": "provider-failure-runs.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "f78a556376a956e6c97550fc15f7d9d904bf6055",
+            "size": 14706
+          },
+          {
+            "path": "provider-failure.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8d64c2dc79f276e122228cd373d40446dfef4458",
+            "size": 7633
+          },
+          {
+            "path": "publication-cancel.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "36c8c56cc3179459b7a98fe24800c60e0d6548d2",
+            "size": 10355
+          },
+          {
+            "path": "quota-exhausted-runs.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "23a237a2cc1776bf5163f4303fc0eee4b8651c5b",
+            "size": 3030
+          },
+          {
+            "path": "quota.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "131c8daac9c4b23ec80a4e7ba0cd60d86d5e684a",
+            "size": 2460
+          },
+          {
+            "path": "real-agents.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6153fb4ead3ffc55d8c31451d27608da05300f1f",
+            "size": 12154
+          },
+          {
+            "path": "registration-login.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "0fbe8a0714941ba7c7d3b0b9eeec65da40bc367a",
+            "size": 1111
+          },
+          {
+            "path": "release.node-test.mjs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "23a8f892397042c3caef46fa59073523ddc3377c",
+            "size": 5510
+          },
+          {
+            "path": "repositories.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "481fe9921576228e6dd8da5ff5cacebd90ea805d",
+            "size": 22705
+          },
+          {
+            "path": "repository-cancel.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a9e4da697b86f06e52bd2e01764fb22f81c73f59",
+            "size": 2241
+          },
+          {
+            "path": "repository-git-timing.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ce608f2016a90e6ea706bd89a951b239f6ded3e1",
+            "size": 4360
+          },
+          {
+            "path": "repository-identity-pure.node-test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "06a9d5a6fea8bc47071cd67ce52ea86c2589e019",
+            "size": 2581
+          },
+          {
+            "path": "retain-resources.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e1f8f19262a944317bb4a2e51905a5eaa5c660a1",
+            "size": 1139
+          },
+          {
+            "path": "rpc.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ac7aad42b06a6fa3fbb140c58553a7373e7d5811",
+            "size": 4565
+          },
+          {
+            "path": "run-control-monitor.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "46a9bd956ea178de4a075735d1f4af167dcf6f1b",
+            "size": 10256
+          },
+          {
+            "path": "run-diagnostics.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b5256c5cf9d02fc780e717ff058ca8417dc7e1ed",
+            "size": 6024
+          },
+          {
+            "path": "run-mailbox.node-test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ddb91440292341e0bc68e28e64b192f4b01bdc48",
+            "size": 26096
+          },
+          {
+            "path": "run-model-credential.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a6c6f83c82d21235592b2844d0189907afedaabe",
+            "size": 7892
+          },
+          {
+            "path": "runs.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "cd5cc6618128a134541e4844de4f5b35a2a6c4a4",
+            "size": 63318
+          },
+          {
+            "path": "server-link-http.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ffd385549bbdc28ff76ba1593be314932e80db37",
+            "size": 29545
+          },
+          {
+            "path": "service.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "eae448c2b24c426465c78ea3de2df40ae3080b02",
+            "size": 5655
+          },
+          {
+            "path": "skill-mounts.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c088448b4056724d5c09ff8f66b357d363cb5fae",
+            "size": 17640
+          },
+          {
+            "path": "skills.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "55a0f950f8f44a7638b88f48f91eff120e572b69",
+            "size": 3438
+          },
+          {
+            "path": "subscription-access-ready.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "085441e12bbdefb4558a21f4e6d1d421c861b413",
+            "size": 5434
+          },
+          {
+            "path": "subscription-credentials.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "60dc55ceba02c261b96e1a245cc1308234e47621",
+            "size": 5379
+          },
+          {
+            "path": "subscription-hosted-runner.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "2aa4fe5c190c8e80876d8661e3068a7eb7a75848",
+            "size": 22918
+          },
+          {
+            "path": "subscription-launcher.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7c69e16e5070c1f3ab284f063b5f1e964ccb4976",
+            "size": 3460
+          },
+          {
+            "path": "subscription-native-broker.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "72dc26e620653969abeb6259abaf617526121ccf",
+            "size": 9213
+          },
+          {
+            "path": "subscription-preflight.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "73d3293de5ac6ae1580bca693c7f9e0cd4ace93a",
+            "size": 12164
+          },
+          {
+            "path": "subscription-question-resume.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "35b68d1ea6871517efabd55268cf8a3109441543",
+            "size": 26499
+          },
+          {
+            "path": "subscription-quota.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "5240a67dda59f1e0ab02b509b41a55919c91e143",
+            "size": 1368
+          },
+          {
+            "path": "subscription-worker-client.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b9f95e2f0367de766ec513e03410a108fe7fe9b1",
+            "size": 23387
+          },
+          {
+            "path": "subscription.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "281a3ba77f191240059c4e06cb3390dee3dd1cc7",
+            "size": 6554
+          },
+          {
+            "path": "task-secret-child.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d24b9d39944873703db5d4b91fc74b44701f139e",
+            "size": 12483
+          },
+          {
+            "path": "terminal-checkpoint.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1615ef8c1645dc35fc7aa39be44e8158431da922",
+            "size": 10522
+          },
+          {
+            "path": "tool-approval-admission.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d0d3889c62518643a0fb7f11230a019c405ba86b",
+            "size": 1484
+          },
+          {
+            "path": "tool-approval-claude.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b3f08441b0ccda012d71796567a0f0db8e3be143",
+            "size": 1931
+          },
+          {
+            "path": "tool-approval-codex.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "35a356fddd4159a5d30fe18d13b379569bbf07f0",
+            "size": 7756
+          },
+          {
+            "path": "tool-approval-liveness.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fa513f21e32ab7d013346aacff7fc2ae6234e0d4",
+            "size": 8892
+          },
+          {
+            "path": "trusted-endpoint.node-test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "62736bad09dc07e0b9d12bda66f6582da55f687b",
+            "size": 1432
+          },
+          {
+            "path": "verify-artifacts.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e9b18cc5708fc4a5eb3bec64b50db7fbf2482ae4",
+            "size": 1709
+          },
+          {
+            "path": "verify.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d831be90d5735921ac16172143b956c3772bc907",
+            "size": 4837
+          },
+          {
+            "path": "worktrees.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d7ddce9f5217817fa402d1244712e18605b37a6d",
+            "size": 8631
+          }
+        ]
+      },
+      {
+        "sha": "23a4c87ccca0df22d3a1cf44b24a5093c62c22e6",
+        "verified": true,
+        "entries": [
+          {
+            "path": "adapters",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "3f142b625865b00cf8271ec232a75a16538229a3"
+          },
+          {
+            "path": "agents",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "062544f538dde3aa9e98a309a434e7c7683f2219"
+          },
+          {
+            "path": "anonymous-claude-spare.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "39ef017d27cd0c7395abfffe99913a7e509ff3d3",
+            "size": 15331
+          },
+          {
+            "path": "anonymous-codex-spare.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "00f476c51799a68c4af5edc38d9a62c91aeea545",
+            "size": 11991
+          },
+          {
+            "path": "api-key-broker.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "0afeb81712523e4d2d0d185fdb3675cf4e72f339",
+            "size": 5988
+          },
+          {
+            "path": "auto-update.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8c476363d1933178d69619358ff2bef57f570fc1",
+            "size": 4500
+          },
+          {
+            "path": "captures.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "5af9ce09d15c20d13e12f6b9299c4e1ea117c4eb",
+            "size": 7630
+          },
+          {
+            "path": "chunks.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b0e5b7e58a10fb95cf986e80a1d04b99fcdee52f",
+            "size": 3791
+          },
+          {
+            "path": "cli.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "0be92f49ab119d6bc10ccfe25286acb1efffe6fd",
+            "size": 10817
+          },
+          {
+            "path": "cloud-bootstrap-broker.mjs",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "15c6637c31e308ffca83d35ff9623fc67f120233",
+            "size": 10763
+          },
+          {
+            "path": "cloud-bootstrap.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "887f668ae7e20c0cb457b5fc4f116b4fecb552fe",
+            "size": 9208
+          },
+          {
+            "path": "cloud-model-probe.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "92fa342ba673e1ba9ca5d0091c51443de1fa44e8",
+            "size": 3219
+          },
+          {
+            "path": "cloud-model-receipt.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3caff6c7e5ebddd4998fcad65201fda4367afc5b",
+            "size": 3263
+          },
+          {
+            "path": "cloud-registration.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b4870fb638b6acbcb73596c764137b8980417756",
+            "size": 558
+          },
+          {
+            "path": "codex-generation-telemetry.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "2464d4164da37b6b4355e4338bf039875cf9fd9e",
+            "size": 18277
+          },
+          {
+            "path": "codex-generation-telemetry.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ddf484c21b5ac4bdbe75d5ad8f404ad814710e10",
+            "size": 19801
+          },
+          {
+            "path": "codex-mcp-context.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "beb35030e17a70a219ec9878701df7726bd4fddf",
+            "size": 1888
+          },
+          {
+            "path": "codex-startup-config.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c7724a698dc12e2e301461941eead3a5bec16177",
+            "size": 10468
+          },
+          {
+            "path": "computer",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "2c628c5b579d4b29b717c3b5502064a417249af6"
+          },
+          {
+            "path": "coordinator",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "2d33b8848cf0ada1412dc021c21e43bc4ce6083f"
+          },
+          {
+            "path": "credential-globs.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "caf7eff4133053f99714465c6f2b02e9041bfdc6",
+            "size": 2813
+          },
+          {
+            "path": "decision-judgments.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "339c5929db4321aab717f88562ac4b906030ce13",
+            "size": 1942
+          },
+          {
+            "path": "device-gateway.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "190f0e367ad538df5fc54d9eefcda52994a6a5b3",
+            "size": 4566
+          },
+          {
+            "path": "device-type.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "78460053a6731f4aea4331f31bcb3b8cf5c54f61",
+            "size": 956
+          },
+          {
+            "path": "device-work-signal.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "0bc49ef43678f5b949313a6af465fbeb6a51d72f",
+            "size": 2249
+          },
+          {
+            "path": "env.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ab3e0923b67853acbd0020c4b3494903d64ec852",
+            "size": 3665
+          },
+          {
+            "path": "env.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6bc2d7673a9feebecb786f62ad2d25e790d075d9",
+            "size": 1981
+          },
+          {
+            "path": "errors.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "07fd88caa07a46a791498f86adeb12d7e5e1daa9",
+            "size": 2271
+          },
+          {
+            "path": "fs-browse.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "528e8d9138cccd3b262ba7320fda6a560c7bcca5",
+            "size": 4423
+          },
+          {
+            "path": "fs-util.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "eccea99eb0c04aa5a4875d461022e326b88b84ab",
+            "size": 1020
+          },
+          {
+            "path": "harness-install.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "19e85b2db4c7be7ff5ecf08d2a505ec14fc02a1f",
+            "size": 9655
+          },
+          {
+            "path": "harness-install.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d754f2e9fac09c54b1521727a5075d65b8c236c2",
+            "size": 489
+          },
+          {
+            "path": "harnesses.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "cf81f5881c56e8c9c4f18e250ae224f7c0aa4afd",
+            "size": 2368
+          },
+          {
+            "path": "harnesses.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a4cd61c6633931a8306d86e54c40665a7a1441f6",
+            "size": 2424
+          },
+          {
+            "path": "hosted-binaries.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e903326b507946fd35e7f8c17c170e4218a017b8",
+            "size": 6461
+          },
+          {
+            "path": "hosted-binaries.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "79d9ac7da4d33316263339b71f82461ade761e2c",
+            "size": 4394
+          },
+          {
+            "path": "hosted-cli-prefetch.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d3136a1667e96faed8e19cc5952f1c06d8bb2fcb",
+            "size": 5805
+          },
+          {
+            "path": "ids.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a9da396c969ae052ba8c7967a9a314a8c3cb8a1c",
+            "size": 835
+          },
+          {
+            "path": "lock.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "752e2d2a170eda4bc11a078abccd6fd278f793be",
+            "size": 4327
+          },
+          {
+            "path": "log.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "43b3050782448f67d0cbe0a9a2e18f2370e73382",
+            "size": 1050
+          },
+          {
+            "path": "log.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7a4e5e2a5da5015d0caa1b14d509c933ff86f844",
+            "size": 2311
+          },
+          {
+            "path": "login.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6b13333c0b1f4f4f4af90c4d4bf940f89389fbe4",
+            "size": 5869
+          },
+          {
+            "path": "main.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "abe9cf6dc0dd634fb76458b0a192f76258d32b43",
+            "size": 95949
+          },
+          {
+            "path": "mcp-http-timing.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "065ec67cafe2bfa59080e3a5d8b2c520224fea10",
+            "size": 9472
+          },
+          {
+            "path": "mcp-http-timing.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "348935cc2784567eef99dd8af85868c6438f5de4",
+            "size": 9646
+          },
+          {
+            "path": "model-probe.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "bbc427d089a8eada65549c6548f3d9550e7b1c68",
+            "size": 7977
+          },
+          {
+            "path": "official-cli-timing.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b00fd6b69d3da0ca4d1b679e65265e533f7b2e75",
+            "size": 9985
+          },
+          {
+            "path": "official-cli-timing.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8a48352489f3455e0c8b74a532b7adbb09f5c835",
+            "size": 13166
+          },
+          {
+            "path": "outbox.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a1cc853d316676eecf3c840fd6e38c0f6978c51b",
+            "size": 6634
+          },
+          {
+            "path": "outbox.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "764b3cfae981dd2ba3f19616ce5782bbb9fcc67a",
+            "size": 9829
+          },
+          {
+            "path": "path-search.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b275652c194487a81f185678c3c6eb16e6e307c7",
+            "size": 1078
+          },
+          {
+            "path": "paths.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "3d9a8043e63e63a43044e2517ef03ab359341b9b",
+            "size": 2445
+          },
+          {
+            "path": "permissions.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "4c11b5d5e6e4fb857ebf245323165a163887857b",
+            "size": 11842
+          },
+          {
+            "path": "permissions.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "fc612dfef206662434f95020e9ce2da6a4707157",
+            "size": 9508
+          },
+          {
+            "path": "process-group.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d2192f3de3693b37946797da81f184860001615e",
+            "size": 1122
+          },
+          {
+            "path": "quota",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "ca941774248f0b835bdcf3931c18da1869752d98"
+          },
+          {
+            "path": "repositories.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "bebf3f981b9c09cc456edbc5eaf741e0e1e58408",
+            "size": 12263
+          },
+          {
+            "path": "repository-git-timing.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "629034e9f747a0cda8d3a7b2792183ba79fc36c6",
+            "size": 2473
+          },
+          {
+            "path": "rpc",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "368a029badc0d8c38a957dc6e08a9823ebd58f88"
+          },
+          {
+            "path": "run-isolation.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "138fbf39b2e304a4647f7b32f5177569aa5df2f2",
+            "size": 8126
+          },
+          {
+            "path": "run-mailbox.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "0371266111af0a53c125d54897852d45fb6ebc27",
+            "size": 9018
+          },
+          {
+            "path": "run-repository.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7b810d1e4a9ac73808dd14e681f586d6f76a69e3",
+            "size": 2567
+          },
+          {
+            "path": "run-runtime-timing.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "51aa0a6591be4d7f05aa5541c9d45d83339691d3",
+            "size": 11272
+          },
+          {
+            "path": "run-runtime-timing.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "9332e6e8b732dd06b41fa47518a9f0b1253d1ca5",
+            "size": 14461
+          },
+          {
+            "path": "run-scratch.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "d9020b4a7f152cbc1a720e9e55c410334cdecb4a",
+            "size": 622
+          },
+          {
+            "path": "runs",
+            "mode": "040000",
+            "type": "tree",
+            "sha": "aeb84085d01ae4c57d455b35940a91b3df43505c"
+          },
+          {
+            "path": "secret-mask.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "18034ae5ad837b56632ae70834dcfec5eb50af17",
+            "size": 10248
+          },
+          {
+            "path": "secret-mask.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "44cc6c3450a750cd7ac12dd3fe08507fc7d61bb2",
+            "size": 8681
+          },
+          {
+            "path": "server-decision.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "5fe6835973c6ca79690eada9004545f34642af80",
+            "size": 2561
+          },
+          {
+            "path": "server-link-http.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "8cbbce8d8706f07b6b5e075dbc4a6d738af285ef",
+            "size": 27701
+          },
+          {
+            "path": "server-link.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "34f271c0def0008d7e9120e37098d4167f951578",
+            "size": 21117
+          },
+          {
+            "path": "service.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "277fae47e47d1ce4a2061838b1f08f457b7b3355",
+            "size": 6054
+          },
+          {
+            "path": "subscription-access-ready.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1124946c71e80b16dee7a67603a670b91a9fe082",
+            "size": 5858
+          },
+          {
+            "path": "subscription-credentials.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e5d7cf7b6e78206f6ba789de850ae7770c700d5f",
+            "size": 5320
+          },
+          {
+            "path": "subscription-hosted-runner.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "62a2d8edd244293b511a00da618849638a943ac0",
+            "size": 26481
+          },
+          {
+            "path": "subscription-launcher.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "35d242f8ad58a623c4f9bb59b0f5bc12febce4b3",
+            "size": 6092
+          },
+          {
+            "path": "subscription-local-runner.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "2e1da8423e1c160e8b277b8be2add26b12c57b41",
+            "size": 8997
+          },
+          {
+            "path": "subscription-local-runner.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6d96bade81dd631d5b5068cd1f272d64bcb7bc91",
+            "size": 6184
+          },
+          {
+            "path": "subscription-native-broker.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "2192561dc4aef519d226acc82b8af3a666818d53",
+            "size": 4837
+          },
+          {
+            "path": "subscription-preflight.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b51c5b1de83de18161e17bff61e93c5e34cf2a23",
+            "size": 3298
+          },
+          {
+            "path": "subscription-quota.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "535a7a7a230f8a84bce34c4d46f42ca5cc0b553d",
+            "size": 1022
+          },
+          {
+            "path": "subscription-worker-client.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e8cf0150fc8ce0962a55ec9723b441abbfb41c02",
+            "size": 17361
+          },
+          {
+            "path": "subscription-worker-timing.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a81384d2249da654d52f63d0c426d41d9145636e",
+            "size": 7219
+          },
+          {
+            "path": "subscription-worker-timing.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "622a0d39f562ff326dc42a4bd7af16b3d1c3d3e0",
+            "size": 9712
+          },
+          {
+            "path": "subscription.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "18338cd3b3fdf5a57a30263a2f0c7319d5f30df1",
+            "size": 2662
+          },
+          {
+            "path": "task-env.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7b097f5e72b54f0a54d4b165b917631eac97e841",
+            "size": 2151
+          },
+          {
+            "path": "task-env.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "cf4970f88fd504592e1c7564f0a1360fe2fa320f",
+            "size": 2701
+          },
+          {
+            "path": "task-secret-bridge.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "4be31ba07bba23de80840cff590a05a1a1a3503d",
+            "size": 17823
+          },
+          {
+            "path": "task-secret-bridge.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7d1f931e7e311b9abaa48a3a06ad19e7ed5be6fb",
+            "size": 10583
+          },
+          {
+            "path": "tool-duration.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e2ca7e45b629c9232f3249e3ba82b065dfea5b4b",
+            "size": 1545
+          },
+          {
+            "path": "tool-duration.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c16c3c18dca3a2de441047e63d48853f06f9d7f3",
+            "size": 1022
+          },
+          {
+            "path": "tracing-ai.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "6f7d7414fb07809880603dc4c20f6525616219ab",
+            "size": 6925
+          },
+          {
+            "path": "tracing-logs.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e8da68cec5d9976ed404e4494ba59037c9b4966e",
+            "size": 3897
+          },
+          {
+            "path": "tracing-sampling.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "a8633f4aeb9211e1f580137d71abb6e9037fb9de",
+            "size": 8410
+          },
+          {
+            "path": "tracing-sampling.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "06d2c47f82853e5d0630dc79feda2d8d0eafe8d3",
+            "size": 7079
+          },
+          {
+            "path": "tracing.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "2c1bdc5fc6896cbe1c1fd54054b98d1845535196",
+            "size": 25860
+          },
+          {
+            "path": "tracing.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "0eed0277c933b0d2457909851bab458a482c184d",
+            "size": 27723
+          },
+          {
+            "path": "trusted-endpoint.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "c9171cd5ae653b43b095ed26fe4f550f1ea49ed8",
+            "size": 425
+          },
+          {
+            "path": "worktrees.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "ee09f23b355b6ed9d8960502a8cdb53fa9b493b7",
+            "size": 15236
+          }
+        ]
+      },
+      {
+        "sha": "3f142b625865b00cf8271ec232a75a16538229a3",
+        "verified": true,
+        "entries": [
+          {
+            "path": "claude-failure.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "4b8f61f67b5cbbe4dca161031c490644cefad145",
+            "size": 3991
+          },
+          {
+            "path": "claude-prewarm.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "cbb45575e495f13d5e76dec1c2b8fd62fb07f16c",
+            "size": 9298
+          },
+          {
+            "path": "claude.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b5659ce0a1d56aeccd29f964d1aed30dd750282f",
+            "size": 51190
+          },
+          {
+            "path": "codex-failure.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "53c4cd4d209aaa666cc7fa5d681ace957075a418",
+            "size": 2591
+          },
+          {
+            "path": "codex-mailbox.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "5b59fa8d81bd9d22fdb1d72cd30f6156e0fb9448",
+            "size": 5930
+          },
+          {
+            "path": "codex-protocol.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "cb2578564cd0c3f686f21eac07dd9edcbcdf1407",
+            "size": 3995
+          },
+          {
+            "path": "codex.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "e85815a955eaff56d7ac389c9d9722c64607345d",
+            "size": 51844
+          },
+          {
+            "path": "cursor.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1a3081575602152bb028783d277fc34441c1a721",
+            "size": 15971
+          },
+          {
+            "path": "generation-metrics.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7b7878479cf37d95253c3c337a9c755346963d96",
+            "size": 7083
+          },
+          {
+            "path": "generation-metrics.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "4827af84d7b53cff43cea29e73b19a5a780e8572",
+            "size": 6748
+          },
+          {
+            "path": "mock.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "385357ded14842c6f77de18df288679776db359a",
+            "size": 10537
+          },
+          {
+            "path": "types.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "bbd59de65673cf8fcd98ad4bfb365a5aaac7ea28",
+            "size": 8818
+          }
+        ]
+      },
+      {
+        "sha": "3885ffaa27853e2a96635eeb0acc86a7400ed0d8",
+        "verified": true,
+        "entries": [
+          {
+            "path": "claude-failure.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "4b8f61f67b5cbbe4dca161031c490644cefad145",
+            "size": 3991
+          },
+          {
+            "path": "claude-prewarm.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "cbb45575e495f13d5e76dec1c2b8fd62fb07f16c",
+            "size": 9298
+          },
+          {
+            "path": "claude.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "b5659ce0a1d56aeccd29f964d1aed30dd750282f",
+            "size": 51190
+          },
+          {
+            "path": "codex-failure.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "53c4cd4d209aaa666cc7fa5d681ace957075a418",
+            "size": 2591
+          },
+          {
+            "path": "codex-mailbox.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "5b59fa8d81bd9d22fdb1d72cd30f6156e0fb9448",
+            "size": 5930
+          },
+          {
+            "path": "codex-protocol.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "cb2578564cd0c3f686f21eac07dd9edcbcdf1407",
+            "size": 3995
+          },
+          {
+            "path": "codex.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1c8ca694b2f3eec633fb71440970170485957703",
+            "size": 51989
+          },
+          {
+            "path": "cursor.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "1a3081575602152bb028783d277fc34441c1a721",
+            "size": 15971
+          },
+          {
+            "path": "generation-metrics.test.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "7b7878479cf37d95253c3c337a9c755346963d96",
+            "size": 7083
+          },
+          {
+            "path": "generation-metrics.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "4827af84d7b53cff43cea29e73b19a5a780e8572",
+            "size": 6748
+          },
+          {
+            "path": "mock.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "385357ded14842c6f77de18df288679776db359a",
+            "size": 10537
+          },
+          {
+            "path": "types.ts",
+            "mode": "100644",
+            "type": "blob",
+            "sha": "bbd59de65673cf8fcd98ad4bfb365a5aaac7ea28",
+            "size": 8818
+          }
+        ]
+      }
+    ]
+  },
+  "sourceReview": {
+    "coldAndResume": {
+      "path": "packages/daemon/src/adapters/codex.ts",
+      "changedLines": [
+        480,
+        481
+      ],
+      "change": "Insert required=true for the local Mikka MCP in the app-server argv shared by new/resumed cold processes. No command,args,env,auth,approval,trace/native-generation,threadId,session-resume,error/fallback or handoff logic changed."
+    },
+    "warmAdoption": {
+      "path": "packages/daemon/src/anonymous-codex-spare.ts",
+      "changedLine": 189,
+      "change": "Spread the existing context.server and explicitly set required:true in the returned threadConfig. Preserve child/rpc/initialized/nativeGenerations and all adoption validation/trace binding/cleanup."
+    },
+    "hostedTests": {
+      "path": "packages/daemon/test/anonymous-codex-hosted.test.ts",
+      "changedLines": [
+        33,
+        84,
+        143
+      ],
+      "change": "Expose fake process argv in the local wire fixture; assert required=true on the warm thread MCP config and cold fallback CLI argv. Existing assertions and synthetic 0.166.0 fixture version remain intact."
+    },
+    "exactVersionGuard": {
+      "path": "packages/daemon/src/anonymous-codex-spare.ts",
+      "line": 138,
+      "text": "    if (!/^[A-Za-z0-9._-]+\\/0\\.166\\.0(?:\\s|$)/.test(initialized.userAgent ?? '')) throw Error('Anonymous Codex version unavailable')",
+      "unchangedFromBase": true
+    },
+    "traceAndNativeContracts": "The two source files round-trip exactly to the common baseline after reversing the stated inserts/replacement. All other repository leaves outside the three proven dependency paths are unchanged by PR1839. Own84ce's packages subtree equals the baseline exactly; its 48 changed paths and current main's two root README paths are pairwise disjoint from this dependency. Therefore a conflict-free content union can retain all own trace, driver, journal, acceptance-window, FIRST-pair, diagnostics/unknown and original Native contract files without manual replacement.",
+    "currentConflictBlocks": [],
+    "conflictStatement": "No content/path overlap exists for the three currently fixed heads relative to 7848e79. This is source comparison, not an executed git merge. The unpublished #1505 compatibility head cannot yet be checked.",
+    "syntheticVersionFixture": {
+      "path": "packages/daemon/test/anonymous-codex-hosted.test.ts",
+      "line": 36,
+      "text": "    FAKE_CODEX_USER_AGENT: 'mikka/0.166.0 (offline fixture)', FIXTURE_WIRE: trace }).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))",
+      "unchangedFromBase": true
+    }
+  },
+  "workerInputEffect": {
+    "previousProof": {
+      "gitBlob": "4814eeb45f841e4b117750c2ab8541969bbb61fc",
+      "bytes": 26484,
+      "sha256": "1333fc640049db6a1d92489dda8c6bc59b064cf6f774174b6bc30f203027dd6d",
+      "verifiedGitBlob": true
+    },
+    "canonicalDefinition": {
+      "gitBlob": "1db4f39b19e83d49404f1df7fd78092d3f9b7ab3",
+      "bytes": 55730,
+      "sha256": "0adb53fbdd6cbcd61f1d1804aee3e2df1538997c0724556062f2741c5ac1cdb1",
+      "path": "scripts/e2b/build-template.py",
+      "workerPaths": [
+        "package.json",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "packages/daemon",
+        "packages/protocol",
+        "packages/config",
+        "patches"
+      ],
+      "recipePaths": [
+        "scripts/e2b/official-files.py",
+        "scripts/e2b/e2b-finalization-files.json",
+        "scripts/e2b/e2b-certificate-relinks.json",
+        "scripts/e2b/start-prebuilt.sh",
+        "scripts/e2b/build-template.py",
+        "scripts/e2b/template-capabilities.json",
+        "scripts/e2b/acceptance-daemon.mts",
+        "scripts/e2b/acceptance-bootstrap.mts",
+        "scripts/e2b/start-desktop.sh",
+        "scripts/e2b/viewer-gateway.py",
+        "scripts/e2b/lease-driver.py"
+      ],
+      "selectorDefinitionLines": "32-41",
+      "projectionAndHashLines": "99-275",
+      "selection": "git ls-tree -r fixedCommit -- exact WORKER_PATHS and RECIPE_PATHS;non-package/lock entries use listing;package files use package_projection;lock uses lock_projection",
+      "fixedPriorProof": {
+        "gitBlob": "290373941494c7d953e1a8262c04de52bffe8845",
+        "bytes": 47650,
+        "sha256": "aa602d6e16151313a1e947b805e0aa3a257ff219fb45a6a0247f74b5c0dfe2e3"
+      }
+    },
+    "changedPaths": [
+      {
+        "path": "packages/daemon/src/adapters/codex.ts",
+        "selectedBy": "packages/daemon",
+        "canonicalEntryBehavior": "raw Git entry identity changes; package/lock projection does not apply"
+      },
+      {
+        "path": "packages/daemon/src/anonymous-codex-spare.ts",
+        "selectedBy": "packages/daemon",
+        "canonicalEntryBehavior": "raw Git entry identity changes; package/lock projection does not apply"
+      },
+      {
+        "path": "packages/daemon/test/anonymous-codex-hosted.test.ts",
+        "selectedBy": "packages/daemon",
+        "canonicalEntryBehavior": "raw Git entry identity changes; package/lock projection does not apply"
+      }
+    ],
+    "inference": "PR1839 changes canonical worker inputs because all three exact modified paths are under selected packages/daemon. The earlier equality of 84ce and main7848 worker inputs must not be carried over after incorporating205d. No actual canonical worker digest was executed or invented; no AppSHA==RuntimeSHA gate."
+  },
+  "futureIntegration": {
+    "readiness": "Fixed205d is source-compatible with own84ce and currentmain12458 under the verified common base.",
+    "preservation": "When explicitly proceeding later, use ordinary branch merges that retain each fixed branch ancestry and preserve own48 changes, dependency3 changes and main2 README changes. No cherry-pick/manual file overwrite is necessary for these fixed inputs.",
+    "unpublished1505": "No compatibility commit was supplied or observed in this task. Its exact source, parentage, overlap, tests and any merge-conflict blocks remain UNKNOWN. The 0.166.0 version guard at anonymous-codex-spare.ts:138 and the hosted fake at line36 are exact existing compatibility surfaces; current required=true warm configuration is line189. These locations do not assert a future candidate diff.",
+    "finalSource": "No final integrated source/tree/commit has been created or claimed. Native84ce evidence remains attached to that actual source; it is not relabelled as evidence for an uncreated combined source.",
+    "runtime": "CI and real Codex/runtime/production acceptance reported by others were not independently executed or certified by this source preparation."
+  },
+  "boundaries": {
+    "originalWorkflowLogsRead": 0,
+    "workflowZipsRead": 0,
+    "testsRun": 0,
+    "resourcesStarted": 0,
+    "resourcesRemaining": 0,
+    "ciTriggered": 0,
+    "refsUpdated": 0,
+    "treesCreated": 0,
+    "sourceCommitsCreated": 0,
+    "otherPrsMerged": 0,
+    "productionActions": 0,
+    "evidenceBlobOnly": true
+  },
+  "supersedesEvidenceBlob": "f05d5868f0c1784e5384ae6d7d6ee0f7945eaaa5",
+  "supersessionReason": "Correct hosted fake source line reference from35 to36; no source or verdict changed."
+}
