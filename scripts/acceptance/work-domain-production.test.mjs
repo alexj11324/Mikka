@@ -240,7 +240,10 @@ function fixture({ badProject = false, badEnvironment = false, unsafeProfile = f
         provider: chatModel, modelId: CASES.find(item => item.id === chatModel).model, available: true } })
       if (action === 'coordinator.pollCoordinatorChat') return rpc({ botId, enabled: true, working: false })
       if (action === 'issues.saveIssue') {
-        const issue = { ...args[0], id: id(200 + issues.length), userId: ownerId, revision: 1,
+        assert.deepEqual(Object.keys(args[0]).sort(), ['content', 'priority', 'status', 'title'])
+        assert.equal(init.headers['x-mikka-workspace-id'], workspaceId)
+        const issue = { ...args[0], workspaceId: init.headers['x-mikka-workspace-id'],
+          id: id(200 + issues.length), userId: ownerId, revision: 1,
           projectId: null, identifier: 'WS-1687-' + (issues.length + 1) }
         issues.push(issue); return rpc({ issue })
       }

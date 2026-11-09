@@ -4,9 +4,12 @@ No browser, model, external service or production credential is used. Run with
 python3 scripts/e2b/preview-gateway.test.py in an isolated Linux environment.
 """
 import asyncio
+import errno
+import http.server
 import importlib.util
 import json
 import os
+import socket
 from pathlib import Path
 import tempfile
 import threading
@@ -187,6 +190,74 @@ class PreviewAcceptance(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(gateway_module.PreviewFailure) as error:
             await self.prepare()
         self.assertEqual(error.exception.code, 'authorization_revoked')
+
+    async def test_revoked_gateway_rebind_after_real_http_close_and_websocket(self):
+        await self.open()
+        previous_port = self.port
+        marker = b'mikka-replacement-after-revoke'
+
+        class ReplacementHandler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header('Content-Length', str(len(marker)))
+                self.end_headers()
+                self.wfile.write(marker)
+
+            def log_message(self, _format, *_args):
+                pass
+
+        # SO_REUSEADDR must not permit a second listener while this origin lives.
+        with self.assertRaises(OSError) as occupied:
+            with http.server.ThreadingHTTPServer(('0.0.0.0', previous_port), ReplacementHandler):
+                self.fail('a live gateway allowed a competing listener')
+        self.assertEqual(occupied.exception.errno, errno.EADDRINUSE)
+
+        # Read through server EOF before closing our side, so this real gateway
+        # owns a TIME_WAIT connection rather than relying on timing or a mock.
+        reader, writer = await asyncio.open_connection('127.0.0.1', previous_port)
+        try:
+            writer.write(('GET / HTTP/1.1\r\nHost: preview.example.test\r\nCookie: '
+                          + self.cookie + '\r\nConnection: close\r\n\r\n').encode())
+            await writer.drain()
+            response = await asyncio.wait_for(reader.read(), timeout=2)
+            self.assertTrue(response.startswith(b'HTTP/1.1 200 '))
+        finally:
+            writer.close()
+            await writer.wait_closed()
+
+        websocket = await self.client.ws_connect(self.url('/hmr'), headers=self.headers(Origin=self.origin))
+        try:
+            await websocket.send_str('replacement-check')
+            self.assertEqual((await websocket.receive(timeout=2)).data, 'hmr:replacement-check')
+            await self.gateway.control({'operation': 'revoke', 'runId': self.binding['runId'],
+                                        'leaseIds': [self.lease_id]})
+            self.assertIn((await websocket.receive(timeout=2)).type,
+                          (WSMsgType.CLOSE, WSMsgType.CLOSED, WSMsgType.CLOSING))
+        finally:
+            await websocket.close()
+        self.assertIsNone(self.gateway.port)
+        self.assertIsNone(self.gateway.site)
+        self.assertIn(self.lease_id, self.gateway.revoked_leases)
+        self.assertIn(previous_port, json.loads((self.root / 'ports.json').read_text()))
+        self.assertTrue(any(row.split()[1].endswith(f':{previous_port:04X}') and row.split()[3] == '06'
+                            for row in Path('/proc/net/tcp').read_text().splitlines()[1:]),
+                        'the exercised gateway must own a real TIME_WAIT connection')
+
+        # This is the same ordinary HTTPServer binding used by the private
+        # takeover probe. Its new socket must not inherit the root socket mark.
+        with http.server.ThreadingHTTPServer(('0.0.0.0', previous_port), ReplacementHandler) as replacement:
+            self.assertEqual(replacement.socket.getsockopt(socket.SOL_SOCKET, socket.SO_MARK), 0)
+            self.assertEqual(replacement.socket.getsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT), 0)
+            serving = threading.Thread(target=replacement.serve_forever, daemon=True)
+            serving.start()
+            try:
+                async with self.client.get(self.url(), headers={'Connection': 'close'}) as response:
+                    self.assertEqual(response.status, 200)
+                    self.assertEqual(await response.read(), marker)
+            finally:
+                await asyncio.to_thread(replacement.shutdown)
+                serving.join(timeout=2)
+                self.assertFalse(serving.is_alive())
 
     async def test_slow_discovery_never_delays_revocation_or_reopens_a_stopped_run(self):
         await self.open()

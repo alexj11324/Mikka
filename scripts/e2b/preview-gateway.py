@@ -317,6 +317,7 @@ class Gateway:
             # Matches the early workspace ingress policy; ordinary dev sockets
             # never inherit public access when this listener closes.
             try:
+                listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 listener.setsockopt(socket.SOL_SOCKET, socket.SO_MARK, 0x4D4B5056)
                 listener.bind(('0.0.0.0', 0))
             except BaseException:

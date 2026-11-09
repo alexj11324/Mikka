@@ -24,7 +24,7 @@ const RAW_NAMES = ['userLoopback4', 'userPublic4', 'userLoopback6']
 const hash = value => createHash('sha256').update(value).digest('hex')
 const CODES = new Set(['configuration', 'source', 'candidate', 'scope', 'guard', 'process', 'ready', 'ports',
   'positive_control', 'raw_exposed', 'outbound', 'dependencies', 'preview', 'authentication', 'http', 'hmr',
-  'revoke', 'takeover', 'resume', 'terminal', 'cleanup', 'journal', 'internal'])
+  'revoke', 'takeover', 'takeover_bind', 'takeover_not_denied', 'resume', 'terminal', 'cleanup', 'journal', 'internal'])
 const error = (code, cause) => Object.assign(new Error(`workspace_acceptance_${code}`, cause ? { cause } : undefined), { receiptCode: code })
 const check = (ok, code) => { if (!ok) throw error(code) }
 const safeFailure = cause => CODES.has(cause?.receiptCode) ? cause.receiptCode : 'internal'
@@ -376,10 +376,10 @@ async function framework(sandbox, kind, root, identity, fetchImpl, Socket) {
     const replacement = await background(sandbox,
       `exec python3 '/opt/mikka/acceptance-${identity.fixtureId}/servers.py' --user --replacement-port ${gatewayPort}`,
       { user: 'user' }, text => text.includes('\n') ? JSON.parse(text.split('\n')[0]) : undefined)
-    check(replacement.value?.ports?.replacement === gatewayPort, 'takeover')
+    check(replacement.value?.ports?.replacement === gatewayPort, 'takeover_bind')
     try {
       report.takeoverLocal = await localMarker(sandbox, gatewayPort)
-      check(denied(await markerSample(origin, fetchImpl)), 'takeover'); report.takeoverDenied = true
+      check(denied(await markerSample(origin, fetchImpl)), 'takeover_not_denied'); report.takeoverDenied = true
     }
     finally { await replacement.handle.kill().catch(() => {}) }
     return report
