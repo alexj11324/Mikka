@@ -5758,7 +5758,7 @@
     "replySelection": "Reply to selected text",
     "messageTask": "Message this task",
     "noTasks": "No tasks",
-    "noAttempts": "No attempts yet",
+    "notStarted": "Not started",
     "allTasks": "All tasks",
     "info": "Info",
     "all": "All",
@@ -5806,7 +5806,18 @@
     "noPriority": "No",
     "activity": "Activity",
     "comment": "+ Comment",
-    "attemptNumber": "Attempt {number}",
+    "conversation": {
+      "switched": "Continued with {agent}",
+      "switchedAfterFailure": "{previous} didn't get through · continued with {agent}",
+      "switchedTo": "Switched to {agent}",
+      "fix": "Fix",
+      "needsYou": "Needs you: {what}",
+      "verdicts": {
+        "passed": "Passed",
+        "changes_requested": "Changes requested",
+        "needs_judgment": "Needs your judgment"
+      }
+    },
     "threadReplaced": "Replaced thread",
     "taskCreatedBy": "{name} created the task",
     "taskCreated": "Task created",

@@ -1,7 +1,7 @@
 diff --git a/install.js b/install.js
 --- a/install.js
 +++ b/install.js
-@@ -1,188 +1,6 @@
+@@ -1,188 +1,7 @@
  'use strict'
  
 -var fs = require("fs");
@@ -182,8 +182,9 @@ diff --git a/install.js b/install.js
 -downloadFile(downloadUrl, binaryPath, onProgress)
 -.then(() => {
 -  fs.chmodSync(binaryPath, 0o755) // make executable
-+require('./mikka-install').install().catch((error) => {
-+  console.error(error)
++const { install, formatInstallError } = require('./mikka-install')
++install().catch(error => {
++  console.error(formatInstallError(error))
 +  process.exitCode = 1
  })
 -.catch(exitOnError)
@@ -197,7 +198,7 @@ diff --git a/mikka-install.js b/mikka-install.js
 new file mode 100644
 --- /dev/null
 +++ b/mikka-install.js
-@@ -0,0 +1,148 @@
+@@ -0,0 +1,240 @@
 +'use strict'
 +
 +const fs = require('node:fs')
@@ -217,6 +218,68 @@ new file mode 100644
 +const ATTEMPT_MS = 30_000
 +const MAX_REDIRECTS = 3
 +
++const HOST_LABELS = new Map([
++  ['github.com', 'release'], ['api.github.com', 'api'],
++  ['release-assets.githubusercontent.com', 'release-assets'],
++  ['objects.githubusercontent.com', 'objects'],
++  ['github-production-release-asset-2e65be.s3.amazonaws.com', 'release-s3'],
++])
++const FILESYSTEM_CODES = new Set(['EACCES', 'EPERM', 'ENOSPC', 'EROFS', 'EISDIR', 'ENOTDIR'])
++const SAFE_CODES = new Set([...FILESYSTEM_CODES, 'ENOENT', 'ECONNRESET', 'ECONNREFUSED',
++  'ENOTFOUND', 'EAI_AGAIN', 'ETIMEDOUT', 'EPIPE', 'ABORT_ERR', 'ERR_STREAM_PREMATURE_CLOSE',
++  'ERR_INVALID_URL', 'Z_DATA_ERROR', 'Z_BUF_ERROR', 'CERT_HAS_EXPIRED',
++  'DEPTH_ZERO_SELF_SIGNED_CERT', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE', 'ERR_TLS_CERT_ALTNAME_INVALID'])
++const SAFE_DETAILS = new Set(['Unexpected ffmpeg asset redirect', 'ffmpeg asset redirect limit',
++  'Unexpected ffmpeg asset content encoding', 'ffmpeg asset integrity mismatch',
++  'ffmpeg binary integrity mismatch', 'incorrect header check'])
++const SAFE_INSTALL_MESSAGES = new Set(['ffmpeg installation requires the pinned official release',
++  'Pinned ffmpeg installation cannot rewrite a custom binary path'])
++const diagnostics = new WeakMap()
++
++function integerHeader(value) {
++  if (typeof value !== 'string' || !/^(0|[1-9][0-9]{0,15})$/.test(value)) return null
++  const number = Number(value)
++  return Number.isSafeInteger(number) ? number : null
++}
++
++function retryHeader(value) {
++  if (typeof value !== 'string') return null
++  if (/^(0|[1-9][0-9]{0,9})$/.test(value)) return value
++  if (!/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), [0-9]{2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) [0-9]{4} [0-9]{2}:[0-9]{2}:[0-9]{2} GMT$/.test(value)) return null
++  const date = new Date(value)
++  return !Number.isNaN(date.getTime()) && date.toUTCString() === value ? value : null
++}
++
++function safeCode(error) { return SAFE_CODES.has(error?.code) ? error.code : null }
++
++function attemptFailure(error, context, signal, started) {
++  const reason = signal.aborted ? 'deadline' : context.reason ||
++    (FILESYSTEM_CODES.has(error.code) ? 'filesystem' :
++      context.phase === 'decompress' ? 'decompression' :
++        context.phase === 'request' ? 'request' : 'stream')
++  const attempt = new Error('ffmpeg asset attempt failed', { cause: error })
++  diagnostics.set(attempt, { ...context, reason, code: safeCode(error),
++    detail: SAFE_DETAILS.has(error.message) ? error.message : null, elapsedMs: Date.now() - started })
++  return attempt
++}
++
++function assetFailure(name, attempts) {
++  const error = new AggregateError(attempts, 'Could not install verified ffmpeg asset ' + name,
++    { cause: attempts[attempts.length - 1] })
++  diagnostics.set(error, { message: error.message, asset: name,
++    attempts: attempts.map(attempt => diagnostics.get(attempt)) })
++  return error
++}
++
++// Causes stay available to programmatic callers. The install launcher prints
++// only this closed record, never raw Error/cause, URLs, headers or response bodies.
++function formatInstallError(error) {
++  return JSON.stringify(diagnostics.get(error) || {
++    message: SAFE_INSTALL_MESSAGES.has(error?.message) ? error.message : 'ffmpeg installation failed',
++    code: safeCode(error),
++  })
++}
++
 +async function matches(file, expected, signal) {
 +  try {
 +    const stat = await fsp.lstat(file)
@@ -230,31 +293,46 @@ new file mode 100644
 +  }
 +}
 +
-+async function responseFor(url, agent, signal) {
++async function responseFor(url, agent, signal, context, apiAuthorization) {
 +  for (let redirects = 0; ; redirects++) {
 +    const parsed = new URL(url)
++    Object.assign(context, { host: HOST_LABELS.get(parsed.hostname) || 'rejected', redirects,
++      phase: 'request', status: null, rateLimitRemaining: null, rateLimitReset: null, retryAfter: null })
 +    if (parsed.protocol !== 'https:' || !REDIRECT_HOSTS.has(parsed.hostname) ||
 +        parsed.username || parsed.password || (parsed.port && parsed.port !== '443')) {
++      context.reason = 'redirect'
 +      throw new Error('Unexpected ffmpeg asset redirect')
 +    }
++    const headers = { Accept: 'application/octet-stream', 'Accept-Encoding': 'identity',
++      'User-Agent': 'ffmpeg-static/5.3.0' }
++    // Only this fixed API source's first hop may use the explicit credential.
++    // Rebuild headers on every redirect, including same-host path/query changes.
++    if (apiAuthorization?.token && redirects === 0 && parsed.href === apiAuthorization.url &&
++        parsed.origin === 'https://api.github.com' && !parsed.search && !parsed.hash) {
++      headers.Authorization = 'Bearer ' + apiAuthorization.token
++    }
 +    const response = await new Promise((resolve, reject) => {
-+      const request = https.get(parsed, {
-+        agent, signal,
-+        headers: { Accept: 'application/octet-stream', 'Accept-Encoding': 'identity',
-+          'User-Agent': 'ffmpeg-static/5.3.0' },
-+      }, resolve)
++      const request = https.get(parsed, { agent, signal, headers }, resolve)
 +      request.once('error', reject)
 +    })
++    Object.assign(context, { phase: 'response', status: response.statusCode,
++      rateLimitRemaining: integerHeader(response.headers['x-ratelimit-remaining']),
++      rateLimitReset: integerHeader(response.headers['x-ratelimit-reset']),
++      retryAfter: retryHeader(response.headers['retry-after']) })
 +    if ([301, 302, 303, 307, 308].includes(response.statusCode)) {
 +      const location = response.headers.location
 +      response.destroy()
-+      if (!location || redirects >= MAX_REDIRECTS) throw new Error('ffmpeg asset redirect limit')
++      if (!location || redirects >= MAX_REDIRECTS) {
++        context.reason = 'redirect'
++        throw new Error('ffmpeg asset redirect limit')
++      }
 +      url = new URL(location, url).href
 +      continue
 +    }
 +    if (response.statusCode !== 200) {
 +      const status = response.statusCode
 +      response.destroy()
++      context.reason = 'http'
 +      throw new Error('ffmpeg asset HTTP ' + status)
 +    }
 +    return response
@@ -268,45 +346,60 @@ new file mode 100644
 +  }
 +  const asset = manifest.assets[name]
 +  const urls = [RELEASE_ROOT + '/' + manifest.release + '/' + name, API_ROOT + asset.id]
-+  let lastError
-+  for (const url of urls) {
++  const attempts = []
++  for (const [index, url] of urls.entries()) {
 +    const directory = await fsp.mkdtemp(path.join(path.dirname(destination), '.ffmpeg-install-'))
 +    const controller = new AbortController()
 +    const timer = setTimeout(() => controller.abort(new Error('ffmpeg asset deadline exceeded')), ATTEMPT_MS)
 +    const { signal } = controller
++    const started = Date.now()
++    const context = { source: index === 0 ? 'release' : 'api' }
 +    try {
 +      const downloaded = path.join(directory, 'download')
-+      const response = await responseFor(url, agent, signal)
++      const response = await responseFor(url, agent, signal, context,
++        index === 1 ? { url: API_ROOT + asset.id, token: process.env.FFMPEG_GITHUB_TOKEN } : undefined)
 +      // Explicit identity encoding keeps the pinned .gz bytes unchanged.
 +      if (response.headers['content-encoding'] &&
 +          response.headers['content-encoding'] !== 'identity') {
 +        response.destroy()
++        context.reason = 'content-encoding'
 +        throw new Error('Unexpected ffmpeg asset content encoding')
 +      }
++      context.phase = 'download'
 +      await pipeline(response, fs.createWriteStream(downloaded, { flags: 'wx' }), { signal })
-+      if (!await matches(downloaded, asset, signal)) throw new Error('ffmpeg asset integrity mismatch')
++      context.phase = 'verify-asset'
++      if (!await matches(downloaded, asset, signal)) {
++        context.reason = 'asset-integrity'
++        throw new Error('ffmpeg asset integrity mismatch')
++      }
 +      let complete = downloaded
 +      if (executable) {
 +        complete = path.join(directory, 'binary')
++        context.phase = 'decompress'
 +        await pipeline(fs.createReadStream(downloaded), createGunzip(),
 +          fs.createWriteStream(complete, { flags: 'wx' }), { signal })
-+        if (!await matches(complete, expected, signal)) throw new Error('ffmpeg binary integrity mismatch')
++        context.phase = 'verify-binary'
++        if (!await matches(complete, expected, signal)) {
++          context.reason = 'binary-integrity'
++          throw new Error('ffmpeg binary integrity mismatch')
++        }
 +        await fsp.chmod(complete, 0o755)
 +      }
 +      signal.throwIfAborted()
++      context.phase = 'publish'
 +      await fsp.rename(complete, destination)
 +      return
 +    } catch (error) {
-+      lastError = error
++      attempts.push(attemptFailure(error, context, signal, started))
 +      // Filesystem failures cannot be repaired by downloading the same asset again.
-+      if (['EACCES', 'EPERM', 'ENOSPC', 'EROFS', 'EISDIR', 'ENOTDIR'].includes(error.code)) throw error
++      if (FILESYSTEM_CODES.has(error.code)) throw assetFailure(name, attempts)
 +    } finally {
 +      clearTimeout(timer)
 +      controller.abort()
 +      await fsp.rm(directory, { recursive: true, force: true })
 +    }
 +  }
-+  throw new Error('Could not install verified ffmpeg asset ' + name, { cause: lastError })
++  throw assetFailure(name, attempts)
 +}
 +
 +async function install() {
@@ -345,7 +438,7 @@ new file mode 100644
 +  console.info('ffmpeg binary, README and LICENSE verified.')
 +}
 +
-+module.exports = { install }
++module.exports = { install, formatInstallError }
 diff --git a/mikka-assets.json b/mikka-assets.json
 new file mode 100644
 --- /dev/null

@@ -30,7 +30,7 @@ assert.equal(sha(readme), manifest.assets[platform + '.README'].sha256)
 assert.equal(sha(license), manifest.assets[platform + '.LICENSE'].sha256)
 if (process.env.FFMPEG_INSTALL_TEST_GZIP) assert.equal(sha(gzip), manifest.assets[binName + '.gz'].sha256)
 else manifest.assets[binName + '.gz'] = { ...manifest.assets[binName + '.gz'], size: gzip.length, sha256: sha(gzip) }
-const preload = "\nconst https = require('node:https')\nconst http = require('node:http')\nconst fs = require('node:fs')\nconst { Readable } = require('node:stream')\nhttps.get = (url, options, callback) => {\n  const original = new URL(url)\n  if (original.hostname !== 'github.com' && original.hostname !== 'api.github.com') {\n    throw new Error('Unexpected network destination in offline installation test')\n  }\n  return http.get(process.env.FFMPEG_TEST_SERVER + '/?url=' + encodeURIComponent(original.href),\n    { ...options, agent: false }, callback)\n}\nif (process.env.FFMPEG_TEST_FAILURE === 'write') {\n  const create = fs.createWriteStream\n  fs.createWriteStream = (file, options) => String(file).endsWith('/download')\n    ? create('/dev/full', { flags: 'w' }) : create(file, options)\n}\nif (process.env.FFMPEG_TEST_FAILURE === 'gunzip') {\n  const create = fs.createReadStream\n  const reads = new Map()\n  fs.createReadStream = (file, options) => {\n    if (String(file).endsWith('/download')) {\n      const count = (reads.get(file) || 0) + 1\n      reads.set(file, count)\n      if (count === 2) return Readable.from([Buffer.from('invalid gzip after a verified download')])\n    }\n    return create(file, options)\n  }\n}\n"
+const preload = "\nconst https = require('node:https')\nconst http = require('node:http')\nconst fs = require('node:fs')\nconst { Readable } = require('node:stream')\nhttps.get = (url, options, callback) => {\n  const original = new URL(url)\n  if (original.hostname !== 'github.com' && original.hostname !== 'api.github.com' && original.hostname !== 'release-assets.githubusercontent.com') {\n    throw new Error('Unexpected network destination in offline installation test')\n  }\n  return http.get(process.env.FFMPEG_TEST_SERVER + '/?url=' + encodeURIComponent(original.href),\n    { ...options, agent: false }, callback)\n}\nif (process.env.FFMPEG_TEST_FAILURE === 'write') {\n  const create = fs.createWriteStream\n  fs.createWriteStream = (file, options) => String(file).endsWith('/download')\n    ? create('/dev/full', { flags: 'w' }) : create(file, options)\n}\nif (process.env.FFMPEG_TEST_FAILURE === 'gunzip') {\n  const create = fs.createReadStream\n  const reads = new Map()\n  fs.createReadStream = (file, options) => {\n    if (String(file).endsWith('/download')) {\n      const count = (reads.get(file) || 0) + 1\n      reads.set(file, count)\n      if (count === 2) return Readable.from([Buffer.from('invalid gzip after a verified download')])\n    }\n    return create(file, options)\n  }\n}\n"
 
 async function fixture(t, options = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'mikka-ffmpeg-install-'))
@@ -55,9 +55,40 @@ async function fixture(t, options = {}) {
     const api = original.hostname === 'api.github.com'
     const tail = original.pathname.split('/').pop()
     const name = api ? Object.entries(manifest.assets).find(([, a]) => String(a.id) === tail)?.[0] : tail
-    requests.push({ name, api, at: Date.now(), encoding: req.headers['accept-encoding'], accept: req.headers.accept })
+    requests.push({ name, api, host: original.hostname, path: original.pathname, query: original.search, authorization: req.headers.authorization ?? null, at: Date.now(), encoding: req.headers['accept-encoding'], accept: req.headers.accept })
     const data = assets.get(name)
     if (!data) { res.writeHead(404); res.end(); return }
+    if (options.authCase && name === platform + '.LICENSE') {
+      const apiUrl = 'https://api.github.com/repos/eugeneware/ffmpeg-static/releases/assets/' + manifest.assets[name].id
+      if (original.hostname === 'github.com') {
+        res.writeHead(options.releaseToApi ? 302 : 504, options.releaseToApi ? { location: apiUrl } : {})
+        res.end(); return
+      }
+      if (original.href === apiUrl) {
+        if (options.authReject) { res.writeHead(403); res.end('DO_NOT_LOG_AUTH_RESPONSE'); return }
+        if (options.authRedirect) {
+          const target = options.authRedirect === 'cdn'
+            ? 'https://release-assets.githubusercontent.com/assets/' + name + '?signed=DO_NOT_LOG_CDN'
+            : options.authRedirect === 'path'
+              ? 'https://api.github.com/other/' + manifest.assets[name].id
+              : apiUrl + '?query=DO_NOT_LOG_QUERY'
+          res.writeHead(302, { location: target }); res.end(); return
+        }
+      }
+    }
+    if (options.diagnostics && name === platform + '.LICENSE') {
+      if (!api && original.hostname === 'github.com' && !options.invalidHeaders) {
+        res.writeHead(302, { location: 'https://release-assets.githubusercontent.com/private/' + name + '?signed=DO_NOT_LOG_SIGNED_QUERY' })
+        res.end(); return
+      }
+      res.writeHead(api ? 403 : 504, {
+        'x-ratelimit-remaining': options.invalidHeaders ? 'DO_NOT_LOG_HEADER' : api ? '0' : '7',
+        'x-ratelimit-reset': options.invalidHeaders ? 'https://private.invalid/reset' : '1794211200',
+        'retry-after': options.invalidHeaders ? 'https://private.invalid/retry?token=DO_NOT_LOG_RETRY' : api ? '60' : 'Mon, 09 Nov 2026 08:00:00 GMT',
+        'x-private-diagnostic': 'DO_NOT_LOG_ARBITRARY_HEADER',
+      })
+      res.end('DO_NOT_LOG_RESPONSE_BODY'); return
+    }
     if (options.stall) {
       res.writeHead(200); res.flushHeaders()
       res.on('close', () => closed.push(name))
@@ -89,14 +120,14 @@ async function fixture(t, options = {}) {
   const env = {
     ...process.env, NODE_PATH: dirname(installed),
     HTTPS_PROXY: '', https_proxy: '', HTTP_PROXY: '', http_proxy: '',
-    FFMPEG_BINARY_RELEASE: '', FFMPEG_BINARIES_URL: '', FFMPEG_BIN: '',
+    FFMPEG_BINARY_RELEASE: '', FFMPEG_BINARIES_URL: '', FFMPEG_BIN: '', FFMPEG_GITHUB_TOKEN: '',
     npm_config_arch: process.arch, npm_config_platform: process.platform,
     FFMPEG_TEST_SERVER: 'http://127.0.0.1:' + server.address().port,
     FFMPEG_TEST_FAILURE: options.failure || '',
   }
-  async function run() {
+  async function run(entry = 'install.js') {
     return await new Promise((resolve, reject) => {
-      const child = spawn(process.execPath, ['--require', join(directory, 'preload.cjs'), join(directory, 'install.js')],
+      const child = spawn(process.execPath, ['--require', join(directory, 'preload.cjs'), join(directory, entry)],
         { cwd: directory, env, stdio: ['ignore', 'pipe', 'pipe'] })
       let output = ''
       child.stdout.on('data', data => { output += data })
@@ -247,4 +278,144 @@ test('an explicit external binary path is rejected without rewriting its bytes',
   assert.equal(await readFile(external, 'utf8'), 'operator-owned executable')
   assert.equal(f.requests.length, 0)
   await f.cleanTemps()
+})
+
+
+function failureRecord(output) {
+  const line = output.split('\n').find(line => line.startsWith('{"message":'))
+  assert.ok(line, 'launcher must emit the safe structured failure record')
+  return JSON.parse(line)
+}
+
+test('failed official sources retain independent status and final-hop diagnostics', async t => {
+  const f = await fixture(t, { binary: 'valid', readme: true, diagnostics: true })
+  const result = await f.run()
+  assert.equal(result.code, 1)
+  const record = failureRecord(result.output)
+  assert.equal(record.message, 'Could not install verified ffmpeg asset ' + platform + '.LICENSE')
+  assert.equal(record.asset, platform + '.LICENSE')
+  assert.deepEqual(record.attempts.map(({ elapsedMs, ...attempt }) => {
+    assert.ok(Number.isSafeInteger(elapsedMs) && elapsedMs >= 0)
+    return attempt
+  }), [
+    { source: 'release', host: 'release-assets', redirects: 1, phase: 'response',
+      reason: 'http', status: 504, code: null, detail: null, rateLimitRemaining: 7,
+      rateLimitReset: 1794211200, retryAfter: 'Mon, 09 Nov 2026 08:00:00 GMT' },
+    { source: 'api', host: 'api', redirects: 0, phase: 'response',
+      reason: 'http', status: 403, code: null, detail: null, rateLimitRemaining: 0,
+      rateLimitReset: 1794211200, retryAfter: '60' },
+  ])
+  assert.deepEqual(f.requests.map(r => r.host), ['github.com', 'release-assets.githubusercontent.com', 'api.github.com'])
+  assert.doesNotMatch(result.output, /DO_NOT_LOG|https?:\/\/|private|x-private-diagnostic/)
+  await assert.rejects(readFile(f.binaryPath + '.LICENSE'), { code: 'ENOENT' })
+  await f.cleanTemps()
+})
+
+test('failure diagnostics discard malformed rate headers and all response content', async t => {
+  const f = await fixture(t, { binary: 'valid', readme: true, diagnostics: true, invalidHeaders: true })
+  const result = await f.run()
+  assert.equal(result.code, 1)
+  const record = failureRecord(result.output)
+  assert.deepEqual(record.attempts.map(a => [a.source, a.host, a.status, a.rateLimitRemaining, a.rateLimitReset, a.retryAfter]),
+    [['release', 'release', 504, null, null, null], ['api', 'api', 403, null, null, null]])
+  assert.doesNotMatch(result.output, /DO_NOT_LOG|https?:\/\/|private|x-private-diagnostic/)
+  assert.equal(f.requests.length, 2)
+  await f.cleanTemps()
+})
+
+test('aggregate errors retain caught causes internally while the launcher formatter excludes them', async t => {
+  const f = await fixture(t, { binary: 'valid', readme: true, diagnostics: true, invalidHeaders: true })
+  await writeFile(join(f.directory, 'observe-failure.cjs'), [
+    "const assert = require('node:assert/strict')",
+    "const fs = require('node:fs')",
+    "const { install, formatInstallError } = require('./mikka-install')",
+    "install().catch(error => {",
+    "  assert.ok(error instanceof AggregateError)",
+    "  assert.equal(error.errors.length, 2)",
+    "  assert.equal(error.cause, error.errors[1])",
+    "  for (const [index, attempt] of error.errors.entries()) {",
+    "    assert.ok(attempt.cause instanceof Error)",
+    "    assert.equal(attempt.cause.message, 'ffmpeg asset HTTP ' + [504, 403][index])",
+    "  }",
+    "  const raw = new Error('https://user:DO_NOT_LOG_PROXY@proxy.invalid/?signed=DO_NOT_LOG_QUERY', { cause: error })",
+    "  raw.code = 'DO_NOT_LOG_CODE'",
+    "  const formatted = formatInstallError(raw)",
+    "  assert.doesNotMatch(formatted, /DO_NOT_LOG|proxy|https|504|403/)",
+    "  assert.equal(raw.cause, error)",
+    "  fs.writeFileSync('cause-proof.json', JSON.stringify({ aggregate: true, causes: 2, rawPreserved: true, formatted: JSON.parse(formatted) }))",
+    "  console.error(formatInstallError(error))",
+    "  process.exitCode = 1",
+    "})",
+  ].join('\n'))
+  const result = await f.run('observe-failure.cjs')
+  assert.equal(result.code, 1)
+  const proof = JSON.parse(await readFile(join(f.directory, 'cause-proof.json'), 'utf8'))
+  assert.deepEqual(proof, { aggregate: true, causes: 2, rawPreserved: true,
+    formatted: { message: 'ffmpeg installation failed', code: null } })
+  assert.equal(failureRecord(result.output).attempts.length, 2)
+  assert.equal(f.requests.length, 2)
+  await f.cleanTemps()
+})
+
+
+const syntheticApiToken = 'fixture_ffmpeg_api_token_DO_NOT_LOG'
+
+test('optional API credentials are sent only on the fixed API entry request', async t => {
+  const f = await fixture(t, { binary: 'valid', readme: true, authCase: true })
+  f.env.FFMPEG_GITHUB_TOKEN = syntheticApiToken
+  const result = await f.run()
+  assert.equal(result.code, 0)
+  await f.complete()
+  assert.deepEqual(f.requests.map(r => [r.host, r.authorization]),
+    [['github.com', null], ['api.github.com', 'Bearer ' + syntheticApiToken]])
+  assert.equal(f.requests[1].path, '/repos/eugeneware/ffmpeg-static/releases/assets/' + manifest.assets[platform + '.LICENSE'].id)
+  assert.equal(f.requests[1].query, '')
+  assert.doesNotMatch(result.output, /fixture_ffmpeg|DO_NOT_LOG/)
+})
+
+test('API redirects drop credentials on CDN and same-host path or query changes', async t => {
+  for (const target of ['cdn', 'path', 'query']) {
+    await t.test(target, async t => {
+      const f = await fixture(t, { binary: 'valid', readme: true, authCase: true, authRedirect: target })
+      f.env.FFMPEG_GITHUB_TOKEN = syntheticApiToken
+      const result = await f.run()
+      assert.equal(result.code, 0)
+      await f.complete()
+      assert.deepEqual(f.requests.map(r => r.authorization), [null, 'Bearer ' + syntheticApiToken, null])
+      assert.equal(f.requests.length, 3)
+      assert.doesNotMatch(result.output, /fixture_ffmpeg|DO_NOT_LOG/)
+    })
+  }
+})
+
+test('release redirects never acquire optional credentials even at the pinned API URL', async t => {
+  const f = await fixture(t, { binary: 'valid', readme: true, authCase: true, releaseToApi: true })
+  f.env.FFMPEG_GITHUB_TOKEN = syntheticApiToken
+  const result = await f.run()
+  assert.equal(result.code, 0)
+  await f.complete()
+  assert.deepEqual(f.requests.map(r => [r.host, r.authorization]), [['github.com', null], ['api.github.com', null]])
+})
+
+test('without an explicit FFmpeg token the existing anonymous contract is unchanged', async t => {
+  const f = await fixture(t, { binary: 'valid', readme: true, authCase: true })
+  f.env.GITHUB_TOKEN = 'unrelated_synthetic_token_must_not_be_used'
+  const result = await f.run()
+  assert.equal(result.code, 0)
+  await f.complete()
+  assert.deepEqual(f.requests.map(r => r.authorization), [null, null])
+  assert.equal(f.requests.length, 2)
+})
+
+test('API authentication rejection keeps the two-source budget and never leaks credentials', async t => {
+  const f = await fixture(t, { binary: 'valid', readme: true, authCase: true, authReject: true })
+  f.env.FFMPEG_GITHUB_TOKEN = syntheticApiToken
+  const result = await f.run()
+  assert.equal(result.code, 1)
+  assert.deepEqual(f.requests.map(r => r.authorization), [null, 'Bearer ' + syntheticApiToken])
+  assert.deepEqual(failureRecord(result.output).attempts.map(a => [a.source, a.status]), [['release', 504], ['api', 403]])
+  assert.doesNotMatch(result.output, /fixture_ffmpeg|DO_NOT_LOG|Bearer|Authorization/)
+  await assert.rejects(readFile(f.binaryPath + '.LICENSE'), { code: 'ENOENT' })
+  await f.cleanTemps()
+  assert.equal(f.requests.length, 2)
 })
