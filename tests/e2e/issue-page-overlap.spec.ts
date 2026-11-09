@@ -11,7 +11,7 @@ function isolatedPool() {
   return new Pool({ connectionString, max: 1 })
 }
 
-test('on a task page, thread times clear their chevron and the block gutter sits left of the text', async ({ page }) => {
+test('on a task page, Agent row times clear their chevron and the block gutter sits left of the text', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   const { email } = await register(page)
   const issueId = await seedTask(page, `Overlap ${randomUUID()}`)
@@ -31,7 +31,7 @@ test('on a task page, thread times clear their chevron and the block gutter sits
   } finally { await pool.end() }
 
   await page.goto(app(`/en?section=all-issues&issue=${issueId}`))
-  const row = page.getByRole('button', { name: 'Open thread Run', exact: true }).filter({ has: page.locator('time') })
+  const row = page.getByRole('button', { name: 'Open thread Claude Code', exact: true }).filter({ has: page.locator('time') })
   await expect(row.locator('time')).toHaveText('27 minutes ago')
   const { textRight, chevronLeft } = await row.evaluate(button => {
     const range = document.createRange()

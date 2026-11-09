@@ -222,7 +222,7 @@ Right column beside the chat
 ├── Bot overview → 详情 / 任务 / PR / 电脑
 ├── 全部任务 → 等待你 / 进行中 / 待办 / 已完成
 ├── Task detail → properties, description and chronological 活动
-└── Task conversation → attempts oldest first, composer on the newest
+└── Task conversation → one conversation, oldest first, composer on the newest
 Centre pages
 ├── Task opened from 看板 or a link
 ├── Project / team under 看板
@@ -230,8 +230,8 @@ Centre pages
 Artifact → shared window over the page
 ```
 
-A chat card and right-panel row open task detail beside the chat. An attempt
-opens the task's one conversation at its section. Other conversation opens
+A chat card and right-panel row open task detail beside the chat. A 活动 row
+opens the task's one conversation at that Agent's stretch. Other conversation opens
 start at the newest message. PRs and web pages open externally. A task opened
 as a centre page retains its origin for close/back and list navigation (R-82).
 Narrow phone web substitutes a full-page right column and a bot-list sheet.
@@ -269,7 +269,7 @@ Chats, task details and task conversations push over the tab bar. Each tab
 root has one centred native title, with actions grouped on the right and an
 empty left side. Bot's + creates a Bot or group; 任务 has filter and +.
 Workspaces switch only in 设置 › 工作区. Tabs carry no badges. Rows show
-the task's own state glyph, with its semantic colour; attempts show their
+the task's own state glyph, with its semantic colour; 活动 rows show their
 own result and never the hand. Native source is in `apps/mobile/app/(tabs)`
 and `apps/mobile/features/tasks/`; [mobile.md](mobile.md) owns the details.
 

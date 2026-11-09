@@ -31,7 +31,7 @@ The frames are a structure sketch, not a visual spec. They are on Figma `zPe5LKy
 | Frame | What it fixes | Light | Dark |
 |---|---|---|---|
 | R0 入口 | The chat's task card and the window bar's 等待你 list show one line, 「PR #1471 · 3 个文件 +42 −7 · ⚠ 1 项检查失败」, with 「审阅」. One click opens R1. The list's footer shows ⌘⇧B and ⌘K 「审阅 #1471」. | `1120:2` | `1120:227` |
-| R0b 任务面板 | The task detail keeps its current shape. Its header row is `#1471 修复 iOS 登录回调 · ⋯ · ⤢ · ✕`. The ⋯ menu, drawn open, lists the code tools first: 改动 (+42 −7, ⌘⇧B) opens R1, 文件 opens R4, 终端 (⌘J) opens R5 and 预览 opens the dev preview. After a divider come the branch name, 复制链接 and 权限. The first row under the title, above 状态 / Bot / Agent, is 「PR #1471 · 3 个文件 +42 −7 · ⚠ 1 项检查失败 ›」, and the whole line opens R1. A non-coding task's ⋯ has no code tools. Attempts appear only in 活动: 第 1 次尝试 · 失败 · 换 Codex 再试 → 第 2 次尝试 · 完成 · 开了 PR #1471. | `1120:432` | `1120:664` |
+| R0b 任务面板 | The task detail keeps its current shape. Its header row is `#1471 修复 iOS 登录回调 · ⋯ · ⤢ · ✕`. The ⋯ menu, drawn open, lists the code tools first: 改动 (+42 −7, ⌘⇧B) opens R1, 文件 opens R4, 终端 (⌘J) opens R5 and 预览 opens the dev preview. After a divider come the branch name, 复制链接 and 权限. The first row under the title, above 状态 / Bot / Agent, is 「PR #1471 · 3 个文件 +42 −7 · ⚠ 1 项检查失败 ›」, and the whole line opens R1. A non-coding task's ⋯ has no code tools. 活动 has one row per Agent stretch ([2026-11-09-0045](2026-11-09-0045-no-attempt-word.md)): Claude Code · 失败 → 换 Codex · 完成 · 开了 PR #1471. | `1120:432` | `1120:664` |
 | R1 审阅页 | One full page, described below. | `1120:869` | `1120:1231` |
 | R1b 检查展开 | The check summary expands in place: the failing check with a log excerpt, 查看完整日志 and 附到评论; the passing checks in one row. | `1120:1542` | `1120:1895` |
 | R4 文件 | The top bar's ⋯ is open with 文件 checked (Conductor's All files): the repository tree, with changed files marked, and read-only source on the right. | `1125:22` | `1125:481` |
@@ -68,7 +68,7 @@ The frames are a structure sketch, not a visual spec. They are on Figma `zPe5LKy
 
 1. **No diff on the task.** The chat card and the 等待你 list each show one summary line with 「审阅」. The task panel shows the same summary line under the title, and the whole line opens the review page. The code tools 改动 · 文件 · 终端 · 预览 are in the task panel's ⋯ menu, not visible buttons (Alex: 「只要求你把这些东西放进省略号里边…不是放在省略号的外边」). Non-coding tasks are unchanged.
 2. **One review page.** It opens in one click from any entry. The old route through the task panel's tabs is dropped.
-3. **The default is the whole PR's final diff** (base…head). There is no attempt switch: every attempt edits the same workspace (Alex). 第 N 次尝试 appears only in the task's 活动 timeline and as dividers in the conversation, never as a diff scope.
+3. **The default is the whole PR's final diff** (base…head). There is no attempt switch: every run edits the same workspace (Alex). Runs show only as the task's 活动 stretches and an Agent-switch divider in the conversation ([2026-11-09-0045](2026-11-09-0045-no-attempt-word.md)), never as a diff scope.
 4. **Comments have their own 「发给 Agent」 button** (Alex).
    - Line comments collect in the batch bar 「N 条评论 · 失败检查」.
    - A failed check is added with 附到评论 from the expanded check summary. It is never sent on its own.
