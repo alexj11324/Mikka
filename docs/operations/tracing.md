@@ -382,11 +382,23 @@ initialization; this is not a database `READ ONLY` transaction. Batches share
 only the current request's workspace memo and real owner/revision reads, never
 a cross-request authorization cache. Revision keys are combined before each
 reader proceeds to its data, preserving the original Live catch-up behavior.
+The validated batch declares only its existing owner-list revision kinds. Once
+an original reader resolves its real personal home, it can read those home
+counters together, including a sibling whose workspace lookup finishes later.
+Each reader receives only its original keys and keeps the conservative earlier
+revision. Selected-team and entity keys still follow their original readers.
+If a later reader fails, its planned home counter can be unused; no extra SQL
+statement or response key is introduced, but this is not zero extra bytes for
+every failed batch.
 No task/thread list is truncated or substituted for another. Queued reads are
 discarded when their owner/session/workspace generation retires, and in-flight
 responses retain Main's existing identity fence. There is no timed collection
 window. An older server's explicit unknown-action response is the only reason
 to fall back to individual reads; transport failures do not replay a batch.
+Native task-run, bot-summary and bot-roster readers return their original
+snapshot, so its actual HTTP dispatch can prove Live readiness coverage. That
+proof stays attached to the same response object, including its own batch item.
+Merged issue, thread and chat results retain their existing catch-up checks.
 
 Startup counts come from the first pair of the unchanged five-pair lifecycle:
 bundled Electron versus the preserved hosted Web renderer in the same compiled
@@ -409,8 +421,9 @@ and completions in memory, then retains only the two RPC routes, registered-acti
 shapes, HTTP status counts and window counts. `startedInWindow` counts requests
 whose start is in the half-open measurement window; completions, confirmed
 crossings and missing boundaries are separate and must not be added together.
-These are RPC invocations, not per-action SQL counts. The raw log, internal IDs
-and user hashes are never copied to the artifact. Missing, oversized, truncated,
+These aggregate counts are RPC invocations, not per-action SQL counts. This
+projection discards internal IDs; raw logs and user hashes never enter the
+artifact. Missing, oversized, truncated,
 invalid or unpaired records explicitly make this diagnosis incomplete; unavailable
 windows do not become zero counts.
 The same log snapshot also groups calls by the existing authentication, handoff
@@ -428,7 +441,7 @@ excluding the batch envelope. Every item has a paired `rpc_action_started` /
 fixed action, status and duration. The parent completion's `rpcItemCount`
 detects even a missing whole pair. The diagnostic verifies parent identity,
 route and time containment; incomplete logical evidence stays incomplete.
-Internal IDs are used only during projection and are not copied to the report.
+This aggregate projection uses internal IDs only while pairing the records.
 Each item also owns an ordinary sampled span and independent metadata scope,
 so parallel reads cannot overwrite another action's SQL attribution. Shared
 queries are attributed once to the action that starts them, without multiplying
@@ -454,6 +467,28 @@ at every snapshot and delta, while the original operation buckets and total stay
 unchanged. Missing historical refinements are unavailable, and a mixed or invalid
 partition fails validation. This diagnoses concurrent work without retaining SQL,
 parameters, request data, arbitrary routes or identity values.
+
+`rpcActions.queryDiagnostics` captures bounded, test-only metadata from the
+first existing checkpoint; its per-query CPU and memory work happens inside
+the measurement windows. After all existing measurements and cleanup, one
+read of the isolated counter's
+`/diagnostics` socket endpoint exports at most 8,192 query records in 2 MiB.
+It leaves the original `/metrics` snapshots, windows and totals unchanged.
+Each row contains the original cumulative query ordinal and indices into the
+closed context, statement and scope tables. Contexts retain internal random
+HTTP/item invocation IDs, method, route and action; they contain no user
+identity, request arguments or headers. These IDs join the existing completion
+receipts, including batch siblings with no SQL of their own.
+
+Queries belong to `(before.queryCalls, after.queryCalls]`, even when their
+request starts or finishes outside that window. An action unknown when SQL
+starts stays unknown. Shared SQL belongs once to the context that issued it.
+`normalizedStructureId` hashes a supported literal-free SQL shape; it is not
+the production raw-text `mikka.db.statement_id`, and equal shapes do not prove
+equal parameters or redundant work. Unsupported syntax, ambiguous contexts,
+overflow and missing receipts remain explicit unknown or incomplete evidence.
+The production request logger only registers a metadata getter; query capture
+and export run exclusively in the isolated acceptance preload.
 
 ### Changing them
 

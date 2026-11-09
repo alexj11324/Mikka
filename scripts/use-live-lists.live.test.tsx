@@ -860,17 +860,21 @@ test('a bot-list push re-reads the bot list only, never a mounted whole Coordina
 })
 
 
-/** The logical task reader uses the real Native queue, JSON codec and fetch
+/** Direct snapshot readers use the real Native queue, JSON codec and fetch
  * boundary. Only authenticated HTTP responses and socket events are fixtures.
  * MessageChannel is the runtime implementation, not a timer/mock scheduler. */
-for (const grouped of [false, true]) for (const beforeReady of [false, true]) {
-  test(`native dispatch proof: ${grouped ? 'batch' : 'single'} HTTP ${beforeReady ? 'before' : 'after'} readiness`, async t => {
+for (const { kind, action, liveKind } of [
+  { kind: 'tasks', action: 'task-runs.pollTaskRuns', liveKind: 'task_run_list' },
+  { kind: 'bots', action: 'coordinator.pollBotChatSummaries', liveKind: 'bot_chat_list' },
+  { kind: 'roster', action: 'bots.pollBots', liveKind: 'bot_list' },
+] as const) for (const grouped of [false, true]) for (const beforeReady of [false, true]) {
+  test(`native dispatch proof: ${kind} ${grouped ? 'batch' : 'single'} HTTP ${beforeReady ? 'before' : 'after'} readiness`, async t => {
     const { callAction } = await import('../apps/desktop/src/renderer/rpc')
     const { resetReadBatchScope } = await import('../apps/desktop/src/renderer/read-batch')
     const { encode, decode } = await import('../lib/desktop-rpc/wire')
     const phases: string[] = []
     const dispatched = deferred<void>()
-    let taskCalls = 0, physicalCalls = 0, revision = 5
+    let listCalls = 0, physicalCalls = 0, revision = 5
     const originalMessage = FakeSocket.prototype.message
     FakeSocket.prototype.message = function (value: unknown) {
       originalMessage.call(this, value)
@@ -878,9 +882,9 @@ for (const grouped of [false, true]) for (const beforeReady of [false, true]) {
     }
     automaticOpen = !beforeReady
     resetReadBatchScope()
-    replies.set('tasks', () => {
-      phases.push('task_fetcher')
-      const pending = callAction<Read>('task-runs.pollTaskRuns', [])
+    replies.set(kind, () => {
+      phases.push('list_fetcher')
+      const pending = callAction<Read>(action, [])
       phases.push('native_enqueued')
       return pending
     })
@@ -901,10 +905,10 @@ for (const grouped of [false, true]) for (const beforeReady of [false, true]) {
       physicalCalls++
       const results = calls.map(call => {
         assert.deepEqual(call.args, [])
-        if (call.action === 'task-runs.pollTaskRuns') {
-          taskCalls++
-          const result = snapshot('tasks')
-          result.live.revisions = { [`task_run_list:${home}`]: revision }
+        if (call.action === action) {
+          listCalls++
+          const result = snapshot(kind, 'owner', home)
+          result.live.revisions = { [`${liveKind}:${home}`]: revision }
           return { ok: true as const, result }
         }
         assert.equal(call.action, 'projects.listProjects')
@@ -924,7 +928,11 @@ for (const grouped of [false, true]) for (const beforeReady of [false, true]) {
     try {
       await act(async () => root.render(<SWRConfig value={{ provider: () => cache, use: [staleOnFocus], dedupingInterval: 0, shouldRetryOnError: false }}>
         <LiveProvider ownerId="owner" workspaceId={home}>
-          <HomeAnchor /><Tasks owner="owner" />{grouped && <Projects />}
+          <HomeAnchor />
+          {kind === 'tasks' && <Tasks owner="owner" />}
+          {kind === 'bots' && <Bots owner="owner" />}
+          {kind === 'roster' && <Roster owner="owner" workspace={home} />}
+          {grouped && <Projects />}
         </LiveProvider>
       </SWRConfig>))
       await dispatched.promise
@@ -937,9 +945,9 @@ for (const grouped of [false, true]) for (const beforeReady of [false, true]) {
       assert.ok(firstSend >= 0 && ready >= 0)
       assert.ok(phases.indexOf('native_enqueued') < firstSend)
       assert.equal(firstSend < ready, beforeReady, 'the actual RPC fetch boundary establishes the tested order')
-      assert.equal(JSON.parse(view('tasks')!).live.revisions[`task_run_list:${home}`], beforeReady ? 6 : 5)
-      t.diagnostic(JSON.stringify({ kind: 'native_dispatch_order', grouped, beforeReady, phases, taskCalls, physicalCalls }))
-      assert.equal(taskCalls, beforeReady ? 2 : 1, 'only a read actually dispatched after coverage may satisfy the late subscription')
+      assert.equal(JSON.parse(view(kind)!).live.revisions[`${liveKind}:${home}`], beforeReady ? 6 : 5)
+      t.diagnostic(JSON.stringify({ kind: 'native_dispatch_order', action, grouped, beforeReady, phases, listCalls, physicalCalls }))
+      assert.equal(listCalls, beforeReady ? 2 : 1, 'only a read actually dispatched after coverage may satisfy the late subscription')
       assert.equal(physicalCalls, beforeReady ? 2 : 1)
     } finally {
       FakeSocket.prototype.message = originalMessage

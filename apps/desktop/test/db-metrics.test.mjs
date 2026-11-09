@@ -10,6 +10,7 @@ import { EventEmitter } from 'node:events'
 import { createLifecycleQueryCounter, projectQuerySnapshot, queryCountDelta } from './lifecycle-query-counts.mjs'
 import queryOperations from './db-query-operations.cjs'
 import unattributedSourceKeys from './db-query-unattributed-sources.cjs'
+import './db-query-diagnostics.test.mjs'
 
 const require = createRequire(import.meta.url)
 const run = promisify(execFile)
@@ -157,6 +158,25 @@ assert.equal(require.cache[selectedEntry], undefined, 'tracing setup itself does
   assert.equal(Object.values(refined.queryOperations).reduce((total, count) => total + count, 0), refined.queryCalls)
   assert.equal(JSON.stringify(refined).includes('PRIVATE_'), false)
   assert.ok(Buffer.byteLength(JSON.stringify(refined)) <= 8192, 'the unchanged metric response bound includes the closed refinement')
+  let diagnostics
+  handler({ method: 'GET', url: '/diagnostics' }, {
+    writeHead(status) { assert.equal(status, 200, 'the isolated counter must export bounded query diagnostics after measurement'); return this },
+    end(body) { diagnostics = JSON.parse(body) },
+  })
+  assert.equal(diagnostics.version, 1)
+  assert.equal(diagnostics.queries.length, refined.queryCalls)
+  assert.equal(diagnostics.endQueryCalls, refined.queryCalls)
+  assert.equal(JSON.stringify(diagnostics).includes('PRIVATE_'), false)
+  const { scopeKeys } = Module.createRequire(metricsPath)('./db-query-diagnostics.cjs')
+  const diagnosticOperations = Object.fromEntries(Object.keys(refined.queryOperations).map(key => [key, 0]))
+  const diagnosticSources = Object.fromEntries(sourceKeys.map(key => [key, 0]))
+  for (const row of diagnostics.queries) {
+    const scope = scopeKeys[row[3]], bucket = Object.hasOwn(diagnosticOperations, scope) ? scope : 'unattributed'
+    diagnosticOperations[bucket]++
+    if (bucket === 'unattributed') diagnosticSources[scope]++
+  }
+  assert.deepEqual(diagnosticOperations, refined.queryOperations, 'every original operation count retains its query ordinal')
+  assert.deepEqual(diagnosticSources, refined.unattributedSources, 'reserved names keep the original source bucket semantics')
   const outsider = new other.Client()
   outsider._queryable = false
   await new Promise(resolve => outsider.query('SELECT 1', () => resolve()))

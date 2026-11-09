@@ -4,7 +4,7 @@ import { decode, encodeArgs, DESKTOP_RPC_VERSION } from '@/lib/desktop-rpc/wire'
 import { isBatchReadAction } from '@/lib/desktop-rpc/read-batch-contract'
 import { localeOf, type Locale } from './location'
 import { setTransportState } from './transport-state'
-import { DesktopTransportError, enqueueRead } from './read-batch'
+import { DesktopTransportError, enqueueRead, isSnapshotReadAction } from './read-batch'
 
 export { DesktopTransportError, resetReadBatchScope } from './read-batch'
 
@@ -30,8 +30,8 @@ export async function callRemoteAction<T = unknown>(action: string, args: unknow
   assertCurrent()
   let response: Response
   // Only this snapshot read (or its batch envelope) supplies a dispatch proof.
-  // Web and other list actions may merge cached data or issue additional reads.
-  const prove = transport.endpoint === '/api/desktop/rpc' && (action === 'task-runs.pollTaskRuns' || action === 'desktop.readBatch') ? captureReadDispatch() : undefined
+  // Other list actions may merge cached data or issue additional reads.
+  const prove = transport.endpoint === '/api/desktop/rpc' && (isSnapshotReadAction(action) || action === 'desktop.readBatch') ? captureReadDispatch() : undefined
   try {
     response = await fetch(withBasePath(transport.endpoint), {
       method: 'POST',
