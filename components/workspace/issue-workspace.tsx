@@ -78,6 +78,7 @@ import { fetchSettingsData } from '@/lib/settings-data'
 import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'
 import type { AgentHistory, SavedAgentSession } from '@/lib/agent-history'
 import { useAgentHistory } from '@/hooks/use-agent-history'
+import { useEnterpriseSignOut } from '@/hooks/use-enterprise-sign-out'
 import { useWorkspace } from '@/hooks/use-workspace'
 import { LiveProvider, useLiveKey } from '@/hooks/use-live-key'
 import { focusChatComposer } from '@/hooks/use-focus-return'
@@ -348,6 +349,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     return () => window.removeEventListener('keydown', capture, true)
   }, [creating])
   const [signingOut, setSigningOut] = useState(false)
+  const enterpriseSignOut = useEnterpriseSignOut()
   const [accountError, setAccountError] = useState('')
   const onDirty = useCallback((value: boolean) => { dirtyRef.current = value }, [])
   async function leave(action: () => void | Promise<void>) {
@@ -452,6 +454,8 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     void leave(async () => {
       setSigningOut(true); setAccountError('')
       try {
+        // A company sign-in session signs out at its IdP (OIDC / SAML); with none, the existing sign-out below.
+        if (await enterpriseSignOut().catch(() => false)) { await clearCache(() => true, undefined, { revalidate: false }); return }
         const result = await endSession()
         if (result.error) throw new Error('sign out failed')
         await clearCache(() => true, undefined, { revalidate: false }); router.replace('/sign-in?login=1'); router.refresh()

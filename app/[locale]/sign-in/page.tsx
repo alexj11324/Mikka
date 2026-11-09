@@ -39,6 +39,8 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
   if (session?.user && !addAccount && oauthResume) redirect(oauthResume)
   if (session?.user && !addAccount && composioResume) redirect(next)
   // The return route sends a refused handoff here with oauth=failed: show that, never redirect back to it.
+  // A company SSO refusal comes back with sso=failed and its own error; the auth-sso slot shows it, so the generic
+  // OAuth notice stays off for that one.
   const desktopRefused = Boolean((desktopFlow || webFlow) && query.oauth)
   // A desktop handoff with a web session shows the account first (AuthForm).
   if (session?.user && !addAccount && !desktopFlow && !webFlow) {
@@ -47,5 +49,5 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
     localeRedirect({ href: next, locale })
   }
   if (isAcceptanceEnabled() && !addAccount && !desktopFlow && !webFlow && !oauthResume && !composioResume && query.login !== '1' && !query.oauth && !query.continue && !query.error && !query.next) redirect('/api/acceptance')
-  return <>{!session?.user && <ClearUnauthenticatedReadCache />}<AuthForm emailEnabled={await emailSignInEnabled()} addAccount={addAccount} next={next} mode="sign-in" googleEnabled={googleEnabled} githubEnabled={await githubSignInEnabled()} oauthFailed={query.oauth === 'failed' || Boolean(query.error)} continueGoogle={query.continue === 'google'} continueGitHub={query.continue === 'github'} oauthAccountNotLinked={oauthAccountNotLinkedProvider(query.error, query.provider)} continueComposio={Boolean(composioResume)} continueURL={oauthResume ? withBasePath(oauthResume) : composioResume} desktopFlow={desktopFlow} webFlow={webFlow} signedInAs={session?.user && (desktopFlow || webFlow) && !desktopRefused ? { name: session.user.name, email: session.user.email, image: session.user.image } : null} /></>
+  return <>{!session?.user && <ClearUnauthenticatedReadCache />}<AuthForm emailEnabled={await emailSignInEnabled()} addAccount={addAccount} next={next} mode="sign-in" googleEnabled={googleEnabled} githubEnabled={await githubSignInEnabled()} oauthFailed={query.oauth === 'failed' || (Boolean(query.error) && query.sso !== 'failed')} continueGoogle={query.continue === 'google'} continueGitHub={query.continue === 'github'} oauthAccountNotLinked={oauthAccountNotLinkedProvider(query.error, query.provider)} continueComposio={Boolean(composioResume)} continueURL={oauthResume ? withBasePath(oauthResume) : composioResume} desktopFlow={desktopFlow} webFlow={webFlow} signedInAs={session?.user && (desktopFlow || webFlow) && !desktopRefused ? { name: session.user.name, email: session.user.email, image: session.user.image } : null} /></>
 }
