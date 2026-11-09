@@ -7,3 +7,5 @@
  */
 export { AppFrameView as AppFrame } from '@/components/app-frame-view'
 export { IconRailView as IconRail } from '@/components/nav/icon-rail-view'
+/** The open-source frame leaves the chats to the page's bot list. */
+export const FRAME_LISTS_CHATS = false
