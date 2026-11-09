@@ -174,7 +174,7 @@ test('driver startup fits within the shared outer budget while UI waits retain s
   const workflow = readFileSync(new URL('../../.github/workflows/mobile-screenshots.yml', import.meta.url), 'utf8')
   const probe = workflow.slice(workflow.indexOf('\n  driver-preflight:\n'))
   assert.match(probe, /timeout-minutes: 25/)
-  assert.match(workflow.slice(0, workflow.indexOf('\n  driver-preflight:\n')), /timeout-minutes: 90/)
+  assert.match(workflow.slice(0, workflow.indexOf('\n  driver-preflight:\n')), /timeout-minutes: 120/)
 })
 
 test('driver preflight rejects existing credentials and invokes only the stock flow without them', () => {
