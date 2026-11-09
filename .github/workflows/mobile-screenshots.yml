@@ -135,7 +135,7 @@ jobs:
       github.ref != 'refs/heads/main' && github.repository == 'alexj11324/Mikka' &&
       github.repository_id == '1427517699' && github.repository_owner_id == '183887963'
     runs-on: macos-26
-    timeout-minutes: 15
+    timeout-minutes: 25
     permissions:
       contents: read
     env:

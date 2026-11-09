@@ -6,7 +6,8 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { screenshotIdentity, pngDimensions, loginFlow, workspaceFlow, readFlow, backendVersion,
-  screenshotFailure, screenshotPhase, nativeDriverFlow, nativeFlowDiagnostics, driverPreflightIdentity, SHOTS } from './mobile-screenshots.mjs'
+  screenshotFailure, screenshotPhase, nativeDriverFlow, nativeFlowDiagnostics, nativeFlowTimeout,
+  driverPreflightIdentity, SHOTS } from './mobile-screenshots.mjs'
 
 const env = { GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REF: 'refs/heads/main',
   GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_SHA: 'a'.repeat(40), GITHUB_RUN_ID: '123',
@@ -161,6 +162,15 @@ test('stock native driver preflight runs before compilation and reviewer credent
   assert.ok(build.indexOf('if [ "${1:-}" = --preflight-only ]; then exit 0; fi') < build.indexOf('cd apps/mobile'))
   const workflow = readFileSync(new URL('../../.github/workflows/mobile-screenshots.yml', import.meta.url), 'utf8')
   assert.ok(workflow.indexOf('Build unsigned Release') < workflow.indexOf('Read existing review email'))
+})
+
+test('only the cold stock driver bootstrap gets a longer outer budget', () => {
+  assert.equal(nativeFlowTimeout('driver-preflight'), 600000)
+  for (const flow of ['login', 'workspace', ...SHOTS]) assert.equal(nativeFlowTimeout(flow), 180000)
+  const workflow = readFileSync(new URL('../../.github/workflows/mobile-screenshots.yml', import.meta.url), 'utf8')
+  const probe = workflow.slice(workflow.indexOf('\n  driver-preflight:\n'))
+  assert.match(probe, /timeout-minutes: 25/)
+  assert.doesNotMatch(workflow, /MAESTRO_DRIVER_STARTUP_TIMEOUT/)
 })
 
 test('driver preflight rejects existing credentials and invokes only the stock flow without them', () => {
