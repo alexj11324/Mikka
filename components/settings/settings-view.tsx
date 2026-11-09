@@ -37,6 +37,7 @@ import { prefetchSettingsSection } from '@/lib/settings-prefetch'
 import { FieldError } from '@/components/ui/field'
 import { GovernancePlan, GovernanceTemplates, GovernanceUsage } from '@ui-slot/settings-governance'
 import { ORGANIZATION_SETTINGS, OrganizationSettings } from '@ui-slot/settings-organization'
+import { MembersScreen } from '@ui-slot/settings-members'
 import { toast } from 'sonner'
 
 export type { SettingsSectionId as SettingsSection } from '@/lib/settings-sections'
@@ -107,7 +108,7 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
     <SettingsContentFrame parent={t('title')} title={title}>
 
       {accountError && <FieldError className="px-6 py-2">{accountError}</FieldError>}
-      {routedBody ? section === 'members' ? <SettingsContent className="gap-6 max-md:pt-1">{team && workspaceId && !preview && <GovernancePlan workspaceId={workspaceId} />}{children ?? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} />}</SettingsContent> : children : <SettingsContent key={section} className={cn('gap-6 max-md:pt-1', enter)}>
+      {routedBody ? section === 'members' ? MembersScreen && resolvedWorkspaceId && !preview ? <MembersScreen key={resolvedWorkspaceId} workspaceId={resolvedWorkspaceId} inviteInitially={inviteInitially} /> : <SettingsContent className="gap-6 max-md:pt-1">{team && workspaceId && !preview && <GovernancePlan workspaceId={workspaceId} />}{children ?? <MembersPanel workspaceId={workspaceId} inviteInitially={inviteInitially} />}</SettingsContent> : children : <SettingsContent key={section} className={cn('gap-6 max-md:pt-1', enter)}>
         {section === 'computers' ? <DevicesSettings workspaceId={resolvedWorkspaceId} /> : <h1 className="text-xl font-semibold max-md:sr-only">{title}</h1>}
         <SectionBody t={t} section={section} user={user} userKey={userKey} googleEnabled={googleEnabled} workspaceId={resolvedWorkspaceId} workspaceName={workspace?.workspace.name} personal={personal} team={team} admin={admin} community={community} workspaceError={Boolean(workspaceError) || (workspace !== undefined && !resolvedWorkspaceId)} linearNotice={linearNotice} preview={preview} onSignOut={onSignOut} signingOut={signingOut} onSection={next => { if (!activeSection || !pushSettingsHistory(settingsHref(next, workspaceId), workspaceId)) setSection(next) }} />
       </SettingsContent>}
