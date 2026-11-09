@@ -6,6 +6,8 @@ import test from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { withBasePath } from '../base-path'
+import { workspaceLink } from '../../components/workspace/workspace-navigation'
 
 const base = process.env.E2E_DATABASE_URL
 if (base) assert.ok(disposableDatabase(), 'memory authority regression only uses loopback *_e2e databases')
@@ -99,7 +101,7 @@ test('memory uses authoritative membership across two real PostgreSQL databases'
       const there = (await memory.readMemoryView(owner, b)).facts.find(fact => fact.id === factId)!
       assert.equal(there.usedCount, 2)
       assert.deepEqual(new Set(there.recentUses.map(use => use.id)), new Set([otherBot, otherTask]))
-      assert.deepEqual(there.source, { kind: 'thread', id: otherBot, url: '/mikka/chat' })
+      assert.deepEqual(there.source, { kind: 'thread', id: otherBot, url: withBasePath(workspaceLink({ bot: otherBot })) })
       await db.update(schema.issues).set({ content: { attrs: { mikka: { deletedAt: new Date().toISOString() } } } }).where(eq(schema.issues.id, otherTask))
       assert.equal((await memory.readMemoryView(owner, b)).facts.find(fact => fact.id === factId)?.usedCount, 1, 'a deleted task is no longer a visible use target')
       for (const sourceKind of ['decision', 'file'] as const) {

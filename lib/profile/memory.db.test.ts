@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
+import { withBasePath } from '../base-path'
+import { workspaceLink } from '../../components/workspace/workspace-navigation'
 
 // No mocks for authorization, PostgreSQL or the fact ledger. Runs only against
 // the existing disposable *_e2e loopback PG, exactly like the other profile tests.
@@ -102,11 +104,11 @@ pgTest('memory: manual idempotency, real provenance/usage, review, scoped reads/
     assert.equal(await memory.recordMemoryFactUsage(owner, wsB, event, [manual!]), 0, 'wrong workspace cannot attribute a thread')
     view = await memory.readMemoryView(owner, wsA)
     assert.equal(view.facts[0].usedCount, 1)
-    assert.equal(view.facts[0].recentUses[0].url, '/mikka/chat')
+    assert.equal(view.facts[0].recentUses[0].url, withBasePath(workspaceLink({ bot: botId })))
     assert.equal(view.facts[0].recentUses[0].id, botId)
     assert.equal(await memory.recordMemoryFactUsage(owner, wsA,
       { ...event, eventId: randomUUID(), url: 'https://evil.invalid/capture' }, [manual!]), 1)
-    assert.equal((await memory.readMemoryView(owner, wsA)).facts[0].recentUses[0].url, null, 'external URL never stored')
+    assert.equal((await memory.readMemoryView(owner, wsA)).facts[0].recentUses[0].url, withBasePath(workspaceLink({ bot: botId })), 'the supplied external URL is ignored; the link names only the authorized target')
 
 
     // When the current session really prepares a model turn, the in-scope
@@ -137,7 +139,7 @@ pgTest('memory: manual idempotency, real provenance/usage, review, scoped reads/
     assert.equal(view.pending.length, 2, 'both conflicting claims await review')
     const first = view.pending.find(item => item.subject === 'First candidate')!
     const conflicting = view.pending.find(item => item.subject === 'Conflicting candidate')!
-    assert.deepEqual(first.source, { kind: 'thread', id: botId, url: '/mikka/chat' })
+    assert.deepEqual(first.source, { kind: 'thread', id: botId, url: withBasePath(workspaceLink({ bot: botId })) })
     assert.equal(conflicting.source, null, 'no fake history')
     assert.deepEqual(first.actions.slice(0, 2), ['approve', 'reject'])
     assert.equal(await memory.recordMemoryFactUsage(owner, wsA, { ...event, eventId: randomUUID() }, [first.id]), 0, 'pending not injectable')

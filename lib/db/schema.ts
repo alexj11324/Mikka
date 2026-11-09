@@ -755,6 +755,17 @@ export const userFacts = pgTable('user_facts', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [unique('user_facts_subject_key').on(table.userId, table.kind, table.subjectKey), index('user_facts_state_idx').on(table.userId, table.state), index('user_facts_kind_idx').on(table.userId, table.kind)])
 
+/** A persisted consolidation answer and the actual facts it derived from. No provider/model attribution is inferred. */
+export const userFactDecisions = pgTable('user_fact_decisions', {
+  id: uuid('id').primaryKey(),
+  userId: text('userId').notNull(),
+  factId: uuid('factId').notNull().references(() => userFacts.id, { onDelete: 'cascade' }),
+  sourceFactIds: uuid('sourceFactIds').array().notNull(),
+  method: text('method').$type<'consolidation_answer'>().notNull(),
+  decisionKey: text('decisionKey').notNull(),
+  decidedAt: timestamp('decidedAt', { withTimezone: true }).notNull(),
+}, table => [unique('user_fact_decisions_request_unique').on(table.userId, table.decisionKey), index('user_fact_decisions_fact_idx').on(table.userId, table.factId)])
+
 /** Short-lived, owner-private snapshot. The main fact is scrubbed immediately on delete. */
 export const userFactUndo = pgTable('user_fact_undo', {
   factId: uuid('factId').primaryKey().references(() => userFacts.id, { onDelete: 'cascade' }),

@@ -3,7 +3,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { and, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/lib/db'
-import { bots, coordinatorSessions, issues, userFacts, userFactUndo, userFactUses } from '@/lib/db/schema'
+import { bots, coordinatorSessions, issues, suggestions, userFacts, userFactDecisions, userFactUndo, userFactUses } from '@/lib/db/schema'
 import { memoryEnabled } from './store'
 import { projectDb, projects } from '@/lib/db/projects'
 import { teamProjects } from '@/lib/db/team-schema'
@@ -15,16 +15,18 @@ import { issueForUser } from '@/lib/issue-access'
 import { issueVisibilityPredicate } from '@/lib/issue-visibility-policy'
 import { clampSubject, subjectKey } from './facts'
 import type { UserFactKind, MemoryScopeKind } from './kinds'
+import { memoryTargetUrl, notificationMemorySource, suggestionSourceId, type MemorySource } from './provenance'
+export type { MemorySource } from './provenance'
 
 /** These facts belong to a person. Scoping controls where that person's facts may be read, never sharing them with teammates. */
 export type MemoryScope =
   | { kind: 'global'; ids: [] }
   | { kind: 'workspaces' | 'projects'; ids: string[] }
 export type MemoryAction = 'correct' | 'remove' | 'setScope' | 'approve' | 'reject' | 'undo'
-export type MemorySource = { kind: 'thread' | 'decision' | 'told' | 'file'; id: string | null; url: string | null }
 export type MemoryUse = { kind: 'thread' | 'task'; id: string; url: string | null; usedAt: string }
 export type MemoryItem = {
   id: string; kind: UserFactKind; subject: string; userEdited: boolean
+  createdAt: string; firstSeenAt: string
   reviewStatus: 'approved' | 'pending'; source: MemorySource | null
   usedCount: number; recentUses: MemoryUse[]
   scope: MemoryScope; actions: MemoryAction[]; undoUntil: string | null
@@ -90,7 +92,7 @@ export async function readMemoryView(reader: MemoryReader, workspaceId: string, 
     for (const untyped of uses.rows) {
       const row = untyped as { factId: string; targetKind: 'thread' | 'task'; targetId: string; targetUrl: string | null; usedAt: Date; usedCount: number }
       const item = useById.get(row.factId) ?? { count: Number(row.usedCount), recent: [] }
-      item.recent.push({ kind: row.targetKind, id: row.targetId, url: row.targetUrl, usedAt: new Date(row.usedAt).toISOString() })
+      item.recent.push({ kind: row.targetKind, id: row.targetId, url: memoryTargetUrl(row.targetKind, row.targetId), usedAt: new Date(row.usedAt).toISOString() })
       useById.set(row.factId, item)
     }
     const sourceIds = [...new Set(visible.filter(row => row.sourceKind === 'thread' && z.uuid().safeParse(row.sourceId).success)
@@ -98,6 +100,31 @@ export async function readMemoryView(reader: MemoryReader, workspaceId: string, 
     const sourceThreads = new Set(sourceIds.length ? (await db.select({ id: bots.id }).from(bots).where(and(
       inArray(bots.id, sourceIds), eq(bots.ownerId, userId), eq(bots.workspaceId, workspaceId),
     ))).map(row => row.id) : [])
+    const noticeIds = [...new Set(visible.map(row => suggestionSourceId(row.sourceId)).filter((id): id is string => id !== null))]
+    const notices = new Map((noticeIds.length ? await db.select({ id: suggestions.id, source: suggestions.source, externalId: suggestions.externalId,
+      matterKey: suggestions.matterKey, url: suggestions.url }).from(suggestions).innerJoin(bots, eq(bots.id, suggestions.botId)).where(and(
+      inArray(suggestions.id, noticeIds), eq(suggestions.userId, userId), eq(bots.ownerId, userId), eq(bots.workspaceId, workspaceId),
+    )) : []).map(row => [row.id, row]))
+    const decisionIds = visible.filter(row => row.sourceKind === 'decision' && z.uuid().safeParse(row.sourceId).success).map(row => row.sourceId!)
+    const decisions = new Map((decisionIds.length ? await db.select().from(userFactDecisions).where(and(
+      inArray(userFactDecisions.id, decisionIds), eq(userFactDecisions.userId, userId),
+    )) : []).map(row => [row.id, row]))
+    const readableFacts = new Set(ids)
+    const source = (row: typeof all[number]): MemorySource | null => {
+      if (!row.sourceKind) return null
+      const unknown: MemorySource = { kind: row.sourceKind, id: null, url: null }
+      const notice = notices.get(suggestionSourceId(row.sourceId) ?? '')
+      if (notice) return notificationMemorySource(row, notice) ?? unknown
+      if (row.sourceKind === 'told' && row.clientRequestId && row.sourceId === row.id) return { kind: 'told', id: row.id, url: null }
+      if (row.sourceKind === 'thread' && sourceThreads.has(row.sourceId?.toLowerCase() ?? '')) {
+        const id = row.sourceId!.toLowerCase()
+        return { kind: 'thread', id, url: memoryTargetUrl('thread', id) }
+      }
+      const decision = row.sourceKind === 'decision' ? decisions.get(row.sourceId ?? '') : null
+      if (decision && decision.factId === row.id && decision.sourceFactIds.length >= 1
+        && decision.sourceFactIds.every(id => id !== row.id && readableFacts.has(id))) return { kind: 'decision', id: decision.id, url: null }
+      return unknown
+    }
     const view = (row: typeof all[number]): MemoryItem => {
       const tombstone = undoById.get(row.id)
       const undone = row.state === 'deleted' && !!tombstone
@@ -107,14 +134,9 @@ export async function readMemoryView(reader: MemoryReader, workspaceId: string, 
         : ['correct', 'remove', 'setScope']
       return {
         id: row.id, kind: row.kind, subject: row.subject, userEdited: row.userEdited,
+        createdAt: row.createdAt.toISOString(), firstSeenAt: row.firstSeenAt.toISOString(),
         reviewStatus: row.reviewStatus,
-        // A kind can be known without a currently authorized locator. No legacy
-        // decision/file identity is inferred from its text or an arbitrary URL.
-        source: row.sourceKind ? {
-          kind: row.sourceKind,
-          id: row.sourceKind === 'thread' && sourceThreads.has(row.sourceId?.toLowerCase() ?? '') ? row.sourceId : null,
-          url: row.sourceKind === 'thread' && sourceThreads.has(row.sourceId?.toLowerCase() ?? '') && row.sourceUrl?.startsWith('/mikka/') ? row.sourceUrl : null,
-        } : null,
+        source: source(row),
         usedCount: uses?.count ?? 0, recentUses: uses?.recent ?? [],
         scope: { kind: row.scopeKind, ids: row.scopeIds } as MemoryScope,
         actions, undoUntil: undone ? tombstone.expiresAt.toISOString() : null,
@@ -179,10 +201,11 @@ export async function addMemoryFact(reader: MemoryReader, workspaceId: string, i
         .where(and(eq(userFacts.userId, userId), eq(userFacts.clientRequestId, input.requestId))).limit(1)
       if (replayed) return replayed.id
       const at = new Date()
+      const id = randomUUID()
       const [inserted] = await tx.insert(userFacts).values({
-        id: randomUUID(), userId, kind: input.kind, subject, subjectKey: key,
+        id, userId, kind: input.kind, subject, subjectKey: key,
         value: {}, evidence: [], confidence: 1, firstSeenAt: at, lastSeenAt: at,
-        userEdited: true, reviewStatus: 'approved', sourceKind: 'told',
+        userEdited: true, reviewStatus: 'approved', sourceKind: 'told', sourceId: id,
         scopeKind: scope.kind, scopeIds: scope.ids, clientRequestId: input.requestId,
       }).onConflictDoNothing().returning({ id: userFacts.id })
       if (inserted) return inserted.id
@@ -319,7 +342,7 @@ export async function recordMemoryFactUsage(reader: MemoryReader, workspaceId: s
     ))
     const eligible = rows.filter(row => applies(row, workspaceId, allowedProjects))
     if (!eligible.length) return 0
-    const url = event.url?.startsWith('/mikka/') ? event.url : null
+    const url = memoryTargetUrl(event.kind, event.targetId)
     const stored = await db.insert(userFactUses).values(eligible.map(fact => ({
       factId: fact.id, userId, eventId: event.eventId, targetKind: event.kind, targetId: event.targetId, targetUrl: url,
     }))).onConflictDoNothing().returning({ factId: userFactUses.factId })
@@ -330,6 +353,8 @@ export async function recordMemoryFactUsage(reader: MemoryReader, workspaceId: s
 /** Existing hourly user-facts cron, never a new timer or polling path. */
 export async function purgeExpiredMemoryUndo() {
   const removed = await db.delete(userFactUndo).where(sql`${userFactUndo.expiresAt} <= now()`).returning({ factId: userFactUndo.factId })
+  if (removed.length) await db.delete(userFactDecisions).where(and(inArray(userFactDecisions.factId, removed.map(row => row.factId)),
+    sql`exists (select 1 from ${userFacts} where ${userFacts.id} = ${userFactDecisions.factId} and ${userFacts.state} = 'deleted')`))
   return removed.length
 }
 

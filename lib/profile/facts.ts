@@ -14,6 +14,7 @@ import type { UserFactEvidence } from '@/lib/db/schema'
 import { USER_FACT_KINDS, type UserFactKind, type UserFactState, type MemorySourceKind } from './kinds'
 import type { ExternalNotification } from '@/lib/suggestions/notification'
 import type { DecisionAnswer, DecisionQuestion } from '@/lib/coordinator/decision'
+import { notificationSourceKind } from './provenance'
 
 /** Most facts one notification may add. */
 export const FACTS_PER_ITEM = 3
@@ -133,7 +134,7 @@ export interface FactInput {
   confidence: number
   seenAt: Date
   expiresAt: Date | null
-  /** Trusted internal provenance only. External notification sources cannot be relabelled as a thread or file. */
+  /** Server-derived provenance only. External notice ids use the suggestion namespace, never an internal Bot/Artifact id. */
   source?: { kind: MemorySourceKind; id: string | null; url: string | null }
 }
 
@@ -148,6 +149,7 @@ export function factInput(fact: ExtractedFact, notification: Pick<ExternalNotifi
   return {
     kind: fact.kind, subject: clampSubject(fact.subject), value,
     evidence: [{ source: notification.source, suggestionId, externalId: notification.externalId, at: notification.occurredAt.toISOString() }],
+    source: { kind: notificationSourceKind(notification.source), id: `suggestion:${suggestionId}`, url: null },
     confidence: Math.min(fact.confidence, FIRST_SIGHT_MAX), seenAt: notification.occurredAt, expiresAt,
   }
 }
