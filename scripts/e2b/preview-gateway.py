@@ -196,6 +196,7 @@ class Gateway:
         self.active = {}
         self.deadline = None
         self.lock = asyncio.Lock()
+        self.stopping = False
         self.revoked = set()
         self.revoked_leases = set()
         used_file = self.root / 'ports.json'
@@ -260,6 +261,8 @@ class Gateway:
             raise PreviewFailure('server_stopped', 409)
 
     async def prepare(self, message):
+        if self.stopping:
+            raise PreviewFailure('control_unavailable', 503)
         binding = checked_binding(message.get('binding'))
         if binding['runId'] in self.revoked:
             raise PreviewFailure('authorization_revoked', 403)
@@ -293,6 +296,8 @@ class Gateway:
         # Discovery may wait for a cold framework compile. It must never hold
         # the control lock that a stop/revocation needs to close live sockets.
         async with self.lock:
+            if self.stopping:
+                raise PreviewFailure('control_unavailable', 503)
             checked_binding(binding)
             if binding['runId'] in self.revoked:
                 raise PreviewFailure('authorization_revoked', 403)
@@ -384,6 +389,8 @@ class Gateway:
         if operation == 'prepare':
             return await self.prepare(message)
         async with self.lock:
+            if self.stopping:
+                raise PreviewFailure('control_unavailable', 503)
             if operation == 'version':
                 return {'version': VERSION}
             if operation == 'issue':
@@ -585,10 +592,14 @@ async def serve(ready_fd=None):
             shutdown = message.get('operation') == 'shutdown'
             if shutdown:
                 async with gateway.lock:
-                    await gateway.revoke()
+                    # A discovery already outside this lock must not reactivate
+                    # after the stopped ACK; its final locked check sees this.
+                    gateway.stopping = True
                     server.close()
-                    await server.wait_closed()
                     socket_path.unlink(missing_ok=True)
+                    await gateway.revoke()
+                # The outer server context drains clients after this writer's
+                # ACK/close; waiting here would wait on this same connection.
                 reply = {'stopped': True}
             else:
                 reply = await gateway.control(message)

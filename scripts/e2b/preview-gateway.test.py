@@ -4,6 +4,7 @@ No browser, model, external service or production credential is used. Run with
 python3 scripts/e2b/preview-gateway.test.py in an isolated Linux environment.
 """
 import asyncio
+from contextlib import asynccontextmanager
 import errno
 import http.server
 import importlib.util
@@ -15,6 +16,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest import mock
 
 from aiohttp import ClientSession, DummyCookieJar, WSMsgType, web
 
@@ -85,6 +87,61 @@ class PreviewAcceptance(unittest.IsolatedAsyncioTestCase):
         await self.upstream_runner.cleanup()
         os.chdir(self.previous)
         self.temporary.cleanup()
+
+    @asynccontextmanager
+    async def control_daemon(self):
+        previous = self.gateway
+        factory = gateway_module.Gateway
+        gateway = factory(self.root, user_id=os.getuid(), protect=lambda _port: None)
+        start_server = asyncio.start_unix_server
+        writers = set()
+
+        async def tracked_server(callback, **options):
+            async def tracked(reader, writer):
+                writers.add(writer)
+                try:
+                    await callback(reader, writer)
+                finally:
+                    writers.discard(writer)
+            return await start_server(tracked, **options)
+
+        # Inject only the owned fixture directory/uid; run the actual daemon,
+        # Gateway and Unix transport, including its real active connections.
+        with mock.patch.object(gateway_module, 'ROOT', self.root), \
+                mock.patch.object(gateway_module, 'Gateway', lambda: gateway), \
+                mock.patch.object(asyncio, 'start_unix_server', tracked_server):
+            self.gateway = gateway
+            serving = asyncio.create_task(gateway_module.serve())
+            try:
+                async with asyncio.timeout(2):
+                    while not (self.root / 'control.sock').exists():
+                        if serving.done():
+                            await serving
+                        await asyncio.sleep(.001)
+                yield serving
+            finally:
+                # An intentionally broken shutdown can wait on its own writer;
+                # close only this fixture's accepted connections during teardown.
+                for writer in list(writers):
+                    writer.close()
+                await asyncio.gather(*(writer.wait_closed() for writer in list(writers)), return_exceptions=True)
+                if not serving.done():
+                    serving.cancel()
+                # Each body awaits the daemon's outcome explicitly; fixture
+                # cleanup must not replace its original assertion failure.
+                await asyncio.gather(serving, return_exceptions=True)
+                await gateway.close()
+                self.gateway = previous
+
+    async def unix_control(self, message):
+        reader, writer = await asyncio.open_unix_connection(str(self.root / 'control.sock'))
+        try:
+            writer.write(json.dumps(message).encode() + b'\n')
+            await writer.drain()
+            return json.loads(await asyncio.wait_for(reader.readline(), timeout=1))
+        finally:
+            writer.close()
+            await writer.wait_closed()
 
     async def prepare(self, binding=None):
         result = await self.gateway.control({'operation': 'prepare', 'binding': binding or self.binding, 'port': self.upstream_port})
@@ -258,6 +315,75 @@ class PreviewAcceptance(unittest.IsolatedAsyncioTestCase):
                 await asyncio.to_thread(replacement.shutdown)
                 serving.join(timeout=2)
                 self.assertFalse(serving.is_alive())
+
+    async def test_shutdown_replies_after_revoking_lease_without_waiting_on_its_own_client(self):
+        async with self.control_daemon() as serving:
+            await self.open()
+            websocket = await self.client.ws_connect(self.url('/hmr'), headers=self.headers(Origin=self.origin))
+            try:
+                await websocket.send_str('before-shutdown')
+                self.assertEqual((await websocket.receive(timeout=2)).data, 'hmr:before-shutdown')
+                reply = await self.unix_control({'operation': 'shutdown'})
+                self.assertEqual(reply, {'stopped': True})
+                self.assertIsNone(self.gateway.site)
+                self.assertIsNone(self.gateway.binding)
+                self.assertIsNone(self.gateway.port)
+                self.assertFalse(self.gateway.sessions)
+                self.assertFalse(self.gateway.tickets)
+                self.assertFalse((self.root / 'control.sock').exists())
+                with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as fresh:
+                    with self.assertRaises(OSError) as refused:
+                        fresh.connect(str(self.root / 'control.sock'))
+                    self.assertIn(refused.exception.errno, (errno.ENOENT, errno.ECONNREFUSED))
+                self.assertIn((await websocket.receive(timeout=2)).type,
+                              (WSMsgType.CLOSE, WSMsgType.CLOSED, WSMsgType.CLOSING))
+                await asyncio.wait_for(serving, timeout=2)
+            finally:
+                await websocket.close()
+
+    async def test_shutdown_refuses_accepted_and_discovering_controls_before_they_can_reopen(self):
+        async with self.control_daemon() as serving:
+            await self.open()
+            used_ports = set(self.gateway.used_ports)
+            entered = asyncio.Event()
+            release = threading.Event()
+            loop = asyncio.get_running_loop()
+
+            def delayed_protection(_port):
+                loop.call_soon_threadsafe(entered.set)
+                if not release.wait(timeout=5):
+                    raise RuntimeError('Synthetic shutdown discovery was not released')
+
+            self.gateway.protect = delayed_protection
+            pending = asyncio.create_task(self.unix_control({'operation': 'prepare',
+                'binding': {**self.binding, 'runId': 'run-after-shutdown', 'epoch': 2}, 'port': self.upstream_port}))
+            reader, writer = await asyncio.open_unix_connection(str(self.root / 'control.sock'))
+            try:
+                await asyncio.wait_for(entered.wait(), timeout=2)
+                self.assertEqual(await self.unix_control({'operation': 'shutdown'}), {'stopped': True})
+                self.assertFalse(serving.done(), 'outer server still waits for its other accepted connections')
+                self.assertIsNone(self.gateway.port)
+                self.assertFalse(self.gateway.sessions)
+                self.assertFalse(self.gateway.tickets)
+                release.set()
+                self.assertEqual(await pending, {'error': 'control_unavailable', 'status': 503})
+                # This socket was accepted before shutdown but supplies its
+                # ordinary command only after the stopped ACK was received.
+                writer.write(json.dumps({'operation': 'version'}).encode() + b'\n')
+                await writer.drain()
+                self.assertEqual(json.loads(await asyncio.wait_for(reader.readline(), timeout=1)),
+                                 {'error': 'control_unavailable', 'status': 503})
+                self.assertIsNone(self.gateway.port)
+                self.assertEqual(self.gateway.used_ports, used_ports)
+                self.assertFalse((self.root / 'control.sock').exists())
+            finally:
+                release.set()
+                if not pending.done():
+                    pending.cancel()
+                await asyncio.gather(pending, return_exceptions=True)
+                writer.close()
+                await writer.wait_closed()
+            await asyncio.wait_for(serving, timeout=2)
 
     async def test_slow_discovery_never_delays_revocation_or_reopens_a_stopped_run(self):
         await self.open()

@@ -1,0 +1,47 @@
+name: Issue 1782 native Unix shutdown proof
+on:
+  push:
+    branches: [ops/1782-preview-shutdown-20261109]
+permissions:
+  contents: read
+jobs:
+  native_shutdown:
+    name: Native Unix baseline, expected self-wait RED and complete GREEN
+    if: github.repository == 'alexj11324/Mikka' && github.actor == 'alexj11324' && github.ref == 'refs/heads/ops/1782-preview-shutdown-20261109' && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify exact failure classification before native execution
+        timeout-minutes: 1
+        run: python3 scripts/ops/preview-shutdown-native-1782.test.py
+      - name: Install the existing isolated Coding workspace dependency
+        timeout-minutes: 3
+        run: |
+          python3 -m venv "$RUNNER_TEMP/coding-review-python"
+          "$RUNNER_TEMP/coding-review-python/bin/pip" install --disable-pip-version-check 'aiohttp==3.14.0'
+      - name: Require genuine native Unix RED and all fifteen GREEN cases
+        timeout-minutes: 4
+        run: |
+          sudo -n env \
+            GITHUB_ACTIONS="$GITHUB_ACTIONS" GITHUB_REPOSITORY="$GITHUB_REPOSITORY" \
+            GITHUB_ACTOR="$GITHUB_ACTOR" GITHUB_TRIGGERING_ACTOR="$GITHUB_TRIGGERING_ACTOR" \
+            GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME" GITHUB_EVENT_PATH="$GITHUB_EVENT_PATH" \
+            GITHUB_REF="$GITHUB_REF" GITHUB_SHA="$GITHUB_SHA" GITHUB_RUN_ID="$GITHUB_RUN_ID" \
+            GITHUB_RUN_ATTEMPT="$GITHUB_RUN_ATTEMPT" GITHUB_WORKFLOW_REF="$GITHUB_WORKFLOW_REF" \
+            GITHUB_JOB="$GITHUB_JOB" RUNNER_TEMP="$RUNNER_TEMP" PYTHONDONTWRITEBYTECODE=1 \
+            "$RUNNER_TEMP/coding-review-python/bin/python" scripts/ops/preview-shutdown-native-1782.py run
+      - name: Retain closed native source and failure evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: preview-shutdown-native-1782-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/preview-shutdown-native-1782/
+          if-no-files-found: error
+          retention-days: 14
