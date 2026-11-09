@@ -7,6 +7,8 @@ import { Group } from '@/components/ui'
 import { authClient } from '@/lib/auth'
 import { useSettings } from '@/lib/settings'
 import { colors, font } from '@/lib/theme'
+import { openAccountDeletion } from '@/lib/web'
+import { mobileMessages as messages } from '@/lib/messages'
 
 /** 个人资料: photo and name; email read-only (Comma iOS Profile, Claude). The name saves when the field is left. */
 export default function ProfileScreen() {
@@ -43,6 +45,9 @@ export default function ProfileScreen() {
       </Group>
       {busy ? <Text accessibilityLiveRegion="polite">正在保存名字</Text> : null}
       {problem ? <View accessibilityRole="alert" style={{ gap: 10 }}><Text style={{ color: colors.danger }}>{problem}</Text><CardButton label="重试保存" onPress={() => void save()} /></View> : null}
+      <Group>
+        <Row label={messages.Settings.profile.deleteAccount} destructive onPress={() => void openAccountDeletion()} />
+      </Group>
     </SettingsPage>
   )
 }

@@ -22,15 +22,15 @@ test('discovery matches the desktop contract without a login or provider credent
   assert.equal(text.includes(env.GITHUB_CLIENT_SECRET), false)
   assert.deepEqual(JSON.parse(text), {
     name: 'Acme Mikka', version: revision, edition: 'community', basePath: '/mikka', desktopProtocol: { min: 0, max: 1 },
-    signIn: { google: false, github: true, email: true }, minDesktopVersion: null, cloud: { connected: false }, mobileReady: false,
+    signIn: { google: false, github: true, apple: false, email: true }, minDesktopVersion: null, cloud: { connected: false }, mobileReady: false,
     web: { enabled: true, protocol: { min: 1, max: 1 } },
   })
 })
 
 test('only configured sign-in methods and effective mobile trust are advertised', () => {
-  assert.deepEqual(desktopDiscovery({ ...env, GITHUB_CLIENT_SECRET: '' }).signIn, { google: false, github: false, email: true })
+  assert.deepEqual(desktopDiscovery({ ...env, GITHUB_CLIENT_SECRET: '' }).signIn, { google: false, github: false, apple: false, email: true })
   assert.deepEqual(desktopDiscovery({ ...env, GOOGLE_CLIENT_ID: 'fixture-google', GOOGLE_CLIENT_SECRET: 'fixture-secret' }).signIn,
-    { google: true, github: true, email: true })
+    { google: true, github: true, apple: false, email: true })
   assert.equal(desktopDiscovery({ ...env, AUTH_TRUSTED_ORIGINS: 'mikka://' }).mobileReady, true)
   assert.equal(desktopDiscovery({ ...env, MIKKA_EDITION: 'cloud' }).mobileReady, true)
   assert.equal(desktopDiscovery({ ...env, MIKKA_SERVER_NAME: ' '.repeat(10_000) }).name, 'Mikka')
@@ -39,7 +39,7 @@ test('only configured sign-in methods and effective mobile trust are advertised'
 
 test('manifest-managed GitHub sign-in can supply its initialized provider status', async () => {
   const response = desktopDiscoveryResponse(new Request('https://self.example.test/mikka/api/desktop/discovery'),
-    { ...env, GITHUB_CLIENT_ID: '', GITHUB_CLIENT_SECRET: '' }, { google: false, github: true, email: true })
+    { ...env, GITHUB_CLIENT_ID: '', GITHUB_CLIENT_SECRET: '' }, { google: false, github: true, apple: false, email: true })
   assert.equal((await response.json()).signIn.github, true)
 })
 

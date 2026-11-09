@@ -1,8 +1,7 @@
-import messages from '../../../messages/zh-CN.json'
+import { mobileMessages as messages } from './messages'
 import type { ServerProbe } from './server-discovery'
 
-/** The app currently uses Chinese UI; both translations live with web copy.
- * Discovery errors match DesktopServer in desktop PR #1558. */
+/** Discovery errors share DesktopServer's account and version terminology. */
 export const serverCopy = messages.MobileServer
 export function probeError(probe: ServerProbe): string {
   if (probe.status === 'ok') return ''

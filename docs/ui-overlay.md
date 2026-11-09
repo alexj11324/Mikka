@@ -13,13 +13,13 @@ never imports it. The build pipeline that checks the layer out is issue #1527.
 | `@ui-slot/<name>` | `components/slots/<name>.tsx` | `$MIKKA_UI_OVERLAY_DIR/slots/<name>.tsx` when the layer has it, else the default |
 | `@hosted/*` | does not resolve | `$MIKKA_UI_OVERLAY_DIR/*` |
 
-`lib/ui-overlay.mjs` decides this once, and both bundlers read it:
-`next.config.mjs` (Turbopack `resolveAlias` and webpack `resolve.alias`) and
-the desktop renderer's Vite plugin (`apps/frontend/scripts/application-plugin.mjs`).
+`lib/ui-overlay.mjs` decides this once. The shared Vite plugin
+(`apps/frontend/scripts/application-plugin.mjs`) applies it to both Web and
+desktop renderer builds. `next.config.mjs` retains aliases for compatibility.
+Production uses the [shared frontend/API runtime](operations/web-runtime.md).
 `tsconfig.json` maps `@ui-slot/*` to the defaults, so typecheck, lint and tests
 in this repository always see the open-source build. The layer must sit inside
-the repository: Turbopack reads nothing outside its root, and the layer
-resolves `react` and this app's modules from this repository's `node_modules`.
+the repository, as `uiOverlay()` enforces, and resolves `react` and this app's modules from this repository's `node_modules`.
 A missing directory, or one outside the repository, fails the build.
 
 ## Slots

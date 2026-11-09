@@ -4,7 +4,7 @@
 - Source: Alex's correction to the interpretation of [#1505](https://github.com/alexj11324/Mikka/issues/1505#issuecomment-6691833153): 「我当时是要求，就是说执行机器直接持有的是GitHub的credential，没让他就是说把所有的这个密钥都给到这个执行机器啊。」 This clarifies the scope of credential delivery, not the [removal of repeated remote authorization](https://github.com/alexj11324/Mikka/issues/1505#issuecomment-6691871552).
 - Rule: Task-machine execution, credentials, user/workspace/repository Secret delivery, cloud and local runners.
 - Replaces: Only the interpretation of [2026-11-06-1800](2026-11-06-1800-machine-is-the-execution-boundary.md) that all task-reachable user/workspace/repository Secrets should be exposed directly to an Agent. Its native execution, GitHub, model-provider direct connection, and no-per-call-control-plane authorization rules remain in force.
-- Status: Effective architecture decision. Runtime migration is **not yet implemented** and requires a separate issue.
+- Status at decision time: Effective architecture decision. Runtime migration is **not yet implemented** and requires a separate issue. See the dated source implementation status under Migration for the later source snapshot.
 
 ## Boundaries and threat model
 
@@ -34,7 +34,26 @@ Distinguish these classes of authority:
 
 ## Migration, compatibility, and acceptance
 
-- **Known current gap:** The current lib/secrets/runtime.ts taskSecretInjection() decrypts user/workspace/repository values and returns a plaintext environment map; app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts delivers it to a cloud runner. The existing runtime therefore **does not yet meet** this new protected-secret default. Documentation does not change deployment behavior.
+### Source implementation status, 2026-11-08
+
+Source revision `5998ce48972937a1104b4a427af5bd73a699d83a` includes the task-secret
+capability path. `taskSecretInjection()` separates ordinary environment and
+approved direct values from protected Secrets and unavailable names.
+`effectiveSecretDelivery()` defaults missing or invalid delivery metadata to
+protected. The device claim checks daemon capability and issues a sealed grant
+inside its final response fence, bound to the run, attempt, device token,
+owner, workspace and repository. The source paths are
+[`runtime.ts`](../../../lib/secrets/runtime.ts),
+[`delivery.ts`](../../../lib/secrets/delivery.ts),
+[`task-access.ts`](../../../lib/secrets/task-access.ts) and the
+[device claim route](../../../app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts).
+
+This source inspection records implementation presence at that revision.
+Deployed migration, protected-secret canaries, local and E2B acceptance, and
+performance require their own version-bound runtime evidence. The original gap
+recorded below describes the implementation at decision time.
+
+- **Gap recorded at decision time:** The current lib/secrets/runtime.ts taskSecretInjection() decrypts user/workspace/repository values and returns a plaintext environment map; app/v1/devices/[deviceId]/runs/[runId]/claim/route.ts delivers it to a cloud runner. The existing runtime therefore **does not yet meet** this new protected-secret default. Documentation does not change deployment behavior.
 - The implementation owner inventories every secret origin/destination, separating ordinary env from sensitive values, and tests both E2B and local daemon, native CLI/GitHub, connected-app/MCP and browser-login cases. Preserve working environments through an explicit compatibility/migration plan, not an unreviewed removal of task env injection.
 - Protected-secret canaries must not be readable through the Agent prompt, environment, command output, files, traces, screenshots, checkpoints or templates; verify cross-owner/workspace/repository/run isolation, wrong origin, redirects, revocation and rotation. Report any unavoidable exposure modes as such rather than claiming absolute invisibility.
 - No new periodic polling, no model-proxy resurrection, no per-provider/per-tool control-plane auth, no change to official Claude Code/Codex files, no weakening task ownership or GitHub operations. Preserve self-hosted behavior.

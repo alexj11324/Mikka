@@ -1,5 +1,10 @@
 # Factory independent checks (#193)
 
+> Historical implementation and verification record for the increments below.
+> [Flow v2](1276-flow-v2.md#observations-and-the-single-review) defines the
+> public single-review and handoff behavior. Current test environments and
+> release evidence follow [the acceptance guide](../acceptance.md).
+
 This increment is based on current main and selectively restores #193. PR #316 remains separate and unmerged. It does not replace current host message policy, Agent Kit snapshots, subscriptions, mailbox transport or native Coordinator behavior.
 
 ## Runtime receipt

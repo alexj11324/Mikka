@@ -16,13 +16,34 @@ const BUSINESS_PATHS = new Set(['/mikka/api/workspace', '/mikka/api/workspace/sw
 const CODES = new Set(['browser_configuration', 'browser_ready_invalid', 'browser_source_rejected', 'browser_expired',
   'browser_interrupted', 'browser_launch_failed', 'browser_ui_failed', 'browser_ui_timeout', 'browser_origin_rejected',
   'browser_identity_failed', 'browser_workspace_ambiguous', 'browser_workspace_failed', 'browser_cloud_unproven',
-  'browser_selection_failed', 'browser_submission_failed', 'browser_cleanup_failed', 'browser_report_failed'])
+  'browser_selection_failed', 'browser_replay_unready', 'browser_submission_failed', 'browser_cleanup_failed', 'browser_report_failed'])
 export class ObservabilityBrowserError extends Error {
   constructor(code) { super(CODES.has(code) ? code : 'browser_ui_failed'); this.code = this.message }
 }
 const refusal = code => new ObservabilityBrowserError(code)
 const check = (condition, code) => { if (!condition) throw refusal(code) }
 const closed = error => error instanceof ObservabilityBrowserError ? error : refusal('browser_ui_failed')
+
+// This function is serialized into Chromium. It must have no Node/module closure.
+export function readReplayReady(value) {
+  try {
+    const state = value === undefined
+      ? globalThis.__mikkaReplayReadiness?.() : value
+    if (!state || state.version !== 1 || state.sdkLoaded !== true
+      || state.recordingStarted !== true || state.snapshotObserved !== true
+      || typeof state.sessionId !== 'string'
+      || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(state.sessionId)
+      || state.sessionId === '00000000-0000-0000-0000-000000000000') return null
+    for (const key of ['sessionObservedAt', 'snapshotObservedAt', 'observedAt']) {
+      if (!Number.isSafeInteger(state[key]) || state[key] <= 0 || state[key] > 8_640_000_000_000_000
+        || state[key] > state.observedAt) return null
+    }
+    // Project only closed metadata even if a broken bridge returns extra fields.
+    return { version: 1, sdkLoaded: true, sessionId: state.sessionId, recordingStarted: true,
+      snapshotObserved: true, sessionObservedAt: state.sessionObservedAt,
+      snapshotObservedAt: state.snapshotObservedAt, observedAt: state.observedAt }
+  } catch { return null }
+}
 
 function configuration(ready, env, now) {
   check(env.GITHUB_ACTIONS === 'true' && env.GITHUB_EVENT_NAME === 'workflow_dispatch'
@@ -61,6 +82,8 @@ export async function startObservabilityBrowser({ ready, env = process.env, sign
     freshContext: false, signInAttempted: false, signInResponseCompleted: false, normalSession: false,
     workspaceMatched: false, workspaceSelection: null, officialBusinessResponses: 0, foreignBusinessRequests: 0,
     cloudBackendConfirmed: false, coordinatorSelected: false, cloudDestinationSelected: false, profileMatched: false,
+    replay: { sessionId: null, sdkLoaded: null, recordingStarted: null, snapshotObserved: null,
+      sessionObservedAt: null, snapshotObservedAt: null, checkedAt: null, uploadAcknowledged: null },
     submitClicks: 0, submissionObserved: false, submissionOutcome: 'not_attempted', pageErrorCount: 0,
     cleanup: { status: 'pending', signOutAttempted: false, signOutSucceeded: false, anonymousAfterLogout: false,
       pageClosed: null, contextClosed: null, browserClosed: null, pendingResourcesSettled: null },
@@ -341,6 +364,24 @@ export async function startObservabilityBrowser({ ready, env = process.env, sign
     const submit = dialog.getByRole('button', { name: 'Create task', exact: true })
     await unique(submit)
     check(await run(() => submit.isEnabled()), 'browser_selection_failed')
+    report.stage = 'replay'
+    let replay
+    try {
+      const handle = await run(ms => owned.page.waitForFunction(readReplayReady, undefined, { timeout: ms, polling: 'raf' }))
+      try { replay = readReplayReady(await run(() => handle.jsonValue())) }
+      finally { await run(() => handle.dispose()) }
+      const current = readReplayReady(await run(() => owned.page.evaluate(readReplayReady)))
+      check(replay && current && current.sessionId === replay.sessionId, 'browser_replay_unready')
+      report.replay = { sessionId: current.sessionId, sdkLoaded: true, recordingStarted: true, snapshotObserved: true,
+        sessionObservedAt: new Date(current.sessionObservedAt).toISOString(),
+        snapshotObservedAt: new Date(current.snapshotObservedAt).toISOString(),
+        checkedAt: new Date(current.observedAt).toISOString(), uploadAcknowledged: null }
+    } catch (error) {
+      if (error instanceof ObservabilityBrowserError
+        && ['browser_interrupted', 'browser_expired', 'browser_origin_rejected'].includes(error.code)) throw error
+      throw refusal('browser_replay_unready')
+    }
+    report.stage = 'submit'
     gate(); pageIsOfficial()
     report.submitClicks = 1; report.submissionOutcome = 'unknown'
     // Never retry, even if the click's result is unknown. The driver observes
