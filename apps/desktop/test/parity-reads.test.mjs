@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import vm from 'node:vm'
 import { Window } from 'happy-dom'
 import { captureParityReadReceipts, parityBotReadKeys } from './parity-reads.mjs'
-import { observeReads, pageReady } from './parity-page-ready.mjs'
+import { observeReads, pageReady, selectParityWorkspace, selectWorkspaceMenuItem } from './parity-page-ready.mjs'
 import { compareImages } from './parity-images.mjs'
 
 const ids = { coordinator: 'coordinator-bot', bot: 'bot', coordinatorUser: 'c1', coordinatorReply: 'c2', botUser: 'b1', botReply: 'b2' }
@@ -179,6 +180,142 @@ function artifactPage(t, { reply = true, frameReady = true } = {}) {
 }
 
 const nextTurn = () => new Promise(resolve => setImmediate(resolve))
+
+function workspacePage({ current = false, clickError } = {}) {
+  const document = Promise.withResolvers()
+  const calls = { menu: 0, item: 0, document: 0, menuReady: 0, observedBeforeClick: false }
+  const menu = { first: () => menu, click: async () => { calls.menu++ }, waitFor: async () => { calls.menuReady++ } }
+  const item = { getAttribute: async name => { assert.equal(name, 'aria-current'); return current ? 'true' : null }, click: async () => {
+    calls.item++
+    calls.observedBeforeClick = calls.document === 1
+    if (clickError) throw clickError
+  } }
+  const page = {
+    getByRole: role => { assert.ok(['button', 'menuitem'].includes(role)); return role === 'button' ? menu : item },
+    // Both the old and new documents have this URL and the same ready menu.
+    waitForURL: async predicate => { assert.equal(predicate(new URL('http://localhost:3000/mikka/en')), true) },
+    waitForEvent: event => { assert.equal(event, 'domcontentloaded'); calls.document++; return document.promise },
+  }
+  const start = () => selectParityWorkspace(page, { menuName: 'Workspace', workspaceName: 'Fixture', basePath: '/mikka' })
+  return { calls, document, start }
+}
+
+test('workspace selection waits for the new document even when its URL and old DOM already match', { timeout: 1000 }, async () => {
+  const f = workspacePage()
+  let completed = false
+  const result = f.start().then(() => { completed = true })
+  await nextTurn()
+  assert.equal(completed, false, 'The old matching URL must not complete a real workspace switch')
+  assert.equal(f.calls.observedBeforeClick, true, 'Observe the new document before the single switch click')
+  assert.equal(f.calls.item, 1)
+  assert.equal(f.calls.menuReady, 0)
+  f.document.resolve()
+  await result
+  assert.equal(completed, true)
+  assert.equal(f.calls.menuReady, 1)
+})
+
+test('the already-selected workspace closes its menu once without awaiting a nonexistent navigation', async () => {
+  const f = workspacePage({ current: true })
+  await f.start()
+  assert.equal(f.calls.item, 1)
+  assert.equal(f.calls.document, 0)
+  assert.equal(f.calls.menuReady, 1)
+})
+
+test('workspace selection preserves a failed document wait and never retries the switch', async () => {
+  const f = workspacePage()
+  const failed = new Error('DOCUMENT_LOAD_FAILED')
+  const result = f.start()
+  const rejected = assert.rejects(result, error => error === failed)
+  void rejected.catch(() => {})
+  await nextTurn()
+  if (f.calls.document) f.document.reject(failed)
+  await rejected
+  assert.equal(f.calls.item, 1)
+  assert.equal(f.calls.menuReady, 0)
+})
+
+test('workspace selection preserves click failures while its pending document observer is safely settled', async () => {
+  const failed = new Error('WORKSPACE_CLICK_FAILED')
+  const f = workspacePage({ clickError: failed })
+  await assert.rejects(f.start(), error => error === failed)
+  if (f.calls.document) f.document.reject(new Error('DOCUMENT_LOAD_TIMEOUT'))
+  await nextTurn()
+  assert.equal(f.calls.item, 1)
+  assert.equal(f.calls.menuReady, 0)
+})
+
+// Exercise the actual lifecycle caller without starting Electron, fixtures or
+// a server. The default locale stays unchanged while the document is replaced.
+const lifecycleSource = await readFile(new URL('./lifecycle.mjs', import.meta.url), 'utf8')
+const selectFixtureSource = lifecycleSource.match(/async function selectFixture\(page\) \{[\s\S]*?\n\}/)?.[0]
+assert.ok(selectFixtureSource, 'The lifecycle workspace selector must remain testable')
+function lifecycleWorkspace({ current = false, clickError } = {}) {
+  const f = workspacePage({ current, clickError })
+  let usableReads = 0, readyDocument = current
+  const selected = []
+  const item = { getAttribute: async () => current ? 'true' : null, click: async () => {
+    f.calls.item++
+    f.calls.observedBeforeClick = f.calls.document === 1
+    if (clickError) throw clickError
+  } }
+  const menu = { first: () => menu, click: async () => { f.calls.menu++ } }
+  const page = {
+    waitForFunction: async () => {}, evaluate: async () => 'zh-CN',
+    getByRole: (role, options) => { selected.push({ role, ...options }); return role === 'button' ? menu : item },
+    waitForEvent: event => { assert.equal(event, 'domcontentloaded'); f.calls.document++; return f.document.promise },
+  }
+  const select = vm.runInNewContext(`(${selectFixtureSource})`, {
+    menuNames: { 'zh-CN': 'Workspace' }, fixtures: { fixture: { workspaceName: 'Fixture' } }, selectWorkspaceMenuItem,
+    usable: async () => { usableReads++; if (!readyDocument) throw new Error('Execution context was destroyed, most likely because of a navigation') },
+  })
+  return { ...f, selected, usableReads: () => usableReads, start: () => select(page), loaded: () => { readyDocument = true; f.document.resolve() } }
+}
+
+test('lifecycle workspace selection waits for the switched document before its viewport readiness read', { timeout: 1000 }, async () => {
+  const f = lifecycleWorkspace()
+  const result = f.start()
+  void result.catch(() => {})
+  await nextTurn()
+  assert.equal(f.usableReads(), 0, 'A matching old document cannot begin the lifecycle viewport read')
+  assert.equal(f.calls.observedBeforeClick, true)
+  assert.deepEqual(f.selected.at(-1), { role: 'menuitem', name: 'Fixture', exact: true })
+  f.loaded()
+  assert.equal(await result, 'zh-CN')
+  assert.equal(f.usableReads(), 1)
+  assert.equal(f.calls.item, 1)
+})
+
+test('lifecycle workspace selection keeps the current default-locale document without waiting for navigation', async () => {
+  const f = lifecycleWorkspace({ current: true })
+  assert.equal(await f.start(), 'zh-CN')
+  assert.equal(f.usableReads(), 1)
+  assert.equal(f.calls.document, 0)
+  assert.equal(f.calls.item, 1)
+})
+
+test('lifecycle workspace selection preserves navigation failure before any viewport read', async () => {
+  const f = lifecycleWorkspace()
+  const failed = new Error('DOCUMENT_LOAD_FAILED')
+  const rejected = assert.rejects(f.start(), error => error === failed)
+  void rejected.catch(() => {})
+  await nextTurn()
+  if (f.calls.document) f.document.reject(failed)
+  await rejected
+  assert.equal(f.usableReads(), 0)
+  assert.equal(f.calls.item, 1)
+})
+
+test('lifecycle workspace selection preserves a single click failure and drains its pending observer', async () => {
+  const failed = new Error('WORKSPACE_CLICK_FAILED')
+  const f = lifecycleWorkspace({ clickError: failed })
+  await assert.rejects(f.start(), error => error === failed)
+  if (f.calls.document) f.document.reject(new Error('DOCUMENT_LOAD_TIMEOUT'))
+  await nextTurn()
+  assert.equal(f.usableReads(), 0)
+  assert.equal(f.calls.item, 1)
+})
 
 for (const name of ['artifact-markdown', 'artifact-html']) {
   test(`${name} waits for both visible thread cards, not background or partial matches`, { timeout: 1000 }, async t => {

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import type { DaemonStatus } from '@mikka/protocol/daemon'
 
 import { OFFLINE_DEVICE, toLocalDevice } from './daemon-map'
-import { localSetupController, readLocalDeviceAccount } from './local-setup'
+import { localSetupController, readLocalDeviceAccount, readLocalDeviceOwner } from './local-setup'
 import { SshInstaller, type SshInstallState } from './ssh-install'
 import { localSetupAction } from '../../../../lib/local-device-setup'
 
@@ -69,6 +69,27 @@ test('main reads the current authenticated device account without caching or fol
   assert.equal((await read()).ownerId, 'b')
   signedIn = false
   await assert.rejects(read(), /Sign in/)
+})
+
+test('setup admission reads only the fresh owner while daemon verification still reads devices', async () => {
+  let owner: string | null = 'owner-a'
+  const requests: string[] = []
+  const fetcher = async (url: string, init: RequestInit) => {
+    requests.push(new URL(url).search)
+    assert.equal(init.cache, 'no-store')
+    assert.equal(init.redirect, 'error')
+    if (owner === null) return new Response(null, { status: 401 })
+    return Response.json(new URL(url).search === '?view=owner' ? { ownerId: owner } : { ownerId: owner, deviceIds: ['owned-device'] })
+  }
+  const app = 'https://example.com/mikka/'
+  assert.deepEqual(await readLocalDeviceOwner(fetcher, app), { ownerId: 'owner-a' })
+  owner = 'owner-b'
+  assert.deepEqual(await readLocalDeviceOwner(fetcher, app), { ownerId: 'owner-b' })
+  assert.deepEqual(await readLocalDeviceAccount(fetcher, app), { ownerId: 'owner-b', deviceIds: ['owned-device'] })
+  owner = null
+  await assert.rejects(readLocalDeviceOwner(fetcher, app), /Sign in/)
+  assert.deepEqual(requests, ['?view=owner', '?view=owner', '', '?view=owner'])
+  await assert.rejects(readLocalDeviceOwner(async () => Response.json({ deviceIds: [] }), app))
 })
 
 test('the bridge setup follows A→B→A in one process, preserves a workspace switch, and only reports owned devices online', async () => {

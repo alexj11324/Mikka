@@ -4,6 +4,7 @@
     "interval": "每 {minutes} 分钟"
   },
   "Common": {
+    "privacyPolicy": "隐私政策",
     "appUpdated": "Mikka 已更新",
     "refresh": "刷新",
     "close": "关闭",
