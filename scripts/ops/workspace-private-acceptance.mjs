@@ -9,16 +9,16 @@ import { pathToFileURL } from 'node:url'
 import { assertOpsContext } from './self-hosted-ingress-probe.mjs'
 
 export const P0 = Object.freeze({
-  source: '37b0e55ddfca6646bc3beea7531048e6e63331c1',
-  tree: '2167f94b74c1ede4b8d37054fb407a462c0b470d',
-  workerSha: '0537b0c49fe197240632ec7c74875c3af0c53260',
+  source: '4e40fba5768a6bcc1341b7638cf6f04f09a0191a',
+  tree: 'a5647074e85709cb5950e5c3ed82e86d96831cf4',
+  workerSha: '53cf8c2af0d6fd9df0cdc7758930ac0eaa5982fc',
   sdks: { nodeMajor: '24', pnpm: '10.34.3', javascriptE2b: '2.61.0', pythonE2b: '2.62.0', next: '16.4.1' },
   files: {
     'package.json': 'c56b9a7aab200373926c23b914111825b5293efb8fae80b85fe4f16682cc020d',
     'pnpm-lock.yaml': '345a6e1d97bb3a0028497f3294a86944bc9f617af892de71990d40d2cdf36054',
     'pnpm-workspace.yaml': '8977ce9916b92a015e0f4dad1d45bcf51c9427637a5988fcdc585a1a21a0301e',
-    'scripts/e2b/workspace-candidates.py': '5de2fc0d65e453802455bb1863c6a12fa9643306710b85575d51bdfadd6990ee',
-    'scripts/e2b/workspace-candidates.test.py': 'a170f525403a4c934774e27ce8bd1fceee72f0af2165974d69d239452d0245fd',
+    'scripts/e2b/workspace-candidates.py': 'a8f545db1ce50954231215f95a0cfb7bb78ee9728c9ccf9c69c28b1eaa884311',
+    'scripts/e2b/workspace-candidates.test.py': '59af23d4d0677fdb4c5a445682c728704a371b25694ddd1fe940e93d79670d18',
     'scripts/e2b/build-template.py': 'efe0a20a73749a06b4e2f20fb4b1c8a1bd99a7b7a4fdae961fee9d410b424d85',
     'scripts/e2b/build-template.test.py': '78e367541f0e6441c60944b107b179b78a75ea754bee0d729df0aa9f5bd4749e',
     'scripts/e2b/official-files.py': '6191212b14205c7cb8043efcfb85eaff05670f8cb65c4c801052cf9d3a28babe',
@@ -101,6 +101,13 @@ const CLEANUP_OUTCOMES = ['creation_not_requested', 'no_creation_journal', 'crea
 const FRAMEWORK_FLAGS = ['rawDenied', 'authenticatedHttp', 'assets', 'hotReload', 'crossSiteBootstrap', 'revoked', 'takeoverDenied']
 const FRAMEWORK_VERSIONS = { next: '16.4.1', vite: '8.3.6', react: '19.3.1', 'react-dom': '19.3.1' }
 const exitCode = number => Number.isInteger(number) && number >= -255 && number <= 255 ? number : null
+const DEBUG_FAILURE_CODES = ['journal_refused', 'request_failed', 'request_timeout', 'worker_failed', 'body_limit',
+  'response_refused', 'http_error', 'unauthorized', 'forbidden', 'not_found', 'not_terminal', 'status_changed', 'time_limit', 'page_limit']
+const DEBUG_REASON_CATEGORIES = ['configuration_failed', 'ready_failed', 'ready_timeout', 'start_confirmation_failed',
+  'start_failed', 'process_start_failed', 'sync_failed', 'deadline_exceeded']
+const debugCategories = value => [...new Set((Array.isArray(value) ? value.slice(0, 8) : [])
+  .filter(code => DEBUG_REASON_CATEGORIES.includes(code)))].sort()
+const debugCount = (value, maximum) => count(value) !== null && value <= maximum ? value : null
 
 function diagnosticException(value) {
   return {
@@ -115,16 +122,27 @@ function diagnosticException(value) {
 function buildStatusLookup(value) {
   if (!value || typeof value !== 'object') return null
   const matched = value.identityMatched === true
+  const requests = debugCount(value.requests, 6), pages = debugCount(value.pages, 6), entries = debugCount(value.entries, 600)
+  const limits = { pages: 6, entriesPerPage: 100, totalSeconds: 90, requestSeconds: 15 }
+  const bounded = Object.entries(limits).every(([key, expected]) => value.limits?.[key] === expected)
   return { attempted: value.attempted === true, identityMatched: matched,
+    outcome: one(value.outcome, ['available', 'partial', 'unavailable'], null),
+    complete: matched && bounded && value.complete === true && value.outcome === 'available' && !value.failure
+      && ['ready', 'error'].includes(value.status) && requests >= 1 && pages >= 1 && requests >= pages
+      && entries !== null && entries >= (pages - 1) * 100 && entries < pages * 100,
+    requests, pages, entries, limits: bounded ? limits : null,
     status: matched ? one(value.status, ['building', 'waiting', 'ready', 'error'], null) : null,
     step: { phase: matched ? one(value.step?.phase, ['base', 'workdir', 'private_directory', 'copy_runtime', 'official_capture',
       'bootstrap', 'npm_runtime', 'official_verify', 'worker_user', 'finalize', 'unknown']) : null,
     index: matched ? count(value.step?.index) : null },
     exitCode: matched ? exitCode(value.exitCode) : null,
     exitCodeSource: matched && exitCode(value.exitCode) !== null ? one(value.exitCodeSource, ['provider_reason'], null) : null,
+    categories: matched ? debugCategories(value.categories) : [],
     reasonLogEntries: matched ? count(value.reasonLogEntries) : null,
     reasonLogEntriesTruncated: value.reasonLogEntriesTruncated === true,
-    failure: value.failure ? diagnosticException(value.failure) : null }
+    debugLogs: matched ? debugBuildLogs(value.debugLogs) : null,
+    failure: value.failure ? { code: one(value.failure.code, DEBUG_FAILURE_CODES, null),
+      httpStatus: status(value.failure.httpStatus), ...diagnosticException(value.failure) } : null }
 }
 
 function ingressCommand(value) {
@@ -143,28 +161,47 @@ function ingressCommand(value) {
     extension, revision, unsupportedExtensions }
 }
 
-function buildDiagnostic(value) {
-  if (!value || typeof value !== 'object') return null
-  const events = rows => (Array.isArray(rows) ? rows.slice(0, 64) : []).flatMap(row => {
+function buildEvents(rows, debug = false) {
+  const values = (Array.isArray(rows) ? rows.slice(0, 64) : []).flatMap(row => {
+    let event
     switch (row?.phase) {
-      case 'template_created': return [{ phase: row.phase }]
-      case 'bootstrap': return [{ phase: row.phase, detail: one(row.detail, BOOTSTRAP_PHASES), elapsedMs: count(row.elapsedMs) }]
+      case 'template_created': event = { phase: row.phase }; break
+      case 'bootstrap': event = { phase: row.phase, detail: one(row.detail, BOOTSTRAP_PHASES), elapsedMs: count(row.elapsedMs) }; break
       case 'ingress': {
         const command = row.detail === 'command' ? ingressCommand(row.command) : null
-        return [{ phase: row.phase, detail: one(row.detail, INGRESS_DETAILS), ...(command ? { command } : {}) }]
+        event = { phase: row.phase, detail: one(row.detail, INGRESS_DETAILS), ...(command ? { command } : {}) }; break
       }
-      case 'host_failure': return [{ phase: row.phase, detail: one(row.detail, BUILD_HOST_ERRORS) }]
-      case 'official_capture': return [{ phase: row.phase, entries: count(row.entries) }]
+      case 'host_failure': event = { phase: row.phase,
+        detail: one(row.detail, debug ? [...BUILD_HOST_ERRORS, 'anonymous_worker_unavailable'] : BUILD_HOST_ERRORS) }; break
+      case 'official_capture': event = { phase: row.phase, entries: count(row.entries) }; break
+      case 'ready_rejected':
+        if (!debug) return []
+        event = { phase: row.phase, categories: debugCategories(row.categories), exitCode: exitCode(row.exitCode) }; break
       default: return []
     }
+    return [{ ...event, ...(debug ? { count: count(row.count) } : {}) }]
   })
+  return values
+}
+
+function debugBuildLogs(value) {
+  if (!value || typeof value !== 'object') return null
+  return { entries: debugCount(value.entries, 1200), ignoredLines: count(value.ignoredLines),
+    oversizedEntries: debugCount(value.oversizedEntries, 1200), truncated: value.truncated === true,
+    levels: Object.fromEntries(['debug', 'info', 'warn', 'error'].map(level => [level, debugCount(value.levels?.[level], 1200)])),
+    signals: { ...flags(value.signals, ['startAnnounced', 'readyAnnounced', 'templateReady']),
+      readyRejected: count(value.signals?.readyRejected) }, events: buildEvents(value.events, true) }
+}
+
+function buildDiagnostic(value) {
+  if (!value || typeof value !== 'object') return null
   return {
     ...diagnosticException(value),
     statusLookup: buildStatusLookup(value.statusLookup),
     buildLogs: Object.fromEntries(KINDS.filter(kind => value.buildLogs?.[kind]).map(kind => {
       const row = value.buildLogs[kind]
       return [kind, { entries: count(row.entries), ignoredLines: count(row.ignoredLines), oversizedEntries: count(row.oversizedEntries),
-        truncated: row.truncated === true, events: events(row.events) }]
+        truncated: row.truncated === true, events: buildEvents(row.events) }]
     })),
   }
 }

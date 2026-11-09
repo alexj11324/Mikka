@@ -1,4 +1,4 @@
-name: Read-only private Coding Workspace build diagnosis
+name: Private Coding Workspace candidate acceptance
 on:
   push:
     branches: [ops/self-hosted-vault-closeout-20261108]
@@ -9,17 +9,19 @@ concurrency:
   cancel-in-progress: false
   queue: max
 jobs:
-  private_build_diagnostic:
-    name: Read only the exact already-deleted Claude build
+  private_candidates:
+    name: Exact private Claude and Codex review runtimes
     if: github.repository == 'alexj11324/Mikka' && github.actor == 'alexj11324' && github.ref == 'refs/heads/ops/self-hosted-vault-closeout-20261108'
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 75
     permissions:
       contents: read
       actions: read
       id-token: write
     env:
-      P0_SOURCE: 37b0e55ddfca6646bc3beea7531048e6e63331c1
+      P0_SOURCE: 4e40fba5768a6bcc1341b7638cf6f04f09a0191a
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
       PYTHONDONTWRITEBYTECODE: '1'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -31,20 +33,44 @@ jobs:
         timeout-minutes: 2
         with:
           repository: alexj11324/Mikka
-          ref: 37b0e55ddfca6646bc3beea7531048e6e63331c1
+          ref: 4e40fba5768a6bcc1341b7638cf6f04f09a0191a
           path: workspace-acceptance-source
           persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        timeout-minutes: 1
+        with:
+          version: 10.34.3
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         timeout-minutes: 1
         with:
           node-version: 24
-      - name: Check fixed read-only request and closed-evidence boundaries
+      - name: Verify the real Ops subject and exact public source before installation
         timeout-minutes: 1
-        run: node --test scripts/ops/workspace-private-acceptance.test.mjs
-      - name: Verify the actual Ops subject and exact public source before credentials
+        run: node scripts/ops/workspace-private-acceptance.mjs check workspace-acceptance-source
+      - name: Install the complete frozen candidate dependencies
+        timeout-minutes: 6
+        working-directory: workspace-acceptance-source
+        run: pnpm install --frozen-lockfile
+      - name: Install the existing release Python SDK
+        timeout-minutes: 2
+        run: |
+          python3 -m venv "$RUNNER_TEMP/e2b-private"
+          "$RUNNER_TEMP/e2b-private/bin/pip" install --disable-pip-version-check 'e2b==2.62.0'
+      - name: Check fixed candidate, driver and cleanup boundaries before credentials
+        timeout-minutes: 3
+        run: |
+          node --test scripts/ops/workspace-private-acceptance.test.mjs
+          cd workspace-acceptance-source
+          node --test scripts/e2b/workspace-ingress-acceptance.test.mjs scripts/e2b/workspace-terminal-acceptance.test.mjs
+          python3 scripts/e2b/workspace-candidates.test.py
+          python3 scripts/e2b/build-template.test.py
+          python3 scripts/e2b/official-files.test.py
+          python3 scripts/e2b/cleanup-template-candidates.test.py
+          bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh scripts/e2b/start-prebuilt.sh
+      - name: Recheck clean source, entry hashes and installed SDK versions
         id: source
         timeout-minutes: 1
-        run: node scripts/ops/workspace-private-acceptance.mjs diagnostic-check workspace-acceptance-source
+        run: node scripts/ops/workspace-private-acceptance.mjs dependencies workspace-acceptance-source
       - name: Read only the existing E2B workload credential
         id: credential
         timeout-minutes: 1
@@ -59,17 +85,58 @@ jobs:
           secret-name: E2B_API_KEY
           recursive: false
           include-imports: false
-      - name: Read bounded debug pages for the exact historical build
-        timeout-minutes: 2
+      - name: Build two private 2 CPU 4 GiB candidates with a cleanup reserve
+        id: build
+        timeout-minutes: 32
+        working-directory: workspace-acceptance-source
         run: >-
-          timeout --signal=TERM --kill-after=5s 100s
-          node scripts/ops/workspace-private-acceptance.mjs diagnose workspace-acceptance-source
-      - name: Retain only closed source and diagnostic evidence
+          timeout --signal=TERM --kill-after=1m 30m
+          "$RUNNER_TEMP/e2b-private/bin/python" scripts/e2b/workspace-candidates.py build
+          --source-ref "$P0_SOURCE" --output "$RUNNER_TEMP/workspace-private/candidates"
+      - name: Accept HTTP HMR PTY and full-memory resume on serial owned VMs
+        id: acceptance
+        timeout-minutes: 13
+        working-directory: workspace-acceptance-source
+        run: >-
+          timeout --signal=TERM --kill-after=30s 12m
+          node scripts/e2b/workspace-ingress-acceptance.mjs
+          --candidates "$RUNNER_TEMP/workspace-private/candidates/candidates.json"
+          --output "$RUNNER_TEMP/workspace-private/runtime"
+      - name: Always reconcile only this run's exact runtime VM journals
+        id: vm_cleanup
+        if: always() && steps.source.outcome == 'success' && steps.credential.outcome == 'success' && steps.build.outcome != 'skipped'
+        timeout-minutes: 3
+        working-directory: workspace-acceptance-source
+        run: >-
+          timeout --signal=TERM --kill-after=15s 2m
+          node scripts/e2b/workspace-ingress-acceptance.mjs
+          --cleanup "$RUNNER_TEMP/workspace-private/runtime"
+          --output "$RUNNER_TEMP/workspace-private/runtime/cleanup.json"
+      - name: Always clean this run's private templates and builder VMs
+        id: template_cleanup
+        if: always() && steps.source.outcome == 'success' && steps.credential.outcome == 'success' && steps.build.outcome != 'skipped'
+        timeout-minutes: 5
+        working-directory: workspace-acceptance-source
+        run: >-
+          timeout --signal=TERM --kill-after=15s 4m
+          "$RUNNER_TEMP/e2b-private/bin/python" scripts/e2b/workspace-candidates.py cleanup
+          --source-ref "$P0_SOURCE" --output "$RUNNER_TEMP/workspace-private/candidates"
+      - name: Bind closed evidence to both sources and preserve all failed cases
+        id: verdict
+        if: always() && steps.source.outcome == 'success'
+        timeout-minutes: 1
+        env:
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          ACCEPTANCE_OUTCOME: ${{ steps.acceptance.outcome }}
+          VM_CLEANUP_OUTCOME: ${{ steps.vm_cleanup.outcome }}
+          TEMPLATE_CLEANUP_OUTCOME: ${{ steps.template_cleanup.outcome }}
+        run: node scripts/ops/workspace-private-acceptance.mjs verdict workspace-acceptance-source
+      - name: Retain only closed source evidence reports and journals
         if: always()
         timeout-minutes: 1
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: private-workspace-build-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/workspace-private-diagnostic/evidence/*.json
+          name: private-workspace-candidates-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/workspace-private/evidence/*.json
           retention-days: 14
           if-no-files-found: warn

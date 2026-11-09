@@ -275,6 +275,62 @@ test('a failed status lookup preserves the original failure and only exact-ident
   assert.equal(JSON.stringify(result).includes(privateText), false)
 })
 
+test('pre-cleanup debug evidence preserves bounded pages and closed reasons without promoting a build failure', () => {
+  const value = fixtureReceipts(), secret = 'private-debug-sdk-url-header-key-and-body'
+  const lookup = { attempted: true, identityMatched: true, status: 'error', step: { phase: 'finalize', index: null },
+    complete: true, outcome: 'available', requests: 2, pages: 2, entries: 103,
+    limits: { pages: 6, entriesPerPage: 100, totalSeconds: 90, requestSeconds: 15, secret },
+    categories: ['ready_failed', 'ready_timeout', 'ready_failed', secret], exitCode: 1, exitCodeSource: 'provider_reason',
+    reasonLogEntries: 0, reasonLogEntriesTruncated: false, failure: null, secret,
+    debugLogs: { entries: 103, ignoredLines: 100, oversizedEntries: 0, truncated: false, secret,
+      levels: { debug: 102, info: 1, warn: 0, error: 0, [secret]: 1 },
+      signals: { startAnnounced: true, readyAnnounced: true, templateReady: false, readyRejected: 2, secret },
+      events: [{ phase: 'ingress', detail: 'worker_order', count: 1, secret },
+        { phase: 'host_failure', detail: 'anonymous_worker_unavailable', count: 1, secret },
+        { phase: 'ready_rejected', categories: ['ready_timeout', secret], exitCode: null, count: 2, secret }] } }
+  value.buildReport = { identity, status: 'failed', stage: 'build_claude', code: 'template_build_failed',
+    diagnostic: { exceptionChain: [{ type: 'BuildException', code: 'template_build_failed' }], statusLookup: lookup } }
+  let result = summarizeAcceptance(context, value), projected = result.build.diagnostic.statusLookup
+  assert.equal(result.passed, false)
+  assert.equal(result.build.code, 'template_build_failed')
+  assert.equal(projected.complete, true)
+  assert.deepEqual([projected.requests, projected.pages, projected.entries], [2, 2, 103])
+  assert.deepEqual(projected.categories, ['ready_failed', 'ready_timeout'])
+  assert.deepEqual(projected.debugLogs.events, [
+    { phase: 'ingress', detail: 'worker_order', count: 1 },
+    { phase: 'host_failure', detail: 'anonymous_worker_unavailable', count: 1 },
+    { phase: 'ready_rejected', categories: ['ready_timeout'], exitCode: null, count: 2 },
+  ])
+  assert.equal(projected.debugLogs.signals.readyRejected, 2)
+  assert.equal(JSON.stringify(result).includes(secret), false)
+  for (const failure of [{ code: 'request_timeout', httpStatus: null }, { code: 'not_found', httpStatus: 400 },
+    { code: 'status_changed', httpStatus: null }]) {
+    lookup.failure = { ...failure, message: secret, exceptionChain: [{ type: 'ReadTimeout', code: 'operation_timeout', message: secret }] }
+    lookup.outcome = 'partial'; lookup.complete = false
+    result = summarizeAcceptance(context, value); projected = result.build.diagnostic.statusLookup
+    assert.equal(projected.complete, false)
+    assert.equal(projected.failure.code, failure.code)
+    assert.equal(projected.failure.httpStatus, failure.httpStatus)
+    assert.equal(projected.failure.exceptionChain[0].type, 'ReadTimeout')
+    assert.equal(JSON.stringify(result).includes(secret), false)
+  }
+})
+
+test('incomplete or unverified debug metadata cannot claim a complete historical read', () => {
+  const value = fixtureReceipts(), secret = 'private-untrusted-debug-result'
+  const base = { attempted: true, identityMatched: true, status: 'error', complete: true, outcome: 'available',
+    requests: 1, pages: 1, entries: 2, limits: { pages: 6, entriesPerPage: 100, totalSeconds: 90, requestSeconds: 15 },
+    failure: null, debugLogs: { events: [{ phase: secret, count: 1 }] } }
+  for (const change of [{ identityMatched: false }, { status: 'building' }, { failure: { code: 'not_terminal' } },
+    { pages: 7 }, { entries: 601 }, { limits: { ...base.limits, totalSeconds: 91 } }, { outcome: 'partial' }]) {
+    value.buildReport = { identity, status: 'failed', stage: 'build_claude', code: 'template_build_failed',
+      diagnostic: { statusLookup: { ...base, ...change } } }
+    const result = summarizeAcceptance(context, value)
+    assert.equal(result.build.diagnostic.statusLookup.complete, false)
+    assert.equal(JSON.stringify(result).includes(secret), false)
+  }
+})
+
 function diagnosticPage(entries = [], reason = null, extra = {}) {
   return { templateID: FINALIZE_DIAGNOSTIC.templateId, buildID: FINALIZE_DIAGNOSTIC.buildId,
     status: 'error', logs: [], logEntries: entries, reason, ...extra }
@@ -422,23 +478,26 @@ test('provider body, error and command text never escape diagnostic failures', a
   assert.equal(result.failure.code, 'credential_missing')
 })
 
-test('the temporary diagnostic carrier keeps the original trust and cannot allocate or mutate resources', () => {
+test('workflow retains the original sole credential and gives cleanup time outside the production lane', () => {
   const workflow = readFileSync(new URL('../../.github/workflows/self-hosted-vault-closeout.yml', import.meta.url), 'utf8')
   assert.match(workflow, /branches: \[ops\/self-hosted-vault-closeout-20261108\]/)
   assert.match(workflow, /group: coding-workspace-private-candidates/)
   assert.doesNotMatch(workflow, /production-smoke-owner-acceptance|workflow_dispatch:|pull_request:|SMOKE_OWNER|publish-verified|(?:GITHUB_SHA|GITHUB_REF)=/)
+  assert.doesNotMatch(workflow, /workspace-private-acceptance\.mjs (?:diagnostic-check|diagnose)\b/)
   assert.doesNotMatch(workflow, /(?:contents|actions): write|secrets: inherit/)
   assert.deepEqual([...workflow.matchAll(/^\s+secret-name: (.+)$/gm)].map(match => match[1]), ['E2B_API_KEY'])
   for (const exact of ['identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac', 'oidc-audience: mikka-infisical',
     'project-id: 89850d6a-f020-4936-863e-df77380dfe40', 'secret-path: /vercel', 'env-slug: prod',
     'recursive: false', 'include-imports: false', `P0_SOURCE: ${P0.source}`, `ref: ${P0.source}`]) assert.ok(workflow.includes(exact))
   assert.equal(workflow.split(P0.source).length - 1, 2)
-  assert.ok(workflow.indexOf('mjs diagnostic-check workspace-acceptance-source') < workflow.indexOf('uses: Infisical/secrets-action'))
-  assert.doesNotMatch(workflow, /workspace-candidates\.py|workspace-ingress-acceptance\.mjs|--cleanup|e2b-private\/bin/)
-  assert.match(workflow, /timeout --signal=TERM --kill-after=5s 100s/)
-  assert.match(workflow, /mjs diagnose workspace-acceptance-source/)
-  assert.match(workflow, /path: \$\{\{ runner.temp \}\}\/workspace-private-diagnostic\/evidence\/\*\.json/)
+  assert.ok(workflow.indexOf('mjs dependencies workspace-acceptance-source') < workflow.indexOf('uses: Infisical/secrets-action'))
+  assert.ok(workflow.indexOf('id: vm_cleanup') < workflow.indexOf('id: template_cleanup'))
+  assert.equal([...workflow.matchAll(/if: always\(\) && steps.source.outcome == 'success' && steps.credential.outcome == 'success' && steps.build.outcome != 'skipped'/g)].length, 2)
+  assert.match(workflow, /pnpm install --frozen-lockfile/)
+  assert.match(workflow, /timeout --signal=TERM --kill-after=1m 30m/)
+  assert.match(workflow, /timeout --signal=TERM --kill-after=30s 12m/)
+  assert.match(workflow, /path: \$\{\{ runner.temp \}\}\/workspace-private\/evidence\/\*\.json/)
   const timeouts = [...workflow.matchAll(/^\s+timeout-minutes: (\d+)$/gm)].map(match => Number(match[1]))
-  assert.equal(timeouts[0], 12)
-  assert.ok(timeouts.slice(1).reduce((sum, value) => sum + value, 0) <= 12)
+  assert.equal(timeouts[0], 75)
+  assert.ok(timeouts.slice(1).reduce((sum, value) => sum + value, 0) <= 75, 'step ceilings must leave cleanup inside the job limit')
 })
