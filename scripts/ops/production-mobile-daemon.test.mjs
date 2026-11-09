@@ -204,7 +204,14 @@ function fixture(options = {}) {
     assert.equal(headers.get('authorization'), 'Bearer ' + CREDENTIAL)
     // The actual repository HttpServerLink supplies these; no fake client implementation.
     assert.equal(headers.get('x-mikka-client-version'), '0.0.1')
-    if (tokenRows.find(row => row.id === NEW_TOKEN)?.revokedAt) return response({ error: 'Unauthorized' }, 401)
+    if (tokenRows.find(row => row.id === NEW_TOKEN)?.revokedAt) {
+      if (options.rejectedCredentialTransportFailure) throw new Error('transport-error-' + CREDENTIAL)
+      if (options.rejectedCredentialReply) {
+        const { body: failure, status } = options.rejectedCredentialReply
+        return typeof failure === 'string' ? new Response(failure, { status }) : response(failure, status)
+      }
+      return response({ error: 'Unauthorized' }, 401)
+    }
     if (path === '/mikka/v1/devices/register') {
       assert.equal(body.daemonVersion, '0.0.1')
       assert.equal(body.protocolVersion, 3)
@@ -344,6 +351,51 @@ test('device removal failure records its own RPC response rather than the prior 
   assert.equal(report.cleanup.oldCredentialRejected, true)
   assert.equal(report.cleanup.deviceRemoved, false)
   assert.equal(report.cleanup.sessionClosed, true)
+  noSensitiveReport(report)
+})
+
+test('post-revoke credential probe records its own JSON failure instead of the successful revoke reply', async () => {
+  const f = fixture({ rejectedCredentialReply: { status: 503, body: { error: 'internal_error', message: CREDENTIAL, cookie: COOKIE } } })
+  const report = await f.run(), failure = report.errors.find(row => row.phase === 'cleanup-credential')
+  assert.equal(failure.code, 'credential_still_admitted')
+  assert.deepEqual(failure.http, { operation: 'devices.repos', method: 'GET', status: 503,
+    body: { error: 'internal_error', message: '[redacted]', redactedFields: 1 } })
+  assert.equal(report.cleanup.credentialRevoked, true)
+  assert.equal(report.cleanup.oldCredentialRejected, false)
+  assert.equal(f.removed, false)
+  noSensitiveReport(report)
+})
+
+test('post-revoke non-JSON response retains its status and size without consuming the client response', async () => {
+  const body = '<html>' + CREDENTIAL + COOKIE + '</html>'
+  const f = fixture({ rejectedCredentialReply: { status: 502, body } })
+  const report = await f.run(), failure = report.errors.find(row => row.phase === 'cleanup-credential')
+  assert.deepEqual(failure.http, { operation: 'devices.repos', method: 'GET', status: 502,
+    body: { format: 'non-json', bytes: Buffer.byteLength(body) } })
+  assert.equal(report.cleanup.credentialRevoked, true)
+  assert.equal(report.cleanup.oldCredentialRejected, false)
+  assert.equal(f.removed, false)
+  noSensitiveReport(report)
+})
+
+test('post-revoke admitted credential records the repos 200 rather than the prior revoke 200', async () => {
+  const f = fixture({ rejectedCredentialReply: { status: 200, body: { repos: [] } } })
+  const report = await f.run(), failure = report.errors.find(row => row.phase === 'cleanup-credential')
+  assert.equal(failure.code, 'credential_still_admitted')
+  assert.deepEqual(failure.http, { operation: 'devices.repos', method: 'GET', status: 200, body: { redactedFields: 1 } })
+  assert.equal(report.cleanup.credentialRevoked, true)
+  assert.equal(report.cleanup.oldCredentialRejected, false)
+  assert.equal(f.removed, false)
+  noSensitiveReport(report)
+})
+
+test('post-revoke transport failure clears the successful revoke HTTP response', async () => {
+  const f = fixture({ rejectedCredentialTransportFailure: true })
+  const report = await f.run(), failure = report.errors.find(row => row.phase === 'cleanup-credential')
+  assert.deepEqual(failure.http, { operation: 'devices.repos', method: 'GET', status: null, body: { format: 'unavailable' } })
+  assert.equal(report.cleanup.credentialRevoked, true)
+  assert.equal(report.cleanup.oldCredentialRejected, false)
+  assert.equal(f.removed, false)
   noSensitiveReport(report)
 })
 

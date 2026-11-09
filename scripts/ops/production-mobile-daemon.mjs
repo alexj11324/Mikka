@@ -285,8 +285,19 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
         || (method === 'GET' && url.pathname === BASE + '/v1/devices/' + target + '/repos'))
       && headers.get('authorization') === 'Bearer ' + credential && !headers.has('cookie')
       && headers.get('x-mikka-client-version') === contract.version, 'request_rejected')
+    const cleanupHttp = phase.startsWith('cleanup-') && method === 'GET'
+      && url.pathname === BASE + '/v1/devices/' + target + '/repos'
+      ? { operation: 'devices.repos', method, status: null, body: { format: 'unavailable' } } : undefined
+    if (cleanupHttp) cleanupResponse = { phase, http: cleanupHttp }
     report.requests.device++
-    return fetchImpl(input, init)
+    const response = await fetchImpl(input, init)
+    if (cleanupHttp) {
+      cleanupHttp.status = response.status
+      // Keep the original body for the real repository client's status and
+      // contract handling. An unreadable clone still retains this HTTP status.
+      try { await json(response.clone(), cleanupHttp) } catch { /* diagnostic body already projected */ }
+    }
+    return response
   }
   async function locateDevice() {
     const rows = await devices()
