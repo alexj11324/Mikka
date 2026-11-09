@@ -1,9 +1,7 @@
 import { withDeviceRoute } from '@/lib/device-route'
 import { NextResponse } from 'next/server'
-import { and, eq } from 'drizzle-orm'
-import { db } from '@/lib/db'
-import { agentRuns } from '@/lib/db/schema'
-import { authenticateDevice, ownedDevice } from '@/lib/device-link'
+import { readUnderDeviceAuthority } from '@/lib/db'
+import { authenticateDevice } from '@/lib/device-link'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,15 +10,14 @@ async function handleGET(request: Request, { params }: { params: Promise<{ devic
   const caller = await authenticateDevice(request)
   if (!caller) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { deviceId } = await params
-  const device = await ownedDevice(deviceId, caller.userId)
-  if (!device) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
+  // Credential, current ownership and queued work share one read snapshot.
   // A device with scheduling off gets no work; it stays registered.
-  if (!device.enabled) return NextResponse.json({ runIds: [] })
-  const rows = await db
-    .select({ id: agentRuns.id })
-    .from(agentRuns)
-    .where(and(eq(agentRuns.deviceId, deviceId), eq(agentRuns.status, 'queued')))
-  return NextResponse.json({ runIds: rows.map(row => row.id) })
+  const result = await readUnderDeviceAuthority<{ runIds: string[] } | null>(`SELECT json_build_object('runIds',
+    CASE WHEN d.enabled THEN COALESCE((SELECT json_agg(r.id) FROM agent_runs r
+      WHERE r."deviceId"=d.id AND r.status=$3), '[]'::json) ELSE '[]'::json END)
+    FROM devices d WHERE d.id=$1 AND d."ownerId"=$2 AND d."removedAt" IS NULL`, [deviceId, caller.userId, 'queued'])
+  if (!result) return NextResponse.json({ error: 'Unknown device.' }, { status: 404 })
+  return NextResponse.json(result)
 }
 
 export const GET = withDeviceRoute(handleGET)
