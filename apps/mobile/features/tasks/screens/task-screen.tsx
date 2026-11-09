@@ -7,6 +7,7 @@ import { CalendarClock, ChevronRight, Sparkles } from 'lucide-react-native'
 import { BotAvatar, MachineIcon, Spinner } from '@/components/icons'
 import { Markdown } from '@/components/Markdown'
 import { NavBar, underBar } from '@/components/NavBar'
+import { useScrolledUnderBar } from '@/components/BarBackdrop'
 import { ReadNotice } from '@/components/ReadNotice'
 import { Text } from '@/components/Text'
 import { GlassButton } from '@/components/GlassButton'
@@ -38,6 +39,7 @@ export function TaskScreen() {
   const { id, attempt } = useLocalSearchParams<{ id: string; attempt?: string }>()
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  const bar = useScrolledUnderBar()
   const home = useHome().data
   const { data, error, loading, reload } = useLiveApi<TaskDetail>(`/api/mobile/tasks/${id}`, () => tasksLive(home?.live?.workspaceId, home?.workspace.id))
   const task = data?.task
@@ -57,8 +59,8 @@ export function TaskScreen() {
 
   return (
     <View style={styles.screen}>
-      <NavBar />
-      <ScrollView {...underBar} contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 96 }]}>
+      <NavBar scrolled={bar.scrolled} />
+      <ScrollView {...underBar} onScroll={bar.onScroll} scrollEventThrottle={16} contentContainerStyle={[styles.body, { paddingBottom: insets.bottom + 96 }]}>
         <ReadNotice error={error} hasData={Boolean(data)} label={mobileMessages.Nav.tasks} onRetry={reload} />
         {loading && !data ? <View style={styles.center}><Spinner /></View> : null}
         {task ? (

@@ -105,6 +105,7 @@
       "privateHint": "Only you can see it at first; invite members after creating it"
     },
     "list": {
+      "clearFilters": "Clear filters",
       "label": "Task list",
       "noResults": "No matching tasks",
       "emptyTitle": "No tasks yet",
@@ -177,10 +178,16 @@
     "openBotChat": "Open Bot chat",
     "archivedConversation": "Archived: {title}",
     "suggestions": "Suggestions",
-    "artifacts": "Artifact",
+    "artifacts": "Artifacts",
     "cardPreview": "[Card]"
   },
   "Plugins": {
+    "ownDescription": {
+      "github": "Repositories, pull requests and issues",
+      "linear": "Issues and projects",
+      "telegram": "Talk to your bots in Telegram"
+    },
+    "unavailable": "Unavailable",
     "title": "Plugins",
     "appsTab": "Apps",
     "skillsTab": "Skills",
@@ -778,6 +785,7 @@
     "editorAria": "{label} editor"
   },
   "Devices": {
+    "scheduledOffline": "Scheduled · runs when back online",
     "otherDevices": "Servers",
     "menu": "More for {name}",
     "add": {
@@ -981,6 +989,7 @@
   },
   "Workspace": {
     "loadingEditor": "Loading task editor",
+    "loading": "Loading…",
     "loadingCreate": "Loading new task…",
     "signOutFailed": "Sign out failed. Please try again.",
     "allIssues": "All tasks",
@@ -1202,7 +1211,7 @@
     "workspaceAccessDenied": "You do not have permission to manage this workspace, or your membership is suspended.",
     "workspaceNotFound": "No accessible workspace.",
     "workspacePaymentTaken": "Another member's card already pays for this team.",
-    "workspacePersonal": "A personal workspace has only you. To invite people, create a team workspace.",
+    "workspacePersonal": "A personal workspace has only you. To invite people, create a shared workspace.",
     "workspacePersonalDelete": "A personal workspace cannot be deleted.",
     "workspaceMemberExists": "One of these emails is already a workspace member. Manage or restore them in the member list.",
     "workspaceMemberNotFound": "This member does not exist.",
@@ -1270,7 +1279,7 @@
     "dataExportRateLimited": "You can export your data once an hour. Try again in {minutes} min.",
     "accountEmailMismatch": "The email doesn’t match this account.",
     "accountSoleAdmin": "You’re the only admin of {workspaces}. Make another member an admin before deleting your account.",
-    "runChainEnded": "Every attempt of this thread has already ended; there is nothing left to stop.",
+    "runChainEnded": "This task has already stopped; there is nothing left to stop.",
     "threadStopping": "The thread is stopping",
     "secretNotFound": "That secret or variable no longer exists.",
     "secretNameReserved": "This name is reserved by the runtime (for example PATH, HOME, proxy, TLS, loader, git, E2B or MIKKA variables). Choose another name.",
@@ -1724,6 +1733,8 @@
     }
   },
   "Settings": {
+    "teamOnlyNotice": "Members, Teams, Team permissions and Audit log are in shared workspaces",
+    "unavailableTitle": "{title} is temporarily unavailable",
     "title": "Settings",
     "searchLabel": "Search settings",
     "searchPlaceholder": "Search settings…",
@@ -1838,6 +1849,7 @@
       "account": "This account"
     },
     "memory": {
+      "emptyBody": "Mikka saves facts from chats and connected apps; they appear here.",
       "enabled": "Use memory",
       "learn": "Learn from connected apps",
       "error": "Could not update memory",
@@ -1889,7 +1901,7 @@
       "heading": "Computer use",
       "label": "Bot computer use",
       "allow": "Allow",
-      "deny": "Deny",
+      "deny": "Block",
       "error": "Could not update or load the computer setting.",
       "loading": "Loading computer setting…"
     },
@@ -2512,7 +2524,7 @@
       "loading": "Loading sharing settings",
       "heading": "Subscriptions and API keys",
       "label": "Members share their own subscriptions and API keys with teammates",
-      "detail": "Deny stops only what is shared with others; everyone keeps using their own"
+      "detail": "Block stops only what is shared with others; everyone keeps using their own"
     },
     "appPolicy": {
       "loading": "Loading app permissions",
@@ -2569,6 +2581,9 @@
       }
     },
     "billing": {
+      "notConfiguredTitle": "Billing isn't set up on this server",
+      "notConfiguredBody": "Plans, seats and points need a payment provider, which whoever runs this server turns on.",
+      "notConfiguredAction": "How to set up billing",
       "loading": "Loading billing",
       "loadFailed": "Couldn’t load billing",
       "plan": "Plan",
@@ -2659,6 +2674,7 @@
       "afterQuotaSection": "When quota runs out"
     },
     "modelOrder": {
+      "fallbackNeedsKey": "Add an API key and connect a subscription to use this.",
       "placesLabel": "Dispatch order",
       "placeServers": "Servers",
       "placeComputers": "Computers",
@@ -3092,7 +3108,7 @@
     "c_6dfc6360": "The association was not saved. Check your permissions and refresh before trying again.",
     "c_b8e346ef": "Could not switch. Please try again.",
     "c_cb11190c": "Create team",
-    "c_d92d1b8d": "Create team workspace",
+    "c_d92d1b8d": "Create shared workspace",
     "c_63373890": "Create workspace · Mikka",
     "c_4eec1ff7": "Create a new team",
     "c_4598f1cb": "Create a Mikka workspace with a name and unique URL, then invite your team.",
@@ -3407,6 +3423,12 @@
       "checking": "Checking"
     },
     "empty": "Tell {name} what you need",
+    "starters": {
+      "fixBug": "Fix a bug in my repo",
+      "reviewPullRequests": "Review my open pull requests",
+      "summarizeToday": "Summarize what needs me today",
+      "dailyBriefing": "Set up a daily briefing"
+    },
     "events": {
       "aThread": "A thread",
       "aTask": "A task",
@@ -3819,12 +3841,12 @@
     "loadingWorkspace": "Loading workspace…",
     "switchWorkspace": "Switch workspace",
     "reloadWorkspace": "Reload workspace",
-    "newWorkspace": "New team workspace",
+    "newWorkspace": "New shared workspace",
     "workspaceName": "Workspace name",
     "forExampleProductTeam": "For example: Product team",
     "cancel": "Cancel",
     "creating": "Creating…",
-    "createWorkspace": "Create team workspace",
+    "createWorkspace": "Create shared workspace",
     "sendingChoice": "Sending",
     "cloudKeySetup": "Set up your E2B key",
     "dispatchWait": "Wait for it",
@@ -3881,6 +3903,7 @@
     "states": {
       "online": "Online",
       "offline": "Offline",
+      "never": "Never online",
       "starting": "Starting",
       "running": "Running",
       "paused": "Sleeping",
@@ -3914,7 +3937,9 @@
     "loadFailed": "Thread failed to load",
     "retry": "Retry",
     "started": "started {time}",
-    "steps": "Handed to {harness} · {count, plural, one {# step} other {# steps}}",
+    "steps": "{count, plural, one {# step} other {# steps}}",
+    "stepsCommands": "{count, plural, one {Ran # command} other {Ran # commands}}",
+    "stepsTools": "{count, plural, one {Called # tool} other {Called # tools}}",
     "composer": "Tell {agent} what to do next…",
     "checkEnded": "This independent check has ended. Handle the result in Acceptance.",
     "sendFailed": "Send outcome unconfirmed. Draft kept",
@@ -4122,6 +4147,7 @@
       "failed": "Not delivered. Try again."
     },
     "addE2BKey": "Add E2B API Key",
+    "e2bKeyNeeded": "Mikka Cloud runs on your own E2B key",
     "loading": "Connecting to the computer"
   },
   "Shell": {
@@ -4287,6 +4313,9 @@
         "created": "Created the task",
         "createdBy": "{name} created the task",
         "dispatchedTask": "{bot} dispatched this task · {time}",
+        "switch": "Continuing with {agent}",
+        "switchAfterFailure": "{from} didn't get through · continuing with {agent}",
+        "switchRow": "Switched to {agent}",
         "divider": "Attempt {n} {outcome} · retrying with {agent}",
         "dividerOutcome": {
           "failed": "failed",
@@ -4565,7 +4594,7 @@
     "refreshFailed": "Couldn’t refresh suggestions. Try again later."
   },
   "ArtifactsPage": {
-    "title": "Artifact",
+    "title": "Artifacts",
     "category": {
       "all": "All",
       "documents": "Documents",
@@ -4911,6 +4940,10 @@
     "mergeConfirm": "Merge"
   },
   "ArtifactReview": {
+    "checksRatio": "{passed}/{total} passed",
+    "checksFailedNote": "{count} failed",
+    "checksPendingNote": "{count} running",
+    "evidenceRatio": "{passed}/{total} with evidence",
     "windowTitle": "{task} · PR #{number}",
     "tooltip": {
       "none": "Artifact · Made when the thread finishes",
@@ -5789,7 +5822,18 @@
     "taskCreatedBy": "{name} created the task",
     "taskCreated": "Task created",
     "openedPullRequest": "Opened PR #{number}",
-    "steps": "{count} steps",
+    "steps": "Ran {count} steps",
+    "threadSteps": {
+      "commands": "Ran {count} commands",
+      "command": "Ran 1 command",
+      "tools": "Called {count} tools",
+      "tool": "Called 1 tool",
+      "showMore": "Show more",
+      "showLess": "Show less",
+      "milliseconds": "{count} ms",
+      "seconds": "{count} s",
+      "minutes": "{minutes} min {seconds} s"
+    },
     "yesterday": "Yesterday",
     "tomorrow": "Tomorrow",
     "content": "Content",

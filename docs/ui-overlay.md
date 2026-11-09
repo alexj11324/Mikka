@@ -1,13 +1,20 @@
-# UI slots and the hosted UI layer
+# UI slots
 
-The official web app and desktop installers lay a private BoardUI layer over
-this repository's interface ([decision 2026-11-06-2000](design/decisions/2026-11-06-2000-hosted-ui-overlay.md)).
-The paid code lives only in `alexj11324/mikka-hosted-ui`; this repository
-never imports it. The build pipeline that checks the layer out is issue #1527.
+There is one UI ([decision 2026-11-08-2133](design/decisions/2026-11-08-2133-one-ui.md)).
+Its code lives in this repository and in the private `alexj11324/mikka-hosted-ui`.
+Slots are how official web and desktop builds bring the private code in
+([decision 2026-11-06-2000](design/decisions/2026-11-06-2000-hosted-ui-overlay.md)).
+Paid component source (BoardUI Pro, affectUI, beUI Pro) lives only in
+`mikka-hosted-ui`; this repository never imports it. The build pipeline that
+checks the private repository out is issue #1527.
+
+Slots are a mechanism, not a requirement: fix a page where its code lives,
+and don't add a slot only to make a fix possible. The build without
+`mikka-hosted-ui` only has to compile.
 
 ## The two builds
 
-| | Open-source build | Official build |
+| | Build without `mikka-hosted-ui` (compile only) | Official build |
 | --- | --- | --- |
 | `MIKKA_UI_OVERLAY_DIR` | unset | path of the `mikka-hosted-ui` checkout, inside this repository (CI uses `.hosted-ui/`, which is gitignored) |
 | `@ui-slot/<name>` | `components/slots/<name>.tsx` | `$MIKKA_UI_OVERLAY_DIR/slots/<name>.tsx` when the layer has it, else the default |
@@ -18,7 +25,7 @@ never imports it. The build pipeline that checks the layer out is issue #1527.
 desktop renderer builds. `next.config.mjs` retains aliases for compatibility.
 Production uses the [shared frontend/API runtime](operations/web-runtime.md).
 `tsconfig.json` maps `@ui-slot/*` to the defaults, so typecheck, lint and tests
-in this repository always see the open-source build. The layer must sit inside
+in this repository always see the build without `mikka-hosted-ui`. The layer must sit inside
 the repository, as `uiOverlay()` enforces, and resolves `react` and this app's modules from this repository's `node_modules`.
 A missing directory, or one outside the repository, fails the build.
 
@@ -36,7 +43,7 @@ A missing directory, or one outside the repository, fails the build.
 | `model-picker` | a bot's model chip and its menu | `BotModelPickerProps` in `components/slots/model-picker-contract.ts`; menu, saves and refresh come from `useBotModelPicker` (`hooks/use-bot-model-picker.ts`) | `BotModelPicker` from `@/components/coordinator/bot-model-picker` |
 | `panel-header` | the header row of a bot's 概览 (search, ⤢, ✕) and of a group's panel (详情, ✕) | `PanelHeaderProps` in `components/slots/panel-header-contract.ts` (`actions` are the secondary actions with their labels; `widen` is ⤢, which the group's default does not draw); optional `PANEL_INITIAL_WIDTH` (`(mainWidth) => width`, from the width right of the left sidebar; `null` or missing: 360) sets the right column's default width through `usePanelInitialWidth` (`hooks/use-panel-width.ts`), and a width the person chose still wins | `ContextPanel`, `GroupPanel`; `PANEL_INITIAL_WIDTH` also `RightColumn` |
 | `reply-activity` | a reply's thinking and tool calls as Trace rows | `ActivityThinkingProps`, `ActivityToolView`, `ActivityGroupProps` in `components/slots/reply-activity-contract.ts`; exports `ActivityList`, `ActivityThinking`, `ActivityTool`, `ActivityGroup` | `components/coordinator/reply-activity.tsx`, through `@ui-slot/reply-activity` |
-| `review-page` | none: the open-source build has no review page | `ReviewPageProps` in `components/slots/review-page-contract.ts` (`taskId`, `onClose`); reads and actions from `hooks/code-review/` (`useReviewDiff`, `useReviewFile`, `useReviewChecks`, `useSendToAgent`, `useMergeReview`) over the typed adapter `lib/code-review/client.ts` and the contract `lib/code-review/contract.ts` (#1722, #1732); Esc and ✕ call `onClose` | `IssueWorkspace` mounts it once while `useReviewPage` (`hooks/code-review/use-review-page.ts`) has a task open |
+| `review-page` | none: the build without `mikka-hosted-ui` has no review page | `ReviewPageProps` in `components/slots/review-page-contract.ts` (`taskId`, `onClose`); reads and actions from `hooks/code-review/` (`useReviewDiff`, `useReviewFile`, `useReviewChecks`, `useSendToAgent`, `useMergeReview`) over the typed adapter `lib/code-review/client.ts` and the contract `lib/code-review/contract.ts` (#1722, #1732); Esc and ✕ call `onClose` | `IssueWorkspace` mounts it once while `useReviewPage` (`hooks/code-review/use-review-page.ts`) has a task open |
 | `review-summary` | none: a coding task shows no summary line and reads nothing | `ReviewSummaryLineProps` in `components/slots/review-summary-contract.ts` (`placement` is `card`, `waiting` or `panel`; `onOpenReview` opens the review page); data from `useReviewSummary`, words from `formatReviewSummary` (`lib/code-review/summary-text.ts`); optional `REVIEW_ENABLED` (`true`: ⌘⇧B opens the current task's review page and ⌘K lists 「审阅 #N」) | the default `thread-card` slot, `ThreadList`'s 等待你 rows; a layer's `task-column` draws it under the title |
 | `settings-devices` | 设置 › 设备's page: connected computers and servers, their state and actions; reading, live updates and the add / reconnect dialogs stay shared | `SettingsDevicesProps` in `components/slots/settings-devices-contract.ts`; actions in `app/actions/agents`; `NoRunsLine`, `InstallAgents`, `SandboxBlocked` in `components/devices/devices-list.tsx` | `DevicesSettings` |
 | `settings-frame` | app rail and window bar around settings (`AppFrame`) | `SettingsFrameProps` in `components/slots/settings-frame-contract.ts`; optional `OWN_SETTINGS_FRAME` (`false` or missing: settings stay in the workspace frame; `true`: `IssueWorkspace` draws settings in this frame); optional prop `onBack` returns to the app page shown before Settings opened (home when Settings was opened directly) | `SettingsFrame` from `@/components/settings/settings-shell`; `IssueWorkspace` |
@@ -91,7 +98,7 @@ The iOS app (`apps/mobile`) has its own slots, filled from the layer's
 `mobile/` folder. They are React Native components, so they share nothing with
 the web slots but the idea.
 
-| | Open-source build | Official OTA |
+| | Build without `mikka-hosted-ui` | Official OTA |
 | --- | --- | --- |
 | `MIKKA_MOBILE_OVERLAY_DIR` | unset | `.hosted-ui/mobile`, relative to the repository root and inside it |
 | `@ui-slot/<name>` | `apps/mobile/slots/<name>.tsx` | `$MIKKA_MOBILE_OVERLAY_DIR/slots/<name>.tsx` when the layer has it, else the default |
@@ -141,6 +148,11 @@ the production update.
   app's names). A few of BoardUI's theme variables share a name with this
   app's (`--font-sans`, `--color-blue-400`); this app's utilities inline their
   own values, so pages outside the slots look the same in both builds.
+  Paid blocks in the layer keep their shipped look and only data and text
+  change ([2026-11-09-0050](design/decisions/2026-11-09-0050-paid-blocks-as-shipped.md)). Because the
+  shadcn token block is left out, affectUI blocks currently resolve shadcn
+  token names to this app's values; that is recorded drift, not a rule to
+  follow.
 - **Dependencies.** Packages BoardUI needs that this repository lacks are
   installed in the layer. `react` and `react-dom` come from this repository
   only.

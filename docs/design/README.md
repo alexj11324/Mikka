@@ -40,19 +40,24 @@ source is now out of date and who owns it.
 | 6 | Comma (app.comma.surf) | Look and feel: shell structure, density, type, radii, shadows |
 | 7 | reUI / shadcn defaults | Only what nothing above covers |
 
+A paid block or component (BoardUI Pro, affectUI, beUI Pro) is outside this
+order: the library's shipped demo decides its look, and only data and text
+change ([2026-11-09-0050](decisions/2026-11-09-0050-paid-blocks-as-shipped.md)).
+
 Notes:
 
 - A Figma frame counts only if `decisions/` or `decisions.md` lists it as accepted. Frames on
   the 「归档」 page, or marked 已废弃, never count.
-- Figma decides layout, not look. Comma decides look. Old Figma frames use
+- Figma decides layout, not look. Comma decides the look of Mikka's own UI. Old Figma frames use
   zinc greys; the tokens in `rules.md` win.
 - The vendored design skills `unslop` and `interface-design`
-  (`.claude/skills/`) win over `rules.md` for product and visual rules by
-  default (decision 2026-10-31); a skill rule that does not fit a dense SaaS
+  (`.claude/skills/`) win over `rules.md` for product and visual rules in
+  Mikka's own UI by default (decision 2026-10-31), never inside a paid block; a skill rule that does not fit a dense SaaS
   product is skipped with a reason. Change the rule, its check and the code
   in the same PR.
-- Library defaults are the lowest source. A shadcn default that breaks a rule
-  (for example the `border-input` hairline, R-31) is a bug, not a choice.
+- Library defaults are the lowest source for Mikka's own UI. A shadcn default
+  that breaks a rule there (for example the `border-input` hairline, R-31) is a
+  bug, not a choice. A paid block's shipped look is not a default: it stays.
 - A measured value (a width, a gap) that differs between Figma and code is a
   conflict. Do not pick one quietly: use the order above, and if it is still
   unclear ask Alex.
@@ -60,9 +65,11 @@ Notes:
   lasting decision in `decisions/` and update its rule in `rules.md`.
 - Feature specs record requirements and their stated implementation evidence.
   Acceptance of a design does not establish that it shipped. Dated audits and
-  research keep their original revision and findings. The official UI layer
-  and the public default slots can render differently; see
-  [UI slots](../ui-overlay.md) before describing implementation coverage.
+  research keep their original revision and findings.
+- There is one UI ([decision](decisions/2026-11-08-2133-one-ui.md)). Describe
+  and review what the official build renders. Some pages come from
+  `mikka-hosted-ui` through [slots](../ui-overlay.md); the defaults in this
+  repository only have to compile and are not a second design.
 
 ## Where things live and who keeps them
 

@@ -17,6 +17,7 @@ import { withBasePath } from '@/lib/base-path'
 import { dayLabel } from '@/lib/relative-time'
 import { useActionError } from '@/lib/use-action-error'
 import { FieldError } from '@/components/ui/field'
+import { Empty, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
 
 /** Scalar metadata only: the ICU templates take named string params. Roles and access levels are words, not codes. */
 function params(event: AuditEventView, word: (key: string) => string | null) {
@@ -61,6 +62,7 @@ export function AuditLogSettings({ workspaceId }: { workspaceId: string }) {
     return t.has(key as never) ? t(key as never, params(event, word) as never) : event.action
   }
 
+  const empty = !pages.isLoading && !failure && !pages.error && events.length === 0
   return <>
     {/* A toolbar over the list, as Linear's: the filter and export act on the log, they are not settings rows. */}
     <div role="toolbar" aria-label={t('filter')} className="flex flex-wrap items-center justify-between gap-2">
@@ -68,11 +70,12 @@ export function AuditLogSettings({ workspaceId }: { workspaceId: string }) {
         <ToggleGroupItem value="all">{t('filters.all')}</ToggleGroupItem>
         <ToggleGroupItem value="security">{t('filters.security')}</ToggleGroupItem>
       </ToggleGroup>
-      <Button variant="secondary" size="sm" nativeButton={false} role="link" render={<a href={exportHref} download />}><Download data-icon="inline-start" />{t('exportCsv')}</Button>
+      {/* Nothing to export while the log is empty. */}
+      {!empty && <Button variant="secondary" size="sm" nativeButton={false} role="link" render={<a href={exportHref} download />}><Download data-icon="inline-start" />{t('exportCsv')}</Button>}
     </div>
     {pages.isLoading && <SettingsLoading label={t('loading')} rows={3} />}
     {(pages.error || failure) && <FieldError className="px-1">{actionError(failure?.error)}</FieldError>}
-    {!pages.isLoading && !failure && !pages.error && events.length === 0 && <p className="px-1 text-sm text-muted-foreground">{t('empty')}</p>}
+    {empty && <Empty className="min-h-48"><EmptyHeader><EmptyTitle>{t('empty')}</EmptyTitle></EmptyHeader></Empty>}
     {days.map(([label, rows]) => <SettingsSection key={label} id={`audit-${label}`} title={label}>
       {rows.map(event => <div key={event.id} className="flex items-center gap-3 px-5 py-3">
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">

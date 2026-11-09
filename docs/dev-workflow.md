@@ -22,7 +22,8 @@ Ordinary acceptance follows [`acceptance.md`](acceptance.md): a local
 application, a real isolated database and, when the flow uses one, a real
 daemon. Ordinary acceptance goes through the API and CLI
 (`pnpm test:local-loop`, [local-runtime.md](local-runtime.md)), and a UI change
-is checked with screenshots of a local production build under
+is checked with screenshots of a local production build of the official UI
+(this repository plus `mikka-hosted-ui`, [one UI](design/decisions/2026-11-08-2133-one-ui.md)) under
 [1520](design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md) and
 [2225](design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md).
 The general browser suite is retired. Retained targeted Desktop, Analytics and
@@ -184,8 +185,8 @@ old module owners (backend was Codex's).
    documents directly.
 
 Before any merge, verify the affected API/CLI flow and required CI checks.
-UI changes also need screenshots of a production build
-(`pnpm build:app`, `pnpm start`) in a cloud Linux or Docker sandbox, against its
+UI changes also need screenshots of a production build of the official UI
+(`pnpm build:app`, `pnpm start`, with `mikka-hosted-ui`) in a cloud Linux or Docker sandbox, against its
 own isolated PostgreSQL database (`mikka_e2e`). Isolated screenshot harnesses
 use their leased owner/peer fixtures ([`test-accounts.md`](test-accounts.md)).
 Shared-team and external-service acceptance follows the shared SMOKE account

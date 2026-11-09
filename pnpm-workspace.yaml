@@ -22,6 +22,7 @@ allowBuilds:
   '@swc/core': true
   electron: true
   esbuild: true
+  ffmpeg-static: true
   sharp: true
 
 patchedDependencies:

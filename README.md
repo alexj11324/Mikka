@@ -37,23 +37,25 @@ daemon gateway, scheduler, migrations and your own model credentials. Its
 default web entry exposes server information and keeps the authentication
 pages needed by the official clients.
 
-The full community workspace UI remains in the public source and still builds,
-but is frozen and disabled by default. Set `MIKKA_COMMUNITY_UI=1` and recreate
-the app container to enable that compatibility UI. The official UI is maintained
-separately; paid UI libraries are not distributed in this repository or image.
+Mikka has one UI: the official web, desktop and iOS apps, which connect to
+Mikka Cloud or to your server. An older built-in workspace UI is still in the
+source and off by default (`MIKKA_COMMUNITY_UI=1` turns it on); it is not a
+second design. Paid UI component source is not distributed in this repository
+or image.
 
 ## Product and source boundaries
 
-This repository contains the backend, native mobile client and frozen community
-Web interface. Official Web and desktop builds resolve UI slots from a private
-[hosted UI overlay](docs/ui-overlay.md). The capability summary describes these
+This repository contains the backend, the native mobile client and most of the
+UI's web code. Official web and desktop builds also bring in the private
+`mikka-hosted-ui` through [UI slots](docs/ui-overlay.md); the build without it
+only has to compile ([one UI](docs/design/decisions/2026-11-08-2133-one-ui.md)). The capability summary describes these
 source paths. Release and external-service results are recorded through
 [runtime acceptance](docs/acceptance.md).
 
 The accepted interface lists tasks and opens their work inside each task, with
-one conversation joining its attempts. The native mobile source implements
-this model. The frozen community Web defaults retain thread lists and separate
-attempt views. Official overlay behavior requires its own version-bound release evidence.
+one conversation joining a task's runs. The native mobile source implements
+this model. The default slots in this repository still show thread lists and separate
+run views; what ships is the official build, which needs its own version-bound release evidence.
 See the [task navigation decision](docs/design/decisions/2026-11-07-2045-tasks-only-threads-inside.md)
 and [task conversation decision](docs/design/decisions/2026-11-07-2300-one-conversation-per-task.md).
 
@@ -121,7 +123,7 @@ account. Publication depends on the configured target and deployment switches.
   you create. Each bot has its own chat, with unread markers and an animated
   avatar.
 - **Makes progress visible.** Dispatch cards link to the work and its status.
-  The accepted task interface opens the task and joins its attempts in one
+  The accepted task interface opens the task and joins its runs in one
   conversation. Workers report progress, ask questions and flag blocks through
   Mikka's MCP tools. You can reply to or stop your own work.
 - **Answers with charts and cards.** Bots reply with OpenUI components: bar,
@@ -143,8 +145,8 @@ account. Publication depends on the configured target and deployment switches.
   relations, activity history and a number every task gets when it is
   created: its team key for a workspace task (AL-12), your own prefix for a
   personal one (ALEX-12). The task's branch and pull request carry it. ⌘K
-  searches bots, group chats, tasks and projects. The community interface also
-  exposes its retained thread results.
+  searches bots, group chats, tasks and projects. The default slots in this
+  repository also expose retained thread results.
 - **Decides what needs you.** Mikka rates notifications from GitHub, Linear,
   Notion and Gmail by what it costs to ignore them. The Coordinator and
   Decision model judge urgency and interruption timing. Other matters wait in

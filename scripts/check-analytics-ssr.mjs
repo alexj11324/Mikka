@@ -6,6 +6,10 @@ import { createHash } from 'node:crypto'
 import { lstat, readFile, realpath } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { promisify } from 'node:util'
+import { gunzip } from 'node:zlib'
+import { POSTER_BINARY_ARCHIVE, POSTER_BINARY_MANIFEST, POSTER_BINARY_MAX_BYTES,
+  POSTER_LICENSE_FILES, POSTER_RUNTIME_DIRECTORY } from '../lib/captures/poster-binary.mjs'
 import { readCompiledBuild } from './start-app.mjs'
 
 export const analyticsKey = 'phc_synthetic_ssr_regression'
@@ -16,6 +20,9 @@ export const requiredRuntimeResources = [
   'scripts/e2b/inspect-retained-deliverable.mjs',
 ]
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
+const decompress = promisify(gunzip)
+const posterResources = new Set([POSTER_BINARY_ARCHIVE, POSTER_BINARY_MANIFEST,
+  ...POSTER_LICENSE_FILES.map(name => `${POSTER_RUNTIME_DIRECTORY}/${name}`)])
 
 export function analyticsEnvironment(env = process.env) {
   assert.equal(env.CI, 'true', 'Requires an isolated CI environment')
@@ -31,6 +38,15 @@ export function analyticsEnvironment(env = process.env) {
 
 async function regularBytes(root, path) {
   assert.ok(typeof path === 'string' && /^[A-Za-z0-9_./-]+$/.test(path) && !path.startsWith('/'))
+  return regularPathBytes(root, path)
+}
+
+async function pinnedPosterBytes(root, path) {
+  assert.match(path, /^node_modules\/\.pnpm\/ffmpeg-static@\d+\.\d+\.\d+\/node_modules\/ffmpeg-static\/(?:ffmpeg|ffmpeg\.(?:README|LICENSE)|LICENSE|README\.md|package\.json)$/)
+  return regularPathBytes(root, path)
+}
+
+async function regularPathBytes(root, path) {
   const parts = path.split('/')
   assert.ok(parts.every(part => part && part !== '.' && part !== '..'), 'Artifact paths must remain inside their build')
   let current = root
@@ -43,20 +59,58 @@ async function regularBytes(root, path) {
   return readFile(current)
 }
 
+/** Only this pinned dependency may resolve pnpm's public package symlink. Its
+ * exact store directory and every actual source file still reject symlinks. */
+async function posterPackageDirectory(root) {
+  const version = JSON.parse(await regularBytes(root, 'package.json')).dependencies?.['ffmpeg-static']
+  assert.match(version, /^\d+\.\d+\.\d+$/)
+  const directory = `node_modules/.pnpm/ffmpeg-static@${version}/node_modules/ffmpeg-static`
+  assert.equal(await realpath(join(root, 'node_modules/ffmpeg-static')), join(root, directory), 'FFmpeg must be the exact pinned pnpm package')
+  const metadata = JSON.parse(await pinnedPosterBytes(root, `${directory}/package.json`))
+  assert.equal(metadata.name, 'ffmpeg-static'); assert.equal(metadata.version, version)
+  return directory
+}
+
 /** Compare the build's actual packaged resources with both its manifest and
  * tracked source. A list of filenames alone is not deployment evidence. */
 export async function verifyRuntimeResources(root, built) {
   root = await realpath(root)
   assert.ok(Array.isArray(built.resources))
   const paths = new Set()
+  const posters = new Map()
+  let posterPackage
   for (const resource of built.resources) {
     assert.ok(resource && typeof resource.path === 'string' && !paths.has(resource.path))
     paths.add(resource.path)
     assert.match(resource.sha256, /^[a-f0-9]{64}$/)
     assert.ok(Number.isSafeInteger(resource.bytes) && resource.bytes >= 0)
-    const [source, packed] = await Promise.all([regularBytes(root, resource.path), regularBytes(root, `.output/${resource.path}`)])
-    assert.equal(source.length, resource.bytes); assert.equal(packed.length, resource.bytes)
-    assert.equal(hash(source), resource.sha256); assert.equal(hash(packed), resource.sha256)
+    const packed = await regularBytes(root, `.output/${resource.path}`)
+    assert.equal(packed.length, resource.bytes); assert.equal(hash(packed), resource.sha256)
+    if (posterResources.has(resource.path)) {
+      posters.set(resource.path, packed)
+      const license = POSTER_LICENSE_FILES.find(name => resource.path === `${POSTER_RUNTIME_DIRECTORY}/${name}`)
+      if (!license) continue
+      posterPackage ??= await posterPackageDirectory(root)
+      const source = await pinnedPosterBytes(root, `${posterPackage}/${license}`)
+      assert.equal(source.length, resource.bytes); assert.equal(hash(source), resource.sha256)
+    } else {
+      const source = await regularBytes(root, resource.path)
+      assert.equal(source.length, resource.bytes); assert.equal(hash(source), resource.sha256)
+    }
+  }
+  if (built.posterBinary !== undefined || posters.size) {
+    for (const path of posterResources) assert.ok(posters.has(path), `Required FFmpeg runtime file must be packaged: ${path}`)
+    const manifest = JSON.parse(posters.get(POSTER_BINARY_MANIFEST).toString())
+    assert.deepEqual(manifest, built.posterBinary)
+    assert.equal(manifest.version, 1)
+    for (const size of [manifest.bytes, manifest.gzipBytes]) assert.ok(Number.isSafeInteger(size) && size > 0 && size <= POSTER_BINARY_MAX_BYTES)
+    for (const digest of [manifest.sha256, manifest.gzipSha256]) assert.match(digest, /^[a-f0-9]{64}$/)
+    posterPackage ??= await posterPackageDirectory(root)
+    const source = await pinnedPosterBytes(root, `${posterPackage}/ffmpeg`), packed = posters.get(POSTER_BINARY_ARCHIVE)
+    assert.equal(source.length, manifest.bytes); assert.equal(hash(source), manifest.sha256)
+    assert.equal(packed.length, manifest.gzipBytes); assert.equal(hash(packed), manifest.gzipSha256)
+    const expanded = await decompress(packed, { maxOutputLength: manifest.bytes })
+    assert.equal(expanded.length, source.length); assert.equal(hash(expanded), hash(source), 'Packaged FFmpeg must expand to the exact pinned executable')
   }
   for (const path of requiredRuntimeResources) assert.ok(paths.has(path), `Required runtime file must be packaged: ${path}`)
   return { count: paths.size, required: [...requiredRuntimeResources] }

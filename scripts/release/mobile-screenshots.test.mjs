@@ -1,7 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import { screenshotIdentity, pngDimensions, loginFlow, workspaceFlow, readFlow, backendVersion, SHOTS } from './mobile-screenshots.mjs'
+import { mkdtempSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir, constants } from 'node:os'
+import { join } from 'node:path'
+import { spawnSync } from 'node:child_process'
+import { screenshotIdentity, pngDimensions, loginFlow, workspaceFlow, readFlow, backendVersion,
+  screenshotFailure, screenshotPhase, SHOTS } from './mobile-screenshots.mjs'
 
 const env = { GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REF: 'refs/heads/main',
   GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_SHA: 'a'.repeat(40), GITHUB_RUN_ID: '123',
@@ -76,4 +80,71 @@ test('backend provenance reads the live version without cache and rejects deploy
   await assert.rejects(backendVersion(undefined, read({ build: 'unknown', overlaySha: null })), /backendVersionSHARequired/)
   await assert.rejects(backendVersion(undefined, read({ ...before, overlaySha: 'main' })), /backendOverlaySHARequired/)
   await assert.rejects(backendVersion(undefined, async () => new Response('', { status: 503 })), /backendVersionHTTPFailed/)
+})
+
+test('failure diagnostics preserve closed error and child metadata without private values', () => {
+  const cause = Object.assign(new Error('private child stderr and command'), { code: 'ETIMEDOUT' })
+  const error = Object.assign(new Error('private email password cookie', { cause }), {
+    code: 'NATIVE_UI_FLOW_FAILED', status: null, signal: 'SIGTERM', timedOut: true,
+    stdout: 'private stdout', stderr: 'private stderr', path: '/private/credential',
+  })
+  assert.deepEqual(screenshotFailure(error), { errorName: 'Error', errorCode: 'NATIVE_UI_FLOW_FAILED',
+    signal: constants.signals.SIGTERM, timedOut: true, causeName: 'Error', causeCode: 'ETIMEDOUT' })
+  assert.deepEqual(screenshotFailure(Object.assign(error, { status: 7 })), {
+    errorName: 'Error', errorCode: 'NATIVE_UI_FLOW_FAILED', exitCode: 7,
+    signal: constants.signals.SIGTERM, timedOut: true, causeName: 'Error', causeCode: 'ETIMEDOUT',
+  })
+  assert.deepEqual(screenshotFailure({ name: 'private name', code: 'private code', message: 'private message',
+    signal: 'private signal', status: 123456789, timedOut: 'private value',
+    cause: { name: 'private cause', code: 'private cause code' } }), { errorName: 'UnknownError' })
+  for (const check of ['backendVersionHTTPFailed', 'backendDeploymentChangedDuringCapture']) {
+    assert.throws(() => assert.deepEqual({ private: 'actual response' }, { private: 'expected response' }, check), error => {
+      assert.deepEqual(screenshotFailure(error), { errorName: 'AssertionError', errorCode: 'ERR_ASSERTION', check })
+      assert.doesNotMatch(JSON.stringify(screenshotFailure(error)), /private|actual response|expected response/)
+      return true
+    })
+  }
+})
+
+test('phase diagnostics time each outcome and rethrow the original failure without serializing it', async () => {
+  const lines = []
+  const log = line => lines.push(JSON.parse(line.replace(/^native-screenshot-phase /, '')))
+  assert.equal(await screenshotPhase('native-login', () => 'private return value', log), 'private return value')
+  const error = Object.assign(new Error('private password'), { code: 'ENOENT', status: 127 })
+  await assert.rejects(screenshotPhase('native-workspace', async () => { throw error }, log), value => value === error)
+  assert.deepEqual(lines.map(row => [row.phase, row.event]), [
+    ['native-login', 'start'], ['native-login', 'success'], ['native-workspace', 'start'], ['native-workspace', 'failure'],
+  ])
+  for (const row of lines) {
+    assert.match(row.at, /^\d{4}-\d{2}-\d{2}T/)
+    assert.ok(Number.isFinite(row.elapsedMs) && row.elapsedMs >= 0)
+  }
+  assert.equal(lines[3].errorCode, 'ENOENT')
+  assert.equal(lines[3].exitCode, 127)
+  assert.doesNotMatch(JSON.stringify(lines), /private/)
+  await assert.rejects(screenshotPhase('private phase', () => {}, log), /screenshotPhaseRequired/)
+  assert.equal(lines.length, 4)
+})
+
+test('build phase diagnostics retain only the exit status while command output stays private', () => {
+  const build = readFileSync(new URL('./mobile-screenshots-build.sh', import.meta.url), 'utf8')
+  const helper = build.match(/^run_build_phase\(\) \{[\s\S]*?^\}/m)?.[0]
+  assert.ok(helper)
+  const directory = mkdtempSync(join(tmpdir(), 'mikka-screenshot-diagnostics-'))
+  mkdirSync(join(directory, 'mikka-screenshots-private'))
+  try {
+    const result = spawnSync('bash', ['-c', `${helper}\nrun_build_phase xcodebuild bash -c 'echo private-command-output; echo private-stderr >&2; exit 7'`], {
+      encoding: 'utf8', env: { ...process.env, RUNNER_TEMP: directory },
+    })
+    assert.equal(result.status, 7)
+    assert.equal(result.stderr, '')
+    assert.doesNotMatch(result.stdout, /private-command-output|private-stderr|bash -c/)
+    const rows = result.stdout.trim().split('\n').map(line => JSON.parse(line.replace(/^native-screenshot-phase /, '')))
+    assert.equal(rows[0].event, 'start')
+    assert.equal(rows[1].event, 'failure')
+    assert.equal(rows[1].phase, 'xcodebuild')
+    assert.equal(rows[1].exitCode, 7)
+    assert.equal(rows[1].errorCode, 'BUILD_CHILD_EXIT')
+    assert.match(readFileSync(join(directory, 'mikka-screenshots-private/xcodebuild.log'), 'utf8'), /private-command-output/)
+  } finally { rmSync(directory, { recursive: true, force: true }) }
 })

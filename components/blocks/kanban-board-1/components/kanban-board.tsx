@@ -33,7 +33,7 @@ import { BoardCard, BoardColumnFrame, BoardHiddenLane } from '@ui-slot/board'
 
 function BoardScrollArea({ children, viewportRef, ...props }: ComponentProps<typeof ScrollAreaPrimitive.Viewport> & { viewportRef: Ref<HTMLDivElement> }) {
   return <ScrollAreaPrimitive.Root data-slot="scroll-area" className="relative min-h-0 w-full min-w-0 flex-1 pb-3">
-    <ScrollAreaPrimitive.Viewport {...props} ref={viewportRef} data-slot="scroll-area-viewport" className="h-full w-full overscroll-x-contain rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
+    <ScrollAreaPrimitive.Viewport {...props} ref={viewportRef} data-slot="scroll-area-viewport" className="h-full w-full overscroll-x-contain scroll-fade-x rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset">
       <ScrollAreaPrimitive.Content data-slot="scroll-area-content" className="h-full w-max min-w-full">{children}</ScrollAreaPrimitive.Content>
     </ScrollAreaPrimitive.Viewport>
     <ScrollAreaPrimitive.Scrollbar orientation="horizontal" className="flex h-2.5 touch-none flex-col p-px select-none"><ScrollAreaPrimitive.Thumb className="relative flex-1 rounded-full bg-foreground/15" /></ScrollAreaPrimitive.Scrollbar>
@@ -225,7 +225,7 @@ export function KanbanBoard({ stateKey = 'board', columns, hiddenColumns: hidden
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const shown = BOARD_COLUMNS.filter(column => columns.includes(column.value))
   // R-25: every column is a fixed 300px, as Linear, sidebar open or not; when they do not fit, the board scrolls
-  // and spare width stays empty. Beside the Coordinator sidebar the hidden lane is left out; hidden columns stay reachable from 显示.
+  // and spare width stays empty; its edges fade where more columns wait (UI audit work-03). Beside the Coordinator sidebar the hidden lane is left out; hidden columns stay reachable from 显示.
   return <Kanban {...props} getItemValue={item => item.id} className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
     <BoardScrollArea viewportRef={viewportRef} id={viewportId} role="region" aria-label={t('horizontalScroll')} aria-describedby={instructionsId} tabIndex={0} onKeyDown={onViewportKeyDown}>
       <KanbanBoardPrimitive className="flex h-full min-h-0 w-max min-w-full items-stretch gap-3 pb-2">
