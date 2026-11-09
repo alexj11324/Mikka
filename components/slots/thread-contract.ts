@@ -59,6 +59,8 @@ export type ThreadEntry =
     parts: ThreadEntryPart[]
     streaming?: boolean
     stopped?: boolean
+    /** Who wrote it, where the conversation has more than one Agent (a task's attempts): shown where it changes. */
+    author?: { id: string; name: string; mark: ReactNode }
     /** Copy, the pages it cites, reactions. */
     actions?: ReactNode
   }
@@ -79,7 +81,7 @@ export type ThreadScreenProps = {
   /** Who the person talks to: the Bot's id (null: the Coordinator) and its name. */
   botId: string | null
   name: string
-  /** Its mark, for the author line. */
+  /** Its mark, for the author line (an entry's own author wins). */
   mark: ReactNode
   /** null while the first read is on its way. */
   entries: ThreadEntry[] | null
