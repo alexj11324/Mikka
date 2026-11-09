@@ -1,4 +1,4 @@
-name: Issue 1212 MCP read and cancellation acceptance
+name: Root final production acceptance
 
 # Bound to the verified 3c production source for three MCP read/cancel cases.
 # The job holds the Web deploy queue and the driver checks the public version.
@@ -150,10 +150,12 @@ jobs:
     runs-on: ubuntu-latest
     # MCP is bounded to 240s; four independent native Stop cases are each
     # bounded to 120s plus normal Stop and session cleanup.
-    timeout-minutes: 12
+    timeout-minutes: 40
     env:
-      MIKKA_ACCEPTANCE_SHA: '01a6bfb3a6c537e2b466911f57429f109b418aa8' # Only the verified final production application SHA.
-      MIKKA_GROUP_MODE: mcp
+      MIKKA_ACCEPTANCE_SHA: '1d1261b607c8d60a27e2131ef59b463156d346d1' # Only the verified final production application SHA.
+      MIKKA_GROUP_MODE: lifecycle
+      MIKKA_APPROVED_RUNTIME_SOURCE: 'facb389f6cc06c453e9135bb60ada1b0f302e0d9'
+      MIKKA_APPROVED_RUNTIME_WORKER: 'a45382985c12c93fb0832eabd8010f60c9b7dabb'
       MIKKA_RELEASE_SOURCE: ${{ github.workspace }}/released
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -188,7 +190,12 @@ jobs:
             return response.json()
           }
           const [main,runs] = await Promise.all([read('git/ref/heads/main'),read('actions/runs?head_sha='+sha+'&per_page=100')])
-          if(main.object?.sha!==sha || runs.total_count>100) throw Error('RELEASE_SOURCE_CHANGED')
+          if(runs.total_count>100) throw Error('RELEASE_SOURCE_CHANGED')
+          if(main.object?.sha!==sha) {
+            if(process.env.MIKKA_GROUP_MODE!=='lifecycle') throw Error('RELEASE_SOURCE_CHANGED')
+            const ancestry=await read('compare/'+sha+'...'+main.object?.sha)
+            if(ancestry.status!=='ahead'||ancestry.behind_by!==0||ancestry.merge_base_commit?.sha!==sha) throw Error('RELEASE_SOURCE_CHANGED')
+          }
           if (process.env.MIKKA_GROUP_MODE === 'mcp') {
             const p0 = await read('pulls/1636')
             let scopedSource = false
@@ -205,6 +212,7 @@ jobs:
             headers:{'cache-control':'no-store'},redirect:'error',signal:AbortSignal.timeout(20000)})
           if(!live.ok || (await live.json()).build!==sha) throw Error('PUBLIC_SOURCE_CHANGED')
           const required = process.env.MIKKA_GROUP_MODE === 'mcp' ? ['Web deploy']
+            : process.env.MIKKA_GROUP_MODE === 'lifecycle' ? ['CI','Web deploy']
             : ['CI','Web deploy','E2B additive runtime release','Self-hosted image']
           const workflows=required.map(name=>{
             const candidates=runs.workflow_runs.filter(r=>r.name===name&&r.head_sha===sha&&r.head_branch==='main')
@@ -237,6 +245,56 @@ jobs:
         run: pnpm --dir released install --frozen-lockfile --ignore-scripts
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      - name: Read only the existing runtime configuration reader credential
+        if: env.MIKKA_GROUP_MODE == 'lifecycle'
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: VERCEL_TEAM_TOKEN
+          recursive: false
+          include-imports: false
+      - name: Verify the actual approved runtime before account credentials or new machines
+        if: env.MIKKA_GROUP_MODE == 'lifecycle'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module <<'JS'
+          import { writeFileSync } from 'node:fs'
+          import { readProductionWorkerRelease } from './released/scripts/acceptance/cloud-startup.mjs'
+          const release=await readProductionWorkerRelease({token:process.env.VERCEL_TEAM_TOKEN})
+          if(release.sourceCommit!==process.env.MIKKA_APPROVED_RUNTIME_SOURCE||release.workerSha!==process.env.MIKKA_APPROVED_RUNTIME_WORKER) throw Error('APPROVED_RUNTIME_CHANGED')
+          const read=async path=>{
+            const response=await fetch('https://api.github.com/repos/alexj11324/Mikka/'+path,{redirect:'error',signal:AbortSignal.timeout(20000),
+              headers:{authorization:'Bearer '+process.env.GITHUB_TOKEN,accept:'application/vnd.github+json'}})
+            if(!response.ok)throw Error('APPROVED_RUNTIME_METADATA_REFUSED')
+            return response.json()
+          }
+          const [history,ancestry]=await Promise.all([read('actions/runs?head_sha='+release.sourceCommit+'&per_page=100'),
+            read('compare/'+release.sourceCommit+'...'+process.env.MIKKA_ACCEPTANCE_SHA)])
+          if(history.total_count>100||!['ahead','identical'].includes(ancestry.status)||ancestry.behind_by!==0||ancestry.merge_base_commit?.sha!==release.sourceCommit)throw Error('APPROVED_RUNTIME_ANCESTRY')
+          const run=history.workflow_runs.filter(r=>r.name==='E2B additive runtime release'&&r.head_branch==='main'&&r.status==='completed'&&r.conclusion==='success'&&['push','workflow_dispatch'].includes(r.event)).sort((a,b)=>b.id-a.id)[0]
+          if(!run)throw Error('APPROVED_RUNTIME_NOT_RELEASED')
+          const jobs=await read('actions/runs/'+run.id+'/jobs?per_page=100')
+          if(jobs.total_count>100)throw Error('APPROVED_RUNTIME_METADATA_TRUNCATED')
+          const groups=[['test'],['check'],['validate','validate / build'],['await-web'],['subscriptions'],['publish','publish / deploy'],['cleanup']]
+          const verified=groups.map(names=>{
+            const job=jobs.jobs.find(j=>names.includes(j.name)&&j.status==='completed'&&j.conclusion==='success')
+            if(!job)throw Error('APPROVED_RUNTIME_INCOMPLETE')
+            return {id:job.id,name:job.name}
+          })
+          const subscription=jobs.jobs.find(j=>j.name==='subscriptions')
+          const publication=jobs.jobs.find(j=>j.name==='publish'||j.name==='publish / deploy')
+          if(!subscription.steps?.some(s=>s.name==='Require real Claude Code and Codex subscriptions on the private candidates'&&s.conclusion==='success')||
+            !publication.steps?.some(s=>s.name==='Publish the verified additive runtime pair inside the deployment queue'&&s.conclusion==='success'))throw Error('APPROVED_RUNTIME_REAL_GATE_REQUIRED')
+          writeFileSync('issue-1212-mcp-report/runtime-pin.json',JSON.stringify({configuration:release,runId:run.id,attempt:run.run_attempt,verifiedJobs:verified,
+            applicationSha:process.env.MIKKA_ACCEPTANCE_SHA,source:'existing_approved_production_configuration',newRuntimePublicationClaimed:false})+'\n')
+          console.log(JSON.stringify({approvedRuntime:'verified',source:release.sourceCommit,worker:release.workerSha,runId:run.id,newMachineCreated:false}))
+          JS
       - name: Read the shared smoke account email only
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:

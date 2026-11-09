@@ -12,6 +12,18 @@ const SHA = /^[a-f0-9]{40}$/
 const need = (value, code) => { if (!value) throw Error('lifecycle_bounds_' + code) }
 const sha = value => createHash('sha256').update(value).digest('hex')
 
+export function assertRuntimePin(current, expected, templateId) {
+  for (const value of [current, expected]) {
+    need(SHA.test(value?.sourceCommit ?? '') && SHA.test(value?.workerSha ?? ''), 'approved_runtime_invalid')
+    need(['desktop','claude','codex'].every(kind => /^[A-Za-z0-9_-]{1,100}$/.test(value.templates?.[kind] ?? '')), 'approved_runtime_invalid')
+  }
+  need(current.sourceCommit === expected.sourceCommit && current.workerSha === expected.workerSha
+    && ['desktop','claude','codex'].every(kind => current.templates[kind] === expected.templates[kind]), 'approved_runtime_changed')
+  if (templateId !== undefined) need(Object.values(expected.templates).includes(templateId), 'unapproved_runtime_template')
+  return { sourceCommit: expected.sourceCommit, workerSha: expected.workerSha,
+    templateMatched: templateId === undefined ? null : true }
+}
+
 export function activeCommand(caseId, sourceCommit, phase = 'work') {
   need(UUID.test(caseId) && SHA.test(sourceCommit) && ['work','margin'].includes(phase), 'command_scope')
   const seconds = phase === 'work' ? 160 : 30
@@ -61,7 +73,21 @@ export async function runLifecycleBounds(env, event, { signal } = {}) {
   need(source.startsWith(resolve(env.GITHUB_WORKSPACE) + '/'), 'source_directory')
   const lifecycle = await import(pathToFileURL(source + '/scripts/acceptance/thread-lifecycle.mjs'))
   const { watchRun, observeChunks, hasStartupInitialization } = await import(pathToFileURL(source + '/scripts/acceptance/cloud-startup.mjs'))
-  const { Pool } = createRequire(source + '/package.json')('pg')
+  const requireSource=createRequire(source+'/package.json')
+  const { Pool } = requireSource('pg')
+  const { Sandbox } = await import(pathToFileURL(requireSource.resolve('e2b')))
+  const runtimeReader=(await import(pathToFileURL(source+'/scripts/acceptance/cloud-startup.mjs'))).readProductionWorkerRelease
+  const approved=JSON.parse(await readFile('issue-1212-mcp-report/runtime-pin.json','utf8'))
+  need(approved.applicationSha===binding.applicationSha && approved.configuration?.sourceCommit===env.MIKKA_APPROVED_RUNTIME_SOURCE
+    && approved.configuration?.workerSha===env.MIKKA_APPROVED_RUNTIME_WORKER,'approved_runtime_invalid')
+  const runtime=approved.configuration, runtimeObservations=[]
+  assertRuntimePin(await runtimeReader({token:env.VERCEL_TEAM_TOKEN}),runtime)
+  const getInfo=async(...args)=>{
+    const info=await Sandbox.getInfo(...args)
+    need(typeof info.templateId==='string','unapproved_runtime_template')
+    runtimeObservations.push({...assertRuntimePin(runtime,runtime,info.templateId),sandboxHash:sha(info.sandboxId).slice(0,16)})
+    return info
+  }
   const target = new URL(env.DATABASE_URL)
   need(['postgres:', 'postgresql:'].includes(target.protocol) && target.hostname.endsWith('.neon.tech')
     && target.pathname === '/orvilo_mvp' && (!target.port || target.port === '5432') && !target.hash, 'database_target')
@@ -177,9 +203,18 @@ export async function runLifecycleBounds(env, event, { signal } = {}) {
   let report
   try {
     report = await lifecycle.runThreadLifecycle({ sourceCommit: binding.applicationSha, timeoutMs: 420000,
-      reportPath: resolve(env.RUNNER_TEMP,'thread-lifecycle-bounds/report.json') }, { env, signal, runCase: oneCase })
+      reportPath: resolve(env.RUNNER_TEMP,'thread-lifecycle-bounds/report.json') }, { env, signal, runCase: oneCase, getInfo })
     report.driver = { revision: binding.driverRevision, runId: binding.runId, authorization: 'existing_actions_branch_push_guard' }
     report.additionalBoundsPassed = bounds.length===2 && bounds.every(row=>row.status==='passed')
+    report.approvedRuntime={configuration:runtime,runId:approved.runId,observations:runtimeObservations,status:'failed'}
+    try {
+      assertRuntimePin(await runtimeReader({token:env.VERCEL_TEAM_TOKEN}),runtime)
+      need(new Set(runtimeObservations.map(row=>row.sandboxHash)).size===2,'approved_runtime_instances_missing')
+      report.approvedRuntime.status='passed'
+    } catch(error) {
+      report.approvedRuntime.code=/^lifecycle_bounds_[a-z_]+$/.test(error?.message??'')?error.message:'lifecycle_bounds_runtime_unconfirmed'
+      report.additionalBoundsPassed=false
+    }
     // Preserve the original driver's issueAcceptance and untested-stage limits.
     await mkdir('issue-1212-mcp-report',{recursive:true})
     await writeFile('issue-1212-mcp-report/lifecycle-bounds.json',JSON.stringify(report,null,2)+'\n')

@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { activeCommand, activeToolProof, terminalPauseBound } from './thread-lifecycle-bounds.mjs'
+import { activeCommand, activeToolProof, terminalPauseBound, assertRuntimePin } from './thread-lifecycle-bounds.mjs'
 
 test('terminal pause timing requires an owned positive provider observation within the actual 60-second bound',()=>{
   const terminal={finishedAt:'2026-11-08T05:00:00.000Z'}
@@ -43,4 +43,15 @@ test('the observation margin cannot substitute for the longer lease-renewal comm
   assert.equal(activeToolProof({chunks},{...scope,phase:'margin'},exact).completed,true)
   assert.equal(activeToolProof({chunks},scope,exact).started,false)
   assert.throws(()=>activeCommand(scope.caseId,'$(printenv)'),/command_scope/)
+})
+
+test('lifecycle uses the actual approved release independently of the newer application source',()=>{
+  const release={sourceCommit:'a'.repeat(40),workerSha:'b'.repeat(40),templates:{desktop:'approved-desktop',claude:'approved-claude',codex:'approved-codex'}}
+  assert.deepEqual(assertRuntimePin(release,structuredClone(release)),{sourceCommit:release.sourceCommit,workerSha:release.workerSha,templateMatched:null})
+  for(const template of Object.values(release.templates))assert.equal(assertRuntimePin(release,release,template).templateMatched,true)
+  for(const patch of [{sourceCommit:'c'.repeat(40)},{workerSha:'c'.repeat(40)},{templates:{...release.templates,codex:'other'}}])
+    assert.throws(()=>assertRuntimePin({...release,...patch},release),/approved_runtime_changed/)
+  assert.throws(()=>assertRuntimePin(release,release,'unapproved-template'),/unapproved_runtime_template/)
+  for(const patch of [{sourceCommit:'main'},{workerSha:''},{templates:{desktop:'bad/value',claude:'x',codex:'y'}}])
+    assert.throws(()=>assertRuntimePin({...release,...patch},release),/approved_runtime_invalid/)
 })
