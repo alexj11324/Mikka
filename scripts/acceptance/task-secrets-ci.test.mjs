@@ -288,6 +288,11 @@ test('Factory uses only the original ACME credentials and real execute path, wit
   assert.match(factory, /production-run-observability-report\/report\.json/)
   assert.match(factory, /task-secrets-ci\.mjs prepare/)
   assert.match(factory, /factory-scope\.json/)
+  const jobStart = factory.indexOf("readSecretJobStart(process.env, { expectedJob: 'factory' })")
+  assert.ok(jobStart >= 0 && jobStart < factory.indexOf('Install exact source-only Factory guard dependencies'))
+  assert.ok(jobStart < factory.indexOf('Recheck Factory scope, main, upstream attempt and public build immediately before account email'))
+  for (const assignment of ['TASK_SECRETS_JOB_ID=${job.id}', 'TASK_SECRETS_JOB_STARTED_AT=${job.startedAt}',
+    'TASK_SECRETS_JOB_START_SOURCE=${job.source}']) assert.ok(factory.includes(assignment))
   assert.doesNotMatch(factory, /--prepare|--browser-submit|--runner-browser|MIKKA_ACCEPTANCE_PROGRESS_TOKEN|SMOKE_OWNER|E2B_API_KEY|issues: write|actions: write|contents: write/)
   assert.doesNotMatch(native, /ACME_DEMO/)
   const steps = factory.split('      - name:')

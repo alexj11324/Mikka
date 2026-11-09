@@ -1047,6 +1047,42 @@ test('job budget reads the actual unique running job in this attempt and refuses
   await assert.rejects(readSecretJobStart(options, { fetchImpl: async () => new Response('{}', { status: 403 }) }), /budget/)
 })
 
+test('Factory obtains its own actual job provenance before the shared execute guard', async () => {
+  const options = { ...env, GITHUB_JOB: 'factory', GITHUB_TOKEN: 'synthetic-github-read-token' }
+  for (const name of ['TASK_SECRETS_JOB_ID', 'TASK_SECRETS_JOB_STARTED_AT', 'TASK_SECRETS_JOB_START_SOURCE']) delete options[name]
+  assert.throws(() => readOptions(['--execute'], options), /task_secrets_configuration/)
+  const startedAt = new Date(Date.now() - 60_000).toISOString()
+  const job = { id: 992, name: 'factory', run_id: 990, run_attempt: 1, head_sha: env.GITHUB_SHA,
+    status: 'in_progress', conclusion: null, started_at: startedAt }
+  const earlierJobs = ['authorize', 'acceptance'].map((name, index) => ({ ...job, id: 989 + index, name,
+    started_at: new Date(Date.parse(startedAt) - 600_000).toISOString() }))
+  const request = (factory = job) => async (url, init) => {
+    assert.equal(url, 'https://api.github.com/repos/alexj11324/Mikka/actions/runs/990/attempts/1/jobs?per_page=100')
+    assert.equal(init.headers.authorization, 'Bearer synthetic-github-read-token')
+    return Response.json({ jobs: [...earlierJobs, factory], total_count: 3 })
+  }
+  const actual = await readSecretJobStart(options, { expectedJob: 'factory', fetchImpl: request() })
+  assert.deepEqual(actual, { id: 992, startedAt, source: 'github_actions_job.started_at' })
+  const complete = { ...options, TASK_SECRETS_JOB_ID: String(actual.id), TASK_SECRETS_JOB_STARTED_AT: actual.startedAt,
+    TASK_SECRETS_JOB_START_SOURCE: actual.source }
+  const selected = readOptions(['--execute'], complete)
+  assert.equal(selected.driver.jobId, job.id)
+  assert.equal(selected.jobStartedAt, job.started_at)
+  for (const name of ['TASK_SECRETS_JOB_ID', 'TASK_SECRETS_JOB_STARTED_AT', 'TASK_SECRETS_JOB_START_SOURCE']) {
+    const incomplete = { ...complete }; delete incomplete[name]
+    assert.throws(() => readOptions(['--execute'], incomplete), /task_secrets_(?:configuration|budget)/)
+  }
+  for (const patch of [{ id: 0 }, { name: 'acceptance' }, { name: 'authorize' }, { run_id: 989 }, { run_attempt: 2 },
+    { head_sha: 'f'.repeat(40) }, { started_at: null }, { started_at: new Date(Date.now() + 60_000).toISOString() }])
+    await assert.rejects(readSecretJobStart(options, { expectedJob: 'factory', fetchImpl: request({ ...job, ...patch }) }), /budget/)
+  for (const expectedJob of ['authorize', 'other', '', null])
+    await assert.rejects(readSecretJobStart(options, { expectedJob, fetchImpl: () => assert.fail('unsupported job must not read the API') }), /budget/)
+  await assert.rejects(readSecretJobStart(options, { fetchImpl: () => assert.fail('factory must be explicitly selected') }), /budget/)
+  await assert.rejects(readSecretJobStart({ ...options, GITHUB_JOB: 'acceptance' }, {
+    expectedJob: 'factory', fetchImpl: () => assert.fail('another job cannot select Factory provenance'),
+  }), /budget/)
+})
+
 test('the earliest fixed job/window/fixture deadline preserves evidence and cleanup time without renewing any limit', () => {
   let time = Date.now()
   const start = new Date(time).toISOString(), window = { ...windowAt(time), expiresAt: new Date(time + 45 * 60_000).toISOString() }

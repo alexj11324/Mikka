@@ -15,10 +15,11 @@ export const SECRET_BUDGET = Object.freeze({ jobMs: 35 * 60_000, stepMs: 24 * 60
 /** Read the running job, not the later shell/process clock. The existing
  * actions:read token suffices; a partial page or unknown job never starts work.
  */
-export async function readSecretJobStart(env, { fetchImpl = fetch, now = Date.now } = {}) {
+export async function readSecretJobStart(env, { fetchImpl = fetch, now = Date.now, expectedJob = 'acceptance' } = {}) {
   const repo = 'alexj11324/Mikka', runId = Number(env.GITHUB_RUN_ID), attempt = Number(env.GITHUB_RUN_ATTEMPT)
   check(env.GITHUB_ACTIONS === 'true' && env.GITHUB_REPOSITORY === repo && env.GITHUB_REF === 'refs/heads/main'
-    && env.GITHUB_JOB === 'acceptance' && positive(runId) && positive(attempt) && env.GITHUB_TOKEN
+    && ['acceptance', 'factory'].includes(expectedJob) && env.GITHUB_JOB === expectedJob
+    && positive(runId) && positive(attempt) && env.GITHUB_TOKEN
     && SHA.test(env.GITHUB_SHA ?? '') && env.APPLICATION_SHA === env.GITHUB_SHA, 'budget')
   const response = await fetchImpl(`https://api.github.com/repos/${repo}/actions/runs/${runId}/attempts/${attempt}/jobs?per_page=100`, {
     headers: { accept: 'application/vnd.github+json', authorization: `Bearer ${env.GITHUB_TOKEN}`,
@@ -34,7 +35,7 @@ export async function readSecretJobStart(env, { fetchImpl = fetch, now = Date.no
   } finally { await reader.cancel().catch(() => {}); reader.releaseLock() }
   const listing = JSON.parse(Buffer.concat(chunks).toString('utf8'))
   check(Array.isArray(listing.jobs) && listing.jobs.length <= 100 && listing.total_count === listing.jobs.length, 'budget')
-  const matches = listing.jobs.filter(job => job.name === 'acceptance')
+  const matches = listing.jobs.filter(job => job.name === expectedJob)
   check(matches.length === 1, 'budget')
   const job = matches[0], started = Date.parse(job.started_at ?? '')
   check(positive(job.id) && job.run_id === runId && (job.run_attempt === undefined || job.run_attempt === attempt)
