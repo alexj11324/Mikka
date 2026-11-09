@@ -169,6 +169,34 @@
       "runId": "7970d2af-b75b-4450-89e3-47f0a8a1154a",
       "operationId": "a2f200cf-28ad-43a4-be76-118ade1660ef",
       "lookup": "operation_metadata"
+    },
+    {
+      "issueId": "fa86659d-a5f2-48ab-992a-ee75f716d562",
+      "taskId": "f695503c-c7fb-40e1-9659-df918f8b1b6e",
+      "runId": "e269de7c-525d-4a1d-88fb-ec5670014b01",
+      "operationId": "11951233-2e0d-463a-ab0e-049ad9c36e13",
+      "lookup": "operation_metadata"
+    },
+    {
+      "issueId": "fa86659d-a5f2-48ab-992a-ee75f716d562",
+      "taskId": "f695503c-c7fb-40e1-9659-df918f8b1b6e",
+      "runId": "532e9734-5b02-4aae-89b5-7a744a6a614d",
+      "operationId": "6702548f-420a-4db3-b40f-1251bc5432fe",
+      "lookup": "operation_metadata"
+    },
+    {
+      "issueId": "c38abb4c-2f8a-48ea-b70b-9f2badda85ee",
+      "taskId": "4ad3fce3-a6e8-40b3-9248-df1ea6bc9faf",
+      "runId": "eb28a228-a575-4bc6-8732-ca505a3b2636",
+      "operationId": "b8597993-83d7-4632-a1a1-8d58faa78c89",
+      "lookup": "operation_metadata"
+    },
+    {
+      "issueId": "c38abb4c-2f8a-48ea-b70b-9f2badda85ee",
+      "taskId": "4ad3fce3-a6e8-40b3-9248-df1ea6bc9faf",
+      "runId": "0450e5aa-7891-47b9-90db-3a1f6b4b9ca3",
+      "operationId": "30dbc2a7-ef8b-4adf-87be-8eac4e7644f5",
+      "lookup": "operation_metadata"
     }
   ],
   "mode": "failed_release",

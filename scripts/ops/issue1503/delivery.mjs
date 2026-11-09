@@ -12,7 +12,7 @@ import { smokeSession, fail, SMOKE_ID, OWNER_ID } from './http.ts'
 import { encode, decode } from '../../../lib/desktop-rpc/wire.ts'
 import { ACTION_ERROR_CODES } from '../../../lib/action-result.ts'
 import { explicitNewTaskArguments, explicitNewTaskComplete, explicitNewTaskEvidence, explicitNewTaskCleanupReceipts } from './explicit-submission.mjs'
-import { codexQuestionConfirmation, confirmationQuestionReference, confirmationRunEvidence, confirmationAnswerReceipt } from './question-confirmation.mjs'
+import { codexQuestionConfirmation, confirmationPendingQuestion, confirmationPendingObservation, confirmationQuestionReference, confirmationRunEvidence, confirmationAnswerReceipt } from './question-confirmation.mjs'
 import { createOwnVmDiagnostic } from './own-vm-diagnostic.mjs'
 import { createFixtureGithubReader, collectFixtureCiEvidence, collectFixtureImplementationEvidence, reviewCriteriaEvidence, verifiedFileBytes } from './fixture-ci-evidence.mjs'
 export { verifiedFileBytes } from './fixture-ci-evidence.mjs'
@@ -587,13 +587,14 @@ export async function runDeliveryAcceptance(env = process.env) {
           fail('factory_terminal_failure')
         }
         if (confirmation && state.task.stage === 'execute' && state.task.status === 'waiting') {
-          check(!activeCase.questionConfirmation.answerAttempted, 'confirmation_repeated_question')
           const pending = await json(`/api/factory/questions?taskId=${activeCase.taskId}`)
-          check(pending.questions?.length === 1 && uuid(pending.questions[0].questionId)
-            && pending.questions[0].type === 'permission' && pending.questions[0].originalText === confirmation.question
-            && pending.questions[0].taskId === activeCase.taskId && pending.questions[0].runId === activeCase.threadRunId,
-          'confirmation_unknown_question')
-          const question = await json(`/api/factory/questions/${pending.questions[0].questionId}`)
+          activeCase.questionConfirmation.latestPendingObservation = confirmationPendingObservation(pending, state.task.revision)
+          await checkpoint()
+          const pendingQuestion = confirmationPendingQuestion(pending, activeCase.questionConfirmation, {
+            taskId: activeCase.taskId, originRunId: activeCase.threadRunId, sourceEventId: state.task.sourceEventId
+          }, confirmation)
+          if (!pendingQuestion) return state
+          const question = await json(`/api/factory/questions/${pendingQuestion.questionId}`)
           const expected = { ownerId: SMOKE_ID, credentialOwnerId: OWNER_ID, workspaceId, taskId: activeCase.taskId,
             issueId: issue.id, botId: bot.id, originRunId: activeCase.threadRunId, sourceEventId: state.task.sourceEventId, profile }
           const originEvidence = await json(`/api/runs/${expected.originRunId}/evidence`)

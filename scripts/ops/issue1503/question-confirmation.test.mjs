@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { codexQuestionConfirmation, confirmationQuestionReference, confirmationRunEvidence, confirmationAnswerReceipt } from './question-confirmation.mjs'
+import { codexQuestionConfirmation, confirmationPendingQuestion, confirmationPendingObservation, confirmationQuestionReference, confirmationRunEvidence, confirmationAnswerReceipt } from './question-confirmation.mjs'
 
 const id = n => `10000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 function fixture() {
@@ -102,4 +102,121 @@ test('normal human answer receipt binds one new attempt and records only a hash 
     const bad = fixture(); mutate(bad)
     assert.throws(() => confirmationAnswerReceipt(bad.result, bad.answered, bad.reference, bad.answerId, bad.expected, bad.confirmation), /^Error: issue1503_confirmation_answer_receipt_mismatch$/)
   }
+})
+
+function pendingQuestion(f, status = 'waiting_user') {
+  return { questionId: f.question.id, taskId: f.expected.taskId, runId: f.expected.originRunId,
+    type: 'permission', originalText: f.confirmation.question, status }
+}
+function answeredProgress(f) {
+  return { answerAttempted: true, questionId: f.question.id, answerId: f.answerId,
+    receipt: confirmationAnswerReceipt(f.result, f.answered, f.reference, f.answerId, f.expected, f.confirmation) }
+}
+
+test('first exact permission question still requires the original detail/reference inspection', () => {
+  const f = fixture()
+  for (const status of ['open', 'waiting_user']) {
+    const question = pendingQuestion(f, status)
+    assert.equal(confirmationPendingQuestion({ questions: [question] }, { answerAttempted: false }, f.expected, f.confirmation), question)
+  }
+})
+
+test('before an answer, empty, multiple, malformed and unknown pending questions stay rejected', () => {
+  const f = fixture(), first = pendingQuestion(f)
+  const cases = [undefined, {}, { questions: null }, { questions: [] }, { questions: [first, first] }]
+  for (const change of [{ questionId: 'invalid' }, { type: 'external' }, { originalText: 'Another question' },
+    { taskId: id(91) }, { runId: id(92) }]) cases.push({ questions: [{ ...first, ...change }] })
+  for (const pending of cases) assert.throws(
+    () => confirmationPendingQuestion(pending, { answerAttempted: false }, f.expected, f.confirmation),
+    /^Error: issue1503_confirmation_unknown_question$/)
+})
+
+test('after the verified human answer, an empty pending set continues the existing wait', () => {
+  const f = fixture()
+  assert.equal(f.state.task.stage, 'execute')
+  assert.equal(f.state.task.status, 'waiting')
+  assert.equal(confirmationPendingQuestion({ questions: [] }, answeredProgress(f), f.expected, f.confirmation), null)
+})
+
+test('the same bound original question remains wait-only across normal pending statuses', () => {
+  const f = fixture(), progress = answeredProgress(f)
+  for (const status of ['open', 'waiting_user', 'resuming', 'blocked']) {
+    assert.equal(confirmationPendingQuestion({ questions: [pendingQuestion(f, status)] }, progress, f.expected, f.confirmation), null)
+  }
+})
+
+test('a new question or an additional question after the answer still fails explicitly', () => {
+  const f = fixture(), progress = answeredProgress(f), original = pendingQuestion(f, 'resuming')
+  const next = { ...original, questionId: id(93) }
+  for (const questions of [[next], [original, next], [original, original]]) assert.throws(
+    () => confirmationPendingQuestion({ questions }, progress, f.expected, f.confirmation),
+    /^Error: issue1503_confirmation_repeated_question$/)
+})
+
+test('the original id does not permit changed text, kind, task, run or an unknown status', () => {
+  const f = fixture(), progress = answeredProgress(f), original = pendingQuestion(f, 'resuming')
+  for (const change of [{ type: 'external' }, { originalText: 'Another question' }, { taskId: id(94) },
+    { runId: id(95) }, { status: 'resolved' }, { status: 'unknown' }]) assert.throws(
+    () => confirmationPendingQuestion({ questions: [{ ...original, ...change }] }, progress, f.expected, f.confirmation),
+    /^Error: issue1503_confirmation_unknown_question$/)
+  for (const pending of [undefined, {}, { questions: null }]) assert.throws(
+    () => confirmationPendingQuestion(pending, progress, f.expected, f.confirmation),
+    /^Error: issue1503_confirmation_unknown_question$/)
+})
+
+test('post-answer waiting requires the already verified receipt and its original bindings', () => {
+  const f = fixture()
+  const changes = [
+    progress => { delete progress.receipt },
+    progress => { progress.questionId = id(96) },
+    progress => { progress.answerId = id(97) },
+    progress => { progress.receipt.originRunId = id(98) },
+    progress => { progress.receipt.sourceEventId = id(99) },
+    progress => { progress.receipt.questionSha256 = 'f'.repeat(64) },
+    progress => { progress.receipt.answerSource = 'orchestrator' },
+    progress => { progress.receipt.replayed = true },
+  ]
+  for (const change of changes) {
+    const progress = answeredProgress(f); change(progress)
+    assert.throws(() => confirmationPendingQuestion({ questions: [] }, progress, f.expected, f.confirmation),
+      /^Error: issue1503_confirmation_answer_receipt_mismatch$/)
+  }
+})
+
+test('pending diagnostics retain only the actual bounded identifiers, statuses and text hash', () => {
+  const f = fixture(), observedAt = '2026-11-09T15:00:00.000Z'
+  const question = { ...pendingQuestion(f, 'resuming'), originSessionId: f.reference.originSessionId }
+  const observation = confirmationPendingObservation({ questions: [question] }, f.state.task.revision, observedAt)
+  assert.deepEqual(observation, { observedAt, taskRevision: f.state.task.revision, totalCount: 1,
+    questions: [{ questionId: f.question.id, type: 'permission', status: 'resuming',
+      runId: f.expected.originRunId, taskId: f.expected.taskId, textSha256: answeredProgress(f).receipt.questionSha256 }],
+    truncated: false })
+  assert.ok(!JSON.stringify(observation).includes(f.confirmation.question))
+  assert.ok(!JSON.stringify(observation).includes(f.reference.originSessionId))
+})
+
+test('pending diagnostics preserve the actual total while limiting retained questions to four', () => {
+  const f = fixture()
+  const questions = Array.from({ length: 5 }, (_, n) => ({ ...pendingQuestion(f), questionId: id(80 + n) }))
+  const observation = confirmationPendingObservation({ questions }, f.state.task.revision)
+  assert.equal(observation.totalCount, 5)
+  assert.equal(observation.questions.length, 4)
+  assert.equal(observation.truncated, true)
+  assert.deepEqual(observation.questions.map(question => question.questionId), questions.slice(0, 4).map(question => question.questionId))
+  assert.ok(!JSON.stringify(observation).includes(id(84)))
+})
+
+test('malformed pending diagnostics cannot expose arbitrary id, kind, status or extra field text', () => {
+  const privateText = 'private-text-fixture'
+  const observation = confirmationPendingObservation({ questions: [{ questionId: privateText, type: privateText,
+    status: privateText, runId: privateText, taskId: privateText, originalText: privateText, extra: privateText }] }, -1)
+  assert.equal(observation.taskRevision, null)
+  assert.deepEqual({ ...observation.questions[0], textSha256: null },
+    { questionId: null, type: null, status: null, runId: null, taskId: null, textSha256: null })
+  assert.match(observation.questions[0].textSha256, /^[a-f0-9]{64}$/)
+  assert.ok(!JSON.stringify(observation).includes(privateText))
+  const malformed = confirmationPendingObservation({ questions: null }, 7)
+  assert.equal(malformed.totalCount, null)
+  assert.deepEqual(malformed.questions, [])
+  assert.equal(malformed.truncated, false)
 })
