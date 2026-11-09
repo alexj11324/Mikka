@@ -8,25 +8,25 @@ import { once } from 'node:events'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
-import { mailpitNotifications, cloudChatResult, selectSharedTeam } from './self-hosting-subscription-acceptance.mjs'
+import { mailpitNotifications, cloudChatResult } from './self-hosting-subscription-acceptance.mjs'
 
-const base = '80f2f7e095a4671efa87f245742ccb8b157c7228'
-const revision = '9bcdefc5fe0c047393d581eea867ffa801f53dbe'
-const image = 'ghcr.io/alexj11324/mikka@sha256:477a4178fcc5989ff030ed350075ff9cc4f7937f9ee998a006a2e6aa2675227c'
+const base = '7ff20714f272f02d2ff8d32c98a397d79b51625b'
+const revision = '88b144d52d091d7ff566c63fce6e902e33edc59e'
+const image = 'ghcr.io/alexj11324/mikka@sha256:96de4972ea7820dca9d7f03d116f8a4589c662ee6a6db9cb33cf8ad0f89ec98e'
 const publicOrigin = 'https://app.aspectlylabs.com'
 const privateProject = 'prj_vhbbfNIkhDO6grmZ3f6zMUH6k7rc', teamId = 'team_C7lwxVVvnUicFli6112mvxpv'
-const model = 'deepseek/deepseek-v4.1-flash', prefix = 'ops: inspect private cloud production subscriptions final services'
+const model = 'deepseek/deepseek-v4.1-flash', prefix = 'ops: inspect private cloud production subscriptions final services paid personal'
 const execute = promisify(execFile), sha = x => createHash('sha256').update(x).digest('hex')
 const need = (ok, code) => { if (!ok) throw Error('SERVICES_' + code) }
 const post = body => ({ method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 const report = { schema: 1, kind: 'real-self-hosted-cloud-services', startedAt: new Date().toISOString(), imageSource: revision,
-  image, model, codingThreadsRequested: 0, driverVirtualMachines: 0, sharedBillingMutations: 0, uiOpened: false, cases: {}, cleanup: {}, status: 'failed' }
+  image, model, codingThreadsRequested: 0, driverVirtualMachines: 0, billingConfigurationWrites: 0, uiOpened: false, cases: {}, cleanup: {}, stage: 'guard', status: 'failed' }
 const source = resolve(process.env.RUNNER_TEMP ?? '.', 'mikka-services-source')
 let cloud, community, pool, tunnel, serverRegistered = false, originalWorkspace, ownerId, quotaWorkspace, quotaName
 const resources = [], ownedBots = []
 const docker = async args => (await execute('docker', args, { encoding: 'utf8', timeout: 150000, maxBuffer: 4 * 1024 * 1024 })).stdout.trim()
-const safe = error => /^SERVICES_[A-Z0-9_]+$/.test(error?.message ?? '') ? error.message : 'SERVICES_OPERATION_FAILED'
+const safe = error => /^(SERVICES_[A-Z0-9_]+|startup_[a-z0-9_]+|SELF_HOSTED_[A-Z0-9_]+)$/.test(error?.message ?? '') ? error.message : 'SERVICES_OPERATION_FAILED'
 async function deployment() {
   const r = await fetch('https://api.vercel.com/v9/projects/' + privateProject + '?teamId=' + teamId,
     { headers: { authorization: 'Bearer ' + process.env.VERCEL_TEAM_TOKEN }, redirect: 'error', signal: AbortSignal.timeout(20000) })
@@ -54,9 +54,9 @@ try {
   need((await execute('git', ['rev-parse', 'HEAD'], { cwd: source })).stdout.trim() === revision, 'IMAGE_SOURCE')
   await execute(process.execPath, [source + '/scripts/assert-test-model.mjs', model])
   const { createSessionClient } = await import(pathToFileURL(source + '/scripts/acceptance/cloud-startup.mjs'))
-  const { selectTeamWorkspace } = await import(pathToFileURL(source + '/scripts/acceptance/team-workspace.mjs'))
   const { socketEvents } = await import(pathToFileURL(source + '/scripts/acceptance/self-hosted-services.mjs'))
   const { Pool } = createRequire(source + '/package.json')('pg')
+  report.stage = 'account'
   report.privateBefore = await deployment()
   cloud = createSessionClient(publicOrigin, (url, init) => fetch(url, { ...init, redirect: 'manual' }))
   await cloud.json('/api/auth/sign-in/email', post({ email: e.SMOKE_OWNER_EMAIL, password: e.SMOKE_OWNER_PASSWORD }))
@@ -64,9 +64,27 @@ try {
   need(identity.user?.email?.toLowerCase() === e.SMOKE_OWNER_EMAIL.toLowerCase() && identity.user.emailVerified === true, 'IDENTITY')
   ownerId = identity.user.id; originalWorkspace = (await cloud.json('/api/workspace')).workspace.id
   report.publicBefore = (await cloud.json('/api/version')).build
-  const shared = await selectSharedTeam(cloud, ownerId, selectTeamWorkspace)
-  report.sharedWorkspaceHash = sha(shared.workspaceId).slice(0, 16)
-  pool = new Pool({ connectionString: e.MIKKA_DATABASE_URL, max: 1, ssl: { rejectUnauthorized: true }, options: '-c default_transaction_read_only=on -c statement_timeout=5000' })
+  const choices = (await cloud.json('/api/workspace')).choices
+  const billingChoices = choices.filter(w => w.kind === 'personal' && sha(w.id).slice(0,16) === '683a9e11b0c2d41f')
+  need(billingChoices.length === 1, 'PAID_WORKSPACE_SCOPE')
+  const billingWorkspace = billingChoices[0].id
+  const eligibility = await cloud.rpc('billing.getHostedUsage', [billingWorkspace])
+  need(eligibility.state === 'ready' && eligibility.balance?.verified === true
+    && Number(eligibility.balance.free) + Number(eligibility.balance.purchased) > 0, 'PAID_WORKSPACE_ELIGIBILITY')
+  report.billingWorkspaceHash = sha(billingWorkspace).slice(0,16)
+  report.billingSelection = 'existing_paid_personal_normal_oauth'
+  report.sharedTeamBillingChanged = false
+  await cloud.rpc('workspace.switchWorkspace', [billingWorkspace])
+  pool = new Pool({ connectionString: e.MIKKA_DATABASE_URL, max: 1, connectionTimeoutMillis: 15000, ssl: { rejectUnauthorized: true } })
+  const readOnly = async work => {
+    const tx = await pool.connect()
+    try {
+      await tx.query('BEGIN READ ONLY'); await tx.query("SET LOCAL statement_timeout = '5s'")
+      need((await tx.query('SHOW transaction_read_only')).rows[0]?.transaction_read_only === 'on', 'READ_ONLY')
+      return await work(tx)
+    } finally { try { await tx.query('ROLLBACK') } finally { tx.release() } }
+  }
+  report.stage = 'self_hosted_bootstrap'
   const name = 'mikka-services-' + e.GITHUB_RUN_ID, password = randomBytes(24).toString('base64url'), key = randomBytes(32).toString('base64')
   await docker(['network', 'create', name]); resources.push(['network', name])
   await docker(['run', '-d', '--name', name + '-pg', '--network', name, '-p', '127.0.0.1:55439:5432', '-e', 'POSTGRES_USER=mikka', '-e', 'POSTGRES_DB=community_services_e2e', '-e', 'POSTGRES_PASSWORD=' + password, 'postgres:17-alpine']); resources.push(['container', name + '-pg'])
@@ -79,8 +97,10 @@ try {
   })
   report.origin = origin
   const inspect = JSON.parse(await docker(['image', 'inspect', image]))[0]
-  need(inspect.Id === 'sha256:24126f5e7cabe44d33ff422cf8ad0fa1dbdbb090609747a166f1c8a5f2dde7b1'
-    && inspect.Config?.Labels?.['org.opencontainers.image.revision'] === revision && inspect.RepoDigests?.includes(image), 'IMAGE_DIGEST')
+  need(inspect.Id === 'sha256:1fb3725678739bf9d448be52ca5ba576ed3e7902b4c9e1240bd5c174f13754b4'
+    && inspect.Config?.Labels?.['org.opencontainers.image.revision'] === revision && inspect.RepoDigests?.includes(image)
+    && inspect.Config.Env.includes('MIKKA_CLOUD_WORKER_SOURCE_COMMIT=' + revision)
+    && inspect.Config.Env.includes('MIKKA_CLOUD_WORKER_SHA=6ada1d4f809eace6ca84ad0329562f4aacb78452'), 'IMAGE_DIGEST')
   report.imageId = inspect.Id
   const appEnv = { BETTER_AUTH_URL: origin, BETTER_AUTH_SECRET: key, WORKSPACE_SECRETS_KEY: key, CREDENTIAL_MASTER_KEY: key,
     DEVICE_GATEWAY_PUSH_SECRET: key, CRON_SECRET: key, MIKKA_EXTERNAL_CRON: '1', MIKKA_EDITION: 'community',
@@ -117,6 +137,7 @@ try {
   const localWorkspace = (await community.json('/api/workspace')).workspace.id
   appEnv.MIKKA_SERVER_ADMIN_USER_IDS = localIdentity.user.id
   await docker(['rm', '-f', name + '-app']); await startApp(); await waitForApp()
+  report.stage = 'cloud_binding'
   await community.json('/api/cloud/connect', post({ action: 'register', name: 'Self-hosted services ' + e.GITHUB_RUN_ID })); serverRegistered = true
   const bind = async workspaceId => {
     const binding = await community.json('/api/cloud/connect', post({ action: 'bind', scopes: ['models'] }))
@@ -132,34 +153,49 @@ try {
     const bound = await community.request(callback.pathname.slice('/mikka'.length) + callback.search); need(bound.status === 303, 'CALLBACK'); await bound.body?.cancel()
     const serverId = u.searchParams.get('client_id'); need(/^[a-f0-9-]{36}$/.test(serverId ?? ''), 'SERVER_ID'); return serverId
   }
-  const cloudServer = await bind(shared.workspaceId); report.serverId = cloudServer
+  const cloudServer = await bind(billingWorkspace); report.serverId = cloudServer
   const chat = async (client, workspaceId, label, quota = false) => {
-    const bot = await client.json('/api/bots', post({ name: '测试1567 ' + label + ' ' + e.GITHUB_RUN_ID })); need(/^[a-f0-9-]{36}$/.test(bot.id) && bot.workspaceId === workspaceId, 'BOT')
-    ownedBots.push({ client, id: bot.id, local: client === community })
-    const menu = await client.json('/api/mobile/model', { ...post({ bot: bot.id, id: '00000000-0000-0000-0000-000000000000' }), method: 'PUT' })
-    need(menu.current?.kind === 'hosted' && (client !== community || menu.current.hostedSource === 'cloud'), 'MODEL_SELECTION')
-    const ticket = await client.json('/api/live/ticket?workspace=' + workspaceId)
-    const socket = socketEvents(ticket.url, ticket.protocol); await socket.ready; await socket.next(v => v.type === 'live_ready')
-    const marker = 'SELFHOSTED_CLOUD_' + randomUUID(), started = Date.now(), deadline = started + 150000
-    let firstContentMs = null
-    await execute(process.execPath, [source + '/scripts/assert-test-model.mjs', model])
+    const evidence = { phase: 'bot', submissionAttempted: false, status: 'failed' }
+    let socket
     try {
-      await client.json('/api/mobile/chat', post({ botId: bot.id, text: 'Reply exactly ' + marker + '. Do not use tools, create tasks, or contact anyone.', submissionId: randomUUID() }))
+      const bot = await client.json('/api/bots', post({ name: '测试1567 ' + label + ' ' + e.GITHUB_RUN_ID }))
+      need(/^[a-f0-9-]{36}$/.test(bot.id) && bot.workspaceId === workspaceId, 'BOT')
+      evidence.botId = bot.id; ownedBots.push({ client, id: bot.id, local: client === community })
+      evidence.phase = 'model_selection'
+      const menu = await client.json('/api/mobile/model', { ...post({ bot: bot.id, id: '00000000-0000-0000-0000-000000000000' }), method: 'PUT' })
+      need(menu.current?.kind === 'hosted' && (client !== community || menu.current.hostedSource === 'cloud'), 'MODEL_SELECTION')
+      need(quota || menu.current.available === true, 'POSITIVE_MODEL_AVAILABLE')
+      evidence.phase = 'live_ready'
+      const ticket = await client.json('/api/live/ticket?workspace=' + workspaceId)
+      socket = socketEvents(ticket.url, ticket.protocol); await socket.ready; await socket.next(v => v.type === 'live_ready')
+      const marker = 'SELFHOSTED_CLOUD_' + randomUUID(), started = Date.now(), deadline = started + 150000
+      let firstContentMs = null
+      await execute(process.execPath, [source + '/scripts/assert-test-model.mjs', model])
+      evidence.phase = 'submit'; evidence.submissionAttempted = true
+      const submitted = await client.request('/api/mobile/chat', post({ botId: bot.id, text: 'Reply exactly ' + marker + '. Do not use tools, create tasks, or contact anyone.', submissionId: randomUUID() }))
+      evidence.submissionHttpStatus = submitted.status
+      const accepted = await submitted.json(); need(submitted.ok && !accepted?.error, 'CHAT_SUBMISSION_HTTP')
+      evidence.phase = 'reply'
       while (Date.now() < deadline) {
-        const snapshot = await client.json('/api/mobile/chat?bot=' + bot.id)
+        const response = await client.request('/api/mobile/chat?bot=' + bot.id); need(response.ok, 'CHAT_READ_HTTP')
+        // error/failure are normal failed-turn DATA, not an API transport error.
+        const snapshot = await response.json()
         if (firstContentMs === null && snapshot.items?.some(i => i.from === 'coordinator' && typeof i.text === 'string' && i.text.length > 0)) firstContentMs = Date.now() - started
         const result = cloudChatResult(snapshot, marker, quota)
-        if (result) return { ...result, botId: bot.id, firstContentObservedMs: firstContentMs, completedMs: Date.now() - started, observation: 'request_to_first_content_upper_bound_via_live' }
+        if (result) return { ...evidence, ...result, canonicalCodes: ['cloud_quota_exhausted','cloud_unavailable','cloud_access_denied','verification_required','points_exhausted','free_allowance_used','platform_paused','usage_cost_unavailable','usage_concurrency_limit'].filter(code => JSON.stringify({ error: snapshot.error, failure: snapshot.failure, cause: snapshot.cause }).includes(code)), phase: 'complete', firstContentObservedMs: firstContentMs, completedMs: Date.now() - started, observation: 'request_to_first_content_upper_bound_via_live' }
         await socket.next(v => v.kind === 'bot_chat' && v.id === bot.id, deadline - Date.now())
       }
       throw Error('SERVICES_CHAT_DEADLINE')
-    } finally { socket.close(); await Promise.race([socket.closed, new Promise(r => setTimeout(r, 5000))]) }
+    } catch (error) { return { ...evidence, code: safe(error) } }
+    finally { if (socket) { socket.close(); await Promise.race([socket.closed, new Promise(r => setTimeout(r, 5000))]) } }
   }
-  try { report.cases.selfHostedReply = await chat(community, localWorkspace, 'self-hosted') } catch (error) { report.cases.selfHostedReply = { status: 'failed', code: safe(error) } }
-  try { report.cases.directReply = await chat(cloud, shared.workspaceId, 'direct') } catch (error) { report.cases.directReply = { status: 'failed', code: safe(error) } }
+  report.stage = 'positive_chats'
+  report.cases.selfHostedReply = await chat(community, localWorkspace, 'self-hosted')
+  report.cases.directReply = await chat(cloud, billingWorkspace, 'direct')
   // A genuine new empty wallet: no balance edits and no zero-monthly-limit key.
   // A pending invite to our own mailbox disables the normal sole-member credit
   // fallback. This API returns an invitation link and sends no email.
+  report.stage = 'zero_wallet_setup'
   quotaName = '测试1567 empty wallet ' + e.GITHUB_RUN_ID
   const created = await cloud.rpc('workspace.createWorkspace', [{ name: quotaName, slug: 'selfhost-quota-' + e.GITHUB_RUN_ID }]); quotaWorkspace = created.workspaceId
   need(/^[a-f0-9-]{36}$/.test(quotaWorkspace ?? ''), 'QUOTA_WORKSPACE')
@@ -168,11 +204,12 @@ try {
   const details = await cloud.json('/api/workspace?workspace=' + quotaWorkspace)
   const credit = await cloud.json('/api/settings/credit-billing?workspace=' + quotaWorkspace)
   const card = await cloud.json('/api/settings/card-verification?workspace=' + quotaWorkspace)
-  const noShares = (await pool.query('SELECT NOT EXISTS(SELECT 1 FROM workspace_credit_shares WHERE "workspaceId"=$1) AS clear', [quotaWorkspace])).rows[0]?.clear
+  const noShares = await readOnly(async tx => (await tx.query('SELECT NOT EXISTS(SELECT 1 FROM workspace_credit_shares WHERE "workspaceId"=$1) AS clear', [quotaWorkspace])).rows[0]?.clear)
   need(details.workspace?.id === quotaWorkspace && details.workspace?.kind === 'team' && details.members?.filter(m => m.status === 'active').length === 1
     && details.invitations?.some(i => i.status === 'pending' && Date.parse(i.expiresAt) > Date.now()) && credit.balancePoints === 0 && noShares === true, 'EMPTY_EFFECTIVE_PAYER')
   report.zeroWallet = { workspaceHash: sha(quotaWorkspace).slice(0, 16), ownBalanceZero: true, sharedPayers: 0, soloFallbackDisabledByPendingOwnInvitation: true,
-    personalCardVerified: card.status === 'verified', sharedBalanceChanged: false, monthlyLimitKeyUsed: false }
+    personalCardVerified: card.status === 'verified', existingBalancesEditedByFixture: false, monthlyLimitKeyUsed: false }
+  report.stage = 'zero_wallet_chat'
   await bind(quotaWorkspace)
   try { report.cases.zeroWallet = await chat(community, localWorkspace, 'empty-wallet', true) } catch (error) { report.cases.zeroWallet = { status: 'failed', code: safe(error) } }
   const billing = new URL((await community.json('/api/cloud/models/billing')).url)
@@ -180,18 +217,26 @@ try {
   report.zeroWallet.topUpWorkspaceMatches = true
   report.zeroWallet.bilingualCopy = {}
   for (const locale of ['zh-CN', 'en']) { const messages = JSON.parse(await readFile(source + '/messages/' + locale + '.json', 'utf8')); const copy = messages.RunErrors?.cloud_quota_exhausted?.default; need(typeof copy === 'string' && copy.length > 0, 'BILINGUAL_COPY'); report.zeroWallet.bilingualCopy[locale] = copy }
-  const rows = (await pool.query(`SELECT c.workspace_id=$2 AS "selectedWorkspace",c.workspace_id=$3 AS "zeroWorkspace",c.model,c.credential_kind,
+  report.stage = 'ledger'
+  const rows = await readOnly(async tx => (await tx.query(`SELECT u.id::text AS "usageId",c.workspace_id=$2 AS "selectedWorkspace",c.workspace_id=$3 AS "zeroWorkspace",c.model,c.credential_kind,
     c.payer_workspace_id::text AS "payer",u.state,u."inputTokens",u."outputTokens",u."costMicroUsd",c.completed_at IS NOT NULL AS completed
-    FROM cloud.model_calls c LEFT JOIN public.hosted_usage u ON u.id=c.usage_id WHERE c.server_id=$1 ORDER BY c.created_at LIMIT 14`, [cloudServer, shared.workspaceId, quotaWorkspace])).rows
+    FROM cloud.model_calls c LEFT JOIN public.hosted_usage u ON u.id=c.usage_id WHERE c.server_id=$1 ORDER BY c.created_at LIMIT 14`, [cloudServer, billingWorkspace, quotaWorkspace])).rows)
   need(rows.length <= 13, 'LEDGER_BOUND')
   report.cloudLedger = rows.map(r => ({ selectedWorkspace: r.selectedWorkspace, zeroWorkspace: r.zeroWorkspace, model: r.model, credentialKind: r.credential_kind,
-    payerHash: r.payer ? sha(r.payer).slice(0, 16) : null, state: r.state, inputTokens: r.inputTokens === null ? null : Number(r.inputTokens), outputTokens: r.outputTokens === null ? null : Number(r.outputTokens),
+    usageHash: r.usageId ? sha(r.usageId).slice(0,16) : null, payerHash: r.payer ? sha(r.payer).slice(0, 16) : null, state: r.state, inputTokens: r.inputTokens === null ? null : Number(r.inputTokens), outputTokens: r.outputTokens === null ? null : Number(r.outputTokens),
     costMicroUsd: r.costMicroUsd === null ? null : Number(r.costMicroUsd), completed: r.completed }))
-  need(rows.some(r => r.selectedWorkspace && r.model === model && r.state === 'settled' && Number.isSafeInteger(Number(r.costMicroUsd)) && r.payer), 'POSITIVE_LEDGER')
+  need(rows.some(r => r.selectedWorkspace && r.model === model && r.state === 'settled' && r.costMicroUsd !== null && Number.isSafeInteger(Number(r.costMicroUsd)) && Number(r.costMicroUsd) >= 0 && Number(r.inputTokens) + Number(r.outputTokens) > 0 && r.payer === billingWorkspace), 'POSITIVE_LEDGER')
   need(!rows.some(r => r.zeroWorkspace && r.payer), 'ZERO_WALLET_PROVIDER_WORK')
+  report.decisionAccepted = rows.some(r => r.selectedWorkspace && r.model === 'openai/gpt-6-luna-decisions' && r.state === 'settled' && r.payer === billingWorkspace)
+  const billingPage = await cloud.rpc('billing.getHostedUsage', [billingWorkspace])
+  const settled = rows.filter(r => r.selectedWorkspace && r.state === 'settled')
+  need(Array.isArray(billingPage.recent) && settled.every(r => billingPage.recent.some(v => v.id === r.usageId && v.model === r.model && v.state === 'settled' && Number(v.costMicroUsd) === Number(r.costMicroUsd))), 'BILLING_PAGE_LEDGER')
+  report.billingPageReceipt = { workspaceHash: sha(billingWorkspace).slice(0,16), endpoint: 'billing.getHostedUsage', matchedSettledCloudRows: settled.length, visuallyInspected: false }
+  report.stage = 'version'
   report.privateAfter = await deployment(); need(report.privateBefore.id === report.privateAfter.id, 'PRIVATE_CHANGED')
   report.publicAfter = (await cloud.json('/api/version')).build
   report.status = Object.values(report.cases).every(c => c.status === 'passed') ? 'passed' : 'partial'
+  report.stage = 'completed'
   if (Number.isFinite(report.cases.selfHostedReply.firstContentObservedMs) && Number.isFinite(report.cases.directReply.firstContentObservedMs))
     report.firstContentDifferenceMs = report.cases.selfHostedReply.firstContentObservedMs - report.cases.directReply.firstContentObservedMs
 } catch (error) { report.code = safe(error); process.exitCode = 1; if (process.env.MIKKA_SERVICES_PREFLIGHT === '1') console.log(JSON.stringify({ preflight: 'failed', code: report.code })) }
@@ -200,7 +245,16 @@ finally {
   if (ownedBots.length && report.cleanup.turnsStopped !== false) report.cleanup.turnsStopped = true
   report.cleanup.publicTestBotRetention = ownedBots.filter(b => !b.local).map(b => ({ id: b.id, reason: 'named_test_bot_no_delete_api' }))
   if (serverRegistered) { try { await community.json('/api/cloud/disconnect', post({ action: 'server' })); report.cleanup.serverRevoked = true } catch { report.cleanup.serverRevoked = false } }
-  if (quotaWorkspace) { try { const now = await cloud.json('/api/workspace?workspace=' + quotaWorkspace); need(now.workspace?.name === quotaName && now.workspace.userId === ownerId, 'CLEANUP_OWNER'); await cloud.rpc('workspace-settings.deleteWorkspace', [quotaWorkspace, quotaName]); report.cleanup.emptyWorkspaceDeleted = true } catch { report.cleanup.emptyWorkspaceDeleted = false } }
+  if (quotaWorkspace) { try {
+    const now = await cloud.json('/api/workspace?workspace=' + quotaWorkspace)
+    const general = await cloud.json('/api/settings/workspace-general?workspace=' + quotaWorkspace)
+    need(now.currentUserId === ownerId && now.workspace?.id === quotaWorkspace && now.workspace.name === quotaName
+      && now.role === 'admin' && general.id === quotaWorkspace && general.canTransfer === true && general.personal === false, 'CLEANUP_OWNER')
+    await cloud.rpc('workspace.switchWorkspace', [quotaWorkspace])
+    await cloud.rpc('workspace-settings.deleteWorkspace', [quotaWorkspace, quotaName])
+    need(!(await cloud.json('/api/workspace')).choices.some(w => w.id === quotaWorkspace), 'CLEANUP_READBACK')
+    report.cleanup.emptyWorkspaceDeleted = true
+  } catch { report.cleanup.emptyWorkspaceDeleted = false } }
   if (cloud && originalWorkspace) { try { const { restoreAcceptanceWorkspace } = await import(pathToFileURL(source + '/scripts/acceptance/cloud-startup.mjs')); await restoreAcceptanceWorkspace(cloud, ownerId, originalWorkspace); report.cleanup.workspaceRestored = true } catch { report.cleanup.workspaceRestored = false } }
   for (const client of [community, cloud].filter(Boolean)) { try { await client.json('/api/auth/sign-out', post({})); } catch { report.cleanup.sessionsSignedOut = false } }
   if ((cloud || community) && report.cleanup.sessionsSignedOut !== false) report.cleanup.sessionsSignedOut = true

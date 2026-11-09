@@ -675,10 +675,10 @@ jobs:
 
   self-hosted-cloud-services:
     if: >-
-      false && github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
+      github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
       github.repository_owner_id == '183887963' && github.actor == 'alexj11324' &&
       github.event_name == 'push' && github.ref == 'refs/heads/ops/infisical-cloud-capabilities' && github.run_attempt == 1 &&
-      startsWith(github.event.head_commit.message, 'ops: inspect private cloud production subscriptions final services')
+      startsWith(github.event.head_commit.message, 'ops: inspect private cloud production subscriptions final services paid personal')
     runs-on: ubuntu-latest
     timeout-minutes: 25
     concurrency:
@@ -714,15 +714,15 @@ jobs:
             if (!r.ok) throw Error('SERVICES_RELEASE_HTTP')
             return r.json()
           }
-          for (const [id,name] of [[42523369732,'Self-hosted image'],[42523369711,'CI']]) {
+          for (const [id,name] of [[42569765628,'Self-hosted image'],[42569765699,'CI']]) {
             const r = await get('actions/runs/' + id)
-            if (r.name !== name || r.head_sha !== '9bcdefc5fe0c047393d581eea867ffa801f53dbe' || r.head_branch !== 'main' || r.event !== 'push' || r.conclusion !== 'success' || r.status !== 'completed') throw Error('SERVICES_IMAGE_NOT_RELEASED')
+            if (r.name !== name || r.head_sha !== '88b144d52d091d7ff566c63fce6e902e33edc59e' || r.head_branch !== 'main' || r.event !== 'push' || r.conclusion !== 'success' || r.status !== 'completed') throw Error('SERVICES_IMAGE_NOT_RELEASED')
           }
           JS
-          git fetch --depth=1 origin 9bcdefc5fe0c047393d581eea867ffa801f53dbe
-          git worktree add --detach "$RUNNER_TEMP/mikka-services-source" 9bcdefc5fe0c047393d581eea867ffa801f53dbe
+          git fetch --depth=1 origin 88b144d52d091d7ff566c63fce6e902e33edc59e
+          git worktree add --detach "$RUNNER_TEMP/mikka-services-source" 88b144d52d091d7ff566c63fce6e902e33edc59e
           pnpm --dir "$RUNNER_TEMP/mikka-services-source" install --frozen-lockfile --ignore-scripts
-          docker pull ghcr.io/alexj11324/mikka@sha256:477a4178fcc5989ff030ed350075ff9cc4f7937f9ee998a006a2e6aa2675227c
+          docker pull ghcr.io/alexj11324/mikka@sha256:96de4972ea7820dca9d7f03d116f8a4589c662ee6a6db9cb33cf8ad0f89ec98e
           curl --fail --silent --show-error --location --retry 2 --retry-max-time 120 --max-time 60 --header 'Accept: application/octet-stream' --header "Authorization: Bearer $GITHUB_TOKEN" https://api.github.com/repos/cloudflare/cloudflared/releases/assets/692817008 -o "$RUNNER_TEMP/mikka-cloudflared"
           node --input-type=module <<'JS'
           import { readFileSync, chmodSync } from 'node:fs'
@@ -789,7 +789,7 @@ jobs:
 
   self-hosted-services-diagnostic-recovery:
     if: >-
-      github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
+      false && github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
       github.repository_owner_id == '183887963' && github.actor == 'alexj11324' &&
       github.event_name == 'push' && github.ref == 'refs/heads/ops/infisical-cloud-capabilities' && github.run_attempt == 1 &&
       startsWith(github.event.head_commit.message, 'ops: inspect private cloud production subscriptions final services diagnostic recovery ledger')
