@@ -36,7 +36,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ConnectionsList } from '@ui-slot/settings-connections'
 import { OwnAppsStatus, type OwnAppState, type OwnAppStates, type OwnAppsRead } from '@/components/plugins/connected-list'
 
-const OWN_APP_STATES_KEY = 'plugin-own-app-states'
+export const OWN_APP_STATES_KEY = 'plugin-own-app-states'
 /** Items a section shows before its ›. */
 const SECTION_PREVIEW = 6
 const CATEGORY_PREVIEW = 4
