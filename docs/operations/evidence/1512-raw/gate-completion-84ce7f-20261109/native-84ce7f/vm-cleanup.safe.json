@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Restore only two existing GitHub artifact references; no Native/business/model execution",
+  "sourceRunId": 42691592260,
+  "sourceJobId": 129416680401,
+  "head": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+  "vm": {
+    "sessionId": "sbx_t2HFsBV7nGSUB6F3DFbwVc3F6Q43",
+    "name": "issue1512-native-84ce-42691592260",
+    "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+    "teamId": "team_C7lwxVVvnUicFli6112mvxpv",
+    "createdAt": "2026-11-09T20:44:21.549Z",
+    "absoluteDeadline": "2026-11-09T20:59:21.549Z",
+    "timeoutMs": 900000,
+    "extensionCalls": 0,
+    "image": "vercel/sandbox/universal@sha256:bbec19cffb43ad724eee446d3bd4476e2993849dc0ff0c9f33356f8365d72219",
+    "vcpus": 1,
+    "memoryMiB": 2048,
+    "persistent": false,
+    "ports": [],
+    "networkPolicy": {
+      "mode": "custom",
+      "allowedDomains": [
+        "*.blob.core.windows.net",
+        "*.amazonaws.com",
+        "*.oaiusercontent.com",
+        "chatgpt.com"
+      ]
+    }
+  },
+  "actual": {
+    "status": "stopped",
+    "startedAt": "2026-11-09T20:44:21.624Z",
+    "stoppedAt": "2026-11-09T20:46:49.340Z",
+    "durationMs": 147716,
+    "activeCpuDurationMs": 6633,
+    "networkTransfer": {
+      "ingress": 14895575,
+      "egress": 331447
+    }
+  },
+  "cleanup": {
+    "stopSucceeded": true,
+    "deleteToolSucceeded": true,
+    "exactGet": {
+      "name": "issue1512-native-84ce-42691592260",
+      "projectId": "prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH",
+      "teamId": "team_C7lwxVVvnUicFli6112mvxpv",
+      "resume": false,
+      "status": 404,
+      "code": "not_found"
+    },
+    "noActiveOwnedResource": true
+  },
+  "billing": {
+    "actualCurrencyAmount": null,
+    "status": "unknown; not claimed zero"
+  },
+  "scope": {
+    "businessRuns": 0,
+    "modelCalls": 0,
+    "nativeRuns": 0,
+    "sourceEdits": 0,
+    "refEdits": 0,
+    "gitHubArtifactDownloadApiCalls": 2,
+    "artifactReferenceReads": 2
+  }
+}

@@ -1,0 +1,562 @@
+{
+  "schemaVersion": 1,
+  "sourceOriginal": {
+    "path": "native-84ce7f/originals/lifecycle.json",
+    "kind": "exact_artifact_original",
+    "mode": "100644",
+    "bytes": 707067,
+    "sha256": "7a04a083e4b442eef7cb73656b55862af00b386bbdb7bf080185012449aaa314",
+    "gitBlob": "9da2b3d883389e803771c44ac439e14c7ca0ae8c",
+    "remoteConfirmed": true
+  },
+  "measurement": {
+    "clock": "Node performance.now, immediately before Electron launch to visible seeded message and enabled composer accepting a draft",
+    "process": "same compiled shell/backend, bundled vs preserved hosted loading path; fresh Electron process for every sample, existing authenticated profile, same account/workspace",
+    "cache": "normal profile/OS caches; no OS cache purge, artificial network delay or renderer response substitution",
+    "pairing": "alternating bundled-first and hosted-first order",
+    "daemon": "after every sample, cancel installers, close Electron and prove that exact profile daemon exited before launching the next process; drain time is outside readiness timing",
+    "preparation": "one owned installed-app profile; both loading modes must reach a real registered online local device before the unchanged cold samples"
+  },
+  "queryWindows": {
+    "webLogin": {
+      "phase": "ordinary-login-to-usable-workspace",
+      "pair": null,
+      "total": {
+        "queryCalls": 427,
+        "receiveBytes": 89188,
+        "sendBytes": 269165,
+        "unknownReadings": 0
+      },
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19,
+          "receiveBytes": 5920,
+          "sendBytes": 5255
+        },
+        {
+          "phase": "web-navigation-to-dom-content-loaded",
+          "queryCalls": 0,
+          "receiveBytes": 0,
+          "sendBytes": 0
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 408,
+          "receiveBytes": 83268,
+          "sendBytes": 263910
+        }
+      ]
+    },
+    "nativeLogin": {
+      "phase": "ordinary-login-to-usable-workspace",
+      "pair": null,
+      "total": {
+        "queryCalls": 426,
+        "receiveBytes": 88717,
+        "sendBytes": 279400,
+        "unknownReadings": 0
+      },
+      "segments": [
+        {
+          "phase": "common-email-authentication",
+          "queryCalls": 19,
+          "receiveBytes": 5920,
+          "sendBytes": 5255
+        },
+        {
+          "phase": "native-pkce-and-automatic-renderer-to-public-session",
+          "queryCalls": 15,
+          "receiveBytes": 3681,
+          "sendBytes": 5059
+        },
+        {
+          "phase": "workspace-selection-to-usable",
+          "queryCalls": 392,
+          "receiveBytes": 79116,
+          "sendBytes": 269086
+        }
+      ]
+    },
+    "startup-bundled": {
+      "phase": "authenticated-launch-to-usable-workspace",
+      "pair": 1,
+      "total": {
+        "queryCalls": 198,
+        "receiveBytes": 42101,
+        "sendBytes": 134117,
+        "unknownReadings": 0
+      },
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 198,
+          "receiveBytes": 42101,
+          "sendBytes": 134117
+        }
+      ]
+    },
+    "startup-hosted": {
+      "phase": "authenticated-launch-to-usable-workspace",
+      "pair": 1,
+      "total": {
+        "queryCalls": 228,
+        "receiveBytes": 50329,
+        "sendBytes": 177218,
+        "unknownReadings": 0
+      },
+      "segments": [
+        {
+          "phase": "launch-to-usable",
+          "queryCalls": 228,
+          "receiveBytes": 50329,
+          "sendBytes": 177218
+        }
+      ]
+    }
+  },
+  "firstPair": [
+    {
+      "pair": 1,
+      "order": 1,
+      "mode": "bundled",
+      "milliseconds": 2750.55,
+      "launchTiming": {
+        "connectedMs": 650.1320839999826,
+        "firstWindowMs": 650.1539999999804,
+        "viewportReadyMs": 974.1914169999654
+      },
+      "startup": {
+        "version": 1,
+        "clocks": {
+          "main": "process performance time origin",
+          "renderer": "document navigation time origin"
+        },
+        "main": {
+          "ready": 232.02,
+          "restore.start": 258.61,
+          "restore.end": 539.63,
+          "window.start": 262.15,
+          "window.created": 396.29,
+          "backend.preconnect": 258.26,
+          "bootstrap.network.start": 1117.2,
+          "bootstrap.headers": 1209.28,
+          "bootstrap.cache.end": 1209.51,
+          "bootstrap.response.end": 1211.2
+        },
+        "renderer": {
+          "marks": {
+            "entry": 622.7,
+            "bootstrap.start": 706.9,
+            "bootstrap.end": 1146.4,
+            "workspace.import.start": 239.3,
+            "workspace.import.end": 1133.5,
+            "workspace.mounted": 1210.9
+          },
+          "navigation": {
+            "responseStart": 11.6,
+            "responseEnd": 100.7,
+            "domInteractive": 196.4,
+            "domContentLoadedEventEnd": 238.2,
+            "loadEventEnd": 544
+          },
+          "completedResources": {}
+        },
+        "phasesMs": {
+          "restore": 281.02,
+          "backendResponseHeaders": 92.08,
+          "backendCredentialPersistence": 0.23,
+          "backendResponseProcessing": 1.69,
+          "backendBootstrap": 94,
+          "windowCreation": 134.14,
+          "bootstrap": 439.5,
+          "workspaceImport": 894.2
+        }
+      }
+    },
+    {
+      "pair": 1,
+      "order": 2,
+      "mode": "hosted",
+      "milliseconds": 4360.3,
+      "launchTiming": {
+        "connectedMs": 1107.2390420000302,
+        "firstWindowMs": 1107.2706670000334,
+        "viewportReadyMs": 1510.8766250000335
+      },
+      "startup": {
+        "version": 1,
+        "clocks": {
+          "main": "process performance time origin",
+          "renderer": "document navigation time origin"
+        },
+        "main": {
+          "ready": 422.92,
+          "restore.start": null,
+          "restore.end": null,
+          "window.start": 445.2,
+          "window.created": 644.63,
+          "backend.preconnect": null,
+          "bootstrap.network.start": null,
+          "bootstrap.headers": null,
+          "bootstrap.cache.end": null,
+          "bootstrap.response.end": null
+        },
+        "renderer": {
+          "marks": {
+            "entry": 698.5,
+            "bootstrap.start": 767.6,
+            "bootstrap.end": 862.2,
+            "workspace.import.start": 868.8,
+            "workspace.import.end": 1897.6,
+            "workspace.mounted": 2248.5
+          },
+          "navigation": {
+            "responseStart": 246.9,
+            "responseEnd": 250.7,
+            "domInteractive": 358.4,
+            "domContentLoadedEventEnd": 508.5,
+            "loadEventEnd": 580.3
+          },
+          "completedResources": {
+            "script": {
+              "count": 202,
+              "totalDurationMs": 13315.1,
+              "firstStartMs": 342.4,
+              "lastEndMs": 2208.1
+            },
+            "style": {
+              "count": 2,
+              "totalDurationMs": 179.2,
+              "firstStartMs": 429.5,
+              "lastEndMs": 1060
+            },
+            "font": {
+              "count": 1,
+              "totalDurationMs": 10.6,
+              "firstStartMs": 737.9,
+              "lastEndMs": 748.5
+            },
+            "api": {
+              "count": 40,
+              "totalDurationMs": 5434.1,
+              "firstStartMs": 767.5,
+              "lastEndMs": 3450.3
+            }
+          }
+        },
+        "phasesMs": {
+          "restore": null,
+          "backendResponseHeaders": null,
+          "backendCredentialPersistence": null,
+          "backendResponseProcessing": null,
+          "backendBootstrap": null,
+          "windowCreation": 199.43,
+          "bootstrap": 94.6,
+          "workspaceImport": 1028.8
+        }
+      }
+    }
+  ],
+  "allFivePairs": [
+    {
+      "pair": 1,
+      "order": 1,
+      "mode": "bundled",
+      "milliseconds": 2750.55
+    },
+    {
+      "pair": 1,
+      "order": 2,
+      "mode": "hosted",
+      "milliseconds": 4360.3
+    },
+    {
+      "pair": 2,
+      "order": 1,
+      "mode": "hosted",
+      "milliseconds": 4193.58
+    },
+    {
+      "pair": 2,
+      "order": 2,
+      "mode": "bundled",
+      "milliseconds": 3794.93
+    },
+    {
+      "pair": 3,
+      "order": 1,
+      "mode": "bundled",
+      "milliseconds": 2560.78
+    },
+    {
+      "pair": 3,
+      "order": 2,
+      "mode": "hosted",
+      "milliseconds": 2638.72
+    },
+    {
+      "pair": 4,
+      "order": 1,
+      "mode": "hosted",
+      "milliseconds": 3264.78
+    },
+    {
+      "pair": 4,
+      "order": 2,
+      "mode": "bundled",
+      "milliseconds": 2374.84
+    },
+    {
+      "pair": 5,
+      "order": 1,
+      "mode": "bundled",
+      "milliseconds": 2100.51
+    },
+    {
+      "pair": 5,
+      "order": 2,
+      "mode": "hosted",
+      "milliseconds": 2283.7
+    }
+  ],
+  "coldStart": {
+    "pairs": 5,
+    "bundledMedianMs": 2560.78,
+    "hostedMedianMs": 3264.78,
+    "differenceMs": -704,
+    "bundledFaster": true,
+    "improvementPercent": 21.56
+  },
+  "nativeSetup": [
+    {
+      "mode": "bundled",
+      "ready": true,
+      "deadlineMs": 480000,
+      "elapsedMs": 3197,
+      "reads": 10,
+      "navigationInterruptions": 0,
+      "transitions": [
+        {
+          "elapsedMs": 45,
+          "bridge": {
+            "device": true,
+            "installer": true
+          },
+          "device": {
+            "read": "fulfilled",
+            "status": "online",
+            "deviceIdPresent": false,
+            "signedIn": false,
+            "server": "unregistered"
+          },
+          "installer": {
+            "read": "fulfilled",
+            "present": true,
+            "status": "running",
+            "step": "connect",
+            "target": "this-computer",
+            "reason": "none",
+            "bootstrapErrorCode": null,
+            "retryable": false
+          }
+        },
+        {
+          "elapsedMs": 1357,
+          "bridge": {
+            "device": true,
+            "installer": true
+          },
+          "device": {
+            "read": "fulfilled",
+            "status": "online",
+            "deviceIdPresent": false,
+            "signedIn": true,
+            "server": "unregistered"
+          },
+          "installer": {
+            "read": "fulfilled",
+            "present": true,
+            "status": "running",
+            "step": "connect",
+            "target": "this-computer",
+            "reason": "none",
+            "bootstrapErrorCode": null,
+            "retryable": false
+          }
+        },
+        {
+          "elapsedMs": 1725,
+          "bridge": {
+            "device": true,
+            "installer": true
+          },
+          "device": {
+            "read": "fulfilled",
+            "status": "online",
+            "deviceIdPresent": true,
+            "signedIn": true,
+            "server": "unregistered"
+          },
+          "installer": {
+            "read": "fulfilled",
+            "present": true,
+            "status": "running",
+            "step": "connect",
+            "target": "this-computer",
+            "reason": "none",
+            "bootstrapErrorCode": null,
+            "retryable": false
+          }
+        },
+        {
+          "elapsedMs": 2074,
+          "bridge": {
+            "device": true,
+            "installer": true
+          },
+          "device": {
+            "read": "fulfilled",
+            "status": "online",
+            "deviceIdPresent": true,
+            "signedIn": true,
+            "server": "online"
+          },
+          "installer": {
+            "read": "fulfilled",
+            "present": true,
+            "status": "running",
+            "step": "connect",
+            "target": "this-computer",
+            "reason": "none",
+            "bootstrapErrorCode": null,
+            "retryable": false
+          }
+        },
+        {
+          "elapsedMs": 3197,
+          "bridge": {
+            "device": true,
+            "installer": true
+          },
+          "device": {
+            "read": "fulfilled",
+            "status": "online",
+            "deviceIdPresent": true,
+            "signedIn": true,
+            "server": "online"
+          },
+          "installer": {
+            "read": "fulfilled",
+            "present": true,
+            "status": "online",
+            "step": "connect",
+            "target": "this-computer",
+            "reason": "none",
+            "bootstrapErrorCode": null,
+            "retryable": false
+          }
+        }
+      ],
+      "overflow": false,
+      "failure": null,
+      "daemon": {
+        "source": "local_daemon_hello",
+        "status": "connected",
+        "daemonVersion": "0.0.564",
+        "protocolVersion": 3
+      },
+      "environment": {
+        "available": true,
+        "profileMatches": true,
+        "overrideMatches": true,
+        "files": {
+          "daemon.sock": "socket",
+          "daemon.secret": "file",
+          "daemon.pid": "file",
+          "daemon.lock": "directory",
+          "device.json": "file"
+        },
+        "service": {
+          "platform": "darwin",
+          "definition": "file",
+          "profile": "matches",
+          "dev": true,
+          "installedVersion": "0.0.564",
+          "installedRevision": "8db16095f46be955df22f42914e0f89b6e5f3d11"
+        }
+      }
+    },
+    {
+      "mode": "hosted",
+      "ready": true,
+      "deadlineMs": 480000,
+      "elapsedMs": 13,
+      "reads": 1,
+      "navigationInterruptions": 0,
+      "transitions": [
+        {
+          "elapsedMs": 13,
+          "bridge": {
+            "device": true,
+            "installer": true
+          },
+          "device": {
+            "read": "fulfilled",
+            "status": "online",
+            "deviceIdPresent": true,
+            "signedIn": true,
+            "server": "online"
+          },
+          "installer": {
+            "read": "fulfilled",
+            "present": true,
+            "status": "online",
+            "step": "service",
+            "target": "this-computer",
+            "reason": "none",
+            "bootstrapErrorCode": null,
+            "retryable": false
+          }
+        }
+      ],
+      "overflow": false,
+      "failure": null,
+      "daemon": {
+        "source": "local_daemon_hello",
+        "status": "connected",
+        "daemonVersion": "0.0.564",
+        "protocolVersion": 3
+      },
+      "environment": {
+        "available": true,
+        "profileMatches": true,
+        "overrideMatches": true,
+        "files": {
+          "daemon.sock": "socket",
+          "daemon.secret": "file",
+          "daemon.pid": "file",
+          "daemon.lock": "directory",
+          "device.json": "file"
+        },
+        "service": {
+          "platform": "darwin",
+          "definition": "file",
+          "profile": "matches",
+          "dev": true,
+          "installedVersion": "0.0.564",
+          "installedRevision": "8db16095f46be955df22f42914e0f89b6e5f3d11"
+        }
+      }
+    }
+  ],
+  "limitations": {
+    "diagnosticsIncomplete": true,
+    "unknownFineAttributionPreserved": true,
+    "installedDaemonSeparateFromCandidate": true,
+    "rootViewedParityPngPixels": false,
+    "productionAcceptance": false,
+    "apiProcessProtocolBytesAreNotWholeNetworkBytes": true
+  },
+  "thresholdNote": "Descriptive latency only; no new threshold and no replacement of original FIRST-pair SQL."
+}

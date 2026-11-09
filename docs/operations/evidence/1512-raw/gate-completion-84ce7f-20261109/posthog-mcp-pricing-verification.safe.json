@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "observedAt": "2026-11-09T20:56:18Z",
+  "supersedesOnlyVisionUnitPriceUnknownInBlob": "d1610b9330d5f0e3bc063ec65ffd850bf8331750",
+  "scope": "Current authoritative PostHog MCP docs, no business data query or mutation; actual bill remains unknown.",
+  "skill": "posthog:understanding-billing-usage",
+  "knowledgeAttempt": {
+    "tool": "business-knowledge-documents-search",
+    "enabled": false,
+    "result": "Tool exists but is not enabled on this connection; no authorization flow or extra access requested."
+  },
+  "queries": [
+    {
+      "command": "call --json docs-search {\"query\":\"Replay Vision standard completed observation credits gemini-3-flash-preview price per credit USD, whether 5 credits and $0.05 per observation are current and whether quota scan submissions are billed\"}",
+      "responseSha256": "de1cad9975cb1c95b2ac8358bd86c6068969821a862caf7acf3b11822ca7f893"
+    },
+    {
+      "command": "call --json docs-search {\"query\":\"AI Observability $ai_ prefix events billing not charged again as Product Analytics; OpenTelemetry APM trace spans numeric price and billing usage type logs_mb versus AI events\"}",
+      "responseSha256": "5adf7f87c4a594eb6de36b4f7595101c5d9a17c66b7e14e9a8d4c5d47be5175d"
+    },
+    {
+      "command": "call --json docs-search {\"query\":\"Distributed tracing APM OpenTelemetry spans pricing billing usage type exact numeric price per GB or span, whether charged as logs_mb or AI Observability events\"}",
+      "responseSha256": "8ec53fc4a90fe4a1821beec921d629adc3fef82b687c54787908fe448d5fb097"
+    }
+  ],
+  "findings": {
+    "replayVision": {
+      "source": "https://posthog.com/docs/replay-vision/quota-and-limits",
+      "usdPerCredit": 0.01,
+      "chargeBasis": "successful observation",
+      "modelPrices": [
+        {
+          "displayName": "Gemini 3.5 Flash Lite",
+          "credits": 2
+        },
+        {
+          "displayName": "Gemini 3 Flash",
+          "credits": 5
+        },
+        {
+          "displayName": "Gemini 3.8 Flash",
+          "credits": 15
+        }
+      ],
+      "twoSuccessfulGemini3FlashObservations": {
+        "credits": 10,
+        "listPriceBeforeFreeAllowanceUsd": 0.1
+      },
+      "actualCreditsSource": "Returned successful observation credits / $recording_observed credits property; price frozen at run time.",
+      "notYetObserved": {
+        "requestedModelIdToActualObservationModel": false,
+        "completedObservations": false,
+        "actualBilledUsd": false
+      },
+      "freePlan": "Scanning stops after the free budget unless billing is added.",
+      "boundary": "Planned two-session Gemini 3 Flash estimate is conditional on the actual returned model and successful observation. Submission and polling are not evidence of completion or charge."
+    },
+    "aiEvents": {
+      "source": "https://posthog.com/docs/ai-observability/basics#the-ai_-prefix",
+      "aiPrefixBilledAsAI": true,
+      "alsoBilledAsProductAnalytics": false,
+      "includes": [
+        "$ai_generation",
+        "$ai_span",
+        "$ai_trace",
+        "$ai_embedding",
+        "custom names beginning $ai_"
+      ]
+    },
+    "apm": {
+      "numericUnitPrice": null,
+      "billingUsageTypeMapping": null,
+      "knownZeroCost": false,
+      "reason": "Exact documentation lookup did not establish an APM numeric rate or mapping; do not assign APM spans to logs_mb or AI events without evidence."
+    },
+    "scout": {
+      "perInvocationDollarPrice": null
+    }
+  },
+  "productionCases": 0,
+  "ownedResourcesCreated": 0,
+  "mutations": 0
+}

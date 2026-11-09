@@ -1,0 +1,354 @@
+{
+  "schema": "mikka.issue1512.posthog-public-pricing-readonly.v1",
+  "observedDateUtc": "2026-11-09",
+  "preparedAtUtc": "2026-11-09T20:46:43.841Z",
+  "purpose": "Prepare unit-aware formulas for later actual acceptance usage; no production acceptance or actual bill conclusion.",
+  "scope": {
+    "repository": "alexj11324/Mikka",
+    "issue": 1512,
+    "posthogProjectId": 670821,
+    "region": "us",
+    "formalProductionCasesCompleted": 0,
+    "formalProductionCasesPlanned": 2
+  },
+  "evidence": [
+    {
+      "kind": "immutable_original_billing_response",
+      "gitBlob": "ddf2d04e9b1a64b1bf64e87adb308e7ae213b83b",
+      "bytes": 52454,
+      "sha256": "9a7709b13b6f3f561397201461df248dd9cd3869d573685000c5cd4a95e32f36",
+      "exactOriginalBytesVerified": true
+    },
+    {
+      "kind": "immutable_safe_preacceptance_projection",
+      "gitBlob": "83246c09aba697b6c11b8c6cf414d0f07315a18a",
+      "bytes": 6834,
+      "sha256": "861ea202870853a05b850fa69e3e8ebd4f9b0f29cf2f273b45ad3924cb1a7b30",
+      "exactOriginalBytesVerified": true
+    }
+  ],
+  "accountSnapshot": {
+    "observedWindowUtc": {
+      "start": "2026-11-09T19:19:26Z",
+      "end": "2026-11-09T19:24:06Z"
+    },
+    "plan": "free",
+    "subscriptionLevel": "free",
+    "hasActiveSubscription": false,
+    "billingPeriod": {
+      "current_period_start": "2026-10-17T17:45:01.620Z",
+      "current_period_end": "2026-11-16T17:45:01.620Z",
+      "interval": "month"
+    },
+    "currentTotalAmountUsd": null,
+    "projectedTotalAmountUsd": null,
+    "amountInterpretation": "UNKNOWN, not zero.",
+    "productView": [
+      {
+        "type": "session_replay",
+        "usageKey": "recordings",
+        "unit": "recording",
+        "displayUnit": null,
+        "displayDivisor": null,
+        "currentUsage": 22,
+        "freeAllocation": 5000,
+        "usageLimit": 5000,
+        "subscribed": false,
+        "unitAmountUsd": null,
+        "tiers": null,
+        "currentAmountUsd": null
+      },
+      {
+        "type": "llm_analytics",
+        "usageKey": "llm_events",
+        "unit": "event",
+        "displayUnit": null,
+        "displayDivisor": null,
+        "currentUsage": 1222,
+        "freeAllocation": 100000,
+        "usageLimit": 100000,
+        "subscribed": false,
+        "unitAmountUsd": null,
+        "tiers": null,
+        "currentAmountUsd": null
+      },
+      {
+        "type": "logs",
+        "usageKey": "logs_mb_ingested",
+        "unit": "ingested MB",
+        "displayUnit": "GB",
+        "displayDivisor": 1000,
+        "currentUsage": 492,
+        "freeAllocation": 10000,
+        "usageLimit": 10000,
+        "subscribed": false,
+        "unitAmountUsd": null,
+        "tiers": null,
+        "currentAmountUsd": null
+      }
+    ],
+    "separateUsageSummaryView": {
+      "llm_events": {
+        "usage": 857,
+        "limit": 100000,
+        "todays_usage": 365
+      },
+      "logs_mb_ingested": {
+        "usage": 373,
+        "limit": 10000,
+        "todays_usage": 119
+      },
+      "recordings": {
+        "usage": 16,
+        "limit": 5000,
+        "todays_usage": 6
+      },
+      "replay_vision_credits": {
+        "usage": 0,
+        "limit": 2500,
+        "todays_usage": 0
+      },
+      "signals_credits": {
+        "usage": 0,
+        "limit": 4500,
+        "todays_usage": 0
+      },
+      "signals_spend_credits": {
+        "usage": 0,
+        "limit": null,
+        "billing_start_date": "2026-12-09",
+        "todays_usage": 0
+      }
+    },
+    "counterBoundary": "Product view and usage_summary are separate returned views. Do not add or silently substitute them; neither gives attributable per-case usage.",
+    "productViewArithmeticHeadroom": {
+      "logsMb": 9508,
+      "aiEvents": 98778,
+      "webRecordings": 4978,
+      "meaning": "Snapshot arithmetic only, not reserved case quota or a guarantee of later availability."
+    },
+    "scopedDailyQuery": {
+      "rows": 0,
+      "next": null,
+      "meaning": "Empty result is absent scoped data, not proof of zero usage or invoice."
+    },
+    "rawBaseRatesAvailable": false,
+    "explicitRawRetentionAddon": {
+      "type": "logs_retention_30d",
+      "name": "Logs 30-day retention",
+      "usage_key": "logs_retention_30d_mb_ingested",
+      "unit": "ingested MB",
+      "display_unit": "GB",
+      "display_divisor": 1000,
+      "current_usage": 0,
+      "free_allocation": null,
+      "subscribed": false,
+      "usage_limit": null,
+      "unit_amount_usd": null,
+      "price_description": null,
+      "current_amount_usd": null,
+      "projected_amount_usd": null,
+      "tiers": [
+        {
+          "flat_amount_usd": "0",
+          "unit_amount_usd": "0.00005",
+          "up_to": null,
+          "current_amount_usd": "0.00",
+          "current_usage": 0,
+          "projected_usage": null,
+          "projected_amount_usd": null
+        }
+      ]
+    },
+    "retentionAddonInterpretation": "A stored tier supplies USD 0.00005 per ingested MB (USD 0.05 per decimal GB). Addon subscribed=false and currentUsage=0. Its nested tier current_amount_usd=0.00 does not replace null base or total monetary values."
+  },
+  "publicRateCards": {
+    "currency": "USD",
+    "checkedDateUtc": "2026-11-09",
+    "priceBasis": "Public usage-based list prices; not an observed invoice, a negotiated account quote, taxes, or proof of the final account charge.",
+    "logs": {
+      "sourceUrl": "https://posthog.com/docs/logs/pricing",
+      "webRef": "turn114view1",
+      "meter": "GB ingested",
+      "decimalMbPerGb": 1000,
+      "tiers": [
+        {
+          "from": 0,
+          "to": 10,
+          "usdPerUnit": 0
+        },
+        {
+          "from": 10,
+          "to": 300,
+          "usdPerUnit": 0.25
+        },
+        {
+          "from": 300,
+          "to": null,
+          "usdPerUnit": 0.15
+        }
+      ],
+      "defaultRetentionDays": 14,
+      "customRetentionUsdPerGbMonth": 0.05,
+      "customRetentionBoundary": "Additional to ingestion. Retention applies to newly ingested logs and the ingestion billing limit does not cap custom-retention charges."
+    },
+    "aiObservability": {
+      "sourceUrl": "https://posthog.com/ai-observability/pricing",
+      "webRef": "turn114view2",
+      "meter": "AI Observability event",
+      "tiers": [
+        {
+          "from": 0,
+          "to": 100000,
+          "usdPerUnit": 0
+        },
+        {
+          "from": 100000,
+          "to": 150000,
+          "usdPerUnit": 0.00035
+        },
+        {
+          "from": 150000,
+          "to": 250000,
+          "usdPerUnit": 0.000175
+        },
+        {
+          "from": 250000,
+          "to": 500000,
+          "usdPerUnit": 0.0001
+        },
+        {
+          "from": 500000,
+          "to": 1000000,
+          "usdPerUnit": 0.00008
+        },
+        {
+          "from": 1000000,
+          "to": 10000000,
+          "usdPerUnit": 0.00007
+        },
+        {
+          "from": 10000000,
+          "to": 50000000,
+          "usdPerUnit": 0.000065
+        },
+        {
+          "from": 50000000,
+          "to": null,
+          "usdPerUnit": 0.00006
+        }
+      ],
+      "boundary": "AI generations/spans/traces captured as AI events are event-billed; no PostHog markup on provider tokens. Do not treat each OTLP APM span as an AI event or assume one event per model call."
+    },
+    "webReplay": {
+      "sourceUrl": "https://posthog.com/session-replay/pricing",
+      "webRef": "turn115view0",
+      "meter": "Web recording",
+      "tiers": [
+        {
+          "from": 0,
+          "to": 5000,
+          "usdPerUnit": 0
+        },
+        {
+          "from": 5000,
+          "to": 15000,
+          "usdPerUnit": 0.005
+        },
+        {
+          "from": 15000,
+          "to": 50000,
+          "usdPerUnit": 0.0035
+        },
+        {
+          "from": 50000,
+          "to": 150000,
+          "usdPerUnit": 0.002
+        },
+        {
+          "from": 150000,
+          "to": 500000,
+          "usdPerUnit": 0.0017
+        },
+        {
+          "from": 500000,
+          "to": null,
+          "usdPerUnit": 0.0015
+        }
+      ],
+      "boundary": "Use actual billable Web recordings, not screenshots, replay frames, playback reads, or an assumed one-recording-per-case count. Mobile replay is a separate meter and is outside this browser-case formula."
+    },
+    "organizationBilling": {
+      "sourceUrl": "https://posthog.com/pricing",
+      "webRefs": [
+        "turn114view0",
+        "turn115search0"
+      ],
+      "quotaScope": "Organization-wide across projects, not an extra free allowance per project.",
+      "limitBehavior": "At the configured limit, extra data may be permanently dropped. A free allowance is not a promise that all later telemetry will be retained.",
+      "historicalConflict": "Current Logs pricing and this account snapshot both say 10 GB free. An older 50 GB GA announcement is not used."
+    },
+    "apmTracing": {
+      "sourceUrl": "https://posthog.com/tracing",
+      "webRef": "turn116view0",
+      "established": "Usage-based with no per-host fee; accepts OpenTelemetry and is correlated with Logs.",
+      "exactIngestionBillingUnit": null,
+      "usdPerUnit": null,
+      "accountMeterMapping": null,
+      "unknownReason": "The inspected account has no separate APM product rate. The inspected official tracing page does not establish a numeric PostHog span-ingestion rate or prove that all trace volume is included in logs_mb_ingested.",
+      "treatment": "Keep APM-specific ingestion costs UNKNOWN unless an actual billing contract/meter mapping provides evidence. Do not silently count it twice or set it to zero."
+    },
+    "scoutAndVision": {
+      "actualPerRunUsd": null,
+      "accountPerCreditRateUsd": null,
+      "accountVisionFreeCredits": 2500,
+      "accountInboxFreeCredits": 4500,
+      "treatment": "Current raw unit prices and amounts are null. Credit/display metadata is not a verified cost per Scout or Vision execution. No additional pricing investigation or execution was performed.",
+      "actualNewExecutionsInSnapshot": {
+        "scout": 0,
+        "vision": 0
+      }
+    }
+  },
+  "formulas": {
+    "requiredActualInputs": {
+      "billableLogsMb": null,
+      "billableAiEvents": null,
+      "billableWebRecordings": null,
+      "customRetainedGbMonths": null,
+      "apmBillingMeterAndVolume": null,
+      "scoutAndVisionBilledCreditsAndRate": null
+    },
+    "tierFunction": "For nonnegative U, F_p(U)=sum_i rate_i * max(0,min(U,upper_i)-lower_i), with infinity for a null upper bound.",
+    "incrementalCharge": "For a verified same-period organization baseline B_p and attributable increment x_p: Delta_p=F_p(B_p+x_p)-F_p(B_p).",
+    "logs": "G=MB/1000; F_logs(G)=0.25*max(0,min(G,300)-10)+0.15*max(0,G-300).",
+    "customRetention": "Additional public-price term = 0.05 * actual billable retained GB-months. Do not subtract the default 14 days without a contract for that proration.",
+    "indicativeKnownIngestionRange": "For nonnegative measured x_MB, E and R: 0 <= Delta_known <= 0.25*(x_MB/1000)+0.000350*E+0.005*R; excludes retention, APM-unknown mapping, Scout/Vision, account-specific adjustments and tax.",
+    "conditionalFreeTier": "If total organization usage, including concurrent traffic, remains within the verified free allowances and default retention applies, these three public-price ingestion terms are zero. This does not turn null observed monetary amounts into a verified zero invoice.",
+    "baselineBoundary": "The recorded 492 MB / 1222 events / 22 recordings is the product-view preacceptance snapshot only. Billing delay and concurrent unrelated traffic prevent attributing a later aggregate difference to these cases alone.",
+    "volumeBoundary": "Span/event row counts, sample-rate-weighted traffic estimates, serialized JSON size and compressed OTLP transfer bytes are not automatically billable ingestion MB.",
+    "modelProviderBoundary": "PostHog AI event fees are distinct from provider token value. An API-equivalent token-cost estimate is not the actual Claude/Codex official subscription charge.",
+    "totalActualCostUsd": null,
+    "totalActualCostStatus": "UNKNOWN; no finite numerical total or predicted future two-case volume is claimed."
+  },
+  "laterEvidenceNeeded": [
+    "Actual two-case identities/time windows and complete evidence before computing attributable usage.",
+    "Actual billable meter units and values; preserve physical counts and unknowns rather than replacing missing units with zero.",
+    "Current same-period organization baseline and quota usage if evaluating the incremental public-price calculation.",
+    "Separate original billing amount evidence if claiming an actual invoice or subscription charge."
+  ],
+  "operationBoundary": {
+    "newPostHogMcpCalls": 0,
+    "newPostHogQueries": 0,
+    "productionRequests": 0,
+    "modelCalls": 0,
+    "resourceCreations": 0,
+    "testExecutions": 0,
+    "jobLogReads": 0,
+    "zipReads": 0,
+    "sourceOrRefMutations": 0,
+    "evidenceAction": "One unreferenced safe JSON Git blob plus exact readback; no branch/ref update.",
+    "rawBillingCustomerOrIdentityFieldsCopied": false
+  },
+  "conclusion": "Prepared unit-aware public-rate formulas and unknown boundaries only. Production acceptance remains 0/2; no performance, telemetry completeness, subscription invoice, or final production PASS is inferred."
+}

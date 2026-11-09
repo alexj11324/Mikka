@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 1,
+  "repository": "alexj11324/Mikka",
+  "head": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+  "tree": "e7c7c6ad66acd729278393711c10eeed67c6d7ac",
+  "actualCheckout": "197ba2452796ce6d5942309f488009963b7cbc7d",
+  "orderedCheckoutParents": [
+    "7848e79df9c5af67e526aeed1c828858db392066",
+    "84ce7f876817f0d73c34a1ef89797fc27ba8661e"
+  ],
+  "ownNativeJobLog": {
+    "path": "native-84ce7f/job-129416680401.original.log",
+    "kind": "exact_decoded_native_job_log",
+    "mode": "100644",
+    "bytes": 254328,
+    "sha256": "0cdb82e7ad732f007e0d702aec8ccd5e593535b803d41a557d3a2f416b9bd14e",
+    "gitBlob": "fd1286bd60e0102050f5c661c76c3280bcd019c7",
+    "remoteConfirmed": true,
+    "scanFindings": []
+  },
+  "checkoutOccurrences": [
+    {
+      "line": 167,
+      "sha": "197ba2452796ce6d5942309f488009963b7cbc7d"
+    }
+  ],
+  "originalRevisionFields": {
+    "lifecycle": "197ba2452796ce6d5942309f488009963b7cbc7d",
+    "smoke": "197ba2452796ce6d5942309f488009963b7cbc7d",
+    "crypto": "197ba2452796ce6d5942309f488009963b7cbc7d",
+    "parityApp": "197ba2452796ce6d5942309f488009963b7cbc7d",
+    "parityHarness": "197ba2452796ce6d5942309f488009963b7cbc7d"
+  },
+  "parityHarnessSha256": "595f222d7ad053d785068fe632a842e5a0e10217a6b65352e0b5bc581149c061",
+  "treeProof": {
+    "gitBlob": "121aa074fbd2ee0c2b891a7ef7884888d5ad2b1d",
+    "bytes": 1671,
+    "readAndGitHashVerified": true,
+    "source": "Root read exact commit tree/parents; this reader read and hash-verified that immutable source receipt."
+  },
+  "nativeLogNodeVersions": [
+    "v24.22.2"
+  ],
+  "platform": "darwin",
+  "architecture": "arm64",
+  "packageBinding": "Standalone package has no revision field; full package object matches crypto report and all three independent processes share its immutable CDHash.",
+  "job": {
+    "id": 129416680401,
+    "runId": 42691592260,
+    "attempt": 1,
+    "name": "desktop-checks / Apple Silicon packaged acceptance and ad-hoc Mikka Dev",
+    "head_sha": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+    "status": "completed",
+    "conclusion": "success",
+    "started_at": "2026-11-09T20:25:27Z",
+    "completed_at": "2026-11-09T20:42:40Z"
+  },
+  "installedDaemon": [
+    {
+      "mode": "bundled",
+      "daemon": {
+        "source": "local_daemon_hello",
+        "status": "connected",
+        "daemonVersion": "0.0.564",
+        "protocolVersion": 3
+      },
+      "service": {
+        "platform": "darwin",
+        "definition": "file",
+        "profile": "matches",
+        "dev": true,
+        "installedVersion": "0.0.564",
+        "installedRevision": "8db16095f46be955df22f42914e0f89b6e5f3d11"
+      }
+    },
+    {
+      "mode": "hosted",
+      "daemon": {
+        "source": "local_daemon_hello",
+        "status": "connected",
+        "daemonVersion": "0.0.564",
+        "protocolVersion": 3
+      },
+      "service": {
+        "platform": "darwin",
+        "definition": "file",
+        "profile": "matches",
+        "dev": true,
+        "installedVersion": "0.0.564",
+        "installedRevision": "8db16095f46be955df22f42914e0f89b6e5f3d11"
+      }
+    }
+  ],
+  "limits": {
+    "eventHeadNotSubstitutedForActualCheckout": true,
+    "installedDaemonRevisionSeparateFromAppSource": true,
+    "workerHashNotReportedByTheseOriginals": true,
+    "productionAcceptance": false
+  }
+}

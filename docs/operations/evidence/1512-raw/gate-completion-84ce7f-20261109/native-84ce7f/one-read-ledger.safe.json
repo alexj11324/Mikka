@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "head": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+  "runId": 42691592260,
+  "attempt": 1,
+  "originalReads": {
+    "nativeJobLog": 1,
+    "otherJobLogs": 0,
+    "artifactDownloadApiCalls": 2,
+    "artifactReferenceByteReads": 2,
+    "artifactRefreshOrRedownloads": 0
+  },
+  "compute": {
+    "vmsCreated": 1,
+    "vmExtensions": 0,
+    "businessRuns": 0,
+    "modelCalls": 0,
+    "nativeReruns": 0,
+    "testReruns": 0,
+    "refMutations": 0,
+    "localExecRetries": 0
+  },
+  "vmCleanupBlob": "ed4d1c16dc21757dcc261a97e1b2d5270ec0d790",
+  "ledger": [
+    {
+      "kind": "resume_after_external_interrupt",
+      "observedAt": "2026-11-09T20:42:36Z",
+      "originalLogReadsBeforeResume": 0,
+      "artifactDownloadsBeforeResume": 0,
+      "vmCreatesBeforeResume": 0,
+      "priorVolatileMetadataLost": true,
+      "recoveryCodeGitBlob": "0d46d7d3d3f1c7edc78d5ea803c1b27ec0d9b816"
+    },
+    {
+      "kind": "main_jobs_metadata",
+      "at": "2026-11-09 20:43:46 UTC",
+      "nativeStatus": "completed",
+      "nativeConclusion": "success",
+      "total": 22
+    },
+    {
+      "kind": "native_job_log",
+      "jobId": 129416680401,
+      "count": 1,
+      "bytes": 254328,
+      "sha256": "0cdb82e7ad732f007e0d702aec8ccd5e593535b803d41a557d3a2f416b9bd14e",
+      "gitBlob": "fd1286bd60e0102050f5c661c76c3280bcd019c7",
+      "published": true
+    },
+    {
+      "kind": "artifact_metadata",
+      "selectedIds": [
+        13709281641,
+        13709126888
+      ],
+      "downloadApiCalls": 0
+    },
+    {
+      "kind": "artifact_download_api",
+      "artifactId": 13709281641,
+      "count": 1,
+      "fileReferenceReturned": true,
+      "downloadUrlPublished": false
+    },
+    {
+      "kind": "artifact_download_api",
+      "artifactId": 13709126888,
+      "count": 1,
+      "fileReferenceReturned": true,
+      "downloadUrlPublished": false
+    }
+  ],
+  "interruptionBoundary": "External interrupt lost volatile metadata before any original read. Original log, ZIP and VM counts were all zero at resume; fixed Git helper and companion metadata were restored. No original was reread.",
+  "readerScope": "Only Native job129416680401 and its Native/package ZIP originals were read; root and peer own all other job originals."
+}

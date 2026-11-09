@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "runId": 42691592260,
+  "attempt": 1,
+  "head": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+  "actualCheckout": "197ba2452796ce6d5942309f488009963b7cbc7d",
+  "selectedArtifacts": [
+    {
+      "id": 13709281641,
+      "name": "desktop-package-evidence-197ba2452796ce6d5942309f488009963b7cbc7d",
+      "sizeInBytes": 1599,
+      "digest": "sha256:7d715ceed1216616b46461754e40d0093b12329eeb824e5be79b50fd3b90912f",
+      "expired": false,
+      "createdAt": "2026-11-09T20:42:29Z",
+      "updatedAt": "2026-11-09T20:42:29Z",
+      "expiresAt": "2026-11-16T20:42:28Z",
+      "workflowRun": {
+        "id": 42691592260,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "fix/1512-daemon-fixture-executable-20261109",
+        "head_sha": "84ce7f876817f0d73c34a1ef89797fc27ba8661e"
+      }
+    },
+    {
+      "id": 13709126888,
+      "name": "desktop-native-evidence-197ba2452796ce6d5942309f488009963b7cbc7d",
+      "sizeInBytes": 14611543,
+      "digest": "sha256:ef3ffd37d80eca1ba21eba33281fd489ee6e414ceb45f004af938406f63cd09f",
+      "expired": false,
+      "createdAt": "2026-11-09T20:42:32Z",
+      "updatedAt": "2026-11-09T20:42:32Z",
+      "expiresAt": "2026-11-16T20:42:30Z",
+      "workflowRun": {
+        "id": 42691592260,
+        "repository_id": 1427517699,
+        "head_repository_id": 1427517699,
+        "head_branch": "fix/1512-daemon-fixture-executable-20261109",
+        "head_sha": "84ce7f876817f0d73c34a1ef89797fc27ba8661e"
+      }
+    }
+  ],
+  "restoredZipBytes": [
+    {
+      "id": 13709281641,
+      "bytes": 1599,
+      "sha256": "7d715ceed1216616b46461754e40d0093b12329eeb824e5be79b50fd3b90912f",
+      "fileCount": 2
+    },
+    {
+      "id": 13709126888,
+      "bytes": 14611543,
+      "sha256": "ef3ffd37d80eca1ba21eba33281fd489ee6e414ceb45f004af938406f63cd09f",
+      "fileCount": 308
+    }
+  ],
+  "downloadApiCalls": 2,
+  "refreshes": 0,
+  "originalsMissing": [],
+  "temporaryDownloadUrlsPublished": false
+}

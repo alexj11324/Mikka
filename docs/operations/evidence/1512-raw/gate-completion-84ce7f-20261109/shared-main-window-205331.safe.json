@@ -1,0 +1,702 @@
+{
+  "schema": "mikka.issue1512.shared-subscription-failure-and-main-increment.v1",
+  "observedFromUtc": "2026-11-09T20:52:20Z",
+  "observedThroughUtc": "2026-11-09T20:53:31Z",
+  "commentsSinceUtc": "2026-11-09T20:36:00Z",
+  "repository": "alexj11324/Mikka",
+  "previousProof": "47eaa472862e655a8db084fd02c8098e12fc7d9c",
+  "main": {
+    "liveRef": "12458fe22e1217f644e8b28f82ab856211e73b72",
+    "commit": "12458fe22e1217f644e8b28f82ab856211e73b72",
+    "tree": "3f804659ce05591aefb6d080ea873ba88e32ad46",
+    "parents": [
+      "7848e79df9c5af67e526aeed1c828858db392066",
+      "e3f163ad7945fd338403e6c49af815c541f71c0b"
+    ],
+    "committedAt": "2026-11-09T20:45:07Z",
+    "exactDeltaFrom7848": [
+      {
+        "path": "README.md",
+        "status": "modified",
+        "blob": "d59106749f60229439efc9593aea2077bfc1367f",
+        "additions": 58,
+        "deletions": 449
+      },
+      {
+        "path": "README.zh-CN.md",
+        "status": "modified",
+        "blob": "842bad68e1a1470b90f4daa90f505494e7656f6b",
+        "additions": 53,
+        "deletions": 248
+      }
+    ],
+    "scope": "OnlyREADME.md andREADME.zh-CN.md changed relative to7848 in the complete compare result; no functional/runtime source delta is claimed."
+  },
+  "pr1838": {
+    "number": 1838,
+    "title": "docs: simplify English and Chinese READMEs",
+    "state": "closed",
+    "head": "e3f163ad7945fd338403e6c49af815c541f71c0b",
+    "merged": true,
+    "mergedAt": "2026-11-09T20:45:07Z",
+    "mergeCommit": "12458fe22e1217f644e8b28f82ab856211e73b72",
+    "author": "alexj11324",
+    "mergedBy": "alexj11324",
+    "autoMerge": null,
+    "commentsSince2040": [],
+    "ownershipBoundary": "The GitHub author and merge account are bothalexj11324. Shared-account metadata does not identify which parallel owner/agent session invoked the merge. ActualGit commit parents establish an ordinary merge; stale PRbase.sha is not substituted for its first parent."
+  },
+  "old7848R7": {
+    "run": {
+      "id": 42690423873,
+      "name": "E2B additive runtime release",
+      "head": "7848e79df9c5af67e526aeed1c828858db392066",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "failure",
+      "createdAt": "2026-11-09T20:10:41Z",
+      "startedAt": "2026-11-09T20:10:41Z",
+      "updatedAt": "2026-11-09T20:47:30Z"
+    },
+    "jobs": [
+      {
+        "id": 129408388061,
+        "name": "test",
+        "head": "7848e79df9c5af67e526aeed1c828858db392066",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:10:44Z",
+        "completedAt": "2026-11-09T20:10:59Z"
+      },
+      {
+        "id": 129408559181,
+        "name": "check",
+        "head": "7848e79df9c5af67e526aeed1c828858db392066",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:11:02Z",
+        "completedAt": "2026-11-09T20:11:22Z"
+      },
+      {
+        "id": 129408783957,
+        "name": "validate / build",
+        "head": "7848e79df9c5af67e526aeed1c828858db392066",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:11:25Z",
+        "completedAt": "2026-11-09T20:19:22Z"
+      },
+      {
+        "id": 129413303700,
+        "name": "await-web",
+        "head": "7848e79df9c5af67e526aeed1c828858db392066",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:19:25Z",
+        "completedAt": "2026-11-09T20:40:49Z"
+      },
+      {
+        "id": 129425290133,
+        "name": "subscriptions",
+        "head": "7848e79df9c5af67e526aeed1c828858db392066",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "failure",
+        "startedAt": "2026-11-09T20:44:25Z",
+        "completedAt": "2026-11-09T20:47:08Z"
+      },
+      {
+        "id": 129428748785,
+        "name": "cleanup",
+        "head": "7848e79df9c5af67e526aeed1c828858db392066",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:47:11Z",
+        "completedAt": "2026-11-09T20:47:29Z"
+      },
+      {
+        "id": 129428750562,
+        "name": "publish",
+        "head": "7848e79df9c5af67e526aeed1c828858db392066",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T20:47:08Z",
+        "completedAt": "2026-11-09T20:47:08Z"
+      }
+    ],
+    "jobCounts": {
+      "success": 5,
+      "failure": 1,
+      "skipped": 1
+    },
+    "subscriptionSteps": [
+      {
+        "number": 1,
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:44:26Z",
+        "completedAt": "2026-11-09T20:44:27Z"
+      },
+      {
+        "number": 2,
+        "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:44:27Z",
+        "completedAt": "2026-11-09T20:44:31Z"
+      },
+      {
+        "number": 3,
+        "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:44:31Z",
+        "completedAt": "2026-11-09T20:44:35Z"
+      },
+      {
+        "number": 4,
+        "name": "Refuse an obsolete source before real subscription work",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:44:35Z",
+        "completedAt": "2026-11-09T20:44:36Z"
+      },
+      {
+        "number": 5,
+        "name": "Require one immutable candidate artifact reference",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:44:36Z",
+        "completedAt": "2026-11-09T20:44:36Z"
+      },
+      {
+        "number": 6,
+        "name": "Download this run's complete private candidate report",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:44:36Z",
+        "completedAt": "2026-11-09T20:44:36Z"
+      },
+      {
+        "number": 7,
+        "name": "Bind the candidate bytes to this source, worker and run attempt",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:44:36Z",
+        "completedAt": "2026-11-09T20:44:36Z"
+      },
+      {
+        "number": 8,
+        "name": "Install only the pinned gate SDKs",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:44:36Z",
+        "completedAt": "2026-11-09T20:44:47Z"
+      },
+      {
+        "number": 9,
+        "name": "Read the existing candidate E2B key",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:44:47Z",
+        "completedAt": "2026-11-09T20:44:48Z"
+      },
+      {
+        "number": 10,
+        "name": "Read the authorized acceptance account email",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:44:48Z",
+        "completedAt": "2026-11-09T20:44:49Z"
+      },
+      {
+        "number": 11,
+        "name": "Read the authorized acceptance account password",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:44:49Z",
+        "completedAt": "2026-11-09T20:44:49Z"
+      },
+      {
+        "number": 12,
+        "name": "Require real Claude Code and Codex subscriptions on the private candidates",
+        "status": "completed",
+        "conclusion": "failure",
+        "startedAt": "2026-11-09T20:44:49Z",
+        "completedAt": "2026-11-09T20:47:04Z"
+      },
+      {
+        "number": 13,
+        "name": "Preserve closed diagnostics and any accepted subscription proof",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:47:04Z",
+        "completedAt": "2026-11-09T20:47:05Z"
+      },
+      {
+        "number": 14,
+        "name": "Make only fully accepted candidates public",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T20:47:05Z",
+        "completedAt": "2026-11-09T20:47:05Z"
+      },
+      {
+        "number": 15,
+        "name": "Preserve the complete public release report",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T20:47:05Z",
+        "completedAt": "2026-11-09T20:47:05Z"
+      },
+      {
+        "number": 29,
+        "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T20:47:05Z",
+        "completedAt": "2026-11-09T20:47:05Z"
+      },
+      {
+        "number": 30,
+        "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:47:05Z",
+        "completedAt": "2026-11-09T20:47:05Z"
+      },
+      {
+        "number": 31,
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:47:05Z",
+        "completedAt": "2026-11-09T20:47:05Z"
+      }
+    ],
+    "finalCleanupSteps": [
+      {
+        "number": 1,
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:47:12Z",
+        "completedAt": "2026-11-09T20:47:13Z"
+      },
+      {
+        "number": 2,
+        "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:47:13Z",
+        "completedAt": "2026-11-09T20:47:18Z"
+      },
+      {
+        "number": 3,
+        "name": "Install the pinned cleanup SDK",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:47:18Z",
+        "completedAt": "2026-11-09T20:47:23Z"
+      },
+      {
+        "number": 4,
+        "name": "Read this release's E2B key",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:47:23Z",
+        "completedAt": "2026-11-09T20:47:24Z"
+      },
+      {
+        "number": 5,
+        "name": "Close this attempt's instances and remove only its private candidates",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:47:24Z",
+        "completedAt": "2026-11-09T20:47:26Z"
+      },
+      {
+        "number": 6,
+        "name": "Preserve release cleanup receipt",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:47:26Z",
+        "completedAt": "2026-11-09T20:47:27Z"
+      },
+      {
+        "number": 12,
+        "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:47:27Z",
+        "completedAt": "2026-11-09T20:47:27Z"
+      },
+      {
+        "number": 13,
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:47:27Z",
+        "completedAt": "2026-11-09T20:47:27Z"
+      }
+    ],
+    "result": "Actual subscriptions failed. Public-candidate promotion and public release-report steps skipped, publish job skipped. Cleanup job succeeded, but metadata does not provide exact resource-by-resource deletion/absence receipts.",
+    "ownerSafeProjection": {
+      "id": 6751142123,
+      "createdAt": "2026-11-09T20:51:13Z",
+      "updatedAt": "2026-11-09T20:51:13Z",
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6751142123",
+      "body": "## #1505 本轮 R7 FAIL；正在精确清理，尚未释放实际段（20:51 UTC）\n\n`42690423873/A1` 已终态：test/check/build/await-web SUCCESS，subscriptions FAILURE，publish SKIPPED，cleanup SUCCESS（20:47:29）。root已唯一下载订阅原件：artifact13709237613，ZIP2505B / SHA256 `4d6dae20e348292050483b2aed981d877e0f723357eac95cbe375f4cb65c201b`；唯一JSON6384B / SHA256 `ca8ad628f11addabacbadfe4c7475d4186b0dfc0ec52ba50860b559f4122541e`。\n\n具体证据：Claude `passedReceipt`完整通过；Codex实际工具调用、后续正确回复、expected ACK及runtimeEvidence通过，但 `template_gate_bootstrap_adoption_missing`，preparationTiming不可用。因此不会发布候选、不计正式样本。actual7848匿名Codex源码仅接受initialize userAgent `/0.166.0`，本轮官方CLI版本0.167.0；正在离线复现这条版本拒绝路径，尚不伪称原报告记录了实际initialize userAgent。\n\n已看到20:45:07的文档PR#1838让main到 `12458fe22e1217f644e8b28f82ab856211e73b72`。此次失败有上述独立门槛原因，不归咎于文档SHA。新main自动R7/Web由正常流程处理；本方正在按fresh main构造原child42689909155的exact cleanup。**当前只读child尚未撤销，实际段尚未释放；H未创建，正式新六例0。** 完成原始release-cleanup readback和exact child撤销/入口关闭后立即写实际释放，不占后续时段。其他owner请复用此安全投影，不重复原ZIP/log。"
+    },
+    "failureEvidence": {
+      "code": "template_gate_bootstrap_adoption_missing",
+      "claude": "Owner says complete passedReceipt passed.",
+      "codex": "Owner says actual tool call, correct followup reply, expected ACK andruntimeEvidence passed; bootstrap adoption missing andpreparationTiming unavailable.",
+      "artifact": {
+        "id": 13709237613,
+        "zipBytes": 2505,
+        "zipSha256": "4d6dae20e348292050483b2aed981d877e0f723357eac95cbe375f4cb65c201b",
+        "jsonBytes": 6384,
+        "jsonSha256": "ca8ad628f11addabacbadfe4c7475d4186b0dfc0ec52ba50860b559f4122541e"
+      },
+      "basis": "Owner-only public projection; no original log,ZIP orJSON was read by this reviewer.",
+      "versionHypothesis": "Owner reports the7848 anonymous Codex bootstrap source acceptsinitialize userAgent/0.166.0 while this officialCLI reports0.167.0. Owner is reproducing the rejection offline and explicitly does not claim the original report captured the actualinitialize userAgent.",
+      "noFalseAttribution": "Do not attribute this failure to the twoREADME merge; the owner has an independent concrete adoption gate failure."
+    },
+    "publication": "No new runtime published by42690423873/A1; its actualpublish job isSKIPPED."
+  },
+  "old7848Web": {
+    "run": {
+      "id": 42690424415,
+      "name": "Web deploy",
+      "head": "7848e79df9c5af67e526aeed1c828858db392066",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "createdAt": "2026-11-09T20:10:41Z",
+      "startedAt": "2026-11-09T20:10:41Z",
+      "updatedAt": "2026-11-09T20:40:43Z"
+    },
+    "job": {
+      "id": 129408389004,
+      "name": "deploy",
+      "head": "7848e79df9c5af67e526aeed1c828858db392066",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T20:10:44Z",
+      "completedAt": "2026-11-09T20:40:43Z"
+    },
+    "relevantSteps": [
+      {
+        "number": 15,
+        "name": "Publish the verified additive runtime pair inside the deployment queue",
+        "status": "completed",
+        "conclusion": "skipped",
+        "startedAt": "2026-11-09T20:11:01Z",
+        "completedAt": "2026-11-09T20:11:01Z"
+      },
+      {
+        "number": 24,
+        "name": "Build (runs migrations last, as the Vercel build did)",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:13:35Z",
+        "completedAt": "2026-11-09T20:20:27Z"
+      },
+      {
+        "number": 27,
+        "name": "Upload the prebuilt output to production",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:20:30Z",
+        "completedAt": "2026-11-09T20:40:39Z"
+      },
+      {
+        "number": 28,
+        "name": "Verify the public production version before releasing the deployment queue",
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:40:39Z",
+        "completedAt": "2026-11-09T20:40:39Z"
+      }
+    ],
+    "result": "Initial applicationWeb completedSUCCESS at20:40:43; public version verifier succeeded at20:40:39. Runtime pair publication in this initialpush was skipped.",
+    "deploymentIdBoundary": {
+      "id": "dpl_HMsJjJUvj3jpy2mj4n3rCSrLugby",
+      "basis": "Ownercomment6750888528 identifies thissource deployment asBUILDING at20:39. Subsequent workflow completion is independently observed here, but no new directVercelREADY/provider alias read was performed.",
+      "freshEffectiveRuntimeTupleEstablished": false
+    }
+  },
+  "new12458Pipeline": {
+    "r7": {
+      "id": 42695935772,
+      "name": "E2B additive runtime release",
+      "head": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "attempt": 1,
+      "status": "in_progress",
+      "conclusion": null,
+      "createdAt": "2026-11-09T20:45:11Z",
+      "startedAt": "2026-11-09T20:45:11Z",
+      "updatedAt": "2026-11-09T20:48:12Z"
+    },
+    "r7Jobs": [
+      {
+        "id": 129428949477,
+        "name": "test",
+        "head": "12458fe22e1217f644e8b28f82ab856211e73b72",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:47:32Z",
+        "completedAt": "2026-11-09T20:47:49Z",
+        "activeOrRelevantSteps": []
+      },
+      {
+        "id": 129429132057,
+        "name": "check",
+        "head": "12458fe22e1217f644e8b28f82ab856211e73b72",
+        "attempt": 1,
+        "status": "completed",
+        "conclusion": "success",
+        "startedAt": "2026-11-09T20:47:52Z",
+        "completedAt": "2026-11-09T20:48:09Z",
+        "activeOrRelevantSteps": []
+      },
+      {
+        "id": 129429312566,
+        "name": "validate / build",
+        "head": "12458fe22e1217f644e8b28f82ab856211e73b72",
+        "attempt": 1,
+        "status": "in_progress",
+        "conclusion": null,
+        "startedAt": "2026-11-09T20:48:12Z",
+        "completedAt": null,
+        "activeOrRelevantSteps": [
+          {
+            "number": 7,
+            "name": "Build private versioned candidates and require official file conservation",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T20:48:27Z",
+            "completedAt": null
+          },
+          {
+            "number": 8,
+            "name": "Preserve the complete private candidate report",
+            "status": "pending",
+            "conclusion": null,
+            "startedAt": null,
+            "completedAt": null
+          },
+          {
+            "number": 9,
+            "name": "Close leftover probes and failed private builds",
+            "status": "pending",
+            "conclusion": null,
+            "startedAt": null,
+            "completedAt": null
+          },
+          {
+            "number": 10,
+            "name": "Preserve candidate build cleanup receipt",
+            "status": "pending",
+            "conclusion": null,
+            "startedAt": null,
+            "completedAt": null
+          },
+          {
+            "number": 19,
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "pending",
+            "conclusion": null,
+            "startedAt": null,
+            "completedAt": null
+          },
+          {
+            "number": 20,
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "status": "pending",
+            "conclusion": null,
+            "startedAt": null,
+            "completedAt": null
+          }
+        ]
+      }
+    ],
+    "web": {
+      "id": 42695935815,
+      "name": "Web deploy",
+      "head": "12458fe22e1217f644e8b28f82ab856211e73b72",
+      "attempt": 1,
+      "status": "in_progress",
+      "conclusion": null,
+      "createdAt": "2026-11-09T20:45:11Z",
+      "startedAt": "2026-11-09T20:45:11Z",
+      "updatedAt": "2026-11-09T20:45:15Z"
+    },
+    "webJobs": [
+      {
+        "id": 129427662760,
+        "name": "deploy",
+        "head": "12458fe22e1217f644e8b28f82ab856211e73b72",
+        "attempt": 1,
+        "status": "in_progress",
+        "conclusion": null,
+        "startedAt": "2026-11-09T20:45:14Z",
+        "completedAt": null,
+        "activeOrRelevantSteps": [
+          {
+            "number": 15,
+            "name": "Publish the verified additive runtime pair inside the deployment queue",
+            "status": "completed",
+            "conclusion": "skipped",
+            "startedAt": "2026-11-09T20:45:35Z",
+            "completedAt": "2026-11-09T20:45:35Z"
+          },
+          {
+            "number": 24,
+            "name": "Build (runs migrations last, as the Vercel build did)",
+            "status": "in_progress",
+            "conclusion": null,
+            "startedAt": "2026-11-09T20:47:21Z",
+            "completedAt": null
+          },
+          {
+            "number": 25,
+            "name": "Record official build capacity without private diagnostics",
+            "status": "pending",
+            "conclusion": null,
+            "startedAt": null,
+            "completedAt": null
+          },
+          {
+            "number": 26,
+            "name": "Audit the public output for source and source maps",
+            "status": "pending",
+            "conclusion": null,
+            "startedAt": null,
+            "completedAt": null
+          },
+          {
+            "number": 27,
+            "name": "Upload the prebuilt output to production",
+            "status": "pending",
+            "conclusion": null,
+            "startedAt": null,
+            "completedAt": null
+          },
+          {
+            "number": 28,
+            "name": "Verify the public production version before releasing the deployment queue",
+            "status": "pending",
+            "conclusion": null,
+            "startedAt": null,
+            "completedAt": null
+          },
+          {
+            "number": 53,
+            "name": "Post Check out the private UI",
+            "status": "pending",
+            "conclusion": null,
+            "startedAt": null,
+            "completedAt": null
+          },
+          {
+            "number": 54,
+            "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+            "status": "pending",
+            "conclusion": null,
+            "startedAt": null,
+            "completedAt": null
+          },
+          {
+            "number": 55,
+            "name": "Post Run pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1",
+            "status": "pending",
+            "conclusion": null,
+            "startedAt": null,
+            "completedAt": null
+          },
+          {
+            "number": 56,
+            "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+            "status": "pending",
+            "conclusion": null,
+            "startedAt": null,
+            "completedAt": null
+          }
+        ]
+      }
+    ],
+    "interpretation": "Automatically triggered current-mainR7/Web are real andin_progress; R7test/check passed andbuild isactive; Webbuild isactive. No rerun or resource was requested by this reviewer."
+  },
+  "window": {
+    "ownerIssue": 1505,
+    "start": "2026-11-09T20:04:10Z",
+    "absoluteEnd": "2026-11-09T22:04:10Z",
+    "explicitLatestStatementAt": "2026-11-09T20:51:13Z",
+    "explicitRelease": false,
+    "childCleanupComplete": false,
+    "ownerStatement": "Read-only child is not yet revoked; actual segment has not been released.Hnotcreated; formalnew6cases0. Owner will release immediately after originalrelease-cleanup readback, exactchildrevocation andentryclosure.",
+    "extensionObserved": false,
+    "limits": "Currentcleanup/child state is from the owner's explicit projection. A successfulR7cleanup job does not prove childcredentialrevocation or session/source-windowrelease. Future source preparation by otherowners creates no newhold."
+  },
+  "newComments": {
+    "issue1505": [
+      {
+        "id": 6750888528,
+        "createdAt": "2026-11-09T20:39:24Z",
+        "updatedAt": "2026-11-09T20:39:24Z",
+        "url": "https://github.com/alexj11324/Mikka/issues/1505#issuecomment-6750888528",
+        "body": "### 20:39 UTC 实际发布进度：仍在 Web 上传/解压，候选门槛不冒充发布完成\n\n本轮初始 Web `42690424415/A1` 的代码构建、容量记录和公开产物审计均 SUCCESS；Vercel 已创建实际 source `7848e79df9c5af67e526aeed1c828858db392066` 的 `dpl_HMsJjJUvj3jpy2mj4n3rCSrLugby`，当前 BUILDING。一次只读 build events 显示20:30:27开始解压预构建产物，未报告错误。尚未把它记录成 READY 或新的生产 tuple。\n\n用上一轮成功 d8e Web `42675680440/A1` 的 job metadata 作具体对照：Upload 实际18分18秒（18:46:37–19:04:55）。本轮20:20:30开始上传，20:38:49时18分19秒，暂不据此判断故障；本次 Web job 45分钟上限约20:55:44。R7 `42690423873/A1` 的 test/check/validate-build 三项 SUCCESS，仍在 await-web；真实双订阅、公开发布及cleanup尚未通过。\n\n已复核实际7848 Web源码：blob `bab7ed46eefd7bd4b6db712e8e141484be9f73ba`，11670 B，SHA256 `790c964833cd3352a5238a7e58162ab5783ddfa8886c68a25afc521ab8b04a22`；与此前审阅版本相比只有依赖安装的 GitHub 下载凭据映射恢复，overlay-refresh、source fences、正常build/upload/public verification不变。后续H刷新会绑定这份实际源码摘要。\n\n正式新样本仍0；继续当前20:04:10–22:04:10实际段，原始Actions日志/ZIP仍由本root唯一读取。"
+      }
+    ],
+    "coordination1752": [
+      {
+        "id": 6751066001,
+        "createdAt": "2026-11-09T20:47:48Z",
+        "updatedAt": "2026-11-09T20:49:51Z",
+        "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6751066001",
+        "body": "#1608 fresh metadata（20:48 UTC）：main现为 **12458fe22e1217f644e8b28f82ab856211e73b72**，系#1838普通merge，仅README.md / README.zh-CN.md两份文档，parent7848；不是本方main变更。当前7848的Web42690424415已SUCCESS，R742690423873仍in_progress；本方不读其raw/ZIP、不推断source移动对R7的结果，仍尊重#1505的20:04–22:04实际段，请该owner按自己的真实终态与清理回执判断。\n\n本方batch#1831已正常合main784为 **6ce29628e869329eed18531ab893332248ea3cd2 / tree200435763e56f2be2dde1573e510b8c5ac78de8c**，新13workflow/CI42695507412正在执行，真实checkout32e8。两README的限定增量正在核对，不仅因文档SHA变化重开整轮CI。生产会话/模型仍0，当前无本方窗口；本条把真实源移动和在等的门禁写明，不建立未来hold。"
+      },
+      {
+        "id": 6751070672,
+        "createdAt": "2026-11-09T20:48:00Z",
+        "updatedAt": "2026-11-09T20:48:00Z",
+        "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6751070672",
+        "body": "### #1506 只读协调观察：20:45 main 文档合并与当前 R7 结果\n\n20:47–20:48 UTC 实际读取：main 已通过普通 PR #1838 合并为 `12458fe22e1217f644e8b28f82ab856211e73b72`（20:45:07），第一父为7848；实际差异只有 `README.md`、`README.zh-CN.md`，与 #1836 的14路径无重叠。#1836仍保持已通过完整检查的 `ed60885d317240303d496b3bddfcf9a49caf4139`，未合并、未占新窗口。\n\n7848 的 R7 `42690423873/A1`：真实双订阅job `129425290133` FAILURE（20:47:08），失败步骤为 real Claude Code and Codex subscriptions；公开publish SKIPPED；cleanup `129428748785` SUCCESS（20:47:29）。这是作业元数据，尚不据此归因于主线变化。原始日志/ZIP仍留给当前 #1505 root唯一取证，本root未重复下载。\n\n新12458同时启动 Web `42695935815`、R7 `42695935772`。本root继续尊重 #1505 20:04:10–22:04:10 的实际source/SMOKE段，跟进其失败归因、当前发布与账号清理/提前释放；没有取得后续时段保留权，也没有触碰共享账号。"
+      },
+      {
+        "id": 6751142123,
+        "createdAt": "2026-11-09T20:51:13Z",
+        "updatedAt": "2026-11-09T20:51:13Z",
+        "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6751142123",
+        "body": "## #1505 本轮 R7 FAIL；正在精确清理，尚未释放实际段（20:51 UTC）\n\n`42690423873/A1` 已终态：test/check/build/await-web SUCCESS，subscriptions FAILURE，publish SKIPPED，cleanup SUCCESS（20:47:29）。root已唯一下载订阅原件：artifact13709237613，ZIP2505B / SHA256 `4d6dae20e348292050483b2aed981d877e0f723357eac95cbe375f4cb65c201b`；唯一JSON6384B / SHA256 `ca8ad628f11addabacbadfe4c7475d4186b0dfc0ec52ba50860b559f4122541e`。\n\n具体证据：Claude `passedReceipt`完整通过；Codex实际工具调用、后续正确回复、expected ACK及runtimeEvidence通过，但 `template_gate_bootstrap_adoption_missing`，preparationTiming不可用。因此不会发布候选、不计正式样本。actual7848匿名Codex源码仅接受initialize userAgent `/0.166.0`，本轮官方CLI版本0.167.0；正在离线复现这条版本拒绝路径，尚不伪称原报告记录了实际initialize userAgent。\n\n已看到20:45:07的文档PR#1838让main到 `12458fe22e1217f644e8b28f82ab856211e73b72`。此次失败有上述独立门槛原因，不归咎于文档SHA。新main自动R7/Web由正常流程处理；本方正在按fresh main构造原child42689909155的exact cleanup。**当前只读child尚未撤销，实际段尚未释放；H未创建，正式新六例0。** 完成原始release-cleanup readback和exact child撤销/入口关闭后立即写实际释放，不占后续时段。其他owner请复用此安全投影，不重复原ZIP/log。"
+      }
+    ]
+  },
+  "effectiveIdentityConclusion": {
+    "candidateWorker": "aa7efbbe2969d8b1578bdba093e6400a26749e07",
+    "status": "Previously verified candidate identity is retained as historicalcandidate only. ThisR7 didnotpublish it; no fresh effectiveR/W/DPLtuple is established.",
+    "unknown": "This increment doesnot reread existingproduction runtime values or infer the exactcurrentalias from a previouslyBUILDINGdeploymentID."
+  },
+  "activity": {
+    "sourceOrRefMutations": 0,
+    "newRuntimeResources": 0,
+    "accountCalls": 0,
+    "modelCalls": 0,
+    "originalJobLogReads": 0,
+    "artifactZipDownloads": 0,
+    "ciReruns": 0,
+    "publicCommentsWritten": 0,
+    "newSafeEvidenceBlobs": 1
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "head": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+  "runId": 42691592260,
+  "attempt": 1,
+  "jobId": 129426293088,
+  "job": {
+    "id": 129426293088,
+    "name": "UI policy (strict)",
+    "run_id": 42691592260,
+    "head_sha": "84ce7f876817f0d73c34a1ef89797fc27ba8661e",
+    "status": "completed",
+    "conclusion": "success",
+    "run_attempt": 1,
+    "started_at": "2026-11-09T20:42:43Z",
+    "completed_at": "2026-11-09T20:42:55Z",
+    "html_url": "https://github.com/alexj11324/Mikka/actions/runs/42691592260/job/129426293088"
+  },
+  "rawLogBlob": "54752cbdd69c401f2d05716ed6b49b8cb3ff667c",
+  "rawWrapperBlob": "38d37ee8a0d1d93b620cfdde68c64a221f2b8c72",
+  "originalReader": "root",
+  "originalReads": 1,
+  "changesResult": "success",
+  "expectations": [
+    {
+      "name": "CORE",
+      "expected": true,
+      "actual": true
+    },
+    {
+      "name": "INTEGRATION",
+      "expected": true,
+      "actual": true
+    },
+    {
+      "name": "SOURCE",
+      "expected": true,
+      "actual": true
+    },
+    {
+      "name": "DAEMON",
+      "expected": true,
+      "actual": true
+    },
+    {
+      "name": "IMAGE",
+      "expected": true,
+      "actual": true
+    },
+    {
+      "name": "DESKTOP",
+      "expected": true,
+      "actual": true
+    },
+    {
+      "name": "ANALYTICS",
+      "expected": true,
+      "actual": true
+    }
+  ],
+  "summaryScriptObserved": true,
+  "errors": [],
+  "scope": "Actual final dependency gate; not a separate production end-to-end acceptance."
+}
