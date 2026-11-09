@@ -1,0 +1,417 @@
+{
+  "manifestSha256": "1db726eab5a4be6ddd2fc6bf27fc61269c0df32a4fbcee76c0f992936b5ca992",
+  "sourceCommit": "40376665ac416ce2228c08b60d7ea8cee97a3de6",
+  "manifestFiles": 53,
+  "decoded": [
+    {
+      "file": "01-postgresql-gates-result.png",
+      "bytes": 327149,
+      "decode": "passed",
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "png",
+            "width": 960,
+            "height": 600
+          }
+        ],
+        "format": {
+          "size": "327149"
+        }
+      }
+    },
+    {
+      "file": "01-postgresql-gates-running.png",
+      "bytes": 496085,
+      "decode": "passed",
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "png",
+            "width": 960,
+            "height": 600
+          }
+        ],
+        "format": {
+          "size": "496085"
+        }
+      }
+    },
+    {
+      "file": "01-postgresql-gates-start.png",
+      "bytes": 179625,
+      "decode": "passed",
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "png",
+            "width": 960,
+            "height": 600
+          }
+        ],
+        "format": {
+          "size": "179625"
+        }
+      }
+    },
+    {
+      "file": "01-postgresql-gates.mp4",
+      "bytes": 3034543,
+      "decode": "passed",
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 600
+          }
+        ],
+        "format": {
+          "duration": "83.166667",
+          "size": "3034543"
+        }
+      }
+    },
+    {
+      "file": "02-real-http-result.png",
+      "bytes": 609102,
+      "decode": "passed",
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "png",
+            "width": 1280,
+            "height": 800
+          }
+        ],
+        "format": {
+          "size": "609102"
+        }
+      }
+    },
+    {
+      "file": "02-real-http-running.png",
+      "bytes": 219454,
+      "decode": "passed",
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "png",
+            "width": 1280,
+            "height": 800
+          }
+        ],
+        "format": {
+          "size": "219454"
+        }
+      }
+    },
+    {
+      "file": "02-real-http-start.png",
+      "bytes": 211574,
+      "decode": "passed",
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "png",
+            "width": 1280,
+            "height": 800
+          }
+        ],
+        "format": {
+          "size": "211574"
+        }
+      }
+    },
+    {
+      "file": "02-real-http.mp4",
+      "bytes": 399219,
+      "decode": "passed",
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 1280,
+            "height": 800
+          }
+        ],
+        "format": {
+          "duration": "41.733333",
+          "size": "399219"
+        }
+      }
+    },
+    {
+      "file": "03-cli-daemon-ffmpeg-result.png",
+      "bytes": 784213,
+      "decode": "passed",
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "png",
+            "width": 1280,
+            "height": 800
+          }
+        ],
+        "format": {
+          "size": "784213"
+        }
+      }
+    },
+    {
+      "file": "03-cli-daemon-ffmpeg-running.png",
+      "bytes": 604741,
+      "decode": "passed",
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "png",
+            "width": 1280,
+            "height": 800
+          }
+        ],
+        "format": {
+          "size": "604741"
+        }
+      }
+    },
+    {
+      "file": "03-cli-daemon-ffmpeg-start.png",
+      "bytes": 231990,
+      "decode": "passed",
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "png",
+            "width": 1280,
+            "height": 800
+          }
+        ],
+        "format": {
+          "size": "231990"
+        }
+      }
+    },
+    {
+      "file": "03-cli-daemon-ffmpeg.mp4",
+      "bytes": 1987184,
+      "decode": "passed",
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 1280,
+            "height": 800
+          }
+        ],
+        "format": {
+          "duration": "22.066667",
+          "size": "1987184"
+        }
+      }
+    },
+    {
+      "file": "04-activity-registration-result.png",
+      "bytes": 827975,
+      "decode": "passed",
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "png",
+            "width": 1280,
+            "height": 800
+          }
+        ],
+        "format": {
+          "size": "827975"
+        }
+      }
+    },
+    {
+      "file": "04-activity-registration-running.png",
+      "bytes": 296339,
+      "decode": "passed",
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "png",
+            "width": 1280,
+            "height": 800
+          }
+        ],
+        "format": {
+          "size": "296339"
+        }
+      }
+    },
+    {
+      "file": "04-activity-registration-start.png",
+      "bytes": 270466,
+      "decode": "passed",
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "png",
+            "width": 1280,
+            "height": 800
+          }
+        ],
+        "format": {
+          "size": "270466"
+        }
+      }
+    },
+    {
+      "file": "04-activity-registration.mp4",
+      "bytes": 583864,
+      "decode": "passed",
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 1280,
+            "height": 800
+          }
+        ],
+        "format": {
+          "duration": "54.933333",
+          "size": "583864"
+        }
+      }
+    },
+    {
+      "file": "ffmpeg-readback/copied-helper.mp4",
+      "bytes": 3780,
+      "decode": "passed",
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 160,
+            "height": 120
+          }
+        ],
+        "format": {
+          "duration": "5.533333",
+          "size": "3780"
+        }
+      }
+    },
+    {
+      "file": "ffmpeg-readback/final-action.png",
+      "bytes": 449,
+      "decode": "passed",
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "png",
+            "width": 160,
+            "height": 120
+          }
+        ],
+        "format": {
+          "size": "449"
+        }
+      }
+    },
+    {
+      "file": "ffmpeg-readback/first-action.png",
+      "bytes": 450,
+      "decode": "passed",
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "png",
+            "width": 160,
+            "height": 120
+          }
+        ],
+        "format": {
+          "size": "450"
+        }
+      }
+    },
+    {
+      "file": "ffmpeg-readback/processed.mp4",
+      "bytes": 3780,
+      "decode": "passed",
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 160,
+            "height": 120
+          }
+        ],
+        "format": {
+          "duration": "5.533333",
+          "size": "3780"
+        }
+      }
+    }
+  ],
+  "suiteTotals": {
+    "total": 311,
+    "passed": 311,
+    "failed": 0,
+    "skipped": 0
+  },
+  "textScan": {
+    "files": 33,
+    "flags": []
+  },
+  "unlistedFiles": [],
+  "missingFiles": [],
+  "sameOriginReadback": {
+    "captures": 6,
+    "documents": 4,
+    "taskId": "bbbc1fe2-2945-4be1-ae3d-d6747b752fd4",
+    "runId": "e41c6f27-d045-46fa-bb10-a60b43cc3661",
+    "candidateId": "5c803e18-e03c-4841-bb68-9487382b55d7",
+    "immutableAcceptance": {
+      "artifactId": "63443314-2612-4d9e-85e9-89cc340fbd7d",
+      "version": 1
+    },
+    "cleaned": true,
+    "passed": true
+  },
+  "reviewedAt": "2026-11-09T21:19:25.971804+00:00",
+  "reviewer": "execution_path independent resume review",
+  "visualReview": {
+    "frames": 12,
+    "stageIds": [
+      "01-postgresql-gates",
+      "02-real-http",
+      "03-cli-daemon-ffmpeg",
+      "04-activity-registration"
+    ],
+    "phases": [
+      "start",
+      "running",
+      "result"
+    ],
+    "result": "passed",
+    "observations": "Observed real terminal command start, running output and pass result for the recorded source; no credential values or private account details visible in the twelve selected frames."
+  },
+  "boundary": "Historical execution evidence for 40376665 only. Hash, decode, visual and task/media/report binding reviewed independently; suites were not rerun by this archive review, and no production or live model acceptance is claimed."
+}

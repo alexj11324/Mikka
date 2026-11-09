@@ -1,0 +1,65 @@
+{
+  "sourceCommit": "1efe99fcdf03f8b386682b92b0508cc164d2e179",
+  "environment": {
+    "platform": "cloud Linux",
+    "provider": "Vercel Sandbox",
+    "persistent": false,
+    "image": "vercel/sandbox/universal@sha256:bbec19cffb43ad724eee446d3bd4476e2993849dc0ff0c9f33356f8365d72219",
+    "node": "v24.22.1",
+    "pnpm": "10.34.3",
+    "ffmpeg": "8.0.1-3ubuntu2",
+    "unixSocket": "available"
+  },
+  "commandId": "cmd_7c2d3412fa724e28b5c61560b243",
+  "startedAt": "2026-11-09T21:24:19.538000+00:00",
+  "finishedAt": "2026-11-09T21:25:50.229000+00:00",
+  "durationMs": 90691,
+  "exitCode": 0,
+  "sourceCleanBeforeAndAfter": true,
+  "tests": {
+    "nodeMediaAndAcceptance": 57,
+    "daemon": 104,
+    "workerInstall": 5,
+    "refresh": 12,
+    "total": 178,
+    "passed": 178,
+    "failed": 0,
+    "skipped": 0
+  },
+  "routes": {
+    "routes": 243,
+    "methods": 315
+  },
+  "files": {
+    "refresh.txt": {
+      "size": 111,
+      "sha256": "f1640e0ec29a96fcab4af755e859034304131dffbbdfd5f8c085d3bb0053e442"
+    },
+    "worker-install.txt": {
+      "size": 103,
+      "sha256": "1f11b6e880045ee35de832b81b45d06257342e13b5c79bbf0034379d4ca220b9"
+    },
+    "routes.txt": {
+      "size": 29,
+      "sha256": "419b282d641a92553dd1dbb9d3d5748838586598927f8f7640c577d9dcae4ef1"
+    },
+    "observed-summary.txt": {
+      "size": 824,
+      "sha256": "0e104e401141a9ab9b42eb6f27a29acb61cef07bb723bb93563c5fa7eb23fd4a",
+      "source": "transcription of observed tool result excerpt; not raw execution output"
+    }
+  },
+  "cleanup": {
+    "ownedDevelopmentSandbox": "stopped",
+    "readBackConfirmed": true,
+    "stoppedAt": "2026-11-09T21:26:52.161000+00:00",
+    "persistent": false
+  },
+  "recordedAt": "2026-11-09T21:28:39.792988+00:00",
+  "boundaries": [
+    "Development source tests only; no production credentials or model calls.",
+    "Historical 311/311 evidence has its own source-bound archive.",
+    "Latest PR head CI and production acceptance remain separate required gates.",
+    "The connector truncated large base64 fields when downloading the full Node and daemon logs. Those partial downloads are not archived. observed-summary.txt transcribes the already observed result excerpt and identifies its command; the small Python and route logs were downloaded completely."
+  ]
+}

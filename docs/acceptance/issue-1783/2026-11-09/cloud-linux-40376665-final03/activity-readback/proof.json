@@ -1,0 +1,711 @@
+{
+  "codeCommit": "40376665ac416ce2228c08b60d7ea8cee97a3de6",
+  "startedAt": "2026-11-09T15:39:06.063Z",
+  "boundary": "Isolated synthetic task graph; real cloud commands, captured terminal footage and authenticated HTTP transport. No model/provider execution is claimed.",
+  "http": [
+    {
+      "method": "POST",
+      "path": "/mikka/api/auth/device/code",
+      "caller": "public",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:35.856Z"
+    },
+    {
+      "method": "GET",
+      "path": "/mikka/api/auth/device",
+      "caller": "owner",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:35.874Z"
+    },
+    {
+      "method": "POST",
+      "path": "/mikka/api/auth/device/approve",
+      "caller": "owner",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:35.897Z"
+    },
+    {
+      "method": "POST",
+      "path": "/mikka/api/auth/device/token",
+      "caller": "public",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:40.918Z"
+    },
+    {
+      "method": "POST",
+      "path": "/mikka/v1/devices/register",
+      "caller": "device",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:40.981Z"
+    },
+    {
+      "method": "POST",
+      "path": "/mikka/v1/runs/e41c6f27-d045-46fa-bb10-a60b43cc3661/captures",
+      "caller": "device",
+      "status": 201,
+      "startedAt": "2026-11-09T15:39:41.054Z"
+    },
+    {
+      "method": "PUT",
+      "path": "/mikka/v1/runs/e41c6f27-d045-46fa-bb10-a60b43cc3661/captures/7e9268d2-1fbd-465b-95f0-a0129debb4bf",
+      "caller": "device",
+      "status": 204,
+      "startedAt": "2026-11-09T15:39:41.094Z"
+    },
+    {
+      "method": "POST",
+      "path": "/mikka/v1/runs/e41c6f27-d045-46fa-bb10-a60b43cc3661/captures/7e9268d2-1fbd-465b-95f0-a0129debb4bf/complete",
+      "caller": "device",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:41.199Z"
+    },
+    {
+      "method": "POST",
+      "path": "/mikka/v1/runs/e41c6f27-d045-46fa-bb10-a60b43cc3661/captures",
+      "caller": "device",
+      "status": 201,
+      "startedAt": "2026-11-09T15:39:41.412Z"
+    },
+    {
+      "method": "PUT",
+      "path": "/mikka/v1/runs/e41c6f27-d045-46fa-bb10-a60b43cc3661/captures/79999697-3c00-4eda-b32e-16dbe2ad4d39",
+      "caller": "device",
+      "status": 204,
+      "startedAt": "2026-11-09T15:39:41.471Z"
+    },
+    {
+      "method": "POST",
+      "path": "/mikka/v1/runs/e41c6f27-d045-46fa-bb10-a60b43cc3661/captures/79999697-3c00-4eda-b32e-16dbe2ad4d39/complete",
+      "caller": "device",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:41.499Z"
+    },
+    {
+      "method": "POST",
+      "path": "/mikka/v1/runs/e41c6f27-d045-46fa-bb10-a60b43cc3661/captures",
+      "caller": "device",
+      "status": 201,
+      "startedAt": "2026-11-09T15:39:41.537Z"
+    },
+    {
+      "method": "PUT",
+      "path": "/mikka/v1/runs/e41c6f27-d045-46fa-bb10-a60b43cc3661/captures/334c00c3-4e57-476c-9f01-ba1f115cf0a5",
+      "caller": "device",
+      "status": 204,
+      "startedAt": "2026-11-09T15:39:41.557Z"
+    },
+    {
+      "method": "POST",
+      "path": "/mikka/v1/runs/e41c6f27-d045-46fa-bb10-a60b43cc3661/captures/334c00c3-4e57-476c-9f01-ba1f115cf0a5/complete",
+      "caller": "device",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:41.582Z"
+    },
+    {
+      "method": "POST",
+      "path": "/mikka/v1/runs/e41c6f27-d045-46fa-bb10-a60b43cc3661/captures",
+      "caller": "device",
+      "status": 201,
+      "startedAt": "2026-11-09T15:39:41.638Z"
+    },
+    {
+      "method": "PUT",
+      "path": "/mikka/v1/runs/e41c6f27-d045-46fa-bb10-a60b43cc3661/captures/22a7624d-8e77-4e32-8bc2-bf6ef25cd254",
+      "caller": "device",
+      "status": 204,
+      "startedAt": "2026-11-09T15:39:41.677Z"
+    },
+    {
+      "method": "POST",
+      "path": "/mikka/v1/runs/e41c6f27-d045-46fa-bb10-a60b43cc3661/captures/22a7624d-8e77-4e32-8bc2-bf6ef25cd254/complete",
+      "caller": "device",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:41.720Z"
+    },
+    {
+      "method": "POST",
+      "path": "/mikka/v1/runs/e41c6f27-d045-46fa-bb10-a60b43cc3661/captures",
+      "caller": "device",
+      "status": 201,
+      "startedAt": "2026-11-09T15:39:41.774Z"
+    },
+    {
+      "method": "PUT",
+      "path": "/mikka/v1/runs/e41c6f27-d045-46fa-bb10-a60b43cc3661/captures/50cb6a85-b271-4159-88df-573e24ed2db8",
+      "caller": "device",
+      "status": 204,
+      "startedAt": "2026-11-09T15:39:41.789Z"
+    },
+    {
+      "method": "POST",
+      "path": "/mikka/v1/runs/e41c6f27-d045-46fa-bb10-a60b43cc3661/captures/50cb6a85-b271-4159-88df-573e24ed2db8/complete",
+      "caller": "device",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:41.916Z"
+    },
+    {
+      "method": "POST",
+      "path": "/mikka/v1/runs/e41c6f27-d045-46fa-bb10-a60b43cc3661/captures",
+      "caller": "device",
+      "status": 201,
+      "startedAt": "2026-11-09T15:39:42.062Z"
+    },
+    {
+      "method": "PUT",
+      "path": "/mikka/v1/runs/e41c6f27-d045-46fa-bb10-a60b43cc3661/captures/efae00c4-b773-4255-93f3-0c8a3f97d38d",
+      "caller": "device",
+      "status": 204,
+      "startedAt": "2026-11-09T15:39:42.086Z"
+    },
+    {
+      "method": "POST",
+      "path": "/mikka/v1/runs/e41c6f27-d045-46fa-bb10-a60b43cc3661/captures/efae00c4-b773-4255-93f3-0c8a3f97d38d/complete",
+      "caller": "device",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:42.135Z"
+    },
+    {
+      "method": "POST",
+      "path": "/mikka/api/mcp",
+      "caller": "worker",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:46.820Z"
+    },
+    {
+      "method": "POST",
+      "path": "/mikka/api/mcp",
+      "caller": "worker",
+      "status": 202,
+      "startedAt": "2026-11-09T15:39:46.950Z"
+    },
+    {
+      "method": "POST",
+      "path": "/mikka/api/mcp",
+      "caller": "worker",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:46.978Z"
+    },
+    {
+      "method": "GET",
+      "path": "/mikka/api/artifacts/94681b89-7533-4500-bdf7-ac2248c7e397/versions/1/download",
+      "caller": "owner",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:47.031Z"
+    },
+    {
+      "method": "POST",
+      "path": "/mikka/api/mcp",
+      "caller": "worker",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:48.775Z"
+    },
+    {
+      "method": "GET",
+      "path": "/mikka/api/artifacts/94681b89-7533-4500-bdf7-ac2248c7e397/versions/1/download",
+      "caller": "owner",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:48.821Z"
+    },
+    {
+      "method": "POST",
+      "path": "/mikka/api/mcp",
+      "caller": "worker",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:48.946Z"
+    },
+    {
+      "method": "GET",
+      "path": "/mikka/api/factory/tasks/bbbc1fe2-2945-4be1-ae3d-d6747b752fd4/activity",
+      "caller": "owner",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:49.050Z"
+    },
+    {
+      "method": "GET",
+      "path": "/mikka/api/factory/tasks/bbbc1fe2-2945-4be1-ae3d-d6747b752fd4/activity",
+      "caller": "public",
+      "status": 401,
+      "startedAt": "2026-11-09T15:39:49.316Z"
+    },
+    {
+      "method": "GET",
+      "path": "/mikka/api/factory/tasks/bbbc1fe2-2945-4be1-ae3d-d6747b752fd4/activity",
+      "caller": "peer",
+      "status": 404,
+      "startedAt": "2026-11-09T15:39:49.323Z"
+    },
+    {
+      "method": "GET",
+      "path": "/mikka/api/factory/tasks/bbbc1fe2-2945-4be1-ae3d-d6747b752fd4/media/7e9268d2-1fbd-465b-95f0-a0129debb4bf",
+      "caller": "owner",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:49.362Z"
+    },
+    {
+      "method": "GET",
+      "path": "/mikka/api/factory/tasks/bbbc1fe2-2945-4be1-ae3d-d6747b752fd4/media/7e9268d2-1fbd-465b-95f0-a0129debb4bf",
+      "caller": "owner",
+      "status": 206,
+      "startedAt": "2026-11-09T15:39:50.293Z"
+    },
+    {
+      "method": "GET",
+      "path": "/mikka/api/captures/7e9268d2-1fbd-465b-95f0-a0129debb4bf",
+      "caller": "owner",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:50.401Z"
+    },
+    {
+      "method": "GET",
+      "path": "/mikka/api/factory/tasks/bbbc1fe2-2945-4be1-ae3d-d6747b752fd4/media/79999697-3c00-4eda-b32e-16dbe2ad4d39",
+      "caller": "owner",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:50.547Z"
+    },
+    {
+      "method": "GET",
+      "path": "/mikka/api/captures/79999697-3c00-4eda-b32e-16dbe2ad4d39",
+      "caller": "owner",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:50.729Z"
+    },
+    {
+      "method": "GET",
+      "path": "/mikka/api/factory/tasks/bbbc1fe2-2945-4be1-ae3d-d6747b752fd4/media/334c00c3-4e57-476c-9f01-ba1f115cf0a5",
+      "caller": "owner",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:50.758Z"
+    },
+    {
+      "method": "GET",
+      "path": "/mikka/api/factory/tasks/bbbc1fe2-2945-4be1-ae3d-d6747b752fd4/media/334c00c3-4e57-476c-9f01-ba1f115cf0a5",
+      "caller": "owner",
+      "status": 206,
+      "startedAt": "2026-11-09T15:39:51.438Z"
+    },
+    {
+      "method": "GET",
+      "path": "/mikka/api/captures/334c00c3-4e57-476c-9f01-ba1f115cf0a5",
+      "caller": "owner",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:51.492Z"
+    },
+    {
+      "method": "GET",
+      "path": "/mikka/api/factory/tasks/bbbc1fe2-2945-4be1-ae3d-d6747b752fd4/media/22a7624d-8e77-4e32-8bc2-bf6ef25cd254",
+      "caller": "owner",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:51.520Z"
+    },
+    {
+      "method": "GET",
+      "path": "/mikka/api/captures/22a7624d-8e77-4e32-8bc2-bf6ef25cd254",
+      "caller": "owner",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:51.694Z"
+    },
+    {
+      "method": "GET",
+      "path": "/mikka/api/factory/tasks/bbbc1fe2-2945-4be1-ae3d-d6747b752fd4/media/50cb6a85-b271-4159-88df-573e24ed2db8",
+      "caller": "owner",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:51.726Z"
+    },
+    {
+      "method": "GET",
+      "path": "/mikka/api/factory/tasks/bbbc1fe2-2945-4be1-ae3d-d6747b752fd4/media/50cb6a85-b271-4159-88df-573e24ed2db8",
+      "caller": "owner",
+      "status": 206,
+      "startedAt": "2026-11-09T15:39:52.405Z"
+    },
+    {
+      "method": "GET",
+      "path": "/mikka/api/captures/50cb6a85-b271-4159-88df-573e24ed2db8",
+      "caller": "owner",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:52.506Z"
+    },
+    {
+      "method": "GET",
+      "path": "/mikka/api/factory/tasks/bbbc1fe2-2945-4be1-ae3d-d6747b752fd4/media/efae00c4-b773-4255-93f3-0c8a3f97d38d",
+      "caller": "owner",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:52.598Z"
+    },
+    {
+      "method": "GET",
+      "path": "/mikka/api/captures/efae00c4-b773-4255-93f3-0c8a3f97d38d",
+      "caller": "owner",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:52.844Z"
+    },
+    {
+      "method": "GET",
+      "path": "/mikka/api/artifacts/94681b89-7533-4500-bdf7-ac2248c7e397/versions/1/download",
+      "caller": "owner",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:52.896Z"
+    },
+    {
+      "method": "GET",
+      "path": "/mikka/api/artifacts/94681b89-7533-4500-bdf7-ac2248c7e397/versions/2/download",
+      "caller": "owner",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:52.926Z"
+    },
+    {
+      "method": "GET",
+      "path": "/mikka/api/artifacts/3542371b-6215-4e20-b935-11d50e1986be/versions/1/download",
+      "caller": "owner",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:52.944Z"
+    },
+    {
+      "method": "GET",
+      "path": "/mikka/api/artifacts/63443314-2612-4d9e-85e9-89cc340fbd7d/versions/1/download",
+      "caller": "owner",
+      "status": 200,
+      "startedAt": "2026-11-09T15:39:52.966Z"
+    }
+  ],
+  "captures": [
+    {
+      "file": "01-postgresql-gates.mp4",
+      "contentType": "video/mp4",
+      "durationMs": 83167,
+      "title": "Actual cloud command recording: 01-postgresql-gates",
+      "stageId": "01-postgresql-gates",
+      "captureId": "7e9268d2-1fbd-465b-95f0-a0129debb4bf",
+      "runId": "e41c6f27-d045-46fa-bb10-a60b43cc3661",
+      "size": 3034543,
+      "sha256": "73adfd61b515213863cc0480e6914d21b6f8acffa0ac27f3d3aeacd14be4d381",
+      "completed": true,
+      "get": {
+        "path": "/mikka/api/factory/tasks/bbbc1fe2-2945-4be1-ae3d-d6747b752fd4/media/7e9268d2-1fbd-465b-95f0-a0129debb4bf",
+        "status": 200,
+        "size": 3034543,
+        "sha256": "73adfd61b515213863cc0480e6914d21b6f8acffa0ac27f3d3aeacd14be4d381",
+        "sameOrigin": true,
+        "decodeExitCode": 0,
+        "archivedFile": "01-postgresql-gates.mp4",
+        "archiveSource": "authenticated-activity-get",
+        "ffprobe": {
+          "programs": [],
+          "stream_groups": [],
+          "streams": [
+            {
+              "codec_name": "h264",
+              "width": 960,
+              "height": 600
+            }
+          ],
+          "format": {
+            "duration": "83.166667",
+            "size": "3034543"
+          }
+        },
+        "rangeStatus": 206,
+        "reportEmbeddedPath": "/mikka/api/captures/7e9268d2-1fbd-465b-95f0-a0129debb4bf"
+      }
+    },
+    {
+      "file": "01-postgresql-gates-result.png",
+      "contentType": "image/png",
+      "title": "Actual terminal result screenshot: 01-postgresql-gates",
+      "stageId": "01-postgresql-gates",
+      "captureId": "79999697-3c00-4eda-b32e-16dbe2ad4d39",
+      "runId": "e41c6f27-d045-46fa-bb10-a60b43cc3661",
+      "size": 327149,
+      "sha256": "f288566d9489a6f6f12db49931b17d5460e6d56a14f02fa7555d8de6d248e92a",
+      "completed": true,
+      "get": {
+        "path": "/mikka/api/factory/tasks/bbbc1fe2-2945-4be1-ae3d-d6747b752fd4/media/79999697-3c00-4eda-b32e-16dbe2ad4d39",
+        "status": 200,
+        "size": 327149,
+        "sha256": "f288566d9489a6f6f12db49931b17d5460e6d56a14f02fa7555d8de6d248e92a",
+        "sameOrigin": true,
+        "decodeExitCode": 0,
+        "archivedFile": "01-postgresql-gates-result.png",
+        "archiveSource": "authenticated-activity-get",
+        "reportEmbeddedPath": "/mikka/api/captures/79999697-3c00-4eda-b32e-16dbe2ad4d39"
+      }
+    },
+    {
+      "file": "02-real-http.mp4",
+      "contentType": "video/mp4",
+      "durationMs": 41733,
+      "title": "Actual cloud command recording: 02-real-http",
+      "stageId": "02-real-http",
+      "captureId": "334c00c3-4e57-476c-9f01-ba1f115cf0a5",
+      "runId": "e41c6f27-d045-46fa-bb10-a60b43cc3661",
+      "size": 399219,
+      "sha256": "0ca7f46aa54e67d9ff607bb9b85012f80e15fdd7fb50c4d35578eb5ee96f3981",
+      "completed": true,
+      "get": {
+        "path": "/mikka/api/factory/tasks/bbbc1fe2-2945-4be1-ae3d-d6747b752fd4/media/334c00c3-4e57-476c-9f01-ba1f115cf0a5",
+        "status": 200,
+        "size": 399219,
+        "sha256": "0ca7f46aa54e67d9ff607bb9b85012f80e15fdd7fb50c4d35578eb5ee96f3981",
+        "sameOrigin": true,
+        "decodeExitCode": 0,
+        "archivedFile": "02-real-http.mp4",
+        "archiveSource": "authenticated-activity-get",
+        "ffprobe": {
+          "programs": [],
+          "stream_groups": [],
+          "streams": [
+            {
+              "codec_name": "h264",
+              "width": 1280,
+              "height": 800
+            }
+          ],
+          "format": {
+            "duration": "41.733333",
+            "size": "399219"
+          }
+        },
+        "rangeStatus": 206,
+        "reportEmbeddedPath": "/mikka/api/captures/334c00c3-4e57-476c-9f01-ba1f115cf0a5"
+      }
+    },
+    {
+      "file": "02-real-http-result.png",
+      "contentType": "image/png",
+      "title": "Actual terminal result screenshot: 02-real-http",
+      "stageId": "02-real-http",
+      "captureId": "22a7624d-8e77-4e32-8bc2-bf6ef25cd254",
+      "runId": "e41c6f27-d045-46fa-bb10-a60b43cc3661",
+      "size": 609102,
+      "sha256": "dc9fcd573e9188e2e224e5597335c4a1fd2aee5087d1b6ce702177267d2a15de",
+      "completed": true,
+      "get": {
+        "path": "/mikka/api/factory/tasks/bbbc1fe2-2945-4be1-ae3d-d6747b752fd4/media/22a7624d-8e77-4e32-8bc2-bf6ef25cd254",
+        "status": 200,
+        "size": 609102,
+        "sha256": "dc9fcd573e9188e2e224e5597335c4a1fd2aee5087d1b6ce702177267d2a15de",
+        "sameOrigin": true,
+        "decodeExitCode": 0,
+        "archivedFile": "02-real-http-result.png",
+        "archiveSource": "authenticated-activity-get",
+        "reportEmbeddedPath": "/mikka/api/captures/22a7624d-8e77-4e32-8bc2-bf6ef25cd254"
+      }
+    },
+    {
+      "file": "03-cli-daemon-ffmpeg.mp4",
+      "contentType": "video/mp4",
+      "durationMs": 22067,
+      "title": "Actual cloud command recording: 03-cli-daemon-ffmpeg",
+      "stageId": "03-cli-daemon-ffmpeg",
+      "captureId": "50cb6a85-b271-4159-88df-573e24ed2db8",
+      "runId": "e41c6f27-d045-46fa-bb10-a60b43cc3661",
+      "size": 1987184,
+      "sha256": "5327fb73cd3baa29e72ef798632702ba57523858009488aa856146f7029b48e7",
+      "completed": true,
+      "get": {
+        "path": "/mikka/api/factory/tasks/bbbc1fe2-2945-4be1-ae3d-d6747b752fd4/media/50cb6a85-b271-4159-88df-573e24ed2db8",
+        "status": 200,
+        "size": 1987184,
+        "sha256": "5327fb73cd3baa29e72ef798632702ba57523858009488aa856146f7029b48e7",
+        "sameOrigin": true,
+        "decodeExitCode": 0,
+        "archivedFile": "03-cli-daemon-ffmpeg.mp4",
+        "archiveSource": "authenticated-activity-get",
+        "ffprobe": {
+          "programs": [],
+          "stream_groups": [],
+          "streams": [
+            {
+              "codec_name": "h264",
+              "width": 1280,
+              "height": 800
+            }
+          ],
+          "format": {
+            "duration": "22.066667",
+            "size": "1987184"
+          }
+        },
+        "rangeStatus": 206,
+        "reportEmbeddedPath": "/mikka/api/captures/50cb6a85-b271-4159-88df-573e24ed2db8"
+      }
+    },
+    {
+      "file": "03-cli-daemon-ffmpeg-result.png",
+      "contentType": "image/png",
+      "title": "Actual terminal result screenshot: 03-cli-daemon-ffmpeg",
+      "stageId": "03-cli-daemon-ffmpeg",
+      "captureId": "efae00c4-b773-4255-93f3-0c8a3f97d38d",
+      "runId": "e41c6f27-d045-46fa-bb10-a60b43cc3661",
+      "size": 784213,
+      "sha256": "7b3092db7b2547186df3828f2bc6946a1e6e696eafa7712297dcd69a16bdee6a",
+      "completed": true,
+      "get": {
+        "path": "/mikka/api/factory/tasks/bbbc1fe2-2945-4be1-ae3d-d6747b752fd4/media/efae00c4-b773-4255-93f3-0c8a3f97d38d",
+        "status": 200,
+        "size": 784213,
+        "sha256": "7b3092db7b2547186df3828f2bc6946a1e6e696eafa7712297dcd69a16bdee6a",
+        "sameOrigin": true,
+        "decodeExitCode": 0,
+        "archivedFile": "03-cli-daemon-ffmpeg-result.png",
+        "archiveSource": "authenticated-activity-get",
+        "reportEmbeddedPath": "/mikka/api/captures/efae00c4-b773-4255-93f3-0c8a3f97d38d"
+      }
+    }
+  ],
+  "documents": [
+    {
+      "kind": "document",
+      "purpose": "detailed-report",
+      "artifactId": "94681b89-7533-4500-bdf7-ac2248c7e397",
+      "version": 1,
+      "runId": "e41c6f27-d045-46fa-bb10-a60b43cc3661",
+      "file": "document-94681b89-7533-4500-bdf7-ac2248c7e397-v1.md",
+      "path": "/mikka/api/artifacts/94681b89-7533-4500-bdf7-ac2248c7e397/versions/1/download",
+      "size": 4419,
+      "sha256": "fd12fb427fd6ce15f396be206980fe17f48da7620f37e2c1fa759473f7b3eb47",
+      "status": 200,
+      "sameOrigin": true
+    },
+    {
+      "kind": "document",
+      "purpose": "detailed-report",
+      "artifactId": "94681b89-7533-4500-bdf7-ac2248c7e397",
+      "version": 2,
+      "runId": "e41c6f27-d045-46fa-bb10-a60b43cc3661",
+      "file": "document-94681b89-7533-4500-bdf7-ac2248c7e397-v2.md",
+      "path": "/mikka/api/artifacts/94681b89-7533-4500-bdf7-ac2248c7e397/versions/2/download",
+      "size": 4827,
+      "sha256": "54cf01ed24884ced67f4a7801e5dd734f7ed10b493ef302c658b9a0a20f92def",
+      "status": 200,
+      "sameOrigin": true
+    },
+    {
+      "kind": "document",
+      "purpose": "screenshot-index",
+      "artifactId": "3542371b-6215-4e20-b935-11d50e1986be",
+      "version": 1,
+      "runId": "e41c6f27-d045-46fa-bb10-a60b43cc3661",
+      "file": "document-3542371b-6215-4e20-b935-11d50e1986be-v1.md",
+      "path": "/mikka/api/artifacts/3542371b-6215-4e20-b935-11d50e1986be/versions/1/download",
+      "size": 2680,
+      "sha256": "dbeb0194fc3492899abd736b8ae30be59fb61e55b3cb7ff63a9fafb65ed47d4f",
+      "status": 200,
+      "sameOrigin": true
+    },
+    {
+      "kind": "acceptance",
+      "purpose": "acceptance",
+      "artifactId": "63443314-2612-4d9e-85e9-89cc340fbd7d",
+      "version": 1,
+      "runId": "e41c6f27-d045-46fa-bb10-a60b43cc3661",
+      "file": "acceptance-63443314-2612-4d9e-85e9-89cc340fbd7d-v1.md",
+      "path": "/mikka/api/artifacts/63443314-2612-4d9e-85e9-89cc340fbd7d/versions/1/download",
+      "size": 3595,
+      "sha256": "0f0976f79808f3b014b18a1fec8f165f806ecdc8186c22f1ba4d5dce899990a3",
+      "status": 200,
+      "sameOrigin": true
+    }
+  ],
+  "checks": [
+    "Own disposable PostgreSQL 17 database",
+    "Real local Vite/Nitro application attests exact code SHA",
+    "Normal device grant, session approval, token exchange and registration",
+    "All three real recordings and three key screenshots completed through HTTP",
+    "Real MCP submits two immutable detailed report versions",
+    "First document bytes remain unchanged after version 2",
+    "Real MCP submits an immutable screenshot index with three same-origin images and recordings",
+    "Existing syncFactoryPresentation generates acceptance Artifact",
+    "Unchanged presentation preserves immutable acceptance version",
+    "Activity returns all same-run image/video evidence",
+    "Activity returns generated immutable acceptance report",
+    "Activity returns both detailed report versions",
+    "Activity returns the immutable screenshot index document",
+    "Every downloaded image/video decoded successfully",
+    "Public JSON and Markdown pass known credential/cookie audit"
+  ],
+  "cleanup": {
+    "leasedAccountsReleased": "completed",
+    "ownedApplicationStopped": "completed",
+    "applicationPoolClosed": "completed",
+    "workspacePoolClosed": "completed",
+    "fixturePoolClosed": "completed",
+    "ownDisposableDatabaseDropped": "completed",
+    "adminPoolClosed": "completed",
+    "ownPrivateAccountStateRemoved": "completed",
+    "privateWorkingDirectoryRemoved": "completed"
+  },
+  "recordedStages": [
+    {
+      "id": "01-postgresql-gates",
+      "codeCommit": "40376665ac416ce2228c08b60d7ea8cee97a3de6",
+      "startedAt": "2026-11-09T15:36:03.604Z",
+      "finishedAt": "2026-11-09T15:37:22.316Z",
+      "durationMs": 83167
+    },
+    {
+      "id": "02-real-http",
+      "codeCommit": "40376665ac416ce2228c08b60d7ea8cee97a3de6",
+      "startedAt": "2026-11-09T15:37:51.117Z",
+      "finishedAt": "2026-11-09T15:38:28.566Z",
+      "durationMs": 41733
+    },
+    {
+      "id": "03-cli-daemon-ffmpeg",
+      "codeCommit": "40376665ac416ce2228c08b60d7ea8cee97a3de6",
+      "startedAt": "2026-11-09T15:38:38.712Z",
+      "finishedAt": "2026-11-09T15:38:56.337Z",
+      "durationMs": 22067
+    }
+  ],
+  "database": {
+    "name": "evidence_transport_6befada1dbf24223894444a3beba6cec_e2e",
+    "address": "127.0.0.1",
+    "version": "17.11 (Ubuntu 17.11-1.pgdg26.04+2)"
+  },
+  "migrations": 262,
+  "origin": "http://127.0.0.1:33979",
+  "basePath": "/mikka",
+  "fixture": {
+    "issueId": "0ed072f5-c8f6-441d-9183-dcf056e7aa58",
+    "taskId": "bbbc1fe2-2945-4be1-ae3d-d6747b752fd4",
+    "runId": "e41c6f27-d045-46fa-bb10-a60b43cc3661",
+    "attemptId": "385daf76-182f-41ed-8937-53c0377d3377",
+    "candidateId": "5c803e18-e03c-4841-bb68-9487382b55d7",
+    "workspaceId": "c706b3ad-eeb9-493d-8bd1-b9bc11055afb",
+    "codeCommit": "40376665ac416ce2228c08b60d7ea8cee97a3de6",
+    "harnessMetadataOnly": true
+  },
+  "screenshotIndex": {
+    "artifactId": "3542371b-6215-4e20-b935-11d50e1986be",
+    "version": 1,
+    "imageCount": 3,
+    "videoLinkCount": 3
+  },
+  "access": {
+    "anonymous": 401,
+    "unrelatedPeer": 404
+  },
+  "applicationDiagnostics": {
+    "stdoutBytes": 6939,
+    "stderrBytes": 1372,
+    "startupCodes": [
+      "AUTH_EMAIL_DELIVERY_UNAVAILABLE"
+    ]
+  },
+  "network": {
+    "guardStarts": 3,
+    "blockedExternalAttempts": 0,
+    "policy": "Child application allows only loopback HTTP, local PostgreSQL and IPC; no external provider is used."
+  },
+  "secretAudit": {
+    "files": 6,
+    "archives": 0,
+    "archiveEntries": 0,
+    "decodedBytes": 0,
+    "result": "passed",
+    "checked": "known credentials and cookies in raw files and decoded Playwright reports; traces and recordings forbidden"
+  },
+  "finishedAt": "2026-11-09T15:39:53.375Z",
+  "exitCode": 0
+}
