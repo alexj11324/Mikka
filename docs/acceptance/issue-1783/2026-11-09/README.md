@@ -6,7 +6,8 @@
 
 ## 证据入口
 
-以下文件保留原始字节，原 manifest 未改写：
+以下文件保留原始字节，原 manifest 未改写。历史脚本的文件名映射及完整
+校验方法见下节：
 
 - [带录像和截图的索引](cloud-linux-40376665-final03/index.html)
 - [原执行说明](cloud-linux-40376665-final03/README.md)
@@ -16,6 +17,61 @@
 - [hosted #59 数据、行为和模板外观复核](hosted-review.json)
 - [activity 原始读回](cloud-linux-40376665-final03/activity-readback/activity.json)
 - [正常上传、不可变文档和清理回执](cloud-linux-40376665-final03/activity-readback/proof.json)
+
+## 历史脚本的文本呈现
+
+归档中的 8 份 `.mjs` 是原执行时的 harness 和复制出的 helper 源码，供审阅
+历史命令；当前产品和 CI 执行入口没有引用它们。它们现在以 `.mjs.txt` 文本
+保存，内容、大小和 SHA-256 与原件完全相同。其余 45 份原文件及 manifest
+本身保留原路径和原始字节。
+
+原 manifest、receipt、执行说明和独立复核回执仍记录原执行时的路径，未按
+当前文件名改写。[路径映射](archive-paths.json)只说明本次归档呈现；它不属于
+原始 53 份产物，也不改变历史执行结果。需要重建原目录时，将映射右侧的
+文本文件按左侧原路径复制到另一目录，其余文件原样复制；实际复现环境仍以
+原执行说明为准。
+
+| 原脚本路径 | 原始内容 |
+| --- | --- |
+| `harness/run.mjs` | [文本](cloud-linux-40376665-final03/harness/run.mjs.txt) |
+| `harness/plan.mjs` | [文本](cloud-linux-40376665-final03/harness/plan.mjs.txt) |
+| `harness/stage.mjs` | [文本](cloud-linux-40376665-final03/harness/stage.mjs.txt) |
+| `harness/register-readback.mjs` | [文本](cloud-linux-40376665-final03/harness/register-readback.mjs.txt) |
+| `harness/oversize-readback.mjs` | [文本](cloud-linux-40376665-final03/harness/oversize-readback.mjs.txt) |
+| `harness/curate-evidence.mjs` | [文本](cloud-linux-40376665-final03/harness/curate-evidence.mjs.txt) |
+| `harness/review.mjs` | [文本](cloud-linux-40376665-final03/harness/review.mjs.txt) |
+| `ffmpeg-readback/copied-helper/capture-video.mjs` | [文本](cloud-linux-40376665-final03/ffmpeg-readback/copied-helper/capture-video.mjs.txt) |
+
+在仓库根目录运行以下命令，可验证原 manifest、全部 53 份内容以及目录清单：
+
+```sh
+python3 - <<'PY'
+import hashlib
+import json
+from pathlib import Path
+
+root = Path("docs/acceptance/issue-1783/2026-11-09")
+presentation = json.loads((root / "archive-paths.json").read_text())
+archive = root / presentation["archiveDirectory"]
+manifest_bytes = (archive / "manifest.json").read_bytes()
+assert hashlib.sha256(manifest_bytes).hexdigest() == presentation["manifestSha256"]
+files = json.loads(manifest_bytes)["files"]
+paths = presentation["originalToTextPaths"]
+assert len(files) == 53
+assert set(paths) == {name for name in files if name.endswith(".mjs")}
+assert all(actual == original + ".txt" for original, actual in paths.items())
+expected = {"manifest.json"}
+for original, metadata in files.items():
+    actual = paths.get(original, original)
+    data = (archive / actual).read_bytes()
+    assert len(data) == metadata["size"], original
+    assert hashlib.sha256(data).hexdigest() == metadata["sha256"], original
+    expected.add(actual)
+assert expected == {str(path.relative_to(archive))
+                    for path in archive.rglob("*") if path.is_file()}
+print("PASS: original manifest and all 53 file sizes/SHA-256; exact directory inventory")
+PY
+```
 
 ## 测试与媒体对应
 
@@ -34,8 +90,8 @@
 
 ## 独立复核结果
 
-原 manifest 中 53 个文件的大小和 SHA-256 全部一致；目录只有这些文件及
-manifest 自身。6 个 MP4 和 14 个 PNG 经 FFmpeg 全量解码通过，12 张
+原 manifest 中 53 个文件的大小和 SHA-256 全部一致；按上述路径映射核对，
+目录只有这些文件及 manifest 自身。6 个 MP4 和 14 个 PNG 经 FFmpeg 全量解码通过，12 张
 阶段截图经逐张查看，画面对应命令启动、执行与结果。33 个文本文件未命中
 GitHub token、私钥或 JWT 的高置信格式；原运行另有已知凭据值审计回执。
 
