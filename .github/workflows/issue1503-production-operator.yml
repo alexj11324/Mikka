@@ -1,4 +1,4 @@
-name: Issue 1503 production acceptance operator
+name: Issue 1503 bounded read-only diagnosis
 on:
   push:
     branches: [ops/issue-1503-production-smoke]
@@ -13,29 +13,30 @@ concurrency:
   cancel-in-progress: false
   queue: max
 jobs:
-  delivery:
-    if: false
+  diagnose:
+    if: github.repository == 'alexj11324/Mikka'
     runs-on: ubuntu-latest
-    timeout-minutes: 90
     concurrency:
       group: web-deploy-production
       cancel-in-progress: false
       queue: max
+    timeout-minutes: 10
     permissions:
       contents: read
       id-token: write
+    env:
+      MIKKA_EDITION: cloud
+      MIKKA_EXPECTED_DEPLOYMENT_SHA: 76537e4c2996f717cbd19589e1efae328028aa4a
+      MIKKA_1503_START_FIXTURE_SHA256: 9e0836aa5e5d290dac5c282e82f56907b99207820ded44396159b935c53f9de7
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        id: setup_node
         with:
           node-version: 24
-      - id: dependencies
-        run: corepack enable && corepack prepare pnpm@10.34.3 --activate && pnpm install --frozen-lockfile
+      - run: corepack enable && corepack prepare pnpm@10.34.3 --activate && pnpm install --frozen-lockfile
       - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-        id: smoke_secrets
         with:
           method: oidc
           identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
@@ -45,92 +46,17 @@ jobs:
           secret-path: /
           recursive: false
           include-imports: false
-      - name: Import optional own-VM diagnostic key
-        continue-on-error: true
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: E2B_API_KEY
-          recursive: false
-          include-imports: false
-      - name: Import the pinned production application database
-        id: start_database
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: MIKKA_DATABASE_URL
-          recursive: false
-          include-imports: false
-      - name: Import the production auth key for the CI token adapter
-        id: ci_auth_secret
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /vercel
-          secret-name: BETTER_AUTH_SECRET
-          recursive: false
-          include-imports: false
-      - name: Require the exact fixture idle and R5 lifetime after acquiring both queues
-        id: start_guard
-        if: ${{ !cancelled() && steps.setup_node.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.smoke_secrets.outcome == 'success' && steps.start_database.outcome == 'success' && steps.ci_auth_secret.outcome == 'success' }}
-        timeout-minutes: 2
-        run: node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1503/start-guard.mjs
+      - name: Read six exact business resources once after failed driver cleanup
+        run: node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1503/diagnose-f42636835234.ts
         env:
           NODE_ENV: production
           VERCEL_ENV: production
-          MIKKA_EDITION: cloud
-          MIKKA_1503_START_FIXTURE_SHA256: 9e0836aa5e5d290dac5c282e82f56907b99207820ded44396159b935c53f9de7
-      - name: Exercise explicit cloud task creation and full delivery on Claude Code
-        id: claude_delivery
-        if: ${{ !cancelled() && steps.setup_node.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.smoke_secrets.outcome == 'success' && steps.ci_auth_secret.outcome == 'success' && steps.start_guard.outcome == 'success' }}
-        run: node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1503/delivery-with-ci-token.mjs
-        env:
-          NODE_ENV: production
-          VERCEL_ENV: production
-          MIKKA_EDITION: cloud
-          MIKKA_EXPECTED_DEPLOYMENT_SHA: 76537e4c2996f717cbd19589e1efae328028aa4a
-          MIKKA_1503_SUBMISSION_MODE: explicit_new_task
-          MIKKA_1503_HARNESS: claude_code
-          MIKKA_1503_CODEX_QUESTION: '0'
-          MIKKA_1503_REPORT: issue1503-report/claude-code-delivery.json
-      - name: Upload Claude Code delivery receipt
-        if: always()
+          BETTER_AUTH_URL: https://app.aspectlylabs.com
+          NEXT_PUBLIC_APP_URL: https://app.aspectlylabs.com
+      - if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: issue1503-claude-code-delivery
-          path: issue1503-report/claude-code-delivery.json
-          retention-days: 3
-      - name: Exercise explicit cloud task creation and full delivery on Codex
-        id: codex_delivery
-        if: ${{ !cancelled() && steps.setup_node.outcome == 'success' && steps.dependencies.outcome == 'success' && steps.smoke_secrets.outcome == 'success' && steps.ci_auth_secret.outcome == 'success' && steps.start_guard.outcome == 'success' }}
-        run: node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1503/delivery-with-ci-token.mjs
-        env:
-          NODE_ENV: production
-          VERCEL_ENV: production
-          MIKKA_EDITION: cloud
-          MIKKA_EXPECTED_DEPLOYMENT_SHA: 76537e4c2996f717cbd19589e1efae328028aa4a
-          MIKKA_1503_SUBMISSION_MODE: explicit_new_task
-          MIKKA_1503_HARNESS: codex
-          MIKKA_1503_CODEX_QUESTION: '1'
-          MIKKA_1503_REPORT: issue1503-report/codex-delivery.json
-      - name: Upload all delivery receipts
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: issue1503-delivery
-          path: issue1503-report
+          name: issue1503-diagnostic-42636835234
+          path: issue1503-report/diagnostic-42636835234.json
+          if-no-files-found: error
           retention-days: 3
