@@ -92,7 +92,7 @@ async function deliverClaim(claim: DeadlineWakeClaim) {
     triage: value => triageInbox(value.userId, value.botId),
     hasWaking: value => hasWakingEvents(value.userId, value.botId),
     start: async value => {
-      const run = await start(coordinatorTurn, [value.userId, value.botId])
+      const run = await start(coordinatorTurn, [value.userId, value.botId, 1])
       console.info('Coordinator wake accepted', { workflowRunId: run.runId, eventIds: claim.ids, attempt: claim.attempt })
     },
     failed: async (value, code) => { ticket = await recovery.failed(value, code) },
