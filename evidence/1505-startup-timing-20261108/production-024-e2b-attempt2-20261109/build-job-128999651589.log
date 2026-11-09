@@ -1,0 +1,951 @@
+﻿2026-11-09T05:36:56.2109329Z Current runner version: '2.338.2'
+2026-11-09T05:36:56.2135419Z ##[group]Runner Image Provisioner
+2026-11-09T05:36:56.2136705Z Hosted Compute Agent
+2026-11-09T05:36:56.2137313Z Version: 20261028.624
+2026-11-09T05:36:56.2138069Z Commit: 54898b74c23fde5556c9b3c3a2290865feef0dfe
+2026-11-09T05:36:56.2138858Z Build Date: 2026-10-28T21:51:42Z
+2026-11-09T05:36:56.2139669Z Worker ID: {df2666e1-03eb-45c8-8bea-692446369200}
+2026-11-09T05:36:56.2140408Z Region: northcentralus
+2026-11-09T05:36:56.2140985Z Cloud: Azure
+2026-11-09T05:36:56.2141601Z ##[endgroup]
+2026-11-09T05:36:56.2143135Z ##[group]Operating System
+2026-11-09T05:36:56.2143894Z Ubuntu
+2026-11-09T05:36:56.2144545Z 24.04.5
+2026-11-09T05:36:56.2145068Z LTS
+2026-11-09T05:36:56.2145642Z ##[endgroup]
+2026-11-09T05:36:56.2146690Z ##[group]Runner Image
+2026-11-09T05:36:56.2147437Z Image: ubuntu-24.04
+2026-11-09T05:36:56.2148047Z Version: 20261101.360.1
+2026-11-09T05:36:56.2149354Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261101.360/images/ubuntu/Ubuntu2404-Readme.md
+2026-11-09T05:36:56.2150996Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20261101.360
+2026-11-09T05:36:56.2152054Z ##[endgroup]
+2026-11-09T05:36:56.2153193Z ##[group]GITHUB_TOKEN Permissions
+2026-11-09T05:36:56.2155409Z Contents: read
+2026-11-09T05:36:56.2156417Z Metadata: read
+2026-11-09T05:36:56.2157089Z ##[endgroup]
+2026-11-09T05:36:56.2159686Z Secret source: Actions
+2026-11-09T05:36:56.2160713Z Cache mode: write
+2026-11-09T05:36:56.2161720Z Prepare workflow directory
+2026-11-09T05:36:56.2599925Z Prepare all required actions
+2026-11-09T05:36:56.2650203Z Getting action download info
+2026-11-09T05:36:56.5428594Z Download action repository 'actions/checkout@11d5960a326750d5838078e36cf38b85af677262' (SHA:11d5960a326750d5838078e36cf38b85af677262)
+2026-11-09T05:36:56.6794910Z Download action repository 'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-11-09T05:36:56.8669420Z Download action repository 'Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d' (SHA:d2e351f16c6ca20d17c85e6c992e04bdeb64e87d)
+2026-11-09T05:36:57.1995729Z Download action repository 'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+2026-11-09T05:36:57.4439107Z Uses: alexj11324/Mikka/.github/workflows/e2b-template.yml@refs/heads/main (02401458a7fe26e00ce4caa653084c7f9680696d)
+2026-11-09T05:36:57.4444400Z Complete job name: validate / build
+2026-11-09T05:36:57.5393247Z ##[group]Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+2026-11-09T05:36:57.5394426Z with:
+2026-11-09T05:36:57.5394937Z   persist-credentials: false
+2026-11-09T05:36:57.5395523Z   repository: alexj11324/Mikka
+2026-11-09T05:36:57.5399611Z   token: ***
+2026-11-09T05:36:57.5400105Z   ssh-strict: true
+2026-11-09T05:36:57.5400610Z   ssh-user: git
+2026-11-09T05:36:57.5401076Z   clean: true
+2026-11-09T05:36:57.5401575Z   sparse-checkout-cone-mode: true
+2026-11-09T05:36:57.5402188Z   fetch-depth: 1
+2026-11-09T05:36:57.5402665Z   fetch-tags: false
+2026-11-09T05:36:57.5403171Z   show-progress: true
+2026-11-09T05:36:57.5403682Z   lfs: false
+2026-11-09T05:36:57.5404146Z   submodules: false
+2026-11-09T05:36:57.5404647Z   set-safe-directory: true
+2026-11-09T05:36:57.5405217Z   allow-unsafe-pr-checkout: false
+2026-11-09T05:36:57.5406439Z ##[endgroup]
+2026-11-09T05:36:58.0320883Z Syncing repository: alexj11324/Mikka
+2026-11-09T05:36:58.0323193Z ##[group]Getting Git version info
+2026-11-09T05:36:58.0324285Z Working directory is '/home/runner/work/Mikka/Mikka'
+2026-11-09T05:36:58.0325793Z [command]/usr/bin/git version
+2026-11-09T05:36:58.0553208Z git version 2.56.0
+2026-11-09T05:36:58.0577700Z ##[endgroup]
+2026-11-09T05:36:58.0594960Z Temporarily overriding HOME='/home/runner/work/_temp/499b25eb-d1f7-426f-851a-72110cd5cfdf' before making global git config changes
+2026-11-09T05:36:58.0599663Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T05:36:58.0604220Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T05:36:58.0678055Z Deleting the contents of '/home/runner/work/Mikka/Mikka'
+2026-11-09T05:36:58.0695224Z ##[group]Initializing the repository
+2026-11-09T05:36:58.0708146Z [command]/usr/bin/git init /home/runner/work/Mikka/Mikka
+2026-11-09T05:36:58.1185821Z hint: Using 'master' as the name for the initial branch. This default branch name
+2026-11-09T05:36:58.1189199Z hint: will change to "main" in Git 3.0. To configure the initial branch name
+2026-11-09T05:36:58.1191678Z hint: to use in all of your new repositories, which will suppress this warning,
+2026-11-09T05:36:58.1193601Z hint: call:
+2026-11-09T05:36:58.1195018Z hint:
+2026-11-09T05:36:58.1197053Z hint: 	git config --global init.defaultBranch <name>
+2026-11-09T05:36:58.1199116Z hint:
+2026-11-09T05:36:58.1200873Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+2026-11-09T05:36:58.1203959Z hint: 'development'. The just-created branch can be renamed via this command:
+2026-11-09T05:36:58.1207015Z hint:
+2026-11-09T05:36:58.1208484Z hint: 	git branch -m <name>
+2026-11-09T05:36:58.1210165Z hint:
+2026-11-09T05:36:58.1212467Z hint: Disable this message with "git config set advice.defaultBranchName false"
+2026-11-09T05:36:58.1216475Z Initialized empty Git repository in /home/runner/work/Mikka/Mikka/.git/
+2026-11-09T05:36:58.1311590Z [command]/usr/bin/git remote add origin https://github.com/alexj11324/Mikka
+2026-11-09T05:36:58.1319129Z ##[endgroup]
+2026-11-09T05:36:58.1322311Z ##[group]Disabling automatic garbage collection
+2026-11-09T05:36:58.1325016Z [command]/usr/bin/git config --local gc.auto 0
+2026-11-09T05:36:58.1352785Z ##[endgroup]
+2026-11-09T05:36:58.1355060Z ##[group]Setting up auth
+2026-11-09T05:36:58.1358042Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T05:36:58.1413350Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T05:36:58.1890043Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T05:36:58.1934757Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T05:36:58.2189724Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T05:36:58.2244817Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T05:36:58.2521445Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
+2026-11-09T05:36:58.2580647Z ##[endgroup]
+2026-11-09T05:36:58.2582714Z ##[group]Fetching the repository
+2026-11-09T05:36:58.2598074Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +02401458a7fe26e00ce4caa653084c7f9680696d:refs/remotes/origin/main
+2026-11-09T05:37:01.9528051Z From https://github.com/alexj11324/Mikka
+2026-11-09T05:37:01.9530076Z  * [new ref]         02401458a7fe26e00ce4caa653084c7f9680696d -> origin/main
+2026-11-09T05:37:01.9532696Z ##[endgroup]
+2026-11-09T05:37:01.9533378Z ##[group]Determining the checkout info
+2026-11-09T05:37:01.9535514Z ##[endgroup]
+2026-11-09T05:37:01.9542584Z [command]/usr/bin/git sparse-checkout disable
+2026-11-09T05:37:01.9604424Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
+2026-11-09T05:37:01.9643504Z ##[group]Checking out the ref
+2026-11-09T05:37:01.9647359Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
+2026-11-09T05:37:02.6704509Z Switched to a new branch 'main'
+2026-11-09T05:37:02.6708062Z branch 'main' set up to track 'origin/main'.
+2026-11-09T05:37:02.6730451Z ##[endgroup]
+2026-11-09T05:37:02.6785946Z [command]/usr/bin/git log -1 --format=%H
+2026-11-09T05:37:02.6820572Z 02401458a7fe26e00ce4caa653084c7f9680696d
+2026-11-09T05:37:02.6830566Z ##[group]Removing auth
+2026-11-09T05:37:02.6834783Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T05:37:02.6875640Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T05:37:02.7127976Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T05:37:02.7162178Z http.https://github.com/.extraheader
+2026-11-09T05:37:02.7171406Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
+2026-11-09T05:37:02.7214441Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T05:37:02.7463992Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T05:37:02.7507338Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T05:37:02.7755833Z ##[endgroup]
+2026-11-09T05:37:02.8040882Z ##[group]Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+2026-11-09T05:37:02.8041327Z with:
+2026-11-09T05:37:02.8041531Z   node-version: 24
+2026-11-09T05:37:02.8041750Z   always-auth: false
+2026-11-09T05:37:02.8041969Z   check-latest: false
+2026-11-09T05:37:02.8044390Z   token: ***
+2026-11-09T05:37:02.8044632Z ##[endgroup]
+2026-11-09T05:37:02.9547806Z Found in cache @ /opt/hostedtoolcache/node/24.22.2/x64
+2026-11-09T05:37:02.9551322Z (node:2329) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T05:37:02.9552080Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T05:37:02.9554752Z ##[group]Environment details
+2026-11-09T05:37:03.3919981Z node: v24.22.2
+2026-11-09T05:37:03.3920389Z npm: 11.19.1
+2026-11-09T05:37:03.3920713Z yarn: 1.22.22
+2026-11-09T05:37:03.3921954Z ##[endgroup]
+2026-11-09T05:37:03.4075788Z ##[group]Run node scripts/release/web-deploy.mjs main
+2026-11-09T05:37:03.4076680Z [36;1mnode scripts/release/web-deploy.mjs main[0m
+2026-11-09T05:37:03.4108335Z shell: /usr/bin/bash -e {0}
+2026-11-09T05:37:03.4108600Z env:
+2026-11-09T05:37:03.4111017Z   GITHUB_TOKEN: ***
+2026-11-09T05:37:03.4111241Z ##[endgroup]
+2026-11-09T05:37:03.7324379Z Current main matches this release
+2026-11-09T05:37:03.7800942Z ##[group]Run python3 -m venv "$RUNNER_TEMP/e2b"
+2026-11-09T05:37:03.7801355Z [36;1mpython3 -m venv "$RUNNER_TEMP/e2b"[0m
+2026-11-09T05:37:03.7801820Z [36;1m"$RUNNER_TEMP/e2b/bin/pip" install --disable-pip-version-check 'e2b==2.62.0'[0m
+2026-11-09T05:37:03.7823052Z shell: /usr/bin/bash -e {0}
+2026-11-09T05:37:03.7823322Z ##[endgroup]
+2026-11-09T05:37:07.1110052Z Collecting e2b==2.62.0
+2026-11-09T05:37:07.1405578Z   Downloading e2b-2.62.0-py3-none-any.whl.metadata (5.4 kB)
+2026-11-09T05:37:07.1687728Z Collecting python-dateutil>=2.8.2 (from e2b==2.62.0)
+2026-11-09T05:37:07.1721027Z   Downloading python_dateutil-4.0.0-py3-none-any.whl.metadata (7.3 kB)
+2026-11-09T05:37:07.2009248Z Collecting wcmatch<12,>=10.1 (from e2b==2.62.0)
+2026-11-09T05:37:07.2042415Z   Downloading wcmatch-11.2-py3-none-any.whl.metadata (6.0 kB)
+2026-11-09T05:37:07.2213427Z Collecting protobuf-py<0.7,>=0.6.0 (from e2b==2.62.0)
+2026-11-09T05:37:07.2244797Z   Downloading protobuf_py-0.6.0-py3-none-any.whl.metadata (10 kB)
+2026-11-09T05:37:07.2566184Z Collecting httpx<1.0.0,>=0.27.0 (from e2b==2.62.0)
+2026-11-09T05:37:07.2599180Z   Downloading httpx-0.28.1-py3-none-any.whl.metadata (7.1 kB)
+2026-11-09T05:37:07.2817451Z Collecting h2<5,>=4.4.1 (from e2b==2.62.0)
+2026-11-09T05:37:07.2849838Z   Downloading h2-4.4.1-py3-none-any.whl.metadata (3.8 kB)
+2026-11-09T05:37:07.3081299Z Collecting attrs>=23.2.0 (from e2b==2.62.0)
+2026-11-09T05:37:07.3113317Z   Downloading attrs-26.1.0-py3-none-any.whl.metadata (8.8 kB)
+2026-11-09T05:37:07.3396616Z Collecting packaging>=24.1 (from e2b==2.62.0)
+2026-11-09T05:37:07.3428700Z   Downloading packaging-26.3-py3-none-any.whl.metadata (3.5 kB)
+2026-11-09T05:37:07.3683667Z Collecting typing-extensions>=4.10.0 (from e2b==2.62.0)
+2026-11-09T05:37:07.3718126Z   Downloading typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+2026-11-09T05:37:07.4395082Z Collecting rich>=14.0.0 (from e2b==2.62.0)
+2026-11-09T05:37:07.4430403Z   Downloading rich-15.0.0-py3-none-any.whl.metadata (18 kB)
+2026-11-09T05:37:07.4675691Z Collecting connectrpc<0.13,>=0.12.1 (from e2b==2.62.0)
+2026-11-09T05:37:07.4708333Z   Downloading connectrpc-0.12.1-py3-none-any.whl.metadata (7.2 kB)
+2026-11-09T05:37:07.5318926Z Collecting pyqwest<0.13,>=0.12.0 (from e2b==2.62.0)
+2026-11-09T05:37:07.5351392Z   Downloading pyqwest-0.12.0-cp311-abi3-manylinux_2_28_x86_64.whl.metadata (3.1 kB)
+2026-11-09T05:37:07.5497077Z Collecting e2b-dockerfile-utils<0.2,>=0.1.0 (from e2b==2.62.0)
+2026-11-09T05:37:07.5529656Z   Downloading e2b_dockerfile_utils-0.1.1-py3-none-any.whl.metadata (2.3 kB)
+2026-11-09T05:37:07.5778642Z Collecting hyperframe<7,>=6.1 (from h2<5,>=4.4.1->e2b==2.62.0)
+2026-11-09T05:37:07.5810943Z   Downloading hyperframe-6.1.0-py3-none-any.whl.metadata (4.3 kB)
+2026-11-09T05:37:07.5968485Z Collecting hpack<5,>=4.2 (from h2<5,>=4.4.1->e2b==2.62.0)
+2026-11-09T05:37:07.6000819Z   Downloading hpack-4.2.0-py3-none-any.whl.metadata (3.3 kB)
+2026-11-09T05:37:07.6379375Z Collecting anyio (from httpx<1.0.0,>=0.27.0->e2b==2.62.0)
+2026-11-09T05:37:07.6411758Z   Downloading anyio-4.16.0-py3-none-any.whl.metadata (4.7 kB)
+2026-11-09T05:37:07.6683031Z Collecting certifi (from httpx<1.0.0,>=0.27.0->e2b==2.62.0)
+2026-11-09T05:37:07.6716929Z   Downloading certifi-2026.10.23-py3-none-any.whl.metadata (2.5 kB)
+2026-11-09T05:37:07.7016070Z Collecting httpcore==1.* (from httpx<1.0.0,>=0.27.0->e2b==2.62.0)
+2026-11-09T05:37:07.7049890Z   Downloading httpcore-1.0.9-py3-none-any.whl.metadata (21 kB)
+2026-11-09T05:37:07.7267844Z Collecting idna (from httpx<1.0.0,>=0.27.0->e2b==2.62.0)
+2026-11-09T05:37:07.7359619Z   Downloading idna-3.20-py3-none-any.whl.metadata (7.2 kB)
+2026-11-09T05:37:07.7560488Z Collecting h11>=0.16 (from httpcore==1.*->httpx<1.0.0,>=0.27.0->e2b==2.62.0)
+2026-11-09T05:37:07.7593007Z   Downloading h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+2026-11-09T05:37:07.8092039Z Collecting protobuf-py-ext==0.6.0 (from protobuf-py<0.7,>=0.6.0->e2b==2.62.0)
+2026-11-09T05:37:07.8127836Z   Downloading protobuf_py_ext-0.6.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (1.1 kB)
+2026-11-09T05:37:07.8519594Z Collecting opentelemetry-api>=1.39.1 (from pyqwest<0.13,>=0.12.0->e2b==2.62.0)
+2026-11-09T05:37:07.8549825Z   Downloading opentelemetry_api-1.45.2-py3-none-any.whl.metadata (1.4 kB)
+2026-11-09T05:37:07.8784875Z Collecting tzdata (from python-dateutil>=2.8.2->e2b==2.62.0)
+2026-11-09T05:37:07.8817427Z   Downloading tzdata-2026.6-py2.py3-none-any.whl.metadata (1.4 kB)
+2026-11-09T05:37:07.9098103Z Collecting markdown-it-py>=2.2.0 (from rich>=14.0.0->e2b==2.62.0)
+2026-11-09T05:37:07.9128987Z   Downloading markdown_it_py-4.2.0-py3-none-any.whl.metadata (7.4 kB)
+2026-11-09T05:37:07.9449818Z Collecting pygments<3.0.0,>=2.13.0 (from rich>=14.0.0->e2b==2.62.0)
+2026-11-09T05:37:07.9479900Z   Downloading pygments-2.21.0-py3-none-any.whl.metadata (2.5 kB)
+2026-11-09T05:37:07.9891911Z Collecting bracex>=3.2 (from wcmatch<12,>=10.1->e2b==2.62.0)
+2026-11-09T05:37:07.9924405Z   Downloading bracex-3.2.2-py3-none-any.whl.metadata (3.3 kB)
+2026-11-09T05:37:08.0295209Z Collecting mdurl~=0.1 (from markdown-it-py>=2.2.0->rich>=14.0.0->e2b==2.62.0)
+2026-11-09T05:37:08.0326341Z   Downloading mdurl-0.1.2-py3-none-any.whl.metadata (1.6 kB)
+2026-11-09T05:37:08.0811892Z Downloading e2b-2.62.0-py3-none-any.whl (426 kB)
+2026-11-09T05:37:08.0904500Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 426.4/426.4 kB 60.9 MB/s eta 0:00:00
+2026-11-09T05:37:08.0936712Z Downloading attrs-26.1.0-py3-none-any.whl (67 kB)
+2026-11-09T05:37:08.0976805Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 67.5/67.5 kB 27.1 MB/s eta 0:00:00
+2026-11-09T05:37:08.1008208Z Downloading connectrpc-0.12.1-py3-none-any.whl (70 kB)
+2026-11-09T05:37:08.1049906Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 70.1/70.1 kB 25.4 MB/s eta 0:00:00
+2026-11-09T05:37:08.1081644Z Downloading e2b_dockerfile_utils-0.1.1-py3-none-any.whl (19 kB)
+2026-11-09T05:37:08.1132859Z Downloading h2-4.4.1-py3-none-any.whl (62 kB)
+2026-11-09T05:37:08.1169788Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 62.6/62.6 kB 26.2 MB/s eta 0:00:00
+2026-11-09T05:37:08.1203101Z Downloading httpx-0.28.1-py3-none-any.whl (73 kB)
+2026-11-09T05:37:08.1253480Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 73.5/73.5 kB 21.6 MB/s eta 0:00:00
+2026-11-09T05:37:08.1287517Z Downloading httpcore-1.0.9-py3-none-any.whl (78 kB)
+2026-11-09T05:37:08.1326092Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 78.8/78.8 kB 31.1 MB/s eta 0:00:00
+2026-11-09T05:37:08.1358116Z Downloading packaging-26.3-py3-none-any.whl (129 kB)
+2026-11-09T05:37:08.1399192Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 130.0/130.0 kB 51.1 MB/s eta 0:00:00
+2026-11-09T05:37:08.1430559Z Downloading protobuf_py-0.6.0-py3-none-any.whl (216 kB)
+2026-11-09T05:37:08.1474126Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 216.1/216.1 kB 76.3 MB/s eta 0:00:00
+2026-11-09T05:37:08.1508272Z Downloading protobuf_py_ext-0.6.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (500 kB)
+2026-11-09T05:37:08.1569884Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 500.5/500.5 kB 116.8 MB/s eta 0:00:00
+2026-11-09T05:37:08.1627018Z Downloading pyqwest-0.12.0-cp311-abi3-manylinux_2_28_x86_64.whl (5.7 MB)
+2026-11-09T05:37:08.1984707Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 5.7/5.7 MB 167.9 MB/s eta 0:00:00
+2026-11-09T05:37:08.2017214Z Downloading python_dateutil-4.0.0-py3-none-any.whl (92 kB)
+2026-11-09T05:37:08.2059222Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 92.9/92.9 kB 32.6 MB/s eta 0:00:00
+2026-11-09T05:37:08.2090916Z Downloading rich-15.0.0-py3-none-any.whl (310 kB)
+2026-11-09T05:37:08.2139450Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 310.7/310.7 kB 93.4 MB/s eta 0:00:00
+2026-11-09T05:37:08.2169176Z Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+2026-11-09T05:37:08.2210199Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 45.6/45.6 kB 14.0 MB/s eta 0:00:00
+2026-11-09T05:37:08.2240480Z Downloading wcmatch-11.2-py3-none-any.whl (44 kB)
+2026-11-09T05:37:08.2277107Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 44.4/44.4 kB 18.0 MB/s eta 0:00:00
+2026-11-09T05:37:08.2307881Z Downloading bracex-3.2.2-py3-none-any.whl (14 kB)
+2026-11-09T05:37:08.2355262Z Downloading hpack-4.2.0-py3-none-any.whl (34 kB)
+2026-11-09T05:37:08.2406616Z Downloading hyperframe-6.1.0-py3-none-any.whl (13 kB)
+2026-11-09T05:37:08.2454605Z Downloading markdown_it_py-4.2.0-py3-none-any.whl (91 kB)
+2026-11-09T05:37:08.2492386Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 91.7/91.7 kB 38.9 MB/s eta 0:00:00
+2026-11-09T05:37:08.2523954Z Downloading opentelemetry_api-1.45.2-py3-none-any.whl (60 kB)
+2026-11-09T05:37:08.2562545Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 60.3/60.3 kB 25.1 MB/s eta 0:00:00
+2026-11-09T05:37:08.2593480Z Downloading pygments-2.21.0-py3-none-any.whl (1.3 MB)
+2026-11-09T05:37:08.2688518Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 1.3/1.3 MB 162.0 MB/s eta 0:00:00
+2026-11-09T05:37:08.2720178Z Downloading anyio-4.16.0-py3-none-any.whl (134 kB)
+2026-11-09T05:37:08.2762570Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 134.5/134.5 kB 51.3 MB/s eta 0:00:00
+2026-11-09T05:37:08.2795880Z Downloading idna-3.20-py3-none-any.whl (69 kB)
+2026-11-09T05:37:08.2843555Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 69.6/69.6 kB 23.8 MB/s eta 0:00:00
+2026-11-09T05:37:08.2874046Z Downloading certifi-2026.10.23-py3-none-any.whl (135 kB)
+2026-11-09T05:37:08.2913398Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 135.1/135.1 kB 54.3 MB/s eta 0:00:00
+2026-11-09T05:37:08.2944074Z Downloading tzdata-2026.6-py2.py3-none-any.whl (348 kB)
+2026-11-09T05:37:08.3016599Z    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 348.2/348.2 kB 62.0 MB/s eta 0:00:00
+2026-11-09T05:37:08.3081399Z Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+2026-11-09T05:37:08.3135238Z Downloading mdurl-0.1.2-py3-none-any.whl (10.0 kB)
+2026-11-09T05:37:08.4235725Z Installing collected packages: tzdata, typing-extensions, pygments, protobuf-py-ext, packaging, mdurl, idna, hyperframe, hpack, h11, e2b-dockerfile-utils, certifi, bracex, attrs, wcmatch, python-dateutil, protobuf-py, opentelemetry-api, markdown-it-py, httpcore, h2, anyio, rich, pyqwest, httpx, connectrpc, e2b
+2026-11-09T05:37:10.6623308Z Successfully installed anyio-4.16.0 attrs-26.1.0 bracex-3.2.2 certifi-2026.10.23 connectrpc-0.12.1 e2b-2.62.0 e2b-dockerfile-utils-0.1.1 h11-0.16.0 h2-4.4.1 hpack-4.2.0 httpcore-1.0.9 httpx-0.28.1 hyperframe-6.1.0 idna-3.20 markdown-it-py-4.2.0 mdurl-0.1.2 opentelemetry-api-1.45.2 packaging-26.3 protobuf-py-0.6.0 protobuf-py-ext-0.6.0 pygments-2.21.0 pyqwest-0.12.0 python-dateutil-4.0.0 rich-15.0.0 typing-extensions-4.16.0 tzdata-2026.6 wcmatch-11.2
+2026-11-09T05:37:10.7507003Z ##[group]Run Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+2026-11-09T05:37:10.7507469Z with:
+2026-11-09T05:37:10.7507656Z   method: oidc
+2026-11-09T05:37:10.7507902Z   identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+2026-11-09T05:37:10.7508225Z   oidc-audience: mikka-infisical
+2026-11-09T05:37:10.7508507Z   project-id: 89850d6a-f020-4936-863e-df77380dfe40
+2026-11-09T05:37:10.7508793Z   env-slug: prod
+2026-11-09T05:37:10.7508997Z   secret-path: /vercel
+2026-11-09T05:37:10.7509226Z   secret-name: E2B_API_KEY
+2026-11-09T05:37:10.7509470Z   include-imports: false
+2026-11-09T05:37:10.7509721Z   domain: https://app.infisical.com
+2026-11-09T05:37:10.7509980Z   export-type: env
+2026-11-09T05:37:10.7510190Z   file-output-path: /.env
+2026-11-09T05:37:10.7510415Z   recursive: false
+2026-11-09T05:37:10.7510609Z ##[endgroup]
+2026-11-09T05:37:11.0194360Z (node:2446) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T05:37:11.0195548Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T05:37:11.3182032Z Injected secrets as environment variables
+2026-11-09T05:37:11.3297447Z ##[group]Run name="mikka-${GITHUB_SHA::12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+2026-11-09T05:37:11.3298062Z [36;1mname="mikka-${GITHUB_SHA::12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"[0m
+2026-11-09T05:37:11.3298824Z [36;1m"$RUNNER_TEMP/e2b/bin/python" scripts/e2b/build-template.py --name "$name" --source-ref "$GITHUB_SHA" --json > "$RUNNER_TEMP/candidates.json"[0m
+2026-11-09T05:37:11.3299592Z [36;1mnode --input-type=module - "$RUNNER_TEMP/candidates.json" <<'JS'[0m
+2026-11-09T05:37:11.3300057Z [36;1mimport { readFileSync, appendFileSync } from 'node:fs'[0m
+2026-11-09T05:37:11.3300966Z [36;1mimport { assertReportIdentity, cleanupIdentity, reportDigest, reportStep, templateModelsDigest } from './scripts/e2b/runtime-report.mjs'[0m
+2026-11-09T05:37:11.3301615Z [36;1mreportStep(() => {[0m
+2026-11-09T05:37:11.3302007Z [36;1m  const bytes = readFileSync(process.argv[2]), report = JSON.parse(bytes)[0m
+2026-11-09T05:37:11.3302627Z [36;1m  const expected = { sourceCommit: process.env.GITHUB_SHA, workerSha: report.workerSha,[0m
+2026-11-09T05:37:11.3303237Z [36;1m    runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT }[0m
+2026-11-09T05:37:11.3303715Z [36;1m  assertReportIdentity(report, expected)[0m
+2026-11-09T05:37:11.3304091Z [36;1m  for (const kind of ['desktop', 'claude', 'codex']) {[0m
+2026-11-09T05:37:11.3304516Z [36;1m    const row = report.templates[kind], proof = row.conservation[0m
+2026-11-09T05:37:11.3305101Z [36;1m    if (row.baseTemplate !== kind || row.preinstalled !== true || !row.buildId || !Array.isArray(row.models)[0m
+2026-11-09T05:37:11.3305954Z [36;1m      || !proof?.before?.entries || JSON.stringify(proof.before) !== JSON.stringify(proof.after)) throw Error('runtime_report_preservation_invalid')[0m
+2026-11-09T05:37:11.3307155Z [36;1m    console.log(`${kind}: ${proof.before.entries} preserved entries, manifest ${proof.before.sha256}`)[0m
+2026-11-09T05:37:11.3307634Z [36;1m  }[0m
+2026-11-09T05:37:11.3308549Z [36;1m  appendFileSync(process.env.GITHUB_OUTPUT, `source-sha=${report.workerSha}\ntemplate-models-sha256=${templateModelsDigest(report)}\ncandidate-sha256=${reportDigest(bytes)}\ncandidate-identities=${cleanupIdentity(report, expected)}\n`)[0m
+2026-11-09T05:37:11.3309521Z [36;1m})[0m
+2026-11-09T05:37:11.3309705Z [36;1mJS[0m
+2026-11-09T05:37:11.3329637Z shell: /usr/bin/bash -e {0}
+2026-11-09T05:37:11.3329890Z env:
+2026-11-09T05:37:11.3330390Z   E2B_API_KEY: ***
+2026-11-09T05:37:11.3330614Z ##[endgroup]
+2026-11-09T05:37:12.7470422Z [desktop] [2026-11-09T05:37:12.746552] [debug] Build started
+2026-11-09T05:37:12.7481760Z [codex] [2026-11-09T05:37:12.748060] [debug] Build started
+2026-11-09T05:37:12.7633368Z [desktop] [2026-11-09T05:37:12.763161] [info] Requesting build for template: mikka-02401458a7fe-42566225093-2-desktop
+2026-11-09T05:37:12.7640911Z [codex] [2026-11-09T05:37:12.763909] [info] Requesting build for template: mikka-02401458a7fe-42566225093-2-codex
+2026-11-09T05:37:12.8760661Z [claude] [2026-11-09T05:37:12.875861] [debug] Build started
+2026-11-09T05:37:12.8761706Z [claude] [2026-11-09T05:37:12.875962] [info] Requesting build for template: mikka-02401458a7fe-42566225093-2-claude
+2026-11-09T05:37:12.9683318Z [codex] [2026-11-09T05:37:12.968148] [info] Template created with ID: ase90rewhnmt942djx8f, Build ID: 2b5d7b08-e1d0-4394-b369-cf9f0a4033a5
+2026-11-09T05:37:12.9685323Z [desktop] [2026-11-09T05:37:12.968269] [info] Template created with ID: srb1tjmu5wxkdwzuz29z, Build ID: 6b852d16-f870-4c90-b52d-cfe056670def
+2026-11-09T05:37:12.9735046Z [claude] [2026-11-09T05:37:12.973315] [info] Template created with ID: 25m13eotn1a7lojt97or, Build ID: 17e62a25-638b-4ec5-a1d1-59346fd1a8cc
+2026-11-09T05:37:13.2263518Z [desktop] [2026-11-09T05:37:13.226104] [info] Skipping upload of 'official-files.py', already cached
+2026-11-09T05:37:13.2318780Z [codex] [2026-11-09T05:37:13.231670] [info] Skipping upload of 'official-files.py', already cached
+2026-11-09T05:37:13.2327043Z [claude] [2026-11-09T05:37:13.232479] [info] Skipping upload of 'official-files.py', already cached
+2026-11-09T05:37:13.3232538Z [codex] [2026-11-09T05:37:13.323001] [info] Skipping upload of 'e2b-finalization-files.json', already cached
+2026-11-09T05:37:13.3303016Z [claude] [2026-11-09T05:37:13.330032] [info] Skipping upload of 'e2b-finalization-files.json', already cached
+2026-11-09T05:37:13.3332741Z [desktop] [2026-11-09T05:37:13.333085] [info] Skipping upload of 'e2b-finalization-files.json', already cached
+2026-11-09T05:37:13.4309146Z [desktop] [2026-11-09T05:37:13.430571] [info] Skipping upload of 'e2b-certificate-relinks.json', already cached
+2026-11-09T05:37:13.5876816Z [claude] [2026-11-09T05:37:13.587406] [info] Skipping upload of 'e2b-certificate-relinks.json', already cached
+2026-11-09T05:37:13.5908740Z [codex] [2026-11-09T05:37:13.590712] [info] Skipping upload of 'e2b-certificate-relinks.json', already cached
+2026-11-09T05:37:13.6707590Z [desktop] [2026-11-09T05:37:13.670487] [info] Skipping upload of 'start-prebuilt.sh', already cached
+2026-11-09T05:37:13.6902169Z [claude] [2026-11-09T05:37:13.690007] [info] Skipping upload of 'start-prebuilt.sh', already cached
+2026-11-09T05:37:13.6951774Z [codex] [2026-11-09T05:37:13.694991] [info] Skipping upload of 'start-prebuilt.sh', already cached
+2026-11-09T05:37:13.7674785Z [desktop] [2026-11-09T05:37:13.767232] [info] Skipping upload of 'instance-bootstrap.sh', already cached
+2026-11-09T05:37:13.7675698Z [desktop] [2026-11-09T05:37:13.767277] [info] All file uploads completed
+2026-11-09T05:37:13.7676615Z [desktop] [2026-11-09T05:37:13.767299] [info] Starting building...
+2026-11-09T05:37:13.7911304Z [claude] [2026-11-09T05:37:13.790934] [info] Skipping upload of 'instance-bootstrap.sh', already cached
+2026-11-09T05:37:13.7912878Z [claude] [2026-11-09T05:37:13.790967] [info] All file uploads completed
+2026-11-09T05:37:13.7914060Z [claude] [2026-11-09T05:37:13.790986] [info] Starting building...
+2026-11-09T05:37:13.7943603Z [codex] [2026-11-09T05:37:13.794209] [info] Skipping upload of 'instance-bootstrap.sh', already cached
+2026-11-09T05:37:13.7944498Z [codex] [2026-11-09T05:37:13.794239] [info] All file uploads completed
+2026-11-09T05:37:13.7945082Z [codex] [2026-11-09T05:37:13.794256] [info] Starting building...
+2026-11-09T05:37:13.8678959Z [desktop] [2026-11-09T05:37:13.867730] [info] Waiting for logs...
+2026-11-09T05:37:13.8899396Z [codex] [2026-11-09T05:37:13.889763] [info] Waiting for logs...
+2026-11-09T05:37:13.9007400Z [claude] [2026-11-09T05:37:13.900612] [info] Waiting for logs...
+2026-11-09T05:37:13.9449199Z [desktop] [2026-11-09T05:37:13.819757+00:00] [info] Building template srb1tjmu5wxkdwzuz29z/6b852d16-f870-4c90-b52d-cfe056670def
+2026-11-09T05:37:13.9450541Z [desktop] [2026-11-09T05:37:13.897728+00:00] [info] CACHED [base] FROM TEMPLATE desktop [59a00b3d88d9648395697e48001ab0ac7dd57f0829102e957f4c871dcc090e1e]
+2026-11-09T05:37:13.9451758Z [desktop] [2026-11-09T05:37:13.897816+00:00] [info] [base] DEFAULT USER user [150befbd71382df96d322709e8d2bf33a1639e1ca4ec83ab61cb7ff9f198ab40]
+2026-11-09T05:37:13.9698746Z [codex] [2026-11-09T05:37:13.843137+00:00] [info] Building template ase90rewhnmt942djx8f/2b5d7b08-e1d0-4394-b369-cf9f0a4033a5
+2026-11-09T05:37:13.9793720Z [claude] [2026-11-09T05:37:13.853312+00:00] [info] Building template 25m13eotn1a7lojt97or/17e62a25-638b-4ec5-a1d1-59346fd1a8cc
+2026-11-09T05:37:13.9795212Z [claude] [2026-11-09T05:37:13.931596+00:00] [info] CACHED [base] FROM TEMPLATE claude [f2306753344746c88c58efec5fbadd32002f17ff3949e18b33f501de95ec61f1]
+2026-11-09T05:37:13.9797112Z [claude] [2026-11-09T05:37:13.931683+00:00] [info] [base] DEFAULT USER user [981ada5fca3e7f9c1b6305a0e492d8467a3e2531e3705b52fa3966839945ba1d]
+2026-11-09T05:37:14.2487627Z [codex] [2026-11-09T05:37:13.941223+00:00] [info] CACHED [base] FROM TEMPLATE codex [057dd417c0fc7dc167980ad78d6ea6230b2e79f9257e836b8c56750c09fe08ac]
+2026-11-09T05:37:14.2489278Z [codex] [2026-11-09T05:37:13.941320+00:00] [info] [base] DEFAULT USER user [2e2c8409d31c2a5a26acdda6cb2f01cd9ac5b1475bb4d5f23d807d71026dc70f]
+2026-11-09T05:37:20.0566845Z [codex] [2026-11-09T05:37:20.002854+00:00] [debug] Updating envd to version v0.10.0
+2026-11-09T05:37:20.0600904Z [claude] [2026-11-09T05:37:19.804771+00:00] [debug] Updating envd to version v0.10.0
+2026-11-09T05:37:21.7201154Z [codex] [2026-11-09T05:37:21.456837+00:00] [debug] [base] [stdout]: passwd: password changed.
+2026-11-09T05:37:21.9971984Z [codex] [2026-11-09T05:37:21.943468+00:00] [debug] Adding layer to cache: f68f5093-5181-4e83-a8f9-5225b2c3c14b
+2026-11-09T05:37:21.9973016Z [codex] [2026-11-09T05:37:21.943623+00:00] [debug] Uploading layer: f68f5093-5181-4e83-a8f9-5225b2c3c14b
+2026-11-09T05:37:21.9974420Z [codex] [2026-11-09T05:37:21.944032+00:00] [info] [builder 1/12] WORKDIR / [00d380f338f12d3a908bad01802c05bae8be712af344ddb0184edd04581208c9]
+2026-11-09T05:37:22.2641469Z [claude] [2026-11-09T05:37:22.027786+00:00] [debug] [base] [stdout]: passwd: password changed.
+2026-11-09T05:37:22.5544765Z [codex] [2026-11-09T05:37:22.390187+00:00] [debug] Adding layer to cache: 34d10456-1a13-4d37-87da-b6131436ec10
+2026-11-09T05:37:22.5545776Z [codex] [2026-11-09T05:37:22.390386+00:00] [debug] Uploading layer: 34d10456-1a13-4d37-87da-b6131436ec10
+2026-11-09T05:37:22.5547631Z [codex] [2026-11-09T05:37:22.390914+00:00] [info] [builder 2/12] RUN test ! -e /opt/mikka && test ! -L /opt/mikka && mkdir -m 0755 /opt/mikka root [49b6841ffa4d7c7e06ab080dce018749d81e521f60bbb906308e16d3c780ecea]
+2026-11-09T05:37:22.8317770Z [codex] [2026-11-09T05:37:22.617970+00:00] [debug] Saved: f68f5093-5181-4e83-a8f9-5225b2c3c14b
+2026-11-09T05:37:22.8318883Z [codex] [2026-11-09T05:37:22.730581+00:00] [debug] Saved: 34d10456-1a13-4d37-87da-b6131436ec10
+2026-11-09T05:37:23.0949494Z [claude] [2026-11-09T05:37:23.009893+00:00] [debug] Adding layer to cache: 04482e20-923f-4e7e-b561-4a6f04ec647d
+2026-11-09T05:37:23.0950819Z [claude] [2026-11-09T05:37:23.010234+00:00] [debug] Uploading layer: 04482e20-923f-4e7e-b561-4a6f04ec647d
+2026-11-09T05:37:23.0952077Z [claude] [2026-11-09T05:37:23.010637+00:00] [info] [builder 1/12] WORKDIR / [3719e5caf8b37ae673d602fb771384d8ecac5a49e7f310f0e9d27052a799735c]
+2026-11-09T05:37:23.1077003Z [codex] [2026-11-09T05:37:22.929610+00:00] [debug] Adding layer to cache: ed6805d3-fcac-489c-a52f-8a33f0a0bb8b
+2026-11-09T05:37:23.1078483Z [codex] [2026-11-09T05:37:22.929802+00:00] [debug] Uploading layer: ed6805d3-fcac-489c-a52f-8a33f0a0bb8b
+2026-11-09T05:37:23.1080038Z [codex] [2026-11-09T05:37:22.930194+00:00] [info] [builder 3/12] COPY official-files.py /opt/mikka/official-files.py   [930320da4f3c34d6b2fc44f3150b18beca49aaae14acc96377433e157cd7386a]
+2026-11-09T05:37:23.1950383Z [desktop] [2026-11-09T05:37:23.080098+00:00] [debug] Updating envd to version v0.10.0
+2026-11-09T05:37:23.3845440Z [codex] [2026-11-09T05:37:23.161277+00:00] [debug] Saved: ed6805d3-fcac-489c-a52f-8a33f0a0bb8b
+2026-11-09T05:37:23.9186552Z [claude] [2026-11-09T05:37:23.767420+00:00] [debug] Saved: 04482e20-923f-4e7e-b561-4a6f04ec647d
+2026-11-09T05:37:23.9187544Z [claude] [2026-11-09T05:37:23.787578+00:00] [debug] Adding layer to cache: dcc3feab-9803-4d53-8495-ecec67bd4ef0
+2026-11-09T05:37:23.9188464Z [claude] [2026-11-09T05:37:23.787763+00:00] [debug] Uploading layer: dcc3feab-9803-4d53-8495-ecec67bd4ef0
+2026-11-09T05:37:23.9189855Z [claude] [2026-11-09T05:37:23.788210+00:00] [info] [builder 2/12] RUN test ! -e /opt/mikka && test ! -L /opt/mikka && mkdir -m 0755 /opt/mikka root [2a69fdaa7271c3a7e16874b29190b404bb42edc1d34c1b8a47fe4d5442bb2f7e]
+2026-11-09T05:37:23.9363449Z [codex] [2026-11-09T05:37:23.731833+00:00] [debug] Adding layer to cache: 0b3798e1-b560-46bc-8d72-2e2e9256a400
+2026-11-09T05:37:23.9364716Z [codex] [2026-11-09T05:37:23.732237+00:00] [debug] Uploading layer: 0b3798e1-b560-46bc-8d72-2e2e9256a400
+2026-11-09T05:37:23.9367023Z [codex] [2026-11-09T05:37:23.732867+00:00] [info] [builder 4/12] COPY e2b-finalization-files.json /opt/mikka/e2b-finalization-files.json   [7cd94f87cd89e703067ce80ee9b7d828f914833b2f99e3f8df8a2b846cc592ef]
+2026-11-09T05:37:24.2106448Z [codex] [2026-11-09T05:37:24.000426+00:00] [debug] Saved: 0b3798e1-b560-46bc-8d72-2e2e9256a400
+2026-11-09T05:37:24.4742781Z [claude] [2026-11-09T05:37:24.176925+00:00] [debug] Saved: dcc3feab-9803-4d53-8495-ecec67bd4ef0
+2026-11-09T05:37:24.4744497Z [claude] [2026-11-09T05:37:24.265520+00:00] [debug] Adding layer to cache: e77a23e5-3735-45fc-9043-2d5f52475228
+2026-11-09T05:37:24.4745786Z [claude] [2026-11-09T05:37:24.265746+00:00] [debug] Uploading layer: e77a23e5-3735-45fc-9043-2d5f52475228
+2026-11-09T05:37:24.4747608Z [claude] [2026-11-09T05:37:24.266186+00:00] [info] [builder 3/12] COPY official-files.py /opt/mikka/official-files.py   [e656808b1f57d53ee431bfbd41700c51aab3b67c049b7fdd4b3e38eb0143a628]
+2026-11-09T05:37:24.4871634Z [codex] [2026-11-09T05:37:24.420129+00:00] [debug] Adding layer to cache: f4586c1c-f174-480d-b698-3e4affbd863a
+2026-11-09T05:37:24.4872626Z [codex] [2026-11-09T05:37:24.420850+00:00] [debug] Uploading layer: f4586c1c-f174-480d-b698-3e4affbd863a
+2026-11-09T05:37:24.4874187Z [codex] [2026-11-09T05:37:24.421255+00:00] [info] [builder 5/12] COPY e2b-certificate-relinks.json /opt/mikka/e2b-certificate-relinks.json   [37ef79df597708c416d55c6606d2b5bb9a493e2678b61803ae0b939cf1eb6c87]
+2026-11-09T05:37:24.7519561Z [claude] [2026-11-09T05:37:24.700511+00:00] [debug] Saved: e77a23e5-3735-45fc-9043-2d5f52475228
+2026-11-09T05:37:24.8076643Z [codex] [2026-11-09T05:37:24.715239+00:00] [debug] Saved: f4586c1c-f174-480d-b698-3e4affbd863a
+2026-11-09T05:37:25.0837524Z [codex] [2026-11-09T05:37:24.855549+00:00] [debug] Adding layer to cache: 0c826cd8-b421-4637-854b-1e43557848e9
+2026-11-09T05:37:25.0838639Z [codex] [2026-11-09T05:37:24.855731+00:00] [debug] Uploading layer: 0c826cd8-b421-4637-854b-1e43557848e9
+2026-11-09T05:37:25.0839971Z [codex] [2026-11-09T05:37:24.856152+00:00] [info] [builder 6/12] COPY start-prebuilt.sh /opt/mikka/start-prebuilt.sh   [dc953cbc410914cb606e162f4d4c1666ebd8dbd9e420ca5a06affd4c9180230c]
+2026-11-09T05:37:25.2987783Z [claude] [2026-11-09T05:37:25.230302+00:00] [debug] Adding layer to cache: 18b7e4ca-b0c7-4f7e-ab72-e4e99936eedf
+2026-11-09T05:37:25.2988955Z [claude] [2026-11-09T05:37:25.230477+00:00] [debug] Uploading layer: 18b7e4ca-b0c7-4f7e-ab72-e4e99936eedf
+2026-11-09T05:37:25.2990541Z [claude] [2026-11-09T05:37:25.230845+00:00] [info] [builder 4/12] COPY e2b-finalization-files.json /opt/mikka/e2b-finalization-files.json   [884a70fa25f949a47f7f60aacedd444066de2ca31565936ce3b21cef02f40aed]
+2026-11-09T05:37:25.3617199Z [codex] [2026-11-09T05:37:25.146373+00:00] [debug] Saved: 0c826cd8-b421-4637-854b-1e43557848e9
+2026-11-09T05:37:25.6399647Z [codex] [2026-11-09T05:37:25.454928+00:00] [debug] Adding layer to cache: d89861ee-c061-4f95-b23e-f591c9c29203
+2026-11-09T05:37:25.6400588Z [codex] [2026-11-09T05:37:25.455289+00:00] [debug] Uploading layer: d89861ee-c061-4f95-b23e-f591c9c29203
+2026-11-09T05:37:25.6401842Z [codex] [2026-11-09T05:37:25.455788+00:00] [info] [builder 7/12] COPY instance-bootstrap.sh /opt/mikka/instance-bootstrap.sh   [33743a43545c13d00baa8b40d0852596a32978d0085af364898e32f93069f92d]
+2026-11-09T05:37:25.8524370Z [claude] [2026-11-09T05:37:25.611906+00:00] [debug] Saved: 18b7e4ca-b0c7-4f7e-ab72-e4e99936eedf
+2026-11-09T05:37:25.9165539Z [codex] [2026-11-09T05:37:25.755312+00:00] [debug] Saved: d89861ee-c061-4f95-b23e-f591c9c29203
+2026-11-09T05:37:26.1301471Z [claude] [2026-11-09T05:37:26.009338+00:00] [debug] Adding layer to cache: 6b47c3d7-bccb-4ca0-b654-844a9604287d
+2026-11-09T05:37:26.1302456Z [claude] [2026-11-09T05:37:26.009537+00:00] [debug] Uploading layer: 6b47c3d7-bccb-4ca0-b654-844a9604287d
+2026-11-09T05:37:26.1303914Z [claude] [2026-11-09T05:37:26.009888+00:00] [info] [builder 5/12] COPY e2b-certificate-relinks.json /opt/mikka/e2b-certificate-relinks.json   [fbb6d125ca6204952a6e938c4120afb6997b6d809f18c51c7160c10f2f323832]
+2026-11-09T05:37:26.1895561Z [codex] [2026-11-09T05:37:25.899792+00:00] [debug] Adding layer to cache: 575940c4-31f6-422f-aa04-08c2fb91b231
+2026-11-09T05:37:26.1896859Z [codex] [2026-11-09T05:37:25.900004+00:00] [debug] Uploading layer: 575940c4-31f6-422f-aa04-08c2fb91b231
+2026-11-09T05:37:26.1899057Z [codex] [2026-11-09T05:37:25.900814+00:00] [info] [builder 8/12] RUN python3 /opt/mikka/official-files.py capture /opt/mikka/official-files-before.json --kind codex --cli-manifest /opt/mikka/original-cli.json root [4f820c1a190673205ce33324c0b4d9593b11d4fbd5b156753b3311ede9b0e450]
+2026-11-09T05:37:26.4672905Z [codex] [2026-11-09T05:37:26.230048+00:00] [debug] Saved: 575940c4-31f6-422f-aa04-08c2fb91b231
+2026-11-09T05:37:26.6871236Z [claude] [2026-11-09T05:37:26.419358+00:00] [debug] Saved: 6b47c3d7-bccb-4ca0-b654-844a9604287d
+2026-11-09T05:37:26.9651874Z [claude] [2026-11-09T05:37:26.658122+00:00] [debug] Adding layer to cache: d88fd5d2-55b4-4b14-b76d-699abb2f96af
+2026-11-09T05:37:26.9653572Z [claude] [2026-11-09T05:37:26.658483+00:00] [debug] Uploading layer: d88fd5d2-55b4-4b14-b76d-699abb2f96af
+2026-11-09T05:37:26.9654978Z [claude] [2026-11-09T05:37:26.658823+00:00] [info] [builder 6/12] COPY start-prebuilt.sh /opt/mikka/start-prebuilt.sh   [5ffd39acd8735800e2c64ac0116453af22fafdacefb925dd445c1df43514302a]
+2026-11-09T05:37:27.2385330Z [claude] [2026-11-09T05:37:27.058169+00:00] [debug] Saved: d88fd5d2-55b4-4b14-b76d-699abb2f96af
+2026-11-09T05:37:27.5156953Z [claude] [2026-11-09T05:37:27.254187+00:00] [debug] Adding layer to cache: 469c6e14-260e-48ea-a986-b39381c4d786
+2026-11-09T05:37:27.5158017Z [claude] [2026-11-09T05:37:27.254364+00:00] [debug] Uploading layer: 469c6e14-260e-48ea-a986-b39381c4d786
+2026-11-09T05:37:27.5159403Z [claude] [2026-11-09T05:37:27.254754+00:00] [info] [builder 7/12] COPY instance-bootstrap.sh /opt/mikka/instance-bootstrap.sh   [cf3b1282c4254bc641c7eb3d2b67620a441f160274365011398bed8c7faa1482]
+2026-11-09T05:37:27.7940268Z [claude] [2026-11-09T05:37:27.689059+00:00] [debug] Adding layer to cache: 3ab47a94-9df6-4fd3-89f5-4e2190210dbb
+2026-11-09T05:37:27.7941260Z [claude] [2026-11-09T05:37:27.689251+00:00] [debug] Uploading layer: 3ab47a94-9df6-4fd3-89f5-4e2190210dbb
+2026-11-09T05:37:27.7943148Z [claude] [2026-11-09T05:37:27.689875+00:00] [info] [builder 8/12] RUN python3 /opt/mikka/official-files.py capture /opt/mikka/official-files-before.json --kind claude --cli-manifest /opt/mikka/original-cli.json root [22bb81f5e9c71e3cfcd608bfe823803df9cf7e7c3c6da9c5fbd5a81707fef79e]
+2026-11-09T05:37:27.8702223Z [desktop] [2026-11-09T05:37:27.571662+00:00] [debug] [base] [stdout]: passwd: password expiry information changed.
+2026-11-09T05:37:28.3472432Z [claude] [2026-11-09T05:37:28.200915+00:00] [debug] Saved: 469c6e14-260e-48ea-a986-b39381c4d786
+2026-11-09T05:37:28.4194678Z [desktop] [2026-11-09T05:37:28.206116+00:00] [debug] Adding layer to cache: 383d6c47-e8cf-4719-af34-bba94bf68c9e
+2026-11-09T05:37:28.4196443Z [desktop] [2026-11-09T05:37:28.206234+00:00] [debug] Uploading layer: 383d6c47-e8cf-4719-af34-bba94bf68c9e
+2026-11-09T05:37:28.4197980Z [desktop] [2026-11-09T05:37:28.206489+00:00] [info] [builder 1/12] WORKDIR / [08cc086755f21e5181ef73c649f33833ca1784d1089508e0afd005362c8025bd]
+2026-11-09T05:37:28.6257816Z [claude] [2026-11-09T05:37:28.320493+00:00] [debug] Saved: 3ab47a94-9df6-4fd3-89f5-4e2190210dbb
+2026-11-09T05:37:28.9760333Z [desktop] [2026-11-09T05:37:28.758996+00:00] [debug] Adding layer to cache: 88c7ffc6-933d-4637-95d2-2c6ef17eaaf1
+2026-11-09T05:37:28.9761601Z [desktop] [2026-11-09T05:37:28.759234+00:00] [debug] Uploading layer: 88c7ffc6-933d-4637-95d2-2c6ef17eaaf1
+2026-11-09T05:37:28.9763219Z [desktop] [2026-11-09T05:37:28.759519+00:00] [info] [builder 2/12] RUN test ! -e /opt/mikka && test ! -L /opt/mikka && mkdir -m 0755 /opt/mikka root [65eee216d12c011b4eb5396e6629666a5e9c1c886489bf36d42be7534ae3a48f]
+2026-11-09T05:37:29.2544050Z [desktop] [2026-11-09T05:37:28.979406+00:00] [debug] Saved: 383d6c47-e8cf-4719-af34-bba94bf68c9e
+2026-11-09T05:37:29.2545452Z [desktop] [2026-11-09T05:37:29.088074+00:00] [debug] Saved: 88c7ffc6-933d-4637-95d2-2c6ef17eaaf1
+2026-11-09T05:37:29.2547570Z [desktop] [2026-11-09T05:37:29.129602+00:00] [debug] Adding layer to cache: 8a1029a7-a003-4864-b71a-061f7d386b63
+2026-11-09T05:37:29.2548996Z [desktop] [2026-11-09T05:37:29.129769+00:00] [debug] Uploading layer: 8a1029a7-a003-4864-b71a-061f7d386b63
+2026-11-09T05:37:29.2550349Z [desktop] [2026-11-09T05:37:29.130025+00:00] [info] [builder 3/12] COPY official-files.py /opt/mikka/official-files.py   [3f0c9e95adca1f5f9a754289c28d3febd42cb09d6370875c7a26eb6bff7873cf]
+2026-11-09T05:37:29.5303853Z [desktop] [2026-11-09T05:37:29.441413+00:00] [debug] Saved: 8a1029a7-a003-4864-b71a-061f7d386b63
+2026-11-09T05:37:29.8036746Z [desktop] [2026-11-09T05:37:29.575637+00:00] [debug] Adding layer to cache: 31eb9ae0-9844-43d5-bfbd-3ed657d2bd03
+2026-11-09T05:37:29.8037683Z [desktop] [2026-11-09T05:37:29.575807+00:00] [debug] Uploading layer: 31eb9ae0-9844-43d5-bfbd-3ed657d2bd03
+2026-11-09T05:37:29.8039390Z [desktop] [2026-11-09T05:37:29.576058+00:00] [info] [builder 4/12] COPY e2b-finalization-files.json /opt/mikka/e2b-finalization-files.json   [4f2bc11a27156b1ce082f86bf9f64d3f1f84075ff52af570ebbd15dd0f0cfdc8]
+2026-11-09T05:37:30.0773601Z [desktop] [2026-11-09T05:37:29.932316+00:00] [debug] Saved: 31eb9ae0-9844-43d5-bfbd-3ed657d2bd03
+2026-11-09T05:37:30.0774649Z [desktop] [2026-11-09T05:37:30.008272+00:00] [debug] Adding layer to cache: 20b0a8eb-1819-468f-936b-e495d30b6fd0
+2026-11-09T05:37:30.0775624Z [desktop] [2026-11-09T05:37:30.008431+00:00] [debug] Uploading layer: 20b0a8eb-1819-468f-936b-e495d30b6fd0
+2026-11-09T05:37:30.0777470Z [desktop] [2026-11-09T05:37:30.008699+00:00] [info] [builder 5/12] COPY e2b-certificate-relinks.json /opt/mikka/e2b-certificate-relinks.json   [d5b0a6b1f287ce715f155ea2fb3437529e784b83ef66887c4814202c54d38c4b]
+2026-11-09T05:37:30.6263042Z [desktop] [2026-11-09T05:37:30.328141+00:00] [debug] Saved: 20b0a8eb-1819-468f-936b-e495d30b6fd0
+2026-11-09T05:37:30.6264004Z [desktop] [2026-11-09T05:37:30.448117+00:00] [debug] Adding layer to cache: 2655d632-1b12-432f-aeff-fff6d69bcaf9
+2026-11-09T05:37:30.6264918Z [desktop] [2026-11-09T05:37:30.448297+00:00] [debug] Uploading layer: 2655d632-1b12-432f-aeff-fff6d69bcaf9
+2026-11-09T05:37:30.6266558Z [desktop] [2026-11-09T05:37:30.448562+00:00] [info] [builder 6/12] COPY start-prebuilt.sh /opt/mikka/start-prebuilt.sh   [fc8e549676a1aa914058374991893d7b70f6736d41adaea1a5ea18713d98d5b3]
+2026-11-09T05:37:30.9035340Z [desktop] [2026-11-09T05:37:30.835877+00:00] [debug] Saved: 2655d632-1b12-432f-aeff-fff6d69bcaf9
+2026-11-09T05:37:31.1765612Z [desktop] [2026-11-09T05:37:30.891795+00:00] [debug] Adding layer to cache: 41341578-cb01-4ea5-b470-06baa9f3d2d0
+2026-11-09T05:37:31.1766908Z [desktop] [2026-11-09T05:37:30.891955+00:00] [debug] Uploading layer: 41341578-cb01-4ea5-b470-06baa9f3d2d0
+2026-11-09T05:37:31.4555913Z [desktop] [2026-11-09T05:37:30.892408+00:00] [info] [builder 7/12] COPY instance-bootstrap.sh /opt/mikka/instance-bootstrap.sh   [517f78e83d107403e3870b17f20fd3824c5b7fe3d6ee0e5e822b2be469478f7e]
+2026-11-09T05:37:31.4557732Z [desktop] [2026-11-09T05:37:31.226066+00:00] [debug] Saved: 41341578-cb01-4ea5-b470-06baa9f3d2d0
+2026-11-09T05:37:31.4558730Z [desktop] [2026-11-09T05:37:31.378730+00:00] [debug] Adding layer to cache: 3d50aeb6-e520-4b35-b0b5-94a539eae344
+2026-11-09T05:37:31.4559619Z [desktop] [2026-11-09T05:37:31.378888+00:00] [debug] Uploading layer: 3d50aeb6-e520-4b35-b0b5-94a539eae344
+2026-11-09T05:37:31.4561387Z [desktop] [2026-11-09T05:37:31.379276+00:00] [info] [builder 8/12] RUN python3 /opt/mikka/official-files.py capture /opt/mikka/official-files-before.json --kind desktop --cli-manifest /opt/mikka/original-cli.json root [c5c09bc53ed95b331b53f07e35564a6a05f6ab42aa80b9898ad57a3a194bcb28]
+2026-11-09T05:37:32.0095597Z [desktop] [2026-11-09T05:37:31.749927+00:00] [debug] Saved: 3d50aeb6-e520-4b35-b0b5-94a539eae344
+2026-11-09T05:38:35.2039481Z [codex] [2026-11-09T05:38:35.093602+00:00] [info] [builder 8/12] [stdout]: {"entries":39646,"sha256":"b466fbc1099bb7a5727fc98e160627b72cb8fa7c75839376c1979299d67beba1"}
+2026-11-09T05:38:35.4777687Z [codex] [2026-11-09T05:38:35.371729+00:00] [debug] Adding layer to cache: 210d22db-4601-43f1-b2f8-14bee9fb19b3
+2026-11-09T05:38:35.4778651Z [codex] [2026-11-09T05:38:35.371915+00:00] [debug] Uploading layer: 210d22db-4601-43f1-b2f8-14bee9fb19b3
+2026-11-09T05:38:35.4780912Z [codex] [2026-11-09T05:38:35.372330+00:00] [info] [builder 9/12] RUN bash /opt/mikka/instance-bootstrap.sh 02401458a7fe26e00ce4caa653084c7f9680696d 6ada1d4f809eace6ca84ad0329562f4aacb78452 codex root [ca2bf9d1e2d7da21e6a77346f1e524ef5f9922e5c455d97dfe4c75eda717a185]
+2026-11-09T05:38:35.7504539Z [codex] [2026-11-09T05:38:35.520918+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase validation 10
+2026-11-09T05:38:39.5967804Z [claude] [2026-11-09T05:38:39.455474+00:00] [info] [builder 8/12] [stdout]: {"entries":44148,"sha256":"677bec766e8ac444b1a38f604082d887e7d6ba699b6c2914d12aca744144c6d4"}
+2026-11-09T05:38:39.8774756Z [claude] [2026-11-09T05:38:39.713068+00:00] [debug] Adding layer to cache: 4afdcdd2-530f-4b65-ac3e-c8d22273c469
+2026-11-09T05:38:39.8775775Z [claude] [2026-11-09T05:38:39.713481+00:00] [debug] Uploading layer: 4afdcdd2-530f-4b65-ac3e-c8d22273c469
+2026-11-09T05:38:39.8777918Z [claude] [2026-11-09T05:38:39.713848+00:00] [info] [builder 9/12] RUN bash /opt/mikka/instance-bootstrap.sh 02401458a7fe26e00ce4caa653084c7f9680696d 6ada1d4f809eace6ca84ad0329562f4aacb78452 claude root [c49bcf506ac3293a4030d49e3e9a59e90419a6a93b55a40829f035d8cc1c19ae]
+2026-11-09T05:38:40.1564593Z [claude] [2026-11-09T05:38:39.871307+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase validation 11
+2026-11-09T05:38:40.7169161Z [codex] [2026-11-09T05:38:40.591952+00:00] [debug] Saved: 210d22db-4601-43f1-b2f8-14bee9fb19b3
+2026-11-09T05:38:41.2683638Z [codex] [2026-11-09T05:38:41.012560+00:00] [info] [builder 9/12] [stdout]: {"version":1,"kind":"codex","original":{"claude_code":null,"codex":{"path":"/usr/local/lib/node_modules/@openai/codex/bin/codex.js","sha256":"e14fc83739c13c1074b12bd1acce4010c893c7f6fbfc1593b4a31d74cabb57af"}},"added":{}}
+2026-11-09T05:38:41.2685900Z [codex] [2026-11-09T05:38:41.016237+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase source 5495
+2026-11-09T05:38:41.5469427Z [codex] [2026-11-09T05:38:41.423372+00:00] [info] [builder 9/12] [stdout]: /opt/mikka/archives/node-v24.19.0-linux-x64.tar.xz: OK
+2026-11-09T05:38:44.0159767Z [codex] [2026-11-09T05:38:43.861719+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase node 2845
+2026-11-09T05:38:44.5669538Z [codex] [2026-11-09T05:38:44.310349+00:00] [info] [builder 9/12] [stdout]: /opt/mikka/archives/gh_2.83.2_linux_amd64.tar.gz: OK
+2026-11-09T05:38:44.8399987Z [codex] [2026-11-09T05:38:44.693907+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase gh 832
+2026-11-09T05:38:45.6731007Z [claude] [2026-11-09T05:38:45.542552+00:00] [info] [builder 9/12] [stdout]: {"version":1,"kind":"claude","original":{"claude_code":{"path":"/usr/local/bin/claude","sha256":"86cb722ab68348877dba7971e4d0c659919e05e6228c05e006e83da320e656ef"},"codex":null},"added":{}}
+2026-11-09T05:38:45.6732853Z [claude] [2026-11-09T05:38:45.547953+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase source 5676
+2026-11-09T05:38:45.9516686Z [claude] [2026-11-09T05:38:45.808998+00:00] [info] [builder 9/12] [stdout]: /opt/mikka/archives/node-v24.19.0-linux-x64.tar.xz: OK
+2026-11-09T05:38:46.2270057Z [codex] [2026-11-09T05:38:46.186767+00:00] [info] [builder 9/12] [stdout]: Scope: 3 of 7 workspace projects
+2026-11-09T05:38:46.5000137Z [codex] [2026-11-09T05:38:46.342628+00:00] [info] [builder 9/12] [stdout]: Lockfile is up to date, resolution step is skipped
+2026-11-09T05:38:46.5001309Z [codex] [2026-11-09T05:38:46.439286+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-09T05:38:46.5042670Z [claude] [2026-11-09T05:38:46.356047+00:00] [debug] Saved: 4afdcdd2-530f-4b65-ac3e-c8d22273c469
+2026-11-09T05:38:46.7781896Z [codex] [2026-11-09T05:38:46.578571+00:00] [info] [builder 9/12] [stdout]: .                                        |    +1978 ++++++++++++++++++++++++++++
+2026-11-09T05:38:47.0536617Z [codex] [2026-11-09T05:38:46.871035+00:00] [info] [builder 9/12] [stdout]: ╭───────────────────────────────────────────────╮
+2026-11-09T05:38:47.0538400Z [codex] [2026-11-09T05:38:46.871070+00:00] [info] [builder 9/12] [stdout]: │                                               │
+2026-11-09T05:38:47.0539567Z [codex] [2026-11-09T05:38:46.871076+00:00] [info] [builder 9/12] [stdout]: │     Update available! 10.34.3 → 12.18.0.      │
+2026-11-09T05:38:47.0540888Z [codex] [2026-11-09T05:38:46.871083+00:00] [info] [builder 9/12] [stdout]: │     Changelog: https://pnpm.io/v/12.18.0      │
+2026-11-09T05:38:47.0542009Z [codex] [2026-11-09T05:38:46.871088+00:00] [info] [builder 9/12] [stdout]: │   To update, run: corepack use pnpm@12.18.0   │
+2026-11-09T05:38:47.0543479Z [codex] [2026-11-09T05:38:46.871093+00:00] [info] [builder 9/12] [stdout]: │                                               │
+2026-11-09T05:38:47.0545077Z [codex] [2026-11-09T05:38:46.871098+00:00] [info] [builder 9/12] [stdout]: ╰───────────────────────────────────────────────╯
+2026-11-09T05:38:47.6088100Z [codex] [2026-11-09T05:38:47.440500+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 6, added 0
+2026-11-09T05:38:48.4321460Z [claude] [2026-11-09T05:38:48.251482+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase node 2703
+2026-11-09T05:38:48.7055550Z [claude] [2026-11-09T05:38:48.647116+00:00] [info] [builder 9/12] [stdout]: /opt/mikka/archives/gh_2.83.2_linux_amd64.tar.gz: OK
+2026-11-09T05:38:48.7097502Z [codex] [2026-11-09T05:38:48.447332+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 96, added 59
+2026-11-09T05:38:49.2510273Z [claude] [2026-11-09T05:38:49.051112+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase gh 799
+2026-11-09T05:38:49.5404482Z [codex] [2026-11-09T05:38:49.447112+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 114, added 67
+2026-11-09T05:38:50.6382773Z [codex] [2026-11-09T05:38:50.456362+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 127, added 71
+2026-11-09T05:38:50.6398371Z [claude] [2026-11-09T05:38:50.460705+00:00] [info] [builder 9/12] [stdout]: Scope: 3 of 7 workspace projects
+2026-11-09T05:38:50.9122407Z [claude] [2026-11-09T05:38:50.609453+00:00] [info] [builder 9/12] [stdout]: Lockfile is up to date, resolution step is skipped
+2026-11-09T05:38:50.9123659Z [claude] [2026-11-09T05:38:50.718092+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-09T05:38:50.9124853Z [claude] [2026-11-09T05:38:50.860785+00:00] [info] [builder 9/12] [stdout]: .                                        |    +1978 ++++++++++++++++++++++++++++
+2026-11-09T05:38:51.4702382Z [claude] [2026-11-09T05:38:51.170793+00:00] [info] [builder 9/12] [stdout]: ╭───────────────────────────────────────────────╮
+2026-11-09T05:38:51.4704370Z [claude] [2026-11-09T05:38:51.170845+00:00] [info] [builder 9/12] [stdout]: │                                               │
+2026-11-09T05:38:51.4705927Z [claude] [2026-11-09T05:38:51.170852+00:00] [info] [builder 9/12] [stdout]: │     Update available! 10.34.3 → 12.18.0.      │
+2026-11-09T05:38:51.4707441Z [claude] [2026-11-09T05:38:51.170857+00:00] [info] [builder 9/12] [stdout]: │     Changelog: https://pnpm.io/v/12.18.0      │
+2026-11-09T05:38:51.4708686Z [claude] [2026-11-09T05:38:51.170864+00:00] [info] [builder 9/12] [stdout]: │   To update, run: corepack use pnpm@12.18.0   │
+2026-11-09T05:38:51.4709602Z [claude] [2026-11-09T05:38:51.170869+00:00] [info] [builder 9/12] [stdout]: │                                               │
+2026-11-09T05:38:51.4710537Z [claude] [2026-11-09T05:38:51.170879+00:00] [info] [builder 9/12] [stdout]: ╰───────────────────────────────────────────────╯
+2026-11-09T05:38:52.0208286Z [claude] [2026-11-09T05:38:51.719253+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 6, added 0
+2026-11-09T05:38:52.0284792Z [codex] [2026-11-09T05:38:51.801693+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 128, added 71
+2026-11-09T05:38:52.8514858Z [claude] [2026-11-09T05:38:52.795648+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 103, added 52
+2026-11-09T05:38:52.8611046Z [codex] [2026-11-09T05:38:52.807376+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 206, added 99
+2026-11-09T05:38:53.9620542Z [claude] [2026-11-09T05:38:53.796458+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 126, added 60
+2026-11-09T05:38:53.9630253Z [codex] [2026-11-09T05:38:53.808281+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 307, added 136
+2026-11-09T05:38:55.0625128Z [codex] [2026-11-09T05:38:54.808178+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 357, added 152
+2026-11-09T05:38:55.8857086Z [codex] [2026-11-09T05:38:55.808882+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 476, added 207
+2026-11-09T05:38:56.1550981Z [claude] [2026-11-09T05:38:55.931392+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 127, added 60
+2026-11-09T05:38:56.9970225Z [claude] [2026-11-09T05:38:56.932538+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 206, added 88
+2026-11-09T05:38:57.0017213Z [codex] [2026-11-09T05:38:56.827951+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 608, added 326
+2026-11-09T05:38:58.1053013Z [claude] [2026-11-09T05:38:57.932739+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 309, added 124
+2026-11-09T05:38:58.1115134Z [codex] [2026-11-09T05:38:57.828260+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 622, added 330
+2026-11-09T05:38:59.2073517Z [codex] [2026-11-09T05:38:59.096191+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 623, added 330
+2026-11-09T05:38:59.2076946Z [claude] [2026-11-09T05:38:58.933709+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 357, added 140
+2026-11-09T05:39:00.0360091Z [claude] [2026-11-09T05:38:59.934731+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 477, added 199
+2026-11-09T05:39:00.3085767Z [codex] [2026-11-09T05:39:00.153819+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 659, added 346
+2026-11-09T05:39:01.1432142Z [claude] [2026-11-09T05:39:00.935382+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 621, added 350
+2026-11-09T05:39:01.4066444Z [codex] [2026-11-09T05:39:01.154142+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 740, added 380
+2026-11-09T05:39:02.2300279Z [codex] [2026-11-09T05:39:02.154654+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 801, added 404
+2026-11-09T05:39:02.2474725Z [claude] [2026-11-09T05:39:01.936000+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 628, added 351
+2026-11-09T05:39:03.3381904Z [codex] [2026-11-09T05:39:03.155257+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 918, added 506
+2026-11-09T05:39:03.9101236Z [claude] [2026-11-09T05:39:03.691626+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 629, added 351
+2026-11-09T05:39:04.4421089Z [codex] [2026-11-09T05:39:04.156857+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 993, added 541
+2026-11-09T05:39:04.7332326Z [claude] [2026-11-09T05:39:04.692905+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 683, added 366
+2026-11-09T05:39:05.2639142Z [codex] [2026-11-09T05:39:05.164151+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1068, added 590
+2026-11-09T05:39:05.8341818Z [claude] [2026-11-09T05:39:05.693139+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 754, added 399
+2026-11-09T05:39:06.3742747Z [codex] [2026-11-09T05:39:06.165241+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1083, added 594
+2026-11-09T05:39:06.9356353Z [claude] [2026-11-09T05:39:06.693598+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 900, added 529
+2026-11-09T05:39:07.2104456Z [codex] [2026-11-09T05:39:07.165819+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1173, added 660
+2026-11-09T05:39:07.7692769Z [claude] [2026-11-09T05:39:07.693991+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 959, added 576
+2026-11-09T05:39:08.3130543Z [codex] [2026-11-09T05:39:08.167424+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1206, added 672
+2026-11-09T05:39:08.8697590Z [claude] [2026-11-09T05:39:08.693914+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1010, added 604
+2026-11-09T05:39:09.4150830Z [codex] [2026-11-09T05:39:09.167395+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1219, added 675
+2026-11-09T05:39:09.9740218Z [claude] [2026-11-09T05:39:09.694892+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1079, added 632
+2026-11-09T05:39:10.2456542Z [codex] [2026-11-09T05:39:10.167720+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1250, added 687
+2026-11-09T05:39:10.8053320Z [claude] [2026-11-09T05:39:10.696209+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1151, added 685
+2026-11-09T05:39:11.3554203Z [codex] [2026-11-09T05:39:11.169463+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1300, added 707
+2026-11-09T05:39:11.9091144Z [claude] [2026-11-09T05:39:11.696673+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1188, added 696
+2026-11-09T05:39:12.4656288Z [codex] [2026-11-09T05:39:12.170660+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1390, added 745
+2026-11-09T05:39:12.7379649Z [claude] [2026-11-09T05:39:12.696972+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1221, added 707
+2026-11-09T05:39:13.2910348Z [codex] [2026-11-09T05:39:13.176052+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1473, added 779
+2026-11-09T05:39:13.8477753Z [claude] [2026-11-09T05:39:13.697943+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1254, added 723
+2026-11-09T05:39:14.3999375Z [codex] [2026-11-09T05:39:14.171872+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1505, added 788
+2026-11-09T05:39:14.9560543Z [claude] [2026-11-09T05:39:14.700847+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1302, added 745
+2026-11-09T05:39:15.2284124Z [codex] [2026-11-09T05:39:15.171480+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1555, added 841
+2026-11-09T05:39:15.7739425Z [claude] [2026-11-09T05:39:15.701507+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1389, added 789
+2026-11-09T05:39:16.3261149Z [codex] [2026-11-09T05:39:16.171466+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1618, added 861
+2026-11-09T05:39:16.8834267Z [claude] [2026-11-09T05:39:16.722796+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1491, added 837
+2026-11-09T05:39:17.4366823Z [codex] [2026-11-09T05:39:17.180401+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1628, added 865
+2026-11-09T05:39:17.9996554Z [claude] [2026-11-09T05:39:17.723362+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1559, added 910
+2026-11-09T05:39:18.2714353Z [codex] [2026-11-09T05:39:18.180572+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1648, added 869
+2026-11-09T05:39:18.8174353Z [claude] [2026-11-09T05:39:18.729651+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1590, added 919
+2026-11-09T05:39:19.3684417Z [codex] [2026-11-09T05:39:19.181295+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1726, added 907
+2026-11-09T05:39:19.9187415Z [claude] [2026-11-09T05:39:19.730112+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1624, added 933
+2026-11-09T05:39:20.4707293Z [codex] [2026-11-09T05:39:20.182552+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1775, added 929
+2026-11-09T05:39:21.0264026Z [claude] [2026-11-09T05:39:20.729788+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1630, added 935
+2026-11-09T05:39:21.2945396Z [codex] [2026-11-09T05:39:21.187617+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1781, added 931
+2026-11-09T05:39:21.8483894Z [claude] [2026-11-09T05:39:21.729819+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1709, added 973
+2026-11-09T05:39:22.4031333Z [codex] [2026-11-09T05:39:22.188925+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1851, added 958
+2026-11-09T05:39:22.9490292Z [claude] [2026-11-09T05:39:22.729719+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1747, added 985
+2026-11-09T05:39:23.2287171Z [codex] [2026-11-09T05:39:23.189164+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1877, added 970
+2026-11-09T05:39:23.7727804Z [claude] [2026-11-09T05:39:23.730074+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1776, added 995
+2026-11-09T05:39:24.3372819Z [codex] [2026-11-09T05:39:24.189395+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1909, added 996
+2026-11-09T05:39:24.8774484Z [claude] [2026-11-09T05:39:24.731518+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1780, added 997
+2026-11-09T05:39:25.4430489Z [codex] [2026-11-09T05:39:25.189757+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1909, added 1362
+2026-11-09T05:39:25.9834259Z [claude] [2026-11-09T05:39:25.732310+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1860, added 1040
+2026-11-09T05:39:26.2706859Z [codex] [2026-11-09T05:39:26.190639+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1909, added 1788
+2026-11-09T05:39:26.8180486Z [claude] [2026-11-09T05:39:26.733253+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1875, added 1044
+2026-11-09T05:39:26.8240207Z [codex] [2026-11-09T05:39:26.761280+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1909, added 1978, done
+2026-11-09T05:39:27.9204877Z [claude] [2026-11-09T05:39:27.733489+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1909, added 1173
+2026-11-09T05:39:27.9211292Z [codex] [2026-11-09T05:39:27.674634+00:00] [info] [builder 9/12] [stdout]: .../node_modules/@swc/core postinstall$ node postinstall.js
+2026-11-09T05:39:27.9213015Z [codex] [2026-11-09T05:39:27.695882+00:00] [info] [builder 9/12] [stdout]: .../node_modules/ffmpeg-static install$ node install.js
+2026-11-09T05:39:27.9214911Z [codex] [2026-11-09T05:39:27.706499+00:00] [info] [builder 9/12] [stdout]: .../node_modules/@parcel/watcher install$ node scripts/build-from-source.js
+2026-11-09T05:39:27.9217036Z [codex] [2026-11-09T05:39:27.707713+00:00] [info] [builder 9/12] [stdout]: .../esbuild@0.28.2/node_modules/esbuild postinstall$ node install.js
+2026-11-09T05:39:27.9218361Z [codex] [2026-11-09T05:39:27.708770+00:00] [info] [builder 9/12] [stdout]: .../node_modules/@swc/core postinstall$ node postinstall.js
+2026-11-09T05:39:27.9219731Z [codex] [2026-11-09T05:39:27.831321+00:00] [info] [builder 9/12] [stdout]: .../node_modules/@parcel/watcher install: Done
+2026-11-09T05:39:27.9220968Z [codex] [2026-11-09T05:39:27.852258+00:00] [info] [builder 9/12] [stdout]: .../esbuild@0.28.2/node_modules/esbuild postinstall: Done
+2026-11-09T05:39:27.9222145Z [codex] [2026-11-09T05:39:27.860041+00:00] [info] [builder 9/12] [stdout]: .../node_modules/@swc/core postinstall: Done
+2026-11-09T05:39:28.1985217Z [codex] [2026-11-09T05:39:27.957873+00:00] [info] [builder 9/12] [stdout]: .../node_modules/@swc/core postinstall: Done
+2026-11-09T05:39:29.0271271Z [claude] [2026-11-09T05:39:28.733620+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1909, added 1589
+2026-11-09T05:39:29.5774226Z [codex] [2026-11-09T05:39:29.337453+00:00] [info] [builder 9/12] [stdout]: .../node_modules/ffmpeg-static install: Done
+2026-11-09T05:39:29.8548472Z [claude] [2026-11-09T05:39:29.796563+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1909, added 1944
+2026-11-09T05:39:30.1332107Z [claude] [2026-11-09T05:39:29.962129+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1909, added 1978, done
+2026-11-09T05:39:30.6866413Z [codex] [2026-11-09T05:39:30.378342+00:00] [info] [builder 9/12] [stdout]: ╭ Warning ─────────────────────────────────────────────────────────────────────╮
+2026-11-09T05:39:30.6868230Z [codex] [2026-11-09T05:39:30.378381+00:00] [info] [builder 9/12] [stdout]: │                                                                              │
+2026-11-09T05:39:30.6869487Z [codex] [2026-11-09T05:39:30.378391+00:00] [info] [builder 9/12] [stdout]: │   Ignored build scripts: @openuidev/lang-core@1.0.1, cbor-extract@2.2.2,     │
+2026-11-09T05:39:30.6870742Z [codex] [2026-11-09T05:39:30.378397+00:00] [info] [builder 9/12] [stdout]: │   core-js@3.51.0, nx@24.0.5, tesseract.js@7.0.0, workerd@1.20261019.1.       │
+2026-11-09T05:39:30.6871963Z [codex] [2026-11-09T05:39:30.378402+00:00] [info] [builder 9/12] [stdout]: │   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+2026-11-09T05:39:30.6873107Z [codex] [2026-11-09T05:39:30.378408+00:00] [info] [builder 9/12] [stdout]: │   to run scripts.                                                            │
+2026-11-09T05:39:30.6874165Z [codex] [2026-11-09T05:39:30.378413+00:00] [info] [builder 9/12] [stdout]: │                                                                              │
+2026-11-09T05:39:30.6875286Z [codex] [2026-11-09T05:39:30.378421+00:00] [info] [builder 9/12] [stdout]: ╰──────────────────────────────────────────────────────────────────────────────╯
+2026-11-09T05:39:30.6876482Z [codex] [2026-11-09T05:39:30.405390+00:00] [info] [builder 9/12] [stdout]: Done in 44.6s using pnpm v10.34.3
+2026-11-09T05:39:30.6877303Z [codex] [2026-11-09T05:39:30.465167+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase dependencies 45771
+2026-11-09T05:39:30.9637416Z [claude] [2026-11-09T05:39:30.741591+00:00] [info] [builder 9/12] [stdout]: .../node_modules/@swc/core postinstall$ node postinstall.js
+2026-11-09T05:39:30.9638516Z [claude] [2026-11-09T05:39:30.761262+00:00] [info] [builder 9/12] [stdout]: .../node_modules/ffmpeg-static install$ node install.js
+2026-11-09T05:39:30.9639643Z [claude] [2026-11-09T05:39:30.771302+00:00] [info] [builder 9/12] [stdout]: .../node_modules/@parcel/watcher install$ node scripts/build-from-source.js
+2026-11-09T05:39:30.9640768Z [claude] [2026-11-09T05:39:30.772234+00:00] [info] [builder 9/12] [stdout]: .../node_modules/@swc/core postinstall$ node postinstall.js
+2026-11-09T05:39:30.9641830Z [claude] [2026-11-09T05:39:30.773055+00:00] [info] [builder 9/12] [stdout]: .../esbuild@0.28.2/node_modules/esbuild postinstall$ node install.js
+2026-11-09T05:39:30.9643374Z [claude] [2026-11-09T05:39:30.822954+00:00] [info] [builder 9/12] [stdout]: .../node_modules/@swc/core postinstall: Done
+2026-11-09T05:39:30.9644456Z [claude] [2026-11-09T05:39:30.898304+00:00] [info] [builder 9/12] [stdout]: .../node_modules/@parcel/watcher install: Done
+2026-11-09T05:39:31.2376286Z [codex] [2026-11-09T05:39:31.161946+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase build 696
+2026-11-09T05:39:31.2421725Z [claude] [2026-11-09T05:39:30.953105+00:00] [info] [builder 9/12] [stdout]: .../esbuild@0.28.2/node_modules/esbuild postinstall: Done
+2026-11-09T05:39:31.2422892Z [claude] [2026-11-09T05:39:30.972995+00:00] [info] [builder 9/12] [stdout]: .../node_modules/@swc/core postinstall: Done
+2026-11-09T05:39:31.7884888Z [codex] [2026-11-09T05:39:31.641876+00:00] [info] [builder 9/12] [stdout]: {"version":1,"kind":"codex","original":{"claude_code":null,"codex":{"path":"/usr/local/lib/node_modules/@openai/codex/bin/codex.js","sha256":"e14fc83739c13c1074b12bd1acce4010c893c7f6fbfc1593b4a31d74cabb57af"}},"added":{"claude_code":{"path":"/opt/mikka/releases/02401458a7fe26e00ce4caa653084c7f9680696d/source/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk-linux-x64@0.3.305/node_modules/@anthropic-ai/claude-agent-sdk-linux-x64/claude","sha256":"86cb722ab68348877dba7971e4d0c659919e05e6228c05e006e83da320e656ef"}}}
+2026-11-09T05:39:32.0633972Z [claude] [2026-11-09T05:39:31.999708+00:00] [info] [builder 9/12] [stdout]: .../node_modules/ffmpeg-static install: Done
+2026-11-09T05:39:32.8864702Z [codex] [2026-11-09T05:39:32.717752+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase cli 1555
+2026-11-09T05:39:32.8865611Z [codex] [2026-11-09T05:39:32.788055+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase journal 70
+2026-11-09T05:39:32.8866802Z [codex] [2026-11-09T05:39:32.788224+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase desktop 0
+2026-11-09T05:39:33.1705586Z [claude] [2026-11-09T05:39:32.972567+00:00] [info] [builder 9/12] [stdout]: ╭ Warning ─────────────────────────────────────────────────────────────────────╮
+2026-11-09T05:39:33.1707263Z [claude] [2026-11-09T05:39:32.972600+00:00] [info] [builder 9/12] [stdout]: │                                                                              │
+2026-11-09T05:39:33.1708660Z [claude] [2026-11-09T05:39:32.972606+00:00] [info] [builder 9/12] [stdout]: │   Ignored build scripts: @openuidev/lang-core@1.0.1, cbor-extract@2.2.2,     │
+2026-11-09T05:39:33.1710027Z [claude] [2026-11-09T05:39:32.972612+00:00] [info] [builder 9/12] [stdout]: │   core-js@3.51.0, nx@24.0.5, tesseract.js@7.0.0, workerd@1.20261019.1.       │
+2026-11-09T05:39:33.1711400Z [claude] [2026-11-09T05:39:32.972621+00:00] [info] [builder 9/12] [stdout]: │   Run "pnpm approve-builds" to pick which dependencies should be allowed     │
+2026-11-09T05:39:33.1712741Z [claude] [2026-11-09T05:39:32.972627+00:00] [info] [builder 9/12] [stdout]: │   to run scripts.                                                            │
+2026-11-09T05:39:33.1713990Z [claude] [2026-11-09T05:39:32.972632+00:00] [info] [builder 9/12] [stdout]: │                                                                              │
+2026-11-09T05:39:33.1715283Z [claude] [2026-11-09T05:39:32.972640+00:00] [info] [builder 9/12] [stdout]: ╰──────────────────────────────────────────────────────────────────────────────╯
+2026-11-09T05:39:33.1716400Z [claude] [2026-11-09T05:39:32.990459+00:00] [info] [builder 9/12] [stdout]: Done in 42.9s using pnpm v10.34.3
+2026-11-09T05:39:33.1717252Z [claude] [2026-11-09T05:39:33.042465+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase dependencies 43991
+2026-11-09T05:39:33.7197253Z [codex] [2026-11-09T05:39:33.618160+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase finalize 830
+2026-11-09T05:39:33.7198988Z [codex] [2026-11-09T05:39:33.618195+00:00] [info] [builder 9/12] [stdout]: mikka-official-instance-ready 02401458a7fe26e00ce4caa653084c7f9680696d 6ada1d4f809eace6ca84ad0329562f4aacb78452
+2026-11-09T05:39:33.9928225Z [claude] [2026-11-09T05:39:33.680383+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase build 637
+2026-11-09T05:39:38.4230196Z [codex] [2026-11-09T05:39:38.152277+00:00] [debug] Adding layer to cache: 69febae7-a631-486b-abf0-03ccd1616505
+2026-11-09T05:39:38.4231633Z [codex] [2026-11-09T05:39:38.152482+00:00] [debug] Uploading layer: 69febae7-a631-486b-abf0-03ccd1616505
+2026-11-09T05:39:38.4232841Z [codex] [2026-11-09T05:39:38.152950+00:00] [info] [builder 10/12] RUN export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH
+2026-11-09T05:39:38.4233878Z node --input-type=module <<'JS'
+2026-11-09T05:39:38.4234387Z import assert from 'node:assert/strict'
+2026-11-09T05:39:38.4235193Z import { execFileSync } from 'node:child_process'
+2026-11-09T05:39:38.4235895Z import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+2026-11-09T05:39:38.4236939Z import { createRequire } from 'node:module'
+2026-11-09T05:39:38.4237569Z import { tmpdir } from 'node:os'
+2026-11-09T05:39:38.4237997Z import { join } from 'node:path'
+2026-11-09T05:39:38.4238555Z const npm = '/opt/mikka/runtime/node/bin/npm'
+2026-11-09T05:39:38.4239106Z createRequire(realpathSync(npm))('pacote')
+2026-11-09T05:39:38.4239731Z const directory = mkdtempSync(join(tmpdir(), 'mikka-npm-runtime-'))
+2026-11-09T05:39:38.4240257Z try {
+2026-11-09T05:39:38.4240779Z   const home = join(directory, 'home'), temp = join(directory, 'tmp')
+2026-11-09T05:39:38.4252002Z   mkdirSync(home); mkdirSync(temp)
+2026-11-09T05:39:38.4252857Z   writeFileSync(join(directory, 'package.json'), JSON.stringify({ private: true, scripts: { test: `node -e "console.log('Mikka npm runtime verified')"` } }))
+2026-11-09T05:39:38.4253599Z   const output = execFileSync(npm, ['test'], {
+2026-11-09T05:39:38.4253988Z     cwd: directory, encoding: 'utf8', timeout: 30_000,
+2026-11-09T05:39:38.4254794Z     env: { PATH: '/opt/mikka/runtime/node/bin:/usr/local/bin:/usr/bin:/bin', HOME: home, TMPDIR: temp, LANG: 'C.UTF-8', NPM_CONFIG_UPDATE_NOTIFIER: 'false' },
+2026-11-09T05:39:38.4255465Z   })
+2026-11-09T05:39:38.4255770Z   assert.match(output, /^Mikka npm runtime verified\r?$/m)
+2026-11-09T05:39:38.4256480Z   console.log('Private npm runtime verified')
+2026-11-09T05:39:38.4257006Z } finally { rmSync(directory, { recursive: true, force: true }) }
+2026-11-09T05:39:38.4257565Z JS user [6cbb0cc152542813dc2b3ecf898765e557502449af523f1169370c5d584aa7a4]
+2026-11-09T05:39:38.9711851Z [claude] [2026-11-09T05:39:38.778282+00:00] [info] [builder 9/12] [stdout]: {"version":1,"kind":"claude","original":{"claude_code":{"path":"/usr/local/bin/claude","sha256":"86cb722ab68348877dba7971e4d0c659919e05e6228c05e006e83da320e656ef"},"codex":null},"added":{"codex":{"path":"/opt/mikka/harness/codex/0.163.0/package/vendor/x86_64-unknown-linux-musl/bin/codex","sha256":"399ff69c431c066e40de318fba45c2b07f45a76b19939d247ee4828fc70c4215"}}}
+2026-11-09T05:39:39.5241901Z [codex] [2026-11-09T05:39:39.398569+00:00] [info] [builder 10/12] [stdout]: Private npm runtime verified
+2026-11-09T05:39:39.8017848Z [codex] [2026-11-09T05:39:39.584845+00:00] [debug] Adding layer to cache: fd7b6958-b1df-4407-a1c9-f35c3f07a384
+2026-11-09T05:39:39.8018892Z [codex] [2026-11-09T05:39:39.585017+00:00] [debug] Uploading layer: fd7b6958-b1df-4407-a1c9-f35c3f07a384
+2026-11-09T05:39:39.8021266Z [codex] [2026-11-09T05:39:39.585695+00:00] [info] [builder 11/12] RUN python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --receipt /opt/mikka/official-files-conservation.json root [1ef1dea25546f76223fd9bbc0d2f633d2dafdc8d5c0572253575aabeee1857a8]
+2026-11-09T05:39:40.0743436Z [claude] [2026-11-09T05:39:39.804092+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase cli 6123
+2026-11-09T05:39:40.0744477Z [claude] [2026-11-09T05:39:39.894054+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase journal 90
+2026-11-09T05:39:40.0745464Z [claude] [2026-11-09T05:39:39.894733+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase desktop 0
+2026-11-09T05:39:40.9070775Z [claude] [2026-11-09T05:39:40.743701+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase finalize 849
+2026-11-09T05:39:40.9072240Z [claude] [2026-11-09T05:39:40.743733+00:00] [info] [builder 9/12] [stdout]: mikka-official-instance-ready 02401458a7fe26e00ce4caa653084c7f9680696d 6ada1d4f809eace6ca84ad0329562f4aacb78452
+2026-11-09T05:39:45.3347322Z [claude] [2026-11-09T05:39:45.151550+00:00] [debug] Adding layer to cache: 1fd6a8b6-11f7-4e49-9830-54324cb08e2b
+2026-11-09T05:39:45.3348309Z [claude] [2026-11-09T05:39:45.151917+00:00] [debug] Uploading layer: 1fd6a8b6-11f7-4e49-9830-54324cb08e2b
+2026-11-09T05:39:45.3349299Z [claude] [2026-11-09T05:39:45.152324+00:00] [info] [builder 10/12] RUN export PATH=/opt/mikka/runtime/node/bin:/opt/mikka/runtime/harness-bin:$PATH
+2026-11-09T05:39:45.3349977Z node --input-type=module <<'JS'
+2026-11-09T05:39:45.3350312Z import assert from 'node:assert/strict'
+2026-11-09T05:39:45.3350699Z import { execFileSync } from 'node:child_process'
+2026-11-09T05:39:45.3351312Z import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+2026-11-09T05:39:45.3351848Z import { createRequire } from 'node:module'
+2026-11-09T05:39:45.3352212Z import { tmpdir } from 'node:os'
+2026-11-09T05:39:45.3352523Z import { join } from 'node:path'
+2026-11-09T05:39:45.3352880Z const npm = '/opt/mikka/runtime/node/bin/npm'
+2026-11-09T05:39:45.3353258Z createRequire(realpathSync(npm))('pacote')
+2026-11-09T05:39:45.3353730Z const directory = mkdtempSync(join(tmpdir(), 'mikka-npm-runtime-'))
+2026-11-09T05:39:45.3354108Z try {
+2026-11-09T05:39:45.3354445Z   const home = join(directory, 'home'), temp = join(directory, 'tmp')
+2026-11-09T05:39:45.3354848Z   mkdirSync(home); mkdirSync(temp)
+2026-11-09T05:39:45.3355611Z   writeFileSync(join(directory, 'package.json'), JSON.stringify({ private: true, scripts: { test: `node -e "console.log('Mikka npm runtime verified')"` } }))
+2026-11-09T05:39:45.3356618Z   const output = execFileSync(npm, ['test'], {
+2026-11-09T05:39:45.3357004Z     cwd: directory, encoding: 'utf8', timeout: 30_000,
+2026-11-09T05:39:45.3357778Z     env: { PATH: '/opt/mikka/runtime/node/bin:/usr/local/bin:/usr/bin:/bin', HOME: home, TMPDIR: temp, LANG: 'C.UTF-8', NPM_CONFIG_UPDATE_NOTIFIER: 'false' },
+2026-11-09T05:39:45.3358399Z   })
+2026-11-09T05:39:45.3358699Z   assert.match(output, /^Mikka npm runtime verified\r?$/m)
+2026-11-09T05:39:45.3359107Z   console.log('Private npm runtime verified')
+2026-11-09T05:39:45.3359561Z } finally { rmSync(directory, { recursive: true, force: true }) }
+2026-11-09T05:39:45.3360117Z JS user [d13228ec871fed036a07fc4eb6310112f7f94bb618c86c80e269d17f9d2fc177]
+2026-11-09T05:39:46.4421344Z [claude] [2026-11-09T05:39:46.176541+00:00] [info] [builder 10/12] [stdout]: Private npm runtime verified
+2026-11-09T05:39:47.2648536Z [claude] [2026-11-09T05:39:46.956691+00:00] [debug] Adding layer to cache: ac60858c-74ae-4361-aed5-0083890b303c
+2026-11-09T05:39:47.2649759Z [claude] [2026-11-09T05:39:46.956931+00:00] [debug] Uploading layer: ac60858c-74ae-4361-aed5-0083890b303c
+2026-11-09T05:39:47.2651986Z [claude] [2026-11-09T05:39:46.957345+00:00] [info] [builder 11/12] RUN python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --receipt /opt/mikka/official-files-conservation.json root [c1d0557329db103b486eec66ca356821dd568532a9977f69e06e047a27aa4101]
+2026-11-09T05:39:47.5474140Z [codex] [2026-11-09T05:39:47.249065+00:00] [debug] Saved: 69febae7-a631-486b-abf0-03ccd1616505
+2026-11-09T05:39:47.5475011Z [codex] [2026-11-09T05:39:47.344821+00:00] [debug] Saved: fd7b6958-b1df-4407-a1c9-f35c3f07a384
+2026-11-09T05:39:54.4667946Z [codex] [2026-11-09T05:39:54.287345+00:00] [info] [builder 11/12] [stdout]: {"before":{"entries":39646,"sha256":"b466fbc1099bb7a5727fc98e160627b72cb8fa7c75839376c1979299d67beba1"},"after":{"entries":39646,"sha256":"b466fbc1099bb7a5727fc98e160627b72cb8fa7c75839376c1979299d67beba1"}}
+2026-11-09T05:39:54.7477309Z [codex] [2026-11-09T05:39:54.449309+00:00] [debug] Adding layer to cache: 5429b6ab-fbe2-43e7-8ffd-ed8ac5dcdb2a
+2026-11-09T05:39:54.7478991Z [codex] [2026-11-09T05:39:54.449726+00:00] [debug] Uploading layer: 5429b6ab-fbe2-43e7-8ffd-ed8ac5dcdb2a
+2026-11-09T05:39:54.7480252Z [codex] [2026-11-09T05:39:54.450089+00:00] [info] [builder 12/12] USER root [e049c16eb04fb10a1acaf6bfb889aa617860a766c0c3326bc1cac16f2b680f29]
+2026-11-09T05:39:56.3850439Z [claude] [2026-11-09T05:39:56.269044+00:00] [debug] Saved: 1fd6a8b6-11f7-4e49-9830-54324cb08e2b
+2026-11-09T05:39:56.6575896Z [claude] [2026-11-09T05:39:56.524905+00:00] [debug] Saved: ac60858c-74ae-4361-aed5-0083890b303c
+2026-11-09T05:39:57.2371707Z [codex] [2026-11-09T05:39:57.147396+00:00] [debug] Adding layer to cache: 1f5e61a6-1bd3-4911-a0b9-ae6898f8baf2
+2026-11-09T05:39:57.2372822Z [codex] [2026-11-09T05:39:57.147599+00:00] [debug] Uploading layer: 1f5e61a6-1bd3-4911-a0b9-ae6898f8baf2
+2026-11-09T05:39:57.2374058Z [codex] [2026-11-09T05:39:57.148040+00:00] [info] [resize-disk] Resizing disk [dafd13887ac8fe21260517a7c67c951005a677e69a83f71f9c7e5458bf7bc4bb]
+2026-11-09T05:39:57.5157051Z [codex] [2026-11-09T05:39:57.447768+00:00] [info] resize-disk: 16801 MiB free already >= target 16384 MiB, no resize needed
+2026-11-09T05:39:57.5158027Z [codex] [2026-11-09T05:39:57.449627+00:00] [debug] Adding layer to cache: 86d44dc1-06a8-4e66-aef0-83fdfb5ca148
+2026-11-09T05:39:57.5158894Z [codex] [2026-11-09T05:39:57.449718+00:00] [debug] Uploading layer: 86d44dc1-06a8-4e66-aef0-83fdfb5ca148
+2026-11-09T05:39:57.5159961Z [codex] [2026-11-09T05:39:57.450044+00:00] [info] [finalize] Finalizing template build [3566bc3c3b4908ed825ac123ea063fd7007dbce113d0f8079972b2dde5d9e102]
+2026-11-09T05:39:58.8976485Z [codex] [2026-11-09T05:39:58.731258+00:00] [debug] [config] [stdout]: Starting configuration script
+2026-11-09T05:39:58.8977630Z [codex] [2026-11-09T05:39:58.734041+00:00] [debug] [config] [stdout]: Create default user 'user' (if doesn't exist yet)
+2026-11-09T05:39:58.8978802Z [codex] [2026-11-09T05:39:58.735822+00:00] [debug] [config] [stdout]: Copy skeleton files to /home/user (keeping existing files)
+2026-11-09T05:39:58.8979973Z [codex] [2026-11-09T05:39:58.739837+00:00] [debug] [config] [stdout]: skel: keeping existing .bash_logout
+2026-11-09T05:39:58.8980923Z [codex] [2026-11-09T05:39:58.739932+00:00] [debug] [config] [stdout]: skel: keeping existing .profile
+2026-11-09T05:39:58.8981827Z [codex] [2026-11-09T05:39:58.739991+00:00] [debug] [config] [stdout]: skel: keeping existing .bashrc
+2026-11-09T05:39:58.8982719Z [codex] [2026-11-09T05:39:58.742136+00:00] [debug] [config] [stdout]: Add sudo to 'user' with no password
+2026-11-09T05:39:58.8983592Z [codex] [2026-11-09T05:39:58.770059+00:00] [debug] [config] [stdout]: passwd: password changed.
+2026-11-09T05:39:58.8984455Z [codex] [2026-11-09T05:39:58.774750+00:00] [debug] [config] [stdout]: sudoers entry already present
+2026-11-09T05:39:58.8985365Z [codex] [2026-11-09T05:39:58.774786+00:00] [debug] [config] [stdout]: Give 'user' ownership to /home/user
+2026-11-09T05:39:58.8986563Z [codex] [2026-11-09T05:39:58.779843+00:00] [debug] [config] [stdout]: Give 777 permission to /usr/local
+2026-11-09T05:39:59.1823164Z [codex] [2026-11-09T05:39:58.903409+00:00] [debug] [config] [stdout]: Create /code directory
+2026-11-09T05:39:59.1824340Z [codex] [2026-11-09T05:39:58.905044+00:00] [debug] [config] [stdout]: Give 777 permission to /code
+2026-11-09T05:39:59.1825916Z [codex] [2026-11-09T05:39:58.906404+00:00] [debug] [config] [stdout]: Finished configuration script
+2026-11-09T05:39:59.1827143Z [codex] [2026-11-09T05:39:58.906884+00:00] [info] Running start command: bash /opt/mikka/start-prebuilt.sh
+2026-11-09T05:39:59.1830368Z [codex] [2026-11-09T05:39:58.906920+00:00] [info] Waiting for template to be ready: test -s /home/user/.mikka/preloaded.pid && read -r mikka_preloaded_pid < /home/user/.mikka/preloaded.pid && kill -0 "$mikka_preloaded_pid" && tr '\0' '\n' < "/proc/$mikka_preloaded_pid/cmdline" | grep -Fxq -- '--wait-bootstrap' && test ! -e /home/user/.mikka/bootstrap.json && test ! -e /home/user/.mikka/worker/device.json && python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization codex > /opt/mikka/official-files-ready.json
+2026-11-09T05:39:59.1834913Z [codex] [2026-11-09T05:39:58.922061+00:00] [debug] Template is not ready: exit status 1
+2026-11-09T05:40:01.1114808Z [codex] [2026-11-09T05:40:00.936667+00:00] [debug] Template is not ready: exit status 1
+2026-11-09T05:40:03.8694775Z [claude] [2026-11-09T05:40:03.554892+00:00] [info] [builder 11/12] [stdout]: {"before":{"entries":44148,"sha256":"677bec766e8ac444b1a38f604082d887e7d6ba699b6c2914d12aca744144c6d4"},"after":{"entries":44148,"sha256":"677bec766e8ac444b1a38f604082d887e7d6ba699b6c2914d12aca744144c6d4"}}
+2026-11-09T05:40:03.8697399Z [claude] [2026-11-09T05:40:03.726991+00:00] [debug] Adding layer to cache: 1b4b7cc5-3134-4dbd-8ddb-3bf5298911ed
+2026-11-09T05:40:03.8698318Z [claude] [2026-11-09T05:40:03.727351+00:00] [debug] Uploading layer: 1b4b7cc5-3134-4dbd-8ddb-3bf5298911ed
+2026-11-09T05:40:03.8699420Z [claude] [2026-11-09T05:40:03.727779+00:00] [info] [builder 12/12] USER root [2ed21e159af8767b9879bc65a299e86c7226e228d92c4a22f2ae6d324b15e0e8]
+2026-11-09T05:40:04.1589663Z [codex] [2026-11-09T05:40:04.032564+00:00] [debug] Saved: 5429b6ab-fbe2-43e7-8ffd-ed8ac5dcdb2a
+2026-11-09T05:40:04.4314893Z [codex] [2026-11-09T05:40:04.144604+00:00] [debug] Saved: 1f5e61a6-1bd3-4911-a0b9-ae6898f8baf2
+2026-11-09T05:40:04.4315737Z [codex] [2026-11-09T05:40:04.243587+00:00] [debug] Saved: 86d44dc1-06a8-4e66-aef0-83fdfb5ca148
+2026-11-09T05:40:06.3641522Z [claude] [2026-11-09T05:40:06.086054+00:00] [debug] Adding layer to cache: fcfc8195-098d-488a-a3d4-2bc6bcea00b4
+2026-11-09T05:40:06.3642453Z [claude] [2026-11-09T05:40:06.104236+00:00] [debug] Uploading layer: fcfc8195-098d-488a-a3d4-2bc6bcea00b4
+2026-11-09T05:40:06.3643515Z [claude] [2026-11-09T05:40:06.104575+00:00] [info] [resize-disk] Resizing disk [3642de6f5fbeda1c6db6073ee0de5bb3162cdec65c58caa197c61f132d3bd08d]
+2026-11-09T05:40:09.4781151Z [claude] [2026-11-09T05:40:09.334776+00:00] [info] resize-disk: free 16286 -> 16385 MiB
+2026-11-09T05:40:09.4782186Z [claude] [2026-11-09T05:40:09.336305+00:00] [debug] Adding layer to cache: da56df88-f08c-481e-9b3c-d8fd4ef4e18b
+2026-11-09T05:40:09.4783117Z [claude] [2026-11-09T05:40:09.339048+00:00] [debug] Uploading layer: da56df88-f08c-481e-9b3c-d8fd4ef4e18b
+2026-11-09T05:40:09.4784293Z [claude] [2026-11-09T05:40:09.339415+00:00] [info] [finalize] Finalizing template build [a90d6b49956d17054185395479b9a0f2b9968efd660ba7606caf02581795cadc]
+2026-11-09T05:40:10.8355935Z [desktop] [2026-11-09T05:40:10.527485+00:00] [info] [builder 8/12] [stdout]: {"entries":103086,"sha256":"d38fd6d492f4e18d91445a394480cf714aba12ff01c974c9cef63cff6a5c17b0"}
+2026-11-09T05:40:11.1138111Z [desktop] [2026-11-09T05:40:10.938803+00:00] [debug] Adding layer to cache: f342768a-2dbe-4e84-af4c-969660f3e032
+2026-11-09T05:40:11.1139051Z [desktop] [2026-11-09T05:40:10.939008+00:00] [debug] Uploading layer: f342768a-2dbe-4e84-af4c-969660f3e032
+2026-11-09T05:40:11.1140786Z [desktop] [2026-11-09T05:40:10.939306+00:00] [info] [builder 9/12] RUN bash /opt/mikka/instance-bootstrap.sh 02401458a7fe26e00ce4caa653084c7f9680696d 6ada1d4f809eace6ca84ad0329562f4aacb78452 desktop root [4c845a20b344399a43ac1f795331aeaf7e5b8e12addaff9aa73c86320bbdceb3]
+2026-11-09T05:40:11.3906766Z [desktop] [2026-11-09T05:40:11.171015+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase validation 16
+2026-11-09T05:40:11.7141117Z [claude] [2026-11-09T05:40:11.451225+00:00] [debug] [config] [stdout]: Starting configuration script
+2026-11-09T05:40:11.7142210Z [claude] [2026-11-09T05:40:11.452995+00:00] [debug] [config] [stdout]: Create default user 'user' (if doesn't exist yet)
+2026-11-09T05:40:11.7143198Z [claude] [2026-11-09T05:40:11.454952+00:00] [debug] [config] [stdout]: Copy skeleton files to /home/user (keeping existing files)
+2026-11-09T05:40:11.7144105Z [claude] [2026-11-09T05:40:11.459156+00:00] [debug] [config] [stdout]: skel: keeping existing .bash_logout
+2026-11-09T05:40:11.7145327Z [claude] [2026-11-09T05:40:11.459293+00:00] [debug] [config] [stdout]: skel: keeping existing .profile
+2026-11-09T05:40:11.7146417Z [claude] [2026-11-09T05:40:11.459314+00:00] [debug] [config] [stdout]: skel: keeping existing .bashrc
+2026-11-09T05:40:11.7147229Z [claude] [2026-11-09T05:40:11.459760+00:00] [debug] [config] [stdout]: Add sudo to 'user' with no password
+2026-11-09T05:40:11.7148014Z [claude] [2026-11-09T05:40:11.478001+00:00] [debug] [config] [stdout]: passwd: password changed.
+2026-11-09T05:40:11.7148764Z [claude] [2026-11-09T05:40:11.482116+00:00] [debug] [config] [stdout]: sudoers entry already present
+2026-11-09T05:40:11.7149570Z [claude] [2026-11-09T05:40:11.482139+00:00] [debug] [config] [stdout]: Give 'user' ownership to /home/user
+2026-11-09T05:40:11.9920678Z [claude] [2026-11-09T05:40:11.943667+00:00] [debug] [config] [stdout]: Give 777 permission to /usr/local
+2026-11-09T05:40:12.2702354Z [claude] [2026-11-09T05:40:11.977489+00:00] [debug] [config] [stdout]: Create /code directory
+2026-11-09T05:40:12.2703249Z [claude] [2026-11-09T05:40:11.980132+00:00] [debug] [config] [stdout]: Give 777 permission to /code
+2026-11-09T05:40:12.2704087Z [claude] [2026-11-09T05:40:11.981530+00:00] [debug] [config] [stdout]: Finished configuration script
+2026-11-09T05:40:12.2704947Z [claude] [2026-11-09T05:40:11.982660+00:00] [info] Running start command: bash /opt/mikka/start-prebuilt.sh
+2026-11-09T05:40:12.2708396Z [claude] [2026-11-09T05:40:11.982724+00:00] [info] Waiting for template to be ready: test -s /home/user/.mikka/preloaded.pid && read -r mikka_preloaded_pid < /home/user/.mikka/preloaded.pid && kill -0 "$mikka_preloaded_pid" && tr '\0' '\n' < "/proc/$mikka_preloaded_pid/cmdline" | grep -Fxq -- '--wait-bootstrap' && test ! -e /home/user/.mikka/bootstrap.json && test ! -e /home/user/.mikka/worker/device.json && python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization claude > /opt/mikka/official-files-ready.json
+2026-11-09T05:40:12.2710962Z [claude] [2026-11-09T05:40:12.016547+00:00] [debug] Template is not ready: exit status 1
+2026-11-09T05:40:14.2161292Z [claude] [2026-11-09T05:40:14.057297+00:00] [debug] Template is not ready: exit status 1
+2026-11-09T05:40:15.0450891Z [claude] [2026-11-09T05:40:14.785124+00:00] [debug] Saved: 1b4b7cc5-3134-4dbd-8ddb-3bf5298911ed
+2026-11-09T05:40:15.0452070Z [claude] [2026-11-09T05:40:14.905484+00:00] [debug] Saved: fcfc8195-098d-488a-a3d4-2bc6bcea00b4
+2026-11-09T05:40:15.3221228Z [claude] [2026-11-09T05:40:15.037019+00:00] [debug] Saved: da56df88-f08c-481e-9b3c-d8fd4ef4e18b
+2026-11-09T05:40:16.3033532Z [codex] [2026-11-09T05:40:16.092742+00:00] [info] Template is ready
+2026-11-09T05:40:16.3034334Z [codex] [2026-11-09T05:40:16.164863+00:00] [debug] [certs] [stdout]: Updating certificates in /etc/ssl/certs...
+2026-11-09T05:40:17.4092353Z [codex] [2026-11-09T05:40:17.129915+00:00] [debug] [certs] [stderr]: rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL
+2026-11-09T05:40:17.4093451Z [codex] [2026-11-09T05:40:17.135586+00:00] [debug] [certs] [stdout]: 149 added, 0 removed; done.
+2026-11-09T05:40:17.4094307Z [codex] [2026-11-09T05:40:17.135624+00:00] [debug] [certs] [stdout]: Running hooks in /etc/ca-certificates/update.d...
+2026-11-09T05:40:17.4095063Z [codex] [2026-11-09T05:40:17.137004+00:00] [debug] [certs] [stdout]: done.
+2026-11-09T05:40:21.6819723Z [desktop] [2026-11-09T05:40:21.404937+00:00] [info] [builder 9/12] [stdout]: {"version":1,"kind":"desktop","original":{"claude_code":null,"codex":null},"added":{}}
+2026-11-09T05:40:21.6820828Z [desktop] [2026-11-09T05:40:21.409586+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase source 10238
+2026-11-09T05:40:22.2427435Z [desktop] [2026-11-09T05:40:21.970617+00:00] [debug] Saved: f342768a-2dbe-4e84-af4c-969660f3e032
+2026-11-09T05:40:23.3523082Z [desktop] [2026-11-09T05:40:23.146324+00:00] [info] [builder 9/12] [stdout]: /opt/mikka/archives/node-v24.19.0-linux-x64.tar.xz: OK
+2026-11-09T05:40:24.0396395Z [codex] [2026-11-09T05:40:23.767526+00:00] [debug] Adding layer to cache: 2b5d7b08-e1d0-4394-b369-cf9f0a4033a5
+2026-11-09T05:40:24.0397678Z [codex] [2026-11-09T05:40:23.767693+00:00] [debug] Uploading layer: 2b5d7b08-e1d0-4394-b369-cf9f0a4033a5
+2026-11-09T05:40:24.0398747Z [codex] [2026-11-09T05:40:23.768152+00:00] [info] [optimize] Optimizing template [5d805c149b4eb7a5f34f7073d405a88ae54dae4ca1d5f8b203a1a0a94f806086]
+2026-11-09T05:40:25.8329607Z [desktop] [2026-11-09T05:40:25.714653+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase node 4303
+2026-11-09T05:40:27.2360894Z [desktop] [2026-11-09T05:40:27.062264+00:00] [info] [builder 9/12] [stdout]: /opt/mikka/archives/gh_2.83.2_linux_amd64.tar.gz: OK
+2026-11-09T05:40:27.5129188Z [desktop] [2026-11-09T05:40:27.432794+00:00] [info] [builder 9/12] [stdout]: mikka-bootstrap-phase gh 1720
+2026-11-09T05:40:29.1629791Z [desktop] [2026-11-09T05:40:28.990379+00:00] [info] [builder 9/12] [stdout]: Scope: 3 of 7 workspace projects
+2026-11-09T05:40:29.4400648Z [desktop] [2026-11-09T05:40:29.139413+00:00] [info] [builder 9/12] [stdout]: Lockfile is up to date, resolution step is skipped
+2026-11-09T05:40:29.4402016Z [desktop] [2026-11-09T05:40:29.239804+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1, reused 0, downloaded 0, added 0
+2026-11-09T05:40:29.4403338Z [desktop] [2026-11-09T05:40:29.388321+00:00] [info] [builder 9/12] [stdout]: .                                        |    +1978 ++++++++++++++++++++++++++++
+2026-11-09T05:40:29.7025930Z [claude] [2026-11-09T05:40:29.405205+00:00] [info] Template is ready
+2026-11-09T05:40:29.7027292Z [claude] [2026-11-09T05:40:29.485979+00:00] [debug] [certs] [stdout]: Updating certificates in /etc/ssl/certs...
+2026-11-09T05:40:29.9906633Z [desktop] [2026-11-09T05:40:29.689531+00:00] [info] [builder 9/12] [stdout]: ╭───────────────────────────────────────────────╮
+2026-11-09T05:40:29.9907849Z [desktop] [2026-11-09T05:40:29.689567+00:00] [info] [builder 9/12] [stdout]: │                                               │
+2026-11-09T05:40:29.9909021Z [desktop] [2026-11-09T05:40:29.689572+00:00] [info] [builder 9/12] [stdout]: │     Update available! 10.34.3 → 12.18.0.      │
+2026-11-09T05:40:29.9910156Z [desktop] [2026-11-09T05:40:29.689581+00:00] [info] [builder 9/12] [stdout]: │     Changelog: https://pnpm.io/v/12.18.0      │
+2026-11-09T05:40:29.9911293Z [desktop] [2026-11-09T05:40:29.689586+00:00] [info] [builder 9/12] [stdout]: │   To update, run: corepack use pnpm@12.18.0   │
+2026-11-09T05:40:29.9912374Z [desktop] [2026-11-09T05:40:29.689592+00:00] [info] [builder 9/12] [stdout]: │                                               │
+2026-11-09T05:40:29.9913478Z [desktop] [2026-11-09T05:40:29.689620+00:00] [info] [builder 9/12] [stdout]: ╰───────────────────────────────────────────────╯
+2026-11-09T05:40:30.2735505Z [codex] [2026-11-09T05:40:30.031450+00:00] [debug] Saved: 2b5d7b08-e1d0-4394-b369-cf9f0a4033a5
+2026-11-09T05:40:30.2736613Z [codex] [2026-11-09T05:40:30.143841+00:00] [info] Build finished, took 3m16s
+2026-11-09T05:40:30.5340033Z [claude] [2026-11-09T05:40:30.249550+00:00] [debug] [certs] [stderr]: rehash: warning: skipping ca-certificates.crt,it does not contain exactly one certificate or CRL
+2026-11-09T05:40:30.5341191Z [claude] [2026-11-09T05:40:30.254717+00:00] [debug] [certs] [stdout]: 120 added, 0 removed; done.
+2026-11-09T05:40:30.5342522Z [claude] [2026-11-09T05:40:30.254759+00:00] [debug] [certs] [stdout]: Running hooks in /etc/ca-certificates/update.d...
+2026-11-09T05:40:30.5343330Z [claude] [2026-11-09T05:40:30.256170+00:00] [debug] [certs] [stdout]: done.
+2026-11-09T05:40:30.5519149Z [desktop] [2026-11-09T05:40:30.241828+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 12, added 0
+2026-11-09T05:40:30.8363566Z [codex] [2026-11-09T05:40:30.836189] [debug] Build finished
+2026-11-09T05:40:31.3828303Z [desktop] [2026-11-09T05:40:31.242052+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 102, added 57
+2026-11-09T05:40:32.4844269Z [desktop] [2026-11-09T05:40:32.243606+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 127, added 65
+2026-11-09T05:40:34.4240945Z [desktop] [2026-11-09T05:40:34.365279+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 128, added 65
+2026-11-09T05:40:34.9745520Z [claude] [2026-11-09T05:40:34.763586+00:00] [debug] Adding layer to cache: 17e62a25-638b-4ec5-a1d1-59346fd1a8cc
+2026-11-09T05:40:34.9747268Z [claude] [2026-11-09T05:40:34.763951+00:00] [debug] Uploading layer: 17e62a25-638b-4ec5-a1d1-59346fd1a8cc
+2026-11-09T05:40:34.9749014Z [claude] [2026-11-09T05:40:34.764347+00:00] [info] [optimize] Optimizing template [3c1e32ad08db435d17c14a4d8c134cbde911856f75cbd626746535329df86db0]
+2026-11-09T05:40:35.5293467Z [desktop] [2026-11-09T05:40:35.366698+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 253, added 135
+2026-11-09T05:40:36.6312707Z [desktop] [2026-11-09T05:40:36.368512+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 327, added 241
+2026-11-09T05:40:37.4346291Z mikka-conservation-stage {"kind":"codex","phase":"create","elapsedMs":911}
+2026-11-09T05:40:37.4625816Z [desktop] [2026-11-09T05:40:37.368351+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 371, added 256
+2026-11-09T05:40:38.5770749Z [desktop] [2026-11-09T05:40:38.369298+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 472, added 314
+2026-11-09T05:40:38.6485215Z mikka-conservation-stage {"kind":"codex","phase":"preload_receipts","elapsedMs":1214}
+2026-11-09T05:40:39.4101462Z [desktop] [2026-11-09T05:40:39.370449+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 600, added 370
+2026-11-09T05:40:40.5148151Z [claude] [2026-11-09T05:40:40.221968+00:00] [debug] Saved: 17e62a25-638b-4ec5-a1d1-59346fd1a8cc
+2026-11-09T05:40:40.5149143Z [claude] [2026-11-09T05:40:40.321880+00:00] [info] Build finished, took 3m26s
+2026-11-09T05:40:40.5151396Z [desktop] [2026-11-09T05:40:40.371286+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 653, added 401
+2026-11-09T05:40:40.7916622Z [claude] [2026-11-09T05:40:40.791433] [debug] Build finished
+2026-11-09T05:40:41.6371414Z [desktop] [2026-11-09T05:40:41.371086+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 739, added 469
+2026-11-09T05:40:42.4685083Z [desktop] [2026-11-09T05:40:42.395911+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 862, added 670
+2026-11-09T05:40:43.5728236Z [desktop] [2026-11-09T05:40:43.403258+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 917, added 706
+2026-11-09T05:40:44.6813234Z [desktop] [2026-11-09T05:40:44.398549+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 931, added 710
+2026-11-09T05:40:45.5083918Z [desktop] [2026-11-09T05:40:45.398128+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 946, added 714
+2026-11-09T05:40:47.1796607Z [desktop] [2026-11-09T05:40:46.932432+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 947, added 714
+2026-11-09T05:40:48.0155167Z [desktop] [2026-11-09T05:40:47.932838+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1014, added 748
+2026-11-09T05:40:49.0785086Z mikka-conservation-stage {"kind":"claude","phase":"create","elapsedMs":815}
+2026-11-09T05:40:49.1186813Z [desktop] [2026-11-09T05:40:48.934650+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1078, added 785
+2026-11-09T05:40:50.2222159Z [desktop] [2026-11-09T05:40:49.934870+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1148, added 832
+2026-11-09T05:40:51.0494218Z [desktop] [2026-11-09T05:40:50.942892+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1210, added 893
+2026-11-09T05:40:51.4191152Z mikka-conservation-stage {"kind":"claude","phase":"preload_receipts","elapsedMs":2341}
+2026-11-09T05:40:52.1530559Z [desktop] [2026-11-09T05:40:51.942334+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1229, added 897
+2026-11-09T05:40:52.9837664Z [desktop] [2026-11-09T05:40:52.942468+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1252, added 907
+2026-11-09T05:40:54.0895026Z [desktop] [2026-11-09T05:40:53.943953+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1298, added 933
+2026-11-09T05:40:55.2023490Z [desktop] [2026-11-09T05:40:54.944955+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1341, added 945
+2026-11-09T05:40:56.0343598Z [desktop] [2026-11-09T05:40:55.945085+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1443, added 1019
+2026-11-09T05:40:57.1480642Z [desktop] [2026-11-09T05:40:56.946527+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1500, added 1040
+2026-11-09T05:40:58.2504441Z [desktop] [2026-11-09T05:40:57.947255+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1579, added 1080
+2026-11-09T05:40:59.0799552Z [desktop] [2026-11-09T05:40:58.978492+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1625, added 1103
+2026-11-09T05:41:00.1848489Z [desktop] [2026-11-09T05:40:59.979371+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1662, added 1132
+2026-11-09T05:41:01.0357222Z [desktop] [2026-11-09T05:41:00.980200+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1729, added 1221
+2026-11-09T05:41:02.1468691Z [desktop] [2026-11-09T05:41:01.984344+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1762, added 1273
+2026-11-09T05:41:03.2499249Z [desktop] [2026-11-09T05:41:02.986476+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1767, added 1274
+2026-11-09T05:41:04.0828509Z [desktop] [2026-11-09T05:41:03.987586+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1774, added 1277
+2026-11-09T05:41:05.1865443Z [desktop] [2026-11-09T05:41:04.988949+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1777, added 1277
+2026-11-09T05:41:06.3035710Z [desktop] [2026-11-09T05:41:05.990363+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1783, added 1281
+2026-11-09T05:41:07.1417480Z [desktop] [2026-11-09T05:41:06.991468+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1865, added 1360
+2026-11-09T05:41:08.2557284Z [desktop] [2026-11-09T05:41:07.991468+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1903, added 1421
+2026-11-09T05:41:09.0872168Z [desktop] [2026-11-09T05:41:08.992670+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1905, added 1421
+2026-11-09T05:41:10.0431088Z [desktop] [2026-11-09T05:41:09.992249+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1909, added 1693
+2026-11-09T05:41:11.1473411Z [desktop] [2026-11-09T05:41:10.852103+00:00] [info] [builder 9/12] [stdout]: Progress: resolved 1978, reused 0, downloaded 1909, added 1978, done
+2026-11-09T05:41:11.9754413Z [desktop] [2026-11-09T05:41:11.683339+00:00] [info] [builder 9/12] [stdout]: .../node_modules/@swc/core postinstall$ node postinstall.js
+2026-11-09T05:41:11.9755620Z [desktop] [2026-11-09T05:41:11.706281+00:00] [info] [builder 9/12] [stdout]: .../node_modules/ffmpeg-static install$ node install.js
+2026-11-09T05:41:11.9757174Z [desktop] [2026-11-09T05:41:11.720009+00:00] [info] [builder 9/12] [stdout]: .../node_modules/@parcel/watcher install$ node scripts/build-from-source.js
+2026-11-09T05:41:11.9758426Z [desktop] [2026-11-09T05:41:11.721862+00:00] [info] [builder 9/12] [stdout]: .../esbuild@0.28.2/node_modules/esbuild postinstall$ node install.js
+2026-11-09T05:41:11.9759660Z [desktop] [2026-11-09T05:41:11.722871+00:00] [info] [builder 9/12] [stdout]: .../node_modules/@swc/core postinstall$ node postinstall.js
+2026-11-09T05:41:11.9760570Z [desktop] [2026-11-09T05:41:11.818041+00:00] [info] [builder 9/12] [stdout]: .../node_modules/@swc/core postinstall: Done
+2026-11-09T05:41:11.9761443Z [desktop] [2026-11-09T05:41:11.826058+00:00] [info] [builder 9/12] [stdout]: .../node_modules/@parcel/watcher install: Done
+2026-11-09T05:41:11.9762353Z [desktop] [2026-11-09T05:41:11.895364+00:00] [info] [builder 9/12] [stdout]: .../esbuild@0.28.2/node_modules/esbuild postinstall: Done
+2026-11-09T05:41:12.2472808Z [desktop] [2026-11-09T05:41:12.021393+00:00] [info] [builder 9/12] [stdout]: .../node_modules/@swc/core postinstall: Done
+2026-11-09T05:41:25.2861882Z [desktop] [2026-11-09T05:41:25.231005+00:00] [info] [builder 9/12] [stdout]: .../node_modules/ffmpeg-static install: Error: Failed to download ffmpeg b6.1.1.
+2026-11-09T05:41:25.2864550Z [desktop] [2026-11-09T05:41:25.231300+00:00] [info] [builder 9/12] [stdout]: .../node_modules/ffmpeg-static install:     at /opt/mikka/releases/02401458a7fe26e00ce4caa653084c7f9680696d/source/node_modules/.pnpm/ffmpeg-static@5.3.0/node_modules/ffmpeg-static/install.js:111:20
+2026-11-09T05:41:25.2867430Z [desktop] [2026-11-09T05:41:25.231942+00:00] [info] [builder 9/12] [stdout]: .../node_modules/ffmpeg-static install:     at /opt/mikka/releases/02401458a7fe26e00ce4caa653084c7f9680696d/source/node_modules/.pnpm/@derhuerst+http-basic@8.2.4/node_modules/@derhuerst/http-basic/lib/index.js:123:20
+2026-11-09T05:41:25.2870086Z [desktop] [2026-11-09T05:41:25.232643+00:00] [info] [builder 9/12] [stdout]: .../node_modules/ffmpeg-static install:     at /opt/mikka/releases/02401458a7fe26e00ce4caa653084c7f9680696d/source/node_modules/.pnpm/@derhuerst+http-basic@8.2.4/node_modules/@derhuerst/http-basic/lib/index.js:179:24
+2026-11-09T05:41:25.2872309Z [desktop] [2026-11-09T05:41:25.233076+00:00] [info] [builder 9/12] [stdout]: .../node_modules/ffmpeg-static install:     at /opt/mikka/releases/02401458a7fe26e00ce4caa653084c7f9680696d/source/node_modules/.pnpm/@derhuerst+http-basic@8.2.4/node_modules/@derhuerst/http-basic/lib/index.js:278:28
+2026-11-09T05:41:25.2874495Z [desktop] [2026-11-09T05:41:25.233819+00:00] [info] [builder 9/12] [stdout]: .../node_modules/ffmpeg-static install:     at /opt/mikka/releases/02401458a7fe26e00ce4caa653084c7f9680696d/source/node_modules/.pnpm/@derhuerst+http-basic@8.2.4/node_modules/@derhuerst/http-basic/lib/index.js:308:17
+2026-11-09T05:41:25.2876949Z [desktop] [2026-11-09T05:41:25.234222+00:00] [info] [builder 9/12] [stdout]: .../node_modules/ffmpeg-static install:     at ClientRequest.<anonymous> (/opt/mikka/releases/02401458a7fe26e00ce4caa653084c7f9680696d/source/node_modules/.pnpm/@derhuerst+http-basic@8.2.4/node_modules/@derhuerst/http-basic/lib/index.js:343:13)
+2026-11-09T05:41:25.2878679Z [desktop] [2026-11-09T05:41:25.234488+00:00] [info] [builder 9/12] [stdout]: .../node_modules/ffmpeg-static install:     at Object.onceWrapper (node:events:631:26)
+2026-11-09T05:41:25.2879856Z [desktop] [2026-11-09T05:41:25.234896+00:00] [info] [builder 9/12] [stdout]: .../node_modules/ffmpeg-static install:     at ClientRequest.emit (node:events:509:28)
+2026-11-09T05:41:25.2881530Z [desktop] [2026-11-09T05:41:25.235249+00:00] [info] [builder 9/12] [stdout]: .../node_modules/ffmpeg-static install:     at HTTPParser.parserOnIncomingClient [as onIncoming] (node:_http_client:950:27)
+2026-11-09T05:41:25.2882966Z [desktop] [2026-11-09T05:41:25.235772+00:00] [info] [builder 9/12] [stdout]: .../node_modules/ffmpeg-static install:     at HTTPParser.parserOnHeadersComplete (node:_http_common:125:17) {
+2026-11-09T05:41:25.2884452Z [desktop] [2026-11-09T05:41:25.235788+00:00] [info] [builder 9/12] [stdout]: .../node_modules/ffmpeg-static install:   url: 'https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/linux-x64.LICENSE',
+2026-11-09T05:41:25.2885688Z [desktop] [2026-11-09T05:41:25.235983+00:00] [info] [builder 9/12] [stdout]: .../node_modules/ffmpeg-static install:   statusCode: 504
+2026-11-09T05:41:25.2886881Z [desktop] [2026-11-09T05:41:25.236549+00:00] [info] [builder 9/12] [stdout]: .../node_modules/ffmpeg-static install: }
+2026-11-09T05:41:25.2887746Z [desktop] [2026-11-09T05:41:25.237348+00:00] [info] [builder 9/12] [stdout]: .../node_modules/ffmpeg-static install: Failed
+2026-11-09T05:41:25.5630296Z [desktop] [2026-11-09T05:41:25.264414+00:00] [info] [builder 9/12] [stdout]: ELIFECYCLE  Command failed with exit code 1.
+2026-11-09T05:41:25.8744971Z [desktop] [2026-11-09T05:41:25.689501+00:00] [error] Build failed: failed to run command: exit status 1
+2026-11-09T05:41:25.9533390Z [desktop] [2026-11-09T05:41:25.953149] [debug] Build finished
+2026-11-09T05:41:43.3700483Z mikka-conservation-stage {"kind":"codex","phase":"fresh_scan","elapsedMs":64722}
+2026-11-09T05:41:43.5051273Z mikka-conservation-stage {"kind":"codex","phase":"fresh_receipt","elapsedMs":135}
+2026-11-09T05:42:03.3749784Z mikka-conservation-stage {"kind":"claude","phase":"fresh_scan","elapsedMs":71956}
+2026-11-09T05:42:03.6358589Z mikka-conservation-stage {"kind":"claude","phase":"fresh_receipt","elapsedMs":261}
+2026-11-09T05:42:07.7356288Z mikka-template-cleanup [{"name":"mikka-02401458a7fe-42566225093-2-desktop","kind":"desktop","templateId":"srb1tjmu5wxkdwzuz29z","status":"deleted"},{"name":"mikka-02401458a7fe-42566225093-2-claude","kind":"claude","templateId":"25m13eotn1a7lojt97or","status":"deleted"},{"name":"mikka-02401458a7fe-42566225093-2-codex","kind":"codex","templateId":"ase90rewhnmt942djx8f","status":"deleted"}]
+2026-11-09T05:42:07.7359229Z Traceback (most recent call last):
+2026-11-09T05:42:07.7359956Z   File "/home/runner/work/Mikka/Mikka/scripts/e2b/build-template.py", line 939, in <module>
+2026-11-09T05:42:07.7360590Z     main()
+2026-11-09T05:42:07.7361193Z   File "/home/runner/work/Mikka/Mikka/scripts/e2b/build-template.py", line 926, in main
+2026-11-09T05:42:07.7361764Z     templates = dict(pool.map(one, kinds))
+2026-11-09T05:42:07.7362136Z                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-09T05:42:07.7362663Z   File "/usr/lib/python3.12/concurrent/futures/_base.py", line 619, in result_iterator
+2026-11-09T05:42:07.7461937Z     yield _result_or_cancel(fs.pop())
+2026-11-09T05:42:07.7462607Z           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-09T05:42:07.7463630Z   File "/usr/lib/python3.12/concurrent/futures/_base.py", line 317, in _result_or_cancel
+2026-11-09T05:42:07.7464612Z     return fut.result(timeout)
+2026-11-09T05:42:07.7464966Z            ^^^^^^^^^^^^^^^^^^^
+2026-11-09T05:42:07.7465872Z   File "/usr/lib/python3.12/concurrent/futures/_base.py", line 456, in result
+2026-11-09T05:42:07.7467057Z     return self.__get_result()
+2026-11-09T05:42:07.7467616Z            ^^^^^^^^^^^^^^^^^^^
+2026-11-09T05:42:07.7468507Z   File "/usr/lib/python3.12/concurrent/futures/_base.py", line 401, in __get_result
+2026-11-09T05:42:07.7469418Z     raise self._exception
+2026-11-09T05:42:07.7470272Z   File "/usr/lib/python3.12/concurrent/futures/thread.py", line 58, in run
+2026-11-09T05:42:07.7471123Z     result = self.fn(*self.args, **self.kwargs)
+2026-11-09T05:42:07.7471699Z              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-09T05:42:07.7472525Z   File "/home/runner/work/Mikka/Mikka/scripts/e2b/build-template.py", line 915, in one
+2026-11-09T05:42:07.7473913Z     _, result = build(name, sha, api_key=api_key, on_build_logs=logs, kind=kind)
+2026-11-09T05:42:07.7474771Z                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-09T05:42:07.7475693Z   File "/home/runner/work/Mikka/Mikka/scripts/e2b/build-template.py", line 322, in build
+2026-11-09T05:42:07.7477031Z     return sha, Template.build(template, name=name, cpu_count=cpu_count, memory_mb=memory_mb,
+2026-11-09T05:42:07.7477995Z                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-09T05:42:07.7479091Z   File "/home/runner/work/_temp/e2b/lib/python3.12/site-packages/e2b/template_sync/main.py", line 286, in build
+2026-11-09T05:42:07.7480239Z     wait_for_build_finish(
+2026-11-09T05:42:07.7481342Z   File "/home/runner/work/_temp/e2b/lib/python3.12/site-packages/e2b/template_sync/build_api.py", line 314, in wait_for_build_finish
+2026-11-09T05:42:07.7482036Z     raise BuildException(
+2026-11-09T05:42:07.7482486Z   File "/home/runner/work/Mikka/Mikka/scripts/e2b/build-template.py", line 308, in build
+2026-11-09T05:42:07.7483181Z     .run_cmd(f'bash /opt/mikka/instance-bootstrap.sh {sha} {worker_sha} {kind}', user='root')
+2026-11-09T05:42:07.7483727Z      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2026-11-09T05:42:07.7484257Z e2b.exceptions.BuildException: failed to run command: exit status 1
+2026-11-09T05:42:07.8007683Z ##[error]Process completed with exit code 1.
+2026-11-09T05:42:07.8066806Z ##[group]Run args=()
+2026-11-09T05:42:07.8067107Z [36;1margs=()[0m
+2026-11-09T05:42:07.8067509Z [36;1mif [ "$BUILD_OUTCOME" = success ]; then args+=(--report "$RUNNER_TEMP/candidates.json"); fi[0m
+2026-11-09T05:42:07.8068193Z [36;1mif [ "$BUILD_OUTCOME" = success ] && [ "$ARTIFACT_OUTCOME" = success ]; then args+=(--sandboxes-only); fi[0m
+2026-11-09T05:42:07.8069008Z [36;1m"$RUNNER_TEMP/e2b/bin/python" scripts/e2b/cleanup-template-candidates.py "${args[@]}" --output "$RUNNER_TEMP/build-cleanup.json"[0m
+2026-11-09T05:42:07.8089184Z shell: /usr/bin/bash -e {0}
+2026-11-09T05:42:07.8089445Z env:
+2026-11-09T05:42:07.8089803Z   E2B_API_KEY: ***
+2026-11-09T05:42:07.8090030Z   BUILD_OUTCOME: failure
+2026-11-09T05:42:07.8090264Z   ARTIFACT_OUTCOME: skipped
+2026-11-09T05:42:07.8090496Z ##[endgroup]
+2026-11-09T05:42:09.3531958Z mikka-release-cleanup {"sourceCommit":"02401458a7fe26e00ce4caa653084c7f9680696d","runId":"42566225093","sandboxes":[],"templates":[{"name":"mikka-02401458a7fe-42566225093-2-desktop","kind":"desktop","status":"absent"},{"name":"mikka-02401458a7fe-42566225093-2-claude","kind":"claude","status":"absent"},{"name":"mikka-02401458a7fe-42566225093-2-codex","kind":"codex","status":"absent"}],"errors":[]}
+2026-11-09T05:42:09.4109147Z ##[group]Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+2026-11-09T05:42:09.4109587Z with:
+2026-11-09T05:42:09.4109833Z   name: e2b-candidate-build-cleanup-42566225093-2
+2026-11-09T05:42:09.4110198Z   path: /home/runner/work/_temp/build-cleanup.json
+2026-11-09T05:42:09.4110525Z   if-no-files-found: warn
+2026-11-09T05:42:09.4110757Z   retention-days: 7
+2026-11-09T05:42:09.4110966Z   compression-level: 6
+2026-11-09T05:42:09.4111180Z   overwrite: false
+2026-11-09T05:42:09.4111395Z   include-hidden-files: false
+2026-11-09T05:42:09.4111634Z env:
+2026-11-09T05:42:09.4112054Z   E2B_API_KEY: ***
+2026-11-09T05:42:09.4112272Z ##[endgroup]
+2026-11-09T05:42:09.5814258Z (node:2728) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-09T05:42:09.5815286Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-09T05:42:09.5861929Z With the provided path, there will be 1 file uploaded
+2026-11-09T05:42:09.5876679Z Artifact name is valid!
+2026-11-09T05:42:09.5877209Z Root directory input is valid!
+2026-11-09T05:42:09.8340033Z Beginning upload of artifact content to blob storage
+2026-11-09T05:42:09.8531005Z (node:2728) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-11-09T05:42:09.9508450Z Uploaded bytes 351
+2026-11-09T05:42:09.9964090Z Finished uploading artifact content to blob storage!
+2026-11-09T05:42:09.9965463Z SHA256 digest of uploaded artifact zip is c037e040c8e5a58a91301e5fbe554aba016b59426b8947640e51f112e51cda7f
+2026-11-09T05:42:09.9967155Z Finalizing artifact upload
+2026-11-09T05:42:10.3777931Z Artifact e2b-candidate-build-cleanup-42566225093-2.zip successfully finalized. Artifact ID 13652338038
+2026-11-09T05:42:10.3780119Z Artifact e2b-candidate-build-cleanup-42566225093-2 has been successfully uploaded! Final size is 351 bytes. Artifact ID is 13652338038
+2026-11-09T05:42:10.3785423Z Artifact download URL: https://github.com/alexj11324/Mikka/actions/runs/42566225093/artifacts/13652338038
+2026-11-09T05:42:10.4000164Z Post job cleanup.
+2026-11-09T05:42:10.4871179Z [command]/usr/bin/git version
+2026-11-09T05:42:10.4919228Z git version 2.56.0
+2026-11-09T05:42:10.4961530Z Temporarily overriding HOME='/home/runner/work/_temp/e29b083a-c1cd-45cc-b33e-797b1747375b' before making global git config changes
+2026-11-09T05:42:10.4963093Z Adding repository directory to the temporary git global config as a safe directory
+2026-11-09T05:42:10.4966958Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Mikka/Mikka
+2026-11-09T05:42:10.5013595Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
+2026-11-09T05:42:10.5055876Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+2026-11-09T05:42:10.5372657Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-11-09T05:42:10.5426770Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+2026-11-09T05:42:10.5708134Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-11-09T05:42:10.5754874Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+2026-11-09T05:42:10.6191583Z Evaluate and set job outputs
+2026-11-09T05:42:10.6199370Z Cleaning up orphan processes
+2026-11-09T05:42:10.6626468Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020, actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

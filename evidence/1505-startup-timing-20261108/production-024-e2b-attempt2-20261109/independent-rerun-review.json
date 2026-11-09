@@ -1,0 +1,108 @@
+{
+  "version": 1,
+  "status": "frozen_static_review",
+  "sourceCommit": "02401458a7fe26e00ce4caa653084c7f9680696d",
+  "sourceInventory": [
+    {
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "bytes": 18463,
+      "sha256": "9c13b3e21a58abac5240495beaa08a0fc26e1fffabeb1506d94f030689833ab3",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/02401458a7fe26e00ce4caa653084c7f9680696d/.github/workflows/e2b-official-runtime.yml"
+    },
+    {
+      "path": "scripts/e2b/runtime-report.mjs",
+      "bytes": 6202,
+      "sha256": "46e652c57a99658b66aa5079ed1d5ddbe226ee68a413dba3bb853c8cdefe0af3",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/02401458a7fe26e00ce4caa653084c7f9680696d/scripts/e2b/runtime-report.mjs"
+    },
+    {
+      "path": "scripts/e2b/cloud-acceptance-release.mjs",
+      "bytes": 2827,
+      "sha256": "81e0baf662a88d3723eed53a43fbae25405d54be631a507576ad15ae30b8df21",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/02401458a7fe26e00ce4caa653084c7f9680696d/scripts/e2b/cloud-acceptance-release.mjs"
+    },
+    {
+      "path": ".github/workflows/e2b-template.yml",
+      "bytes": 5492,
+      "sha256": "b7ddc06e28f0bc09ec0a01d2c7f01793bc6ccff66f63f204ac064596e0c2d676",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/02401458a7fe26e00ce4caa653084c7f9680696d/.github/workflows/e2b-template.yml"
+    },
+    {
+      "path": "scripts/e2b/build-template.py",
+      "bytes": 55730,
+      "sha256": "0adb53fbdd6cbcd61f1d1804aee3e2df1538997c0724556062f2741c5ac1cdb1",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/02401458a7fe26e00ce4caa653084c7f9680696d/scripts/e2b/build-template.py"
+    },
+    {
+      "path": "scripts/release/web-deploy.mjs",
+      "bytes": 19867,
+      "sha256": "e8012d49653ab635ea26d3ba881450860f8c3ead2893d799a98bc395eb65bf9a",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/02401458a7fe26e00ce4caa653084c7f9680696d/scripts/release/web-deploy.mjs"
+    },
+    {
+      "path": "scripts/e2b/cleanup-template-candidates.py",
+      "bytes": 7437,
+      "sha256": "893b0d50f30f4b21f92f155aee97965e12f84fd0e21ea0ada3dfb3a00392533d",
+      "url": "https://raw.githubusercontent.com/alexj11324/Mikka/02401458a7fe26e00ce4caa653084c7f9680696d/scripts/e2b/cleanup-template-candidates.py"
+    }
+  ],
+  "docs": [
+    {
+      "url": "https://docs.github.com/en/rest/actions/workflow-runs#re-run-a-job-from-a-workflow-run",
+      "fact": "Re-run a job and its dependent jobs; independently retrieved official search result."
+    },
+    {
+      "url": "https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs",
+      "fact": "Same GITHUB_SHA/REF and dependent-job rerun; Root independently read, not claimed as my separate page read."
+    }
+  ],
+  "graph": {
+    "test": [],
+    "check": [
+      "test"
+    ],
+    "validate": [
+      "test",
+      "check"
+    ],
+    "await-web": [
+      "validate"
+    ],
+    "subscriptions": [
+      "validate",
+      "await-web"
+    ],
+    "publish": [
+      "validate",
+      "await-web",
+      "subscriptions"
+    ],
+    "cleanup": [
+      "check",
+      "validate",
+      "await-web",
+      "subscriptions",
+      "publish"
+    ]
+  },
+  "decision": {
+    "rootJobCascade": "supports the full seven-job dependency graph",
+    "rootJobId": 128993195370,
+    "failedOnly": "does not rerun successful test/check; insufficient for seven same-attempt successes",
+    "changedCheck": "no attempt-based skip; original push control diff OR fresh canonical wanted!=live",
+    "mainFresh": "Root reported main=A at05:35:27; no duplicate current-main request",
+    "wantedVsLive": "Root reported different; values not independently read",
+    "candidates": "mikka-${GITHUB_SHA:0:12}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${kind}",
+    "reports": "sourceCommit+workerSha+runId+runAttempt+candidate names/digests enforced",
+    "timeLimit": "06:14:35 hard coordination deadline; workflow does not guarantee completion by it"
+  },
+  "mutations": 0,
+  "vmCalls": 0,
+  "logsRead": 0,
+  "artifactDownloads": 0,
+  "limitations": [
+    "No promise of successful build or network recovery",
+    "All attempt2 execution outcomes must be observed",
+    "Root retains sole log/artifact reader"
+  ]
+}

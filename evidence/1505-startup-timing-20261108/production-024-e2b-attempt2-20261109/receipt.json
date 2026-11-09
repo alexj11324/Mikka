@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "02401458a7fe26e00ce4caa653084c7f9680696d",
+  "sourceTree": "0013159d8dd0e1155b84d81907f19f4e1283cff7",
+  "runId": 42566225093,
+  "attempt": 2,
+  "event": "push",
+  "branch": "main",
+  "rerun": {
+    "jobId": 128993195370,
+    "mutations": 1,
+    "at": "2026-11-09T05:35:59Z",
+    "mode": "root test job and all dependent jobs"
+  },
+  "metadata": {
+    "observedBy": "template_prebuild",
+    "observedAt": "2026-11-09T05:48:51Z",
+    "runUpdatedAt": "2026-11-09T05:45:38Z",
+    "allSevenJobsSameSourceAndAttempt": true,
+    "jobs": [
+      {
+        "id": 128999387543,
+        "name": "test",
+        "conclusion": "success"
+      },
+      {
+        "id": 128999551131,
+        "name": "check",
+        "conclusion": "success"
+      },
+      {
+        "id": 128999651589,
+        "name": "validate / build",
+        "conclusion": "failure"
+      },
+      {
+        "id": 129001194701,
+        "name": "cleanup",
+        "conclusion": "success"
+      },
+      {
+        "id": 129001195649,
+        "name": "subscriptions",
+        "conclusion": "skipped"
+      },
+      {
+        "id": 129001195712,
+        "name": "publish",
+        "conclusion": "skipped"
+      },
+      {
+        "id": 129001195885,
+        "name": "await-web",
+        "conclusion": "skipped"
+      }
+    ],
+    "originalAgentReceipt": {
+      "bytes": 3791,
+      "sha256": "217511f7333c0a157bc85a6e499a08e1f26e6ce6976fd8416b97e36c38c6d295",
+      "note": "Full agent text delivered in collaboration message, not duplicated in this directory; job projection above."
+    }
+  },
+  "cause": {
+    "dependency": "ffmpeg-static@5.3.0",
+    "kind": "desktop",
+    "asset": "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/linux-x64.LICENSE",
+    "httpStatus": 504,
+    "at": "2026-11-09T05:41:25Z",
+    "claudeInstallDoneAt": "2026-11-09T05:39:32Z",
+    "codexInstallDoneAt": "2026-11-09T05:39:29Z",
+    "note": "Different asset and template from attempt 1; no third rerun."
+  },
+  "buildLog": {
+    "bytes": 126168,
+    "sha256": "e0596bebf02d8c4ef4e2f71208a7bb6f3bfa84d4529de21e00f284005215e6e0"
+  },
+  "cleanupLog": {
+    "bytes": 28696,
+    "sha256": "902124741768414298ac92edebd744841a7413553527b4d6d88b004e01565205",
+    "receipt": {
+      "sourceCommit": "02401458a7fe26e00ce4caa653084c7f9680696d",
+      "runId": "42566225093",
+      "sandboxes": [],
+      "templates": [
+        {
+          "name": "mikka-02401458a7fe-42566225093-2-desktop",
+          "kind": "desktop",
+          "status": "absent"
+        },
+        {
+          "name": "mikka-02401458a7fe-42566225093-2-claude",
+          "kind": "claude",
+          "status": "absent"
+        },
+        {
+          "name": "mikka-02401458a7fe-42566225093-2-codex",
+          "kind": "codex",
+          "status": "absent"
+        }
+      ],
+      "errors": []
+    }
+  },
+  "cleanupArtifacts": [
+    {
+      "id": 13652338038,
+      "name": "e2b-candidate-build-cleanup-42566225093-2",
+      "zipBytes": 351,
+      "zipSha256": "c037e040c8e5a58a91301e5fbe554aba016b59426b8947640e51f112e51cda7f"
+    },
+    {
+      "id": 13652009789,
+      "name": "e2b-runtime-release-cleanup-42566225093-2",
+      "zipBytes": 355,
+      "zipSha256": "ad7177b7344c0dee74ace28bb736c91e8af848070fc299fa6bcd052b1ef04f8c"
+    }
+  ],
+  "newFormalSamples": 0,
+  "subscriptionsExecuted": false,
+  "published": false,
+  "sourceWindowReleasedAt": "2026-11-09T05:51:10Z",
+  "sourceWindowReleaseComment": 6733292402,
+  "issueComment": 6733296323
+}
