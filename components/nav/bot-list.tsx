@@ -154,7 +154,7 @@ export function BotList({ phoneOnly = false, ...props }: ListProps) {
 function BotListBody({ bots, workspaceId, threads, issues, active, onOpen, onNewBot, rail, onRail, user, onSettings, onSignOut, signingOut, onBeforeChange }: Omit<ListProps, 'phoneOnly'>) {
   const i18nText = useTranslations()
   const { toggleSidebar, setOpenMobile, open, openMobile, isMobile } = useSidebar()
-  const { chats, groups, reloadGroups, rows, coordinator, unread } = useChatRows({ bots, workspaceId, active, userId: user.id })
+  const { chats, reloadGroups, rows, coordinator, unread } = useChatRows({ bots, workspaceId, active, userId: user.id })
   const [creatingGroupIn, setCreatingGroupIn] = useState<string | null>(null)
   useEffect(() => { setCreatingGroupIn(null) }, [workspaceId])
   /** One plain line of a message; a card that shows no words reads as the card placeholder. */
