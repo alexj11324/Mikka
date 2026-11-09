@@ -1,7 +1,7 @@
-# Disabled issue1506 reuse of the reviewed issue1505 read-only connection contract.
+# Disabled issue1506 reuse of the reviewed read-only connection contract.
 # Bind actual APP/tree and one finite deadline only after shared-account handoff.
 # Does not revoke or renew any historical child. Cleanup must use this run's new receipt.
-name: Issue 1506 read-only Smoke GitHub cleanup
+name: Issue 1506 read-only Smoke GitHub prepare
 on:
   push:
     branches: [acceptance/issues-1504-1506]
@@ -26,7 +26,7 @@ jobs:
     timeout-minutes: 15
     env:
       MIKKA_EDITION: cloud
-      MIKKA_GITHUB_OPERATION: 'cleanup'
+      MIKKA_GITHUB_OPERATION: 'prepare'
       MIKKA_GITHUB_REPAIR_GO: 'root-reviewed-1506-r7-20261109t1622'
     permissions:
       contents: read
@@ -46,35 +46,32 @@ jobs:
           import datetime,hashlib,json,os,pathlib,re,subprocess
           root=pathlib.Path(os.environ['GITHUB_WORKSPACE']).resolve()
           assert pathlib.Path.cwd().resolve()==root
-          assert re.fullmatch(r'[a-f0-9]{40}','8db16095f46be955df22f42914e0f89b6e5f3d11'), 'app_source_unbound'
-          assert re.fullmatch(r'[a-f0-9]{40}','18b539c3541594cfa540d1e178985f00d03ab4fc'), 'app_tree_unbound'
+          assert re.fullmatch(r'[a-f0-9]{40}','7848e79df9c5af67e526aeed1c828858db392066'), 'app_source_unbound'
+          assert re.fullmatch(r'[a-f0-9]{40}','87b4344eebdc24b12ffdafa9101d0c9f51ad6b70'), 'app_tree_unbound'
           assert 'root-reviewed-1506-r7-20261109t1622'.startswith('root-reviewed-1506-'), 'go_unbound'
           assert os.environ.get('MIKKA_GITHUB_REPAIR_GO')=='root-reviewed-1506-r7-20261109t1622'
           assert os.environ.get('GITHUB_REPOSITORY')=='alexj11324/Mikka'
           assert os.environ.get('GITHUB_RUN_ATTEMPT')=='1'
           assert os.environ.get('GITHUB_REF')=='refs/heads/acceptance/issues-1504-1506'
-          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T17:52:00+00:00')
+          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T00:00:00+00:00')
           def git(*args): return subprocess.check_output(['git','-C',str(root),*args],text=True).strip()
           assert git('rev-parse','HEAD')==os.environ['GITHUB_SHA']
-          assert re.fullmatch(r'[a-f0-9]{40}','8be468d01035fd516cefd4c856fb456c702a7a27'), 'cleanup_parent_unbound'
-          assert re.fullmatch(r'[a-f0-9]{40}','889cdd6b5524620b178e403cf50c76e261e76227'), 'cleanup_parent_tree_unbound'
-          assert git('rev-list','--parents','-n','1','HEAD').split()[1:]==['8be468d01035fd516cefd4c856fb456c702a7a27']
-          assert git('rev-parse','8be468d01035fd516cefd4c856fb456c702a7a27^{tree}')=='889cdd6b5524620b178e403cf50c76e261e76227'
-          assert set(git('diff','--name-only','8be468d01035fd516cefd4c856fb456c702a7a27','HEAD').splitlines())=={'.github/workflows/issue1505-smoke-github-readonly.yml'}
-          try: git('cat-file','-e','98c6329ed091c28ba557dabf1e74b98dcc951d9c^{commit}')
+          assert git('rev-list','--parents','-n','1','HEAD').split()[1:]==['ddace2a2424a698ed23570971e7cbadee4e3f9f1']
+          try: git('cat-file','-e','ddace2a2424a698ed23570971e7cbadee4e3f9f1^{commit}')
           except subprocess.CalledProcessError:
-              subprocess.run(['git','-C',str(root),'fetch','--no-tags','--depth=1','https://github.com/alexj11324/Mikka.git','98c6329ed091c28ba557dabf1e74b98dcc951d9c'],check=True,timeout=60,stdout=subprocess.DEVNULL)
-          assert git('rev-parse','98c6329ed091c28ba557dabf1e74b98dcc951d9c^{tree}')=='1f2a6de1f4838a4496e89e30824f29cf1d0a5104'
+              subprocess.run(['git','-C',str(root),'fetch','--no-tags','--depth=1','https://github.com/alexj11324/Mikka.git','ddace2a2424a698ed23570971e7cbadee4e3f9f1'],check=True,timeout=60,stdout=subprocess.DEVNULL)
+          assert git('rev-parse','ddace2a2424a698ed23570971e7cbadee4e3f9f1^{tree}')=='eff173143c80a6079e6a9abdd1dc6ea537ab05ae'
           expected={"scripts/ops/issue1505/github-readonly-helper.mjs":"cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742","scripts/ops/issue1505/github-readonly-provider.mjs":"23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e","scripts/ops/issue1505/github-readonly-runner.mjs":"7c8fd8874a27d47447b5e8eeffe87c115a2ab138a20e946aaac5bec6132331ef","scripts/ops/issue1505/github-readonly-store.mjs":"1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5","scripts/ops/issue1505/github-readonly.test.mjs":"ffa4fb2004471bc4831eb8d4099b7c3bf0130a540b1583eac6412ebe01dd292b"}
-          allowed=set(expected)|{'.github/workflows/issue1505-smoke-github-readonly.yml'}
-          assert set(git('diff','--name-only','98c6329ed091c28ba557dabf1e74b98dcc951d9c','HEAD').splitlines())==allowed
-          raw=git('diff','--raw','--no-renames','--abbrev=40','98c6329ed091c28ba557dabf1e74b98dcc951d9c','HEAD').splitlines()
+          allowed={'.github/workflows/issue1505-smoke-github-readonly.yml'}
+          assert set(git('diff','--name-only','ddace2a2424a698ed23570971e7cbadee4e3f9f1','HEAD').splitlines())==allowed
+          raw=git('diff','--raw','--no-renames','--abbrev=40','ddace2a2424a698ed23570971e7cbadee4e3f9f1','HEAD').splitlines()
           entries=[line.split('\t',1) for line in raw]
           assert len(entries)==len(allowed) and all(len(entry)==2 for entry in entries)
           assert {entry[1] for entry in entries}==allowed
           for header,path in entries:
               fields=header.split()
-              assert len(fields)==5 and fields[0]==':000000' and fields[1]=='100644' and fields[4]=='A',path
+              assert len(fields)==5 and fields[0]==':100644' and fields[1]=='100644' and fields[4]=='M',path
+              assert fields[2]=='296ded3f7af989c6bf6d90f851a94b5928404886' and re.fullmatch(r'[a-f0-9]{40}',fields[3]),path
           assert not git('diff','--name-only','HEAD')
           for path,want in expected.items():
               assert hashlib.sha256((root/path).read_bytes()).hexdigest()==want,path
@@ -86,93 +83,9 @@ jobs:
           with urllib.request.build_opener(NoRedirect).open(request,timeout=20) as response:
               assert response.status==200
               actual=json.load(response)
-          assert actual['object']['sha']=='8db16095f46be955df22f42914e0f89b6e5f3d11','main_changed'
-          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T17:52:00+00:00')
-          print(json.dumps({'status':'passed','source':os.environ['GITHUB_SHA'],'operatorParent':'8be468d01035fd516cefd4c856fb456c702a7a27','appSource':'8db16095f46be955df22f42914e0f89b6e5f3d11','appTree':'18b539c3541594cfa540d1e178985f00d03ab4fc','files':len(expected),'productDelta':False}))
-          PY
-      - name: Validate only this preparation's original sanitized receipt before credentials
-        working-directory: .
-        run: |
-          python3 - <<'PY'
-          import base64,datetime,hashlib,json,os,pathlib,re
-          origin={"source":"9df5743cbd1e7c01cbf7f3bedcceed24b711c614","runId":"42654821674","runAttempt":1,"artifactId":"13692110116","artifactSha256":"a859e613629a80284d22f07feb1266f9ef86b90cb7728a1be28255cde0e489e1","receiptSha256":"79f0fc15dfacda5d810cb7082b569f79c6515a8934f248dc4ee422f9ef05d5bc"}
-          assert re.fullmatch(r'[a-f0-9]{40}',origin['source']), 'receipt_source_unbound'
-          assert all(re.fullmatch(r'[1-9][0-9]*',origin[key]) for key in ('runId','artifactId')), 'receipt_origin_unbound'
-          assert origin['runAttempt']==1
-          assert all(re.fullmatch(r'[a-f0-9]{64}',origin[key]) for key in ('artifactSha256','receiptSha256')), 'receipt_hash_unbound'
-          encoded='ewogICJ2ZXJzaW9uIjogMSwKICAiaXNzdWUiOiAxNTA1LAogICJvcGVyYXRpb24iOiAicHJlcGFyZSIsCiAgInN0YXR1cyI6ICJwYXNzZWQiLAogICJzdGFnZSI6ICJub3JtYWxfcmVwb3NpdG9yeV9yZWFkYmFjayIsCiAgInN0YXJ0ZWRBdCI6ICIyMDI2LTExLTA5VDE2OjI3OjM5LjEyMFoiLAogICJjaGFuZ2VkIjogdHJ1ZSwKICAib3duZXJSZWZyZXNoQXR0ZW1wdGVkIjogdHJ1ZSwKICAibWludEF0dGVtcHRlZCI6IHRydWUsCiAgIm93bmVyVG9rZW5SZXNvbHV0aW9uIjogewogICAgIm1pbmltdW1WYWxpZGl0eU1zIjogNjYwMDAwLAogICAgInN0YXR1cyI6ICJjb21taXR0ZWQiLAogICAgImFjdHVhbFJlZnJlc2giOiAibm90X2luZGVwZW5kZW50bHlfb2JzZXJ2ZWQiLAogICAgImJlZm9yZVVwZGF0ZWRBdCI6ICIyMDI2LTExLTA5VDEwOjU5OjM4LjY1M1oiLAogICAgImJlZm9yZUV4cGlyZXNBdCI6ICIyMDI2LTExLTA5VDE4OjU5OjM4LjY1MloiLAogICAgImFmdGVyVXBkYXRlZEF0IjogIjIwMjYtMTEtMDlUMTA6NTk6MzguNjUzWiIsCiAgICAiYWZ0ZXJFeHBpcmVzQXQiOiAiMjAyNi0xMS0wOVQxODo1OTozOC42NTJaIiwKICAgICJwZXJzaXN0ZWRNZXRhZGF0YUNoYW5nZWQiOiBmYWxzZQogIH0sCiAgIm93bmVyU291cmNlQmFzZWxpbmUiOiAiYWZ0ZXJfbm9ybWFsX3Rva2VuX3Jlc29sdXRpb24iLAogICJvd25lclByb3ZpZGVyRXhwaXJlc0F0IjogIjIwMjYtMTEtMDlUMTg6NTk6MzguMDAwWiIsCiAgIm1pbnRPdXRjb21lIjogInJlY2VpdmVkIiwKICAibWludGVkVG9rZW5TaGEyNTYiOiAiNDcyNDM5NDVhOTliZDhmYTYwMTI4ODFlZTU0NzhiMDU3NTFmODYzNzc5MzY0ZDMyNDM3OWFkZjFmOGFjNTQzNyIsCiAgIm1pbnRlZCI6IHsKICAgICJ0b2tlblNoYTI1NiI6ICI0NzI0Mzk0NWE5OWJkOGZhNjAxMjg4MWVlNTQ3OGIwNTc1MWY4NjM3NzkzNjRkMzI0Mzc5YWRmMWY4YWM1NDM3IiwKICAgICJwcm92aWRlckV4cGlyZXNBdCI6ICIyMDI2LTExLTEwVDAwOjI3OjQxLjAwMFoiLAogICAgImFwcElkIjogIjQ4NDA5MDgiLAogICAgInJlcG9zaXRvcnlJZCI6ICIxNDM2MjAyMDk5IiwKICAgICJpbnN0YWxsYXRpb25JZCI6ICIxNzMxNjQ2NzkiLAogICAgInBlcm1pc3Npb25zIjogewogICAgICAibWV0YWRhdGEiOiAicmVhZCIsCiAgICAgICJjb250ZW50cyI6ICJyZWFkIgogICAgfSwKICAgICJtaW50U2NvcGVDb25maXJtZWQiOiB0cnVlLAogICAgImNoZWNrVG9rZW5TY29wZUNvbmZpcm1lZCI6IGZhbHNlCiAgfSwKICAic3RhdGUiOiB7CiAgICAidmVyc2lvbiI6IDEsCiAgICAiaXNzdWUiOiAxNTA1LAogICAgInVzZXJJZCI6ICJjTDFOWGUxbXI3V3VJUzh4V2hVMzd2MHA3a05vVU1ZMyIsCiAgICAib3duZXJVc2VySWQiOiAiWGpUc3ZWMUFTcXRWOHdXYXQ5YWNvMFowS0xvZGQ5akoiLAogICAgImdpdGh1YkFjY291bnRJZCI6ICIxODM4ODc5NjMiLAogICAgImdpdGh1YkxvZ2luIjogImFsZXhqMTEzMjQiLAogICAgInJlcG9zaXRvcnkiOiAiYWxleGoxMTMyNC9NaWtrYS1oYW5kb2ZmIiwKICAgICJhcHBJZCI6ICI0ODQwOTA4IiwKICAgICJhcHBDbGllbnRJZCI6ICJJdjIzbGltbjFHODhwT082cHZ5SiIsCiAgICAicmVwb3NpdG9yeUlkIjogIjE0MzYyMDIwOTkiLAogICAgImluc3RhbGxhdGlvbklkIjogIjE3MzE2NDY3OSIsCiAgICAidG9rZW5TaGEyNTYiOiAiNDcyNDM5NDVhOTliZDhmYTYwMTI4ODFlZTU0NzhiMDU3NTFmODYzNzc5MzY0ZDMyNDM3OWFkZjFmOGFjNTQzNyIsCiAgICAicHJvdmlkZXJFeHBpcmVzQXQiOiAiMjAyNi0xMS0xMFQwMDoyNzo0MS4wMDBaIiwKICAgICJjb25uZWN0aW9uRXhwaXJlc0F0IjogIjIwMjYtMTEtMDlUMjA6Mjc6MzMuNDI2WiIsCiAgICAiY29ubmVjdGlvblVwZGF0ZWRBdCI6ICIyMDI2LTExLTA5VDE2OjI3OjQzLjQyN1oiCiAgfSwKICAicmVhZGJhY2siOiB7CiAgICAiY29ubmVjdGVkIjogdHJ1ZSwKICAgICJzYW1lUHJpbmNpcGFsIjogdHJ1ZSwKICAgICJyZXBvc2l0b3J5QWNjZXNzaWJsZSI6IHRydWUsCiAgICAic2FtZUFwcEluc3RhbGxhdGlvbiI6IHRydWUKICB9LAogICJvd25lclVuY2hhbmdlZCI6IHRydWUsCiAgImNvbXBsZXRlZEF0IjogIjIwMjYtMTEtMDlUMTY6Mjc6NDQuMTc3WiIKfQo='
-          raw=base64.b64decode(encoded,validate=True)
-          assert hashlib.sha256(raw).hexdigest()==origin['receiptSha256'], 'receipt_bytes_changed'
-          receipt=json.loads(raw)
-          def closed(value,allowed):
-              assert isinstance(value,dict) and set(value)<=set(allowed), 'receipt_fields_not_closed'
-          def field_type(value,kind):
-              assert type(value) is kind, 'receipt_type_not_closed'
-          top={'version','issue','operation','status','stage','startedAt','completedAt','changed','ownerRefreshAttempted','mintAttempted','ownerTokenResolution','ownerSourceBaseline','ownerProviderExpiresAt','mintOutcome','mintedTokenSha256','minted','state','readback','ownerUnchanged','code','commitUnconfirmed','cleanup','newChildRevocation','closeCode','receiptWriteUnconfirmed','providerFailure'}
-          state_keys={'version','issue','userId','ownerUserId','githubAccountId','githubLogin','repository','appId','appClientId','repositoryId','installationId','tokenSha256','providerExpiresAt','connectionExpiresAt','connectionUpdatedAt'}
-          closed(receipt,top)
-          assert receipt.get('version')==1 and receipt.get('issue')==1505 and receipt.get('operation')=='prepare'
-          assert receipt.get('status') in ('passed','incomplete') and isinstance(receipt.get('state'),dict), 'receipt_has_no_owned_child_state'
-          assert set(receipt['state'])==state_keys
-          state=receipt['state']
-          assert state['version']==1 and state['issue']==1505
-          assert state['userId']=='cL1NXe1mr7WuIS8xWhU37v0p7kNoUMY3' and state['ownerUserId']=='XjTsvV1ASqtV8wWat9aco0Z0KLodd9jJ'
-          assert state['githubAccountId']=='183887963' and state['githubLogin']=='alexj11324' and state['repository']=='alexj11324/Mikka-handoff'
-          if 'ownerTokenResolution' in receipt: closed(receipt['ownerTokenResolution'],{'minimumValidityMs','status','actualRefresh','beforeUpdatedAt','beforeExpiresAt','afterUpdatedAt','afterExpiresAt','persistedMetadataChanged'})
-          if 'minted' in receipt:
-              closed(receipt['minted'],{'tokenSha256','providerExpiresAt','appId','repositoryId','installationId','permissions','mintScopeConfirmed','checkTokenScopeConfirmed'})
-              closed(receipt['minted'].get('permissions'),{'metadata','contents'})
-              assert receipt['minted']['permissions']=={'metadata':'read','contents':'read'}
-          if 'readback' in receipt: closed(receipt['readback'],{'connected','samePrincipal','repositoryAccessible','sameAppInstallation'})
-          for key in ('cleanup',):
-              if key in receipt:
-                  closed(receipt[key],{'version','issue','operation','status','stage','startedAt','completedAt','revoked','disconnected','revocation','code','providerFailure'})
-          for value in (receipt.get('newChildRevocation'),receipt.get('cleanup',{}).get('revocation')):
-              if value is not None:
-                  closed(value,{'kind','status'})
-                  assert (value.get('kind'),value.get('status')) in (('delete_token',204),('authenticated_check_token',404))
-          codes=set(["issue1505_github_app_configuration_changed","issue1505_github_app_discovery_ambiguous","issue1505_github_app_not_configured","issue1505_github_arguments_invalid","issue1505_github_child_digest_mismatch","issue1505_github_child_not_distinct","issue1505_github_cleanup_token_mismatch","issue1505_github_cleanup_token_unavailable","issue1505_github_dependency_failed","issue1505_github_execution_not_enabled","issue1505_github_identity_mismatch","issue1505_github_invalid_state","issue1505_github_normal_readback_mismatch","issue1505_github_output_overwrites_input","issue1505_github_owner_connection_changed","issue1505_github_owner_credential_invalid","issue1505_github_owner_provider_expiry_invalid","issue1505_github_owner_source_not_fresh","issue1505_github_pagination_limit","issue1505_github_principal_mismatch","issue1505_github_provider_http","issue1505_github_provider_schema","issue1505_github_provider_transport","issue1505_github_provider_validity_insufficient","issue1505_github_repository_mismatch","issue1505_github_repository_unavailable","issue1505_github_revoke_scoped_token_failed","issue1505_github_scope_not_selected","issue1505_github_scope_permissions_mismatch","issue1505_github_scoped_app_mismatch","issue1505_github_scoped_expiry_invalid","issue1505_github_scoped_token_mismatch","issue1505_github_scoped_token_not_distinct","issue1505_github_smoke_connection_changed","issue1505_github_smoke_connection_exists","issue1505_github_smoke_legacy_github_exists","issue1505_github_smoke_work_active","issue1505_github_state_bytes_changed","issue1505_github_stored_credential_invalid","issue1505_github_stored_identity_invalid","issue1505_github_unexpected_oauth_scopes","issue1505_github_verified_app_id_invalid"])
-          dates={'startedAt','completedAt','ownerProviderExpiresAt','providerExpiresAt','connectionExpiresAt','connectionUpdatedAt','beforeUpdatedAt','beforeExpiresAt','afterUpdatedAt','afterExpiresAt'}
-          booleans={'ownerRefreshAttempted','mintAttempted','persistedMetadataChanged','mintScopeConfirmed','checkTokenScopeConfirmed','connected','samePrincipal','repositoryAccessible','sameAppInstallation','ownerUnchanged','commitUnconfirmed','revoked','disconnected','receiptWriteUnconfirmed'}
-          enums={'operation':{'prepare','cleanup'},'status':{'passed','incomplete','attempting','committed'},'stage':{'configuration','identity','prepare_owner_source','read_owner_no_refresh','mint_readonly_child','mint_request','install_vacant_connection','commit_new_child','normal_repository_readback','state','match_owned_child','revoke_exact_child','disconnect_exact_child'},'actualRefresh':{'not_independently_observed'},'ownerSourceBaseline':{'after_normal_token_resolution'},'mintOutcome':{'unknown','received'},'metadata':{'read'},'contents':{'read'},'kind':{'delete_token','authenticated_check_token'}}
-          public_state={'userId','ownerUserId','githubAccountId','githubLogin','repository'}
-          provider_stages=set(["owner_identity","check_owner_token","discover_app","owner_repository","owner_installations","owner_installation_repositories","mint_scoped_token","scoped_identity","check_scoped_token","scoped_repository","scoped_installations","scoped_installation_repositories","revoke_scoped_token","check_revoked_token"])
-          def provider_failure(value,code):
-              closed(value,{'stage','status'})
-              assert code in ('issue1505_github_provider_http','issue1505_github_provider_transport','issue1505_github_provider_schema'), 'receipt_provider_code_not_closed'
-              assert isinstance(value.get('stage'),str) and value['stage'] in provider_stages, 'receipt_provider_stage_not_closed'
-              if code=='issue1505_github_provider_http':
-                  assert set(value)=={'stage','status'} and type(value['status']) is int and 100<=value['status']<=599, 'receipt_provider_status_not_closed'
-              else:
-                  assert set(value)=={'stage'}, 'receipt_provider_fields_not_closed'
-          def values(value):
-              for key,item in value.items():
-                  if key=='providerFailure': provider_failure(item,value.get('code'))
-                  elif isinstance(item,dict): values(item)
-                  elif key in dates:
-                      assert item is None or (isinstance(item,str) and re.fullmatch(r'[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+(?:Z|\+00:00)',item)), 'receipt_date_not_closed'
-                      if item is not None: datetime.datetime.fromisoformat(item.replace('Z','+00:00'))
-                  elif key in booleans: field_type(item,bool)
-                  elif key=='changed': assert item is None or type(item) is bool
-                  elif key in ('code','closeCode'): assert item in codes
-                  elif key in ('tokenSha256','mintedTokenSha256'): assert isinstance(item,str) and re.fullmatch(r'[a-f0-9]{64}',item)
-                  elif key in ('appId','repositoryId','installationId'): assert isinstance(item,str) and re.fullmatch(r'[1-9][0-9]{0,19}',item)
-                  elif key=='appClientId': assert isinstance(item,str) and re.fullmatch(r'[A-Za-z0-9_.-]{1,128}',item)
-                  elif key in public_state: assert item==state[key]
-                  elif key=='version': assert type(item) is int and item==1
-                  elif key=='issue': assert type(item) is int and item==1505
-                  elif key=='minimumValidityMs': assert type(item) is int and item==660000
-                  elif key=='status' and type(item) is int: assert item in (204,404)
-                  elif key in enums: assert item in enums[key]
-                  else: raise AssertionError('receipt_scalar_not_closed')
-          values(receipt)
-          destination=pathlib.Path(os.environ['RUNNER_TEMP'])/'issue1506-github-readonly-input'
-          destination.mkdir(mode=0o700,parents=False,exist_ok=False)
-          target=destination/'receipt.json'
-          with target.open('xb') as output: output.write(raw)
-          target.chmod(0o600)
-          assert hashlib.sha256(target.read_bytes()).hexdigest()==origin['receiptSha256']
-          print(json.dumps({'status':'passed','operation':'cleanup','receiptOrigin':origin,'inputBytes':len(raw)}))
+          assert actual['object']['sha']=='7848e79df9c5af67e526aeed1c828858db392066','main_changed'
+          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T00:00:00+00:00')
+          print(json.dumps({'status':'passed','source':os.environ['GITHUB_SHA'],'operatorParent':'ddace2a2424a698ed23570971e7cbadee4e3f9f1','appSource':'7848e79df9c5af67e526aeed1c828858db392066','appTree':'87b4344eebdc24b12ffdafa9101d0c9f51ad6b70','files':len(expected),'productDelta':False}))
           PY
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
@@ -183,7 +96,7 @@ jobs:
       - name: Check out the exact bound application independently of the operator carrier
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: 8db16095f46be955df22f42914e0f89b6e5f3d11
+          ref: 7848e79df9c5af67e526aeed1c828858db392066
           path: app-source
           persist-credentials: false
           fetch-depth: 1
@@ -198,8 +111,8 @@ jobs:
           def git(where,*args): return subprocess.check_output(['git','-C',str(where),*args],text=True).strip()
           assert git(operator,'rev-parse','HEAD')==os.environ['GITHUB_SHA']
           assert not git(operator,'diff','--name-only','HEAD')
-          assert git(app,'rev-parse','HEAD')=='8db16095f46be955df22f42914e0f89b6e5f3d11'
-          assert git(app,'rev-parse','HEAD^{tree}')=='18b539c3541594cfa540d1e178985f00d03ab4fc'
+          assert git(app,'rev-parse','HEAD')=='7848e79df9c5af67e526aeed1c828858db392066'
+          assert git(app,'rev-parse','HEAD^{tree}')=='87b4344eebdc24b12ffdafa9101d0c9f51ad6b70'
           assert not git(app,'diff','--name-only','HEAD')
           assert not git(app,'ls-files','--others','--exclude-standard')
           expected={"scripts/ops/issue1505/github-readonly-helper.mjs":"cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742","scripts/ops/issue1505/github-readonly-provider.mjs":"23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e","scripts/ops/issue1505/github-readonly-runner.mjs":"7c8fd8874a27d47447b5e8eeffe87c115a2ab138a20e946aaac5bec6132331ef","scripts/ops/issue1505/github-readonly-store.mjs":"1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5","scripts/ops/issue1505/github-readonly.test.mjs":"ffa4fb2004471bc4831eb8d4099b7c3bf0130a540b1583eac6412ebe01dd292b"}
@@ -227,7 +140,7 @@ jobs:
               assert plain_file(app,relative).read_bytes()==source,relative
           assert set(git(app,'ls-files','--others','--exclude-standard').splitlines())==allowed
           assert not git(app,'diff','--name-only','HEAD')
-          print(json.dumps({'status':'passed','operator':os.environ['GITHUB_SHA'],'appSource':'8db16095f46be955df22f42914e0f89b6e5f3d11','appTree':'18b539c3541594cfa540d1e178985f00d03ab4fc','overlayFiles':len(allowed),'productDelta':False}))
+          print(json.dumps({'status':'passed','operator':os.environ['GITHUB_SHA'],'appSource':'7848e79df9c5af67e526aeed1c828858db392066','appTree':'87b4344eebdc24b12ffdafa9101d0c9f51ad6b70','overlayFiles':len(allowed),'productDelta':False}))
           PY
       - name: Install the existing application dependencies with frozen lock and normal scripts
         working-directory: app-source
@@ -248,8 +161,8 @@ jobs:
           def git(where,*args): return subprocess.check_output(['git','-C',str(where),*args],text=True).strip()
           assert git(operator,'rev-parse','HEAD')==os.environ['GITHUB_SHA']
           assert not git(operator,'diff','--name-only','HEAD')
-          assert git(app,'rev-parse','HEAD')=='8db16095f46be955df22f42914e0f89b6e5f3d11'
-          assert git(app,'rev-parse','HEAD^{tree}')=='18b539c3541594cfa540d1e178985f00d03ab4fc'
+          assert git(app,'rev-parse','HEAD')=='7848e79df9c5af67e526aeed1c828858db392066'
+          assert git(app,'rev-parse','HEAD^{tree}')=='87b4344eebdc24b12ffdafa9101d0c9f51ad6b70'
           assert not git(app,'diff','--name-only','HEAD')
           expected={"scripts/ops/issue1505/github-readonly-helper.mjs":"cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742","scripts/ops/issue1505/github-readonly-provider.mjs":"23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e","scripts/ops/issue1505/github-readonly-runner.mjs":"7c8fd8874a27d47447b5e8eeffe87c115a2ab138a20e946aaac5bec6132331ef","scripts/ops/issue1505/github-readonly-store.mjs":"1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5","scripts/ops/issue1505/github-readonly.test.mjs":"ffa4fb2004471bc4831eb8d4099b7c3bf0130a540b1583eac6412ebe01dd292b"}
           allowed=set(expected)|{".github/workflows/issue1505-smoke-github-readonly.yml"}
@@ -266,7 +179,7 @@ jobs:
               target=plain_file(app,relative).read_bytes()
               assert target==source,relative
               if relative in expected: assert hashlib.sha256(target).hexdigest()==expected[relative],relative
-          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T17:52:00+00:00')
+          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T00:00:00+00:00')
           import json,os,urllib.request
           class NoRedirect(urllib.request.HTTPRedirectHandler):
               def redirect_request(self,req,fp,code,msg,headers,newurl): return None
@@ -275,8 +188,8 @@ jobs:
           with urllib.request.build_opener(NoRedirect).open(request,timeout=20) as response:
               assert response.status==200
               actual=json.load(response)
-          assert actual['object']['sha']=='8db16095f46be955df22f42914e0f89b6e5f3d11','main_changed'
-          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T17:52:00+00:00')
+          assert actual['object']['sha']=='7848e79df9c5af67e526aeed1c828858db392066','main_changed'
+          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T00:00:00+00:00')
           PY
       - uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
@@ -334,7 +247,7 @@ jobs:
           recursive: false
           include-imports: false
 
-      - name: Recheck current source and clean up only the child bound by this original receipt
+      - name: Recheck current source and prepare one new read-only child using the normal Owner getter
         working-directory: app-source
         env:
           GH_TOKEN: ${{ github.token }}
@@ -352,8 +265,8 @@ jobs:
           def git(where,*args): return subprocess.check_output(['git','-C',str(where),*args],text=True).strip()
           assert git(operator,'rev-parse','HEAD')==os.environ['GITHUB_SHA']
           assert not git(operator,'diff','--name-only','HEAD')
-          assert git(app,'rev-parse','HEAD')=='8db16095f46be955df22f42914e0f89b6e5f3d11'
-          assert git(app,'rev-parse','HEAD^{tree}')=='18b539c3541594cfa540d1e178985f00d03ab4fc'
+          assert git(app,'rev-parse','HEAD')=='7848e79df9c5af67e526aeed1c828858db392066'
+          assert git(app,'rev-parse','HEAD^{tree}')=='87b4344eebdc24b12ffdafa9101d0c9f51ad6b70'
           assert not git(app,'diff','--name-only','HEAD')
           expected={"scripts/ops/issue1505/github-readonly-helper.mjs":"cdafa2f571ed898de2fc9d0a6f208cd3a0e53cfdc1d0777333cf755e73edb742","scripts/ops/issue1505/github-readonly-provider.mjs":"23a6f1098e66cddac71e76d6f9c9f41d5da0c3ba8bdf24c964cf4e7cece5851e","scripts/ops/issue1505/github-readonly-runner.mjs":"7c8fd8874a27d47447b5e8eeffe87c115a2ab138a20e946aaac5bec6132331ef","scripts/ops/issue1505/github-readonly-store.mjs":"1431219596ce2241f65f01df6642f0145c7f4c3b00f31181fefbc332ad9511d5","scripts/ops/issue1505/github-readonly.test.mjs":"ffa4fb2004471bc4831eb8d4099b7c3bf0130a540b1583eac6412ebe01dd292b"}
           allowed=set(expected)|{".github/workflows/issue1505-smoke-github-readonly.yml"}
@@ -370,7 +283,7 @@ jobs:
               target=plain_file(app,relative).read_bytes()
               assert target==source,relative
               if relative in expected: assert hashlib.sha256(target).hexdigest()==expected[relative],relative
-          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T17:52:00+00:00')
+          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T00:00:00+00:00')
           import json,os,urllib.request
           class NoRedirect(urllib.request.HTTPRedirectHandler):
               def redirect_request(self,req,fp,code,msg,headers,newurl): return None
@@ -379,15 +292,15 @@ jobs:
           with urllib.request.build_opener(NoRedirect).open(request,timeout=20) as response:
               assert response.status==200
               actual=json.load(response)
-          assert actual['object']['sha']=='8db16095f46be955df22f42914e0f89b6e5f3d11','main_changed'
-          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T17:52:00+00:00')
+          assert actual['object']['sha']=='7848e79df9c5af67e526aeed1c828858db392066','main_changed'
+          assert datetime.datetime.now(datetime.timezone.utc)<datetime.datetime.fromisoformat('2026-11-09T00:00:00+00:00')
           PY
-          node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1505/github-readonly-runner.mjs --cleanup "$RUNNER_TEMP/issue1506-github-readonly-input/receipt.json" '79f0fc15dfacda5d810cb7082b569f79c6515a8934f248dc4ee422f9ef05d5bc'
+          node --import ./tests/support/server-only.mjs --import tsx scripts/ops/issue1505/github-readonly-runner.mjs --prepare
       - name: Preserve the exact fresh receipt and any uncertain outcome
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: issue1506-github-readonly-cleanup-${{ github.run_id }}-${{ github.run_attempt }}
+          name: issue1506-github-readonly-prepare-${{ github.run_id }}-${{ github.run_attempt }}
           path: app-source/issue1505-github-readonly-report/*.json
           if-no-files-found: warn
           retention-days: 14
