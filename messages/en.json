@@ -1260,7 +1260,7 @@
     "dataExportRateLimited": "You can export your data once an hour. Try again in {minutes} min.",
     "accountEmailMismatch": "The email doesn’t match this account.",
     "accountSoleAdmin": "You’re the only admin of {workspaces}. Make another member an admin before deleting your account.",
-    "runChainEnded": "Every attempt of this thread has already ended; there is nothing left to stop.",
+    "runChainEnded": "This task has already stopped; there is nothing left to stop.",
     "threadStopping": "The thread is stopping",
     "secretNotFound": "That secret or variable no longer exists.",
     "secretNameReserved": "This name is reserved by the runtime (for example PATH, HOME, proxy, TLS, loader, git, E2B or MIKKA variables). Choose another name.",
@@ -4277,6 +4277,9 @@
         "created": "Created the task",
         "createdBy": "{name} created the task",
         "dispatchedTask": "{bot} dispatched this task · {time}",
+        "switch": "Continuing with {agent}",
+        "switchAfterFailure": "{from} didn't get through · continuing with {agent}",
+        "switchRow": "Switched to {agent}",
         "divider": "Attempt {n} {outcome} · retrying with {agent}",
         "dividerOutcome": {
           "failed": "failed",
