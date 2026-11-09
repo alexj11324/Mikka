@@ -55,8 +55,8 @@ function withConfiguredAuthority(fetch: Handler, configuration: Configuration, a
   for (const host of [configuration.deploymentHost, configuration.productionHost]) {
     if (host) { const value = platformOrigin(host); origins.set(value.host, value.origin) }
   }
-  // This legacy domain has one existing fixed 308 destination, never a route
-  // into application data. Preserve that redirect without adding an auth host.
+  // This retired host redirects to the public product site without granting
+  // any route into application data or adding an authentication authority.
   const legacy = configuration.legacyHost ? platformOrigin(configuration.legacyHost).host : undefined
   if (legacy && origins.has(legacy)) return invalid('invalid_platform_host')
 
@@ -90,7 +90,7 @@ function withConfiguredAuthority(fetch: Handler, configuration: Configuration, a
     // Request reads anything; preserve the same body, abort, req/res and waitUntil.
     request._url = absolute
     if (request.url !== absolute.href) return rejected()
-    if (host === legacy) return pageRedirect(request, { legacyHost: legacy, origin: canonical.origin }) ?? rejected()
+    if (host === legacy) return pageRedirect(request, { legacyHost: legacy }) ?? rejected()
     return fetch(request)
   }
 }
