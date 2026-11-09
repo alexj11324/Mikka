@@ -120,6 +120,27 @@ strict 安装阶段仍拒绝原文件转链接，仅显式 finalization 接受�
 及[范围说明](../../operations/evidence/1506-official-desktop-certificate-relinks-20261109.md)
 保留 Codex 的阴性结果；该定点控制不代表全量文件保全、真实订阅或发布通过。
 
+2026-11-09，实际主线 `8db16095f46be955df22f42914e0f89b6e5f3d11` 的
+[R7 42656120803/1](https://github.com/alexj11324/Mikka/actions/runs/42656120803)
+在 Claude fresh 检查被同两条 CA 引用的 file→link 转换拦下。原发布 owner 的
+[失败和精确清理回执](https://github.com/alexj11324/Mikka/pull/1810#issuecomment-6745930838)
+记录两份原文件的 SHA-256 均为 `4e04ce0bc2dcacdcc12cbf8b5ea06d12efb0fbffd80c77a13e08660cf8255aa1`，
+fresh 的精确链接依次为 `e2b-ca.pem` 和 `/usr/local/share/ca-certificates/e2b-ca.crt`。
+三项本 run 候选均已删除，最终清理确认精确名字 absent、sandbox 和 errors 列表为空；
+真实双订阅和公开发布均未执行。这个失败不等于新运行时或五秒验收通过。
+
+本后继先准备仅适用于 `claude` 的两条精确规则，等待
+[#1724 的无 Mikka 官方 Claude 对照](https://github.com/alexj11324/Mikka/issues/1724#issuecomment-6745956055)
+补齐 before/ready/fresh 的完整 stat、链接终点和根证书证据后再确认可发布性。
+不把 Desktop 对照或本次差异行直接推广成 Claude 的 provider 证明。
+候选只追加规则数据并同步其摘要，不改变匹配算法：原摘要、原 file 类型、
+精确链接、mode/uid/gid 不变及精确 provider root 普通文件终点均继续校验，
+provider 每次启动的实际 root 摘要可轮换；不要求它等于旧 `4e04ce…`。
+strict 安装阶段、官方 CLI、普通证书、其他路径和模板的拒绝条件保持。
+测试保留原用例和原失败证据，仅将已被新行为取代的 Claude 正确形状旧负例
+更新为 Claude 错误旧摘要负例，并增加针对该规则的正例和拒绝回归。
+此处仍是未发布候选；完整保全、真实双订阅及同一生产元组六次 ≤5000ms 仍待完成。
+
 构建记录轻量 CLI manifest，包含构建前官方 CLI 的真实路径和摘要；官方原本缺少
 某个 harness 时，才记录 `/opt/mikka` 内补装的位置。每个 worker release 保存
 自己的 `.mikka-original-cli.json`，与 worker symlink 一起切换和回退。生产 worker、
