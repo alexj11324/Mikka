@@ -944,6 +944,15 @@
       "sourceHash": "39fc9291d69eb3ba43118d2a113a99144b5a6d849645bac2476ddb9b6b0c0b1f"
     },
     {
+      "path": "/mikka/api/factory/tasks/[taskId]/activity",
+      "template": "/api/factory/tasks/[taskId]/activity",
+      "source": "app/api/factory/tasks/[taskId]/activity/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "edac210320cffb7eb32d34c0f51eb4f8ac9709fa7d691ba691a2900d7e6b4b6f"
+    },
+    {
       "path": "/mikka/api/factory/tasks/[taskId]/approval",
       "template": "/api/factory/tasks/[taskId]/approval",
       "source": "app/api/factory/tasks/[taskId]/approval/route.ts",
@@ -989,6 +998,25 @@
         "POST"
       ],
       "sourceHash": "c8326fce5959bcb5a2d94abd065d52df6fed17a79b05abd8c72f16742cd640e2"
+    },
+    {
+      "path": "/mikka/api/factory/tasks/[taskId]/media/[captureId]",
+      "template": "/api/factory/tasks/[taskId]/media/[captureId]",
+      "source": "app/api/factory/tasks/[taskId]/media/[captureId]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "a0600f48f5d8b9fa5d81c75df7e20808c8a7b255efa8e031e9faf3675d3369c2"
+    },
+    {
+      "path": "/mikka/api/factory/tasks/[taskId]/media/[captureId]/poster",
+      "template": "/api/factory/tasks/[taskId]/media/[captureId]/poster",
+      "source": "app/api/factory/tasks/[taskId]/media/[captureId]/poster/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "maxDuration": 30,
+      "sourceHash": "c3f4a50167504fd641299c32261c24c1da80fc4a75466b9116527717aba8be67"
     },
     {
       "path": "/mikka/api/frontend/oauth-consent",
@@ -2222,7 +2250,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "905447199d1dcf030fe3ee67227dd47532adfe23dc57ea43979c841830c8aa85"
+      "sourceHash": "0a1326bfdb882a5627d075e6e789f0ea3f2d39edc07d323ad431b62c6efe7c6c"
     },
     {
       "path": "/mikka/v1/runs/[runId]/policy-snapshot",
