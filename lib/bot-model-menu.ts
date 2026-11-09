@@ -46,7 +46,8 @@ export async function botModelMenu(
   scope: ExecutionSettingsScope,
   botId: string | null,
   now = Date.now(),
-): Promise<BotModelMenu> {
+  inspectPreference = false,
+): Promise<BotModelMenu & { preferenceState?: "absent" | "present" }> {
   const rows = await settings.chatModels(scope);
   const pooled = botId && settings.pooledBindings ? await settings.pooledBindings(scope) : [];
   // Claude first, then ChatGPT/Codex, as the resolver orders them (orchestration §2).
@@ -103,8 +104,9 @@ export async function botModelMenu(
       kind: "shared" as const, owner: ownerNames.get(key.ownerId)!, credentialLabel: keyLabel(key), options: keyOptions(key),
     })),
   ];
+  const preference = await botModelPreference(pool, scope, botId);
   const choice = await resolveBotModelChoice(pool, settings, scope, botId,
-    await botModelPreference(pool, scope, botId), { rows, pooled, keys, now });
+    preference, { rows, pooled, keys, now });
   const state = { chosen: choice.chosen, ...(choice.fallback ? { fallback: choice.fallback } : {}) };
   let current: BotModelCurrent;
   if (choice.kind === "hosted") {
@@ -130,7 +132,7 @@ export async function botModelMenu(
       ...(choice.quota && !choice.sharedOwnerId ? { quota: choice.quota } : {}),
     };
   }
-  return { groups, current };
+  return { groups, current, ...(inspectPreference ? { preferenceState: !preference.key && preference.selected === undefined ? "absent" as const : "present" as const } : {}) };
 }
 
 /** Active members' public names for shared subscriptions and keys. Never the credential. */
