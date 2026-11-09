@@ -14,6 +14,7 @@ Every agent, from laptop to cloud, working as one team.
 [Open Mikka](https://app.aspectlylabs.com/mikka) · [Documentation](https://aspectlylabs.com/mikka/docs) · [Quickstart](https://aspectlylabs.com/mikka/docs/quickstart)
 
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+[![LINUX DO](https://img.shields.io/badge/LINUX%20DO-Community-FFB003)](https://linux.do)
 
 **English** · [简体中文](README.zh-CN.md)
 
