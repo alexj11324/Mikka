@@ -44,7 +44,8 @@ const errorCodes = new Set([
   'task_timeout', 'interrupted', 'submission_refused', 'foreign_activity', 'task_scope', 'fixture_ambiguous',
   'run_scope', 'run_model', 'run_identity', 'run_profile', 'run_failed', 'budget_exceeded', 'task_blocked',
   'artifact_missing', 'artifact_content', 'cleanup_incomplete', 'acceptance_failed',
-  'owner_busy', 'preparation_conflict', 'preparation_restore_failed', 'task_inventory_changed',
+  'owner_busy', 'owner_inventory_incomplete', 'owner_inventory_changed', 'owner_inventory_timeout',
+  'preparation_conflict', 'preparation_restore_failed', 'task_inventory_changed',
   'task_checks_missing', 'task_acceptance',
 ])
 const serverCodes = new Set(['authRequired', 'modelUnavailable', 'modelChanged', 'factoryStale', 'factoryStopped', 'runChainEnded',
@@ -304,18 +305,28 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
   let ownerId, workspaceId, botId, closeSession = false
   // Full definitions never leave this closure or appear in the public report.
   const preparation = { profiles: [], fallback: null }
-  async function request(path, { body, method = body === undefined ? 'GET' : 'POST', headers: extra, cleanup = false } = {}) {
+  async function request(path, { body, method = body === undefined ? 'GET' : 'POST', headers: extra, cleanup = false, deadline } = {}) {
     check(path.startsWith('/api/') || path.startsWith('/mikka/api/artifacts/'), 'origin_rejected')
     const url = new URL(path.startsWith('/mikka/') ? path : '/mikka' + path, ORIGIN)
     check(url.origin === ORIGIN && !url.username && !url.password && !url.hash, 'origin_rejected')
     if (!cleanup && signal?.aborted) throw new AcceptanceError('interrupted')
     const headers = new Headers({ origin: ORIGIN, 'cache-control': 'no-store', accept: 'application/json', ...extra })
+    if (url.pathname.startsWith('/mikka/api/factory/')) {
+      // Selection is routing, never authority: the ordinary endpoint still
+      // checks the fresh session, membership, Origin and exact business target.
+      check(uuid(workspaceId) && (!headers.has('x-mikka-workspace-id') || headers.get('x-mikka-workspace-id') === workspaceId)
+        && url.searchParams.getAll('workspaceId').every(value => value === workspaceId)
+        && (body?.workspaceId === undefined || body.workspaceId === workspaceId), 'workspace_missing')
+      headers.set('x-mikka-workspace-id', workspaceId)
+    }
+    const remaining = deadline === undefined ? 30_000 : Math.min(30_000, deadline - now())
+    check(Number.isSafeInteger(remaining) && remaining > 0, 'owner_inventory_timeout')
     const cookie = cookies.header(url); if (cookie) headers.set('cookie', cookie)
     if (body !== undefined) headers.set('content-type', 'application/json')
     let response
     try {
       response = await fetchImpl(url, { method, headers, redirect: 'error',
-        signal: !cleanup && signal ? AbortSignal.any([signal, AbortSignal.timeout(30_000)]) : AbortSignal.timeout(30_000),
+        signal: !cleanup && signal ? AbortSignal.any([signal, AbortSignal.timeout(remaining)]) : AbortSignal.timeout(remaining),
         ...(body === undefined ? {} : { body: JSON.stringify(body) }) })
     } catch (cause) { throw new AcceptanceError(!cleanup && signal?.aborted ? 'interrupted' : 'request_failed', { cause }) }
     cookies.receive(url, response.headers)
@@ -384,12 +395,72 @@ export async function runObservabilityAcceptance({ env = process.env, execute = 
     return { ownerId, menu, order, connections, keys, profiles }
   }
   async function ownerIdle(cleanup = false) {
-    // Both existing readers are owner-wide, including other workspaces. They
-    // expose at most 200 rows/30 days each; we claim only this visible scope.
-    const [threads, tasks] = await Promise.all([rpc('task-runs.pollThreads', [], { cleanup }), rpc('task-runs.pollTaskRuns', [], { cleanup })])
-    check(Array.isArray(threads?.items) && Array.isArray(tasks?.items), 'response_invalid')
-    check([...threads.items, ...tasks.items].every(value => nativeTerminal.has(value.status)), 'owner_busy')
-    report.preparation.visibleRunRowsChecked = threads.items.length + tasks.items.length
+    // P0 makes both readers workspace-scoped. Inventory is the ordinary,
+    // unpaginated active-membership endpoint; never infer owner-wide idle from
+    // the selected workspace alone. This finite scan is not an atomic fence.
+    const started = now(), deadline = started + 30_000
+    const withinTime = () => check(now() >= started && now() < deadline, 'owner_inventory_timeout')
+    const complete = value => value && !Object.hasOwn(value, 'error')
+      && (value.nextCursor === undefined || value.nextCursor === null)
+      && (value.truncated === undefined || value.truncated === false)
+      && (value.hasMore === undefined || value.hasMore === false)
+    const inventory = async () => {
+      withinTime()
+      const value = await read('/api/workspace', { cleanup, deadline, headers: { 'x-mikka-workspace-id': workspaceId } })
+      withinTime()
+      check(complete(value) && value.currentUserId === ownerId && value.workspace?.id === workspaceId
+        && value.workspace.kind === 'personal' && Array.isArray(value.choices) && value.choices.length > 0
+        && value.choices.length <= 32, 'owner_inventory_incomplete')
+      const choices = value.choices
+      check(choices.every(choice => uuid(choice?.id) && ['personal', 'team'].includes(choice.kind))
+        && new Set(choices.map(choice => choice.id.toLowerCase())).size === choices.length
+        && choices.filter(choice => choice.kind === 'personal').length === 1
+        && choices.some(choice => choice.kind === 'personal' && choice.id === workspaceId), 'owner_inventory_incomplete')
+      return choices.map(({ id, kind }) => ({ id, kind })).sort((a, b) => a.id.localeCompare(b.id))
+    }
+    const before = await inventory()
+    let checked = 0
+    const expiries = []
+    for (const workspace of before) {
+      withinTime()
+      const options = { cleanup, deadline, headers: { 'x-mikka-workspace-id': workspace.id } }
+      const [threads, tasks] = await Promise.all([
+        rpc('task-runs.pollThreads', [], options), rpc('task-runs.pollTaskRuns', [], options),
+      ])
+      withinTime()
+      for (const [kind, result] of [['threads', threads], ['tasks', tasks]]) {
+        check(complete(result) && Array.isArray(result.items) && result.items.length < 200
+          && (result.delta === undefined || result.delta === false) && (result.unchanged === undefined || result.unchanged === false)
+          && result.live?.ownerId === ownerId && result.live.workspaceId === workspace.id, 'owner_inventory_incomplete')
+        const ids = result.items.map(value => kind === 'threads' ? value?.id : value?.runId)
+        check(ids.every(uuid) && new Set(ids).size === ids.length
+          && result.items.every(value => nativeStatuses.has(value?.status)), 'owner_inventory_incomplete')
+        if (kind === 'threads') {
+          check(typeof result.version === 'string' && /^[0-9a-f]{32}$/.test(result.version) && Array.isArray(result.positions)
+            && result.positions.length === ids.length && new Set(result.positions.map(value => value?.id)).size === ids.length
+            && result.positions.every(value => ids.includes(value?.id) && typeof value.version === 'string'
+              && /^[0-9a-f]{32}$/.test(value.version)), 'owner_inventory_incomplete')
+        }
+        if (result.items.length) {
+          const expiry = result.live.deadline
+          check(typeof expiry?.at === 'string' && Number.isFinite(Date.parse(expiry.at))
+            && Number.isFinite(expiry.afterMs) && expiry.afterMs > 0, 'owner_inventory_incomplete')
+          expiries.push(Math.min(Date.parse(expiry.at), started + expiry.afterMs))
+        }
+        check(result.items.every(value => nativeTerminal.has(value.status)), 'owner_busy')
+        checked += result.items.length
+      }
+    }
+    const after = await inventory()
+    check(isDeepStrictEqual(before, after), 'owner_inventory_changed')
+    withinTime()
+    // The existing readers cover only the last 30 days. If a visible row
+    // expires during this scan, do not turn its disappearance into idle proof.
+    check(expiries.every(expiry => expiry > now()), 'owner_inventory_incomplete')
+    report.preparation.visibleRunRowsChecked = checked
+    report.preparation.visibleRunWorkspacesChecked = before.length
+    report.preparation.visibleRunWindowDays = 30
+    report.preparation.workspaceScanAtomic = false
   }
   async function prepareSettings() {
     await quiet(); await ownerIdle()

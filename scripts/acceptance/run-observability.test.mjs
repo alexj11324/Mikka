@@ -22,7 +22,7 @@ const existingProfile = { id: id(99), version: 3, digest: '3'.repeat(64), archiv
   description: 'PRIVATE_DESCRIPTION', enabled: true, harness: 'claude_code', model: { mode: 'inherit' }, effort: 'low', roles: [],
   skills: ['private-skill'], instructions: 'PRIVATE_INSTRUCTIONS' }
 function fixture({ failure, machineFailure, baselineRuns = [], profileBusy = false, paidFallback = false, flowVersion = 2, teamDefault = false, workspaceView = value => value,
-  historicalTask = null, historicalDetail = value => value, implicitDefault = false } = {}) {
+  historicalTask = null, historicalDetail = value => value, implicitDefault = false, pollView = value => value, factoryGate } = {}) {
   const calls = [], profiles = new Map(), submissions = [], foreignMessages = [], cancelled = new Set(), accepted = new Set(), machineEnds = new Set()
   const stages = flowVersion === 2 ? ['execute', 'review'] : ['execute', 'review', 'verify']
   const historical = historicalTask && { id: id(901), issueId: id(902), revision: 7, stage: 'execute', status: 'blocked',
@@ -76,6 +76,10 @@ function fixture({ failure, machineFailure, baselineRuns = [], profileBusy = fal
       const team = { id: teamId, kind: 'team', name: 'PRIVATE_TEAM_NAME' }
       return response(workspaceView({ workspace: selected === workspaceId ? personal : team, choices: [team, personal],
         currentUserId: ownerId, role: 'admin', members: [{ userId: ownerId, role: 'admin', status: 'active', email: env.ACME_DEMO_EMAIL }] }))
+    }
+    if (path.startsWith('/api/factory/') && factoryGate) {
+      const refused = factoryGate({ url, method, body, headers: new Headers(init.headers), submissions })
+      if (refused) return response({ error: 'workspaceAccessDenied' }, refused)
     }
     if (path === '/api/coordinator/messages') return response(chat())
     if (path === '/api/settings/workspace-bots') return response({ bots: [{ status: 'idle', runningThreads: failure === 'busy' ? 1 : 0 }] })
@@ -162,7 +166,12 @@ function fixture({ failure, machineFailure, baselineRuns = [], profileBusy = fal
       }
       if (body.action === 'task-runs.pollThreads' || body.action === 'task-runs.pollTaskRuns') {
         const busy = failure === 'owner_busy' || failure === 'owner_busy_restore' && submissions.length
-        return response({ ok: true, result: encode({ items: busy ? [{ id: id(909), status: 'running', prompt: 'PRIVATE_OTHER_WORKSPACE' }] : [] }) })
+        const selectedWorkspace = new Headers(init.headers).get('x-mikka-workspace-id') ?? workspaceId
+        const items = busy ? [{ id: id(909), runId: id(909), status: 'running', prompt: 'PRIVATE_OTHER_WORKSPACE' }] : []
+        const result = { items, version: 'a'.repeat(32), positions: items.map(value => ({ id: value.id, version: 'b'.repeat(32) })),
+          live: { ownerId, workspaceId: selectedWorkspace, ...(items.length ? {
+            deadline: { at: new Date(Date.now() + 60_000).toISOString(), afterMs: 60_000 } } : {}) } }
+        return response({ ok: true, result: encode(pollView(result, { action: body.action, workspace: selectedWorkspace, args, submissions, signal: init.signal })) })
       }
       if (body.action === 'model-api-keys.updateApiKeyAfterQuota') {
         assert.deepEqual(args, [!fallback, workspaceId])
@@ -516,14 +525,15 @@ test('prepare is explicit, requires execution and restores only its acknowledged
   const data = fixture({ profileBusy: true, paidFallback: true }), report = await run(data, true, {}, { prepare: true })
   assert.equal(report.status, 'runtime_verified', JSON.stringify(report))
   assert.deepEqual(report.preparation, { requested: true, profilesDisabled: 1, profilesRestored: 1, fallbackChanged: true,
-    restoration: 'complete', visibleRunRowsChecked: 0, restoreFailures: 0, fallbackRestored: true })
+    restoration: 'complete', visibleRunRowsChecked: 0, visibleRunWorkspacesChecked: 2, visibleRunWindowDays: 30,
+    workspaceScanAtomic: false, restoreFailures: 0, fallbackRestored: true })
   assert.deepEqual(data.profiles.get(existingProfile.id), { ...existingProfile, version: 5, digest: '5'.repeat(64) })
   assert.equal(data.state.fallback, true)
   assert.deepEqual(data.calls.filter(value => value.body?.action === 'model-api-keys.updateApiKeyAfterQuota').map(value => decode(value.body.args)),
     [[false, workspaceId], [true, workspaceId]])
   assert.equal(data.submissions.length, 1); safe(report)
 })
-test('prepare refuses owner-wide activity and inherited model choices without changing settings', async () => {
+test('prepare refuses visible activity in authorized workspaces and inherited model choices without changing settings', async () => {
   for (const [failure, code] of [['owner_busy', 'owner_busy'], ['unchosen', 'model_not_restorable']]) {
     const data = fixture({ failure, profileBusy: true, paidFallback: true }), report = await run(data, true, {}, { prepare: true })
     assert.equal(report.code, code, JSON.stringify(report))
@@ -732,4 +742,305 @@ test('implicit default checks absence once after a lost restoration response and
   assert.equal(data.calls.slice(restore + 1).filter(call => call.path === '/mikka/api/mobile/model' && call.method === 'GET').length, 1)
   assert.equal(data.state.storedPreference, false); assert.equal(report.cases[0].cleanup.modelRestored, true)
   safe(report)
+})
+
+const factoryWorkspaceGate = ({ url, body, headers }) => {
+  const selected = headers.get('x-mikka-workspace-id')
+  if (!selected || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(selected)) return 400
+  if (selected !== workspaceId) return 403
+  if (url.searchParams.has('workspaceId') && url.searchParams.get('workspaceId') !== selected
+    || body?.workspaceId !== undefined && body.workspaceId !== selected) return 404
+  return null
+}
+const scopedRows = (value, { action, workspace }, { status = 'succeeded', count = 1, afterMs = 60_000, at = Date.now() + afterMs } = {}) => {
+  const items = Array.from({ length: count }, (_, index) => ({ id: id(2000 + index), runId: id(2000 + index),
+    issueId: id(3000 + index), status, createdAt: new Date(at - 30 * 86_400_000).toISOString() }))
+  return { ...value, items, ...(action === 'task-runs.pollThreads'
+    ? { positions: items.map(item => ({ id: item.id, version: 'b'.repeat(32) })) } : {}),
+    live: { ownerId, workspaceId: workspace, ...(count ? { deadline: { at: new Date(at).toISOString(), afterMs } } : {}) } }
+}
+const noPreparationWrites = data => {
+  assert.equal(data.submissions.length, 0)
+  assert.equal(data.state.fallback, true)
+  assert.deepEqual(data.profiles.get(existingProfile.id), existingProfile)
+  assert.equal(data.calls.some(call => call.method === 'PATCH' || call.body?.action === 'model-api-keys.updateApiKeyAfterQuota'), false)
+}
+
+test('all Factory reads, writes, approval and cleanup pin the authorized personal workspace even when a team is listed first', async () => {
+  for (const teamDefault of [false, true]) for (const failure of [undefined, 'review_failed']) {
+    const data = fixture({ teamDefault, failure, profileBusy: true, paidFallback: true, factoryGate: factoryWorkspaceGate })
+    const report = await run(data, true, {}, { prepare: true })
+    assert.equal(report.status, failure ? 'blocked' : 'runtime_verified', JSON.stringify(report))
+    assert.equal(report.cases[0].cleanup.state, 'complete')
+    assert.equal(report.preparation.restoration, 'complete')
+    assert.equal(report.workspaceSelection, teamDefault ? 'switched_personal' : 'current_personal')
+    const factory = data.calls.filter(call => call.path.startsWith('/mikka/api/factory/'))
+    assert.ok(factory.length > 0)
+    for (const call of factory) {
+      assert.equal(call.headers['x-mikka-workspace-id'], workspaceId)
+      assert.equal(call.headers.origin, ORIGIN)
+      assert.match(call.headers.cookie, /PRIVATE_COOKIE/)
+      if (new URLSearchParams(call.search).has('workspaceId')) assert.equal(new URLSearchParams(call.search).get('workspaceId'), workspaceId)
+      if (call.body?.workspaceId) assert.equal(call.body.workspaceId, workspaceId)
+    }
+    assert.deepEqual(new Set(factory.map(call => call.method)), new Set(['GET', 'POST', 'PATCH', 'DELETE']))
+    assert.ok(factory.some(call => failure ? call.body?.action === 'cancel' : call.path.endsWith('/approval')))
+    assert.equal(data.calls.filter(call => call.body?.action === 'workspace.switchWorkspace').length, teamDefault ? 1 : 0)
+    assert.equal(report.sessionClosed, true); safe(report)
+  }
+})
+
+test('Factory authority refusals remain failures without retrying an implicit workspace', async () => {
+  for (const status of [400, 401, 403, 404]) {
+    const data = fixture({ factoryGate: request => factoryWorkspaceGate(request) ?? status })
+    const report = await run(data, true)
+    assert.equal(report.status, 'blocked'); assert.equal(report.cases[0].code, 'http_refused')
+    assert.equal(report.cases[0].httpStatus, status)
+    assert.equal(data.submissions.length, 0); assert.equal(data.profiles.size, 0)
+    const reads = data.calls.filter(call => call.path.startsWith('/mikka/api/factory/'))
+    assert.equal(reads.length, 1); assert.equal(reads[0].headers['x-mikka-workspace-id'], workspaceId)
+    assert.equal(report.sessionClosed, true); safe(report)
+  }
+})
+
+test('Factory cleanup keeps its explicit workspace and exposes revoked authority or mismatch instead of retrying elsewhere', async () => {
+  for (const status of [401, 403, 404]) {
+    const data = fixture({ factoryGate: request => factoryWorkspaceGate(request) ?? (request.method === 'DELETE' ? status : null) })
+    const report = await run(data, true)
+    assert.equal(report.status, 'blocked'); assert.equal(report.cases[0].code, 'cleanup_incomplete')
+    assert.equal(report.cases[0].cleanup.profileError.httpStatus, status)
+    const archived = data.calls.filter(call => call.method === 'DELETE')
+    assert.equal(archived.length, 1); assert.equal(archived[0].headers['x-mikka-workspace-id'], workspaceId)
+    assert.equal(data.submissions.length, 1); assert.equal(report.sessionClosed, true); safe(report)
+  }
+})
+
+test('malformed or foreign personal workspace selection stops before any Factory call', async () => {
+  for (const workspaceView of [
+    value => ({ ...value, choices: value.choices.map(choice => choice.kind === 'personal' ? { ...choice, id: 'PRIVATE_INVALID_WORKSPACE' } : choice) }),
+    value => ({ ...value, workspace: { ...value.workspace, id: id(999) } }),
+    value => ({ ...value, members: [{ ...value.members[0], userId: 'PRIVATE_FOREIGN_OWNER' }] }),
+    value => ({ ...value, members: [{ ...value.members[0], status: 'revoked' }] }),
+  ]) {
+    const data = fixture({ workspaceView }), report = await run(data, true)
+    assert.equal(report.status, 'blocked'); assert.equal(report.code, 'workspace_missing')
+    assert.equal(data.calls.some(call => call.path.startsWith('/mikka/api/factory/')), false)
+    assert.equal(data.submissions.length, 0); assert.equal(report.sessionClosed, true); safe(report)
+  }
+})
+
+test('workspace A idle cannot hide workspace B activity in either scoped reader', async () => {
+  for (const busyAction of ['task-runs.pollThreads', 'task-runs.pollTaskRuns']) for (const status of ['queued', 'running', 'paused', 'waiting_input']) {
+    const data = fixture({ paidFallback: true, profileBusy: true, pollView: (value, scope) =>
+      scope.workspace === teamId && scope.action === busyAction ? scopedRows(value, scope, { status }) : value })
+    const report = await run(data, true, {}, { prepare: true })
+    assert.equal(report.code, 'owner_busy', busyAction + ':' + status + ':' + JSON.stringify(report))
+    noPreparationWrites(data)
+    const reads = data.calls.filter(call => ['task-runs.pollThreads', 'task-runs.pollTaskRuns'].includes(call.body?.action))
+    assert.deepEqual(new Set(reads.map(call => call.headers['x-mikka-workspace-id'])), new Set([workspaceId, teamId]))
+    for (const call of reads) assert.deepEqual(decode(call.body.args), [])
+    assert.equal(report.sessionClosed, true); safe(report)
+  }
+})
+
+test('idle proof covers every authorized workspace but reports only the existing 30-day visible window and is not atomic', async () => {
+  const data = fixture({ paidFallback: true, profileBusy: true, pollView: (value, scope) => scopedRows(value, scope) })
+  const report = await run(data, true, {}, { prepare: true })
+  assert.equal(report.status, 'runtime_verified', JSON.stringify(report))
+  assert.equal(report.preparation.visibleRunRowsChecked, 4)
+  assert.equal(report.preparation.visibleRunWorkspacesChecked, 2)
+  assert.equal(report.preparation.visibleRunWindowDays, 30)
+  assert.equal(report.preparation.workspaceScanAtomic, false)
+  assert.equal(report.preparation.restoration, 'complete')
+  assert.equal(data.calls.some(call => call.body?.action === 'workspace.switchWorkspace'), false)
+  safe(report)
+})
+
+test('workspace inventory errors, missing pages, unknown memberships and the workspace cap fail before changing settings', async () => {
+  const cases = [
+    value => ({ ...value, choices: undefined }),
+    value => ({ ...value, choices: [] }),
+    value => ({ ...value, choices: [...value.choices, value.choices[0]] }),
+    value => ({ ...value, choices: value.choices.map(choice => choice.kind === 'team' ? { ...choice, id: 'PRIVATE_INVALID' } : choice) }),
+    value => ({ ...value, choices: value.choices.map(choice => choice.kind === 'team' ? { ...choice, kind: 'unknown' } : choice) }),
+    value => ({ ...value, choices: value.choices.filter(choice => choice.kind !== 'personal') }),
+    value => ({ ...value, currentUserId: 'PRIVATE_FOREIGN_OWNER' }),
+    value => ({ ...value, workspace: { ...value.workspace, id: teamId, kind: 'team' } }),
+    value => ({ ...value, nextCursor: 'PRIVATE_NEXT_PAGE' }),
+    value => ({ ...value, truncated: true }),
+    value => ({ ...value, hasMore: true }),
+    value => ({ ...value, choices: [value.choices[1], ...Array.from({ length: 32 }, (_, index) => ({ id: id(6000 + index), kind: 'team' }))] }),
+  ]
+  for (const mutate of cases) {
+    let reads = 0
+    const data = fixture({ paidFallback: true, profileBusy: true, workspaceView: value => ++reads === 1 ? value : mutate(value) })
+    const report = await run(data, true, {}, { prepare: true })
+    assert.equal(report.code, 'owner_inventory_incomplete', JSON.stringify(report))
+    noPreparationWrites(data)
+    assert.equal(data.calls.some(call => ['task-runs.pollThreads', 'task-runs.pollTaskRuns'].includes(call.body?.action)), false)
+    assert.equal(report.sessionClosed, true); safe(report)
+  }
+  for (const status of [401, 403, 500]) {
+    const data = fixture({ paidFallback: true, profileBusy: true }), originalFetch = data.fetchImpl
+    let reads = 0
+    data.fetchImpl = (url, init) => new URL(url).pathname === '/mikka/api/workspace' && ++reads > 1
+      ? Promise.resolve(Response.json({ error: 'workspaceAccessDenied' }, { status })) : originalFetch(url, init)
+    const report = await run(data, true, {}, { prepare: true })
+    assert.equal(report.code, 'http_refused'); assert.equal(report.httpStatus, status)
+    noPreparationWrites(data); assert.equal(report.sessionClosed, true); safe(report)
+  }
+})
+
+test('a changed workspace inventory cannot turn an incomplete scan into an idle proof', async () => {
+  let reads = 0
+  const data = fixture({ paidFallback: true, profileBusy: true,
+    workspaceView: value => ++reads < 3 ? value : { ...value, choices: [...value.choices, { id: id(9), kind: 'team' }] } })
+  const report = await run(data, true, {}, { prepare: true })
+  assert.equal(report.code, 'owner_inventory_changed', JSON.stringify(report))
+  noPreparationWrites(data); assert.equal(report.sessionClosed, true); safe(report)
+})
+
+test('scoped run reads reject saturation, delta or missing rows, malformed data and a foreign scope', async () => {
+  const cases = [
+    (value, scope) => scopedRows(value, scope, { count: 200 }),
+    (value, scope) => scopedRows(value, scope, { count: 201 }),
+    value => ({ ...value, items: undefined }),
+    value => ({ ...value, delta: true }),
+    value => ({ ...value, delta: 'PRIVATE_MALFORMED' }),
+    value => ({ ...value, unchanged: true }),
+    value => ({ ...value, nextCursor: 'PRIVATE_NEXT_PAGE' }),
+    value => ({ ...value, truncated: true }),
+    value => ({ ...value, live: undefined }),
+    value => ({ ...value, live: { ...value.live, ownerId: 'PRIVATE_FOREIGN_OWNER' } }),
+    value => ({ ...value, live: { ...value.live, workspaceId: id(999) } }),
+    (value, scope) => scopedRows(value, scope, { status: 'PRIVATE_UNKNOWN_STATUS' }),
+    (value, scope) => ({ ...scopedRows(value, scope), items: [{ id: 'PRIVATE_BAD_ID', runId: 'PRIVATE_BAD_ID', status: 'succeeded' }] }),
+  ]
+  for (const action of ['task-runs.pollThreads', 'task-runs.pollTaskRuns']) for (const mutate of cases) {
+    const data = fixture({ paidFallback: true, profileBusy: true,
+      pollView: (value, scope) => scope.action === action ? mutate(value, scope) : value })
+    const report = await run(data, true, {}, { prepare: true })
+    assert.equal(report.code, 'owner_inventory_incomplete', action + ':' + JSON.stringify(report))
+    noPreparationWrites(data); assert.equal(report.sessionClosed, true); safe(report)
+  }
+  for (const mutate of [
+    value => ({ ...value, version: undefined }),
+    value => ({ ...value, positions: undefined }),
+    value => ({ ...value, positions: [] }),
+    value => ({ ...value, positions: [{ id: id(999), version: 'b'.repeat(32) }] }),
+  ]) {
+    const data = fixture({ paidFallback: true, profileBusy: true,
+      pollView: (value, scope) => scope.action === 'task-runs.pollThreads' ? mutate(scopedRows(value, scope)) : value })
+    const report = await run(data, true, {}, { prepare: true })
+    assert.equal(report.code, 'owner_inventory_incomplete', JSON.stringify(report))
+    noPreparationWrites(data); assert.equal(report.sessionClosed, true); safe(report)
+  }
+})
+
+test('fresh authorization failures in another workspace and during restoration remain visible', async () => {
+  for (const restoring of [false, true]) {
+    const data = fixture({ paidFallback: true, profileBusy: true }), originalFetch = data.fetchImpl
+    data.fetchImpl = (url, init) => {
+      const body = init.body && JSON.parse(init.body)
+      if (body?.action === 'task-runs.pollTaskRuns' && new Headers(init.headers).get('x-mikka-workspace-id') === teamId
+        && (!restoring || data.submissions.length)) return Promise.resolve(Response.json({ error: 'workspaceAccessDenied' }, { status: 403 }))
+      return originalFetch(url, init)
+    }
+    const report = await run(data, true, {}, { prepare: true })
+    if (restoring) {
+      assert.equal(report.code, 'preparation_restore_failed', JSON.stringify(report))
+      assert.equal(report.preparation.restoreError.httpStatus, 403)
+      assert.equal(data.state.fallback, false)
+      assert.equal(data.profiles.get(existingProfile.id).enabled, false)
+      assert.equal(data.calls.filter(call => call.method === 'PATCH').length, 1)
+    } else {
+      assert.equal(report.code, 'http_refused'); assert.equal(report.httpStatus, 403)
+      noPreparationWrites(data)
+    }
+    assert.equal(report.sessionClosed, true); safe(report)
+  }
+})
+
+test('the scan rejects a 30-day row expiry at or during the scan and never filters it away', async () => {
+  const fixed = Date.parse('2026-11-09T09:00:00.000Z')
+  for (const kind of ['missing', 'already_expired', 'zero_remaining', 'expires_during_scan']) {
+    let clock = fixed
+    const data = fixture({ paidFallback: true, profileBusy: true, pollView: (value, scope) => {
+      if (scope.workspace === teamId) clock += kind === 'expires_during_scan' ? 2 : 0
+      if (scope.workspace !== workspaceId) return value
+      const result = scopedRows(value, scope, { at: kind === 'already_expired' ? fixed : fixed + 1,
+        afterMs: kind === 'zero_remaining' ? 0 : 1 })
+      if (kind === 'missing') delete result.live.deadline
+      return result
+    } })
+    const report = await run(data, true, {}, { prepare: true, now: () => clock })
+    assert.equal(report.code, 'owner_inventory_incomplete', kind + ':' + JSON.stringify(report))
+    noPreparationWrites(data); assert.equal(report.sessionClosed, true); safe(report)
+  }
+})
+
+test('one overall scan deadline and backwards time fail closed without extending the scan per workspace', async () => {
+  const fixed = Date.parse('2026-11-09T09:00:00.000Z')
+  for (const advance of [30_000, 30_001, -1]) {
+    let clock = fixed, reads = 0
+    const data = fixture({ paidFallback: true, profileBusy: true, workspaceView: value => {
+      if (++reads === 2) clock += advance
+      return value
+    } })
+    const report = await run(data, true, {}, { prepare: true, now: () => clock })
+    assert.equal(report.code, 'owner_inventory_timeout', String(advance) + ':' + JSON.stringify(report))
+    noPreparationWrites(data); assert.equal(report.sessionClosed, true); safe(report)
+  }
+  let clock = fixed
+  const data = fixture({ paidFallback: true, profileBusy: true, pollView: (value, scope) => {
+    if (scope.workspace === workspaceId && scope.action === 'task-runs.pollTaskRuns') clock = fixed + 30_000
+    return value
+  } })
+  const report = await run(data, true, {}, { prepare: true, now: () => clock })
+  assert.equal(report.code, 'owner_inventory_timeout', JSON.stringify(report))
+  noPreparationWrites(data)
+  assert.equal(data.calls.some(call => ['task-runs.pollThreads', 'task-runs.pollTaskRuns'].includes(call.body?.action)
+    && call.headers['x-mikka-workspace-id'] === teamId), false)
+  assert.equal(report.sessionClosed, true); safe(report)
+})
+
+test('a real request AbortSignal expires within the remaining scan deadline and closes the login session', async () => {
+  const fixed = Date.parse('2026-11-09T09:00:00.000Z')
+  let clock = fixed, reads = 0
+  const data = fixture({ paidFallback: true, profileBusy: true, workspaceView: value => {
+    if (++reads === 2) clock += 29_990
+    return value
+  } }), originalFetch = data.fetchImpl
+  let aborted = 0
+  data.fetchImpl = (url, init) => {
+    const body = init.body && JSON.parse(init.body)
+    if (['task-runs.pollThreads', 'task-runs.pollTaskRuns'].includes(body?.action)) {
+      return new Promise((resolve, reject) => {
+        const keepAlive = setTimeout(() => reject(new Error('test deadline was not enforced')), 1000)
+        init.signal.addEventListener('abort', () => { clearTimeout(keepAlive); aborted++; reject(init.signal.reason) }, { once: true })
+      })
+    }
+    return originalFetch(url, init)
+  }
+  const report = await run(data, true, {}, { prepare: true, now: () => clock })
+  assert.equal(report.code, 'request_failed', JSON.stringify(report))
+  noPreparationWrites(data)
+  assert.ok(aborted > 0); assert.equal(report.sessionClosed, true); safe(report)
+})
+
+test('the finite workspace cap and 199-row boundary can succeed without paging or widening the 30-day read', async () => {
+  let reads = 0
+  const data = fixture({ paidFallback: true, profileBusy: true, workspaceView: value => {
+    if (++reads === 1) return value
+    return { ...value, choices: [value.choices[1], ...Array.from({ length: 31 }, (_, index) => ({ id: id(6000 + index), kind: 'team' }))] }
+  }, pollView: (value, scope) => scope.workspace === workspaceId ? scopedRows(value, scope, { count: 199 }) : value })
+  const report = await run(data, true, {}, { prepare: true })
+  assert.equal(report.status, 'runtime_verified', JSON.stringify(report))
+  assert.equal(report.preparation.visibleRunRowsChecked, 398)
+  assert.equal(report.preparation.visibleRunWorkspacesChecked, 32)
+  assert.equal(report.preparation.visibleRunWindowDays, 30)
+  const readsByWorkspace = data.calls.filter(call => ['task-runs.pollThreads', 'task-runs.pollTaskRuns'].includes(call.body?.action))
+  assert.equal(new Set(readsByWorkspace.map(call => call.headers['x-mikka-workspace-id'])).size, 32)
+  for (const call of readsByWorkspace) assert.deepEqual(decode(call.body.args), [])
+  assert.equal(report.sessionClosed, true); safe(report)
 })
