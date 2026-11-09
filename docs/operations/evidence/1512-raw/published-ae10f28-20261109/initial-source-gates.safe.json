@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "kind": "source-original-gate-review",
+  "head": "ae10f28aa471dbfc64f04d981b8934d374476259",
+  "checkout": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4",
+  "tree": "1acbe0b8d50a7102543e24b9bd0395355bcba438",
+  "sourceJob": 129114784935,
+  "sourceLog": {
+    "jobId": 129114784935,
+    "bytes": 138798,
+    "sha256": "f661fe72c2028a54088ddd6bb9a7fbddc3ec51c662a555ad4795a8fa16dd178d",
+    "lines": 1787,
+    "downloadCount": 1,
+    "sha": "38bf977089b0ca71c735d992d5d849f4195adcbb",
+    "privacyScanMatched": []
+  },
+  "nitroOriginalLines": [
+    "# Subtest: real development workers instrument pg before application imports, including hot replacements",
+    "ok 11 - real development workers instrument pg before application imports, including hot replacements",
+    "  ---",
+    "  duration_ms: 1026.229722",
+    "  type: 'test'",
+    "  ..."
+  ],
+  "driverTests": {
+    "exactFullCount": 63,
+    "fail": 0,
+    "skip": 0,
+    "sourceBlob": "002b8501cd4f4df023148515add7c55e2863dbd3",
+    "testBlob": "aab0a21c4c8fadb9df81ff87ada4fa23198fa575"
+  },
+  "canonical": {
+    "actualCommand": "node apps/api/scripts/generate-routes.mjs --check",
+    "reportedRoutes": 243,
+    "reportedMethods": 315,
+    "generatorHasCheckBranch": false,
+    "notClaimed": "The argument name is not proof of read-only comparison; exact source/generator/registry binding is reviewed separately."
+  },
+  "sourceTests": {
+    "apiTypeScript": 102,
+    "apiNode": 69,
+    "frontend": 45,
+    "fail": 0,
+    "skip": 0
+  },
+  "daemon": {
+    "filesPassed": 139,
+    "filesSkipped": 1,
+    "testsPassed": 1577,
+    "testsSkipped": 2
+  },
+  "desktop": {
+    "nodeGroups": [
+      156,
+      294,
+      46,
+      10
+    ],
+    "vitest": 4,
+    "fail": 0,
+    "skip": 0
+  },
+  "wholeCIAndNativeComplete": false,
+  "productionAccepted": false
+}

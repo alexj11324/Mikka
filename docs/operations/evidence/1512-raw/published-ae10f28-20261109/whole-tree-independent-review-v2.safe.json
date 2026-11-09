@@ -1,0 +1,1039 @@
+{
+  "version": 1,
+  "kind": "independent-two-stage-whole-tree-merge-review",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "source": {
+    "base": {
+      "commit": "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+      "tree": "dba5247cc453a7978f4f0dffe637f37e4d9a88f8",
+      "previousExactBinding": "9b9d51a5457665b4438efdf25bdb4bbcd4f45de4"
+    },
+    "ours": {
+      "commit": "f0956eb1481cee710efb714ec3635ac66b4b44ec",
+      "tree": "1431bb492e1a10b282202602e977f15dcfe52246",
+      "parents": [
+        "0c35e2005fc7c92872229ef895a6ef9aa95bef44"
+      ],
+      "verifiedByApi": true
+    },
+    "p0": {
+      "commit": "521db4799a4a85e1955f7dd86a1ad5ccef143cc8",
+      "tree": "d82a34d59bf072348869ef086e24ae0ad5a852ec",
+      "parents": [
+        "5a7686b4bb6bbf1c0abe6ce250e8deeb7e1022d3",
+        "76df3935c8be5af480485c52e445d389e85d8a35"
+      ],
+      "verifiedByApiPreviously": true
+    },
+    "firstMerge": {
+      "commit": "82d47c8bf062363d058c79920060f4c688de52ad",
+      "tree": "2059df0b18196515ed0d370129aaee851a569000",
+      "parents": [
+        "f0956eb1481cee710efb714ec3635ac66b4b44ec",
+        "521db4799a4a85e1955f7dd86a1ad5ccef143cc8"
+      ],
+      "verifiedByApi": true
+    },
+    "main": {
+      "commit": "a2198c8c2f608f7b8169329b9da853067618dba6",
+      "tree": "d3c86f905a0ff548720f54a9c73bf92a4764e033",
+      "parents": [
+        "76df3935c8be5af480485c52e445d389e85d8a35"
+      ],
+      "verifiedByApi": true
+    },
+    "finalTree": "1acbe0b8d50a7102543e24b9bd0395355bcba438",
+    "expectedFinalParents": [
+      "82d47c8bf062363d058c79920060f4c688de52ad",
+      "a2198c8c2f608f7b8169329b9da853067618dba6"
+    ],
+    "finalCommit": {
+      "sha": "ae10f28aa471dbfc64f04d981b8934d374476259",
+      "tree": "1acbe0b8d50a7102543e24b9bd0395355bcba438",
+      "parents": [
+        "82d47c8bf062363d058c79920060f4c688de52ad",
+        "a2198c8c2f608f7b8169329b9da853067618dba6"
+      ],
+      "verifiedByReadOnlyApi": true
+    },
+    "finalCommitCreatedByReviewer": false,
+    "finalCommitReadByReviewer": true
+  },
+  "method": {
+    "fiveRemoteRecursiveTreesRead": true,
+    "allNontruncated": true,
+    "unitOfComparison": "Every leaf's full path, mode, type and Git object SHA, including missing entries; no path-only or text-only comparison.",
+    "threeWayRule": "Use identical ours/theirs; else the changed side when the other equals base; else require an exact pre-reviewed resolution. Missing/extra/deleted leaves are checked.",
+    "gitHashReconstruction": "Build Git binary tree objects recursively from all leaves, using bytewise UTF-8 Git ordering, tree mode40000 and raw20-byte child object IDs; hash tree header and body with SHA1. Reconstruct both actual returned tree and independently computed expected merge.",
+    "canonicalLeafFormat": "UTF-8 bytewise path sort; mode + space + type + space + SHA + TAB + path + LF; SHA256 over exact UTF-8 bytes.",
+    "testsOrGeneratorExecuted": false,
+    "refsUpdated": false,
+    "resourcesCreated": 0,
+    "productionRequests": 0,
+    "jobLogsRead": 0
+  },
+  "remoteTrees": [
+    {
+      "role": "base",
+      "tree": "dba5247cc453a7978f4f0dffe637f37e4d9a88f8",
+      "truncated": false,
+      "entries": 7631,
+      "leaves": 6760
+    },
+    {
+      "role": "ours",
+      "tree": "1431bb492e1a10b282202602e977f15dcfe52246",
+      "truncated": false,
+      "entries": 7633,
+      "leaves": 6762
+    },
+    {
+      "role": "theirs",
+      "tree": "d82a34d59bf072348869ef086e24ae0ad5a852ec",
+      "truncated": false,
+      "entries": 7660,
+      "leaves": 6788
+    },
+    {
+      "role": "merged",
+      "tree": "2059df0b18196515ed0d370129aaee851a569000",
+      "truncated": false,
+      "entries": 7662,
+      "leaves": 6790
+    },
+    {
+      "role": "second-final",
+      "tree": "1acbe0b8d50a7102543e24b9bd0395355bcba438",
+      "truncated": false,
+      "entries": 7664,
+      "leaves": 6792
+    }
+  ],
+  "firstMergeProof": {
+    "counts": {
+      "base": 6760,
+      "ours": 6762,
+      "theirs": 6788,
+      "actual": 6790,
+      "expected": 6790,
+      "oursChanged": 59,
+      "theirsChanged": 432,
+      "overlay": 57,
+      "deletedFromTheirs": 0
+    },
+    "stats": {
+      "unchanged": 6307,
+      "oursOnly": 51,
+      "theirsOnly": 424,
+      "bothSame": 2,
+      "conflict": 6
+    },
+    "conflicts": [
+      {
+        "path": "apps/api/generated/routes.json",
+        "base": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "8962037c3ef428b77d4417bfc12281aeb7e30c11"
+        },
+        "ours": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "06017439de4b98555310e13c35c079bca379174f"
+        },
+        "theirs": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "016af99a766db7d863704225d451d9eb3a950bbb"
+        },
+        "resolution": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "6fbced33e672f3fa0d5e35bed40b63fa103809d5"
+        }
+      },
+      {
+        "path": "apps/api/generated/routes.ts",
+        "base": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "78fe57ce3f6ceeed2489d569c14b1ae0642aebe0"
+        },
+        "ours": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "16fe573dc6d192566f6bf2810b9ba94e186cba82"
+        },
+        "theirs": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "f218fd0698bfae6296be7a06c732c26cac412eb7"
+        },
+        "resolution": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "a0cc13783eb567c256c34e08eaf3f6e9aca157e2"
+        }
+      },
+      {
+        "path": "apps/desktop/src/renderer/rpc.ts",
+        "base": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "a9ffaee70d53e2c9c0471b61abbddf80cc244fbe"
+        },
+        "ours": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "1dfb20c85e930e3c4b75d4f6e656a04fa9c2ffc5"
+        },
+        "theirs": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "c69dcfe5f459de0e603651fd510f06cf8d32e75b"
+        },
+        "resolution": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "dae8798653457afad334c2d909b10b63e9b3956f"
+        }
+      },
+      {
+        "path": "lib/device-heartbeat.db.test.ts",
+        "base": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "68423cee4e9fa1f0f89274ed3dec67859e6f164b"
+        },
+        "ours": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "27bbb720ac8f5bd3716787db62eb11833e9f3530"
+        },
+        "theirs": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "46c43f5c8bd9d33818f67d1e899f924ac9d267ae"
+        },
+        "resolution": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e8f4f35748707364e77c53fa594c166bafc3dae8"
+        }
+      },
+      {
+        "path": "package.json",
+        "base": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "ec9951453307dd586dfe058648d9fc762a6665ad"
+        },
+        "ours": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "785071f84b258c420e97d1c2b1e8afe3b9bd7048"
+        },
+        "theirs": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "3158b34c16d1734861e1f487f3142a98908e5d78"
+        },
+        "resolution": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "ef6da7b3d6b33220051fef56d7e9e5e024105310"
+        }
+      },
+      {
+        "path": "workflows/coordinator/steps.ts",
+        "base": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "4437f048cda5c22142d407e46417abb8f15e80e6"
+        },
+        "ours": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "8b7a5b06f3d1a9c0ebae03a434095a33fa552894"
+        },
+        "theirs": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "5002aebd9ed3df6047ccb3f7a083401c3cad34c3"
+        },
+        "resolution": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "d500795e9a62631b6c7619c4ffd1df67f137ee54"
+        }
+      }
+    ],
+    "failures": []
+  },
+  "firstMergeReconstructedGitHashes": [
+    {
+      "role": "base",
+      "expected": "dba5247cc453a7978f4f0dffe637f37e4d9a88f8",
+      "reconstructed": "dba5247cc453a7978f4f0dffe637f37e4d9a88f8"
+    },
+    {
+      "role": "ours",
+      "expected": "1431bb492e1a10b282202602e977f15dcfe52246",
+      "reconstructed": "1431bb492e1a10b282202602e977f15dcfe52246"
+    },
+    {
+      "role": "theirs",
+      "expected": "d82a34d59bf072348869ef086e24ae0ad5a852ec",
+      "reconstructed": "d82a34d59bf072348869ef086e24ae0ad5a852ec"
+    },
+    {
+      "role": "merged",
+      "expected": "2059df0b18196515ed0d370129aaee851a569000",
+      "reconstructed": "2059df0b18196515ed0d370129aaee851a569000"
+    },
+    {
+      "role": "computed-three-way-expected",
+      "expected": "2059df0b18196515ed0d370129aaee851a569000",
+      "reconstructed": "2059df0b18196515ed0d370129aaee851a569000"
+    }
+  ],
+  "secondMergeProof": {
+    "firstTree": "2059df0b18196515ed0d370129aaee851a569000",
+    "finalTree": "1acbe0b8d50a7102543e24b9bd0395355bcba438",
+    "firstLeaves": 6790,
+    "finalLeaves": 6792,
+    "changedPaths": 10,
+    "modified": 8,
+    "added": 2,
+    "deleted": 0,
+    "unchangedExisting": 6782,
+    "exactTenSet": true,
+    "resolutions": 3,
+    "mainExact": 7,
+    "checks": [
+      {
+        "path": "components/workspace/issue-thread-panel.tsx",
+        "rule": "exact-main-blob",
+        "sourceMainBlob": "c9e5223c1cceca956f4b5d5abfec17ececa04654",
+        "expected": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "c9e5223c1cceca956f4b5d5abfec17ececa04654"
+        },
+        "actual": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "c9e5223c1cceca956f4b5d5abfec17ececa04654"
+        },
+        "matches": true
+      },
+      {
+        "path": "components/workspace/issue-threads.tsx",
+        "rule": "exact-main-blob",
+        "sourceMainBlob": "33328818b49b5d6fa3c940ec0281fd2e0cac5ccf",
+        "expected": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "33328818b49b5d6fa3c940ec0281fd2e0cac5ccf"
+        },
+        "actual": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "33328818b49b5d6fa3c940ec0281fd2e0cac5ccf"
+        },
+        "matches": true
+      },
+      {
+        "path": "docs/design/glossary.md",
+        "rule": "exact-main-blob",
+        "sourceMainBlob": "bf4d10e9b5f228ff1009cba7015e62ba73b9c220",
+        "expected": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "bf4d10e9b5f228ff1009cba7015e62ba73b9c220"
+        },
+        "actual": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "bf4d10e9b5f228ff1009cba7015e62ba73b9c220"
+        },
+        "matches": true
+      },
+      {
+        "path": "docs/design/rules.md",
+        "rule": "exact-main-blob",
+        "sourceMainBlob": "7f732181f78949fe743e6991cb60af7005cbba60",
+        "expected": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "7f732181f78949fe743e6991cb60af7005cbba60"
+        },
+        "actual": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "7f732181f78949fe743e6991cb60af7005cbba60"
+        },
+        "matches": true
+      },
+      {
+        "path": "hooks/use-run-result.test.ts",
+        "rule": "exact-main-blob",
+        "sourceMainBlob": "ba76ad025f4e707a21fd939d97a2b627129d3e40",
+        "expected": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "ba76ad025f4e707a21fd939d97a2b627129d3e40"
+        },
+        "actual": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "ba76ad025f4e707a21fd939d97a2b627129d3e40"
+        },
+        "matches": true
+      },
+      {
+        "path": "hooks/use-run-result.ts",
+        "rule": "exact-main-blob",
+        "sourceMainBlob": "62be3068a787242d0c604d15863bb8fd079aade6",
+        "expected": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "62be3068a787242d0c604d15863bb8fd079aade6"
+        },
+        "actual": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "62be3068a787242d0c604d15863bb8fd079aade6"
+        },
+        "matches": true
+      },
+      {
+        "path": "messages/en.json",
+        "rule": "reviewed-resolution",
+        "sourceMainBlob": "eefae5cb99d77220d53cdf802fa6716e64db3cd1",
+        "expected": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "f8d4dc109e3adbf625a37e291b1ef11e83473ac9"
+        },
+        "actual": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "f8d4dc109e3adbf625a37e291b1ef11e83473ac9"
+        },
+        "matches": true
+      },
+      {
+        "path": "messages/zh-CN.json",
+        "rule": "reviewed-resolution",
+        "sourceMainBlob": "be4f5f0c7d4237df4bcdf5e77d3e64513f161e65",
+        "expected": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "cdda5d5fc21468db80c1bc475ec68e47cd1cddff"
+        },
+        "actual": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "cdda5d5fc21468db80c1bc475ec68e47cd1cddff"
+        },
+        "matches": true
+      },
+      {
+        "path": "package.json",
+        "rule": "reviewed-resolution",
+        "sourceMainBlob": "2464da06d4a809c500aff11195f60a9c6b66c70b",
+        "expected": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "568cfeee161309202699acefd0a57a8edc52bf6e"
+        },
+        "actual": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "568cfeee161309202699acefd0a57a8edc52bf6e"
+        },
+        "matches": true
+      },
+      {
+        "path": "scripts/issue-thread-acceptance.test.tsx",
+        "rule": "exact-main-blob",
+        "sourceMainBlob": "779dc18f1eb72f13505108efb0c41bafcb79048b",
+        "expected": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "779dc18f1eb72f13505108efb0c41bafcb79048b"
+        },
+        "actual": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "779dc18f1eb72f13505108efb0c41bafcb79048b"
+        },
+        "matches": true
+      }
+    ],
+    "failures": [],
+    "reconstructedActual": "1acbe0b8d50a7102543e24b9bd0395355bcba438",
+    "reconstructedExpected": "1acbe0b8d50a7102543e24b9bd0395355bcba438"
+  },
+  "canonicalLeafIndexSha256": [
+    {
+      "role": "base",
+      "sha256": "de6366d34a35222e9f302176ab1f4ba6b40e8998c811ec5e42002099957bcf12"
+    },
+    {
+      "role": "ours",
+      "sha256": "40c8e1419483bceee0d8b2ac663ff7a2534e0c271715294e5df77640ffa0267d"
+    },
+    {
+      "role": "theirs",
+      "sha256": "0b9801d631d34bd5655ca276477f1140c02a72e8da54e81b33c0afb78f892970"
+    },
+    {
+      "role": "merged",
+      "sha256": "8c152516d4a0571341b84c4f2577bd17f9a35d1907a8ee4f20c9948013e738c7"
+    },
+    {
+      "role": "second-final",
+      "sha256": "70feb5c09babbf3ed5d72ba52a8517cb36de13c5e2ceb222e8bbe05c7db4babe"
+    }
+  ],
+  "explicitDriverAndExecutableFakePreservation": [
+    {
+      "path": "scripts/acceptance/run-observability.mjs",
+      "sha": "002b8501cd4f4df023148515add7c55e2863dbd3",
+      "mode": "100644",
+      "first": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "002b8501cd4f4df023148515add7c55e2863dbd3"
+      },
+      "final": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "002b8501cd4f4df023148515add7c55e2863dbd3"
+      },
+      "matches": true
+    },
+    {
+      "path": "scripts/acceptance/run-observability.test.mjs",
+      "sha": "aab0a21c4c8fadb9df81ff87ada4fa23198fa575",
+      "mode": "100644",
+      "first": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "aab0a21c4c8fadb9df81ff87ada4fa23198fa575"
+      },
+      "final": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "aab0a21c4c8fadb9df81ff87ada4fa23198fa575"
+      },
+      "matches": true
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "sha": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116",
+      "mode": "100755",
+      "first": {
+        "mode": "100755",
+        "type": "blob",
+        "sha": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116"
+      },
+      "final": {
+        "mode": "100755",
+        "type": "blob",
+        "sha": "09e0751562d1164cb3c0ba67fe7e4bc971dc3116"
+      },
+      "matches": true
+    },
+    {
+      "path": "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+      "sha": "2b4fd7946c39a83eac97def4bab1cf0839802a3b",
+      "mode": "100755",
+      "first": {
+        "mode": "100755",
+        "type": "blob",
+        "sha": "2b4fd7946c39a83eac97def4bab1cf0839802a3b"
+      },
+      "final": {
+        "mode": "100755",
+        "type": "blob",
+        "sha": "2b4fd7946c39a83eac97def4bab1cf0839802a3b"
+      },
+      "matches": true
+    }
+  ],
+  "firstConflictReview": {
+    "sourceIndex": "f449e443232bed85347e08d6014ec54c25b3a370",
+    "p521BindingIndex": "c2e0dc20f4f127b9b49ac97b605df9aa0388e9b6",
+    "conflictContentsReused": 6,
+    "firstTreePackage": "ef6da7b3d6b33220051fef56d7e9e5e024105310",
+    "generatedRouteCount": 243,
+    "generatedMethodCount": 315,
+    "canonicalGeneratorNotExecuted": true
+  },
+  "secondConflictReview": {
+    "peerReceipt": "38d3e64f52075c76a31b28918d5d71e789825881",
+    "peerReceiptBytes": 25986,
+    "peerReceiptSha256": "ddccded1b8fa171b52900da7be9052e588d72b2f55c8109f567828dbad5f8049",
+    "bindingOnly": "Read the immutable detailed source review and verify its ten-path inventory/three approved content objects against the actual final tree. No source rewrite or test rerun.",
+    "package": "568cfeee161309202699acefd0a57a8edc52bf6e",
+    "en": "f8d4dc109e3adbf625a37e291b1ef11e83473ac9",
+    "zhCN": "cdda5d5fc21468db80c1bc475ec68e47cd1cddff",
+    "preserved": "Main's test:groups registration and result labels coexist with the existing P0 script/three Errors.taskWorkspace labels; all other bytes are covered by the frozen source review."
+  },
+  "exactOurs59Inventory": {
+    "count": 59,
+    "paths": [
+      ".github/actions/pnpm-install/action.yml",
+      ".github/workflows/issue1415-deployed-production.yml",
+      ".github/workflows/issue1415-managed-inspection.yml",
+      ".github/workflows/issues-1516-welcome-acceptance.yml",
+      ".github/workflows/read-cache-production.yml",
+      ".github/workflows/read-cache.yml",
+      ".github/workflows/self-hosted-production.yml",
+      ".github/workflows/thread-lifecycle-acceptance.yml",
+      ".github/workflows/ui-policy.yml",
+      ".github/workflows/web-deploy.yml",
+      "Dockerfile",
+      "app/v1/devices/[deviceId]/repos/route.ts",
+      "app/v1/devices/[deviceId]/runs/route.ts",
+      "apps/api/generated/routes.json",
+      "apps/api/generated/routes.ts",
+      "apps/desktop/src/renderer/read-batch.ts",
+      "apps/desktop/src/renderer/rpc.ts",
+      "components/swr-defaults.tsx",
+      "docs/operations/tracing.md",
+      "hooks/use-live-lists.ts",
+      "instrumentation-client.ts",
+      "lib/analytics-policy.ts",
+      "lib/coordinator/repository-resolution.test.ts",
+      "lib/coordinator/repository-resolution.ts",
+      "lib/desktop-rpc/read-batch-context.ts",
+      "lib/device-enrollment.db.test.ts",
+      "lib/device-enrollment.ts",
+      "lib/device-heartbeat.db.test.ts",
+      "lib/device-management.ts",
+      "lib/device-unit-fence.db.test.ts",
+      "lib/dispatch-timing.ts",
+      "lib/personal-policy.test.ts",
+      "lib/personal-policy.ts",
+      "lib/replay-readiness.ts",
+      "lib/swr/read-observer.ts",
+      "lib/tracing/logs.test.ts",
+      "lib/tracing/node.ts",
+      "package.json",
+      "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+      "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+      "patches/ffmpeg-static@5.3.0.patch",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      "scripts/acceptance/run-observability-browser.mjs",
+      "scripts/acceptance/run-observability-browser.test.mjs",
+      "scripts/acceptance/run-observability.md",
+      "scripts/acceptance/run-observability.mjs",
+      "scripts/acceptance/run-observability.test.mjs",
+      "scripts/check-analytics-ssr.mjs",
+      "scripts/e2b/validate-template-subscriptions.mjs",
+      "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "scripts/ffmpeg-install.test.mjs",
+      "scripts/use-live-lists.live.test.tsx",
+      "tests/analytics-policy.test.mjs",
+      "tests/cloud-dispatch-startup.test.ts",
+      "tests/mvp/pinned-pnpm.test.mjs",
+      "tests/replay-readiness.test.mjs",
+      "workflows/coordinator/factory-steps.ts",
+      "workflows/coordinator/steps.ts"
+    ],
+    "exactModeTypeBlobProjectionSha256": "cf6df05ca088cc3f232837070e697827a6c7380ab639e99646c712d0c997e506",
+    "projectionHeldInReviewerRam": true
+  },
+  "exactP0Overlay57": {
+    "count": 57,
+    "paths": [
+      ".github/actions/pnpm-install/action.yml",
+      ".github/workflows/issue1415-deployed-production.yml",
+      ".github/workflows/issue1415-managed-inspection.yml",
+      ".github/workflows/issues-1516-welcome-acceptance.yml",
+      ".github/workflows/read-cache-production.yml",
+      ".github/workflows/read-cache.yml",
+      ".github/workflows/self-hosted-production.yml",
+      ".github/workflows/thread-lifecycle-acceptance.yml",
+      ".github/workflows/ui-policy.yml",
+      ".github/workflows/web-deploy.yml",
+      "Dockerfile",
+      "app/v1/devices/[deviceId]/repos/route.ts",
+      "app/v1/devices/[deviceId]/runs/route.ts",
+      "apps/api/generated/routes.json",
+      "apps/api/generated/routes.ts",
+      "apps/desktop/src/renderer/read-batch.ts",
+      "apps/desktop/src/renderer/rpc.ts",
+      "components/swr-defaults.tsx",
+      "docs/operations/tracing.md",
+      "hooks/use-live-lists.ts",
+      "instrumentation-client.ts",
+      "lib/analytics-policy.ts",
+      "lib/coordinator/repository-resolution.test.ts",
+      "lib/coordinator/repository-resolution.ts",
+      "lib/desktop-rpc/read-batch-context.ts",
+      "lib/device-enrollment.db.test.ts",
+      "lib/device-enrollment.ts",
+      "lib/device-heartbeat.db.test.ts",
+      "lib/device-management.ts",
+      "lib/device-unit-fence.db.test.ts",
+      "lib/dispatch-timing.ts",
+      "lib/personal-policy.test.ts",
+      "lib/personal-policy.ts",
+      "lib/replay-readiness.ts",
+      "lib/swr/read-observer.ts",
+      "lib/tracing/logs.test.ts",
+      "lib/tracing/node.ts",
+      "package.json",
+      "patches/ffmpeg-static@5.3.0.patch",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      "scripts/acceptance/run-observability-browser.mjs",
+      "scripts/acceptance/run-observability-browser.test.mjs",
+      "scripts/acceptance/run-observability.md",
+      "scripts/acceptance/run-observability.mjs",
+      "scripts/acceptance/run-observability.test.mjs",
+      "scripts/check-analytics-ssr.mjs",
+      "scripts/e2b/validate-template-subscriptions.mjs",
+      "scripts/e2b/validate-template-subscriptions.test.mjs",
+      "scripts/ffmpeg-install.test.mjs",
+      "scripts/use-live-lists.live.test.tsx",
+      "tests/analytics-policy.test.mjs",
+      "tests/cloud-dispatch-startup.test.ts",
+      "tests/mvp/pinned-pnpm.test.mjs",
+      "tests/replay-readiness.test.mjs",
+      "workflows/coordinator/factory-steps.ts",
+      "workflows/coordinator/steps.ts"
+    ],
+    "exactModeTypeBlobProjectionSha256": "9705426be5853b167bf1345a06588183d66335d5bfdeac66c32999fac05ac6e0",
+    "projectionHeldInReviewerRam": true
+  },
+  "actualSecondDelta10": [
+    {
+      "path": "components/workspace/issue-thread-panel.tsx",
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "3e07eacde5cf28eac30a66e4b50df8e1e8cbc5cf"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c9e5223c1cceca956f4b5d5abfec17ececa04654"
+      }
+    },
+    {
+      "path": "components/workspace/issue-threads.tsx",
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "5ae5cc571e64afb49539bfba8933e36806a507df"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "33328818b49b5d6fa3c940ec0281fd2e0cac5ccf"
+      }
+    },
+    {
+      "path": "docs/design/glossary.md",
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "e35bd2da492cc4da80e83675886c10374ea8948c"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bf4d10e9b5f228ff1009cba7015e62ba73b9c220"
+      }
+    },
+    {
+      "path": "docs/design/rules.md",
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cc115d464b83560a4ea1739bcfaaaa3dc22cec2d"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7f732181f78949fe743e6991cb60af7005cbba60"
+      }
+    },
+    {
+      "path": "hooks/use-run-result.test.ts",
+      "before": null,
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ba76ad025f4e707a21fd939d97a2b627129d3e40"
+      }
+    },
+    {
+      "path": "hooks/use-run-result.ts",
+      "before": null,
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "62be3068a787242d0c604d15863bb8fd079aade6"
+      }
+    },
+    {
+      "path": "messages/en.json",
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "95dc94444fe0149348acfec5598fb8cab743ba32"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f8d4dc109e3adbf625a37e291b1ef11e83473ac9"
+      }
+    },
+    {
+      "path": "messages/zh-CN.json",
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "35ca6cb153df026c66881b0d4083c79ae9119df1"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cdda5d5fc21468db80c1bc475ec68e47cd1cddff"
+      }
+    },
+    {
+      "path": "package.json",
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ef6da7b3d6b33220051fef56d7e9e5e024105310"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "568cfeee161309202699acefd0a57a8edc52bf6e"
+      }
+    },
+    {
+      "path": "scripts/issue-thread-acceptance.test.tsx",
+      "before": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "80bfbb3eefa4253ba6e662dd8820f4ceaed8d40c"
+      },
+      "after": {
+        "mode": "100644",
+        "type": "blob",
+        "sha": "779dc18f1eb72f13505108efb0c41bafcb79048b"
+      }
+    }
+  ],
+  "conclusion": {
+    "staticContentAndTreeBindingPassed": true,
+    "unexpectedChanges": 0,
+    "deletedLeaves": 0,
+    "combinedRuntimeOrNativePassClaimed": false,
+    "upstreamSourceBoundary": "Parent reported P0 A2 Source job/run green; original A1 failure cause remains unknown and is not erased. This reviewer did not read or rerun either job. Actual combined CI and actual final commit/source still belong to the publication owner."
+  },
+  "installerElevenPreservation": {
+    "basis": "Reconstruct exact prior c0e tree from main0415 and its frozen49-entry source index9b9d51a; compare that full tree to actual f095. Its13 changed paths split into the explicit2 driver files and11 installer paths; verify the complete11 across both actual merged trees.",
+    "priorC0eTree": "3e09885ffb34a9c04fc8a7ac5b8b88e3415f7325",
+    "prior49Index": "9b9d51a5457665b4438efdf25bdb4bbcd4f45de4",
+    "deltaPaths": 13,
+    "driverPaths": 2,
+    "installerPaths": 11,
+    "entries": [
+      {
+        "path": ".github/actions/pnpm-install/action.yml",
+        "priorC0e": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "20a5db53847172db9f52ee12c6c0feeec6c48dce"
+        },
+        "reviewedF095": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "553d718ad413f0db4b12833e06ffb8f29d98e555"
+        },
+        "firstPreserved": true,
+        "finalPreserved": true
+      },
+      {
+        "path": ".github/workflows/issue1415-deployed-production.yml",
+        "priorC0e": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "8ef902848aba3a2e59ce01608782697ec7f4d14c"
+        },
+        "reviewedF095": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "6d0b50becc99ce6d5f6cfb69cceea1037f2ee1be"
+        },
+        "firstPreserved": true,
+        "finalPreserved": true
+      },
+      {
+        "path": ".github/workflows/issue1415-managed-inspection.yml",
+        "priorC0e": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "0d8cc322ddddb2bada48abff741cf7887b6631b0"
+        },
+        "reviewedF095": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "9ece51fc2a39c2d362446e68df1f9bbf2076f641"
+        },
+        "firstPreserved": true,
+        "finalPreserved": true
+      },
+      {
+        "path": ".github/workflows/issues-1516-welcome-acceptance.yml",
+        "priorC0e": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "74c7dd24872ef8e02ef27d559822fb6440d01c0a"
+        },
+        "reviewedF095": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "4757d62065017957f6e1e4300ab4695507ce40d8"
+        },
+        "firstPreserved": true,
+        "finalPreserved": true
+      },
+      {
+        "path": ".github/workflows/read-cache-production.yml",
+        "priorC0e": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "82b0a711738730df3dcdc5f6e2f07beda4b7c8c1"
+        },
+        "reviewedF095": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "7ffa772dc65e85ae6665d7fb70f5d5a3b604da22"
+        },
+        "firstPreserved": true,
+        "finalPreserved": true
+      },
+      {
+        "path": ".github/workflows/read-cache.yml",
+        "priorC0e": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "54464667276af18611ba083e968ce9f1672fb301"
+        },
+        "reviewedF095": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "86ee0112413eae241189bb2d748a6d6901201c4f"
+        },
+        "firstPreserved": true,
+        "finalPreserved": true
+      },
+      {
+        "path": ".github/workflows/self-hosted-image.yml",
+        "priorC0e": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "46f05f36960559221030e89e1add41ecdfced3b4"
+        },
+        "reviewedF095": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "3dc64ed2c8d58efdf981036e7bb6362e1bd92077"
+        },
+        "firstPreserved": true,
+        "finalPreserved": true
+      },
+      {
+        "path": ".github/workflows/self-hosted-production.yml",
+        "priorC0e": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "77788506cdb928f64b6975483c73c6523c76d483"
+        },
+        "reviewedF095": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "862a9f7cdea8df0373207e389f3cbf3afaca46df"
+        },
+        "firstPreserved": true,
+        "finalPreserved": true
+      },
+      {
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "priorC0e": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e90d6530e978d638d3040c0daa4ac6dc84b39767"
+        },
+        "reviewedF095": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "42ae23945f798020ec068635e7621869fb427af2"
+        },
+        "firstPreserved": true,
+        "finalPreserved": true
+      },
+      {
+        "path": ".github/workflows/ui-policy.yml",
+        "priorC0e": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "18e7c54ec507d02b12fd1131b5a8b6112ece2212"
+        },
+        "reviewedF095": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "e3938ad5c343fb14d60709e014cb3d9a3189b104"
+        },
+        "firstPreserved": true,
+        "finalPreserved": true
+      },
+      {
+        "path": "tests/mvp/pinned-pnpm.test.mjs",
+        "priorC0e": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "b22b319424ada32e3592f7a6ea464aa49121aad0"
+        },
+        "reviewedF095": {
+          "mode": "100644",
+          "type": "blob",
+          "sha": "0306d340b38cf455facba376c2eb6dda58362c96"
+        },
+        "firstPreserved": true,
+        "finalPreserved": true
+      }
+    ],
+    "latestOwnerReview": {
+      "gitBlob": "32809be58280550a53c9fd97a1f0f97d60652afe",
+      "bytes": 28867,
+      "sha256": "ffed446aab95ff56cb3d964db88ddeeefa982a6c2560d113180c2b428d5ec22f",
+      "all11PreimagesAndPostimagesMatch": true,
+      "runtimeTestsNotReexecuted": true
+    }
+  },
+  "privacy": {
+    "content": "Public repository paths/object hashes and closed review results only.",
+    "emailShapeFilenameException": {
+      "count": 2,
+      "kind": "The same versioned patch filename occurs in the two path inventories; it is not an email address."
+    },
+    "unresolvedScanFindings": 0
+  },
+  "supersedes": "298c356b31ab38d7727da0b213bae48e72a36c26"
+}

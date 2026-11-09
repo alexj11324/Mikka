@@ -1,0 +1,596 @@
+{
+  "version": 1,
+  "kind": "fixed-main-a219-p521-f095-compatibility-and-three-disjoint-merges",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "source": {
+    "main": {
+      "commit": "a2198c8c2f608f7b8169329b9da853067618dba6",
+      "tree": "d3c86f905a0ff548720f54a9c73bf92a4764e033",
+      "parents": [
+        "76df3935c8be5af480485c52e445d389e85d8a35"
+      ],
+      "commitVerifiedByApi": true,
+      "compareUrl": "https://github.com/alexj11324/Mikka/compare/76df3935c8be5af480485c52e445d389e85d8a35...a2198c8c2f608f7b8169329b9da853067618dba6"
+    },
+    "stack": {
+      "commit": "f0956eb1481cee710efb714ec3635ac66b4b44ec",
+      "tree": "1431bb492e1a10b282202602e977f15dcfe52246",
+      "parents": [
+        "0c35e2005fc7c92872229ef895a6ef9aa95bef44"
+      ],
+      "commitVerifiedByApi": true,
+      "commonBaseForChangedPathInventory": "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+      "changedPathCount": 59,
+      "changedPaths": [
+        ".github/actions/pnpm-install/action.yml",
+        ".github/workflows/issue1415-deployed-production.yml",
+        ".github/workflows/issue1415-managed-inspection.yml",
+        ".github/workflows/issues-1516-welcome-acceptance.yml",
+        ".github/workflows/read-cache-production.yml",
+        ".github/workflows/read-cache.yml",
+        ".github/workflows/self-hosted-production.yml",
+        ".github/workflows/thread-lifecycle-acceptance.yml",
+        ".github/workflows/ui-policy.yml",
+        ".github/workflows/web-deploy.yml",
+        "Dockerfile",
+        "app/v1/devices/[deviceId]/repos/route.ts",
+        "app/v1/devices/[deviceId]/runs/route.ts",
+        "apps/api/generated/routes.json",
+        "apps/api/generated/routes.ts",
+        "apps/desktop/src/renderer/read-batch.ts",
+        "apps/desktop/src/renderer/rpc.ts",
+        "components/swr-defaults.tsx",
+        "docs/operations/tracing.md",
+        "hooks/use-live-lists.ts",
+        "instrumentation-client.ts",
+        "lib/analytics-policy.ts",
+        "lib/coordinator/repository-resolution.test.ts",
+        "lib/coordinator/repository-resolution.ts",
+        "lib/desktop-rpc/read-batch-context.ts",
+        "lib/device-enrollment.db.test.ts",
+        "lib/device-enrollment.ts",
+        "lib/device-heartbeat.db.test.ts",
+        "lib/device-management.ts",
+        "lib/device-unit-fence.db.test.ts",
+        "lib/dispatch-timing.ts",
+        "lib/personal-policy.test.ts",
+        "lib/personal-policy.ts",
+        "lib/replay-readiness.ts",
+        "lib/swr/read-observer.ts",
+        "lib/tracing/logs.test.ts",
+        "lib/tracing/node.ts",
+        "package.json",
+        "packages/daemon/test/fakes/fake-claude-generation-abort.mjs",
+        "packages/daemon/test/fakes/fake-codex-generation-completion.mjs",
+        "patches/ffmpeg-static@5.3.0.patch",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "scripts/acceptance/run-observability-browser.mjs",
+        "scripts/acceptance/run-observability-browser.test.mjs",
+        "scripts/acceptance/run-observability.md",
+        "scripts/acceptance/run-observability.mjs",
+        "scripts/acceptance/run-observability.test.mjs",
+        "scripts/check-analytics-ssr.mjs",
+        "scripts/e2b/validate-template-subscriptions.mjs",
+        "scripts/e2b/validate-template-subscriptions.test.mjs",
+        "scripts/ffmpeg-install.test.mjs",
+        "scripts/use-live-lists.live.test.tsx",
+        "tests/analytics-policy.test.mjs",
+        "tests/cloud-dispatch-startup.test.ts",
+        "tests/mvp/pinned-pnpm.test.mjs",
+        "tests/replay-readiness.test.mjs",
+        "workflows/coordinator/factory-steps.ts",
+        "workflows/coordinator/steps.ts"
+      ],
+      "inventoryBoundary": "Current f095 stack compared to common base 0415 has 59 paths; the earlier c0-only 49 overlay count is not reused as this inventory."
+    },
+    "p0": {
+      "commit": "521db4799a4a85e1955f7dd86a1ad5ccef143cc8",
+      "tree": "d82a34d59bf072348869ef086e24ae0ad5a852ec",
+      "reviewIndex": "c2e0dc20f4f127b9b49ac97b605df9aa0388e9b6",
+      "commitBindingSource": "Previously frozen P521 review index; this task read the fixed root tree and only the subtrees needed for the ten main paths.",
+      "priorSixCandidates": [
+        {
+          "path": "apps/api/generated/routes.json",
+          "gitBlob": "6fbced33e672f3fa0d5e35bed40b63fa103809d5"
+        },
+        {
+          "path": "apps/api/generated/routes.ts",
+          "gitBlob": "a0cc13783eb567c256c34e08eaf3f6e9aca157e2"
+        },
+        {
+          "path": "apps/desktop/src/renderer/rpc.ts",
+          "gitBlob": "dae8798653457afad334c2d909b10b63e9b3956f"
+        },
+        {
+          "path": "lib/device-heartbeat.db.test.ts",
+          "gitBlob": "e8f4f35748707364e77c53fa594c166bafc3dae8"
+        },
+        {
+          "path": "package.json",
+          "gitBlob": "ef6da7b3d6b33220051fef56d7e9e5e024105310"
+        },
+        {
+          "path": "workflows/coordinator/steps.ts",
+          "gitBlob": "d500795e9a62631b6c7619c4ffd1df67f137ee54"
+        }
+      ],
+      "unchangedOtherFiveCandidates": true
+    }
+  },
+  "completeMainDelta": {
+    "fileCount": 10,
+    "commitCount": 1,
+    "allTenPatchesRead": true,
+    "patchAdditionDeletionCountsMatchedMetadata": [
+      {
+        "path": "components/workspace/issue-thread-panel.tsx",
+        "newBlob": "c9e5223c1cceca956f4b5d5abfec17ececa04654",
+        "status": "modified",
+        "additions": 9,
+        "deletions": 6,
+        "patchAdditions": 9,
+        "patchDeletions": 6,
+        "completeCounts": true
+      },
+      {
+        "path": "components/workspace/issue-threads.tsx",
+        "newBlob": "33328818b49b5d6fa3c940ec0281fd2e0cac5ccf",
+        "status": "modified",
+        "additions": 15,
+        "deletions": 4,
+        "patchAdditions": 15,
+        "patchDeletions": 4,
+        "completeCounts": true
+      },
+      {
+        "path": "docs/design/glossary.md",
+        "newBlob": "bf4d10e9b5f228ff1009cba7015e62ba73b9c220",
+        "status": "modified",
+        "additions": 23,
+        "deletions": 0,
+        "patchAdditions": 23,
+        "patchDeletions": 0,
+        "completeCounts": true
+      },
+      {
+        "path": "docs/design/rules.md",
+        "newBlob": "7f732181f78949fe743e6991cb60af7005cbba60",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 1,
+        "patchAdditions": 2,
+        "patchDeletions": 1,
+        "completeCounts": true
+      },
+      {
+        "path": "hooks/use-run-result.test.ts",
+        "newBlob": "ba76ad025f4e707a21fd939d97a2b627129d3e40",
+        "status": "added",
+        "additions": 22,
+        "deletions": 0,
+        "patchAdditions": 22,
+        "patchDeletions": 0,
+        "completeCounts": true
+      },
+      {
+        "path": "hooks/use-run-result.ts",
+        "newBlob": "62be3068a787242d0c604d15863bb8fd079aade6",
+        "status": "added",
+        "additions": 33,
+        "deletions": 0,
+        "patchAdditions": 33,
+        "patchDeletions": 0,
+        "completeCounts": true
+      },
+      {
+        "path": "messages/en.json",
+        "newBlob": "eefae5cb99d77220d53cdf802fa6716e64db3cd1",
+        "status": "modified",
+        "additions": 2,
+        "deletions": 0,
+        "patchAdditions": 2,
+        "patchDeletions": 0,
+        "completeCounts": true
+      },
+      {
+        "path": "messages/zh-CN.json",
+        "newBlob": "be4f5f0c7d4237df4bcdf5e77d3e64513f161e65",
+        "status": "modified",
+        "additions": 3,
+        "deletions": 1,
+        "patchAdditions": 3,
+        "patchDeletions": 1,
+        "completeCounts": true
+      },
+      {
+        "path": "package.json",
+        "newBlob": "2464da06d4a809c500aff11195f60a9c6b66c70b",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 1,
+        "patchAdditions": 1,
+        "patchDeletions": 1,
+        "completeCounts": true
+      },
+      {
+        "path": "scripts/issue-thread-acceptance.test.tsx",
+        "newBlob": "779dc18f1eb72f13505108efb0c41bafcb79048b",
+        "status": "modified",
+        "additions": 1,
+        "deletions": 1,
+        "patchAdditions": 1,
+        "patchDeletions": 1,
+        "completeCounts": true
+      }
+    ],
+    "inventory": [
+      {
+        "path": "components/workspace/issue-thread-panel.tsx",
+        "baseBlob": "3e07eacde5cf28eac30a66e4b50df8e1e8cbc5cf",
+        "baseMode": "100644",
+        "p0Blob": "3e07eacde5cf28eac30a66e4b50df8e1e8cbc5cf",
+        "p0Mode": "100644",
+        "mainBlob": "c9e5223c1cceca956f4b5d5abfec17ececa04654",
+        "mainStatus": "modified",
+        "p0DiffersFromBase": false,
+        "p0SameAsMain": false
+      },
+      {
+        "path": "components/workspace/issue-threads.tsx",
+        "baseBlob": "5ae5cc571e64afb49539bfba8933e36806a507df",
+        "baseMode": "100644",
+        "p0Blob": "5ae5cc571e64afb49539bfba8933e36806a507df",
+        "p0Mode": "100644",
+        "mainBlob": "33328818b49b5d6fa3c940ec0281fd2e0cac5ccf",
+        "mainStatus": "modified",
+        "p0DiffersFromBase": false,
+        "p0SameAsMain": false
+      },
+      {
+        "path": "docs/design/glossary.md",
+        "baseBlob": "e35bd2da492cc4da80e83675886c10374ea8948c",
+        "baseMode": "100644",
+        "p0Blob": "e35bd2da492cc4da80e83675886c10374ea8948c",
+        "p0Mode": "100644",
+        "mainBlob": "bf4d10e9b5f228ff1009cba7015e62ba73b9c220",
+        "mainStatus": "modified",
+        "p0DiffersFromBase": false,
+        "p0SameAsMain": false
+      },
+      {
+        "path": "docs/design/rules.md",
+        "baseBlob": "cc115d464b83560a4ea1739bcfaaaa3dc22cec2d",
+        "baseMode": "100644",
+        "p0Blob": "cc115d464b83560a4ea1739bcfaaaa3dc22cec2d",
+        "p0Mode": "100644",
+        "mainBlob": "7f732181f78949fe743e6991cb60af7005cbba60",
+        "mainStatus": "modified",
+        "p0DiffersFromBase": false,
+        "p0SameAsMain": false
+      },
+      {
+        "path": "hooks/use-run-result.test.ts",
+        "baseBlob": null,
+        "baseMode": null,
+        "p0Blob": null,
+        "p0Mode": null,
+        "mainBlob": "ba76ad025f4e707a21fd939d97a2b627129d3e40",
+        "mainStatus": "added",
+        "p0DiffersFromBase": false,
+        "p0SameAsMain": false
+      },
+      {
+        "path": "hooks/use-run-result.ts",
+        "baseBlob": null,
+        "baseMode": null,
+        "p0Blob": null,
+        "p0Mode": null,
+        "mainBlob": "62be3068a787242d0c604d15863bb8fd079aade6",
+        "mainStatus": "added",
+        "p0DiffersFromBase": false,
+        "p0SameAsMain": false
+      },
+      {
+        "path": "messages/en.json",
+        "baseBlob": "b27501a8d69d766df76709418c8811e5aa94e815",
+        "baseMode": "100644",
+        "p0Blob": "95dc94444fe0149348acfec5598fb8cab743ba32",
+        "p0Mode": "100644",
+        "mainBlob": "eefae5cb99d77220d53cdf802fa6716e64db3cd1",
+        "mainStatus": "modified",
+        "p0DiffersFromBase": true,
+        "p0SameAsMain": false
+      },
+      {
+        "path": "messages/zh-CN.json",
+        "baseBlob": "32cb3ded65d4d6b572b8d647354164ab08f4ee96",
+        "baseMode": "100644",
+        "p0Blob": "35ca6cb153df026c66881b0d4083c79ae9119df1",
+        "p0Mode": "100644",
+        "mainBlob": "be4f5f0c7d4237df4bcdf5e77d3e64513f161e65",
+        "mainStatus": "modified",
+        "p0DiffersFromBase": true,
+        "p0SameAsMain": false
+      },
+      {
+        "path": "package.json",
+        "baseBlob": "ec9951453307dd586dfe058648d9fc762a6665ad",
+        "baseMode": "100644",
+        "p0Blob": "3158b34c16d1734861e1f487f3142a98908e5d78",
+        "p0Mode": "100644",
+        "mainBlob": "2464da06d4a809c500aff11195f60a9c6b66c70b",
+        "mainStatus": "modified",
+        "p0DiffersFromBase": true,
+        "p0SameAsMain": false
+      },
+      {
+        "path": "scripts/issue-thread-acceptance.test.tsx",
+        "baseBlob": "80bfbb3eefa4253ba6e662dd8820f4ceaed8d40c",
+        "baseMode": "100644",
+        "p0Blob": "80bfbb3eefa4253ba6e662dd8820f4ceaed8d40c",
+        "p0Mode": "100644",
+        "mainBlob": "779dc18f1eb72f13505108efb0c41bafcb79048b",
+        "mainStatus": "modified",
+        "p0DiffersFromBase": false,
+        "p0SameAsMain": false
+      }
+    ]
+  },
+  "intersections": {
+    "mainTenVsCurrentF095Stack": [
+      "package.json"
+    ],
+    "mainTenVsP521From76df": [
+      "messages/en.json",
+      "messages/zh-CN.json",
+      "package.json"
+    ],
+    "jsonLeafIntersection": [],
+    "preservationRule": "Preserve all ten a219 changes. Keep the seven non-overlapping main paths at their exact main blobs. Merge package and both locale files without replacing either side's disjoint changes."
+  },
+  "candidates": {
+    "package": {
+      "path": "package.json",
+      "bytes": 80839,
+      "sha256": "d1e4b875976a3076381ad30949da73686ea7dc794f5ff7bc0cc27ccb6111443a",
+      "gitBlob": "568cfeee161309202699acefd0a57a8edc52bf6e",
+      "mode": "100644",
+      "remoteConfirmed": true,
+      "proof": {
+        "baseBlob": "ec9951453307dd586dfe058648d9fc762a6665ad",
+        "reviewedBlob": "ef6da7b3d6b33220051fef56d7e9e5e024105310",
+        "mainBlob": "2464da06d4a809c500aff11195f60a9c6b66c70b",
+        "preservedExistingScriptKeys": [
+          "test:web-auth-db",
+          "test:migrations",
+          "test:relation-cycle",
+          "test:captures",
+          "test:visibility-db",
+          "test:factory-monitor-db",
+          "test:bot-threads-db"
+        ],
+        "addedMainScriptKey": "test:groups",
+        "mainOnlyOneLineReplacement": true,
+        "bothMergeOrdersByteIdentical": true,
+        "allOtherBytesOfReviewedPackagePreserved": true,
+        "newTestPath": "hooks/use-run-result.test.ts",
+        "nodeTestsRun": false
+      }
+    },
+    "locales": [
+      {
+        "path": "messages/en.json",
+        "mode": "100644",
+        "before": {
+          "base": {
+            "path": "messages/en.json",
+            "bytes": 252792,
+            "sha256": "4085c3132b62352c7f7f0a54cee46a653331b0989eda69cd11165268f2caa98e",
+            "gitBlob": "b27501a8d69d766df76709418c8811e5aa94e815"
+          },
+          "p0": {
+            "path": "messages/en.json",
+            "bytes": 253238,
+            "sha256": "a3be31bf741658d783a40a252d22f8e4e8796b102990e64526ace29929bdbc69",
+            "gitBlob": "95dc94444fe0149348acfec5598fb8cab743ba32"
+          },
+          "main": {
+            "path": "messages/en.json",
+            "bytes": 252863,
+            "sha256": "676f4a2268174afe5d41958bdeb975ca1a3d3e1fe5540426b8768f567d82f2fd",
+            "gitBlob": "eefae5cb99d77220d53cdf802fa6716e64db3cd1"
+          }
+        },
+        "after": {
+          "path": "messages/en.json",
+          "bytes": 253309,
+          "sha256": "9d43a03419a898462d5d7edcdf801c3c2c77b6960f3d80ce22c95c905a1a346d",
+          "gitBlob": "f8d4dc109e3adbf625a37e291b1ef11e83473ac9"
+        },
+        "mainLeafChanges": [
+          {
+            "path": "Shell.panel.task.result.queued",
+            "before": null,
+            "after": "Queued"
+          },
+          {
+            "path": "Shell.panel.task.result.waiting",
+            "before": null,
+            "after": "Needs your reply"
+          }
+        ],
+        "p0LeafChanges": [
+          {
+            "path": "Errors.taskWorkspaceUnresolved",
+            "before": null,
+            "after": "This resource has no verified workspace. Select a workspace for a new resource, or ask an administrator to resolve its recorded ownership."
+          },
+          {
+            "path": "Errors.taskWorkspaceMismatch",
+            "before": null,
+            "after": "The task, thread, artifact and Agent must belong to the same workspace. Choose resources from the current workspace."
+          },
+          {
+            "path": "Errors.taskWorkspaceTransferDenied",
+            "before": null,
+            "after": "A task cannot be moved between workspaces. Its workspace is fixed when it is created."
+          }
+        ],
+        "leafIntersection": [],
+        "bothMergeOrdersByteIdentical": true,
+        "allUnchangedBytesPreservedByUniqueContextReplacement": true,
+        "fromP0Replacement": {
+          "before": "        \"result\": {\n          \"running\": \"Running\",\n          \"needsReply\": \"Needs your reply\",\n          \"paused\": \"Paused\",",
+          "after": "        \"result\": {\n          \"running\": \"Running\",\n          \"queued\": \"Queued\",\n          \"waiting\": \"Needs your reply\",\n          \"needsReply\": \"Needs your reply\",\n          \"paused\": \"Paused\","
+        },
+        "fromMainReplacement": {
+          "before": "    \"projectIssuesSaveFailed\": \"Could not link tasks. Check your access and try again.\",\n    \"workspaceAccessDenied\": \"You do not have permission to manage this workspace, or your membership is suspended.\",\n    \"workspaceNotFound\": \"No accessible workspace.\",\n    \"workspacePaymentTaken\": \"Another member's card already pays for this team.\",",
+          "after": "    \"projectIssuesSaveFailed\": \"Could not link tasks. Check your access and try again.\",\n    \"workspaceAccessDenied\": \"You do not have permission to manage this workspace, or your membership is suspended.\",\n    \"taskWorkspaceUnresolved\": \"This resource has no verified workspace. Select a workspace for a new resource, or ask an administrator to resolve its recorded ownership.\",\n    \"taskWorkspaceMismatch\": \"The task, thread, artifact and Agent must belong to the same workspace. Choose resources from the current workspace.\",\n    \"taskWorkspaceTransferDenied\": \"A task cannot be moved between workspaces. Its workspace is fixed when it is created.\",\n    \"workspaceNotFound\": \"No accessible workspace.\",\n    \"workspacePaymentTaken\": \"Another member's card already pays for this team.\","
+        },
+        "execution": "Pure V8 static source merge only; no UI/test/runtime execution.",
+        "remoteConfirmed": true
+      },
+      {
+        "path": "messages/zh-CN.json",
+        "mode": "100644",
+        "before": {
+          "base": {
+            "path": "messages/zh-CN.json",
+            "bytes": 243480,
+            "sha256": "82b800238a52c21080ff4d02e719c0b30c82e5ef62e1acb4d2d6458753e143a6",
+            "gitBlob": "32cb3ded65d4d6b572b8d647354164ab08f4ee96"
+          },
+          "p0": {
+            "path": "messages/zh-CN.json",
+            "bytes": 243885,
+            "sha256": "ef1aea2fb7ca0858a700584733afdee6cf33eabff4e4893ef847a95bff5fff6b",
+            "gitBlob": "35ca6cb153df026c66881b0d4083c79ae9119df1"
+          },
+          "main": {
+            "path": "messages/zh-CN.json",
+            "bytes": 243550,
+            "sha256": "9f522a14910271111db2dc9efc36f4f7d62303db902581b44d91b70caf9adbd6",
+            "gitBlob": "be4f5f0c7d4237df4bcdf5e77d3e64513f161e65"
+          }
+        },
+        "after": {
+          "path": "messages/zh-CN.json",
+          "bytes": 243955,
+          "sha256": "32cbd22b9d04e56684549434f14f930c3e1dbebcfc50b5f0f2f356918acaadd3",
+          "gitBlob": "cdda5d5fc21468db80c1bc475ec68e47cd1cddff"
+        },
+        "mainLeafChanges": [
+          {
+            "path": "Shell.panel.task.result.running",
+            "before": "进行中",
+            "after": "运行中"
+          },
+          {
+            "path": "Shell.panel.task.result.queued",
+            "before": null,
+            "after": "排队中"
+          },
+          {
+            "path": "Shell.panel.task.result.waiting",
+            "before": null,
+            "after": "等你回复"
+          }
+        ],
+        "p0LeafChanges": [
+          {
+            "path": "Errors.taskWorkspaceUnresolved",
+            "before": null,
+            "after": "此资源尚无已核实的工作区归属。新建资源时请选择工作区；历史资源请由管理员核实归属记录。"
+          },
+          {
+            "path": "Errors.taskWorkspaceMismatch",
+            "before": null,
+            "after": "任务、对话、产物和 Agent 必须属于同一工作区。请使用当前工作区的资源。"
+          },
+          {
+            "path": "Errors.taskWorkspaceTransferDenied",
+            "before": null,
+            "after": "任务创建后工作区归属固定，不支持跨工作区转移。"
+          }
+        ],
+        "leafIntersection": [],
+        "bothMergeOrdersByteIdentical": true,
+        "allUnchangedBytesPreservedByUniqueContextReplacement": true,
+        "fromP0Replacement": {
+          "before": "        },\n        \"result\": {\n          \"running\": \"进行中\",\n          \"needsReply\": \"等你回复\",\n          \"paused\": \"已暂停\",",
+          "after": "        },\n        \"result\": {\n          \"running\": \"运行中\",\n          \"queued\": \"排队中\",\n          \"waiting\": \"等你回复\",\n          \"needsReply\": \"等你回复\",\n          \"paused\": \"已暂停\","
+        },
+        "fromMainReplacement": {
+          "before": "    \"projectIssuesSaveFailed\": \"任务关联失败，请确认访问权限后重试。\",\n    \"workspaceAccessDenied\": \"没有管理此工作区的权限，或成员资格已被停用。\",\n    \"workspaceNotFound\": \"没有可访问的工作区。\",\n    \"workspacePaymentTaken\": \"这个团队已经由另一位成员的卡支付。\",",
+          "after": "    \"projectIssuesSaveFailed\": \"任务关联失败，请确认访问权限后重试。\",\n    \"workspaceAccessDenied\": \"没有管理此工作区的权限，或成员资格已被停用。\",\n    \"taskWorkspaceUnresolved\": \"此资源尚无已核实的工作区归属。新建资源时请选择工作区；历史资源请由管理员核实归属记录。\",\n    \"taskWorkspaceMismatch\": \"任务、对话、产物和 Agent 必须属于同一工作区。请使用当前工作区的资源。\",\n    \"taskWorkspaceTransferDenied\": \"任务创建后工作区归属固定，不支持跨工作区转移。\",\n    \"workspaceNotFound\": \"没有可访问的工作区。\",\n    \"workspacePaymentTaken\": \"这个团队已经由另一位成员的卡支付。\","
+        },
+        "execution": "Pure V8 static source merge only; no UI/test/runtime execution.",
+        "remoteConfirmed": true
+      }
+    ]
+  },
+  "behaviorReview": {
+    "mainChanges": [
+      {
+        "paths": [
+          "components/workspace/issue-thread-panel.tsx"
+        ],
+        "behavior": "Reveal the requested run section in a joined conversation only after no data-thread-loading marker remains; adds a marker to the existing skeleton and extends eligibility to the panel's own run.",
+        "newNetworkCallsInPatch": false
+      },
+      {
+        "paths": [
+          "components/workspace/issue-threads.tsx",
+          "hooks/use-run-result.ts"
+        ],
+        "behavior": "Reuse existing useIssueThreads and useAcceptanceTasks; project run state through runResult/localTaskState and translation label hooks. No additional data-read invocation in this patch.",
+        "newNetworkCallsInPatch": false
+      },
+      {
+        "paths": [
+          "messages/en.json",
+          "messages/zh-CN.json"
+        ],
+        "behavior": "Change only Shell.panel.task.result labels: add queued/waiting in both locales and change zh running wording.",
+        "errorNamespaceModified": false
+      },
+      {
+        "paths": [
+          "package.json",
+          "hooks/use-run-result.test.ts",
+          "scripts/issue-thread-acceptance.test.tsx"
+        ],
+        "behavior": "Register new runResult tests in test:groups and update the expected result label from Resolved to Done.",
+        "testExecutionObserved": false
+      }
+    ],
+    "browserActor": {
+      "path": "scripts/acceptance/run-observability-browser.mjs",
+      "gitBlob": "2f6cb3ab32695c64fa67191653c0add6e8720b39",
+      "selectors": "Existing exact roles/names for sign-in, Workspace, search, New task, Coordinator, Mikka Cloud, Agent profile and Create task; Replay readiness uses the existing function.",
+      "dependsOnChangedRunResultLabels": false,
+      "dependsOnDataThreadLoadingMarker": false
+    },
+    "sourceOnly": true,
+    "noObservedNewSqlClaim": true,
+    "uiRuntimeBoundary": "The scrolling/rendering changes may alter UI behavior; this source review does not replace a combined-source CI/browser/Native run or infer extra SQL from them.",
+    "authorizationAndTracingBoundary": "No authentication, Workspace authorization, request trace, sampler, span/log exporter or account-window code is among these ten paths."
+  },
+  "conclusion": {
+    "additionalMustFixAfterThreeCandidateMerges": [],
+    "runtimeClaim": "No new HTTP/RPC/SQL invocation is present in the reviewed a219 hunks. That is source inspection, not measured traffic or a claim that UI timing is unchanged.",
+    "driverSelectors": "The fixed production browser actor does not select the changed run-result labels or data-thread-loading marker; no direct selector mismatch was found.",
+    "testRegistration": "The new hooks/use-run-result.test.ts remains in main's existing test:groups command, including its module-mocks/server-test/tsx setup; all seven prior merged package script changes remain unchanged.",
+    "combinedSourceNotExecuted": true,
+    "generatedFiles": "No generated file was regenerated here; the five other previously reviewed P521 conflict candidates remain byte-identical inputs, and final union source gates remain required."
+  },
+  "boundaries": [
+    "This task fixed and read source objects only; no mutable-main polling after the given a219 snapshot.",
+    "Only package and two language merged blob objects were created; no UI logic was edited or redesigned.",
+    "No ref, branch, PR, workflow, CI, model, production account, database, VM or local process was created or changed.",
+    "No other owner's job log was read; P0 Source rerun status is outside this source review.",
+    "Earlier Native and CI results remain bound to their actual tested source; this receipt does not transfer them to a P0/a219/f095 union."
+  ]
+}

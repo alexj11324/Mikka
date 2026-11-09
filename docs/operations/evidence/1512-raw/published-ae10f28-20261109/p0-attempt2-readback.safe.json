@@ -1,0 +1,413 @@
+{
+  "schemaVersion": 1,
+  "kind": "bounded-P0521-source-check-rerun-metadata-readback",
+  "repository": "alexj11324/Mikka",
+  "issue": 1512,
+  "relatedPR": 1636,
+  "preparedAtUTC": "2026-11-09T10:41:05.984Z",
+  "observedAtUTC": "2026-11-09T10:39:58.469Z",
+  "requestedScope": "Reuse owner-published Source failure evidence and read only one bounded followup. No raw job logs, source rereview, tests or repair.",
+  "publicSources": [
+    {
+      "commentId": 6737782574,
+      "url": "https://github.com/alexj11324/Mikka/pull/1752#issuecomment-6737782574",
+      "createdAt": "2026-11-09T10:30:21Z",
+      "attributedStatement": "Owner reports P0521 dev-tracing providerStarted failure, unchanged9related blobs, local Node24.22.1 single-file1/1 and Team CI Node24.22.2 pass. A prior rerun request got403 because run was active; no A2 existed at that report time."
+    },
+    {
+      "commentId": 6737649452,
+      "url": "https://github.com/alexj11324/Mikka/pull/1636#issuecomment-6737649452",
+      "createdAt": "2026-11-09T10:23:04Z",
+      "attributedStatement": "A1 Source129098715476 failed; pnpm test:api failed10:12:48–10:13:07, job failure10:14:16."
+    },
+    {
+      "commentId": 6737707850,
+      "url": "https://github.com/alexj11324/Mikka/pull/1636#issuecomment-6737707850",
+      "createdAt": "2026-11-09T10:26:24Z",
+      "attributedStatement": "#1512 requested existing original safe blob and9blob list rather than redownload."
+    },
+    {
+      "commentId": 6737865106,
+      "url": "https://github.com/alexj11324/Mikka/pull/1636#issuecomment-6737865106",
+      "createdAt": "2026-11-09T10:34:52Z",
+      "attributedStatement": "Source-only review identifies dev-tracing.test.mjs:80 providerStarted assertion. That line precedes worker/version assertions and does not distinguish initial from HMR round."
+    }
+  ],
+  "originalFailureEvidence": {
+    "ownerRetainsOriginalJobLog": true,
+    "originalJobId": 129098715476,
+    "originalJobLogDownloadedByThisReviewer": false,
+    "fullSafeOriginalBlobFoundInReadComments": false,
+    "failingTest": "apps/api/runtime/dev-tracing.test.mjs",
+    "reportedAssertion": "assert.equal(result.providerStarted,true),line80",
+    "originalFullStackIndependentlyRead": false,
+    "failingInitialOrHMRRound": null,
+    "nineSourceBlobListProvided": false,
+    "failureCause": "unknown",
+    "noClaimOfFlakyOrCauseFixed": true,
+    "searchBoundary": "Specific1752comment and1636comments updated since09:50, followed by one final comments read since10:34. This is not a claim that no evidence exists in any other private/public location."
+  },
+  "earlierReproduction": {
+    "localNode24221SingleFile": "1/1, owner public report only",
+    "teamNode24222CI": "same test passed, owner public report only",
+    "independentOriginalReceiptRetrieved": false,
+    "didNotSubstituteForP0Gate": true
+  },
+  "firstMetadataObservation": {
+    "atUTC": "2026-11-09T10:38:44.530Z",
+    "runAttempt": 2,
+    "status": "in_progress",
+    "sourceJobId": 129108256862,
+    "testApiStep": {
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T10:36:36Z",
+      "completedAt": "2026-11-09T10:37:00Z"
+    },
+    "correction": "A real A2 existed after10:35:17; the older10:30 no-A2 report no longer described current state."
+  },
+  "finalMetadata": {
+    "run": {
+      "id": 42598869271,
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/42598869271",
+      "headSha": "521db4799a4a85e1955f7dd86a1ad5ccef143cc8",
+      "runAttempt": 2,
+      "path": ".github/workflows/ui-policy.yml",
+      "status": "completed",
+      "conclusion": "success",
+      "runStartedAt": "2026-11-09T10:35:17Z",
+      "updatedAt": "2026-11-09T10:39:05Z"
+    },
+    "sourceJob": {
+      "id": 129108256862,
+      "name": "Source checks",
+      "runAttempt": 2,
+      "headSha": "521db4799a4a85e1955f7dd86a1ad5ccef143cc8",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T10:35:22Z",
+      "completedAt": "2026-11-09T10:38:51Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:35:23Z",
+          "completedAt": "2026-11-09T10:35:23Z"
+        },
+        {
+          "number": 2,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:35:23Z",
+          "completedAt": "2026-11-09T10:35:29Z"
+        },
+        {
+          "number": 3,
+          "name": "Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:35:29Z",
+          "completedAt": "2026-11-09T10:36:11Z"
+        },
+        {
+          "number": 4,
+          "name": "Shadow selection against full baseline scenarios",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:36:11Z",
+          "completedAt": "2026-11-09T10:36:19Z"
+        },
+        {
+          "number": 5,
+          "name": "Run pnpm check:cloud-boundary",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:36:19Z",
+          "completedAt": "2026-11-09T10:36:30Z"
+        },
+        {
+          "number": 6,
+          "name": "Verify all production release credentials use existing Infisical OIDC",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:36:30Z",
+          "completedAt": "2026-11-09T10:36:30Z"
+        },
+        {
+          "number": 7,
+          "name": "Verify production auth and lease acceptance drivers without credentials",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:36:30Z",
+          "completedAt": "2026-11-09T10:36:31Z"
+        },
+        {
+          "number": 8,
+          "name": "Run pnpm lint:code",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:36:31Z",
+          "completedAt": "2026-11-09T10:36:34Z"
+        },
+        {
+          "number": 9,
+          "name": "Run node apps/api/scripts/generate-routes.mjs --check",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:36:34Z",
+          "completedAt": "2026-11-09T10:36:35Z"
+        },
+        {
+          "number": 10,
+          "name": "Run pnpm lint:runtime",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:36:35Z",
+          "completedAt": "2026-11-09T10:36:36Z"
+        },
+        {
+          "number": 11,
+          "name": "Run pnpm test:api",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:36:36Z",
+          "completedAt": "2026-11-09T10:37:00Z"
+        },
+        {
+          "number": 12,
+          "name": "Run pnpm --filter @mikka/frontend test",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:37:00Z",
+          "completedAt": "2026-11-09T10:37:36Z"
+        },
+        {
+          "number": 13,
+          "name": "Run pnpm typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:37:36Z",
+          "completedAt": "2026-11-09T10:38:24Z"
+        },
+        {
+          "number": 14,
+          "name": "Run pnpm --filter @mikka/protocol typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:38:24Z",
+          "completedAt": "2026-11-09T10:38:25Z"
+        },
+        {
+          "number": 15,
+          "name": "Run pnpm --filter @mikka/mobile typecheck",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:38:25Z",
+          "completedAt": "2026-11-09T10:38:35Z"
+        },
+        {
+          "number": 16,
+          "name": "Audit business UI composition",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:38:35Z",
+          "completedAt": "2026-11-09T10:38:46Z"
+        },
+        {
+          "number": 17,
+          "name": "Show audit summary",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:38:46Z",
+          "completedAt": "2026-11-09T10:38:46Z"
+        },
+        {
+          "number": 18,
+          "name": "Upload detailed audit",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:38:46Z",
+          "completedAt": "2026-11-09T10:38:48Z"
+        },
+        {
+          "number": 35,
+          "name": "Post Run ./.github/actions/pnpm-install",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:38:48Z",
+          "completedAt": "2026-11-09T10:38:48Z"
+        },
+        {
+          "number": 36,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:38:48Z",
+          "completedAt": "2026-11-09T10:38:48Z"
+        },
+        {
+          "number": 37,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:38:48Z",
+          "completedAt": "2026-11-09T10:38:48Z"
+        }
+      ]
+    },
+    "strictAggregate": {
+      "id": 129109703769,
+      "name": "UI policy (strict)",
+      "runAttempt": 2,
+      "headSha": "521db4799a4a85e1955f7dd86a1ad5ccef143cc8",
+      "status": "completed",
+      "conclusion": "success",
+      "startedAt": "2026-11-09T10:38:53Z",
+      "completedAt": "2026-11-09T10:39:05Z",
+      "steps": [
+        {
+          "number": 1,
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:38:54Z",
+          "completedAt": "2026-11-09T10:38:54Z"
+        },
+        {
+          "number": 2,
+          "name": "Require every selected source, unit and daemon job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:38:54Z",
+          "completedAt": "2026-11-09T10:38:55Z"
+        },
+        {
+          "number": 3,
+          "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:38:55Z",
+          "completedAt": "2026-11-09T10:39:00Z"
+        },
+        {
+          "number": 4,
+          "name": "Record actual completed job timings",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:39:00Z",
+          "completedAt": "2026-11-09T10:39:03Z"
+        },
+        {
+          "number": 8,
+          "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:39:03Z",
+          "completedAt": "2026-11-09T10:39:04Z"
+        },
+        {
+          "number": 9,
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "startedAt": "2026-11-09T10:39:04Z",
+          "completedAt": "2026-11-09T10:39:04Z"
+        }
+      ]
+    },
+    "completeLatestJobsPage": {
+      "totalCount": 22,
+      "returnedCount": 22,
+      "counts": {
+        "success": 21,
+        "skipped": 1
+      },
+      "byAttempt": {
+        "2": 22
+      },
+      "skipped": [
+        {
+          "id": 129108258522,
+          "name": "Cloud credential access (OIDC)",
+          "runAttempt": 2
+        }
+      ]
+    }
+  },
+  "sourceBindingLimits": {
+    "metadataHeadSha": "521db4799a4a85e1955f7dd86a1ad5ccef143cc8",
+    "checkoutStep": "success",
+    "actualCheckedOutCommit": null,
+    "actualCheckedOutTree": null,
+    "runtimeNodeVersionFromA2Log": null,
+    "explanation": "Workflow/job head_sha and successful checkout step are metadata. Without the assigned owner's original log, do not replace actual checkout/PR synthetic merge/tree or runtime version with declared head fields."
+  },
+  "conclusion": {
+    "exactDeclaredHeadSourceJobGreen": true,
+    "wholeRunAttempt2Green": true,
+    "originalAttempt1FailureRetained": true,
+    "rootCauseStillUnknown": true,
+    "boundedRerunRecoveredGate": true,
+    "noProductOrTracingFixClaim": true,
+    "noReasonToInventAnUnlimitedBlockerFromUnprovenCause": true,
+    "futureCombinedSourceRequiresOwnNormalCI": true
+  },
+  "metadataFingerprints": [
+    {
+      "key": "run42598869271",
+      "request": {
+        "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42598869271"
+      },
+      "observedAtUTC": "2026-11-09T10:38:44.530Z",
+      "bytes": 13139,
+      "sha256": "15cd9ed1fe24fbd454cc63b924610090bdbce7f7ee5fd083459eea924cbb26bf",
+      "rawStoredPrivately": true
+    },
+    {
+      "key": "latestJobs42598869271",
+      "request": {
+        "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42598869271/jobs?filter=latest&per_page=100"
+      },
+      "observedAtUTC": "2026-11-09T10:38:48.169Z",
+      "bytes": 73498,
+      "sha256": "b55e3c4d124b0aeb1890c6bfce26da96a407de3926ec8628630ffd9270226ddd",
+      "rawStoredPrivately": true
+    },
+    {
+      "key": "followupRun",
+      "request": {
+        "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42598869271"
+      },
+      "observedAtUTC": "2026-11-09T10:39:58.469Z",
+      "bytes": 13142,
+      "sha256": "95e63d04626c4a159008b95352cd72aae72b0f33f9692f5a5fcb92d504903450",
+      "rawStoredPrivately": true
+    },
+    {
+      "key": "followupJobs",
+      "request": {
+        "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/42598869271/jobs?filter=latest&per_page=100"
+      },
+      "observedAtUTC": "2026-11-09T10:40:01.814Z",
+      "bytes": 75846,
+      "sha256": "9d1ff09f2cbe686fa6798dc0e6e3b98d747e572421dfc4a0e527dab0ce53c1ae",
+      "rawStoredPrivately": true
+    }
+  ],
+  "storage": "Full original metadata tool envelopes kept in functions store; only whitelist projected here. No job log fetched.",
+  "operations": {
+    "rawJobLogCalls": 0,
+    "testsRun": 0,
+    "VMsCreated": 0,
+    "rerunsRequested": 0,
+    "sourceChanges": 0,
+    "refUpdates": 0,
+    "publicCommentsPosted": 0,
+    "models": 0,
+    "productionCalls": 0,
+    "backgroundPolling": false
+  }
+}

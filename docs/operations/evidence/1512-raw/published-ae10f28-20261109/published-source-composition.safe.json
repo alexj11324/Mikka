@@ -1,0 +1,285 @@
+{
+  "version": 1,
+  "kind": "issue1512-published-source-composition",
+  "publishedAt": "2026-11-09 10:47:32 UTC",
+  "head": "ae10f28aa471dbfc64f04d981b8934d374476259",
+  "tree": "1acbe0b8d50a7102543e24b9bd0395355bcba438",
+  "previousHead": "c0e94d594f1ecf4f5edc25904912702e61fce86b",
+  "firstMerge": {
+    "base": "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+    "ours": "f0956eb1481cee710efb714ec3635ac66b4b44ec",
+    "theirs": "521db4799a4a85e1955f7dd86a1ad5ccef143cc8",
+    "leafCount": 6790,
+    "oursChanged": 59,
+    "p0Changed": 432,
+    "conflicts": [
+      "apps/api/generated/routes.json",
+      "apps/api/generated/routes.ts",
+      "apps/desktop/src/renderer/rpc.ts",
+      "lib/device-heartbeat.db.test.ts",
+      "package.json",
+      "workflows/coordinator/steps.ts"
+    ],
+    "resolutions": [
+      {
+        "path": "apps/api/generated/routes.json",
+        "type": "blob",
+        "mode": "100644",
+        "sha": "6fbced33e672f3fa0d5e35bed40b63fa103809d5"
+      },
+      {
+        "path": "apps/api/generated/routes.ts",
+        "type": "blob",
+        "mode": "100644",
+        "sha": "a0cc13783eb567c256c34e08eaf3f6e9aca157e2"
+      },
+      {
+        "path": "apps/desktop/src/renderer/rpc.ts",
+        "type": "blob",
+        "mode": "100644",
+        "sha": "dae8798653457afad334c2d909b10b63e9b3956f"
+      },
+      {
+        "path": "lib/device-heartbeat.db.test.ts",
+        "type": "blob",
+        "mode": "100644",
+        "sha": "e8f4f35748707364e77c53fa594c166bafc3dae8"
+      },
+      {
+        "path": "package.json",
+        "type": "blob",
+        "mode": "100644",
+        "sha": "ef6da7b3d6b33220051fef56d7e9e5e024105310"
+      },
+      {
+        "path": "workflows/coordinator/steps.ts",
+        "type": "blob",
+        "mode": "100644",
+        "sha": "d500795e9a62631b6c7619c4ffd1df67f137ee54"
+      }
+    ],
+    "overlayCount": 57,
+    "deletions": []
+  },
+  "firstMergeCommit": "82d47c8bf062363d058c79920060f4c688de52ad",
+  "firstMergeTree": "2059df0b18196515ed0d370129aaee851a569000",
+  "secondMerge": {
+    "commonBaseUsed": "0415e5e0aabcd91b51e99ee73c41f6b6abb75ce6",
+    "actualMergeBaseKnown": "76df3935c8be5af480485c52e445d389e85d8a35",
+    "ours": "82d47c8bf062363d058c79920060f4c688de52ad",
+    "theirs": "a2198c8c2f608f7b8169329b9da853067618dba6",
+    "incomingChangedFrom0415": [
+      ".github/workflows/mobile-screenshots.yml",
+      "components/workspace/issue-thread-panel.tsx",
+      "components/workspace/issue-threads.tsx",
+      "docs/design/glossary.md",
+      "docs/design/rules.md",
+      "messages/en.json",
+      "messages/zh-CN.json",
+      "package.json",
+      "scripts/issue-thread-acceptance.test.tsx",
+      "scripts/release/mobile-screenshots-build.sh",
+      "scripts/release/mobile-screenshots.mjs",
+      "scripts/release/mobile-screenshots.test.mjs",
+      "hooks/use-run-result.test.ts",
+      "hooks/use-run-result.ts"
+    ],
+    "overlaid10": [
+      {
+        "path": "components/workspace/issue-thread-panel.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "c9e5223c1cceca956f4b5d5abfec17ececa04654"
+      },
+      {
+        "path": "components/workspace/issue-threads.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "33328818b49b5d6fa3c940ec0281fd2e0cac5ccf"
+      },
+      {
+        "path": "docs/design/glossary.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "bf4d10e9b5f228ff1009cba7015e62ba73b9c220"
+      },
+      {
+        "path": "docs/design/rules.md",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "7f732181f78949fe743e6991cb60af7005cbba60"
+      },
+      {
+        "path": "hooks/use-run-result.test.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "ba76ad025f4e707a21fd939d97a2b627129d3e40"
+      },
+      {
+        "path": "hooks/use-run-result.ts",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "62be3068a787242d0c604d15863bb8fd079aade6"
+      },
+      {
+        "path": "messages/en.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "f8d4dc109e3adbf625a37e291b1ef11e83473ac9"
+      },
+      {
+        "path": "messages/zh-CN.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "cdda5d5fc21468db80c1bc475ec68e47cd1cddff"
+      },
+      {
+        "path": "package.json",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "568cfeee161309202699acefd0a57a8edc52bf6e"
+      },
+      {
+        "path": "scripts/issue-thread-acceptance.test.tsx",
+        "mode": "100644",
+        "type": "blob",
+        "sha": "779dc18f1eb72f13505108efb0c41bafcb79048b"
+      }
+    ],
+    "conflicts": [
+      "messages/en.json",
+      "messages/zh-CN.json",
+      "package.json"
+    ],
+    "leafCount": 6792,
+    "deletions": []
+  },
+  "rootSecondResolutionProof": [
+    {
+      "path": "messages/en.json",
+      "blob": "f8d4dc109e3adbf625a37e291b1ef11e83473ac9",
+      "bytes": 253309,
+      "sha256": "9d43a03419a898462d5d7edcdf801c3c2c77b6960f3d80ce22c95c905a1a346d",
+      "onlyReviewedIncomingTextChanged": true,
+      "preservedP0ErrorKeys": [
+        "taskWorkspaceUnresolved",
+        "taskWorkspaceMismatch",
+        "taskWorkspaceTransferDenied"
+      ]
+    },
+    {
+      "path": "messages/zh-CN.json",
+      "blob": "cdda5d5fc21468db80c1bc475ec68e47cd1cddff",
+      "bytes": 243955,
+      "sha256": "32cbd22b9d04e56684549434f14f930c3e1dbebcfc50b5f0f2f356918acaadd3",
+      "onlyReviewedIncomingTextChanged": true,
+      "preservedP0ErrorKeys": [
+        "taskWorkspaceUnresolved",
+        "taskWorkspaceMismatch",
+        "taskWorkspaceTransferDenied"
+      ]
+    },
+    {
+      "path": "package.json",
+      "blob": "568cfeee161309202699acefd0a57a8edc52bf6e",
+      "onlyChangedScriptKey": "test:groups",
+      "allOtherBytesUnchanged": true,
+      "bytes": 80839,
+      "sha256": "d1e4b875976a3076381ad30949da73686ea7dc794f5ff7bc0cc27ccb6111443a"
+    }
+  ],
+  "independentWholeTreeReview": "9ae47079427fed4b589e30b977e42c8a128e2aa0",
+  "completeLeafVerification": {
+    "first": 6790,
+    "final": 6792,
+    "mismatches": 0,
+    "deleted": 0
+  },
+  "diffFromActualMain": {
+    "base": "a2198c8c2f608f7b8169329b9da853067618dba6",
+    "paths": 479,
+    "added": 30,
+    "includesUnmergedP0Dependency": true
+  },
+  "syntheticCheckout": {
+    "jobId": 129114378174,
+    "fromOriginalLog": "ddbc7e9b8e156493af730f00ed4a6efd3de475b4",
+    "gitTree": "1acbe0b8d50a7102543e24b9bd0395355bcba438",
+    "parents": [
+      "a2198c8c2f608f7b8169329b9da853067618dba6",
+      "ae10f28aa471dbfc64f04d981b8934d374476259"
+    ],
+    "sameTreeAsPublishedHead": true
+  },
+  "ciSelection": {
+    "original": {
+      "sha": "f9a8897406fe2e318823ceed90a2810744a0b1d5",
+      "bytes": 389272,
+      "sha256": "e1305a79e9240dc4e1c1dca2b997fbea4bf31ef8d520d676c837e7167baed178",
+      "sourceJob": 129114378174,
+      "firstNormalizedLine": 2638,
+      "lastNormalizedLine": 10312
+    },
+    "full": true,
+    "coreTargets": 57,
+    "integrationTargets": 29,
+    "pgSuites": 72,
+    "shards": 4
+  },
+  "initialObservedJobs": [
+    {
+      "name": "changes",
+      "jobId": 129114378174,
+      "bytes": 969556,
+      "sha256": "3b769c434ffbfa8791dd64699874b599726f3763e80a6372c3aba715de990618",
+      "lines": 10347,
+      "downloadCount": 1,
+      "sha": "0795d366db29e89ed0079d9a17c1c9df2a31fc65",
+      "privacyScanMatched": []
+    },
+    {
+      "name": "source",
+      "jobId": 129114784935,
+      "bytes": 138798,
+      "sha256": "f661fe72c2028a54088ddd6bb9a7fbddc3ec51c662a555ad4795a8fa16dd178d",
+      "lines": 1787,
+      "downloadCount": 1,
+      "sha": "38bf977089b0ca71c735d992d5d849f4195adcbb",
+      "privacyScanMatched": []
+    },
+    {
+      "name": "daemon",
+      "jobId": 129114784961,
+      "bytes": 124549,
+      "sha256": "efb61693fb93eba1ade5eee4bfa4ad13edf77fa48683a1114524de1ccd82bd2c",
+      "lines": 1243,
+      "downloadCount": 1,
+      "sha": "323dc836c1254db2595782152aec2efd9e3cf734",
+      "privacyScanMatched": []
+    },
+    {
+      "name": "desktopChecks",
+      "jobId": 129115195285,
+      "bytes": 104404,
+      "sha256": "ae07446638d272bbfdf81492bd614067aee25d6d4398b1610ae8aa6361a88f1e",
+      "lines": 1102,
+      "downloadCount": 1,
+      "sha": "8fe25f5ad851f94630f2a4a3b6b5a88a985fe5bd",
+      "privacyScanMatched": []
+    }
+  ],
+  "resourceBoundary": {
+    "newVMs": 0,
+    "productionModels": 0,
+    "productionSessions": 0,
+    "productionTasks": 0,
+    "githubCIActive": true
+  },
+  "issueBoundary": {
+    "acmeAccepted": 0,
+    "issueOpen": true,
+    "prAutoClose": false,
+    "mainNotMerged": true,
+    "originalOwnerP0First": true
+  }
+}
