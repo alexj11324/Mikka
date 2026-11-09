@@ -234,8 +234,11 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const [createdBot, setCreatedBot] = useState<BotView>()
   // The Coordinator's last line and time come from the bot chat summaries, never its whole chat.
   const { data: botChatSummaries } = useLiveBotChatList(user.id)
-  const [panelOpen, setPanelOpen] = useState(true)
-  useEffect(() => { try { if (window.localStorage.getItem('mikka:context-panel') === '0') setPanelOpen(false) } catch { /* storage unavailable */ } }, [])
+  // A frame that lists the chats itself (the hosted shell) gives the chat the page's width: the panel starts closed
+  // there and opens when asked for; its choice is kept apart from the open-source layout's.
+  const panelKey = FRAME_LISTS_CHATS ? 'mikka:context-panel:shell' : 'mikka:context-panel'
+  const [panelOpen, setPanelOpen] = useState(!FRAME_LISTS_CHATS)
+  useEffect(() => { try { const stored = window.localStorage.getItem(panelKey); if (stored) setPanelOpen(stored === '1') } catch { /* storage unavailable */ } }, [panelKey])
   // Below xl the column has no room, so 打开右栏 shows it in a Sheet instead.
   const [panelSheet, setPanelSheet] = useState(false)
   // The thread open in the right column, beside the chat or the task (R-82); its address is ?thread=.
@@ -256,7 +259,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     return () => wide.removeEventListener('change', close)
   }, [])
   function openPanel() { showPanel(true); if (!window.matchMedia('(min-width: 80rem)').matches) setPanelSheet(true) }
-  function showPanel(next: boolean) { setPanelOpen(next); try { window.localStorage.setItem('mikka:context-panel', next ? '1' : '0') } catch { /* storage unavailable */ } }
+  function showPanel(next: boolean) { setPanelOpen(next); try { window.localStorage.setItem(panelKey, next ? '1' : '0') } catch { /* storage unavailable */ } }
   // The app-wide browser (top bar 🌐): while open it takes the right panel's place.
   const [browserOpen, setBrowserOpen] = useState(false)
   // Not inside a frame: the app opened in its own browser must not open another one.

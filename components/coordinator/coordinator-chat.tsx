@@ -473,7 +473,8 @@ export function CoordinatorChat({ onOpenIssue, prefill, placeholder, compact = f
   const speaker: ChatSpeaker = bot ? { id: bot.id, name: bot.name, color: bot.color, shape: bot.shape } : { name, coordinator: true }
 
   // A layer that draws the conversation as one screen (slot `thread`) gets the same rows as data and nodes.
-  const Screen = !embedded && !compact ? threadSlot.ThreadScreen ?? null : null
+  // The board's chat column (compact) is a conversation too; only an artifact's chat (embedded) keeps its chips.
+  const Screen = !embedded ? threadSlot.ThreadScreen ?? null : null
   const toolRows = useThreadToolRows()
   const tMessage = useTranslations('AiElements.message')
   const tNavAll = useTranslations()
