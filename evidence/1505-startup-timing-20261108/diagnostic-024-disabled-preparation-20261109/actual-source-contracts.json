@@ -1,0 +1,56 @@
+{
+  "source": "02401458a7fe26e00ce4caa653084c7f9680696d",
+  "tree": "0013159d8dd0e1155b84d81907f19f4e1283cff7",
+  "sourceBlobs": [
+    {
+      "path": ".github/workflows/web-deploy.yml",
+      "blob": "e15741a3ae51a294593eeb2151311378babd8ce4",
+      "bytes": 11619,
+      "sha256": "2916c80cc6a764fe2167ad5dad17be68b309161119bffbcb9001ee26b015e9a1"
+    },
+    {
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "blob": "be1f902f97e50628fbe26fa55b9dab0160f749be",
+      "bytes": 18463,
+      "sha256": "9c13b3e21a58abac5240495beaa08a0fc26e1fffabeb1506d94f030689833ab3"
+    },
+    {
+      "path": "scripts/acceptance/cloud-startup.mjs",
+      "blob": "1bca723b8110625b48127a1d28ade9ecf0e153de",
+      "bytes": 83254,
+      "sha256": "e3ae3c84925100ac0c79a2b0d7dac70933312acd2e235fef5f2fe9d572da65b2"
+    },
+    {
+      "path": "scripts/release/web-deploy.mjs",
+      "blob": "948caacb60d05c04f21e5d0a55303716192771da",
+      "bytes": 19867,
+      "sha256": "e8012d49653ab635ea26d3ba881450860f8c3ead2893d799a98bc395eb65bf9a"
+    },
+    {
+      "path": "scripts/e2b/publish-template-env.mjs",
+      "blob": "56ca3993bf11e33ca02a28ccf0678a45ee509215",
+      "bytes": 17883,
+      "sha256": "2c15611a5304d3b5c4cf6b12e7969426dbc14c65404e1de197eab3aebd26819a"
+    }
+  ],
+  "namedContractDeclarations": [
+    {
+      "line": 167,
+      "text": "export function createSessionClient(origin, fetchImpl = fetch) {"
+    },
+    {
+      "line": 213,
+      "text": "export function smokeAcceptanceAccount(env) {"
+    },
+    {
+      "line": 221,
+      "text": "export async function selectAcceptanceTeam(client, { ownerId, workspace }, rememberOriginal) {"
+    },
+    {
+      "line": 237,
+      "text": "export async function restoreAcceptanceWorkspace(client, ownerId, workspaceId) {"
+    }
+  ],
+  "hasPyYaml": false,
+  "node": "v24.22.1"
+}

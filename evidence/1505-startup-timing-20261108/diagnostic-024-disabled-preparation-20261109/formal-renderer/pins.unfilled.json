@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "executionBranch": null,
+  "pins": {
+    "ACCEPTANCE_SOURCE_COMMIT": null,
+    "ACCEPTANCE_SOURCE_TREE": null,
+    "EXPECTED_APP_COMMIT": null,
+    "EXPECTED_DEPLOYMENT_ID": "RESOLVE_ONCE_FROM_PRODUCTION_ALIAS",
+    "EXPECTED_WORKER_SHA": null,
+    "EXPECTED_WORKER_SOURCE": null,
+    "EXPECTED_TEMPLATE_DESKTOP": null,
+    "EXPECTED_TEMPLATE_CLAUDE": null,
+    "EXPECTED_TEMPLATE_CODEX": null,
+    "EXPECTED_DIAGNOSTIC_BOT_ID": "fdeea45f-8cb2-450a-96a4-d9a682f71482",
+    "EXPECTED_DIAGNOSTIC_ENV_ID": null,
+    "EXPECTED_DIAGNOSTIC_VALUE_SHA256": null,
+    "EXPECTED_DIAGNOSTIC_EXPIRES_AT": null,
+    "DIAGNOSTIC_HELPER_COMMIT": null,
+    "DIAGNOSTIC_HELPER_SHA256": null
+  },
+  "upstreamRelease": {
+    "runId": null,
+    "runAttempt": null
+  }
+}

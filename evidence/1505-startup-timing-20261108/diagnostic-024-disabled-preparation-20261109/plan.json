@@ -1,0 +1,102 @@
+{
+  "status": "OFFLINE_DISABLED_NO_RUN",
+  "source": "02401458a7fe26e00ce4caa653084c7f9680696d",
+  "tree": "0013159d8dd0e1155b84d81907f19f4e1283cff7",
+  "proposedBranch": "ops/1505-scope-web-02401458-20261109",
+  "singleParent": "5958dea38437de20512bbbdf60b940ccc83f00ff",
+  "parentTree": "af895d6418b1b1d960b2884aec91a2078bb37d96",
+  "expectedHelperGoLiteral": "root-reviewed-1505-scope-web-02401458-20261109",
+  "expectedOperatorGoLiteral": "root-reviewed-1505-web-dispatch-only-v1-02401458",
+  "executionGoValues": "both empty; dispatch pins.go and helper.go also empty",
+  "changedPaths": [
+    ".github/workflows/issue1505-diagnostic-window.yml",
+    "scripts/ops/issue1505-diagnostic-window.mjs"
+  ],
+  "helperSha256": "e24ccbdc72063e44841d7356639edab2bf6c0341bc03a0c669e09cab218d343a",
+  "sourceContractsIdenticalToF997": true,
+  "futureNullPins": [
+    "overlaySha",
+    "previousDeploymentId",
+    "upstream.webRunId",
+    "upstream.webAttempt",
+    "upstream.runtimeRunId",
+    "upstream.runtimeAttempt",
+    "upstream.releaseArtifactId",
+    "upstream.releaseArtifactDigest",
+    "release.workerSha",
+    "release.sourceCommit",
+    "release.templates.desktop",
+    "release.templates.claude",
+    "release.templates.codex",
+    "coordination.privateOverlayReviewed",
+    "coordination.reviewedAt",
+    "coordination.expiresAt",
+    "runtimeSourceCommit",
+    "staticWorkerFingerprint"
+  ],
+  "renewMode": [
+    "renew",
+    "$RUNNER_TEMP/diagnostic-window.json",
+    "$RUNNER_TEMP/diagnostic-window-rotation.json"
+  ],
+  "freshTtlMinutes": 120,
+  "scopeEntryMinMinutes": 45,
+  "originalBot": "fdeea45f-8cb2-450a-96a4-d9a682f71482",
+  "workspaceHash": "a38307f75620de4bfe3b374ed2d510041da807af094c571eafb0318ce21f3535",
+  "doNotUseF997AsParent": "readPreviousWindow binds historical workflowHead to HELPER_PARENT5958",
+  "historyNeverRelabeled": "historical e33/5U3 receipt remains exact; later bb5 cleanup42531083519 is separate",
+  "absentBehavior": "old exactID404 plus final KEY+ID absent permits removal receipt without DELETE; another KEY/ID/hash fails closed",
+  "originalHistoricalReceiptUnchanged": true,
+  "activationOrder": [
+    "root verifies actual new runtime7jobs/release+cleanup and eligible READY Web/tuple/source",
+    "fresh coordination/writers/shared-account and read-only GitHub connection validity from existing receipts; no helper credential refresh",
+    "root produces final enabled 2file commit directly sole-parent5958; never publish disabled then child-enable",
+    "create single reviewed ops branch only once",
+    "helper immutable verification before unchanged three existing OIDC secret loaders",
+    "renew confirms exact historical absence, same normal SMOKE owner/shared workspace/original idle Bot; restore workspace and sign out; create fresh120min scope once",
+    "upload raw scope+rotation evidence",
+    "unchanged operator verifies current main/sourceblobs/fullR/coordination/writers/READY/actual scope, performs only one standard Web dispatch with exact returned childID",
+    "upload dispatch intent+response before helper selfref cleanup",
+    "observe returned child READY+source+public version and scope capture gate; only then fill all formal pins and render original six-case workflow",
+    "formal same six/39stages/14version checks/15pins/5000ms formula and cleanup; runner entry scope>=45min"
+  ],
+  "caveat": "In the inherited composition operator upstream-release guard occurs after scope preparation. New-R-before-scope is a required external root activation gate; not asserted to be a new earlier in-workflow guard.",
+  "notVerified": [
+    "actualnewR",
+    "actualworker/templates",
+    "actualpairedDPL/publicA",
+    "coordinationwindow/comments",
+    "newscopeID/hash/expiry",
+    "helperH",
+    "returnedWebchildID"
+  ],
+  "executionBoundary": {
+    "offlineDeveloperVmUsed": true,
+    "newVmCreationByThisAgent": 0,
+    "productionCalls": 0,
+    "secretReads": 0,
+    "modelCalls": 0,
+    "newRefWrites": 0,
+    "workflowDispatches": 0,
+    "productTests": 0,
+    "dependencyInstalls": 0
+  },
+  "currentDisposition": {
+    "status": "DISABLED_A024_FAILED_RELEASE_REBIND_REQUIRED",
+    "source": "root messages in this session, not an independent CI read by this agent",
+    "runtimeRunId": 42566225093,
+    "runtimeAttempt": 2,
+    "runtimeResult": "FAIL",
+    "reportedFailure": "desktop ffmpeg-static@5.3.0 LICENSE download HTTP 504",
+    "reportedSubscriptionsAndPublish": "not executed",
+    "futureSourceRule": "A024 remains the static review input only. A later actual source requires fresh source/tree/five-contract verification and re-render; this candidate must not be activated."
+  },
+  "coordinationBoundary": {
+    "currentPublishedInterval": "2026-11-09T05:14:35Z to 2026-11-09T06:14:35Z",
+    "sourceCommentId": 6732811394,
+    "source": "root fresh comment read supplied in session",
+    "formalInterval": "not registered; must be separately bounded to 45 minutes including fresh scope, exactly one refresh, six cases and cleanup",
+    "carriedIntoDispatchPins": false,
+    "currentIntervalNotExtendedByThisArtifact": true
+  }
+}

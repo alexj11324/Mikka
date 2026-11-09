@@ -1,0 +1,73 @@
+[
+  {
+    "name": "helper-syntax",
+    "command": [
+      "node",
+      "--input-type=module",
+      "--check"
+    ],
+    "exitCode": 0
+  },
+  {
+    "name": "operator-syntax",
+    "command": [
+      "node",
+      "--input-type=module",
+      "--check"
+    ],
+    "exitCode": 0
+  },
+  {
+    "name": "bash-block-47",
+    "command": [
+      "bash",
+      "-n"
+    ],
+    "exitCode": 0
+  },
+  {
+    "name": "bash-block-58",
+    "command": [
+      "bash",
+      "-n"
+    ],
+    "exitCode": 0
+  },
+  {
+    "name": "bash-block-673",
+    "command": [
+      "bash",
+      "-n"
+    ],
+    "exitCode": 0
+  },
+  {
+    "name": "python-block-695",
+    "exitCode": 0
+  },
+  {
+    "name": "renderer-python-syntax",
+    "exitCode": 0
+  },
+  {
+    "name": "formal-partial-rejected",
+    "exitCode": 0,
+    "expectedRejection": "pin_unfilled:EXPECTED_WORKER_SHA"
+  },
+  {
+    "name": "original-operator-byte-conservation",
+    "exitCode": 0,
+    "bytes": 31102,
+    "sha256": "9ea70758563204ea174a10cea83aed59a82e29bbb327923f6f80c5e17652ba69"
+  },
+  {
+    "name": "helper-four-literal-inverse-byte-conservation",
+    "exitCode": 0,
+    "restoredSha256": "8b19d8f763a49a3813d104d3adb57b34f718db515da008df1f915c364b546f4c"
+  },
+  {
+    "name": "workflow-explicit-pin-guard-header-inverse-byte-conservation",
+    "exitCode": 0,
+    "restoredSha256": "5677069be25e9ff59f50149fee5bea453ccb34d1eafa8968c1336b8e36f8f15a"
+  }
+]

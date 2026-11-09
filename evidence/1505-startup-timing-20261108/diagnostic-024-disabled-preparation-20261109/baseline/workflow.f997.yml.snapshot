@@ -1,0 +1,735 @@
+# ROOT-REVIEWED ONE-SHOT COMPOSITION: actual source and release facts are pinned below.
+# Confirm the previously cleaned exact window is absent, then create one new 120-minute scope.
+# Reuse only the same independently verified idle Bot. No task/Profile/model/VM creation.
+# Normal child of 5958dea; the actual prepared receipt remains immutable and hash-bound.
+# Its project environment was removed by formal 42430097946; do not assume it is still present.
+# Prepared before merge; create this helper ref only after latest CI and actual writers permit release.
+name: Issue 1505 renew exact owned diagnostic window
+on:
+  push:
+    branches: [ops/1505-scope-web-bb5d1f9e-20261108]
+permissions:
+  contents: write
+  id-token: write
+  actions: write
+concurrency:
+  group: production-smoke-owner-acceptance
+  cancel-in-progress: false
+  queue: max
+jobs:
+  prepare:
+    if: github.repository == 'alexj11324/Mikka'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: source
+    env:
+      DIAGNOSTIC_WINDOW_GO: 'root-reviewed-1505-scope-web-bb5d1f9e-20261108'
+    steps:
+      - name: Check out the exact temporary helper
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          path: ops
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Check out the reviewed application source without credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: bb5d1f9e224aea395b9c45823960e8ad10f1a099
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Verify immutable source and explicit root review before credentials
+        run: |
+          test "$DIAGNOSTIC_WINDOW_GO" = 'root-reviewed-1505-scope-web-bb5d1f9e-20261108'
+          test "$GITHUB_RUN_ATTEMPT" = '1'
+          test "$(git rev-parse HEAD)" = 'bb5d1f9e224aea395b9c45823960e8ad10f1a099'
+          test "$(git rev-parse HEAD^{tree})" = 'f70f40367331b6408c5b68b6f7be6483cc7cbc0d'
+          printf '%s  %s\n' '8b19d8f763a49a3813d104d3adb57b34f718db515da008df1f915c364b546f4c' '../ops/scripts/ops/issue1505-diagnostic-window.mjs' | sha256sum -c -
+          node ../ops/scripts/ops/issue1505-diagnostic-window.mjs verify "$RUNNER_TEMP/diagnostic-window-preflight.json"
+      - name: Materialize the disabled reviewed dispatch-only operator
+        id: refresh_materialize
+        if: success()
+        shell: bash
+        run: |
+          cat > "$RUNNER_TEMP/web-dispatch-pins.json" <<'PINS_JSON'
+          {
+            "version": 1,
+            "enabled": true,
+            "go": "root-reviewed-1505-web-dispatch-only-v1-bb5d1f9e",
+            "sourceCommit": "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+            "sourceTree": "f70f40367331b6408c5b68b6f7be6483cc7cbc0d",
+            "appCommit": "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+            "ref": "main",
+            "overlaySha": "c34b3adf07240afebae725b2af599cfbc69c4f42",
+            "previousDeploymentId": "dpl_8AfXc4eUfDpgahyjM9bQ28ftKvJD",
+            "helper": {
+              "branch": "ops/1505-scope-web-bb5d1f9e-20261108",
+              "parent": "5958dea38437de20512bbbdf60b940ccc83f00ff",
+              "parentTree": "af895d6418b1b1d960b2884aec91a2078bb37d96",
+              "sha256": "8b19d8f763a49a3813d104d3adb57b34f718db515da008df1f915c364b546f4c",
+              "go": "root-reviewed-1505-scope-web-bb5d1f9e-20261108"
+            },
+            "upstream": {
+              "webRunId": 42525776665,
+              "webAttempt": 1,
+              "runtimeRunId": 42516906256,
+              "runtimeAttempt": 1,
+              "releaseArtifactId": 13633033159,
+              "releaseArtifactDigest": "95ef5d67a22e92cfbcc143176f9cbab79e2dd7ca09ea3d283a8a95ef62dba5ce"
+            },
+            "release": {
+              "workerSha": "a45382985c12c93fb0832eabd8010f60c9b7dabb",
+              "sourceCommit": "facb389f6cc06c453e9135bb60ada1b0f302e0d9",
+              "templates": {
+                "desktop": "254vai4zmh475r5hppcj",
+                "claude": "0zd73b9wo0mv4pkk80mm",
+                "codex": "zlsft5zfm3rbeginw6d8"
+              }
+            },
+            "coordination": {
+              "exclusiveWindowReviewed": true,
+              "privateOverlayReviewed": "c34b3adf07240afebae725b2af599cfbc69c4f42",
+              "reviewedAt": "2026-11-08T22:01:18.477Z",
+              "expiresAt": "2026-11-08T22:40:00.000Z",
+              "issues": [
+                1505
+              ],
+              "comments": [
+                {
+                  "issue": 1505,
+                  "id": 6727713699,
+                  "bodySha256": "b4a5bbc6f4b341196c6498536813eb65291cc2048fc0873044571507d1d19951"
+                }
+              ],
+              "otherOpsWritersReviewed": true
+            },
+            "sourceBlobs": {
+              ".github/workflows/web-deploy.yml": {
+                "blob": "e15741a3ae51a294593eeb2151311378babd8ce4",
+                "sha256": "2916c80cc6a764fe2167ad5dad17be68b309161119bffbcb9001ee26b015e9a1"
+              },
+              ".github/workflows/e2b-official-runtime.yml": {
+                "blob": "be1f902f97e50628fbe26fa55b9dab0160f749be",
+                "sha256": "9c13b3e21a58abac5240495beaa08a0fc26e1fffabeb1506d94f030689833ab3"
+              },
+              "scripts/acceptance/cloud-startup.mjs": {
+                "blob": "1bca723b8110625b48127a1d28ade9ecf0e153de",
+                "sha256": "e3ae3c84925100ac0c79a2b0d7dac70933312acd2e235fef5f2fe9d572da65b2"
+              },
+              "scripts/release/web-deploy.mjs": {
+                "blob": "948caacb60d05c04f21e5d0a55303716192771da",
+                "sha256": "e8012d49653ab635ea26d3ba881450860f8c3ead2893d799a98bc395eb65bf9a"
+              },
+              "scripts/e2b/publish-template-env.mjs": {
+                "blob": "56ca3993bf11e33ca02a28ccf0678a45ee509215",
+                "sha256": "2c15611a5304d3b5c4cf6b12e7969426dbc14c65404e1de197eab3aebd26819a"
+              }
+            },
+            "runtimeSourceCommit": "facb389f6cc06c453e9135bb60ada1b0f302e0d9",
+            "staticWorkerFingerprint": "a45382985c12c93fb0832eabd8010f60c9b7dabb"
+          }
+          PINS_JSON
+          cat > "$RUNNER_TEMP/web-dispatch-operator.mjs" <<'OPERATOR_MJS'
+          // OFFLINE REVIEW CANDIDATE. No network or side effects on import.
+          // One bounded standard GitHub Web dispatch, then exit. Never wait for its child.
+          // Compose into the already reviewed scope-helper job; do not add secret loaders.
+          import { createHash } from 'node:crypto'
+          import { isDeepStrictEqual } from 'node:util'
+          import { readFile, writeFile, rename, mkdir } from 'node:fs/promises'
+          import { execFileSync } from 'node:child_process'
+          import { resolve, dirname } from 'node:path'
+          import { pathToFileURL } from 'node:url'
+
+          export const CONTRACT = Object.freeze({
+            repository: 'alexj11324/Mikka',
+            project: 'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH',
+            team: 'team_C7lwxVVvnUicFli6112mvxpv',
+            alias: 'app.aspectlylabs.com',
+            publicVersion: 'https://app.aspectlylabs.com/mikka/api/version',
+            key: 'MIKKA_CLOUD_DIAGNOSTIC_WINDOW',
+            webPath: '.github/workflows/web-deploy.yml',
+            runtimePath: '.github/workflows/e2b-official-runtime.yml',
+            botId: 'fdeea45f-8cb2-450a-96a4-d9a682f71482',
+            originalReceipt: '12f6f3758c382dd55c9055b3ab32f9d785c620594c66ad4d49a2030b3ccda8d5',
+            minEntryMs: 45 * 60_000,
+          })
+          export const RUNTIME_JOBS = ['test', 'check', 'validate / build', 'await-web', 'subscriptions', 'publish / deploy', 'cleanup']
+          export const WEB_STEPS = [
+            'Refuse an obsolete source before release work',
+            'Pull the production project settings and environment',
+            'Fill build-time values',
+            'Verify the official runtime stays on the cloud edition',
+            'Build (runs migrations last, as the Vercel build did)',
+            'Upload the prebuilt output to production',
+            'Verify the public production version before releasing the deployment queue',
+          ]
+          export const SOURCE_PATHS = [
+            CONTRACT.webPath, CONTRACT.runtimePath, 'scripts/acceptance/cloud-startup.mjs',
+            'scripts/release/web-deploy.mjs', 'scripts/e2b/publish-template-env.mjs',
+          ]
+          const SHA = /^[a-f0-9]{40}$/, HASH = /^[a-f0-9]{64}$/, ID = /^[A-Za-z0-9_-]{1,200}$/
+          const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
+          const ACTIVE = ['queued', 'in_progress', 'pending', 'waiting', 'requested']
+          export const hash = bytes => createHash('sha256').update(bytes).digest('hex')
+          const same = isDeepStrictEqual
+          class OperatorFailure extends Error { constructor(code) { super(code); this.code = code } }
+          const ok = (condition, code) => { if (!condition) throw new OperatorFailure(code) }
+          const failureCode = error => error instanceof OperatorFailure ? error.code : 'operator_failed_closed'
+          const iso = now => new Date(now()).toISOString()
+          const integer = value => Number.isSafeInteger(value) && value > 0
+          const timestamp = value => typeof value === 'string' && Number.isFinite(Date.parse(value))
+          const dig = value => typeof value === 'string' ? value.replace(/^sha256:/, '') : ''
+          const gh = path => '/repos/' + CONTRACT.repository + path
+
+
+          // Local source proof only. Never inherit credentials or execute a mismatched working-copy script.
+          const WORKER_HASH_SCRIPT = 'scripts/e2b/build-template.py'
+          const WORKER_HASH_ENV = Object.freeze({
+            PATH: '/usr/local/bin:/usr/bin:/bin', LC_ALL: 'C',
+            GIT_NO_LAZY_FETCH: '1', GIT_TERMINAL_PROMPT: '0',
+            GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null',
+          })
+          export async function verifyCanonicalWorkerSource({ repo = process.cwd(), sourceCommit, sourceTree,
+            expectedWorkerSha, staticWorkerFingerprint }) {
+            ok(SHA.test(sourceCommit ?? '') && SHA.test(sourceTree ?? '')
+              && SHA.test(expectedWorkerSha ?? '') && SHA.test(staticWorkerFingerprint ?? ''),
+            'canonical_worker_inputs_invalid')
+            const startedAt = new Date().toISOString()
+            const command = ['python3', '-I', WORKER_HASH_SCRIPT, '--worker-hash', '--source-ref', sourceCommit]
+            const gitOptions = { cwd: repo, env: WORKER_HASH_ENV, timeout: 15_000,
+              maxBuffer: 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] }
+            let script, scriptBlob
+            try {
+              const git = args => execFileSync('git', args, gitOptions)
+              ok(git(['rev-parse', '--verify', sourceCommit + '^{commit}']).toString('utf8').trim() === sourceCommit
+                && git(['rev-parse', sourceCommit + '^{tree}']).toString('utf8').trim() === sourceTree,
+              'canonical_worker_source_mismatch')
+              script = git(['show', sourceCommit + ':' + WORKER_HASH_SCRIPT])
+              scriptBlob = git(['rev-parse', sourceCommit + ':' + WORKER_HASH_SCRIPT]).toString('utf8').trim()
+              ok(SHA.test(scriptBlob) && script.equals(await readFile(resolve(repo, WORKER_HASH_SCRIPT))),
+                'canonical_worker_script_changed')
+            } catch (error) {
+              if (error instanceof OperatorFailure) throw error
+              throw new OperatorFailure('canonical_worker_source_unavailable')
+            }
+            let output
+            try {
+              output = execFileSync(command[0], command.slice(1), { cwd: repo, env: WORKER_HASH_ENV,
+                timeout: 15_000, maxBuffer: 128, stdio: ['ignore', 'pipe', 'pipe'] })
+            } catch { throw new OperatorFailure('canonical_worker_hash_failed') }
+            const text = output.toString('utf8')
+            ok(output.length <= 41 && /^[a-f0-9]{40}\n?$/.test(text), 'canonical_worker_hash_invalid')
+            const workerSha = text.replace(/\n$/, '')
+            ok(workerSha === expectedWorkerSha && workerSha === staticWorkerFingerprint, 'canonical_worker_hash_mismatch')
+            return { version: 1, status: 'passed', sourceCommit, sourceTree, workerSha, staticWorkerFingerprint,
+              script: { path: WORKER_HASH_SCRIPT, blob: scriptBlob, bytes: script.length, sha256: hash(script) },
+              command, timeoutMs: 15_000, maxOutputBytes: 128, outputBytes: output.length,
+              environmentKeys: Object.keys(WORKER_HASH_ENV).sort(), inheritedEnvironment: false,
+              inputScope: 'canonical WORKER_PATHS/RECIPE_PATHS and package/lock projections; no fixed input-count claim',
+              startedAt, finishedAt: new Date().toISOString() }
+          }
+
+          export function validatePins(p, env) {
+            ok(p?.version === 1 && p.enabled === true, 'draft_disabled')
+            ok(SHA.test(p.sourceCommit ?? '') && SHA.test(p.sourceTree ?? '')
+              && p.appCommit === p.sourceCommit && p.ref === 'main', 'source_unfilled')
+            ok(p.go === 'root-reviewed-1505-web-dispatch-only-v1-' + p.sourceCommit.slice(0, 8)
+              && env.OVERLAY_REFRESH_GO === p.go, 'review_go_missing')
+            ok(SHA.test(p.overlaySha ?? '') && /^dpl_[A-Za-z0-9]+$/.test(p.previousDeploymentId ?? ''), 'deployment_pin_missing')
+            ok(p.helper && /^ops\/1505-[a-z0-9-]+$/.test(p.helper.branch ?? '')
+              && SHA.test(p.helper.parent ?? '') && SHA.test(p.helper.parentTree ?? '')
+              && HASH.test(p.helper.sha256 ?? '') && /^root-reviewed-1505-[a-z0-9-]+$/.test(p.helper.go ?? '')
+              && env.DIAGNOSTIC_WINDOW_GO === p.helper.go, 'helper_review_missing')
+            ok(env.GITHUB_REPOSITORY === CONTRACT.repository && env.GITHUB_REF === 'refs/heads/' + p.helper.branch
+              && env.GITHUB_RUN_ATTEMPT === '1' && /^\d+$/.test(env.GITHUB_RUN_ID ?? '')
+              && SHA.test(env.GITHUB_SHA ?? ''), 'execution_mismatch')
+            ok(SHA.test(p.runtimeSourceCommit ?? ''), 'runtime_source_unfilled')
+            const u = p.upstream
+            ok(u && integer(u.webRunId) && integer(u.webAttempt) && integer(u.runtimeRunId) && integer(u.runtimeAttempt)
+              && integer(u.releaseArtifactId) && HASH.test(u.releaseArtifactDigest ?? ''), 'upstream_unfilled')
+            ok(p.release?.sourceCommit === p.runtimeSourceCommit && SHA.test(p.release.workerSha ?? '')
+              && ['desktop','claude','codex'].every(k => ID.test(p.release.templates?.[k] ?? '')
+                && p.release.templates[k] !== k), 'runtime_tuple_unfilled')
+            ok(SHA.test(p.staticWorkerFingerprint ?? '') && p.staticWorkerFingerprint === p.release.workerSha,
+              'canonical_worker_pin_mismatch')
+            const c = p.coordination
+            ok(c?.exclusiveWindowReviewed === true && c.privateOverlayReviewed === p.overlaySha
+              && timestamp(c.reviewedAt) && timestamp(c.expiresAt) && Array.isArray(c.comments) && c.comments.length > 0
+              && c.comments.length <= 20 && Array.isArray(c.issues) && c.issues.includes(1505) && c.issues.length <= 20
+              && c.issues.every(integer) && c.comments.every(x => integer(x.id) && c.issues.includes(x.issue)
+                && HASH.test(x.bodySha256 ?? '')), 'coordination_unfilled')
+            ok(c.otherOpsWritersReviewed === true, 'other_ops_review_missing')
+            ok(p.sourceBlobs && same(Object.keys(p.sourceBlobs).sort(), [...SOURCE_PATHS].sort())
+              && SOURCE_PATHS.every(path => SHA.test(p.sourceBlobs[path]?.blob ?? '')
+                && HASH.test(p.sourceBlobs[path]?.sha256 ?? '')), 'source_contract_unfilled')
+          }
+
+          export function validateScope(raw, rotation, p, env, now) {
+            ok(raw?.version === 1 && raw.issue === 1505 && raw.status === 'prepared'
+              && raw.sourceCommit === p.sourceCommit && raw.sourceTree === p.sourceTree
+              && raw.applicationAtPreparation === p.appCommit
+              && raw.projectId === CONTRACT.project && raw.teamId === CONTRACT.team
+              && raw.workflowHead === env.GITHUB_SHA && raw.workflowRunId === env.GITHUB_RUN_ID
+              && raw.attempt === '1' && raw.helperBranch === p.helper.branch, 'scope_receipt_binding')
+            ok(raw.botId === CONTRACT.botId && raw.reusedFrom?.receiptSha256 === CONTRACT.originalReceipt
+              && raw.normalSessionVerified === true && raw.sharedTeamVerified === true && raw.botOwnedAndNamed === true
+              && raw.botCreationAttempted === false && raw.botStopAttempted === false
+              && raw.modelsDispatched === 0 && raw.virtualMachinesCreated === 0 && raw.profilesCreated === 0
+              && raw.cleanup?.botIdleVerified === true && raw.cleanup.workspaceRestored === true
+              && raw.cleanup.signedOut === true && Array.isArray(raw.cleanup.errors) && raw.cleanup.errors.length === 0
+              && HASH.test(raw.requesterHash ?? '') && HASH.test(raw.workspaceHash ?? ''), 'scope_account_cleanup_invalid')
+            const w = raw.window
+            ok(w?.key === CONTRACT.key && ID.test(w.id ?? '') && HASH.test(w.valueSha256 ?? '')
+              && w.durationMinutes === 120 && w.writeAttempted === true && w.creationAcknowledged === true
+              && w.readbackVerified === true && w.requiresSubsequentWebBuild === true && w.activeDeploymentRevoked === false
+              && timestamp(raw.startedAt) && timestamp(raw.finishedAt) && timestamp(w.expiresAt)
+              && Date.parse(w.expiresAt) - 120 * 60_000 >= Date.parse(raw.startedAt)
+              && Date.parse(w.expiresAt) - 120 * 60_000 <= Date.parse(raw.finishedAt)
+              && Date.parse(raw.finishedAt) <= now(), 'scope_window_invalid')
+            ok(rotation?.status === 'renewed' && rotation.operation === 'replace_owned_diagnostic_window'
+              && rotation.workflowHead === env.GITHUB_SHA && rotation.workflowRunId === env.GITHUB_RUN_ID
+              && rotation.attempt === '1' && rotation.helperBranch === p.helper.branch
+              && rotation.sourceCommit === p.sourceCommit && rotation.sourceTree === p.sourceTree
+              && rotation.removal?.projectEnvironmentRemoved === true && same(rotation.newWindow, w)
+              && rotation.activeDeploymentRevoked === false, 'scope_rotation_unconfirmed')
+            return { id: w.id, valueSha256: w.valueSha256, expiresAt: w.expiresAt,
+              botId: raw.botId, helperFinishedAt: raw.finishedAt, createdAtFromFixedTtl: new Date(Date.parse(w.expiresAt) - 120 * 60_000).toISOString() }
+          }
+
+          export function requireBudget(scope, coordination, now) {
+            ok(Date.parse(scope.expiresAt) - now() >= CONTRACT.minEntryMs, 'scope_entry_budget_short')
+            ok(Date.parse(coordination.reviewedAt) <= now() && Date.parse(coordination.expiresAt) > now(), 'coordination_window_expired')
+          }
+
+          async function pageList(io, path, field, { count = true, maxPages = 5 } = {}) {
+            const rows = []; let total
+            for (let page = 1; page <= maxPages; page++) {
+              const r = await io.api('github', path + (path.includes('?') ? '&' : '?') + 'per_page=100&page=' + page)
+              const a = count ? r?.[field] : r
+              ok(Array.isArray(a) && a.length <= 100, 'list_contract_invalid')
+              if (count) {
+                ok(Number.isSafeInteger(r.total_count) && r.total_count >= 0 && r.total_count <= maxPages * 100, 'list_truncated')
+                total ??= r.total_count
+                ok(total === r.total_count, 'list_changed')
+              }
+              rows.push(...a)
+              if (a.length < 100 || (count && rows.length === total)) {
+                ok(!count || rows.length === total, 'list_incomplete')
+                return rows
+              }
+            }
+            ok(false, 'list_truncated')
+          }
+
+          function validateRun(run, expectedSource, id, path, attempt, event) {
+            ok(run?.id === id && run.repository?.full_name === CONTRACT.repository
+              && run.head_repository?.full_name === CONTRACT.repository && run.head_sha === expectedSource
+              && run.head_branch === 'main' && run.path === path && run.run_attempt === attempt
+              && (!event || run.event === event), 'run_binding_invalid')
+          }
+          async function runJobs(io, id, attempt) {
+            const rows = await pageList(io, gh('/actions/runs/' + id + '/attempts/' + attempt + '/jobs'), 'jobs', { maxPages: 2 })
+            ok(new Set(rows.map(x => x.id)).size === rows.length, 'duplicate_jobs')
+            return rows
+          }
+          function requireNamedSteps(job, required, conclusion = 'success') {
+            ok(Array.isArray(job?.steps), 'steps_missing')
+            for (const name of required) {
+              const rows = job.steps.filter(s => s.name === name)
+              ok(rows.length === 1 && rows[0].status === 'completed' && rows[0].conclusion === conclusion, 'required_step_not_complete')
+            }
+          }
+          async function assertMain(io, p) {
+            const r = await io.api('github', gh('/git/ref/heads/main'))
+            ok(r?.ref === 'refs/heads/main' && r.object?.type === 'commit' && r.object.sha === p.sourceCommit, 'main_changed')
+          }
+          async function assertUpstream(io, p) {
+            const u = p.upstream
+            for (const [id, attempt, path] of [[u.webRunId, u.webAttempt, CONTRACT.webPath], [u.runtimeRunId, u.runtimeAttempt, CONTRACT.runtimePath]]) {
+              const r = await io.api('github', gh('/actions/runs/' + id))
+              const expectedSource = path === CONTRACT.runtimePath ? p.runtimeSourceCommit : p.sourceCommit
+              validateRun(r, expectedSource, id, path, attempt)
+              ok(['push', 'workflow_dispatch'].includes(r.event) && r.status === 'completed' && r.conclusion === 'success', 'upstream_not_success')
+              const jobs = await runJobs(io, id, attempt)
+              if (path === CONTRACT.runtimePath) {
+                ok(jobs.length === RUNTIME_JOBS.length && new Set(jobs.map(x => x.name)).size === RUNTIME_JOBS.length
+                  && RUNTIME_JOBS.every(n => jobs.some(j => j.name === n && j.status === 'completed' && j.conclusion === 'success')), 'runtime_jobs_not_closed')
+              } else {
+                ok(jobs.length === 1 && jobs[0].name === 'deploy' && jobs[0].status === 'completed' && jobs[0].conclusion === 'success', 'prior_web_not_closed')
+                requireNamedSteps(jobs[0], WEB_STEPS)
+              }
+            }
+            const artifact = await io.api('github', gh('/actions/artifacts/' + u.releaseArtifactId))
+            ok(artifact?.id === u.releaseArtifactId && artifact.expired === false
+              && artifact.workflow_run?.id === u.runtimeRunId && dig(artifact.digest) === u.releaseArtifactDigest, 'release_artifact_mismatch')
+          }
+          async function assertCoordination(io, p, now) {
+            ok(Date.parse(p.coordination.reviewedAt) <= now() && Date.parse(p.coordination.expiresAt) > now(), 'coordination_window_expired')
+            for (const c of p.coordination.comments) {
+              const v = await io.api('github', gh('/issues/comments/' + c.id))
+              ok(v?.id === c.id && v.issue_url === 'https://api.github.com/repos/' + CONTRACT.repository + '/issues/' + c.issue
+                && typeof v.body === 'string' && hash(v.body) === c.bodySha256
+                && timestamp(v.updated_at) && Date.parse(v.updated_at) <= Date.parse(p.coordination.reviewedAt), 'coordination_changed')
+            }
+          }
+          export async function assertWriters(io, ownRunId) {
+            // One bounded metadata snapshot, limited to these two production workflows.
+            // PR-only E2B test/check paths are not writers; unrelated CI is not a barrier.
+            const observed = new Set()
+            for (const path of [CONTRACT.webPath, CONTRACT.runtimePath]) {
+              const workflow = path.slice(path.lastIndexOf('/') + 1)
+              for (const event of ['push', 'workflow_dispatch']) for (const status of ACTIVE) {
+                const rows = await pageList(io, gh('/actions/workflows/' + workflow
+                  + '/runs?branch=main&event=' + event + '&status=' + status), 'workflow_runs', { maxPages: 2 })
+                for (const run of rows) {
+                  ok(integer(run.id) && run.repository?.full_name === CONTRACT.repository
+                    && run.path === path, 'writer_contract_invalid')
+                  if (run.id === ownRunId || run.status === 'completed') continue
+                  if (run.event === 'pull_request' && path === CONTRACT.runtimePath) continue
+                  if (run.head_branch !== 'main') continue
+                  ok(['push', 'workflow_dispatch'].includes(run.event), 'writer_event_unreviewed')
+                  ok(ACTIVE.includes(run.status), 'writer_status_unreviewed')
+                  observed.add(run.id)
+                }
+              }
+            }
+            ok(observed.size === 0, 'main_production_writer_present')
+          }
+          async function assertNoActiveDeployment(io) {
+            // Query each documented state separately; do not infer an empty project queue from the public alias.
+            for (const state of ['BUILDING', 'INITIALIZING', 'QUEUED', 'BLOCKED']) {
+              const r = await io.api('vercel', '/v7/deployments?projectId=' + CONTRACT.project + '&target=production&state=' + state + '&limit=1')
+              ok(Array.isArray(r?.deployments) && r.deployments.length === 0 && !r.pagination?.next, 'active_platform_deployment')
+            }
+          }
+          async function assertScopeLive(io, scope, raw, now) {
+            const listed = await io.api('vercel', '/v10/projects/' + CONTRACT.project + '/env')
+            ok(Array.isArray(listed?.envs) && !listed.pagination?.next, 'scope_list_incomplete')
+            const rows = listed.envs.filter(x => x.key === CONTRACT.key || x.id === scope.id)
+            ok(rows.length === 1 && rows[0].id === scope.id && rows[0].key === CONTRACT.key
+              && rows[0].type === 'encrypted' && same(rows[0].target, ['production'])
+              && !rows[0].gitBranch && !rows[0].customEnvironmentIds?.length, 'scope_live_conflict')
+            const v = await io.api('vercel', '/v1/projects/' + CONTRACT.project + '/env/' + encodeURIComponent(scope.id))
+            ok(typeof v?.value === 'string' && hash(v.value) === scope.valueSha256, 'scope_live_hash_changed')
+            let s; try { s = JSON.parse(v.value) } catch { ok(false, 'scope_live_schema') }
+            ok(s && same(Object.keys(s).sort(), ['version','requesterId','workspaceId','botId','repository','expiresAt'].sort())
+              && s.version === 1 && typeof s.requesterId === 'string' && s.requesterId.length > 0 && s.requesterId.length <= 128
+              && UUID.test(s.workspaceId ?? '') && hash(s.requesterId) === raw.requesterHash
+              && hash(s.workspaceId) === raw.workspaceHash && s.botId === CONTRACT.botId
+              && s.repository?.toLowerCase() === 'alexj11324/mikka-handoff' && s.expiresAt === scope.expiresAt
+              && Date.parse(s.expiresAt) > now(), 'scope_live_schema')
+            return { id: scope.id, valueSha256: scope.valueSha256, observedAt: iso(now) }
+          }
+          async function assertReady(io, p, deploymentId, expectedHost = null) {
+            const alias = await io.api('vercel', '/v4/aliases/' + CONTRACT.alias + '?projectId=' + CONTRACT.project)
+            ok(alias?.deploymentId === deploymentId, 'production_alias_changed')
+            const d = await io.api('vercel', '/v13/deployments/' + encodeURIComponent(deploymentId))
+            ok((d?.id ?? d?.uid) === deploymentId && d.readyState === 'READY' && d.target === 'production'
+              && (d.projectId ?? d.project?.id) === CONTRACT.project
+              && (d.gitSource?.sha ?? d.meta?.githubCommitSha) === p.appCommit
+              && d.meta?.mikkaUiOverlaySha === p.overlaySha && (!expectedHost || d.url === expectedHost), 'deployment_not_exact_ready')
+            const version = await io.api('public', '/mikka/api/version')
+            ok(version?.build === p.appCommit && version.overlaySha === p.overlaySha, 'public_version_changed')
+            const release = await io.readRelease()
+            ok(same(release, p.release), 'runtime_tuple_changed')
+            ok(/^[a-z0-9-]+\.vercel\.app$/.test(d.url ?? ''), 'deployment_url_invalid')
+            return { id: deploymentId, url: d.url, sourceCommit: p.appCommit, overlaySha: p.overlaySha,
+              target: d.target, readyState: d.readyState, readyAt: Number.isFinite(d.ready ?? d.readyAt) ? (d.ready ?? d.readyAt) : null }
+          }
+          export async function runOperator({ pins: p, env, rawBytes, rotationBytes, artifactId, artifactDigest, io, now = Date.now }) {
+            const result = { version: 1, issue: 1505, status: 'blocked', startedAt: iso(now), dispatchAttempted: false,
+              runtimeRefresh: false, modelsDispatched: 0, virtualMachinesCreated: 0, accountCalls: 0,
+              captureConfirmed: false, deploymentEnvironmentDirectlyRead: false, childWaitPerformed: false,
+              childSourceVerified: false, childReadyVerified: false,
+              formalEntryRecheckRequired: true, recovery: { preserveHelperRef: true, retainScope: true, retryDispatch: false } }
+            try {
+              validatePins(p, env)
+              result.sourceCommit = p.sourceCommit
+              result.runtimeSourceCommit = p.runtimeSourceCommit
+              result.release = p.release
+              result.execution = { head: env.GITHUB_SHA, branch: p.helper.branch, runId: env.GITHUB_RUN_ID, attempt: 1 }
+              const raw = JSON.parse(rawBytes), rotation = JSON.parse(rotationBytes)
+              const scope = validateScope(raw, rotation, p, env, now)
+              requireBudget(scope, p.coordination, now)
+              result.scope = scope
+              result.rawScopeSha256 = hash(rawBytes); result.rotationSha256 = hash(rotationBytes)
+              result.rawScopeBytes = rawBytes.length; result.rotationBytes = rotationBytes.length
+              ok(integer(artifactId) && HASH.test(artifactDigest ?? ''), 'scope_artifact_missing')
+              const artifact = await io.api('github', gh('/actions/artifacts/' + artifactId))
+              ok(artifact?.id === artifactId && artifact.expired === false
+                && artifact.workflow_run?.id === Number(env.GITHUB_RUN_ID)
+                && artifact.workflow_run?.head_sha === env.GITHUB_SHA
+                && dig(artifact.digest) === artifactDigest, 'scope_artifact_mismatch')
+              result.scopeArtifact = { id: artifactId, digest: artifactDigest }
+              await assertMain(io, p)
+              const commit = await io.api('github', gh('/git/commits/' + p.sourceCommit))
+              ok(commit?.sha === p.sourceCommit && commit.tree?.sha === p.sourceTree, 'source_tree_changed')
+              for (const path of [CONTRACT.webPath, CONTRACT.runtimePath]) {
+                const file = await io.api('github', gh('/contents/' + path + '?ref=' + p.sourceCommit))
+                ok(file?.type === 'file' && file.path === path && file.sha === p.sourceBlobs[path].blob, 'workflow_blob_changed')
+              }
+              await assertUpstream(io, p)
+              await assertCoordination(io, p, now)
+              await assertWriters(io, Number(env.GITHUB_RUN_ID))
+              await assertNoActiveDeployment(io)
+              result.before = await assertReady(io, p, p.previousDeploymentId)
+              result.scopeReadback = await assertScopeLive(io, scope, raw, now)
+              await assertMain(io, p)
+              requireBudget(scope, p.coordination, now)
+              const requestBody = { ref: 'main', inputs: { 'overlay-refresh': true }, return_run_details: true }
+              result.dispatch = { path: gh('/actions/workflows/web-deploy.yml/dispatches'), method: 'POST', body: requestBody,
+                requestedAt: iso(now), responseStatus: null, runId: null, acknowledged: false,
+                expectedHeadSha: p.sourceCommit, actualHeadSha: null }
+              // Durable exclusive intent precedes the only POST. No retry or child search.
+              await io.reserve({ source: p.sourceCommit, helperRunId: env.GITHUB_RUN_ID, requestBody })
+              result.dispatchAttempted = true
+              await io.save(result)
+              let response
+              try { response = await io.dispatch(result.dispatch.path, requestBody) }
+              catch { ok(false, 'dispatch_outcome_unknown') }
+              result.dispatch.responseStatus = response.status; result.dispatch.respondedAt = iso(now)
+              if (Buffer.isBuffer(response.rawBody)) {
+                result.dispatch.responseSha256 = hash(response.rawBody)
+                result.dispatch.responseBytes = response.rawBody.length
+              }
+              ok(response.status === 200, response.status === 204 ? 'dispatch_run_id_unavailable' : 'dispatch_not_confirmed')
+              ok(Buffer.isBuffer(response.rawBody) && response.rawBody.length > 0
+                && response.rawBody.length <= 64_000 && response.bodyComplete === true, 'dispatch_response_incomplete')
+              let data; try { data = JSON.parse(response.rawBody) } catch { ok(false, 'dispatch_response_invalid') }
+              ok(data && same(Object.keys(data).sort(), ['html_url', 'run_url', 'workflow_run_id'])
+                && integer(data.workflow_run_id)
+                && data.run_url === 'https://api.github.com/repos/' + CONTRACT.repository + '/actions/runs/' + data.workflow_run_id
+                && data.html_url === 'https://github.com/' + CONTRACT.repository + '/actions/runs/' + data.workflow_run_id
+                && ![p.upstream.webRunId, p.upstream.runtimeRunId, Number(env.GITHUB_RUN_ID)].includes(data.workflow_run_id), 'dispatch_response_binding')
+              result.dispatch.runId = data.workflow_run_id
+              result.dispatch.runUrl = data.run_url
+              result.dispatch.htmlUrl = data.html_url
+              result.dispatch.acknowledged = true
+              // Only the closed, public run-ID response is retained verbatim. Never a token or error body.
+              await io.saveResponse(response.rawBody)
+              result.status = 'refresh_dispatched_not_deployed'
+              result.recovery.preserveHelperRef = false
+              // Exit now. Root observes this exact child outside the helper/Smoke lock.
+            } catch (error) { result.error = { code: failureCode(error) } }
+            result.finishedAt = iso(now)
+            try { await io.save(result) } catch {
+              result.status = 'blocked'; result.error = { code: 'evidence_write_failed' }
+              result.recovery.preserveHelperRef = true
+            }
+            return result
+          }
+
+          async function boundedBody(response, limit) {
+            if (!response.body) return Buffer.alloc(0)
+            const reader = response.body.getReader(), chunks = []; let size = 0
+            try {
+              while (true) {
+                const { done, value } = await reader.read(); if (done) break
+                size += value.byteLength; ok(size <= limit, 'response_too_large'); chunks.push(value)
+              }
+            } catch (error) { await reader.cancel().catch(() => {}); throw error }
+            return Buffer.concat(chunks)
+          }
+          export function fetchTransport({ githubToken, vercelToken, fetchImpl = fetch }) {
+            ok(typeof githubToken === 'string' && githubToken.length > 0
+              && typeof vercelToken === 'string' && vercelToken.length > 0, 'existing_tokens_missing')
+            const request = async (kind, path, { method = 'GET', body } = {}) => {
+              ok(['github', 'vercel', 'public'].includes(kind), 'transport_kind_invalid')
+              const origin = kind === 'github' ? 'https://api.github.com' : kind === 'vercel' ? 'https://api.vercel.com' : 'https://' + CONTRACT.alias
+              const url = new URL(path, origin)
+              ok(url.origin === origin && !url.username && !url.password
+                && (kind !== 'github' || url.pathname.startsWith('/repos/' + CONTRACT.repository + '/'))
+                && (kind !== 'public' || path === '/mikka/api/version'), 'transport_path_invalid')
+              ok(method === 'GET' || (kind === 'github' && method === 'POST'
+                && path === gh('/actions/workflows/web-deploy.yml/dispatches')
+                && same(body, { ref: 'main', inputs: { 'overlay-refresh': true }, return_run_details: true })), 'transport_write_forbidden')
+              if (kind === 'vercel') url.searchParams.set('teamId', CONTRACT.team)
+              // Fixed comments belong to this public repository: no additional issues grant or loader.
+              const publicComment = kind === 'github' && method === 'GET'
+                && new RegExp('^/repos/' + CONTRACT.repository + '/issues/comments/[1-9][0-9]*$').test(path)
+              const headers = kind === 'public' ? { 'cache-control': 'no-store' }
+                : { accept: 'application/vnd.github+json',
+                    ...(!publicComment ? { authorization: 'Bearer ' + (kind === 'github' ? githubToken : vercelToken) } : {}) }
+              if (kind === 'github') headers['X-GitHub-Api-Version'] = '2022-11-28'
+              if (body) headers['content-type'] = 'application/json'
+              const response = await fetchImpl(url, { method, redirect: 'error', headers,
+                signal: AbortSignal.timeout(30_000), ...(body ? { body: JSON.stringify(body) } : {}) })
+              if (method === 'POST') {
+                try { return { status: response.status, rawBody: await boundedBody(response, 64_000), bodyComplete: true } }
+                catch { return { status: response.status, rawBody: null, bodyComplete: false } }
+              }
+              ok(response.status === 200, 'readonly_api_refused')
+              return JSON.parse(await boundedBody(response, 4 * 1024 * 1024))
+            }
+            return {
+              api: (kind, path) => request(kind, path),
+              dispatch: (path, body) => request('github', path, { method: 'POST', body }),
+            }
+          }
+
+          async function cli() {
+            const [mode, pinsPath, rawPath, rotationPath, output] = process.argv.slice(2)
+            ok(mode === 'dispatch', 'operator_mode_invalid')
+            const p = JSON.parse(await readFile(pinsPath, 'utf8'))
+            validatePins(p, process.env) // Before token validation, imports, fetch or output mutations.
+            const git = args => execFileSync('git', args, { encoding: 'utf8' }).trim()
+            ok(git(['rev-parse', 'HEAD']) === p.sourceCommit && git(['rev-parse', 'HEAD^{tree}']) === p.sourceTree, 'source_checkout_mismatch')
+            for (const [path, expected] of Object.entries(p.sourceBlobs)) {
+              ok(git(['rev-parse', p.sourceCommit + ':' + path]) === expected.blob
+                && hash(await readFile(resolve(path))) === expected.sha256, 'source_file_changed')
+            }
+            const helperPath = process.env.WINDOW_HELPER_PATH
+            ok(typeof helperPath === 'string' && hash(await readFile(helperPath)) === p.helper.sha256, 'helper_bytes_changed')
+            // Original helper already enforces its two-path parent/branch/GO guard; repeat parent identity here.
+            const opsRoot = resolve(dirname(helperPath), '../..')
+            ok(git(['-C', opsRoot, 'rev-list', '--parents', '-n', '1', 'HEAD']) === process.env.GITHUB_SHA + ' ' + p.helper.parent
+              && git(['-C', opsRoot, 'rev-parse', p.helper.parent + '^{tree}']) === p.helper.parentTree, 'helper_parent_changed')
+            const canonicalWorkerSource = await verifyCanonicalWorkerSource({ sourceCommit: p.sourceCommit, sourceTree: p.sourceTree,
+              expectedWorkerSha: p.release.workerSha, staticWorkerFingerprint: p.staticWorkerFingerprint })
+            const { readProductionWorkerRelease } = await import(pathToFileURL(resolve('scripts/acceptance/cloud-startup.mjs')).href)
+            const transport = fetchTransport({ githubToken: process.env.GH_TOKEN, vercelToken: process.env.VERCEL_TEAM_TOKEN })
+            await mkdir(dirname(output), { recursive: true })
+            const save = async record => {
+              await writeFile(output + '.tmp', JSON.stringify({ ...record, canonicalWorkerSource }, null, 2) + '\n', { mode: 0o600 })
+              await rename(output + '.tmp', output)
+            }
+            const sharedIo = { ...transport, save,
+              reserve: value => writeFile(output + '.dispatch-intent.json', JSON.stringify(value) + '\n', { flag: 'wx', mode: 0o600 }),
+              readRelease: () => readProductionWorkerRelease({ token: process.env.VERCEL_TEAM_TOKEN }),
+              saveResponse: value => writeFile(output + '.dispatch-response.json', value, { flag: 'wx', mode: 0o600 }) }
+            const result = await runOperator({ pins: p, env: process.env,
+              rawBytes: await readFile(rawPath), rotationBytes: await readFile(rotationPath),
+              artifactId: Number(process.env.SCOPE_ARTIFACT_ID), artifactDigest: dig(process.env.SCOPE_ARTIFACT_DIGEST),
+              io: sharedIo })
+            console.log(JSON.stringify({ status: result.status, error: result.error ?? null, runId: result.dispatch?.runId ?? null }))
+            if (result.status !== 'refresh_dispatched_not_deployed') process.exitCode = 1
+          }
+          if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+            cli().catch(error => { console.log(JSON.stringify({ status: 'blocked', error: { code: failureCode(error) } })); process.exitCode = 1 })
+          }
+          OPERATOR_MJS
+          printf '%s  %s\n' '9ea70758563204ea174a10cea83aed59a82e29bbb327923f6f80c5e17652ba69' "$RUNNER_TEMP/web-dispatch-operator.mjs" | sha256sum -c -
+      - name: Read the existing SMOKE email only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_EMAIL
+          recursive: false
+          include-imports: false
+      - name: Read the existing SMOKE password only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          secret-name: SMOKE_OWNER_PASSWORD
+          recursive: false
+          include-imports: false
+      - name: Read the existing project configuration token only
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: VERCEL_TEAM_TOKEN
+          recursive: false
+          include-imports: false
+      - name: Confirm exact prior absence, then verify the same idle Bot and prepare once
+        id: prepare
+        run: node ../ops/scripts/ops/issue1505-diagnostic-window.mjs renew "$RUNNER_TEMP/diagnostic-window.json" "$RUNNER_TEMP/diagnostic-window-rotation.json"
+      - name: Preserve the recovery record before any helper ref deletion
+        id: scope_evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue-1505-diagnostic-window
+          path: |
+            ${{ runner.temp }}/diagnostic-window.json
+            ${{ runner.temp }}/diagnostic-window-preflight.json
+            ${{ runner.temp }}/diagnostic-window-rotation.json
+            ${{ runner.temp }}/diagnostic-window-previous.json
+            ops/scripts/ops/issue1505-diagnostic-window-original-42366750743.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Dispatch one exact standard Web refresh and end without waiting for it
+        id: refresh_dispatch
+        if: success() && steps.prepare.outcome == 'success' && steps.scope_evidence.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OVERLAY_REFRESH_GO: 'root-reviewed-1505-web-dispatch-only-v1-bb5d1f9e'
+          WINDOW_HELPER_PATH: ${{ github.workspace }}/ops/scripts/ops/issue1505-diagnostic-window.mjs
+          SCOPE_ARTIFACT_ID: ${{ steps.scope_evidence.outputs.artifact-id }}
+          SCOPE_ARTIFACT_DIGEST: ${{ steps.scope_evidence.outputs.artifact-digest }}
+        run: |
+          node "$RUNNER_TEMP/web-dispatch-operator.mjs" dispatch \
+            "$RUNNER_TEMP/web-dispatch-pins.json" "$RUNNER_TEMP/diagnostic-window.json" \
+            "$RUNNER_TEMP/diagnostic-window-rotation.json" "$RUNNER_TEMP/web-dispatch.json"
+      - name: Preserve the dispatch intent and exact returned run response
+        id: refresh_evidence
+        if: always() && steps.refresh_materialize.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue-1505-window-web-dispatch-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/web-dispatch.json
+            ${{ runner.temp }}/web-dispatch.json.dispatch-intent.json
+            ${{ runner.temp }}/web-dispatch.json.dispatch-response.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Remove only this successfully completed immutable helper ref
+        id: ref_cleanup
+        if: success() && steps.prepare.outcome == 'success' && steps.scope_evidence.outcome == 'success' && steps.refresh_dispatch.outcome == 'success' && steps.refresh_evidence.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: python
+        run: |
+          import json, os, urllib.request, urllib.error
+          from pathlib import Path
+          repo, branch = 'alexj11324/Mikka', 'ops/1505-scope-web-bb5d1f9e-20261108'
+          assert os.environ['GITHUB_REPOSITORY'] == repo and os.environ['GITHUB_REF'] == 'refs/heads/' + branch
+          receipt = {'branch': branch, 'expectedSha': os.environ['GITHUB_SHA'], 'status': 'failed'}
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, req, fp, code, msg, hdrs, newurl): return None
+          opener = urllib.request.build_opener(NoRedirect)
+          def call(path, method='GET'):
+              request = urllib.request.Request('https://api.github.com/repos/' + repo + '/' + path, method=method,
+                  headers={'Authorization':'Bearer ' + os.environ['GH_TOKEN'], 'Accept':'application/vnd.github+json'})
+              try:
+                  with opener.open(request, timeout=20) as response:
+                      body = response.read(); return response.status, json.loads(body) if body else None
+              except urllib.error.HTTPError as error:
+                  return error.code, None
+          try:
+              status, ref = call('git/ref/heads/' + branch)
+              assert status == 200 and ref['object']['sha'] == os.environ['GITHUB_SHA'], 'helper_ref_changed'
+              status, _ = call('git/refs/heads/' + branch, 'DELETE'); receipt['deleteStatus'] = status
+              assert status == 204, 'helper_delete_unconfirmed'
+              status, _ = call('git/ref/heads/' + branch); receipt['readbackStatus'] = status
+              assert status == 404, 'helper_absence_unconfirmed'
+              receipt['status'] = 'deleted_and_absent'
+          finally:
+              Path(os.environ['RUNNER_TEMP'], 'diagnostic-window-ref.json').write_text(json.dumps(receipt, indent=2) + '\n')
+      - name: Preserve exact ref cleanup evidence
+        if: always() && steps.ref_cleanup.outcome != 'skipped'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: issue-1505-diagnostic-window-ref
+          path: ${{ runner.temp }}/diagnostic-window-ref.json
+          if-no-files-found: error
+          retention-days: 14

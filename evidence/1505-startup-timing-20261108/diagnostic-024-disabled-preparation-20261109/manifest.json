@@ -1,0 +1,134 @@
+{
+  "schema": "issue1505-diagnostic-offline-review.v1",
+  "createdAt": "2026-11-09T05:53:43.652384+00:00",
+  "status": "FROZEN_DISABLED_A024_REBIND_REQUIRED",
+  "source": "02401458a7fe26e00ce4caa653084c7f9680696d",
+  "sourceTree": "0013159d8dd0e1155b84d81907f19f4e1283cff7",
+  "finalEnabledSoleParent": "5958dea38437de20512bbbdf60b940ccc83f00ff",
+  "parentTree": "af895d6418b1b1d960b2884aec91a2078bb37d96",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 4716,
+      "sha256": "7117ed2b1eb5e6c376c2bec8ad66fd56b823c3c68dee524efdd3ffbb4feb756c"
+    },
+    {
+      "path": "actual-source-contracts.json",
+      "bytes": 1842,
+      "sha256": "8bd0a36d31867605b8a6e10c739aa4846ace5b896760996b0c8a36365a71cb4c"
+    },
+    {
+      "path": "baseline/helper.f997.mjs",
+      "bytes": 27870,
+      "sha256": "8b19d8f763a49a3813d104d3adb57b34f718db515da008df1f915c364b546f4c"
+    },
+    {
+      "path": "baseline/workflow.f997.yml.snapshot",
+      "bytes": 48948,
+      "sha256": "5677069be25e9ff59f50149fee5bea453ccb34d1eafa8968c1336b8e36f8f15a"
+    },
+    {
+      "path": "bash-block-47.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "bash-block-58.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "bash-block-673.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "candidate.diff",
+      "bytes": 9795,
+      "sha256": "644b49871020452d00e7f286ca4d31e459c7ec092ea3a05ced1c06c0e515341e"
+    },
+    {
+      "path": "checks.json",
+      "bytes": 1401,
+      "sha256": "a5b0c04d1fec16da9f5b340138f7c8f06f7e9a444a1723ea31ee930b7d65f893"
+    },
+    {
+      "path": "configuration.review.json",
+      "bytes": 462,
+      "sha256": "9aa8b0809ea662eab3f316e5faa20873e7d8922241db04e241302a797b7c6e45"
+    },
+    {
+      "path": "dispatch-pins.disabled.json",
+      "bytes": 2228,
+      "sha256": "1c4d50a5b5065a0dfaff5ddec1bdfb7fefa16822e038298df315d95cc37c9df7"
+    },
+    {
+      "path": "formal-renderer/base.yml.snapshot",
+      "bytes": 75974,
+      "sha256": "2fc8d8a480a35f0f97011dc4149d3e368bcb45901e604aeb354a1d5d9e2e1d89"
+    },
+    {
+      "path": "formal-renderer/fields.json",
+      "bytes": 9097,
+      "sha256": "342d6d7d2b54ffffe62b40dcbbd70bac1b056443eb5d8bd868888ce8bf9ff1aa"
+    },
+    {
+      "path": "formal-renderer/pins.A024-partial.review.json",
+      "bytes": 921,
+      "sha256": "9854aa2f1b4c3701515f38db402438a7f0a018b3762d06cf725fbd895ccb6f70"
+    },
+    {
+      "path": "formal-renderer/pins.unfilled.json",
+      "bytes": 776,
+      "sha256": "694b7488760d8fa971d1dce4cb60203297c9c3a8bdaf8d42c0f331c89f7ff053"
+    },
+    {
+      "path": "formal-renderer/render.py",
+      "bytes": 12368,
+      "sha256": "bf3afe1e40c5218a9f28cc5980595ba8c04e66e6a0e33f2a73c2780a20dd38c4"
+    },
+    {
+      "path": "formal-renderer/workflow.template.yml.in",
+      "bytes": 76125,
+      "sha256": "2059caf7dfd907685b3cb201a715f56cbf0ef9f3266636e3571e6504b3ff9209"
+    },
+    {
+      "path": "helper-syntax.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "issue1505-diagnostic-window.mjs.review",
+      "bytes": 27870,
+      "sha256": "e24ccbdc72063e44841d7356639edab2bf6c0341bc03a0c669e09cab218d343a"
+    },
+    {
+      "path": "issue1505-diagnostic-window.yml.review",
+      "bytes": 48119,
+      "sha256": "ca9300e5bddbd0f214a1e6d1f2769959202e798eb2b455eee3f04dd60cf26ff4"
+    },
+    {
+      "path": "operator-syntax.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "plan.json",
+      "bytes": 5120,
+      "sha256": "fb39000e4b20615d96af5caede30a5e9e899801ef0a1ff126b1c1c8fefd297e4"
+    },
+    {
+      "path": "source-index.json",
+      "bytes": 1887,
+      "sha256": "fa6c84f3eea36c5846ff030e8a46557e7713d2f76a2430b17741e4af5d17b787"
+    }
+  ],
+  "fileCount": 23,
+  "totalBytes": 355519,
+  "checksPassed": 11,
+  "checksFailed": 0,
+  "futureNullDispatchPins": 18,
+  "sourceProvenance": "source-index.json",
+  "currentCIStateSource": "root session messages only; no new CI/API reads in this finalization",
+  "activationAllowed": false
+}

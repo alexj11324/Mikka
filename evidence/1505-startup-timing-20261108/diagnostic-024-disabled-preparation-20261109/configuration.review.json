@@ -1,0 +1,10 @@
+{
+  "source": "02401458a7fe26e00ce4caa653084c7f9680696d",
+  "tree": "0013159d8dd0e1155b84d81907f19f4e1283cff7",
+  "branch": "ops/1505-scope-web-02401458-20261109",
+  "go": "root-reviewed-1505-scope-web-02401458-20261109",
+  "parent": "5958dea38437de20512bbbdf60b940ccc83f00ff",
+  "parentTree": "af895d6418b1b1d960b2884aec91a2078bb37d96",
+  "formalBranch": "ops/1505-formal-02401458-20261109",
+  "operatorGo": "root-reviewed-1505-web-dispatch-only-v1-02401458"
+}

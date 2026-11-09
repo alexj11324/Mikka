@@ -1,0 +1,56 @@
+{
+  "source": {
+    "commit": "02401458a7fe26e00ce4caa653084c7f9680696d",
+    "tree": "0013159d8dd0e1155b84d81907f19f4e1283cff7",
+    "parents": [
+      "93e9d5e260cf899b9a40a188cfa34f069903489d",
+      "b7be7cc15f6b59dd11ae1c286640553432376fe6"
+    ]
+  },
+  "baseline": {
+    "commit": "f997dbe4f97829cd54f96705ec4e56d624f61c52",
+    "helper": {
+      "path": "scripts/ops/issue1505-diagnostic-window.mjs",
+      "blob": "3e1f366d6752822c8b68d78df0481df227043f3c"
+    },
+    "workflow": {
+      "path": ".github/workflows/issue1505-diagnostic-window.yml",
+      "blob": "a5a2fb43397ac49755776e4443b3e3f177d4e5b8"
+    }
+  },
+  "finalHelperSoleParent": {
+    "commit": "5958dea38437de20512bbbdf60b940ccc83f00ff",
+    "tree": "af895d6418b1b1d960b2884aec91a2078bb37d96"
+  },
+  "renderer": {
+    "commit": "d4a8bfadf08433fc9dec07a023b2b5305b513c00",
+    "tree": "feae7c44c5e502037dadc93dee485cb5734a9f72",
+    "files": [
+      {
+        "path": "evidence/1505-startup-timing-20261108/formal-renderer/base.yml.snapshot",
+        "blob": "3c65028b80cee0b983bce68c47843b77e8435481",
+        "mode": "100644"
+      },
+      {
+        "path": "evidence/1505-startup-timing-20261108/formal-renderer/fields.json",
+        "blob": "02f447c886b547757aacf2b8ba3a0e90bd7bc69f",
+        "mode": "100644"
+      },
+      {
+        "path": "evidence/1505-startup-timing-20261108/formal-renderer/pins.unfilled.json",
+        "blob": "839747af3be6ba0d1f179499c4b4e529772d3b41",
+        "mode": "100644"
+      },
+      {
+        "path": "evidence/1505-startup-timing-20261108/formal-renderer/render.py",
+        "blob": "2db0c65c49306fcfc20ff57f3fb9d45173ed6cfe",
+        "mode": "100644"
+      },
+      {
+        "path": "evidence/1505-startup-timing-20261108/formal-renderer/workflow.template.yml.in",
+        "blob": "7b362afec496c51a3f8d2d5bfe8ab86ba437762c",
+        "mode": "100644"
+      }
+    ]
+  }
+}

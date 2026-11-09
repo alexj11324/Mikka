@@ -1,0 +1,193 @@
+--- f997/scripts/ops/issue1505-diagnostic-window.mjs
++++ A024-review/scripts/ops/issue1505-diagnostic-window.mjs
+@@ -5,16 +5,16 @@
+ import { pathToFileURL, fileURLToPath } from 'node:url'
+ import { execFileSync } from 'node:child_process'
+ 
+-export const SOURCE = 'bb5d1f9e224aea395b9c45823960e8ad10f1a099'
+-export const TREE = 'f70f40367331b6408c5b68b6f7be6483cc7cbc0d'
+-export const BRANCH = 'ops/1505-scope-web-bb5d1f9e-20261108'
++export const SOURCE = '02401458a7fe26e00ce4caa653084c7f9680696d'
++export const TREE = '0013159d8dd0e1155b84d81907f19f4e1283cff7'
++export const BRANCH = 'ops/1505-scope-web-02401458-20261109'
+ export const HELPER_PARENT = '5958dea38437de20512bbbdf60b940ccc83f00ff'
+ export const HELPER_PARENT_TREE = 'af895d6418b1b1d960b2884aec91a2078bb37d96'
+ export const PROJECT = 'prj_VdNz3P0FmuRbZKeI40hbCqwR0NVH'
+ export const TEAM = 'team_C7lwxVVvnUicFli6112mvxpv'
+ export const KEY = 'MIKKA_CLOUD_DIAGNOSTIC_WINDOW'
+ export const ORIGIN = 'https://app.aspectlylabs.com'
+-export const GO = 'root-reviewed-1505-scope-web-bb5d1f9e-20261108'
++export const GO = 'root-reviewed-1505-scope-web-02401458-20261109'
+ export const ORIGINAL = Object.freeze({
+   receiptSha256: '12f6f3758c382dd55c9055b3ab32f9d785c620594c66ad4d49a2030b3ccda8d5',
+   helperCommit: '5cd039213a531476cde35500a2498bd3a5089556', helperTree: 'a841f19b0bab028bc386d6c768cce35496ca306b',
+--- f997/.github/workflows/issue1505-diagnostic-window.yml
++++ A024-review/.github/workflows/issue1505-diagnostic-window.yml
+@@ -1,4 +1,4 @@
+-# ROOT-REVIEWED ONE-SHOT COMPOSITION: actual source and release facts are pinned below.
++# OFFLINE DISABLED CANDIDATE: no reviewed runtime/DPL/coordination tuple; do not publish.
+ # Confirm the previously cleaned exact window is absent, then create one new 120-minute scope.
+ # Reuse only the same independently verified idle Bot. No task/Profile/model/VM creation.
+ # Normal child of 5958dea; the actual prepared receipt remains immutable and hash-bound.
+@@ -7,7 +7,7 @@
+ name: Issue 1505 renew exact owned diagnostic window
+ on:
+   push:
+-    branches: [ops/1505-scope-web-bb5d1f9e-20261108]
++    branches: [ops/1505-scope-web-02401458-20261109]
+ permissions:
+   contents: write
+   id-token: write
+@@ -18,14 +18,14 @@
+   queue: max
+ jobs:
+   prepare:
+-    if: github.repository == 'alexj11324/Mikka'
++    if: false # OFFLINE_UNFILLED_DRAFT_DO_NOT_PUBLISH
+     runs-on: ubuntu-latest
+     timeout-minutes: 10
+     defaults:
+       run:
+         working-directory: source
+     env:
+-      DIAGNOSTIC_WINDOW_GO: 'root-reviewed-1505-scope-web-bb5d1f9e-20261108'
++      DIAGNOSTIC_WINDOW_GO: ''
+     steps:
+       - name: Check out the exact temporary helper
+         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+@@ -37,7 +37,7 @@
+       - name: Check out the reviewed application source without credentials
+         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+         with:
+-          ref: bb5d1f9e224aea395b9c45823960e8ad10f1a099
++          ref: 02401458a7fe26e00ce4caa653084c7f9680696d
+           path: source
+           persist-credentials: false
+       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+@@ -45,11 +45,11 @@
+           node-version: 24
+       - name: Verify immutable source and explicit root review before credentials
+         run: |
+-          test "$DIAGNOSTIC_WINDOW_GO" = 'root-reviewed-1505-scope-web-bb5d1f9e-20261108'
++          test "$DIAGNOSTIC_WINDOW_GO" = 'root-reviewed-1505-scope-web-02401458-20261109'
+           test "$GITHUB_RUN_ATTEMPT" = '1'
+-          test "$(git rev-parse HEAD)" = 'bb5d1f9e224aea395b9c45823960e8ad10f1a099'
+-          test "$(git rev-parse HEAD^{tree})" = 'f70f40367331b6408c5b68b6f7be6483cc7cbc0d'
+-          printf '%s  %s\n' '8b19d8f763a49a3813d104d3adb57b34f718db515da008df1f915c364b546f4c' '../ops/scripts/ops/issue1505-diagnostic-window.mjs' | sha256sum -c -
++          test "$(git rev-parse HEAD)" = '02401458a7fe26e00ce4caa653084c7f9680696d'
++          test "$(git rev-parse HEAD^{tree})" = '0013159d8dd0e1155b84d81907f19f4e1283cff7'
++          printf '%s  %s\n' 'e24ccbdc72063e44841d7356639edab2bf6c0341bc03a0c669e09cab218d343a' '../ops/scripts/ops/issue1505-diagnostic-window.mjs' | sha256sum -c -
+           node ../ops/scripts/ops/issue1505-diagnostic-window.mjs verify "$RUNNER_TEMP/diagnostic-window-preflight.json"
+       - name: Materialize the disabled reviewed dispatch-only operator
+         id: refresh_materialize
+@@ -59,54 +59,48 @@
+           cat > "$RUNNER_TEMP/web-dispatch-pins.json" <<'PINS_JSON'
+           {
+             "version": 1,
+-            "enabled": true,
+-            "go": "root-reviewed-1505-web-dispatch-only-v1-bb5d1f9e",
+-            "sourceCommit": "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
+-            "sourceTree": "f70f40367331b6408c5b68b6f7be6483cc7cbc0d",
+-            "appCommit": "bb5d1f9e224aea395b9c45823960e8ad10f1a099",
++            "enabled": false,
++            "go": "",
++            "sourceCommit": "02401458a7fe26e00ce4caa653084c7f9680696d",
++            "sourceTree": "0013159d8dd0e1155b84d81907f19f4e1283cff7",
++            "appCommit": "02401458a7fe26e00ce4caa653084c7f9680696d",
+             "ref": "main",
+-            "overlaySha": "c34b3adf07240afebae725b2af599cfbc69c4f42",
+-            "previousDeploymentId": "dpl_8AfXc4eUfDpgahyjM9bQ28ftKvJD",
++            "overlaySha": null,
++            "previousDeploymentId": null,
+             "helper": {
+-              "branch": "ops/1505-scope-web-bb5d1f9e-20261108",
++              "branch": "ops/1505-scope-web-02401458-20261109",
+               "parent": "5958dea38437de20512bbbdf60b940ccc83f00ff",
+               "parentTree": "af895d6418b1b1d960b2884aec91a2078bb37d96",
+-              "sha256": "8b19d8f763a49a3813d104d3adb57b34f718db515da008df1f915c364b546f4c",
+-              "go": "root-reviewed-1505-scope-web-bb5d1f9e-20261108"
++              "sha256": "e24ccbdc72063e44841d7356639edab2bf6c0341bc03a0c669e09cab218d343a",
++              "go": ""
+             },
+             "upstream": {
+-              "webRunId": 42525776665,
+-              "webAttempt": 1,
+-              "runtimeRunId": 42516906256,
+-              "runtimeAttempt": 1,
+-              "releaseArtifactId": 13633033159,
+-              "releaseArtifactDigest": "95ef5d67a22e92cfbcc143176f9cbab79e2dd7ca09ea3d283a8a95ef62dba5ce"
++              "webRunId": null,
++              "webAttempt": null,
++              "runtimeRunId": null,
++              "runtimeAttempt": null,
++              "releaseArtifactId": null,
++              "releaseArtifactDigest": null
+             },
+             "release": {
+-              "workerSha": "a45382985c12c93fb0832eabd8010f60c9b7dabb",
+-              "sourceCommit": "facb389f6cc06c453e9135bb60ada1b0f302e0d9",
++              "workerSha": null,
++              "sourceCommit": null,
+               "templates": {
+-                "desktop": "254vai4zmh475r5hppcj",
+-                "claude": "0zd73b9wo0mv4pkk80mm",
+-                "codex": "zlsft5zfm3rbeginw6d8"
++                "desktop": null,
++                "claude": null,
++                "codex": null
+               }
+             },
+             "coordination": {
+-              "exclusiveWindowReviewed": true,
+-              "privateOverlayReviewed": "c34b3adf07240afebae725b2af599cfbc69c4f42",
+-              "reviewedAt": "2026-11-08T22:01:18.477Z",
+-              "expiresAt": "2026-11-08T22:40:00.000Z",
++              "exclusiveWindowReviewed": false,
++              "privateOverlayReviewed": null,
++              "reviewedAt": null,
++              "expiresAt": null,
+               "issues": [
+                 1505
+               ],
+-              "comments": [
+-                {
+-                  "issue": 1505,
+-                  "id": 6727713699,
+-                  "bodySha256": "b4a5bbc6f4b341196c6498536813eb65291cc2048fc0873044571507d1d19951"
+-                }
+-              ],
+-              "otherOpsWritersReviewed": true
++              "comments": [],
++              "otherOpsWritersReviewed": false
+             },
+             "sourceBlobs": {
+               ".github/workflows/web-deploy.yml": {
+@@ -130,8 +124,8 @@
+                 "sha256": "2c15611a5304d3b5c4cf6b12e7969426dbc14c65404e1de197eab3aebd26819a"
+               }
+             },
+-            "runtimeSourceCommit": "facb389f6cc06c453e9135bb60ada1b0f302e0d9",
+-            "staticWorkerFingerprint": "a45382985c12c93fb0832eabd8010f60c9b7dabb"
++            "runtimeSourceCommit": null,
++            "staticWorkerFingerprint": null
+           }
+           PINS_JSON
+           cat > "$RUNNER_TEMP/web-dispatch-operator.mjs" <<'OPERATOR_MJS'
+@@ -672,7 +666,7 @@
+         if: success() && steps.prepare.outcome == 'success' && steps.scope_evidence.outcome == 'success'
+         env:
+           GH_TOKEN: ${{ github.token }}
+-          OVERLAY_REFRESH_GO: 'root-reviewed-1505-web-dispatch-only-v1-bb5d1f9e'
++          OVERLAY_REFRESH_GO: ''
+           WINDOW_HELPER_PATH: ${{ github.workspace }}/ops/scripts/ops/issue1505-diagnostic-window.mjs
+           SCOPE_ARTIFACT_ID: ${{ steps.scope_evidence.outputs.artifact-id }}
+           SCOPE_ARTIFACT_DIGEST: ${{ steps.scope_evidence.outputs.artifact-digest }}
+@@ -701,7 +695,7 @@
+         run: |
+           import json, os, urllib.request, urllib.error
+           from pathlib import Path
+-          repo, branch = 'alexj11324/Mikka', 'ops/1505-scope-web-bb5d1f9e-20261108'
++          repo, branch = 'alexj11324/Mikka', 'ops/1505-scope-web-02401458-20261109'
+           assert os.environ['GITHUB_REPOSITORY'] == repo and os.environ['GITHUB_REF'] == 'refs/heads/' + branch
+           receipt = {'branch': branch, 'expectedSha': os.environ['GITHUB_SHA'], 'status': 'failed'}
+           class NoRedirect(urllib.request.HTTPRedirectHandler):
