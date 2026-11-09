@@ -159,11 +159,12 @@ export interface ComputerStatus { machine: 'sleeping' | 'waking' | 'running' | '
 
 export interface Threads { threads: Thread[]; devices: { id: string; name: string; kind: MachineKind; online: boolean }[]; live?: LiveScope & { presence?: PresenceProof | null } }
 
+/** Optional result fields are absent on older servers or when timing is unknown. */
+export type ThreadStep = { id: string; name: string; detail: string | null; failed: boolean; output?: string; ms?: number }
+
 export type ThreadItem =
   | { kind: 'agent'; id: string; text: string; at: number }
-  | { kind: 'steps'; id: string; count: number; at: number
-    /** Each tool call (lib/issue-run-conversation.ts ThreadStep); absent from an older server. */
-    steps?: import('../features/tasks/model/thread-steps').ThreadStep[] }
+  | { kind: 'steps'; id: string; count: number; steps?: ThreadStep[]; at: number }
   | { kind: 'error'; id: string; text: string; at: number }
   | { kind: 'person'; id: string; text: string; mine: boolean; at: number }
 
