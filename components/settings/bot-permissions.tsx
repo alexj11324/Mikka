@@ -6,7 +6,8 @@ import { useTranslations } from 'next-intl'
 import { BotPermissionsPage } from '@ui-slot/settings-bot-permissions'
 import { listBots } from '@/app/actions/bots'
 import { listAgents } from '@/app/actions/agents'
-import { AppTile, useAppInfo, useConnectedApps, appState } from '@/components/plugins/connected-apps'
+import { AppTile, OWN_APPS, useAppInfo, useConnectedApps, appState } from '@/components/plugins/connected-apps'
+import { OWN_APP_STATES_KEY, fetchOwnAppStates } from '@/components/plugins/plugins-view'
 import { withBasePath } from '@/lib/base-path'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
@@ -53,6 +54,8 @@ export function useBotPermissions({ admin = false }: { admin?: boolean } = {}): 
   const tError = useTranslations('Settings.botPermissions.errors')
   const info = useAppInfo()
   const apps = useConnectedApps()
+  // Mikka's own apps (GitHub, Linear, Telegram) are connected apps too; their writes are judged call by call.
+  const own = useSWR(OWN_APP_STATES_KEY, () => fetchOwnAppStates())
   const { data: bots } = useSWR('bots', listBots)
   const { data: agents } = useSWR('agents', () => listAgents())
   const [chosen, setChosen] = useState<string | null | undefined>(undefined)
@@ -80,7 +83,8 @@ export function useBotPermissions({ admin = false }: { admin?: boolean } = {}): 
   }
   const connected = apps.connectedToolkits().filter(id => appState(apps.accountsFor(id)).on)
   const withSettings = Object.entries(WRITES).filter(([, actions]) => actions.some(action => stored[action])).map(([id]) => id)
-  const appList: BotPermissionApp[] | null = apps.loading || !bots || write.isLoading ? null : [...new Set([...connected, ...withSettings])].map(id => {
+  const ownConnected = OWN_APPS.filter(id => own.data?.states[id] === 'connected')
+  const appList: BotPermissionApp[] | null = apps.loading || (!own.data && !own.error) || !bots || write.isLoading ? null : [...new Set([...ownConnected, ...connected, ...withSettings])].map(id => {
     const account = apps.accountsFor(id).find(item => item.enabled)
     return { id, name: info(id).name, account: account?.alias ?? account?.email ?? null, iconUrl: info(id).iconUrl, actions: (WRITES[id] ?? []).map(writeAction) }
   })
