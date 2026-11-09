@@ -140,6 +140,14 @@ async function containsDesktopSource({ expectedBuild, publicCommit, token, fetch
     && comparison.merge_base_commit.sha === expectedBuild
 }
 
+/** Keep the runtime's queued Web wait separate from Desktop and direct callers. */
+export function webDeploymentWaitOptions(command) {
+  return {
+    allowDescendant: command === 'await-desktop-web',
+    maxWaitMs: (command === 'await-web' ? 90 : 40) * 60_000,
+  }
+}
+
 /** This read-only wait runs OUTSIDE web-deploy-production: GitHub can still be
  * building while Vercel only knows the previous READY deployment. A successful
  * docs-only workflow is not a successful application build. */
@@ -298,7 +306,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     if (process.env.GITHUB_OUTPUT) writeFileSync(process.env.GITHUB_OUTPUT, `refresh=${refresh}\n`, { flag: 'a' })
   } else if (command === 'await-web' || command === 'await-desktop-web') {
     const result = await waitForWebDeployment({ expectedBuild: process.env.GITHUB_SHA,
-      allowDescendant: command === 'await-desktop-web',
+      ...webDeploymentWaitOptions(command),
       expectedOverlay: process.env.EXPECTED_UI_OVERLAY_SHA || (command === 'await-desktop-web' ? process.env.MIKKA_UI_OVERLAY_SHA : undefined), token: process.env.GITHUB_TOKEN })
     console.log(JSON.stringify({ event: 'matching_web_deployment_verified', ...result }))
   } else if (command === 'verify') {
